@@ -463,6 +463,13 @@ func startProtocolHandshake(conn *Connection, nodeInfo *Info) (*Info, error) {
 	return peerInfo, nil
 }
 
+type DiscMsgTooManyPeers struct {
+}
+
+func (d *DiscMsgTooManyPeers) Error() string {
+	return "too many peers"
+}
+
 func readProtocolHandshake(conn *Connection) (*Info, error) {
 	msg, err := conn.ReadMsg()
 	if err != nil {
@@ -477,6 +484,9 @@ func readProtocolHandshake(conn *Connection) (*Info, error) {
 		reason, err := decodeDiscMsg(msg.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("discMsg found but could not be decoded")
+		}
+		if reason == DiscTooManyPeers {
+			return nil, &DiscMsgTooManyPeers{}
 		}
 		return nil, fmt.Errorf("DiscMsg %s", reason.String())
 	}

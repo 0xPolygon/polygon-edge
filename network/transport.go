@@ -198,7 +198,7 @@ func (t *NetTransport) tcpListen(tcpLn *net.TCPListener) {
 				break
 			}
 
-			t.logger.Printf("[ERR] memberlist: Error accepting TCP connection: %v", err)
+			t.logger.Printf("[ERR] minimal: Error accepting TCP connection: %v", err)
 			continue
 		}
 
@@ -221,20 +221,20 @@ func (t *NetTransport) udpListen(udpLn *net.UDPConn) {
 				break
 			}
 
-			t.logger.Printf("[ERR] memberlist: Error reading UDP packet: %v", err)
+			t.logger.Printf("[ERR] minimal: Error reading UDP packet: %v", err)
 			continue
 		}
 
 		// Check the length - it needs to have at least one byte to be a
 		// proper message.
 		if n < 1 {
-			t.logger.Printf("[ERR] memberlist: UDP packet too short (%d bytes) %s",
+			t.logger.Printf("[ERR] minimal: UDP packet too short (%d bytes) %s",
 				len(buf), addr)
 			continue
 		}
 
 		// Ingest the packet.
-		metrics.IncrCounter([]string{"memberlist", "udp", "received"}, float32(n))
+		metrics.IncrCounter([]string{"minimal", "udp", "received"}, float32(n))
 		t.packetCh <- &discover.Packet{
 			Buf:       buf[:n],
 			From:      addr,

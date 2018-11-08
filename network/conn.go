@@ -10,6 +10,7 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -58,13 +59,18 @@ func (msg Message) Decode(val interface{}) error {
 	return nil
 }
 
+type handler struct {
+	callback func([]byte)
+	salt     uint64
+}
+
 type Session struct {
 	offset uint64
 	conn   Conn
 	msgs   chan Message
 
 	respLock sync.Mutex
-	handlers map[uint64]func([]byte)
+	handlers map[uint64]*handler
 	timer    *time.Timer
 }
 
@@ -74,7 +80,7 @@ func NewSession(offset uint64, conn Conn) *Session {
 		conn:     conn,
 		msgs:     make(chan Message, 10),
 		respLock: sync.Mutex{},
-		handlers: map[uint64]func([]byte){},
+		handlers: map[uint64]*handler{},
 	}
 }
 
@@ -86,7 +92,7 @@ func (s *Session) Consume(code uint64, payload []byte) bool {
 	}
 
 	// consume the handler
-	handler(payload)
+	handler.callback(payload)
 
 	s.respLock.Lock()
 	delete(s.handlers, code)
@@ -112,12 +118,25 @@ func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.D
 		}
 	}
 
+	rand.Seed(time.Now().UnixNano())
+	salt := rand.Uint64()
+
+	handler := &handler{
+		callback: callback,
+		salt:     salt,
+	}
+
 	s.respLock.Lock()
-	s.handlers[code] = callback
+	s.handlers[code] = handler
 	s.respLock.Unlock()
 
 	s.timer = time.AfterFunc(duration, func() {
-		if _, ok := s.handlers[code]; !ok {
+		h, ok := s.handlers[code]
+		if !ok {
+			return
+		}
+
+		if h.salt != salt {
 			return
 		}
 
@@ -154,32 +173,6 @@ type Connection struct {
 	LocalID  *ecdsa.PublicKey
 
 	Snappy bool
-}
-
-func NewConnection(conn net.Conn, s Secrets) (*Connection, error) {
-	macc, err := aes.NewCipher(s.MAC)
-	if err != nil {
-		return nil, err
-	}
-	encc, err := aes.NewCipher(s.AES)
-	if err != nil {
-		return nil, err
-	}
-
-	iv := make([]byte, encc.BlockSize())
-	c := &Connection{
-		conn:       conn,
-		enc:        cipher.NewCTR(encc, iv),
-		dec:        cipher.NewCTR(encc, iv),
-		macCipher:  macc,
-		egressMAC:  s.EgressMAC,
-		ingressMAC: s.IngressMAC,
-		rmu:        &sync.Mutex{},
-		wmu:        &sync.Mutex{},
-		RemoteID:   s.RemoteID,
-	}
-
-	return c, nil
 }
 
 func newConnection(conn net.Conn, s Secrets) (*Connection, error) {

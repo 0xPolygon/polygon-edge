@@ -139,8 +139,32 @@ type Instance struct {
 	offset   uint64
 }
 
+type Status int
+
+const (
+	PeerActive Status = iota
+	PeerPending
+	PeerDisconnected
+	PeerBusy
+)
+
+func (s Status) String() string {
+	switch s {
+	case PeerActive:
+		return "active"
+	case PeerPending:
+		return "pending"
+	case PeerDisconnected:
+		return "disconnected"
+	}
+	panic(fmt.Sprintf("Status %d not found", s))
+}
+
 // Peer is each of the connected peers
 type Peer struct {
+	Enode        string
+	ID           string
+	Status       Status
 	logger       *log.Logger
 	conn         Conn
 	Info         *Info
@@ -152,7 +176,11 @@ type Peer struct {
 }
 
 func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
+	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.conn.RemoteAddr().String())
+
 	peer := &Peer{
+		Enode:        enode,
+		ID:           info.ID.String(),
 		logger:       logger,
 		conn:         conn,
 		Info:         info,
@@ -160,6 +188,7 @@ func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
 		pongTimeout:  time.NewTimer(10 * time.Second),
 		closeCh:      make(chan struct{}),
 		pingInterval: defaultPingInterval,
+		protocols:    []*Instance{},
 	}
 
 	return peer
@@ -185,13 +214,24 @@ func (p *Peer) startPing() {
 	}
 }
 
-func (p *Peer) Close() {
-	// Close protocols
+func (p *Peer) GetProtocol(name string, version uint) protocol.Handler {
 	for _, i := range p.protocols {
-		if err := i.Runtime.Close(); err != nil {
-			p.logger.Printf("failed to close protocol %s: %v\n", i.protocol.Name, err)
+		if i.protocol.Name == name && i.protocol.Version == version {
+			return i.Runtime
 		}
 	}
+	return nil
+}
+
+func (p *Peer) Close() {
+	// Close protocols
+	/*
+		for _, i := range p.protocols {
+			if err := i.Runtime.Close(); err != nil {
+				p.logger.Printf("failed to close protocol %s: %v\n", i.protocol.Name, err)
+			}
+		}
+	*/
 
 	p.conn.Close()
 	close(p.closeCh)

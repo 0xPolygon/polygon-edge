@@ -31,7 +31,6 @@ func TestMatchProtocols(t *testing.T) {
 		{
 			[]protocol.Protocol{
 				protocol.ETH63,
-				protocol.ETH64,
 			},
 			[]*Cap{
 				toCap(protocol.ETH63),
@@ -80,6 +79,10 @@ func (d *dummyHandler) Close() error {
 func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 	s0, s1 := TestServers()
 
+	// desactivate discover
+	s0.routing.Close()
+	s1.routing.Close()
+
 	// sessions
 	var e0, e1 Conn
 
@@ -101,7 +104,7 @@ func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
 	return s0, e0, s1, e1
 }
 
@@ -179,18 +182,22 @@ func TestProtocolEncoding(t *testing.T) {
 
 	// s0 has s1 as a peer
 	if len(s0.peers) != 1 {
-		t.Fatal("bad")
+		t.Fatal("s0 should have at least one peer")
 	}
-	if s0.peers[0].Info.ID != s1.ID() {
-		t.Fatal("bad")
+	for _, v := range s0.peers {
+		if v.Info.ID != s1.ID() {
+			t.Fatal("s0 peer is bad")
+		}
 	}
 
 	// s1 has s0 as a peer
 	if len(s1.peers) != 1 {
-		t.Fatal("bad")
+		t.Fatal("s1 should have at least one peer")
 	}
-	if s1.peers[0].Info.ID != s0.ID() {
-		t.Fatal("bad")
+	for _, v := range s1.peers {
+		if v.Info.ID != s0.ID() {
+			t.Fatal("s1 peer is bad")
+		}
 	}
 
 	// send messages

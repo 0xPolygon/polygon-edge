@@ -3,8 +3,10 @@ package ethereum
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
 )
@@ -99,13 +101,18 @@ func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
 	return e.conn.WriteMsg(GetReceiptsMsg, hashes)
 }
 
+// Conn returns the connection referece
+func (e *Ethereum) Conn() network.Conn {
+	return e.conn
+}
+
 func (e *Ethereum) readStatus(localStatus *Status) (*Status, error) {
 	msg, err := e.conn.ReadMsg()
 	if err != nil {
 		return nil, err
 	}
 	if msg.Code != StatusMsg {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("Message code is not statusMsg but %d", msg.Code)
 	}
 
 	var status Status
@@ -113,14 +120,14 @@ func (e *Ethereum) readStatus(localStatus *Status) (*Status, error) {
 		return nil, err
 	}
 
-	if status.GenesisBlock != localStatus.GenesisBlock {
-		return nil, fmt.Errorf("")
-	}
 	if status.NetworkID != localStatus.NetworkID {
-		return nil, fmt.Errorf("")
+		return nil, &network.MismatchProtocolError{Msg: fmt.Errorf("Network id does not match. Found %d but expected %d", status.NetworkID, localStatus.NetworkID)}
+	}
+	if status.GenesisBlock != localStatus.GenesisBlock {
+		return nil, &network.MismatchProtocolError{Msg: fmt.Errorf("Genesis block does not match")}
 	}
 	if int(status.ProtocolVersion) != int(localStatus.ProtocolVersion) {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(status.ProtocolVersion), int(localStatus.ProtocolVersion))
 	}
 
 	return &status, nil
@@ -147,12 +154,18 @@ func (e *Ethereum) Init() error {
 	}()
 
 	go func() {
+		time.Sleep(1 * time.Second)
 		errr <- e.conn.WriteMsg(StatusMsg, status)
 	}()
 
 	for i := 0; i < 2; i++ {
-		if err := <-errr; err != nil {
-			return err
+		select {
+		case err := <-errr:
+			if err != nil {
+				return err
+			}
+		case <-time.After(5 * time.Second):
+			return fmt.Errorf("ethereum protocol handshake timeout")
 		}
 	}
 
@@ -160,7 +173,6 @@ func (e *Ethereum) Init() error {
 
 	// handshake was correct, start to listen for packets
 	go e.listen()
-
 	return nil
 }
 
@@ -180,12 +192,24 @@ func (e *Ethereum) listen() {
 
 // HandleMsg handles a message from ethereum
 func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
+	if code != TxMsg && code != 0x1 {
+		fmt.Printf("Code: %d\n", code)
+	}
+
 	switch {
 	case code == StatusMsg:
 		return fmt.Errorf("Status msg not expected after handshake")
 
 	case code == GetBlockHeadersMsg:
 		// TODO. send
+		var query getBlockHeadersData
+		if err := rlp.DecodeBytes(payload, &query); err != nil {
+			return err
+		}
+
+		fmt.Println(query)
+
+		return e.sendBlockHeaders([]*types.Header{})
 
 	case code == BlockHeadersMsg:
 		// TODO. deliver
@@ -222,4 +246,9 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 	}
 
 	return nil
+}
+
+// SendBlockHeaders sends a batch of block headers to the remote peer.
+func (e *Ethereum) sendBlockHeaders(headers []*types.Header) error {
+	return e.conn.WriteMsg(BlockHeadersMsg, headers)
 }

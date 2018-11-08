@@ -27,10 +27,10 @@ var ETH63 = Protocol{
 	Length:  17,
 }
 
-// ETH64 is the other
-var ETH64 = Protocol{
+// ETH62 is the other
+var ETH62 = Protocol{
 	Name:    ETH,
-	Version: 64,
+	Version: 62,
 	Length:  8,
 }
 

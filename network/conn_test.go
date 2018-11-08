@@ -207,3 +207,22 @@ func TestMultipleSessionHandlers(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionHandlerUpdate(t *testing.T) {
+	s := NewSession(0, nil)
+
+	ack0 := make(chan AckMessage, 1)
+	s.SetHandler(1, ack0, 500*time.Millisecond)
+
+	ack1 := make(chan AckMessage, 1)
+	s.SetHandler(1, ack1, 700*time.Millisecond)
+
+	select {
+	case <-ack1:
+		// good. seconds handler updates the first one
+	case <-ack0:
+		t.Fatal("it should have been updated")
+	case <-time.After(1 * time.Second):
+		t.Fatal("bad")
+	}
+}

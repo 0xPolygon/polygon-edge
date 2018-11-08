@@ -2,7 +2,6 @@ package discover
 
 import (
 	"crypto/elliptic"
-	"fmt"
 	"math/rand"
 	"net"
 	"reflect"
@@ -15,18 +14,18 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func pipe(config *Config) (*RoutingTable, *udpTransport, *RoutingTable, *udpTransport) {
+func pipe(config *Config) (*Discover, *udpTransport, *Discover, *udpTransport) {
 	prv0, _ := crypto.GenerateKey()
 	prv1, _ := crypto.GenerateKey()
 
 	c0 := newUDPTransport()
 	c1 := newUDPTransport()
 
-	r0, err := NewRoutingTable(prv0, c0, c0.udpAddr, config)
+	r0, err := NewDiscover(prv0, c0, c0.udpAddr, config)
 	if err != nil {
 		panic(err)
 	}
-	r1, err := NewRoutingTable(prv1, c1, c1.udpAddr, config)
+	r1, err := NewDiscover(prv1, c1, c1.udpAddr, config)
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +63,7 @@ func TestPeerExpired(t *testing.T) {
 			pub := &prv0.PublicKey
 			id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
-			p, err := newPeer(id, nil)
+			p, err := newPeer(id, nil, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -149,7 +148,7 @@ func TestPingPong(t *testing.T) {
 	}
 }
 
-func testProbeNode(t *testing.T, r0 *RoutingTable, c0 *udpTransport, r1 *RoutingTable, c1 *udpTransport) {
+func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c1 *udpTransport) {
 	// --- 0 probe starts ---
 
 	// 0. send ping packet
@@ -278,7 +277,7 @@ func TestFindNode(t *testing.T) {
 				id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
 				addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}
-				p, err := newPeer(id, addr)
+				p, err := newPeer(id, addr, 0)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -292,18 +291,13 @@ func TestFindNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			expected, err := r1.nearestPeers(r0.local.Bytes)
+			expected, err := r1.NearestPeersFromTarget(r0.local.Bytes)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			if len(expected) != len(nodes) {
 				t.Fatalf("length should be the same. Expected %d but found %d", len(expected), len(nodes))
-
-				fmt.Println("--- SSS ---")
-				fmt.Println(expected)
-				fmt.Println(nodes)
-				fmt.Println(r1.nearestPeers(r0.local.Bytes))
 			}
 			for indx := range expected {
 				if !reflect.DeepEqual(expected[indx].ID, nodes[indx].ID) {
