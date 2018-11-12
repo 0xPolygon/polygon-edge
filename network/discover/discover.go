@@ -264,7 +264,10 @@ func (d *Discover) SetBootnodes(bootnodes []string) {
 // Schedule starts the discovery protocol
 func (d *Discover) Schedule() {
 	go d.schedule()
+	go d.loadBootnodes()
+}
 
+func (d *Discover) loadBootnodes() {
 	// load bootnodes
 	errr := make(chan error, len(d.bootnodes))
 

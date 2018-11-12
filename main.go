@@ -11,20 +11,33 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/umbracle/minimal/consensus/ethash"
 
+	"github.com/ethereum/go-ethereum/core"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
-
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/storage"
+	"github.com/umbracle/minimal/syncer"
 )
 
 // mainnet nodes
 var peers = []string{}
 
+var mainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+
 func main() {
 	fmt.Println("## Minimal ##")
+
+	mainnetGenesis := core.DefaultGenesisBlock().ToBlock(nil).Header()
+	if mainnetGenesis.Hash() != mainnetGenesisHash {
+		panic("mainnet block not correct")
+	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
@@ -47,7 +60,7 @@ func main() {
 
 	// register protocols
 
-	// mainnet status
+	// mainnet status (TODO: take status from syncer)
 	status := func() (*ethereum.Status, error) {
 		s := &ethereum.Status{ // mainnet status
 			ProtocolVersion: 63,
@@ -65,6 +78,25 @@ func main() {
 
 	server.RegisterProtocol(protocol.ETH63, callback)
 
+	// blockchain storage
+	storage, err := storage.NewStorage("/tmp/minimal-test")
+	if err != nil {
+		panic(err)
+	}
+
+	// consensus
+	consensus := ethash.NewEthHash(storage)
+
+	// blockchain object
+	blockchain := blockchain.NewBlockchain(storage, consensus)
+	if err := blockchain.WriteGenesis(mainnetGenesis); err != nil {
+		panic(err)
+	}
+
+	// syncer
+	syncer := syncer.NewSyncer(1, blockchain)
+	go syncer.Run()
+
 	// connect to some peers
 
 	for _, i := range config.Bootnodes {
@@ -77,6 +109,7 @@ func main() {
 			case evnt := <-server.EventCh:
 				if evnt.Type == network.NodeJoin {
 					fmt.Printf("Node joined: %s\n", evnt.Peer.ID)
+					syncer.AddNode(evnt.Peer)
 				}
 			}
 		}
