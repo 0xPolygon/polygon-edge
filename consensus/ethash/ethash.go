@@ -5,10 +5,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/umbracle/minimal/consensus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/umbracle/minimal/storage"
 )
 
 var (
@@ -26,54 +27,37 @@ var (
 
 // EthHash consensus algorithm
 type EthHash struct {
-	db *storage.Storage
+	config *consensus.ChainConfig
 }
 
 // NewEthHash creates a new ethash consensus
-func NewEthHash(db *storage.Storage) *EthHash {
-	return &EthHash{db}
+func NewEthHash(config *consensus.ChainConfig) *EthHash {
+	return &EthHash{config}
 }
 
 // VerifyHeader verifies the header is correct
-func (e *EthHash) VerifyHeader(header *types.Header, seal bool) error {
-	parent, err := e.db.ReadHeader(header.ParentHash)
-	if err != nil {
-		return err
-	}
-
+func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("")
+		return fmt.Errorf("Extra data too long")
 	}
-	// Verify the header's timestamp
-	if header.Time.Cmp(big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())) > 0 {
-		return fmt.Errorf("")
-	}
-
 	if header.Time.Cmp(parent.Time) <= 0 {
-		return fmt.Errorf("")
+		return fmt.Errorf("timestamp lower or equal than parent")
 	}
-
-	/*
-		// TODO
-		// Verify the block's difficulty based in it's timestamp and parent's difficulty
-		expected := ethash.CalcDifficulty(chain, header.Time.Uint64(), parent)
-
-		if expected.Cmp(header.Difficulty) != 0 {
-			return fmt.Errorf("")
-		}
-	*/
-
+	// Verify the block's difficulty based in it's timestamp and parent's difficulty
+	expected := e.calcDifficulty(header.Time.Uint64(), parent)
+	if expected.Cmp(header.Difficulty) != 0 {
+		return fmt.Errorf("difficulty not correct: expected %d but found %d", expected.Uint64(), header.Difficulty.Uint64())
+	}
 	// Verify that the gas limit is <= 2^63-1
 	cap := uint64(0x7fffffffffffffff)
 	if header.GasLimit > cap {
-		return fmt.Errorf("")
+		return fmt.Errorf("gas limit not correct: have %v, want %v", header.GasLimit, cap)
 	}
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("")
+		return fmt.Errorf("gas used not correct: have %v, want %v", header.GasUsed, header.GasLimit)
 	}
-
 	// Verify that the gas limit remains within allowed bounds
 	diff := int64(parent.GasLimit) - int64(header.GasLimit)
 	if diff < 0 {
@@ -82,20 +66,19 @@ func (e *EthHash) VerifyHeader(header *types.Header, seal bool) error {
 	limit := parent.GasLimit / params.GasLimitBoundDivisor
 
 	if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
-		return fmt.Errorf("")
+		return fmt.Errorf("gas limit not correct")
 	}
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-		return fmt.Errorf("")
+		return fmt.Errorf("invalid sequence")
 	}
 
 	// Verify the engine specific seal securing the block
 	if seal {
 		if err := e.verifySeal(header); err != nil {
-			return fmt.Errorf("")
+			return err
 		}
 	}
-
 	return nil
 }
 
@@ -111,6 +94,20 @@ func (e *EthHash) Author(header *types.Header) (common.Address, error) {
 // Seal seals the block
 func (e *EthHash) Seal(block *types.Block) error {
 	return nil
+}
+
+func (e *EthHash) calcDifficulty(time uint64, parent *types.Header) *big.Int {
+	next := new(big.Int).Add(parent.Number, big1)
+	switch {
+	case e.config.ConstantinopleBlock.Active(next):
+		return calcDifficultyConstantinople(time, parent)
+	case e.config.ByzantiumBlock.Active(next):
+		return calcDifficultyByzantium(time, parent)
+	case e.config.HomesteadBlock.Active(next):
+		return calcDifficultyHomestead(time, parent)
+	default:
+		return calcDifficultyFrontier(time, parent)
+	}
 }
 
 // Close closes the connection

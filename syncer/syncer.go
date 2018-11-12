@@ -122,7 +122,6 @@ func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
 
 	hh := s.list.commitData()
 	if len(hh) != 0 {
-		fmt.Println("GOING IN")
 		if err := s.blockchain.WriteHeaders(hh); err != nil {
 			fmt.Printf("FAILED TO COMMIT: %v\n", err)
 		}

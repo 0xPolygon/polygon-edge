@@ -83,6 +83,10 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 		if headers[i].ParentHash != headers[i-1].Hash() {
 			return fmt.Errorf("parent hash not correct")
 		}
+		// TODO: check the first header
+		if err := b.consensus.VerifyHeader(headers[i-1], headers[i], true); err != nil {
+			return fmt.Errorf("failed to verify the header: %v", err)
+		}
 	}
 
 	// NOTE: Add headers in batches, check if the parent of the first header

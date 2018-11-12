@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/ethereum/go-ethereum/core"
@@ -34,10 +35,18 @@ var mainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a
 func main() {
 	fmt.Println("## Minimal ##")
 
+	// -- chain config
+
+	// -- genesis
+
 	mainnetGenesis := core.DefaultGenesisBlock().ToBlock(nil).Header()
 	if mainnetGenesis.Hash() != mainnetGenesisHash {
 		panic("mainnet block not correct")
 	}
+
+	// -- chain config (block forks)
+
+	chainConfig := consensus.NewChainConfig(1150000, 4370000, 0)
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
@@ -85,7 +94,7 @@ func main() {
 	}
 
 	// consensus
-	consensus := ethash.NewEthHash(storage)
+	consensus := ethash.NewEthHash(chainConfig)
 
 	// blockchain object
 	blockchain := blockchain.NewBlockchain(storage, consensus)
