@@ -202,6 +202,10 @@ func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
 	return peer
 }
 
+func (p *Peer) PrettyString() string {
+	return p.ID[:8]
+}
+
 // UpdateHeader updates the header of the peer
 func (p *Peer) UpdateHeader(h common.Hash, d *big.Int) {
 	p.headerLock.Lock()

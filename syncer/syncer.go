@@ -47,7 +47,7 @@ func NewSyncer(networkID uint64, blockchain Blockchain) *Syncer {
 	s := &Syncer{
 		NetworkID:  networkID,
 		peers:      map[string]*Peer{},
-		WorkerPool: make(chan chan Job),
+		WorkerPool: make(chan chan Job, 10),
 		blockchain: blockchain,
 		listLock:   &sync.Mutex{},
 	}
@@ -85,7 +85,6 @@ func (s *Syncer) Run() {
 			panic("its nil")
 		}
 
-		fmt.Printf("SYNC: %d\n", i.block)
 		idle <- i.ToJob()
 	}
 }
@@ -143,7 +142,6 @@ func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
 		if err := s.blockchain.WriteHeaders(hh); err != nil {
 			fmt.Printf("FAILED TO COMMIT: %v\n", err)
 		}
-		fmt.Println("DONE")
 	}
 	//}
 }

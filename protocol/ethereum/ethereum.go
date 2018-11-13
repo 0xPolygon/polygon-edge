@@ -36,6 +36,11 @@ const (
 	ReceiptsMsg    = 0x10
 )
 
+// Downloader ingest the data
+type Downloader interface {
+	Headers([]*types.Header)
+}
+
 // Blockchain is the interface the ethereum protocol needs to work
 type Blockchain interface {
 	GetHeaderByHash(hash common.Hash) *types.Header
@@ -49,6 +54,7 @@ type Ethereum struct {
 	getStatus  GetStatus
 	status     *Status
 	blockchain Blockchain
+	downloader Downloader
 }
 
 // GetStatus is the interface that gives the eth protocol the information it needs
@@ -62,6 +68,11 @@ func NewEthereumProtocol(conn network.Conn, peer *network.Peer, getStatus GetSta
 		getStatus:  getStatus,
 		blockchain: blockchain,
 	}
+}
+
+// SetDownloader changes the downloader that ingests the data
+func (e *Ethereum) SetDownloader(downloader Downloader) {
+	e.downloader = downloader
 }
 
 // Status is the object for the status message.
@@ -265,8 +276,14 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		return e.sendBlockHeaders(headers)
 
 	case code == BlockHeadersMsg:
-		// TODO. deliver
+		var headers []*types.Header
+		if err := rlp.DecodeBytes(payload, &headers); err != nil {
+			return err
+		}
 
+		if e.downloader != nil {
+			e.downloader.Headers(headers)
+		}
 	case code == GetBlockBodiesMsg:
 		// TODO. send
 
