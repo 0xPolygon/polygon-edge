@@ -7,11 +7,14 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol"
 )
 
-func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, s1 *network.Server, ss1 *Status) (*Ethereum, *Ethereum) {
+func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, b0 *blockchain.Blockchain, s1 *network.Server, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	st0 := func() (*Status, error) {
 		return ss0, nil
 	}
@@ -22,22 +25,20 @@ func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, s1 *network
 
 	var eth0 *Ethereum
 	c0 := func(s network.Conn, p *network.Peer) protocol.Handler {
-		eth0 = NewEthereumProtocol(s, p, st0)
+		eth0 = NewEthereumProtocol(s, p, st0, b0)
 		return eth0
 	}
 
 	var eth1 *Ethereum
 	c1 := func(s network.Conn, p *network.Peer) protocol.Handler {
-		eth1 = NewEthereumProtocol(s, p, st1)
+		eth1 = NewEthereumProtocol(s, p, st1, b1)
 		return eth1
 	}
 
 	s0.RegisterProtocol(protocol.ETH63, c0)
 	s1.RegisterProtocol(protocol.ETH63, c1)
 
-	if err := s0.Dial(s1.Enode); err != nil {
-		t.Fatal(err)
-	}
+	s0.Dial(s1.Enode)
 
 	time.Sleep(500 * time.Millisecond)
 	return eth0, eth1
@@ -94,7 +95,7 @@ func TestHandshake(t *testing.T) {
 
 	for _, cc := range cases {
 		s0, s1 := network.TestServers()
-		eth0, eth1 := testEthHandshake(t, s0, cc.Status0, s1, cc.Status1)
+		eth0, eth1 := testEthHandshake(t, s0, cc.Status0, nil, s1, cc.Status1, nil)
 
 		// Both handshake fail
 		evnt0, evnt1 := <-s0.EventCh, <-s1.EventCh
@@ -114,27 +115,13 @@ func TestHandshake(t *testing.T) {
 				t.Fatal("bad")
 			}
 		}
-
-		// If it did not work, check that the peers are disconnected
-		if !cc.Expected {
-			// Check if they are still connected
-			p0 := s0.GetPeer(s1.ID().String())
-			if p0.Connected == true {
-				t.Fatal("should be disconnected")
-			}
-
-			p1 := s1.GetPeer(s0.ID().String())
-			if p1.Connected == true {
-				t.Fatal("should be disconnected")
-			}
-		}
 	}
 }
 
 func TestHandshakeMsgPostHandshake(t *testing.T) {
 	// After the handshake we dont accept more handshake messages
 	s0, s1 := network.TestServers()
-	eth0, _ := testEthHandshake(t, s0, &status, s1, &status)
+	eth0, _ := testEthHandshake(t, s0, &status, nil, s1, &status, nil)
 
 	if err := eth0.conn.WriteMsg(StatusMsg); err != nil {
 		t.Fatal(err)
@@ -154,5 +141,91 @@ func TestHandshakeMsgPostHandshake(t *testing.T) {
 	}
 }
 
-// TODO Test: Message send.
-// TODO Test: Ethereum stops handshake if parity protocol is also enabled.
+func headersToNumbers(headers []*types.Header) []int {
+	n := []int{}
+	for _, h := range headers {
+		n = append(n, int(h.Number.Int64()))
+	}
+	return n
+}
+
+func TestEthereumBlockHeadersMsg(t *testing.T) {
+	b0, close0 := blockchain.NewTestBlockchain(t)
+	defer close0()
+
+	b1, close1 := blockchain.NewTestBlockchain(t)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	genesis := &types.Header{Number: big.NewInt(0)}
+	headers := []*types.Header{genesis}
+
+	// populate b1 with headers
+	for i := 1; i < 100; i++ {
+		headers = append(headers, &types.Header{ParentHash: headers[i-1].Hash(), Number: big.NewInt(int64(i)), Difficulty: big.NewInt(int64(i))})
+	}
+
+	if err := b1.WriteGenesis(genesis); err != nil {
+		t.Fatal(err)
+	}
+	if err := b1.WriteHeaders(headers[1:]); err != nil {
+		t.Fatal(err)
+	}
+
+	var cases = []struct {
+		origin   interface{}
+		amount   uint64
+		skip     uint64
+		reverse  bool
+		expected []int
+	}{
+		{
+			headers[1].Hash(),
+			10,
+			5,
+			false,
+			[]int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+		},
+		{
+			1,
+			10,
+			5,
+			false,
+			[]int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+		},
+	}
+
+	for _, cc := range cases {
+		t.Run("", func(tt *testing.T) {
+			ack := make(chan network.AckMessage, 1)
+			eth0.Conn().SetHandler(BlockHeadersMsg, ack, 5*time.Second)
+
+			var err error
+			if reflect.TypeOf(cc.origin).Name() == "Hash" {
+				err = eth0.RequestHeadersByHash(cc.origin.(common.Hash), cc.amount, cc.skip, cc.reverse)
+			} else {
+				err = eth0.RequestHeadersByNumber(uint64(cc.origin.(int)), cc.amount, cc.skip, cc.reverse)
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			resp := <-ack
+			if resp.Complete {
+				var result []*types.Header
+				if err := rlp.DecodeBytes(resp.Payload, &result); err != nil {
+					t.Fatal(err)
+				}
+
+				if !reflect.DeepEqual(headersToNumbers(result), cc.expected) {
+					t.Fatal("expected numbers dont match")
+				}
+			} else {
+				t.Fatal("failed to receive the headers")
+			}
+		})
+	}
+}

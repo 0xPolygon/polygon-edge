@@ -26,8 +26,8 @@ func (h *hashOrNumber) EncodeRLP(w io.Writer) error {
 }
 
 // IsHash checks if its a hash
-func (h *hashOrNumber) IsHash(hh common.Hash) bool {
-	return hh != (common.Hash{})
+func (h *hashOrNumber) IsHash() bool {
+	return h.Hash != (common.Hash{})
 }
 
 // DecodeRLP decodes hashOrNumber in RLP to object

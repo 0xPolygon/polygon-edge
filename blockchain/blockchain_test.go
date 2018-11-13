@@ -2,36 +2,16 @@ package blockchain
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/umbracle/minimal/storage"
 )
 
-func newBlockchain(t *testing.T) (*Blockchain, func()) {
-	path, err := ioutil.TempDir("/tmp", "minimal_storage")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err := storage.NewStorage(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	close := func() {
-		if err := os.RemoveAll(path); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return NewBlockchain(s), close
-}
-
 func TestGenesis(t *testing.T) {
-	b, close := newBlockchain(t)
+	b, close := NewTestBlockchain(t)
 	defer close()
 
 	// no genesis block yet
@@ -165,7 +145,7 @@ func TestInsertHeaders(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run(cc.Name, func(tt *testing.T) {
-			b, close := newBlockchain(t)
+			b, close := NewTestBlockchain(t)
 			defer close()
 
 			chain := chain{

@@ -67,6 +67,21 @@ func main() {
 		panic(err)
 	}
 
+	// blockchain storage
+	storage, err := storage.NewStorage("/tmp/minimal-test")
+	if err != nil {
+		panic(err)
+	}
+
+	// consensus
+	consensus := ethash.NewEthHash(chainConfig)
+
+	// blockchain object
+	blockchain := blockchain.NewBlockchain(storage, consensus)
+	if err := blockchain.WriteGenesis(mainnetGenesis); err != nil {
+		panic(err)
+	}
+
 	// register protocols
 
 	// mainnet status (TODO: take status from syncer)
@@ -82,25 +97,10 @@ func main() {
 	}
 
 	callback := func(conn network.Conn, peer *network.Peer) protocol.Handler {
-		return ethereum.NewEthereumProtocol(conn, peer, status)
+		return ethereum.NewEthereumProtocol(conn, peer, status, blockchain)
 	}
 
 	server.RegisterProtocol(protocol.ETH63, callback)
-
-	// blockchain storage
-	storage, err := storage.NewStorage("/tmp/minimal-test")
-	if err != nil {
-		panic(err)
-	}
-
-	// consensus
-	consensus := ethash.NewEthHash(chainConfig)
-
-	// blockchain object
-	blockchain := blockchain.NewBlockchain(storage, consensus)
-	if err := blockchain.WriteGenesis(mainnetGenesis); err != nil {
-		panic(err)
-	}
 
 	// syncer
 	syncer := syncer.NewSyncer(1, blockchain)

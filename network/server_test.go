@@ -80,8 +80,8 @@ func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 	s0, s1 := TestServers()
 
 	// desactivate discover
-	s0.routing.Close()
-	s1.routing.Close()
+	s0.discover.Close()
+	s1.discover.Close()
 
 	// sessions
 	var e0, e1 Conn
@@ -100,7 +100,7 @@ func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 	s0.RegisterProtocol(p, callback0)
 	s1.RegisterProtocol(p, callback1)
 
-	if err := s0.Dial(s1.Enode); err != nil {
+	if err := s0.DialSync(s1.Enode); err != nil {
 		t.Fatal(err)
 	}
 

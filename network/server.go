@@ -338,6 +338,7 @@ func (s *Server) connectWithEnode(enode string) error {
 func (s *Server) connect2(conn net.Conn, pub *ecdsa.PublicKey) error {
 	peer, err := s.connect(conn, pub)
 	if err != nil && peer == nil {
+		s.EventCh <- MemberEvent{NodeHandshakeFail, nil}
 		return err
 	}
 

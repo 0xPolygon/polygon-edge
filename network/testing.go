@@ -3,8 +3,10 @@ package network
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
+	"os"
 	"reflect"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -28,7 +30,9 @@ func TestServers() (*Server, *Server) {
 			}
 
 			config.BindPort = port
-			s, err := NewServer("minimal-test", key, config, nil)
+
+			logger := log.New(os.Stderr, "", log.LstdFlags)
+			s, err := NewServer("minimal-test", key, config, logger)
 			if err == nil {
 				return s
 			}

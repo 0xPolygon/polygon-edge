@@ -72,6 +72,22 @@ func (b *Blockchain) Header() (*types.Header, error) {
 	return header, nil
 }
 
+// GetHeaderByHash returns the header by his hash
+func (b *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
+	h, _ := b.db.ReadHeader(hash)
+	return h
+}
+
+// GetHeaderByNumber returns the header by his number
+func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
+	hash, err := b.db.ReadCanonicalHash(n)
+	if err != nil {
+		return nil
+	}
+	h, _ := b.db.ReadHeader(hash)
+	return h
+}
+
 // WriteHeaders writes a batch of headers
 func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 
@@ -104,6 +120,9 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 
 func (b *Blockchain) addHeader(header *types.Header) error {
 	if err := b.db.WriteHeader(header); err != nil {
+		return err
+	}
+	if err := b.db.WriteCanonicalHash(header.Number, header.Hash()); err != nil {
 		return err
 	}
 	return nil
@@ -200,6 +219,8 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 			return err
 		}
 	}
+
+	// TODO: Handle the fork
 
 	// NOTE. this loops are used to know the oldblocks not belonging anymore
 	// to the canonical chain and updating the tx and state

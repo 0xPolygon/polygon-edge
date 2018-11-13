@@ -7,8 +7,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
+)
+
+const (
+	softResponseLimit = 2 * 1024 * 1024
+	estHeaderRlpSize  = 500
 )
 
 // eth protocol message codes
@@ -30,23 +36,31 @@ const (
 	ReceiptsMsg    = 0x10
 )
 
+// Blockchain is the interface the ethereum protocol needs to work
+type Blockchain interface {
+	GetHeaderByHash(hash common.Hash) *types.Header
+	GetHeaderByNumber(n *big.Int) *types.Header
+}
+
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
-	conn      network.Conn
-	peer      *network.Peer
-	getStatus GetStatus
-	status    *Status
+	conn       network.Conn
+	peer       *network.Peer
+	getStatus  GetStatus
+	status     *Status
+	blockchain Blockchain
 }
 
 // GetStatus is the interface that gives the eth protocol the information it needs
 type GetStatus func() (*Status, error)
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn network.Conn, peer *network.Peer, getStatus GetStatus) *Ethereum {
+func NewEthereumProtocol(conn network.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
 	return &Ethereum{
-		conn:      conn,
-		peer:      peer,
-		getStatus: getStatus,
+		conn:       conn,
+		peer:       peer,
+		getStatus:  getStatus,
+		blockchain: blockchain,
 	}
 }
 
@@ -62,7 +76,7 @@ type Status struct {
 // Requester is the etheruem protocol interface
 type Requester interface {
 	RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error
-	RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error
+	RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error
 	RequestBodies(hashes []common.Hash) error
 	RequestNodeData(hashes []common.Hash) error
 	RequestReceipts(hashes []common.Hash) error
@@ -82,7 +96,7 @@ func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uin
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
-func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
 	return e.conn.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
@@ -154,7 +168,6 @@ func (e *Ethereum) Init() error {
 	}()
 
 	go func() {
-		time.Sleep(1 * time.Second)
 		errr <- e.conn.WriteMsg(StatusMsg, status)
 	}()
 
@@ -201,15 +214,49 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		return fmt.Errorf("Status msg not expected after handshake")
 
 	case code == GetBlockHeadersMsg:
-		// TODO. send
 		var query getBlockHeadersData
-		if err := rlp.DecodeBytes(payload, &query); err != nil {
+		err := rlp.DecodeBytes(payload, &query)
+		if err != nil {
 			return err
 		}
 
-		fmt.Println(query)
+		var origin *types.Header
+		if query.Origin.IsHash() {
+			origin = e.blockchain.GetHeaderByHash(query.Origin.Hash)
+		} else {
+			origin = e.blockchain.GetHeaderByNumber(big.NewInt(int64(query.Origin.Number)))
+		}
 
-		return e.sendBlockHeaders([]*types.Header{})
+		if origin == nil {
+			return e.sendBlockHeaders([]*types.Header{})
+		}
+
+		headers := []*types.Header{origin}
+		bytes := common.StorageSize(estHeaderRlpSize)
+
+		skip := int64(query.Skip)
+
+		dir := int64(1)
+		if query.Reverse {
+			dir = int64(-1)
+		}
+
+		for len(headers) < int(query.Amount) && bytes < softResponseLimit && len(headers) < downloader.MaxHeaderFetch {
+			block := origin.Number.Int64()
+			block = block + (dir)*skip
+
+			if block < 0 {
+				break
+			}
+			origin = e.blockchain.GetHeaderByNumber(big.NewInt(block))
+			if origin == nil {
+				break
+			}
+
+			headers = append(headers, origin)
+			bytes += estHeaderRlpSize
+		}
+		return e.sendBlockHeaders(headers)
 
 	case code == BlockHeadersMsg:
 		// TODO. deliver

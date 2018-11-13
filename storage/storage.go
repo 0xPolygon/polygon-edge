@@ -23,6 +23,9 @@ var (
 
 	// FORK is the entry to store forks
 	FORK = []byte("f")
+
+	// CANONICAL is the prefix for the canonical chain numbers
+	CANONICAL = []byte("c")
 )
 
 // sub-prefix
@@ -50,6 +53,22 @@ func NewStorage(path string) (*Storage, error) {
 // Close closes the storage connection
 func (s *Storage) Close() error {
 	return s.Close()
+}
+
+// -- canonical hash --
+
+// ReadCanonicalHash gets the hash from the number of the canonical chain
+func (s *Storage) ReadCanonicalHash(n *big.Int) (common.Hash, error) {
+	data, err := s.get(CANONICAL, n.Bytes())
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return common.BytesToHash(data), nil
+}
+
+// WriteCanonicalHash writes a hash for a number block in the canonical chain
+func (s *Storage) WriteCanonicalHash(n *big.Int, hash common.Hash) error {
+	return s.set(CANONICAL, n.Bytes(), hash.Bytes())
 }
 
 // -- head --

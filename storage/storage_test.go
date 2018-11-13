@@ -28,6 +28,44 @@ func newStorage(t *testing.T) (*Storage, func()) {
 	return s, close
 }
 
+func TestCanonicalChain(t *testing.T) {
+	s, close := newStorage(t)
+	defer close()
+
+	var cases = []struct {
+		Number *big.Int
+		Hash   common.Hash
+	}{
+		{
+			Number: big.NewInt(1),
+			Hash:   common.HexToHash("111"),
+		},
+		{
+			Number: big.NewInt(1),
+			Hash:   common.HexToHash("222"),
+		},
+		{
+			Number: big.NewInt(2),
+			Hash:   common.HexToHash("111"),
+		},
+	}
+
+	for _, cc := range cases {
+		if err := s.WriteCanonicalHash(cc.Number, cc.Hash); err != nil {
+			t.Fatal(err)
+		}
+
+		data, err := s.ReadCanonicalHash(cc.Number)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(data, cc.Hash) {
+			t.Fatal("not match")
+		}
+	}
+}
+
 func TestDifficulty(t *testing.T) {
 	s, close := newStorage(t)
 	defer close()
