@@ -131,22 +131,20 @@ func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
 		fmt.Printf("FAIL: %v\n", err)
 	}
 
-	fmt.Println(s.list.numCompleted())
-
 	// check the number of completed items to commit those values
 	// protect with lock
 	//if s.list.numCompleted() == 1 {
 	// commit values to the storage
-	fmt.Println("## COMMIT ##")
 
 	hh := s.list.commitData()
 	if len(hh) != 0 {
+		fmt.Printf("## COMMIT %d ##\n", len(hh))
+
 		if err := s.blockchain.WriteHeaders(hh); err != nil {
 			fmt.Printf("FAILED TO COMMIT: %v\n", err)
 		}
 		fmt.Println("DONE")
 	}
-
 	//}
 }
 

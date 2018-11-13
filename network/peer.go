@@ -3,9 +3,12 @@ package network
 import (
 	"fmt"
 	"log"
+	"math/big"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network/discover"
 	"github.com/umbracle/minimal/protocol"
@@ -173,6 +176,10 @@ type Peer struct {
 	pongTimeout  *time.Timer
 	closeCh      chan struct{}
 	pingInterval time.Duration
+
+	headerHash common.Hash
+	headerDiff *big.Int
+	headerLock sync.Mutex
 }
 
 func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
@@ -189,9 +196,32 @@ func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
 		closeCh:      make(chan struct{}),
 		pingInterval: defaultPingInterval,
 		protocols:    []*Instance{},
+		headerLock:   sync.Mutex{},
 	}
 
 	return peer
+}
+
+// UpdateHeader updates the header of the peer
+func (p *Peer) UpdateHeader(h common.Hash, d *big.Int) {
+	p.headerLock.Lock()
+	p.headerHash = h
+	p.headerDiff = d
+	p.headerLock.Unlock()
+}
+
+// HeaderHash returns the header hash of the peer
+func (p *Peer) HeaderHash() common.Hash {
+	p.headerLock.Lock()
+	defer p.headerLock.Unlock()
+	return p.headerHash
+}
+
+// HeaderDiff returns the header difficulty of the peer
+func (p *Peer) HeaderDiff() *big.Int {
+	p.headerLock.Lock()
+	defer p.headerLock.Unlock()
+	return p.headerDiff
 }
 
 func (p *Peer) Schedule() {

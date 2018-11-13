@@ -183,6 +183,7 @@ func (e *Ethereum) Init() error {
 	}
 
 	e.status = peerStatus
+	e.peer.UpdateHeader(peerStatus.CurrentBlock, peerStatus.TD)
 
 	// handshake was correct, start to listen for packets
 	go e.listen()
@@ -201,6 +202,11 @@ func (e *Ethereum) listen() {
 			e.conn.Close()
 		}
 	}
+}
+
+type newBlockData struct {
+	Block *types.Block
+	TD    *big.Int
 }
 
 // HandleMsg handles a message from ethereum
@@ -283,7 +289,18 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		// TODO. notify announce
 
 	case code == NewBlockMsg:
-		// TODO: propagated block
+		var request newBlockData
+		if err := rlp.DecodeBytes(payload, &request); err != nil {
+			return err
+		}
+
+		trueHead := request.Block.ParentHash()
+		trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
+
+		if td := e.peer.HeaderDiff(); trueTD.Cmp(td) > 0 {
+			e.peer.UpdateHeader(trueHead, trueTD)
+		}
+		// TODO: notify the syncer about the new block (syncer interface as in blockchain?)
 
 	case code == TxMsg:
 		// TODO: deliver
