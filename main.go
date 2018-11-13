@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"os"
 	"os/signal"
 	"strings"
@@ -82,28 +81,16 @@ func main() {
 		panic(err)
 	}
 
+	syncer := syncer.NewSyncer(1, blockchain)
+
 	// register protocols
-
-	// mainnet status (TODO: take status from syncer)
-	status := func() (*ethereum.Status, error) {
-		s := &ethereum.Status{ // mainnet status
-			ProtocolVersion: 63,
-			NetworkID:       1,
-			TD:              big.NewInt(17179869184),
-			CurrentBlock:    common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"),
-			GenesisBlock:    common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"),
-		}
-		return s, nil
-	}
-
 	callback := func(conn network.Conn, peer *network.Peer) protocol.Handler {
-		return ethereum.NewEthereumProtocol(conn, peer, status, blockchain)
+		return ethereum.NewEthereumProtocol(conn, peer, syncer.GetStatus, blockchain)
 	}
 
 	server.RegisterProtocol(protocol.ETH63, callback)
 
 	// syncer
-	syncer := syncer.NewSyncer(1, blockchain)
 	go syncer.Run()
 
 	// connect to some peers

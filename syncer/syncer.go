@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 // Blockchain is the reference the syncer needs to connect to the blockchain
 type Blockchain interface {
 	Header() (*types.Header, error)
+	Genesis() *types.Header
 	WriteHeaders(headers []*types.Header) error
 }
 
@@ -29,7 +31,7 @@ type Job struct {
 
 // Syncer is the syncer protocol
 type Syncer struct {
-	NetworkID int
+	NetworkID uint64
 
 	peers      map[string]*Peer
 	blockchain Blockchain
@@ -41,7 +43,7 @@ type Syncer struct {
 }
 
 // NewSyncer creates a new syncer
-func NewSyncer(networkID int, blockchain Blockchain) *Syncer {
+func NewSyncer(networkID uint64, blockchain Blockchain) *Syncer {
 	s := &Syncer{
 		NetworkID:  networkID,
 		peers:      map[string]*Peer{},
@@ -86,6 +88,23 @@ func (s *Syncer) Run() {
 		fmt.Printf("SYNC: %d\n", i.block)
 		idle <- i.ToJob()
 	}
+}
+
+// GetStatus returns the current ethereum status
+func (s *Syncer) GetStatus() (*ethereum.Status, error) {
+	header, err := s.blockchain.Header()
+	if err != nil {
+		return nil, err
+	}
+
+	status := &ethereum.Status{
+		ProtocolVersion: 63,
+		NetworkID:       s.NetworkID,
+		TD:              header.Difficulty,
+		CurrentBlock:    header.Hash(),
+		GenesisBlock:    s.blockchain.Genesis().Hash(),
+	}
+	return status, nil
 }
 
 func (s *Syncer) getSlot() *item {

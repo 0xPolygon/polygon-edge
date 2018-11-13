@@ -19,11 +19,12 @@ var (
 type Blockchain struct {
 	db        *storage.Storage
 	consensus consensus.Consensus
+	genesis   *types.Header
 }
 
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db *storage.Storage, consensus consensus.Consensus) *Blockchain {
-	return &Blockchain{db, consensus}
+	return &Blockchain{db, consensus, nil}
 }
 
 // GetParent return the parent
@@ -31,8 +32,15 @@ func (b *Blockchain) GetParent(header *types.Header) (*types.Header, error) {
 	return b.db.ReadHeader(header.ParentHash)
 }
 
+// Genesis returns the genesis block
+func (b *Blockchain) Genesis() *types.Header {
+	return b.genesis
+}
+
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(header *types.Header) error {
+	b.genesis = header
+
 	hash, err := b.db.ReadHeadHash()
 	if err != nil && err.Error() != NOTFOUND {
 		return err
