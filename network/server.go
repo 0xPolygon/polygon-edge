@@ -173,7 +173,7 @@ func (s *Server) streamListen() {
 
 func (s *Server) handleIncomingConn(conn net.Conn) {
 	if err := s.connect2(conn, nil); err != nil {
-		s.logger.Printf("ERR: %v", err)
+		s.logger.Printf("ERR: incoming connection %v", err)
 	}
 }
 

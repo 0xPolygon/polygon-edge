@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,17 @@ import (
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
+
+type Config struct {
+	MaxRequests int
+}
+
+func DefaultConfig() *Config {
+	c := &Config{
+		MaxRequests: 5,
+	}
+	return c
+}
 
 var (
 	daoBlock            = uint64(1920000)
@@ -33,6 +45,7 @@ type Job struct {
 type Syncer struct {
 	NetworkID uint64
 
+	config     *Config
 	peers      map[string]*Peer
 	blockchain Blockchain
 
@@ -43,16 +56,23 @@ type Syncer struct {
 }
 
 // NewSyncer creates a new syncer
-func NewSyncer(networkID uint64, blockchain Blockchain) *Syncer {
+func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer, error) {
+	header, err := blockchain.Header()
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Syncer{
+		config:     config,
 		NetworkID:  networkID,
 		peers:      map[string]*Peer{},
 		WorkerPool: make(chan chan Job, 10),
 		blockchain: blockchain,
 		listLock:   &sync.Mutex{},
+		list:       newList(header.Number.Uint64()+1, 6000000),
 	}
 
-	return s
+	return s, nil
 }
 
 // AddNode is called when we connect to a new node
@@ -62,21 +82,13 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 	p := NewPeer(peer, s.WorkerPool, s)
 	s.peers[peer.ID] = p
 
-	go p.run()
+	go p.run(s.config.MaxRequests)
 }
+
+// TODO. check that the difficulty of the new peer is higher than ours to consider for sync
 
 // Run is the main entry point
 func (s *Syncer) Run() {
-	// get the header from the blockchain
-	header, err := s.blockchain.Header()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Current header: %d\n", header.Number.Uint64())
-
-	s.list = newList(header.Number.Uint64()+1, 6000000)
-
 	for {
 		idle := <-s.WorkerPool
 
@@ -113,13 +125,17 @@ func (s *Syncer) getSlot() *item {
 	return s.list.GetQuerySlot()
 }
 
-func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
+func (s *Syncer) Result(id uint32, headers []*types.Header, err error) {
 	s.listLock.Lock()
 	defer s.listLock.Unlock()
 
 	var t itemType
 	if err != nil {
 		t = failed
+
+		fmt.Println("FAILED")
+		fmt.Println(err)
+
 	} else if len(headers) != 100 {
 		t = failed
 	} else {
@@ -135,6 +151,8 @@ func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
 	//if s.list.numCompleted() == 1 {
 	// commit values to the storage
 
+	printFirsts(s.list)
+
 	hh := s.list.commitData()
 	if len(hh) != 0 {
 		fmt.Printf("## COMMIT %d ##\n", len(hh))
@@ -144,6 +162,21 @@ func (s *Syncer) result(id uint32, headers []*types.Header, err error) {
 		}
 	}
 	//}
+}
+
+func printFirsts(l *list) {
+	str := []string{}
+	elem := l.front
+	i := 0
+	for elem != nil && i < 10 {
+		str = append(str, fmt.Sprintf("%d %d", elem.block, elem.t))
+		//if elem.next == nil {
+		//	break
+		//}
+		elem = elem.next
+		i++
+	}
+	fmt.Println(strings.Join(str, ","))
 }
 
 /*

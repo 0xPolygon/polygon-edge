@@ -122,3 +122,62 @@ func TestListCommit(t *testing.T) {
 		{1000, empty},
 	})
 }
+
+/*
+func TestSyncer(t *testing.T) {
+	headers := blockchain.NewTestChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+
+	config := DefaultConfig()
+	config.MaxRequests = 1
+	syncer, err := NewSyncer(1, b0, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// -- sync eth network
+	s0.RegisterProtocol(protocol.ETH63, func(s network.Conn, p *network.Peer) protocol.Handler {
+		return ethereum.NewEthereumProtocol(s, p, syncer.GetStatus, b0)
+	})
+	s1.RegisterProtocol(protocol.ETH63, func(s network.Conn, p *network.Peer) protocol.Handler {
+		return ethereum.NewEthereumProtocol(s, p, syncer.GetStatus, b1)
+	})
+
+	s0.Dial(s1.Enode)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// eth0 receives an eventadd
+	n := <-s0.EventCh
+
+	fmt.Println(n.Peer)
+	fmt.Println(n.Type)
+
+	go syncer.AddNode(n.Peer)
+
+	time.Sleep(1 * time.Second)
+
+	idle := <-syncer.WorkerPool
+
+	i := syncer.getSlot()
+	if i == nil {
+		panic("its nil")
+	}
+
+	// close s1
+	s1.Close()
+
+	idle <- i.ToJob()
+
+	time.Sleep(5 * time.Second)
+}
+*/

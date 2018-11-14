@@ -251,7 +251,7 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		headers := []*types.Header{origin}
 		bytes := common.StorageSize(estHeaderRlpSize)
 
-		skip := int64(query.Skip)
+		skip := int64(query.Skip) + 1
 
 		dir := int64(1)
 		if query.Reverse {

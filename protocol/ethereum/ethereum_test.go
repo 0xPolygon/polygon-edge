@@ -150,29 +150,16 @@ func headersToNumbers(headers []*types.Header) []int {
 }
 
 func TestEthereumBlockHeadersMsg(t *testing.T) {
-	b0, close0 := blockchain.NewTestBlockchain(t)
+	headers := blockchain.NewTestChain(100)
+
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
 	defer close0()
 
-	b1, close1 := blockchain.NewTestBlockchain(t)
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
 	defer close1()
 
 	s0, s1 := network.TestServers()
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
-
-	genesis := &types.Header{Number: big.NewInt(0)}
-	headers := []*types.Header{genesis}
-
-	// populate b1 with headers
-	for i := 1; i < 100; i++ {
-		headers = append(headers, &types.Header{ParentHash: headers[i-1].Hash(), Number: big.NewInt(int64(i)), Difficulty: big.NewInt(int64(i))})
-	}
-
-	if err := b1.WriteGenesis(genesis); err != nil {
-		t.Fatal(err)
-	}
-	if err := b1.WriteHeaders(headers[1:]); err != nil {
-		t.Fatal(err)
-	}
 
 	var cases = []struct {
 		origin   interface{}
@@ -184,16 +171,23 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 		{
 			headers[1].Hash(),
 			10,
-			5,
+			4,
 			false,
 			[]int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
 		},
 		{
 			1,
 			10,
-			5,
+			4,
 			false,
 			[]int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+		},
+		{
+			1,
+			10,
+			0,
+			false,
+			[]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 		},
 	}
 
@@ -210,21 +204,21 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatal(err)
+				tt.Fatal(err)
 			}
 
 			resp := <-ack
 			if resp.Complete {
 				var result []*types.Header
 				if err := rlp.DecodeBytes(resp.Payload, &result); err != nil {
-					t.Fatal(err)
+					tt.Fatal(err)
 				}
 
 				if !reflect.DeepEqual(headersToNumbers(result), cc.expected) {
-					t.Fatal("expected numbers dont match")
+					tt.Fatal("expected numbers dont match")
 				}
 			} else {
-				t.Fatal("failed to receive the headers")
+				tt.Fatal("failed to receive the headers")
 			}
 		})
 	}

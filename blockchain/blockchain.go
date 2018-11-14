@@ -102,7 +102,7 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 	// validate chain
 	for i := 1; i < len(headers); i++ {
 		if headers[i].Number.Uint64()-1 != headers[i-1].Number.Uint64() {
-			return fmt.Errorf("number sequence not correct")
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number.Uint64(), headers[i-1].Number.Uint64())
 		}
 		if headers[i].ParentHash != headers[i-1].Hash() {
 			return fmt.Errorf("parent hash not correct")

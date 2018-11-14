@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"io/ioutil"
+	"math/big"
 	"os"
 	"testing"
 
@@ -29,8 +30,20 @@ func (f *fakeConsensus) Close() error {
 	return nil
 }
 
+// NewTestChain creates a chain of valid headers
+func NewTestChain(n int) []*types.Header {
+	genesis := &types.Header{Number: big.NewInt(0)}
+	headers := []*types.Header{genesis}
+
+	for i := 1; i < n; i++ {
+		headers = append(headers, &types.Header{ParentHash: headers[i-1].Hash(), Number: big.NewInt(int64(i)), Difficulty: big.NewInt(int64(i))})
+	}
+
+	return headers
+}
+
 // NewTestBlockchain creates a new dummy blockchain for testing
-func NewTestBlockchain(t *testing.T) (*Blockchain, func()) {
+func NewTestBlockchain(t *testing.T, headers []*types.Header) (*Blockchain, func()) {
 	path, err := ioutil.TempDir("/tmp", "minimal_storage")
 	if err != nil {
 		t.Fatal(err)
@@ -44,5 +57,16 @@ func NewTestBlockchain(t *testing.T) (*Blockchain, func()) {
 			t.Fatal(err)
 		}
 	}
-	return NewBlockchain(s, &fakeConsensus{}), close
+	b := NewBlockchain(s, &fakeConsensus{})
+
+	if headers != nil {
+		if err := b.WriteGenesis(headers[0]); err != nil {
+			t.Fatal(err)
+		}
+		if err := b.WriteHeaders(headers[1:]); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return b, close
 }

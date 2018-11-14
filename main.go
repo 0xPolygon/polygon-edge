@@ -81,7 +81,10 @@ func main() {
 		panic(err)
 	}
 
-	syncer := syncer.NewSyncer(1, blockchain)
+	syncer, err := syncer.NewSyncer(1, blockchain, syncer.DefaultConfig())
+	if err != nil {
+		panic(err)
+	}
 
 	// register protocols
 	callback := func(conn network.Conn, peer *network.Peer) protocol.Handler {

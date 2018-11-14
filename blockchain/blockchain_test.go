@@ -11,7 +11,7 @@ import (
 )
 
 func TestGenesis(t *testing.T) {
-	b, close := NewTestBlockchain(t)
+	b, close := NewTestBlockchain(t, nil)
 	defer close()
 
 	// no genesis block yet
@@ -145,7 +145,7 @@ func TestInsertHeaders(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run(cc.Name, func(tt *testing.T) {
-			b, close := NewTestBlockchain(t)
+			b, close := NewTestBlockchain(t, nil)
 			defer close()
 
 			chain := chain{
