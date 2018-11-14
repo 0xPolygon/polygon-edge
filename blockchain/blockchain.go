@@ -168,7 +168,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		}
 	} else {
 		// fork
-		if err := b.handleFork(parent, header); err != nil {
+		if err := b.writeFork(header); err != nil {
 			return err
 		}
 	}
@@ -176,7 +176,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	return nil
 }
 
-func (b *Blockchain) handleFork(parent, header *types.Header) error {
+func (b *Blockchain) writeFork(header *types.Header) error {
 	forks, err := b.db.ReadForks()
 	if err != nil {
 		if err.Error() == NOTFOUND {
@@ -188,18 +188,17 @@ func (b *Blockchain) handleFork(parent, header *types.Header) error {
 
 	newForks := []common.Hash{}
 	for _, fork := range forks {
-		if fork != parent.Hash() {
+		if fork != header.ParentHash {
 			newForks = append(newForks, fork)
 		}
 	}
 	newForks = append(newForks, header.Hash())
-
-	b.db.WriteForks(newForks)
-	return nil
+	return b.db.WriteForks(newForks)
 }
 
 func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Header) error {
 	newChainHead := newHeader
+	oldChainHead := oldHeader
 
 	var err error
 	for oldHeader.Number.Cmp(newHeader.Number) > 0 {
@@ -228,7 +227,9 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 		}
 	}
 
-	// TODO: Handle the fork
+	if err := b.writeFork(oldChainHead); err != nil {
+		return fmt.Errorf("failed to write the old header as fork: %v", err)
+	}
 
 	// NOTE. this loops are used to know the oldblocks not belonging anymore
 	// to the canonical chain and updating the tx and state

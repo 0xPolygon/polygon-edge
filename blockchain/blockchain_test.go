@@ -71,6 +71,7 @@ type header struct {
 
 func (h *header) Parent(parent byte) *header {
 	h.parent = parent
+	h.number = uint64(parent) + 1
 	return h
 }
 
@@ -141,6 +142,20 @@ func TestInsertHeaders(t *testing.T) {
 			Head:  mock(0x5),
 			Forks: []*header{mock(0x6)},
 		},
+		{
+			Name: "Forks in reorgs",
+			History: []*header{
+				mock(0x0),
+				mock(0x1),
+				mock(0x2),
+				mock(0x3), // fork because of the 0x4 reorg
+				mock(0x4).Parent(0x2).Diff(11),
+				mock(0x5).Parent(0x3),         // replace 0x3 as header fork
+				mock(0x6).Parent(0x2).Diff(5), // lower fork in 0x1
+			},
+			Head:  mock(0x4),
+			Forks: []*header{mock(0x5), mock(0x6)},
+		},
 	}
 
 	for _, cc := range cases {
@@ -190,9 +205,13 @@ func TestInsertHeaders(t *testing.T) {
 				expectedForks = append(expectedForks, chain.headers[i.hash].Hash())
 			}
 
-			if len(forks) == len(expectedForks) && len(forks) != 0 {
-				if !reflect.DeepEqual(forks, expectedForks) {
-					t.Fatal("forks dont match")
+			if len(forks) != 0 {
+				if len(forks) != len(expectedForks) {
+					tt.Fatalf("forks length dont match, expected %d but found %d", len(expectedForks), len(forks))
+				} else {
+					if !reflect.DeepEqual(forks, expectedForks) {
+						tt.Fatal("forks dont match")
+					}
 				}
 			}
 		})

@@ -33,7 +33,7 @@ var (
 var (
 	HASH   = []byte("hash")
 	NUMBER = []byte("number")
-	EMPTY  = []byte("")
+	EMPTY  = []byte("empty")
 )
 
 // Storage is the blockchain storage using boltdb
