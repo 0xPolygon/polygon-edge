@@ -14,6 +14,17 @@ import (
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
+// Pending stores the pending requests
+type Pending struct {
+	pending map[string]*callback
+	// timer
+	// encode tasks
+}
+
+func (p *Pending) sethandler() {
+
+}
+
 // AckMessage is the ack message
 type AckMessage struct {
 	Complete bool
@@ -239,4 +250,14 @@ func (p *Peer) Headers(headers []*types.Header) {
 	case callback.ack <- AckMessage{Complete: true, Result: headers}:
 	default:
 	}
+}
+
+// Receipts receives the receipts
+func (p *Peer) Receipts(receipts [][]*types.Receipt) {
+
+}
+
+// Bodies receives the bodies
+func (p *Peer) Bodies(bodies ethereum.BlockBodiesData) {
+
 }

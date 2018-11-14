@@ -217,3 +217,43 @@ func TestInsertHeaders(t *testing.T) {
 		})
 	}
 }
+
+func TestCommitChain(t *testing.T) {
+	// test if the data written in commitchain is retrieved correctly
+
+	headers, blocks, receipts := NewTestBodyChain(2)
+	b, close := NewTestBlockchain(t, headers)
+	defer close()
+
+	if err := b.CommitChain(blocks, receipts); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 1; i < len(blocks); i++ {
+		block := blocks[i]
+
+		// check blocks
+		i, err := b.db.ReadBody(block.Hash())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(i.Transactions) != 1 {
+			t.Fatal("should have 1 tx")
+		}
+		if i.Transactions[0].Nonce() != block.Number().Uint64() {
+			t.Fatal("number is incorrect")
+		}
+
+		// check receipts
+		r, err := b.db.ReadReceipts(block.Hash())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(r) != 1 {
+			t.Fatal("should have 1 receipt")
+		}
+		if r[0].TxHash != i.Transactions[0].Hash() {
+			t.Fatal("receipt does not match with transaction")
+		}
+	}
+}

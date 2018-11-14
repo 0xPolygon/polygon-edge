@@ -177,3 +177,75 @@ func TestHeader(t *testing.T) {
 		t.Fatal("bad")
 	}
 }
+
+func TestBody(t *testing.T) {
+	s, close := newStorage(t)
+	defer close()
+
+	header := &types.Header{
+		Number:     big.NewInt(5),
+		Difficulty: big.NewInt(10),
+		ParentHash: common.HexToHash("11"),
+		Time:       big.NewInt(10),
+		Extra:      []byte{}, // if not set it will fail
+	}
+
+	t0 := types.NewTransaction(0, common.HexToAddress("11"), big.NewInt(1), 11, big.NewInt(11), []byte{1, 2})
+	t1 := types.NewTransaction(1, common.HexToAddress("22"), big.NewInt(1), 22, big.NewInt(11), []byte{4, 5})
+
+	block := types.NewBlock(header, []*types.Transaction{t0, t1}, nil, nil)
+	hash := block.Hash()
+
+	if err := s.WriteBody(hash, block.Body()); err != nil {
+		t.Fatal(err)
+	}
+	body, err := s.ReadBody(hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
+	tx0, tx1 := block.Body().Transactions, body.Transactions
+	if len(tx0) != len(tx1) {
+		t.Fatal("lengths are different")
+	}
+	for indx, i := range tx0 {
+		if i.Hash() != tx1[indx].Hash() {
+			t.Fatal("tx not correct")
+		}
+	}
+}
+
+// TODO, not working
+func TestReceipts(t *testing.T) {
+	s, close := newStorage(t)
+	defer close()
+
+	r0 := types.NewReceipt([]byte{1}, false, 10)
+	r0.TxHash = common.HexToHash("11")
+
+	r1 := types.NewReceipt([]byte{1}, false, 10)
+	r1.TxHash = common.HexToHash("33")
+
+	receipts := []*types.Receipt{r0, r1}
+	hash := common.HexToHash("11")
+
+	if err := s.WriteReceipts(hash, receipts); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := s.ReadReceipts(hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the receipt
+	if len(r) != len(receipts) {
+		t.Fatal("lengths are different")
+	}
+	for indx, i := range receipts {
+		if i.TxHash != r[indx].TxHash {
+			t.Fatal("receipt txhash is not correct")
+		}
+	}
+}

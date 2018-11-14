@@ -37,7 +37,7 @@ func NewParityProtocol(conn network.Conn, peer *network.Peer, getStatus GetStatu
 	return &Parity{
 		conn:      conn,
 		peer:      peer,
-		ethereum:  ethereum.NewEthereumProtocol(conn, peer, nil),
+		ethereum:  ethereum.NewEthereumProtocol(conn, peer, nil, nil),
 		getStatus: getStatus,
 	}
 }
@@ -85,7 +85,7 @@ func (p *Parity) RequestHeadersByNumber(number uint64, amount uint64, skip uint6
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
-func (p *Parity) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+func (p *Parity) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
 	return p.ethereum.RequestHeadersByHash(origin, amount, skip, reverse)
 }
 

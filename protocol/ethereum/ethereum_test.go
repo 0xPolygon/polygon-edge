@@ -150,7 +150,7 @@ func headersToNumbers(headers []*types.Header) []int {
 }
 
 func TestEthereumBlockHeadersMsg(t *testing.T) {
-	headers := blockchain.NewTestChain(100)
+	headers := blockchain.NewTestHeaderChain(100)
 
 	b0, close0 := blockchain.NewTestBlockchain(t, headers)
 	defer close0()
@@ -221,5 +221,131 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 				tt.Fatal("failed to receive the headers")
 			}
 		})
+	}
+}
+
+func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
+	// There are no body and no receipts, the answer is empty
+	headers := blockchain.NewTestHeaderChain(100)
+
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
+	defer close0()
+
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	batch := []common.Hash{
+		headers[0].Hash(),
+		headers[5].Hash(),
+		headers[10].Hash(),
+	}
+
+	// bodies
+
+	ack := make(chan network.AckMessage, 1)
+	eth0.Conn().SetHandler(BlockBodiesMsg, ack, 5*time.Second)
+
+	if err := eth0.RequestBodies(batch); err != nil {
+		t.Fatal(err)
+	}
+	if resp := <-ack; resp.Complete {
+		if len(resp.Payload) != 1 {
+			t.Fatal("there is some content")
+		}
+	} else {
+		t.Fatal("body request failed")
+	}
+
+	// receipts
+
+	ack = make(chan network.AckMessage, 1)
+	eth0.Conn().SetHandler(ReceiptsMsg, ack, 5*time.Second)
+
+	if err := eth0.RequestReceipts(batch); err != nil {
+		t.Fatal(err)
+	}
+	if resp := <-ack; resp.Complete {
+		if len(resp.Payload) != 1 { // when the response is empty is 1 byte
+			t.Fatal("there is some content")
+		}
+	} else {
+		t.Fatal("body request failed")
+	}
+}
+
+func TestEthereumBody(t *testing.T) {
+	b0, close0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(100))
+	defer close0()
+
+	headers, blocks, receipts := blockchain.NewTestBodyChain(3) // only s1 needs to have bodies and receipts
+	b1, close1 := blockchain.NewTestBlockchainWithBlocks(t, blocks, receipts)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	// NOTE, we use tx to check if the response is correct, genesis does not
+	// have any tx so if we use that one it will fail
+	batch := []uint64{2}
+
+	msg := []common.Hash{}
+	for _, i := range batch {
+		msg = append(msg, headers[i].Hash())
+	}
+
+	// -- bodies --
+
+	ack := make(chan network.AckMessage, 1)
+	eth0.Conn().SetHandler(BlockBodiesMsg, ack, 5*time.Second)
+
+	if err := eth0.RequestBodies(msg); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := <-ack
+	if !resp.Complete {
+		t.Fatal("not completed")
+	}
+	var bodies []*types.Body
+	if err := rlp.DecodeBytes(resp.Payload, &bodies); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != len(batch) {
+		t.Fatal("bodies: length is not correct")
+	}
+	for indx := range batch {
+		if batch[indx] != bodies[indx].Transactions[0].Nonce() {
+			t.Fatal("numbers dont match")
+		}
+	}
+
+	// -- receipts --
+
+	ack = make(chan network.AckMessage, 1)
+	eth0.Conn().SetHandler(ReceiptsMsg, ack, 5*time.Second)
+
+	if err := eth0.RequestReceipts(msg); err != nil {
+		t.Fatal(err)
+	}
+
+	resp = <-ack
+	if !resp.Complete {
+		t.Fatal("not completed")
+	}
+	var receiptsResp [][]*types.Receipt
+	if err := rlp.DecodeBytes(resp.Payload, &receiptsResp); err != nil {
+		t.Fatal(err)
+	}
+	if len(receiptsResp) != len(batch) {
+		t.Fatal("receipts: length is not correct")
+	}
+	for indx, i := range batch {
+		// cumulativegasused is the index of the block to which the receipt belongs
+		if i != receiptsResp[indx][0].CumulativeGasUsed {
+			t.Fatal("error")
+		}
 	}
 }

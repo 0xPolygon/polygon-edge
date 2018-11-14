@@ -80,6 +80,52 @@ func (b *Blockchain) Header() (*types.Header, error) {
 	return header, nil
 }
 
+// CommitChain writes all the other data related to the chain (body and receipts)
+func (b *Blockchain) CommitChain(blocks []*types.Block, receipts []types.Receipts) error {
+	if len(blocks) != len(receipts) {
+		return fmt.Errorf("length dont match. %d and %d", len(blocks), len(receipts))
+	}
+
+	for i := 1; i < len(blocks); i++ {
+		if blocks[i].Number().Uint64()-1 != blocks[i-1].Number().Uint64() {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number().Uint64(), blocks[i-1].Number().Uint64())
+		}
+		if blocks[i].ParentHash() != blocks[i-1].Hash() {
+			return fmt.Errorf("parent hash not correct")
+		}
+		// TODO, validate bodies
+	}
+
+	for indx, block := range blocks {
+		r := receipts[indx]
+
+		hash := block.Hash()
+		if err := b.db.WriteBody(hash, block.Body()); err != nil {
+			return err
+		}
+		if err := b.db.WriteReceipts(hash, r); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// GetReceiptsByHash returns the receipts by their hash
+func (b *Blockchain) GetReceiptsByHash(hash common.Hash) types.Receipts {
+	r, _ := b.db.ReadReceipts(hash)
+	return r
+}
+
+// GetBodyByHash returns the body by their hash
+func (b *Blockchain) GetBodyByHash(hash common.Hash) *types.Body {
+	body, err := b.db.ReadBody(hash)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return body
+}
+
 // GetHeaderByHash returns the header by his hash
 func (b *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 	h, _ := b.db.ReadHeader(hash)

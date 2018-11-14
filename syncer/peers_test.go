@@ -54,7 +54,7 @@ func testPeers(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *
 }
 
 func TestPeerConcurrentHeaderCalls(t *testing.T) {
-	headers := blockchain.NewTestChain(1000)
+	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
 	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
@@ -97,7 +97,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 }
 
 func TestPeerEmptyResponseFails(t *testing.T) {
-	headers := blockchain.NewTestChain(1000)
+	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
 	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
@@ -123,7 +123,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 func TestPeerCloseConnection(t *testing.T) {
 	// close the connection while doing the request
 
-	headers := blockchain.NewTestChain(1000)
+	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
 	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
@@ -179,23 +179,23 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, head
 
 func TestPeerFindCommonAncestor(t *testing.T) {
 	t.Run("Server with shorter chain", func(t *testing.T) {
-		headers := blockchain.NewTestChain(1000)
+		headers := blockchain.NewTestHeaderChain(1000)
 		testPeerAncestor(t, headers[0:5], headers, headers[4])
 	})
 
 	t.Run("Server with longer chain", func(t *testing.T) {
-		headers := blockchain.NewTestChain(1000)
+		headers := blockchain.NewTestHeaderChain(1000)
 		testPeerAncestor(t, headers, headers[0:5], headers[4])
 	})
 
 	t.Run("Same chain", func(t *testing.T) {
-		headers := blockchain.NewTestChain(100)
+		headers := blockchain.NewTestHeaderChain(100)
 		testPeerAncestor(t, headers, headers, headers[len(headers)-1])
 	})
 
 	t.Run("No matches", func(t *testing.T) {
-		h0 := blockchain.NewTestChain(100)
-		h1 := blockchain.NewTestChainWithSeed(100, 10)
+		h0 := blockchain.NewTestHeaderChain(100)
+		h1 := blockchain.NewTestHeaderChainWithSeed(100, 10)
 		testPeerAncestor(t, h0, h1, nil)
 	})
 }

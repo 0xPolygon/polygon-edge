@@ -30,8 +30,8 @@ func (f *fakeConsensus) Close() error {
 	return nil
 }
 
-// NewTestChainWithSeed creates a new chain with a seed factor
-func NewTestChainWithSeed(n int, seed int) []*types.Header {
+// NewTestHeaderChainWithSeed creates a new chain with a seed factor
+func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
 	genesis := &types.Header{Number: big.NewInt(0), GasLimit: uint64(seed)}
 	headers := []*types.Header{genesis}
 
@@ -49,9 +49,63 @@ func NewTestChainWithSeed(n int, seed int) []*types.Header {
 	return headers
 }
 
-// NewTestChain creates a chain of valid headers
-func NewTestChain(n int) []*types.Header {
-	return NewTestChainWithSeed(n, 0)
+// NewTestHeaderChain creates a chain of valid headers
+func NewTestHeaderChain(n int) []*types.Header {
+	return NewTestHeaderChainWithSeed(n, 0)
+}
+
+// NewTestBodyChain creates a test blockchain with headers, body and receipts
+func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, []types.Receipts) {
+	genesis := types.NewBlockWithHeader(&types.Header{Number: big.NewInt(0), GasLimit: uint64(0)})
+
+	blocks := []*types.Block{genesis}
+	receipts := []types.Receipts{types.Receipts{}} // genesis does not have tx
+
+	for i := 1; i < n; i++ {
+		header := &types.Header{
+			ParentHash: blocks[i-1].Hash(),
+			Number:     big.NewInt(int64(i)),
+			Difficulty: big.NewInt(int64(i)),
+			Extra:      []byte{},
+		}
+
+		// -- txs ---
+		t0 := types.NewTransaction(uint64(i), common.HexToAddress("00"), big.NewInt(0), 0, big.NewInt(0), header.Hash().Bytes())
+		txs := []*types.Transaction{t0}
+
+		// -- receipts --
+		r0 := types.NewReceipt([]byte{1}, false, uint64(i))
+		r0.TxHash = t0.Hash()
+
+		localReceipts := types.Receipts{r0}
+
+		block := types.NewBlock(header, txs, nil, nil)
+
+		blocks = append(blocks, block)
+		receipts = append(receipts, localReceipts)
+	}
+
+	headers := []*types.Header{}
+	for _, block := range blocks {
+		headers = append(headers, block.Header())
+	}
+
+	return headers, blocks, receipts
+}
+
+// NewTestBlockchainWithBlocks creates a dummy blockchain with headers, bodies and receipts
+func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts []types.Receipts) (*Blockchain, func()) {
+	headers := []*types.Header{}
+	for _, block := range blocks {
+		headers = append(headers, block.Header())
+	}
+
+	b, close := NewTestBlockchain(t, headers)
+	if err := b.CommitChain(blocks, receipts); err != nil {
+		t.Fatal(err)
+	}
+
+	return b, close
 }
 
 // NewTestBlockchain creates a new dummy blockchain for testing

@@ -26,6 +26,12 @@ var (
 
 	// CANONICAL is the prefix for the canonical chain numbers
 	CANONICAL = []byte("c")
+
+	// BODY is the prefix for bodies
+	BODY = []byte("b")
+
+	// RECEIPTS is the prefix for receipts
+	RECEIPTS = []byte("r")
 )
 
 // sub-prefix
@@ -163,12 +169,73 @@ func (s *Storage) ReadHeader(hash common.Hash) (*types.Header, error) {
 	return header, err
 }
 
+// -- body --
+
+// WriteBody writes the body
+func (s *Storage) WriteBody(hash common.Hash, body *types.Body) error {
+	data, err := rlp.EncodeToBytes(body)
+	if err != nil {
+		return err
+	}
+	return s.set(BODY, hash.Bytes(), data)
+}
+
+// ReadBody reads the body
+func (s *Storage) ReadBody(hash common.Hash) (*types.Body, error) {
+	data, err := s.get(BODY, hash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	var body *types.Body
+	err = rlp.DecodeBytes(data, &body)
+	return body, err
+}
+
+// -- receipts --
+
+// WriteReceipts writes the receipts
+func (s *Storage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) error {
+	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
+	for i, receipt := range receipts {
+		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
+	}
+
+	data, err := rlp.EncodeToBytes(storageReceipts)
+	if err != nil {
+		return err
+	}
+
+	return s.set(RECEIPTS, hash.Bytes(), data)
+}
+
+// ReadReceipts reads the receipts
+func (s *Storage) ReadReceipts(hash common.Hash) ([]*types.Receipt, error) {
+	data, err := s.get(RECEIPTS, hash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	var storage []*types.ReceiptForStorage
+	if err = rlp.DecodeBytes(data, &storage); err != nil {
+		return nil, err
+	}
+
+	receipts := make([]*types.Receipt, len(storage))
+	for i, receipt := range storage {
+		receipts[i] = (*types.Receipt)(receipt)
+	}
+
+	return receipts, err
+}
+
 // -- write ops --
 
 func (s *Storage) set(p []byte, k []byte, v []byte) error {
-	return s.db.Put(k, v, nil)
+	p = append(p, k...)
+	return s.db.Put(p, v, nil)
 }
 
 func (s *Storage) get(p []byte, k []byte) ([]byte, error) {
-	return s.db.Get(k, nil)
+	p = append(p, k...)
+	return s.db.Get(p, nil)
 }

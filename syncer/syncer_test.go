@@ -125,7 +125,7 @@ func TestListCommit(t *testing.T) {
 
 /*
 func TestSyncer(t *testing.T) {
-	headers := blockchain.NewTestChain(1000)
+	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
 	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
