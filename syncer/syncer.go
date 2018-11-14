@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,6 +34,7 @@ type Blockchain interface {
 	Header() (*types.Header, error)
 	Genesis() *types.Header
 	WriteHeaders(headers []*types.Header) error
+	GetHeaderByNumber(number *big.Int) *types.Header
 }
 
 // Job is the syncer job
@@ -53,6 +55,7 @@ type Syncer struct {
 
 	list     *list
 	listLock *sync.Mutex
+	header   *types.Header // TODO, update it
 }
 
 // NewSyncer creates a new syncer
@@ -69,6 +72,7 @@ func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer
 		WorkerPool: make(chan chan Job, 10),
 		blockchain: blockchain,
 		listLock:   &sync.Mutex{},
+		header:     header,
 		list:       newList(header.Number.Uint64()+1, 6000000),
 	}
 

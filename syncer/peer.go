@@ -2,11 +2,14 @@ package syncer
 
 import (
 	"fmt"
+	"math"
+	"math/big"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
@@ -145,6 +148,66 @@ func (p *Peer) run(maxRequests int) {
 	for i := 0; i < maxRequests; i++ {
 		go p.requestTask(strconv.Itoa(i))
 	}
+}
+
+// FindCommonAncestor finds the common ancestor with the peer and the syncer connection
+func (p *Peer) FindCommonAncestor() (*types.Header, error) {
+	// Binary search, TODO, works but it may take a lot of time
+
+	min := 0 // genesis
+	max := int(p.syncer.header.Number.Uint64())
+
+	var header *types.Header
+
+	for min <= max {
+		m := uint64(math.Floor(float64(min+max) / 2))
+
+		ack := make(chan network.AckMessage, 1)
+		p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 5*time.Second)
+
+		if err := p.eth.RequestHeadersByNumber(m, 1, 0, false); err != nil {
+			return nil, err
+		}
+
+		resp := <-ack
+		if !resp.Complete {
+			return nil, fmt.Errorf("timeout")
+		}
+
+		var headers []*types.Header
+		if err := rlp.DecodeBytes(resp.Payload, &headers); err != nil {
+			return nil, err
+		}
+
+		l := len(headers)
+		if l == 0 {
+			// peer does not have the m peer, search in lower bounds
+			max = int(m - 1)
+		} else if l == 1 {
+			header = headers[0]
+			if header.Number.Uint64() != m {
+				return nil, fmt.Errorf("header response number not correct")
+			}
+
+			expectedHeader := p.syncer.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
+			if expectedHeader == nil {
+				return nil, fmt.Errorf("cannot find the header in local chain")
+			}
+
+			if expectedHeader.Hash() == header.Hash() {
+				min = int(m + 1)
+			} else {
+				max = int(m - 1)
+			}
+		} else {
+			return nil, fmt.Errorf("expected either 1 or 0 headers")
+		}
+	}
+
+	if min == 0 {
+		return nil, nil
+	}
+	return header, nil
 }
 
 // -- downloader --

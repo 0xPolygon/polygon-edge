@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol"
@@ -41,11 +41,13 @@ func testPeers(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *
 	s0.RegisterProtocol(protocol.ETH63, c0)
 	s1.RegisterProtocol(protocol.ETH63, c1)
 
-	s0.Dial(s1.Enode)
+	if err := s0.DialSync(s1.Enode); err != nil {
+		t.Fatal(err)
+	}
 
-	time.Sleep(500 * time.Millisecond)
-
+	// p0 is the connection reference for server 0 to peer 1
 	p0 := NewPeer(peer0, nil, nil)
+	// p1 is the connection reference for server 1 to peer 0
 	p1 := NewPeer(peer1, nil, nil)
 
 	return p0, p1
@@ -142,4 +144,58 @@ func TestPeerCloseConnection(t *testing.T) {
 	if _, err := p0.requestJob(Job{2, 100}); err == nil {
 		t.Fatal("it should fail after the connection has been closed")
 	}
+}
+
+func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, header *types.Header) {
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, h0)
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, h1)
+	defer close1()
+
+	syncer, err := NewSyncer(1, b0, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s0, s1 := network.TestServers()
+	p0, _ := testPeers(t, s0, b0, s1, b1)
+	p0.syncer = syncer
+
+	h, err := p0.FindCommonAncestor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if header == nil && h != nil {
+		fmt.Println(h)
+		t.Fatal("expected nothing but header has content")
+	}
+	if h.Hash() != header.Hash() {
+		t.Fatal("hash dont match")
+	}
+}
+
+func TestPeerFindCommonAncestor(t *testing.T) {
+	t.Run("Server with shorter chain", func(t *testing.T) {
+		headers := blockchain.NewTestChain(1000)
+		testPeerAncestor(t, headers[0:5], headers, headers[4])
+	})
+
+	t.Run("Server with longer chain", func(t *testing.T) {
+		headers := blockchain.NewTestChain(1000)
+		testPeerAncestor(t, headers, headers[0:5], headers[4])
+	})
+
+	t.Run("Same chain", func(t *testing.T) {
+		headers := blockchain.NewTestChain(100)
+		testPeerAncestor(t, headers, headers, headers[len(headers)-1])
+	})
+
+	t.Run("No matches", func(t *testing.T) {
+		h0 := blockchain.NewTestChain(100)
+		h1 := blockchain.NewTestChainWithSeed(100, 10)
+		testPeerAncestor(t, h0, h1, nil)
+	})
 }

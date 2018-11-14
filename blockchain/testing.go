@@ -30,16 +30,28 @@ func (f *fakeConsensus) Close() error {
 	return nil
 }
 
-// NewTestChain creates a chain of valid headers
-func NewTestChain(n int) []*types.Header {
-	genesis := &types.Header{Number: big.NewInt(0)}
+// NewTestChainWithSeed creates a new chain with a seed factor
+func NewTestChainWithSeed(n int, seed int) []*types.Header {
+	genesis := &types.Header{Number: big.NewInt(0), GasLimit: uint64(seed)}
 	headers := []*types.Header{genesis}
 
 	for i := 1; i < n; i++ {
-		headers = append(headers, &types.Header{ParentHash: headers[i-1].Hash(), Number: big.NewInt(int64(i)), Difficulty: big.NewInt(int64(i))})
+		header := &types.Header{
+			ParentHash: headers[i-1].Hash(),
+			Number:     big.NewInt(int64(i)),
+			Difficulty: big.NewInt(int64(i)),
+			GasLimit:   uint64(seed), // enough to change the hash
+		}
+
+		headers = append(headers, header)
 	}
 
 	return headers
+}
+
+// NewTestChain creates a chain of valid headers
+func NewTestChain(n int) []*types.Header {
+	return NewTestChainWithSeed(n, 0)
 }
 
 // NewTestBlockchain creates a new dummy blockchain for testing
