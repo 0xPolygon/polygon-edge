@@ -226,10 +226,6 @@ type newBlockData struct {
 
 // HandleMsg handles a message from ethereum
 func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
-	if code != TxMsg && code != 0x1 {
-		fmt.Printf("Code: %d\n", code)
-	}
-
 	switch {
 	case code == StatusMsg:
 		return fmt.Errorf("Status msg not expected after handshake")

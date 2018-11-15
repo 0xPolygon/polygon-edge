@@ -8,22 +8,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
-// Pending stores the pending requests
-type Pending struct {
-	pending map[string]*callback
-	// timer
-	// encode tasks
-}
-
-func (p *Pending) sethandler() {
-
-}
+const (
+	receiptsContext = "receipts"
+	bodiesContext   = "bodies"
+	headersContext  = "headers"
+)
 
 // AckMessage is the ack message
 type AckMessage struct {
@@ -51,9 +48,9 @@ type Peer struct {
 	closeCh    chan struct{}
 	once       sync.Once
 
-	// -- pending operations (TODO. make an struct of this)
-	pendingBlocks     map[uint64]*callback
-	pendingBlocksLock sync.Mutex
+	// pendin objects
+	pending     map[string]*callback
+	pendingLock sync.Mutex
 
 	timer *time.Timer
 }
@@ -63,13 +60,13 @@ func NewPeer(peer *network.Peer, workerPool chan chan Job, syncer *Syncer) *Peer
 	eth := peer.GetProtocol("eth", 63).(*ethereum.Ethereum)
 
 	p := &Peer{
-		peer:              peer,
-		eth:               eth,
-		closeCh:           make(chan struct{}),
-		workerPool:        workerPool,
-		syncer:            syncer,
-		pendingBlocks:     make(map[uint64]*callback),
-		pendingBlocksLock: sync.Mutex{},
+		peer:        peer,
+		eth:         eth,
+		closeCh:     make(chan struct{}),
+		workerPool:  workerPool,
+		syncer:      syncer,
+		pending:     make(map[string]*callback),
+		pendingLock: sync.Mutex{},
 	}
 
 	eth.SetDownloader(p)
@@ -88,7 +85,7 @@ func (p *Peer) stopTasks() {
 func (p *Peer) requestTask(id string) {
 	jobChannel := make(chan Job, 10)
 
-	for {
+	for { // change this with a queue
 		p.workerPool <- jobChannel
 
 		select {
@@ -96,7 +93,7 @@ func (p *Peer) requestTask(id string) {
 
 			fmt.Printf("SYNC (%s) (%s): %d\n", p.peer.PrettyString(), id, job.block)
 
-			headers, err := p.requestJob(job)
+			headers, err := p.requestHeaders(job.block)
 			if err != nil {
 				// check if the connection is still open
 				if p.peer.Connected == false {
@@ -104,55 +101,87 @@ func (p *Peer) requestTask(id string) {
 					p.stopTasks()
 				}
 			}
-			p.syncer.Result(job.id, headers, err)
 
+			p.syncer.Result(job.id, headers, err)
 		case <-p.closeCh:
 			return
 		}
 	}
 }
 
-func (p *Peer) requestJob(j Job) ([]*types.Header, error) {
+func (p *Peer) requestReceipts(receipts []*types.Header) ([][]*types.Receipt, error) {
+	if len(receipts) == 0 {
+		return nil, nil
+	}
+
+	hashes := []common.Hash{}
+	for _, b := range receipts {
+		hashes = append(hashes, b.Hash())
+	}
+
+	hash := receipts[0].ReceiptHash.String()
+
 	ack := make(chan AckMessage, 1)
-	if err := p.requestHeader(j, ack); err != nil {
+	p.setHandler(hash, 1, ack)
+
+	if err := p.eth.RequestReceipts(hashes); err != nil {
 		return nil, err
 	}
-
-	// wait for ack
 	resp := <-ack
 	if !resp.Complete {
-		return nil, fmt.Errorf("timeout")
+		return nil, fmt.Errorf("failed")
 	}
 
-	return resp.Result.([]*types.Header), nil
+	// TODO. handle malformed response in the receipts
+	response := resp.Result.([][]*types.Receipt)
+	return response, nil
 }
 
-func (p *Peer) requestHeader(job Job, ack chan AckMessage) error {
-	if err := p.eth.RequestHeadersByNumber(job.block, 100, 0, false); err != nil {
-		return err
+func (p *Peer) requestBodies(bodies []*types.Header) (ethereum.BlockBodiesData, error) {
+	if len(bodies) == 0 {
+		return nil, nil
 	}
 
-	p.pendingBlocksLock.Lock()
-	p.pendingBlocks[job.block] = &callback{job.id, ack}
-	p.pendingBlocksLock.Unlock()
+	hashes := []common.Hash{}
+	for _, b := range bodies {
+		hashes = append(hashes, b.Hash())
+	}
 
-	p.timer = time.AfterFunc(5*time.Second, func() {
-		p.pendingBlocksLock.Lock()
-		if _, ok := p.pendingBlocks[job.block]; !ok {
-			p.pendingBlocksLock.Unlock()
-			return
-		}
+	first := bodies[0]
+	hash := encodeHash(first.UncleHash, first.TxHash).String()
 
-		delete(p.pendingBlocks, job.block)
-		p.pendingBlocksLock.Unlock()
+	ack := make(chan AckMessage, 1)
+	p.setHandler(hash, 1, ack)
 
-		select {
-		case ack <- AckMessage{false, nil}:
-		default:
-		}
-	})
+	if err := p.eth.RequestBodies(hashes); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
 
-	return nil
+	// TODO. handle malformed response in the bodies
+	response := resp.Result.(ethereum.BlockBodiesData)
+	return response, nil
+}
+
+func (p *Peer) requestHeaders(origin uint64) ([]*types.Header, error) {
+	hash := string(origin)
+
+	ack := make(chan AckMessage, 1)
+	p.setHandler(hash, 1, ack)
+
+	if err := p.eth.RequestHeadersByNumber(origin, 100, 0, false); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
+
+	response := resp.Result.([]*types.Header)
+	return response, nil
 }
 
 func (p *Peer) run(maxRequests int) {
@@ -221,6 +250,85 @@ func (p *Peer) FindCommonAncestor() (*types.Header, error) {
 	return header, nil
 }
 
+// fetchHeight returns the header of the head hash of the peer
+func (p *Peer) fetchHeight() (*types.Header, error) {
+	head := p.peer.HeaderHash()
+
+	ack := make(chan network.AckMessage, 1)
+	p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 5*time.Second)
+
+	if err := p.eth.RequestHeadersByHash(head, 1, 0, false); err != nil {
+		return nil, err
+	}
+
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("timeout")
+	}
+
+	var headers []*types.Header
+	if err := rlp.DecodeBytes(resp.Payload, &headers); err != nil {
+		return nil, err
+	}
+	if len(headers) != 1 {
+		return nil, fmt.Errorf("expected one but found %d", len(headers))
+	}
+
+	header := headers[0]
+	if header.Hash() != head {
+		return nil, fmt.Errorf("returned hash is not the correct one")
+	}
+
+	return header, nil
+}
+
+// -- handlers --
+
+func (p *Peer) setHandler(key string, id uint32, ack chan AckMessage) error {
+	p.pendingLock.Lock()
+	p.pending[key] = &callback{id, ack}
+	p.pendingLock.Unlock()
+
+	p.timer = time.AfterFunc(5*time.Second, func() {
+		p.pendingLock.Lock()
+		if _, ok := p.pending[key]; !ok {
+			p.pendingLock.Unlock()
+			return
+		}
+
+		delete(p.pending, key)
+		p.pendingLock.Unlock()
+
+		select {
+		case ack <- AckMessage{false, nil}:
+		default:
+		}
+	})
+
+	return nil
+}
+
+func (p *Peer) consumeHandler(origin string, result interface{}) bool {
+	p.pendingLock.Lock()
+	callback, ok := p.pending[origin]
+	if !ok {
+		p.pendingLock.Unlock()
+		return false
+	}
+
+	// delete
+	delete(p.pending, origin)
+	p.pendingLock.Unlock()
+
+	// let him know its over
+	select {
+	case callback.ack <- AckMessage{Complete: true, Result: result}:
+	default:
+	}
+
+	return true
+}
+
 // -- downloader --
 
 // Headers receives the headers
@@ -231,33 +339,50 @@ func (p *Peer) Headers(headers []*types.Header) {
 		return
 	}
 
-	origin := headers[0].Number.Uint64()
-
-	// check if its in pending blocks
-	p.pendingBlocksLock.Lock()
-	callback, ok := p.pendingBlocks[origin]
-	if !ok {
-		p.pendingBlocksLock.Unlock()
-		return
-	}
-
-	// delete
-	delete(p.pendingBlocks, origin)
-	p.pendingBlocksLock.Unlock()
-
-	// let him know its over
-	select {
-	case callback.ack <- AckMessage{Complete: true, Result: headers}:
-	default:
+	hash := string(headers[0].Number.Uint64())
+	if !p.consumeHandler(hash, headers) {
+		fmt.Println("Could not consume headers handler")
 	}
 }
 
 // Receipts receives the receipts
 func (p *Peer) Receipts(receipts [][]*types.Receipt) {
+	if len(receipts) == 0 {
+		// this should only happen if the other peer does not have the data
+		return
+	}
 
+	hash := types.DeriveSha(types.Receipts(receipts[0]))
+	if !p.consumeHandler(hash.String(), receipts) {
+		fmt.Println("Could not consume receipts handler")
+	}
 }
 
 // Bodies receives the bodies
 func (p *Peer) Bodies(bodies ethereum.BlockBodiesData) {
+	if len(bodies) == 0 {
+		// this should only happen if the other peer does not have the data
+		return
+	}
 
+	first := bodies[0]
+	hash := encodeHash(types.CalcUncleHash(first.Uncles), types.DeriveSha(types.Transactions(first.Transactions)))
+
+	if !p.consumeHandler(hash.String(), bodies) {
+		fmt.Println("Could not consume bodies handler")
+	}
+}
+
+func encodeHash(x common.Hash, y common.Hash) common.Hash {
+	hw := sha3.NewKeccak256()
+	if _, err := hw.Write(x.Bytes()); err != nil {
+		panic(err)
+	}
+	if _, err := hw.Write(y.Bytes()); err != nil {
+		panic(err)
+	}
+
+	var h common.Hash
+	hw.Sum(h[:0])
+	return h
 }

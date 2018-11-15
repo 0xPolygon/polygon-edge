@@ -216,7 +216,6 @@ func TestBody(t *testing.T) {
 	}
 }
 
-// TODO, not working
 func TestReceipts(t *testing.T) {
 	s, close := newStorage(t)
 	defer close()

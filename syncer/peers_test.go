@@ -22,20 +22,28 @@ var status = &ethereum.Status{
 }
 
 func testPeers(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *network.Server, b1 *blockchain.Blockchain) (*Peer, *Peer) {
-	st := func() (*ethereum.Status, error) {
-		return status, nil
+	sts := func(b *blockchain.Blockchain) func() (*ethereum.Status, error) {
+		header, err := b.Header()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return func() (*ethereum.Status, error) {
+			s := status
+			s.CurrentBlock = header.Hash()
+			return s, nil
+		}
 	}
 
 	var peer0 *network.Peer
 	c0 := func(s network.Conn, p *network.Peer) protocol.Handler {
 		peer0 = p
-		return ethereum.NewEthereumProtocol(s, p, st, b0)
+		return ethereum.NewEthereumProtocol(s, p, sts(b0), b0)
 	}
 
 	var peer1 *network.Peer
 	c1 := func(s network.Conn, p *network.Peer) protocol.Handler {
 		peer1 = p
-		return ethereum.NewEthereumProtocol(s, p, st, b1)
+		return ethereum.NewEthereumProtocol(s, p, sts(b1), b1)
 	}
 
 	s0.RegisterProtocol(protocol.ETH63, c0)
@@ -72,7 +80,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 
 	for indx, i := range cases {
 		go func(indx int, i uint64) {
-			h, err := p0.requestJob(Job{uint32(indx), i})
+			h, err := p0.requestHeaders(i)
 			if err == nil {
 				if len(h) != 100 {
 					err = fmt.Errorf("length not correct")
@@ -110,7 +118,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	s0, s1 := network.TestServers()
 	p0, _ := testPeers(t, s0, b0, s1, b1)
 
-	if _, err := p0.requestJob(Job{0, 1100}); err == nil {
+	if _, err := p0.requestHeaders(1100); err == nil {
 		t.Fatal("it should fail")
 	}
 
@@ -136,12 +144,12 @@ func TestPeerCloseConnection(t *testing.T) {
 	s0, s1 := network.TestServers()
 	p0, _ := testPeers(t, s0, b0, s1, b1)
 
-	if _, err := p0.requestJob(Job{1, 0}); err != nil {
+	if _, err := p0.requestHeaders(0); err != nil {
 		t.Fatal(err)
 	}
 
 	s1.Close()
-	if _, err := p0.requestJob(Job{2, 100}); err == nil {
+	if _, err := p0.requestHeaders(100); err == nil {
 		t.Fatal("it should fail after the connection has been closed")
 	}
 }
@@ -198,4 +206,62 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 		h1 := blockchain.NewTestHeaderChainWithSeed(100, 10)
 		testPeerAncestor(t, h0, h1, nil)
 	})
+
+	// TODO, ancestor with forked chain
+}
+
+func TestPeerHeight(t *testing.T) {
+
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	p0, _ := testPeers(t, s0, b0, s1, b1)
+
+	height, err := p0.fetchHeight()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if height.Number.Uint64() != 999 {
+		t.Fatal("it should be 999")
+	}
+}
+
+func TestPeerReceiptsAndBodies(t *testing.T) {
+	headers, bodies, receipts := blockchain.NewTestBodyChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(1000))
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchainWithBlocks(t, bodies, receipts)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	p0, _ := testPeers(t, s0, b0, s1, b1)
+
+	// start from 1 to avoid genesis block
+	bb, err := p0.requestReceipts(headers[1:11])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bb) != 10 {
+		t.Fatal("expected 10 items")
+	}
+
+	r0, err := p0.requestBodies(headers[1:11])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r0) != 10 {
+		t.Fatal("expected 10 items")
+	}
 }

@@ -183,6 +183,14 @@ func printFirsts(l *list) {
 	fmt.Println(strings.Join(str, ","))
 }
 
+func noBody(h *types.Header) bool {
+	return h.TxHash == types.EmptyRootHash && h.UncleHash == types.EmptyUncleHash
+}
+
+func hasReceipts(h *types.Header) bool {
+	return h.ReceiptHash != types.EmptyRootHash
+}
+
 /*
 // TODO
 func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
@@ -323,7 +331,7 @@ func (l *list) nextSlotFromItem(elem *item) *item {
 }
 
 func (l *list) newItem(block uint64) *item {
-	return &item{id: l.nextSeqNo(), block: block, t: empty}
+	return newItem(l.nextSeqNo(), block)
 }
 
 func (l *list) nextSeqNo() uint32 {
@@ -364,7 +372,19 @@ type item struct {
 	block      uint64
 	prev, next *item
 	t          itemType
-	headers    []*types.Header
+
+	// -- data --
+	headers  []*types.Header
+	bodies   []*types.Body
+	receipts []types.Receipts
+}
+
+func newItem(id uint32, block uint64) *item {
+	return &item{
+		id:    id,
+		block: block,
+		t:     empty,
+	}
 }
 
 func (i *item) Len() uint64 {

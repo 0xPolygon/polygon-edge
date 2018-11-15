@@ -79,7 +79,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, []types.Receipts)
 
 		localReceipts := types.Receipts{r0}
 
-		block := types.NewBlock(header, txs, nil, nil)
+		block := types.NewBlock(header, txs, nil, localReceipts)
 
 		blocks = append(blocks, block)
 		receipts = append(receipts, localReceipts)
