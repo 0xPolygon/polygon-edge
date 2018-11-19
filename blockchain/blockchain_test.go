@@ -15,7 +15,7 @@ func TestGenesis(t *testing.T) {
 	defer close()
 
 	// no genesis block yet
-	if _, err := b.Header(); err == nil {
+	if b.Header() != nil {
 		t.Fatal("it shoudl be empty")
 	}
 
@@ -25,11 +25,7 @@ func TestGenesis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	header, err := b.Header()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	header := b.Header()
 	if header.Hash() != genesis.Hash() {
 		t.Fatal("bad")
 	}
@@ -184,10 +180,7 @@ func TestInsertHeaders(t *testing.T) {
 				}
 			}
 
-			head, err := b.Header()
-			if err != nil {
-				tt.Fatal(err)
-			}
+			head := b.Header()
 
 			expected, ok := chain.headers[cc.Head.hash]
 			if !ok {
@@ -233,10 +226,7 @@ func TestCommitChain(t *testing.T) {
 		block := blocks[i]
 
 		// check blocks
-		i, err := b.db.ReadBody(block.Hash())
-		if err != nil {
-			t.Fatal(err)
-		}
+		i := b.db.ReadBody(block.Hash())
 		if len(i.Transactions) != 1 {
 			t.Fatal("should have 1 tx")
 		}
@@ -245,10 +235,7 @@ func TestCommitChain(t *testing.T) {
 		}
 
 		// check receipts
-		r, err := b.db.ReadReceipts(block.Hash())
-		if err != nil {
-			t.Fatal(err)
-		}
+		r := b.db.ReadReceipts(block.Hash())
 		if len(r) != 1 {
 			t.Fatal("should have 1 receipt")
 		}

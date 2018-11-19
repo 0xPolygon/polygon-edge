@@ -16,7 +16,7 @@ func newStorage(t *testing.T) (*Storage, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStorage(path)
+	s, err := NewStorage(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,14 +51,8 @@ func TestCanonicalChain(t *testing.T) {
 	}
 
 	for _, cc := range cases {
-		if err := s.WriteCanonicalHash(cc.Number, cc.Hash); err != nil {
-			t.Fatal(err)
-		}
-
-		data, err := s.ReadCanonicalHash(cc.Number)
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.WriteCanonicalHash(cc.Number, cc.Hash)
+		data := s.ReadCanonicalHash(cc.Number)
 
 		if !reflect.DeepEqual(data, cc.Hash) {
 			t.Fatal("not match")
@@ -89,13 +83,9 @@ func TestDifficulty(t *testing.T) {
 	}
 
 	for _, cc := range cases {
-		if err := s.WriteDiff(cc.Hash, cc.Diff); err != nil {
-			t.Fatal(err)
-		}
-		diff, err := s.ReadDiff(cc.Hash)
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.WriteDiff(cc.Hash, cc.Diff)
+		diff := s.ReadDiff(cc.Hash)
+
 		if !reflect.DeepEqual(cc.Diff, diff) {
 			t.Fatal("bad")
 		}
@@ -115,13 +105,9 @@ func TestHead(t *testing.T) {
 	}
 
 	for _, cc := range cases {
-		if err := s.WriteHeadHash(cc.Hash); err != nil {
-			t.Fatal(err)
-		}
-		hash, err := s.ReadHeadHash()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.WriteHeadHash(cc.Hash)
+		hash := s.ReadHeadHash()
+
 		if !reflect.DeepEqual(cc.Hash, *hash) {
 			t.Fatal("bad")
 		}
@@ -140,13 +126,9 @@ func TestForks(t *testing.T) {
 	}
 
 	for _, cc := range cases {
-		if err := s.WriteForks(cc.Forks); err != nil {
-			t.Fatal(err)
-		}
-		forks, err := s.ReadForks()
-		if err != nil {
-			t.Fatal(err)
-		}
+		s.WriteForks(cc.Forks)
+		forks := s.ReadForks()
+
 		if !reflect.DeepEqual(cc.Forks, forks) {
 			t.Fatal("bad")
 		}
@@ -165,13 +147,8 @@ func TestHeader(t *testing.T) {
 		Extra:      []byte{}, // if not set it will fail
 	}
 
-	if err := s.WriteHeader(header); err != nil {
-		t.Fatal(err)
-	}
-	header1, err := s.ReadHeader(header.Hash())
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.WriteHeader(header)
+	header1 := s.ReadHeader(header.Hash())
 
 	if !reflect.DeepEqual(header.Hash(), header1.Hash()) {
 		t.Fatal("bad")
@@ -196,13 +173,8 @@ func TestBody(t *testing.T) {
 	block := types.NewBlock(header, []*types.Transaction{t0, t1}, nil, nil)
 	hash := block.Hash()
 
-	if err := s.WriteBody(hash, block.Body()); err != nil {
-		t.Fatal(err)
-	}
-	body, err := s.ReadBody(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.WriteBody(hash, block.Body())
+	body := s.ReadBody(hash)
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
 	tx0, tx1 := block.Body().Transactions, body.Transactions
@@ -229,14 +201,8 @@ func TestReceipts(t *testing.T) {
 	receipts := []*types.Receipt{r0, r1}
 	hash := common.HexToHash("11")
 
-	if err := s.WriteReceipts(hash, receipts); err != nil {
-		t.Fatal(err)
-	}
-
-	r, err := s.ReadReceipts(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.WriteReceipts(hash, receipts)
+	r := s.ReadReceipts(hash)
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the receipt
 	if len(r) != len(receipts) {
@@ -246,5 +212,20 @@ func TestReceipts(t *testing.T) {
 		if i.TxHash != r[indx].TxHash {
 			t.Fatal("receipt txhash is not correct")
 		}
+	}
+}
+
+func TestEmptyData(t *testing.T) {
+	s, close := newStorage(t)
+	defer close()
+
+	if s.ReadBody(common.HexToHash("1")) != nil {
+		t.Fatal("body should be empty")
+	}
+	if s.ReadHeadHash() != nil {
+		t.Fatal("head hash should be nil")
+	}
+	if s.ReadHeadNumber() != nil {
+		t.Fatal("head hash should be nil")
 	}
 }

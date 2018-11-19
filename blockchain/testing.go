@@ -32,17 +32,22 @@ func (f *fakeConsensus) Close() error {
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
 func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
-	genesis := &types.Header{Number: big.NewInt(0), GasLimit: uint64(seed)}
+	head := func(i int64) *types.Header {
+		return &types.Header{
+			Number:      big.NewInt(i),
+			GasLimit:    uint64(seed),
+			TxHash:      types.EmptyRootHash,
+			UncleHash:   types.EmptyUncleHash,
+			ReceiptHash: types.EmptyRootHash,
+		}
+	}
+
+	genesis := head(0)
 	headers := []*types.Header{genesis}
 
 	for i := 1; i < n; i++ {
-		header := &types.Header{
-			ParentHash: headers[i-1].Hash(),
-			Number:     big.NewInt(int64(i)),
-			Difficulty: big.NewInt(int64(i)),
-			GasLimit:   uint64(seed), // enough to change the hash
-		}
-
+		header := head(int64(i) - 1)
+		header.ParentHash = headers[i-1].Hash()
 		headers = append(headers, header)
 	}
 
@@ -55,11 +60,11 @@ func NewTestHeaderChain(n int) []*types.Header {
 }
 
 // NewTestBodyChain creates a test blockchain with headers, body and receipts
-func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, []types.Receipts) {
+func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receipt) {
 	genesis := types.NewBlockWithHeader(&types.Header{Number: big.NewInt(0), GasLimit: uint64(0)})
 
 	blocks := []*types.Block{genesis}
-	receipts := []types.Receipts{types.Receipts{}} // genesis does not have tx
+	receipts := [][]*types.Receipt{types.Receipts{}} // genesis does not have tx
 
 	for i := 1; i < n; i++ {
 		header := &types.Header{
@@ -94,7 +99,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, []types.Receipts)
 }
 
 // NewTestBlockchainWithBlocks creates a dummy blockchain with headers, bodies and receipts
-func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts []types.Receipts) (*Blockchain, func()) {
+func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) (*Blockchain, func()) {
 	headers := []*types.Header{}
 	for _, block := range blocks {
 		headers = append(headers, block.Header())
@@ -114,7 +119,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) (*Blockchain, func
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := storage.NewStorage(path)
+	s, err := storage.NewStorage(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

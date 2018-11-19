@@ -3,12 +3,10 @@ package syncer
 import (
 	"fmt"
 	"math/big"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
@@ -24,93 +22,167 @@ func DefaultConfig() *Config {
 	return c
 }
 
-var (
-	daoBlock            = uint64(1920000)
-	daoChallengeTimeout = 5 * time.Second
-)
-
 // Blockchain is the reference the syncer needs to connect to the blockchain
 type Blockchain interface {
-	Header() (*types.Header, error)
+	Header() *types.Header
 	Genesis() *types.Header
 	WriteHeaders(headers []*types.Header) error
 	GetHeaderByNumber(number *big.Int) *types.Header
 }
 
-// Job is the syncer job
-type Job struct {
-	id    uint32
-	block uint64
-}
-
 // Syncer is the syncer protocol
 type Syncer struct {
-	NetworkID uint64
-
+	NetworkID  uint64
 	config     *Config
 	peers      map[string]*Peer
 	blockchain Blockchain
-
-	WorkerPool chan chan Job
-
-	list     *list
-	listLock *sync.Mutex
-	header   *types.Header // TODO, update it
+	queue      *queue
 }
 
 // NewSyncer creates a new syncer
 func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer, error) {
-	header, err := blockchain.Header()
-	if err != nil {
-		return nil, err
-	}
-
 	s := &Syncer{
 		config:     config,
 		NetworkID:  networkID,
 		peers:      map[string]*Peer{},
-		WorkerPool: make(chan chan Job, 10),
 		blockchain: blockchain,
-		listLock:   &sync.Mutex{},
-		header:     header,
-		list:       newList(header.Number.Uint64()+1, 6000000),
+		queue:      newQueue(),
 	}
 
+	header := blockchain.Header()
+
+	s.queue.front = s.queue.newItem(header.Number.Uint64() + 1)
+	s.queue.head = header.Hash()
+
+	// Maybe start s.back as s.front and calls to dequeue would block
+
+	fmt.Printf("Current header (%d): %s\n", header.Number.Uint64(), header.Hash().String())
+
 	return s, nil
+}
+
+func (s *Syncer) updateChain(block uint64) {
+	// updates the back object
+	if s.queue.back == nil {
+		s.queue.addBack(block)
+	} else {
+		if block > s.queue.back.block {
+			s.queue.addBack(block)
+		}
+	}
 }
 
 // AddNode is called when we connect to a new node
 func (s *Syncer) AddNode(peer *network.Peer) {
 	fmt.Println("----- ADD NODE -----")
 
-	p := NewPeer(peer, s.WorkerPool, s)
+	if err := s.checkDAOHardFork(peer.GetProtocol("eth", 63).(*ethereum.Ethereum)); err != nil {
+		fmt.Println("Failed to check the DAO block")
+		return
+	}
+
+	fmt.Println("DAO Fork completed")
+
+	p := NewPeer(peer, s)
 	s.peers[peer.ID] = p
+
+	// find data about the peer
+	header, err := p.fetchHeight()
+	if err != nil {
+		fmt.Printf("ERR: fetch height failed: %v\n", err)
+		return
+	}
+
+	/*
+		ancestor, err := p.FindCommonAncestor()
+		if err != nil {
+			fmt.Printf("ERR: ancestor failed: %v\n", err)
+		}
+	*/
+
+	fmt.Printf("Heigth: %d\n", header.Number.Uint64())
+	// fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
+
+	// check that the difficulty is higher than ours
+	if peer.HeaderDiff().Cmp(s.blockchain.Header().Difficulty) < 0 {
+		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
+	}
+
+	fmt.Println("Difficulty higher than ours")
+	s.updateChain(header.Number.Uint64())
 
 	go p.run(s.config.MaxRequests)
 }
 
-// TODO. check that the difficulty of the new peer is higher than ours to consider for sync
-
 // Run is the main entry point
 func (s *Syncer) Run() {
-	for {
-		idle := <-s.WorkerPool
+	/*
+		for {
+			idle := <-s.WorkerPool
 
-		i := s.getSlot()
-		if i == nil {
-			panic("its nil")
+			i := s.dequeue()
+			if i == nil {
+				panic("its nil")
+			}
+
+			idle <- i.ToJob()
+		}
+	*/
+}
+
+func (s *Syncer) dequeue() *Job {
+	job, err := s.queue.Dequeue()
+	if err != nil {
+		fmt.Println("Failed to dequeue: %v\n", err)
+	}
+	return job
+}
+
+func (s *Syncer) deliver(id uint32, data interface{}, err error) {
+	if err != nil {
+		// log
+		fmt.Printf("Failed to deliver (%d): %v\n", id, err)
+		return
+	}
+
+	switch obj := data.(type) {
+	case []*types.Header:
+		if err := s.queue.deliverHeaders(id, obj); err != nil {
+			fmt.Printf("Failed to deliver headers (%d): %v\n", id, err)
 		}
 
-		idle <- i.ToJob()
+	case []*types.Body:
+		if err := s.queue.deliverBodies(id, obj); err != nil {
+			fmt.Printf("Failed to deliver bodies (%d): %v\n", id, err)
+		}
+
+	case [][]*types.Receipt:
+		if err := s.queue.deliverReceipts(id, obj); err != nil {
+			fmt.Printf("Failed to deliver receipts (%d): %v\n", id, err)
+		}
+
+	default:
+		panic(data)
+	}
+
+	if s.queue.NumOfCompletedBatches() > 10 {
+		data := s.queue.FetchCompletedData()
+
+		fmt.Printf("Commit data: %d\n", len(data)*maxElements)
+
+		// write the headers
+		for _, elem := range data {
+			if err := s.blockchain.WriteHeaders(elem.headers); err != nil {
+				fmt.Printf("Failed to write headers batch: %v", err)
+				return
+			}
+		}
 	}
 }
 
 // GetStatus returns the current ethereum status
 func (s *Syncer) GetStatus() (*ethereum.Status, error) {
-	header, err := s.blockchain.Header()
-	if err != nil {
-		return nil, err
-	}
+	header := s.blockchain.Header()
 
 	status := &ethereum.Status{
 		ProtocolVersion: 63,
@@ -122,78 +194,14 @@ func (s *Syncer) GetStatus() (*ethereum.Status, error) {
 	return status, nil
 }
 
-func (s *Syncer) getSlot() *item {
-	s.listLock.Lock()
-	defer s.listLock.Unlock()
+var (
+	daoBlock            = uint64(1920000)
+	daoChallengeTimeout = 5 * time.Second
+)
 
-	return s.list.GetQuerySlot()
-}
-
-func (s *Syncer) Result(id uint32, headers []*types.Header, err error) {
-	s.listLock.Lock()
-	defer s.listLock.Unlock()
-
-	var t itemType
-	if err != nil {
-		t = failed
-
-		fmt.Println("FAILED")
-		fmt.Println(err)
-
-	} else if len(headers) != 100 {
-		t = failed
-	} else {
-		t = completed
-	}
-
-	if err := s.list.UpdateSlot(id, t, headers); err != nil {
-		fmt.Printf("FAIL: %v\n", err)
-	}
-
-	// check the number of completed items to commit those values
-	// protect with lock
-	//if s.list.numCompleted() == 1 {
-	// commit values to the storage
-
-	printFirsts(s.list)
-
-	hh := s.list.commitData()
-	if len(hh) != 0 {
-		fmt.Printf("## COMMIT %d ##\n", len(hh))
-
-		if err := s.blockchain.WriteHeaders(hh); err != nil {
-			fmt.Printf("FAILED TO COMMIT: %v\n", err)
-		}
-	}
-	//}
-}
-
-func printFirsts(l *list) {
-	str := []string{}
-	elem := l.front
-	i := 0
-	for elem != nil && i < 10 {
-		str = append(str, fmt.Sprintf("%d %d", elem.block, elem.t))
-		//if elem.next == nil {
-		//	break
-		//}
-		elem = elem.next
-		i++
-	}
-	fmt.Println(strings.Join(str, ","))
-}
-
-func noBody(h *types.Header) bool {
-	return h.TxHash == types.EmptyRootHash && h.UncleHash == types.EmptyUncleHash
-}
-
-func hasReceipts(h *types.Header) bool {
-	return h.ReceiptHash != types.EmptyRootHash
-}
-
-/*
-// TODO
 func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
+	return nil // hack
+
 	if s.NetworkID == 1 {
 		ack := make(chan network.AckMessage, 1)
 		eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, daoChallengeTimeout)
@@ -211,6 +219,7 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 			}
 
 			// TODO. check that daoblock is correct
+			fmt.Println(headers)
 
 		} else {
 			return fmt.Errorf("timeout")
@@ -218,179 +227,4 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 	}
 
 	return nil
-}
-*/
-
-// -- linked list
-
-const (
-	maxElements = 100
-)
-
-type list struct {
-	front, back *item
-	seq         uint32
-	lock        *sync.Mutex
-}
-
-func newList(head, last uint64) *list {
-	l := &list{seq: 0, lock: &sync.Mutex{}}
-
-	l.front = l.newItem(head)
-	l.back = l.newItem(last)
-
-	l.front.next = l.back
-	l.back.prev = l.front
-
-	return l
-}
-
-func (l *list) UpdateSlot(id uint32, t itemType, headers []*types.Header) error {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	item := l.findSlot(id)
-	if item == nil {
-		return fmt.Errorf("not found item %d", id)
-	}
-
-	if item.t != pending {
-		return fmt.Errorf("The state of the knot should be pending")
-	}
-
-	item.t = t
-	if item.t == completed {
-		item.headers = headers
-	}
-
-	return nil
-}
-
-func (l *list) findSlot(id uint32) *item {
-	elem := l.front
-	for elem != nil {
-		if elem.id == id {
-			return elem
-		}
-		elem = elem.next
-	}
-	return nil
-}
-
-func (l *list) GetQuerySlot() *item {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	elem := l.nextSlot()
-	if elem == nil {
-		return nil
-	}
-
-	if elem.Len() <= maxElements {
-		elem.t = pending
-		return elem
-	}
-
-	// split the item
-	i := l.newItem(elem.block + maxElements)
-
-	i.prev = elem
-	i.next = elem.next
-
-	elem.next = i
-	elem.t = pending
-
-	return elem
-}
-
-func (l *list) numCompleted() int {
-	n := 0
-	elem := l.front
-	for elem != nil {
-		if elem.t != completed {
-			break
-		}
-		n++
-		elem = elem.next
-	}
-	return n
-}
-
-func (l *list) nextSlot() *item {
-	return l.nextSlotFromItem(l.front)
-}
-
-func (l *list) nextSlotFromItem(elem *item) *item {
-	for elem != nil {
-		if elem.t == failed || elem.t == empty {
-			return elem
-		}
-		elem = elem.next
-	}
-	return nil
-}
-
-func (l *list) newItem(block uint64) *item {
-	return newItem(l.nextSeqNo(), block)
-}
-
-func (l *list) nextSeqNo() uint32 {
-	return atomic.AddUint32(&l.seq, 1)
-}
-
-func (l *list) commitData() []*types.Header {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	headers := []*types.Header{}
-
-	// remove the completed values and return all the headers
-	elem := l.front
-	for elem != nil {
-		if elem.t != completed {
-			break
-		}
-		headers = append(headers, elem.headers...)
-		elem = elem.next
-	}
-
-	l.front = elem
-	return headers
-}
-
-type itemType int
-
-const (
-	failed itemType = iota
-	completed
-	pending
-	empty
-)
-
-type item struct {
-	id         uint32
-	block      uint64
-	prev, next *item
-	t          itemType
-
-	// -- data --
-	headers  []*types.Header
-	bodies   []*types.Body
-	receipts []types.Receipts
-}
-
-func newItem(id uint32, block uint64) *item {
-	return &item{
-		id:    id,
-		block: block,
-		t:     empty,
-	}
-}
-
-func (i *item) Len() uint64 {
-	return i.next.block - i.block
-}
-
-func (i *item) ToJob() Job {
-	return Job{block: i.block, id: i.id}
 }

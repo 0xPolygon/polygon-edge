@@ -23,13 +23,9 @@ var status = &ethereum.Status{
 
 func testPeers(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *network.Server, b1 *blockchain.Blockchain) (*Peer, *Peer) {
 	sts := func(b *blockchain.Blockchain) func() (*ethereum.Status, error) {
-		header, err := b.Header()
-		if err != nil {
-			t.Fatal(err)
-		}
 		return func() (*ethereum.Status, error) {
 			s := status
-			s.CurrentBlock = header.Hash()
+			s.CurrentBlock = b.Header().Hash()
 			return s, nil
 		}
 	}
@@ -54,9 +50,9 @@ func testPeers(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *
 	}
 
 	// p0 is the connection reference for server 0 to peer 1
-	p0 := NewPeer(peer0, nil, nil)
+	p0 := NewPeer(peer0, nil)
 	// p1 is the connection reference for server 1 to peer 0
-	p1 := NewPeer(peer1, nil, nil)
+	p1 := NewPeer(peer1, nil)
 
 	return p0, p1
 }
@@ -80,7 +76,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 
 	for indx, i := range cases {
 		go func(indx int, i uint64) {
-			h, err := p0.requestHeaders(i)
+			h, err := p0.requestHeaders(i, 100)
 			if err == nil {
 				if len(h) != 100 {
 					err = fmt.Errorf("length not correct")
@@ -118,7 +114,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	s0, s1 := network.TestServers()
 	p0, _ := testPeers(t, s0, b0, s1, b1)
 
-	if _, err := p0.requestHeaders(1100); err == nil {
+	if _, err := p0.requestHeaders(1100, 100); err == nil {
 		t.Fatal("it should fail")
 	}
 
@@ -144,12 +140,12 @@ func TestPeerCloseConnection(t *testing.T) {
 	s0, s1 := network.TestServers()
 	p0, _ := testPeers(t, s0, b0, s1, b1)
 
-	if _, err := p0.requestHeaders(0); err != nil {
+	if _, err := p0.requestHeaders(0, 100); err != nil {
 		t.Fatal(err)
 	}
 
 	s1.Close()
-	if _, err := p0.requestHeaders(100); err == nil {
+	if _, err := p0.requestHeaders(100, 100); err == nil {
 		t.Fatal("it should fail after the connection has been closed")
 	}
 }

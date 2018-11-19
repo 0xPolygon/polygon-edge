@@ -67,7 +67,7 @@ func main() {
 	}
 
 	// blockchain storage
-	storage, err := storage.NewStorage("/tmp/minimal-test")
+	storage, err := storage.NewStorage("/tmp/minimal-test", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +81,10 @@ func main() {
 		panic(err)
 	}
 
-	syncer, err := syncer.NewSyncer(1, blockchain, syncer.DefaultConfig())
+	cc := syncer.DefaultConfig()
+	cc.MaxRequests = 1
+
+	syncer, err := syncer.NewSyncer(1, blockchain, cc)
 	if err != nil {
 		panic(err)
 	}

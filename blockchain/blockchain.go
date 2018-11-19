@@ -11,10 +11,6 @@ import (
 	"github.com/umbracle/minimal/storage"
 )
 
-var (
-	NOTFOUND = "leveldb: not found"
-)
-
 // Blockchain is a blockchain reference
 type Blockchain struct {
 	db        *storage.Storage
@@ -28,7 +24,7 @@ func NewBlockchain(db *storage.Storage, consensus consensus.Consensus) *Blockcha
 }
 
 // GetParent return the parent
-func (b *Blockchain) GetParent(header *types.Header) (*types.Header, error) {
+func (b *Blockchain) GetParent(header *types.Header) *types.Header {
 	return b.db.ReadHeader(header.ParentHash)
 }
 
@@ -41,10 +37,7 @@ func (b *Blockchain) Genesis() *types.Header {
 func (b *Blockchain) WriteGenesis(header *types.Header) error {
 	b.genesis = header
 
-	hash, err := b.db.ReadHeadHash()
-	if err != nil && err.Error() != NOTFOUND {
-		return err
-	}
+	hash := b.db.ReadHeadHash()
 	if hash != nil {
 		return nil
 	}
@@ -53,35 +46,31 @@ func (b *Blockchain) WriteGenesis(header *types.Header) error {
 	if err := b.addHeader(header); err != nil {
 		return err
 	}
-	return b.advanceHead(header)
+	if err := b.advanceHead(header); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *Blockchain) advanceHead(h *types.Header) error {
-	if err := b.db.WriteHeadHash(h.Hash()); err != nil {
-		return err
-	}
-
-	if err := b.db.WriteHeadNumber(h.Number); err != nil {
-		return err
-	}
+	b.db.WriteHeadHash(h.Hash())
+	b.db.WriteHeadNumber(h.Number)
 	return nil
 }
 
 // Header returns the header of the blockchain
-func (b *Blockchain) Header() (*types.Header, error) {
-	hash, err := b.db.ReadHeadHash()
-	if err != nil {
-		return nil, err
+func (b *Blockchain) Header() *types.Header {
+	hash := b.db.ReadHeadHash()
+	if hash == nil {
+		return nil
 	}
-	header, err := b.db.ReadHeader(*hash)
-	if err != nil {
-		return nil, err
-	}
-	return header, nil
+	header := b.db.ReadHeader(*hash)
+	return header
 }
 
 // CommitChain writes all the other data related to the chain (body and receipts)
-func (b *Blockchain) CommitChain(blocks []*types.Block, receipts []types.Receipts) error {
+func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Receipt) error {
 	if len(blocks) != len(receipts) {
 		return fmt.Errorf("length dont match. %d and %d", len(blocks), len(receipts))
 	}
@@ -100,12 +89,8 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts []types.Receipt
 		r := receipts[indx]
 
 		hash := block.Hash()
-		if err := b.db.WriteBody(hash, block.Body()); err != nil {
-			return err
-		}
-		if err := b.db.WriteReceipts(hash, r); err != nil {
-			return err
-		}
+		b.db.WriteBody(hash, block.Body())
+		b.db.WriteReceipts(hash, r)
 	}
 
 	return nil
@@ -113,32 +98,24 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts []types.Receipt
 
 // GetReceiptsByHash returns the receipts by their hash
 func (b *Blockchain) GetReceiptsByHash(hash common.Hash) types.Receipts {
-	r, _ := b.db.ReadReceipts(hash)
+	r := b.db.ReadReceipts(hash)
 	return r
 }
 
 // GetBodyByHash returns the body by their hash
 func (b *Blockchain) GetBodyByHash(hash common.Hash) *types.Body {
-	body, err := b.db.ReadBody(hash)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return body
+	return b.db.ReadBody(hash)
 }
 
 // GetHeaderByHash returns the header by his hash
 func (b *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
-	h, _ := b.db.ReadHeader(hash)
-	return h
+	return b.db.ReadHeader(hash)
 }
 
 // GetHeaderByNumber returns the header by his number
 func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
-	hash, err := b.db.ReadCanonicalHash(n)
-	if err != nil {
-		return nil
-	}
-	h, _ := b.db.ReadHeader(hash)
+	hash := b.db.ReadCanonicalHash(n)
+	h := b.db.ReadHeader(hash)
 	return h
 }
 
@@ -173,25 +150,21 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 }
 
 func (b *Blockchain) addHeader(header *types.Header) error {
-	if err := b.db.WriteHeader(header); err != nil {
-		return err
-	}
-	if err := b.db.WriteCanonicalHash(header.Number, header.Hash()); err != nil {
-		return err
-	}
+	b.db.WriteHeader(header)
+	b.db.WriteCanonicalHash(header.Number, header.Hash())
 	return nil
 }
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) WriteHeader(header *types.Header) error {
-	head, err := b.Header()
-	if err != nil {
-		return err
-	}
+	head := b.Header()
 
-	parent, err := b.db.ReadHeader(header.ParentHash)
-	if err != nil {
-		return err
+	//fmt.Println("-- current header --")
+	//fmt.Println(b.db.ReadHeadHash().String())
+
+	parent := b.db.ReadHeader(header.ParentHash)
+	if parent == nil {
+		return fmt.Errorf("parent of %s (%d) not found", header.Hash().String(), header.Number.Uint64())
 	}
 
 	// local difficulty of the block
@@ -223,14 +196,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 }
 
 func (b *Blockchain) writeFork(header *types.Header) error {
-	forks, err := b.db.ReadForks()
-	if err != nil {
-		if err.Error() == NOTFOUND {
-			forks = []common.Hash{}
-		} else {
-			return err
-		}
-	}
+	forks := b.db.ReadForks()
 
 	newForks := []common.Hash{}
 	for _, fork := range forks {
@@ -239,38 +205,25 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 		}
 	}
 	newForks = append(newForks, header.Hash())
-	return b.db.WriteForks(newForks)
+	b.db.WriteForks(newForks)
+	return nil
 }
 
 func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Header) error {
 	newChainHead := newHeader
 	oldChainHead := oldHeader
 
-	var err error
 	for oldHeader.Number.Cmp(newHeader.Number) > 0 {
-		oldHeader, err = b.db.ReadHeader(oldHeader.ParentHash)
-		if err != nil {
-			return err
-		}
+		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
 	}
 
 	for newHeader.Number.Cmp(oldHeader.Number) > 0 {
-		newHeader, err = b.db.ReadHeader(newHeader.ParentHash)
-		if err != nil {
-			return err
-		}
+		newHeader = b.db.ReadHeader(newHeader.ParentHash)
 	}
 
 	for oldHeader.Hash() != newHeader.Hash() {
-		oldHeader, err = b.db.ReadHeader(oldHeader.ParentHash)
-		if err != nil {
-			return err
-		}
-
-		newHeader, err = b.db.ReadHeader(newHeader.ParentHash)
-		if err != nil {
-			return err
-		}
+		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
+		newHeader = b.db.ReadHeader(newHeader.ParentHash)
 	}
 
 	if err := b.writeFork(oldChainHead); err != nil {
@@ -285,6 +238,5 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 
 // GetForks returns the forks
 func (b *Blockchain) GetForks() []common.Hash {
-	forks, _ := b.db.ReadForks()
-	return forks
+	return b.db.ReadForks()
 }

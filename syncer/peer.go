@@ -33,10 +33,6 @@ type callback struct {
 	ack chan AckMessage
 }
 
-type dispatcher interface {
-	Result(uint32, []*types.Header, error)
-}
-
 // Peer is a network connection in the syncer
 type Peer struct {
 	peer *network.Peer
@@ -44,9 +40,9 @@ type Peer struct {
 
 	syncer *Syncer
 
-	workerPool chan chan Job
-	closeCh    chan struct{}
-	once       sync.Once
+	// workerPool chan chan Job
+	closeCh chan struct{}
+	once    sync.Once
 
 	// pendin objects
 	pending     map[string]*callback
@@ -56,14 +52,14 @@ type Peer struct {
 }
 
 // NewPeer creates a new peer
-func NewPeer(peer *network.Peer, workerPool chan chan Job, syncer *Syncer) *Peer {
+func NewPeer(peer *network.Peer, syncer *Syncer) *Peer {
 	eth := peer.GetProtocol("eth", 63).(*ethereum.Ethereum)
 
 	p := &Peer{
-		peer:        peer,
-		eth:         eth,
-		closeCh:     make(chan struct{}),
-		workerPool:  workerPool,
+		peer:    peer,
+		eth:     eth,
+		closeCh: make(chan struct{}),
+		// workerPool:  workerPool,
 		syncer:      syncer,
 		pending:     make(map[string]*callback),
 		pendingLock: sync.Mutex{},
@@ -73,39 +69,32 @@ func NewPeer(peer *network.Peer, workerPool chan chan Job, syncer *Syncer) *Peer
 	return p
 }
 
-// put another timer as in the handler
-
-func (p *Peer) stopTasks() {
-	p.once.Do(func() {
-		fmt.Printf("STOPPING TASKS (%s)\n", p.peer.PrettyString())
-		close(p.closeCh)
-	})
-}
-
 func (p *Peer) requestTask(id string) {
-	jobChannel := make(chan Job, 10)
-
-	for { // change this with a queue
-		p.workerPool <- jobChannel
-
-		select {
-		case job := <-jobChannel:
-
-			fmt.Printf("SYNC (%s) (%s): %d\n", p.peer.PrettyString(), id, job.block)
-
-			headers, err := p.requestHeaders(job.block)
-			if err != nil {
-				// check if the connection is still open
-				if p.peer.Connected == false {
-					// close all the download tasks
-					p.stopTasks()
-				}
-			}
-
-			p.syncer.Result(job.id, headers, err)
-		case <-p.closeCh:
-			return
+	for {
+		i := p.syncer.dequeue()
+		if i == nil {
+			time.Sleep(5 * time.Second) // if no job available, sleep and try again
+			continue
 		}
+
+		var data interface{}
+		var err error
+
+		switch job := i.payload.(type) {
+		case *HeadersJob:
+			fmt.Printf("SYNC HEADERS (%d) (%s) (%s): %d, %d\n", i.id, p.peer.PrettyString(), id, job.block, job.count)
+			data, err = p.requestHeaders(job.block, job.count)
+		case *BodiesJob:
+			fmt.Printf("SYNC BODIES (%d) (%s) (%s): %d\n", i.id, p.peer.PrettyString(), id, len(job.hashes))
+			data, err = p.requestBodies(job.hashes)
+		case *ReceiptsJob:
+			fmt.Printf("SYNC RECEIPTS (%d) (%s) (%s): %d\n", i.id, p.peer.PrettyString(), id, len(job.hashes))
+			data, err = p.requestReceipts(job.hashes)
+		}
+
+		p.syncer.deliver(i.id, data, err)
+
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -137,7 +126,7 @@ func (p *Peer) requestReceipts(receipts []*types.Header) ([][]*types.Receipt, er
 	return response, nil
 }
 
-func (p *Peer) requestBodies(bodies []*types.Header) (ethereum.BlockBodiesData, error) {
+func (p *Peer) requestBodies(bodies []*types.Header) ([]*types.Body, error) {
 	if len(bodies) == 0 {
 		return nil, nil
 	}
@@ -163,16 +152,22 @@ func (p *Peer) requestBodies(bodies []*types.Header) (ethereum.BlockBodiesData, 
 
 	// TODO. handle malformed response in the bodies
 	response := resp.Result.(ethereum.BlockBodiesData)
-	return response, nil
+
+	res := []*types.Body{}
+	for _, r := range response {
+		res = append(res, &types.Body{Transactions: r.Transactions, Uncles: r.Uncles})
+	}
+
+	return res, nil
 }
 
-func (p *Peer) requestHeaders(origin uint64) ([]*types.Header, error) {
-	hash := string(origin)
+func (p *Peer) requestHeaders(origin uint64, count uint64) ([]*types.Header, error) {
+	hash := strconv.Itoa(int(origin))
 
 	ack := make(chan AckMessage, 1)
 	p.setHandler(hash, 1, ack)
 
-	if err := p.eth.RequestHeadersByNumber(origin, 100, 0, false); err != nil {
+	if err := p.eth.RequestHeadersByNumber(origin, count, 0, false); err != nil {
 		return nil, err
 	}
 	resp := <-ack
@@ -195,7 +190,7 @@ func (p *Peer) FindCommonAncestor() (*types.Header, error) {
 	// Binary search, TODO, works but it may take a lot of time
 
 	min := 0 // genesis
-	max := int(p.syncer.header.Number.Uint64())
+	max := int(p.syncer.blockchain.Header().Number.Uint64())
 
 	var header *types.Header
 
@@ -226,7 +221,7 @@ func (p *Peer) FindCommonAncestor() (*types.Header, error) {
 		} else if l == 1 {
 			header = headers[0]
 			if header.Number.Uint64() != m {
-				return nil, fmt.Errorf("header response number not correct")
+				return nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
 			}
 
 			expectedHeader := p.syncer.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
@@ -255,7 +250,7 @@ func (p *Peer) fetchHeight() (*types.Header, error) {
 	head := p.peer.HeaderHash()
 
 	ack := make(chan network.AckMessage, 1)
-	p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 5*time.Second)
+	p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 10*time.Second)
 
 	if err := p.eth.RequestHeadersByHash(head, 1, 0, false); err != nil {
 		return nil, err
@@ -339,7 +334,7 @@ func (p *Peer) Headers(headers []*types.Header) {
 		return
 	}
 
-	hash := string(headers[0].Number.Uint64())
+	hash := headers[0].Number.String()
 	if !p.consumeHandler(hash, headers) {
 		fmt.Println("Could not consume headers handler")
 	}
