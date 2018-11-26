@@ -253,7 +253,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	}
 	if resp := <-ack; resp.Complete {
 		if len(resp.Payload) != 1 {
-			t.Fatal("there is some content")
+			t.Fatal("there is some content in bodies")
 		}
 	} else {
 		t.Fatal("body request failed")
@@ -268,8 +268,8 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp := <-ack; resp.Complete {
-		if len(resp.Payload) != 1 { // when the response is empty is 1 byte
-			t.Fatal("there is some content")
+		if len(resp.Payload) != len(batch)+1 { // when the response is one byte + one byte per empty element
+			t.Fatal("there is some content in receipts")
 		}
 	} else {
 		t.Fatal("body request failed")

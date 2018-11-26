@@ -44,9 +44,13 @@ func newQueue() *queue {
 }
 
 func (q *queue) addBack(block uint64) {
-	q.back = q.newItem(block)
-	q.front.next = q.back
-	q.back.prev = q.front
+	if q.back == nil {
+		q.back = q.newItem(block)
+		q.front.next = q.back
+		q.back.prev = q.front
+	} else {
+		q.back.block = block
+	}
 }
 
 func (q *queue) newItem(block uint64) *element {
@@ -54,6 +58,7 @@ func (q *queue) newItem(block uint64) *element {
 	return &element{
 		id:             id,
 		block:          block,
+		past:           []string{},
 		headersStatus:  waitingX,
 		bodiesStatus:   completedX,
 		receiptsStatus: completedX,
@@ -147,6 +152,42 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	}
 
 	// TODO, check the cases
+	return nil
+}
+
+func (q *queue) updateFailedElem(peer string, id uint32, context string) error {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	elem, err := q.findElement(id)
+	if err != nil {
+		return err
+	}
+
+	if !contains(elem.past, peer) {
+		elem.past = append(elem.past, peer)
+	}
+
+	switch context {
+	case "receipts":
+		if elem.receiptsStatus != pendingX {
+			return fmt.Errorf("receipts status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.receiptsStatus = waitingX
+	case "bodies":
+		if elem.bodiesStatus != pendingX {
+			return fmt.Errorf("bodies status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.bodiesStatus = waitingX
+	case "headers":
+		if elem.headersStatus != pendingX {
+			return fmt.Errorf("headers status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.headersStatus = waitingX
+	default:
+		return fmt.Errorf("context name not found %s", context)
+	}
+
 	return nil
 }
 
@@ -256,11 +297,11 @@ func (q *queue) findElement(id uint32) (*element, error) {
 	return nil, fmt.Errorf("element %d not found", id)
 }
 
-func (q *queue) Dequeue() (*Job, error) {
+func (q *queue) Dequeue(id string) (*Job, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	elem := q.getNextElegibleSlot()
+	elem := q.getNextElegibleSlot(id)
 	if elem == nil {
 		return nil, fmt.Errorf("All the jobs are different from waiting")
 	}
@@ -330,11 +371,30 @@ func (q *queue) FetchCompletedData() []*element {
 	return elements
 }
 
-func (q *queue) getNextElegibleSlot() *element {
+func (q *queue) printQueue() {
+	elem := q.front
+	for elem != nil {
+		fmt.Printf("block %d: %s %s %s\n", elem.block, elem.headersStatus.String(), elem.bodiesStatus.String(), elem.receiptsStatus.String())
+		elem = elem.next
+	}
+}
+
+func contains(s []string, i string) bool {
+	for _, j := range s {
+		if j == i {
+			return true
+		}
+	}
+	return false
+}
+
+func (q *queue) getNextElegibleSlot(id string) *element {
 	elem := q.front
 	for elem != nil {
 		if elem.headersStatus == waitingX || elem.receiptsStatus == waitingX || elem.bodiesStatus == waitingX {
-			break
+			if !contains(elem.past, id) {
+				break
+			}
 		}
 		elem = elem.next
 	}
@@ -382,6 +442,9 @@ type element struct {
 
 	prev *element
 	next *element
+
+	// past is the list of past peers that tried to fetch data and failed
+	past []string
 
 	// headers
 	headers       []*types.Header

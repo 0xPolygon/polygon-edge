@@ -261,3 +261,7 @@ func TestPeerReceiptsAndBodies(t *testing.T) {
 		t.Fatal("expected 10 items")
 	}
 }
+
+func TestPeerDisconnection(t *testing.T) {
+	// If peer gets disconnected all the task have to fail
+}

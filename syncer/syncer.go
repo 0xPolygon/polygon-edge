@@ -3,6 +3,7 @@ package syncer
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -37,16 +38,24 @@ type Syncer struct {
 	peers      map[string]*Peer
 	blockchain Blockchain
 	queue      *queue
+
+	counter int
+	last    int
+
+	deliverLock sync.Mutex
 }
 
 // NewSyncer creates a new syncer
 func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer, error) {
 	s := &Syncer{
-		config:     config,
-		NetworkID:  networkID,
-		peers:      map[string]*Peer{},
-		blockchain: blockchain,
-		queue:      newQueue(),
+		config:      config,
+		NetworkID:   networkID,
+		peers:       map[string]*Peer{},
+		blockchain:  blockchain,
+		queue:       newQueue(),
+		counter:     0,
+		last:        0,
+		deliverLock: sync.Mutex{},
 	}
 
 	header := blockchain.Header()
@@ -130,50 +139,87 @@ func (s *Syncer) Run() {
 	*/
 }
 
-func (s *Syncer) dequeue() *Job {
-	job, err := s.queue.Dequeue()
+func (s *Syncer) dequeue(peer string) *Job {
+	job, err := s.queue.Dequeue(peer)
 	if err != nil {
-		fmt.Println("Failed to dequeue: %v\n", err)
+		fmt.Printf("Failed to dequeue: %v\n", err)
 	}
 	return job
 }
 
-func (s *Syncer) deliver(id uint32, data interface{}, err error) {
+func (s *Syncer) deliver(peer string, context string, id uint32, data interface{}, err error) {
+	s.deliverLock.Lock()
+	defer s.deliverLock.Unlock()
+
 	if err != nil {
 		// log
-		fmt.Printf("Failed to deliver (%d): %v\n", id, err)
+		// TODO, we need to set here the thing that was not deliver as waiting to be dequeued again
+		fmt.Printf("==================================> Failed to deliver (%d): %v\n", id, err)
+		if err := s.queue.updateFailedElem(peer, id, context); err != nil {
+			fmt.Printf("Could not be updated: %v\n", err)
+		}
 		return
 	}
 
 	switch obj := data.(type) {
 	case []*types.Header:
+		fmt.Printf("deliver headers %d: %d\n", id, len(obj))
 		if err := s.queue.deliverHeaders(id, obj); err != nil {
 			fmt.Printf("Failed to deliver headers (%d): %v\n", id, err)
+
+			panic("")
 		}
 
 	case []*types.Body:
+		fmt.Printf("deliver bodies %d: %d\n", id, len(obj))
 		if err := s.queue.deliverBodies(id, obj); err != nil {
 			fmt.Printf("Failed to deliver bodies (%d): %v\n", id, err)
+
+			panic("")
 		}
 
 	case [][]*types.Receipt:
+		fmt.Printf("deliver receipts %d: %d\n", id, len(obj))
 		if err := s.queue.deliverReceipts(id, obj); err != nil {
 			fmt.Printf("Failed to deliver receipts (%d): %v\n", id, err)
+
+			panic("")
 		}
 
 	default:
 		panic(data)
 	}
 
-	if s.queue.NumOfCompletedBatches() > 10 {
+	fmt.Println(s.queue.NumOfCompletedBatches())
+	if n := s.queue.NumOfCompletedBatches(); n == s.last {
+		s.counter++
+	} else {
+		s.last = n
+		s.counter = 0
+	}
+
+	if s.counter == 500 {
+		s.queue.printQueue()
+		panic("")
+	}
+
+	if s.queue.NumOfCompletedBatches() > 100 {
 		data := s.queue.FetchCompletedData()
 
 		fmt.Printf("Commit data: %d\n", len(data)*maxElements)
+		fmt.Printf("New Head: %s\n", s.queue.head.String())
 
 		// write the headers
-		for _, elem := range data {
+		for indx, elem := range data {
 			if err := s.blockchain.WriteHeaders(elem.headers); err != nil {
 				fmt.Printf("Failed to write headers batch: %v", err)
+
+				first, last := elem.headers[0], elem.headers[len(elem.headers)-1]
+
+				fmt.Printf("Error at step: %d\n", indx)
+				fmt.Printf("First block we have is %s (%s) %s (%s)\n", first.Hash().String(), first.Number.String(), last.Hash().String(), last.Number.String())
+
+				panic("")
 				return
 			}
 		}

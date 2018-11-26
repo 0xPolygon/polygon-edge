@@ -35,6 +35,8 @@ type callback struct {
 
 // Peer is a network connection in the syncer
 type Peer struct {
+	index int
+
 	peer *network.Peer
 	eth  *ethereum.Ethereum
 
@@ -70,8 +72,10 @@ func NewPeer(peer *network.Peer, syncer *Syncer) *Peer {
 }
 
 func (p *Peer) requestTask(id string) {
+	peerID := p.peer.PrettyString()
+
 	for {
-		i := p.syncer.dequeue()
+		i := p.syncer.dequeue(peerID)
 		if i == nil {
 			time.Sleep(5 * time.Second) // if no job available, sleep and try again
 			continue
@@ -82,19 +86,27 @@ func (p *Peer) requestTask(id string) {
 
 		switch job := i.payload.(type) {
 		case *HeadersJob:
-			fmt.Printf("SYNC HEADERS (%d) (%s) (%s): %d, %d\n", i.id, p.peer.PrettyString(), id, job.block, job.count)
+			fmt.Printf("SYNC HEADERS (%d) (%s) (%s): %d, %d\n", i.id, peerID, id, job.block, job.count)
 			data, err = p.requestHeaders(job.block, job.count)
+			p.syncer.deliver(peerID, "headers", i.id, data, err)
 		case *BodiesJob:
-			fmt.Printf("SYNC BODIES (%d) (%s) (%s): %d\n", i.id, p.peer.PrettyString(), id, len(job.hashes))
+			fmt.Printf("SYNC BODIES (%d) (%s) (%s): %d\n", i.id, peerID, id, len(job.hashes))
 			data, err = p.requestBodies(job.hashes)
+			p.syncer.deliver(peerID, "bodies", i.id, data, err)
 		case *ReceiptsJob:
-			fmt.Printf("SYNC RECEIPTS (%d) (%s) (%s): %d\n", i.id, p.peer.PrettyString(), id, len(job.hashes))
+			fmt.Printf("SYNC RECEIPTS (%d) (%s) (%s): %d\n", i.id, peerID, id, len(job.hashes))
 			data, err = p.requestReceipts(job.hashes)
+			p.syncer.deliver(peerID, "receipts", i.id, data, err)
 		}
 
-		p.syncer.deliver(i.id, data, err)
-
-		time.Sleep(1 * time.Second)
+		if err != nil {
+			// check if the connection is still open
+			if !p.peer.Connected {
+				fmt.Println("Not connected anymore, closing")
+				return
+			}
+		}
+		// time.Sleep(1 * time.Second)
 	}
 }
 
@@ -250,7 +262,7 @@ func (p *Peer) fetchHeight() (*types.Header, error) {
 	head := p.peer.HeaderHash()
 
 	ack := make(chan network.AckMessage, 1)
-	p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 10*time.Second)
+	p.eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 30*time.Second)
 
 	if err := p.eth.RequestHeadersByHash(head, 1, 0, false); err != nil {
 		return nil, err

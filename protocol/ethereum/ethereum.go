@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/network"
 )
 
@@ -186,15 +187,19 @@ func (e *Ethereum) Init() error {
 		errr <- e.conn.WriteMsg(StatusMsg, status)
 	}()
 
+	var errors error
 	for i := 0; i < 2; i++ {
 		select {
 		case err := <-errr:
 			if err != nil {
-				return err
+				errors = multierror.Append(errors, err)
 			}
 		case <-time.After(5 * time.Second):
 			return fmt.Errorf("ethereum protocol handshake timeout")
 		}
+	}
+	if errors != nil {
+		return errors
 	}
 
 	e.status = peerStatus

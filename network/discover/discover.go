@@ -301,11 +301,11 @@ func (d *Discover) schedule() {
 		case packet := <-d.transport.PacketCh():
 			go d.handlePacket(packet)
 
-		case <-revalidate.C:
-			go d.revalidatePeer()
-
 		case <-lookup.C:
 			go d.LookupRandom()
+
+		case <-revalidate.C:
+			go d.revalidatePeer()
 
 		case <-d.shutdownCh:
 			return

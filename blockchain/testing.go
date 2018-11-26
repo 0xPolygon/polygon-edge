@@ -39,6 +39,7 @@ func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
 			TxHash:      types.EmptyRootHash,
 			UncleHash:   types.EmptyUncleHash,
 			ReceiptHash: types.EmptyRootHash,
+			Difficulty:  big.NewInt(int64(i)),
 		}
 	}
 
@@ -46,7 +47,7 @@ func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
 	headers := []*types.Header{genesis}
 
 	for i := 1; i < n; i++ {
-		header := head(int64(i) - 1)
+		header := head(int64(i))
 		header.ParentHash = headers[i-1].Hash()
 		headers = append(headers, header)
 	}

@@ -271,6 +271,24 @@ func TestQueueDeliverTotalHeaders(t *testing.T) {
 	}
 }
 
+func TestQueueDequeueLastElement(t *testing.T) {
+	// PRETTIER
+	// if the last element is select in elegible function it will
+	// failed because it does not have a next then Len will panic
+
+	headers := blockchain.NewTestHeaderChain(1000)
+	q := newTestQueue(headers[0], 1000)
+	if _, err := q.Dequeue(); err != nil {
+		t.Fatal(err)
+	}
+
+	q.printQueue()
+
+	q.addBack(2000)
+
+	q.printQueue()
+}
+
 func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 	headers, blocks, receipts := blockchain.NewTestBodyChain(1000)
 	q := newTestQueue(headers[0], 1000)

@@ -139,12 +139,21 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 	// NOTE: Add headers in batches, check if the parent of the first header
 	// exists, write all the blocks and set the last block as the head.
 
-	for _, h := range headers {
+	for indx, h := range headers {
 		if err := b.WriteHeader(h); err != nil {
+			fmt.Printf("Failed at sequence: %d\n", indx)
+
+			headerNumber := b.db.ReadHeadNumber()
+
+			// head number should match the last one you just added
+			fmt.Printf("Head number is %s\n", headerNumber.String())
+
 			// rollback? we have to remove all the blocks written, cache
 			return err
 		}
 	}
+
+	fmt.Printf("Done: last header written was %s at %s\n", headers[len(headers)-1].Hash().String(), headers[len(headers)-1].Number.String())
 
 	return nil
 }
