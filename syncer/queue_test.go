@@ -25,7 +25,7 @@ func findElement(t *testing.T, q *queue, id uint32) *element {
 }
 
 func dequeue(t *testing.T, q *queue) *Job {
-	job, err := q.Dequeue()
+	job, err := q.Dequeue("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,24 +269,6 @@ func TestQueueDeliverTotalHeaders(t *testing.T) {
 	if !elem.Completed() {
 		t.Fatal("it should be completed")
 	}
-}
-
-func TestQueueDequeueLastElement(t *testing.T) {
-	// PRETTIER
-	// if the last element is select in elegible function it will
-	// failed because it does not have a next then Len will panic
-
-	headers := blockchain.NewTestHeaderChain(1000)
-	q := newTestQueue(headers[0], 1000)
-	if _, err := q.Dequeue(); err != nil {
-		t.Fatal(err)
-	}
-
-	q.printQueue()
-
-	q.addBack(2000)
-
-	q.printQueue()
 }
 
 func TestQueueDeliverReceiptsAndBodies(t *testing.T) {

@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -29,6 +30,11 @@ type Blockchain interface {
 	Genesis() *types.Header
 	WriteHeaders(headers []*types.Header) error
 	GetHeaderByNumber(number *big.Int) *types.Header
+}
+
+type Peer struct {
+	conn *ethereum.Ethereum
+	peer *network.Peer
 }
 
 // Syncer is the syncer protocol
@@ -92,11 +98,11 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 
 	fmt.Println("DAO Fork completed")
 
-	p := NewPeer(peer, s)
+	p := &Peer{peer.GetProtocol("eth", 63).(*ethereum.Ethereum), peer}
 	s.peers[peer.ID] = p
 
 	// find data about the peer
-	header, err := p.fetchHeight()
+	header, err := s.fetchHeight(p.conn)
 	if err != nil {
 		fmt.Printf("ERR: fetch height failed: %v\n", err)
 		return
@@ -119,8 +125,6 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 
 	fmt.Println("Difficulty higher than ours")
 	s.updateChain(header.Number.Uint64())
-
-	go p.run(s.config.MaxRequests)
 }
 
 // Run is the main entry point
@@ -273,4 +277,92 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 	}
 
 	return nil
+}
+
+// FindCommonAncestor finds the common ancestor with the peer and the syncer connection
+func (s *Syncer) FindCommonAncestor(peer *ethereum.Ethereum) (*types.Header, error) {
+	// Binary search, TODO, works but it may take a lot of time
+
+	min := 0 // genesis
+	max := int(s.blockchain.Header().Number.Uint64())
+
+	height, err := s.fetchHeight(peer)
+	if err != nil {
+		return nil, err
+	}
+	if heightNumber := int(height.Number.Uint64()); max > heightNumber {
+		max = heightNumber
+	}
+
+	var header *types.Header
+
+	for min <= max {
+		m := uint64(math.Floor(float64(min+max) / 2))
+
+		headers, err := peer.RequestHeadersSync(m, 1)
+		if err != nil {
+			return nil, err
+		}
+
+		l := len(headers)
+		if l == 0 {
+			// peer does not have the m peer, search in lower bounds
+			max = int(m - 1)
+		} else if l == 1 {
+			header = headers[0]
+			if header.Number.Uint64() != m {
+				return nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
+			}
+
+			expectedHeader := s.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
+			if expectedHeader == nil {
+				return nil, fmt.Errorf("cannot find the header in local chain")
+			}
+
+			if expectedHeader.Hash() == header.Hash() {
+				min = int(m + 1)
+			} else {
+				max = int(m - 1)
+			}
+		} else {
+			return nil, fmt.Errorf("expected either 1 or 0 headers")
+		}
+	}
+
+	if min == 0 {
+		return nil, nil
+	}
+	return header, nil
+}
+
+// fetchHeight returns the header of the head hash of the peer
+func (s *Syncer) fetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
+	head := peer.Header()
+
+	ack := make(chan network.AckMessage, 1)
+	peer.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 30*time.Second)
+
+	if err := peer.RequestHeadersByHash(head, 1, 0, false); err != nil {
+		return nil, err
+	}
+
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("timeout")
+	}
+
+	var headers []*types.Header
+	if err := rlp.DecodeBytes(resp.Payload, &headers); err != nil {
+		return nil, err
+	}
+	if len(headers) != 1 {
+		return nil, fmt.Errorf("expected one but found %d", len(headers))
+	}
+
+	header := headers[0]
+	if header.Hash() != head {
+		return nil, fmt.Errorf("returned hash is not the correct one")
+	}
+
+	return header, nil
 }

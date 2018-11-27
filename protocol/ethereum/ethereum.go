@@ -3,10 +3,13 @@ package ethereum
 import (
 	"fmt"
 	"math/big"
+	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
 	multierror "github.com/hashicorp/go-multierror"
@@ -60,6 +63,11 @@ type Ethereum struct {
 	status     *Status
 	blockchain Blockchain
 	downloader Downloader
+
+	// pendin objects
+	pending     map[string]*callback
+	pendingLock sync.Mutex
+	timer       *time.Timer
 }
 
 // GetStatus is the interface that gives the eth protocol the information it needs
@@ -68,16 +76,22 @@ type GetStatus func() (*Status, error)
 // NewEthereumProtocol creates the ethereum protocol
 func NewEthereumProtocol(conn network.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
 	return &Ethereum{
-		conn:       conn,
-		peer:       peer,
-		getStatus:  getStatus,
-		blockchain: blockchain,
+		conn:        conn,
+		peer:        peer,
+		getStatus:   getStatus,
+		blockchain:  blockchain,
+		pending:     make(map[string]*callback),
+		pendingLock: sync.Mutex{},
 	}
 }
 
 // SetDownloader changes the downloader that ingests the data
 func (e *Ethereum) SetDownloader(downloader Downloader) {
 	e.downloader = downloader
+}
+
+func (e *Ethereum) Header() common.Hash {
+	return e.peer.HeaderHash()
 }
 
 // Status is the object for the status message.
@@ -281,14 +295,13 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		return e.sendBlockHeaders(headers)
 
 	case code == BlockHeadersMsg:
+		fmt.Println("-- receive headers --")
 		var headers []*types.Header
 		if err := rlp.DecodeBytes(payload, &headers); err != nil {
 			return err
 		}
-
-		if e.downloader != nil {
-			e.downloader.Headers(headers)
-		}
+		fmt.Println(headers)
+		e.Headers(headers)
 	case code == GetBlockBodiesMsg:
 		var hashes []common.Hash
 		if err := rlp.DecodeBytes(payload, &hashes); err != nil {
@@ -316,14 +329,11 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		return e.sendBlockBodies(bodies)
 
 	case code == BlockBodiesMsg:
-		var request BlockBodiesData
-		if err := rlp.DecodeBytes(payload, &request); err != nil {
+		var bodies BlockBodiesData
+		if err := rlp.DecodeBytes(payload, &bodies); err != nil {
 			return err
 		}
-
-		if e.downloader != nil {
-			e.downloader.Bodies(request)
-		}
+		e.Bodies(bodies)
 	case code == GetNodeDataMsg:
 		// TODO. send
 
@@ -365,10 +375,7 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		if err := rlp.DecodeBytes(payload, &receipts); err != nil {
 			return err
 		}
-
-		if e.downloader != nil {
-			e.downloader.Receipts(receipts)
-		}
+		e.Receipts(receipts)
 	case code == NewBlockHashesMsg:
 		// TODO. notify announce
 
@@ -416,4 +423,202 @@ func (e *Ethereum) sendBlockBodies(bodies []rlp.RawValue) error {
 
 func (e *Ethereum) sendReceipts(receipts []rlp.RawValue) error {
 	return e.conn.WriteMsg(ReceiptsMsg, receipts)
+}
+
+// -- handlers --
+
+// AckMessage is the ack message
+type AckMessage struct {
+	Complete bool
+	Result   interface{}
+}
+
+type callback struct {
+	id  uint32
+	ack chan AckMessage
+}
+
+// RequestHeadersSync requests headers and waits for the response
+func (e *Ethereum) RequestHeadersSync(origin uint64, count uint64) ([]*types.Header, error) {
+	hash := strconv.Itoa(int(origin))
+
+	ack := make(chan AckMessage, 1)
+	e.setHandler(hash, 1, ack)
+
+	if err := e.RequestHeadersByNumber(origin, count, 0, false); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
+
+	response := resp.Result.([]*types.Header)
+	return response, nil
+}
+
+// RequestReceiptsSync requests receipts and waits for the response
+func (e *Ethereum) RequestReceiptsSync(receipts []*types.Header) ([][]*types.Receipt, error) {
+	if len(receipts) == 0 {
+		return nil, nil
+	}
+
+	hashes := []common.Hash{}
+	for _, b := range receipts {
+		hashes = append(hashes, b.Hash())
+	}
+
+	hash := receipts[0].ReceiptHash.String()
+
+	ack := make(chan AckMessage, 1)
+	e.setHandler(hash, 1, ack)
+
+	if err := e.RequestReceipts(hashes); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
+
+	// TODO. handle malformed response in the receipts
+	response := resp.Result.([][]*types.Receipt)
+	return response, nil
+}
+
+// RequestBodiesSync requests bodies and waits for the response
+func (e *Ethereum) RequestBodiesSync(bodies []*types.Header) ([]*types.Body, error) {
+	if len(bodies) == 0 {
+		return nil, nil
+	}
+
+	hashes := []common.Hash{}
+	for _, b := range bodies {
+		hashes = append(hashes, b.Hash())
+	}
+
+	first := bodies[0]
+	hash := encodeHash(first.UncleHash, first.TxHash).String()
+
+	ack := make(chan AckMessage, 1)
+	e.setHandler(hash, 1, ack)
+
+	if err := e.RequestBodies(hashes); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
+
+	// TODO. handle malformed response in the bodies
+	response := resp.Result.(BlockBodiesData)
+
+	res := []*types.Body{}
+	for _, r := range response {
+		res = append(res, &types.Body{Transactions: r.Transactions, Uncles: r.Uncles})
+	}
+
+	return res, nil
+}
+
+func (e *Ethereum) setHandler(key string, id uint32, ack chan AckMessage) error {
+	e.pendingLock.Lock()
+	e.pending[key] = &callback{id, ack}
+	e.pendingLock.Unlock()
+
+	e.timer = time.AfterFunc(5*time.Second, func() {
+		e.pendingLock.Lock()
+		if _, ok := e.pending[key]; !ok {
+			e.pendingLock.Unlock()
+			return
+		}
+
+		delete(e.pending, key)
+		e.pendingLock.Unlock()
+
+		select {
+		case ack <- AckMessage{false, nil}:
+		default:
+		}
+	})
+
+	return nil
+}
+
+func (e *Ethereum) consumeHandler(origin string, result interface{}) bool {
+	e.pendingLock.Lock()
+	callback, ok := e.pending[origin]
+	if !ok {
+		e.pendingLock.Unlock()
+		return false
+	}
+
+	// delete
+	delete(e.pending, origin)
+	e.pendingLock.Unlock()
+
+	// let him know its over
+	select {
+	case callback.ack <- AckMessage{Complete: true, Result: result}:
+	default:
+	}
+
+	return true
+}
+
+// -- downloader --
+
+// Headers receives the headers
+func (e *Ethereum) Headers(headers []*types.Header) {
+	if len(headers) != 0 {
+		hash := headers[0].Number.String()
+		if e.consumeHandler(hash, headers) {
+			return
+		}
+	}
+	if e.downloader != nil {
+		e.downloader.Headers(headers)
+	}
+}
+
+// Receipts receives the receipts
+func (e *Ethereum) Receipts(receipts [][]*types.Receipt) {
+	if len(receipts) != 0 {
+		hash := types.DeriveSha(types.Receipts(receipts[0]))
+		if e.consumeHandler(hash.String(), receipts) {
+			return
+		}
+	}
+	if e.downloader != nil {
+		e.downloader.Receipts(receipts)
+	}
+}
+
+// Bodies receives the bodies
+func (e *Ethereum) Bodies(bodies BlockBodiesData) {
+	if len(bodies) != 0 {
+		first := bodies[0]
+		hash := encodeHash(types.CalcUncleHash(first.Uncles), types.DeriveSha(types.Transactions(first.Transactions)))
+		if e.consumeHandler(hash.String(), bodies) {
+			return
+		}
+	}
+	if e.downloader != nil {
+		e.downloader.Bodies(bodies)
+	}
+}
+
+func encodeHash(x common.Hash, y common.Hash) common.Hash {
+	hw := sha3.NewKeccak256()
+	if _, err := hw.Write(x.Bytes()); err != nil {
+		panic(err)
+	}
+	if _, err := hw.Write(y.Bytes()); err != nil {
+		panic(err)
+	}
+
+	var h common.Hash
+	hw.Sum(h[:0])
+	return h
 }

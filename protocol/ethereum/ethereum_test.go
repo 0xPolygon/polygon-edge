@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -347,5 +348,98 @@ func TestEthereumBody(t *testing.T) {
 		if i != receiptsResp[indx][0].CumulativeGasUsed {
 			t.Fatal("error")
 		}
+	}
+}
+
+func TestPeerConcurrentHeaderCalls(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	cases := []uint64{10}
+	errr := make(chan error, len(cases))
+
+	for indx, i := range cases {
+		go func(indx int, i uint64) {
+			h, err := p0.RequestHeadersSync(i, 100)
+			if err == nil {
+				if len(h) != 100 {
+					err = fmt.Errorf("length not correct")
+				} else {
+					for indx, j := range h {
+						if j.Number.Uint64() != i+uint64(indx) {
+							err = fmt.Errorf("numbers dont match")
+							break
+						}
+					}
+				}
+			}
+			errr <- err
+		}(indx, i)
+	}
+
+	for i := 0; i < len(cases); i++ {
+		if err := <-errr; err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestPeerEmptyResponseFails(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	if _, err := p0.RequestHeadersSync(1100, 100); err == nil {
+		t.Fatal("it should fail")
+	}
+
+	// NOTE: We cannot know from an empty response which is the
+	// pending block it belongs to (because we use the first block to know the origin)
+	// Thus, the query will fail with a timeout message but it does not
+	// mean the peer is timing out on the responses.
+}
+
+func TestPeerCloseConnection(t *testing.T) {
+	// close the connection while doing the request
+
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
+	defer close0()
+
+	// b1 with the whole chain
+	b1, close1 := blockchain.NewTestBlockchain(t, headers)
+	defer close1()
+
+	s0, s1 := network.TestServers()
+	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+
+	if _, err := p0.RequestHeadersSync(0, 100); err != nil {
+		t.Fatal(err)
+	}
+
+	s1.Close()
+	if _, err := p0.RequestHeadersSync(100, 100); err == nil {
+		t.Fatal("it should fail after the connection has been closed")
 	}
 }
