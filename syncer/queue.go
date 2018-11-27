@@ -44,9 +44,13 @@ func newQueue() *queue {
 }
 
 func (q *queue) addBack(block uint64) {
-	q.back = q.newItem(block)
-	q.front.next = q.back
-	q.back.prev = q.front
+	if q.back == nil {
+		q.back = q.newItem(block)
+		q.front.next = q.back
+		q.back.prev = q.front
+	} else {
+		q.back.block = block
+	}
 }
 
 func (q *queue) newItem(block uint64) *element {
@@ -147,6 +151,38 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	}
 
 	// TODO, check the cases
+	return nil
+}
+
+func (q *queue) updateFailedElem(peer string, id uint32, context string) error {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	elem, err := q.findElement(id)
+	if err != nil {
+		return err
+	}
+
+	switch context {
+	case "receipts":
+		if elem.receiptsStatus != pendingX {
+			return fmt.Errorf("receipts status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.receiptsStatus = waitingX
+	case "bodies":
+		if elem.bodiesStatus != pendingX {
+			return fmt.Errorf("bodies status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.bodiesStatus = waitingX
+	case "headers":
+		if elem.headersStatus != pendingX {
+			return fmt.Errorf("headers status should be pending but found: %s", elem.headersStatus)
+		}
+		elem.headersStatus = waitingX
+	default:
+		return fmt.Errorf("context name not found %s", context)
+	}
+
 	return nil
 }
 
@@ -328,6 +364,23 @@ func (q *queue) FetchCompletedData() []*element {
 
 	q.front = elem
 	return elements
+}
+
+func (q *queue) printQueue() {
+	elem := q.front
+	for elem != nil {
+		fmt.Printf("block %d: %s %s %s\n", elem.block, elem.headersStatus.String(), elem.bodiesStatus.String(), elem.receiptsStatus.String())
+		elem = elem.next
+	}
+}
+
+func contains(s []string, i string) bool {
+	for _, j := range s {
+		if j == i {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *queue) getNextElegibleSlot() *element {

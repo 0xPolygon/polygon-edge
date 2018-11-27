@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"strings"
 	"syscall"
 	"time"
@@ -31,10 +33,22 @@ var peers = []string{}
 
 var mainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
 	fmt.Println("## Minimal ##")
 
 	// -- chain config
+
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	// -- genesis
 
@@ -67,7 +81,7 @@ func main() {
 	}
 
 	// blockchain storage
-	storage, err := storage.NewStorage("/tmp/minimal-test", nil)
+	storage, err := storage.NewStorage("/home/thor/Desktop/ethereum/minimal-test", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -82,7 +96,7 @@ func main() {
 	}
 
 	cc := syncer.DefaultConfig()
-	cc.MaxRequests = 1
+	cc.NumWorkers = 4
 
 	syncer, err := syncer.NewSyncer(1, blockchain, cc)
 	if err != nil {
