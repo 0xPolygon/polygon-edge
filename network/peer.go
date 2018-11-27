@@ -267,6 +267,8 @@ func (p *Peer) Close() {
 		}
 	*/
 
+	fmt.Println("- close -")
+
 	p.conn.Close()
 	close(p.closeCh)
 	p.Connected = false
@@ -302,7 +304,10 @@ func (p *Peer) handleMsg(msg Message) error {
 		if err != nil {
 			p.logger.Printf("failed to decode disc msg: %v\n", err)
 		} else {
-			p.logger.Printf("Disconnected: %s\n", reason)
+			p.logger.Printf("Disconnected (%s): %s\n", p.Enode, reason)
+		}
+		if err := p.conn.Close(); err != nil {
+			p.logger.Printf("Failed to close the connection: %v", err)
 		}
 		p.Connected = false
 	default:

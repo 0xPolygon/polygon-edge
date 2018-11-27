@@ -130,3 +130,103 @@ func TestPeerHeight(t *testing.T) {
 		t.Fatal("it should be 999")
 	}
 }
+
+func newTestPeer(id string, pending int) *Peer {
+	return &Peer{id: id, active: true, pending: pending, failed: 0}
+}
+
+func dequeuePeer(t *testing.T, s *Syncer) *Peer {
+	// dequeue peer without blocking
+	peer := make(chan *Peer, 1)
+	go func() {
+		p := s.dequeuePeer()
+		peer <- p
+	}()
+
+	select {
+	case p := <-peer:
+		return p
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("it did not wake up")
+	}
+
+	return nil
+}
+
+func expectDequeue(t *testing.T, s *Syncer, id string) {
+	if found := dequeuePeer(t, s); found.id != id {
+		t.Fatalf("expected to dequeue %s but found %s", id, found.id)
+	}
+}
+
+func TestDequeueIncreasePending(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
+	defer close0()
+
+	s, err := NewSyncer(1, b0, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.peers["a"] = newTestPeer("a", 0)
+
+	expectDequeue(t, s, "a")
+	if pending := s.peers["a"].pending; pending != 1 {
+		t.Fatalf("pending should have been increased, expected 1 but found %d", pending)
+	}
+}
+
+func TestDequeuePeers(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
+	defer close0()
+
+	s, err := NewSyncer(1, b0, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.peers["a"] = newTestPeer("a", 0)
+	s.peers["b"] = newTestPeer("b", 3)
+
+	expectDequeue(t, s, "a")
+	expectDequeue(t, s, "a")
+	expectDequeue(t, s, "a")
+	expectDequeue(t, s, "a")
+	expectDequeue(t, s, "b")
+}
+
+func TestDequeuPeerWithAwake(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0, close0 := blockchain.NewTestBlockchain(t, headers)
+	defer close0()
+
+	s, err := NewSyncer(1, b0, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.peers["a"] = newTestPeer("a", 5)
+
+	peer := make(chan *Peer, 1)
+	go func() {
+		p := s.dequeuePeer()
+		peer <- p
+	}()
+
+	// awake peer a
+	s.ack(s.peers["a"], false)
+
+	select {
+	case p := <-peer:
+		if p.id != "a" {
+			t.Fatalf("wrong peer woke up, expected a but found %s", p.id)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("it did not wake up")
+	}
+}

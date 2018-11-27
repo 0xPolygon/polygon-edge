@@ -332,7 +332,11 @@ func (s *Server) connectWithEnode(enode string) error {
 		return err
 	}
 
-	return s.connect2(conn, rpub)
+	if err := s.connect2(conn, rpub); err != nil {
+		conn.Close()
+		return err
+	}
+	return nil
 }
 
 func (s *Server) connect2(conn net.Conn, pub *ecdsa.PublicKey) error {

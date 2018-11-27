@@ -25,7 +25,7 @@ func findElement(t *testing.T, q *queue, id uint32) *element {
 }
 
 func dequeue(t *testing.T, q *queue) *Job {
-	job, err := q.Dequeue("")
+	job, err := q.Dequeue()
 	if err != nil {
 		t.Fatal(err)
 	}

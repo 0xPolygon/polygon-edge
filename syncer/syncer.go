@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -15,11 +17,13 @@ import (
 
 type Config struct {
 	MaxRequests int
+	NumWorkers  int
 }
 
 func DefaultConfig() *Config {
 	c := &Config{
 		MaxRequests: 5,
+		NumWorkers:  2,
 	}
 	return c
 }
@@ -33,20 +37,39 @@ type Blockchain interface {
 }
 
 type Peer struct {
-	conn *ethereum.Ethereum
-	peer *network.Peer
+	pretty  string
+	id      string
+	conn    *ethereum.Ethereum
+	peer    *network.Peer
+	active  bool
+	failed  int
+	pending int
+}
+
+func newPeer(id string, peer *network.Peer) *Peer {
+	return &Peer{
+		id:     id,
+		active: true,
+		pretty: peer.PrettyString(),
+		conn:   peer.GetProtocol("eth", 63).(*ethereum.Ethereum),
+		peer:   peer,
+	}
 }
 
 // Syncer is the syncer protocol
 type Syncer struct {
-	NetworkID  uint64
-	config     *Config
-	peers      map[string]*Peer
+	NetworkID uint64
+	config    *Config
+
 	blockchain Blockchain
 	queue      *queue
 
 	counter int
 	last    int
+
+	peers     map[string]*Peer
+	peersLock sync.Mutex
+	waitCh    []chan struct{}
 
 	deliverLock sync.Mutex
 }
@@ -57,11 +80,13 @@ func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer
 		config:      config,
 		NetworkID:   networkID,
 		peers:       map[string]*Peer{},
+		peersLock:   sync.Mutex{},
 		blockchain:  blockchain,
 		queue:       newQueue(),
 		counter:     0,
 		last:        0,
 		deliverLock: sync.Mutex{},
+		waitCh:      make([]chan struct{}, 0),
 	}
 
 	header := blockchain.Header()
@@ -98,7 +123,7 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 
 	fmt.Println("DAO Fork completed")
 
-	p := &Peer{peer.GetProtocol("eth", 63).(*ethereum.Ethereum), peer}
+	p := newPeer(peer.ID, peer)
 	s.peers[peer.ID] = p
 
 	// find data about the peer
@@ -125,26 +150,152 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 
 	fmt.Println("Difficulty higher than ours")
 	s.updateChain(header.Number.Uint64())
+
+	// wake up some task
+	s.wakeUp()
+}
+
+func (s *Syncer) workerTask(id string) {
+	fmt.Printf("Worker task starts: %s\n", id)
+
+	for {
+		peer := s.dequeuePeer()
+
+		fmt.Printf("(%s) peer is ready %s: %d\n", id, peer.pretty, peer.pending)
+
+		i := s.dequeue()
+
+		var data interface{}
+		var err error
+		var context string
+
+		switch job := i.payload.(type) {
+		case *HeadersJob:
+			fmt.Printf("SYNC HEADERS (%s) (%d) (%s): %d, %d\n", id, i.id, peer.pretty, job.block, job.count)
+
+			data, err = peer.conn.RequestHeadersSync(job.block, job.count)
+			context = "headers"
+		case *BodiesJob:
+			fmt.Printf("SYNC BODIES (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
+
+			data, err = peer.conn.RequestBodiesSync(job.hashes)
+			context = "bodies"
+		case *ReceiptsJob:
+			fmt.Printf("SYNC RECEIPTS (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
+
+			data, err = peer.conn.RequestReceiptsSync(job.hashes)
+			context = "receipts"
+		}
+
+		// ack the job and enqueue again for more work
+		s.ack(peer, err != nil)
+
+		s.deliver(peer.pretty, context, i.id, data, err)
+
+		fmt.Printf("Completed: %d\n", s.queue.NumOfCompletedBatches())
+	}
 }
 
 // Run is the main entry point
 func (s *Syncer) Run() {
-	/*
-		for {
-			idle := <-s.WorkerPool
-
-			i := s.dequeue()
-			if i == nil {
-				panic("its nil")
-			}
-
-			idle <- i.ToJob()
-		}
-	*/
+	for i := 0; i < s.config.NumWorkers; i++ {
+		go s.workerTask(strconv.Itoa(i))
+	}
 }
 
-func (s *Syncer) dequeue(peer string) *Job {
-	job, err := s.queue.Dequeue(peer)
+type peers []*Peer
+
+func (p peers) Len() int {
+	return len(p)
+}
+func (p peers) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+func (p peers) Less(i, j int) bool {
+	if p[i].failed < p[j].failed {
+		return true
+	}
+	return p[i].pending < p[j].pending
+}
+
+func (s *Syncer) dequeuePeer() *Peer {
+SELECT:
+	//fmt.Println("-- getting peers --")
+	s.peersLock.Lock()
+	pp := peers{}
+	for _, i := range s.peers {
+		//fmt.Printf("Peer: %s %v %d %v\n", i.pretty, i.active, i.pending, i.pending <= s.config.MaxRequests-1)
+		if i.active && i.pending <= s.config.MaxRequests-1 {
+			pp = append(pp, i)
+		}
+	}
+	sort.Sort(pp)
+
+	//fmt.Println("-- pending --")
+	//fmt.Println(pp)
+
+	if len(pp) > 0 {
+		candidate := pp[0]
+		candidate.pending++
+
+		s.peersLock.Unlock()
+		return candidate
+	}
+
+	s.peersLock.Unlock()
+
+	fmt.Println("- nothign found go to sleep -")
+
+	// wait and sleep
+	wait := make(chan struct{})
+	s.waitCh = append(s.waitCh, wait)
+
+	for {
+		<-wait
+		fmt.Println("- awake now -")
+		goto SELECT
+	}
+}
+
+func (s *Syncer) ack(peer *Peer, failed bool) {
+	s.peersLock.Lock()
+
+	// acknoledge a task has finished
+	peer.pending--
+
+	if failed {
+		peer.failed++
+	}
+	if peer.failed == 10 {
+		peer.active = false
+	}
+	s.peersLock.Unlock()
+
+	if peer.active {
+		for i := peer.pending; i < s.config.MaxRequests; i++ {
+			s.wakeUp()
+		}
+	}
+}
+
+func (s *Syncer) wakeUp() {
+	//fmt.Println("- wake up -")
+	//fmt.Println(len(s.waitCh))
+
+	// wake up a task if necessary
+	if len(s.waitCh) > 0 {
+		var wake chan struct{}
+		wake, s.waitCh = s.waitCh[0], s.waitCh[1:]
+
+		select {
+		case wake <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (s *Syncer) dequeue() *Job {
+	job, err := s.queue.Dequeue()
 	if err != nil {
 		fmt.Printf("Failed to dequeue: %v\n", err)
 	}

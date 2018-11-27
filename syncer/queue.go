@@ -58,7 +58,6 @@ func (q *queue) newItem(block uint64) *element {
 	return &element{
 		id:             id,
 		block:          block,
-		past:           []string{},
 		headersStatus:  waitingX,
 		bodiesStatus:   completedX,
 		receiptsStatus: completedX,
@@ -162,10 +161,6 @@ func (q *queue) updateFailedElem(peer string, id uint32, context string) error {
 	elem, err := q.findElement(id)
 	if err != nil {
 		return err
-	}
-
-	if !contains(elem.past, peer) {
-		elem.past = append(elem.past, peer)
 	}
 
 	switch context {
@@ -297,11 +292,11 @@ func (q *queue) findElement(id uint32) (*element, error) {
 	return nil, fmt.Errorf("element %d not found", id)
 }
 
-func (q *queue) Dequeue(id string) (*Job, error) {
+func (q *queue) Dequeue() (*Job, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	elem := q.getNextElegibleSlot(id)
+	elem := q.getNextElegibleSlot()
 	if elem == nil {
 		return nil, fmt.Errorf("All the jobs are different from waiting")
 	}
@@ -388,13 +383,11 @@ func contains(s []string, i string) bool {
 	return false
 }
 
-func (q *queue) getNextElegibleSlot(id string) *element {
+func (q *queue) getNextElegibleSlot() *element {
 	elem := q.front
 	for elem != nil {
 		if elem.headersStatus == waitingX || elem.receiptsStatus == waitingX || elem.bodiesStatus == waitingX {
-			if !contains(elem.past, id) {
-				break
-			}
+			break
 		}
 		elem = elem.next
 	}
@@ -442,9 +435,6 @@ type element struct {
 
 	prev *element
 	next *element
-
-	// past is the list of past peers that tried to fetch data and failed
-	past []string
 
 	// headers
 	headers       []*types.Header

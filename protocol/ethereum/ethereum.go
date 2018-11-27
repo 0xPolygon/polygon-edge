@@ -295,12 +295,10 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		return e.sendBlockHeaders(headers)
 
 	case code == BlockHeadersMsg:
-		fmt.Println("-- receive headers --")
 		var headers []*types.Header
 		if err := rlp.DecodeBytes(payload, &headers); err != nil {
 			return err
 		}
-		fmt.Println(headers)
 		e.Headers(headers)
 	case code == GetBlockBodiesMsg:
 		var hashes []common.Hash
