@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/oxtoacart/bpool"
+
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discover"
 )
@@ -39,7 +41,7 @@ type Transport interface {
 const (
 	// udpPacketBufSize is used to buffer incoming packets during read
 	// operations.
-	udpPacketBufSize = 65536
+	udpPacketBufSize = 1280
 
 	// udpRecvBufSize is a large buffer size that we attempt to set UDP
 	// sockets to in order to handle a large volume of messages.
@@ -70,6 +72,7 @@ type NetTransport struct {
 	tcpListeners []*net.TCPListener
 	udpListeners []*net.UDPConn
 	shutdown     int32
+	buffer       *bpool.BytePool
 }
 
 // NewNetTransport returns a net transport with the given configuration. On
@@ -88,6 +91,7 @@ func NewNetTransport(config *NetTransportConfig) (*NetTransport, error) {
 		packetCh: make(chan *discover.Packet),
 		streamCh: make(chan net.Conn),
 		logger:   config.Logger,
+		buffer:   bpool.NewBytePool(10, udpPacketBufSize),
 	}
 
 	// Clean up listeners if there's an error.
@@ -121,9 +125,11 @@ func NewNetTransport(config *NetTransportConfig) (*NetTransport, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to start UDP listener on %q port %d: %v", addr, port, err)
 		}
-		if err := setUDPRecvBuf(udpLn); err != nil {
-			return nil, fmt.Errorf("Failed to resize UDP buffer: %v", err)
-		}
+		/*
+			if err := setUDPRecvBuf(udpLn); err != nil {
+				return nil, fmt.Errorf("Failed to resize UDP buffer: %v", err)
+			}
+		*/
 		t.udpListeners = append(t.udpListeners, udpLn)
 	}
 
@@ -213,7 +219,8 @@ func (t *NetTransport) udpListen(udpLn *net.UDPConn) {
 	for {
 		// Do a blocking read into a fresh buffer. Grab a time stamp as
 		// close as possible to the I/O.
-		buf := make([]byte, udpPacketBufSize)
+		// buf := make([]byte, udpPacketBufSize)
+		buf := t.buffer.Get()
 		n, addr, err := udpLn.ReadFrom(buf)
 		ts := time.Now()
 		if err != nil {
@@ -239,6 +246,9 @@ func (t *NetTransport) udpListen(udpLn *net.UDPConn) {
 			Buf:       buf[:n],
 			From:      addr,
 			Timestamp: ts,
+			Release: func() {
+				t.buffer.Put(buf)
+			},
 		}
 	}
 }
