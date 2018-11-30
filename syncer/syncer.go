@@ -153,6 +153,45 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 
 	// wake up some task
 	s.wakeUp()
+	// go s.runPeer(p)
+}
+
+func (s *Syncer) runPeer(peer *Peer) {
+	/*
+		block := 0
+
+		for {
+			fmt.Printf("Peer (%s) %d\n", peer.pretty, block)
+
+			headers, err := peer.conn.RequestHeadersSync(uint64(block), 100)
+			if err != nil {
+				fmt.Printf("failed to deliver: %v", err)
+				return
+			}
+
+			bodies := []*types.Header{}
+			receipts := []*types.Header{}
+
+			for _, h := range headers {
+				if hasBody(h) {
+					bodies = append(bodies, h)
+				}
+				if hasReceipts(h) {
+					receipts = append(receipts, h)
+				}
+			}
+
+			if _, err := peer.conn.RequestBodiesSync(bodies); err != nil {
+				fmt.Printf("failed to receive receipts: %v", err)
+			}
+
+			if _, err := peer.conn.RequestReceiptsSync(receipts); err != nil {
+				fmt.Printf("failed to receive bodies: %v", err)
+			}
+
+			block += 100
+		}
+	*/
 }
 
 func (s *Syncer) workerTask(id string) {
@@ -178,12 +217,12 @@ func (s *Syncer) workerTask(id string) {
 		case *BodiesJob:
 			fmt.Printf("SYNC BODIES (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
 
-			data, err = peer.conn.RequestBodiesSync(job.hashes)
+			data, err = peer.conn.RequestBodiesSync(job.hash, job.hashes)
 			context = "bodies"
 		case *ReceiptsJob:
 			fmt.Printf("SYNC RECEIPTS (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
 
-			data, err = peer.conn.RequestReceiptsSync(job.hashes)
+			data, err = peer.conn.RequestReceiptsSync(job.hash, job.hashes)
 			context = "receipts"
 		}
 
@@ -358,7 +397,7 @@ func (s *Syncer) deliver(peer string, context string, id uint32, data interface{
 		panic("")
 	}
 
-	if s.queue.NumOfCompletedBatches() > 100 {
+	if s.queue.NumOfCompletedBatches() > 2 {
 		data := s.queue.FetchCompletedData()
 
 		fmt.Printf("Commit data: %d\n", len(data)*maxElements)
@@ -415,7 +454,7 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 		resp := <-ack
 		if resp.Complete {
 			var headers []*types.Header
-			if err := rlp.DecodeBytes(resp.Payload, &headers); err != nil {
+			if err := rlp.Decode(resp.Payload, &headers); err != nil {
 				return err
 			}
 
@@ -503,7 +542,7 @@ func (s *Syncer) fetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
 	}
 
 	var headers []*types.Header
-	if err := rlp.DecodeBytes(resp.Payload, &headers); err != nil {
+	if err := rlp.Decode(resp.Payload, &headers); err != nil {
 		return nil, err
 	}
 	if len(headers) != 1 {

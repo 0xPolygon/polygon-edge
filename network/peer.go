@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"strings"
@@ -79,9 +80,9 @@ func (d DiscReason) Error() string {
 	return d.String()
 }
 
-func decodeDiscMsg(msg []byte) (DiscReason, error) {
+func decodeDiscMsg(msg io.Reader) (DiscReason, error) {
 	var reason [1]DiscReason
-	if err := rlp.DecodeBytes(msg, &reason); err != nil {
+	if err := rlp.Decode(msg, &reason); err != nil {
 		return 0x0, err
 	}
 	return reason[0], nil
@@ -168,6 +169,7 @@ type Peer struct {
 	Enode        string
 	ID           string
 	Status       Status
+	server       *Server
 	logger       *log.Logger
 	conn         Conn
 	Info         *Info
@@ -182,7 +184,7 @@ type Peer struct {
 	headerLock sync.Mutex
 }
 
-func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
+func newPeer(logger *log.Logger, conn *Connection, info *Info, server *Server) *Peer {
 	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.conn.RemoteAddr().String())
 
 	peer := &Peer{
@@ -197,6 +199,7 @@ func newPeer(logger *log.Logger, conn *Connection, info *Info) *Peer {
 		pingInterval: defaultPingInterval,
 		protocols:    []*Instance{},
 		headerLock:   sync.Mutex{},
+		server:       server,
 	}
 
 	return peer
@@ -310,6 +313,7 @@ func (p *Peer) handleMsg(msg Message) error {
 			p.logger.Printf("Failed to close the connection: %v", err)
 		}
 		p.Connected = false
+		p.server.removePeer(p)
 	default:
 		pp := p.getProtocol(msg.Code)
 		if pp == nil {

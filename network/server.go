@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+
 	"github.com/ferranbt/periodic-dispatcher"
 
 	"github.com/umbracle/minimal/network/discover"
@@ -220,6 +222,8 @@ func (s *Server) dialTask(id string, tasks chan string) {
 					}
 				}
 			}
+
+			metrics.IncrCounter([]string{"server", "dial task"}, 1.0)
 		case <-s.closeCh:
 			return
 		}
@@ -277,6 +281,19 @@ func (s *Server) GetPeer(id string) *Peer {
 		}
 	}
 	return nil
+}
+
+func (s *Server) removePeer(peer *Peer) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	if _, ok := s.peers[peer.ID]; ok {
+		delete(s.peers, peer.ID)
+	} else {
+		s.logger.Printf("Removing peer %s but not found", peer.ID)
+	}
+
+	metrics.SetGauge([]string{"minimal", "peers"}, float32(len(s.peers)))
 }
 
 func (s *Server) Disconnect() {
@@ -357,6 +374,7 @@ func (s *Server) connect2(conn net.Conn, pub *ecdsa.PublicKey) error {
 	} else {
 		s.peersLock.Lock()
 		s.peers[id] = peer
+		metrics.SetGauge([]string{"minimal", "peers"}, float32(len(s.peers)))
 		s.peersLock.Unlock()
 
 		s.EventCh <- MemberEvent{NodeJoin, peer}
@@ -389,7 +407,7 @@ func (s *Server) connect(conn net.Conn, pub *ecdsa.PublicKey) (*Peer, error) {
 	}
 	sort.Sort(remoteInfo.Caps)
 
-	peer := newPeer(s.logger, upgraded, remoteInfo)
+	peer := newPeer(s.logger, upgraded, remoteInfo, s)
 
 	instances := s.matchProtocols(peer, remoteInfo.Caps)
 	if len(instances) == 0 {

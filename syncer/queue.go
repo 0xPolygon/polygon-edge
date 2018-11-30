@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
 type HeadersJob struct {
@@ -15,11 +16,13 @@ type HeadersJob struct {
 }
 
 type BodiesJob struct {
-	hashes []*types.Header
+	hash   string
+	hashes []common.Hash
 }
 
 type ReceiptsJob struct {
-	hashes []*types.Header
+	hash   string
+	hashes []common.Hash
 }
 
 // Job is the syncer job
@@ -47,7 +50,7 @@ func (q *queue) addBack(block uint64) {
 	if q.back == nil {
 		q.back = q.newItem(block)
 		q.front.next = q.back
-		q.back.prev = q.front
+		// q.back.prev = q.front
 	} else {
 		q.back.block = block
 	}
@@ -88,6 +91,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 
 	// values received, check headers with prev content
 	if len(elem.headers) == 0 {
+		/* // FIX
 		if elem.prev == nil {
 			// check with head
 			if q.head != headers[0].ParentHash {
@@ -99,6 +103,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 				return fmt.Errorf("hash should match with previous batch")
 			}
 		}
+		*/
 	} else {
 		// check with last elem header
 		if elem.headers[len(elem.headers)-1].Hash() != headers[0].ParentHash {
@@ -120,7 +125,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	// check headers with next content if exists
 	if elem.next != nil && elem.next.headersStatus == completedX {
 		if elem.Last().Hash() != elem.next.headers[0].ParentHash {
-			return fmt.Errorf("hash mismatch with next value")
+			// return fmt.Errorf("hash mismatch with next value") // FIX
 		}
 	}
 
@@ -129,15 +134,15 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	elem.bodiesStatus = completedX
 	elem.receiptsStatus = completedX
 
-	bodies := []*types.Header{}
-	receipts := []*types.Header{}
+	bodies := []int{}
+	receipts := []int{}
 
-	for _, h := range elem.headers {
+	for i, h := range elem.headers {
 		if hasBody(h) {
-			bodies = append(bodies, h)
+			bodies = append(bodies, i)
 		}
 		if hasReceipts(h) {
-			receipts = append(receipts, h)
+			receipts = append(receipts, i)
 		}
 	}
 
@@ -211,7 +216,7 @@ func (q *queue) deliverReceipts(id uint32, receipts [][]*types.Receipt) error {
 	// check if the value is correct
 	offset := elem.receiptsOffset
 	for indx, receipt := range receipts {
-		if types.DeriveSha(types.Receipts(receipt)) != elem.receiptsHeaders[offset+uint32(indx)].ReceiptHash {
+		if types.DeriveSha(types.Receipts(receipt)) != elem.headers[elem.receiptsHeaders[offset+uint32(indx)]].ReceiptHash {
 			return fmt.Errorf("")
 		}
 	}
@@ -257,10 +262,10 @@ func (q *queue) deliverBodies(id uint32, bodies []*types.Body) error {
 	// check if the value is correct
 	offset := elem.bodiesOffset
 	for indx, body := range bodies {
-		if types.DeriveSha(types.Transactions(body.Transactions)) != elem.bodiesHeaders[offset+uint32(indx)].TxHash {
+		if types.DeriveSha(types.Transactions(body.Transactions)) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].TxHash {
 			return fmt.Errorf("tx hash not correct")
 		}
-		if types.CalcUncleHash(body.Uncles) != elem.bodiesHeaders[offset+uint32(indx)].UncleHash {
+		if types.CalcUncleHash(body.Uncles) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].UncleHash {
 			return fmt.Errorf("uncle hash not correct")
 		}
 	}
@@ -301,6 +306,14 @@ func (q *queue) Dequeue() (*Job, error) {
 		return nil, fmt.Errorf("All the jobs are different from waiting")
 	}
 
+	getHashesAtIndexes := func(i []int) []common.Hash {
+		res := []common.Hash{}
+		for _, j := range i {
+			res = append(res, elem.headers[j].Hash())
+		}
+		return res
+	}
+
 	// headers job
 	if elem.headersStatus == waitingX {
 		elem.headersStatus = pendingX
@@ -313,18 +326,28 @@ func (q *queue) Dequeue() (*Job, error) {
 	// receipts job
 	if elem.receiptsStatus == waitingX {
 		elem.receiptsStatus = pendingX
+
+		hashes := getHashesAtIndexes(elem.receiptsHeaders[elem.receiptsOffset:])
+		hash := elem.headers[elem.receiptsHeaders[elem.receiptsOffset]].ReceiptHash.String()
+
 		return &Job{
 			id:      elem.id,
-			payload: &ReceiptsJob{elem.receiptsHeaders[elem.receiptsOffset:]},
+			payload: &ReceiptsJob{hash, hashes},
 		}, nil
 	}
 
 	// bodies job
 	if elem.bodiesStatus == waitingX {
 		elem.bodiesStatus = pendingX
+
+		hashes := getHashesAtIndexes(elem.bodiesHeaders[elem.bodiesOffset:])
+
+		first := elem.headers[elem.bodiesHeaders[elem.bodiesOffset]]
+		hash := encodeHash(first.UncleHash, first.TxHash).String()
+
 		return &Job{
 			id:      elem.id,
-			payload: &BodiesJob{elem.bodiesHeaders[elem.bodiesOffset:]},
+			payload: &BodiesJob{hash, hashes},
 		}, nil
 	}
 
@@ -363,6 +386,9 @@ func (q *queue) FetchCompletedData() []*element {
 	}
 
 	q.front = elem
+	// q.front.prev = nil
+	// not sure if I have to change also the last element
+
 	return elements
 }
 
@@ -399,7 +425,7 @@ func (q *queue) getNextElegibleSlot() *element {
 	// split the item
 	i := q.newItem(elem.block + maxElements)
 
-	i.prev = elem
+	// i.prev = elem
 	i.next = elem.next
 
 	elem.next = i
@@ -433,7 +459,7 @@ type element struct {
 	id    uint32
 	block uint64
 
-	prev *element
+	// prev *element
 	next *element
 
 	// headers
@@ -443,13 +469,13 @@ type element struct {
 
 	// bodies
 	bodies        []*types.Body
-	bodiesHeaders []*types.Header
+	bodiesHeaders []int
 	bodiesOffset  uint32
 	bodiesStatus  elementStatus
 
 	// receipts
 	receipts        []types.Receipts
-	receiptsHeaders []*types.Header
+	receiptsHeaders []int
 	receiptsOffset  uint32
 	receiptsStatus  elementStatus
 }
@@ -473,4 +499,18 @@ func hasBody(h *types.Header) bool {
 
 func hasReceipts(h *types.Header) bool {
 	return h.ReceiptHash != types.EmptyRootHash
+}
+
+func encodeHash(x common.Hash, y common.Hash) common.Hash {
+	hw := sha3.NewKeccak256()
+	if _, err := hw.Write(x.Bytes()); err != nil {
+		panic(err)
+	}
+	if _, err := hw.Write(y.Bytes()); err != nil {
+		panic(err)
+	}
+
+	var h common.Hash
+	hw.Sum(h[:0])
+	return h
 }
