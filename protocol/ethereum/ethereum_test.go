@@ -2,6 +2,8 @@ package ethereum
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math/big"
 	"reflect"
 	"testing"
@@ -211,7 +213,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			resp := <-ack
 			if resp.Complete {
 				var result []*types.Header
-				if err := rlp.DecodeBytes(resp.Payload, &result); err != nil {
+				if err := rlp.Decode(resp.Payload, &result); err != nil {
 					tt.Fatal(err)
 				}
 
@@ -228,6 +230,14 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	// There are no body and no receipts, the answer is empty
 	headers := blockchain.NewTestHeaderChain(100)
+
+	read := func(r io.Reader) []byte {
+		data, err := ioutil.ReadAll(r)
+		if err != nil {
+			t.Fatalf("failed to consume io.Reader: %v", err)
+		}
+		return data
+	}
 
 	b0, close0 := blockchain.NewTestBlockchain(t, headers)
 	defer close0()
@@ -253,7 +263,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp := <-ack; resp.Complete {
-		if len(resp.Payload) != 1 {
+		if len(read(resp.Payload)) != 1 {
 			t.Fatal("there is some content in bodies")
 		}
 	} else {
@@ -269,7 +279,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp := <-ack; resp.Complete {
-		if len(resp.Payload) != len(batch)+1 { // when the response is one byte + one byte per empty element
+		if len(read(resp.Payload)) != len(batch)+1 { // when the response is one byte + one byte per empty element
 			t.Fatal("there is some content in receipts")
 		}
 	} else {
@@ -311,7 +321,7 @@ func TestEthereumBody(t *testing.T) {
 		t.Fatal("not completed")
 	}
 	var bodies []*types.Body
-	if err := rlp.DecodeBytes(resp.Payload, &bodies); err != nil {
+	if err := rlp.Decode(resp.Payload, &bodies); err != nil {
 		t.Fatal(err)
 	}
 	if len(bodies) != len(batch) {
@@ -337,7 +347,7 @@ func TestEthereumBody(t *testing.T) {
 		t.Fatal("not completed")
 	}
 	var receiptsResp [][]*types.Receipt
-	if err := rlp.DecodeBytes(resp.Payload, &receiptsResp); err != nil {
+	if err := rlp.Decode(resp.Payload, &receiptsResp); err != nil {
 		t.Fatal(err)
 	}
 	if len(receiptsResp) != len(batch) {

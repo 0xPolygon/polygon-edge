@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/armon/go-metrics"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -24,6 +28,10 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 )
+
+// NOTE: ProbeTasks could be lowered even more, I think it will suffice with only one or two
+// because it does not matter how fast discover can find nodes if dialing in server takes a couple
+// of seconds.
 
 const (
 	nodeIDBytes               = 512 / 8
@@ -42,6 +50,7 @@ type Config struct {
 	RespTimeout        time.Duration
 	RevalidateInterval time.Duration
 	LookupInterval     time.Duration
+	NumProbeTasks      int
 }
 
 // DefaultConfig is the default config
@@ -52,6 +61,7 @@ func DefaultConfig() *Config {
 		RespTimeout:        defaultRespTimeout,
 		RevalidateInterval: defaultRevalidateInterval,
 		LookupInterval:     1 * time.Minute,
+		NumProbeTasks:      4,
 	}
 	return c
 }
@@ -201,6 +211,7 @@ type Packet struct {
 	Buf       []byte
 	From      net.Addr
 	Timestamp time.Time
+	Release   func() // release frees the buffer
 }
 
 // Transport is the UDP transport to send packets
@@ -225,6 +236,8 @@ type Discover struct {
 	active     bool // set to true when the bootnodes are loaded
 	EventCh    chan string
 	bootnodes  []string
+	tasks      chan *Peer
+	inlookup   int32
 }
 
 // NewDiscover creates a new routing table
@@ -251,6 +264,8 @@ func NewDiscover(key *ecdsa.PrivateKey, transport Transport, addr *net.UDPAddr, 
 		shutdownCh: make(chan bool),
 		EventCh:    make(chan string, 10),
 		bootnodes:  []string{},
+		tasks:      make(chan *Peer, 100),
+		inlookup:   0,
 	}
 
 	return r, nil
@@ -261,8 +276,36 @@ func (d *Discover) SetBootnodes(bootnodes []string) {
 	d.bootnodes = bootnodes
 }
 
+func (d *Discover) sendTask(peer *Peer) {
+	select {
+	case d.tasks <- peer:
+	default:
+	}
+}
+
+func (d *Discover) probeTask(id string) {
+	fmt.Printf("### Start probe task: %s\n", id)
+
+	for {
+		select {
+		case task := <-d.tasks:
+			d.probeNode(task)
+			// fmt.Printf("TASK (%s) Probe node: %s: %v\n", id, task.Enode(), res)
+
+		case <-d.shutdownCh:
+			return
+		}
+	}
+}
+
 // Schedule starts the discovery protocol
 func (d *Discover) Schedule() {
+	fmt.Println("## start scheduling ##")
+
+	for i := 0; i < d.config.NumProbeTasks; i++ {
+		go d.probeTask(strconv.Itoa(i))
+	}
+
 	go d.schedule()
 	go d.loadBootnodes()
 }
@@ -273,7 +316,7 @@ func (d *Discover) loadBootnodes() {
 
 	for _, p := range d.bootnodes {
 		go func(p string) {
-			_, err := d.AddNode(p)
+			err := d.AddNode(p)
 			errr <- err
 		}(p)
 	}
@@ -281,6 +324,9 @@ func (d *Discover) loadBootnodes() {
 	for i := 0; i < len(d.bootnodes); i++ {
 		<-errr
 	}
+
+	fmt.Println("Bootnodes loaded")
+	fmt.Println("Start lookup")
 
 	// start the initial lookup
 	d.active = true
@@ -317,6 +363,7 @@ func (d *Discover) handlePacket(packet *Packet) {
 	if err := d.HandlePacket(packet); err != nil {
 		// fmt.Printf("ERR: %v\n", err)
 	}
+	packet.Release() // free the bufffer
 }
 
 func (d *Discover) revalidatePeer() {
@@ -362,6 +409,7 @@ func min(i, j int) int {
 }
 
 // LookupRandom performs a lookup in a random target
+// TODO, remove peers from lookup response, nobody uses it
 func (d *Discover) LookupRandom() ([]*Peer, error) {
 	var t [64]byte
 	crand.Read(t[:])
@@ -381,15 +429,35 @@ func (d *Discover) Lookup() ([]*Peer, error) {
 
 // LookupTarget does a kademlia lookup around target
 func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
+	fmt.Println("- trying the lookup -")
+
+	// Only allow one lookup at a time
+	if atomic.LoadInt32(&(d.inlookup)) == 1 {
+		fmt.Println("- someone already in -")
+		return nil, nil
+	}
+
+	fmt.Println("- no one in yet, trying -")
+	atomic.StoreInt32(&d.inlookup, 1)
+
+	defer func() {
+		fmt.Println("- set to zero again -")
+		atomic.StoreInt32(&d.inlookup, 0)
+	}()
+
 	if !d.active {
+		fmt.Println("it is not active yet")
 		return []*Peer{}, nil
 	}
 
 	visited := map[peer.ID]bool{}
 
 	// initialize the queue
-	queue, err := d.NearestPeers()
+	queue, err := d.NearestPeersFromTarget(target)
 	if err != nil {
+		fmt.Println("errro")
+		fmt.Println(err)
+
 		return nil, err
 	}
 
@@ -454,6 +522,7 @@ func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
 		discovered = append(discovered, p)
 	}
 
+	fmt.Println("- end -")
 	return discovered, nil
 }
 
@@ -577,7 +646,8 @@ func (d *Discover) handlePingPacket(payload []byte, mac []byte, peer *Peer) erro
 
 	// received a ping, probe back it it has expired
 	if d.hasExpired(peer) {
-		go d.probeNode(peer)
+		// go d.probeNode(peer)
+		d.sendTask(peer)
 	} else {
 		d.updatePeer(peer)
 	}
@@ -647,10 +717,11 @@ func hasExpired(ts uint64) bool {
 }
 
 // AddNode adds a new node to the discover process (NOTE: its a sync process)
-func (d *Discover) AddNode(nodeStr string) (bool, error) {
+// TODO. split in nodeStrToPeer and probe
+func (d *Discover) AddNode(nodeStr string) error {
 	node, err := ParseNode(nodeStr)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	id := make([]byte, 64)
@@ -660,13 +731,16 @@ func (d *Discover) AddNode(nodeStr string) (bool, error) {
 
 	peer, err := newPeer(hexutil.Encode(id), &net.UDPAddr{IP: node.IP, Port: int(node.UDP)}, node.TCP)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return d.probeNode(peer), nil
+	d.probeNode(peer)
+	return nil
 }
 
 func (d *Discover) probeNode(peer *Peer) bool {
+	metrics.IncrCounter([]string{"discover", "probe"}, 1.0)
+
 	// fmt.Printf("Probe peer %25s %20s %s\n", peer.Addr(), peer.ID, hexutil.Encode(peer.Bytes))
 
 	// Send ping packet
@@ -799,7 +873,8 @@ func (d *Discover) findNodes(peer *Peer, target []byte) ([]*Peer, error) {
 	}
 
 	for _, p := range peers {
-		go d.probeNode(p) // not optimal, query only if the peer is new or has expired
+		// go d.probeNode(p) // not optimal, query only if the peer is new or has expired
+		d.sendTask(p)
 	}
 
 	return peers, nil

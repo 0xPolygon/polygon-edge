@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
@@ -160,7 +162,7 @@ func (e *Ethereum) readStatus(localStatus *Status) (*Status, error) {
 	}
 
 	var status Status
-	if err := rlp.DecodeBytes(msg.Payload, &status); err != nil {
+	if err := rlp.Decode(msg.Payload, &status); err != nil {
 		return nil, err
 	}
 
@@ -231,7 +233,7 @@ func (e *Ethereum) listen() {
 			panic(err)
 		}
 
-		if err := e.HandleMsg(msg.Code, msg.Payload); err != nil {
+		if err := e.HandleMsg(msg); err != nil {
 			// close connection
 			e.conn.Close()
 		}
@@ -244,14 +246,20 @@ type newBlockData struct {
 }
 
 // HandleMsg handles a message from ethereum
-func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
+func (e *Ethereum) HandleMsg(msg network.Message) error {
+	metrics.IncrCounterWithLabels([]string{"minimal", "ethereum", "msg"}, float32(1.0), []metrics.Label{{Name: "Code", Value: strconv.Itoa(int(msg.Code))}})
+
+	code := msg.Code
+
 	switch {
 	case code == StatusMsg:
 		return fmt.Errorf("Status msg not expected after handshake")
 
 	case code == GetBlockHeadersMsg:
+		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getHeaders"}, time.Now())
+
 		var query getBlockHeadersData
-		err := rlp.DecodeBytes(payload, &query)
+		err := msg.Decode(&query)
 		if err != nil {
 			return err
 		}
@@ -296,13 +304,16 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 
 	case code == BlockHeadersMsg:
 		var headers []*types.Header
-		if err := rlp.DecodeBytes(payload, &headers); err != nil {
+		if err := msg.Decode(&headers); err != nil {
 			return err
 		}
 		e.Headers(headers)
+
 	case code == GetBlockBodiesMsg:
+		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getBodies"}, time.Now())
+
 		var hashes []common.Hash
-		if err := rlp.DecodeBytes(payload, &hashes); err != nil {
+		if err := msg.Decode(&hashes); err != nil {
 			return err
 		}
 
@@ -328,7 +339,7 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 
 	case code == BlockBodiesMsg:
 		var bodies BlockBodiesData
-		if err := rlp.DecodeBytes(payload, &bodies); err != nil {
+		if err := msg.Decode(&bodies); err != nil {
 			return err
 		}
 		e.Bodies(bodies)
@@ -339,8 +350,10 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 		// TODO. deliver
 
 	case code == GetReceiptsMsg:
+		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getReceipts"}, time.Now())
+
 		var hashes []common.Hash
-		if err := rlp.DecodeBytes(payload, &hashes); err != nil {
+		if err := msg.Decode(&hashes); err != nil {
 			return err
 		}
 
@@ -370,7 +383,7 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 
 	case code == ReceiptsMsg:
 		var receipts [][]*types.Receipt
-		if err := rlp.DecodeBytes(payload, &receipts); err != nil {
+		if err := msg.Decode(&receipts); err != nil {
 			return err
 		}
 		e.Receipts(receipts)
@@ -379,7 +392,7 @@ func (e *Ethereum) HandleMsg(code uint64, payload []byte) error {
 
 	case code == NewBlockMsg:
 		var request newBlockData
-		if err := rlp.DecodeBytes(payload, &request); err != nil {
+		if err := msg.Decode(&request); err != nil {
 			return err
 		}
 
@@ -456,17 +469,19 @@ func (e *Ethereum) RequestHeadersSync(origin uint64, count uint64) ([]*types.Hea
 }
 
 // RequestReceiptsSync requests receipts and waits for the response
-func (e *Ethereum) RequestReceiptsSync(receipts []*types.Header) ([][]*types.Receipt, error) {
-	if len(receipts) == 0 {
+func (e *Ethereum) RequestReceiptsSync(hash string, hashes []common.Hash) ([][]*types.Receipt, error) {
+	if len(hashes) == 0 {
 		return nil, nil
 	}
 
-	hashes := []common.Hash{}
-	for _, b := range receipts {
-		hashes = append(hashes, b.Hash())
-	}
+	/*
+		hashes := []common.Hash{}
+		for _, b := range receipts {
+			hashes = append(hashes, b.Hash())
+		}
 
-	hash := receipts[0].ReceiptHash.String()
+		hash := receipts[0].ReceiptHash.String()
+	*/
 
 	ack := make(chan AckMessage, 1)
 	e.setHandler(hash, 1, ack)
@@ -485,18 +500,20 @@ func (e *Ethereum) RequestReceiptsSync(receipts []*types.Header) ([][]*types.Rec
 }
 
 // RequestBodiesSync requests bodies and waits for the response
-func (e *Ethereum) RequestBodiesSync(bodies []*types.Header) ([]*types.Body, error) {
-	if len(bodies) == 0 {
+func (e *Ethereum) RequestBodiesSync(hash string, hashes []common.Hash) ([]*types.Body, error) {
+	if len(hashes) == 0 {
 		return nil, nil
 	}
 
-	hashes := []common.Hash{}
-	for _, b := range bodies {
-		hashes = append(hashes, b.Hash())
-	}
+	/*
+		hashes := []common.Hash{}
+		for _, b := range bodies {
+			hashes = append(hashes, b.Hash())
+		}
 
-	first := bodies[0]
-	hash := encodeHash(first.UncleHash, first.TxHash).String()
+		first := bodies[0]
+		hash := encodeHash(first.UncleHash, first.TxHash).String()
+	*/
 
 	ack := make(chan AckMessage, 1)
 	e.setHandler(hash, 1, ack)

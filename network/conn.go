@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/hmac"
 	"errors"
+	"fmt"
 	"hash"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,9 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/armon/go-metrics"
+	"github.com/umbracle/minimal/network/discover"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
@@ -23,7 +27,7 @@ import (
 type AckMessage struct {
 	Complete bool
 	Code     uint64 // only used for tests
-	Payload  []byte
+	Payload  io.Reader
 }
 
 // Conn is the network connection
@@ -38,7 +42,7 @@ type Conn interface {
 type Message struct {
 	Code       uint64
 	Size       uint32 // size of the paylod
-	Payload    []byte
+	Payload    io.Reader
 	ReceivedAt time.Time
 	Err        error
 }
@@ -52,15 +56,15 @@ func (msg *Message) Copy() *Message {
 }
 
 func (msg Message) Decode(val interface{}) error {
-	s := rlp.NewStream(bytes.NewReader(msg.Payload), uint64(msg.Size))
+	s := rlp.NewStream(msg.Payload, uint64(msg.Size))
 	if err := s.Decode(val); err != nil {
-		panic(err)
+		return fmt.Errorf("failed to decode rlp: %v", err)
 	}
 	return nil
 }
 
 type handler struct {
-	callback func([]byte)
+	callback func(io.Reader)
 	salt     uint64
 }
 
@@ -85,7 +89,7 @@ func NewSession(offset uint64, conn Conn) *Session {
 }
 
 // Consume consumes the handler if exists
-func (s *Session) Consume(code uint64, payload []byte) bool {
+func (s *Session) Consume(code uint64, payload io.Reader) bool {
 	handler, ok := s.handlers[code]
 	if !ok {
 		return false
@@ -111,7 +115,7 @@ func (s *Session) ReadMsg() (Message, error) {
 }
 
 func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
-	callback := func(payload []byte) {
+	callback := func(payload io.Reader) {
 		select {
 		case ackCh <- AckMessage{true, code, payload}:
 		default:
@@ -157,6 +161,7 @@ func (s *Session) Close() error {
 
 // Connection is the connection between peers (implements net.Conn)
 type Connection struct {
+	id   string
 	conn net.Conn
 
 	enc cipher.Stream
@@ -196,6 +201,7 @@ func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
 		rmu:        &sync.Mutex{},
 		wmu:        &sync.Mutex{},
 		RemoteID:   s.RemoteID,
+		id:         discover.PubkeyToNodeID(s.RemoteID).String(),
 	}
 
 	return c, nil
@@ -250,16 +256,14 @@ func (c *Connection) ReadMsg() (msg Message, err error) {
 		return msg, err
 	}
 	msg.Size = uint32(content.Len())
-
-	payload, err := ioutil.ReadAll(content)
-	if err != nil {
-		return msg, err
-	}
-
-	msg.Payload = payload
+	msg.Payload = content
 
 	// if snappy is enabled, verify and decompress message
 	if c.Snappy {
+		payload, err := ioutil.ReadAll(msg.Payload)
+		if err != nil {
+			return msg, err
+		}
 		size, err := snappy.DecodedLen(payload)
 		if err != nil {
 			return msg, err
@@ -272,8 +276,10 @@ func (c *Connection) ReadMsg() (msg Message, err error) {
 		if err != nil {
 			return msg, err
 		}
-		msg.Size, msg.Payload = uint32(size), payload
+		msg.Size, msg.Payload = uint32(size), bytes.NewReader(payload)
 	}
+
+	metrics.SetGaugeWithLabels([]string{"conn", "inbound"}, float32(msg.Size), []metrics.Label{{Name: "id", Value: c.id}})
 	return msg, nil
 }
 
@@ -308,12 +314,8 @@ func (c *Connection) WriteMsg(msgcode uint64, input ...interface{}) error {
 		return err
 	}
 
-	data2, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
-	return c.Write(Message{Code: msgcode, Size: uint32(size), Payload: data2})
+	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: c.id}})
+	return c.Write(Message{Code: msgcode, Size: uint32(size), Payload: r})
 }
 
 func (c *Connection) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
@@ -334,9 +336,11 @@ func (c *Connection) Write(msg Message) error {
 		if msg.Size > maxUint24 {
 			return errPlainMessageTooLarge
 		}
+		payload, _ := ioutil.ReadAll(msg.Payload)
+		payload = snappy.Encode(nil, payload)
 
-		msg.Payload = snappy.Encode(nil, msg.Payload)
-		msg.Size = uint32(len(msg.Payload))
+		msg.Payload = bytes.NewReader(payload)
+		msg.Size = uint32(len(payload))
 	}
 
 	// write header
@@ -362,7 +366,7 @@ func (c *Connection) Write(msg Message) error {
 	if _, err := tee.Write(ptype); err != nil {
 		return err
 	}
-	if _, err := tee.Write(msg.Payload); err != nil {
+	if _, err := io.Copy(tee, msg.Payload); err != nil {
 		return err
 	}
 	if padding := fsize % 16; padding > 0 {

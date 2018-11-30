@@ -70,7 +70,7 @@ func testConn(c0, c1 *Connection, msgs []req) error {
 						r.err = msg.Err
 					} else {
 						var payload []byte
-						if err := rlp.DecodeBytes(msg.Payload, &payload); err != nil {
+						if err := rlp.Decode(msg.Payload, &payload); err != nil {
 							r.err = err
 						} else {
 							r.msg = message{code: msg.Code, payload: payload}
