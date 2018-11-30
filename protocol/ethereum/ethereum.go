@@ -7,10 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/armon/go-metrics"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -47,6 +50,7 @@ type Downloader interface {
 	Headers([]*types.Header)
 	Receipts([][]*types.Receipt)
 	Bodies(BlockBodiesData)
+	Data([][]byte)
 }
 
 // Blockchain is the interface the ethereum protocol needs to work
@@ -343,11 +347,16 @@ func (e *Ethereum) HandleMsg(msg network.Message) error {
 			return err
 		}
 		e.Bodies(bodies)
+
 	case code == GetNodeDataMsg:
 		// TODO. send
 
 	case code == NodeDataMsg:
-		// TODO. deliver
+		var data [][]byte
+		if err := msg.Decode(&data); err != nil {
+			panic(err)
+		}
+		e.Data(data)
 
 	case code == GetReceiptsMsg:
 		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getReceipts"}, time.Now())
@@ -387,6 +396,7 @@ func (e *Ethereum) HandleMsg(msg network.Message) error {
 			return err
 		}
 		e.Receipts(receipts)
+
 	case code == NewBlockHashesMsg:
 		// TODO. notify announce
 
@@ -537,6 +547,22 @@ func (e *Ethereum) RequestBodiesSync(hash string, hashes []common.Hash) ([]*type
 	return res, nil
 }
 
+// RequestNodeDataSync requests node data and waits for the response
+func (e *Ethereum) RequestNodeDataSync(hashes []common.Hash) ([][]byte, error) {
+	ack := make(chan AckMessage, 1)
+	e.setHandler(hashes[0].String(), 1, ack)
+
+	if err := e.RequestNodeData(hashes); err != nil {
+		return nil, err
+	}
+	resp := <-ack
+	if !resp.Complete {
+		return nil, fmt.Errorf("failed")
+	}
+
+	return resp.Result.([][]byte), nil
+}
+
 func (e *Ethereum) setHandler(key string, id uint32, ack chan AckMessage) error {
 	e.pendingLock.Lock()
 	e.pending[key] = &callback{id, ack}
@@ -621,6 +647,19 @@ func (e *Ethereum) Bodies(bodies BlockBodiesData) {
 	}
 	if e.downloader != nil {
 		e.downloader.Bodies(bodies)
+	}
+}
+
+// Data receives the node state data
+func (e *Ethereum) Data(data [][]byte) {
+	if len(data) != 0 {
+		hash := hexutil.Encode(crypto.Keccak256(data[0]))
+		if e.consumeHandler(hash, data) {
+			return
+		}
+	}
+	if e.downloader != nil {
+		e.downloader.Data(data)
 	}
 }
 
