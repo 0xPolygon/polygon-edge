@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/pprof"
@@ -12,6 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
+	metrics "github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/consensus/ethash"
 
@@ -26,7 +33,45 @@ import (
 	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/storage"
 	"github.com/umbracle/minimal/syncer"
+
+	gops "github.com/google/gops/agent"
 )
+
+// prometheus monitoring
+
+func startTelemetry() {
+	memSink := metrics.NewInmemSink(10*time.Second, time.Minute)
+	metrics.DefaultInmemSignal(memSink)
+
+	metricsConf := metrics.DefaultConfig("minimal")
+	metricsConf.EnableHostnameLabel = false
+	metricsConf.HostName = ""
+
+	var sinks metrics.FanoutSink
+
+	prom, err := prometheus.NewPrometheusSink()
+	if err != nil {
+		panic(err)
+	}
+
+	sinks = append(sinks, prom)
+
+	sinks = append(sinks, memSink)
+	metrics.NewGlobal(metricsConf, sinks)
+
+	l, err := net.Listen("tcp", "localhost:8080")
+	if err != nil {
+		panic(err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/metrics", func(resp http.ResponseWriter, req *http.Request) {
+		handler := promhttp.Handler()
+		handler.ServeHTTP(resp, req)
+	})
+
+	go http.Serve(l, mux)
+}
 
 // mainnet nodes
 var peers = []string{}
@@ -34,9 +79,25 @@ var peers = []string{}
 var mainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 
 func main() {
 	fmt.Println("## Minimal ##")
+
+	// -- telemtry
+	startTelemetry()
+
+	// start pproff
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	// start gops
+	go func() {
+		if err := gops.Listen(gops.Options{}); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// -- chain config
 
@@ -110,21 +171,18 @@ func main() {
 
 	server.RegisterProtocol(protocol.ETH63, callback)
 
-	// syncer
-	go syncer.Run()
-
-	// connect to some peers
-
 	for _, i := range config.Bootnodes {
 		server.Dial(i)
 	}
+
+	go syncer.Run()
 
 	go func() {
 		for {
 			select {
 			case evnt := <-server.EventCh:
 				if evnt.Type == network.NodeJoin {
-					fmt.Printf("Node joined: %s\n", evnt.Peer.ID)
+					fmt.Println("@@@ ADD NODE @@@")
 					syncer.AddNode(evnt.Peer)
 				}
 			}
@@ -132,6 +190,16 @@ func main() {
 	}()
 
 	handleSignals(server)
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
+		return
+	}
 }
 
 func handleSignals(s *network.Server) int {
