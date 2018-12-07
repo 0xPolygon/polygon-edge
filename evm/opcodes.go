@@ -355,6 +355,7 @@ func (op OpCode) String() string {
 
 // TODO, change with the hex values, its better, add log
 const (
+	LOG  = 0xa0
 	PUSH = 0x5f
 	DUP  = PUSH32
 	SWAP = DUP16

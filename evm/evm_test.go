@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
@@ -40,18 +41,19 @@ func newTestContract(code []byte) *Contract {
 	return f
 }
 
+func testEVM(code []byte) *EVM {
+	evm := NewEVM(nil, nil, nil)
+	evm.pushContract(newTestContract(code))
+	return evm
+}
+
+/*
 func testEVMWithStack(stack []byte, op OpCode) *EVM {
 	evm := NewEVM(nil)
 	evm.pushContract(newTestContract([]byte{byte(op)}))
 	for _, i := range stack {
 		evm.push(big.NewInt(0).SetBytes([]byte{i}))
 	}
-	return evm
-}
-
-func testEVM(code []byte) *EVM {
-	evm := NewEVM(nil)
-	evm.pushContract(newTestContract(code))
 	return evm
 }
 
@@ -133,6 +135,7 @@ func TestArithmeticOperands(t *testing.T) {
 	}
 	testIntTestCases(t, DIV, cases)
 }
+*/
 
 func TestComparisonOperands(t *testing.T) {
 	cases := []intTestCase{
@@ -326,4 +329,87 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 			}
 		})
 	}
+}
+
+func equalBytes(t *testing.T, a, b []byte) {
+	if !bytes.Equal(a, b) {
+		t.Fatal("not equal")
+	}
+}
+
+func expectLength(t *testing.T, m *Memory, len int) {
+	if m.Len() != len {
+		t.Fatalf("expected length %d but found %d", len, m.Len())
+	}
+}
+
+func equalInt(t *testing.T, i, j uint32) {
+	if i != j {
+		t.Fatalf("mismatch: i (%d) j (%d)", i, j)
+	}
+}
+
+func TestMemorySetResize(t *testing.T) {
+	m := newMemory()
+	data := mustDecode("0x123456")
+
+	m.Set(0, 3, data)
+	expectLength(t, m, 32)
+
+	equalBytes(t, m.store, common.RightPadBytes(data, 32))
+	equalBytes(t, m.Get(0, 3), data)
+
+	// resize not necessary
+	m.Set(10, 3, data)
+	expectLength(t, m, 32)
+
+	m.Set(65, 10, data)
+	expectLength(t, m, 96)
+
+	// take two more slots
+	m.Set(129, 65, data)
+	expectLength(t, m, 224)
+}
+
+func TestMemorySetByte(t *testing.T) {
+	m := newMemory()
+
+	m.SetByte(10, 10)
+	expectLength(t, m, 32)
+
+	m.SetByte(31, 10)
+	expectLength(t, m, 32)
+
+	m.SetByte(32, 10)
+	expectLength(t, m, 64)
+}
+
+func TestMemorySet32(t *testing.T) {
+	m := newMemory()
+
+	m.Set32(0, big.NewInt(32))
+	expectLength(t, m, 32)
+
+	m.Set32(1, big.NewInt(32))
+	expectLength(t, m, 64)
+
+	m = newMemory()
+	m.Set32(0, big.NewInt(32))
+	expectLength(t, m, 32)
+
+	m.Set32(32, big.NewInt(32))
+	expectLength(t, m, 64)
+}
+
+func TestMemoryResizeGas(t *testing.T) {
+	m := newMemory()
+	data := mustDecode("0x123456")
+
+	fmt.Println(m)
+
+	gas := m.Set(0, 32, data)
+	fmt.Println(gas)
+
+	gas = m.Set(64, 32, data)
+	fmt.Println(gas)
 }
