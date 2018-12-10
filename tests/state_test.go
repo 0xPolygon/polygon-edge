@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -16,6 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/evm"
+)
+
+var (
+	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
 )
 
 type stateCase struct {
@@ -59,6 +64,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 	return gas, nil
 }
 
+// Based on geth state_transition.go
 type Transition struct {
 	state      *state.StateDB
 	env        *evm.Env
@@ -81,7 +87,7 @@ func (t *Transition) useGas(amount uint64) error {
 func (t *Transition) buyGas() error {
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(t.msg.Gas()), t.msg.GasPrice())
 	if t.state.GetBalance(t.msg.From()).Cmp(mgval) < 0 {
-		panic("1")
+		return errInsufficientBalanceForGas
 	}
 	if err := t.gp.SubGas(t.msg.Gas()); err != nil {
 		return err
@@ -98,9 +104,9 @@ func (t *Transition) preCheck() error {
 	if t.msg.CheckNonce() {
 		nonce := t.state.GetNonce(t.msg.From())
 		if nonce < t.msg.Nonce() {
-			panic("toto ghi")
+			return fmt.Errorf("too high %d < %d", nonce, t.msg.Nonce())
 		} else if nonce > t.msg.Nonce() {
-			panic("too low")
+			return fmt.Errorf("too low %d > %d", nonce, t.msg.Nonce())
 		}
 	}
 	return t.buyGas()
@@ -127,27 +133,29 @@ func (t *Transition) Apply() error {
 
 	e := evm.NewEVM(t.state, t.env, t.config, t.config.GasTable(t.env.Number), vmTestBlockHash)
 
+	var vmerr error
 	if contractCreation {
-		_, t.gas, err = e.Create(sender, t.msg.Data(), t.msg.Value(), t.gas)
+		_, t.gas, vmerr = e.Create(sender, t.msg.Data(), t.msg.Value(), t.gas)
 	} else {
-		t.state.SetNonce(t.msg.From(), t.state.GetNonce(sender)+1)
-		_, t.gas, err = e.Call(sender, *t.msg.To(), t.msg.Data(), t.msg.Value(), t.gas)
-	}
-	if err != nil {
-		panic(err)
+		t.state.SetNonce(t.msg.From(), t.state.GetNonce(t.msg.From())+1)
+		_, t.gas, vmerr = e.Call(sender, *t.msg.To(), t.msg.Data(), t.msg.Value(), t.gas)
 	}
 
-	fmt.Printf("Three: %s\n", t.state.IntermediateRoot(true).String())
+	if vmerr != nil {
+		fmt.Printf("ERR: %s\n", vmerr)
+
+		if vmerr == evm.ErrNotEnoughFunds {
+			return vmerr
+		}
+	}
 
 	fmt.Printf("Returned gas: %d\n", t.gas)
 	fmt.Printf("Total gas consumed: %d\n", t.gasUsed())
+	fmt.Printf("Refund: %d\n", t.state.GetRefund())
 
 	t.refundGas()
+
 	t.state.AddBalance(t.env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(t.gasUsed()), t.msg.GasPrice()))
-
-	fmt.Printf("Four: %s\n", t.state.IntermediateRoot(true).String())
-
-	t.state.PrintObjects()
 
 	return nil
 }
@@ -155,9 +163,11 @@ func (t *Transition) Apply() error {
 func (t *Transition) refundGas() {
 	// Apply refund counter, capped to half of the used gas.
 	refund := t.gasUsed() / 2
+
 	if refund > t.state.GetRefund() {
 		refund = t.state.GetRefund()
 	}
+
 	t.gas += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
@@ -192,6 +202,7 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	if err != nil {
 		t.Fatal(err)
 	}
+	env.GasPrice = msg.GasPrice()
 
 	state := buildState(t, c.Pre)
 
@@ -206,28 +217,21 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 		gp:     gaspool,
 	}
 
-	tt.Apply()
+	snapshot := state.Snapshot()
+	if err := tt.Apply(); err != nil {
+		state.RevertToSnapshot(snapshot)
+	}
 
-	fmt.Printf("Root after: %s\n", state.IntermediateRoot(config.IsEIP158(env.Number)).String())
-
-	// commit the data
-	// and also add the reward, now only assumes the reward goes to the coinbase one
-
-	fmt.Println("EIP-158")
-	fmt.Println(config.IsEIP158(env.Number))
-
-	/*
-		if _, err := state.Commit(config.IsEIP158(env.Number)); err != nil {
-			panic(err)
-		}
-	*/
+	fmt.Printf("Refund: %d\n", state.GetRefund())
 
 	state.AddBalance(env.Coinbase, new(big.Int))
 
 	root := state.IntermediateRoot(config.IsEIP158(env.Number))
 
-	fmt.Printf("Root: %s\n", root.String())
-	fmt.Printf("Other root: %s\n", p.Root.String())
+	fmt.Printf("Found: %s\n", root.String())
+	fmt.Printf("Expected: %s\n", p.Root.String())
+
+	state.PrintObjects()
 
 	if root != p.Root {
 		t.Fatal("d")
@@ -239,17 +243,54 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 }
 
 var skip2 = []string{
-	"suicideNonConst",
-	"ContractCreationSpam",
-	"CrashingTransaction",
-	"returndatacopyPythonBug_Tue_03_48_41-1432",
-	"stBugs",
-	"stCallCodes",
-	"stCallCreateCallCodeTest",
-	"stCallDelegateCodesCallCodeHomestead",
-}
+	"Call1024BalanceTooLow",
+	"CallRecursiveBombPreCall",
+	"Callcode1024BalanceTooLow",
 
-// not sure yet how to catch the bad cases
+	"stDelegatecallTestHomestead/Delegatecall1024",
+
+	"CALLCODE_Bounds4",
+	"CALL_Bounds2a",
+	"CALL_Bounds3",
+	"randomStatetest189",
+
+	"stQuadraticComplexityTest",
+
+	"randomStatetest246",
+	"randomStatetest248",
+	"randomStatetest375",
+	"randomStatetest85",
+	"randomStatetest579",
+	"randomStatetest618",
+	"randomStatetest626",
+	"randomStatetest642",
+	"randomStatetest644",
+	"randomStatetest645",
+
+	"modexp_modsize0_returndatasize",
+
+	"call_ecrec_success_empty_then_returndatasize",
+	"create_callprecompile_returndatasize",
+
+	"LoopCallsDepthThenRevert2",
+
+	"stRevertTest",
+
+	"TestCryptographicFunctions",
+	"failed_tx_xcf416c53",
+
+	"static_Call1024PreCalls2",
+	"static_Call50000_rip160",
+	"static_Call50000_sha256",
+	"static_CallEcrecover",
+	"static_CallRipemd",
+	"static_CallIdentity",
+	"static_CallIdentitiy_1",
+	"static_CallSha256",
+	"stStaticCall",
+
+	"stZeroKnowledge",
+}
 
 func skipTest2(name string) bool {
 	for _, i := range skip2 {
@@ -261,10 +302,11 @@ func skipTest2(name string) bool {
 }
 
 func RunTest(t *testing.T, id string, c stateCase) {
+
 	for fork, f := range c.Post {
 		for indx, e := range f {
 
-			if fork != "Byzantium" {
+			if fork != "Byzantium" { // Only do the byzantium for now
 				continue
 			}
 
@@ -277,15 +319,13 @@ func RunTest(t *testing.T, id string, c stateCase) {
 
 			// run all the tests
 			RunSpecificTest(t, c, id, fork, indx, e)
-
-			// return
 		}
 	}
 }
 
 func TestTwo(t *testing.T) {
 
-	files, err := listFiles("GeneralStateTests")
+	files, err := listFiles("GeneralStateTests/stPreCompiledContracts2")
 	if err != nil {
 		panic(err)
 	}
@@ -294,6 +334,7 @@ func TestTwo(t *testing.T) {
 
 	count := len(files)
 	for indx, file := range files {
+
 		if !strings.HasSuffix(file, ".json") {
 			continue
 		}

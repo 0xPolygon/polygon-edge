@@ -205,14 +205,12 @@ func buildState(t *testing.T, pre stateSnapshop) *state.StateDB {
 	for i, a := range pre {
 		addr := stringToAddressT(t, i)
 
+		statedb.CreateAccount(addr)
 		if a.Code != "" {
 			statedb.SetCode(addr, stringToBytesT(t, a.Code))
 		}
 		statedb.SetNonce(addr, stringToUint64T(t, a.Nonce))
 		statedb.SetBalance(addr, stringToBigIntT(t, a.Balance))
-
-		fmt.Println("-- set balance --")
-		fmt.Println(a.Balance)
 
 		for k, v := range a.Storage {
 			statedb.SetState(addr, common.HexToHash(k), common.HexToHash(v))
@@ -291,7 +289,12 @@ func (t *stTransaction) At(i indexes) (*types.Message, error) {
 	}
 
 	fmt.Println("-- tx values --")
-	fmt.Println(t.Data[i.Data])
+	if len(t.Data[i.Data]) > 20 {
+		fmt.Println(len(t.Data[i.Data]))
+	} else {
+		fmt.Println(t.Data[i.Data])
+	}
+
 	fmt.Println(t.Value[i.Value])
 	fmt.Println(t.GasLimit[i.Gas])
 
