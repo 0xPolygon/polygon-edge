@@ -427,3 +427,88 @@ var Forks = map[string]*params.ChainConfig{
 		ByzantiumBlock: big.NewInt(5),
 	},
 }
+
+type header struct {
+	header *types.Header
+}
+
+func (h *header) UnmarshalJSON(input []byte) error {
+	h.header = &types.Header{}
+
+	type headerUnmarshall struct {
+		Bloom            *types.Bloom
+		Coinbase         *common.Address
+		MixHash          *common.Hash
+		Nonce            *types.BlockNonce
+		Number           *math.HexOrDecimal256
+		Hash             *common.Hash
+		ParentHash       *common.Hash
+		ReceiptTrie      *common.Hash
+		StateRoot        *common.Hash
+		TransactionsTrie *common.Hash
+		UncleHash        *common.Hash
+		ExtraData        *hexutil.Bytes
+		Difficulty       *math.HexOrDecimal256
+		GasLimit         *math.HexOrDecimal64
+		GasUsed          *math.HexOrDecimal64
+		Timestamp        *math.HexOrDecimal256
+	}
+
+	var dec headerUnmarshall
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return err
+	}
+
+	if dec.Bloom != nil {
+		h.header.Bloom = *dec.Bloom
+	}
+	if dec.Coinbase != nil {
+		h.header.Coinbase = *dec.Coinbase
+	}
+	if dec.MixHash != nil {
+		h.header.MixDigest = *dec.MixHash
+	}
+	if dec.Nonce != nil {
+		h.header.Nonce = *dec.Nonce
+	}
+	if dec.Number != nil {
+		h.header.Number = (*big.Int)(dec.Number)
+	}
+	if dec.ParentHash != nil {
+		h.header.ParentHash = *dec.ParentHash
+	}
+	if dec.ReceiptTrie != nil {
+		h.header.ReceiptHash = *dec.ReceiptTrie
+	}
+	if dec.StateRoot != nil {
+		h.header.Root = *dec.StateRoot
+	}
+	if dec.TransactionsTrie != nil {
+		h.header.TxHash = *dec.TransactionsTrie
+	}
+	if dec.UncleHash != nil {
+		h.header.UncleHash = *dec.UncleHash
+	}
+	if dec.ExtraData != nil {
+		h.header.Extra = *dec.ExtraData
+	}
+	if dec.Difficulty != nil {
+		h.header.Difficulty = (*big.Int)(dec.Difficulty)
+	}
+	if dec.GasLimit != nil {
+		h.header.GasLimit = uint64(*dec.GasLimit)
+	}
+	if dec.GasUsed != nil {
+		h.header.GasUsed = uint64(*dec.GasUsed)
+	}
+	if dec.Timestamp != nil {
+		h.header.Time = (*big.Int)(dec.Timestamp)
+	}
+
+	if dec.Hash != nil {
+		if hash := h.header.Hash(); hash != *dec.Hash {
+			return fmt.Errorf("hash mismatch: found %s but expected %s", hash.String(), (*dec.Hash).String())
+		}
+	}
+	return nil
+}
