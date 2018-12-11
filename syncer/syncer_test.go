@@ -52,11 +52,8 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 }
 
 func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ancestor *types.Header) {
-	b0, close0 := blockchain.NewTestBlockchain(t, h0)
-	defer close0()
-
-	b1, close1 := blockchain.NewTestBlockchain(t, h1)
-	defer close1()
+	b0 := blockchain.NewTestBlockchain(t, h0)
+	b1 := blockchain.NewTestBlockchain(t, h1)
 
 	syncer, err := NewSyncer(1, b0, DefaultConfig())
 	if err != nil {
@@ -107,12 +104,10 @@ func TestPeerHeight(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers)
 
 	// b1 with the whole chain
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	syncer, err := NewSyncer(1, b0, DefaultConfig())
 	if err != nil {
@@ -163,8 +158,7 @@ func TestDequeueIncreasePending(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers)
 
 	s, err := NewSyncer(1, b0, DefaultConfig())
 	if err != nil {
@@ -182,8 +176,7 @@ func TestDequeuePeers(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers)
 
 	s, err := NewSyncer(1, b0, DefaultConfig())
 	if err != nil {
@@ -203,8 +196,7 @@ func TestDequeuPeerWithAwake(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers)
 
 	s, err := NewSyncer(1, b0, DefaultConfig())
 	if err != nil {

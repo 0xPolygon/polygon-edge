@@ -11,8 +11,7 @@ import (
 )
 
 func TestGenesis(t *testing.T) {
-	b, close := NewTestBlockchain(t, nil)
-	defer close()
+	b := NewTestBlockchain(t, nil)
 
 	// no genesis block yet
 	if b.Header() != nil {
@@ -156,8 +155,7 @@ func TestInsertHeaders(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run(cc.Name, func(tt *testing.T) {
-			b, close := NewTestBlockchain(t, nil)
-			defer close()
+			b := NewTestBlockchain(t, nil)
 
 			chain := chain{
 				headers: map[byte]*types.Header{},
@@ -215,8 +213,7 @@ func TestCommitChain(t *testing.T) {
 	// test if the data written in commitchain is retrieved correctly
 
 	headers, blocks, receipts := NewTestBodyChain(2)
-	b, close := NewTestBlockchain(t, headers)
-	defer close()
+	b := NewTestBlockchain(t, headers)
 
 	if err := b.CommitChain(blocks, receipts); err != nil {
 		t.Fatal(err)

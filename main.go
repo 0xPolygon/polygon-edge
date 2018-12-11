@@ -142,7 +142,7 @@ func main() {
 	}
 
 	// blockchain storage
-	storage, err := storage.NewStorage("/home/thor/Desktop/ethereum/minimal-test", nil)
+	storage, err := storage.NewLevelDBStorage("/home/thor/Desktop/ethereum/minimal-test", nil)
 	if err != nil {
 		panic(err)
 	}
