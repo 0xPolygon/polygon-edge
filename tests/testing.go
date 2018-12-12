@@ -3,7 +3,10 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -288,16 +291,6 @@ func (t *stTransaction) At(i indexes) (*types.Message, error) {
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
-	fmt.Println("-- tx values --")
-	if len(t.Data[i.Data]) > 20 {
-		fmt.Println(len(t.Data[i.Data]))
-	} else {
-		fmt.Println(t.Data[i.Data])
-	}
-
-	fmt.Println(t.Value[i.Value])
-	fmt.Println(t.GasLimit[i.Gas])
-
 	msg := types.NewMessage(t.From, t.To, t.Nonce, t.Value[i.Value], t.GasLimit[i.Gas], t.GasPrice, hexutil.MustDecode(t.Data[i.Data]), true)
 	return &msg, nil
 }
@@ -511,4 +504,48 @@ func (h *header) UnmarshalJSON(input []byte) error {
 		}
 	}
 	return nil
+}
+
+func contains(l []string, name string) bool {
+	for _, i := range l {
+		if strings.Contains(name, i) {
+			return true
+		}
+	}
+	return false
+}
+
+func listFolders(folder string) ([]string, error) {
+	path := filepath.Join(TESTS, folder)
+
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	folders := []string{}
+	for _, i := range files {
+		if i.IsDir() {
+			folders = append(folders, filepath.Join(path, i.Name()))
+		}
+	}
+	return folders, nil
+}
+
+func listFiles(folder string) ([]string, error) {
+	if strings.HasPrefix(TESTS, folder) {
+		folder = filepath.Join(TESTS, folder)
+	}
+
+	files := []string{}
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
 }

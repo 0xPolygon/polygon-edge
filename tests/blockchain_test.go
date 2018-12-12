@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/umbracle/minimal/consensus/ethash"
@@ -80,15 +79,6 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	if hash := b.Header().Hash().String(); hash != c.LastBlockHash {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
 	}
-}
-
-func contains(s []string, i string) bool {
-	for _, j := range s {
-		if strings.Contains(i, j) {
-			return true
-		}
-	}
-	return false
 }
 
 func testBlockChainCases(t *testing.T, folder string, skip []string) {

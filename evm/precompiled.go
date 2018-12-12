@@ -295,16 +295,14 @@ func (c *bn256ScalarMul) Call(input []byte) ([]byte, error) {
 	return res.Marshal(), nil
 }
 
-var (
-	// true32Byte is returned if the bn256 pairing check succeeds.
-	true32Byte = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+// true32Byte is returned if the bn256 pairing check succeeds.
+var true32Byte = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 
-	// false32Byte is returned if the bn256 pairing check fails.
-	false32Byte = make([]byte, 32)
+// false32Byte is returned if the bn256 pairing check fails.
+var false32Byte = make([]byte, 32)
 
-	// errBadPairingInput is returned if the bn256 pairing input is invalid.
-	errBadPairingInput = errors.New("bad elliptic curve pairing size")
-)
+// errBadPairingInput is returned if the bn256 pairing input is invalid.
+var errBadPairingInput = errors.New("bad elliptic curve pairing size")
 
 // bn256Pairing implements a pairing pre-compile for the bn256 curve
 type bn256Pairing struct{}

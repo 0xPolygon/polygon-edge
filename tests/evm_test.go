@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/evm"
 )
+
+var vmTests = "VMTests"
 
 type VMCase struct {
 	Info *info `json:"_info"`
@@ -30,15 +31,34 @@ type VMCase struct {
 	Pre  stateSnapshop `json:"pre"`
 }
 
-func testVMCase(name string, t *testing.T, c *VMCase) {
+func testVMCase(t *testing.T, name string, c *VMCase) {
 	env := c.Env.ToEnv(t)
 	env.GasPrice = c.Exec.GasPrice
 
+	fmt.Println("-------------------------------------")
+	fmt.Println(name)
+
+	initialCall := true
+	canTransfer := func(state *state.StateDB, address common.Address, amount *big.Int) bool {
+		if initialCall {
+			initialCall = false
+			return true
+		}
+		return evm.CanTransfer(state, address, amount)
+	}
+
+	transfer := func(state *state.StateDB, from, to common.Address, amount *big.Int) error {
+		return nil
+	}
+
 	state := buildState(t, c.Pre)
 
-	e := evm.NewEVM(state, env, nil, params.GasTableHomestead, vmTestBlockHash)
+	e := evm.NewEVM(state, env, params.MainnetChainConfig, params.GasTableHomestead, vmTestBlockHash)
+	e.CanTransfer = canTransfer
+	e.Transfer = transfer
 
 	fmt.Printf("BlockNumber: %s\n", c.Env.Number)
+	fmt.Println(c.Exec.Code)
 
 	ret, gas, err := e.Call(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
 
@@ -86,67 +106,50 @@ func testVMCase(name string, t *testing.T, c *VMCase) {
 	}
 }
 
-var skip = []string{}
-
-// not sure yet how to catch the bad cases
-
-func skipTest(name string) bool {
-	for _, i := range skip {
-		if name == i {
-			return true
-		}
-	}
-	return false
-}
-
-func TestOne(t *testing.T) {
-	files, err := listFiles("VMTests")
+func TestEVM(t *testing.T) {
+	folders, err := listFolders(vmTests)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
-	count := len(files)
-	for indx, file := range files {
-		fmt.Printf("%d|%d: %s\n", indx, count, file)
+	long := []string{
+		"loop-",
+		"vmPerformance",
+	}
 
-		data, err := ioutil.ReadFile(file)
+	for _, folder := range folders {
+		files, err := listFiles(folder)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
-		var vmcases map[string]*VMCase
-		if err := json.Unmarshal(data, &vmcases); err != nil {
-			panic(err)
-		}
+		for _, file := range files {
+			t.Run(folder, func(t *testing.T) {
+				if !strings.HasSuffix(file, ".json") {
+					return
+				}
 
-		for name, cc := range vmcases {
-			// fmt.Println(cc)
+				data, err := ioutil.ReadFile(file)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-			// skip them for now
-			if strings.HasPrefix(name, "loop-") {
-				continue
-			}
-			if skipTest(name) {
-				continue
-			}
+				var vmcases map[string]*VMCase
+				if err := json.Unmarshal(data, &vmcases); err != nil {
+					t.Fatal(err)
+				}
 
-			testVMCase(name, t, cc)
+				for name, cc := range vmcases {
+					if contains(long, name) && testing.Short() {
+						t.Skip()
+						continue
+					}
+
+					testVMCase(t, name, cc)
+				}
+			})
 		}
 	}
-}
-
-func listFiles(folder string) ([]string, error) {
-	files := []string{}
-	err := filepath.Walk(filepath.Join(TESTS, folder), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			files = append(files, path)
-		}
-		return nil
-	})
-	return files, err
 }
 
 func vmTestBlockHash(n uint64) common.Hash {
