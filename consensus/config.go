@@ -7,6 +7,10 @@ type Fork struct {
 	block *big.Int
 }
 
+func NewFork(block uint64) Fork {
+	return Fork{block: big.NewInt(int64(block))}
+}
+
 // Active checks if the fork is active
 func (f *Fork) Active(n *big.Int) bool {
 	if f.block == nil {

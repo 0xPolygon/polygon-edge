@@ -16,7 +16,7 @@ func newStorage(t *testing.T) (*Storage, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStorage(path, nil)
+	s, err := NewLevelDBStorage(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

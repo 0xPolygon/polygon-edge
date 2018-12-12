@@ -1,9 +1,12 @@
 package storage
 
 import (
+	"fmt"
 	"log"
 	"math/big"
 	"os"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -12,6 +15,8 @@ import (
 )
 
 // prefix
+
+var ErrNotFound = fmt.Errorf("not found")
 
 var (
 	// DIFFICULTY is the difficulty prefix
@@ -44,14 +49,58 @@ var (
 	EMPTY  = []byte("empty")
 )
 
+// KV is a key value storage interface
+type KV interface {
+	set(p []byte, v []byte) error
+	get(p []byte) ([]byte, error)
+}
+
+// levelDBKV is the leveldb implementation of the kv storage
+type levelDBKV struct {
+	db *leveldb.DB
+}
+
+func (l *levelDBKV) set(p []byte, v []byte) error {
+	return l.db.Put(p, v, nil)
+}
+
+func (l *levelDBKV) get(p []byte) ([]byte, error) {
+	data, err := l.db.Get(p, nil)
+	if err != nil {
+		if err.Error() == "leveldb: not found" {
+			return nil, ErrNotFound
+		}
+	}
+	return data, err
+}
+
+// memoryKV is an in memory implementation of the kv storage
+type memoryKV struct {
+	db map[string][]byte
+}
+
+func (m *memoryKV) set(p []byte, v []byte) error {
+	m.db[hexutil.Encode(p)] = v
+	return nil
+}
+
+func (m *memoryKV) get(p []byte) ([]byte, error) {
+	v, ok := m.db[hexutil.Encode(p)]
+	if !ok {
+		return []byte{}, ErrNotFound
+	}
+	return v, nil
+}
+
 // Storage is the blockchain storage using boltdb
 type Storage struct {
 	logger *log.Logger
-	db     *leveldb.DB
+	// db     *leveldb.DB
+	db KV
 }
 
-// NewStorage creates the new storage reference
-func NewStorage(path string, logger *log.Logger) (*Storage, error) {
+// NewLevelDBStorage creates the new storage reference with leveldb
+func NewLevelDBStorage(path string, logger *log.Logger) (*Storage, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
@@ -59,6 +108,14 @@ func NewStorage(path string, logger *log.Logger) (*Storage, error) {
 	if logger == nil {
 		logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
+
+	kv := &levelDBKV{db}
+	return &Storage{logger, kv}, nil
+}
+
+// NewMemoryStorage creates the new storage reference with inmemory
+func NewMemoryStorage(logger *log.Logger) (*Storage, error) {
+	db := &memoryKV{map[string][]byte{}}
 	return &Storage{logger, db}, nil
 }
 
@@ -294,16 +351,16 @@ func (s *Storage) read(p []byte, k []byte, obj interface{}) {
 
 func (s *Storage) set(p []byte, k []byte, v []byte) {
 	p = append(p, k...)
-	if err := s.db.Put(p, v, nil); err != nil {
+	if err := s.db.set(p, v); err != nil {
 		s.logger.Printf("failed to write: %v", err)
 	}
 }
 
 func (s *Storage) get(p []byte, k []byte) []byte {
 	p = append(p, k...)
-	data, err := s.db.Get(p, nil)
+	data, err := s.db.get(p)
 	if err != nil {
-		if err.Error() != "leveldb: not found" {
+		if err != ErrNotFound {
 			s.logger.Printf("failed to read: %v", err)
 		}
 	}

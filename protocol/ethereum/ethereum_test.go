@@ -155,11 +155,8 @@ func headersToNumbers(headers []*types.Header) []int {
 func TestEthereumBlockHeadersMsg(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(100)
 
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
-
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b0 := blockchain.NewTestBlockchain(t, headers)
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	s0, s1 := network.TestServers()
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
@@ -239,11 +236,8 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 		return data
 	}
 
-	b0, close0 := blockchain.NewTestBlockchain(t, headers)
-	defer close0()
-
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b0 := blockchain.NewTestBlockchain(t, headers)
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	s0, s1 := network.TestServers()
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
@@ -288,12 +282,10 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 }
 
 func TestEthereumBody(t *testing.T) {
-	b0, close0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(100))
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(100))
 
 	headers, blocks, receipts := blockchain.NewTestBodyChain(3) // only s1 needs to have bodies and receipts
-	b1, close1 := blockchain.NewTestBlockchainWithBlocks(t, blocks, receipts)
-	defer close1()
+	b1 := blockchain.NewTestBlockchainWithBlocks(t, blocks, receipts)
 
 	s0, s1 := network.TestServers()
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
@@ -365,12 +357,10 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers[0:5])
 
 	// b1 with the whole chain
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	s0, s1 := network.TestServers()
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
@@ -408,12 +398,10 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers[0:5])
 
 	// b1 with the whole chain
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	s0, s1 := network.TestServers()
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
@@ -434,12 +422,10 @@ func TestPeerCloseConnection(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
-	b0, close0 := blockchain.NewTestBlockchain(t, headers[0:5])
-	defer close0()
+	b0 := blockchain.NewTestBlockchain(t, headers[0:5])
 
 	// b1 with the whole chain
-	b1, close1 := blockchain.NewTestBlockchain(t, headers)
-	defer close1()
+	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	s0, s1 := network.TestServers()
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)

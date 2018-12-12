@@ -1,9 +1,7 @@
 package blockchain
 
 import (
-	"io/ioutil"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -100,37 +98,28 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 }
 
 // NewTestBlockchainWithBlocks creates a dummy blockchain with headers, bodies and receipts
-func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) (*Blockchain, func()) {
+func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) *Blockchain {
 	headers := []*types.Header{}
 	for _, block := range blocks {
 		headers = append(headers, block.Header())
 	}
 
-	b, close := NewTestBlockchain(t, headers)
+	b := NewTestBlockchain(t, headers)
 	if err := b.CommitChain(blocks, receipts); err != nil {
 		t.Fatal(err)
 	}
 
-	return b, close
+	return b
 }
 
 // NewTestBlockchain creates a new dummy blockchain for testing
-func NewTestBlockchain(t *testing.T, headers []*types.Header) (*Blockchain, func()) {
-	path, err := ioutil.TempDir("/tmp", "minimal_storage")
+func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
+	s, err := storage.NewMemoryStorage(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := storage.NewStorage(path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	close := func() {
-		if err := os.RemoveAll(path); err != nil {
-			t.Fatal(err)
-		}
-	}
-	b := NewBlockchain(s, &fakeConsensus{})
 
+	b := NewBlockchain(s, &fakeConsensus{})
 	if headers != nil {
 		if err := b.WriteGenesis(headers[0]); err != nil {
 			t.Fatal(err)
@@ -140,5 +129,5 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) (*Blockchain, func
 		}
 	}
 
-	return b, close
+	return b
 }

@@ -45,7 +45,7 @@ func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal 
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
 	// Verify the block's difficulty based in it's timestamp and parent's difficulty
-	expected := e.calcDifficulty(header.Time.Uint64(), parent)
+	expected := e.CalcDifficulty(header.Time.Uint64(), parent)
 	if expected.Cmp(header.Difficulty) != 0 {
 		return fmt.Errorf("difficulty not correct: expected %d but found %d", expected.Uint64(), header.Difficulty.Uint64())
 	}
@@ -96,7 +96,7 @@ func (e *EthHash) Seal(block *types.Block) error {
 	return nil
 }
 
-func (e *EthHash) calcDifficulty(time uint64, parent *types.Header) *big.Int {
+func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
 	case e.config.ConstantinopleBlock.Active(next):

@@ -1,10 +1,13 @@
 package evm
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -30,28 +33,28 @@ func newState(t *testing.T) *state.StateDB {
 
 func newTestContract(code []byte) *Contract {
 	f := &Contract{
-		ip:     -1,
-		code:   code,
-		memory: newMemory(),
-		stack:  make([]*big.Int, StackSize),
-		sp:     0,
+		ip:    -1,
+		code:  code,
+		gas:   1000000,
+		stack: make([]*big.Int, StackSize),
+		sp:    0,
 	}
-
+	f.memory = newMemory(f)
 	return f
 }
 
+func testEVM(code []byte) *EVM {
+	evm := NewEVM(nil, nil, nil, params.GasTableHomestead, nil)
+	evm.pushContract(newTestContract(code))
+	return evm
+}
+
 func testEVMWithStack(stack []byte, op OpCode) *EVM {
-	evm := NewEVM(nil)
+	evm := NewEVM(nil, nil, nil, params.GasTableHomestead, nil)
 	evm.pushContract(newTestContract([]byte{byte(op)}))
 	for _, i := range stack {
 		evm.push(big.NewInt(0).SetBytes([]byte{i}))
 	}
-	return evm
-}
-
-func testEVM(code []byte) *EVM {
-	evm := NewEVM(nil)
-	evm.pushContract(newTestContract(code))
 	return evm
 }
 
@@ -310,6 +313,9 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 	for _, cc := range cases {
 		t.Run(instruction.String(), func(t *testing.T) {
 			evm := testEVM(Instructions{byte(instruction)})
+			evm.config = &params.ChainConfig{ConstantinopleBlock: big.NewInt(0)}
+			evm.env = &Env{Number: big.NewInt(0)}
+
 			evm.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.x)))
 			evm.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.y)))
 
@@ -326,4 +332,82 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 			}
 		})
 	}
+}
+
+func equalBytes(t *testing.T, a, b []byte) {
+	if !bytes.Equal(a, b) {
+		t.Fatal("not equal")
+	}
+}
+
+func expectLength(t *testing.T, m *Memory, len int) {
+	if m.Len() != len {
+		t.Fatalf("expected length %d but found %d", len, m.Len())
+	}
+}
+
+func equalInt(t *testing.T, i, j uint32) {
+	if i != j {
+		t.Fatalf("mismatch: i (%d) j (%d)", i, j)
+	}
+}
+
+func c(i int64) *big.Int {
+	return big.NewInt(i)
+}
+
+func TestMemorySetResize(t *testing.T) {
+	m := newMemory(newTestContract([]byte{}))
+	data := mustDecode("0x123456")
+
+	m.Set(c(0), c(3), data)
+	expectLength(t, m, 32)
+
+	equalBytes(t, m.store, common.RightPadBytes(data, 32))
+	found, _, err := m.Get(c(0), c(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	equalBytes(t, found, data)
+
+	// resize not necessary
+	m.Set(c(10), c(3), data)
+	expectLength(t, m, 32)
+
+	m.Set(c(65), c(10), data)
+	expectLength(t, m, 96)
+
+	// take two more slots
+	m.Set(c(129), c(65), data)
+	expectLength(t, m, 224)
+}
+
+func TestMemorySetByte(t *testing.T) {
+	m := newMemory(newTestContract([]byte{}))
+
+	m.SetByte(c(10), 10)
+	expectLength(t, m, 32)
+
+	m.SetByte(c(31), 10)
+	expectLength(t, m, 32)
+
+	m.SetByte(c(32), 10)
+	expectLength(t, m, 64)
+}
+
+func TestMemorySet32(t *testing.T) {
+	m := newMemory(newTestContract([]byte{}))
+
+	m.Set32(c(0), big.NewInt(32))
+	expectLength(t, m, 32)
+
+	m.Set32(c(1), big.NewInt(32))
+	expectLength(t, m, 64)
+
+	m = newMemory(newTestContract([]byte{}))
+	m.Set32(c(0), big.NewInt(32))
+	expectLength(t, m, 32)
+
+	m.Set32(c(32), big.NewInt(32))
+	expectLength(t, m, 64)
 }
