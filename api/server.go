@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/rpc"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/api/jsonrpc"
 	"github.com/umbracle/minimal/blockchain"
 )
@@ -16,7 +15,7 @@ type Server struct {
 	endpoints  endpoints
 }
 
-func NewServer(blockchain *blockchain.Blockchain) error {
+func NewServer(blockchain *blockchain.Blockchain) (*Server, error) {
 	s := &Server{blockchain: blockchain}
 
 	s.endpoints = endpoints{
@@ -24,7 +23,7 @@ func NewServer(blockchain *blockchain.Blockchain) error {
 	}
 
 	go s.start()
-	return nil
+	return s, nil
 }
 
 func (s *Server) start() {
@@ -41,12 +40,4 @@ func (s *Server) start() {
 
 type endpoints struct {
 	Eth *Eth
-}
-
-type Eth struct {
-	s *Server
-}
-
-func (e *Eth) GetBlockByNumber(in *[]interface{}, out *types.Header) error {
-	return nil
 }
