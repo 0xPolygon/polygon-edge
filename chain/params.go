@@ -7,21 +7,27 @@ type Params struct {
 
 // Forks specifies when each fork is activated
 type Forks struct {
-	Homestead      uint64 `json:"homestead"`
-	Byzantium      uint64 `json:"byzantium"`
-	Constantinople uint64 `json:"constantinople"`
-	EIP150         uint64 `json:"EIP150"`
-	EIP158         uint64 `json:"EIP158"`
+	Homestead      Fork `json:"homestead"`
+	Byzantium      Fork `json:"byzantium"`
+	Constantinople Fork `json:"constantinople"`
+	EIP150         Fork `json:"EIP150"`
+	EIP158         Fork `json:"EIP158"`
 }
 
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      block >= f.Homestead,
-		Byzantium:      block >= f.Byzantium,
-		Constantinople: block >= f.Constantinople,
-		EIP150:         block >= f.EIP150,
-		EIP158:         block >= f.EIP158,
+		Homestead:      f.Homestead.Active(block),
+		Byzantium:      f.Byzantium.Active(block),
+		Constantinople: f.Constantinople.Active(block),
+		EIP150:         f.EIP150.Active(block),
+		EIP158:         f.EIP158.Active(block),
 	}
+}
+
+type Fork uint64
+
+func (f Fork) Active(block uint64) bool {
+	return block >= uint64(f)
 }
 
 type ForksInTime struct {

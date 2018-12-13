@@ -19,10 +19,8 @@ import (
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
-
-	"github.com/ethereum/go-ethereum/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -111,16 +109,15 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	// -- genesis
+	// -- load chain
 
-	mainnetGenesis := core.DefaultGenesisBlock().ToBlock(nil).Header()
-	if mainnetGenesis.Hash() != mainnetGenesisHash {
-		panic("mainnet block not correct")
+	name := "foundation"
+
+	chain, err := chain.ImportFromName(name)
+	if err != nil {
+		panic(fmt.Errorf("Failed to load chain %s: %v", name, err))
 	}
-
-	// -- chain config (block forks)
-
-	chainConfig := consensus.NewChainConfig(1150000, 4370000, 0)
+	genesis := chain.Genesis.ToBlock().Header()
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
@@ -134,7 +131,7 @@ func main() {
 	// Start network protocol
 
 	config := network.DefaultConfig()
-	config.Bootnodes = readFile("./foundation.txt")
+	config.Bootnodes = chain.Bootnodes
 
 	server, err := network.NewServer("minimal", key, config, logger)
 	if err != nil {
@@ -148,11 +145,11 @@ func main() {
 	}
 
 	// consensus
-	consensus := ethash.NewEthHash(chainConfig)
+	consensus := ethash.NewEthHash(chain.Params)
 
 	// blockchain object
 	blockchain := blockchain.NewBlockchain(storage, consensus)
-	if err := blockchain.WriteGenesis(mainnetGenesis); err != nil {
+	if err := blockchain.WriteGenesis(genesis); err != nil {
 		panic(err)
 	}
 
@@ -171,11 +168,11 @@ func main() {
 
 	server.RegisterProtocol(protocol.ETH63, callback)
 
-	for _, i := range config.Bootnodes {
-		server.Dial(i)
-	}
+	//for _, i := range config.Bootnodes {
+	//	server.Dial(i)
+	//}
 
-	go syncer.Run()
+	//go syncer.Run()
 
 	go func() {
 		for {
@@ -183,7 +180,7 @@ func main() {
 			case evnt := <-server.EventCh:
 				if evnt.Type == network.NodeJoin {
 					fmt.Println("@@@ ADD NODE @@@")
-					syncer.AddNode(evnt.Peer)
+					// syncer.AddNode(evnt.Peer)
 				}
 			}
 		}

@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/umbracle/minimal/chain"
+
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -63,15 +64,15 @@ func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-var testnetConfig = &consensus.ChainConfig{
-	HomesteadBlock:      consensus.NewFork(0),
-	ByzantiumBlock:      consensus.NewFork(1700000),
-	ConstantinopleBlock: consensus.NewFork(4230000),
+var testnetConfig = &chain.Forks{
+	Homestead:      0,
+	Byzantium:      1700000,
+	Constantinople: 4230000,
 }
 
-var mainnetConfig = &consensus.ChainConfig{
-	HomesteadBlock: consensus.NewFork(1150000),
-	ByzantiumBlock: consensus.NewFork(4370000),
+var mainnetConfig = &chain.Forks{
+	Homestead: 1150000,
+	Byzantium: 4370000,
 }
 
 func TestDifficultyRopsten(t *testing.T) {
@@ -91,24 +92,24 @@ func TestDifficultyMainnet1(t *testing.T) {
 }
 
 func TestDifficultyHomestead(t *testing.T) {
-	testDifficultyCase(t, "difficultyHomestead.json", &consensus.ChainConfig{
-		HomesteadBlock: consensus.NewFork(0),
+	testDifficultyCase(t, "difficultyHomestead.json", &chain.Forks{
+		Homestead: 0,
 	})
 }
 
 func TestDifficultyByzantium(t *testing.T) {
-	testDifficultyCase(t, "difficultyByzantium.json", &consensus.ChainConfig{
-		ByzantiumBlock: consensus.NewFork(0),
+	testDifficultyCase(t, "difficultyByzantium.json", &chain.Forks{
+		Byzantium: 0,
 	})
 }
 
 func TestDifficultyConstantinople(t *testing.T) {
-	testDifficultyCase(t, "difficultyConstantinople.json", &consensus.ChainConfig{
-		ConstantinopleBlock: consensus.NewFork(0),
+	testDifficultyCase(t, "difficultyConstantinople.json", &chain.Forks{
+		Constantinople: 0,
 	})
 }
 
-func testDifficultyCase(t *testing.T, file string, config *consensus.ChainConfig) {
+func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 	data, err := ioutil.ReadFile(filepath.Join(TESTS, difficultyTests, file))
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +120,7 @@ func testDifficultyCase(t *testing.T, file string, config *consensus.ChainConfig
 		t.Fatal(err)
 	}
 
-	engine := ethash.NewEthHash(config)
+	engine := ethash.NewEthHash(&chain.Params{Forks: config})
 	for name, i := range cases {
 		t.Run(name, func(tt *testing.T) {
 			parentNumber := i.CurrentBlockNumber

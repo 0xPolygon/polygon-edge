@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,11 +27,11 @@ var (
 
 // EthHash consensus algorithm
 type EthHash struct {
-	config *consensus.ChainConfig
+	config *chain.Params
 }
 
 // NewEthHash creates a new ethash consensus
-func NewEthHash(config *consensus.ChainConfig) *EthHash {
+func NewEthHash(config *chain.Params) *EthHash {
 	return &EthHash{config}
 }
 
@@ -97,13 +97,13 @@ func (e *EthHash) Seal(block *types.Block) error {
 }
 
 func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
-	next := new(big.Int).Add(parent.Number, big1)
+	next := parent.Number.Uint64() + 1
 	switch {
-	case e.config.ConstantinopleBlock.Active(next):
+	case e.config.Forks.Constantinople.Active(next):
 		return calcDifficultyConstantinople(time, parent)
-	case e.config.ByzantiumBlock.Active(next):
+	case e.config.Forks.Byzantium.Active(next):
 		return calcDifficultyByzantium(time, parent)
-	case e.config.HomesteadBlock.Active(next):
+	case e.config.Forks.Homestead.Active(next):
 		return calcDifficultyHomestead(time, parent)
 	default:
 		return calcDifficultyFrontier(time, parent)
