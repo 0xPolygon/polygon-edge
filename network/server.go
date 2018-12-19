@@ -3,13 +3,10 @@ package network
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
-	"os"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +20,7 @@ import (
 
 const (
 	DialTimeout = 15 * time.Second
-	peersFile   = "peers.txt"
+	peersFile   = "peers.json"
 )
 
 // Config is the p2p server configuration
@@ -109,6 +106,8 @@ type Server struct {
 	addPeer chan string
 
 	dispatcher *periodic.Dispatcher
+
+	peerStore *PeerStore
 }
 
 // NewServer creates a new node
@@ -143,6 +142,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		pendingNodes: sync.Map{},
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
+		peerStore:    NewPeerStore(peersFile),
 	}
 
 	udpAddr := &net.UDPAddr{IP: net.ParseIP(config.BindAddress), Port: config.BindPort}
@@ -156,7 +156,12 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 	s.discover.Schedule()
 
 	go s.streamListen()
-	go s.bootstrapPeers()
+
+	// bootstrap peers
+	for _, peer := range s.peerStore.Load() {
+		s.Dial(peer)
+	}
+
 	go s.dialRunner()
 
 	return s, nil
@@ -289,8 +294,6 @@ func (s *Server) removePeer(peer *Peer) {
 
 	if _, ok := s.peers[peer.ID]; ok {
 		delete(s.peers, peer.ID)
-	} else {
-		s.logger.Printf("Removing peer %s but not found", peer.ID)
 	}
 
 	metrics.SetGauge([]string{"minimal", "peers"}, float32(len(s.peers)))
@@ -482,34 +485,17 @@ func (s *Server) matchProtocols(peer *Peer, caps Capabilities) []*Instance {
 	return protocols
 }
 
-func (s *Server) bootstrapPeers() {
-	if _, err := os.Stat(peersFile); !os.IsNotExist(err) {
-		data, err := ioutil.ReadFile(peersFile)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, peer := range strings.Split(string(data), "\n") {
-			if peer != "" {
-				s.Dial(peer)
-			}
-		}
-	}
-}
-
 func (s *Server) Close() {
 	// close peers
 	for _, i := range s.peers {
 		i.Close()
 	}
 
-	// write peers to peers.json
-	str := []string{}
 	for _, i := range s.peers {
-		str = append(str, i.Enode)
+		s.peerStore.Update(i.Enode, i.Status)
 	}
 
-	if err := ioutil.WriteFile(peersFile, []byte(strings.Join(str, "\n")), 0644); err != nil {
+	if err := s.peerStore.Save(); err != nil {
 		panic(err)
 	}
 }

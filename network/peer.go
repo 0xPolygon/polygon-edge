@@ -308,6 +308,9 @@ func (p *Peer) handleMsg(msg Message) error {
 			p.logger.Printf("failed to decode disc msg: %v\n", err)
 		} else {
 			p.logger.Printf("Disconnected (%s): %s\n", p.Enode, reason)
+			if reason == DiscTooManyPeers {
+				p.server.peerStore.Update(p.Enode, PeerBusy)
+			}
 		}
 		if err := p.conn.Close(); err != nil {
 			p.logger.Printf("Failed to close the connection: %v", err)
