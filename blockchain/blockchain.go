@@ -249,3 +249,25 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 func (b *Blockchain) GetForks() []common.Hash {
 	return b.db.ReadForks()
 }
+
+// GetBlockByHash returns the block by their hash
+func (b *Blockchain) GetBlockByHash(hash common.Hash, full bool) *types.Block {
+	header := b.db.ReadHeader(hash)
+	if header == nil {
+		return nil
+	}
+	block := types.NewBlockWithHeader(header)
+	if !full {
+		return block
+	}
+	body := b.db.ReadBody(hash)
+	if body == nil {
+		return block
+	}
+	return block.WithBody(body.Transactions, body.Uncles)
+}
+
+// GetBlockByNumber returns the block by their number
+func (b *Blockchain) GetBlockByNumber(n *big.Int, full bool) *types.Block {
+	return b.GetBlockByHash(b.db.ReadCanonicalHash(n), full)
+}
