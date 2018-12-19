@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/umbracle/minimal/blockchain"
@@ -57,7 +58,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	if c.SealEngine == "NoProof" {
 		engine = &consensus.NoProof{}
 	} else {
-		engine = ethash.NewEthHash(&consensus.ChainConfig{})
+		engine = ethash.NewEthHash(&chain.Params{})
 	}
 
 	b := blockchain.NewBlockchain(s, engine)

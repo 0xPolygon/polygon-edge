@@ -41,13 +41,16 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	gaspool := new(core.GasPool)
 	gaspool.AddGas(env.GasLimit.Uint64())
 
+	forks := config.At(env.Number.Uint64())
+
 	tt := &transition.Transition{
-		State:   state,
-		Env:     env,
-		Config:  config,
-		Msg:     msg,
-		Gp:      gaspool,
-		GetHash: vmTestBlockHash,
+		State:    state,
+		Env:      env,
+		Config:   forks,
+		GasTable: config.GasTable(env.Number),
+		Msg:      msg,
+		Gp:       gaspool,
+		GetHash:  vmTestBlockHash,
 	}
 
 	snapshot := state.Snapshot()
@@ -56,14 +59,14 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	}
 
 	state.AddBalance(env.Coinbase, new(big.Int))
-	root := state.IntermediateRoot(config.IsEIP158(env.Number))
+	root := state.IntermediateRoot(forks.EIP158)
 
 	if root != p.Root {
-		t.Fatalf("root mismatch: expected %s but found %s", p.Root, root)
+		t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), root.String())
 	}
 
 	if logs := rlpHash(state.Logs()); logs != common.Hash(p.Logs) {
-		t.Fatalf("logs mismatch: expected %s but found %s", p.Logs, logs.String())
+		t.Fatalf("logs mismatch (%s %d): expected %s but found %s", fork, index, p.Logs, logs.String())
 	}
 }
 

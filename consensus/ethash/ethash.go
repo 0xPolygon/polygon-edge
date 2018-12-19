@@ -5,11 +5,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -27,18 +26,18 @@ var (
 
 // EthHash consensus algorithm
 type EthHash struct {
-	config *consensus.ChainConfig
+	config *chain.Params
 }
 
 // NewEthHash creates a new ethash consensus
-func NewEthHash(config *consensus.ChainConfig) *EthHash {
+func NewEthHash(config *chain.Params) *EthHash {
 	return &EthHash{config}
 }
 
 // VerifyHeader verifies the header is correct
 func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("Extra data too long")
 	}
 	if header.Time.Cmp(parent.Time) <= 0 {
@@ -63,9 +62,9 @@ func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal 
 	if diff < 0 {
 		diff *= -1
 	}
-	limit := parent.GasLimit / params.GasLimitBoundDivisor
+	limit := parent.GasLimit / chain.GasLimitBoundDivisor
 
-	if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
+	if uint64(diff) >= limit || header.GasLimit < chain.MinGasLimit {
 		return fmt.Errorf("gas limit not correct")
 	}
 	// Verify that the block number is parent's +1
@@ -97,13 +96,13 @@ func (e *EthHash) Seal(block *types.Block) error {
 }
 
 func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
-	next := new(big.Int).Add(parent.Number, big1)
+	next := parent.Number.Uint64() + 1
 	switch {
-	case e.config.ConstantinopleBlock.Active(next):
+	case e.config.Forks.IsConstantinople(next):
 		return calcDifficultyConstantinople(time, parent)
-	case e.config.ByzantiumBlock.Active(next):
+	case e.config.Forks.IsByzantium(next):
 		return calcDifficultyByzantium(time, parent)
-	case e.config.HomesteadBlock.Active(next):
+	case e.config.Forks.IsHomestead(next):
 		return calcDifficultyHomestead(time, parent)
 	default:
 		return calcDifficultyFrontier(time, parent)

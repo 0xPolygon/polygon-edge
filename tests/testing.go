@@ -10,12 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/minimal/chain"
+
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -357,67 +358,48 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 // forks
 
-var Forks = map[string]*params.ChainConfig{
-	"Frontier": {
-		ChainID: big.NewInt(1),
-	},
+var Forks = map[string]*chain.Forks{
+	"Frontier": {},
 	"Homestead": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
+		Homestead: chain.NewFork(0),
 	},
 	"EIP150": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
+		Homestead: chain.NewFork(0),
+		EIP150:    chain.NewFork(0),
 	},
 	"EIP158": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
+		Homestead: chain.NewFork(0),
+		EIP150:    chain.NewFork(0),
+		EIP158:    chain.NewFork(0),
 	},
 	"Byzantium": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		DAOForkBlock:   big.NewInt(0),
-		ByzantiumBlock: big.NewInt(0),
+		Homestead: chain.NewFork(0),
+		EIP150:    chain.NewFork(0),
+		EIP158:    chain.NewFork(0),
+		Byzantium: chain.NewFork(0),
 	},
 	"Constantinople": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		DAOForkBlock:        big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
+		Homestead:      chain.NewFork(0),
+		EIP150:         chain.NewFork(0),
+		EIP158:         chain.NewFork(0),
+		Byzantium:      chain.NewFork(0),
+		Constantinople: chain.NewFork(0),
 	},
 	"FrontierToHomesteadAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(5),
+		Homestead: chain.NewFork(5),
 	},
 	"HomesteadToEIP150At5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(5),
+		Homestead: chain.NewFork(0),
+		EIP150:    chain.NewFork(5),
 	},
 	"HomesteadToDaoAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		DAOForkBlock:   big.NewInt(5),
-		DAOForkSupport: true,
+		Homestead: chain.NewFork(0),
 	},
 	"EIP158ToByzantiumAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(5),
+		Homestead: chain.NewFork(0),
+		EIP150:    chain.NewFork(0),
+		EIP158:    chain.NewFork(0),
+		Byzantium: chain.NewFork(5),
 	},
 }
 

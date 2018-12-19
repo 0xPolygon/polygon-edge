@@ -8,13 +8,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/minimal/chain"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/evm"
 )
+
+var mainnetChainConfig = chain.Params{
+	Forks: &chain.Forks{
+		Homestead: chain.NewFork(1150000),
+		EIP150:    chain.NewFork(2463000),
+		EIP158:    chain.NewFork(2675000),
+		Byzantium: chain.NewFork(4370000),
+	},
+}
 
 var vmTests = "VMTests"
 
@@ -53,7 +63,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 
 	state := buildState(t, c.Pre)
 
-	e := evm.NewEVM(state, env, params.MainnetChainConfig, params.GasTableHomestead, vmTestBlockHash)
+	e := evm.NewEVM(state, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 

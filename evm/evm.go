@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -30,37 +30,6 @@ var (
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrOpcodeNotFound           = errors.New("opcode not found")
-)
-
-// Gas costs
-const (
-	GasQuickStep   uint64 = 2
-	GasFastestStep uint64 = 3
-	GasFastStep    uint64 = 5
-	GasMidStep     uint64 = 8
-	GasSlowStep    uint64 = 10
-	GasExtStep     uint64 = 20
-
-	GasReturn       uint64 = 0
-	GasStop         uint64 = 0
-	GasContractByte uint64 = 200
-
-	SstoreSetGas    uint64 = 20000 // Once per SLOAD operation.
-	SstoreResetGas  uint64 = 5000  // Once per SSTORE operation if the big.NewInt(0)ness changes from big.NewInt(0).
-	SstoreClearGas  uint64 = 5000  // Once per SSTORE operation if the big.NewInt(0)ness doesn't change.
-	SstoreRefundGas uint64 = 15000 // Once per SSTORE operation if the big.NewInt(0)ness changes to big.NewInt(0).
-
-	NetSstoreNoopGas  uint64 = 200   // Once per SSTORE operation if the value doesn't change.
-	NetSstoreInitGas  uint64 = 20000 // Once per SSTORE operation from clean big.NewInt(0).
-	NetSstoreCleanGas uint64 = 5000  // Once per SSTORE operation from clean non-big.NewInt(0).
-	NetSstoreDirtyGas uint64 = 200   // Once per SSTORE operation from dirty.
-
-	NetSstoreClearRefund      uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
-	NetSstoreResetRefund      uint64 = 4800  // Once per SSTORE operation for resetting to the original non-big.NewInt(0) value
-	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original big.NewInt(0) value
-
-	MemoryGas    uint64 = 3
-	QuadCoeffDiv uint64 = 512
 )
 
 var (
@@ -235,8 +204,8 @@ type EVM struct {
 	contracts      []*Contract
 	contractsIndex int
 
-	config   *params.ChainConfig
-	gasTable params.GasTable
+	config   chain.ForksInTime
+	gasTable chain.GasTable
 
 	state *state.StateDB
 	env   *Env
@@ -251,7 +220,7 @@ type EVM struct {
 }
 
 // NewEVM creates a new EVM
-func NewEVM(state *state.StateDB, env *Env, config *params.ChainConfig, gasTable params.GasTable, getHash GetHashByNumber) *EVM {
+func NewEVM(state *state.StateDB, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
 	return &EVM{
 		contracts:      make([]*Contract, MaxContracts),
 		config:         config,
@@ -437,7 +406,7 @@ func (e *EVM) Run() error {
 				e.push(val)
 
 			case SHL, SHR, SAR:
-				if !e.config.IsConstantinople(e.env.Number) {
+				if !e.config.Constantinople {
 					vmerr = ErrOpcodeNotFound
 					goto END
 				}
@@ -570,6 +539,10 @@ func (e *EVM) Run() error {
 
 			case MLOAD:
 				offset := e.pop()
+				if offset == nil {
+					vmerr = ErrStackUnderflow
+					goto END
+				}
 
 				data, gas, err := e.currentContract().memory.Get(offset, big.NewInt(32))
 				if err != nil {
@@ -642,6 +615,10 @@ func (e *EVM) Run() error {
 
 			case SLOAD:
 				loc := e.pop()
+				if loc == nil {
+					vmerr = ErrStackUnderflow
+					goto END
+				}
 				val := e.state.GetState(e.currentContract().address, common.BigToHash(loc))
 				e.push(val.Big())
 
@@ -797,7 +774,7 @@ func (e *EVM) executeSStoreOperation() error {
 	current := e.state.GetState(address, common.BigToHash(loc))
 
 	// discount gas (constantinople)
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		switch {
 		case current == (common.Hash{}) && val.Sign() != 0: // 0 => non 0
 			gas = SstoreSetGas
@@ -886,15 +863,15 @@ func (e *EVM) executeLogsOperation(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if gas, overflow = math.SafeAdd(gas, params.LogGas); overflow {
+	if gas, overflow = math.SafeAdd(gas, LogGas); overflow {
 		return ErrGasOverflow
 	}
-	if gas, overflow = math.SafeAdd(gas, uint64(size)*params.LogTopicGas); overflow {
+	if gas, overflow = math.SafeAdd(gas, uint64(size)*LogTopicGas); overflow {
 		return ErrGasOverflow
 	}
 
 	var memorySizeGas uint64
-	if memorySizeGas, overflow = math.SafeMul(requestedSize, params.LogDataGas); overflow {
+	if memorySizeGas, overflow = math.SafeMul(requestedSize, LogDataGas); overflow {
 		return ErrGasOverflow
 	}
 	if gas, overflow = math.SafeAdd(gas, memorySizeGas); overflow {
@@ -925,7 +902,7 @@ func (e *EVM) sha3() error {
 	e.push(hash.Big())
 
 	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, params.Sha3Gas); overflow {
+	if gas, overflow = math.SafeAdd(gas, Sha3Gas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -934,7 +911,7 @@ func (e *EVM) sha3() error {
 		return ErrGasOverflow
 	}
 
-	if wordGas, overflow = math.SafeMul(numWords(wordGas), params.Sha3WordGas); overflow {
+	if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -952,7 +929,7 @@ func (e *EVM) create(contract *Contract) error {
 	e.pushContract(contract)
 
 	// Check if its too deep
-	if e.Depth() > int(params.CallCreateDepth)+1 {
+	if e.Depth() > int(CallCreateDepth)+1 {
 		return ErrDepth
 	}
 
@@ -978,7 +955,7 @@ func (e *EVM) create(contract *Contract) error {
 
 	// Create the new account for the contract
 	e.state.CreateAccount(address)
-	if e.config.IsEIP158(e.env.Number) {
+	if e.config.EIP158 {
 		e.state.SetNonce(address, 1)
 	}
 
@@ -1028,21 +1005,21 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 		return nil, err
 	}
 
-	gasParam := params.CreateGas
+	gasParam := CreateGas
 	if op == CREATE2 {
 		// Need to add the sha3 gas cost
 		wordGas, overflow := bigUint64(size)
 		if overflow {
 			return nil, ErrGasOverflow
 		}
-		if wordGas, overflow = math.SafeMul(numWords(wordGas), params.Sha3WordGas); overflow {
+		if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
 			return nil, ErrGasOverflow
 		}
 		if gasCost, overflow = math.SafeAdd(gasCost, wordGas); overflow {
 			return nil, ErrGasOverflow
 		}
 
-		gasParam = params.Create2Gas
+		gasParam = Create2Gas
 	}
 
 	if gasCost, overflow = math.SafeAdd(gasCost, gasParam); overflow {
@@ -1057,7 +1034,7 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 	gas := e.currentContract().gas
 
 	// CREATE2 uses by default EIP150
-	if e.config.IsEIP150(e.env.Number) || op == CREATE2 {
+	if e.config.EIP150 || op == CREATE2 {
 		gas -= gas / 64
 	}
 
@@ -1083,7 +1060,7 @@ func (e *EVM) executeCreateOperation(op OpCode) error {
 	}
 
 	if op == CREATE2 {
-		if !e.config.IsConstantinople(e.env.Number) {
+		if !e.config.Constantinople {
 			return ErrOpcodeNotFound
 		}
 	}
@@ -1103,10 +1080,10 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 		}
 	}
 
-	if op == DELEGATECALL && !e.config.IsHomestead(e.env.Number) {
+	if op == DELEGATECALL && !e.config.Homestead {
 		return ErrOpcodeNotFound
 	}
-	if op == STATICCALL && !e.config.IsByzantium(e.env.Number) {
+	if op == STATICCALL && !e.config.Byzantium {
 		return ErrOpcodeNotFound
 	}
 
@@ -1122,7 +1099,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 	e.pushContract(contract)
 
 	// Check if its too deep
-	if e.Depth() > int(params.CallCreateDepth)+1 {
+	if e.Depth() > int(CallCreateDepth)+1 {
 		return ErrDepth
 	}
 
@@ -1137,7 +1114,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 
 	// check first if its precompiled
 	precompiledContracts := ContractsHomestead
-	if e.config.IsByzantium(e.env.Number) {
+	if e.config.Byzantium {
 		precompiledContracts = ContractsByzantium
 	}
 
@@ -1145,7 +1122,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 
 	if op == CALL {
 		if !e.state.Exist(contract.address) {
-			if !isPrecompiled && e.config.IsEIP158(e.env.Number) && contract.value.Sign() == 0 {
+			if !isPrecompiled && e.config.EIP158 && contract.value.Sign() == 0 {
 				// calling an unexisting account
 				return nil
 			}
@@ -1229,21 +1206,21 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 	}
 
 	gasCost := e.gasTable.Calls
-	eip158 := e.config.IsEIP158(e.env.Number)
+	eip158 := e.config.EIP158
 	transfersValue := value != nil && value.Sign() != 0
 
 	if op == CALL {
 		if eip158 {
 			if transfersValue && e.state.Empty(addr) {
-				gasCost += params.CallNewAccountGas
+				gasCost += CallNewAccountGas
 			}
 		} else if !e.state.Exist(addr) {
-			gasCost += params.CallNewAccountGas
+			gasCost += CallNewAccountGas
 		}
 	}
 	if op == CALL || op == CALLCODE {
 		if transfersValue {
-			gasCost += params.CallValueTransferGas
+			gasCost += CallValueTransferGas
 		}
 	}
 
@@ -1267,7 +1244,7 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 
 	if op == CALL || op == CALLCODE {
 		if transfersValue {
-			gas += params.CallStipend
+			gas += CallStipend
 		}
 	}
 
@@ -1296,7 +1273,7 @@ func (e *EVM) Depth() int {
 }
 
 func (e *EVM) executeExtCodeHashOperation() error {
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		return ErrOpcodeNotFound
 	}
 
@@ -1316,7 +1293,7 @@ func (e *EVM) executeExtCodeHashOperation() error {
 }
 
 func (e *EVM) executeHaltOperations(op OpCode) error {
-	if op == REVERT && !e.config.IsByzantium(e.env.Number) {
+	if op == REVERT && !e.config.Byzantium {
 		return ErrOpcodeNotFound
 	}
 
@@ -1353,12 +1330,12 @@ func (e *EVM) executeHaltOperations(op OpCode) error {
 
 	if op == RETURN {
 		if e.currentContract().creation {
-			maxCodeSizeExceeded := e.config.IsEIP158(e.env.Number) && len(ret) > params.MaxCodeSize
+			maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
 				return ErrMaxCodeSizeExceeded
 			}
 
-			createDataGas := uint64(len(ret)) * params.CreateDataGas
+			createDataGas := uint64(len(ret)) * CreateDataGas
 			if !e.currentContract().consumeGas(createDataGas) {
 				return ErrGasConsumed
 			}
@@ -1382,10 +1359,10 @@ func (e *EVM) selfDestruct() error {
 	var gas uint64
 
 	// EIP150 homestead gas reprice fork:
-	if e.config.IsEIP150(e.env.Number) {
+	if e.config.EIP150 {
 		gas = e.gasTable.Suicide
 
-		eip158 := e.config.IsEIP158(e.env.Number)
+		eip158 := e.config.EIP158
 
 		if eip158 {
 			// if empty and transfers value
@@ -1398,7 +1375,7 @@ func (e *EVM) selfDestruct() error {
 	}
 
 	if !e.state.HasSuicided(e.currentContract().address) {
-		e.state.AddRefund(params.SuicideRefundGas)
+		e.state.AddRefund(SuicideRefundGas)
 	}
 
 	if !e.currentContract().consumeGas(gas) {
@@ -1440,7 +1417,7 @@ func (e *EVM) executeExtCodeCopy() error {
 		return ErrGasOverflow
 	}
 
-	if words, overflow = math.SafeMul(numWords(words), params.CopyGas); overflow {
+	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -1470,7 +1447,7 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		gas, err = e.currentContract().memory.Set(memOffset, length, getSlice(e.currentContract().input, dataOffset, length))
 
 	case RETURNDATACOPY:
-		if !e.config.IsByzantium(e.env.Number) {
+		if !e.config.Byzantium {
 			return ErrOpcodeNotFound
 		}
 
@@ -1504,7 +1481,7 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if words, overflow = math.SafeMul(numWords(words), params.CopyGas); overflow {
+	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -1591,7 +1568,7 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 		return e.env.GasPrice, nil
 
 	case RETURNDATASIZE:
-		if !e.config.IsByzantium(e.env.Number) {
+		if !e.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
 
@@ -1833,7 +1810,7 @@ func (e *EVM) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 }
 
 func (e *EVM) executeShiftOperations(op OpCode) (*big.Int, error) {
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		return nil, ErrOpcodeNotFound
 	}
 
@@ -2208,7 +2185,7 @@ func codeBitmap(code []byte) bitvec {
 	return bits
 }
 
-func callGas(gasTable params.GasTable, availableGas, base uint64, callCost *big.Int) (uint64, error) {
+func callGas(gasTable chain.GasTable, availableGas, base uint64, callCost *big.Int) (uint64, error) {
 	if gasTable.CreateBySuicide > 0 {
 		availableGas = availableGas - base
 		gas := availableGas - availableGas/64

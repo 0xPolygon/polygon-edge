@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -44,13 +44,13 @@ func newTestContract(code []byte) *Contract {
 }
 
 func testEVM(code []byte) *EVM {
-	evm := NewEVM(nil, nil, nil, params.GasTableHomestead, nil)
+	evm := NewEVM(nil, nil, chain.ForksInTime{}, chain.GasTableHomestead, nil)
 	evm.pushContract(newTestContract(code))
 	return evm
 }
 
 func testEVMWithStack(stack []byte, op OpCode) *EVM {
-	evm := NewEVM(nil, nil, nil, params.GasTableHomestead, nil)
+	evm := NewEVM(nil, nil, chain.ForksInTime{}, chain.GasTableHomestead, nil)
 	evm.pushContract(newTestContract([]byte{byte(op)}))
 	for _, i := range stack {
 		evm.push(big.NewInt(0).SetBytes([]byte{i}))
@@ -313,7 +313,7 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 	for _, cc := range cases {
 		t.Run(instruction.String(), func(t *testing.T) {
 			evm := testEVM(Instructions{byte(instruction)})
-			evm.config = &params.ChainConfig{ConstantinopleBlock: big.NewInt(0)}
+			evm.config = chain.ForksInTime{Constantinople: true}
 			evm.env = &Env{Number: big.NewInt(0)}
 
 			evm.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.x)))
