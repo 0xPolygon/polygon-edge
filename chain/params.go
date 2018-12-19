@@ -4,7 +4,7 @@ import "math/big"
 
 // Params are all the set of params for the chain
 type Params struct {
-	Forks *Forks `json:"number"`
+	Forks *Forks `json:"forks"`
 }
 
 // Forks specifies when each fork is activated
