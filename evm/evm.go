@@ -32,37 +32,6 @@ var (
 	ErrOpcodeNotFound           = errors.New("opcode not found")
 )
 
-// Gas costs
-const (
-	GasQuickStep   uint64 = 2
-	GasFastestStep uint64 = 3
-	GasFastStep    uint64 = 5
-	GasMidStep     uint64 = 8
-	GasSlowStep    uint64 = 10
-	GasExtStep     uint64 = 20
-
-	GasReturn       uint64 = 0
-	GasStop         uint64 = 0
-	GasContractByte uint64 = 200
-
-	SstoreSetGas    uint64 = 20000 // Once per SLOAD operation.
-	SstoreResetGas  uint64 = 5000  // Once per SSTORE operation if the big.NewInt(0)ness changes from big.NewInt(0).
-	SstoreClearGas  uint64 = 5000  // Once per SSTORE operation if the big.NewInt(0)ness doesn't change.
-	SstoreRefundGas uint64 = 15000 // Once per SSTORE operation if the big.NewInt(0)ness changes to big.NewInt(0).
-
-	NetSstoreNoopGas  uint64 = 200   // Once per SSTORE operation if the value doesn't change.
-	NetSstoreInitGas  uint64 = 20000 // Once per SSTORE operation from clean big.NewInt(0).
-	NetSstoreCleanGas uint64 = 5000  // Once per SSTORE operation from clean non-big.NewInt(0).
-	NetSstoreDirtyGas uint64 = 200   // Once per SSTORE operation from dirty.
-
-	NetSstoreClearRefund      uint64 = 15000 // Once per SSTORE operation for clearing an originally existing storage slot
-	NetSstoreResetRefund      uint64 = 4800  // Once per SSTORE operation for resetting to the original non-big.NewInt(0) value
-	NetSstoreResetClearRefund uint64 = 19800 // Once per SSTORE operation for resetting to the original big.NewInt(0) value
-
-	MemoryGas    uint64 = 3
-	QuadCoeffDiv uint64 = 512
-)
-
 var (
 	errReadOnly = fmt.Errorf("it is a static call and the state cannot be changed")
 )
@@ -570,6 +539,10 @@ func (e *EVM) Run() error {
 
 			case MLOAD:
 				offset := e.pop()
+				if offset == nil {
+					vmerr = ErrStackUnderflow
+					goto END
+				}
 
 				data, gas, err := e.currentContract().memory.Get(offset, big.NewInt(32))
 				if err != nil {
@@ -642,6 +615,10 @@ func (e *EVM) Run() error {
 
 			case SLOAD:
 				loc := e.pop()
+				if loc == nil {
+					vmerr = ErrStackUnderflow
+					goto END
+				}
 				val := e.state.GetState(e.currentContract().address, common.BigToHash(loc))
 				e.push(val.Big())
 
@@ -886,15 +863,15 @@ func (e *EVM) executeLogsOperation(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if gas, overflow = math.SafeAdd(gas, params.LogGas); overflow {
+	if gas, overflow = math.SafeAdd(gas, LogGas); overflow {
 		return ErrGasOverflow
 	}
-	if gas, overflow = math.SafeAdd(gas, uint64(size)*params.LogTopicGas); overflow {
+	if gas, overflow = math.SafeAdd(gas, uint64(size)*LogTopicGas); overflow {
 		return ErrGasOverflow
 	}
 
 	var memorySizeGas uint64
-	if memorySizeGas, overflow = math.SafeMul(requestedSize, params.LogDataGas); overflow {
+	if memorySizeGas, overflow = math.SafeMul(requestedSize, LogDataGas); overflow {
 		return ErrGasOverflow
 	}
 	if gas, overflow = math.SafeAdd(gas, memorySizeGas); overflow {
@@ -925,7 +902,7 @@ func (e *EVM) sha3() error {
 	e.push(hash.Big())
 
 	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, params.Sha3Gas); overflow {
+	if gas, overflow = math.SafeAdd(gas, Sha3Gas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -934,7 +911,7 @@ func (e *EVM) sha3() error {
 		return ErrGasOverflow
 	}
 
-	if wordGas, overflow = math.SafeMul(numWords(wordGas), params.Sha3WordGas); overflow {
+	if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -952,7 +929,7 @@ func (e *EVM) create(contract *Contract) error {
 	e.pushContract(contract)
 
 	// Check if its too deep
-	if e.Depth() > int(params.CallCreateDepth)+1 {
+	if e.Depth() > int(CallCreateDepth)+1 {
 		return ErrDepth
 	}
 
@@ -1028,21 +1005,21 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 		return nil, err
 	}
 
-	gasParam := params.CreateGas
+	gasParam := CreateGas
 	if op == CREATE2 {
 		// Need to add the sha3 gas cost
 		wordGas, overflow := bigUint64(size)
 		if overflow {
 			return nil, ErrGasOverflow
 		}
-		if wordGas, overflow = math.SafeMul(numWords(wordGas), params.Sha3WordGas); overflow {
+		if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
 			return nil, ErrGasOverflow
 		}
 		if gasCost, overflow = math.SafeAdd(gasCost, wordGas); overflow {
 			return nil, ErrGasOverflow
 		}
 
-		gasParam = params.Create2Gas
+		gasParam = Create2Gas
 	}
 
 	if gasCost, overflow = math.SafeAdd(gasCost, gasParam); overflow {
@@ -1122,7 +1099,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 	e.pushContract(contract)
 
 	// Check if its too deep
-	if e.Depth() > int(params.CallCreateDepth)+1 {
+	if e.Depth() > int(CallCreateDepth)+1 {
 		return ErrDepth
 	}
 
@@ -1235,15 +1212,15 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 	if op == CALL {
 		if eip158 {
 			if transfersValue && e.state.Empty(addr) {
-				gasCost += params.CallNewAccountGas
+				gasCost += CallNewAccountGas
 			}
 		} else if !e.state.Exist(addr) {
-			gasCost += params.CallNewAccountGas
+			gasCost += CallNewAccountGas
 		}
 	}
 	if op == CALL || op == CALLCODE {
 		if transfersValue {
-			gasCost += params.CallValueTransferGas
+			gasCost += CallValueTransferGas
 		}
 	}
 
@@ -1267,7 +1244,7 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 
 	if op == CALL || op == CALLCODE {
 		if transfersValue {
-			gas += params.CallStipend
+			gas += CallStipend
 		}
 	}
 
@@ -1353,12 +1330,12 @@ func (e *EVM) executeHaltOperations(op OpCode) error {
 
 	if op == RETURN {
 		if e.currentContract().creation {
-			maxCodeSizeExceeded := e.config.IsEIP158(e.env.Number) && len(ret) > params.MaxCodeSize
+			maxCodeSizeExceeded := e.config.IsEIP158(e.env.Number) && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
 				return ErrMaxCodeSizeExceeded
 			}
 
-			createDataGas := uint64(len(ret)) * params.CreateDataGas
+			createDataGas := uint64(len(ret)) * CreateDataGas
 			if !e.currentContract().consumeGas(createDataGas) {
 				return ErrGasConsumed
 			}
@@ -1398,7 +1375,7 @@ func (e *EVM) selfDestruct() error {
 	}
 
 	if !e.state.HasSuicided(e.currentContract().address) {
-		e.state.AddRefund(params.SuicideRefundGas)
+		e.state.AddRefund(SuicideRefundGas)
 	}
 
 	if !e.currentContract().consumeGas(gas) {
@@ -1440,7 +1417,7 @@ func (e *EVM) executeExtCodeCopy() error {
 		return ErrGasOverflow
 	}
 
-	if words, overflow = math.SafeMul(numWords(words), params.CopyGas); overflow {
+	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -1504,7 +1481,7 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if words, overflow = math.SafeMul(numWords(words), params.CopyGas); overflow {
+	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
 

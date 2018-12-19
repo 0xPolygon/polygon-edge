@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/evm"
 )
 
@@ -23,9 +24,9 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
-		gas = params.TxGasContractCreation
+		gas = chain.TxGasContractCreation
 	} else {
-		gas = params.TxGas
+		gas = chain.TxGas
 	}
 	// Bump the required gas by the amount of transactional data
 	if len(data) > 0 {
@@ -37,16 +38,16 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 			}
 		}
 		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-gas)/params.TxDataNonZeroGas < nz {
+		if (math.MaxUint64-gas)/chain.TxDataNonZeroGas < nz {
 			return 0, vm.ErrOutOfGas
 		}
-		gas += nz * params.TxDataNonZeroGas
+		gas += nz * chain.TxDataNonZeroGas
 
 		z := uint64(len(data)) - nz
-		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
+		if (math.MaxUint64-gas)/chain.TxDataZeroGas < z {
 			return 0, vm.ErrOutOfGas
 		}
-		gas += z * params.TxDataZeroGas
+		gas += z * chain.TxDataZeroGas
 	}
 	return gas, nil
 }

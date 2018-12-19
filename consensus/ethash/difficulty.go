@@ -5,10 +5,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 // Based on geth
+
+var (
+	// difficultyBoundDivisor is the bound divisor of the difficulty, used in the update calculations.
+	difficultyBoundDivisor = big.NewInt(2048)
+	// minimumDifficulty  is the minimum that the difficulty may ever be.
+	minimumDifficulty = big.NewInt(131072)
+	// durationLimit is the decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
+	durationLimit = big.NewInt(13)
+)
 
 var (
 	expDiffPeriod = big.NewInt(100000)
@@ -57,13 +65,13 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 			x.Set(bigMinus99)
 		}
 		// parent_diff + (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
-		y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
+		y.Div(parent.Difficulty, difficultyBoundDivisor)
 		x.Mul(y, x)
 		x.Add(parent.Difficulty, x)
 
 		// minimum difficulty can ever be (before exponential factor)
-		if x.Cmp(params.MinimumDifficulty) < 0 {
-			x.Set(params.MinimumDifficulty)
+		if x.Cmp(minimumDifficulty) < 0 {
+			x.Set(minimumDifficulty)
 		}
 		// calculate a fake block number for the ice-age delay
 		// Specification: https://eips.ethereum.org/EIPS/eip-1234
@@ -111,13 +119,13 @@ func calcDifficultyHomestead(time uint64, parent *types.Header) *big.Int {
 		x.Set(bigMinus99)
 	}
 	// (parent_diff + parent_diff // 2048 * max(1 - (block_timestamp - parent_timestamp) // 10, -99))
-	y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
+	y.Div(parent.Difficulty, difficultyBoundDivisor)
 	x.Mul(y, x)
 	x.Add(parent.Difficulty, x)
 
 	// minimum difficulty can ever be (before exponential factor)
-	if x.Cmp(params.MinimumDifficulty) < 0 {
-		x.Set(params.MinimumDifficulty)
+	if x.Cmp(minimumDifficulty) < 0 {
+		x.Set(minimumDifficulty)
 	}
 	// for the exponential factor
 	periodCount := new(big.Int).Add(parent.Number, big1)
@@ -136,20 +144,20 @@ func calcDifficultyHomestead(time uint64, parent *types.Header) *big.Int {
 // calcDifficultyFrontier is the Frontier difficulty adjustment algorithm
 func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 	diff := new(big.Int)
-	adjust := new(big.Int).Div(parent.Difficulty, params.DifficultyBoundDivisor)
+	adjust := new(big.Int).Div(parent.Difficulty, difficultyBoundDivisor)
 	bigTime := new(big.Int)
 	bigParentTime := new(big.Int)
 
 	bigTime.SetUint64(time)
 	bigParentTime.Set(parent.Time)
 
-	if bigTime.Sub(bigTime, bigParentTime).Cmp(params.DurationLimit) < 0 {
+	if bigTime.Sub(bigTime, bigParentTime).Cmp(durationLimit) < 0 {
 		diff.Add(parent.Difficulty, adjust)
 	} else {
 		diff.Sub(parent.Difficulty, adjust)
 	}
-	if diff.Cmp(params.MinimumDifficulty) < 0 {
-		diff.Set(params.MinimumDifficulty)
+	if diff.Cmp(minimumDifficulty) < 0 {
+		diff.Set(minimumDifficulty)
 	}
 
 	periodCount := new(big.Int).Add(parent.Number, big1)
@@ -159,7 +167,7 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 		expDiff := periodCount.Sub(periodCount, big2)
 		expDiff.Exp(big2, expDiff, nil)
 		diff.Add(diff, expDiff)
-		diff = math.BigMax(diff, params.MinimumDifficulty)
+		diff = math.BigMax(diff, minimumDifficulty)
 	}
 	return diff
 }

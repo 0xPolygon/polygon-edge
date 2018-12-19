@@ -59,11 +59,11 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	root := state.IntermediateRoot(config.IsEIP158(env.Number))
 
 	if root != p.Root {
-		t.Fatalf("root mismatch: expected %s but found %s", p.Root, root)
+		t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), root.String())
 	}
 
 	if logs := rlpHash(state.Logs()); logs != common.Hash(p.Logs) {
-		t.Fatalf("logs mismatch: expected %s but found %s", p.Logs, logs.String())
+		t.Fatalf("logs mismatch (%s %d): expected %s but found %s", fork, index, p.Logs, logs.String())
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
@@ -38,7 +37,7 @@ func NewEthHash(config *chain.Params) *EthHash {
 // VerifyHeader verifies the header is correct
 func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("Extra data too long")
 	}
 	if header.Time.Cmp(parent.Time) <= 0 {
@@ -63,9 +62,9 @@ func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal 
 	if diff < 0 {
 		diff *= -1
 	}
-	limit := parent.GasLimit / params.GasLimitBoundDivisor
+	limit := parent.GasLimit / chain.GasLimitBoundDivisor
 
-	if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
+	if uint64(diff) >= limit || header.GasLimit < chain.MinGasLimit {
 		return fmt.Errorf("gas limit not correct")
 	}
 	// Verify that the block number is parent's +1

@@ -13,7 +13,7 @@ func TestParamsForks(t *testing.T) {
 				"homestead": 1000
 			}`,
 			output: Forks{
-				Homestead: 1000,
+				Homestead: NewFork(1000),
 			},
 		},
 	}
@@ -32,10 +32,10 @@ func TestParamsForks(t *testing.T) {
 
 func TestParamsForksInTime(t *testing.T) {
 	f := Forks{
-		Homestead:      0,
-		Byzantium:      1000,
-		Constantinople: 1001,
-		EIP150:         2000,
+		Homestead:      NewFork(0),
+		Byzantium:      NewFork(1000),
+		Constantinople: NewFork(1001),
+		EIP150:         NewFork(2000),
 	}
 
 	ff := f.At(1000)

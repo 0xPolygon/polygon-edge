@@ -12,8 +12,23 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/gobuffalo/packr"
+)
+
+const (
+	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
+	GasLimitBoundDivisor uint64 = 1024
+	// MinGasLimit is the minimum the gas limit may ever be.
+	MinGasLimit uint64 = 5000
+	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
+	MaximumExtraDataSize uint64 = 32
+)
+
+var (
+	// GenesisGasLimit is the default gas limit of the Genesis block.
+	GenesisGasLimit uint64 = 4712388
+	// GenesisDifficulty is the default difficulty of the Genesis block.
+	GenesisDifficulty = big.NewInt(131072)
 )
 
 var (
@@ -74,10 +89,10 @@ func (g *Genesis) ToBlock() *types.Block {
 		Root:       root,
 	}
 	if g.GasLimit == 0 {
-		head.GasLimit = params.GenesisGasLimit
+		head.GasLimit = GenesisGasLimit
 	}
 	if g.Difficulty == nil {
-		head.Difficulty = params.GenesisDifficulty
+		head.Difficulty = GenesisDifficulty
 	}
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true)
