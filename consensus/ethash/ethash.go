@@ -98,11 +98,11 @@ func (e *EthHash) Seal(block *types.Block) error {
 func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
 	next := parent.Number.Uint64() + 1
 	switch {
-	case e.config.Forks.Constantinople.Active(next):
+	case e.config.Forks.IsConstantinople(next):
 		return calcDifficultyConstantinople(time, parent)
-	case e.config.Forks.Byzantium.Active(next):
+	case e.config.Forks.IsByzantium(next):
 		return calcDifficultyByzantium(time, parent)
-	case e.config.Forks.Homestead.Active(next):
+	case e.config.Forks.IsHomestead(next):
 		return calcDifficultyHomestead(time, parent)
 	default:
 		return calcDifficultyFrontier(time, parent)

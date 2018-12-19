@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -204,8 +204,8 @@ type EVM struct {
 	contracts      []*Contract
 	contractsIndex int
 
-	config   *params.ChainConfig
-	gasTable params.GasTable
+	config   chain.ForksInTime
+	gasTable chain.GasTable
 
 	state *state.StateDB
 	env   *Env
@@ -220,7 +220,7 @@ type EVM struct {
 }
 
 // NewEVM creates a new EVM
-func NewEVM(state *state.StateDB, env *Env, config *params.ChainConfig, gasTable params.GasTable, getHash GetHashByNumber) *EVM {
+func NewEVM(state *state.StateDB, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
 	return &EVM{
 		contracts:      make([]*Contract, MaxContracts),
 		config:         config,
@@ -406,7 +406,7 @@ func (e *EVM) Run() error {
 				e.push(val)
 
 			case SHL, SHR, SAR:
-				if !e.config.IsConstantinople(e.env.Number) {
+				if !e.config.Constantinople {
 					vmerr = ErrOpcodeNotFound
 					goto END
 				}
@@ -774,7 +774,7 @@ func (e *EVM) executeSStoreOperation() error {
 	current := e.state.GetState(address, common.BigToHash(loc))
 
 	// discount gas (constantinople)
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		switch {
 		case current == (common.Hash{}) && val.Sign() != 0: // 0 => non 0
 			gas = SstoreSetGas
@@ -955,7 +955,7 @@ func (e *EVM) create(contract *Contract) error {
 
 	// Create the new account for the contract
 	e.state.CreateAccount(address)
-	if e.config.IsEIP158(e.env.Number) {
+	if e.config.EIP158 {
 		e.state.SetNonce(address, 1)
 	}
 
@@ -1034,7 +1034,7 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 	gas := e.currentContract().gas
 
 	// CREATE2 uses by default EIP150
-	if e.config.IsEIP150(e.env.Number) || op == CREATE2 {
+	if e.config.EIP150 || op == CREATE2 {
 		gas -= gas / 64
 	}
 
@@ -1060,7 +1060,7 @@ func (e *EVM) executeCreateOperation(op OpCode) error {
 	}
 
 	if op == CREATE2 {
-		if !e.config.IsConstantinople(e.env.Number) {
+		if !e.config.Constantinople {
 			return ErrOpcodeNotFound
 		}
 	}
@@ -1080,10 +1080,10 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 		}
 	}
 
-	if op == DELEGATECALL && !e.config.IsHomestead(e.env.Number) {
+	if op == DELEGATECALL && !e.config.Homestead {
 		return ErrOpcodeNotFound
 	}
-	if op == STATICCALL && !e.config.IsByzantium(e.env.Number) {
+	if op == STATICCALL && !e.config.Byzantium {
 		return ErrOpcodeNotFound
 	}
 
@@ -1114,7 +1114,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 
 	// check first if its precompiled
 	precompiledContracts := ContractsHomestead
-	if e.config.IsByzantium(e.env.Number) {
+	if e.config.Byzantium {
 		precompiledContracts = ContractsByzantium
 	}
 
@@ -1122,7 +1122,7 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 
 	if op == CALL {
 		if !e.state.Exist(contract.address) {
-			if !isPrecompiled && e.config.IsEIP158(e.env.Number) && contract.value.Sign() == 0 {
+			if !isPrecompiled && e.config.EIP158 && contract.value.Sign() == 0 {
 				// calling an unexisting account
 				return nil
 			}
@@ -1206,7 +1206,7 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 	}
 
 	gasCost := e.gasTable.Calls
-	eip158 := e.config.IsEIP158(e.env.Number)
+	eip158 := e.config.EIP158
 	transfersValue := value != nil && value.Sign() != 0
 
 	if op == CALL {
@@ -1273,7 +1273,7 @@ func (e *EVM) Depth() int {
 }
 
 func (e *EVM) executeExtCodeHashOperation() error {
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		return ErrOpcodeNotFound
 	}
 
@@ -1293,7 +1293,7 @@ func (e *EVM) executeExtCodeHashOperation() error {
 }
 
 func (e *EVM) executeHaltOperations(op OpCode) error {
-	if op == REVERT && !e.config.IsByzantium(e.env.Number) {
+	if op == REVERT && !e.config.Byzantium {
 		return ErrOpcodeNotFound
 	}
 
@@ -1330,7 +1330,7 @@ func (e *EVM) executeHaltOperations(op OpCode) error {
 
 	if op == RETURN {
 		if e.currentContract().creation {
-			maxCodeSizeExceeded := e.config.IsEIP158(e.env.Number) && len(ret) > MaxCodeSize
+			maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
 				return ErrMaxCodeSizeExceeded
 			}
@@ -1359,10 +1359,10 @@ func (e *EVM) selfDestruct() error {
 	var gas uint64
 
 	// EIP150 homestead gas reprice fork:
-	if e.config.IsEIP150(e.env.Number) {
+	if e.config.EIP150 {
 		gas = e.gasTable.Suicide
 
-		eip158 := e.config.IsEIP158(e.env.Number)
+		eip158 := e.config.EIP158
 
 		if eip158 {
 			// if empty and transfers value
@@ -1447,7 +1447,7 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		gas, err = e.currentContract().memory.Set(memOffset, length, getSlice(e.currentContract().input, dataOffset, length))
 
 	case RETURNDATACOPY:
-		if !e.config.IsByzantium(e.env.Number) {
+		if !e.config.Byzantium {
 			return ErrOpcodeNotFound
 		}
 
@@ -1568,7 +1568,7 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 		return e.env.GasPrice, nil
 
 	case RETURNDATASIZE:
-		if !e.config.IsByzantium(e.env.Number) {
+		if !e.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
 
@@ -1810,7 +1810,7 @@ func (e *EVM) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 }
 
 func (e *EVM) executeShiftOperations(op OpCode) (*big.Int, error) {
-	if !e.config.IsConstantinople(e.env.Number) {
+	if !e.config.Constantinople {
 		return nil, ErrOpcodeNotFound
 	}
 
@@ -2185,7 +2185,7 @@ func codeBitmap(code []byte) bitvec {
 	return bits
 }
 
-func callGas(gasTable params.GasTable, availableGas, base uint64, callCost *big.Int) (uint64, error) {
+func callGas(gasTable chain.GasTable, availableGas, base uint64, callCost *big.Int) (uint64, error) {
 	if gasTable.CreateBySuicide > 0 {
 		availableGas = availableGas - base
 		gas := availableGas - availableGas/64

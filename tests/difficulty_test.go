@@ -65,14 +65,14 @@ func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 }
 
 var testnetConfig = &chain.Forks{
-	Homestead:      0,
-	Byzantium:      1700000,
-	Constantinople: 4230000,
+	Homestead:      chain.NewFork(0),
+	Byzantium:      chain.NewFork(1700000),
+	Constantinople: chain.NewFork(4230000),
 }
 
 var mainnetConfig = &chain.Forks{
-	Homestead: 1150000,
-	Byzantium: 4370000,
+	Homestead: chain.NewFork(1150000),
+	Byzantium: chain.NewFork(4370000),
 }
 
 func TestDifficultyRopsten(t *testing.T) {
@@ -93,19 +93,19 @@ func TestDifficultyMainnet1(t *testing.T) {
 
 func TestDifficultyHomestead(t *testing.T) {
 	testDifficultyCase(t, "difficultyHomestead.json", &chain.Forks{
-		Homestead: 0,
+		Homestead: chain.NewFork(0),
 	})
 }
 
 func TestDifficultyByzantium(t *testing.T) {
 	testDifficultyCase(t, "difficultyByzantium.json", &chain.Forks{
-		Byzantium: 0,
+		Byzantium: chain.NewFork(0),
 	})
 }
 
 func TestDifficultyConstantinople(t *testing.T) {
 	testDifficultyCase(t, "difficultyConstantinople.json", &chain.Forks{
-		Constantinople: 0,
+		Constantinople: chain.NewFork(0),
 	})
 }
 
