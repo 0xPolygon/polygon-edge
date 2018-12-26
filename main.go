@@ -14,6 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/trie"
+
 	_ "net/http/pprof"
 
 	metrics "github.com/armon/go-metrics"
@@ -119,6 +123,9 @@ func main() {
 	}
 	genesis := chain.Genesis.ToBlock().Header()
 
+	fmt.Println("-- params --")
+	fmt.Println(chain.Params)
+
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
 	privateKey := "b4c65ef6b82e96fb5f26dc10a79c929985217c078584721e9157c238d1690b22"
@@ -168,22 +175,70 @@ func main() {
 
 	server.RegisterProtocol(protocol.ETH63, callback)
 
-	//for _, i := range config.Bootnodes {
-	//	server.Dial(i)
-	//}
+	/*
+		for _, i := range config.Bootnodes {
+			server.Dial(i)
+		}
+	*/
 
-	//go syncer.Run()
+	go syncer.Run()
+
+	// root := common.HexToHash("0xabd629fff6d46c80035f1d7bd5dd47dac51d79f699492a1400418e0a6e6bfa48")
+
+	/*
+		stateDB, err := ethdb.NewLDBDatabase("test-3000000", 1000, 1000)
+		if err != nil {
+			panic(err)
+		}
+
+		//h := blockchain.GetHeaderByNumber(big.NewInt(3000000))
+		//root := h.Root
+
+		//fmt.Println("Other root")
+		//fmt.Println(h.Root.String())
+
+		//root := common.HexToHash("0x0adc4e8e9e6e2316817366304de11332e32e7d831e02f7edb173cabbf0e957a9")
+
+		ss := state.NewStateSync(root, stateDB)
+		if ss.Pending() == 0 {
+			panic("Already 0")
+		}
+	*/
+
+	// check if its a full node
 
 	go func() {
+		defer func() {
+			fmt.Println("finished")
+		}()
+
 		for {
 			select {
 			case evnt := <-server.EventCh:
 				if evnt.Type == network.NodeJoin {
 					fmt.Println("@@@ ADD NODE @@@")
-					// syncer.AddNode(evnt.Peer)
+
+					/*
+						p := newPeer("", evnt.Peer)
+
+						if res, err := p.conn.RequestNodeDataSync([]common.Hash{root}); err != nil {
+							fmt.Println("IT IS NOT AN ARCHIVE NODE")
+							fmt.Println(res)
+						} else {
+							fmt.Println("IT IS AN ARCHIVE NODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+							go syncStateTest(stateDB, ss, p)
+							return
+						}
+					*/
+
+					fmt.Println("@@@ ADD NODE @@@")
+					syncer.AddNode(evnt.Peer)
+
 				}
 			}
 		}
+
 	}()
 
 	handleSignals(server)
@@ -196,6 +251,52 @@ func main() {
 		pprof.WriteHeapProfile(f)
 		f.Close()
 		return
+	}
+}
+
+func syncStateTest(stateDB ethdb.Database, s *trie.Sync, p *Peer) {
+	fmt.Println("- start trie sync -")
+
+	keccak := sha3.NewKeccak256()
+
+	count := 0
+
+	for {
+		fmt.Printf("%d Pending: %d\n", count, s.Pending())
+
+		// request missing data
+		var tasks []common.Hash
+		for _, i := range s.Missing(200) {
+			tasks = append(tasks, i)
+		}
+		res, err := p.conn.RequestNodeDataSync(tasks)
+		if err != nil {
+			fmt.Printf("ERR 4: %s\n", err)
+		}
+
+		count += len(res)
+
+		// range over the result
+		for _, j := range res {
+
+			r := trie.SyncResult{Data: j}
+			keccak.Reset()
+			keccak.Write(j)
+			keccak.Sum(r.Hash[:0])
+
+			_, _, err := s.Process([]trie.SyncResult{r})
+			if err != nil {
+				fmt.Printf("ERR 3: %s\n", err)
+			}
+		}
+
+		// commit values
+		b := stateDB.NewBatch()
+		if written, err := s.Commit(b); written == 0 || err != nil {
+			fmt.Printf("ERR 1: %s\n", err)
+		} else if err := b.Write(); err != nil {
+			fmt.Printf("ERR 2: %s\n", err)
+		}
 	}
 }
 
@@ -233,4 +334,24 @@ func readFile(s string) []string {
 		panic(err)
 	}
 	return strings.Split(string(data), "\n")
+}
+
+type Peer struct {
+	pretty  string
+	id      string
+	conn    *ethereum.Ethereum
+	peer    *network.Peer
+	active  bool
+	failed  int
+	pending int
+}
+
+func newPeer(id string, peer *network.Peer) *Peer {
+	return &Peer{
+		id:     id,
+		active: true,
+		pretty: peer.PrettyString(),
+		conn:   peer.GetProtocol("eth", 63).(*ethereum.Ethereum),
+		peer:   peer,
+	}
 }
