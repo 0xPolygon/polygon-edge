@@ -11,7 +11,7 @@ import (
 	"github.com/umbracle/minimal/network/discover"
 )
 
-func TestP2PHandshake(t *testing.T) (*Connection, *Connection) {
+func TestP2PHandshake(t *testing.T) (*Session, *Session) {
 	c0, c1, err := DoP2PHandshake()
 	if err != nil {
 		t.Fatal(err)
@@ -19,7 +19,7 @@ func TestP2PHandshake(t *testing.T) (*Connection, *Connection) {
 	return c0, c1
 }
 
-func DoProtocolHandshake(c0 *Connection, info0 *Info, c1 *Connection, info1 *Info) error {
+func DoProtocolHandshake(c0 *Session, info0 *Info, c1 *Session, info1 *Info) error {
 	errr := make(chan error, 2)
 
 	go func() {
@@ -53,7 +53,7 @@ func DoProtocolHandshake(c0 *Connection, info0 *Info, c1 *Connection, info1 *Inf
 	return nil
 }
 
-func DoP2PHandshake() (*Connection, *Connection, error) {
+func DoP2PHandshake() (*Session, *Session, error) {
 	prv0, _ := crypto.GenerateKey()
 	prv1, _ := crypto.GenerateKey()
 
@@ -66,7 +66,7 @@ func DoP2PHandshake() (*Connection, *Connection, error) {
 
 	errs := make(chan error, 2)
 
-	var c0, c1 *Connection
+	var c0, c1 *Session
 
 	go func() {
 		c0 = Server(conn0, prv0, nil)
@@ -113,8 +113,8 @@ func DoP2PHandshake() (*Connection, *Connection, error) {
 			return nil, nil, fmt.Errorf("MAC cipher mismatch")
 		}
 
-		c0, _ := newConnection(conn0, sec0)
-		c1, _ := newConnection(conn1, sec1)
+		c0, _ := newSession(conn0, sec0)
+		c1, _ := newSession(conn1, sec1)
 
 		c0.LocalID, c0.RemoteID = &prv0.PublicKey, &prv1.PublicKey
 		c1.LocalID, c1.RemoteID = &prv1.PublicKey, &prv0.PublicKey

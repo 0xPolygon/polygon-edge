@@ -10,19 +10,19 @@ import (
 
 // A Config structure is used to configure a Rlpx server.
 type Config struct {
-	prv  *ecdsa.PrivateKey
-	pub  *ecdsa.PublicKey
-	info *Info
+	Prv  *ecdsa.PrivateKey
+	Pub  *ecdsa.PublicKey
+	Info *Info
 }
 
-// Server returns a new Rlpx server side connection
-func Server(conn net.Conn, prv *ecdsa.PrivateKey, info *Info) *Connection {
-	return &Connection{conn: conn, prv: prv, localInfo: info}
+// Server returns a new Rlpx server side Session
+func Server(conn net.Conn, prv *ecdsa.PrivateKey, info *Info) *Session {
+	return &Session{conn: conn, prv: prv, localInfo: info}
 }
 
-// Client returns a new Rlpx client side connection
-func Client(conn net.Conn, prv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, info *Info) *Connection {
-	return &Connection{conn: conn, prv: prv, pub: pub, localInfo: info, isClient: true}
+// Client returns a new Rlpx client side Session
+func Client(conn net.Conn, prv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, info *Info) *Session {
+	return &Session{conn: conn, prv: prv, pub: pub, localInfo: info, isClient: true}
 }
 
 // Listener implements a network listener for Rlpx sessions.
@@ -31,13 +31,13 @@ type Listener struct {
 	config *Config
 }
 
-// Accept waits for and returns the next connection to the listener.
-func (l *Listener) Accept() (*Connection, error) {
+// Accept waits for and returns the next Session to the listener.
+func (l *Listener) Accept() (*Session, error) {
 	rawConn, err := l.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	conn := Server(rawConn, l.config.prv, l.config.info)
+	conn := Server(rawConn, l.config.Prv, l.config.Info)
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
 		return nil, err
@@ -45,7 +45,7 @@ func (l *Listener) Accept() (*Connection, error) {
 	return conn, nil
 }
 
-// NewListener creates a Listener which accepts Rlpx connections
+// NewListener creates a Listener which accepts Rlpx Sessions
 func NewListener(inner net.Listener, config *Config) *Listener {
 	l := new(Listener)
 	l.Listener = inner
@@ -53,10 +53,10 @@ func NewListener(inner net.Listener, config *Config) *Listener {
 	return l
 }
 
-// Listen creates a Rlpx listener accepting connections on the
+// Listen creates a Rlpx listener accepting Sessions on the
 // given network address using net.Listen.
 func Listen(network, laddr string, config *Config) (*Listener, error) {
-	if config == nil || (config.prv == nil) {
+	if config == nil || (config.Prv == nil) {
 		return nil, errors.New("rlpx: private key not set")
 	}
 	l, err := net.Listen(network, laddr)
@@ -68,28 +68,28 @@ func Listen(network, laddr string, config *Config) (*Listener, error) {
 
 // DialWithDialer connects to the given network address using dialer.Dial and
 // then initiates a Rlpx handshake
-func DialWithDialer(dialer *net.Dialer, network, addr string, config *Config) (*Connection, error) {
+func DialWithDialer(dialer *net.Dialer, network, addr string, config *Config) (*Session, error) {
 	rawConn, err := dialer.Dial(network, addr)
 	if err != nil {
 		return nil, err
 	}
-	conn := Client(rawConn, config.prv, config.pub, config.info)
+	conn := Client(rawConn, config.Prv, config.Pub, config.Info)
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
-		return nil, err
+		return conn, err
 	}
 	return conn, nil
 }
 
 // Dial connects to the given network address using net.Dial
 // and then initiates a Rlpx handshake.
-func Dial(network, addr string, config *Config) (*Connection, error) {
+func Dial(network, addr string, config *Config) (*Session, error) {
 	return DialWithDialer(new(net.Dialer), network, addr, config)
 }
 
 // DialEnode connects to the given enode address using net.Dial
 // and then initiates a Rlpx handshake.
-func DialEnode(network, addr string, config *Config) (*Connection, error) {
+func DialEnode(network, addr string, config *Config) (*Session, error) {
 	enode, err := discv5.ParseNode(addr)
 	if err != nil {
 		return nil, err
@@ -99,5 +99,5 @@ func DialEnode(network, addr string, config *Config) (*Connection, error) {
 		return nil, err
 	}
 	tcpAddr := net.TCPAddr{IP: enode.IP, Port: int(enode.TCP)}
-	return DialWithDialer(new(net.Dialer), network, tcpAddr.String(), &Config{pub: pub, prv: config.prv})
+	return DialWithDialer(new(net.Dialer), network, tcpAddr.String(), &Config{Pub: pub, Prv: config.Prv})
 }

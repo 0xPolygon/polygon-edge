@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	baseProtocolVersion    = 5
+	BaseProtocolVersion    = 5
 	baseProtocolLength     = uint64(16)
 	baseProtocolMaxMsgSize = 2 * 1024
 
@@ -37,6 +37,7 @@ const (
 	DiscSelf
 	DiscReadTimeout
 	DiscSubprotocolError = 0x10
+	DiscUnknown          = 0x100
 )
 
 func (d DiscReason) String() string {
@@ -76,12 +77,19 @@ func (d DiscReason) Error() string {
 	return d.String()
 }
 
-func decodeDiscMsg(msg io.Reader) (DiscReason, error) {
+// DiscMsgTooManyPeers happens when there are too many peers connected
+type DiscMsgTooManyPeers struct{}
+
+func (d *DiscMsgTooManyPeers) Error() string {
+	return "too many peers"
+}
+
+func decodeDiscMsg(msg io.Reader) DiscReason {
 	var reason [1]DiscReason
 	if err := rlp.Decode(msg, &reason); err != nil {
-		return 0x0, err
+		return DiscUnknown
 	}
-	return reason[0], nil
+	return reason[0]
 }
 
 const (

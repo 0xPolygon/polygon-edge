@@ -247,7 +247,7 @@ func sealEIP8(msg interface{}, h *handshakeState) ([]byte, error) {
 	return append(prefix, enc...), err
 }
 
-// Secrets represents the connection Secrets
+// Secrets represents the Session Secrets
 // which are negotiated during the encryption handshake.
 type Secrets struct {
 	RemoteID              *ecdsa.PublicKey
@@ -503,7 +503,7 @@ func (h *handshakeState) makeAuthResp() (msg *authRespV4, err error) {
 
 // -- PROTOCOL HANDSHAKE --
 
-func StartProtocolHandshake(conn *Connection, nodeInfo *Info) (*Info, error) {
+func StartProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	errr := make(chan error, 2)
 	var peerInfo *Info
 
@@ -535,14 +535,7 @@ func StartProtocolHandshake(conn *Connection, nodeInfo *Info) (*Info, error) {
 	return peerInfo, nil
 }
 
-type DiscMsgTooManyPeers struct {
-}
-
-func (d *DiscMsgTooManyPeers) Error() string {
-	return "too many peers"
-}
-
-func readProtocolHandshake(conn *Connection) (*Info, error) {
+func readProtocolHandshake(conn *Session) (*Info, error) {
 	msg, err := conn.ReadMsg()
 	if err != nil {
 		return nil, err
@@ -553,14 +546,7 @@ func readProtocolHandshake(conn *Connection) (*Info, error) {
 	}
 
 	if msg.Code == discMsg {
-		reason, err := decodeDiscMsg(msg.Payload)
-		if err != nil {
-			return nil, fmt.Errorf("discMsg found but could not be decoded")
-		}
-		if reason == DiscTooManyPeers {
-			return nil, &DiscMsgTooManyPeers{}
-		}
-		return nil, fmt.Errorf("DiscMsg %s", reason.String())
+		return nil, decodeDiscMsg(msg.Payload)
 	}
 	if msg.Code != handshakeMsg {
 		return nil, fmt.Errorf("expected handshake, got %x", msg.Code)

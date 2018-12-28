@@ -2,11 +2,12 @@ package rlpx
 
 import (
 	"fmt"
+	"net"
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -31,7 +32,7 @@ type resp struct {
 	err error
 }
 
-func readMsgCh(conn *Connection) chan Message {
+func readMsgCh(conn *Session) chan Message {
 	msgs := make(chan Message, 10)
 	go func() {
 		for {
@@ -45,7 +46,7 @@ func readMsgCh(conn *Connection) chan Message {
 	return msgs
 }
 
-func testConn(c0, c1 *Connection, msgs []req) error {
+func testConn(c0, c1 *Session, msgs []req) error {
 	req0 := make(chan message, 2)
 	req1 := make(chan message, 2)
 
@@ -53,7 +54,7 @@ func testConn(c0, c1 *Connection, msgs []req) error {
 
 	responses := make(chan *resp, 2)
 
-	runConn := func(conn *Connection, requests chan message, id string) {
+	runConn := func(conn *Session, requests chan message, id string) {
 		// con0
 		go func() {
 			msgs := readMsgCh(conn)
@@ -148,89 +149,59 @@ func TestOnlyOneSnappyConn(t *testing.T) {
 	}
 }
 
-func TestP2PHandshake2(t *testing.T) {
-	// test p2p handshake in general
-}
+func pipe(t *testing.T) (*Session, *Session) {
+	conn0, conn1 := net.Pipe()
 
-func TestProtocolHandshake2(t *testing.T) {
-	// test protocol handshake in general
-}
+	prv0, _ := crypto.GenerateKey()
+	prv1, _ := crypto.GenerateKey()
 
-type timestamp struct {
-	t    time.Duration
-	code uint64
-}
+	errs := make(chan error, 2)
+	var c0, c1 *Session
 
-type timestamps []*timestamp
+	go func() {
+		c0 = Server(conn0, prv0, mockInfo(prv0))
+		errs <- c0.Handshake()
+	}()
+	go func() {
+		c1 = Client(conn1, prv1, &prv0.PublicKey, mockInfo(prv1))
+		errs <- c1.Handshake()
+	}()
 
-func (t *timestamps) Copy() timestamps {
-	tt := []*timestamp{}
-	for _, i := range *t {
-		tt = append(tt, &timestamp{i.t, i.code})
-	}
-	return tt
-}
-
-func (t timestamps) Len() int           { return len(t) }
-func (t timestamps) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t timestamps) Less(i, j int) bool { return t[i].t.Nanoseconds() < t[j].t.Nanoseconds() }
-
-func TestMultipleSessionHandlers(t *testing.T) {
-	s := NewSession(0, nil)
-
-	tt := timestamps{
-		{1 * time.Second, 0x1},
-		{500 * time.Millisecond, 0x2},
-		{200 * time.Millisecond, 0x3},
-		{700 * time.Millisecond, 0x4},
-	}
-
-	expected := tt.Copy()
-	sort.Sort(expected)
-
-	now := time.Now()
-
-	ack := make(chan AckMessage, len(tt))
-	for _, i := range tt {
-		s.SetHandler(i.code, ack, i.t)
-	}
-
-	span := time.Duration(100 * time.Millisecond).Nanoseconds()
-
-	for _, i := range expected {
-		a := <-ack
-		if a.Code != i.code {
-			t.Fatal("bad")
-		}
-
-		elapsed := time.Now().Sub(now)
-
-		d := elapsed.Nanoseconds() - i.t.Nanoseconds()
-		if d < 0 {
-			d = d * -1
-		}
-
-		if d > span {
-			t.Fatal("bad")
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
 		}
 	}
+	return c0, c1
 }
 
-func TestSessionHandlerUpdate(t *testing.T) {
-	s := NewSession(0, nil)
+func TestPeerDisconnect(t *testing.T) {
+	s0, s1 := pipe(t)
 
-	ack0 := make(chan AckMessage, 1)
-	s.SetHandler(1, ack0, 500*time.Millisecond)
+	if err := s1.Close(); err != nil {
+		t.Fatal(err)
+	}
 
-	ack1 := make(chan AckMessage, 1)
-	s.SetHandler(1, ack1, 700*time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
+	if !s0.IsClosed() {
+		t.Fatal("p0 is still connected")
+	}
+}
 
-	select {
-	case <-ack1:
-		// good. seconds handler updates the first one
-	case <-ack0:
-		t.Fatal("it should have been updated")
-	case <-time.After(1 * time.Second):
-		t.Fatal("bad")
+func TestDisconnectMsg(t *testing.T) {
+	p0, p1 := pipe(t)
+
+	go p0.Disconnect(DiscTooManyPeers)
+
+	msg, err := p1.ReadMsg()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Code != discMsg {
+		t.Fatalf("expected discMsg %d but found %d", discMsg, msg.Code)
+	}
+	reason := decodeDiscMsg(msg.Payload)
+	if reason != DiscTooManyPeers {
+		t.Fatalf("Reasons should be %d, instead %d found", DiscTooManyPeers, reason)
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -23,6 +22,11 @@ import (
 	"github.com/golang/snappy"
 )
 
+const (
+	// default ping interval for the rlpx protocol
+	pingInterval = 15 * time.Second
+)
+
 // AckMessage is the hook for the message handlers
 type AckMessage struct {
 	Complete bool
@@ -30,7 +34,7 @@ type AckMessage struct {
 	Payload  io.Reader
 }
 
-// Conn is the network connection
+// Conn is the network Session
 type Conn interface {
 	WriteMsg(uint64, ...interface{}) error
 	ReadMsg() (Message, error)
@@ -68,101 +72,12 @@ type handler struct {
 	salt     uint64
 }
 
+// Session is the Session between peers (implements net.Conn)
 type Session struct {
-	offset uint64
-	conn   Conn
-	Msgs   chan Message
-
-	respLock sync.Mutex
-	handlers map[uint64]*handler
-	timer    *time.Timer
-}
-
-func NewSession(offset uint64, conn Conn) *Session {
-	return &Session{
-		offset:   offset,
-		conn:     conn,
-		Msgs:     make(chan Message, 10),
-		respLock: sync.Mutex{},
-		handlers: map[uint64]*handler{},
-	}
-}
-
-// Consume consumes the handler if exists
-func (s *Session) Consume(code uint64, payload io.Reader) bool {
-	handler, ok := s.handlers[code]
-	if !ok {
-		return false
-	}
-
-	// consume the handler
-	handler.callback(payload)
-
-	s.respLock.Lock()
-	delete(s.handlers, code)
-	s.respLock.Unlock()
-
-	return true
-}
-
-func (s *Session) WriteMsg(msgcode uint64, data ...interface{}) error {
-	return s.conn.WriteMsg(msgcode+s.offset, data...)
-}
-
-func (s *Session) ReadMsg() (Message, error) {
-	msg := <-s.Msgs
-	return msg, msg.Err
-}
-
-func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
-	callback := func(payload io.Reader) {
-		select {
-		case ackCh <- AckMessage{true, code, payload}:
-		default:
-		}
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	salt := rand.Uint64()
-
-	handler := &handler{
-		callback: callback,
-		salt:     salt,
-	}
-
-	s.respLock.Lock()
-	s.handlers[code] = handler
-	s.respLock.Unlock()
-
-	s.timer = time.AfterFunc(duration, func() {
-		h, ok := s.handlers[code]
-		if !ok {
-			return
-		}
-
-		if h.salt != salt {
-			return
-		}
-
-		s.respLock.Lock()
-		delete(s.handlers, code)
-		s.respLock.Unlock()
-
-		select {
-		case ackCh <- AckMessage{false, code, nil}:
-		default:
-		}
-	})
-}
-
-func (s *Session) Close() error {
-	return s.conn.Close()
-}
-
-// Connection is the connection between peers (implements net.Conn)
-type Connection struct {
 	id   string
 	conn net.Conn
+
+	streams []*Stream
 
 	localInfo  *Info
 	remoteInfo *Info
@@ -186,26 +101,35 @@ type Connection struct {
 	pub *ecdsa.PublicKey
 
 	Snappy bool
+
+	// shutdown
+	shutdown     bool
+	shutdownErr  error
+	shutdownCh   chan struct{}
+	shutdownLock sync.Mutex
+
+	// ping/pong
+	pongTimeout *time.Timer
 }
 
-func NewConnection(conn net.Conn, s Secrets) (*Connection, error) {
-	return newConnection(conn, s)
+func NewSession(conn net.Conn, s Secrets) (*Session, error) {
+	return newSession(conn, s)
 }
 
-func (c *Connection) p2pHandshake() error {
+func (s *Session) p2pHandshake() error {
 	var secrets Secrets
 	var err error
 
-	if c.isClient {
-		secrets, err = handshakeClient(c.conn, c.prv, c.pub)
+	if s.isClient {
+		secrets, err = handshakeClient(s.conn, s.prv, s.pub)
 	} else {
-		secrets, err = handshakeServer(c.conn, c.prv)
+		secrets, err = handshakeServer(s.conn, s.prv)
 	}
 	if err != nil {
 		return err
 	}
 
-	c.macCipher, err = aes.NewCipher(secrets.MAC)
+	s.macCipher, err = aes.NewCipher(secrets.MAC)
 	if err != nil {
 		return err
 	}
@@ -215,47 +139,177 @@ func (c *Connection) p2pHandshake() error {
 	}
 
 	iv := make([]byte, encc.BlockSize())
-	c.enc = cipher.NewCTR(encc, iv)
-	c.dec = cipher.NewCTR(encc, iv)
+	s.enc = cipher.NewCTR(encc, iv)
+	s.dec = cipher.NewCTR(encc, iv)
 
-	c.egressMAC = secrets.EgressMAC
-	c.ingressMAC = secrets.IngressMAC
+	s.egressMAC = secrets.EgressMAC
+	s.ingressMAC = secrets.IngressMAC
 
-	c.RemoteID = secrets.RemoteID
-	c.id = discover.PubkeyToNodeID(secrets.RemoteID).String()
+	s.RemoteID = secrets.RemoteID
+	s.id = discover.PubkeyToNodeID(secrets.RemoteID).String()
 
-	c.rmu = &sync.Mutex{}
-	c.wmu = &sync.Mutex{}
+	s.rmu = &sync.Mutex{}
+	s.wmu = &sync.Mutex{}
+
+	s.streams = []*Stream{}
+	s.shutdownCh = make(chan struct{})
+	s.shutdownLock = sync.Mutex{}
+
+	s.pongTimeout = time.NewTimer(10 * time.Second)
 
 	return nil
 }
 
-func (c *Connection) protocolHandshake() error {
-	fmt.Println("-- local info --")
-	fmt.Println(c.localInfo)
-
-	info, err := StartProtocolHandshake(c, c.localInfo)
+func (s *Session) protocolHandshake() error {
+	info, err := StartProtocolHandshake(s, s.localInfo)
 	if err != nil {
 		return err
 	}
 
-	c.remoteInfo = info
+	s.remoteInfo = info
 	return nil
 }
 
 // Handshake does the p2p and protocol handshake
-func (c *Connection) Handshake() error {
-	if err := c.p2pHandshake(); err != nil {
+func (s *Session) Handshake() error {
+	if err := s.p2pHandshake(); err != nil {
 		return err
 	}
-	if err := c.protocolHandshake(); err != nil {
+	if err := s.protocolHandshake(); err != nil {
 		return err
+	}
+
+	// start ping protocol and listen for incoming messages
+	go s.keepalive()
+	go s.recv()
+
+	return nil
+}
+
+func (s *Session) RemoteInfo() *Info {
+	return s.remoteInfo
+}
+
+func (s *Session) Close() error {
+	return s.Disconnect(DiscQuitting)
+}
+
+func (s *Session) Disconnect(reason DiscReason) error {
+	s.shutdownLock.Lock()
+	defer s.shutdownLock.Unlock()
+
+	if s.shutdown {
+		return nil
+	}
+	s.shutdown = true
+	if s.shutdownErr == nil {
+		s.shutdownErr = reason
+	}
+	if err := s.WriteMsg(discMsg, []DiscReason{reason}); err != nil {
+		return err
+	}
+
+	s.shutdown = true
+	close(s.shutdownCh)
+	s.conn.Close()
+	return nil
+}
+
+// IsClosed does a safe check to see if we have shutdown
+func (s *Session) IsClosed() bool {
+	select {
+	case <-s.shutdownCh:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Session) recv() {
+	if err := s.recvLoop(); err != nil {
+		s.exitErr(err)
+	}
+}
+
+func (s *Session) recvLoop() error {
+	for {
+		msg, err := s.ReadMsg()
+		if err != nil {
+			return err
+		}
+
+		// Reset timeout
+		s.pongTimeout.Reset(2 * time.Second)
+
+		switch {
+		case msg.Code == pingMsg:
+			if err := s.WriteMsg(pongMsg); err != nil {
+				return err
+			}
+
+		case msg.Code == pongMsg:
+			// Already handled
+
+		case msg.Code == discMsg:
+			return decodeDiscMsg(msg.Payload)
+
+		default:
+			// stream message
+			ss := s.getStream(msg.Code)
+
+			if ss != nil {
+				real := msg.Copy()
+				real.Code = real.Code - ss.offset
+
+				ss.deliver(real)
+			}
+		}
+	}
+}
+
+func (s *Session) exitErr(err error) {
+	s.shutdownLock.Lock()
+	if s.shutdownErr == nil {
+		s.shutdownErr = err
+	}
+	s.shutdownLock.Unlock()
+	s.Close()
+}
+
+func (s *Session) keepalive() {
+	for {
+		select {
+		case <-time.After(pingInterval):
+			if err := s.WriteMsg(pingMsg); err != nil {
+				s.exitErr(err)
+				return
+			}
+		case <-s.pongTimeout.C:
+			s.exitErr(DiscProtocolError)
+			return
+		case <-s.shutdownCh:
+			return
+		}
+	}
+}
+
+func (s *Session) OpenStream(offset uint, length uint) *Stream {
+	ss := NewStream(uint64(offset), uint64(length), s)
+	s.streams = append(s.streams, ss)
+	return ss
+}
+
+func (s *Session) getStream(code uint64) *Stream {
+	for _, proto := range s.streams {
+		if code >= proto.offset && code < proto.offset+proto.length {
+			return proto
+		}
 	}
 	return nil
 }
 
 // DEPRECATED
-func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
+func newSession(conn net.Conn, s Secrets) (*Session, error) {
 	macc, err := aes.NewCipher(s.MAC)
 	if err != nil {
 		return nil, err
@@ -266,7 +320,7 @@ func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
 	}
 
 	iv := make([]byte, encc.BlockSize())
-	c := &Connection{
+	c := &Session{
 		conn:       conn,
 		enc:        cipher.NewCTR(encc, iv),
 		dec:        cipher.NewCTR(encc, iv),
@@ -282,26 +336,26 @@ func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
 	return c, nil
 }
 
-func (c *Connection) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
+func (s *Session) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
 }
 
-// ReadMsg from the connection
-func (c *Connection) ReadMsg() (msg Message, err error) {
-	c.rmu.Lock()
-	defer c.rmu.Unlock()
+// ReadMsg from the Session
+func (s *Session) ReadMsg() (msg Message, err error) {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
 
 	// read the header
 	headbuf := make([]byte, 32)
-	if _, err := io.ReadFull(c.conn, headbuf); err != nil {
+	if _, err := io.ReadFull(s.conn, headbuf); err != nil {
 		return msg, err
 	}
 	// verify header mac
-	shouldMAC := updateMAC(c.ingressMAC, c.macCipher, headbuf[:16])
+	shouldMAC := updateMAC(s.ingressMAC, s.macCipher, headbuf[:16])
 	if !hmac.Equal(shouldMAC, headbuf[16:]) {
 		return msg, errors.New("bad header MAC")
 	}
-	c.dec.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now decrypted
+	s.dec.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now decrypted
 	fsize := readInt24(headbuf)
 	// ignore protocol type for now
 
@@ -311,23 +365,23 @@ func (c *Connection) ReadMsg() (msg Message, err error) {
 		rsize += 16 - padding
 	}
 	framebuf := make([]byte, rsize)
-	if _, err := io.ReadFull(c.conn, framebuf); err != nil {
+	if _, err := io.ReadFull(s.conn, framebuf); err != nil {
 		return msg, err
 	}
 
 	// read and validate frame MAC. we can re-use headbuf for that.
-	c.ingressMAC.Write(framebuf)
-	fmacseed := c.ingressMAC.Sum(nil)
-	if _, err := io.ReadFull(c.conn, headbuf[:16]); err != nil {
+	s.ingressMAC.Write(framebuf)
+	fmacseed := s.ingressMAC.Sum(nil)
+	if _, err := io.ReadFull(s.conn, headbuf[:16]); err != nil {
 		return msg, err
 	}
-	shouldMAC = updateMAC(c.ingressMAC, c.macCipher, fmacseed)
+	shouldMAC = updateMAC(s.ingressMAC, s.macCipher, fmacseed)
 	if !hmac.Equal(shouldMAC, headbuf[:16]) {
 		return msg, errors.New("bad frame MAC")
 	}
 
 	// decrypt frame content
-	c.dec.XORKeyStream(framebuf, framebuf)
+	s.dec.XORKeyStream(framebuf, framebuf)
 
 	// decode message code
 	content := bytes.NewReader(framebuf[:fsize])
@@ -338,7 +392,7 @@ func (c *Connection) ReadMsg() (msg Message, err error) {
 	msg.Payload = content
 
 	// if snappy is enabled, verify and decompress message
-	if c.Snappy {
+	if s.Snappy {
 		payload, err := ioutil.ReadAll(msg.Payload)
 		if err != nil {
 			return msg, err
@@ -358,7 +412,7 @@ func (c *Connection) ReadMsg() (msg Message, err error) {
 		msg.Size, msg.Payload = uint32(size), bytes.NewReader(payload)
 	}
 
-	metrics.SetGaugeWithLabels([]string{"conn", "inbound"}, float32(msg.Size), []metrics.Label{{Name: "id", Value: c.id}})
+	metrics.SetGaugeWithLabels([]string{"conn", "inbound"}, float32(msg.Size), []metrics.Label{{Name: "id", Value: s.id}})
 	return msg, nil
 }
 
@@ -372,11 +426,7 @@ var (
 
 var errPlainMessageTooLarge = errors.New("message length >= 16MB")
 
-func (c *Connection) Close() error {
-	return c.conn.Close()
-}
-
-func (c *Connection) WriteMsg(msgcode uint64, input ...interface{}) error {
+func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 	var data interface{}
 
 	l := len(input)
@@ -393,17 +443,17 @@ func (c *Connection) WriteMsg(msgcode uint64, input ...interface{}) error {
 		return err
 	}
 
-	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: c.id}})
-	return c.Write(Message{Code: msgcode, Size: uint32(size), Payload: r})
+	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
+	return s.Write(Message{Code: msgcode, Size: uint32(size), Payload: r})
 }
 
-func (c *Connection) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
-	panic("handlers not available in plain connection")
+func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
+	panic("handlers not available in plain Session")
 }
 
-func (c *Connection) Write(msg Message) error {
-	c.wmu.Lock()
-	defer c.wmu.Unlock()
+func (s *Session) Write(msg Message) error {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
 
 	ptype, err := rlp.EncodeToBytes(msg.Code)
 	if err != nil {
@@ -411,7 +461,7 @@ func (c *Connection) Write(msg Message) error {
 	}
 
 	// if snappy is enabled, compress message now
-	if c.Snappy {
+	if s.Snappy {
 		if msg.Size > maxUint24 {
 			return errPlainMessageTooLarge
 		}
@@ -431,17 +481,17 @@ func (c *Connection) Write(msg Message) error {
 
 	putInt24(fsize, headbuf) // TODO: check overflow
 	copy(headbuf[3:], zeroHeader)
-	c.enc.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now encrypted
+	s.enc.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now encrypted
 
 	// write header MAC
-	copy(headbuf[16:], updateMAC(c.egressMAC, c.macCipher, headbuf[:16]))
-	if _, err := c.conn.Write(headbuf); err != nil {
+	copy(headbuf[16:], updateMAC(s.egressMAC, s.macCipher, headbuf[:16]))
+	if _, err := s.conn.Write(headbuf); err != nil {
 		return err
 	}
 
 	// write encrypted frame, updating the egress MAC hash with
 	// the data written to conn.
-	tee := cipher.StreamWriter{S: c.enc, W: io.MultiWriter(c.conn, c.egressMAC)}
+	tee := cipher.StreamWriter{S: s.enc, W: io.MultiWriter(s.conn, s.egressMAC)}
 	if _, err := tee.Write(ptype); err != nil {
 		return err
 	}
@@ -456,9 +506,9 @@ func (c *Connection) Write(msg Message) error {
 
 	// write frame MAC. egress MAC hash is up to date because
 	// frame content was written to it as well.
-	fmacseed := c.egressMAC.Sum(nil)
-	mac := updateMAC(c.egressMAC, c.macCipher, fmacseed)
-	if _, err := c.conn.Write(mac); err != nil {
+	fmacseed := s.egressMAC.Sum(nil)
+	mac := updateMAC(s.egressMAC, s.macCipher, fmacseed)
+	if _, err := s.conn.Write(mac); err != nil {
 		return err
 	}
 
