@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
-func toCap(p protocol.Protocol) *Cap {
-	return &Cap{Name: p.Name, Version: p.Version}
+func toCap(p protocol.Protocol) *rlpx.Cap {
+	return &rlpx.Cap{Name: p.Name, Version: p.Version}
 }
 
 func TestMatchProtocols(t *testing.T) {
@@ -19,20 +20,20 @@ func TestMatchProtocols(t *testing.T) {
 		offset  uint64
 	}
 
-	toExpected := func(c *Cap, offset uint64) expected {
+	toExpected := func(c *rlpx.Cap, offset uint64) expected {
 		return expected{name: c.Name, version: c.Version, offset: offset}
 	}
 
 	var cases = []struct {
 		protocols []protocol.Protocol
-		caps      Capabilities
+		caps      rlpx.Capabilities
 		expected  []expected
 	}{
 		{
 			[]protocol.Protocol{
 				protocol.ETH63,
 			},
-			[]*Cap{
+			[]*rlpx.Cap{
 				toCap(protocol.ETH63),
 			},
 			[]expected{
@@ -42,7 +43,7 @@ func TestMatchProtocols(t *testing.T) {
 	}
 
 	p := &Peer{}
-	callback := func(session Conn, peer *Peer) protocol.Handler {
+	callback := func(session rlpx.Conn, peer *Peer) protocol.Handler {
 		return nil
 	}
 
@@ -76,7 +77,7 @@ func (d *dummyHandler) Close() error {
 	return nil
 }
 
-func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
+func testProtocolSessions(t *testing.T) (*Server, rlpx.Conn, *Server, rlpx.Conn) {
 	s0, s1 := TestServers()
 
 	// desactivate discover
@@ -84,15 +85,15 @@ func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 	s1.discover.Close()
 
 	// sessions
-	var e0, e1 Conn
+	var e0, e1 rlpx.Conn
 
 	p := protocol.Protocol{Name: "test", Version: 1, Length: 7}
 
-	callback0 := func(session Conn, peer *Peer) protocol.Handler {
+	callback0 := func(session rlpx.Conn, peer *Peer) protocol.Handler {
 		e0 = session
 		return &dummyHandler{}
 	}
-	callback1 := func(session Conn, peer *Peer) protocol.Handler {
+	callback1 := func(session rlpx.Conn, peer *Peer) protocol.Handler {
 		e1 = session
 		return &dummyHandler{}
 	}
@@ -111,15 +112,15 @@ func testProtocolSessions(t *testing.T) (*Server, Conn, *Server, Conn) {
 func TestSessionHandler(t *testing.T) {
 	_, e0, _, e1 := testProtocolSessions(t)
 
-	ack := make(chan AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	e0.SetHandler(0x1, ack, 1*time.Second)
 
 	if err := e1.WriteMsg(0x1, []byte{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
 
-	readOnce := func(conn Conn) chan Message {
-		m := make(chan Message, 5)
+	readOnce := func(conn rlpx.Conn) chan rlpx.Message {
+		m := make(chan rlpx.Message, 5)
 		go func() {
 			msg, _ := conn.ReadMsg()
 			m <- msg
@@ -142,7 +143,7 @@ func TestSessionHandler(t *testing.T) {
 func TestSessionHandlerTimeout(t *testing.T) {
 	_, e0, _, _ := testProtocolSessions(t)
 
-	ack := make(chan AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	e0.SetHandler(0x1, ack, 1*time.Second)
 
 	select {
@@ -158,7 +159,7 @@ func TestSessionHandlerTimeout(t *testing.T) {
 func TestSessionHandlerMessageAfterTimeout(t *testing.T) {
 	_, e0, _, e1 := testProtocolSessions(t)
 
-	ack := make(chan AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	e0.SetHandler(0x1, ack, 600*time.Millisecond)
 
 	time.Sleep(600 * time.Millisecond)

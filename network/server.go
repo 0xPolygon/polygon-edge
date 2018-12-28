@@ -15,6 +15,7 @@ import (
 	"github.com/ferranbt/periodic-dispatcher"
 
 	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
@@ -92,7 +93,7 @@ type Server struct {
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
-	info      *Info
+	info      *rlpx.Info
 	config    *Config
 	closeCh   chan struct{}
 	transport Transport
@@ -207,7 +208,7 @@ func (s *Server) dialTask(id string, tasks chan string) {
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				if _, ok := err.(*DiscMsgTooManyPeers); ok {
+				if _, ok := err.(*rlpx.DiscMsgTooManyPeers); ok {
 					busy = true
 				}
 			}
@@ -390,12 +391,12 @@ func (s *Server) connect2(conn net.Conn, pub *ecdsa.PublicKey) error {
 func (s *Server) connect(conn net.Conn, pub *ecdsa.PublicKey) (*Peer, error) {
 
 	// -- network handshake --
-	secrets, err := doEncHandshake(conn, s.key, pub)
+	secrets, err := rlpx.DoEncHandshake(conn, s.key, pub)
 	if err != nil {
 		return nil, fmt.Errorf("handshake failed: %v", err)
 	}
 
-	upgraded, err := newConnection(conn, secrets) // do this maybe on doEncHandhsake at the same time
+	upgraded, err := rlpx.NewConnection(conn, secrets) // do this maybe on doEncHandhsake at the same time
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %v", err)
 	}
@@ -404,7 +405,7 @@ func (s *Server) connect(conn net.Conn, pub *ecdsa.PublicKey) (*Peer, error) {
 
 	localInfo := s.getServerCapabilities()
 
-	remoteInfo, err := startProtocolHandshake(upgraded, localInfo)
+	remoteInfo, err := rlpx.StartProtocolHandshake(upgraded, localInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +441,7 @@ func (s *Server) connect(conn net.Conn, pub *ecdsa.PublicKey) (*Peer, error) {
 }
 
 // Callback is the one calling whenever the protocol is used
-type Callback = func(session Conn, peer *Peer) protocol.Handler
+type Callback = func(session rlpx.Conn, peer *Peer) protocol.Handler
 
 // RegisterProtocol registers a protocol
 func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
@@ -451,10 +452,10 @@ func (s *Server) ID() discover.NodeID {
 	return discover.PubkeyToNodeID(&s.key.PublicKey)
 }
 
-func (s *Server) getServerCapabilities() *Info {
-	ourHandshake := &Info{Version: baseProtocolVersion, Caps: Capabilities{}, Name: s.Name, ID: discover.PubkeyToNodeID(&s.key.PublicKey)}
+func (s *Server) getServerCapabilities() *rlpx.Info {
+	ourHandshake := &rlpx.Info{Version: baseProtocolVersion, Caps: rlpx.Capabilities{}, Name: s.Name, ID: discover.PubkeyToNodeID(&s.key.PublicKey)}
 	for _, p := range s.Protocols {
-		ourHandshake.Caps = append(ourHandshake.Caps, &Cap{Name: p.protocol.Name, Version: p.protocol.Version})
+		ourHandshake.Caps = append(ourHandshake.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
 	}
 	return ourHandshake
 }
@@ -468,13 +469,13 @@ func (s *Server) getProtocol(name string, version uint) *protocolStub {
 	return nil
 }
 
-func (s *Server) matchProtocols(peer *Peer, caps Capabilities) []*Instance {
+func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance {
 	offset := baseProtocolLength
 	protocols := []*Instance{}
 
 	for _, i := range caps {
 		if proto := s.getProtocol(i.Name, i.Version); proto != nil {
-			session := NewSession(offset, peer.conn)
+			session := rlpx.NewSession(offset, peer.conn)
 			runtime := proto.callback(session, peer)
 
 			protocols = append(protocols, &Instance{session: session, protocol: proto.protocol, offset: offset, Runtime: runtime})

@@ -1,4 +1,4 @@
-package network
+package rlpx
 
 import (
 	"bytes"
@@ -71,7 +71,7 @@ type handler struct {
 type Session struct {
 	offset uint64
 	conn   Conn
-	msgs   chan Message
+	Msgs   chan Message
 
 	respLock sync.Mutex
 	handlers map[uint64]*handler
@@ -82,7 +82,7 @@ func NewSession(offset uint64, conn Conn) *Session {
 	return &Session{
 		offset:   offset,
 		conn:     conn,
-		msgs:     make(chan Message, 10),
+		Msgs:     make(chan Message, 10),
 		respLock: sync.Mutex{},
 		handlers: map[uint64]*handler{},
 	}
@@ -110,7 +110,7 @@ func (s *Session) WriteMsg(msgcode uint64, data ...interface{}) error {
 }
 
 func (s *Session) ReadMsg() (Message, error) {
-	msg := <-s.msgs
+	msg := <-s.Msgs
 	return msg, msg.Err
 }
 
@@ -164,6 +164,11 @@ type Connection struct {
 	id   string
 	conn net.Conn
 
+	localInfo  *Info
+	remoteInfo *Info
+
+	isClient bool
+
 	enc cipher.Stream
 	dec cipher.Stream
 
@@ -177,9 +182,79 @@ type Connection struct {
 	RemoteID *ecdsa.PublicKey
 	LocalID  *ecdsa.PublicKey
 
+	prv *ecdsa.PrivateKey
+	pub *ecdsa.PublicKey
+
 	Snappy bool
 }
 
+func NewConnection(conn net.Conn, s Secrets) (*Connection, error) {
+	return newConnection(conn, s)
+}
+
+func (c *Connection) p2pHandshake() error {
+	var secrets Secrets
+	var err error
+
+	if c.isClient {
+		secrets, err = handshakeClient(c.conn, c.prv, c.pub)
+	} else {
+		secrets, err = handshakeServer(c.conn, c.prv)
+	}
+	if err != nil {
+		return err
+	}
+
+	c.macCipher, err = aes.NewCipher(secrets.MAC)
+	if err != nil {
+		return err
+	}
+	encc, err := aes.NewCipher(secrets.AES)
+	if err != nil {
+		return err
+	}
+
+	iv := make([]byte, encc.BlockSize())
+	c.enc = cipher.NewCTR(encc, iv)
+	c.dec = cipher.NewCTR(encc, iv)
+
+	c.egressMAC = secrets.EgressMAC
+	c.ingressMAC = secrets.IngressMAC
+
+	c.RemoteID = secrets.RemoteID
+	c.id = discover.PubkeyToNodeID(secrets.RemoteID).String()
+
+	c.rmu = &sync.Mutex{}
+	c.wmu = &sync.Mutex{}
+
+	return nil
+}
+
+func (c *Connection) protocolHandshake() error {
+	fmt.Println("-- local info --")
+	fmt.Println(c.localInfo)
+
+	info, err := StartProtocolHandshake(c, c.localInfo)
+	if err != nil {
+		return err
+	}
+
+	c.remoteInfo = info
+	return nil
+}
+
+// Handshake does the p2p and protocol handshake
+func (c *Connection) Handshake() error {
+	if err := c.p2pHandshake(); err != nil {
+		return err
+	}
+	if err := c.protocolHandshake(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DEPRECATED
 func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
 	macc, err := aes.NewCipher(s.MAC)
 	if err != nil {
@@ -205,6 +280,10 @@ func newConnection(conn net.Conn, s Secrets) (*Connection, error) {
 	}
 
 	return c, nil
+}
+
+func (c *Connection) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
 }
 
 // ReadMsg from the connection

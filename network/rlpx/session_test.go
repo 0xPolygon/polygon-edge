@@ -1,4 +1,4 @@
-package network
+package rlpx
 
 import (
 	"fmt"
@@ -122,14 +122,14 @@ var connCases = []req{
 }
 
 func TestNonSnappyConn(t *testing.T) {
-	c0, c1 := testP2PHandshake(t)
+	c0, c1 := TestP2PHandshake(t)
 	if err := testConn(c0, c1, connCases); err != nil {
 		t.Fatal(err.Error())
 	}
 }
 
 func TestSnappyConn(t *testing.T) {
-	c0, c1 := testP2PHandshake(t)
+	c0, c1 := TestP2PHandshake(t)
 
 	c0.Snappy = true
 	c1.Snappy = true
@@ -140,12 +140,20 @@ func TestSnappyConn(t *testing.T) {
 }
 
 func TestOnlyOneSnappyConn(t *testing.T) {
-	c0, c1 := testP2PHandshake(t)
+	c0, c1 := TestP2PHandshake(t)
 	c0.Snappy = true
 
 	if err := testConn(c0, c1, connCases); err == nil {
 		t.Fatal("Only conn0 with snappy enabled, it should fail")
 	}
+}
+
+func TestP2PHandshake2(t *testing.T) {
+	// test p2p handshake in general
+}
+
+func TestProtocolHandshake2(t *testing.T) {
+	// test protocol handshake in general
 }
 
 type timestamp struct {

@@ -5,13 +5,12 @@ import (
 	"io"
 	"log"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
@@ -88,46 +87,6 @@ func decodeDiscMsg(msg io.Reader) (DiscReason, error) {
 	return reason[0], nil
 }
 
-// Cap is the peer capability.
-type Cap struct {
-	Name    string
-	Version uint
-}
-
-func (c *Cap) less(cc *Cap) bool {
-	if cmp := strings.Compare(c.Name, cc.Name); cmp != 0 {
-		return cmp == -1
-	}
-	return c.Version < cc.Version
-}
-
-// Capabilities are all the capabilities of the other peer
-type Capabilities []*Cap
-
-func (c Capabilities) Len() int {
-	return len(c)
-}
-
-func (c Capabilities) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c Capabilities) Less(i, j int) bool {
-	return c[i].less(c[j])
-}
-
-// Info is the info of the node
-type Info struct {
-	Version    uint64
-	Name       string
-	Caps       Capabilities
-	ListenPort uint64
-	ID         discover.NodeID
-
-	// Ignore additional fields (for forward compatibility).
-	Rest []rlp.RawValue `rlp:"tail"`
-}
-
 const (
 	// devp2p message codes
 	handshakeMsg = 0x00
@@ -137,7 +96,7 @@ const (
 )
 
 type Instance struct {
-	session  *Session // session of the peer with the protocoll
+	session  *rlpx.Session // session of the peer with the protocoll
 	protocol *protocol.Protocol
 	Runtime  protocol.Handler
 	offset   uint64
@@ -171,8 +130,8 @@ type Peer struct {
 	Status       Status
 	server       *Server
 	logger       *log.Logger
-	conn         Conn
-	Info         *Info
+	conn         rlpx.Conn
+	Info         *rlpx.Info
 	protocols    []*Instance
 	Connected    bool
 	pongTimeout  *time.Timer
@@ -184,8 +143,8 @@ type Peer struct {
 	headerLock sync.Mutex
 }
 
-func newPeer(logger *log.Logger, conn *Connection, info *Info, server *Server) *Peer {
-	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.conn.RemoteAddr().String())
+func newPeer(logger *log.Logger, conn *rlpx.Connection, info *rlpx.Info, server *Server) *Peer {
+	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.RemoteAddr().String())
 
 	peer := &Peer{
 		Enode:        enode,
@@ -294,7 +253,7 @@ func (p *Peer) getProtocol(msgcode uint64) *Instance {
 	return nil
 }
 
-func (p *Peer) handleMsg(msg Message) error {
+func (p *Peer) handleMsg(msg rlpx.Message) error {
 	p.pongTimeout.Reset(2 * time.Second)
 
 	switch {
@@ -327,7 +286,7 @@ func (p *Peer) handleMsg(msg Message) error {
 		real.Code = real.Code - pp.offset
 
 		if !pp.session.Consume(real.Code, real.Payload) {
-			pp.session.msgs <- *real
+			pp.session.Msgs <- *real
 		}
 	}
 

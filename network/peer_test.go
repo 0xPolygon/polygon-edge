@@ -5,20 +5,22 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/umbracle/minimal/network/rlpx"
 )
 
 func testPeers(t *testing.T) (*Peer, *Peer) {
-	c0, c1 := testP2PHandshake(t)
+	c0, c1 := rlpx.TestP2PHandshake(t)
 
-	info0 := dummyInfo("info0", c0.LocalID)
-	info1 := dummyInfo("info1", c1.LocalID)
+	info0 := rlpx.DummyInfo("info0", c0.LocalID)
+	info1 := rlpx.DummyInfo("info1", c1.LocalID)
 
 	if err := DoProtocolHandshake(c0, info0, c1, info1); err != nil {
 		t.Fatal(err)
 	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	return newPeer(logger, c0, info0), newPeer(logger, c1, info1)
+	return newPeer(logger, c0, info0, nil), newPeer(logger, c1, info1, nil)
 }
 
 func TestPing(t *testing.T) {
