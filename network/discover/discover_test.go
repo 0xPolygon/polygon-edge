@@ -2,6 +2,8 @@ package discover
 
 import (
 	"crypto/elliptic"
+	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
 	"reflect"
@@ -14,23 +16,29 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func pipe(config *Config) (*Discover, *udpTransport, *Discover, *udpTransport) {
+func newTestDiscovery(config *Config, capturePacket bool) *Discover {
+	logger := log.New(ioutil.Discard, "", log.LstdFlags)
 	prv0, _ := crypto.GenerateKey()
-	prv1, _ := crypto.GenerateKey()
 
-	c0 := newUDPTransport()
-	c1 := newUDPTransport()
+PORT:
+	rand.Seed(time.Now().Unix())
+	port := rand.Intn(9000-5000) + 5000 // Random port between 5000 and 9000
 
-	r0, err := NewDiscover(prv0, c0, c0.udpAddr, config)
+	config.BindPort = port
+	r, err := NewDiscover(logger, prv0, config)
 	if err != nil {
-		panic(err)
-	}
-	r1, err := NewDiscover(prv1, c1, c1.udpAddr, config)
-	if err != nil {
-		panic(err)
+		goto PORT
 	}
 
-	return r0, c0, r1, c1
+	if capturePacket {
+		r.packetCh = make(chan *Packet, 10)
+	}
+
+	return r
+}
+
+func pipe(config *Config, capturePacket bool) (*Discover, *Discover) {
+	return newTestDiscovery(config, capturePacket), newTestDiscovery(config, capturePacket)
 }
 
 func TestPeerExpired(t *testing.T) {
@@ -77,7 +85,7 @@ func TestPeerExpired(t *testing.T) {
 }
 
 func TestExpiredPacket(t *testing.T) {
-	r0, _, r1, c1 := pipe(DefaultConfig())
+	r0, r1 := pipe(DefaultConfig(), true)
 
 	expiration := uint64(time.Now().Unix())
 
@@ -90,7 +98,7 @@ func TestExpiredPacket(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	p := <-c1.PacketCh()
+	p := <-r1.packetCh
 
 	err := r1.HandlePacket(p)
 	if err == nil {
@@ -102,7 +110,7 @@ func TestExpiredPacket(t *testing.T) {
 }
 
 func TestNotExpectedPacket(t *testing.T) {
-	r0, _, r1, c1 := pipe(DefaultConfig())
+	r0, r1 := pipe(DefaultConfig(), true)
 
 	r0.sendPacket(r1.local, pongPacket, pongResponse{
 		To:         r1.local.toRPCEndpoint(),
@@ -110,7 +118,7 @@ func TestNotExpectedPacket(t *testing.T) {
 		Expiration: uint64(time.Now().Add(20 * time.Second).Unix()),
 	})
 
-	p := <-c1.PacketCh()
+	p := <-r1.packetCh
 
 	err := r1.HandlePacket(p)
 	if err == nil {
@@ -122,7 +130,7 @@ func TestNotExpectedPacket(t *testing.T) {
 }
 
 func TestPingPong(t *testing.T) {
-	r0, c0, r1, c1 := pipe(DefaultConfig())
+	r0, r1 := pipe(DefaultConfig(), true)
 
 	r0.sendPacket(r1.local, pingPacket, pingRequest{
 		Version:    4,
@@ -131,13 +139,13 @@ func TestPingPong(t *testing.T) {
 		Expiration: uint64(time.Now().Add(10 * time.Second).Unix()),
 	})
 
-	p := <-c1.PacketCh()
+	p := <-r1.packetCh
 
 	if err := r1.HandlePacket(p); err != nil {
 		t.Fatal(err)
 	}
 
-	p = <-c0.PacketCh()
+	p = <-r0.packetCh
 
 	_, sigdata, _, err := decodePacket(p.Buf)
 	if err != nil {
@@ -148,20 +156,22 @@ func TestPingPong(t *testing.T) {
 	}
 }
 
-func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c1 *udpTransport) {
+func testProbeNode(t *testing.T, r0 *Discover, r1 *Discover) {
 	// --- 0 probe starts ---
+	// r0.Schedule()
+	// r1.Schedule()
 
 	// 0. send ping packet
 	go r0.probeNode(r1.local)
 
 	// 1. receive ping packet (send pong packet)
-	p := <-c1.PacketCh()
+	p := <-r1.packetCh
 	if err := r1.HandlePacket(p); err != nil {
 		t.Fatal(err)
 	}
 
 	// 0. receive pong packet (finish 0. probe)
-	p = <-c0.PacketCh()
+	p = <-r0.packetCh
 	if err := r0.HandlePacket(p); err != nil {
 		t.Fatal(err)
 	}
@@ -171,10 +181,10 @@ func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c
 
 	peers := r0.GetPeers()
 	if len(peers) != 1 {
-		t.Fatal("bad")
+		t.Fatalf("Expected one peer but found %d", len(peers))
 	}
 
-	if !reflect.DeepEqual(peers[0].UDPAddr, c1.udpAddr) {
+	if !reflect.DeepEqual(peers[0].UDPAddr, r1.addr) {
 		t.Fatal("address of probe node is not the same")
 	}
 	if peers[0].Last.String() != p.Timestamp.String() {
@@ -184,34 +194,34 @@ func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c
 	// --- 1 probe starts ---
 
 	// 0. receive ping packet
-	p = <-c0.PacketCh()
+	p = <-r0.packetCh
 
 	peer, err := decodePeerFromPacket(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if peer.addr() != r1.local.addr() {
-		t.Fatal("bad")
+		t.Fatalf("address mismatch: expected %s but found %s", r1.local.addr(), peer.addr())
 	}
 	if r0.hasExpired(peer) == true {
 		t.Fatal("peer should not have expired")
 	}
 
 	if err := r0.HandlePacket(p); err != nil {
-		t.Fatal("bad")
+		t.Fatal(err)
 	}
 
 	// the timestamp of the peer should be updated
 	peer1, ok := r0.getPeer(peer.ID)
 	if !ok {
-		t.Fatal("bad")
+		t.Fatalf("peer %s not found after probe", peer.ID)
 	}
 	if peer1.Last.String() != p.Timestamp.String() {
 		t.Fatal("timestamp of the peer has not been updated")
 	}
 
 	// 1.receive pong packet
-	p = <-c1.PacketCh()
+	p = <-r1.packetCh
 	if err := r1.HandlePacket(p); err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +234,7 @@ func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c
 	// the timestamp of the peer should be updated
 	peer1, ok = r1.getPeer(peer.ID)
 	if !ok {
-		t.Fatal("bad")
+		t.Fatalf("peer %s not found after probe", peer.ID)
 	}
 	if peer1.Last.String() != p.Timestamp.String() {
 		t.Fatal("timestamp of the peer has not been updated")
@@ -232,17 +242,18 @@ func testProbeNode(t *testing.T, r0 *Discover, c0 *udpTransport, r1 *Discover, c
 }
 
 func TestProbeNode(t *testing.T) {
-	r0, c0, r1, c1 := pipe(DefaultConfig())
-	testProbeNode(t, r0, c0, r1, c1)
+	r0, r1 := pipe(DefaultConfig(), true)
+	testProbeNode(t, r0, r1)
 }
 
 func TestFindNodeWithUnavailableNode(t *testing.T) {
 	config := DefaultConfig()
 	config.RespTimeout = 5 * time.Second
 
-	r0, c0, r1, c1 := pipe(config)
+	r0, r1 := pipe(config, true)
 
-	testProbeNode(t, r0, c0, r1, c1)
+	testProbeNode(t, r0, r1)
+	r0.packetCh, r1.packetCh = nil, nil
 
 	r0.Schedule()
 	r1.Close()
@@ -256,7 +267,7 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 	}
 }
 
-func TestFindNode(t *testing.T) {
+func TestFindNodeX(t *testing.T) {
 	config := DefaultConfig()
 	config.RespTimeout = 2 * time.Second
 
@@ -264,11 +275,10 @@ func TestFindNode(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run("", func(t *testing.T) {
-			r0, c0, r1, c1 := pipe(config)
-			testProbeNode(t, r0, c0, r1, c1)
+			r0, r1 := pipe(config, true)
 
-			r0.Schedule()
-			r1.Schedule()
+			testProbeNode(t, r0, r1)
+			r0.packetCh, r1.packetCh = nil, nil
 
 			// r1. populate the buckets
 			for i := 0; i < cc; i++ {
@@ -285,12 +295,10 @@ func TestFindNode(t *testing.T) {
 				r1.updatePeer(p)
 			}
 
-			// r0. find node request
 			nodes, err := r0.findNodes(r1.local, r0.local.Bytes)
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			expected, err := r1.NearestPeersFromTarget(r0.local.Bytes)
 			if err != nil {
 				t.Fatal(err)
@@ -301,132 +309,9 @@ func TestFindNode(t *testing.T) {
 			}
 			for indx := range expected {
 				if !reflect.DeepEqual(expected[indx].ID, nodes[indx].ID) {
-					t.Fatal("id not equal")
+					t.Fatalf("id not equal")
 				}
 			}
-
-			// r0. all the expected nodes without a timestamp
-			for _, n := range nodes {
-				if n.ID == r1.local.ID { // this one has a timestamp from the probe
-					continue
-				}
-				p, ok := r0.getPeer(n.ID)
-				if !ok {
-					t.Fatal("peer not found")
-				}
-				if p.Last != nil {
-					t.Fatal("timestamp is set")
-				}
-			}
-
-			// close()
 		})
 	}
-}
-
-const (
-	udpPacketBufSize = 65536
-	udpRecvBufSize   = 2 * 1024 * 1024
-)
-
-// udpTransport outside the transport code to test the discover protocol
-type udpTransport struct {
-	packetCh    chan *Packet
-	udpListener *net.UDPConn
-	udpAddr     *net.UDPAddr
-}
-
-func random(min, max int) int {
-	rand.Seed(time.Now().Unix())
-	return rand.Intn(max-min) + min
-}
-
-func newUDPTransport() *udpTransport {
-	ip := net.ParseIP("127.0.0.1")
-
-	var udpLn *net.UDPConn
-	var udpAddr *net.UDPAddr
-	var err error
-
-	port := -1
-	for {
-		if port == -1 {
-			port = random(10000, 60000)
-		}
-
-		udpAddr = &net.UDPAddr{IP: ip, Port: port}
-		udpLn, err = net.ListenUDP("udp", udpAddr)
-
-		if err != nil {
-			port = -1
-		} else {
-			break
-		}
-	}
-
-	if err := setUDPRecvBuf(udpLn); err != nil {
-		panic(err)
-	}
-
-	t := &udpTransport{
-		packetCh:    make(chan *Packet),
-		udpListener: udpLn,
-		udpAddr:     udpAddr,
-	}
-
-	go t.udpListen()
-	return t
-}
-
-func setUDPRecvBuf(c *net.UDPConn) error {
-	size := udpRecvBufSize
-	var err error
-	for size > 0 {
-		if err = c.SetReadBuffer(size); err == nil {
-			return nil
-		}
-		size = size / 2
-	}
-	return err
-}
-
-func (t *udpTransport) close() {
-	if err := t.udpListener.Close(); err != nil {
-		panic(err)
-	}
-}
-
-func (t *udpTransport) udpListen() {
-	for {
-		buf := make([]byte, udpPacketBufSize)
-		n, addr, err := t.udpListener.ReadFrom(buf)
-		ts := time.Now()
-		if err != nil {
-			panic(err)
-		}
-
-		if n < 1 {
-			panic("")
-		}
-
-		t.packetCh <- &Packet{
-			Buf:       buf[:n],
-			From:      addr,
-			Timestamp: ts,
-		}
-	}
-}
-
-func (t *udpTransport) PacketCh() <-chan *Packet {
-	return t.packetCh
-}
-
-func (t *udpTransport) WriteTo(b []byte, addr string) (time.Time, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	_, err = t.udpListener.WriteTo(b, udpAddr)
-	return time.Now(), err
 }
