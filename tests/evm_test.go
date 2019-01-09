@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -14,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/evm"
+	"github.com/umbracle/minimal/state/evm"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -45,9 +44,6 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env := c.Env.ToEnv(t)
 	env.GasPrice = c.Exec.GasPrice
 
-	fmt.Println("-------------------------------------")
-	fmt.Println(name)
-
 	initialCall := true
 	canTransfer := func(state *state.StateDB, address common.Address, amount *big.Int) bool {
 		if initialCall {
@@ -67,12 +63,8 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 
-	fmt.Printf("BlockNumber: %s\n", c.Env.Number)
-	fmt.Println(c.Exec.Code)
-
 	ret, gas, err := e.Call(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
 
-	fmt.Println(name)
 	if c.Gas == "" {
 		if err == nil {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")

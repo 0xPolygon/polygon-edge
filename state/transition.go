@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/evm"
+	"github.com/umbracle/minimal/state/evm"
 )
 
 var (

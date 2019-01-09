@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/umbracle/minimal/evm"
+	"github.com/umbracle/minimal/state/evm"
 )
 
 // TESTS is the default location of the tests folder
