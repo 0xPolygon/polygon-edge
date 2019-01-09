@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/chain"
+	newState "github.com/umbracle/minimal/state/state"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -58,9 +59,9 @@ type Env struct {
 	GasPrice   *big.Int
 }
 
-type CanTransferFunc func(*state.StateDB, common.Address, *big.Int) bool
+type CanTransferFunc func(newState.State, common.Address, *big.Int) bool
 
-type TransferFunc func(state *state.StateDB, from common.Address, to common.Address, amount *big.Int) error
+type TransferFunc func(state newState.State, from common.Address, to common.Address, amount *big.Int) error
 
 // Contract is each value from the caller stack
 type Contract struct {
@@ -207,7 +208,7 @@ type EVM struct {
 	config   chain.ForksInTime
 	gasTable chain.GasTable
 
-	state *state.StateDB
+	state newState.State
 	env   *Env
 
 	getHash     GetHashByNumber
@@ -1962,11 +1963,11 @@ func (e *EVM) popContract() *Contract {
 	return e.contracts[e.contractsIndex]
 }
 
-func CanTransfer(state *state.StateDB, from common.Address, amount *big.Int) bool {
+func CanTransfer(state newState.State, from common.Address, amount *big.Int) bool {
 	return state.GetBalance(from).Cmp(amount) >= 0
 }
 
-func Transfer(state *state.StateDB, from common.Address, to common.Address, amount *big.Int) error {
+func Transfer(state newState.State, from common.Address, to common.Address, amount *big.Int) error {
 	if balance := state.GetBalance(from); balance.Cmp(amount) < 0 {
 		return ErrNotEnoughFunds
 	}

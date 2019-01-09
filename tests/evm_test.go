@@ -11,9 +11,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/state/evm"
+	newState "github.com/umbracle/minimal/state/state"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -45,7 +45,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env.GasPrice = c.Exec.GasPrice
 
 	initialCall := true
-	canTransfer := func(state *state.StateDB, address common.Address, amount *big.Int) bool {
+	canTransfer := func(state newState.State, address common.Address, amount *big.Int) bool {
 		if initialCall {
 			initialCall = false
 			return true
@@ -53,7 +53,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return evm.CanTransfer(state, address, amount)
 	}
 
-	transfer := func(state *state.StateDB, from, to common.Address, amount *big.Int) error {
+	transfer := func(state newState.State, from, to common.Address, amount *big.Int) error {
 		return nil
 	}
 
