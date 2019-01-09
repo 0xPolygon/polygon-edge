@@ -384,12 +384,15 @@ func (d *Discover) loadBootnodes() {
 
 	// start the initial lookup
 	d.active = true
+
+	d.logger.Printf("Finished probing bootnodes")
 	d.Lookup()
 }
 
 // Close closes the discover
 func (d *Discover) Close() error {
 	close(d.shutdownCh)
+	atomic.StoreInt32(&d.shutdown, 1)
 	return d.listener.Close()
 }
 

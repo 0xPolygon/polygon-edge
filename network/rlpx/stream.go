@@ -62,6 +62,10 @@ func (s *Stream) deliver(msg *Message) {
 	}
 }
 
+func (s *Stream) RemoteAddr() string {
+	return s.conn.RemoteAddr()
+}
+
 func (s *Stream) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
 	callback := func(payload io.Reader) {
 		select {

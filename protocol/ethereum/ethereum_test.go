@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/umbracle/minimal/network/rlpx"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -27,13 +29,13 @@ func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, b0 *blockch
 	}
 
 	var eth0 *Ethereum
-	c0 := func(s network.Conn, p *network.Peer) protocol.Handler {
+	c0 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
 		eth0 = NewEthereumProtocol(s, p, st0, b0)
 		return eth0
 	}
 
 	var eth1 *Ethereum
-	c1 := func(s network.Conn, p *network.Peer) protocol.Handler {
+	c1 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
 		eth1 = NewEthereumProtocol(s, p, st1, b1)
 		return eth1
 	}
@@ -41,7 +43,16 @@ func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, b0 *blockch
 	s0.RegisterProtocol(protocol.ETH63, c0)
 	s1.RegisterProtocol(protocol.ETH63, c1)
 
-	s0.Dial(s1.Enode)
+	if err := s0.Schedule(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s1.Schedule(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s0.DialSync(s1.Enode); err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(500 * time.Millisecond)
 	return eth0, eth1
@@ -97,7 +108,7 @@ func TestHandshake(t *testing.T) {
 	}
 
 	for _, cc := range cases {
-		s0, s1 := network.TestServers()
+		s0, s1 := network.TestServers(network.DefaultConfig())
 		eth0, eth1 := testEthHandshake(t, s0, cc.Status0, nil, s1, cc.Status1, nil)
 
 		// Both handshake fail
@@ -111,10 +122,10 @@ func TestHandshake(t *testing.T) {
 
 		// If it worked, check if the status message we get is the good one
 		if cc.Expected {
-			if !reflect.DeepEqual(eth0.status, cc.Status1) {
+			if !reflect.DeepEqual(eth0.remoteStatus, cc.Status1) {
 				t.Fatal("bad")
 			}
-			if !reflect.DeepEqual(eth1.status, cc.Status0) {
+			if !reflect.DeepEqual(eth1.remoteStatus, cc.Status0) {
 				t.Fatal("bad")
 			}
 		}
@@ -123,7 +134,7 @@ func TestHandshake(t *testing.T) {
 
 func TestHandshakeMsgPostHandshake(t *testing.T) {
 	// After the handshake we dont accept more handshake messages
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	eth0, _ := testEthHandshake(t, s0, &status, nil, s1, &status, nil)
 
 	if err := eth0.conn.WriteMsg(StatusMsg); err != nil {
@@ -134,13 +145,13 @@ func TestHandshakeMsgPostHandshake(t *testing.T) {
 
 	// Check if they are still connected
 	p0 := s0.GetPeer(s1.ID().String())
-	if p0.Connected == true {
-		t.Fatal("should be disconnected")
+	if !p0.IsClosed() {
+		t.Fatal("p0 should be disconnected")
 	}
 
 	p1 := s1.GetPeer(s0.ID().String())
-	if p1.Connected == true {
-		t.Fatal("should be disconnected")
+	if !p1.IsClosed() {
+		t.Fatal("p1 should be disconnected")
 	}
 }
 
@@ -158,7 +169,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 	b0 := blockchain.NewTestBlockchain(t, headers)
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	var cases = []struct {
@@ -193,7 +204,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 
 	for _, cc := range cases {
 		t.Run("", func(tt *testing.T) {
-			ack := make(chan network.AckMessage, 1)
+			ack := make(chan rlpx.AckMessage, 1)
 			eth0.Conn().SetHandler(BlockHeadersMsg, ack, 5*time.Second)
 
 			var err error
@@ -239,7 +250,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	b0 := blockchain.NewTestBlockchain(t, headers)
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	batch := []common.Hash{
@@ -250,7 +261,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// bodies
 
-	ack := make(chan network.AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	eth0.Conn().SetHandler(BlockBodiesMsg, ack, 5*time.Second)
 
 	if err := eth0.RequestBodies(batch); err != nil {
@@ -266,7 +277,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// receipts
 
-	ack = make(chan network.AckMessage, 1)
+	ack = make(chan rlpx.AckMessage, 1)
 	eth0.Conn().SetHandler(ReceiptsMsg, ack, 5*time.Second)
 
 	if err := eth0.RequestReceipts(batch); err != nil {
@@ -287,7 +298,7 @@ func TestEthereumBody(t *testing.T) {
 	headers, blocks, receipts := blockchain.NewTestBodyChain(3) // only s1 needs to have bodies and receipts
 	b1 := blockchain.NewTestBlockchainWithBlocks(t, blocks, receipts)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	eth0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	// NOTE, we use tx to check if the response is correct, genesis does not
@@ -301,7 +312,7 @@ func TestEthereumBody(t *testing.T) {
 
 	// -- bodies --
 
-	ack := make(chan network.AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	eth0.Conn().SetHandler(BlockBodiesMsg, ack, 5*time.Second)
 
 	if err := eth0.RequestBodies(msg); err != nil {
@@ -327,7 +338,7 @@ func TestEthereumBody(t *testing.T) {
 
 	// -- receipts --
 
-	ack = make(chan network.AckMessage, 1)
+	ack = make(chan rlpx.AckMessage, 1)
 	eth0.Conn().SetHandler(ReceiptsMsg, ack, 5*time.Second)
 
 	if err := eth0.RequestReceipts(msg); err != nil {
@@ -362,7 +373,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	cases := []uint64{10}
@@ -403,7 +414,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	if _, err := p0.RequestHeadersSync(1100, 100); err == nil {
@@ -427,7 +438,7 @@ func TestPeerCloseConnection(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
 
 	if _, err := p0.RequestHeadersSync(0, 100); err != nil {

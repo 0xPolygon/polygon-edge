@@ -1,7 +1,6 @@
 package rlpx
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -104,31 +103,9 @@ func TestStreamMessages(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println(x)
-}
-
-func TestStreamMessagesWrongStream(t *testing.T) {
-	c0, c1 := pipe(t)
-	defer c0.Close()
-	defer c1.Close()
-
-	s0 := c0.OpenStream(5, 10)
-	s1 := c1.OpenStream(5, 10)
-
-	go func() {
-		if err := s0.WriteMsg(0x1); err != nil {
-			panic(err)
-		}
-	}()
-
-	x, err := s1.ReadMsg()
-	if err != nil {
-		panic(err)
+	if x.Code != 0x1 {
+		t.Fatal("bad")
 	}
-
-	fmt.Println("-- code --")
-	fmt.Println(x.Code)
 }
 
 func TestSessionMultipleStreams(t *testing.T) {

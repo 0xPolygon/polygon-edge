@@ -23,6 +23,29 @@ import (
 )
 
 const (
+	defaultPongTimeout  = 10 * time.Second
+	defaultPingInterval = 5 * time.Second
+)
+
+// A Config structure is used to configure an Rlpx session.
+type Config struct {
+	Prv  *ecdsa.PrivateKey
+	Pub  *ecdsa.PublicKey
+	Info *Info
+}
+
+var (
+	ErrStreamClosed = fmt.Errorf("session closed")
+)
+
+type sessionState int
+
+const (
+	sessionEstablished sessionState = iota
+	sessionClosed
+)
+
+const (
 	// default ping interval for the rlpx protocol
 	pingInterval = 15 * time.Second
 )
@@ -36,6 +59,7 @@ type AckMessage struct {
 
 // Conn is the network Session
 type Conn interface {
+	RemoteAddr() string
 	WriteMsg(uint64, ...interface{}) error
 	ReadMsg() (Message, error)
 	SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration)
@@ -77,9 +101,10 @@ type Session struct {
 	id   string
 	conn net.Conn
 
+	config  *Config
 	streams []*Stream
 
-	localInfo  *Info
+	Info       *Info
 	remoteInfo *Info
 
 	isClient bool
@@ -110,10 +135,10 @@ type Session struct {
 
 	// ping/pong
 	pongTimeout *time.Timer
-}
 
-func NewSession(conn net.Conn, s Secrets) (*Session, error) {
-	return newSession(conn, s)
+	// state
+	state     sessionState
+	stateLock sync.Mutex
 }
 
 func (s *Session) p2pHandshake() error {
@@ -155,13 +180,22 @@ func (s *Session) p2pHandshake() error {
 	s.shutdownCh = make(chan struct{})
 	s.shutdownLock = sync.Mutex{}
 
-	s.pongTimeout = time.NewTimer(10 * time.Second)
+	// Set default values
+
+	s.pongTimeout = time.NewTimer(defaultPongTimeout)
+
+	s.stateLock = sync.Mutex{}
+	s.state = sessionEstablished
 
 	return nil
 }
 
+func (s *Session) RemoteIDString() string {
+	return s.id
+}
+
 func (s *Session) protocolHandshake() error {
-	info, err := StartProtocolHandshake(s, s.localInfo)
+	info, err := doDevP2PHandshake(s, s.Info)
 	if err != nil {
 		return err
 	}
@@ -205,14 +239,23 @@ func (s *Session) Disconnect(reason DiscReason) error {
 	if s.shutdownErr == nil {
 		s.shutdownErr = reason
 	}
-	if err := s.WriteMsg(discMsg, []DiscReason{reason}); err != nil {
-		return err
-	}
+
+	s.WriteMsg(discMsg, []DiscReason{reason})
+
+	s.stateLock.Lock()
+	s.state = sessionClosed
+	s.stateLock.Unlock()
 
 	s.shutdown = true
 	close(s.shutdownCh)
 	s.conn.Close()
 	return nil
+}
+
+// CloseChan returns a read-only channel which is closed as
+// soon as the session is closed.
+func (s *Session) CloseChan() <-chan struct{} {
+	return s.shutdownCh
 }
 
 // IsClosed does a safe check to see if we have shutdown
@@ -232,6 +275,7 @@ func (s *Session) recv() {
 }
 
 func (s *Session) recvLoop() error {
+	// fmt.Println("-- recv --")
 	for {
 		msg, err := s.ReadMsg()
 		if err != nil {
@@ -239,7 +283,7 @@ func (s *Session) recvLoop() error {
 		}
 
 		// Reset timeout
-		s.pongTimeout.Reset(2 * time.Second)
+		s.pongTimeout.Reset(defaultPongTimeout)
 
 		switch {
 		case msg.Code == pingMsg:
@@ -279,18 +323,24 @@ func (s *Session) exitErr(err error) {
 func (s *Session) keepalive() {
 	for {
 		select {
-		case <-time.After(pingInterval):
+		case <-time.After(defaultPingInterval):
 			if err := s.WriteMsg(pingMsg); err != nil {
 				s.exitErr(err)
 				return
 			}
+
 		case <-s.pongTimeout.C:
 			s.exitErr(DiscProtocolError)
 			return
+
 		case <-s.shutdownCh:
 			return
 		}
 	}
+}
+
+func (s *Session) RemoteAddr() string {
+	return s.conn.RemoteAddr().String()
 }
 
 func (s *Session) OpenStream(offset uint, length uint) *Stream {
@@ -306,38 +356,6 @@ func (s *Session) getStream(code uint64) *Stream {
 		}
 	}
 	return nil
-}
-
-// DEPRECATED
-func newSession(conn net.Conn, s Secrets) (*Session, error) {
-	macc, err := aes.NewCipher(s.MAC)
-	if err != nil {
-		return nil, err
-	}
-	encc, err := aes.NewCipher(s.AES)
-	if err != nil {
-		return nil, err
-	}
-
-	iv := make([]byte, encc.BlockSize())
-	c := &Session{
-		conn:       conn,
-		enc:        cipher.NewCTR(encc, iv),
-		dec:        cipher.NewCTR(encc, iv),
-		macCipher:  macc,
-		egressMAC:  s.EgressMAC,
-		ingressMAC: s.IngressMAC,
-		rmu:        &sync.Mutex{},
-		wmu:        &sync.Mutex{},
-		RemoteID:   s.RemoteID,
-		id:         discover.PubkeyToNodeID(s.RemoteID).String(),
-	}
-
-	return c, nil
-}
-
-func (s *Session) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
 }
 
 // ReadMsg from the Session
@@ -452,6 +470,14 @@ func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.D
 }
 
 func (s *Session) Write(msg Message) error {
+	// check if the connection is open
+	s.stateLock.Lock()
+	defer s.stateLock.Unlock()
+
+	if s.state == sessionClosed {
+		return ErrStreamClosed
+	}
+
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 

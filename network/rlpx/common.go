@@ -1,11 +1,9 @@
 package rlpx
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network/discover"
@@ -13,12 +11,10 @@ import (
 
 const (
 	BaseProtocolVersion    = 5
-	baseProtocolLength     = uint64(16)
+	BaseProtocolLength     = uint64(16)
 	baseProtocolMaxMsgSize = 2 * 1024
 
 	snappyProtocolVersion = 5
-
-	defaultPingInterval = 15 * time.Second
 )
 
 type DiscReason uint
@@ -77,13 +73,6 @@ func (d DiscReason) Error() string {
 	return d.String()
 }
 
-// DiscMsgTooManyPeers happens when there are too many peers connected
-type DiscMsgTooManyPeers struct{}
-
-func (d *DiscMsgTooManyPeers) Error() string {
-	return "too many peers"
-}
-
 func decodeDiscMsg(msg io.Reader) DiscReason {
 	var reason [1]DiscReason
 	if err := rlp.Decode(msg, &reason); err != nil {
@@ -138,8 +127,4 @@ type Info struct {
 
 	// Ignore additional fields (for forward compatibility).
 	Rest []rlp.RawValue `rlp:"tail"`
-}
-
-func mockInfo(prv *ecdsa.PrivateKey) *Info {
-	return dummyInfo("mock", &prv.PublicKey)
 }

@@ -123,14 +123,14 @@ var connCases = []req{
 }
 
 func TestNonSnappyConn(t *testing.T) {
-	c0, c1 := TestP2PHandshake(t)
+	c0, c1 := testP2PHandshake(t)
 	if err := testConn(c0, c1, connCases); err != nil {
 		t.Fatal(err.Error())
 	}
 }
 
 func TestSnappyConn(t *testing.T) {
-	c0, c1 := TestP2PHandshake(t)
+	c0, c1 := testP2PHandshake(t)
 
 	c0.Snappy = true
 	c1.Snappy = true
@@ -141,7 +141,7 @@ func TestSnappyConn(t *testing.T) {
 }
 
 func TestOnlyOneSnappyConn(t *testing.T) {
-	c0, c1 := TestP2PHandshake(t)
+	c0, c1 := testP2PHandshake(t)
 	c0.Snappy = true
 
 	if err := testConn(c0, c1, connCases); err == nil {
@@ -188,20 +188,62 @@ func TestPeerDisconnect(t *testing.T) {
 	}
 }
 
-func TestDisconnectMsg(t *testing.T) {
-	p0, p1 := pipe(t)
+func TestSessionDisconnect(t *testing.T) {
+	c0, c1 := pipe(t)
+	defer c1.Close()
 
-	go p0.Disconnect(DiscTooManyPeers)
+	ch := c1.CloseChan()
+	if err := c0.Disconnect(DiscTooManyPeers); err != nil {
+		t.Fatalf("Failed to send disconnect message: %v", err)
+	}
 
-	msg, err := p1.ReadMsg()
-	if err != nil {
-		t.Fatal(err)
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("failed")
 	}
-	if msg.Code != discMsg {
-		t.Fatalf("expected discMsg %d but found %d", discMsg, msg.Code)
+	if c1.shutdownErr != DiscTooManyPeers {
+		t.Fatalf("Shutdown error should be DiscTooManyPeers but found %v", c1.shutdownErr)
 	}
-	reason := decodeDiscMsg(msg.Payload)
-	if reason != DiscTooManyPeers {
-		t.Fatalf("Reasons should be %d, instead %d found", DiscTooManyPeers, reason)
+}
+
+func TestSessionClose(t *testing.T) {
+	c0, c1 := pipe(t)
+	defer c1.Close()
+
+	ch := c1.CloseChan()
+	time.Sleep(100 * time.Millisecond)
+
+	if err := c0.Close(); err != nil {
+		t.Fatalf("Failed to send disconnect message: %v", err)
 	}
+
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("failed")
+	}
+	if c1.shutdownErr != DiscQuitting {
+		t.Fatalf("Shutdown error should be DiscQuitting but found %v", c1.shutdownErr)
+	}
+}
+
+func TestSessionWriteClosedConnection(t *testing.T) {
+	c0, c1 := pipe(t)
+	defer c1.Close()
+
+	if err := c0.Close(); err != nil {
+		t.Fatalf("Failed to send disconnect message: %v", err)
+	}
+
+	c1.CloseChan() // wait till is closed
+	time.Sleep(100 * time.Millisecond)
+
+	if err := c1.WriteMsg(0x10); err != ErrStreamClosed {
+		t.Fatalf("It should be ErrStreamClosed but found %v", err)
+	}
+}
+
+func TestSessionPingPong(t *testing.T) {
+	t.Skip()
 }

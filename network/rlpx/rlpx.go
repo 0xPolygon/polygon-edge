@@ -8,21 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
-// A Config structure is used to configure a Rlpx server.
-type Config struct {
-	Prv  *ecdsa.PrivateKey
-	Pub  *ecdsa.PublicKey
-	Info *Info
-}
-
 // Server returns a new Rlpx server side Session
 func Server(conn net.Conn, prv *ecdsa.PrivateKey, info *Info) *Session {
-	return &Session{conn: conn, prv: prv, localInfo: info}
+	return &Session{conn: conn, prv: prv, Info: info}
 }
 
 // Client returns a new Rlpx client side Session
 func Client(conn net.Conn, prv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, info *Info) *Session {
-	return &Session{conn: conn, prv: prv, pub: pub, localInfo: info, isClient: true}
+	return &Session{conn: conn, prv: prv, pub: pub, Info: info, isClient: true}
 }
 
 // Listener implements a network listener for Rlpx sessions.
@@ -99,5 +92,5 @@ func DialEnode(network, addr string, config *Config) (*Session, error) {
 		return nil, err
 	}
 	tcpAddr := net.TCPAddr{IP: enode.IP, Port: int(enode.TCP)}
-	return DialWithDialer(new(net.Dialer), network, tcpAddr.String(), &Config{Pub: pub, Prv: config.Prv})
+	return DialWithDialer(new(net.Dialer), network, tcpAddr.String(), &Config{Pub: pub, Prv: config.Prv, Info: config.Info})
 }

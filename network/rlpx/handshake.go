@@ -503,16 +503,19 @@ func (h *handshakeState) makeAuthResp() (msg *authRespV4, err error) {
 
 // -- PROTOCOL HANDSHAKE --
 
-func StartProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
+func doDevP2PHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	errr := make(chan error, 2)
 	var peerInfo *Info
+
+	// fmt.Println("-- node info --")
+	// fmt.Println(nodeInfo)
 
 	go func() {
 		errr <- conn.WriteMsg(handshakeMsg, nodeInfo)
 	}()
 
 	go func() {
-		info, err := readProtocolHandshake(conn)
+		info, err := readDevP2PHandshake(conn)
 		peerInfo = info
 		errr <- err
 	}()
@@ -531,11 +534,10 @@ func StartProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	if peerInfo.Version >= snappyProtocolVersion {
 		conn.Snappy = true
 	}
-
 	return peerInfo, nil
 }
 
-func readProtocolHandshake(conn *Session) (*Info, error) {
+func readDevP2PHandshake(conn *Session) (*Info, error) {
 	msg, err := conn.ReadMsg()
 	if err != nil {
 		return nil, err
@@ -560,6 +562,10 @@ func readProtocolHandshake(conn *Session) (*Info, error) {
 		return nil, DiscInvalidIdentity
 	}
 	if !reflect.DeepEqual(discover.PubkeyToNodeID(conn.RemoteID), info.ID) {
+
+		fmt.Println(conn.RemoteID)
+		fmt.Println(info.ID)
+
 		return nil, fmt.Errorf("Node ID does not match")
 	}
 

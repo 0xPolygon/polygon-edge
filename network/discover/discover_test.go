@@ -267,7 +267,7 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 	}
 }
 
-func TestFindNodeX(t *testing.T) {
+func TestFindNode(t *testing.T) {
 	config := DefaultConfig()
 	config.RespTimeout = 2 * time.Second
 
