@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/chain"
@@ -221,7 +220,7 @@ type EVM struct {
 }
 
 // NewEVM creates a new EVM
-func NewEVM(state *state.StateDB, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
+func NewEVM(state newState.State, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
 	return &EVM{
 		contracts:      make([]*Contract, MaxContracts),
 		config:         config,

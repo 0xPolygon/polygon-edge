@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/umbracle/minimal/state/evm"
+	newState "github.com/umbracle/minimal/state/state"
 )
 
 // TESTS is the default location of the tests folder
@@ -200,7 +201,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, pre stateSnapshop) *state.StateDB {
+func buildState(t *testing.T, pre stateSnapshop) newState.State {
 	db := state.NewDatabase(ethdb.NewMemDatabase())
 	statedb, err := state.New(common.Hash{}, db)
 	if err != nil {

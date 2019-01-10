@@ -7,11 +7,11 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state/evm"
+	newState "github.com/umbracle/minimal/state/state"
 )
 
 var (
@@ -53,7 +53,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 
 // Based on geth state_transition.go
 type Transition struct {
-	State      *state.StateDB
+	State      newState.State
 	Env        *evm.Env
 	GasTable   chain.GasTable
 	Config     chain.ForksInTime

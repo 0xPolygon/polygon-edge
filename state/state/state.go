@@ -22,6 +22,7 @@ type State interface {
 
 	// Logs
 	AddLog(log *types.Log)
+	Logs() []*types.Log
 
 	// State
 	SetState(addr common.Address, key, value common.Hash)
@@ -44,10 +45,20 @@ type State interface {
 	// Refund
 	AddRefund(gas uint64)
 	SubRefund(gas uint64)
+	GetRefund() uint64
 	GetCommittedState(addr common.Address, hash common.Hash) common.Hash
 
 	// Others
 	Exist(addr common.Address) bool
 	Empty(addr common.Address) bool
 	CreateAccount(addr common.Address)
+	IntermediateRoot(bool) common.Hash // It will be removed later
+}
+
+// Account is the account reference in the ethereum state
+type Account struct {
+	Nonce    uint64
+	Balance  *big.Int
+	Root     common.Hash
+	CodeHash []byte
 }
