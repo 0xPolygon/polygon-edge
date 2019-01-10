@@ -201,6 +201,32 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+func buildNewState(t *testing.T, pre stateSnapshop) newState.State {
+	statedb := newState.NewStateDB(newState.NewMemoryTrie())
+	// txn := statedb.Txn()
+
+	for i, a := range pre {
+		addr := stringToAddressT(t, i)
+
+		statedb.CreateAccount(addr)
+		if a.Code != "" {
+			// fmt.Printf("CODE: %s %s\n", addr.String(), a.Code)
+
+			statedb.SetCode(addr, stringToBytesT(t, a.Code))
+		}
+		statedb.SetNonce(addr, stringToUint64T(t, a.Nonce))
+		statedb.SetBalance(addr, stringToBigIntT(t, a.Balance))
+
+		for k, v := range a.Storage {
+			statedb.SetState(addr, common.HexToHash(k), common.HexToHash(v))
+		}
+	}
+
+	// fmt.Println(statedb.GetAccount(common.HexToAddress("0x0f572e5295c57F15886F9b263E2f6d2d6c7b5ec6")))
+
+	return statedb
+}
+
 func buildState(t *testing.T, pre stateSnapshop) newState.State {
 	db := state.NewDatabase(ethdb.NewMemDatabase())
 	statedb, err := state.New(common.Hash{}, db)

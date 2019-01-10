@@ -57,7 +57,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return nil
 	}
 
-	state := buildState(t, c.Pre)
+	state := buildNewState(t, c.Pre)
 
 	e := evm.NewEVM(state, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
