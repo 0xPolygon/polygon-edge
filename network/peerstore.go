@@ -56,7 +56,6 @@ func (p *PeerStore) Save() error {
 	if err != nil {
 		return err
 	}
-
 	if err := ioutil.WriteFile(p.path, data, 0644); err != nil {
 		return err
 	}

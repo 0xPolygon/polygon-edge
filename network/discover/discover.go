@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"strconv"
@@ -29,9 +30,11 @@ import (
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
-// NOTE: ProbeTasks could be lowered even more, I think it will suffice with only one or two
-// because it does not matter how fast discover can find nodes if dialing in server takes a couple
-// of seconds.
+const (
+	// udpPacketBufSize is used to buffer incoming packets during read
+	// operations.
+	udpPacketBufSize = 1280
+)
 
 const (
 	nodeIDBytes               = 512 / 8
@@ -39,12 +42,15 @@ const (
 	defaultBondExpiration     = 24 * time.Hour
 	defaultRespTimeout        = 10 * time.Second
 	defaultRevalidateInterval = 10 * time.Second
+	defaultNumTasks           = 4
 	maxNeighbors              = 6
 	alpha                     = 3
 )
 
 // Config is the discover configuration
 type Config struct {
+	BindAddr           string
+	BindPort           int
 	BucketSize         int
 	BondExpiration     time.Duration
 	RespTimeout        time.Duration
@@ -61,7 +67,9 @@ func DefaultConfig() *Config {
 		RespTimeout:        defaultRespTimeout,
 		RevalidateInterval: defaultRevalidateInterval,
 		LookupInterval:     1 * time.Minute,
-		NumProbeTasks:      4,
+		NumProbeTasks:      2,
+		BindAddr:           "127.0.0.1",
+		BindPort:           30303,
 	}
 	return c
 }
@@ -205,26 +213,12 @@ type rpcEndpoint struct {
 	TCP uint16 // for RLPx protocol
 }
 
-// Packet is used to provide some metadata about incoming packets from peers
-// over a packet connection, as well as the packet payload.
-type Packet struct {
-	Buf       []byte
-	From      net.Addr
-	Timestamp time.Time
-	Release   func() // release frees the buffer
-}
-
-// Transport is the UDP transport to send packets
-type Transport interface {
-	WriteTo([]byte, string) (time.Time, error)
-	PacketCh() <-chan *Packet
-}
-
 // Discover is the p2p discover protocol
 type Discover struct {
-	ID         *ecdsa.PrivateKey
-	config     *Config
-	transport  Transport
+	logger *log.Logger
+	ID     *ecdsa.PrivateKey
+	config *Config
+	// transport  *transport
 	timer      *time.Timer
 	handlers   map[string]func(payload []byte, timestamp *time.Time)
 	respLock   sync.Mutex
@@ -233,15 +227,28 @@ type Discover struct {
 	nodes      map[peer.ID]*Peer
 	local      *Peer
 	shutdownCh chan bool
+	shutdown   int32
 	active     bool // set to true when the bootnodes are loaded
 	EventCh    chan string
 	bootnodes  []string
 	tasks      chan *Peer
 	inlookup   int32
+	addr       *net.UDPAddr
+	listener   *net.UDPConn
+	pool       sync.Pool
+	packetCh   chan *Packet
+}
+
+// Packet is used to provide some metadata about incoming packets from peers
+type Packet struct {
+	Buf       []byte
+	From      net.Addr
+	Timestamp time.Time
 }
 
 // NewDiscover creates a new routing table
-func NewDiscover(key *ecdsa.PrivateKey, transport Transport, addr *net.UDPAddr, config *Config) (*Discover, error) {
+func NewDiscover(logger *log.Logger, key *ecdsa.PrivateKey, config *Config) (*Discover, error) {
+	addr := &net.UDPAddr{IP: net.ParseIP(config.BindAddr), Port: config.BindPort}
 
 	pub := &key.PublicKey
 	id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
@@ -251,10 +258,17 @@ func NewDiscover(key *ecdsa.PrivateKey, transport Transport, addr *net.UDPAddr, 
 		return nil, err
 	}
 
+	l, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to start UDP listener on %q: %v", addr.String(), err)
+	}
+
 	r := &Discover{
+		logger:     logger,
 		ID:         key,
 		config:     config,
-		transport:  transport,
+		addr:       addr,
+		listener:   l,
 		handlers:   map[string]func(payload []byte, timestamp *time.Time){},
 		respLock:   sync.Mutex{},
 		validLock:  sync.Mutex{},
@@ -268,7 +282,59 @@ func NewDiscover(key *ecdsa.PrivateKey, transport Transport, addr *net.UDPAddr, 
 		inlookup:   0,
 	}
 
+	r.pool = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, udpPacketBufSize)
+		},
+	}
+
+	go r.listen()
+
+	// Start probe tasks
+	for i := 0; i < config.NumProbeTasks; i++ {
+		go r.probeTask(strconv.Itoa(i))
+	}
+
 	return r, nil
+}
+
+func (d *Discover) listen() {
+	for {
+		vbuf := d.pool.Get()
+		buf := vbuf.([]byte)
+
+		n, addr, err := d.listener.ReadFrom(buf)
+		ts := time.Now()
+		if err != nil {
+			if s := atomic.LoadInt32(&d.shutdown); s == 1 {
+				break
+			}
+			d.logger.Printf("Error reading UDP packet: %v", err)
+			continue
+		}
+
+		// Check the length - it needs to have at least one byte
+		if n < 1 {
+			d.logger.Printf("UDP packet too short (%d bytes) %s", len(buf), addr)
+			continue
+		}
+
+		packet := &Packet{
+			Buf:       buf[:n],
+			From:      addr,
+			Timestamp: ts,
+		}
+		go func() {
+			if d.packetCh != nil {
+				d.packetCh <- packet
+			} else {
+				if err := d.HandlePacket(packet); err != nil {
+					d.logger.Printf(err.Error())
+				}
+				d.pool.Put(vbuf)
+			}
+		}()
+	}
 }
 
 // SetBootnodes set the bootnodes for discovering
@@ -284,13 +350,10 @@ func (d *Discover) sendTask(peer *Peer) {
 }
 
 func (d *Discover) probeTask(id string) {
-	fmt.Printf("### Start probe task: %s\n", id)
-
 	for {
 		select {
 		case task := <-d.tasks:
 			d.probeNode(task)
-			// fmt.Printf("TASK (%s) Probe node: %s: %v\n", id, task.Enode(), res)
 
 		case <-d.shutdownCh:
 			return
@@ -300,12 +363,6 @@ func (d *Discover) probeTask(id string) {
 
 // Schedule starts the discovery protocol
 func (d *Discover) Schedule() {
-	fmt.Println("## start scheduling ##")
-
-	for i := 0; i < d.config.NumProbeTasks; i++ {
-		go d.probeTask(strconv.Itoa(i))
-	}
-
 	go d.schedule()
 	go d.loadBootnodes()
 }
@@ -325,17 +382,18 @@ func (d *Discover) loadBootnodes() {
 		<-errr
 	}
 
-	fmt.Println("Bootnodes loaded")
-	fmt.Println("Start lookup")
-
 	// start the initial lookup
 	d.active = true
+
+	d.logger.Printf("Finished probing bootnodes")
 	d.Lookup()
 }
 
 // Close closes the discover
-func (d *Discover) Close() {
+func (d *Discover) Close() error {
 	close(d.shutdownCh)
+	atomic.StoreInt32(&d.shutdown, 1)
+	return d.listener.Close()
 }
 
 func (d *Discover) schedule() {
@@ -344,9 +402,6 @@ func (d *Discover) schedule() {
 
 	for {
 		select {
-		case packet := <-d.transport.PacketCh():
-			go d.handlePacket(packet)
-
 		case <-lookup.C:
 			go d.LookupRandom()
 
@@ -357,13 +412,6 @@ func (d *Discover) schedule() {
 			return
 		}
 	}
-}
-
-func (d *Discover) handlePacket(packet *Packet) {
-	if err := d.HandlePacket(packet); err != nil {
-		// fmt.Printf("ERR: %v\n", err)
-	}
-	packet.Release() // free the bufffer
 }
 
 func (d *Discover) revalidatePeer() {
@@ -429,24 +477,16 @@ func (d *Discover) Lookup() ([]*Peer, error) {
 
 // LookupTarget does a kademlia lookup around target
 func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
-	fmt.Println("- trying the lookup -")
-
 	// Only allow one lookup at a time
 	if atomic.LoadInt32(&(d.inlookup)) == 1 {
-		fmt.Println("- someone already in -")
 		return nil, nil
 	}
 
-	fmt.Println("- no one in yet, trying -")
-	atomic.StoreInt32(&d.inlookup, 1)
-
 	defer func() {
-		fmt.Println("- set to zero again -")
 		atomic.StoreInt32(&d.inlookup, 0)
 	}()
 
 	if !d.active {
-		fmt.Println("it is not active yet")
 		return []*Peer{}, nil
 	}
 
@@ -455,9 +495,6 @@ func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
 	// initialize the queue
 	queue, err := d.NearestPeersFromTarget(target)
 	if err != nil {
-		fmt.Println("errro")
-		fmt.Println(err)
-
 		return nil, err
 	}
 
@@ -504,8 +541,6 @@ func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
 			}
 		}
 
-		// fmt.Printf("Returned nodes (%d, %d): %v\n", len(nodes), v, nodes)
-
 		for pending < alpha && len(queue) != 0 {
 			peer, queue = queue[0], queue[1:]
 			findNodes(peer)
@@ -522,7 +557,6 @@ func (d *Discover) LookupTarget(target []byte) ([]*Peer, error) {
 		discovered = append(discovered, p)
 	}
 
-	fmt.Println("- end -")
 	return discovered, nil
 }
 
@@ -554,7 +588,7 @@ func decodePacket(payload []byte) ([]byte, []byte, []byte, error) {
 	return mac, sigdata, pubkey, nil
 }
 
-// TODO. what to do with this, i'd like to remove it
+// Used in tests
 func decodePeerFromPacket(packet *Packet) (*Peer, error) {
 	_, _, pubkey, err := decodePacket(packet.Buf)
 	if err != nil {
@@ -674,11 +708,6 @@ func (d *Discover) hasExpired(p *Peer) bool {
 	return p.hasExpired(*receivedTime, d.config.BondExpiration)
 }
 
-// TODO, build nearestPeers wrapper that returns peer objects
-
-// TODO. if we probe and findnode all at the same time we might end up
-// not working becasues the other is not synced yet
-
 func (d *Discover) handleFindNodePacket(payload []byte, peer *Peer) error {
 	if d.hasExpired(peer) {
 		return nil
@@ -741,8 +770,6 @@ func (d *Discover) AddNode(nodeStr string) error {
 func (d *Discover) probeNode(peer *Peer) bool {
 	metrics.IncrCounter([]string{"discover", "probe"}, 1.0)
 
-	// fmt.Printf("Probe peer %25s %20s %s\n", peer.Addr(), peer.ID, hexutil.Encode(peer.Bytes))
-
 	// Send ping packet
 	d.sendPacket(peer, pingPacket, pingRequest{
 		Version:    4,
@@ -754,13 +781,9 @@ func (d *Discover) probeNode(peer *Peer) bool {
 	ack := make(chan respMessage)
 	d.setHandler(peer.ID, pongPacket, ack, d.config.RespTimeout)
 
-	// fmt.Printf("-- handler set for %s --\n", peer.Addr())
-
 	resp := <-ack
 
-	// TODO. add time from the packet here
 	if resp.Complete {
-
 		peer.Last = resp.Timestamp
 		d.updatePeer(peer)
 
@@ -768,12 +791,7 @@ func (d *Discover) probeNode(peer *Peer) bool {
 		case d.EventCh <- peer.Enode():
 		default:
 		}
-
-		// fmt.Printf("Probe worked %s\n", peer.addr())
-
 		return true
-	} else {
-		// fmt.Printf("probe failed %s\n", peer.Addr())
 	}
 
 	return false
@@ -813,17 +831,12 @@ func (d *Discover) findNodes(peer *Peer, target []byte) ([]*Peer, error) {
 			return nil, fmt.Errorf("failed to probe node")
 		}
 
-		// fmt.Printf("- here %s -\n", peer.ID)
-
 		// wait for a ping from the peer to ensure we are alive on his side
 		ack := make(chan respMessage)
 		d.setHandler(peer.ID, pingPacket, ack, d.config.RespTimeout)
 
 		if resp := <-ack; !resp.Complete {
-			// fmt.Printf("- ended bad %s -\n", peer.ID)
-			// return nil, fmt.Errorf("We have not received probe back from other peer")
-		} else {
-			// fmt.Printf("- done %s -\n", peer.ID)
+			return nil, fmt.Errorf("We have not received probe back from other peer")
 		}
 
 		// sleep a couple of milliseconds to send the other package first
@@ -873,7 +886,6 @@ func (d *Discover) findNodes(peer *Peer, target []byte) ([]*Peer, error) {
 	}
 
 	for _, p := range peers {
-		// go d.probeNode(p) // not optimal, query only if the peer is new or has expired
 		d.sendTask(p)
 	}
 
@@ -918,11 +930,21 @@ func (d *Discover) sendPacket(peer *Peer, code byte, payload interface{}) error 
 		return err
 	}
 
-	if _, err := d.transport.WriteTo(data, peer.addr()); err != nil {
+	if _, err := d.WriteTo(data, peer.addr()); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// WriteTo sends b to addrs with an udp packet
+func (d *Discover) WriteTo(b []byte, addr string) (time.Time, error) {
+	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	if err != nil {
+		return time.Time{}, err
+	}
+	_, err = d.listener.WriteTo(b, udpAddr)
+	return time.Now(), err
 }
 
 func (d *Discover) encodePacket(code byte, payload interface{}) ([]byte, error) {

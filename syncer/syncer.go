@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
@@ -116,10 +117,12 @@ func (s *Syncer) updateChain(block uint64) {
 func (s *Syncer) AddNode(peer *network.Peer) {
 	fmt.Println("----- ADD NODE -----")
 
-	if err := s.checkDAOHardFork(peer.GetProtocol("eth", 63).(*ethereum.Ethereum)); err != nil {
-		fmt.Println("Failed to check the DAO block")
-		return
-	}
+	/*
+		if err := s.checkDAOHardFork(peer.GetProtocol("eth", 63).(*ethereum.Ethereum)); err != nil {
+			fmt.Println("Failed to check the DAO block")
+			return
+		}
+	*/
 
 	fmt.Println("DAO Fork completed")
 
@@ -143,55 +146,19 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 	fmt.Printf("Heigth: %d\n", header.Number.Uint64())
 	// fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
 
-	// check that the difficulty is higher than ours
-	if peer.HeaderDiff().Cmp(s.blockchain.Header().Difficulty) < 0 {
-		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
-	}
+	ourHeader := s.blockchain.Header()
 
-	fmt.Println("Difficulty higher than ours")
-	s.updateChain(header.Number.Uint64())
+	// check that the difficulty is higher than ours
+	if peer.HeaderDiff().Cmp(ourHeader.Difficulty) < 0 {
+		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
+	} else {
+		fmt.Println("Difficulty higher than ours")
+		s.updateChain(header.Number.Uint64())
+	}
 
 	// wake up some task
 	s.wakeUp()
 	// go s.runPeer(p)
-}
-
-func (s *Syncer) runPeer(peer *Peer) {
-	/*
-		block := 0
-
-		for {
-			fmt.Printf("Peer (%s) %d\n", peer.pretty, block)
-
-			headers, err := peer.conn.RequestHeadersSync(uint64(block), 100)
-			if err != nil {
-				fmt.Printf("failed to deliver: %v", err)
-				return
-			}
-
-			bodies := []*types.Header{}
-			receipts := []*types.Header{}
-
-			for _, h := range headers {
-				if hasBody(h) {
-					bodies = append(bodies, h)
-				}
-				if hasReceipts(h) {
-					receipts = append(receipts, h)
-				}
-			}
-
-			if _, err := peer.conn.RequestBodiesSync(bodies); err != nil {
-				fmt.Printf("failed to receive receipts: %v", err)
-			}
-
-			if _, err := peer.conn.RequestReceiptsSync(receipts); err != nil {
-				fmt.Printf("failed to receive bodies: %v", err)
-			}
-
-			block += 100
-		}
-	*/
 }
 
 func (s *Syncer) workerTask(id string) {
@@ -199,8 +166,6 @@ func (s *Syncer) workerTask(id string) {
 
 	for {
 		peer := s.dequeuePeer()
-
-		fmt.Printf("(%s) peer is ready %s: %d\n", id, peer.pretty, peer.pending)
 
 		i := s.dequeue()
 
@@ -307,6 +272,7 @@ func (s *Syncer) ack(peer *Peer, failed bool) {
 	}
 	if peer.failed == 10 {
 		peer.active = false
+		s.retryAfter(peer, 5*time.Second)
 	}
 	s.peersLock.Unlock()
 
@@ -443,7 +409,7 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 	return nil // hack
 
 	if s.NetworkID == 1 {
-		ack := make(chan network.AckMessage, 1)
+		ack := make(chan rlpx.AckMessage, 1)
 		eth.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, daoChallengeTimeout)
 
 		// check the DAO block
@@ -467,6 +433,15 @@ func (s *Syncer) checkDAOHardFork(eth *ethereum.Ethereum) error {
 	}
 
 	return nil
+}
+
+func (s *Syncer) retryAfter(p *Peer, d time.Duration) {
+	time.AfterFunc(d, func() {
+		s.peersLock.Lock()
+		p.active = true
+		s.wakeUp()
+		s.peersLock.Unlock()
+	})
 }
 
 // FindCommonAncestor finds the common ancestor with the peer and the syncer connection
@@ -529,7 +504,7 @@ func (s *Syncer) FindCommonAncestor(peer *ethereum.Ethereum) (*types.Header, err
 func (s *Syncer) fetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
 	head := peer.Header()
 
-	ack := make(chan network.AckMessage, 1)
+	ack := make(chan rlpx.AckMessage, 1)
 	peer.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 30*time.Second)
 
 	if err := peer.RequestHeadersByHash(head, 1, 0, false); err != nil {

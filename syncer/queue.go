@@ -50,7 +50,7 @@ func (q *queue) addBack(block uint64) {
 	if q.back == nil {
 		q.back = q.newItem(block)
 		q.front.next = q.back
-		// q.back.prev = q.front
+		q.back.prev = q.front
 	} else {
 		q.back.block = block
 	}
@@ -91,7 +91,6 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 
 	// values received, check headers with prev content
 	if len(elem.headers) == 0 {
-		/* // FIX
 		if elem.prev == nil {
 			// check with head
 			if q.head != headers[0].ParentHash {
@@ -103,7 +102,6 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 				return fmt.Errorf("hash should match with previous batch")
 			}
 		}
-		*/
 	} else {
 		// check with last elem header
 		if elem.headers[len(elem.headers)-1].Hash() != headers[0].ParentHash {
@@ -383,11 +381,11 @@ func (q *queue) FetchCompletedData() []*element {
 
 	if len(elements) != 0 {
 		q.head = elements[len(elements)-1].Last().Hash()
+		elements[len(elements)-1].next = nil
 	}
 
 	q.front = elem
-	// q.front.prev = nil
-	// not sure if I have to change also the last element
+	q.front.prev = nil
 
 	return elements
 }
@@ -425,7 +423,7 @@ func (q *queue) getNextElegibleSlot() *element {
 	// split the item
 	i := q.newItem(elem.block + maxElements)
 
-	// i.prev = elem
+	i.prev = elem
 	i.next = elem.next
 
 	elem.next = i
@@ -459,7 +457,7 @@ type element struct {
 	id    uint32
 	block uint64
 
-	// prev *element
+	prev *element
 	next *element
 
 	// headers

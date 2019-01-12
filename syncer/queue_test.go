@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
 )
@@ -271,6 +272,14 @@ func TestQueueDeliverTotalHeaders(t *testing.T) {
 	}
 }
 
+func headersToHashes(headers []*types.Header) []common.Hash {
+	res := []common.Hash{}
+	for _, i := range headers {
+		res = append(res, i.Hash())
+	}
+	return res
+}
+
 func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 	headers, blocks, receipts := blockchain.NewTestBodyChain(1000)
 	q := newTestQueue(headers[0], 1000)
@@ -296,14 +305,17 @@ func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 	checkStatus(t, elem.headersStatus, completedX)
 
 	receiptsJob := dequeue(t, q)
-	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, headers[1:101]) {
+
+	hashes1 := headersToHashes(headers[1:101])
+
+	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, hashes1) {
 		t.Fatal("bad receipts job")
 	}
 	checkStatus(t, elem.receiptsStatus, pendingX)
 
 	// dequeue another job for bodies at the same time
 	bodiesJob := dequeue(t, q)
-	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, headers[1:101]) {
+	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, hashes1) {
 		t.Fatal("bad bodies job")
 	}
 	checkStatus(t, elem.bodiesStatus, pendingX)
@@ -316,8 +328,10 @@ func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 		t.Fatal("offset should be 49")
 	}
 
+	hashes2 := headersToHashes(headers[50:101])
+
 	receiptsJob = dequeue(t, q)
-	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, headers[50:101]) {
+	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, hashes2) {
 		t.Fatal("bad receipts job")
 	}
 	// deliver incorrect receipts
@@ -347,7 +361,7 @@ func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 		t.Fatal("offset should be 49")
 	}
 	bodiesJob = dequeue(t, q)
-	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, headers[50:101]) {
+	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, hashes2) {
 		t.Fatal("bad receipts job")
 	}
 	if err := q.deliverBodies(bodiesJob.id, bodies[50:101]); err != nil {
@@ -360,6 +374,30 @@ func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 	}
 }
 
-// Test combined, what happenes after u receive the other one
-// Test to check the headers
-// check after you commit the data the head changes
+func TestQueueMemoryRelease(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+	q := newTestQueue(headers[0], 1000)
+
+	job := dequeue(t, q)
+	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 100}) {
+		t.Fatal("bad.1")
+	}
+	if err := q.deliverHeaders(job.id, headers[1:101]); err != nil {
+		t.Fatal(err)
+	}
+
+	job2 := dequeue(t, q)
+	completed := q.FetchCompletedData()
+
+	if len(completed) != 1 {
+		t.Fatal("completed should be equal to 1")
+	}
+	if completed[0].next != nil {
+		t.Fatal("completed should not have next element")
+	}
+
+	elem := findElement(t, q, job2.id)
+	if elem.prev != nil {
+		t.Fatal("prev element should be nil")
+	}
+}

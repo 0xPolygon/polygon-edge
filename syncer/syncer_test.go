@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
@@ -31,13 +32,13 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 	}
 
 	var eth0 *ethereum.Ethereum
-	c0 := func(s network.Conn, p *network.Peer) protocol.Handler {
+	c0 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
 		eth0 = ethereum.NewEthereumProtocol(s, p, sts(b0), b0)
 		return eth0
 	}
 
 	var eth1 *ethereum.Ethereum
-	c1 := func(s network.Conn, p *network.Peer) protocol.Handler {
+	c1 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
 		eth1 = ethereum.NewEthereumProtocol(s, p, sts(b1), b1)
 		return eth1
 	}
@@ -45,7 +46,16 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 	s0.RegisterProtocol(protocol.ETH63, c0)
 	s1.RegisterProtocol(protocol.ETH63, c1)
 
-	s0.Dial(s1.Enode)
+	if err := s0.Schedule(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s1.Schedule(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s0.DialSync(s1.Enode); err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(500 * time.Millisecond)
 	return eth0, eth1
@@ -60,7 +70,7 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 		t.Fatal(err)
 	}
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	p0, _ := testEthHandshake(t, s0, b0, s1, b1)
 
 	h, err := syncer.FindCommonAncestor(p0)
@@ -114,7 +124,7 @@ func TestPeerHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s0, s1 := network.TestServers()
+	s0, s1 := network.TestServers(network.DefaultConfig())
 	p0, _ := testEthHandshake(t, s0, b0, s1, b1)
 
 	height, err := syncer.fetchHeight(p0)

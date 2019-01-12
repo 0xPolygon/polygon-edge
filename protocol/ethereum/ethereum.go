@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/network/rlpx"
 )
 
 const (
@@ -63,10 +64,10 @@ type Blockchain interface {
 
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
-	conn       network.Conn
+	conn       rlpx.Conn
 	peer       *network.Peer
 	getStatus  GetStatus
-	status     *Status
+	status     *Status // status of the remote peer
 	blockchain Blockchain
 	downloader Downloader
 
@@ -80,7 +81,7 @@ type Ethereum struct {
 type GetStatus func() (*Status, error)
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn network.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
+func NewEthereumProtocol(conn rlpx.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
 	return &Ethereum{
 		conn:        conn,
 		peer:        peer,
@@ -152,11 +153,13 @@ func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
 }
 
 // Conn returns the connection referece
-func (e *Ethereum) Conn() network.Conn {
-	return e.conn
+func (e *Ethereum) Conn() *rlpx.Stream {
+	return e.conn.(*rlpx.Stream)
 }
 
-func (e *Ethereum) readStatus(localStatus *Status) (*Status, error) {
+func (e *Ethereum) ReadStatus() (*Status, error) {
+	var status *Status
+
 	msg, err := e.conn.ReadMsg()
 	if err != nil {
 		return nil, err
@@ -164,28 +167,41 @@ func (e *Ethereum) readStatus(localStatus *Status) (*Status, error) {
 	if msg.Code != StatusMsg {
 		return nil, fmt.Errorf("Message code is not statusMsg but %d", msg.Code)
 	}
-
-	var status Status
 	if err := rlp.Decode(msg.Payload, &status); err != nil {
 		return nil, err
 	}
+	return status, nil
+}
 
-	if status.NetworkID != localStatus.NetworkID {
-		return nil, &network.MismatchProtocolError{Msg: fmt.Errorf("Network id does not match. Found %d but expected %d", status.NetworkID, localStatus.NetworkID)}
+func (e *Ethereum) ValidateStatus(remoteStatus *Status, localStatus *Status) error {
+	if remoteStatus.NetworkID != localStatus.NetworkID {
+		return fmt.Errorf("Network id does not match. Found %d but expected %d", remoteStatus.NetworkID, localStatus.NetworkID)
 	}
-	if status.GenesisBlock != localStatus.GenesisBlock {
-		return nil, &network.MismatchProtocolError{Msg: fmt.Errorf("Genesis block does not match")}
+	if remoteStatus.GenesisBlock != localStatus.GenesisBlock {
+		return fmt.Errorf("Genesis block does not match")
 	}
-	if int(status.ProtocolVersion) != int(localStatus.ProtocolVersion) {
-		return nil, fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(status.ProtocolVersion), int(localStatus.ProtocolVersion))
+	if int(remoteStatus.ProtocolVersion) != int(localStatus.ProtocolVersion) {
+		return fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(remoteStatus.ProtocolVersion), int(localStatus.ProtocolVersion))
 	}
+	return nil
+}
 
-	return &status, nil
+func (e *Ethereum) ReadAndValidateStatus(localStatus *Status) error {
+	var err error
+	e.status, err = e.ReadStatus()
+	if err != nil {
+		return err
+	}
+	return e.ValidateStatus(e.status, localStatus)
 }
 
 // Close the protocol
 func (e *Ethereum) Close() error {
 	return nil
+}
+
+func (e *Ethereum) Status() *Status {
+	return e.status
 }
 
 // Init starts the protocol
@@ -195,12 +211,10 @@ func (e *Ethereum) Init() error {
 		return err
 	}
 
-	var peerStatus *Status
 	errr := make(chan error, 2)
 
 	go func() {
-		peerStatus, err = e.readStatus(status)
-		errr <- err
+		errr <- e.ReadAndValidateStatus(status)
 	}()
 
 	go func() {
@@ -222,8 +236,7 @@ func (e *Ethereum) Init() error {
 		return errors
 	}
 
-	e.status = peerStatus
-	e.peer.UpdateHeader(peerStatus.CurrentBlock, peerStatus.TD)
+	e.peer.UpdateHeader(e.status.CurrentBlock, e.status.TD)
 
 	// handshake was correct, start to listen for packets
 	go e.listen()
@@ -250,7 +263,7 @@ type newBlockData struct {
 }
 
 // HandleMsg handles a message from ethereum
-func (e *Ethereum) HandleMsg(msg network.Message) error {
+func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	metrics.IncrCounterWithLabels([]string{"minimal", "ethereum", "msg"}, float32(1.0), []metrics.Label{{Name: "Code", Value: strconv.Itoa(int(msg.Code))}})
 
 	code := msg.Code
@@ -353,6 +366,10 @@ func (e *Ethereum) HandleMsg(msg network.Message) error {
 
 	case code == NodeDataMsg:
 		var data [][]byte
+
+		fmt.Println("-- size --")
+		fmt.Println(msg.Size)
+
 		if err := msg.Decode(&data); err != nil {
 			panic(err)
 		}

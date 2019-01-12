@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/ferranbt/periodic-dispatcher"
 
 	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
@@ -32,20 +33,20 @@ type Config struct {
 	Bootnodes        []string
 	DialTasks        int
 	DialBusyInterval time.Duration
-	Discover         *discover.Config
+	DiscoverCh       chan string
 }
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	c := &Config{
 		Name:             "Minimal/go1.10.2",
-		BindAddress:      "0.0.0.0",
+		BindAddress:      "127.0.0.1",
 		BindPort:         30304,
 		MaxPeers:         10,
 		Bootnodes:        []string{},
 		DialTasks:        5,
 		DialBusyInterval: 1 * time.Minute,
-		Discover:         discover.DefaultConfig(),
+		DiscoverCh:       make(chan string, 1),
 	}
 
 	return c
@@ -92,13 +93,13 @@ type Server struct {
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
-	info      *Info
-	config    *Config
-	closeCh   chan struct{}
-	transport Transport
-	discover  *discover.Discover
-	Enode     string
-	EventCh   chan MemberEvent
+	info *rlpx.Info
+
+	config  *Config
+	closeCh chan struct{}
+
+	Enode   string
+	EventCh chan MemberEvent
 
 	// set of pending nodes
 	pendingNodes sync.Map
@@ -108,23 +109,11 @@ type Server struct {
 	dispatcher *periodic.Dispatcher
 
 	peerStore *PeerStore
+	listener  *rlpx.Listener
 }
 
 // NewServer creates a new node
-func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.Logger) (*Server, error) {
-
-	// Start transport
-	nc := &NetTransportConfig{
-		BindAddrs: []string{config.BindAddress},
-		BindPort:  config.BindPort,
-		Logger:    logger,
-	}
-
-	transport, err := NewNetTransport(nc)
-	if err != nil {
-		return nil, err
-	}
-
+func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.Logger) *Server {
 	enode := fmt.Sprintf("enode://%s@%s:%d", discover.PubkeyToNodeID(&key.PublicKey), config.BindAddress, config.BindPort)
 
 	s := &Server{
@@ -136,7 +125,6 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		config:       config,
 		logger:       logger,
 		closeCh:      make(chan struct{}),
-		transport:    transport,
 		Enode:        enode,
 		EventCh:      make(chan MemberEvent, 20),
 		pendingNodes: sync.Map{},
@@ -145,43 +133,65 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		peerStore:    NewPeerStore(peersFile),
 	}
 
-	udpAddr := &net.UDPAddr{IP: net.ParseIP(config.BindAddress), Port: config.BindPort}
+	return s
+}
 
-	s.discover, err = discover.NewDiscover(key, transport, udpAddr, config.Discover)
-	if err != nil {
-		return nil, err
+func (s *Server) buildInfo() {
+	info := &rlpx.Info{
+		Version: rlpx.BaseProtocolVersion,
+		Caps:    rlpx.Capabilities{},
+		Name:    s.Name,
+		ID:      discover.PubkeyToNodeID(&s.key.PublicKey),
 	}
+	for _, p := range s.Protocols {
+		info.Caps = append(info.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
+	}
+	s.info = info
+}
 
-	s.discover.SetBootnodes(config.Bootnodes)
-	s.discover.Schedule()
-
-	go s.streamListen()
-
+// Schedule starts all the tasks once all the protocols have been loaded
+func (s *Server) Schedule() error {
 	// bootstrap peers
 	for _, peer := range s.peerStore.Load() {
 		s.Dial(peer)
 	}
 
+	// Create rlpx info
+	s.buildInfo()
+
+	if err := s.setupTransport(); err != nil {
+		return err
+	}
+
 	go s.dialRunner()
-
-	return s, nil
+	return nil
 }
 
-func (s *Server) streamListen() {
-	for {
-		select {
-		case conn := <-s.transport.StreamCh():
+func (s *Server) setupTransport() error {
+	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
+
+	var err error
+	s.listener, err = rlpx.Listen("tcp", addr.String(), &rlpx.Config{Prv: s.key, Info: s.info})
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			// TODO, Accept should check if we have enough slots or return tooManyPeers message
+			conn, err := s.listener.Accept()
+			if err != nil {
+				// log
+			}
 			go s.handleIncomingConn(conn)
-		case <-s.closeCh:
-			return
 		}
-	}
+	}()
+	return nil
 }
 
-func (s *Server) handleIncomingConn(conn net.Conn) {
-	if err := s.connect2(conn, nil); err != nil {
-		s.logger.Printf("ERR: incoming connection %v", err)
-	}
+func (s *Server) handleIncomingConn(conn *rlpx.Session) {
+	// check if we have enough incoming slots
+	s.addSession(conn)
 }
 
 // PeriodicDial is the periodic dial of busy peers
@@ -197,17 +207,19 @@ func (p *PeriodicDial) ID() string {
 // -- DIALING --
 
 func (s *Server) dialTask(id string, tasks chan string) {
+	s.logger.Printf("Dial task %s running", id)
+
 	for {
 		select {
 		case task := <-tasks:
 			s.logger.Printf("DIAL (%s): %s", id, task)
 
-			err := s.connectWithEnode(task)
+			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				if _, ok := err.(*DiscMsgTooManyPeers); ok {
+				if err == rlpx.DiscTooManyPeers {
 					busy = true
 				}
 			}
@@ -254,7 +266,7 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-		case enode := <-s.discover.EventCh:
+		case enode := <-s.config.DiscoverCh:
 			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
@@ -280,8 +292,8 @@ func (s *Server) DialSync(enode string) error {
 }
 
 func (s *Server) GetPeer(id string) *Peer {
-	for _, i := range s.peers {
-		if i.Info.ID.String() == id {
+	for x, i := range s.peers {
+		if id == x {
 			return i
 		}
 	}
@@ -302,145 +314,64 @@ func (s *Server) removePeer(peer *Peer) {
 func (s *Server) Disconnect() {
 	// disconnect the peers
 	for _, p := range s.peers {
-		p.Disconnect(DiscRequested)
+		p.Close()
 	}
 }
 
-// MismatchProtocolError happens when the other peer has a different networkid or genesisblock
-type MismatchProtocolError struct {
-	Msg error
-}
-
-func (m *MismatchProtocolError) Error() string {
-	return m.Msg.Error()
-}
-
-func (s *Server) connectWithEnode(enode string) error {
-	node, err := discover.ParseNode(enode)
-	if err != nil {
-		return err
+var (
+	handlers = map[string]func(*Server, string) error{
+		"enode": (*Server).connectWithEnode,
 	}
+)
 
-	rpub, err := node.ID.Pubkey()
-	if err != nil {
-		return err
-	}
-
-	id := node.ID.String()
-
-	// check if its already a peer
-	s.peersLock.Lock()
-	_, ok := s.peers[id]
-	s.peersLock.Unlock()
-	if ok {
-		return nil
-	}
-
-	// check if its pending
-	if _, ok := s.pendingNodes.Load(id); ok {
-		return nil
-	}
-
-	// set as pending
-	s.pendingNodes.Store(id, true)
-	defer s.pendingNodes.Delete(id)
-
-	addr := &net.TCPAddr{IP: node.IP, Port: int(node.TCP)}
-
-	conn, err := s.transport.DialTimeout(addr.String(), DialTimeout)
-	if err != nil {
-		return err
-	}
-
-	if err := s.connect2(conn, rpub); err != nil {
-		conn.Close()
-		return err
-	}
-	return nil
-}
-
-func (s *Server) connect2(conn net.Conn, pub *ecdsa.PublicKey) error {
-	peer, err := s.connect(conn, pub)
-	if err != nil && peer == nil {
-		s.EventCh <- MemberEvent{NodeHandshakeFail, nil}
-		return err
-	}
-
-	id := peer.ID
-	if err != nil {
-		if peer != nil {
-			peer.Close()
+func (s *Server) connect(addrs string) error {
+	for n, h := range handlers {
+		if strings.HasPrefix(addrs, n) {
+			return h(s, addrs)
 		}
-
-		s.EventCh <- MemberEvent{NodeHandshakeFail, peer}
-		return err
-	} else {
-		s.peersLock.Lock()
-		s.peers[id] = peer
-		metrics.SetGauge([]string{"minimal", "peers"}, float32(len(s.peers)))
-		s.peersLock.Unlock()
-
-		s.EventCh <- MemberEvent{NodeJoin, peer}
 	}
-
-	return nil
+	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-// do all the handshakes
-func (s *Server) connect(conn net.Conn, pub *ecdsa.PublicKey) (*Peer, error) {
-
-	// -- network handshake --
-	secrets, err := doEncHandshake(conn, s.key, pub)
+func (s *Server) connectWithEnode(addrs string) error {
+	ss, err := rlpx.DialEnode("tcp", addrs, &rlpx.Config{Prv: s.key, Info: s.info})
 	if err != nil {
-		return nil, fmt.Errorf("handshake failed: %v", err)
+		return err
 	}
 
-	upgraded, err := newConnection(conn, secrets) // do this maybe on doEncHandhsake at the same time
-	if err != nil {
-		return nil, fmt.Errorf("connection failed: %v", err)
-	}
+	// match protocols
+	return s.addSession(ss)
+}
 
-	// -- protocol handshake --
+func (s *Server) addSession(session *rlpx.Session) error {
+	p := newPeer(s.logger, session, session.RemoteInfo(), s)
 
-	localInfo := s.getServerCapabilities()
-
-	remoteInfo, err := startProtocolHandshake(upgraded, localInfo)
-	if err != nil {
-		return nil, err
-	}
-	sort.Sort(remoteInfo.Caps)
-
-	peer := newPeer(s.logger, upgraded, remoteInfo, s)
-
-	instances := s.matchProtocols(peer, remoteInfo.Caps)
+	instances := s.matchProtocols(p, p.Info.Caps)
 	if len(instances) == 0 {
-		return nil, fmt.Errorf("no matching protocols")
+		return fmt.Errorf("no matching protocols found")
 	}
 
-	peer.SetInstances(instances)
-	go peer.listen()
-
-	// --- initialize the protocols
-
-	errr := make(chan error, len(peer.protocols))
-
-	for _, i := range peer.protocols {
-		go func(i *Instance) {
-			errr <- i.Runtime.Init()
-		}(i)
-	}
-
-	for i := 0; i < len(peer.protocols); i++ {
-		if err := <-errr; err != nil {
-			return nil, err
+	for _, i := range instances {
+		if err := i.Runtime.Init(); err != nil {
+			return err
 		}
 	}
+	p.SetInstances(instances)
 
-	return peer, nil
+	s.peersLock.Lock()
+	s.peers[session.RemoteIDString()] = p
+	s.peersLock.Unlock()
+
+	select {
+	case s.EventCh <- MemberEvent{Type: NodeJoin, Peer: p}:
+	default:
+	}
+
+	return nil
 }
 
 // Callback is the one calling whenever the protocol is used
-type Callback = func(session Conn, peer *Peer) protocol.Handler
+type Callback = func(session rlpx.Conn, peer *Peer) protocol.Handler
 
 // RegisterProtocol registers a protocol
 func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
@@ -449,14 +380,6 @@ func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
 
 func (s *Server) ID() discover.NodeID {
 	return discover.PubkeyToNodeID(&s.key.PublicKey)
-}
-
-func (s *Server) getServerCapabilities() *Info {
-	ourHandshake := &Info{Version: baseProtocolVersion, Caps: Capabilities{}, Name: s.Name, ID: discover.PubkeyToNodeID(&s.key.PublicKey)}
-	for _, p := range s.Protocols {
-		ourHandshake.Caps = append(ourHandshake.Caps, &Cap{Name: p.protocol.Name, Version: p.protocol.Version})
-	}
-	return ourHandshake
 }
 
 func (s *Server) getProtocol(name string, version uint) *protocolStub {
@@ -468,16 +391,15 @@ func (s *Server) getProtocol(name string, version uint) *protocolStub {
 	return nil
 }
 
-func (s *Server) matchProtocols(peer *Peer, caps Capabilities) []*Instance {
-	offset := baseProtocolLength
+func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance {
+	offset := rlpx.BaseProtocolLength
 	protocols := []*Instance{}
 
 	for _, i := range caps {
 		if proto := s.getProtocol(i.Name, i.Version); proto != nil {
-			session := NewSession(offset, peer.conn)
-			runtime := proto.callback(session, peer)
-
-			protocols = append(protocols, &Instance{session: session, protocol: proto.protocol, offset: offset, Runtime: runtime})
+			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.protocol.Length))
+			runtime := proto.callback(stream, peer)
+			protocols = append(protocols, &Instance{session: stream, protocol: proto.protocol, offset: uint64(offset), Runtime: runtime})
 			offset += proto.protocol.Length
 		}
 	}
@@ -492,10 +414,17 @@ func (s *Server) Close() {
 	}
 
 	for _, i := range s.peers {
+		fmt.Println("-- update --")
+		fmt.Println(i.Enode)
+
 		s.peerStore.Update(i.Enode, i.Status)
 	}
-
 	if err := s.peerStore.Save(); err != nil {
 		panic(err)
+	}
+
+	// close listener transport
+	if err := s.listener.Close(); err != nil {
+		// log
 	}
 }
