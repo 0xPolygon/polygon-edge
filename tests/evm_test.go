@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/state/evm"
-	newState "github.com/umbracle/minimal/state/state"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -45,7 +44,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env.GasPrice = c.Exec.GasPrice
 
 	initialCall := true
-	canTransfer := func(state newState.State, address common.Address, amount *big.Int) bool {
+	canTransfer := func(state evm.State, address common.Address, amount *big.Int) bool {
 		if initialCall {
 			initialCall = false
 			return true
@@ -53,13 +52,14 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return evm.CanTransfer(state, address, amount)
 	}
 
-	transfer := func(state newState.State, from, to common.Address, amount *big.Int) error {
+	transfer := func(state evm.State, from, to common.Address, amount *big.Int) error {
 		return nil
 	}
 
-	state := buildNewState(t, c.Pre)
+	state, _ := buildState(t, c.Pre)
+	txn := state.Txn()
 
-	e := evm.NewEVM(state, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
+	e := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 
@@ -84,7 +84,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	// check logs
-	if logs := rlpHash(state.Logs()); logs != common.HexToHash(c.Logs) {
+	if logs := rlpHash(txn.Logs()); logs != common.HexToHash(c.Logs) {
 		t.Fatalf("logs hash mismatch: got %x, want %x", logs, c.Logs)
 	}
 
@@ -96,7 +96,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 			key := common.HexToHash(k)
 			val := common.HexToHash(v)
 
-			if have := state.GetState(addr, key); have != val {
+			if have := txn.GetState(addr, key); have != val {
 				t.Fatalf("wrong storage value at %x:\n  got  %x\n  want %x", k, have, val)
 			}
 		}
@@ -116,7 +116,6 @@ func TestEVM(t *testing.T) {
 
 	long := []string{
 		"loop-",
-		"vmPerformance",
 	}
 
 	for _, folder := range folders {
@@ -126,7 +125,7 @@ func TestEVM(t *testing.T) {
 		}
 
 		for _, file := range files {
-			t.Run(folder, func(t *testing.T) {
+			t.Run(file, func(t *testing.T) {
 				if !strings.HasSuffix(file, ".json") {
 					return
 				}

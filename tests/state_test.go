@@ -1,15 +1,32 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/core"
-	transition "github.com/umbracle/minimal/state"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
+
+type gasPool struct {
+	gas uint64
+}
+
+func (g *gasPool) SubGas(amount uint64) error {
+	if g.gas < amount {
+		return fmt.Errorf("gas limit reached")
+	}
+	g.gas -= amount
+	return nil
+}
+
+func newGasPool(gas uint64) *gasPool {
+	return &gasPool{gas}
+}
 
 var stateTests = "GeneralStateTests"
 
@@ -35,42 +52,29 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	}
 	env.GasPrice = msg.GasPrice()
 
-	state := buildNewState(t, c.Pre)
-
-	gaspool := new(core.GasPool)
-	gaspool.AddGas(env.GasLimit.Uint64())
+	state, _ := buildState(t, c.Pre)
 
 	forks := config.At(env.Number.Uint64())
+	gasTable := config.GasTable(env.Number)
 
-	tt := &transition.Transition{
-		State:    state,
-		Env:      env,
-		Config:   forks,
-		GasTable: config.GasTable(env.Number),
-		Msg:      msg,
-		Gp:       gaspool,
-		GetHash:  vmTestBlockHash,
+	var root []byte
+
+	txn := state.Txn()
+
+	gasPool := newGasPool(env.GasLimit.Uint64())
+
+	err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+
+	// mining rewards
+	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
+
+	_, root = txn.Commit(forks.EIP158)
+
+	if !bytes.Equal(root, p.Root.Bytes()) {
+		t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), hexutil.Encode(root))
 	}
 
-	snapshot := state.Snapshot()
-	if err := tt.Apply(); err != nil {
-		state.RevertToSnapshot(snapshot)
-	}
-
-	state.AddBalance(env.Coinbase, new(big.Int))
-
-	/*
-		root := state.IntermediateRoot(forks.EIP158)
-
-		if root != p.Root {
-			t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), root.String())
-		}
-	*/
-
-	//fmt.Println("-- logs --")
-	//fmt.Println(state.Logs())
-
-	if logs := rlpHash(state.Logs()); logs != p.Logs {
+	if logs := rlpHash(txn.Logs()); logs != p.Logs {
 		t.Fatalf("logs mismatch (%s %d): expected %s but found %s", fork, index, p.Logs.String(), logs.String())
 	}
 }
@@ -83,7 +87,9 @@ func TestState(t *testing.T) {
 	}
 
 	skip := []string{
-		"RevertPrecompiledTouch",
+		"failed_tx_xcf416c53",
+		"RevertOpcodeInCallsOnNonEmptyReturnData",
+		"sstore_combinations_initial",
 	}
 
 	folders, err := listFolders(stateTests)
@@ -126,15 +132,6 @@ func TestState(t *testing.T) {
 				for _, i := range c {
 					for fork, f := range i.Post {
 						for indx, e := range f {
-
-							/*
-								fmt.Println("-----------")
-								fmt.Println(file)
-								fmt.Println(fork)
-								fmt.Println(indx)
-								fmt.Println(id)
-							*/
-
 							RunSpecificTest(t, i, "id", fork, indx, e)
 						}
 					}

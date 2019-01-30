@@ -9,12 +9,61 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/chain"
-	newState "github.com/umbracle/minimal/state/state"
 
 	"github.com/ethereum/go-ethereum/common"
 )
+
+// State is the state interface for the ethereum protocol
+type State interface {
+
+	// Balance
+	AddBalance(addr common.Address, amount *big.Int)
+	SubBalance(addr common.Address, amount *big.Int)
+	SetBalance(addr common.Address, amount *big.Int)
+	GetBalance(addr common.Address) *big.Int
+
+	// Snapshot
+	Snapshot() int
+	RevertToSnapshot(int)
+
+	// Logs
+	AddLog(log *types.Log)
+	Logs() []*types.Log
+
+	// State
+	SetState(addr common.Address, key, value common.Hash)
+	GetState(addr common.Address, hash common.Hash) common.Hash
+
+	// Nonce
+	SetNonce(addr common.Address, nonce uint64)
+	GetNonce(addr common.Address) uint64
+
+	// Code
+	SetCode(addr common.Address, code []byte)
+	GetCode(addr common.Address) []byte
+	GetCodeSize(addr common.Address) int
+	GetCodeHash(addr common.Address) common.Hash
+
+	// Suicide
+	HasSuicided(addr common.Address) bool
+	Suicide(addr common.Address) bool
+
+	// Refund
+	AddRefund(gas uint64)
+	SubRefund(gas uint64)
+	GetRefund() uint64
+	GetCommittedState(addr common.Address, hash common.Hash) common.Hash
+
+	// Others
+	Exist(addr common.Address) bool
+	Empty(addr common.Address) bool
+	CreateAccount(addr common.Address)
+	IntermediateRoot(bool) common.Hash // It will be removed later
+}
 
 // IMPORTANT. Memory access needs more overflow protection, right now, only calls and returns are protected
 
@@ -30,6 +79,7 @@ var (
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrOpcodeNotFound           = errors.New("opcode not found")
+	ErrExecutionReverted        = errors.New("execution was reverted")
 )
 
 var (
@@ -58,9 +108,9 @@ type Env struct {
 	GasPrice   *big.Int
 }
 
-type CanTransferFunc func(newState.State, common.Address, *big.Int) bool
+type CanTransferFunc func(State, common.Address, *big.Int) bool
 
-type TransferFunc func(state newState.State, from common.Address, to common.Address, amount *big.Int) error
+type TransferFunc func(state State, from common.Address, to common.Address, amount *big.Int) error
 
 // Contract is each value from the caller stack
 type Contract struct {
@@ -154,6 +204,10 @@ func (c *Contract) consumeGas(gas uint64) bool {
 	return true
 }
 
+func (c *Contract) consumeAllGas() {
+	c.gas = 0
+}
+
 func (c *Contract) showStack() string {
 	str := []string{}
 	for i := 0; i < c.sp; i++ {
@@ -207,7 +261,7 @@ type EVM struct {
 	config   chain.ForksInTime
 	gasTable chain.GasTable
 
-	state newState.State
+	state State
 	env   *Env
 
 	getHash     GetHashByNumber
@@ -220,7 +274,7 @@ type EVM struct {
 }
 
 // NewEVM creates a new EVM
-func NewEVM(state newState.State, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
+func NewEVM(state State, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
 	return &EVM{
 		contracts:      make([]*Contract, MaxContracts),
 		config:         config,
@@ -343,7 +397,6 @@ func isDup(op OpCode) bool {
 
 // Run executes the virtual machine
 func (e *EVM) Run() error {
-
 	var op OpCode
 
 	for {
@@ -1335,11 +1388,26 @@ func (e *EVM) executeHaltOperations(op OpCode) error {
 				return ErrMaxCodeSizeExceeded
 			}
 
-			createDataGas := uint64(len(ret)) * CreateDataGas
-			if !e.currentContract().consumeGas(createDataGas) {
-				return ErrGasConsumed
+			if err == nil && !maxCodeSizeExceeded {
+				createDataGas := uint64(len(ret)) * params.CreateDataGas
+				if !e.currentContract().consumeGas(createDataGas) {
+					err = vm.ErrCodeStoreOutOfGas
+				} else {
+					e.state.SetCode(e.currentContract().address, ret)
+				}
 			}
-			e.state.SetCode(e.currentContract().address, ret)
+
+			if maxCodeSizeExceeded || (err != nil && (e.config.Homestead || err != vm.ErrCodeStoreOutOfGas)) {
+				e.state.RevertToSnapshot(e.currentContract().snapshot)
+				if err != ErrExecutionReverted {
+					e.currentContract().consumeAllGas()
+				}
+			}
+
+			// Assign err if contract code size exceeds the max while the err is still empty.
+			if maxCodeSizeExceeded && err == nil {
+				err = ErrMaxCodeSizeExceeded
+			}
 		}
 	}
 
@@ -1962,11 +2030,11 @@ func (e *EVM) popContract() *Contract {
 	return e.contracts[e.contractsIndex]
 }
 
-func CanTransfer(state newState.State, from common.Address, amount *big.Int) bool {
+func CanTransfer(state State, from common.Address, amount *big.Int) bool {
 	return state.GetBalance(from).Cmp(amount) >= 0
 }
 
-func Transfer(state newState.State, from common.Address, to common.Address, amount *big.Int) error {
+func Transfer(state State, from common.Address, to common.Address, amount *big.Int) error {
 	if balance := state.GetBalance(from); balance.Cmp(amount) < 0 {
 		return ErrNotEnoughFunds
 	}
