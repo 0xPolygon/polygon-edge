@@ -11,8 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 func mustDecode(s string) []byte {
@@ -21,14 +19,6 @@ func mustDecode(s string) []byte {
 		panic(err)
 	}
 	return res
-}
-
-func newState(t *testing.T) *state.StateDB {
-	state, err := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return state
 }
 
 func newTestContract(code []byte) *Contract {

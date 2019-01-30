@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -12,9 +11,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/evm"
+	"github.com/umbracle/minimal/state/evm"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -45,11 +43,8 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env := c.Env.ToEnv(t)
 	env.GasPrice = c.Exec.GasPrice
 
-	fmt.Println("-------------------------------------")
-	fmt.Println(name)
-
 	initialCall := true
-	canTransfer := func(state *state.StateDB, address common.Address, amount *big.Int) bool {
+	canTransfer := func(state evm.State, address common.Address, amount *big.Int) bool {
 		if initialCall {
 			initialCall = false
 			return true
@@ -57,22 +52,19 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return evm.CanTransfer(state, address, amount)
 	}
 
-	transfer := func(state *state.StateDB, from, to common.Address, amount *big.Int) error {
+	transfer := func(state evm.State, from, to common.Address, amount *big.Int) error {
 		return nil
 	}
 
-	state := buildState(t, c.Pre)
+	state, _ := buildState(t, c.Pre)
+	txn := state.Txn()
 
-	e := evm.NewEVM(state, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
+	e := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 
-	fmt.Printf("BlockNumber: %s\n", c.Env.Number)
-	fmt.Println(c.Exec.Code)
-
 	ret, gas, err := e.Call(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
 
-	fmt.Println(name)
 	if c.Gas == "" {
 		if err == nil {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")
@@ -92,7 +84,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	// check logs
-	if logs := rlpHash(state.Logs()); logs != common.HexToHash(c.Logs) {
+	if logs := rlpHash(txn.Logs()); logs != common.HexToHash(c.Logs) {
 		t.Fatalf("logs hash mismatch: got %x, want %x", logs, c.Logs)
 	}
 
@@ -104,7 +96,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 			key := common.HexToHash(k)
 			val := common.HexToHash(v)
 
-			if have := state.GetState(addr, key); have != val {
+			if have := txn.GetState(addr, key); have != val {
 				t.Fatalf("wrong storage value at %x:\n  got  %x\n  want %x", k, have, val)
 			}
 		}
@@ -124,7 +116,6 @@ func TestEVM(t *testing.T) {
 
 	long := []string{
 		"loop-",
-		"vmPerformance",
 	}
 
 	for _, folder := range folders {
@@ -134,7 +125,7 @@ func TestEVM(t *testing.T) {
 		}
 
 		for _, file := range files {
-			t.Run(folder, func(t *testing.T) {
+			t.Run(file, func(t *testing.T) {
 				if !strings.HasSuffix(file, ".json") {
 					return
 				}
