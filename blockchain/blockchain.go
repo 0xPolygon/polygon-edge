@@ -8,7 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/umbracle/minimal/storage"
+	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 )
 
 // Blockchain is a blockchain reference
@@ -34,11 +36,44 @@ func (b *Blockchain) Genesis() *types.Header {
 }
 
 // WriteGenesis writes the genesis block if not present
-func (b *Blockchain) WriteGenesis(header *types.Header) error {
+func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
+
+	// The chain is not empty
+	if !b.Empty() {
+		return nil
+	}
+
+	// The chain is empty, write the genesis and generate
+	// the preallocated state
+
+	// TODO, later on this state will be stored on the blockchain object
+	// Right now is only used to calculate the state root of the genesis
+	s := state.NewState()
+
+	txn := s.Txn()
+	for addr, account := range genesis.Alloc {
+		txn.AddBalance(addr, account.Balance)
+		txn.SetCode(addr, account.Code)
+		txn.SetNonce(addr, account.Nonce)
+		for key, value := range account.Storage {
+			txn.SetState(addr, key, value)
+		}
+	}
+
+	_, root := txn.Commit(false)
+
+	header := genesis.ToBlock()
+	header.Root = common.BytesToHash(root)
+
 	b.genesis = header
 
-	hash := b.db.ReadHeadHash()
-	if hash != nil {
+	return nil
+}
+
+// WriteHeaderGenesis writes the genesis without any state allocation
+func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
+	// The chain is not empty
+	if !b.Empty() {
 		return nil
 	}
 
@@ -49,8 +84,16 @@ func (b *Blockchain) WriteGenesis(header *types.Header) error {
 	if err := b.advanceHead(header); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// Empty checks if the blockchain is empty
+func (b *Blockchain) Empty() bool {
+	header := b.db.ReadHeadNumber()
+	if header == nil {
+		return true
+	}
+	return header.Cmp(big.NewInt(0)) != 0
 }
 
 func (b *Blockchain) advanceHead(h *types.Header) error {
@@ -67,6 +110,29 @@ func (b *Blockchain) Header() *types.Header {
 	}
 	header := b.db.ReadHeader(*hash)
 	return header
+}
+
+// CommitBodies writes the bodies
+func (b *Blockchain) CommitBodies(headers []common.Hash, bodies []*types.Body) error {
+	if len(headers) != len(bodies) {
+		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(bodies))
+	}
+
+	for indx, hash := range headers {
+		b.db.WriteBody(hash, bodies[indx])
+	}
+	return nil
+}
+
+// CommitReceipts writes the receipts
+func (b *Blockchain) CommitReceipts(headers []common.Hash, receipts []types.Receipts) error {
+	if len(headers) != len(receipts) {
+		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(receipts))
+	}
+	for indx, hash := range headers {
+		b.db.WriteReceipts(hash, receipts[indx])
+	}
+	return nil
 }
 
 // CommitChain writes all the other data related to the chain (body and receipts)

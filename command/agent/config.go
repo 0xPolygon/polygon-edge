@@ -21,7 +21,7 @@ func DefaultTelemetry() *Telemetry {
 func DefaultConfig() *Config {
 	return &Config{
 		Chain:     "foundation",
-		DataDir:   "./",
+		DataDir:   "./test-chain",
 		BindAddr:  "0.0.0.0",
 		BindPort:  30303,
 		Telemetry: DefaultTelemetry(),
