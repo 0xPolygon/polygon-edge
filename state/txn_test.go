@@ -12,11 +12,29 @@ import (
 	"github.com/umbracle/minimal/state/evm"
 )
 
+var addr1 = common.HexToAddress("1")
+var addr2 = common.HexToAddress("2")
+
+var hash0 = common.HexToHash("0")
+var hash1 = common.HexToHash("1")
+var hash2 = common.HexToHash("2")
+
+var defaultPreState = map[common.Address]*PreState{
+	addr1: {
+		State: map[common.Hash]common.Hash{
+			hash1: hash1,
+		},
+	},
+}
+
 func buildPreState(s *State, preState map[common.Address]*PreState) {
 	txn := s.Txn()
 	for i, j := range preState {
 		txn.SetNonce(i, j.Nonce)
 		txn.SetBalance(i, big.NewInt(int64(j.Balance)))
+		for k, v := range j.State {
+			txn.SetState(i, k, v)
+		}
 	}
 	txn.Commit(false)
 }
@@ -24,6 +42,7 @@ func buildPreState(s *State, preState map[common.Address]*PreState) {
 type PreState struct {
 	Nonce   uint64
 	Balance uint64
+	State   map[common.Hash]common.Hash
 }
 
 type Transaction struct {
@@ -129,5 +148,199 @@ func TestTransition(t *testing.T) {
 				t.Fatalf("It did not failed (%s)", c.Err)
 			}
 		})
+	}
+}
+
+func TestWriteState(t *testing.T) {
+	// write new state
+	s := NewState()
+	txn := s.Txn()
+
+	txn.SetState(addr1, hash1, hash1)
+	txn.SetState(addr1, hash2, hash2)
+
+	txn.Commit(false)
+
+	txn = s.Txn()
+	if txn.GetState(addr1, hash1) != hash1 {
+		t.Fail()
+	}
+	if txn.GetState(addr1, hash2) != hash2 {
+		t.Fail()
+	}
+}
+
+func TestWriteEmptyState(t *testing.T) {
+	// Create account and write empty state
+	s := NewState()
+	txn := s.Txn()
+
+	// Without EIP150 the data is added
+	txn.SetState(addr1, hash1, hash0)
+	txn.Commit(false)
+
+	txn = s.Txn()
+	if !txn.Exist(addr1) {
+		t.Fatal()
+	}
+
+	s = NewState()
+	txn = s.Txn()
+
+	// With EIP150 the empty data is removed
+	txn.SetState(addr1, hash1, hash0)
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestUpdateStateInPreState(t *testing.T) {
+	// update state that was already set in prestate
+	s := NewState()
+	buildPreState(s, defaultPreState)
+
+	txn := s.Txn()
+	if txn.GetState(addr1, hash1) != hash1 {
+		t.Fatal()
+	}
+
+	txn.SetState(addr1, hash1, hash2)
+	txn.Commit(false)
+
+	txn = s.Txn()
+	if txn.GetState(addr1, hash1) != hash2 {
+		t.Fatal()
+	}
+}
+
+func TestUpdateStateWithEmpty(t *testing.T) {
+	// If the state (in prestate) is updated to empty it should be removed
+	s := NewState()
+	buildPreState(s, defaultPreState)
+
+	txn := s.Txn()
+	txn.SetState(addr1, hash1, hash0)
+
+	// TODO, test with false (should not be deleted)
+	// TODO, test with balance on the account and nonce
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestSuicideAccountInPreState(t *testing.T) {
+	// Suicide an account created in the prestate
+	s := NewState()
+	buildPreState(s, defaultPreState)
+
+	txn := s.Txn()
+	txn.Suicide(addr1)
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestSuicideAccount(t *testing.T) {
+	// Create a new account and suicide it
+	s := NewState()
+
+	txn := s.Txn()
+	txn.SetState(addr1, hash1, hash1)
+	txn.Suicide(addr1)
+
+	// Note, even if has commit suicide it still exists in the current txn
+	if !txn.Exist(addr1) {
+		t.Fatal()
+	}
+
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestSuicideCoinbase(t *testing.T) {
+	// Suicide the coinbase of the block
+	s := NewState()
+	buildPreState(s, defaultPreState)
+
+	txn := s.Txn()
+	txn.Suicide(addr1)
+	txn.AddSealingReward(addr1, big.NewInt(10))
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.GetBalance(addr1).Cmp(big.NewInt(10)) != 0 {
+		t.Fatal()
+	}
+}
+
+func TestChangePrestateAccountBalanceToZero(t *testing.T) {
+	// If the balance of the account changes to zero the account is deleted
+	preState := map[common.Address]*PreState{
+		addr1: {
+			Balance: 10,
+		},
+	}
+
+	s := NewState()
+	buildPreState(s, preState)
+
+	txn := s.Txn()
+	txn.SetBalance(addr1, big.NewInt(0))
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestChangeAccountBalanceToZero(t *testing.T) {
+	// If the balance of the account changes to zero the account is deleted
+	s := NewState()
+
+	txn := s.Txn()
+	txn.SetBalance(addr1, big.NewInt(10))
+	txn.SetBalance(addr1, big.NewInt(0))
+	txn.Commit(true)
+
+	txn = s.Txn()
+	if txn.Exist(addr1) {
+		t.Fatal()
+	}
+}
+
+func TestSnapshotUpdateData(t *testing.T) {
+	// Snapshots should keep the data
+
+	s := NewState()
+	txn := s.Txn()
+
+	txn.SetState(addr1, hash1, hash1)
+	if txn.GetState(addr1, hash1) != hash1 {
+		t.Fail()
+	}
+
+	ss := txn.Snapshot()
+	txn.SetState(addr1, hash1, hash2)
+	if txn.GetState(addr1, hash1) != hash2 {
+		t.Fail()
+	}
+
+	txn.RevertToSnapshot(ss)
+	if txn.GetState(addr1, hash1) != hash1 {
+		t.Fail()
 	}
 }
