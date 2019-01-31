@@ -10,8 +10,8 @@ import (
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/storage"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -62,7 +62,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 
 	b := blockchain.NewBlockchain(s, engine)
-	if err := b.WriteGenesis(c.Genesis.header); err != nil {
+	if err := b.WriteHeaderGenesis(c.Genesis.header); err != nil {
 		t.Fatal(err)
 	}
 

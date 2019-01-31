@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/umbracle/minimal/storage"
+	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 type fakeConsensus struct {
@@ -121,7 +121,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 
 	b := NewBlockchain(s, &fakeConsensus{})
 	if headers != nil {
-		if err := b.WriteGenesis(headers[0]); err != nil {
+		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)
 		}
 		if err := b.WriteHeaders(headers[1:]); err != nil {

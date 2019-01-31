@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/minimal/chain"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -20,7 +22,7 @@ func TestGenesis(t *testing.T) {
 
 	// add genesis block
 	genesis := &types.Header{Difficulty: big.NewInt(1), Number: big.NewInt(0)}
-	if err := b.WriteGenesis(genesis); err != nil {
+	if err := b.WriteHeaderGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,11 +32,42 @@ func TestGenesis(t *testing.T) {
 	}
 }
 
-type chain struct {
+func TestChainGenesis(t *testing.T) {
+	// Test chain genesis from json files
+	cases := []struct {
+		Name string
+		Root string
+	}{
+		{
+			Name: "foundation",
+			Root: "0xd7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			genesis, err := chain.ImportFromName(c.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			b := NewTestBlockchain(t, nil)
+			if err := b.WriteGenesis(genesis.Genesis); err != nil {
+				t.Fatal(err)
+			}
+
+			if root := b.genesis.Root.String(); root != c.Root {
+				t.Fatalf("Expected %s but found %s", c.Root, root)
+			}
+		})
+	}
+}
+
+type dummyChain struct {
 	headers map[byte]*types.Header
 }
 
-func (c *chain) add(h *header) error {
+func (c *dummyChain) add(h *header) error {
 	if _, ok := c.headers[h.hash]; ok {
 		return fmt.Errorf("hash already imported")
 	}
@@ -157,7 +190,7 @@ func TestInsertHeaders(t *testing.T) {
 		t.Run(cc.Name, func(tt *testing.T) {
 			b := NewTestBlockchain(t, nil)
 
-			chain := chain{
+			chain := dummyChain{
 				headers: map[byte]*types.Header{},
 			}
 			for _, i := range cc.History {
@@ -167,7 +200,7 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			// genesis is 0x0
-			if err := b.WriteGenesis(chain.headers[0x0]); err != nil {
+			if err := b.WriteHeaderGenesis(chain.headers[0x0]); err != nil {
 				tt.Fatal(err)
 			}
 

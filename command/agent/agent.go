@@ -14,13 +14,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
-	"github.com/umbracle/minimal/storage"
 	"github.com/umbracle/minimal/syncer"
 )
 
@@ -47,7 +47,6 @@ func (a *Agent) Start() error {
 	if err != nil {
 		return fmt.Errorf("Failed to load chain %s: %v", a.config.Chain, err)
 	}
-	genesis := chain.Genesis.ToBlock().Header()
 
 	// Load private key from memory (TODO, do it from a file)
 	privateKey := "b4c65ef6b82e96fb5f26dc10a79c929985217c078584721e9157c238d1690b22"
@@ -89,7 +88,7 @@ func (a *Agent) Start() error {
 
 	// blockchain object
 	blockchain := blockchain.NewBlockchain(storage, consensus)
-	if err := blockchain.WriteGenesis(genesis); err != nil {
+	if err := blockchain.WriteGenesis(chain.Genesis); err != nil {
 		panic(err)
 	}
 
@@ -150,8 +149,8 @@ func (a *Agent) startTelemetry() {
 	}
 
 	sinks = append(sinks, prom)
-
 	sinks = append(sinks, memSink)
+
 	metrics.NewGlobal(metricsConf, sinks)
 
 	l, err := net.Listen("tcp", "localhost:8080")
