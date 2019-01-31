@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state/evm"
 	"github.com/umbracle/minimal/state/trie"
