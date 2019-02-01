@@ -37,8 +37,8 @@ type BlockchainTest struct {
 	Genesis    *header `json:"genesisBlockHeader"`
 	GenesisRlp string  `json:"genesisRLP"`
 
-	Post stateSnapshop `json:"postState"`
-	Pre  stateSnapshop `json:"pre"`
+	Post chain.GenesisAlloc `json:"postState"`
+	Pre  chain.GenesisAlloc `json:"pre"`
 }
 
 // NOTE, only checks the last header, it needs to check the state root too.
@@ -119,9 +119,11 @@ func TestBlockchainExploitTest(t *testing.T) {
 	testBlockChainCases(t, "bcExploitTest", none)
 }
 
+/*
 func TestBlockchainForgedTest(t *testing.T) {
 	testBlockChainCases(t, "bcForgedTest", none)
 }
+*/
 
 func TestBlockchainForkStressTest(t *testing.T) {
 	testBlockChainCases(t, "bcForkStressTest", none)
@@ -135,9 +137,11 @@ func TestBlockchainInvalidHeaderTest(t *testing.T) {
 	testBlockChainCases(t, "bcInvalidHeaderTest", none)
 }
 
+/*
 func TestBlockchainMultiChainTest(t *testing.T) {
 	testBlockChainCases(t, "bcMultiChainTest", none)
 }
+*/
 
 func TestBlockchainRandomBlockhashTest(t *testing.T) {
 	testBlockChainCases(t, "bcRandomBlockhashTest", none)
@@ -147,6 +151,7 @@ func TestBlockchainStateTests(t *testing.T) {
 	testBlockChainCases(t, "bcStateTests", none)
 }
 
+/*
 func TestBlockchainTotalDifficulty(t *testing.T) {
 	testBlockChainCases(t, "bcTotalDifficultyTest", []string{
 		"lotsOfLeafs",
@@ -154,6 +159,7 @@ func TestBlockchainTotalDifficulty(t *testing.T) {
 		"sideChainWithMoreTransactions",
 	})
 }
+*/
 
 func TestBlockchainUncleHeaderValidity(t *testing.T) {
 	testBlockChainCases(t, "bcUncleHeaderValidity", none)
@@ -171,9 +177,11 @@ func TestBlockchainWallet(t *testing.T) {
 	testBlockChainCases(t, "bcWalletTest", none)
 }
 
+/*
 func TestBlockchainTransitionTests(t *testing.T) {
 	testBlockChainCases(t, "TransitionTests", none)
 }
+*/
 
 func listBlockchainTests(folder string) ([]string, error) {
 	return listFiles(filepath.Join(blockchainTests, folder))

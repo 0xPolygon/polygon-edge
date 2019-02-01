@@ -37,6 +37,7 @@ type info struct {
 	SourceHash  string `json:"sourcehash"`
 }
 
+/*
 type stateEntry struct {
 	Balance string            `json:"balance"`
 	Code    string            `json:"code"`
@@ -45,6 +46,7 @@ type stateEntry struct {
 }
 
 type stateSnapshop map[string]*stateEntry
+*/
 
 type env struct {
 	Coinbase   string `json:"currentCoinbase"`
@@ -99,29 +101,12 @@ func stringToBigIntT(t *testing.T, str string) *big.Int {
 	return n
 }
 
-func stringToBytesT(t *testing.T, str string) []byte {
-	data, err := hexutil.Decode(str)
-	if err != nil {
-		panic(err)
-		t.Fatal(err)
-	}
-	return data
-}
-
 func stringToUint64(str string) (uint64, error) {
 	n, err := stringToBigInt(str)
 	if err != nil {
 		return 0, err
 	}
 	return n.Uint64(), nil
-}
-
-func stringToUint64T(t *testing.T, str string) uint64 {
-	n, err := stringToUint64(str)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return n
 }
 
 func (e *env) ToEnv(t *testing.T) *evm.Env {
@@ -199,24 +184,21 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, pre stateSnapshop) (*state.State, []byte) {
+func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) {
 	state := state.NewState()
 	txn := state.Txn()
 
-	for i, a := range pre {
-		addr := stringToAddressT(t, i)
-
+	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)
-		txn.SetNonce(addr, stringToUint64T(t, a.Nonce))
-		txn.SetBalance(addr, stringToBigIntT(t, a.Balance))
+		txn.SetNonce(addr, alloc.Nonce)
+		txn.SetBalance(addr, alloc.Balance)
 
-		if a.Code != "" {
-			code := stringToBytesT(t, a.Code)
-			txn.SetCode(addr, code)
+		if len(alloc.Code) != 0 {
+			txn.SetCode(addr, alloc.Code)
 		}
 
-		for k, v := range a.Storage {
-			txn.SetState(addr, common.HexToHash(k), common.HexToHash(v))
+		for k, v := range alloc.Storage {
+			txn.SetState(addr, k, v)
 		}
 	}
 
@@ -508,7 +490,7 @@ func listFolders(folder string) ([]string, error) {
 }
 
 func listFiles(folder string) ([]string, error) {
-	if strings.HasPrefix(TESTS, folder) {
+	if !strings.HasPrefix(folder, filepath.Base(TESTS)) {
 		folder = filepath.Join(TESTS, folder)
 	}
 

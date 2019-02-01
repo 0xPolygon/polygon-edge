@@ -35,8 +35,8 @@ type VMCase struct {
 	Logs string `json:"logs"`
 	Out  string `json:"out"`
 
-	Post stateSnapshop `json:"post"`
-	Pre  stateSnapshop `json:"pre"`
+	Post chain.GenesisAlloc `json:"post"`
+	Pre  chain.GenesisAlloc `json:"pre"`
 }
 
 func testVMCase(t *testing.T, name string, c *VMCase) {
@@ -89,15 +89,10 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	// check state
-	for i, account := range c.Post {
-		addr := stringToAddressT(t, i)
-
-		for k, v := range account.Storage {
-			key := common.HexToHash(k)
-			val := common.HexToHash(v)
-
+	for addr, alloc := range c.Post {
+		for key, val := range alloc.Storage {
 			if have := txn.GetState(addr, key); have != val {
-				t.Fatalf("wrong storage value at %x:\n  got  %x\n  want %x", k, have, val)
+				t.Fatalf("wrong storage value at %x:\n  got  %x\n  want %x", key, have, val)
 			}
 		}
 	}
