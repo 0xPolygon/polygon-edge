@@ -109,6 +109,14 @@ func stringToUint64(str string) (uint64, error) {
 	return n.Uint64(), nil
 }
 
+func stringToUint64T(t *testing.T, str string) uint64 {
+	n, err := stringToUint64(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
 func (e *env) ToEnv(t *testing.T) *evm.Env {
 	return &evm.Env{
 		BlockHash:  common.HexToHash(""),
