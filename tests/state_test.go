@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/chain"
 )
 
 type gasPool struct {
@@ -33,7 +34,7 @@ var stateTests = "GeneralStateTests"
 type stateCase struct {
 	Info        *info                `json:"_info"`
 	Env         *env                 `json:"env"`
-	Pre         stateSnapshop        `json:"pre"`
+	Pre         chain.GenesisAlloc   `json:"pre"`
 	Post        map[string]postState `json:"post"`
 	Transaction *stTransaction       `json:"transaction"`
 }

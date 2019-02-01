@@ -1,8 +1,11 @@
 package chain
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 
@@ -163,7 +166,7 @@ type GenesisAlloc map[common.Address]GenesisAccount
 func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
 		Code       *hexutil.Bytes              `json:"code,omitempty"`
-		Storage    map[common.Hash]common.Hash `json:"storage,omitempty"`
+		Storage    map[storageJSON]storageJSON `json:"storage,omitempty"`
 		Balance    *math.HexOrDecimal256       `json:"balance" gencodec:"required"`
 		Nonce      *math.HexOrDecimal64        `json:"nonce,omitempty"`
 		PrivateKey *hexutil.Bytes              `json:"secretKey,omitempty"`
@@ -177,7 +180,12 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	if dec.Code != nil {
 		g.Code = *dec.Code
 	}
-	g.Storage = dec.Storage
+	if dec.Storage != nil {
+		g.Storage = make(map[common.Hash]common.Hash, len(dec.Storage))
+		for k, v := range dec.Storage {
+			g.Storage[common.Hash(k)] = common.Hash(v)
+		}
+	}
 	if dec.Balance == nil {
 		return errors.New("missing required field 'balance' for GenesisAccount")
 	}
@@ -187,6 +195,21 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	}
 	if dec.PrivateKey != nil {
 		g.PrivateKey = *dec.PrivateKey
+	}
+	return nil
+}
+
+type storageJSON common.Hash
+
+func (h *storageJSON) UnmarshalText(text []byte) error {
+	text = bytes.TrimPrefix(text, []byte("0x"))
+	if len(text) > 64 {
+		return fmt.Errorf("too many hex characters in storage key/value %q", text)
+	}
+
+	offset := len(h) - len(text)/2 // pad on the left
+	if _, err := hex.Decode(h[offset:], text); err != nil {
+		return fmt.Errorf("invalid hex storage key/value %q", text)
 	}
 	return nil
 }
