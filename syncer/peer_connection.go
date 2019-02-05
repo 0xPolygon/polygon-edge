@@ -104,7 +104,7 @@ func (p *PeerConnection) action() {
 
 			p.requestBandwidth(p.sched.getHeaderSize() * int(job.count))
 
-			data, size, ll, err = p.conn.RequestHeadersSyncSize(job.block, job.count)
+			data, err = p.conn.RequestHeadersSync(job.block, job.count)
 			fmt.Printf("DOWN HEADERS: (%s): %d\n", p.peerID, size)
 			context = "headers"
 		case *BodiesJob:
@@ -112,7 +112,7 @@ func (p *PeerConnection) action() {
 
 			p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
-			data, size, ll, err = p.conn.RequestBodiesSyncSize(job.hash, job.hashes)
+			data, err = p.conn.RequestBodiesSync(job.hash, job.hashes)
 			fmt.Printf("DOWN BODIES: (%s): %d\n", p.peerID, size)
 			context = "bodies"
 		case *ReceiptsJob:
@@ -120,7 +120,7 @@ func (p *PeerConnection) action() {
 
 			p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
-			data, size, ll, err = p.conn.RequestReceiptsSyncSize(job.hash, job.hashes)
+			data, err = p.conn.RequestReceiptsSync(job.hash, job.hashes)
 			fmt.Printf("DOWN RECEIPTS: (%s): %d\n", p.peerID, size)
 			context = "receipts"
 		}
@@ -134,15 +134,17 @@ func (p *PeerConnection) action() {
 		if err != nil {
 			if strings.Contains(err.Error(), "session closed") {
 
-				fmt.Println("---- DOPE ----")
-				connectedAt := p.peer.ConnectedAt()
+				/*
+					fmt.Println("---- DOPE ----")
+					connectedAt := p.peer.ConnectedAt()
 
-				fmt.Println(p.peerID)
-				fmt.Println(connectedAt)
-				fmt.Println(time.Since(connectedAt))
-				fmt.Println(p.peer.Info.Name)
+					fmt.Println(p.peerID)
+					fmt.Println(connectedAt)
+					fmt.Println(time.Since(connectedAt))
+					fmt.Println(p.peer.Info.Name)
 
-				// panic("X")
+					// panic("X")
+				*/
 
 				return
 			}
