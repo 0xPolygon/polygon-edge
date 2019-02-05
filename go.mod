@@ -8,7 +8,7 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190115013929-ed77733ec07d // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
-	github.com/ethereum/go-ethereum v1.8.22
+	github.com/ethereum/go-ethereum v1.8.20
 	github.com/ferranbt/periodic-dispatcher v0.0.0-20181108165813-15a0c0298473
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gobuffalo/packr v1.22.0
@@ -37,11 +37,14 @@ require (
 	github.com/opentracing/opentracing-go v1.0.2 // indirect
 	github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c // indirect
 	github.com/prometheus/client_golang v0.9.2
+	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a // indirect
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/ryanuber/columnize v2.1.0+incompatible
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
 	github.com/syndtr/goleveldb v0.0.0-20190203031304-2f17a3356c66
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc // indirect
 	golang.org/x/crypto v0.0.0-20190131182504-b8fe1690c613
+	gopkg.in/fatih/set.v0 v0.2.1 // indirect
+	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
