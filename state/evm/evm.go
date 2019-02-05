@@ -99,7 +99,6 @@ type Instructions []byte
 // Env refers to the block information the transactions runs in
 // it is shared for all the contracts executed so its in the EVM.
 type Env struct {
-	BlockHash  common.Hash
 	Coinbase   common.Address
 	Timestamp  *big.Int
 	Number     *big.Int
@@ -347,6 +346,9 @@ func (e *EVM) calculateFixedGasUsage(op OpCode) uint64 {
 
 	case JUMPI:
 		return GasSlowStep
+
+	case BLOCKHASH:
+		return GasExtStep
 
 	case PC, GAS, MSIZE, POP, GASLIMIT, DIFFICULTY, NUMBER, TIMESTAMP, COINBASE, GASPRICE, CODESIZE, CALLDATASIZE, CALLVALUE, CALLER, ORIGIN, ADDRESS, RETURNDATASIZE:
 		return GasQuickStep
@@ -1650,11 +1652,15 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 func (e *EVM) executeBlockInformation(op OpCode) (*big.Int, error) {
 	switch op {
 	case BLOCKHASH:
-		n := e.pop()
-		if n == nil {
+		num := e.pop()
+		if num == nil {
 			return nil, ErrStackUnderflow
 		}
-		return e.getHash(n.Uint64()).Big(), nil
+		n := big.NewInt(1).Sub(e.env.Number, common.Big257)
+		if num.Cmp(n) > 0 && num.Cmp(e.env.Number) < 0 {
+			return e.getHash(num.Uint64()).Big(), nil
+		}
+		return big.NewInt(0), nil
 
 	case COINBASE:
 		return e.env.Coinbase.Big(), nil
@@ -2149,6 +2155,11 @@ func (m *Memory) Set32(o *big.Int, val *big.Int) (uint64, error) {
 func (m *Memory) Set(o *big.Int, l *big.Int, data []byte) (uint64, error) {
 	offset := o.Uint64()
 	length := l.Uint64()
+
+	// length is zero
+	if l.Sign() == 0 {
+		return 0, nil
+	}
 
 	size, overflow := bigUint64(big.NewInt(1).Add(o, l))
 	if overflow {

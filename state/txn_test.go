@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -76,6 +78,10 @@ func (g *gasPool) SubGas(amount uint64) error {
 	return nil
 }
 
+func (g *gasPool) AddGas(amount uint64) {
+	g.gas += amount
+}
+
 func newGasPool(gas uint64) *gasPool {
 	return &gasPool{gas}
 }
@@ -135,7 +141,7 @@ func TestTransition(t *testing.T) {
 			buildPreState(s, c.PreState)
 
 			txn := s.Txn()
-			err := txn.Apply(c.Transaction.ToMessage(), &evm.Env{}, chain.GasTableHomestead, chain.ForksInTime{}, vmTestBlockHash, newGasPool(1000), true)
+			_, err := txn.Apply(c.Transaction.ToMessage(), &evm.Env{}, chain.GasTableHomestead, chain.ForksInTime{}, vmTestBlockHash, newGasPool(1000), true)
 
 			if err != nil {
 				if c.Err == "" {
@@ -270,6 +276,41 @@ func TestSuicideAccount(t *testing.T) {
 	}
 }
 
+func TestSuicideAccountWithData(t *testing.T) {
+	// Data (nonce, balance, code) from a suicided account should be empty
+	s := NewState()
+	txn := s.Txn()
+
+	txn.SetNonce(addr1, 10)
+	txn.SetBalance(addr1, big.NewInt(100))
+	txn.SetCode(addr1, []byte{0x1, 0x2, 0x3})
+	txn.SetState(addr1, hash1, hash1)
+
+	txn.Suicide(addr1)
+	txn.Commit(true)
+
+	txn = s.Txn()
+
+	if balance := txn.GetBalance(addr1); balance.Cmp(big.NewInt(0)) != 0 {
+		t.Fatalf("balance should be zero but found: %d", balance)
+	}
+	if nonce := txn.GetNonce(addr1); nonce != 0 {
+		t.Fatalf("nonce should be zero but found %d", nonce)
+	}
+	if code := txn.GetCode(addr1); len(code) != 0 {
+		t.Fatalf("code should be empty but found: %s", hexutil.Encode(code))
+	}
+	if codeHash := txn.GetCodeHash(addr1); codeHash != (common.Hash{}) {
+		t.Fatalf("code hash should be empty but found: %s", codeHash.String())
+	}
+	if size := txn.GetCodeSize(addr1); size != 0 {
+		t.Fatalf("code size should be zero but found %d", size)
+	}
+	if value := txn.GetState(addr1, hash1); value != (common.Hash{}) {
+		t.Fatalf("value should be empty but found: %s", value.String())
+	}
+}
+
 func TestSuicideCoinbase(t *testing.T) {
 	// Suicide the coinbase of the block
 	s := NewState()
@@ -283,6 +324,46 @@ func TestSuicideCoinbase(t *testing.T) {
 	txn = s.Txn()
 	if txn.GetBalance(addr1).Cmp(big.NewInt(10)) != 0 {
 		t.Fatal()
+	}
+}
+
+func TestSuicideWithIntermediateCommit(t *testing.T) {
+	s := NewState()
+
+	txn := s.Txn()
+	txn.SetNonce(addr1, 10)
+	txn.Suicide(addr1)
+
+	if txn.GetNonce(addr1) != 10 { // it is still 'active'
+		t.Fatal()
+	}
+
+	txn.IntermediateCommit(true)
+
+	if txn.GetNonce(addr1) == 10 {
+		t.Fatal()
+	}
+
+	txn.Commit(true)
+	if txn.GetNonce(addr1) == 10 {
+		t.Fatal()
+	}
+}
+
+func TestRestartRefunds(t *testing.T) {
+	// refunds are only valid per single txn so after each
+	// intermediateCommit they have to be restarted
+	s := NewState()
+	txn := s.Txn()
+
+	txn.AddRefund(1000)
+	if txn.GetRefund() != 1000 {
+		t.Fatal()
+	}
+
+	txn.IntermediateCommit(false)
+	if refunds := txn.GetRefund(); refunds == 1000 {
+		t.Fatalf("refunds should be empty buf founds: %d", refunds)
 	}
 }
 

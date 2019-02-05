@@ -4,14 +4,19 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/blockchain/storage"
-	"github.com/umbracle/minimal/consensus"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -23,6 +28,16 @@ type block struct {
 	Number string    `json:"blocknumber"`
 	Rlp    string    `json:"rlp"`
 	Uncles []*header `json:"uncleHeaders"`
+}
+
+func (b *block) decode() (*types.Block, error) {
+	data, err := hexutil.Decode(b.Rlp)
+	if err != nil {
+		return nil, err
+	}
+	var bb types.Block
+	err = rlp.DecodeBytes(data, &bb)
+	return &bb, err
 }
 
 type BlockchainTest struct {
@@ -41,10 +56,23 @@ type BlockchainTest struct {
 	Pre  chain.GenesisAlloc `json:"pre"`
 }
 
-// NOTE, only checks the last header, it needs to check the state root too.
+func (b *BlockchainTest) buildGenesis() *chain.Genesis {
+	return &chain.Genesis{
+		Nonce:      b.Genesis.header.Nonce.Uint64(),
+		Timestamp:  b.Genesis.header.Time.Uint64(),
+		ParentHash: b.Genesis.header.ParentHash,
+		ExtraData:  b.Genesis.header.Extra,
+		GasLimit:   b.Genesis.header.GasLimit,
+		GasUsed:    b.Genesis.header.GasUsed,
+		Difficulty: b.Genesis.header.Difficulty,
+		Mixhash:    b.Genesis.header.MixDigest,
+		Coinbase:   b.Genesis.header.Coinbase,
+		Alloc:      b.Pre,
+	}
+}
 
 func testBlockChainCase(t *testing.T, c *BlockchainTest) {
-	_, ok := Forks[c.Network]
+	config, ok := Forks[c.Network]
 	if !ok {
 		t.Fatalf("config %s not found", c.Network)
 	}
@@ -54,31 +82,90 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatal(err)
 	}
 
-	var engine consensus.Consensus
-	if c.SealEngine == "NoProof" {
-		engine = &consensus.NoProof{}
-	} else {
-		engine = ethash.NewEthHash(&chain.Params{})
-	}
+	params := &chain.Params{Forks: config}
 
-	b := blockchain.NewBlockchain(s, engine)
-	if err := b.WriteHeaderGenesis(c.Genesis.header); err != nil {
+	engine := ethash.NewEthHash(params)
+	genesis := c.buildGenesis()
+
+	b := blockchain.NewBlockchain(s, engine, params)
+	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}
 
+	if hash := b.Genesis().Hash(); hash != c.Genesis.header.Hash() {
+		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash(), hash.String())
+	}
+	if stateRoot := b.Genesis().Root; stateRoot != c.Genesis.header.Root {
+		t.Fatalf("genesis state root mismatch: expected %s but found %s", c.Genesis.header.Root.String(), stateRoot.String())
+	}
+
 	// Write blocks
-	for _, block := range c.Blocks {
-		if block.Header == nil {
-			continue
+	validBlocks := map[common.Hash]*types.Block{}
+	for _, entry := range c.Blocks {
+		block, err := entry.decode()
+		if err != nil {
+			if entry.Header == nil {
+				continue
+			} else {
+				t.Fatalf("Failed to decode rlp block: %v", err)
+			}
 		}
 
-		if err := b.WriteHeader(block.Header.header); err != nil {
-			t.Fatal(err)
+		blocks := []*types.Block{block}
+		if err := b.WriteBlocks(blocks); err != nil {
+			if entry.Header == nil {
+				continue
+			} else {
+				t.Fatalf("Failed to insert block: %v", err)
+			}
+		}
+		if entry.Header == nil {
+			t.Fatal("Block insertion should have failed")
+		}
+
+		// validate header
+		if !reflect.DeepEqual(entry.Header.header, b.Header()) {
+			t.Fatal("Header is not correct")
+		}
+		validBlocks[block.Hash()] = block
+	}
+
+	lastBlock := b.Header()
+
+	// Validate last block
+	if hash := lastBlock.Hash().String(); hash != c.LastBlockHash {
+		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
+	}
+
+	state, ok := b.GetState(lastBlock)
+	if !ok {
+		t.Fatalf("state of last block not found")
+	}
+
+	// Validate post state, TODO account state and code
+	txn := state.Txn()
+	for k, v := range c.Post {
+		obj, ok := txn.GetAccount(k)
+		if !ok {
+			t.Fatalf("account %s not found", k.String())
+		}
+		if v.Balance.Cmp(obj.Balance) != 0 {
+			t.Fatal()
+		}
+		if v.Nonce != obj.Nonce {
+			t.Fatal()
 		}
 	}
 
-	if hash := b.Header().Hash().String(); hash != c.LastBlockHash {
-		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
+	// Validate imported headers
+	for current := b.Header(); current != nil && current.Number.Uint64() != 0; current = b.GetHeaderByHash(current.ParentHash) {
+		valid, ok := validBlocks[current.Hash()]
+		if !ok {
+			t.Fatalf("Block from chain %s not found", current.Hash())
+		}
+		if !reflect.DeepEqual(current, valid.Header()) {
+			t.Fatalf("Headers are not equal")
+		}
 	}
 }
 
@@ -99,14 +186,23 @@ func testBlockChainCases(t *testing.T, folder string, skip []string) {
 			t.Fatal(err)
 		}
 
+		skip2 := []string{
+			"log1_wrongBloom", // .
+			"wrongMixHash",
+			"wrongNonce",
+			"wrongReceiptTrie", // .
+		}
+
 		for name, cc := range bccases {
-			t.Run(name, func(tt *testing.T) {
-				if contains(skip, name) {
-					tt.Skip()
-				} else {
-					testBlockChainCase(tt, cc)
-				}
-			})
+			if contains(skip2, name) {
+				continue
+			}
+
+			if contains(skip, name) {
+				t.Skip()
+			} else {
+				testBlockChainCase(t, cc)
+			}
 		}
 	}
 }
@@ -116,14 +212,16 @@ func TestBlockchainBlockGasLimitTest(t *testing.T) {
 }
 
 func TestBlockchainExploitTest(t *testing.T) {
-	testBlockChainCases(t, "bcExploitTest", none)
+	if !testing.Short() {
+		testBlockChainCases(t, "bcExploitTest", none)
+	}
 }
 
-/*
 func TestBlockchainForgedTest(t *testing.T) {
-	testBlockChainCases(t, "bcForgedTest", none)
+	testBlockChainCases(t, "bcForgedTest", []string{
+		"ForkUncle",
+	})
 }
-*/
 
 func TestBlockchainForkStressTest(t *testing.T) {
 	testBlockChainCases(t, "bcForkStressTest", none)
@@ -137,11 +235,12 @@ func TestBlockchainInvalidHeaderTest(t *testing.T) {
 	testBlockChainCases(t, "bcInvalidHeaderTest", none)
 }
 
-/*
 func TestBlockchainMultiChainTest(t *testing.T) {
-	testBlockChainCases(t, "bcMultiChainTest", none)
+	testBlockChainCases(t, "bcMultiChainTest", []string{
+		"ChainAtoChainB_blockorder",
+		"CallContractFromNotBestBlock",
+	})
 }
-*/
 
 func TestBlockchainRandomBlockhashTest(t *testing.T) {
 	testBlockChainCases(t, "bcRandomBlockhashTest", none)
@@ -151,15 +250,14 @@ func TestBlockchainStateTests(t *testing.T) {
 	testBlockChainCases(t, "bcStateTests", none)
 }
 
-/*
 func TestBlockchainTotalDifficulty(t *testing.T) {
 	testBlockChainCases(t, "bcTotalDifficultyTest", []string{
 		"lotsOfLeafs",
 		"lotsOfBranches",
 		"sideChainWithMoreTransactions",
+		"uncleBlockAtBlock3afterBlock4",
 	})
 }
-*/
 
 func TestBlockchainUncleHeaderValidity(t *testing.T) {
 	testBlockChainCases(t, "bcUncleHeaderValidity", none)
@@ -177,11 +275,11 @@ func TestBlockchainWallet(t *testing.T) {
 	testBlockChainCases(t, "bcWalletTest", none)
 }
 
-/*
 func TestBlockchainTransitionTests(t *testing.T) {
-	testBlockChainCases(t, "TransitionTests", none)
+	testBlockChainCases(t, "TransitionTests", []string{
+		"blockChainFrontier",
+	})
 }
-*/
 
 func listBlockchainTests(folder string) ([]string, error) {
 	return listFiles(filepath.Join(blockchainTests, folder))

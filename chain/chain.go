@@ -64,16 +64,19 @@ type Genesis struct {
 
 func (g *Genesis) ToBlock() *types.Header {
 	head := &types.Header{
-		Number:     new(big.Int).SetUint64(g.Number),
-		Nonce:      types.EncodeNonce(g.Nonce),
-		Time:       new(big.Int).SetUint64(g.Timestamp),
-		ParentHash: g.ParentHash,
-		Extra:      g.ExtraData,
-		GasLimit:   g.GasLimit,
-		GasUsed:    g.GasUsed,
-		Difficulty: g.Difficulty,
-		MixDigest:  g.Mixhash,
-		Coinbase:   g.Coinbase,
+		Number:      new(big.Int).SetUint64(g.Number),
+		Nonce:       types.EncodeNonce(g.Nonce),
+		Time:        new(big.Int).SetUint64(g.Timestamp),
+		ParentHash:  g.ParentHash,
+		Extra:       g.ExtraData,
+		GasLimit:    g.GasLimit,
+		GasUsed:     g.GasUsed,
+		Difficulty:  g.Difficulty,
+		MixDigest:   g.Mixhash,
+		Coinbase:    g.Coinbase,
+		UncleHash:   types.EmptyUncleHash,
+		ReceiptHash: types.EmptyRootHash,
+		TxHash:      types.EmptyRootHash,
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = GenesisGasLimit

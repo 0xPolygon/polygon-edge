@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/state"
 )
 
 var err = fmt.Errorf("NoProof consensus only meant to be used to verify headers only")
@@ -14,7 +15,7 @@ type NoProof struct {
 }
 
 // VerifyHeader verifies the header is correct
-func (n *NoProof) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
+func (n *NoProof) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
@@ -31,4 +32,8 @@ func (n *NoProof) Seal(block *types.Block) error {
 // Close closes the connection
 func (n *NoProof) Close() error {
 	return err
+}
+
+func (n *NoProof) Finalize(txn *state.Txn, block *types.Block) error {
+	return nil
 }

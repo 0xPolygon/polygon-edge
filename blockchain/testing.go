@@ -7,12 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 )
 
 type fakeConsensus struct {
 }
 
-func (f *fakeConsensus) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
+func (f *fakeConsensus) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
@@ -21,6 +23,10 @@ func (f *fakeConsensus) Author(header *types.Header) (common.Address, error) {
 }
 
 func (f *fakeConsensus) Seal(block *types.Block) error {
+	return nil
+}
+
+func (f *fakeConsensus) Finalize(txn *state.Txn, block *types.Block) error {
 	return nil
 }
 
@@ -119,9 +125,9 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
-	b := NewBlockchain(s, &fakeConsensus{})
+	b := NewBlockchain(s, &fakeConsensus{}, nil)
 	if headers != nil {
-		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
+		if err := b.WriteGenesis(createGenesis(headers[0])); err != nil {
 			t.Fatal(err)
 		}
 		if err := b.WriteHeaders(headers[1:]); err != nil {
@@ -130,4 +136,21 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	return b
+}
+
+func createGenesis(header *types.Header) *chain.Genesis {
+	genesis := &chain.Genesis{
+		Nonce:      header.Nonce.Uint64(),
+		ExtraData:  header.Extra,
+		GasLimit:   header.GasLimit,
+		Difficulty: header.Difficulty,
+		Mixhash:    header.MixDigest,
+		Coinbase:   header.Coinbase,
+		ParentHash: header.ParentHash,
+		Number:     header.Number.Uint64(),
+	}
+	if header.Time != nil {
+		genesis.Timestamp = header.Time.Uint64()
+	}
+	return genesis
 }

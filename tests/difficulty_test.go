@@ -10,6 +10,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/umbracle/minimal/consensus/ethash"
 
@@ -122,19 +123,24 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 
 	engine := ethash.NewEthHash(&chain.Params{Forks: config})
 	for name, i := range cases {
-		t.Run(name, func(tt *testing.T) {
-			parentNumber := i.CurrentBlockNumber
+		t.Run(name, func(t *testing.T) {
+			if i.ParentDifficulty.Cmp(params.MinimumDifficulty) < 0 {
+				t.Skip("difficulty below minimum")
+				return
+			}
+
+			parentNumber := big.NewInt(int64(i.CurrentBlockNumber - 1))
 
 			parent := &types.Header{
 				Difficulty: i.ParentDifficulty,
 				Time:       i.ParentTimestamp,
-				Number:     big.NewInt(int64(parentNumber)),
+				Number:     parentNumber,
 				UncleHash:  i.UncleHash,
 			}
-			difficulty := engine.CalcDifficulty(i.CurrentTimestamp.Uint64(), parent)
 
+			difficulty := engine.CalcDifficulty(i.CurrentTimestamp.Uint64(), parent)
 			if difficulty.Cmp(i.CurrentDifficulty) != 0 {
-				tt.Fatal()
+				t.Fatal()
 			}
 		})
 	}

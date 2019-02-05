@@ -37,17 +37,6 @@ type info struct {
 	SourceHash  string `json:"sourcehash"`
 }
 
-/*
-type stateEntry struct {
-	Balance string            `json:"balance"`
-	Code    string            `json:"code"`
-	Nonce   string            `json:"nonce"`
-	Storage map[string]string `json:"storage"`
-}
-
-type stateSnapshop map[string]*stateEntry
-*/
-
 type env struct {
 	Coinbase   string `json:"currentCoinbase"`
 	Difficulty string `json:"currentDifficulty"`
@@ -119,7 +108,6 @@ func stringToUint64T(t *testing.T, str string) uint64 {
 
 func (e *env) ToEnv(t *testing.T) *evm.Env {
 	return &evm.Env{
-		BlockHash:  common.HexToHash(""),
 		Coinbase:   stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToBigIntT(t, e.Difficulty),
 		GasLimit:   stringToBigIntT(t, e.GasLimit),
@@ -210,8 +198,7 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) 
 		}
 	}
 
-	_, root := txn.Commit(false)
-	return state, root
+	return txn.Commit(false)
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
@@ -353,17 +340,20 @@ var Forks = map[string]*chain.Forks{
 	"EIP158": {
 		Homestead: chain.NewFork(0),
 		EIP150:    chain.NewFork(0),
+		EIP155:    chain.NewFork(0),
 		EIP158:    chain.NewFork(0),
 	},
 	"Byzantium": {
 		Homestead: chain.NewFork(0),
 		EIP150:    chain.NewFork(0),
+		EIP155:    chain.NewFork(0),
 		EIP158:    chain.NewFork(0),
 		Byzantium: chain.NewFork(0),
 	},
 	"Constantinople": {
 		Homestead:      chain.NewFork(0),
 		EIP150:         chain.NewFork(0),
+		EIP155:         chain.NewFork(0),
 		EIP158:         chain.NewFork(0),
 		Byzantium:      chain.NewFork(0),
 		Constantinople: chain.NewFork(0),
@@ -381,8 +371,13 @@ var Forks = map[string]*chain.Forks{
 	"EIP158ToByzantiumAt5": {
 		Homestead: chain.NewFork(0),
 		EIP150:    chain.NewFork(0),
+		EIP155:    chain.NewFork(0),
 		EIP158:    chain.NewFork(0),
 		Byzantium: chain.NewFork(5),
+	},
+	"ByzantiumToConstantinopleAt5": {
+		Byzantium:      chain.NewFork(0),
+		Constantinople: chain.NewFork(5),
 	},
 }
 

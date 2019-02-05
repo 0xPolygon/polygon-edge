@@ -1,14 +1,30 @@
 package ethash
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
+)
+
+var (
+	errLargeBlockTime    = errors.New("timestamp too big")
+	errZeroBlockTime     = errors.New("timestamp equals parent's")
+	errTooManyUncles     = errors.New("too many uncles")
+	errDuplicateUncle    = errors.New("duplicate uncle")
+	errUncleIsAncestor   = errors.New("uncle is ancestor")
+	errDanglingUncle     = errors.New("uncle's parent is not ancestor")
+	errInvalidDifficulty = errors.New("non-positive difficulty")
+	errInvalidMixDigest  = errors.New("invalid mix digest")
+	errInvalidPoW        = errors.New("invalid proof-of-work")
 )
 
 var (
@@ -35,11 +51,22 @@ func NewEthHash(config *chain.Params) *EthHash {
 }
 
 // VerifyHeader verifies the header is correct
-func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal bool) error {
+func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("Extra data too long")
 	}
+
+	if uncle {
+		if header.Time.Cmp(math.MaxBig256) > 0 {
+			return errLargeBlockTime
+		}
+	} else {
+		if header.Time.Cmp(big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())) > 0 {
+			return consensus.ErrFutureBlock
+		}
+	}
+
 	if header.Time.Cmp(parent.Time) <= 0 {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
@@ -81,7 +108,45 @@ func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, seal 
 	return nil
 }
 
+var (
+	big8  = big.NewInt(8)
+	big32 = big.NewInt(32)
+)
+
+func (e *EthHash) Finalize(txn *state.Txn, block *types.Block) error {
+	number := block.Number()
+
+	// Select the correct block reward based on chain progression
+	blockReward := FrontierBlockReward
+	if e.config.Forks.IsByzantium(number.Uint64()) {
+		blockReward = ByzantiumBlockReward
+	}
+	if e.config.Forks.IsConstantinople(number.Uint64()) {
+		blockReward = ConstantinopleBlockReward
+	}
+
+	// Accumulate the rewards for the miner and any included uncles
+	reward := new(big.Int).Set(blockReward)
+
+	r := new(big.Int)
+	for _, uncle := range block.Uncles() {
+		r.Add(uncle.Number, big8)
+		r.Sub(r, number)
+		r.Mul(r, blockReward)
+		r.Div(r, big8)
+
+		txn.AddBalance(uncle.Coinbase, r)
+
+		r.Div(blockReward, big32)
+		reward.Add(reward, r)
+	}
+
+	txn.AddBalance(block.Coinbase(), reward)
+	return nil
+}
+
 func (e *EthHash) verifySeal(header *types.Header) error {
+	// verify the mixHash (nonce)
 	return nil
 }
 

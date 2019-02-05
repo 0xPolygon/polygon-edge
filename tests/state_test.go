@@ -3,31 +3,15 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
 )
-
-type gasPool struct {
-	gas uint64
-}
-
-func (g *gasPool) SubGas(amount uint64) error {
-	if g.gas < amount {
-		return fmt.Errorf("gas limit reached")
-	}
-	g.gas -= amount
-	return nil
-}
-
-func newGasPool(gas uint64) *gasPool {
-	return &gasPool{gas}
-}
 
 var stateTests = "GeneralStateTests"
 
@@ -62,9 +46,9 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 
 	txn := state.Txn()
 
-	gasPool := newGasPool(env.GasLimit.Uint64())
+	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+	_, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
