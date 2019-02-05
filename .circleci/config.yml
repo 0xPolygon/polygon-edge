@@ -10,7 +10,11 @@ jobs:
             - go-mod-v1-{{ checksum "go.sum" }}
       
       - checkout
-      - run: go test -v ./tests/...
+      - run:
+          command: |
+            git submodule init
+            git submodule update
+      - run: go test -v ./tests/... -test.short
 
       - save_cache:
           key: go-mod-v1-{{ checksum "go.sum" }}
