@@ -5,10 +5,13 @@ import (
 	"math"
 	"math/big"
 	"sort"
-	"strconv"
+
+	// "strconv"
 	"sync"
 	"time"
 
+	metrics "github.com/armon/go-metrics"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
@@ -35,6 +38,8 @@ type Blockchain interface {
 	Genesis() *types.Header
 	WriteHeaders(headers []*types.Header) error
 	GetHeaderByNumber(number *big.Int) *types.Header
+	CommitBodies(headers []common.Hash, bodies []*types.Body) error
+	CommitReceipts(headers []common.Hash, receipts []types.Receipts) error
 }
 
 type Peer struct {
@@ -73,24 +78,47 @@ type Syncer struct {
 	waitCh    []chan struct{}
 
 	deliverLock sync.Mutex
+
+	// sizes
+	sizesLock     sync.Mutex
+	headerSize    int
+	headerCount   int
+	bodySize      int
+	bodyCount     int
+	receiptSize   int
+	receiptsCount int
+
+	// bandwidth
+	bandwidthLock sync.Mutex
+	bandwidth     int
 }
 
 // NewSyncer creates a new syncer
 func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer, error) {
 	s := &Syncer{
-		config:      config,
-		NetworkID:   networkID,
-		peers:       map[string]*Peer{},
-		peersLock:   sync.Mutex{},
-		blockchain:  blockchain,
-		queue:       newQueue(),
-		counter:     0,
-		last:        0,
-		deliverLock: sync.Mutex{},
-		waitCh:      make([]chan struct{}, 0),
+		config:        config,
+		NetworkID:     networkID,
+		peers:         map[string]*Peer{},
+		peersLock:     sync.Mutex{},
+		blockchain:    blockchain,
+		queue:         newQueue(),
+		counter:       0,
+		last:          0,
+		deliverLock:   sync.Mutex{},
+		waitCh:        make([]chan struct{}, 0),
+		sizesLock:     sync.Mutex{},
+		headerSize:    300,
+		headerCount:   1,
+		bodySize:      300,
+		bodyCount:     1,
+		receiptSize:   300,
+		receiptsCount: 1,
+		bandwidthLock: sync.Mutex{},
 	}
 
 	header := blockchain.Header()
+
+	fmt.Println(header)
 
 	s.queue.front = s.queue.newItem(header.Number.Uint64() + 1)
 	s.queue.head = header.Hash()
@@ -99,7 +127,52 @@ func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer
 
 	fmt.Printf("Current header (%d): %s\n", header.Number.Uint64(), header.Hash().String())
 
+	go s.refreshBandwidth()
+
 	return s, nil
+}
+
+func (s *Syncer) requestBandwidth(bytes int) (int, int) {
+	s.bandwidthLock.Lock()
+	defer s.bandwidthLock.Unlock()
+
+	if bytes > s.bandwidth {
+		return 0, s.bandwidth
+	}
+	s.bandwidth -= bytes
+	return bytes, s.bandwidth
+}
+
+func (s *Syncer) getHeaderSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.headerSize
+}
+
+func (s *Syncer) getBodiesSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.bodySize
+}
+
+func (s *Syncer) getReceiptsSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.receiptSize
+}
+
+func (s *Syncer) refreshBandwidth() {
+	for {
+		s.bandwidthLock.Lock()
+
+		s.bandwidth += 256000
+		if s.bandwidth > 256000 {
+			s.bandwidth = 256000
+		}
+
+		s.bandwidthLock.Unlock()
+		time.Sleep(1 * time.Second)
+	}
 }
 
 func (s *Syncer) updateChain(block uint64) {
@@ -124,40 +197,46 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 		}
 	*/
 
-	fmt.Println("DAO Fork completed")
-
-	p := newPeer(peer.ID, peer)
-	s.peers[peer.ID] = p
-
-	// find data about the peer
-	header, err := s.fetchHeight(p.conn)
-	if err != nil {
-		fmt.Printf("ERR: fetch height failed: %v\n", err)
-		return
-	}
-
 	/*
-		ancestor, err := p.FindCommonAncestor()
+		fmt.Println("DAO Fork completed")
+
+		p := newPeer(peer.ID, peer)
+		s.peers[peer.ID] = p
+
+		// find data about the peer
+		header, err := s.fetchHeight(p.conn)
 		if err != nil {
-			fmt.Printf("ERR: ancestor failed: %v\n", err)
+			fmt.Printf("ERR: fetch height failed: %v\n", err)
+			return
 		}
+
+		fmt.Printf("Heigth: %d\n", header.Number.Uint64())
+		// fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
+
+		ourHeader := s.blockchain.Header()
+
+		// check that the difficulty is higher than ours
+		if peer.HeaderDiff().Cmp(ourHeader.Difficulty) < 0 {
+			fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
+		} else {
+			fmt.Println("Difficulty higher than ours")
+			s.updateChain(header.Number.Uint64())
+		}
+
+		// wake up some task
+		// s.wakeUp()
 	*/
 
-	fmt.Printf("Heigth: %d\n", header.Number.Uint64())
-	// fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
+	s.updateChain(6000000)
 
-	ourHeader := s.blockchain.Header()
-
-	// check that the difficulty is higher than ours
-	if peer.HeaderDiff().Cmp(ourHeader.Difficulty) < 0 {
-		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
-	} else {
-		fmt.Println("Difficulty higher than ours")
-		s.updateChain(header.Number.Uint64())
+	conn := PeerConnection{
+		peer:   peer,
+		conn:   peer.GetProtocol("eth", 63).(*ethereum.Ethereum),
+		sched:  s,
+		peerID: peer.PrettyString(),
 	}
+	conn.Run()
 
-	// wake up some task
-	s.wakeUp()
 	// go s.runPeer(p)
 }
 
@@ -167,7 +246,7 @@ func (s *Syncer) workerTask(id string) {
 	for {
 		peer := s.dequeuePeer()
 
-		i := s.dequeue()
+		i := s.Dequeue()
 
 		var data interface{}
 		var err error
@@ -194,7 +273,7 @@ func (s *Syncer) workerTask(id string) {
 		// ack the job and enqueue again for more work
 		s.ack(peer, err != nil)
 
-		s.deliver(peer.pretty, context, i.id, data, err)
+		s.Deliver(peer.pretty, context, i.id, data, err)
 
 		fmt.Printf("Completed: %d\n", s.queue.NumOfCompletedBatches())
 	}
@@ -202,9 +281,11 @@ func (s *Syncer) workerTask(id string) {
 
 // Run is the main entry point
 func (s *Syncer) Run() {
-	for i := 0; i < s.config.NumWorkers; i++ {
-		go s.workerTask(strconv.Itoa(i))
-	}
+	/*
+		for i := 0; i < s.config.NumWorkers; i++ {
+			go s.workerTask(strconv.Itoa(i))
+		}
+	*/
 }
 
 type peers []*Peer
@@ -261,6 +342,28 @@ SELECT:
 	}
 }
 
+// TODO, measure this every n times (i.e. epoch)
+func (s *Syncer) updateApproxSize(t string, size int, n int) {
+	// fmt.Printf("T %s, S %d, L %d, Total %d\n", t, size, n, size/n)
+
+	ss := size / n
+
+	switch t {
+	case "headers":
+		s.headerSize = s.headerSize + (ss-s.headerSize)/s.headerCount
+		s.headerCount++
+		// fmt.Printf("Header size: %d\n", s.headerSize)
+	case "bodies":
+		s.bodySize = s.bodySize + (ss-s.bodySize)/s.bodyCount
+		s.bodyCount++
+		// fmt.Printf("Body size: %d\n", s.bodySize)
+	case "receipts":
+		s.receiptSize = s.receiptSize + (ss-s.receiptSize)/s.receiptsCount
+		s.receiptsCount++
+		// fmt.Printf("Receipts size: %d\n", s.receiptSize)
+	}
+}
+
 func (s *Syncer) ack(peer *Peer, failed bool) {
 	s.peersLock.Lock()
 
@@ -299,7 +402,7 @@ func (s *Syncer) wakeUp() {
 	}
 }
 
-func (s *Syncer) dequeue() *Job {
+func (s *Syncer) Dequeue() *Job {
 	job, err := s.queue.Dequeue()
 	if err != nil {
 		fmt.Printf("Failed to dequeue: %v\n", err)
@@ -307,7 +410,7 @@ func (s *Syncer) dequeue() *Job {
 	return job
 }
 
-func (s *Syncer) deliver(peer string, context string, id uint32, data interface{}, err error) {
+func (s *Syncer) Deliver(peer string, context string, id uint32, data interface{}, err error) {
 	s.deliverLock.Lock()
 	defer s.deliverLock.Unlock()
 
@@ -371,6 +474,8 @@ func (s *Syncer) deliver(peer string, context string, id uint32, data interface{
 
 		// write the headers
 		for indx, elem := range data {
+			metrics.SetGauge([]string{"syncer", "block"}, float32(elem.headers[0].Number.Uint64()))
+
 			if err := s.blockchain.WriteHeaders(elem.headers); err != nil {
 				fmt.Printf("Failed to write headers batch: %v", err)
 
@@ -381,6 +486,14 @@ func (s *Syncer) deliver(peer string, context string, id uint32, data interface{
 
 				panic("")
 				return
+			}
+			if err := s.blockchain.CommitBodies(elem.GetBodiesHashes(), elem.bodies); err != nil {
+				fmt.Printf("Failed to write bodies: %v", err)
+				panic("")
+			}
+			if err := s.blockchain.CommitReceipts(elem.GetReceiptsHashes(), elem.receipts); err != nil {
+				fmt.Printf("Failed to write receipts: %v", err)
+				panic("")
 			}
 		}
 	}
@@ -498,6 +611,10 @@ func (s *Syncer) FindCommonAncestor(peer *ethereum.Ethereum) (*types.Header, err
 		return nil, nil
 	}
 	return header, nil
+}
+
+func (s *Syncer) FetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
+	return s.fetchHeight(peer)
 }
 
 // fetchHeight returns the header of the head hash of the peer

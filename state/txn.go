@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sync/atomic"
 	"unsafe"
 
 	"golang.org/x/crypto/sha3"
@@ -39,6 +38,7 @@ var (
 
 type GasPool interface {
 	SubGas(uint64) error
+	AddGas(uint64)
 }
 
 // Trie references the underlaying trie storage
@@ -66,16 +66,16 @@ func newTxn(state *State) *Txn {
 	}
 }
 
-func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) error {
+func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, error) {
 	s := txn.Snapshot()
-	err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun)
+	gas, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun)
 	if err != nil {
 		txn.RevertToSnapshot(s)
 	}
-	return err
+	return gas, err
 }
 
-func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) error {
+func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, error) {
 	// transition
 	s := txn.Snapshot()
 
@@ -83,24 +83,25 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 	if msg.CheckNonce() {
 		nonce := txn.GetNonce(msg.From())
 		if nonce < msg.Nonce() {
-			return fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
+			return 0, fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
 		} else if nonce > msg.Nonce() {
-			return fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
+			return 0, fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
 		}
 	}
 
 	// buy gas
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
 	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
-		return ErrInsufficientBalanceForGas
+		return 0, ErrInsufficientBalanceForGas
 	}
 
 	// check if there is space for this tx in the gaspool
 	if err := gasPool.SubGas(msg.Gas()); err != nil {
-		return err
+		return 0, err
 	}
 
-	txn.gas += msg.Gas()
+	// restart the txn gas
+	txn.gas = msg.Gas()
 
 	txn.initialGas = msg.Gas()
 	txn.SubBalance(msg.From(), mgval)
@@ -127,20 +128,20 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 		}
 		// Make sure we don't exceed uint64 for all data combinations
 		if (math.MaxUint64-txGas)/chain.TxDataNonZeroGas < nz {
-			return vm.ErrOutOfGas
+			return 0, vm.ErrOutOfGas
 		}
 		txGas += nz * chain.TxDataNonZeroGas
 
 		z := uint64(len(data)) - nz
 		if (math.MaxUint64-txGas)/chain.TxDataZeroGas < z {
-			return vm.ErrOutOfGas
+			return 0, vm.ErrOutOfGas
 		}
 		txGas += z * chain.TxDataZeroGas
 	}
 
 	// reduce the intrinsic gas from the total gas
 	if txn.gas < txGas {
-		return vm.ErrOutOfGas
+		return 0, vm.ErrOutOfGas
 	}
 
 	txn.gas -= txGas
@@ -152,8 +153,10 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 		var vmerr error
 		if contractCreation {
+			//fmt.Println("- one ")
 			_, txn.gas, vmerr = e.Create(sender, msg.Data(), msg.Value(), txn.gas)
 		} else {
+			//fmt.Println("- two")
 			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
 			_, txn.gas, vmerr = e.Call(sender, *msg.To(), msg.Data(), msg.Value(), txn.gas)
 		}
@@ -161,7 +164,7 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 		if vmerr != nil {
 			if vmerr == evm.ErrNotEnoughFunds {
 				txn.RevertToSnapshot(s)
-				return vmerr
+				return 0, vmerr
 			}
 		}
 	}
@@ -183,7 +186,11 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 	// pay the coinbase
 	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), msg.GasPrice()))
-	return nil
+
+	// Return remaining gas to the pool for the block
+	gasPool.AddGas(txn.gas)
+
+	return txn.gasUsed(), nil
 }
 
 // gasUsed returns the amount of gas used up by the state transition.
@@ -256,7 +263,11 @@ func (s *stateObject) Copy() *stateObject {
 func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
-		return val.(*stateObject).Copy(), true
+		obj := val.(*stateObject)
+		if obj.deleted {
+			return nil, false
+		}
+		return obj.Copy(), true
 	}
 
 	// From the state we get the account object
@@ -573,7 +584,47 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) (*iradix.Tree, []byte) {
+// IntermediateCommit runs after each tx is completed to set to false those accounts that
+// have been deleted
+func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
+	// between different transactions and before the final commit we must
+	// check all the txns and mark as deleted the ones removed
+
+	remove := [][]byte{}
+	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
+		a, ok := v.(*stateObject)
+		if !ok {
+			return false
+		}
+
+		if a.suicide || a.Empty() && deleteEmptyObjects {
+			remove = append(remove, k)
+		}
+		return false
+	})
+
+	for _, k := range remove {
+		v, ok := txn.txn.Get(k)
+		if !ok {
+			panic("it should not happen")
+		}
+		obj, ok := v.(*stateObject)
+		if !ok {
+			panic("it should not happen")
+		}
+
+		obj2 := obj.Copy()
+		obj2.deleted = true
+		txn.txn.Insert(k, obj2)
+	}
+
+	// delete refunds
+	txn.txn.Delete(refundIndex)
+}
+
+func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
+	txn.IntermediateCommit(deleteEmptyObjects)
+
 	x := txn.txn.Commit()
 
 	tt := txn.state.getRoot().Txn()
@@ -587,7 +638,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*iradix.Tree, []byte) {
 			return false
 		}
 
-		if a.suicide {
+		if a.deleted {
 			tt.Delete(hashit(k))
 			return false
 		}
@@ -599,11 +650,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*iradix.Tree, []byte) {
 
 			a.account.Root = common.BytesToHash(accountStateRoot)
 			a.account.trie = subTrie
-		}
-
-		if a.Empty() && deleteEmptyObjects {
-			tt.Delete(hashit(k))
-			return false
 		}
 
 		if a.dirtyCode {
@@ -622,6 +668,16 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*iradix.Tree, []byte) {
 	t := tt.Commit()
 	hash := tt.Hash()
 
-	atomic.StorePointer(&txn.state.root, unsafe.Pointer(t))
-	return x, hash
+	newState := &State{
+		root: unsafe.Pointer(t),
+		code: map[string][]byte{},
+	}
+
+	// copy all the code
+	for k, v := range txn.state.code {
+		newState.code[k] = v
+	}
+
+	// atomic.StorePointer(&txn.state.root, unsafe.Pointer(t))
+	return newState, hash
 }

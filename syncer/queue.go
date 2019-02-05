@@ -32,7 +32,7 @@ type Job struct {
 }
 
 const (
-	maxElements = 100
+	maxElements = 190
 )
 
 type queue struct {
@@ -131,6 +131,8 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	elem.headersStatus = completedX
 	elem.bodiesStatus = completedX
 	elem.receiptsStatus = completedX
+
+	return nil
 
 	bodies := []int{}
 	receipts := []int{}
@@ -317,7 +319,7 @@ func (q *queue) Dequeue() (*Job, error) {
 		elem.headersStatus = pendingX
 		return &Job{
 			id:      elem.id,
-			payload: &HeadersJob{block: uint64(elem.headersOffset) + elem.block, count: uint64(100 - elem.headersOffset)},
+			payload: &HeadersJob{block: uint64(elem.headersOffset) + elem.block, count: uint64(maxElements - elem.headersOffset)},
 		}, nil
 	}
 
@@ -476,6 +478,22 @@ type element struct {
 	receiptsHeaders []int
 	receiptsOffset  uint32
 	receiptsStatus  elementStatus
+}
+
+func (e *element) GetBodiesHashes() []common.Hash {
+	h := []common.Hash{}
+	for _, i := range e.bodiesHeaders {
+		h = append(h, e.headers[i].Hash())
+	}
+	return h
+}
+
+func (e *element) GetReceiptsHashes() []common.Hash {
+	h := []common.Hash{}
+	for _, i := range e.receiptsHeaders {
+		h = append(h, e.headers[i].Hash())
+	}
+	return h
 }
 
 func (e *element) Last() *types.Header {
