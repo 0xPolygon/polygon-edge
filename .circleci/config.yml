@@ -2,10 +2,17 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.9
-      
-    working_directory: /go/src/github.com/umbracle/minimal
+      - image: circleci/golang:1.11
+    
     steps:
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+      
       - checkout
-      - run: go get -v -t -d ./...
-      - run: go test -v ./tests/... -run TestState
+      - run: go test -v ./tests/...
+
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
