@@ -1874,7 +1874,7 @@ func (e *EVM) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 
 	case BYTE:
 		if x.Cmp(common.Big32) < 0 {
-			return big.NewInt(int64(math.Byte(y, 32, int(x.Int64())))), nil
+			return big.NewInt(1).SetUint64(uint64(math.Byte(y, 32, int(x.Int64())))), nil
 		}
 		return big.NewInt(0), nil
 
