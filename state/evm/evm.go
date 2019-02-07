@@ -301,14 +301,13 @@ func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value
 		return nil, 0, err
 	}
 
-	if err := e.Run(); err != nil {
-		return nil, 0, err
-	}
+	err := e.Run()
 
-	// fmt.Println("-- call is over --")
+	fmt.Println("-- call is over --")
+	fmt.Println(err)
 
 	c := e.currentContract()
-	return c.returnData, c.gas, nil
+	return c.returnData, c.gas, err
 }
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -325,12 +324,10 @@ func (e *EVM) Create(caller common.Address, code []byte, value *big.Int, gas uin
 		return nil, 0, err
 	}
 
-	if err := e.Run(); err != nil {
-		return nil, 0, err
-	}
+	err := e.Run()
 
 	c := e.currentContract()
-	return c.returnData, c.gas, nil
+	return c.returnData, c.gas, err
 }
 
 func (e *EVM) calculateFixedGasUsage(op OpCode) uint64 {
@@ -415,6 +412,8 @@ func (e *EVM) Run() error {
 			ip := e.currentContract().ip
 			ins := e.currentContract().Instructions()
 			op = OpCode(ins[ip])
+
+			fmt.Printf("OP: %s (%d)\n", op.String(), e.currentContract().gas)
 
 			// consume gas for those opcodes with fixed gas
 			if gasUsed := e.calculateFixedGasUsage(op); gasUsed != 0 {
@@ -568,9 +567,17 @@ func (e *EVM) Run() error {
 				vmerr = e.executeCallOperation(op)
 
 			case REVERT, RETURN:
+
+				if op == REVERT {
+					fmt.Println("REVERT")
+				}
+
 				ret, err := e.executeHaltOperations(op)
 				vmerr = err
 				returnData = ret
+
+				fmt.Println("-- err from halt --")
+				fmt.Println(err)
 
 				goto END
 
@@ -605,6 +612,9 @@ func (e *EVM) Run() error {
 					vmerr = ErrStackUnderflow
 					goto END
 				}
+
+				fmt.Println("-- offset --")
+				fmt.Println(offset)
 
 				data, gas, err := e.currentContract().memory.Get(offset, big.NewInt(32))
 				if err != nil {
@@ -749,13 +759,17 @@ func (e *EVM) Run() error {
 
 	END:
 
+		fmt.Println("--")
+		fmt.Println(vmerr)
+
 		// need to handle first the error to consume the gas at least
 		c := e.currentContract()
 
 		// consume all the gas of the current contract
 		if vmerr != nil {
 			// only if its a smart contract error,
-			if vmerr != ErrNotEnoughFunds && vmerr != ErrDepth {
+			if vmerr != ErrNotEnoughFunds && vmerr != ErrDepth && vmerr != ErrExecutionReverted && vmerr != vm.ErrCodeStoreOutOfGas {
+				fmt.Println("- consume all gas -")
 				c.consumeGas(c.gas)
 			}
 		}
@@ -764,7 +778,11 @@ func (e *EVM) Run() error {
 		if e.contractsIndex == 1 {
 			// revert the state
 			if vmerr != nil || op == REVERT {
-				e.state.RevertToSnapshot(e.currentContract().snapshot)
+				if vmerr != vm.ErrCodeStoreOutOfGas { // dont revert in this case
+
+					fmt.Println("REVERT TO SNAPSHOT")
+					e.state.RevertToSnapshot(e.currentContract().snapshot)
+				}
 			}
 
 			return vmerr
@@ -775,7 +793,16 @@ func (e *EVM) Run() error {
 
 		// Set return data
 		if returnData != nil {
-			e.currentContract().returnData = returnData
+			if c.creation {
+				// contract creation only return data if there was a revert error
+				if vmerr == ErrExecutionReverted {
+					fmt.Println("XX")
+					e.currentContract().returnData = returnData
+				}
+			} else {
+				fmt.Println("YYY")
+				e.currentContract().returnData = returnData
+			}
 		}
 
 		returnData = e.currentContract().returnData
@@ -792,7 +819,7 @@ func (e *EVM) Run() error {
 		}
 
 		// Set the state on memory for the contract calls
-		if !c.creation && vmerr == nil && len(returnData) != 0 {
+		if !c.creation && (vmerr == nil || vmerr == ErrExecutionReverted) && len(returnData) != 0 {
 			// return offset values are stored in the child contract
 			retOffset, retSize := c.retOffset, c.retSize
 
@@ -834,6 +861,10 @@ func (e *EVM) executeSStoreOperation() error {
 	address := e.currentContract().address
 
 	loc, val := e.pop(), e.pop()
+
+	fmt.Println("-- store --")
+	fmt.Println(loc)
+	fmt.Println(val)
 
 	var gas uint64
 
@@ -1017,6 +1048,7 @@ func (e *EVM) create(contract *Contract) error {
 	}
 
 	// Take snapshot of the current state
+	fmt.Println("- take snapshot -")
 	contract.snapshot = e.state.Snapshot()
 
 	// Create the new account for the contract
@@ -1399,8 +1431,22 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 		rett = ret
 	}
 
+	if op == REVERT {
+
+		fmt.Println("- check the revert -")
+		// fmt.Println(rett)
+
+		return rett, ErrExecutionReverted
+	}
+
 	if op == RETURN {
 		if e.currentContract().creation {
+
+			fmt.Println("-- return from creation --")
+			// fmt.Println(ret)
+
+			rett = ret
+
 			maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
 				return nil, ErrMaxCodeSizeExceeded
@@ -1426,6 +1472,11 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 			if maxCodeSizeExceeded && err == nil {
 				err = ErrMaxCodeSizeExceeded
 			}
+
+			if err != nil {
+				return nil, err
+			}
+			return rett, nil
 		}
 	}
 
@@ -1656,6 +1707,10 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 		if !e.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
+
+		fmt.Println("-- return --")
+		fmt.Println(e.currentContract().returnData)
+
 		return big.NewInt(int64(len(e.currentContract().returnData))), nil
 
 	default:
