@@ -141,6 +141,8 @@ type Contract struct {
 	bitvec bitvec
 
 	snapshot int
+
+	returnData []byte
 }
 
 func (c *Contract) MemoryLen() *big.Int {
@@ -267,7 +269,7 @@ type EVM struct {
 	CanTransfer CanTransferFunc
 	Transfer    TransferFunc
 
-	returnData []byte
+	// returnData []byte
 
 	snapshot int
 }
@@ -282,9 +284,9 @@ func NewEVM(state State, env *Env, config chain.ForksInTime, gasTable chain.GasT
 		state:          state,
 		env:            env,
 		getHash:        getHash,
-		returnData:     []byte{},
-		CanTransfer:    CanTransfer,
-		Transfer:       Transfer,
+		// returnData:     []byte{},
+		CanTransfer: CanTransfer,
+		Transfer:    Transfer,
 	}
 }
 
@@ -303,8 +305,10 @@ func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value
 		return nil, 0, err
 	}
 
+	// fmt.Println("-- call is over --")
+
 	c := e.currentContract()
-	return e.returnData, c.gas, nil
+	return c.returnData, c.gas, nil
 }
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -326,7 +330,7 @@ func (e *EVM) Create(caller common.Address, code []byte, value *big.Int, gas uin
 	}
 
 	c := e.currentContract()
-	return e.returnData, c.gas, nil
+	return c.returnData, c.gas, nil
 }
 
 func (e *EVM) calculateFixedGasUsage(op OpCode) uint64 {
@@ -403,6 +407,7 @@ func (e *EVM) Run() error {
 
 	for {
 		var vmerr error
+		var returnData []byte
 
 		for e.currentContract().ip < len(e.currentContract().Instructions())-1 {
 			e.currentContract().ip++
@@ -563,8 +568,10 @@ func (e *EVM) Run() error {
 				vmerr = e.executeCallOperation(op)
 
 			case REVERT, RETURN:
-				err := e.executeHaltOperations(op)
+				ret, err := e.executeHaltOperations(op)
 				vmerr = err
+				returnData = ret
+
 				goto END
 
 			case SELFDESTRUCT:
@@ -766,6 +773,13 @@ func (e *EVM) Run() error {
 		// Otherwise, pop the last contract and fill the return fields
 		e.popContract()
 
+		// Set return data
+		if returnData != nil {
+			e.currentContract().returnData = returnData
+		}
+
+		returnData = e.currentContract().returnData
+
 		// Set return codes
 		if vmerr != nil || op == REVERT {
 			e.push(big.NewInt(0))
@@ -778,19 +792,16 @@ func (e *EVM) Run() error {
 		}
 
 		// Set the state on memory for the contract calls
-		if !c.creation && vmerr == nil && len(e.returnData) != 0 {
+		if !c.creation && vmerr == nil && len(returnData) != 0 {
 			// return offset values are stored in the child contract
 			retOffset, retSize := c.retOffset, c.retSize
 
-			if _, err := e.currentContract().memory.Set(big.NewInt(int64(retOffset)), big.NewInt(int64(retSize)), e.returnData); err != nil {
+			if _, err := e.currentContract().memory.Set(big.NewInt(int64(retOffset)), big.NewInt(int64(retSize)), returnData); err != nil {
 				panic(fmt.Errorf("This memory error should not happen: %v", err))
 			}
 		}
 
-		// Remove return data if there is an error
-		if vmerr != nil {
-			e.returnData = []byte{}
-		}
+		returnData = nil
 
 		// Return the gas
 		e.currentContract().gas += c.gas
@@ -1038,8 +1049,6 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 		return nil, ErrStackUnderflow
 	}
 
-	e.returnData = nil
-
 	// Pop input arguments
 	value := e.pop()
 	offset, size := e.pop(), e.pop()
@@ -1125,6 +1134,7 @@ func (e *EVM) executeCreateOperation(op OpCode) error {
 		return err
 	}
 
+	e.currentContract().returnData = nil
 	return e.create(contract)
 }
 
@@ -1147,6 +1157,7 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 		return err
 	}
 
+	e.currentContract().returnData = nil
 	return e.call(contract, op)
 }
 
@@ -1201,7 +1212,14 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 		if err != nil {
 			return err
 		}
-		e.returnData = output
+
+		if e.numContracts() != 1 {
+			// e.returnData = output
+			e.prevContract().returnData = output
+		} else {
+			// its a call
+			e.currentContract().returnData = output
+		}
 	}
 
 	return nil
@@ -1218,8 +1236,6 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 	if !e.stackAtLeast(expected) {
 		return nil, ErrStackUnderflow
 	}
-
-	e.returnData = nil
 
 	// Pop input arguments
 	initialGas := e.pop()
@@ -1347,47 +1363,47 @@ func (e *EVM) executeExtCodeHashOperation() error {
 	return nil
 }
 
-func (e *EVM) executeHaltOperations(op OpCode) error {
+func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 	if op == REVERT && !e.config.Byzantium {
-		return ErrOpcodeNotFound
+		return nil, ErrOpcodeNotFound
 	}
 
-	e.returnData = nil
+	var rett []byte
 
 	if !e.stackAtLeast(2) {
-		return ErrStackUnderflow
+		return nil, ErrStackUnderflow
 	}
 
 	offset, size := e.pop(), e.pop()
 
 	if _, overflow := bigUint64(size); overflow {
-		return ErrGasOverflow
+		return nil, ErrGasOverflow
 	}
 
 	ret, gas, err := e.currentContract().memory.Get(offset, size)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !e.currentContract().consumeGas(gas) {
-		return ErrGasConsumed
+		return nil, ErrGasConsumed
 	}
 
 	// Return only allowed in calls
 	if !e.currentContract().creation {
-		e.returnData = ret
+		rett = ret
 	}
 
 	// Return if reverted inside a contract creation
 	if e.currentContract().creation && op == REVERT {
-		e.returnData = ret
+		rett = ret
 	}
 
 	if op == RETURN {
 		if e.currentContract().creation {
 			maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
-				return ErrMaxCodeSizeExceeded
+				return nil, ErrMaxCodeSizeExceeded
 			}
 
 			if err == nil && !maxCodeSizeExceeded {
@@ -1413,7 +1429,7 @@ func (e *EVM) executeHaltOperations(op OpCode) error {
 		}
 	}
 
-	return nil
+	return rett, nil
 }
 
 func (e *EVM) selfDestruct() error {
@@ -1522,11 +1538,11 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		}
 
 		end := big.NewInt(1).Add(dataOffset, length)
-		if end.BitLen() > 64 || uint64(len(e.returnData)) < end.Uint64() {
+		if end.BitLen() > 64 || uint64(len(e.currentContract().returnData)) < end.Uint64() {
 			return fmt.Errorf("out of bounds")
 		}
 
-		gas, err = e.currentContract().memory.Set(memOffset, length, e.returnData[dataOffset.Uint64():end.Uint64()])
+		gas, err = e.currentContract().memory.Set(memOffset, length, e.currentContract().returnData[dataOffset.Uint64():end.Uint64()])
 
 	case CODECOPY:
 		gas, err = e.currentContract().memory.Set(memOffset, length, getSlice(e.currentContract().code, dataOffset, length))
@@ -1631,7 +1647,6 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 		if addr == nil {
 			return nil, ErrStackUnderflow
 		}
-
 		return big.NewInt(int64(e.state.GetCodeSize(common.BigToAddress(addr)))), nil
 
 	case GASPRICE:
@@ -1641,8 +1656,7 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 		if !e.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
-
-		return big.NewInt(int64(len(e.returnData))), nil
+		return big.NewInt(int64(len(e.currentContract().returnData))), nil
 
 	default:
 		return nil, fmt.Errorf("context bad opcode found: %s", op.String())
@@ -2020,6 +2034,13 @@ func (e *EVM) peekAt(n int) *big.Int {
 
 func (e *EVM) swap(n int) {
 	e.currentContract().swap(n)
+}
+
+func (e *EVM) numContracts() int {
+	return e.contractsIndex
+}
+func (e *EVM) prevContract() *Contract {
+	return e.contracts[e.contractsIndex-2]
 }
 
 func (e *EVM) currentContract() *Contract {

@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -64,6 +65,56 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	}
 }
 
+func TestTwo(t *testing.T) {
+	// file := "./tests/GeneralStateTests/stRevertTest/RevertOpcodeInCallsOnNonEmptyReturnData.json"
+
+	files, err := listFiles("tests/GeneralStateTests/stSpecialTest")
+	if err != nil {
+		panic(err)
+	}
+
+	files = []string{
+		"tests/GeneralStateTests/stSpecialTest/failed_tx_xcf416c53.json",
+	}
+
+	for _, file := range files {
+		fmt.Printf("============> %s\n", file)
+
+		data, err := ioutil.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var c map[string]stateCase
+		if err := json.Unmarshal(data, &c); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, i := range c {
+			for fork, f := range i.Post {
+				for indx, e := range f {
+
+					/*
+						if fork != "Byzantium" {
+							continue
+						}
+						if indx != 6 {
+							continue
+						}
+					*/
+
+					fmt.Println("###############################")
+
+					fmt.Println(fork)
+					fmt.Println(indx)
+
+					RunSpecificTest(t, i, "id", fork, indx, e)
+				}
+			}
+		}
+	}
+}
+
 func TestState(t *testing.T) {
 	long := []string{
 		"static_Call50000",
@@ -73,7 +124,6 @@ func TestState(t *testing.T) {
 
 	skip := []string{
 		"failed_tx_xcf416c53",
-		"RevertOpcodeInCallsOnNonEmptyReturnData",
 		"sstore_combinations_initial",
 	}
 
