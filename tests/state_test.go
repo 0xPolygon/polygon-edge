@@ -3,7 +3,6 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -49,7 +48,7 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	_, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
@@ -65,61 +64,12 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	}
 }
 
-func TestTwo(t *testing.T) {
-	// file := "./tests/GeneralStateTests/stRevertTest/RevertOpcodeInCallsOnNonEmptyReturnData.json"
-
-	files, err := listFiles("tests/GeneralStateTests/stSpecialTest")
-	if err != nil {
-		panic(err)
-	}
-
-	files = []string{
-		"tests/GeneralStateTests/stSpecialTest/failed_tx_xcf416c53.json",
-	}
-
-	for _, file := range files {
-		fmt.Printf("============> %s\n", file)
-
-		data, err := ioutil.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		var c map[string]stateCase
-		if err := json.Unmarshal(data, &c); err != nil {
-			t.Fatal(err)
-		}
-
-		for _, i := range c {
-			for fork, f := range i.Post {
-				for indx, e := range f {
-
-					/*
-						if fork != "Byzantium" {
-							continue
-						}
-						if indx != 6 {
-							continue
-						}
-					*/
-
-					fmt.Println("###############################")
-
-					fmt.Println(fork)
-					fmt.Println(indx)
-
-					RunSpecificTest(t, i, "id", fork, indx, e)
-				}
-			}
-		}
-	}
-}
-
 func TestState(t *testing.T) {
 	long := []string{
 		"static_Call50000",
 		"static_Return50000",
 		"static_Call1MB",
+		"stQuadraticComplexityTest",
 	}
 
 	skip := []string{
@@ -146,12 +96,10 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
-					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
-					continue
 				}
 
 				data, err := ioutil.ReadFile(file)

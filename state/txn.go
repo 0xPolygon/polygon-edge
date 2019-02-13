@@ -66,16 +66,20 @@ func newTxn(state *State) *Txn {
 	}
 }
 
-func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, error) {
+func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, bool, error) {
 	s := txn.Snapshot()
-	gas, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun)
+	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun)
 	if err != nil {
 		txn.RevertToSnapshot(s)
 	}
-	return gas, err
+
+	//fmt.Println("-- failed --")
+	//fmt.Println(failed)
+
+	return gas, failed, err
 }
 
-func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, error) {
+func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, bool, error) {
 	// transition
 	s := txn.Snapshot()
 
@@ -83,21 +87,21 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 	if msg.CheckNonce() {
 		nonce := txn.GetNonce(msg.From())
 		if nonce < msg.Nonce() {
-			return 0, fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
+			return 0, false, fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
 		} else if nonce > msg.Nonce() {
-			return 0, fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
+			return 0, false, fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
 		}
 	}
 
 	// buy gas
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
 	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
-		return 0, ErrInsufficientBalanceForGas
+		return 0, false, ErrInsufficientBalanceForGas
 	}
 
 	// check if there is space for this tx in the gaspool
 	if err := gasPool.SubGas(msg.Gas()); err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	// restart the txn gas
@@ -128,30 +132,31 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 		}
 		// Make sure we don't exceed uint64 for all data combinations
 		if (math.MaxUint64-txGas)/chain.TxDataNonZeroGas < nz {
-			return 0, vm.ErrOutOfGas
+			return 0, false, vm.ErrOutOfGas
 		}
 		txGas += nz * chain.TxDataNonZeroGas
 
 		z := uint64(len(data)) - nz
 		if (math.MaxUint64-txGas)/chain.TxDataZeroGas < z {
-			return 0, vm.ErrOutOfGas
+			return 0, false, vm.ErrOutOfGas
 		}
 		txGas += z * chain.TxDataZeroGas
 	}
 
 	// reduce the intrinsic gas from the total gas
 	if txn.gas < txGas {
-		return 0, vm.ErrOutOfGas
+		return 0, false, vm.ErrOutOfGas
 	}
 
 	txn.gas -= txGas
 
 	sender := msg.From()
 
+	var vmerr error
+
 	if !dryRun {
 		e := evm.NewEVM(txn, env, config, gasTable, getHash)
 
-		var vmerr error
 		if contractCreation {
 			//fmt.Println("- one ")
 			_, txn.gas, vmerr = e.Create(sender, msg.Data(), msg.Value(), txn.gas)
@@ -161,10 +166,13 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 			_, txn.gas, vmerr = e.Call(sender, *msg.To(), msg.Data(), msg.Value(), txn.gas)
 		}
 
+		//fmt.Println("-- vm err --")
+		//fmt.Println(vmerr)
+
 		if vmerr != nil {
 			if vmerr == evm.ErrNotEnoughFunds {
 				txn.RevertToSnapshot(s)
-				return 0, vmerr
+				return 0, false, vmerr
 			}
 		}
 	}
@@ -179,8 +187,17 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 	txn.gas += refund
 
+	//fmt.Println("-- get refund --")
+	//fmt.Println(txn.GetRefund())
+
+	//fmt.Println("-- refund --")
+	//fmt.Println(refund)
+
 	// Return ETH for remaining gas, exchanged at the original rate.
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice())
+
+	//fmt.Println("-- remaining --")
+	// fmt.Println(remaining)
 
 	txn.AddBalance(msg.From(), remaining)
 
@@ -190,7 +207,10 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 	// Return remaining gas to the pool for the block
 	gasPool.AddGas(txn.gas)
 
-	return txn.gasUsed(), nil
+	//fmt.Println("-- ## VMerr --")
+	//fmt.Println(vmerr)
+
+	return txn.gasUsed(), vmerr != nil, nil
 }
 
 // gasUsed returns the amount of gas used up by the state transition.
@@ -205,11 +225,15 @@ func (txn *Txn) Snapshot() int {
 	id := len(txn.snapshots)
 	txn.snapshots = append(txn.snapshots, t)
 
+	// fmt.Printf("take snapshot ========> %d\n", id)
+
 	return id
 }
 
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
+	// fmt.Printf("revert to snapshot ======> %d\n", id)
+
 	if id > len(txn.snapshots) {
 		panic("")
 	}
@@ -322,6 +346,8 @@ func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
+	//fmt.Printf("ADD BALANCE: %s %d\n", addr.String(), balance.Uint64())
+
 	txn.upsertAccount(addr, true, func(object *stateObject) {
 		object.account.Balance.Add(object.account.Balance, balance)
 	})
@@ -597,6 +623,8 @@ func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
 			return false
 		}
 
+		// fmt.Println(hexutil.Encode(k))
+
 		if a.suicide || a.Empty() && deleteEmptyObjects {
 			remove = append(remove, k)
 		}
@@ -627,9 +655,32 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 
 	x := txn.txn.Commit()
 
+	// fmt.Printf("EIP enabled: %v\n", deleteEmptyObjects)
+
 	tt := txn.state.getRoot().Txn()
 
 	h1 := sha3.NewLegacyKeccak256()
+
+	/*
+		fmt.Println("##################################################################################")
+
+		x.Root().Walk(func(k []byte, v interface{}) bool {
+			a, ok := v.(*stateObject)
+			if !ok {
+				// We also have logs, avoid those
+				return false
+			}
+			fmt.Printf("# ----------------- %s -------------------\n", hexutil.Encode(k))
+			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.deleted, a.suicide)
+			fmt.Printf("# Balance: %d\n", a.account.Balance.Uint64())
+			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.account.Nonce)))
+			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.account.CodeHash))
+			fmt.Printf("# State root: %s\n", a.account.Root.String())
+
+			return false
+		})
+		fmt.Println("##################################################################################")
+	*/
 
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*stateObject)

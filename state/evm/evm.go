@@ -303,8 +303,8 @@ func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value
 
 	err := e.Run()
 
-	fmt.Println("-- call is over --")
-	fmt.Println(err)
+	//fmt.Println("-- call is over --")
+	//fmt.Println(err)
 
 	c := e.currentContract()
 	return c.returnData, c.gas, err
@@ -413,7 +413,7 @@ func (e *EVM) Run() error {
 			ins := e.currentContract().Instructions()
 			op = OpCode(ins[ip])
 
-			fmt.Printf("OP: %s (%d)\n", op.String(), e.currentContract().gas)
+			// fmt.Printf("OP: %s (%d)\n", op.String(), e.currentContract().gas)
 
 			// consume gas for those opcodes with fixed gas
 			if gasUsed := e.calculateFixedGasUsage(op); gasUsed != 0 {
@@ -569,15 +569,15 @@ func (e *EVM) Run() error {
 			case REVERT, RETURN:
 
 				if op == REVERT {
-					fmt.Println("REVERT")
+					// fmt.Println("REVERT")
 				}
 
 				ret, err := e.executeHaltOperations(op)
 				vmerr = err
 				returnData = ret
 
-				fmt.Println("-- err from halt --")
-				fmt.Println(err)
+				//fmt.Println("-- err from halt --")
+				//fmt.Println(err)
 
 				goto END
 
@@ -613,8 +613,8 @@ func (e *EVM) Run() error {
 					goto END
 				}
 
-				fmt.Println("-- offset --")
-				fmt.Println(offset)
+				//fmt.Println("-- offset --")
+				//fmt.Println(offset)
 
 				data, gas, err := e.currentContract().memory.Get(offset, big.NewInt(32))
 				if err != nil {
@@ -759,8 +759,8 @@ func (e *EVM) Run() error {
 
 	END:
 
-		fmt.Println("--")
-		fmt.Println(vmerr)
+		//fmt.Println("--")
+		//fmt.Println(vmerr)
 
 		// need to handle first the error to consume the gas at least
 		c := e.currentContract()
@@ -769,7 +769,7 @@ func (e *EVM) Run() error {
 		if vmerr != nil {
 			// only if its a smart contract error,
 			if vmerr != ErrNotEnoughFunds && vmerr != ErrDepth && vmerr != ErrExecutionReverted && vmerr != vm.ErrCodeStoreOutOfGas {
-				fmt.Println("- consume all gas -")
+				//fmt.Println("- consume all gas -")
 				c.consumeGas(c.gas)
 			}
 		}
@@ -780,7 +780,7 @@ func (e *EVM) Run() error {
 			if vmerr != nil || op == REVERT {
 				if vmerr != vm.ErrCodeStoreOutOfGas { // dont revert in this case
 
-					fmt.Println("REVERT TO SNAPSHOT")
+					//fmt.Println("REVERT TO SNAPSHOT")
 					e.state.RevertToSnapshot(e.currentContract().snapshot)
 				}
 			}
@@ -796,11 +796,11 @@ func (e *EVM) Run() error {
 			if c.creation {
 				// contract creation only return data if there was a revert error
 				if vmerr == ErrExecutionReverted {
-					fmt.Println("XX")
+					//fmt.Println("XX")
 					e.currentContract().returnData = returnData
 				}
 			} else {
-				fmt.Println("YYY")
+				//fmt.Println("YYY")
 				e.currentContract().returnData = returnData
 			}
 		}
@@ -862,9 +862,9 @@ func (e *EVM) executeSStoreOperation() error {
 
 	loc, val := e.pop(), e.pop()
 
-	fmt.Println("-- store --")
-	fmt.Println(loc)
-	fmt.Println(val)
+	//fmt.Println("-- store --")
+	//fmt.Println(loc)
+	//fmt.Println(val)
 
 	var gas uint64
 
@@ -1048,7 +1048,7 @@ func (e *EVM) create(contract *Contract) error {
 	}
 
 	// Take snapshot of the current state
-	fmt.Println("- take snapshot -")
+	//fmt.Println("- take snapshot -")
 	contract.snapshot = e.state.Snapshot()
 
 	// Create the new account for the contract
@@ -1433,7 +1433,7 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 
 	if op == REVERT {
 
-		fmt.Println("- check the revert -")
+		//fmt.Println("- check the revert -")
 		// fmt.Println(rett)
 
 		return rett, ErrExecutionReverted
@@ -1442,7 +1442,7 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 	if op == RETURN {
 		if e.currentContract().creation {
 
-			fmt.Println("-- return from creation --")
+			//fmt.Println("-- return from creation --")
 			// fmt.Println(ret)
 
 			rett = ret
@@ -1708,8 +1708,8 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 			return nil, ErrOpcodeNotFound
 		}
 
-		fmt.Println("-- return --")
-		fmt.Println(e.currentContract().returnData)
+		//fmt.Println("-- return --")
+		//fmt.Println(e.currentContract().returnData)
 
 		return big.NewInt(int64(len(e.currentContract().returnData))), nil
 

@@ -141,7 +141,7 @@ func TestTransition(t *testing.T) {
 			buildPreState(s, c.PreState)
 
 			txn := s.Txn()
-			_, err := txn.Apply(c.Transaction.ToMessage(), &evm.Env{}, chain.GasTableHomestead, chain.ForksInTime{}, vmTestBlockHash, newGasPool(1000), true)
+			_, _, err := txn.Apply(c.Transaction.ToMessage(), &evm.Env{}, chain.GasTableHomestead, chain.ForksInTime{}, vmTestBlockHash, newGasPool(1000), true)
 
 			if err != nil {
 				if c.Err == "" {
