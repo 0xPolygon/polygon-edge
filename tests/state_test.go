@@ -48,7 +48,7 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	_, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
@@ -69,11 +69,11 @@ func TestState(t *testing.T) {
 		"static_Call50000",
 		"static_Return50000",
 		"static_Call1MB",
+		"stQuadraticComplexityTest",
 	}
 
 	skip := []string{
 		"failed_tx_xcf416c53",
-		"RevertOpcodeInCallsOnNonEmptyReturnData",
 		"sstore_combinations_initial",
 	}
 
@@ -96,12 +96,10 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
-					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
-					continue
 				}
 
 				data, err := ioutil.ReadFile(file)

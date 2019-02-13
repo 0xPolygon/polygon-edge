@@ -172,7 +172,14 @@ func TestBitWiseLogic(t *testing.T) {
 	testStringTestCases(t, XOR, cases)
 
 	cases = []stringTestCase{
-		{"ABCD", "00", "AB"},
+		{"ABCDEF0908070605040302010000000000000000000000000000000000000000", "00", "ab"},
+		{"ABCDEF0908070605040302010000000000000000000000000000000000000000", "01", "cd"},
+		{"00CDEF090807060504030201ffffffffffffffffffffffffffffffffffffffff", "00", "00"},
+		{"00CDEF090807060504030201ffffffffffffffffffffffffffffffffffffffff", "01", "cd"},
+		{"0000000000000000000000000000000000000000000000000000000000102030", "1f", "30"},
+		{"0000000000000000000000000000000000000000000000000000000000102030", "1e", "20"},
+		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "20", "00"},
+		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "FFFFFFFFFFFFFFFF", "00"},
 	}
 	testStringTestCases(t, BYTE, cases)
 
@@ -317,7 +324,7 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 			found := strings.Replace(hexutil.Encode(evm.peek().Bytes()), "0x", "", -1)
 			found = fmt.Sprintf("%064s", found)
 
-			if found != cc.expected {
+			if !strings.Contains(found, cc.expected) {
 				t.Fatalf("not equal. Found %s and expected %s", found, cc.expected)
 			}
 		})
