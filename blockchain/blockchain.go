@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/umbracle/minimal/consensus"
@@ -38,6 +39,7 @@ type Blockchain struct {
 	consensus consensus.Consensus
 	genesis   *types.Header
 	state     map[string]*state.State
+	stateRoot common.Hash
 	params    *chain.Params
 }
 
@@ -64,22 +66,24 @@ func (b *Blockchain) Genesis() *types.Header {
 
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
-
 	// The chain is not empty
 	if !b.Empty() {
 		return nil
 	}
 
-	// The chain is empty, write the genesis and generate
-	// the preallocated state
-
 	s := state.NewState()
 
 	txn := s.Txn()
 	for addr, account := range genesis.Alloc {
-		txn.AddBalance(addr, account.Balance)
-		txn.SetCode(addr, account.Code)
-		txn.SetNonce(addr, account.Nonce)
+		if account.Balance != nil {
+			txn.AddBalance(addr, account.Balance)
+		}
+		if account.Nonce != 0 {
+			txn.SetNonce(addr, account.Nonce)
+		}
+		if len(account.Code) != 0 {
+			txn.SetCode(addr, account.Code)
+		}
 		for key, value := range account.Storage {
 			txn.SetState(addr, key, value)
 		}
@@ -92,6 +96,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 
 	b.genesis = header
 	b.state[hexutil.Encode(root)] = ss
+	b.stateRoot = common.BytesToHash(root)
 
 	// add genesis block
 	if err := b.addHeader(header); err != nil {
@@ -124,16 +129,18 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	if err := b.advanceHead(header); err != nil {
 		return err
 	}
+
+	b.state[types.EmptyRootHash.String()] = state.NewState()
 	return nil
 }
 
 // Empty checks if the blockchain is empty
 func (b *Blockchain) Empty() bool {
-	header := b.db.ReadHeadNumber()
-	if header == nil {
+	hash := b.db.ReadHeadHash()
+	if hash == nil {
 		return true
 	}
-	return header.Cmp(big.NewInt(0)) != 0
+	return false
 }
 
 func (b *Blockchain) advanceHead(h *types.Header) error {
@@ -225,9 +232,28 @@ func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
 	return h
 }
 
-// WriteHeaders writes a batch of headers
 func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 	panic("TODO")
+}
+
+// WriteHeadersWithBodies writes a batch of headers
+func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
+	// validate chain
+	for i := 1; i < len(headers); i++ {
+		if headers[i].Number.Uint64()-1 != headers[i-1].Number.Uint64() {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number.Uint64(), headers[i-1].Number.Uint64())
+		}
+		if headers[i].ParentHash != headers[i-1].Hash() {
+			return fmt.Errorf("parent hash not correct")
+		}
+	}
+
+	for _, h := range headers {
+		if err := b.WriteHeader(h); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // WriteBlocks writes a batch of blocks
@@ -305,10 +331,17 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 		// Add state if everything worked
 		b.state[hexutil.Encode(root)] = state
+
+		// b.state = state
+		b.stateRoot = common.BytesToHash(root)
 	}
 
 	// fmt.Printf("Done: last header written was %s at %s\n", headers[len(headers)-1].Hash().String(), headers[len(headers)-1].Number.String())
 	return nil
+}
+
+func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
+	b.db.WriteBody(block.Header().Hash(), block.Body())
 }
 
 func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
@@ -328,10 +361,12 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 	totalGas := uint64(0)
 
+	receipts := types.Receipts{}
+
 	// apply the transactions
-	for _, tx := range block.Transactions() {
+	for indx, tx := range block.Transactions() {
 		legacyConfig := &params.ChainConfig{
-			ChainID:        big.NewInt(1), // TODO, in tests is always 1
+			ChainID:        big.NewInt(1), // TODO, Always 1 in tests
 			EIP155Block:    nil,
 			HomesteadBlock: nil,
 		}
@@ -358,13 +393,37 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 			GasPrice:   tx.GasPrice(),
 		}
 
-		gasUsed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
+		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		totalGas += gasUsed
-		txn.IntermediateCommit(config.EIP155)
+
+		logs := txn.Logs()
+
+		ss, root := txn.Commit(config.EIP155)
+		txn = ss.Txn()
+
+		if config.Byzantium {
+			root = []byte{}
+		}
+
+		// Create receipt
+
+		receipt := types.NewReceipt(root, failed, totalGas)
+		receipt.TxHash = tx.Hash()
+		receipt.GasUsed = gasUsed
+
+		// if the transaction created a contract, store the creation address in the receipt.
+		if msg.To() == nil {
+			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce())
+		}
+
+		// Set the receipt logs and create a bloom for filtering
+		receipt.Logs = buildLogs(logs, tx.Hash(), block.Hash(), uint(indx))
+		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipts = append(receipts, receipt)
 	}
 
 	if err := b.consensus.Finalize(txn, block); err != nil {
@@ -382,8 +441,33 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 		return nil, nil, fmt.Errorf("gas used is different")
 	}
 
-	// TODO, check logs
+	receiptSha := types.DeriveSha(receipts)
+	if receiptSha != block.ReceiptHash() {
+		return nil, nil, fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
+	}
+	rbloom := types.CreateBloom(receipts)
+	if rbloom != block.Bloom() {
+		return nil, nil, fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
+	}
+
 	return s2, root, nil
+}
+
+func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) []*types.Log {
+	newLogs := []*types.Log{}
+
+	for indx, log := range logs {
+		newLog := log
+
+		newLog.TxHash = txHash
+		newLog.BlockHash = blockHash
+		newLog.TxIndex = txIndex
+		newLog.Index = uint(indx)
+
+		newLogs = append(newLogs, newLog)
+	}
+
+	return newLogs
 }
 
 func (b *Blockchain) GetHashByNumber(i uint64) common.Hash {

@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -22,7 +23,7 @@ func (f *fakeConsensus) Author(header *types.Header) (common.Address, error) {
 	return common.Address{}, nil
 }
 
-func (f *fakeConsensus) Seal(block *types.Block) error {
+func (f *fakeConsensus) Seal(ctx context.Context, block *types.Block) error {
 	return nil
 }
 
@@ -125,7 +126,14 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
-	b := NewBlockchain(s, &fakeConsensus{}, nil)
+	config := &chain.Params{
+		Forks: &chain.Forks{
+			EIP155:    chain.NewFork(0),
+			Homestead: chain.NewFork(0),
+		},
+	}
+
+	b := NewBlockchain(s, &fakeConsensus{}, config)
 	if headers != nil {
 		if err := b.WriteGenesis(createGenesis(headers[0])); err != nil {
 			t.Fatal(err)
