@@ -30,5 +30,10 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
+		"genesis": func() (cli.Command, error) {
+			return &GenesisCommand{
+				Meta: meta,
+			}, nil
+		},
 	}
 }
