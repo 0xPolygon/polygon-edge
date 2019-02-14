@@ -62,7 +62,6 @@ type State interface {
 	Exist(addr common.Address) bool
 	Empty(addr common.Address) bool
 	CreateAccount(addr common.Address)
-	IntermediateRoot(bool) common.Hash // It will be removed later
 }
 
 // IMPORTANT. Memory access needs more overflow protection, right now, only calls and returns are protected
@@ -302,9 +301,6 @@ func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value
 	}
 
 	err := e.Run()
-
-	//fmt.Println("-- call is over --")
-	//fmt.Println(err)
 
 	c := e.currentContract()
 	return c.returnData, c.gas, err
@@ -785,6 +781,8 @@ func (e *EVM) Run() error {
 				}
 			}
 
+			// Set return data if any
+			e.currentContract().returnData = returnData
 			return vmerr
 		}
 
