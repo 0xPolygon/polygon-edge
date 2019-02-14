@@ -15,6 +15,7 @@ import (
 	"github.com/ferranbt/periodic-dispatcher"
 
 	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/discovery"
 	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
@@ -26,14 +27,15 @@ const (
 
 // Config is the p2p server configuration
 type Config struct {
-	Name             string
-	BindAddress      string
-	BindPort         int
-	MaxPeers         int
-	Bootnodes        []string
-	DialTasks        int
-	DialBusyInterval time.Duration
-	DiscoverCh       chan string
+	Name              string
+	BindAddress       string
+	BindPort          int
+	MaxPeers          int
+	Bootnodes         []string
+	DialTasks         int
+	DialBusyInterval  time.Duration
+	DiscoverCh        chan string
+	DiscoveryBackends map[string]discovery.Factory
 }
 
 // DefaultConfig returns a default configuration

@@ -11,6 +11,7 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/discovery"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/blockchain"
@@ -22,6 +23,9 @@ import (
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/syncer"
+
+	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
+	discoveryDiscv4 "github.com/umbracle/minimal/network/discovery/discv4"
 )
 
 // Agent is a long running daemon that is used to run
@@ -71,6 +75,11 @@ func (a *Agent) Start() error {
 	serverConfig := network.DefaultConfig()
 	serverConfig.BindAddress = a.config.BindAddr
 	serverConfig.BindPort = a.config.BindPort
+
+	serverConfig.DiscoveryBackends = map[string]discovery.Factory{
+		"discv4": discoveryDiscv4.Factory,
+		"consul": discoveryConsul.Factory,
+	}
 
 	// Pipe messages from the discover into the server
 	serverConfig.DiscoverCh = a.discover.EventCh
