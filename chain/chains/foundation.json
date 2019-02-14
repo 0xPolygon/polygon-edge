@@ -4,7 +4,8 @@
         "forks": {
             "homestead": 1150000,
             "byzantium": 4370000
-        }
+        },
+        "chainID": 1
     },
     "genesis": {
         "nonce": "0x0000000000000042",

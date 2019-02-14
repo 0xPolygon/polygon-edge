@@ -4,7 +4,8 @@ import "math/big"
 
 // Params are all the set of params for the chain
 type Params struct {
-	Forks *Forks `json:"forks"`
+	Forks   *Forks `json:"forks"`
+	ChainID int    `json:"chainID"`
 }
 
 func (p *Params) GasTable(num *big.Int) GasTable {
