@@ -1,6 +1,8 @@
 package chain
 
-import "math/big"
+import (
+	"math/big"
+)
 
 // Params are all the set of params for the chain
 type Params struct {
@@ -28,12 +30,12 @@ func (p *Params) GasTable(num *big.Int) GasTable {
 
 // Forks specifies when each fork is activated
 type Forks struct {
-	Homestead      *Fork `json:"homestead"`
-	Byzantium      *Fork `json:"byzantium"`
-	Constantinople *Fork `json:"constantinople"`
-	EIP150         *Fork `json:"EIP150"`
-	EIP158         *Fork `json:"EIP158"`
-	EIP155         *Fork `json:"EIP155"`
+	Homestead      *Fork `json:"homestead,omitempty"`
+	Byzantium      *Fork `json:"byzantium,omitempty"`
+	Constantinople *Fork `json:"constantinople,omitempty"`
+	EIP150         *Fork `json:"EIP150,omitempty"`
+	EIP158         *Fork `json:"EIP158,omitempty"`
+	EIP155         *Fork `json:"EIP155,omitempty"`
 }
 
 func (f *Forks) GasTable(num *big.Int) GasTable {

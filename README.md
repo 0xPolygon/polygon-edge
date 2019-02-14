@@ -21,3 +21,11 @@ Probes and returns information of a given enode:
 ```
 $ go run main.go probe <enode://>
 ```
+
+### Genesis
+
+Generates a test genesis file:
+
+```
+$ go run main.go genesis
+```

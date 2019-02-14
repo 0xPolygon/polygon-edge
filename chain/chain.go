@@ -49,12 +49,12 @@ type Bootnodes []string
 type Genesis struct {
 	Nonce      uint64         `json:"nonce"`
 	Timestamp  uint64         `json:"timestamp"`
-	ExtraData  []byte         `json:"extraData"`
+	ExtraData  []byte         `json:"extraData,omitempty"`
 	GasLimit   uint64         `json:"gasLimit"`
 	Difficulty *big.Int       `json:"difficulty"`
 	Mixhash    common.Hash    `json:"mixHash"`
 	Coinbase   common.Address `json:"coinbase"`
-	Alloc      GenesisAlloc   `json:"alloc"`
+	Alloc      GenesisAlloc   `json:"alloc,omitempty"`
 
 	// Only for testing
 	Number     uint64      `json:"number"`
