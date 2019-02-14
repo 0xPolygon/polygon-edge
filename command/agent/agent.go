@@ -78,7 +78,7 @@ func (a *Agent) Start() error {
 	a.server = network.NewServer("minimal", key, serverConfig, a.logger)
 
 	// Load consensus engine (TODO, configurable)
-	consensus := ethash.NewEthHash(chain.Params)
+	consensus := ethash.NewEthHash(chain.Params, true)
 
 	// blockchain storage
 	storage, err := storage.NewLevelDBStorage(a.config.DataDir, nil)
@@ -87,7 +87,7 @@ func (a *Agent) Start() error {
 	}
 
 	// blockchain object
-	blockchain := blockchain.NewBlockchain(storage, consensus)
+	blockchain := blockchain.NewBlockchain(storage, consensus, chain.Params)
 	if err := blockchain.WriteGenesis(chain.Genesis); err != nil {
 		panic(err)
 	}
