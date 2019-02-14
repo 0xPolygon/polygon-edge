@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -25,7 +26,7 @@ func (n *NoProof) Author(header *types.Header) (common.Address, error) {
 }
 
 // Seal seals the block
-func (n *NoProof) Seal(block *types.Block) error {
+func (n *NoProof) Seal(ctx context.Context, block *types.Block) error {
 	return err
 }
 

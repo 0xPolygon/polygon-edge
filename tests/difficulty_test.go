@@ -121,7 +121,7 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 		t.Fatal(err)
 	}
 
-	engine := ethash.NewEthHash(&chain.Params{Forks: config})
+	engine := ethash.NewEthHash(&chain.Params{Forks: config}, false)
 	for name, i := range cases {
 		t.Run(name, func(t *testing.T) {
 			if i.ParentDifficulty.Cmp(params.MinimumDifficulty) < 0 {

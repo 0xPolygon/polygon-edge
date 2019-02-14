@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"context"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/state"
@@ -15,7 +17,7 @@ type Consensus interface {
 	Author(header *types.Header) (common.Address, error)
 
 	// Seal seals the block
-	Seal(block *types.Block) error
+	Seal(ctx context.Context, block *types.Block) error
 
 	// Finalize do
 	Finalize(txn *state.Txn, block *types.Block) error

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
@@ -84,7 +85,14 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 
 	params := &chain.Params{Forks: config}
 
-	engine := ethash.NewEthHash(params)
+	var fakePow bool
+	if c.SealEngine == "NoProof" {
+		fakePow = true
+	} else {
+		fakePow = false
+	}
+
+	engine := ethash.NewEthHash(params, fakePow)
 	genesis := c.buildGenesis()
 
 	b := blockchain.NewBlockchain(s, engine, params)
@@ -149,6 +157,9 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		if !ok {
 			t.Fatalf("account %s not found", k.String())
 		}
+		if code := txn.GetCode(k); !bytes.Equal(v.Code, code) {
+			t.Fatal()
+		}
 		if v.Balance.Cmp(obj.Balance) != 0 {
 			t.Fatal()
 		}
@@ -176,34 +187,23 @@ func testBlockChainCases(t *testing.T, folder string, skip []string) {
 	}
 
 	for _, file := range files {
-		data, err := ioutil.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		var bccases map[string]*BlockchainTest
-		if err := json.Unmarshal(data, &bccases); err != nil {
-			t.Fatal(err)
-		}
-
-		skip2 := []string{
-			"log1_wrongBloom", // .
-			"wrongMixHash",
-			"wrongNonce",
-			"wrongReceiptTrie", // .
-		}
-
-		for name, cc := range bccases {
-			if contains(skip2, name) {
-				continue
+		t.Run(file, func(t *testing.T) {
+			data, err := ioutil.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			if contains(skip, name) {
-				t.Skip()
-			} else {
-				testBlockChainCase(t, cc)
+			var bccases map[string]*BlockchainTest
+			if err := json.Unmarshal(data, &bccases); err != nil {
+				t.Fatal(err)
 			}
-		}
+
+			for name, cc := range bccases {
+				if !contains(skip, name) {
+					testBlockChainCase(t, cc)
+				}
+			}
+		})
 	}
 }
 
@@ -255,7 +255,7 @@ func TestBlockchainTotalDifficulty(t *testing.T) {
 		"lotsOfLeafs",
 		"lotsOfBranches",
 		"sideChainWithMoreTransactions",
-		"uncleBlockAtBlock3afterBlock4",
+		"uncleBlockAtBlock3afterBlock4", // TODO
 	})
 }
 
@@ -278,6 +278,7 @@ func TestBlockchainWallet(t *testing.T) {
 func TestBlockchainTransitionTests(t *testing.T) {
 	testBlockChainCases(t, "TransitionTests", []string{
 		"blockChainFrontier",
+		"DaoTransactions", // TODO
 	})
 }
 
