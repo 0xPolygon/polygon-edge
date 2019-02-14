@@ -1,9 +1,13 @@
 package ethash
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/umbracle/minimal/chain"
@@ -11,7 +15,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -25,6 +28,7 @@ var (
 	errInvalidDifficulty = errors.New("non-positive difficulty")
 	errInvalidMixDigest  = errors.New("invalid mix digest")
 	errInvalidPoW        = errors.New("invalid proof-of-work")
+	errFutureBlock       = errors.New("future block")
 )
 
 var (
@@ -42,12 +46,33 @@ var (
 
 // EthHash consensus algorithm
 type EthHash struct {
-	config *chain.Params
+	config  *chain.Params
+	lock    sync.Mutex
+	rand    *rand.Rand
+	threads int
+
+	DatasetDir     string
+	DatasetsOnDisk int
+
+	CacheDir     string
+	CachesOnDisk int
+
+	Test bool
+
+	FakePow  bool
+	caches   *lru // In memory caches to avoid regenerating too often
+	datasets *lru // In memory datasets to avoid regenerating too often
 }
 
 // NewEthHash creates a new ethash consensus
-func NewEthHash(config *chain.Params) *EthHash {
-	return &EthHash{config}
+func NewEthHash(config *chain.Params, FakePow bool) *EthHash {
+	e := &EthHash{
+		config:   config,
+		caches:   newlru("cache", 1, newCache),
+		datasets: newlru("dataset", 1, newDataset),
+		FakePow:  FakePow,
+	}
+	return e
 }
 
 // VerifyHeader verifies the header is correct
@@ -63,7 +88,7 @@ func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, uncle
 		}
 	} else {
 		if header.Time.Cmp(big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())) > 0 {
-			return consensus.ErrFutureBlock
+			return errFutureBlock
 		}
 	}
 
@@ -146,18 +171,45 @@ func (e *EthHash) Finalize(txn *state.Txn, block *types.Block) error {
 }
 
 func (e *EthHash) verifySeal(header *types.Header) error {
-	// verify the mixHash (nonce)
+	if e.FakePow {
+		return nil
+	}
+
+	// Ensure that we have a valid difficulty for the block
+	if header.Difficulty.Sign() <= 0 {
+		return errInvalidDifficulty
+	}
+	// Recompute the digest and PoW values
+	number := header.Number.Uint64()
+
+	var (
+		digest []byte
+		result []byte
+	)
+
+	cache := e.cache(number)
+
+	size := datasetSize(number)
+	digest, result = hashimotoLight(size, cache.cache, e.sealHash(header).Bytes(), header.Nonce.Uint64())
+
+	// Caches are unmapped in a finalizer. Ensure that the cache stays alive
+	// until after the call to hashimotoLight so it's not unmapped while being used.
+	runtime.KeepAlive(cache)
+
+	// Verify the calculated values against the ones provided in the header
+	if !bytes.Equal(header.MixDigest[:], digest) {
+		return errInvalidMixDigest
+	}
+	target := new(big.Int).Div(two256, header.Difficulty)
+	if new(big.Int).SetBytes(result).Cmp(target) > 0 {
+		return errInvalidPoW
+	}
 	return nil
 }
 
 // Author checks the author of the header
 func (e *EthHash) Author(header *types.Header) (common.Address, error) {
 	return common.Address{}, nil
-}
-
-// Seal seals the block
-func (e *EthHash) Seal(block *types.Block) error {
-	return nil
 }
 
 func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
