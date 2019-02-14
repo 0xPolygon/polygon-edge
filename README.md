@@ -11,8 +11,24 @@ Modular implementation of different stacks of the Ethereum blockchain
 Starts the Ethereum client for the mainnet:
 
 ```
-$ go run main.go agent
+$ go run main.go agent [--config ./config.json]
 ```
+
+The configuration file can be specified either in HCL or JSON format:
+
+```
+{
+    "data-dir": "/tmp/data-dir"
+}
+```
+
+Some attributes can be also set from the command line:
+
+```
+$ go run main.go agent --config ./config.json --data-dir /tmp/local
+```
+
+The values from the CLI have preference over the ones in the configuration file.
 
 ### Probe
 
