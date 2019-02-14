@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +11,17 @@ import (
 
 	"github.com/mitchellh/cli"
 )
+
+type configFlag []string
+
+func (c *configFlag) String() string {
+	return "configuration flags"
+}
+
+func (c *configFlag) Set(value string) error {
+	*c = append(*c, value)
+	return nil
+}
 
 type AgentCommand struct {
 	Ui cli.Ui
@@ -23,10 +35,46 @@ func (a *AgentCommand) Synopsis() string {
 	return ""
 }
 
-func (a *AgentCommand) Run(args []string) int {
-
-	// TODO, read config from flags and args
+func readConfig(args []string) (*Config, error) {
 	config := DefaultConfig()
+
+	cliConfig := &Config{}
+
+	flags := flag.NewFlagSet("agent", flag.ContinueOnError)
+	flags.Usage = func() {}
+
+	flags.IntVar(&cliConfig.BindPort, "port", 0, "")
+	flags.StringVar(&cliConfig.BindAddr, "bind", "", "")
+	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
+
+	var configFilePaths configFlag
+	flags.Var(&configFilePaths, "config", "")
+
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
+
+	// config file
+	if len(configFilePaths) != 0 {
+		for _, path := range configFilePaths {
+			configFile, err := readConfigFile(path)
+			if err != nil {
+				return nil, err
+			}
+			config.Merge(configFile)
+		}
+	}
+
+	config.Merge(cliConfig)
+	return config, nil
+}
+
+func (a *AgentCommand) Run(args []string) int {
+	config, err := readConfig(args)
+	if err != nil {
+		a.Ui.Error(fmt.Sprintf("Failed to read config: %v", err))
+		return 1
+	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 
