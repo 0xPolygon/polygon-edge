@@ -94,7 +94,7 @@ func (p *PeerConnection) action() {
 		var err error
 		var context string
 		var size uint
-		var ll int
+		// var ll int
 
 		start := time.Now()
 
@@ -151,8 +151,8 @@ func (p *PeerConnection) action() {
 			fmt.Printf("ERR: %v\n", err)
 			time.Sleep(5 * time.Second)
 		} else {
-			p.updateRate(int(size))
-			p.sched.updateApproxSize(context, int(size), ll)
+			// p.updateRate(int(size))
+			// p.sched.updateApproxSize(context, int(size), ll)
 		}
 
 		time.Sleep(500 * time.Millisecond)

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"log"
@@ -14,7 +15,8 @@ import (
 
 	"github.com/ferranbt/periodic-dispatcher"
 
-	"github.com/umbracle/minimal/network/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/umbracle/minimal/network/discovery"
 	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
@@ -26,14 +28,14 @@ const (
 
 // Config is the p2p server configuration
 type Config struct {
-	Name             string
-	BindAddress      string
-	BindPort         int
-	MaxPeers         int
-	Bootnodes        []string
-	DialTasks        int
-	DialBusyInterval time.Duration
-	DiscoverCh       chan string
+	Name              string
+	BindAddress       string
+	BindPort          int
+	MaxPeers          int
+	Bootnodes         []string
+	DialTasks         int
+	DialBusyInterval  time.Duration
+	DiscoveryBackends map[string]discovery.Factory
 }
 
 // DefaultConfig returns a default configuration
@@ -46,7 +48,6 @@ func DefaultConfig() *Config {
 		Bootnodes:        []string{},
 		DialTasks:        5,
 		DialBusyInterval: 1 * time.Minute,
-		DiscoverCh:       make(chan string, 1),
 	}
 
 	return c
@@ -110,11 +111,13 @@ type Server struct {
 
 	peerStore *PeerStore
 	listener  *rlpx.Listener
+
+	discovery discovery.Backend
 }
 
 // NewServer creates a new node
 func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.Logger) *Server {
-	enode := fmt.Sprintf("enode://%s@%s:%d", discover.PubkeyToNodeID(&key.PublicKey), config.BindAddress, config.BindPort)
+	enode := fmt.Sprintf("enode://%s@%s:%d", discv5.PubkeyID(&key.PublicKey), config.BindAddress, config.BindPort)
 
 	s := &Server{
 		Protocols:    []*protocolStub{},
@@ -141,7 +144,7 @@ func (s *Server) buildInfo() {
 		Version: rlpx.BaseProtocolVersion,
 		Caps:    rlpx.Capabilities{},
 		Name:    s.Name,
-		ID:      discover.PubkeyToNodeID(&s.key.PublicKey),
+		ID:      discv5.PubkeyID(&s.key.PublicKey),
 	}
 	for _, p := range s.Protocols {
 		info.Caps = append(info.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
@@ -161,6 +164,30 @@ func (s *Server) Schedule() error {
 
 	if err := s.setupTransport(); err != nil {
 		return err
+	}
+
+	// setup discovery factories
+	discoveryConfig := &discovery.BackendConfig{
+		Logger:  s.logger,
+		Key:     s.key,
+		Address: &net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort},
+		Config:  map[string]interface{}{},
+	}
+
+	disc, ok := s.config.DiscoveryBackends["devp2p"]
+	if ok {
+		// Add the bootnodes. Maybe do this is a prestep in agent. If there are any bootnodes
+		// in genesis file create a devp2p config with the list so that
+		// server does not know about any bootnodes.
+		discoveryConfig.Config["bootnodes"] = s.config.Bootnodes
+
+		backend, err := disc(context.Background(), discoveryConfig)
+		if err != nil {
+			return err
+		}
+
+		s.discovery = backend
+		s.discovery.Schedule()
 	}
 
 	go s.dialRunner()
@@ -266,7 +293,8 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-		case enode := <-s.config.DiscoverCh:
+		case enode := <-s.discovery.Deliver():
+			fmt.Printf("FROM DISCOVER: %s\n", enode)
 			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
@@ -378,8 +406,8 @@ func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
 	s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
 }
 
-func (s *Server) ID() discover.NodeID {
-	return discover.PubkeyToNodeID(&s.key.PublicKey)
+func (s *Server) ID() discv5.NodeID {
+	return discv5.PubkeyID(&s.key.PublicKey)
 }
 
 func (s *Server) getProtocol(name string, version uint) *protocolStub {

@@ -9,7 +9,7 @@ import (
 	"github.com/umbracle/minimal/protocol/ethereum"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/network/discover"
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/umbracle/minimal/network/rlpx"
 )
 
@@ -48,7 +48,7 @@ func (p *ProbeCommand) Run(args []string) int {
 		Name:       "minimal-probe",
 		ListenPort: 30303,
 		Caps:       rlpx.Capabilities{&rlpx.Cap{Name: "eth", Version: 63}},
-		ID:         discover.PubkeyToNodeID(&prv.PublicKey),
+		ID:         discv5.PubkeyID(&prv.PublicKey),
 	}
 
 	s, err := rlpx.DialEnode("tcp", enode, &rlpx.Config{Prv: prv, Info: localInfo})

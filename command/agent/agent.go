@@ -9,8 +9,9 @@ import (
 
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/hashicorp/go-discover"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/minimal/network/discover"
+	"github.com/umbracle/minimal/network/discovery"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/blockchain"
@@ -22,6 +23,9 @@ import (
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/syncer"
+
+	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
+	discoveryDevP2P "github.com/umbracle/minimal/network/discovery/devp2p"
 )
 
 // Agent is a long running daemon that is used to run
@@ -56,24 +60,16 @@ func (a *Agent) Start() error {
 		panic(err)
 	}
 
-	// Start discovery
-	discoverConfig := discover.DefaultConfig()
-	discoverConfig.BindAddr = a.config.BindAddr
-	discoverConfig.BindPort = a.config.BindPort
-
-	a.discover, err = discover.NewDiscover(a.logger, key, discoverConfig)
-	if err != nil {
-		return err
-	}
-	a.discover.SetBootnodes(chain.Bootnodes)
-
 	// Start server
 	serverConfig := network.DefaultConfig()
 	serverConfig.BindAddress = a.config.BindAddr
 	serverConfig.BindPort = a.config.BindPort
+	serverConfig.Bootnodes = chain.Bootnodes
 
-	// Pipe messages from the discover into the server
-	serverConfig.DiscoverCh = a.discover.EventCh
+	serverConfig.DiscoveryBackends = map[string]discovery.Factory{
+		"devp2p": discoveryDevP2P.Factory,
+		"consul": discoveryConsul.Factory,
+	}
 
 	a.server = network.NewServer("minimal", key, serverConfig, a.logger)
 
@@ -107,9 +103,6 @@ func (a *Agent) Start() error {
 		return ethereum.NewEthereumProtocol(conn, peer, a.syncer.GetStatus, blockchain)
 	}
 	a.server.RegisterProtocol(protocol.ETH63, callback)
-
-	// Load bootnodes in discover
-	a.discover.Schedule()
 
 	// Start network server work after all the protocols have been registered
 	a.server.Schedule()
@@ -170,6 +163,5 @@ func (a *Agent) startTelemetry() {
 // Close stops the agent
 func (a *Agent) Close() {
 	// TODO, close syncer first
-	a.discover.Close()
 	a.server.Close()
 }

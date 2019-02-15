@@ -1,4 +1,4 @@
-package discover
+package discv4
 
 import (
 	"crypto/elliptic"
@@ -25,6 +25,8 @@ PORT:
 	port := rand.Intn(9000-5000) + 5000 // Random port between 5000 and 9000
 
 	config.BindPort = port
+	config.BindAddr = "127.0.0.1"
+
 	r, err := NewDiscover(logger, prv0, config)
 	if err != nil {
 		goto PORT
@@ -248,7 +250,6 @@ func TestProbeNode(t *testing.T) {
 
 func TestFindNodeWithUnavailableNode(t *testing.T) {
 	config := DefaultConfig()
-	config.RespTimeout = 5 * time.Second
 
 	r0, r1 := pipe(config, true)
 
@@ -269,7 +270,6 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 
 func TestFindNode(t *testing.T) {
 	config := DefaultConfig()
-	config.RespTimeout = 2 * time.Second
 
 	var cases = []int{1, 5, 10, 15, 20, 30, 50}
 
