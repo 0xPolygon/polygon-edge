@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log"
+	"net"
 )
 
 // TODO, Is is necessary the Schedule call or we can start once the factory
@@ -29,6 +30,9 @@ type Backend interface {
 type BackendConfig struct {
 	// Logger to be used by the backend
 	Logger *log.Logger
+
+	// Address is the tcp address of the server running
+	Address *net.TCPAddr
 
 	// Private key of the node to encrypt/decrypt messages
 	Key *ecdsa.PrivateKey

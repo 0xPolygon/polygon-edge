@@ -2,19 +2,23 @@ package consul
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"log"
+	"net"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 
 	consul "github.com/hashicorp/consul/api"
+	"github.com/umbracle/minimal/network/discover"
 	"github.com/umbracle/minimal/network/discovery"
 )
 
 type config struct {
-	Endpoint    string
-	NodeName    string
-	ServiceName string
+	Address     string `json:"endpoint"`
+	NodeName    string `json:"nodename"`
+	ServiceName string `json:"servicename"`
 }
 
 // Backend is the consul discovery backend
@@ -23,6 +27,8 @@ type Backend struct {
 	config  config
 	client  *consul.Client
 	eventCh chan string
+	address *net.TCPAddr
+	key     *ecdsa.PrivateKey
 }
 
 func (b *Backend) Close() error {
@@ -34,17 +40,83 @@ func (b *Backend) Deliver() chan string {
 }
 
 func (b *Backend) Schedule() {
+	addr := b.address.IP.String()
+	port := b.address.Port
+
+	enode := fmt.Sprintf("enode://%s@%s:%d", discover.PubkeyToNodeID(&b.key.PublicKey), addr, port)
+
 	service := &consul.AgentServiceRegistration{
-		ID:   b.config.NodeName,
-		Name: b.config.ServiceName,
-		Tags: []string{"minimal"},
+		ID:      b.config.NodeName,
+		Name:    b.config.ServiceName,
+		Tags:    []string{"minimal"},
+		Address: addr,
+		Port:    port,
+		Check: &consul.AgentServiceCheck{
+			Interval: "5s",
+			TCP:      b.address.String(),
+		},
+		Meta: map[string]string{
+			"enode": enode,
+		},
 	}
 
 	if err := b.client.Agent().ServiceRegister(service); err != nil {
 		b.logger.Printf("Failed to register service: %v\n", err)
 	}
 
-	// TODO, start listening
+	go func() {
+		for {
+			if err := b.findNodes(); err != nil {
+				b.logger.Printf("Failed to find nodes: %v", err)
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}()
+}
+
+func (b *Backend) findNodes() error {
+	catalog := b.client.Catalog()
+
+	dcs, err := catalog.Datacenters()
+	if err != nil {
+		return fmt.Errorf("failed to get the datacenters: %v", err)
+	}
+
+	serverServices := []string{}
+	for _, dc := range dcs {
+		opts := &consul.QueryOptions{
+			Datacenter: dc,
+		}
+
+		services, _, err := catalog.Service(b.config.ServiceName, "minimal", opts)
+		if err != nil {
+			return fmt.Errorf("failed to get the services: %v", err)
+		}
+
+		for _, service := range services {
+			addr := service.ServiceAddress
+			port := service.ServicePort
+
+			if addr == "" {
+				addr = service.Address
+			}
+			if b.address.IP.String() == addr && int(b.address.Port) == port {
+				continue
+			}
+
+			if enode, ok := service.ServiceMeta["enode"]; ok {
+				serverServices = append(serverServices, enode)
+			}
+		}
+	}
+
+	for _, s := range serverServices {
+		select {
+		case b.eventCh <- s:
+		default:
+		}
+	}
+	return nil
 }
 
 func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Backend, error) {
@@ -54,8 +126,8 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 		return nil, err
 	}
 
-	if c.Endpoint == "" {
-		c.Endpoint = "127.0.0.1:8500"
+	if c.Address == "" {
+		c.Address = "127.0.0.1:8500"
 	}
 	if c.NodeName == "" {
 		c.NodeName = "minimal"
@@ -65,7 +137,7 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 	}
 
 	consulConfig := consul.DefaultConfig()
-	consulConfig.Address = c.Endpoint
+	consulConfig.Address = c.Address
 
 	client, err := consul.NewClient(consulConfig)
 	if err != nil {
@@ -77,6 +149,8 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 		config:  c,
 		client:  client,
 		eventCh: make(chan string, 10),
+		address: conf.Address,
+		key:     conf.Key,
 	}
 
 	return b, nil
