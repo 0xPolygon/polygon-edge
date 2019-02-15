@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/minimal/network/discover"
 )
 
 const (
@@ -123,7 +123,7 @@ type Info struct {
 	Name       string
 	Caps       Capabilities
 	ListenPort uint64
-	ID         discover.NodeID
+	ID         discv5.NodeID
 
 	// Ignore additional fields (for forward compatibility).
 	Rest []rlp.RawValue `rlp:"tail"`

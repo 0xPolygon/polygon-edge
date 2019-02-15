@@ -8,10 +8,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/mitchellh/mapstructure"
 
 	consul "github.com/hashicorp/consul/api"
-	"github.com/umbracle/minimal/network/discover"
 	"github.com/umbracle/minimal/network/discovery"
 )
 
@@ -43,7 +43,7 @@ func (b *Backend) Schedule() {
 	addr := b.address.IP.String()
 	port := b.address.Port
 
-	enode := fmt.Sprintf("enode://%s@%s:%d", discover.PubkeyToNodeID(&b.key.PublicKey), addr, port)
+	enode := fmt.Sprintf("enode://%s@%s:%d", discv5.PubkeyID(&b.key.PublicKey), addr, port)
 
 	service := &consul.AgentServiceRegistration{
 		ID:      b.config.NodeName,
