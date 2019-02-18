@@ -23,7 +23,11 @@ func (f *fakeConsensus) Author(header *types.Header) (common.Address, error) {
 	return common.Address{}, nil
 }
 
-func (f *fakeConsensus) Seal(ctx context.Context, block *types.Block) error {
+func (f *fakeConsensus) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+	return nil, nil
+}
+
+func (f *fakeConsensus) Prepare(parent *types.Header, header *types.Header) error {
 	return nil
 }
 

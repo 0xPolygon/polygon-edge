@@ -260,6 +260,8 @@ func newDataset(epoch uint64) interface{} {
 
 // generate ensures that the dataset content is generated before use.
 func (d *dataset) generate(dir string, limit int, test bool) {
+	fmt.Println("-- generate --")
+
 	d.once.Do(func() {
 		// Mark the dataset generated after we're done. This is needed for remote
 		defer atomic.StoreUint32(&d.done, 1)
@@ -288,6 +290,9 @@ func (d *dataset) generate(dir string, limit int, test bool) {
 		}
 		path := filepath.Join(dir, fmt.Sprintf("full-R%d-%x%s", algorithmRevision, seed[:8], endian))
 		logger := log.New("epoch", d.epoch)
+
+		fmt.Println("-- path --")
+		fmt.Println(path)
 
 		// We're about to mmap the file, ensure that the mapping is cleaned up when the
 		// cache becomes unused.
@@ -319,6 +324,8 @@ func (d *dataset) generate(dir string, limit int, test bool) {
 			path := filepath.Join(dir, fmt.Sprintf("full-R%d-%x%s", algorithmRevision, seed[:8], endian))
 			os.Remove(path)
 		}
+
+		fmt.Println("- done -")
 	})
 }
 

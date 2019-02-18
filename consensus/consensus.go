@@ -17,9 +17,12 @@ type Consensus interface {
 	Author(header *types.Header) (common.Address, error)
 
 	// Seal seals the block
-	Seal(ctx context.Context, block *types.Block) error
+	Seal(ctx context.Context, block *types.Block) (*types.Block, error)
 
-	// Finalize do
+	// Prepare runs before processing the head during mining.
+	Prepare(parent *types.Header, header *types.Header) error
+
+	// Finalize runs after the block has been processed
 	Finalize(txn *state.Txn, block *types.Block) error
 
 	// Close closes the connection
