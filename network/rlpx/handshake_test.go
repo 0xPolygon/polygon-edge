@@ -7,8 +7,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/minimal/helper/enode"
+
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/network/discover"
 )
 
 func TestHandshakeP2P(t *testing.T) {
@@ -147,6 +148,6 @@ func mockInfo(prv *ecdsa.PrivateKey) *Info {
 		Name:       "mock",
 		ListenPort: 30303,
 		Caps:       Capabilities{&Cap{"eth", 1}, &Cap{"par", 2}},
-		ID:         discover.PubkeyToNodeID(&prv.PublicKey),
+		ID:         enode.PubkeyToEnode(&prv.PublicKey),
 	}
 }

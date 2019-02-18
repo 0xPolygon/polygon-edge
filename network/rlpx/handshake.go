@@ -21,8 +21,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/helper/enode"
 )
 
 const (
@@ -558,10 +558,10 @@ func readDevP2PHandshake(conn *Session) (*Info, error) {
 	if err := msg.Decode(&info); err != nil {
 		return nil, err
 	}
-	if (info.ID == discv5.NodeID{}) {
+	if (info.ID == enode.ID{}) {
 		return nil, DiscInvalidIdentity
 	}
-	if !reflect.DeepEqual(discv5.PubkeyID(conn.RemoteID), info.ID) {
+	if !reflect.DeepEqual(enode.PubkeyToEnode(conn.RemoteID), info.ID) {
 
 		fmt.Println(conn.RemoteID)
 		fmt.Println(info.ID)

@@ -1,0 +1,116 @@
+package enode
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"math/big"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+const nodeIDBytes = 512 / 8
+
+// ID is the unique identifier of each node.
+type ID [nodeIDBytes]byte
+
+func (i ID) String() string {
+	return strings.TrimPrefix(hexutil.Encode(i[:]), "0x")
+}
+
+// Enode is the URL scheme description of an ethereum node.
+type Enode struct {
+	ID  ID
+	TCP uint16
+	UDP uint16
+	IP  net.IP
+}
+
+// ParseURL parses an enode address
+func ParseURL(rawurl string) (*Enode, error) {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "enode" {
+		return nil, fmt.Errorf("invalid URL scheme, expected 'enode'")
+	}
+
+	var id ID
+	h, err := hex.DecodeString(u.User.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode id: %v", err)
+	}
+	if len(h) != nodeIDBytes {
+		return nil, fmt.Errorf("id not found")
+	}
+	copy(id[:], h)
+
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return nil, fmt.Errorf("invalid host: %v", err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address '%s'", host)
+	}
+
+	tcpPort, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("invalid tcp port '%s': %v", port, err)
+	}
+
+	udpPort := tcpPort
+	if discPort := u.Query().Get("discport"); discPort != "" {
+		udpPort, err = strconv.ParseUint(discPort, 10, 16)
+		if err != nil {
+			return nil, fmt.Errorf("invalid udp port '%s': %v", discPort, err)
+		}
+	}
+
+	node := &Enode{
+		ID:  id,
+		TCP: uint16(tcpPort),
+		UDP: uint16(udpPort),
+		IP:  ip,
+	}
+	return node, nil
+}
+
+func (n *Enode) String() string {
+	url := fmt.Sprintf("enode://%s@%s", n.ID.String(), (&net.TCPAddr{IP: n.IP, Port: int(n.TCP)}).String())
+	if n.TCP != n.UDP {
+		url += "?discport=" + strconv.Itoa(int(n.UDP))
+	}
+	return url
+}
+
+// PublicKey returns the public key of the enode
+func (n *Enode) PublicKey() (*ecdsa.PublicKey, error) {
+	p := &ecdsa.PublicKey{Curve: crypto.S256(), X: new(big.Int), Y: new(big.Int)}
+	half := len(n.ID) / 2
+	p.X.SetBytes(n.ID[:half])
+	p.Y.SetBytes(n.ID[half:])
+	if !p.Curve.IsOnCurve(p.X, p.Y) {
+		return nil, errors.New("id is invalid secp256k1 curve point")
+	}
+	return p, nil
+}
+
+// PubkeyToEnode converts a public key to an enode
+func PubkeyToEnode(pub *ecdsa.PublicKey) ID {
+	var id ID
+	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+	if len(pbytes)-1 != len(id) {
+		panic(fmt.Errorf("need %d bit pubkey, got %d bits", (len(id)+1)*8, len(pbytes)))
+	}
+	copy(id[:], pbytes[1:])
+	return id
+}

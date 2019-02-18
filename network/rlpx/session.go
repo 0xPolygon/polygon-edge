@@ -15,9 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/umbracle/minimal/helper/enode"
+
 	"github.com/armon/go-metrics"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
 )
@@ -171,7 +172,7 @@ func (s *Session) p2pHandshake() error {
 	s.ingressMAC = secrets.IngressMAC
 
 	s.RemoteID = secrets.RemoteID
-	s.id = discv5.PubkeyID(secrets.RemoteID).String()
+	s.id = enode.PubkeyToEnode(secrets.RemoteID).String()
 
 	s.rmu = &sync.Mutex{}
 	s.wmu = &sync.Mutex{}

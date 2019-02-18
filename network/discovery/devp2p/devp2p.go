@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/umbracle/minimal/helper/enode"
+
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discovery"
 
@@ -22,7 +24,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	crand "crypto/rand"
@@ -110,22 +111,6 @@ func newPeer(id string, addr *net.UDPAddr, tcp uint16) (*Peer, error) {
 	}
 
 	return &Peer{peer.ID(id), bytes, addr, nil, tcp}, nil
-}
-
-type Node = discv5.Node
-
-func nodeToRpcEndpoint(node *Node) *rpcEndpoint {
-	return nil
-}
-
-type NodeID = discv5.NodeID
-
-func ParseNode(node string) (*Node, error) {
-	return discv5.ParseNode(node)
-}
-
-func PubkeyToNodeID(pub *ecdsa.PublicKey) NodeID {
-	return discv5.PubkeyID(pub)
 }
 
 const (
@@ -227,6 +212,10 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read config: %v", err)
 	}
+
+	// TODO, remove this fields from read config
+	config.BindAddr = conf.Enode.IP.String()
+	config.BindPort = int(conf.Enode.UDP)
 
 	d, err := NewBackend(conf.Logger, conf.Key, config)
 	if err != nil {
@@ -733,7 +722,7 @@ func hasExpired(ts uint64) bool {
 // AddNode adds a new node to the discover process (NOTE: its a sync process)
 // TODO. split in nodeStrToPeer and probe
 func (b *Backend) AddNode(nodeStr string) error {
-	node, err := ParseNode(nodeStr)
+	node, err := enode.ParseURL(nodeStr)
 	if err != nil {
 		return err
 	}

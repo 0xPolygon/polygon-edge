@@ -50,7 +50,7 @@ func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, b0 *blockch
 		t.Fatal(err)
 	}
 
-	if err := s0.DialSync(s1.Enode); err != nil {
+	if err := s0.DialSync(s1.Enode.String()); err != nil {
 		t.Fatal(err)
 	}
 
