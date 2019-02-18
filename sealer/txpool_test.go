@@ -330,18 +330,24 @@ func TestTxQueuePromotion(t *testing.T) {
 func TestPricedTxs(t *testing.T) {
 	pool := newTxPriceHeap()
 
-	if err := pool.Push(txn(1, key1), 100); err != nil {
-		panic(err)
+	if err := pool.Push(addr1, txn(1, key1), 100); err != nil {
+		t.Fatal(err)
 	}
-	if err := pool.Push(txn(2, key1), 1000); err != nil {
-		panic(err)
+	if err := pool.Push(addr1, txn(2, key1), 1000); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.Push(addr2, txn(3, key2), 1001); err != nil {
+		t.Fatal(err)
 	}
 
-	if nonce := pool.Pop().tx.Nonce(); nonce != 2 {
-		t.Fatalf("expected nonce 2 but found: %d", nonce)
+	if nonce := pool.Pop().tx.Nonce(); nonce != 3 {
+		t.Fatalf("expected nonce 3 but found: %d", nonce)
 	}
 	if nonce := pool.Pop().tx.Nonce(); nonce != 1 {
 		t.Fatalf("expected nonce 1 but found: %d", nonce)
+	}
+	if nonce := pool.Pop().tx.Nonce(); nonce != 2 {
+		t.Fatalf("expected nonce 2 but found: %d", nonce)
 	}
 	if pool.Pop() != nil {
 		t.Fatal("not expected any other element")

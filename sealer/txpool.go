@@ -244,6 +244,7 @@ func (t *txHeap) Pop() interface{} {
 
 type pricedTx struct {
 	tx    *types.Transaction
+	from  common.Address
 	price uint64
 	index int
 }
@@ -260,13 +261,14 @@ func newTxPriceHeap() *txPriceHeap {
 	}
 }
 
-func (t *txPriceHeap) Push(tx *types.Transaction, price uint64) error {
+func (t *txPriceHeap) Push(from common.Address, tx *types.Transaction, price uint64) error {
 	if _, ok := t.index[tx.Hash()]; ok {
 		return fmt.Errorf("tx %s already exists", tx.Hash())
 	}
 
 	pTx := &pricedTx{
 		tx:    tx,
+		from:  from,
 		price: price,
 	}
 	t.index[tx.Hash()] = pTx
@@ -293,6 +295,9 @@ type txPriceHeapImpl []*pricedTx
 func (t txPriceHeapImpl) Len() int { return len(t) }
 
 func (t txPriceHeapImpl) Less(i, j int) bool {
+	if t[i].from == t[j].from {
+		return t[i].tx.Nonce() < t[j].tx.Nonce()
+	}
 	return t[i].price > (t[j].price)
 }
 
