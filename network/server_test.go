@@ -35,7 +35,7 @@ func testProtocolSessions(t *testing.T) (*Server, rlpx.Conn, *Server, rlpx.Conn)
 		t.Fatal(err)
 	}
 
-	if err := s0.DialSync(s1.Enode); err != nil {
+	if err := s0.DialSync(s1.Enode.String()); err != nil {
 		t.Fatal(err)
 	}
 

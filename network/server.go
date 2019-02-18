@@ -11,11 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/umbracle/minimal/helper/enode"
+
 	"github.com/armon/go-metrics"
 
 	"github.com/ferranbt/periodic-dispatcher"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/umbracle/minimal/network/discovery"
 	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
@@ -98,8 +99,6 @@ type Server struct {
 
 	config  *Config
 	closeCh chan struct{}
-
-	Enode   string
 	EventCh chan MemberEvent
 
 	// set of pending nodes
@@ -113,11 +112,17 @@ type Server struct {
 	listener  *rlpx.Listener
 
 	discovery discovery.Backend
+	Enode     *enode.Enode
 }
 
 // NewServer creates a new node
 func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.Logger) *Server {
-	enode := fmt.Sprintf("enode://%s@%s:%d", discv5.PubkeyID(&key.PublicKey), config.BindAddress, config.BindPort)
+	enode := &enode.Enode{
+		IP:  net.ParseIP(config.BindAddress),
+		TCP: uint16(config.BindPort),
+		UDP: uint16(config.BindPort),
+		ID:  enode.PubkeyToEnode(&key.PublicKey),
+	}
 
 	s := &Server{
 		Protocols:    []*protocolStub{},
@@ -144,7 +149,7 @@ func (s *Server) buildInfo() {
 		Version: rlpx.BaseProtocolVersion,
 		Caps:    rlpx.Capabilities{},
 		Name:    s.Name,
-		ID:      discv5.PubkeyID(&s.key.PublicKey),
+		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
 	}
 	for _, p := range s.Protocols {
 		info.Caps = append(info.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
@@ -166,12 +171,18 @@ func (s *Server) Schedule() error {
 		return err
 	}
 
+	enode := &enode.Enode{
+		IP:  net.ParseIP(s.config.BindAddress),
+		TCP: uint16(s.config.BindPort),
+		UDP: uint16(s.config.BindPort),
+	}
+
 	// setup discovery factories
 	discoveryConfig := &discovery.BackendConfig{
-		Logger:  s.logger,
-		Key:     s.key,
-		Address: &net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort},
-		Config:  map[string]interface{}{},
+		Logger: s.logger,
+		Key:    s.key,
+		Enode:  enode,
+		Config: map[string]interface{}{},
 	}
 
 	disc, ok := s.config.DiscoveryBackends["devp2p"]
@@ -406,8 +417,8 @@ func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
 	s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
 }
 
-func (s *Server) ID() discv5.NodeID {
-	return discv5.PubkeyID(&s.key.PublicKey)
+func (s *Server) ID() enode.ID {
+	return s.Enode.ID
 }
 
 func (s *Server) getProtocol(name string, version uint) *protocolStub {

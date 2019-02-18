@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/umbracle/minimal/helper/enode"
 )
 
 // Server returns a new Rlpx server side Session
@@ -83,11 +83,11 @@ func Dial(network, addr string, config *Config) (*Session, error) {
 // DialEnode connects to the given enode address using net.Dial
 // and then initiates a Rlpx handshake.
 func DialEnode(network, addr string, config *Config) (*Session, error) {
-	enode, err := discv5.ParseNode(addr)
+	enode, err := enode.ParseURL(addr)
 	if err != nil {
 		return nil, err
 	}
-	pub, err := enode.ID.Pubkey()
+	pub, err := enode.PublicKey()
 	if err != nil {
 		return nil, err
 	}

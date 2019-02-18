@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func newTestDiscovery(config *Config, capturePacket bool) *Discover {
+func newTestDiscovery(config *Config, capturePacket bool) *Backend {
 	logger := log.New(ioutil.Discard, "", log.LstdFlags)
 	prv0, _ := crypto.GenerateKey()
 
@@ -27,7 +27,7 @@ PORT:
 	config.BindPort = port
 	config.BindAddr = "127.0.0.1"
 
-	r, err := NewDiscover(logger, prv0, config)
+	r, err := NewBackend(logger, prv0, config)
 	if err != nil {
 		goto PORT
 	}
@@ -39,7 +39,7 @@ PORT:
 	return r
 }
 
-func pipe(config *Config, capturePacket bool) (*Discover, *Discover) {
+func pipe(config *Config, capturePacket bool) (*Backend, *Backend) {
 	return newTestDiscovery(config, capturePacket), newTestDiscovery(config, capturePacket)
 }
 
@@ -158,7 +158,7 @@ func TestPingPong(t *testing.T) {
 	}
 }
 
-func testProbeNode(t *testing.T, r0 *Discover, r1 *Discover) {
+func testProbeNode(t *testing.T, r0 *Backend, r1 *Backend) {
 	// --- 0 probe starts ---
 	// r0.Schedule()
 	// r1.Schedule()

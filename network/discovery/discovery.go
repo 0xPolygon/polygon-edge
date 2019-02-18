@@ -4,7 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log"
-	"net"
+
+	"github.com/umbracle/minimal/helper/enode"
 )
 
 // TODO, Is is necessary the Schedule call or we can start once the factory
@@ -31,8 +32,8 @@ type BackendConfig struct {
 	// Logger to be used by the backend
 	Logger *log.Logger
 
-	// Address is the tcp address of the server running
-	Address *net.TCPAddr
+	// Enode is the identification of the node
+	Enode *enode.Enode
 
 	// Private key of the node to encrypt/decrypt messages
 	Key *ecdsa.PrivateKey

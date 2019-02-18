@@ -8,8 +8,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/mitchellh/mapstructure"
+	"github.com/umbracle/minimal/helper/enode"
 
 	consul "github.com/hashicorp/consul/api"
 	"github.com/umbracle/minimal/network/discovery"
@@ -29,6 +29,7 @@ type Backend struct {
 	eventCh chan string
 	address *net.TCPAddr
 	key     *ecdsa.PrivateKey
+	enode   *enode.Enode
 }
 
 func (b *Backend) Close() error {
@@ -43,8 +44,6 @@ func (b *Backend) Schedule() {
 	addr := b.address.IP.String()
 	port := b.address.Port
 
-	enode := fmt.Sprintf("enode://%s@%s:%d", discv5.PubkeyID(&b.key.PublicKey), addr, port)
-
 	service := &consul.AgentServiceRegistration{
 		ID:      b.config.NodeName,
 		Name:    b.config.ServiceName,
@@ -56,7 +55,7 @@ func (b *Backend) Schedule() {
 			TCP:      b.address.String(),
 		},
 		Meta: map[string]string{
-			"enode": enode,
+			"enode": b.enode.String(),
 		},
 	}
 
@@ -144,13 +143,19 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 		return nil, fmt.Errorf("Failed to setup consul: %v", err)
 	}
 
+	tcpAddress := &net.TCPAddr{
+		IP:   conf.Enode.IP,
+		Port: int(conf.Enode.TCP),
+	}
+
 	b := &Backend{
 		logger:  conf.Logger,
 		config:  c,
 		client:  client,
 		eventCh: make(chan string, 10),
-		address: conf.Address,
+		address: tcpAddress,
 		key:     conf.Key,
+		enode:   conf.Enode,
 	}
 
 	return b, nil

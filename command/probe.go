@@ -4,12 +4,13 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/umbracle/minimal/helper/enode"
+
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/umbracle/minimal/network/rlpx"
 )
 
@@ -39,7 +40,7 @@ func (p *ProbeCommand) Run(args []string) int {
 		return 1
 	}
 
-	enode := args[0]
+	rawURL := args[0]
 	prv, _ := crypto.GenerateKey()
 
 	// later on use a protocol specified by the user (either parity or ethereum)
@@ -48,10 +49,10 @@ func (p *ProbeCommand) Run(args []string) int {
 		Name:       "minimal-probe",
 		ListenPort: 30303,
 		Caps:       rlpx.Capabilities{&rlpx.Cap{Name: "eth", Version: 63}},
-		ID:         discv5.PubkeyID(&prv.PublicKey),
+		ID:         enode.PubkeyToEnode(&prv.PublicKey),
 	}
 
-	s, err := rlpx.DialEnode("tcp", enode, &rlpx.Config{Prv: prv, Info: localInfo})
+	s, err := rlpx.DialEnode("tcp", rawURL, &rlpx.Config{Prv: prv, Info: localInfo})
 	if err != nil {
 		p.Ui.Error(fmt.Sprintf("Failed to connect: %v", err))
 		return 1
