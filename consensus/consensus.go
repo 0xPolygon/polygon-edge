@@ -47,5 +47,4 @@ type Config struct {
 type Factory func(context.Context, *Config) (Consensus, error)
 
 // TODO, remove close method and use the context
-// TODO, introduce factory method for ethash
 // TODO, move prepare to seal
