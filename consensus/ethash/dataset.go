@@ -357,29 +357,29 @@ func MakeDataset(block uint64, dir string) {
 	d.generate(dir, math.MaxInt32, false)
 }
 
-func (ethash *EthHash) dataset(block uint64, async bool) *dataset {
+func (e *Ethash) dataset(block uint64, async bool) *dataset {
 	// Retrieve the requested ethash dataset
 	epoch := block / epochLength
-	currentI, futureI := ethash.datasets.get(epoch)
+	currentI, futureI := e.datasets.get(epoch)
 	current := currentI.(*dataset)
 
 	// If async is specified, generate everything in a background thread
 	if async && !current.generated() {
 		go func() {
-			current.generate(ethash.DatasetDir, ethash.DatasetsOnDisk, ethash.Test)
+			current.generate(e.DatasetDir, e.DatasetsOnDisk, e.Test)
 
 			if futureI != nil {
 				future := futureI.(*dataset)
-				future.generate(ethash.DatasetDir, ethash.DatasetsOnDisk, ethash.Test)
+				future.generate(e.DatasetDir, e.DatasetsOnDisk, e.Test)
 			}
 		}()
 	} else {
 		// Either blocking generation was requested, or already done
-		current.generate(ethash.DatasetDir, ethash.DatasetsOnDisk, ethash.Test)
+		current.generate(e.DatasetDir, e.DatasetsOnDisk, e.Test)
 
 		if futureI != nil {
 			future := futureI.(*dataset)
-			go future.generate(ethash.DatasetDir, ethash.DatasetsOnDisk, ethash.Test)
+			go future.generate(e.DatasetDir, e.DatasetsOnDisk, e.Test)
 		}
 	}
 	return current
@@ -388,18 +388,18 @@ func (ethash *EthHash) dataset(block uint64, async bool) *dataset {
 // cache tries to retrieve a verification cache for the specified block number
 // by first checking against a list of in-memory caches, then against caches
 // stored on disk, and finally generating one if none can be found.
-func (ethash *EthHash) cache(block uint64) *cache {
+func (e *Ethash) cache(block uint64) *cache {
 	epoch := block / epochLength
-	currentI, futureI := ethash.caches.get(epoch)
+	currentI, futureI := e.caches.get(epoch)
 	current := currentI.(*cache)
 
 	// Wait for generation finish.
-	current.generate(ethash.CacheDir, ethash.CachesOnDisk, ethash.Test)
+	current.generate(e.CacheDir, e.CachesOnDisk, e.Test)
 
 	// If we need a new future cache, now's a good time to regenerate it.
 	if futureI != nil {
 		future := futureI.(*cache)
-		go future.generate(ethash.CacheDir, ethash.CachesOnDisk, ethash.Test)
+		go future.generate(e.CacheDir, e.CachesOnDisk, e.Test)
 	}
 	return current
 }

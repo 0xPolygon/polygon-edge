@@ -37,10 +37,12 @@ func TestChainGenesis(t *testing.T) {
 	cases := []struct {
 		Name string
 		Root string
+		Hash string
 	}{
 		{
 			Name: "foundation",
 			Root: "0xd7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544",
+			Hash: "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
 		},
 	}
 
@@ -57,7 +59,10 @@ func TestChainGenesis(t *testing.T) {
 			}
 
 			if root := b.genesis.Root.String(); root != c.Root {
-				t.Fatalf("Expected %s but found %s", c.Root, root)
+				t.Fatalf("Expected state root '%s' but found '%s'", c.Root, root)
+			}
+			if hash := b.genesis.Hash().String(); hash != c.Hash {
+				t.Fatalf("Expected hash '%s' but found '%s'", c.Hash, hash)
 			}
 		})
 	}

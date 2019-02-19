@@ -6,8 +6,17 @@ import (
 
 // Params are all the set of params for the chain
 type Params struct {
-	Forks   *Forks `json:"forks"`
-	ChainID int    `json:"chainID"`
+	Forks   *Forks                 `json:"forks"`
+	ChainID int                    `json:"chainID"`
+	Engine  map[string]interface{} `json:"engine"`
+}
+
+func (p *Params) GetEngine() string {
+	// We now there is already one
+	for k := range p.Engine {
+		return k
+	}
+	return ""
 }
 
 func (p *Params) GasTable(num *big.Int) GasTable {

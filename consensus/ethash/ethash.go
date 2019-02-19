@@ -2,6 +2,7 @@ package ethash
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -45,7 +47,7 @@ var (
 )
 
 // EthHash consensus algorithm
-type EthHash struct {
+type Ethash struct {
 	config  *chain.Params
 	lock    sync.Mutex
 	rand    *rand.Rand
@@ -64,9 +66,18 @@ type EthHash struct {
 	datasets *lru // In memory datasets to avoid regenerating too often
 }
 
+func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+	e := &Ethash{
+		config:   config.Params,
+		caches:   newlru("cache", 1, newCache),
+		datasets: newlru("dataset", 1, newDataset),
+	}
+	return e, nil
+}
+
 // NewEthHash creates a new ethash consensus
-func NewEthHash(config *chain.Params, FakePow bool) *EthHash {
-	e := &EthHash{
+func NewEthHash(config *chain.Params, FakePow bool) *Ethash {
+	e := &Ethash{
 		config:   config,
 		caches:   newlru("cache", 1, newCache),
 		datasets: newlru("dataset", 1, newDataset),
@@ -76,7 +87,7 @@ func NewEthHash(config *chain.Params, FakePow bool) *EthHash {
 }
 
 // VerifyHeader verifies the header is correct
-func (e *EthHash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("Extra data too long")
@@ -138,7 +149,7 @@ var (
 	big32 = big.NewInt(32)
 )
 
-func (e *EthHash) Finalize(txn *state.Txn, block *types.Block) error {
+func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
 	number := block.Number()
 
 	// Select the correct block reward based on chain progression
@@ -170,7 +181,7 @@ func (e *EthHash) Finalize(txn *state.Txn, block *types.Block) error {
 	return nil
 }
 
-func (e *EthHash) verifySeal(header *types.Header) error {
+func (e *Ethash) verifySeal(header *types.Header) error {
 	if e.FakePow {
 		return nil
 	}
@@ -208,11 +219,11 @@ func (e *EthHash) verifySeal(header *types.Header) error {
 }
 
 // Author checks the author of the header
-func (e *EthHash) Author(header *types.Header) (common.Address, error) {
+func (e *Ethash) Author(header *types.Header) (common.Address, error) {
 	return common.Address{}, nil
 }
 
-func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
+func (e *Ethash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
 	next := parent.Number.Uint64() + 1
 	switch {
 	case e.config.Forks.IsConstantinople(next):
@@ -227,6 +238,6 @@ func (e *EthHash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
 }
 
 // Close closes the connection
-func (e *EthHash) Close() error {
+func (e *Ethash) Close() error {
 	return nil
 }
