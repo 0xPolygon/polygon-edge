@@ -237,6 +237,11 @@ func ImportFromFile(filename string) (*Chain, error) {
 
 func importChain(content []byte) (*Chain, error) {
 	var chain *Chain
-	err := json.Unmarshal(content, &chain)
-	return chain, err
+	if err := json.Unmarshal(content, &chain); err != nil {
+		return nil, err
+	}
+	if engines := chain.Params.Engine; len(engines) != 1 {
+		return nil, fmt.Errorf("Expected one consensus engine but found %d", len(engines))
+	}
+	return chain, nil
 }

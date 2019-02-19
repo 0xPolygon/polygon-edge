@@ -28,28 +28,28 @@ var (
 	errInvalidSealResult = errors.New("invalid or stale proof-of-work solution")
 )
 
-func (ethash *EthHash) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = ethash.CalcDifficulty(header.Time.Uint64(), parent)
+func (e *Ethash) Prepare(parent *types.Header, header *types.Header) error {
+	header.Difficulty = e.CalcDifficulty(header.Time.Uint64(), parent)
 	return nil
 }
 
-func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
 	fmt.Println("- seal -")
 
 	// Create a runner and the multiple search threads it directs
 	abort := make(chan struct{})
 
-	ethash.lock.Lock()
-	threads := ethash.threads
-	if ethash.rand == nil {
+	e.lock.Lock()
+	threads := e.threads
+	if e.rand == nil {
 		seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
 		if err != nil {
-			ethash.lock.Unlock()
+			e.lock.Unlock()
 			return nil, err
 		}
-		ethash.rand = rand.New(rand.NewSource(seed.Int64()))
+		e.rand = rand.New(rand.NewSource(seed.Int64()))
 	}
-	ethash.lock.Unlock()
+	e.lock.Unlock()
 	if threads == 0 {
 		threads = runtime.NumCPU()
 	}
@@ -68,8 +68,8 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Blo
 		pend.Add(1)
 		go func(id int, nonce uint64) {
 			defer pend.Done()
-			ethash.mine(block, id, nonce, abort, locals)
-		}(i, uint64(ethash.rand.Int63()))
+			e.mine(block, id, nonce, abort, locals)
+		}(i, uint64(e.rand.Int63()))
 	}
 
 	resultCh := make(chan *types.Block, 1)
@@ -95,7 +95,7 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Blo
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
-func (ethash *EthHash) sealHash(header *types.Header) (hash common.Hash) {
+func (e *Ethash) sealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256()
 
 	rlp.Encode(hasher, []interface{}{
@@ -119,15 +119,15 @@ func (ethash *EthHash) sealHash(header *types.Header) (hash common.Hash) {
 
 // mine is the actual proof-of-work miner that searches for a nonce starting from
 // seed that results in correct final block difficulty.
-func (ethash *EthHash) mine(block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block) {
+func (e *Ethash) mine(block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block) {
 	// Extract some data from the header
 	fmt.Println("- mine -")
 
 	header := block.Header()
-	hash := ethash.sealHash(header).Bytes()
+	hash := e.sealHash(header).Bytes()
 	target := new(big.Int).Div(two256, header.Difficulty)
 	number := header.Number.Uint64()
-	dataset := ethash.dataset(number, false)
+	dataset := e.dataset(number, false)
 
 	// Start generating random nonces until we abort or find a good one
 	var (

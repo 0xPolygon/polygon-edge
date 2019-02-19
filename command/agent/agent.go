@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -11,18 +12,21 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-discover"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/network/discovery"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/consensus/ethash"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/syncer"
+
+	consensusClique "github.com/umbracle/minimal/consensus/clique"
+	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
 
 	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
 	discoveryDevP2P "github.com/umbracle/minimal/network/discovery/devp2p"
@@ -46,6 +50,11 @@ func NewAgent(logger *log.Logger, config *Config) *Agent {
 // Start starts the agent
 func (a *Agent) Start() error {
 	a.startTelemetry()
+
+	consensusFactory := map[string]consensus.Factory{
+		"ethash": consensusEthash.Factory,
+		"clique": consensusClique.Factory,
+	}
 
 	chain, err := chain.ImportFromName(a.config.Chain)
 	if err != nil {
@@ -73,8 +82,13 @@ func (a *Agent) Start() error {
 
 	a.server = network.NewServer("minimal", key, serverConfig, a.logger)
 
-	// Load consensus engine (TODO, configurable)
-	consensus := ethash.NewEthHash(chain.Params, true)
+	consensusConfig := &consensus.Config{
+		Params: chain.Params,
+	}
+	consensus, err := consensusFactory[chain.Params.GetEngine()](context.Background(), consensusConfig)
+	if err != nil {
+		panic(err)
+	}
 
 	// blockchain storage
 	storage, err := storage.NewLevelDBStorage(a.config.DataDir, nil)

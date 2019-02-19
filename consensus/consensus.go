@@ -2,9 +2,11 @@ package consensus
 
 import (
 	"context"
+	"log"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 )
 
@@ -28,3 +30,22 @@ type Consensus interface {
 	// Close closes the connection
 	Close() error
 }
+
+// Config is the configuration for the consensus
+type Config struct {
+	// Logger to be used by the backend
+	Logger *log.Logger
+
+	// Params are the params of the chain and the consensus
+	Params *chain.Params
+
+	// Specific configuration parameters for the backend
+	Config map[string]interface{}
+}
+
+// Factory is the factory function to create a discovery backend
+type Factory func(context.Context, *Config) (Consensus, error)
+
+// TODO, remove close method and use the context
+// TODO, introduce factory method for ethash
+// TODO, move prepare to seal
