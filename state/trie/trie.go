@@ -120,7 +120,7 @@ func (t *Txn) insert(n *Node, k, search []byte, v interface{}) (*Node, interface
 		newChild, oldVal, didUpdate := t.insert(child, k, search, v)
 		if newChild != nil {
 			nc := t.writeNode(n, false)
-			nc.edges[idx].node = newChild
+			nc.edges[idx] = newChild
 			return nc, oldVal, didUpdate
 		}
 		return nil, oldVal, didUpdate
@@ -186,7 +186,7 @@ func (t *Txn) delete(parent, n *Node, search []byte) (*Node, *leafNode) {
 		nc.leaf = nil
 
 		// Check if this node should be merged
-		if n != t.root && len(nc.edges) == 1 {
+		if n != t.root && nc.Len() == 1 {
 			t.mergeChild(nc)
 		}
 		return nc, oldLeaf
@@ -213,13 +213,14 @@ func (t *Txn) delete(parent, n *Node, search []byte) (*Node, *leafNode) {
 	nc := t.writeNode(n, false)
 
 	// Delete the edge if the node has no edges
-	if newChild.leaf == nil && len(newChild.edges) == 0 {
+	if newChild.leaf == nil && newChild.Len() == 0 {
 		nc.delEdge(label)
-		if n != t.root && len(nc.edges) == 1 && !nc.isLeaf() {
+
+		if n != t.root && nc.Len() == 1 && !nc.isLeaf() {
 			t.mergeChild(nc)
 		}
 	} else {
-		nc.edges[idx].node = newChild
+		nc.edges[idx] = newChild
 	}
 	return nc, leaf
 }
@@ -227,21 +228,15 @@ func (t *Txn) delete(parent, n *Node, search []byte) (*Node, *leafNode) {
 // mergeChild is called to collapse the given node with its child. This is only
 // called when the given node is not a leaf and has a single edge.
 func (t *Txn) mergeChild(n *Node) {
-	// Mark the child node as being mutated since we are about to abandon
-	// it. We don't need to mark the leaf since we are retaining it if it
-	// is there.
-	e := n.edges[0]
-	child := e.node
+	e := n.First()
+	child := e
 
 	// Merge the nodes.
 	n.prefix = concat(n.prefix, child.prefix)
 	n.leaf = child.leaf
-	if len(child.edges) != 0 {
-		n.edges = make([]edge, len(child.edges))
-		copy(n.edges, child.edges)
-	} else {
-		n.edges = nil
-	}
+
+	n.edges = [17]*Node{}
+	copy(n.edges[:], child.edges[:])
 }
 
 // concat two byte slices, returning a third new copy
@@ -272,10 +267,7 @@ func (t *Txn) writeNode(n *Node, x bool) *Node {
 		nc.prefix = make([]byte, len(n.prefix))
 		copy(nc.prefix, n.prefix)
 	}
-	if len(n.edges) != 0 {
-		nc.edges = make([]edge, len(n.edges))
-		copy(nc.edges, n.edges)
-	}
+	copy(nc.edges[:], n.edges[:])
 	return nc
 }
 
