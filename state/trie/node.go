@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -27,28 +26,10 @@ type edge struct {
 	node  *Node
 }
 
-type edges []edge
-
-func (e edges) Len() int {
-	return len(e)
-}
-
-func (e edges) Less(i, j int) bool {
-	return e[i].label < e[j].label
-}
-
-func (e edges) Swap(i, j int) {
-	e[i], e[j] = e[j], e[i]
-}
-
-func (e edges) Sort() {
-	sort.Sort(e)
-}
-
 type Node struct {
 	leaf   *leafNode
 	prefix []byte
-	edges  edges
+	edges  [17]*Node
 }
 
 func (n *Node) isLeaf() bool {
@@ -60,38 +41,21 @@ func (n *Node) isShort() bool {
 }
 
 func (n *Node) addEdge(e edge) {
-	num := len(n.edges)
-	idx := sort.Search(num, func(i int) bool {
-		return n.edges[i].label >= e.label
-	})
-	n.edges = append(n.edges, e)
-	if idx != num {
-		copy(n.edges[idx+1:], n.edges[idx:num])
-		n.edges[idx] = e
-	}
+	n.edges[e.label] = e.node
 }
 
 func (n *Node) replaceEdge(e edge) {
-	num := len(n.edges)
-	idx := sort.Search(num, func(i int) bool {
-		return n.edges[i].label >= e.label
-	})
-	if idx < num && n.edges[idx].label == e.label {
-		n.edges[idx].node = e.node
-		return
+	if n.edges[e.label] == nil {
+		panic("replacing missing edge")
 	}
-	panic("replacing missing edge")
+	n.edges[e.label] = e.node
 }
 
 func (n *Node) getEdge(label byte) (int, *Node) {
-	num := len(n.edges)
-	idx := sort.Search(num, func(i int) bool {
-		return n.edges[i].label >= label
-	})
-	if idx < num && n.edges[idx].label == label {
-		return idx, n.edges[idx].node
+	if n.edges[label] == nil {
+		return -1, nil
 	}
-	return -1, nil
+	return int(label), n.edges[label]
 }
 
 // Walk is used to walk the tree
@@ -109,7 +73,7 @@ func recursiveWalk(n *Node, fn WalkFn) bool {
 
 	// Recurse on the children
 	for _, e := range n.edges {
-		if recursiveWalk(e.node, fn) {
+		if recursiveWalk(e, fn) {
 			return true
 		}
 	}
@@ -147,17 +111,38 @@ func (n *Node) get(k []byte) (interface{}, bool) {
 	return nil, false
 }
 
+// First returns the first element
+func (n *Node) First() *Node {
+	for _, i := range n.edges {
+		if i != nil {
+			return i
+		}
+	}
+	return nil
+}
+
+// Len returns the number of edges in the node
+func (n *Node) Len() int {
+	l := 0
+	for _, i := range n.edges {
+		if i != nil {
+			l++
+		}
+	}
+	return l
+}
+
 func (n *Node) Hash() []byte {
 	var x []byte
 	var ok bool
 
-	if len(n.edges) == 0 && n.leaf == nil {
-		return emptyRoot
-	}
+	size := n.Len()
 
-	if len(n.edges) == 1 {
+	if size == 0 {
+		return emptyRoot
+	} else if size == 1 { // only one short node
 		// its a short node
-		x, ok = Hash(n.edges[0].node, 0, 0, false)
+		x, ok = Hash(n.First(), 0, 0, false)
 	} else {
 		x, ok = Hash(n, 0, 0, false)
 	}
@@ -180,15 +165,7 @@ func depth(d int) string {
 }
 
 func (n *Node) delEdge(label byte) {
-	num := len(n.edges)
-	idx := sort.Search(num, func(i int) bool {
-		return n.edges[i].label >= label
-	})
-	if idx < num && n.edges[idx].label == label {
-		copy(n.edges[idx:], n.edges[idx+1:])
-		n.edges[len(n.edges)-1] = edge{}
-		n.edges = n.edges[:len(n.edges)-1]
-	}
+	n.edges[label] = nil
 }
 
 type kk struct {
@@ -209,9 +186,6 @@ const valueEdge = 16
 
 func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 	if n.leaf != nil {
-		if len(n.edges) != 0 {
-			panic("Leaf cannot have edges")
-		}
 
 		p := n.prefix
 
@@ -249,12 +223,14 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 	if len(n.edges) != 0 {
 		vals := [17]node{}
 
-		for _, e := range n.edges {
-			r, ok := Hash(e.node, d+1, e.label, true)
-			if ok {
-				vals[e.label] = encodeItem(r)
-			} else {
-				vals[e.label] = r
+		for label, e := range n.edges {
+			if e != nil {
+				r, ok := Hash(e, d+1, byte(label), true)
+				if ok {
+					vals[label] = encodeItem(r)
+				} else {
+					vals[label] = r
+				}
 			}
 		}
 
