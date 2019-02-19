@@ -28,7 +28,13 @@ var (
 	errInvalidSealResult = errors.New("invalid or stale proof-of-work solution")
 )
 
-func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) error {
+func (ethash *EthHash) Prepare(parent *types.Header, header *types.Header) error {
+	header.Difficulty = ethash.CalcDifficulty(header.Time.Uint64(), parent)
+	return nil
+}
+
+func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+	fmt.Println("- seal -")
 
 	// Create a runner and the multiple search threads it directs
 	abort := make(chan struct{})
@@ -39,7 +45,7 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) error {
 		seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
 		if err != nil {
 			ethash.lock.Unlock()
-			return err
+			return nil, err
 		}
 		ethash.rand = rand.New(rand.NewSource(seed.Int64()))
 	}
@@ -55,6 +61,9 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) error {
 		pend   sync.WaitGroup
 		locals = make(chan *types.Block)
 	)
+
+	threads = 1
+
 	for i := 0; i < threads; i++ {
 		pend.Add(1)
 		go func(id int, nonce uint64) {
@@ -62,6 +71,9 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) error {
 			ethash.mine(block, id, nonce, abort, locals)
 		}(i, uint64(ethash.rand.Int63()))
 	}
+
+	resultCh := make(chan *types.Block, 1)
+
 	// Wait until sealing is terminated or a nonce is found
 	go func() {
 		var result *types.Block
@@ -71,22 +83,15 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) error {
 			close(abort)
 		case result = <-locals:
 			// One of the threads found a block, abort all others
-			/*
-				select {
-				case results <- result:
-				default:
-				}
-			*/
-
-			fmt.Println("-- found --")
-			fmt.Println(result)
-
 			close(abort)
 		}
 		// Wait for all miners to terminate and return the block
 		pend.Wait()
+		resultCh <- result
 	}()
-	return nil
+
+	res := <-resultCh
+	return res, nil
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
@@ -116,6 +121,7 @@ func (ethash *EthHash) sealHash(header *types.Header) (hash common.Hash) {
 // seed that results in correct final block difficulty.
 func (ethash *EthHash) mine(block *types.Block, id int, seed uint64, abort chan struct{}, found chan *types.Block) {
 	// Extract some data from the header
+	fmt.Println("- mine -")
 
 	header := block.Header()
 	hash := ethash.sealHash(header).Bytes()
@@ -130,6 +136,7 @@ func (ethash *EthHash) mine(block *types.Block, id int, seed uint64, abort chan 
 	)
 	logger := log.New("miner", id)
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
+
 search:
 	for {
 		select {

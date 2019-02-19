@@ -26,13 +26,17 @@ func (n *NoProof) Author(header *types.Header) (common.Address, error) {
 }
 
 // Seal seals the block
-func (n *NoProof) Seal(ctx context.Context, block *types.Block) error {
-	return err
+func (n *NoProof) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+	return nil, err
 }
 
 // Close closes the connection
 func (n *NoProof) Close() error {
 	return err
+}
+
+func (n *NoProof) Prepare(parent *types.Header, header *types.Header) error {
+	return nil
 }
 
 func (n *NoProof) Finalize(txn *state.Txn, block *types.Block) error {

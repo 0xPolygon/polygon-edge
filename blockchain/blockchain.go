@@ -320,9 +320,28 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return fmt.Errorf("unknown ancestor")
 		}
 
-		state, root, err := b.Process(st, blocks[indx])
+		block := blocks[indx]
+		state, root, receipts, totalGas, err := b.Process(st, block)
 		if err != nil {
 			return err
+		}
+
+		// Validate the result
+
+		if hexutil.Encode(root) != block.Root().String() {
+			return fmt.Errorf("invalid merkle root")
+		}
+		if totalGas != block.GasUsed() {
+			return fmt.Errorf("gas used is different")
+		}
+
+		receiptSha := types.DeriveSha(receipts)
+		if receiptSha != block.ReceiptHash() {
+			return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
+		}
+		rbloom := types.CreateBloom(receipts)
+		if rbloom != block.Bloom() {
+			return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
 		}
 
 		if err := b.WriteHeader(h); err != nil {
@@ -349,7 +368,114 @@ func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
 	return s, ok
 }
 
-func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, []byte, error) {
+func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.State, []byte, []*types.Transaction, error) {
+
+	// add the rewards
+	txn := s.Txn()
+
+	// start the gasPool
+	config := b.params.Forks.At(header.Number.Uint64())
+
+	// gasPool
+	gasPool := NewGasPool(header.GasLimit)
+
+	totalGas := uint64(0)
+
+	receipts := types.Receipts{}
+
+	legacyConfig := &params.ChainConfig{
+		ChainID:        big.NewInt(1), // TODO, Always 1 in tests
+		EIP155Block:    nil,
+		HomesteadBlock: nil,
+	}
+	if b.params.Forks.EIP155 != nil {
+		legacyConfig.EIP155Block = b.params.Forks.EIP155.Int()
+	}
+	if b.params.Forks.Homestead != nil {
+		legacyConfig.HomesteadBlock = b.params.Forks.Homestead.Int()
+	}
+
+	var txerr error
+
+	count := 0
+
+	txns := []*types.Transaction{}
+
+	// apply the transactions
+	for {
+		tx, ok := getTx(txerr, gasPool.gas)
+		if !ok {
+			break
+		}
+
+		msg, err := tx.AsMessage(types.MakeSigner(legacyConfig, header.Number))
+		if err != nil {
+			panic(err)
+		}
+
+		gasTable := b.params.GasTable(header.Number)
+
+		env := &evm.Env{
+			Coinbase:   header.Coinbase,
+			Timestamp:  header.Time,
+			Number:     header.Number,
+			Difficulty: header.Difficulty,
+			GasLimit:   big.NewInt(int64(header.GasLimit)),
+			GasPrice:   tx.GasPrice(),
+		}
+
+		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
+		if err != nil {
+			continue
+		}
+
+		txerr = err
+		totalGas += gasUsed
+
+		logs := txn.Logs()
+
+		ss, root := txn.Commit(config.EIP155)
+		txn = ss.Txn()
+
+		if config.Byzantium {
+			root = []byte{}
+		}
+
+		// Create receipt
+
+		receipt := types.NewReceipt(root, failed, totalGas)
+		receipt.TxHash = tx.Hash()
+		receipt.GasUsed = gasUsed
+
+		// if the transaction created a contract, store the creation address in the receipt.
+		if msg.To() == nil {
+			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce())
+		}
+
+		// Set the receipt logs and create a bloom for filtering
+		receipt.Logs = buildLogs(logs, tx.Hash(), header.Hash(), uint(count))
+		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipts = append(receipts, receipt)
+
+		count++
+
+		txns = append(txns, tx)
+	}
+
+	// without uncles
+	if err := b.consensus.Finalize(txn, types.NewBlock(header, nil, nil, nil)); err != nil {
+		panic(err)
+	}
+
+	s2, root := txn.Commit(config.EIP155)
+
+	fmt.Println(s2)
+	fmt.Println(root)
+
+	return s2, root, txns, nil
+}
+
+func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, []byte, types.Receipts, uint64, error) {
 	// add the rewards
 	txn := s.Txn()
 
@@ -395,7 +521,7 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 
 		totalGas += gasUsed
@@ -432,25 +558,7 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 	s2, root := txn.Commit(config.EIP155)
 
-	txn = s2.Txn()
-
-	if hexutil.Encode(root) != block.Root().String() {
-		return nil, nil, fmt.Errorf("invalid merkle root")
-	}
-	if totalGas != block.GasUsed() {
-		return nil, nil, fmt.Errorf("gas used is different")
-	}
-
-	receiptSha := types.DeriveSha(receipts)
-	if receiptSha != block.ReceiptHash() {
-		return nil, nil, fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
-	}
-	rbloom := types.CreateBloom(receipts)
-	if rbloom != block.Bloom() {
-		return nil, nil, fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
-	}
-
-	return s2, root, nil
+	return s2, root, receipts, totalGas, nil
 }
 
 func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) []*types.Log {
