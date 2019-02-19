@@ -64,9 +64,6 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Blo
 
 	threads = 1
 
-	fmt.Println("-- threads --")
-	fmt.Println(threads)
-
 	for i := 0; i < threads; i++ {
 		pend.Add(1)
 		go func(id int, nonce uint64) {
@@ -85,8 +82,6 @@ func (ethash *EthHash) Seal(ctx context.Context, block *types.Block) (*types.Blo
 			// Outside abort, stop all miner threads
 			close(abort)
 		case result = <-locals:
-			fmt.Println("-- found it --")
-
 			// One of the threads found a block, abort all others
 			close(abort)
 		}
@@ -129,15 +124,10 @@ func (ethash *EthHash) mine(block *types.Block, id int, seed uint64, abort chan 
 	fmt.Println("- mine -")
 
 	header := block.Header()
-	fmt.Println("A")
 	hash := ethash.sealHash(header).Bytes()
-	fmt.Println("B")
 	target := new(big.Int).Div(two256, header.Difficulty)
-	fmt.Println("C")
 	number := header.Number.Uint64()
-	fmt.Println("D")
 	dataset := ethash.dataset(number, false)
-	fmt.Println("E")
 
 	// Start generating random nonces until we abort or find a good one
 	var (
@@ -147,21 +137,15 @@ func (ethash *EthHash) mine(block *types.Block, id int, seed uint64, abort chan 
 	logger := log.New("miner", id)
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
 
-	fmt.Println("-- started searching --")
-
 search:
 	for {
-		fmt.Println("XX")
 		select {
 		case <-abort:
-			fmt.Println("--xx")
 			// Mining terminated, update stats and abort
 			logger.Trace("Ethash nonce search aborted", "attempts", nonce-seed)
 			break search
 
 		default:
-			fmt.Println("-- attempt --")
-
 			// We don't have to update hash rate on every nonce, so update after after 2^X nonces
 			attempts++
 			if (attempts % (1 << 15)) == 0 {
