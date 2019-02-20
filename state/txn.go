@@ -66,9 +66,9 @@ func newTxn(state *State) *Txn {
 	}
 }
 
-func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, bool, error) {
+func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*evm.Precompiled2) (uint64, bool, error) {
 	s := txn.Snapshot()
-	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun)
+	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
 	if err != nil {
 		txn.RevertToSnapshot(s)
 	}
@@ -79,7 +79,7 @@ func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 	return gas, failed, err
 }
 
-func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool) (uint64, bool, error) {
+func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*evm.Precompiled2) (uint64, bool, error) {
 	// transition
 	s := txn.Snapshot()
 
@@ -156,6 +156,7 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 	if !dryRun {
 		e := evm.NewEVM(txn, env, config, gasTable, getHash)
+		e.SetPrecompiled(builtins)
 
 		if contractCreation {
 			//fmt.Println("- one ")

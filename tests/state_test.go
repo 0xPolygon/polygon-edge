@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -29,7 +30,10 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 		t.Fatalf("config %s not found", fork)
 	}
 
+	builtins := buildBuiltins(config)
 	env := c.Env.ToEnv(t)
+
+	fmt.Println(builtins)
 
 	msg, err := c.Transaction.At(p.Indexes)
 	if err != nil {
@@ -48,7 +52,7 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false, builtins)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))

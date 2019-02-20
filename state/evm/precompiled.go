@@ -9,8 +9,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
+	"github.com/umbracle/minimal/state/evm/precompiled"
 	"golang.org/x/crypto/ripemd160"
 )
+
+type Precompiled2 struct {
+	Precompiled precompiled.Precompiled
+	ActiveAt    uint64
+}
 
 // Based on geth precompiled contracts
 

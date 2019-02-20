@@ -35,12 +35,13 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db        *storage.Storage
-	consensus consensus.Consensus
-	genesis   *types.Header
-	state     map[string]*state.State
-	stateRoot common.Hash
-	params    *chain.Params
+	db          *storage.Storage
+	consensus   consensus.Consensus
+	genesis     *types.Header
+	state       map[string]*state.State
+	stateRoot   common.Hash
+	params      *chain.Params
+	precompiled map[common.Address]*evm.Precompiled2
 }
 
 // NewBlockchain creates a new blockchain object
@@ -52,6 +53,10 @@ func NewBlockchain(db *storage.Storage, consensus consensus.Consensus, params *c
 		state:     map[string]*state.State{},
 		params:    params,
 	}
+}
+
+func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*evm.Precompiled2) {
+	b.precompiled = precompiled
 }
 
 // GetParent return the parent
@@ -424,7 +429,7 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 			GasPrice:   tx.GasPrice(),
 		}
 
-		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
+		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 		if err != nil {
 			continue
 		}
@@ -519,7 +524,7 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 			GasPrice:   tx.GasPrice(),
 		}
 
-		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
+		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 		if err != nil {
 			return nil, nil, nil, 0, err
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state/evm/precompiled"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -270,7 +271,8 @@ type EVM struct {
 
 	// returnData []byte
 
-	snapshot int
+	snapshot    int
+	precompiled map[common.Address]*Precompiled2
 }
 
 // NewEVM creates a new EVM
@@ -1191,6 +1193,22 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 	return e.call(contract, op)
 }
 
+// SetPrecompiled sets the precompiled contracts
+func (e *EVM) SetPrecompiled(precompiled map[common.Address]*Precompiled2) {
+	e.precompiled = precompiled
+}
+
+func (e *EVM) getPrecompiled(addr common.Address) (precompiled.Precompiled, bool) {
+	p, ok := e.precompiled[addr]
+	if !ok {
+		return nil, false
+	}
+	if p.ActiveAt < e.env.Number.Uint64() {
+		return nil, false
+	}
+	return p.Precompiled, true
+}
+
 func (e *EVM) call(contract *Contract, op OpCode) error {
 	e.pushContract(contract)
 
@@ -1208,13 +1226,17 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 
 	contract.snapshot = e.state.Snapshot()
 
-	// check first if its precompiled
-	precompiledContracts := ContractsHomestead
-	if e.config.Byzantium {
-		precompiledContracts = ContractsByzantium
-	}
+	/*
+		// check first if its precompiled
+		precompiledContracts := ContractsHomestead
+		if e.config.Byzantium {
+			precompiledContracts = ContractsByzantium
+		}
 
-	precompiled, isPrecompiled := precompiledContracts[contract.codeAddress]
+		precompiled, isPrecompiled := precompiledContracts[contract.codeAddress]
+	*/
+
+	precompiled, isPrecompiled := e.getPrecompiled(contract.codeAddress)
 
 	if op == CALL {
 		if !e.state.Exist(contract.address) {

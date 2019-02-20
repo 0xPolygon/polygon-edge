@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/minimal/state/evm/precompiled"
+
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 
@@ -509,3 +511,89 @@ func listFiles(folder string) ([]string, error) {
 	})
 	return files, err
 }
+
+func init() {
+	if err := json.Unmarshal([]byte(baseBuiltinsStr), &baseBuiltins); err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal([]byte(homesteadBuiltinsStr), &homesteadBuiltins); err != nil {
+		panic(err)
+	}
+}
+
+func buildBuiltins(forks *chain.Forks) map[common.Address]*evm.Precompiled2 {
+	p := map[common.Address]*evm.Precompiled2{}
+
+	addBuiltin := func(active uint64, addr common.Address, b *chain.Builtin) {
+		aux, err := precompiled.CreatePrecompiled(b)
+		if err != nil {
+			panic(err)
+		}
+		p[addr] = &evm.Precompiled2{
+			Precompiled: aux,
+			ActiveAt:    0,
+		}
+	}
+
+	for addr, b := range baseBuiltins {
+		addBuiltin(0, addr, b.Builtin)
+	}
+
+	/*
+		homesteadFork := uint64(0)
+		if forks.Homestead != nil {
+			homesteadFork = forks.Homestead.Int().Uint64()
+		}
+		for addr, b := range homesteadBuiltins {
+			addBuiltin(homesteadFork, addr, b.Builtin)
+		}
+	*/
+
+	return p
+}
+
+var baseBuiltins map[common.Address]*chain.GenesisAccount
+
+var baseBuiltinsStr = `{
+	"0x0000000000000000000000000000000000000001": {
+		"builtin": { "name": "ecrecover", "pricing": { "base": 3000 } } 
+	},
+	"0x0000000000000000000000000000000000000002": { 
+		"builtin": { "name": "sha256", "pricing": { "base": 60, "word": 12 } } 
+	},
+	"0x0000000000000000000000000000000000000003": {
+		"builtin": { "name": "ripemd160", "pricing": { "base": 600, "word": 120 } } 
+	},
+	"0x0000000000000000000000000000000000000004": {
+		"builtin": { "name": "identity", "pricing": { "base": 15, "word": 3 } } 
+	},
+	"0x0000000000000000000000000000000000000005": { 
+		"builtin": { "name": "modexp", "activate_at": 4370000, "pricing": { "divisor": 20 }} 
+	},
+	"0x0000000000000000000000000000000000000006": { 
+		"builtin": { "name": "alt_bn128_add", "activate_at": 4370000, "pricing": { "base": 500 } } 
+	},
+	"0x0000000000000000000000000000000000000007": { 
+		"builtin": { "name": "alt_bn128_mul", "activate_at": 4370000, "pricing": { "base": 40000 } }
+	},
+	"0x0000000000000000000000000000000000000008": { 
+		"builtin": { "name": "alt_bn128_pairing", "activate_at": 4370000, "pricing": { "base": 100000, "pair": 80000 } }
+	}
+}`
+
+var homesteadBuiltins map[common.Address]*chain.GenesisAccount
+
+var homesteadBuiltinsStr = `{
+	"0x0000000000000000000000000000000000000005": { 
+		"builtin": { "name": "modexp", "activate_at": 4370000, "pricing": { "divisor": 20 }} 
+	},
+	"0x0000000000000000000000000000000000000006": { 
+		"builtin": { "name": "alt_bn128_add", "activate_at": 4370000, "pricing": { "base": 500 } } 
+	},
+	"0x0000000000000000000000000000000000000007": { 
+		"builtin": { "name": "alt_bn128_mul", "activate_at": 4370000, "pricing": { "base": 40000 } }
+	},
+	"0x0000000000000000000000000000000000000008": { 
+		"builtin": { "name": "alt_bn128_pairing", "activate_at": 4370000, "pricing": { "base": 100000, "pair": 80000 } }
+	}
+}`
