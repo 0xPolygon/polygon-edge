@@ -2,10 +2,15 @@ package agent
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -61,10 +66,16 @@ func (a *Agent) Start() error {
 		return fmt.Errorf("Failed to load chain %s: %v", a.config.Chain, err)
 	}
 
-	// Load private key from memory (TODO, do it from a file)
-	privateKey := "b4c65ef6b82e96fb5f26dc10a79c929985217c078584721e9157c238d1690b22"
+	// Create data-dir if it does not exists
+	paths := []string{
+		"blockchain",
+	}
+	if err := setupDataDir(a.config.DataDir, paths); err != nil {
+		panic(err)
+	}
 
-	key, err := crypto.HexToECDSA(privateKey)
+	// Load private key from memory (TODO, do it from a file)
+	key, err := loadKey(a.config.DataDir)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +102,7 @@ func (a *Agent) Start() error {
 	}
 
 	// blockchain storage
-	storage, err := storage.NewLevelDBStorage(a.config.DataDir, nil)
+	storage, err := storage.NewLevelDBStorage(filepath.Join(a.config.DataDir, "blockchain"), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -178,4 +189,63 @@ func (a *Agent) startTelemetry() {
 func (a *Agent) Close() {
 	// TODO, close syncer first
 	a.server.Close()
+}
+
+func setupDataDir(dataDir string, paths []string) error {
+	if err := createDir(dataDir); err != nil {
+		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+	}
+
+	for _, path := range paths {
+		path := filepath.Join(dataDir, path)
+		if err := createDir(path); err != nil {
+			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+		}
+	}
+	return nil
+}
+
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadKey(dataDir string) (*ecdsa.PrivateKey, error) {
+	path := filepath.Join(dataDir, "./key")
+
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("Failed to stat (%s): %v", path, err)
+	}
+	if !os.IsNotExist(err) {
+		// exists
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		key, err := hex.DecodeString(string(data))
+		if err != nil {
+			return nil, err
+		}
+		return crypto.ToECDSA(key)
+	}
+
+	// it does not exists
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	if err := ioutil.WriteFile(path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
