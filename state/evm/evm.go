@@ -125,6 +125,9 @@ type Contract struct {
 	origin      common.Address // origin is where the storage is taken from
 	caller      common.Address // caller is the one calling the contract
 
+	// remove later
+	evm *EVM
+
 	// inputs
 	value *big.Int // value of the tx
 	input []byte   // Input of the tx
@@ -216,10 +219,11 @@ func (c *Contract) showStack() string {
 	return "Stack: " + strings.Join(str, ",")
 }
 
-func newContract(origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func newContract(evm *EVM, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	f := &Contract{
 		ip:          -1,
 		code:        code,
+		evm:         evm,
 		caller:      from,
 		origin:      origin,
 		codeAddress: to,
@@ -236,14 +240,14 @@ func newContract(origin common.Address, from common.Address, to common.Address, 
 	return f
 }
 
-func newContractCreation(origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
-	c := newContract(origin, from, to, value, gas, code)
+func newContractCreation(evm *EVM, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+	c := newContract(evm, origin, from, to, value, gas, code)
 	c.creation = true
 	return c
 }
 
-func newContractCall(origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
-	c := newContract(origin, from, to, value, gas, code)
+func newContractCall(evm *EVM, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
+	c := newContract(evm, origin, from, to, value, gas, code)
 	c.input = input
 	return c
 }
@@ -291,19 +295,17 @@ func NewEVM(state State, env *Env, config chain.ForksInTime, gasTable chain.GasT
 
 // Call calls a specific contract
 func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
-	contract := newContractCall(caller, caller, to, value, gas, e.state.GetCode(to), input)
+	contract := newContractCall(e, caller, caller, to, value, gas, e.state.GetCode(to), input)
 
-	if err := e.call(contract, CALL); err != nil {
+	if err := contract.call(contract, CALL); err != nil {
 		if contract.snapshot != -1 {
 			e.state.RevertToSnapshot(contract.snapshot)
 		}
 		return nil, 0, err
 	}
 
-	err := e.Run()
-
-	c := e.currentContract()
-	return c.returnData, c.gas, err
+	ret, err := contract.Run()
+	return ret, contract.gas, err
 }
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -311,22 +313,20 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 // Create creates a new contract
 func (e *EVM) Create(caller common.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
 	address := crypto.CreateAddress(caller, e.state.GetNonce(caller))
-	contract := newContractCreation(caller, caller, address, value, gas, code)
+	contract := newContractCreation(e, caller, caller, address, value, gas, code)
 
-	if err := e.create(contract); err != nil {
+	if err := contract.create(contract); err != nil {
 		if contract.snapshot != -1 {
 			e.state.RevertToSnapshot(contract.snapshot)
 		}
 		return nil, 0, err
 	}
 
-	err := e.Run()
-
-	c := e.currentContract()
-	return c.returnData, c.gas, err
+	ret, err := contract.Run()
+	return ret, contract.gas, err
 }
 
-func (e *EVM) calculateFixedGasUsage(op OpCode) uint64 {
+func (e *Contract) calculateFixedGasUsage(op OpCode) uint64 {
 	if isPush(op) || isSwap(op) || isDup(op) {
 		return GasFastestStep
 	}
@@ -360,16 +360,16 @@ func (e *EVM) calculateFixedGasUsage(op OpCode) uint64 {
 		return GasFastestStep
 
 	case BALANCE:
-		return e.gasTable.Balance
+		return e.evm.gasTable.Balance
 
 	case EXTCODEHASH:
-		return e.gasTable.ExtcodeHash
+		return e.evm.gasTable.ExtcodeHash
 
 	case EXTCODESIZE:
-		return e.gasTable.ExtcodeSize
+		return e.evm.gasTable.ExtcodeSize
 
 	case SLOAD:
-		return e.gasTable.SLoad
+		return e.evm.gasTable.SLoad
 
 	case JUMPDEST:
 		return 1
@@ -395,460 +395,465 @@ func isDup(op OpCode) bool {
 }
 
 // Run executes the virtual machine
-func (e *EVM) Run() error {
+func (e *Contract) Run() ([]byte, error) {
 	var op OpCode
 
-	for {
-		var vmerr error
-		var returnData []byte
+	var vmerr error
+	var returnData []byte
 
-		for e.currentContract().ip < len(e.currentContract().Instructions())-1 {
-			e.currentContract().ip++
+	for e.ip < len(e.Instructions())-1 {
+		e.ip++
 
-			ip := e.currentContract().ip
-			ins := e.currentContract().Instructions()
-			op = OpCode(ins[ip])
+		ip := e.ip
+		ins := e.Instructions()
+		op = OpCode(ins[ip])
 
-			// fmt.Printf("OP: %s (%d)\n", op.String(), e.currentContract().gas)
+		// fmt.Printf("OP: %s (%d)\n", op.String(), e.gas)
 
-			// consume gas for those opcodes with fixed gas
-			if gasUsed := e.calculateFixedGasUsage(op); gasUsed != 0 {
-				if !e.currentContract().consumeGas(gasUsed) {
-					vmerr = ErrGasConsumed
-					goto END
-				}
+		// consume gas for those opcodes with fixed gas
+		if gasUsed := e.calculateFixedGasUsage(op); gasUsed != 0 {
+			if !e.consumeGas(gasUsed) {
+				vmerr = ErrGasConsumed
+				goto END
+			}
+		}
+
+		switch op {
+		case ADD, MUL, SUB, DIV, SDIV, MOD, SMOD, EXP: // add the other operations
+			val, err := e.executeUnsignedArithmeticOperations(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
+
+		case ADDMOD, MULMOD:
+			val, err := e.executeModularOperations(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
+
+		case NOT, ISZERO:
+			val, err := e.executeBitWiseOperations1(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
+
+		case AND, OR, XOR, BYTE:
+			val, err := e.executeBitWiseOperations2(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
+
+		case EQ, GT, LT, SLT, SGT:
+			val, err := e.executeComparison(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
+
+		case SHL, SHR, SAR:
+			if !e.evm.config.Constantinople {
+				vmerr = ErrOpcodeNotFound
+				goto END
 			}
 
-			switch op {
-			case ADD, MUL, SUB, DIV, SDIV, MOD, SMOD, EXP: // add the other operations
-				val, err := e.executeUnsignedArithmeticOperations(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case ADDMOD, MULMOD:
-				val, err := e.executeModularOperations(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case NOT, ISZERO:
-				val, err := e.executeBitWiseOperations1(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case AND, OR, XOR, BYTE:
-				val, err := e.executeBitWiseOperations2(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case EQ, GT, LT, SLT, SGT:
-				val, err := e.executeComparison(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case SHL, SHR, SAR:
-				if !e.config.Constantinople {
-					vmerr = ErrOpcodeNotFound
-					goto END
-				}
-
-				val, err := e.executeShiftOperations(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			case SIGNEXTEND:
-				val, err := e.executeSignExtension()
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				if val != nil {
-					e.push(val)
-				}
-
-			// --- context ---
-
-			case ADDRESS, BALANCE, ORIGIN, CALLER, CALLVALUE, CALLDATALOAD, CALLDATASIZE, CODESIZE, EXTCODESIZE, GASPRICE, RETURNDATASIZE:
-				val, err := e.executeContextOperations(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			// --- context memory copy ---
-
-			case EXTCODECOPY:
-				vmerr = e.executeExtCodeCopy()
-
-			case CODECOPY, CALLDATACOPY, RETURNDATACOPY:
-				vmerr = e.executeContextCopyOperations(op)
-
-			// --- block information ---
-
-			case BLOCKHASH, COINBASE, TIMESTAMP, NUMBER, DIFFICULTY, GASLIMIT:
-				val, err := e.executeBlockInformation(op)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(val)
-
-			// Push operations
-
-			case PUSH1, PUSH2, PUSH3, PUSH4, PUSH5, PUSH6, PUSH7, PUSH8, PUSH9, PUSH10, PUSH11, PUSH12, PUSH13, PUSH14, PUSH15, PUSH16, PUSH17, PUSH18, PUSH19, PUSH20, PUSH21, PUSH22, PUSH23, PUSH24, PUSH25, PUSH26, PUSH27, PUSH28, PUSH29, PUSH30, PUSH31, PUSH32:
-				n := int(op - PUSH) // i.e. PUSH6, n = 6
-
-				var data []byte
-				if ip+1+n > len(ins) {
-					data = common.RightPadBytes(ins[ip+1:len(ins)], n)
-				} else {
-					data = ins[ip+1 : ip+1+n]
-				}
-
-				e.push(big.NewInt(0).SetBytes(data))
-				e.currentContract().ip += n
-
-			// Duplicate operations
-
-			case DUP1, DUP2, DUP3, DUP4, DUP5, DUP6, DUP7, DUP8, DUP9, DUP10, DUP11, DUP12, DUP13, DUP14, DUP15, DUP16:
-				n := int(op - DUP)
-				if !e.stackAtLeast(n) {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
-				e.push(e.peekAt(n))
-
-			// Swap operations
-
-			case SWAP1, SWAP2, SWAP3, SWAP4, SWAP5, SWAP6, SWAP7, SWAP8, SWAP9, SWAP10, SWAP11, SWAP12, SWAP13, SWAP14, SWAP15, SWAP16:
-				n := int(op - SWAP)
-				if !e.stackAtLeast(n + 1) {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
-				e.swap(n)
-
-			// Logging operations
-
-			case LOG0, LOG1, LOG2, LOG3, LOG4:
-				vmerr = e.executeLogsOperation(op)
-
-			// System operations
-
-			case EXTCODEHASH:
-				vmerr = e.executeExtCodeHashOperation()
-
-			case CREATE, CREATE2:
-				vmerr = e.executeCreateOperation(op)
-
-			case CALL, CALLCODE, DELEGATECALL, STATICCALL:
-				vmerr = e.executeCallOperation(op)
-
-			case REVERT, RETURN:
-
-				if op == REVERT {
-					// fmt.Println("REVERT")
-				}
-
-				ret, err := e.executeHaltOperations(op)
+			val, err := e.executeShiftOperations(op)
+			if err != nil {
 				vmerr = err
-				returnData = ret
-
-				//fmt.Println("-- err from halt --")
-				//fmt.Println(err)
-
 				goto END
+			}
+			e.push(val)
 
-			case SELFDESTRUCT:
-				if e.inStaticCall() {
-					vmerr = errReadOnly
-					goto END
-				}
-				vmerr = e.selfDestruct()
+		case SIGNEXTEND:
+			val, err := e.executeSignExtension()
+			if err != nil {
+				vmerr = err
 				goto END
+			}
+			if val != nil {
+				e.push(val)
+			}
 
-			case STOP:
+		// --- context ---
+
+		case ADDRESS, BALANCE, ORIGIN, CALLER, CALLVALUE, CALLDATALOAD, CALLDATASIZE, CODESIZE, EXTCODESIZE, GASPRICE, RETURNDATASIZE:
+			val, err := e.executeContextOperations(op)
+			if err != nil {
+				vmerr = err
 				goto END
+			}
+			e.push(val)
 
-			// --- sha3 ---
+		// --- context memory copy ---
 
-			case SHA3:
-				vmerr = e.sha3()
+		case EXTCODECOPY:
+			vmerr = e.executeExtCodeCopy()
 
-			// --- stack ---
+		case CODECOPY, CALLDATACOPY, RETURNDATACOPY:
+			vmerr = e.executeContextCopyOperations(op)
 
-			case POP:
-				if n := e.pop(); n == nil {
-					vmerr = ErrStackUnderflow
-				}
+		// --- block information ---
 
-			// --- memory ---
+		case BLOCKHASH, COINBASE, TIMESTAMP, NUMBER, DIFFICULTY, GASLIMIT:
+			val, err := e.executeBlockInformation(op)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(val)
 
-			case MLOAD:
-				offset := e.pop()
-				if offset == nil {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
+		// Push operations
 
-				//fmt.Println("-- offset --")
-				//fmt.Println(offset)
+		case PUSH1, PUSH2, PUSH3, PUSH4, PUSH5, PUSH6, PUSH7, PUSH8, PUSH9, PUSH10, PUSH11, PUSH12, PUSH13, PUSH14, PUSH15, PUSH16, PUSH17, PUSH18, PUSH19, PUSH20, PUSH21, PUSH22, PUSH23, PUSH24, PUSH25, PUSH26, PUSH27, PUSH28, PUSH29, PUSH30, PUSH31, PUSH32:
+			n := int(op - PUSH) // i.e. PUSH6, n = 6
 
-				data, gas, err := e.currentContract().memory.Get(offset, big.NewInt(32))
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				e.push(big.NewInt(1).SetBytes(data))
+			var data []byte
+			if ip+1+n > len(ins) {
+				data = common.RightPadBytes(ins[ip+1:len(ins)], n)
+			} else {
+				data = ins[ip+1 : ip+1+n]
+			}
 
-				gas, overflow := math.SafeAdd(gas, GasFastestStep)
-				if overflow {
-					vmerr = ErrGasOverflow
-					goto END
-				}
+			e.push(big.NewInt(0).SetBytes(data))
+			e.ip += n
 
-				if !e.currentContract().consumeGas(gas) {
-					vmerr = ErrGasConsumed
-					goto END
-				}
+		// Duplicate operations
 
-			case MSTORE:
-				// TODO, try to mix mstore8, mstore and mload
-				if !e.stackAtLeast(2) {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
-				start, val := e.pop(), e.pop()
+		case DUP1, DUP2, DUP3, DUP4, DUP5, DUP6, DUP7, DUP8, DUP9, DUP10, DUP11, DUP12, DUP13, DUP14, DUP15, DUP16:
+			n := int(op - DUP)
+			if !e.stackAtLeast(n) {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+			e.push(e.peekAt(n))
 
-				gas, err := e.currentContract().memory.Set32(start, val)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
+		// Swap operations
 
-				gas, overflow := math.SafeAdd(gas, GasFastestStep)
-				if overflow {
-					vmerr = ErrGasConsumed
-					goto END
-				}
+		case SWAP1, SWAP2, SWAP3, SWAP4, SWAP5, SWAP6, SWAP7, SWAP8, SWAP9, SWAP10, SWAP11, SWAP12, SWAP13, SWAP14, SWAP15, SWAP16:
+			n := int(op - SWAP)
+			if !e.stackAtLeast(n + 1) {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+			e.swap(n)
 
-				if !e.currentContract().consumeGas(gas) {
-					vmerr = ErrGasConsumed
-					goto END
-				}
+		// Logging operations
 
-			case MSTORE8:
-				if !e.stackAtLeast(2) {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
+		case LOG0, LOG1, LOG2, LOG3, LOG4:
+			vmerr = e.executeLogsOperation(op)
 
-				offset, val := e.pop(), e.pop().Int64()
+		// System operations
 
-				gas, err := e.currentContract().memory.SetByte(offset, val)
-				if err != nil {
-					vmerr = err
-					goto END
-				}
-				gas, overflow := math.SafeAdd(gas, GasFastestStep)
-				if overflow {
-					vmerr = ErrGasOverflow
-					goto END
-				}
+		case EXTCODEHASH:
+			vmerr = e.executeExtCodeHashOperation()
 
-				if !e.currentContract().consumeGas(gas) {
-					vmerr = ErrGasConsumed
-					goto END
-				}
+		case CREATE, CREATE2:
+			vmerr = e.executeCreateOperation(op)
 
-			// --- storage ---
+		case CALL, CALLCODE, DELEGATECALL, STATICCALL:
+			vmerr = e.executeCallOperation(op)
 
-			case SLOAD:
-				loc := e.pop()
-				if loc == nil {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
-				val := e.state.GetState(e.currentContract().address, common.BigToHash(loc))
-				e.push(val.Big())
+		case REVERT, RETURN:
 
-			case SSTORE:
-				vmerr = e.executeSStoreOperation()
+			if op == REVERT {
+				// fmt.Println("REVERT")
+			}
 
-			// --- flow ---
+			ret, err := e.executeHaltOperations(op)
+			vmerr = err
+			returnData = ret
 
-			case JUMP:
-				dest := e.pop()
-				if dest == nil {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
+			//fmt.Println("-- err from halt --")
+			//fmt.Println(err)
 
-				if !e.currentContract().validJumpdest(dest) {
+			goto END
+
+		case SELFDESTRUCT:
+			if e.inStaticCall() {
+				vmerr = errReadOnly
+				goto END
+			}
+			vmerr = e.selfDestruct()
+			goto END
+
+		case STOP:
+			goto END
+
+		// --- sha3 ---
+
+		case SHA3:
+			vmerr = e.sha3()
+
+		// --- stack ---
+
+		case POP:
+			if n := e.pop(); n == nil {
+				vmerr = ErrStackUnderflow
+			}
+
+		// --- memory ---
+
+		case MLOAD:
+			offset := e.pop()
+			if offset == nil {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+
+			//fmt.Println("-- offset --")
+			//fmt.Println(offset)
+
+			data, gas, err := e.memory.Get(offset, big.NewInt(32))
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			e.push(big.NewInt(1).SetBytes(data))
+
+			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			if overflow {
+				vmerr = ErrGasOverflow
+				goto END
+			}
+
+			if !e.consumeGas(gas) {
+				vmerr = ErrGasConsumed
+				goto END
+			}
+
+		case MSTORE:
+			// TODO, try to mix mstore8, mstore and mload
+			if !e.stackAtLeast(2) {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+			start, val := e.pop(), e.pop()
+
+			gas, err := e.memory.Set32(start, val)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+
+			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			if overflow {
+				vmerr = ErrGasConsumed
+				goto END
+			}
+
+			if !e.consumeGas(gas) {
+				vmerr = ErrGasConsumed
+				goto END
+			}
+
+		case MSTORE8:
+			if !e.stackAtLeast(2) {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+
+			offset, val := e.pop(), e.pop().Int64()
+
+			gas, err := e.memory.SetByte(offset, val)
+			if err != nil {
+				vmerr = err
+				goto END
+			}
+			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			if overflow {
+				vmerr = ErrGasOverflow
+				goto END
+			}
+
+			if !e.consumeGas(gas) {
+				vmerr = ErrGasConsumed
+				goto END
+			}
+
+		// --- storage ---
+
+		case SLOAD:
+			loc := e.pop()
+			if loc == nil {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+			val := e.evm.state.GetState(e.address, common.BigToHash(loc))
+			e.push(val.Big())
+
+		case SSTORE:
+			vmerr = e.executeSStoreOperation()
+
+		// --- flow ---
+
+		case JUMP:
+			dest := e.pop()
+			if dest == nil {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+
+			if !e.validJumpdest(dest) {
+				vmerr = ErrJumpDestNotValid
+				goto END
+			}
+			e.ip = int(dest.Uint64() - 1)
+
+		case JUMPI:
+			if !e.stackAtLeast(2) {
+				vmerr = ErrStackUnderflow
+				goto END
+			}
+			dest, cond := e.pop(), e.pop()
+
+			if cond.Sign() != 0 {
+				if !e.validJumpdest(dest) {
 					vmerr = ErrJumpDestNotValid
 					goto END
 				}
-				e.currentContract().ip = int(dest.Uint64() - 1)
-
-			case JUMPI:
-				if !e.stackAtLeast(2) {
-					vmerr = ErrStackUnderflow
-					goto END
-				}
-				dest, cond := e.pop(), e.pop()
-
-				if cond.Sign() != 0 {
-					if !e.currentContract().validJumpdest(dest) {
-						vmerr = ErrJumpDestNotValid
-						goto END
-					}
-					e.currentContract().ip = int(dest.Uint64() - 1)
-				}
-
-			case JUMPDEST:
-				// Nothing
-
-			case PC:
-				e.push(big.NewInt(int64(e.currentContract().ip)))
-
-			case MSIZE:
-				e.push(e.currentContract().MemoryLen())
-
-			case GAS:
-				e.push(big.NewInt(int64(e.currentContract().gas)))
-
-			default:
-				if strings.Contains(op.String(), "Missing") {
-					vmerr = ErrOpcodeNotFound
-					goto END
-				}
-				return fmt.Errorf("opcode not found: %s", op.String())
+				e.ip = int(dest.Uint64() - 1)
 			}
 
-			if e.currentContract().sp > 1024 {
-				vmerr = ErrStackOverflow
+		case JUMPDEST:
+			// Nothing
+
+		case PC:
+			e.push(big.NewInt(int64(e.ip)))
+
+		case MSIZE:
+			e.push(e.MemoryLen())
+
+		case GAS:
+			e.push(big.NewInt(int64(e.gas)))
+
+		default:
+			if strings.Contains(op.String(), "Missing") {
+				vmerr = ErrOpcodeNotFound
 				goto END
 			}
-
-			if vmerr != nil {
-				break
-			}
+			return nil, fmt.Errorf("opcode not found: %s", op.String())
 		}
 
-	END:
+		if e.sp > 1024 {
+			vmerr = ErrStackOverflow
+			goto END
+		}
 
-		//fmt.Println("--")
-		//fmt.Println(vmerr)
-
-		// need to handle first the error to consume the gas at least
-		c := e.currentContract()
-
-		// consume all the gas of the current contract
 		if vmerr != nil {
-			// only if its a smart contract error,
-			if vmerr != ErrNotEnoughFunds && vmerr != ErrDepth && vmerr != ErrExecutionReverted && vmerr != vm.ErrCodeStoreOutOfGas {
-				//fmt.Println("- consume all gas -")
-				c.consumeGas(c.gas)
-			}
-		}
-
-		// If its the last contract, just stop the loop
-		if e.contractsIndex == 1 {
-			// revert the state
-			if vmerr != nil || op == REVERT {
-				if vmerr != vm.ErrCodeStoreOutOfGas { // dont revert in this case
-
-					//fmt.Println("REVERT TO SNAPSHOT")
-					e.state.RevertToSnapshot(e.currentContract().snapshot)
-				}
-			}
-
-			// Set return data if any
-			e.currentContract().returnData = returnData
-			return vmerr
-		}
-
-		// Otherwise, pop the last contract and fill the return fields
-		e.popContract()
-
-		// Set return data
-		if returnData != nil {
-			if c.creation {
-				// contract creation only return data if there was a revert error
-				if vmerr == ErrExecutionReverted {
-					//fmt.Println("XX")
-					e.currentContract().returnData = returnData
-				}
-			} else {
-				//fmt.Println("YYY")
-				e.currentContract().returnData = returnData
-			}
-		}
-
-		returnData = e.currentContract().returnData
-
-		// Set return codes
-		if vmerr != nil || op == REVERT {
-			e.push(big.NewInt(0))
-		} else {
-			if c.creation {
-				e.push(c.address.Big())
-			} else {
-				e.push(big.NewInt(1))
-			}
-		}
-
-		// Set the state on memory for the contract calls
-		if !c.creation && (vmerr == nil || vmerr == ErrExecutionReverted) && len(returnData) != 0 {
-			// return offset values are stored in the child contract
-			retOffset, retSize := c.retOffset, c.retSize
-
-			if _, err := e.currentContract().memory.Set(big.NewInt(int64(retOffset)), big.NewInt(int64(retSize)), returnData); err != nil {
-				panic(fmt.Errorf("This memory error should not happen: %v", err))
-			}
-		}
-
-		returnData = nil
-
-		// Return the gas
-		e.currentContract().gas += c.gas
-
-		// revert the state
-		if vmerr != nil || op == REVERT {
-			if c.snapshot == -1 {
-				if vmerr != ErrNotEnoughFunds && vmerr != ErrContractAddressCollision && vmerr != ErrDepth {
-					panic("there should be a snapshot")
-				}
-			} else {
-				e.state.RevertToSnapshot(c.snapshot)
-			}
+			break
 		}
 	}
+
+END:
+
+	return returnData, vmerr
+
+	/*
+		END:
+
+			//fmt.Println("--")
+			//fmt.Println(vmerr)
+
+			// need to handle first the error to consume the gas at least
+			c := e.currentContract()
+
+			// consume all the gas of the current contract
+			if vmerr != nil {
+				// only if its a smart contract error,
+				if vmerr != ErrNotEnoughFunds && vmerr != ErrDepth && vmerr != ErrExecutionReverted && vmerr != vm.ErrCodeStoreOutOfGas {
+					//fmt.Println("- consume all gas -")
+					c.consumeGas(c.gas)
+				}
+			}
+
+			// If its the last contract, just stop the loop
+			if e.contractsIndex == 1 {
+				// revert the state
+				if vmerr != nil || op == REVERT {
+					if vmerr != vm.ErrCodeStoreOutOfGas { // dont revert in this case
+
+						//fmt.Println("REVERT TO SNAPSHOT")
+						e.evm.state.RevertToSnapshot(e.snapshot)
+					}
+				}
+
+				// Set return data if any
+				e.returnData = returnData
+				return vmerr
+			}
+
+			// Otherwise, pop the last contract and fill the return fields
+			e.popContract()
+
+			// Set return data
+			if returnData != nil {
+				if c.creation {
+					// contract creation only return data if there was a revert error
+					if vmerr == ErrExecutionReverted {
+						//fmt.Println("XX")
+						e.returnData = returnData
+					}
+				} else {
+					//fmt.Println("YYY")
+					e.returnData = returnData
+				}
+			}
+
+			returnData = e.returnData
+
+			// Set return codes
+			if vmerr != nil || op == REVERT {
+				e.push(big.NewInt(0))
+			} else {
+				if c.creation {
+					e.push(c.address.Big())
+				} else {
+					e.push(big.NewInt(1))
+				}
+			}
+
+			// Set the state on memory for the contract calls
+			if !c.creation && (vmerr == nil || vmerr == ErrExecutionReverted) && len(returnData) != 0 {
+				// return offset values are stored in the child contract
+				retOffset, retSize := c.retOffset, c.retSize
+
+				if _, err := e.memory.Set(big.NewInt(int64(retOffset)), big.NewInt(int64(retSize)), returnData); err != nil {
+					panic(fmt.Errorf("This memory error should not happen: %v", err))
+				}
+			}
+
+			returnData = nil
+
+			// Return the gas
+			e.gas += c.gas
+
+			// revert the state
+			if vmerr != nil || op == REVERT {
+				if c.snapshot == -1 {
+					if vmerr != ErrNotEnoughFunds && vmerr != ErrContractAddressCollision && vmerr != ErrDepth {
+						panic("there should be a snapshot")
+					}
+				} else {
+					e.evm.state.RevertToSnapshot(c.snapshot)
+				}
+			}
+	*/
+
 }
 
 func (e *EVM) isLastContract() bool {
 	return e.contractsIndex == 1
 }
 
-func (e *EVM) executeSStoreOperation() error {
+func (e *Contract) executeSStoreOperation() error {
 	if e.inStaticCall() {
 		return errReadOnly
 	}
@@ -856,7 +861,7 @@ func (e *EVM) executeSStoreOperation() error {
 		return ErrStackUnderflow
 	}
 
-	address := e.currentContract().address
+	address := e.address
 
 	loc, val := e.pop(), e.pop()
 
@@ -866,15 +871,15 @@ func (e *EVM) executeSStoreOperation() error {
 
 	var gas uint64
 
-	current := e.state.GetState(address, common.BigToHash(loc))
+	current := e.evm.state.GetState(address, common.BigToHash(loc))
 
 	// discount gas (constantinople)
-	if !e.config.Constantinople {
+	if !e.evm.config.Constantinople {
 		switch {
 		case current == (common.Hash{}) && val.Sign() != 0: // 0 => non 0
 			gas = SstoreSetGas
 		case current != (common.Hash{}) && val.Sign() == 0: // non 0 => 0
-			e.state.AddRefund(SstoreRefundGas)
+			e.evm.state.AddRefund(SstoreRefundGas)
 			gas = SstoreClearGas
 		default: // non 0 => non 0 (or 0 => 0)
 			gas = SstoreResetGas
@@ -887,28 +892,28 @@ func (e *EVM) executeSStoreOperation() error {
 			if current == value { // noop (1)
 				return NetSstoreNoopGas
 			}
-			original := e.state.GetCommittedState(address, common.BigToHash(loc))
+			original := e.evm.state.GetCommittedState(address, common.BigToHash(loc))
 			if original == current {
 				if original == (common.Hash{}) { // create slot (2.1.1)
 					return NetSstoreInitGas
 				}
 				if value == (common.Hash{}) { // delete slot (2.1.2b)
-					e.state.AddRefund(NetSstoreClearRefund)
+					e.evm.state.AddRefund(NetSstoreClearRefund)
 				}
 				return NetSstoreCleanGas // write existing slot (2.1.2)
 			}
 			if original != (common.Hash{}) {
 				if current == (common.Hash{}) { // recreate slot (2.2.1.1)
-					e.state.SubRefund(NetSstoreClearRefund)
+					e.evm.state.SubRefund(NetSstoreClearRefund)
 				} else if value == (common.Hash{}) { // delete slot (2.2.1.2)
-					e.state.AddRefund(NetSstoreClearRefund)
+					e.evm.state.AddRefund(NetSstoreClearRefund)
 				}
 			}
 			if original == value {
 				if original == (common.Hash{}) { // reset to original inexistent slot (2.2.2.1)
-					e.state.AddRefund(NetSstoreResetClearRefund)
+					e.evm.state.AddRefund(NetSstoreResetClearRefund)
 				} else { // reset to original existing slot (2.2.2.2)
-					e.state.AddRefund(NetSstoreResetRefund)
+					e.evm.state.AddRefund(NetSstoreResetRefund)
 				}
 			}
 			return NetSstoreDirtyGas
@@ -917,15 +922,15 @@ func (e *EVM) executeSStoreOperation() error {
 		gas = getGas()
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasOverflow
 	}
 
-	e.state.SetState(address, common.BigToHash(loc), common.BigToHash(val))
+	e.evm.state.SetState(address, common.BigToHash(loc), common.BigToHash(val))
 	return nil
 }
 
-func (e *EVM) executeLogsOperation(op OpCode) error {
+func (e *Contract) executeLogsOperation(op OpCode) error {
 	if e.inStaticCall() {
 		return errReadOnly
 	}
@@ -942,15 +947,15 @@ func (e *EVM) executeLogsOperation(op OpCode) error {
 		topics[i] = common.BigToHash(e.pop())
 	}
 
-	data, gas, err := e.currentContract().memory.Get(mStart, mSize)
+	data, gas, err := e.memory.Get(mStart, mSize)
 	if err != nil {
 		return err
 	}
-	e.state.AddLog(&types.Log{
-		Address:     e.currentContract().address,
+	e.evm.state.AddLog(&types.Log{
+		Address:     e.address,
 		Topics:      topics,
 		Data:        data,
-		BlockNumber: e.env.Number.Uint64(),
+		BlockNumber: e.evm.env.Number.Uint64(),
 	})
 
 	requestedSize, overflow := bigUint64(mSize)
@@ -973,13 +978,13 @@ func (e *EVM) executeLogsOperation(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasConsumed
 	}
 	return nil
 }
 
-func (e *EVM) sha3() error {
+func (e *Contract) sha3() error {
 
 	if !e.stackAtLeast(2) {
 		return ErrStackUnderflow
@@ -987,7 +992,7 @@ func (e *EVM) sha3() error {
 
 	offset, size := e.pop(), e.pop()
 
-	data, gas, err := e.currentContract().memory.Get(offset, size)
+	data, gas, err := e.memory.Get(offset, size)
 	if err != nil {
 
 		return err
@@ -1014,50 +1019,53 @@ func (e *EVM) sha3() error {
 		return ErrGasOverflow
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasConsumed
 	}
 	return nil
 }
 
-func (e *EVM) create(contract *Contract) error {
-	e.pushContract(contract)
+func (e *Contract) create(contract *Contract) error {
+	// e.pushContract(contract)
 
-	// Check if its too deep
-	if e.Depth() > int(CallCreateDepth)+1 {
-		return ErrDepth
-	}
+	/*
+		// TODO
+		// Check if its too deep
+		if e.Depth() > int(CallCreateDepth)+1 {
+			return ErrDepth
+		}
+	*/
 
 	caller, address, value := contract.caller, contract.address, contract.value
 
 	// Check if the values can be transfered
-	if !e.CanTransfer(e.state, caller, value) {
+	if !e.evm.CanTransfer(e.evm.state, caller, value) {
 		return ErrNotEnoughFunds
 	}
 
 	// Increase the nonce of the caller
-	nonce := e.state.GetNonce(caller)
-	e.state.SetNonce(caller, nonce+1)
+	nonce := e.evm.state.GetNonce(caller)
+	e.evm.state.SetNonce(caller, nonce+1)
 
 	// Check for address collisions
-	contractHash := e.state.GetCodeHash(address)
-	if e.state.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
+	contractHash := e.evm.state.GetCodeHash(address)
+	if e.evm.state.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return ErrContractAddressCollision
 	}
 
 	// Take snapshot of the current state
 	//fmt.Println("- take snapshot -")
-	contract.snapshot = e.state.Snapshot()
+	contract.snapshot = e.evm.state.Snapshot()
 
 	// Create the new account for the contract
-	e.state.CreateAccount(address)
-	if e.config.EIP158 {
-		e.state.SetNonce(address, 1)
+	e.evm.state.CreateAccount(address)
+	if e.evm.config.EIP158 {
+		e.evm.state.SetNonce(address, 1)
 	}
 
 	// Transfer the value
 	if value != nil {
-		if err := e.Transfer(e.state, caller, address, value); err != nil {
+		if err := e.evm.Transfer(e.evm.state, caller, address, value); err != nil {
 			return ErrNotEnoughFunds
 		}
 	}
@@ -1065,7 +1073,7 @@ func (e *EVM) create(contract *Contract) error {
 	return nil
 }
 
-func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
+func (e *Contract) buildCreateContract(op OpCode) (*Contract, error) {
 	var expected int
 	if op == CREATE {
 		expected = 3
@@ -1094,7 +1102,7 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 	var gasCost uint64
 
 	// Both CREATE and CREATE2 use memory
-	input, gasCost, err := e.currentContract().memory.Get(offset, size)
+	input, gasCost, err := e.memory.Get(offset, size)
 	if err != nil {
 		return nil, err
 	}
@@ -1120,41 +1128,41 @@ func (e *EVM) buildCreateContract(op OpCode) (*Contract, error) {
 		return nil, ErrGasOverflow
 	}
 
-	if !e.currentContract().consumeGas(gasCost) {
+	if !e.consumeGas(gasCost) {
 		return nil, ErrGasOverflow
 	}
 
 	// Calculate and consume gas for the call
-	gas := e.currentContract().gas
+	gas := e.gas
 
 	// CREATE2 uses by default EIP150
-	if e.config.EIP150 || op == CREATE2 {
+	if e.evm.config.EIP150 || op == CREATE2 {
 		gas -= gas / 64
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return nil, ErrGasOverflow
 	}
 
 	// Calculate address
 	var address common.Address
 	if op == CREATE {
-		address = crypto.CreateAddress(e.currentContract().address, e.state.GetNonce(e.currentContract().address))
+		address = crypto.CreateAddress(e.address, e.evm.state.GetNonce(e.address))
 	} else {
-		address = crypto.CreateAddress2(e.currentContract().address, common.BigToHash(salt), crypto.Keccak256Hash(input).Bytes())
+		address = crypto.CreateAddress2(e.address, common.BigToHash(salt), crypto.Keccak256Hash(input).Bytes())
 	}
 
-	contract := newContractCreation(e.currentContract().origin, e.currentContract().address, address, value, gas, input)
+	contract := newContractCreation(e.evm, e.origin, e.address, address, value, gas, input)
 	return contract, nil
 }
 
-func (e *EVM) executeCreateOperation(op OpCode) error {
+func (e *Contract) executeCreateOperation(op OpCode) error {
 	if e.inStaticCall() {
 		return errReadOnly
 	}
 
 	if op == CREATE2 {
-		if !e.config.Constantinople {
+		if !e.evm.config.Constantinople {
 			return ErrOpcodeNotFound
 		}
 	}
@@ -1164,21 +1172,21 @@ func (e *EVM) executeCreateOperation(op OpCode) error {
 		return err
 	}
 
-	e.currentContract().returnData = nil
+	// e.returnData = nil
 	return e.create(contract)
 }
 
-func (e *EVM) executeCallOperation(op OpCode) error {
+func (e *Contract) executeCallOperation(op OpCode) error {
 	if op == CALL && e.inStaticCall() {
 		if val := e.peekAt(3); val != nil && val.BitLen() > 0 {
 			return errReadOnly
 		}
 	}
 
-	if op == DELEGATECALL && !e.config.Homestead {
+	if op == DELEGATECALL && !e.evm.config.Homestead {
 		return ErrOpcodeNotFound
 	}
-	if op == STATICCALL && !e.config.Byzantium {
+	if op == STATICCALL && !e.evm.config.Byzantium {
 		return ErrOpcodeNotFound
 	}
 
@@ -1187,75 +1195,86 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 		return err
 	}
 
-	e.currentContract().returnData = nil
-	return e.call(contract, op)
+	// e.returnData = nil
+	return contract.call(contract, op)
 }
 
-func (e *EVM) call(contract *Contract, op OpCode) error {
-	e.pushContract(contract)
+func (e *Contract) call(contract *Contract, op OpCode) error {
+	// e.pushContract(contract)
 
-	// Check if its too deep
-	if e.Depth() > int(CallCreateDepth)+1 {
-		return ErrDepth
-	}
+	/*
+		// TODO
+		// Check if its too deep
+		if e.Depth() > int(CallCreateDepth)+1 {
+			return ErrDepth
+		}
+	*/
 
 	// Check if there is enough balance
 	if op == CALL || op == CALLCODE {
-		if !e.CanTransfer(e.state, contract.caller, contract.value) {
+		if !e.evm.CanTransfer(e.evm.state, contract.caller, contract.value) {
 			return ErrNotEnoughFunds
 		}
 	}
 
-	contract.snapshot = e.state.Snapshot()
+	contract.snapshot = e.evm.state.Snapshot()
 
 	// check first if its precompiled
 	precompiledContracts := ContractsHomestead
-	if e.config.Byzantium {
+	if e.evm.config.Byzantium {
 		precompiledContracts = ContractsByzantium
 	}
 
-	precompiled, isPrecompiled := precompiledContracts[contract.codeAddress]
+	_, isPrecompiled := precompiledContracts[contract.codeAddress]
 
 	if op == CALL {
-		if !e.state.Exist(contract.address) {
-			if !isPrecompiled && e.config.EIP158 && contract.value.Sign() == 0 {
+		if !e.evm.state.Exist(contract.address) {
+			if !isPrecompiled && e.evm.config.EIP158 && contract.value.Sign() == 0 {
 				// calling an unexisting account
 				return nil
 			}
 
 			// Not sure why but the address has to be created for the precompiled contracts
-			e.state.CreateAccount(contract.address)
+			e.evm.state.CreateAccount(contract.address)
 		}
 
 		// Try to transfer
-		if err := e.Transfer(e.state, contract.caller, contract.address, contract.value); err != nil {
+		if err := e.evm.Transfer(e.evm.state, contract.caller, contract.address, contract.value); err != nil {
 			return err
 		}
 	}
 
 	if isPrecompiled {
-		if !contract.consumeGas(precompiled.Gas(contract.input)) {
-			return ErrGasOverflow
-		}
 
-		output, err := precompiled.Call(contract.input)
-		if err != nil {
-			return err
-		}
+		panic("NOT DONE YET")
 
-		if e.numContracts() != 1 {
-			// e.returnData = output
-			e.prevContract().returnData = output
-		} else {
-			// its a call
-			e.currentContract().returnData = output
-		}
+		/*
+			if !contract.consumeGas(precompiled.Gas(contract.input)) {
+				return ErrGasOverflow
+			}
+
+			output, err := precompiled.Call(contract.input)
+			if err != nil {
+				return err
+			}
+		*/
+
+		/*
+			// TODO
+			if e.numContracts() != 1 {
+				// e.returnData = output
+				e.prevContract().returnData = output
+			} else {
+				// its a call
+				e.returnData = output
+			}
+		*/
 	}
 
 	return nil
 }
 
-func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
+func (e *Contract) buildCallContract(op OpCode) (*Contract, error) {
 	var expected int
 	if op == CALL || op == CALLCODE {
 		expected = 7
@@ -1296,26 +1315,26 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 		return nil, ErrGasOverflow
 	}
 
-	memoryGas, err := e.currentContract().memory.Resize(max.Uint64())
+	memoryGas, err := e.memory.Resize(max.Uint64())
 	if err != nil {
 		return nil, err
 	}
 
-	args, _, err := e.currentContract().memory.Get(inOffset, inSize)
+	args, _, err := e.memory.Get(inOffset, inSize)
 	if err != nil {
 		return nil, err
 	}
 
-	gasCost := e.gasTable.Calls
-	eip158 := e.config.EIP158
+	gasCost := e.evm.gasTable.Calls
+	eip158 := e.evm.config.EIP158
 	transfersValue := value != nil && value.Sign() != 0
 
 	if op == CALL {
 		if eip158 {
-			if transfersValue && e.state.Empty(addr) {
+			if transfersValue && e.evm.state.Empty(addr) {
 				gasCost += CallNewAccountGas
 			}
-		} else if !e.state.Exist(addr) {
+		} else if !e.evm.state.Exist(addr) {
 			gasCost += CallNewAccountGas
 		}
 	}
@@ -1329,7 +1348,7 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 		return nil, ErrGasOverflow
 	}
 
-	gas, err := callGas(e.gasTable, e.currentContract().gas, gasCost, initialGas)
+	gas, err := callGas(e.evm.gasTable, e.gas, gasCost, initialGas)
 	if err != nil {
 		return nil, err
 	}
@@ -1339,7 +1358,7 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 	}
 
 	// Consume gas cost
-	if !e.currentContract().consumeGas(gasCost) {
+	if !e.consumeGas(gasCost) {
 		return nil, ErrGasConsumed
 	}
 
@@ -1349,9 +1368,11 @@ func (e *EVM) buildCallContract(op OpCode) (*Contract, error) {
 		}
 	}
 
-	parent := e.currentContract()
+	// parent := e.currentContract()
 
-	contract := newContractCall(parent.origin, parent.address, addr, value, gas, e.state.GetCode(addr), args)
+	parent := e
+
+	contract := newContractCall(e.evm, parent.origin, parent.address, addr, value, gas, e.evm.state.GetCode(addr), args)
 	contract.retOffset = retOffset.Uint64()
 	contract.retSize = retSize.Uint64()
 
@@ -1373,8 +1394,8 @@ func (e *EVM) Depth() int {
 	return e.contractsIndex
 }
 
-func (e *EVM) executeExtCodeHashOperation() error {
-	if !e.config.Constantinople {
+func (e *Contract) executeExtCodeHashOperation() error {
+	if !e.evm.config.Constantinople {
 		return ErrOpcodeNotFound
 	}
 
@@ -1384,17 +1405,17 @@ func (e *EVM) executeExtCodeHashOperation() error {
 	}
 
 	address := common.BigToAddress(addr)
-	if e.state.Empty(address) {
+	if e.evm.state.Empty(address) {
 		e.push(big.NewInt(0))
 	} else {
-		e.push(big.NewInt(0).SetBytes(e.state.GetCodeHash(address).Bytes()))
+		e.push(big.NewInt(0).SetBytes(e.evm.state.GetCodeHash(address).Bytes()))
 	}
 
 	return nil
 }
 
-func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
-	if op == REVERT && !e.config.Byzantium {
+func (e *Contract) executeHaltOperations(op OpCode) ([]byte, error) {
+	if op == REVERT && !e.evm.config.Byzantium {
 		return nil, ErrOpcodeNotFound
 	}
 
@@ -1410,22 +1431,22 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 		return nil, ErrGasOverflow
 	}
 
-	ret, gas, err := e.currentContract().memory.Get(offset, size)
+	ret, gas, err := e.memory.Get(offset, size)
 	if err != nil {
 		return nil, err
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return nil, ErrGasConsumed
 	}
 
 	// Return only allowed in calls
-	if !e.currentContract().creation {
+	if !e.creation {
 		rett = ret
 	}
 
 	// Return if reverted inside a contract creation
-	if e.currentContract().creation && op == REVERT {
+	if e.creation && op == REVERT {
 		rett = ret
 	}
 
@@ -1438,31 +1459,31 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 	}
 
 	if op == RETURN {
-		if e.currentContract().creation {
+		if e.creation {
 
 			//fmt.Println("-- return from creation --")
 			// fmt.Println(ret)
 
 			rett = ret
 
-			maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
+			maxCodeSizeExceeded := e.evm.config.EIP158 && len(ret) > MaxCodeSize
 			if maxCodeSizeExceeded {
 				return nil, ErrMaxCodeSizeExceeded
 			}
 
 			if err == nil && !maxCodeSizeExceeded {
 				createDataGas := uint64(len(ret)) * params.CreateDataGas
-				if !e.currentContract().consumeGas(createDataGas) {
+				if !e.consumeGas(createDataGas) {
 					err = vm.ErrCodeStoreOutOfGas
 				} else {
-					e.state.SetCode(e.currentContract().address, ret)
+					e.evm.state.SetCode(e.address, ret)
 				}
 			}
 
-			if maxCodeSizeExceeded || (err != nil && (e.config.Homestead || err != vm.ErrCodeStoreOutOfGas)) {
-				e.state.RevertToSnapshot(e.currentContract().snapshot)
+			if maxCodeSizeExceeded || (err != nil && (e.evm.config.Homestead || err != vm.ErrCodeStoreOutOfGas)) {
+				e.evm.state.RevertToSnapshot(e.snapshot)
 				if err != ErrExecutionReverted {
-					e.currentContract().consumeAllGas()
+					e.consumeAllGas()
 				}
 			}
 
@@ -1481,7 +1502,7 @@ func (e *EVM) executeHaltOperations(op OpCode) ([]byte, error) {
 	return rett, nil
 }
 
-func (e *EVM) selfDestruct() error {
+func (e *Contract) selfDestruct() error {
 
 	addr := e.pop()
 	if addr == nil {
@@ -1494,32 +1515,32 @@ func (e *EVM) selfDestruct() error {
 	var gas uint64
 
 	// EIP150 homestead gas reprice fork:
-	if e.config.EIP150 {
-		gas = e.gasTable.Suicide
+	if e.evm.config.EIP150 {
+		gas = e.evm.gasTable.Suicide
 
-		eip158 := e.config.EIP158
+		eip158 := e.evm.config.EIP158
 
 		if eip158 {
 			// if empty and transfers value
-			if e.state.Empty(address) && e.state.GetBalance(e.currentContract().address).Sign() != 0 {
-				gas += e.gasTable.CreateBySuicide
+			if e.evm.state.Empty(address) && e.evm.state.GetBalance(e.address).Sign() != 0 {
+				gas += e.evm.gasTable.CreateBySuicide
 			}
-		} else if !e.state.Exist(address) {
-			gas += e.gasTable.CreateBySuicide
+		} else if !e.evm.state.Exist(address) {
+			gas += e.evm.gasTable.CreateBySuicide
 		}
 	}
 
-	if !e.state.HasSuicided(e.currentContract().address) {
-		e.state.AddRefund(SuicideRefundGas)
+	if !e.evm.state.HasSuicided(e.address) {
+		e.evm.state.AddRefund(SuicideRefundGas)
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasConsumed
 	}
 
-	balance := e.state.GetBalance(e.currentContract().address)
-	e.state.AddBalance(address, balance)
-	e.state.Suicide(e.currentContract().address)
+	balance := e.evm.state.GetBalance(e.address)
+	e.evm.state.AddBalance(address, balance)
+	e.evm.state.Suicide(e.address)
 
 	return nil
 }
@@ -1528,22 +1549,22 @@ func bigUint64(v *big.Int) (uint64, bool) {
 	return v.Uint64(), v.BitLen() > 64
 }
 
-func (e *EVM) executeExtCodeCopy() error {
+func (e *Contract) executeExtCodeCopy() error {
 	if !e.stackAtLeast(4) {
 		return ErrStackUnderflow
 	}
 
 	address, memOffset, codeOffset, length := e.pop(), e.pop(), e.pop(), e.pop()
 
-	codeCopy := getSlice(e.state.GetCode(common.BigToAddress(address)), codeOffset, length)
+	codeCopy := getSlice(e.evm.state.GetCode(common.BigToAddress(address)), codeOffset, length)
 
-	gas, err := e.currentContract().memory.Set(memOffset, length, codeCopy)
+	gas, err := e.memory.Set(memOffset, length, codeCopy)
 	if err != nil {
 		return err
 	}
 
 	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, e.gasTable.ExtcodeCopy); overflow {
+	if gas, overflow = math.SafeAdd(gas, e.evm.gasTable.ExtcodeCopy); overflow {
 		return ErrGasOverflow
 	}
 
@@ -1560,14 +1581,14 @@ func (e *EVM) executeExtCodeCopy() error {
 		return ErrGasOverflow
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasConsumed
 	}
 	return nil
 }
 
 // copy values to memory
-func (e *EVM) executeContextCopyOperations(op OpCode) error {
+func (e *Contract) executeContextCopyOperations(op OpCode) error {
 	if !e.stackAtLeast(3) {
 		return ErrStackUnderflow
 	}
@@ -1579,22 +1600,22 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 
 	switch op {
 	case CALLDATACOPY:
-		gas, err = e.currentContract().memory.Set(memOffset, length, getSlice(e.currentContract().input, dataOffset, length))
+		gas, err = e.memory.Set(memOffset, length, getSlice(e.input, dataOffset, length))
 
 	case RETURNDATACOPY:
-		if !e.config.Byzantium {
+		if !e.evm.config.Byzantium {
 			return ErrOpcodeNotFound
 		}
 
 		end := big.NewInt(1).Add(dataOffset, length)
-		if end.BitLen() > 64 || uint64(len(e.currentContract().returnData)) < end.Uint64() {
+		if end.BitLen() > 64 || uint64(len(e.returnData)) < end.Uint64() {
 			return fmt.Errorf("out of bounds")
 		}
 
-		gas, err = e.currentContract().memory.Set(memOffset, length, e.currentContract().returnData[dataOffset.Uint64():end.Uint64()])
+		gas, err = e.memory.Set(memOffset, length, e.returnData[dataOffset.Uint64():end.Uint64()])
 
 	case CODECOPY:
-		gas, err = e.currentContract().memory.Set(memOffset, length, getSlice(e.currentContract().code, dataOffset, length))
+		gas, err = e.memory.Set(memOffset, length, getSlice(e.code, dataOffset, length))
 
 	default:
 		return fmt.Errorf("copy bad opcode found: %s", op.String())
@@ -1624,7 +1645,7 @@ func (e *EVM) executeContextCopyOperations(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if !e.currentContract().consumeGas(gas) {
+	if !e.consumeGas(gas) {
 		return ErrGasOverflow
 	}
 	return nil
@@ -1650,10 +1671,10 @@ func getSlice(data []byte, start *big.Int, size *big.Int) []byte {
 	return common.RightPadBytes(data[s.Uint64():e.Uint64()], int(size.Uint64()))
 }
 
-func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
+func (e *Contract) executeContextOperations(op OpCode) (*big.Int, error) {
 	switch op {
 	case ADDRESS:
-		return e.currentContract().address.Big(), nil
+		return e.address.Big(), nil
 
 	case BALANCE:
 		addr := e.pop()
@@ -1661,16 +1682,16 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 			return nil, ErrStackUnderflow
 		}
 
-		return e.state.GetBalance(common.BigToAddress(addr)), nil
+		return e.evm.state.GetBalance(common.BigToAddress(addr)), nil
 
 	case ORIGIN:
-		return e.currentContract().origin.Big(), nil
+		return e.origin.Big(), nil
 
 	case CALLER:
-		return e.currentContract().caller.Big(), nil
+		return e.caller.Big(), nil
 
 	case CALLVALUE:
-		value := e.currentContract().value
+		value := e.value
 		if value == nil {
 			return big.NewInt(0), nil
 		} else {
@@ -1683,66 +1704,66 @@ func (e *EVM) executeContextOperations(op OpCode) (*big.Int, error) {
 			return nil, ErrStackUnderflow
 		}
 
-		return big.NewInt(1).SetBytes(getSlice(e.currentContract().input, offset, big.NewInt(32))), nil
+		return big.NewInt(1).SetBytes(getSlice(e.input, offset, big.NewInt(32))), nil
 
 	case CALLDATASIZE:
-		return big.NewInt(int64(len(e.currentContract().input))), nil
+		return big.NewInt(int64(len(e.input))), nil
 
 	case CODESIZE:
-		return big.NewInt(int64(len(e.currentContract().code))), nil
+		return big.NewInt(int64(len(e.code))), nil
 
 	case EXTCODESIZE:
 		addr := e.pop()
 		if addr == nil {
 			return nil, ErrStackUnderflow
 		}
-		return big.NewInt(int64(e.state.GetCodeSize(common.BigToAddress(addr)))), nil
+		return big.NewInt(int64(e.evm.state.GetCodeSize(common.BigToAddress(addr)))), nil
 
 	case GASPRICE:
-		return e.env.GasPrice, nil
+		return e.evm.env.GasPrice, nil
 
 	case RETURNDATASIZE:
-		if !e.config.Byzantium {
+		if !e.evm.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
 
 		//fmt.Println("-- return --")
-		//fmt.Println(e.currentContract().returnData)
+		//fmt.Println(e.returnData)
 
-		return big.NewInt(int64(len(e.currentContract().returnData))), nil
+		return big.NewInt(int64(len(e.returnData))), nil
 
 	default:
 		return nil, fmt.Errorf("context bad opcode found: %s", op.String())
 	}
 }
 
-func (e *EVM) executeBlockInformation(op OpCode) (*big.Int, error) {
+func (e *Contract) executeBlockInformation(op OpCode) (*big.Int, error) {
 	switch op {
 	case BLOCKHASH:
 		num := e.pop()
 		if num == nil {
 			return nil, ErrStackUnderflow
 		}
-		n := big.NewInt(1).Sub(e.env.Number, common.Big257)
-		if num.Cmp(n) > 0 && num.Cmp(e.env.Number) < 0 {
-			return e.getHash(num.Uint64()).Big(), nil
+		n := big.NewInt(1).Sub(e.evm.env.Number, common.Big257)
+		if num.Cmp(n) > 0 && num.Cmp(e.evm.env.Number) < 0 {
+			return e.evm.getHash(num.Uint64()).Big(), nil
 		}
 		return big.NewInt(0), nil
 
 	case COINBASE:
-		return e.env.Coinbase.Big(), nil
+		return e.evm.env.Coinbase.Big(), nil
 
 	case TIMESTAMP:
-		return math.U256(e.env.Timestamp), nil
+		return math.U256(e.evm.env.Timestamp), nil
 
 	case NUMBER:
-		return math.U256(e.env.Number), nil
+		return math.U256(e.evm.env.Number), nil
 
 	case DIFFICULTY:
-		return math.U256(e.env.Difficulty), nil
+		return math.U256(e.evm.env.Difficulty), nil
 
 	case GASLIMIT:
-		return math.U256(e.env.GasLimit), nil
+		return math.U256(e.evm.env.GasLimit), nil
 
 	default:
 		return nil, fmt.Errorf("arithmetic bad opcode found: %s", op.String())
@@ -1750,7 +1771,7 @@ func (e *EVM) executeBlockInformation(op OpCode) (*big.Int, error) {
 }
 
 // do it there but add the helper functions
-func (e *EVM) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, error) {
+func (e *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, error) {
 	if !e.stackAtLeast(2) {
 		return nil, ErrStackUnderflow
 	}
@@ -1826,13 +1847,13 @@ func (e *EVM) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, error) {
 			res = math.Exp(base, exponent)
 		}
 
-		gas := expByteLen * e.gasTable.ExpByte
+		gas := expByteLen * e.evm.gasTable.ExpByte
 		overflow := false
 
 		if gas, overflow = math.SafeAdd(gas, GasSlowStep); overflow {
 			return nil, ErrGasOverflow
 		}
-		if !e.currentContract().consumeGas(gas) {
+		if !e.consumeGas(gas) {
 			return nil, ErrGasConsumed
 		}
 
@@ -1843,7 +1864,7 @@ func (e *EVM) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, error) {
 	}
 }
 
-func (e *EVM) executeSignExtension() (*big.Int, error) {
+func (e *Contract) executeSignExtension() (*big.Int, error) {
 	back := e.pop()
 	if back == nil {
 		return nil, ErrStackUnderflow
@@ -1871,7 +1892,7 @@ func (e *EVM) executeSignExtension() (*big.Int, error) {
 	return nil, nil
 }
 
-func (e *EVM) executeModularOperations(op OpCode) (*big.Int, error) {
+func (e *Contract) executeModularOperations(op OpCode) (*big.Int, error) {
 	if !e.stackAtLeast(3) {
 		return nil, ErrStackUnderflow
 	}
@@ -1901,7 +1922,7 @@ func (e *EVM) executeModularOperations(op OpCode) (*big.Int, error) {
 	}
 }
 
-func (e *EVM) executeBitWiseOperations1(op OpCode) (*big.Int, error) {
+func (e *Contract) executeBitWiseOperations1(op OpCode) (*big.Int, error) {
 	x := e.pop()
 	if x == nil {
 		return nil, ErrStackUnderflow
@@ -1922,7 +1943,7 @@ func (e *EVM) executeBitWiseOperations1(op OpCode) (*big.Int, error) {
 	}
 }
 
-func (e *EVM) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
+func (e *Contract) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 	if !e.stackAtLeast(2) {
 		return nil, ErrStackUnderflow
 	}
@@ -1950,8 +1971,8 @@ func (e *EVM) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 	}
 }
 
-func (e *EVM) executeShiftOperations(op OpCode) (*big.Int, error) {
-	if !e.config.Constantinople {
+func (e *Contract) executeShiftOperations(op OpCode) (*big.Int, error) {
+	if !e.evm.config.Constantinople {
 		return nil, ErrOpcodeNotFound
 	}
 
@@ -1993,7 +2014,7 @@ func (e *EVM) executeShiftOperations(op OpCode) (*big.Int, error) {
 	}
 }
 
-func (e *EVM) executeComparison(op OpCode) (*big.Int, error) {
+func (e *Contract) executeComparison(op OpCode) (*big.Int, error) {
 	if !e.stackAtLeast(2) {
 		return nil, ErrStackUnderflow
 	}
@@ -2059,39 +2080,41 @@ func sgtComparison(x, y *big.Int) *big.Int {
 	return big.NewInt(0)
 }
 
-func (e *EVM) inStaticCall() bool {
-	return e.currentContract().static
+func (e *Contract) inStaticCall() bool {
+	return e.static
 }
 
 // -- evm ---
 
 func (e *EVM) stackAtLeast(n int) bool {
-	return e.currentContract().stackAtLeast(n)
+	return e.stackAtLeast(n)
 }
 
 func (e *EVM) push(val *big.Int) {
-	e.currentContract().push(val)
+	e.push(val)
 }
 
 func (e *EVM) pop() *big.Int {
-	return e.currentContract().pop()
+	return e.pop()
 }
 
 func (e *EVM) peek() *big.Int {
-	return e.currentContract().peek()
+	return e.peek()
 }
 
 func (e *EVM) peekAt(n int) *big.Int {
-	return e.currentContract().peekAt(n)
+	return e.peekAt(n)
 }
 
 func (e *EVM) swap(n int) {
-	e.currentContract().swap(n)
+	e.swap(n)
 }
 
 func (e *EVM) numContracts() int {
 	return e.contractsIndex
 }
+
+/*
 func (e *EVM) prevContract() *Contract {
 	return e.contracts[e.contractsIndex-2]
 }
@@ -2109,6 +2132,7 @@ func (e *EVM) popContract() *Contract {
 	e.contractsIndex--
 	return e.contracts[e.contractsIndex]
 }
+*/
 
 func CanTransfer(state State, from common.Address, amount *big.Int) bool {
 	return state.GetBalance(from).Cmp(amount) >= 0
