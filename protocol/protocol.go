@@ -1,5 +1,7 @@
 package protocol
 
+import "context"
+
 // Handler is the handler of the msg for the protocol
 type Handler interface {
 	Init() error
@@ -40,3 +42,6 @@ var PAR1 = Protocol{
 	Version: 1,
 	Length:  21,
 }
+
+// Factory is the factory method to create the protocol (TODO)
+type Factory func(context.Context)
