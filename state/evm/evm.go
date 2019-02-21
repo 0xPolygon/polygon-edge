@@ -305,6 +305,9 @@ func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value
 	}
 
 	ret, err := contract.Run()
+	if err != nil {
+		contract.consumeAllGas()
+	}
 	return ret, contract.gas, err
 }
 
@@ -2086,6 +2089,7 @@ func (e *Contract) inStaticCall() bool {
 
 // -- evm ---
 
+/*
 func (e *EVM) stackAtLeast(n int) bool {
 	return e.stackAtLeast(n)
 }
@@ -2113,6 +2117,7 @@ func (e *EVM) swap(n int) {
 func (e *EVM) numContracts() int {
 	return e.contractsIndex
 }
+*/
 
 /*
 func (e *EVM) prevContract() *Contract {
