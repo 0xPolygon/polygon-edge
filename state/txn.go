@@ -17,6 +17,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state/evm"
+	"github.com/umbracle/minimal/state/evm/precompiled"
 	"github.com/umbracle/minimal/state/trie"
 )
 
@@ -66,7 +67,7 @@ func newTxn(state *State) *Txn {
 	}
 }
 
-func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*evm.Precompiled2) (uint64, bool, error) {
+func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	s := txn.Snapshot()
 	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
 	if err != nil {
@@ -79,7 +80,7 @@ func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 	return gas, failed, err
 }
 
-func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*evm.Precompiled2) (uint64, bool, error) {
+func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	// transition
 	s := txn.Snapshot()
 

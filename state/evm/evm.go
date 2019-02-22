@@ -272,7 +272,7 @@ type EVM struct {
 	// returnData []byte
 
 	snapshot    int
-	precompiled map[common.Address]*Precompiled2
+	precompiled map[common.Address]*precompiled.Precompiled
 }
 
 // NewEVM creates a new EVM
@@ -1194,19 +1194,19 @@ func (e *EVM) executeCallOperation(op OpCode) error {
 }
 
 // SetPrecompiled sets the precompiled contracts
-func (e *EVM) SetPrecompiled(precompiled map[common.Address]*Precompiled2) {
+func (e *EVM) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
 	e.precompiled = precompiled
 }
 
-func (e *EVM) getPrecompiled(addr common.Address) (precompiled.Precompiled, bool) {
+func (e *EVM) getPrecompiled(addr common.Address) (precompiled.Backend, bool) {
 	p, ok := e.precompiled[addr]
 	if !ok {
 		return nil, false
 	}
-	if p.ActiveAt < e.env.Number.Uint64() {
+	if p.ActiveAt > e.env.Number.Uint64() {
 		return nil, false
 	}
-	return p.Precompiled, true
+	return p.Backend, true
 }
 
 func (e *EVM) call(contract *Contract, op OpCode) error {
@@ -1225,16 +1225,6 @@ func (e *EVM) call(contract *Contract, op OpCode) error {
 	}
 
 	contract.snapshot = e.state.Snapshot()
-
-	/*
-		// check first if its precompiled
-		precompiledContracts := ContractsHomestead
-		if e.config.Byzantium {
-			precompiledContracts = ContractsByzantium
-		}
-
-		precompiled, isPrecompiled := precompiledContracts[contract.codeAddress]
-	*/
 
 	precompiled, isPrecompiled := e.getPrecompiled(contract.codeAddress)
 

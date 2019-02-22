@@ -78,6 +78,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatalf("config %s not found", c.Network)
 	}
 
+	builtins := buildBuiltins(t, config)
 	s, err := storage.NewMemoryStorage(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +97,8 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	genesis := c.buildGenesis()
 
 	b := blockchain.NewBlockchain(s, engine, params)
+	b.SetPrecompiled(builtins)
+
 	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}

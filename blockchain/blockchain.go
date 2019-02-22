@@ -17,6 +17,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/state/evm"
+	"github.com/umbracle/minimal/state/evm/precompiled"
 
 	mapset "github.com/deckarep/golang-set"
 )
@@ -41,7 +42,7 @@ type Blockchain struct {
 	state       map[string]*state.State
 	stateRoot   common.Hash
 	params      *chain.Params
-	precompiled map[common.Address]*evm.Precompiled2
+	precompiled map[common.Address]*precompiled.Precompiled
 }
 
 // NewBlockchain creates a new blockchain object
@@ -55,7 +56,7 @@ func NewBlockchain(db *storage.Storage, consensus consensus.Consensus, params *c
 	}
 }
 
-func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*evm.Precompiled2) {
+func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
 	b.precompiled = precompiled
 }
 

@@ -3,7 +3,6 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -30,10 +29,8 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 		t.Fatalf("config %s not found", fork)
 	}
 
-	builtins := buildBuiltins(config)
+	builtins := buildBuiltins(t, config)
 	env := c.Env.ToEnv(t)
-
-	fmt.Println(builtins)
 
 	msg, err := c.Transaction.At(p.Indexes)
 	if err != nil {
