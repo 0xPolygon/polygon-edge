@@ -23,7 +23,7 @@ type stateCase struct {
 	Transaction *stTransaction       `json:"transaction"`
 }
 
-func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p postEntry) {
+func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
 	config, ok := Forks[fork]
 	if !ok {
 		t.Fatalf("config %s not found", fork)
@@ -57,11 +57,11 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	_, root = txn.Commit(forks.EIP158)
 
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), hexutil.Encode(root))
+		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hexutil.Encode(root))
 	}
 
 	if logs := rlpHash(txn.Logs()); logs != p.Logs {
-		t.Fatalf("logs mismatch (%s %d): expected %s but found %s", fork, index, p.Logs.String(), logs.String())
+		t.Fatalf("logs mismatch (%s, %s %d): expected %s but found %s", name, fork, index, p.Logs.String(), logs.String())
 	}
 }
 
@@ -97,10 +97,12 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
+					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
+					continue
 				}
 
 				data, err := ioutil.ReadFile(file)
@@ -113,10 +115,10 @@ func TestState(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				for _, i := range c {
+				for name, i := range c {
 					for fork, f := range i.Post {
 						for indx, e := range f {
-							RunSpecificTest(t, i, "id", fork, indx, e)
+							RunSpecificTest(file, t, i, name, fork, indx, e)
 						}
 					}
 				}
