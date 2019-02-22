@@ -19,19 +19,22 @@ func TestValidateChainID(t *testing.T) {
 }
 
 func TestParamsForks(t *testing.T) {
-	cases := []Case{
+	cases := []struct {
+		input  string
+		output *Forks
+	}{
 		{
 			input: `{
 				"homestead": 1000
 			}`,
-			output: Forks{
+			output: &Forks{
 				Homestead: NewFork(1000),
 			},
 		},
 	}
 
 	for _, c := range cases {
-		var dec Forks
+		var dec *Forks
 		if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
 			if c.output != nil {
 				t.Fatal(err)

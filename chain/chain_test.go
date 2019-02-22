@@ -2,7 +2,6 @@ package chain
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -14,11 +13,6 @@ import (
 
 var emptyAddr common.Address
 
-type Case struct {
-	input  string
-	output interface{}
-}
-
 func addr(str string) common.Address {
 	return common.HexToAddress(str)
 }
@@ -28,7 +22,10 @@ func hash(str string) common.Hash {
 }
 
 func TestGenesisAlloc(t *testing.T) {
-	cases := []Case{
+	cases := []struct {
+		input  string
+		output GenesisAlloc
+	}{
 		{
 			input: `{
 				"0x0000000000000000000000000000000000000000": {
@@ -40,12 +37,6 @@ func TestGenesisAlloc(t *testing.T) {
 					Balance: big.NewInt(17),
 				},
 			},
-		},
-		{
-			input: `{
-				"0x0000000000000000000000000000000000000000": {}
-			}`,
-			output: nil,
 		},
 		{
 			input: `{
@@ -87,22 +78,51 @@ func TestGenesisAlloc(t *testing.T) {
 				},
 			},
 		},
+		{
+			input: `{
+					"0x0000000000000000000000000000000000000000": {
+						"builtin": {
+							"name": "precompiled1",
+							"activate_at": 10,
+							"pricing": {
+								"base": 11
+							}
+						}
+					}
+				}`,
+			output: GenesisAlloc{
+				addr("0"): GenesisAccount{
+					Builtin: &Builtin{
+						Name:       "precompiled1",
+						ActivateAt: 10,
+						Pricing: map[string]uint64{
+							"base": 11,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
-		var dec GenesisAlloc
-		if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
-			if c.output != nil {
-				t.Fatal(err)
+		t.Run("", func(t *testing.T) {
+			var dec GenesisAlloc
+			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
+				if c.output != nil {
+					t.Fatal(err)
+				}
+			} else if !reflect.DeepEqual(dec, c.output) {
+				t.Fatal("bad")
 			}
-		} else if !reflect.DeepEqual(dec, c.output) {
-			t.Fatal("bad")
-		}
+		})
 	}
 }
 
 func TestGenesis(t *testing.T) {
-	cases := []Case{
+	cases := []struct {
+		input  string
+		output *Genesis
+	}{
 		{
 			input: `{
 				"difficulty": "0x12",
@@ -116,7 +136,7 @@ func TestGenesis(t *testing.T) {
 					}
 				}
 			}`,
-			output: Genesis{
+			output: &Genesis{
 				Difficulty: big.NewInt(18),
 				GasLimit:   17,
 				Alloc: GenesisAlloc{
@@ -132,15 +152,16 @@ func TestGenesis(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		var dec Genesis
-		if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
-			fmt.Println(err)
-			if c.output != nil {
-				t.Fatal(err)
+		t.Run("", func(t *testing.T) {
+			var dec *Genesis
+			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
+				if c.output != nil {
+					t.Fatal(err)
+				}
+			} else if !reflect.DeepEqual(dec, c.output) {
+				t.Fatal("bad")
 			}
-		} else if !reflect.DeepEqual(dec, c.output) {
-			t.Fatal("bad")
-		}
+		})
 	}
 }
 
