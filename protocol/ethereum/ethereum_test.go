@@ -1,63 +1,210 @@
 package ethereum
 
 import (
-	"fmt"
-	"io"
-	"io/ioutil"
 	"math/big"
+	"net"
 	"reflect"
+	"strconv"
 	"testing"
-	"time"
-
-	"github.com/umbracle/minimal/network/rlpx"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/protocol"
 )
 
-func testEthHandshake(t *testing.T, s0 *network.Server, ss0 *Status, b0 *blockchain.Blockchain, s1 *network.Server, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
+var status = Status{
+	ProtocolVersion: 63,
+	NetworkID:       1,
+	TD:              big.NewInt(1),
+	CurrentBlock:    common.HexToHash("1"),
+	GenesisBlock:    common.HexToHash("1"),
+}
+
+func TestHandshake(t *testing.T) {
+	// Networkid is different
+	status1 := status
+	status1.NetworkID = 2
+
+	// Current block is different
+	status2 := status
+	status2.CurrentBlock = common.HexToHash("2")
+
+	// Genesis block is different
+	status3 := status
+	status3.GenesisBlock = common.HexToHash("2")
+
+	cases := []struct {
+		Name    string
+		Status0 *Status
+		Status1 *Status
+		Error   bool
+	}{
+		{
+			Name:    "Same status",
+			Status0: &status,
+			Status1: &status,
+			Error:   false,
+		},
+		{
+			Name:    "Different network id",
+			Status0: &status,
+			Status1: &status1,
+			Error:   true,
+		},
+		{
+			Name:    "Different current block",
+			Status0: &status,
+			Status1: &status2,
+			Error:   false,
+		},
+		{
+			Name:    "Different genesis block",
+			Status0: &status,
+			Status1: &status3,
+			Error:   true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			eth0, err0, eth1, err1 := testEthHandshakeWithStatus(c.Status0, nil, c.Status1, nil)
+
+			if err0 != err1 && (err0 == nil || err1 == nil) {
+				t.Fatal("errors dont match")
+			}
+			if err0 != nil && !c.Error {
+				t.Fatalf("error not expected: %v", err0)
+			} else if err0 == nil && c.Error {
+				t.Fatal("expected error")
+			}
+
+			if !c.Error {
+				if !reflect.DeepEqual(eth0.status, c.Status1) {
+					t.Fatal("bad")
+				}
+				if !reflect.DeepEqual(eth1.status, c.Status0) {
+					t.Fatal("bad")
+				}
+			}
+		})
+	}
+}
+
+func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, error, *Ethereum, error) {
 	st0 := func() (*Status, error) {
 		return ss0, nil
 	}
-
 	st1 := func() (*Status, error) {
 		return ss1, nil
 	}
 
-	var eth0 *Ethereum
-	c0 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
-		eth0 = NewEthereumProtocol(s, p, st0, b0)
-		return eth0
-	}
+	conn0, conn1 := net.Pipe()
 
-	var eth1 *Ethereum
-	c1 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
-		eth1 = NewEthereumProtocol(s, p, st1, b1)
-		return eth1
-	}
+	eth0 := NewEthereumProtocol(conn0, nil, st0, b0)
+	eth1 := NewEthereumProtocol(conn1, nil, st1, b1)
 
-	s0.RegisterProtocol(protocol.ETH63, c0)
-	s1.RegisterProtocol(protocol.ETH63, c1)
+	err := make(chan error)
+	go func() {
+		err <- eth0.Init()
+	}()
+	go func() {
+		err <- eth1.Init()
+	}()
 
-	if err := s0.Schedule(); err != nil {
-		t.Fatal(err)
-	}
-	if err := s1.Schedule(); err != nil {
-		t.Fatal(err)
-	}
+	err0 := <-err
+	err1 := <-err
 
-	if err := s0.DialSync(s1.Enode.String()); err != nil {
-		t.Fatal(err)
-	}
+	return eth0, err0, eth1, err1
+}
 
-	time.Sleep(500 * time.Millisecond)
+func testEthProtocol(t *testing.T, b0 *blockchain.Blockchain, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
+	eth0, err0, eth1, err1 := testEthHandshakeWithStatus(&status, b0, &status, b1)
+	if err0 != nil || err1 != nil {
+		t.Fatal("bad")
+	}
 	return eth0, eth1
 }
 
+func headersToNumbers(headers []*types.Header) []int {
+	n := []int{}
+	for _, h := range headers {
+		n = append(n, int(h.Number.Int64()))
+	}
+	return n
+}
+
+func TestEthereumBlockHeadersMsg(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(100)
+
+	b0 := blockchain.NewTestBlockchain(t, headers)
+	b1 := blockchain.NewTestBlockchain(t, headers)
+
+	eth0, _ := testEthProtocol(t, b0, b1)
+
+	var cases = []struct {
+		Origin   interface{}
+		Amount   uint64
+		Skip     uint64
+		Reverse  bool
+		Expected []int
+	}{
+		/*
+			{
+				Origin:   headers[1].Hash(),
+				Amount:   10,
+				Skip:     4,
+				Reverse:  false,
+				Expected: []int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+			},
+		*/
+		{
+			Origin:   1,
+			Amount:   10,
+			Skip:     4,
+			Reverse:  false,
+			Expected: []int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+		},
+		{
+			Origin:   1,
+			Amount:   10,
+			Skip:     0,
+			Reverse:  false,
+			Expected: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run("", func(t *testing.T) {
+			ack := make(chan AckMessage, 1)
+
+			var err error
+			if reflect.TypeOf(c.Origin).Name() == "Hash" {
+				hash := c.Origin.(common.Hash)
+				eth0.setHandler(hash.String(), 1, ack)
+				err = eth0.RequestHeadersByHash(hash, c.Amount, c.Skip, c.Reverse)
+			} else {
+				number := uint64(c.Origin.(int))
+				eth0.setHandler(strconv.Itoa(int(number)), 1, ack)
+				err = eth0.RequestHeadersByNumber(number, c.Amount, c.Skip, c.Reverse)
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			resp := <-ack
+			if resp.Complete {
+				if !reflect.DeepEqual(headersToNumbers(resp.Result.([]*types.Header)), c.Expected) {
+					t.Fatal("expected numbers dont match")
+				}
+			} else {
+				t.Fatal("failed to receive the headers")
+			}
+		})
+	}
+}
+
+/*
 var status = Status{
 	ProtocolVersion: 63,
 	NetworkID:       1,
@@ -450,3 +597,4 @@ func TestPeerCloseConnection(t *testing.T) {
 		t.Fatal("it should fail after the connection has been closed")
 	}
 }
+*/

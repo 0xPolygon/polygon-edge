@@ -239,7 +239,7 @@ func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
 }
 
 func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
-	panic("TODO")
+	return b.WriteHeadersWithBodies(headers)
 }
 
 // WriteHeadersWithBodies writes a batch of headers

@@ -1,8 +1,11 @@
 package ethereum
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math/big"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -64,7 +67,9 @@ type Blockchain interface {
 
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
-	conn       rlpx.Conn
+	conn     net.Conn
+	sendLock sync.Mutex
+
 	peer       *network.Peer
 	getStatus  GetStatus
 	status     *Status // status of the remote peer
@@ -81,7 +86,7 @@ type Ethereum struct {
 type GetStatus func() (*Status, error)
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn rlpx.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
+func NewEthereumProtocol(conn net.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
 	return &Ethereum{
 		conn:        conn,
 		peer:        peer,
@@ -127,47 +132,85 @@ type getBlockHeadersData struct {
 	Reverse bool
 }
 
+func (e *Ethereum) WriteMsg(code int, data interface{}) error {
+	e.sendLock.Lock()
+	defer e.sendLock.Unlock()
+
+	r, err := rlp.EncodeToBytes(data)
+	if err != nil {
+		return err
+	}
+
+	buf := make([]byte, binary.MaxVarintLen64)
+
+	binary.PutUvarint(buf, uint64(code))
+	if _, err := e.conn.Write(buf); err != nil {
+		return err
+	}
+
+	binary.PutUvarint(buf, uint64(len(r)))
+	if _, err := e.conn.Write(buf); err != nil {
+		return err
+	}
+	if _, err := e.conn.Write(r); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RequestHeadersByNumber fetches a batch of blocks' headers based on the number of an origin block.
 func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error {
-	return e.conn.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
+	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
 func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
-	return e.conn.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestBodies fetches a batch of blocks' bodies based on a set of hashes.
 func (e *Ethereum) RequestBodies(hashes []common.Hash) error {
-	return e.conn.WriteMsg(GetBlockBodiesMsg, hashes)
+	return e.WriteMsg(GetBlockBodiesMsg, hashes)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state.
 func (e *Ethereum) RequestNodeData(hashes []common.Hash) error {
-	return e.conn.WriteMsg(GetNodeDataMsg, hashes)
+	return e.WriteMsg(GetNodeDataMsg, hashes)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
 func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
-	return e.conn.WriteMsg(GetReceiptsMsg, hashes)
+	return e.WriteMsg(GetReceiptsMsg, hashes)
 }
 
 // Conn returns the connection referece
 func (e *Ethereum) Conn() *rlpx.Stream {
-	return e.conn.(*rlpx.Stream)
+	return nil
+	// return e.conn.(*rlpx.Stream)
 }
 
 func (e *Ethereum) ReadStatus() (*Status, error) {
 	var status *Status
 
-	msg, err := e.conn.ReadMsg()
-	if err != nil {
+	header := make([]byte, 10)
+	if _, err := e.conn.Read(header); err != nil {
 		return nil, err
 	}
-	if msg.Code != StatusMsg {
-		return nil, fmt.Errorf("Message code is not statusMsg but %d", msg.Code)
+	code, _ := binary.Uvarint(header[0:10])
+	if code != StatusMsg {
+		return nil, fmt.Errorf("Message code is not statusMsg but %d", code)
 	}
-	if err := rlp.Decode(msg.Payload, &status); err != nil {
+
+	if _, err := e.conn.Read(header); err != nil {
+		return nil, err
+	}
+	size, _ := binary.Uvarint(header[0:10])
+
+	buf := make([]byte, size)
+	if _, err := e.conn.Read(buf); err != nil {
+		return nil, err
+	}
+	if err := rlp.DecodeBytes(buf, &status); err != nil {
 		return nil, err
 	}
 	return status, nil
@@ -218,7 +261,7 @@ func (e *Ethereum) Init() error {
 	}()
 
 	go func() {
-		errr <- e.conn.WriteMsg(StatusMsg, status)
+		errr <- e.WriteMsg(StatusMsg, status)
 	}()
 
 	var errors error
@@ -236,7 +279,7 @@ func (e *Ethereum) Init() error {
 		return errors
 	}
 
-	e.peer.UpdateHeader(e.status.CurrentBlock, e.status.TD)
+	// e.peer.UpdateHeader(e.status.CurrentBlock, e.status.TD)
 
 	// handshake was correct, start to listen for packets
 	go e.listen()
@@ -245,16 +288,46 @@ func (e *Ethereum) Init() error {
 
 func (e *Ethereum) listen() {
 	for {
-		msg, err := e.conn.ReadMsg()
-		if err != nil {
+
+		header := make([]byte, 10)
+		if _, err := e.conn.Read(header); err != nil {
+			panic(err)
+		}
+		code, _ := binary.Uvarint(header[0:10])
+
+		if _, err := e.conn.Read(header); err != nil {
+			panic(err)
+		}
+		size, _ := binary.Uvarint(header[0:10])
+
+		buf := make([]byte, size)
+		if _, err := e.conn.Read(buf); err != nil {
 			panic(err)
 		}
 
+		msg := rlpx.Message{
+			Code:    code,
+			Payload: bytes.NewReader(buf),
+		}
+
 		if err := e.HandleMsg(msg); err != nil {
-			// close connection
-			e.conn.Close()
+			panic(err)
 		}
 	}
+
+	/*
+		for {
+			msg, err := e.conn.ReadMsg()
+			if err != nil {
+				panic(err)
+			}
+
+			if err := e.HandleMsg(msg); err != nil {
+				// close connection
+				e.conn.Close()
+			}
+		}
+	*/
 }
 
 type newBlockData struct {
@@ -443,7 +516,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 
 // sendBlockHeaders sends a batch of block headers to the remote peer.
 func (e *Ethereum) sendBlockHeaders(headers []*types.Header) error {
-	return e.conn.WriteMsg(BlockHeadersMsg, headers)
+	return e.WriteMsg(BlockHeadersMsg, headers)
 }
 
 // blockBody represents the data content of a single block.
@@ -456,11 +529,11 @@ type blockBody struct {
 type BlockBodiesData []*blockBody
 
 func (e *Ethereum) sendBlockBodies(bodies []rlp.RawValue) error {
-	return e.conn.WriteMsg(BlockBodiesMsg, bodies)
+	return e.WriteMsg(BlockBodiesMsg, bodies)
 }
 
 func (e *Ethereum) sendReceipts(receipts []rlp.RawValue) error {
-	return e.conn.WriteMsg(ReceiptsMsg, receipts)
+	return e.WriteMsg(ReceiptsMsg, receipts)
 }
 
 // -- handlers --
