@@ -30,6 +30,27 @@ const (
 	estHeaderRlpSize  = 500
 )
 
+const (
+	sizeOfType   = 2
+	sizeOfLength = 4
+	headerSize   = sizeOfType + sizeOfLength
+)
+
+type header []byte
+
+func (h header) MsgType() uint16 {
+	return binary.BigEndian.Uint16(h[0:2])
+}
+
+func (h header) Length() uint32 {
+	return binary.BigEndian.Uint32(h[2:6])
+}
+
+func (h header) encode(msgType uint16, length uint32) {
+	binary.BigEndian.PutUint16(h[0:2], msgType)
+	binary.BigEndian.PutUint32(h[2:6], length)
+}
+
 // eth protocol message codes
 const (
 	// Protocol messages belonging to eth/62
@@ -80,6 +101,8 @@ type Ethereum struct {
 	pending     map[string]*callback
 	pendingLock sync.Mutex
 	timer       *time.Timer
+
+	header header
 }
 
 // GetStatus is the interface that gives the eth protocol the information it needs
@@ -94,6 +117,7 @@ func NewEthereumProtocol(conn net.Conn, peer *network.Peer, getStatus GetStatus,
 		blockchain:  blockchain,
 		pending:     make(map[string]*callback),
 		pendingLock: sync.Mutex{},
+		header:      make([]byte, headerSize),
 	}
 }
 
@@ -141,15 +165,9 @@ func (e *Ethereum) WriteMsg(code int, data interface{}) error {
 		return err
 	}
 
-	buf := make([]byte, binary.MaxVarintLen64)
+	e.header.encode(uint16(code), uint32(len(r)))
 
-	binary.PutUvarint(buf, uint64(code))
-	if _, err := e.conn.Write(buf); err != nil {
-		return err
-	}
-
-	binary.PutUvarint(buf, uint64(len(r)))
-	if _, err := e.conn.Write(buf); err != nil {
+	if _, err := e.conn.Write(e.header[:]); err != nil {
 		return err
 	}
 	if _, err := e.conn.Write(r); err != nil {
@@ -191,22 +209,13 @@ func (e *Ethereum) Conn() *rlpx.Stream {
 
 func (e *Ethereum) ReadStatus() (*Status, error) {
 	var status *Status
-
-	header := make([]byte, 10)
-	if _, err := e.conn.Read(header); err != nil {
+	if _, err := e.conn.Read(e.header[:]); err != nil {
 		return nil, err
 	}
-	code, _ := binary.Uvarint(header[0:10])
-	if code != StatusMsg {
+	if code := e.header.MsgType(); code != StatusMsg {
 		return nil, fmt.Errorf("Message code is not statusMsg but %d", code)
 	}
-
-	if _, err := e.conn.Read(header); err != nil {
-		return nil, err
-	}
-	size, _ := binary.Uvarint(header[0:10])
-
-	buf := make([]byte, size)
+	buf := make([]byte, e.header.Length())
 	if _, err := e.conn.Read(buf); err != nil {
 		return nil, err
 	}
@@ -288,25 +297,17 @@ func (e *Ethereum) Init() error {
 
 func (e *Ethereum) listen() {
 	for {
-
-		header := make([]byte, 10)
-		if _, err := e.conn.Read(header); err != nil {
+		if _, err := e.conn.Read(e.header[:]); err != nil {
 			panic(err)
 		}
-		code, _ := binary.Uvarint(header[0:10])
 
-		if _, err := e.conn.Read(header); err != nil {
-			panic(err)
-		}
-		size, _ := binary.Uvarint(header[0:10])
-
-		buf := make([]byte, size)
+		buf := make([]byte, e.header.Length())
 		if _, err := e.conn.Read(buf); err != nil {
 			panic(err)
 		}
 
 		msg := rlpx.Message{
-			Code:    code,
+			Code:    uint64(e.header.MsgType()),
 			Payload: bytes.NewReader(buf),
 		}
 
@@ -314,20 +315,6 @@ func (e *Ethereum) listen() {
 			panic(err)
 		}
 	}
-
-	/*
-		for {
-			msg, err := e.conn.ReadMsg()
-			if err != nil {
-				panic(err)
-			}
-
-			if err := e.HandleMsg(msg); err != nil {
-				// close connection
-				e.conn.Close()
-			}
-		}
-	*/
 }
 
 type newBlockData struct {
