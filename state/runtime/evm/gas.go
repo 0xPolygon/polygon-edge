@@ -1,5 +1,6 @@
 package evm
 
+/*
 // Precompiled contract gas prices
 const (
 	// EcrecoverGas is the elliptic curve sender recovery gas price
@@ -27,6 +28,7 @@ const (
 	// Bn256PairingPerPointGas is the per-point price for an elliptic curve pairing check
 	Bn256PairingPerPointGas uint64 = 80000
 )
+*/
 
 // Sha3 gas prices
 const (

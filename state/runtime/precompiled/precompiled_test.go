@@ -11,7 +11,7 @@ import (
 func TestPrecompiled(t *testing.T) {
 	var cases = []struct {
 		Builtin     string
-		Precompiled Precompiled
+		Precompiled *Precompiled
 		Error       bool
 	}{
 		{
@@ -22,9 +22,11 @@ func TestPrecompiled(t *testing.T) {
 					"word": 0
 				}	
 			}`,
-			Precompiled: &sha256hash{
-				Base: 0,
-				Word: 0,
+			Precompiled: &Precompiled{
+				Backend: &sha256hash{
+					Base: 0,
+					Word: 0,
+				},
 			},
 			Error: false,
 		},
@@ -36,9 +38,11 @@ func TestPrecompiled(t *testing.T) {
 					"word": 11
 				}	
 			}`,
-			Precompiled: &sha256hash{
-				Base: 10,
-				Word: 11,
+			Precompiled: &Precompiled{
+				Backend: &sha256hash{
+					Base: 10,
+					Word: 11,
+				},
 			},
 			Error: false,
 		},
@@ -49,8 +53,10 @@ func TestPrecompiled(t *testing.T) {
 					"divisor": 10
 				}
 			}`,
-			Precompiled: &modExp{
-				Divisor: 10,
+			Precompiled: &Precompiled{
+				Backend: &modExp{
+					Divisor: 10,
+				},
 			},
 			Error: false,
 		},
@@ -62,9 +68,11 @@ func TestPrecompiled(t *testing.T) {
 					"pair": 2
 				}
 			}`,
-			Precompiled: &bn256Pairing{
-				Base: 1,
-				Pair: 2,
+			Precompiled: &Precompiled{
+				Backend: &bn256Pairing{
+					Base: 1,
+					Pair: 2,
+				},
 			},
 			Error: false,
 		},
@@ -98,8 +106,10 @@ func TestPrecompiled(t *testing.T) {
 				t.Fatal("expected error")
 			}
 
-			if !reflect.DeepEqual(p, c.Precompiled) {
-				t.Fatal("bad")
+			if !c.Error {
+				if !reflect.DeepEqual(p, c.Precompiled) {
+					t.Fatal("bad")
+				}
 			}
 		})
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 )
 
 var stateTests = "GeneralStateTests"
@@ -38,18 +39,20 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	}
 	env.GasPrice = msg.GasPrice()
 
-	state, _ := buildState(t, c.Pre)
+	s, _ := buildState(t, c.Pre)
 
 	forks := config.At(env.Number.Uint64())
 	gasTable := config.GasTable(env.Number)
 
 	var root []byte
 
-	txn := state.Txn()
+	txn := s.Txn()
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false, builtins)
+	executor := state.NewExecutor(txn, env, forks, gasTable, vmTestBlockHash)
+
+	_, _, err = executor.Apply(txn, msg, env, gasTable, forks, vmTestBlockHash, gasPool, false, builtins)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))

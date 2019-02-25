@@ -2,17 +2,18 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/state/evm"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -39,31 +40,40 @@ type VMCase struct {
 	Pre  chain.GenesisAlloc `json:"pre"`
 }
 
+// NOTE: maybe we can just test the EVM here without the executor
+
 func testVMCase(t *testing.T, name string, c *VMCase) {
 	env := c.Env.ToEnv(t)
 	env.GasPrice = c.Exec.GasPrice
 
 	initialCall := true
-	canTransfer := func(state evm.State, address common.Address, amount *big.Int) bool {
+	canTransfer := func(txn *state.Txn, address common.Address, amount *big.Int) bool {
 		if initialCall {
 			initialCall = false
 			return true
 		}
-		return evm.CanTransfer(state, address, amount)
+		return state.CanTransfer(txn, address, amount)
 	}
 
-	transfer := func(state evm.State, from, to common.Address, amount *big.Int) error {
+	transfer := func(state *state.Txn, from, to common.Address, amount *big.Int) error {
 		return nil
 	}
 
-	state, _ := buildState(t, c.Pre)
-	txn := state.Txn()
+	s, _ := buildState(t, c.Pre)
+	txn := s.Txn()
 
-	e := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
+	/*
+		evm := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
+		contract := runtime.NewContract(c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, c.Exec.Data)
+
+		ret, gas, err := evm.Run(contract)
+	*/
+
+	e := state.NewExecutor(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 
-	ret, gas, err := e.Call(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
+	ret, gas, err := e.Call2(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
 
 	if c.Gas == "" {
 		if err == nil {
@@ -120,30 +130,35 @@ func TestEVM(t *testing.T) {
 		}
 
 		for _, file := range files {
-			t.Run(file, func(t *testing.T) {
-				if !strings.HasSuffix(file, ".json") {
-					return
+			// t.Run(file, func(t *testing.T) {
+
+			if !strings.HasSuffix(file, ".json") {
+				return
+			}
+
+			data, err := ioutil.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var vmcases map[string]*VMCase
+			if err := json.Unmarshal(data, &vmcases); err != nil {
+				t.Fatal(err)
+			}
+
+			for name, cc := range vmcases {
+				if contains(long, name) && testing.Short() {
+					// t.Skip()
+					continue
 				}
 
-				data, err := ioutil.ReadFile(file)
-				if err != nil {
-					t.Fatal(err)
-				}
+				fmt.Println("======>")
+				fmt.Println(file)
+				fmt.Println(name)
 
-				var vmcases map[string]*VMCase
-				if err := json.Unmarshal(data, &vmcases); err != nil {
-					t.Fatal(err)
-				}
-
-				for name, cc := range vmcases {
-					if contains(long, name) && testing.Short() {
-						t.Skip()
-						continue
-					}
-
-					testVMCase(t, name, cc)
-				}
-			})
+				testVMCase(t, name, cc)
+			}
+			// })
 		}
 	}
 }

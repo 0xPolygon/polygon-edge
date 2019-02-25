@@ -6,7 +6,15 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state/runtime"
 )
+
+type Runtime struct {
+}
+
+func (r *Runtime) Run(c *runtime.Contract) ([]byte, uint64, error) {
+	return nil, 0, nil
+}
 
 // Precompiled is a specific precompiled contract
 type Precompiled struct {

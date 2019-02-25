@@ -3,8 +3,6 @@ package state
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"math"
 	"math/big"
 	"unsafe"
 
@@ -12,12 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state/evm"
-	"github.com/umbracle/minimal/state/evm/precompiled"
 	"github.com/umbracle/minimal/state/trie"
 )
 
@@ -67,6 +61,7 @@ func newTxn(state *State) *Txn {
 	}
 }
 
+/*
 func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	s := txn.Snapshot()
 	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
@@ -214,6 +209,7 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 	return txn.gasUsed(), vmerr != nil, nil
 }
+*/
 
 // gasUsed returns the amount of gas used up by the state transition.
 func (txn *Txn) gasUsed() uint64 {
