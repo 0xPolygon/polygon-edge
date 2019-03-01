@@ -12,8 +12,9 @@ import (
 
 // State is the ethereum state reference
 type State struct {
-	root unsafe.Pointer
-	code map[string][]byte
+	root    unsafe.Pointer
+	code    map[string][]byte
+	storage trie.Storage
 }
 
 // NewState creates a new state
@@ -22,6 +23,10 @@ func NewState() *State {
 		root: unsafe.Pointer(trie.NewTrie()),
 		code: map[string][]byte{},
 	}
+}
+
+func (s *State) SetStorage(storage trie.Storage) {
+	s.storage = storage
 }
 
 // getRoot is used to do an atomic load of the root pointer

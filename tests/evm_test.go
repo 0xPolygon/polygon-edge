@@ -2,7 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strings"
@@ -130,35 +129,29 @@ func TestEVM(t *testing.T) {
 		}
 
 		for _, file := range files {
-			// t.Run(file, func(t *testing.T) {
-
-			if !strings.HasSuffix(file, ".json") {
-				return
-			}
-
-			data, err := ioutil.ReadFile(file)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			var vmcases map[string]*VMCase
-			if err := json.Unmarshal(data, &vmcases); err != nil {
-				t.Fatal(err)
-			}
-
-			for name, cc := range vmcases {
-				if contains(long, name) && testing.Short() {
-					// t.Skip()
-					continue
+			t.Run(file, func(t *testing.T) {
+				if !strings.HasSuffix(file, ".json") {
+					return
 				}
 
-				fmt.Println("======>")
-				fmt.Println(file)
-				fmt.Println(name)
+				data, err := ioutil.ReadFile(file)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-				testVMCase(t, name, cc)
-			}
-			// })
+				var vmcases map[string]*VMCase
+				if err := json.Unmarshal(data, &vmcases); err != nil {
+					t.Fatal(err)
+				}
+
+				for name, cc := range vmcases {
+					if contains(long, name) && testing.Short() {
+						t.Skip()
+						continue
+					}
+					testVMCase(t, name, cc)
+				}
+			})
 		}
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
@@ -183,6 +184,8 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 
 func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) {
 	state := state.NewState()
+	state.SetStorage(trie.NewMemoryStorage())
+
 	txn := state.Txn()
 
 	for addr, alloc := range allocs {

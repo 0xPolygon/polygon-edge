@@ -32,9 +32,22 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 		return nil, err
 	}
 
-	t := &Trie{
-		root: node,
+	var t *Trie
+	if node.Len() == 0 {
+		// short node, we need to include another external full root node
+		// and the short node in the correct edge (i.e. the first nibble of his key)
+
+		indx := int(node.leaf.key[0])
+		t = &Trie{
+			root: &Node{},
+		}
+		t.root.edges[indx] = node
+	} else {
+		t = &Trie{
+			root: node,
+		}
 	}
+
 	return t, nil
 }
 
@@ -54,6 +67,10 @@ func (t *Trie) Root() *Node {
 
 type Txn struct {
 	root *Node
+}
+
+func (t *Txn) Root() *Node {
+	return t.root
 }
 
 func (t *Txn) Copy() *Txn {

@@ -3,6 +3,7 @@ package trie
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -18,6 +19,8 @@ var (
 // key and value, returning if iteration should
 // be terminated.
 type WalkFn func(k []byte, v []byte) bool
+
+type WalkFnNode func(v *Node) bool
 
 type leafNode struct {
 	key []byte
@@ -36,36 +39,26 @@ type Node struct {
 }
 
 func (n *Node) Equal(nn *Node) bool {
-	nVals := map[string][]byte{}
-	nnVals := map[string][]byte{}
+	nVals := []*Node{}
+	nnVals := []*Node{}
 
-	n.Walk(func(k, v []byte) bool {
-		nVals[hexutil.Encode(k)] = v
+	n.WalkNode(func(n *Node) bool {
+		nVals = append(nVals, n)
 		return false
 	})
-	nn.Walk(func(k, v []byte) bool {
-		nnVals[hexutil.Encode(k)] = v
+	nn.WalkNode(func(n *Node) bool {
+		nnVals = append(nnVals, n)
 		return false
 	})
 
-	for k, v := range nVals {
-		v2, ok := nnVals[k]
-		if !ok {
-			return false
-		}
-		if !bytes.Equal(v, v2) {
-			return false
-		}
-
-		delete(nVals, k)
-		delete(nnVals, k)
-	}
-
-	if len(nVals) != 0 {
+	if len(nVals) != len(nnVals) {
 		return false
 	}
-	if len(nnVals) != 0 {
-		return false
+
+	for indx, v := range nVals {
+		if !reflect.DeepEqual(v, nnVals[indx]) {
+			return false
+		}
 	}
 	return true
 }
@@ -113,6 +106,27 @@ func recursiveWalk(n *Node, fn WalkFn) bool {
 	for _, e := range n.edges {
 		if e != nil {
 			if recursiveWalk(e, fn) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (n *Node) WalkNode(fn WalkFnNode) {
+	recursiveWalkNode(n, fn)
+}
+
+func recursiveWalkNode(n *Node, fn WalkFnNode) bool {
+	// Visit the leaf values if any
+	if fn(n) {
+		return true
+	}
+
+	// Recurse on the children
+	for _, e := range n.edges {
+		if e != nil {
+			if recursiveWalkNode(e, fn) {
 				return true
 			}
 		}
@@ -209,13 +223,19 @@ func (n *Node) delEdge(label byte) {
 }
 
 func (n *Node) Show() {
-	size := n.Len()
+	show(n, 0, 0, false)
 
-	if size == 1 {
-		show(n.First(), 0, 0, false)
-	} else {
-		show(n, 0, 0, false)
-	}
+	/*
+		size := n.Len()
+
+		if size == 1 {
+			fmt.Println("-- ONE --")
+			show(n.First(), 0, 0, false)
+		} else {
+			fmt.Println("-- TWO --")
+			show(n, 0, 0, false)
+		}
+	*/
 }
 
 func show(n *Node, d int, label byte, handlePrefix bool) {

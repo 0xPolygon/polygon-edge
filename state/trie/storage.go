@@ -133,7 +133,7 @@ func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
 			return nil, err
 		}
 		if n != nil {
-			n.prefix = []byte{byte(i)}
+			n.prefix = append([]byte{byte(i)}, n.prefix...)
 		}
 		edges[i] = n
 		data = rest
@@ -145,11 +145,13 @@ func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
 		return nil, err
 	}
 	if len(val) > 0 {
-
-		edges[16] = &Node{leaf: &leafNode{
-			key: append(h, []byte{0x10}...),
-			val: val,
-		}}
+		edges[16] = &Node{
+			prefix: []byte{0x10},
+			leaf: &leafNode{
+				key: append(h, []byte{0x10}...),
+				val: val,
+			},
+		}
 	}
 
 	n := &Node{

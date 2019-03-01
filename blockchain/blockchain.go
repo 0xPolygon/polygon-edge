@@ -18,6 +18,7 @@ import (
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/state/trie"
 
 	mapset "github.com/deckarep/golang-set"
 )
@@ -78,6 +79,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	}
 
 	s := state.NewState()
+	s.SetStorage(trie.NewMemoryStorage())
 
 	txn := s.Txn()
 	for addr, account := range genesis.Alloc {
