@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/umbracle/minimal/state/evm/precompiled"
+	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
@@ -24,8 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/umbracle/minimal/state/evm"
 )
 
 // TESTS is the default location of the tests folder
@@ -108,8 +108,8 @@ func stringToUint64T(t *testing.T, str string) uint64 {
 	return n
 }
 
-func (e *env) ToEnv(t *testing.T) *evm.Env {
-	return &evm.Env{
+func (e *env) ToEnv(t *testing.T) *runtime.Env {
+	return &runtime.Env{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToBigIntT(t, e.Difficulty),
 		GasLimit:   stringToBigIntT(t, e.GasLimit),
@@ -184,6 +184,8 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 
 func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) {
 	state := state.NewState()
+	state.SetStorage(trie.NewMemoryStorage())
+
 	txn := state.Txn()
 
 	for addr, alloc := range allocs {

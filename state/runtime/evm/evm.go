@@ -6,64 +6,17 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state/evm/precompiled"
+	"github.com/umbracle/minimal/state/runtime"
+
+	// "github.com/umbracle/minimal/state/runtime/evm/precompiled"
 
 	"github.com/ethereum/go-ethereum/common"
 )
-
-// State is the state interface for the ethereum protocol
-type State interface {
-
-	// Balance
-	AddBalance(addr common.Address, amount *big.Int)
-	SubBalance(addr common.Address, amount *big.Int)
-	SetBalance(addr common.Address, amount *big.Int)
-	GetBalance(addr common.Address) *big.Int
-
-	// Snapshot
-	Snapshot() int
-	RevertToSnapshot(int)
-
-	// Logs
-	AddLog(log *types.Log)
-	Logs() []*types.Log
-
-	// State
-	SetState(addr common.Address, key, value common.Hash)
-	GetState(addr common.Address, hash common.Hash) common.Hash
-
-	// Nonce
-	SetNonce(addr common.Address, nonce uint64)
-	GetNonce(addr common.Address) uint64
-
-	// Code
-	SetCode(addr common.Address, code []byte)
-	GetCode(addr common.Address) []byte
-	GetCodeSize(addr common.Address) int
-	GetCodeHash(addr common.Address) common.Hash
-
-	// Suicide
-	HasSuicided(addr common.Address) bool
-	Suicide(addr common.Address) bool
-
-	// Refund
-	AddRefund(gas uint64)
-	SubRefund(gas uint64)
-	GetRefund() uint64
-	GetCommittedState(addr common.Address, hash common.Hash) common.Hash
-
-	// Others
-	Exist(addr common.Address) bool
-	Empty(addr common.Address) bool
-	CreateAccount(addr common.Address)
-}
 
 // IMPORTANT. Memory access needs more overflow protection, right now, only calls and returns are protected
 
@@ -74,12 +27,10 @@ var (
 	ErrStackUnderflow           = fmt.Errorf("stack underflow")
 	ErrJumpDestNotValid         = fmt.Errorf("jump destination is not valid")
 	ErrMemoryOverflow           = fmt.Errorf("error memory overflow")
-	ErrNotEnoughFunds           = fmt.Errorf("not enough funds")
 	ErrMaxCodeSizeExceeded      = errors.New("evm: max code size exceeded")
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrOpcodeNotFound           = errors.New("opcode not found")
-	ErrExecutionReverted        = errors.New("execution was reverted")
 )
 
 var (
@@ -96,20 +47,9 @@ const MaxContracts = 1030
 // Instructions is the code of instructions
 type Instructions []byte
 
-// Env refers to the block information the transactions runs in
-// it is shared for all the contracts executed so its in the EVM.
-type Env struct {
-	Coinbase   common.Address
-	Timestamp  *big.Int
-	Number     *big.Int
-	Difficulty *big.Int
-	GasLimit   *big.Int
-	GasPrice   *big.Int
-}
+type CanTransferFunc func(runtime.State, common.Address, *big.Int) bool
 
-type CanTransferFunc func(State, common.Address, *big.Int) bool
-
-type TransferFunc func(state State, from common.Address, to common.Address, amount *big.Int) error
+type TransferFunc func(state runtime.State, from common.Address, to common.Address, amount *big.Int) error
 
 // Contract is each value from the caller stack
 type Contract struct {
@@ -137,8 +77,7 @@ type Contract struct {
 	gas   uint64
 
 	// type of contract
-	creation bool
-	static   bool
+	static bool
 
 	retOffset uint64
 	retSize   uint64
@@ -246,7 +185,6 @@ func newContract(evm *EVM, depth int, origin common.Address, from common.Address
 
 func newContractCreation(evm *EVM, depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	c := newContract(evm, depth, origin, from, to, value, gas, code)
-	c.creation = true
 	return c
 }
 
@@ -269,8 +207,8 @@ type EVM struct {
 	config   chain.ForksInTime
 	gasTable chain.GasTable
 
-	state State
-	env   *Env
+	state runtime.State
+	env   *runtime.Env
 
 	getHash     GetHashByNumber
 	CanTransfer CanTransferFunc
@@ -278,26 +216,55 @@ type EVM struct {
 
 	// returnData []byte
 
-	snapshot    int
-	precompiled map[common.Address]*precompiled.Precompiled
+	executor runtime.Executor
+	snapshot int
+	// precompiled map[common.Address]*precompiled.Precompiled
+}
+
+func (e *EVM) Run(c *runtime.Contract) ([]byte, uint64, error) {
+	contract := &Contract{
+		ip:          -1,
+		depth:       c.Depth(),
+		code:        c.Code,
+		evm:         e,
+		caller:      c.Caller,
+		origin:      c.Origin,
+		codeAddress: c.CodeAddress,
+		address:     c.Address,
+		value:       c.Value,
+		stack:       make([]*big.Int, StackSize),
+		sp:          0,
+		gas:         c.Gas,
+		input:       c.Input,
+		bitvec:      codeBitmap(c.Code),
+		snapshot:    -1,
+		static:      c.Static,
+	}
+
+	contract.memory = newMemory(contract)
+
+	ret, err := contract.Run()
+	return ret, contract.gas, err
 }
 
 // NewEVM creates a new EVM
-func NewEVM(state State, env *Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
+func NewEVM(executor runtime.Executor, state runtime.State, env *runtime.Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
 	return &EVM{
 		contracts:      make([]*Contract, MaxContracts),
 		config:         config,
 		gasTable:       gasTable,
 		contractsIndex: 0,
+		executor:       executor,
 		state:          state,
 		env:            env,
 		getHash:        getHash,
 		// returnData:     []byte{},
-		CanTransfer: CanTransfer,
-		Transfer:    Transfer,
+		// CanTransfer: CanTransfer,
+		// Transfer:    Transfer,
 	}
 }
 
+/*
 // Call calls a specific contract
 func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
 	contract := newContractCall(e, 1, caller, caller, to, value, gas, e.state.GetCode(to), input)
@@ -316,6 +283,7 @@ func (e *EVM) Create(caller common.Address, code []byte, value *big.Int, gas uin
 	_, err := contract.create(contract)
 	return nil, contract.gas, err
 }
+*/
 
 func (c *Contract) calculateFixedGasUsage(op OpCode) uint64 {
 	if isPush(op) || isSwap(op) || isDup(op) {
@@ -399,7 +367,7 @@ func (c *Contract) Run() ([]byte, error) {
 		ins := c.Instructions()
 		op = OpCode(ins[ip])
 
-		//fmt.Printf("OP [%d]: %s (%d)\n", c.depth, op.String(), c.gas)
+		// fmt.Printf("OP [%d]: %s (%d)\n", c.depth, op.String(), c.gas)
 
 		// consume gas for those opcodes with fixed gas
 		if gasUsed := c.calculateFixedGasUsage(op); gasUsed != 0 {
@@ -893,6 +861,7 @@ func (c *Contract) sha3() error {
 	return nil
 }
 
+/*
 func (c *Contract) create(contract *Contract) ([]byte, error) {
 	// Check if its too deep
 	if c.Depth() > int(CallCreateDepth) {
@@ -961,8 +930,9 @@ func (c *Contract) create(contract *Contract) ([]byte, error) {
 
 	return ret, err
 }
+*/
 
-func (c *Contract) buildCreateContract(op OpCode) (*Contract, common.Address, error) {
+func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Address, error) {
 	var expected int
 	if op == CREATE {
 		expected = 3
@@ -1041,7 +1011,7 @@ func (c *Contract) buildCreateContract(op OpCode) (*Contract, common.Address, er
 		address = crypto.CreateAddress2(c.address, common.BigToHash(salt), crypto.Keccak256Hash(input).Bytes())
 	}
 
-	contract := newContractCreation(c.evm, c.depth+1, c.origin, c.address, address, value, gas, input)
+	contract := runtime.NewContractCreation(c.depth+1, c.origin, c.address, address, value, gas, input)
 	return contract, address, nil
 }
 
@@ -1061,7 +1031,7 @@ func (c *Contract) executeCreateOperation(op OpCode) ([]byte, error) {
 		return nil, err
 	}
 
-	ret, err := c.create(contract)
+	ret, gas, err := c.evm.executor.Create(contract)
 
 	if op == CREATE && c.evm.config.Homestead && err == vm.ErrCodeStoreOutOfGas {
 		c.push(big.NewInt(0))
@@ -1071,9 +1041,9 @@ func (c *Contract) executeCreateOperation(op OpCode) ([]byte, error) {
 		c.push(addr.Big())
 	}
 
-	c.gas += contract.gas
+	c.gas += gas
 
-	if err == ErrExecutionReverted {
+	if err == runtime.ErrExecutionReverted {
 		return ret, nil
 	}
 	return nil, nil
@@ -1093,24 +1063,43 @@ func (c *Contract) executeCallOperation(op OpCode) ([]byte, error) {
 		return nil, ErrOpcodeNotFound
 	}
 
+	var callType runtime.CallType
+	switch op {
+	case CALL:
+		callType = runtime.Call
+
+	case CALLCODE:
+		callType = runtime.CallCode
+
+	case DELEGATECALL:
+		callType = runtime.DelegateCall
+
+	case STATICCALL:
+		callType = runtime.StaticCall
+
+	default:
+		panic("not expected")
+	}
+
 	contract, err := c.buildCallContract(op)
 	if err != nil {
 		return nil, err
 	}
 
-	ret, err := c.call(contract, op)
+	ret, gas, err := c.evm.executor.Call(contract, callType)
+
 	if err != nil {
 		c.push(big.NewInt(0))
 	} else {
 		c.push(big.NewInt(1))
 	}
 
-	if err == nil || err == ErrExecutionReverted {
+	if err == nil || err == runtime.ErrExecutionReverted {
 		// TODO, change retOffset
-		c.memory.Set(big.NewInt(int64(contract.retOffset)), big.NewInt(int64(contract.retSize)), ret)
+		c.memory.Set(big.NewInt(int64(contract.RetOffset)), big.NewInt(int64(contract.RetSize)), ret)
 	}
 
-	c.gas += contract.gas
+	c.gas += gas
 	return ret, nil
 }
 
@@ -1118,6 +1107,7 @@ func (c *Contract) Depth() int {
 	return c.depth
 }
 
+/*
 // SetPrecompiled sets the precompiled contracts
 func (e *EVM) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
 	e.precompiled = precompiled
@@ -1133,7 +1123,9 @@ func (e *EVM) getPrecompiled(addr common.Address) (precompiled.Backend, bool) {
 	}
 	return p.Backend, true
 }
+*/
 
+/*
 func (c *Contract) call(contract *Contract, op OpCode) ([]byte, error) {
 	// Check if its too deep
 	if c.Depth() > int(CallCreateDepth) {
@@ -1194,8 +1186,9 @@ func (c *Contract) call(contract *Contract, op OpCode) ([]byte, error) {
 
 	return ret, err
 }
+*/
 
-func (c *Contract) buildCallContract(op OpCode) (*Contract, error) {
+func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 	var expected int
 	if op == CALL || op == CALLCODE {
 		expected = 7
@@ -1291,18 +1284,19 @@ func (c *Contract) buildCallContract(op OpCode) (*Contract, error) {
 
 	parent := c
 
-	contract := newContractCall(c.evm, c.depth+1, parent.origin, parent.address, addr, value, gas, c.evm.state.GetCode(addr), args)
-	contract.retOffset = retOffset.Uint64()
-	contract.retSize = retSize.Uint64()
+	contract := runtime.NewContractCall(c.depth+1, parent.origin, parent.address, addr, value, gas, c.evm.state.GetCode(addr), args)
+
+	contract.RetOffset = retOffset.Uint64()
+	contract.RetSize = retSize.Uint64()
 
 	if op == STATICCALL || parent.static {
-		contract.static = true
+		contract.Static = true
 	}
 	if op == CALLCODE || op == DELEGATECALL {
-		contract.address = parent.address
+		contract.Address = parent.address
 		if op == DELEGATECALL {
-			contract.value = parent.value
-			contract.caller = parent.caller
+			contract.Value = parent.value
+			contract.Caller = parent.caller
 		}
 	}
 
@@ -1357,13 +1351,8 @@ func (c *Contract) executeHaltOperations(op OpCode) ([]byte, error) {
 
 	rett = ret
 
-	// Return if reverted inside a contract creation
-	if c.creation && op == REVERT {
-		rett = ret
-	}
-
 	if op == REVERT {
-		return rett, ErrExecutionReverted
+		return rett, runtime.ErrExecutionReverted
 	}
 	return rett, nil
 }
@@ -1546,7 +1535,6 @@ func (c *Contract) executeContextOperations(op OpCode) (*big.Int, error) {
 		if addr == nil {
 			return nil, ErrStackUnderflow
 		}
-
 		return c.evm.state.GetBalance(common.BigToAddress(addr)), nil
 
 	case ORIGIN:
@@ -1591,10 +1579,6 @@ func (c *Contract) executeContextOperations(op OpCode) (*big.Int, error) {
 		if !c.evm.config.Byzantium {
 			return nil, ErrOpcodeNotFound
 		}
-
-		//fmt.Println("-- return --")
-		//fmt.Println(c.returnData)
-
 		return big.NewInt(int64(len(c.returnData))), nil
 
 	default:
@@ -1947,190 +1931,6 @@ func sgtComparison(x, y *big.Int) *big.Int {
 
 func (c *Contract) inStaticCall() bool {
 	return c.static
-}
-
-func CanTransfer(state State, from common.Address, amount *big.Int) bool {
-	return state.GetBalance(from).Cmp(amount) >= 0
-}
-
-func Transfer(state State, from common.Address, to common.Address, amount *big.Int) error {
-	if balance := state.GetBalance(from); balance.Cmp(amount) < 0 {
-		return ErrNotEnoughFunds
-	}
-
-	x := big.NewInt(amount.Int64())
-
-	state.SubBalance(from, x)
-	state.AddBalance(to, x)
-	return nil
-}
-
-// Memory (based on geth)
-
-type Memory struct {
-	c           *Contract
-	store       []byte
-	lastGasCost uint64
-}
-
-func newMemory(c *Contract) *Memory {
-	return &Memory{c: c, store: []byte{}, lastGasCost: 0}
-}
-
-func (m *Memory) Len() int {
-	return len(m.store)
-}
-
-func roundUpToWord(n uint64) uint64 {
-	return (n + 31) / 32 * 32
-}
-
-func numWords(n uint64) uint64 {
-	if n > math.MaxUint64-31 {
-		return math.MaxUint64/32 + 1
-	}
-
-	return (n + 31) / 32
-}
-
-func (m *Memory) Resize(size uint64) (uint64, error) {
-	fee := uint64(0)
-
-	if uint64(len(m.store)) < size {
-
-		// expand in slots of 32 bytes
-		words := numWords(size)
-		size = roundUpToWord(size)
-
-		// measure gas
-		square := words * words
-		linCoef := words * MemoryGas
-		quadCoef := square / QuadCoeffDiv
-		newTotalFee := linCoef + quadCoef
-
-		fee = newTotalFee - m.lastGasCost
-
-		if fee > m.c.gas {
-			return 0, ErrGasConsumed
-		}
-
-		m.lastGasCost = newTotalFee
-
-		m.store = append(m.store, make([]byte, size-uint64(len(m.store)))...)
-	}
-
-	return fee, nil
-}
-
-// calculates the memory size required for a step
-func calcMemSize(off, l *big.Int) *big.Int {
-	if l.Sign() == 0 {
-		return common.Big0
-	}
-
-	return new(big.Int).Add(off, l)
-}
-
-func (m *Memory) SetByte(o *big.Int, val int64) (uint64, error) {
-	offset := o.Uint64()
-
-	size, overflow := bigUint64(big.NewInt(1).Add(o, big.NewInt(1)))
-	if overflow {
-		return 0, ErrMemoryOverflow
-	}
-
-	gas, err := m.Resize(size)
-	if err != nil {
-		return 0, err
-	}
-	m.store[offset] = byte(val & 0xff)
-	return gas, nil
-}
-
-func (m *Memory) Set32(o *big.Int, val *big.Int) (uint64, error) {
-	offset := o.Uint64()
-
-	size, overflow := bigUint64(big.NewInt(1).Add(o, big.NewInt(32)))
-	if overflow {
-		return 0, ErrMemoryOverflow
-	}
-
-	gas, err := m.Resize(size)
-	if err != nil {
-		return 0, err
-	}
-
-	copy(m.store[offset:offset+32], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-	math.ReadBits(val, m.store[offset:offset+32])
-	return gas, nil
-}
-
-func (m *Memory) Set(o *big.Int, l *big.Int, data []byte) (uint64, error) {
-	offset := o.Uint64()
-	length := l.Uint64()
-
-	// length is zero
-	if l.Sign() == 0 {
-		return 0, nil
-	}
-
-	size, overflow := bigUint64(big.NewInt(1).Add(o, l))
-	if overflow {
-		return 0, ErrMemoryOverflow
-	}
-
-	gas, err := m.Resize(size)
-	if err != nil {
-		return 0, err
-	}
-
-	copy(m.store[offset:offset+length], data)
-	return gas, nil
-}
-
-func (m *Memory) Get(o *big.Int, l *big.Int) ([]byte, uint64, error) {
-	offset := o.Uint64()
-	length := l.Uint64()
-
-	if length == 0 {
-		return []byte{}, 0, nil
-	}
-
-	size, overflow := bigUint64(big.NewInt(1).Add(o, l))
-	if overflow {
-		return nil, 0, ErrMemoryOverflow
-	}
-
-	gas, err := m.Resize(size)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	cpy := make([]byte, length)
-	copy(cpy, m.store[offset:offset+length])
-	return cpy, gas, nil
-}
-
-func (m *Memory) Resize2(o *big.Int, l *big.Int) (uint64, error) {
-	size, overflow := bigUint64(big.NewInt(1).Add(o, l))
-	if overflow {
-		return 0, ErrMemoryOverflow
-	}
-
-	return m.Resize(size)
-}
-
-func (m *Memory) Show() string {
-	str := []string{}
-	for i := 0; i < len(m.store); i += 16 {
-		j := i + 16
-		if j > len(m.store) {
-			j = len(m.store)
-		}
-
-		str = append(str, hexutil.Encode(m.store[i:j]))
-	}
-	return strings.Join(str, "\n")
 }
 
 // bitmap

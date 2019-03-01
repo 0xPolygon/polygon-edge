@@ -3,21 +3,17 @@ package state
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"math"
 	"math/big"
 	"unsafe"
+
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state/evm"
-	"github.com/umbracle/minimal/state/evm/precompiled"
 	"github.com/umbracle/minimal/state/trie"
 )
 
@@ -67,6 +63,7 @@ func newTxn(state *State) *Txn {
 	}
 }
 
+/*
 func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	s := txn.Snapshot()
 	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
@@ -214,6 +211,7 @@ func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable,
 
 	return txn.gasUsed(), vmerr != nil, nil
 }
+*/
 
 // gasUsed returns the amount of gas used up by the state transition.
 func (txn *Txn) gasUsed() uint64 {
@@ -260,11 +258,23 @@ type stateObject struct {
 	suicide   bool
 	deleted   bool
 	dirtyCode bool
-	txn       *trie.Txn
+	txn       *iradix.Txn
 }
 
 func (s *stateObject) Empty() bool {
 	return s.account.Nonce == 0 && s.account.Balance.Sign() == 0 && bytes.Equal(s.account.CodeHash, emptyCodeHash)
+}
+
+func (s *stateObject) GetCommitedState(hash common.Hash) common.Hash {
+	val, ok := s.account.trie.Get(hash.Bytes())
+	if !ok {
+		return common.Hash{}
+	}
+	_, content, _, err := rlp.Split(val)
+	if err != nil {
+		return common.Hash{}
+	}
+	return common.BytesToHash(content)
 }
 
 // Copy makes a copy of the state object
@@ -274,14 +284,14 @@ func (s *stateObject) Copy() *stateObject {
 	// copy account
 	ss.account = s.account.Copy()
 
-	if s.txn != nil {
-		ss.txn = s.txn.Copy()
-	}
-
 	ss.suicide = s.suicide
 	ss.deleted = s.deleted
 	ss.dirtyCode = s.dirtyCode
 	ss.code = s.code
+
+	if s.txn != nil {
+		ss.txn = s.txn.CommitOnly().Txn()
+	}
 
 	return ss
 }
@@ -302,14 +312,25 @@ func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 		return nil, false
 	}
 
-	account, ok := data.(*Account)
-	if !ok {
-		panic("XX")
+	var account Account
+	err := rlp.DecodeBytes(data, &account)
+	if err != nil {
+		return nil, false
+	}
+
+	// Load trie from memory if there is some state
+	if account.Root == emptyStateHash {
+		account.trie = trie.NewTrie()
+	} else {
+		// TODO, load from state that keeps a cache of tries
+		account.trie, err = trie.NewTrieAt(txn.state.storage, account.Root)
+		if err != nil {
+			return nil, false
+		}
 	}
 
 	obj := &stateObject{
 		account: account.Copy(),
-		// storage: map[common.Hash]common.Hash{},
 	}
 	return obj, true
 }
@@ -408,11 +429,11 @@ func isZeros(b []byte) bool {
 func (txn *Txn) SetState(addr common.Address, key, value common.Hash) {
 	txn.upsertAccount(addr, true, func(object *stateObject) {
 		if object.txn == nil {
-			object.txn = object.account.trie.Txn()
+			object.txn = iradix.New().Txn()
 		}
 
 		if isZeros(value.Bytes()) {
-			object.txn.Delete(hashit(key.Bytes()))
+			object.txn.Insert(hashit(key.Bytes()), nil)
 		} else {
 			object.txn.Insert(hashit(key.Bytes()), value.Bytes())
 		}
@@ -426,19 +447,17 @@ func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
 		return common.Hash{}
 	}
 
-	var f func(k []byte) (interface{}, bool)
+	k := hashit(hash.Bytes())
 
 	if object.txn != nil {
-		f = object.txn.Get
-	} else {
-		f = object.account.trie.Get
+		if val, ok := object.txn.Get(k); ok {
+			if val == nil {
+				return common.Hash{}
+			}
+			return common.BytesToHash(val.([]byte))
+		}
 	}
-
-	val, ok := f(hashit(hash.Bytes()))
-	if ok {
-		return common.BytesToHash(val.([]byte))
-	}
-	return common.Hash{}
+	return object.GetCommitedState(common.BytesToHash(k))
 }
 
 // Nonce
@@ -555,11 +574,7 @@ func (txn *Txn) GetCommittedState(addr common.Address, hash common.Hash) common.
 	if !ok {
 		return common.Hash{}
 	}
-	val, ok := obj.account.trie.Get(hashit(hash.Bytes()))
-	if !ok {
-		return common.Hash{}
-	}
-	return common.BytesToHash(val.([]byte))
+	return obj.GetCommitedState(common.BytesToHash(hashit(hash.Bytes())))
 }
 
 // TODO, check panics with this ones
@@ -661,8 +676,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 
 	tt := txn.state.getRoot().Txn()
 
-	h1 := sha3.NewLegacyKeccak256()
-
 	/*
 		fmt.Println("##################################################################################")
 
@@ -678,7 +691,16 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.account.Nonce)))
 			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.account.CodeHash))
 			fmt.Printf("# State root: %s\n", a.account.Root.String())
-
+			if a.txn != nil {
+				a.txn.Root().Walk(func(k []byte, v interface{}) bool {
+					if v == nil {
+						fmt.Printf("#\t%s: EMPTY\n", hexutil.Encode(k))
+					} else {
+						fmt.Printf("#\t%s: %s\n", hexutil.Encode(k), hexutil.Encode(v.([]byte)))
+					}
+					return false
+				})
+			}
 			return false
 		})
 		fmt.Println("##################################################################################")
@@ -698,8 +720,21 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 
 		// compute first the state changes
 		if a.txn != nil {
-			subTrie := a.txn.Commit()
-			accountStateRoot := subTrie.Root().Hash()
+			localTxn := a.account.trie.Txn()
+
+			// Apply all the changes
+			a.txn.Root().Walk(func(k []byte, v interface{}) bool {
+				if v == nil {
+					localTxn.Delete(k)
+				} else {
+					vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
+					localTxn.Insert(k, vv)
+				}
+				return false
+			})
+
+			subTrie := localTxn.Commit()
+			accountStateRoot := subTrie.Root().Hash(txn.state.storage)
 
 			a.account.Root = common.BytesToHash(accountStateRoot)
 			a.account.trie = subTrie
@@ -709,21 +744,22 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 			txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
 		}
 
-		h1.Reset()
-		h1.Write(k)
-		kk := h1.Sum(nil)
+		data, err := rlp.EncodeToBytes(a.account)
+		if err != nil {
+			panic(err)
+		}
 
-		tt.Insert(kk, a.account)
-
+		tt.Insert(hashit(k), data)
 		return false
 	})
 
 	t := tt.Commit()
-	hash := tt.Hash()
+	hash := tt.Hash(txn.state.storage)
 
 	newState := &State{
-		root: unsafe.Pointer(t),
-		code: map[string][]byte{},
+		storage: txn.state.storage,
+		root:    unsafe.Pointer(t),
+		code:    map[string][]byte{},
 	}
 
 	// copy all the code

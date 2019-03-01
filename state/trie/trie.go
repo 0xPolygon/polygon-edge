@@ -2,7 +2,9 @@ package trie
 
 import (
 	"bytes"
+	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
@@ -18,7 +20,38 @@ func NewTrie() *Trie {
 	}
 }
 
-func (t *Trie) Get(k []byte) (interface{}, bool) {
+func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
+	data, ok := storage.Get(root.Bytes())
+	if !ok {
+		return nil, fmt.Errorf("root not found")
+	}
+
+	// NOTE, this expands the whole trie
+	node, err := DecodeNode(storage, []byte{}, data)
+	if err != nil {
+		return nil, err
+	}
+
+	var t *Trie
+	if node.Len() == 0 {
+		// short node, we need to include another external full root node
+		// and the short node in the correct edge (i.e. the first nibble of his key)
+
+		indx := int(node.leaf.key[0])
+		t = &Trie{
+			root: &Node{},
+		}
+		t.root.edges[indx] = node
+	} else {
+		t = &Trie{
+			root: node,
+		}
+	}
+
+	return t, nil
+}
+
+func (t *Trie) Get(k []byte) ([]byte, bool) {
 	return t.root.Get(KeybytesToHex(k))
 }
 
@@ -36,6 +69,10 @@ type Txn struct {
 	root *Node
 }
 
+func (t *Txn) Root() *Node {
+	return t.root
+}
+
 func (t *Txn) Copy() *Txn {
 	tt := new(Txn)
 	tt.root = t.root
@@ -46,7 +83,7 @@ func (t *Txn) Commit() *Trie {
 	return &Trie{t.root}
 }
 
-func (t *Txn) Insert(key []byte, v interface{}) {
+func (t *Txn) Insert(key []byte, v []byte) {
 	k := KeybytesToHex(key)
 	newRoot, _, _ := t.insert(t.root, k, k, v)
 	if newRoot != nil {
@@ -69,16 +106,16 @@ func (t *Txn) Delete(key []byte) bool {
 }
 
 // Get returns a specific key
-func (t *Txn) Get(key []byte) (interface{}, bool) {
+func (t *Txn) Get(key []byte) ([]byte, bool) {
 	k := KeybytesToHex(key)
 	return t.root.Get(k)
 }
 
 // insert does a recursive insertion
-func (t *Txn) insert(n *Node, k, search []byte, v interface{}) (*Node, interface{}, bool) {
+func (t *Txn) insert(n *Node, k, search []byte, v []byte) (*Node, []byte, bool) {
 	// Handle key exhaustion
 	if len(search) == 0 {
-		var oldVal interface{}
+		var oldVal []byte
 		didUpdate := false
 		if n.isLeaf() {
 			oldVal = n.leaf.val
@@ -254,8 +291,8 @@ func hashit(b []byte) []byte {
 	return res
 }
 
-func (t *Txn) Hash() []byte {
-	return t.root.Hash()
+func (t *Txn) Hash(storage Storage) []byte {
+	return t.root.Hash(storage)
 }
 
 func (t *Txn) writeNode(n *Node, x bool) *Node {

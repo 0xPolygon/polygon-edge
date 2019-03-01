@@ -12,7 +12,7 @@ type precompiledTest struct {
 	Expected string
 }
 
-func testPrecompiled(t *testing.T, p Precompiled, cases []precompiledTest) {
+func testPrecompiled(t *testing.T, p Backend, cases []precompiledTest) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			found, err := p.Call(common.Hex2Bytes(c.Input))
