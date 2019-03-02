@@ -18,7 +18,7 @@ import (
 	"github.com/ferranbt/periodic-dispatcher"
 
 	"github.com/umbracle/minimal/network/discovery"
-	"github.com/umbracle/minimal/network/rlpx"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
@@ -257,6 +257,8 @@ func (s *Server) dialTask(id string, tasks chan string) {
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
+				fmt.Printf("ERR: %v\n", err)
+
 				if err == rlpx.DiscTooManyPeers {
 					busy = true
 				}
@@ -304,9 +306,11 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-		case enode := <-s.discovery.Deliver():
-			fmt.Printf("FROM DISCOVER: %s\n", enode)
-			sendToTask(enode)
+			/*
+				case enode := <-s.discovery.Deliver():
+					fmt.Printf("FROM DISCOVER: %s\n", enode)
+					sendToTask(enode)
+			*/
 
 		case enode := <-s.dispatcher.Events():
 			sendToTask(enode.ID())
@@ -410,7 +414,7 @@ func (s *Server) addSession(session *rlpx.Session) error {
 }
 
 // Callback is the one calling whenever the protocol is used
-type Callback = func(session rlpx.Conn, peer *Peer) protocol.Handler
+type Callback = func(conn net.Conn, peer *Peer) protocol.Handler
 
 // RegisterProtocol registers a protocol
 func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
