@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/rlpx"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
@@ -508,7 +508,8 @@ func (s *Syncer) GetStatus() (*ethereum.Status, error) {
 		NetworkID:       s.NetworkID,
 		TD:              header.Difficulty,
 		CurrentBlock:    header.Hash(),
-		GenesisBlock:    s.blockchain.Genesis().Hash(),
+		// Hardcoded for now
+		GenesisBlock: common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"),
 	}
 	return status, nil
 }

@@ -296,18 +296,25 @@ func (s *Session) recvLoop() error {
 			// Already handled
 
 		case msg.Code == discMsg:
-			return decodeDiscMsg(msg.Payload)
+			msg := decodeDiscMsg(msg.Payload)
 
+			fmt.Printf("DISCONNECTED: %s\n", msg.String())
+			return msg
 		default:
 			// stream message
-			ss := s.getStream(msg.Code)
 
-			if ss != nil {
-				real := msg.Copy()
-				real.Code = real.Code - ss.offset
+			s.handleStreamMessage(&msg)
 
-				ss.deliver(real)
-			}
+			/*
+				ss := s.getStream(msg.Code)
+
+				if ss != nil {
+					real := msg.Copy()
+					real.Code = real.Code - ss.offset
+
+					ss.deliver(real)
+				}
+			*/
 		}
 	}
 }
@@ -464,6 +471,11 @@ func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 
 	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
 	return s.Write(Message{Code: msgcode, Size: uint32(size), Payload: r})
+}
+
+func (s *Session) handleStreamMessage(msg *Message) {
+	stream := s.getStream(msg.Code)
+	stream.readData(msg)
 }
 
 func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {

@@ -2,7 +2,6 @@ package ethereum
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net"
@@ -22,34 +21,13 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/rlpx"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 )
 
 const (
 	softResponseLimit = 2 * 1024 * 1024
 	estHeaderRlpSize  = 500
 )
-
-const (
-	sizeOfType   = 2
-	sizeOfLength = 4
-	headerSize   = sizeOfType + sizeOfLength
-)
-
-type header []byte
-
-func (h header) MsgType() uint16 {
-	return binary.BigEndian.Uint16(h[0:2])
-}
-
-func (h header) Length() uint32 {
-	return binary.BigEndian.Uint32(h[2:6])
-}
-
-func (h header) encode(msgType uint16, length uint32) {
-	binary.BigEndian.PutUint16(h[0:2], msgType)
-	binary.BigEndian.PutUint32(h[2:6], length)
-}
 
 // eth protocol message codes
 const (
@@ -102,7 +80,7 @@ type Ethereum struct {
 	pendingLock sync.Mutex
 	timer       *time.Timer
 
-	header header
+	header rlpx.Header
 }
 
 // GetStatus is the interface that gives the eth protocol the information it needs
@@ -117,7 +95,7 @@ func NewEthereumProtocol(conn net.Conn, peer *network.Peer, getStatus GetStatus,
 		blockchain:  blockchain,
 		pending:     make(map[string]*callback),
 		pendingLock: sync.Mutex{},
-		header:      make([]byte, headerSize),
+		header:      make([]byte, rlpx.HeaderSize),
 	}
 }
 
@@ -165,7 +143,7 @@ func (e *Ethereum) WriteMsg(code int, data interface{}) error {
 		return err
 	}
 
-	e.header.encode(uint16(code), uint32(len(r)))
+	e.header.Encode(uint16(code), uint32(len(r)))
 
 	if _, err := e.conn.Write(e.header[:]); err != nil {
 		return err

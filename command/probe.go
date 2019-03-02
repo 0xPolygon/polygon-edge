@@ -11,7 +11,7 @@ import (
 	"github.com/umbracle/minimal/protocol/ethereum"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/network/rlpx"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 )
 
 type ProbeCommand struct {
