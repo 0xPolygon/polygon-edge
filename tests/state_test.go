@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 )
 
 var stateTests = "GeneralStateTests"
@@ -23,12 +24,13 @@ type stateCase struct {
 	Transaction *stTransaction       `json:"transaction"`
 }
 
-func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p postEntry) {
+func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
 	config, ok := Forks[fork]
 	if !ok {
 		t.Fatalf("config %s not found", fork)
 	}
 
+	builtins := buildBuiltins(t, config)
 	env := c.Env.ToEnv(t)
 
 	msg, err := c.Transaction.At(p.Indexes)
@@ -37,18 +39,20 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	}
 	env.GasPrice = msg.GasPrice()
 
-	state, _ := buildState(t, c.Pre)
+	s, _ := buildState(t, c.Pre)
 
 	forks := config.At(env.Number.Uint64())
 	gasTable := config.GasTable(env.Number)
 
 	var root []byte
 
-	txn := state.Txn()
+	txn := s.Txn()
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 
-	_, _, err = txn.Apply(msg, env, gasTable, forks, vmTestBlockHash, gasPool, false)
+	executor := state.NewExecutor(txn, env, forks, gasTable, vmTestBlockHash)
+
+	_, _, err = executor.Apply(txn, msg, env, gasTable, forks, vmTestBlockHash, gasPool, false, builtins)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
@@ -56,11 +60,11 @@ func RunSpecificTest(t *testing.T, c stateCase, id, fork string, index int, p po
 	_, root = txn.Commit(forks.EIP158)
 
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %d): expected %s but found %s", fork, index, p.Root.String(), hexutil.Encode(root))
+		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hexutil.Encode(root))
 	}
 
 	if logs := rlpHash(txn.Logs()); logs != p.Logs {
-		t.Fatalf("logs mismatch (%s %d): expected %s but found %s", fork, index, p.Logs.String(), logs.String())
+		t.Fatalf("logs mismatch (%s, %s %d): expected %s but found %s", name, fork, index, p.Logs.String(), logs.String())
 	}
 }
 
@@ -96,10 +100,12 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
+					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
+					continue
 				}
 
 				data, err := ioutil.ReadFile(file)
@@ -112,10 +118,10 @@ func TestState(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				for _, i := range c {
+				for name, i := range c {
 					for fork, f := range i.Post {
 						for indx, e := range f {
-							RunSpecificTest(t, i, "id", fork, indx, e)
+							RunSpecificTest(file, t, i, name, fork, indx, e)
 						}
 					}
 				}

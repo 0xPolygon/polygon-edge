@@ -2,6 +2,10 @@ package trie
 
 import (
 	"bytes"
+	"fmt"
+	"reflect"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -14,11 +18,13 @@ var (
 // WalkFn is used when walking the tree. Takes a
 // key and value, returning if iteration should
 // be terminated.
-type WalkFn func(k []byte, v interface{}) bool
+type WalkFn func(k []byte, v []byte) bool
+
+type WalkFnNode func(v *Node) bool
 
 type leafNode struct {
 	key []byte
-	val interface{}
+	val []byte
 }
 
 type edge struct {
@@ -30,6 +36,31 @@ type Node struct {
 	leaf   *leafNode
 	prefix []byte
 	edges  [17]*Node
+}
+
+func (n *Node) Equal(nn *Node) bool {
+	nVals := []*Node{}
+	nnVals := []*Node{}
+
+	n.WalkNode(func(n *Node) bool {
+		nVals = append(nVals, n)
+		return false
+	})
+	nn.WalkNode(func(n *Node) bool {
+		nnVals = append(nnVals, n)
+		return false
+	})
+
+	if len(nVals) != len(nnVals) {
+		return false
+	}
+
+	for indx, v := range nVals {
+		if !reflect.DeepEqual(v, nnVals[indx]) {
+			return false
+		}
+	}
+	return true
 }
 
 func (n *Node) isLeaf() bool {
@@ -73,19 +104,42 @@ func recursiveWalk(n *Node, fn WalkFn) bool {
 
 	// Recurse on the children
 	for _, e := range n.edges {
-		if recursiveWalk(e, fn) {
-			return true
+		if e != nil {
+			if recursiveWalk(e, fn) {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func (n *Node) Get(k []byte) (interface{}, bool) {
+func (n *Node) WalkNode(fn WalkFnNode) {
+	recursiveWalkNode(n, fn)
+}
+
+func recursiveWalkNode(n *Node, fn WalkFnNode) bool {
+	// Visit the leaf values if any
+	if fn(n) {
+		return true
+	}
+
+	// Recurse on the children
+	for _, e := range n.edges {
+		if e != nil {
+			if recursiveWalkNode(e, fn) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (n *Node) Get(k []byte) ([]byte, bool) {
 	val, ok := n.get(k)
 	return val, ok
 }
 
-func (n *Node) get(k []byte) (interface{}, bool) {
+func (n *Node) get(k []byte) ([]byte, bool) {
 	search := k
 	for {
 		// Check for key exhaustion
@@ -132,7 +186,7 @@ func (n *Node) Len() int {
 	return l
 }
 
-func (n *Node) Hash() []byte {
+func (n *Node) Hash(storage Storage) []byte {
 	var x []byte
 	var ok bool
 
@@ -142,13 +196,13 @@ func (n *Node) Hash() []byte {
 		return emptyRoot
 	} else if size == 1 { // only one short node
 		// its a short node
-		x, ok = Hash(n.First(), 0, 0, false)
+		x, ok = Hash(storage, n.First(), 0, 0, false)
 	} else {
-		x, ok = Hash(n, 0, 0, false)
+		x, ok = Hash(storage, n, 0, 0, false)
 	}
 
 	if len(x) > 32 || !ok {
-		return hashit(x)
+		return hashitAndStore(storage, x)
 	}
 	return x
 }
@@ -168,6 +222,47 @@ func (n *Node) delEdge(label byte) {
 	n.edges[label] = nil
 }
 
+func (n *Node) Show() {
+	show(n, 0, 0, false)
+
+	/*
+		size := n.Len()
+
+		if size == 1 {
+			fmt.Println("-- ONE --")
+			show(n.First(), 0, 0, false)
+		} else {
+			fmt.Println("-- TWO --")
+			show(n, 0, 0, false)
+		}
+	*/
+}
+
+func show(n *Node, d int, label byte, handlePrefix bool) {
+	if n.leaf != nil {
+		k, v := hexutil.Encode(n.leaf.key), hexutil.Encode(n.leaf.val)
+		fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
+	} else {
+
+		p := n.prefix
+		if handlePrefix {
+			p = n.prefix[1:]
+		}
+
+		if len(p) == 0 {
+			fmt.Printf("%s(%d) EDGES: %d\n", depth(d), label, n.Len())
+		} else {
+			fmt.Printf("%s(%d) SHORT: %s\n", depth(d), label, hexutil.Encode(p))
+		}
+
+		for label, e := range n.edges {
+			if e != nil {
+				show(e, d+1, byte(label), true)
+			}
+		}
+	}
+}
+
 type kk struct {
 	Key, Val []byte
 }
@@ -184,7 +279,7 @@ type node []byte
 
 const valueEdge = 16
 
-func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
+func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 	if n.leaf != nil {
 
 		p := n.prefix
@@ -193,17 +288,21 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 			p = n.prefix[1:]
 		}
 
-		var v []byte
-		var err error
+		// var v []byte
+		// var err error
 
-		if b, ok := n.leaf.val.([]byte); ok {
-			v, _ = rlp.EncodeToBytes(bytes.TrimLeft(b[:], "\x00"))
-		} else {
-			v, err = rlp.EncodeToBytes(n.leaf.val)
-			if err != nil {
-				panic(err)
+		v := n.leaf.val
+
+		/*
+			if b, ok := n.leaf.val.([]byte); ok {
+				v, _ = rlp.EncodeToBytes(bytes.TrimLeft(b[:], "\x00"))
+			} else {
+				v, err = rlp.EncodeToBytes(n.leaf.val)
+				if err != nil {
+					panic(err)
+				}
 			}
-		}
+		*/
 
 		if label == valueEdge {
 			// its a leaf, only encode with rlp and dont hash
@@ -214,7 +313,7 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 		key := hexToCompact(p)
 		val := encodeKeyValue(key, v)
 		if len(val) >= 32 {
-			return hashit(val), true
+			return hashitAndStore(storage, val), true
 		}
 
 		return val, false
@@ -225,7 +324,7 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 
 		for label, e := range n.edges {
 			if e != nil {
-				r, ok := Hash(e, d+1, byte(label), true)
+				r, ok := Hash(storage, e, d+1, byte(label), true)
 				if ok {
 					vals[label] = encodeItem(r)
 				} else {
@@ -238,7 +337,7 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 		hashed := false
 
 		if len(val) >= 32 {
-			val = hashit(val)
+			val = hashitAndStore(storage, val)
 			hashed = true
 		}
 
@@ -262,13 +361,21 @@ func Hash(n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
 
 		if len(val2) >= 32 {
 			hashed = true
-			val2 = hashit(val2)
+			val2 = hashitAndStore(storage, val2)
 		}
 
 		return val2, hashed
 	}
 
 	panic("XX")
+}
+
+func hashitAndStore(storage Storage, val []byte) []byte {
+	kk := hashit(val)
+	if storage != nil {
+		storage.Put(kk, val)
+	}
+	return kk
 }
 
 func encodeListOfBytes(vals [17]node) []byte {

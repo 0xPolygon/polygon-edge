@@ -139,7 +139,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 
 	b := NewBlockchain(s, &fakeConsensus{}, config)
 	if headers != nil {
-		if err := b.WriteGenesis(createGenesis(headers[0])); err != nil {
+		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)
 		}
 		if err := b.WriteHeaders(headers[1:]); err != nil {

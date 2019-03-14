@@ -25,7 +25,6 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/rlpx"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/syncer"
@@ -124,7 +123,7 @@ func (a *Agent) Start() error {
 	}
 
 	// register protocols
-	callback := func(conn rlpx.Conn, peer *network.Peer) protocol.Handler {
+	callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
 		return ethereum.NewEthereumProtocol(conn, peer, a.syncer.GetStatus, blockchain)
 	}
 	a.server.RegisterProtocol(protocol.ETH63, callback)

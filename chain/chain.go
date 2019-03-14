@@ -158,7 +158,15 @@ type GenesisAccount struct {
 	Storage    map[common.Hash]common.Hash
 	Balance    *big.Int
 	Nonce      uint64
+	Builtin    *Builtin
 	PrivateKey []byte // for tests
+}
+
+// Builtin is a precompiled contract
+type Builtin struct {
+	Name       string            `json:"name"`
+	ActivateAt uint64            `json:"activate_at"`
+	Pricing    map[string]uint64 `json:"pricing"`
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -170,8 +178,9 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
 		Code       *hexutil.Bytes              `json:"code,omitempty"`
 		Storage    map[storageJSON]storageJSON `json:"storage,omitempty"`
-		Balance    *math.HexOrDecimal256       `json:"balance" gencodec:"required"`
+		Balance    *math.HexOrDecimal256       `json:"balance"`
 		Nonce      *math.HexOrDecimal64        `json:"nonce,omitempty"`
+		Builtin    *Builtin                    `json:"builtin,omitempty"`
 		PrivateKey *hexutil.Bytes              `json:"secretKey,omitempty"`
 	}
 
@@ -189,12 +198,12 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 			g.Storage[common.Hash(k)] = common.Hash(v)
 		}
 	}
-	if dec.Balance == nil {
-		return errors.New("missing required field 'balance' for GenesisAccount")
-	}
 	g.Balance = (*big.Int)(dec.Balance)
 	if dec.Nonce != nil {
 		g.Nonce = uint64(*dec.Nonce)
+	}
+	if dec.Builtin != nil {
+		g.Builtin = dec.Builtin
 	}
 	if dec.PrivateKey != nil {
 		g.PrivateKey = *dec.PrivateKey

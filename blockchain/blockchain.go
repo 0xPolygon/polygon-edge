@@ -16,7 +16,9 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/state/evm"
+	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/state/trie"
 
 	mapset "github.com/deckarep/golang-set"
 )
@@ -35,12 +37,13 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db        *storage.Storage
-	consensus consensus.Consensus
-	genesis   *types.Header
-	state     map[string]*state.State
-	stateRoot common.Hash
-	params    *chain.Params
+	db          *storage.Storage
+	consensus   consensus.Consensus
+	genesis     *types.Header
+	state       map[string]*state.State
+	stateRoot   common.Hash
+	params      *chain.Params
+	precompiled map[common.Address]*precompiled.Precompiled
 }
 
 // NewBlockchain creates a new blockchain object
@@ -52,6 +55,10 @@ func NewBlockchain(db *storage.Storage, consensus consensus.Consensus, params *c
 		state:     map[string]*state.State{},
 		params:    params,
 	}
+}
+
+func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
+	b.precompiled = precompiled
 }
 
 // GetParent return the parent
@@ -72,6 +79,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	}
 
 	s := state.NewState()
+	s.SetStorage(trie.NewMemoryStorage())
 
 	txn := s.Txn()
 	for addr, account := range genesis.Alloc {
@@ -233,7 +241,7 @@ func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
 }
 
 func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
-	panic("TODO")
+	return b.WriteHeadersWithBodies(headers)
 }
 
 // WriteHeadersWithBodies writes a batch of headers
@@ -415,7 +423,7 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 
 		gasTable := b.params.GasTable(header.Number)
 
-		env := &evm.Env{
+		env := &runtime.Env{
 			Coinbase:   header.Coinbase,
 			Timestamp:  header.Time,
 			Number:     header.Number,
@@ -424,10 +432,16 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 			GasPrice:   tx.GasPrice(),
 		}
 
-		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
-		if err != nil {
-			continue
-		}
+		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
+
+		gasUsed, failed, err := executor.Apply(txn, &msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
+
+		/*
+			gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
+			if err != nil {
+				continue
+			}
+		*/
 
 		txerr = err
 		totalGas += gasUsed
@@ -460,6 +474,7 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 		count++
 
 		txns = append(txns, tx)
+
 	}
 
 	// without uncles
@@ -510,7 +525,7 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 		gasTable := b.params.GasTable(block.Number())
 
-		env := &evm.Env{
+		env := &runtime.Env{
 			Coinbase:   block.Coinbase(),
 			Timestamp:  block.Time(),
 			Number:     block.Number(),
@@ -519,10 +534,16 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 			GasPrice:   tx.GasPrice(),
 		}
 
-		gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false)
-		if err != nil {
-			return nil, nil, nil, 0, err
-		}
+		/*
+			gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
+			if err != nil {
+				return nil, nil, nil, 0, err
+			}
+		*/
+
+		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
+
+		gasUsed, failed, err := executor.Apply(txn, &msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 
 		totalGas += gasUsed
 
