@@ -1,4 +1,4 @@
-package syncer
+package ethereum
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
 type HeadersJob struct {
@@ -517,6 +516,7 @@ func hasReceipts(h *types.Header) bool {
 	return h.ReceiptHash != types.EmptyRootHash
 }
 
+/*
 func encodeHash(x common.Hash, y common.Hash) common.Hash {
 	hw := sha3.NewKeccak256()
 	if _, err := hw.Write(x.Bytes()); err != nil {
@@ -530,3 +530,4 @@ func encodeHash(x common.Hash, y common.Hash) common.Hash {
 	hw.Sum(h[:0])
 	return h
 }
+*/

@@ -3,16 +3,18 @@ package network
 import (
 	"fmt"
 	"log"
+	"net"
 
 	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
 type Instance struct {
-	session  *rlpx.Stream // session of the peer with the protocoll
-	protocol *protocol.Protocol
-	Runtime  protocol.Handler
-	offset   uint64
+	session net.Conn // session of the peer with the protocoll
+	// protocol *protocol.Protocol
+	backend protocol.Backend
+	// Runtime  protocol.Handler
+	offset uint64
 }
 
 type Status int
@@ -74,6 +76,7 @@ func (p *Peer) PrettyString() string {
 	return p.ID[:8]
 }
 
+/*
 func (p *Peer) GetProtocol(name string) protocol.Handler {
 	proto, ok := p.protocols[name]
 	if !ok {
@@ -81,11 +84,13 @@ func (p *Peer) GetProtocol(name string) protocol.Handler {
 	}
 	return proto.Runtime
 }
+*/
 
 func (p *Peer) Close() {
 	p.conn.Close()
 }
 
+/*
 func (p *Peer) SetInstances(protocols []*Instance) {
 	for _, i := range protocols {
 		p.protocols[i.protocol.Name] = i
@@ -100,3 +105,4 @@ func (p *Peer) getProtocol(msgcode uint64) *Instance {
 	}
 	return nil
 }
+*/

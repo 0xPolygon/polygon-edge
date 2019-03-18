@@ -1,6 +1,9 @@
 package protocol
 
-import "context"
+import (
+	"context"
+	"net"
+)
 
 // Handler is the handler of the msg for the protocol
 type Handler interface {
@@ -15,33 +18,11 @@ type Protocol struct {
 	Length  uint64
 }
 
-const (
-	// ETH is the name of the ethereum protocol
-	ETH = "eth"
-	// PAR is the name of the parity protocol
-	PAR = "par"
-)
-
-// ETH63 is the Fast synchronization protocol
-var ETH63 = Protocol{
-	Name:    ETH,
-	Version: 63,
-	Length:  17,
+// Backend is a protocol backend
+type Backend interface {
+	Protocol() Protocol
+	Add(conn net.Conn, peerID string) error
 }
 
-// ETH62 is the other
-var ETH62 = Protocol{
-	Name:    ETH,
-	Version: 62,
-	Length:  8,
-}
-
-// PAR1 is the parity protocol
-var PAR1 = Protocol{
-	Name:    PAR,
-	Version: 1,
-	Length:  21,
-}
-
-// Factory is the factory method to create the protocol (TODO)
-type Factory func(context.Context)
+// Factory is the factory method to create the protocol
+type Factory func(ctx context.Context, m interface{}) (Backend, error)

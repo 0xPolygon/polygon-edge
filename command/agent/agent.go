@@ -77,7 +77,12 @@ func (a *Agent) Start() error {
 	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	a.minimal = minimal.NewMinimal(logger, config)
+	m, err := minimal.NewMinimal(logger, config)
+	if err != nil {
+		panic(err)
+	}
+
+	a.minimal = m
 
 	/*
 		consensusFactory := map[string]consensus.Factory{

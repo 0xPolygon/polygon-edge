@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"path/filepath"
 	"time"
 
+	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/blockchain"
@@ -15,15 +15,11 @@ import (
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/network/discovery"
-	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/protocol/ethereum"
 	"github.com/umbracle/minimal/sealer"
-	"github.com/umbracle/minimal/syncer"
 
 	consensusClique "github.com/umbracle/minimal/consensus/clique"
 	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
 	consensusPOW "github.com/umbracle/minimal/consensus/pow"
-
 	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
 )
 
@@ -40,23 +36,25 @@ var discoveryBackends = map[string]discovery.Factory{
 
 // Minimal is the central manager of the blockchain client
 type Minimal struct {
-	logger     *log.Logger
-	config     *Config
-	sealingCh  chan bool
-	sealer     *sealer.Sealer
-	server     *network.Server
-	syncer     *syncer.Syncer
+	logger    *log.Logger
+	config    *Config
+	sealingCh chan bool
+	sealer    *sealer.Sealer
+	server    *network.Server
+	backends  []protocol.Backend
+	// syncer     *syncer.Syncer
 	consensus  consensus.Consensus
-	blockchain *blockchain.Blockchain
+	Blockchain *blockchain.Blockchain
 	closeCh    chan struct{}
 }
 
-func NewMinimal(logger *log.Logger, config *Config) *Minimal {
+func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	m := &Minimal{
 		logger:    logger,
 		config:    config,
 		sealingCh: make(chan bool, 1),
 		closeCh:   make(chan struct{}),
+		backends:  []protocol.Backend{},
 	}
 
 	fmt.Println(config.BindAddr)
@@ -78,59 +76,81 @@ func NewMinimal(logger *log.Logger, config *Config) *Minimal {
 	var err error
 	m.consensus, err = consensusBackends[config.Chain.Params.GetEngine()](context.Background(), consensusConfig)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// blockchain storage
 	storage, err := storage.NewLevelDBStorage(filepath.Join(m.config.DataDir, "blockchain"), nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	trieDB, err := trie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	// blockchain object
-	m.blockchain = blockchain.NewBlockchain(storage, trieDB, m.consensus, config.Chain.Params)
-	if err := m.blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
-		panic(err)
+	m.Blockchain = blockchain.NewBlockchain(storage, trieDB, m.consensus, config.Chain.Params)
+	if err := m.Blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
+		return nil, err
 	}
 
-	// Start syncer
-	syncerConfig := syncer.DefaultConfig()
-	syncerConfig.NumWorkers = 1
+	// Start protocols
 
-	// TODO, get network id from chain object
-	m.syncer, err = syncer.NewSyncer(1, m.blockchain, syncerConfig)
-	if err != nil {
-		panic(err)
+	// Register protocols in server
+
+	for _, b := range config.ProtocolBackends {
+		backend, err := b(context.Background(), m)
+		if err != nil {
+			return nil, err
+		}
+		m.backends = append(m.backends, backend)
 	}
 
-	// register protocols
-	callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
-		return ethereum.NewEthereumProtocol(conn, peer, m.syncer.GetStatus, m.blockchain)
+	for _, i := range m.backends {
+		if err := m.server.RegisterProtocol(i); err != nil {
+			return nil, err
+		}
 	}
-	m.server.RegisterProtocol(protocol.ETH63, callback)
+
+	/*
+		// Start syncer
+		syncerConfig := syncer.DefaultConfig()
+		syncerConfig.NumWorkers = 1
+
+		// TODO, get network id from chain object
+		m.syncer, err = syncer.NewSyncer(1, m.blockchain, syncerConfig)
+		if err != nil {
+			panic(err)
+		}
+	*/
+
+	/*
+		// register protocols
+		callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
+			return ethereum.NewEthereumProtocol(conn, peer, m.syncer.GetStatus, m.blockchain)
+		}
+		m.server.RegisterProtocol(protocol.ETH63, callback)
+	*/
 
 	// Start network server work after all the protocols have been registered
 	m.server.Schedule()
 
 	// Pipe new added nodes into syncer
-	go m.listenServerEvents()
+	// go m.listenServerEvents()
 
 	// Start sealer
 	sealerConfig := &sealer.Config{
 		CommitInterval: 1 * time.Second, // TODO, where does it comes from this value?
 	}
-	m.sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus)
+	m.sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
 
 	// Enable the sealer by default. If new blocks arrive and he finds out he is lagging behind
 	// it will stop the sealing. NOTE: Maybe it would be better to wait for the first peer we connect?
 	m.sealer.SetEnabled(true)
 
-	return m
+	return m, nil
 }
 
 func (m *Minimal) Close() {
@@ -138,6 +158,7 @@ func (m *Minimal) Close() {
 	// TODO, add other close methods
 }
 
+/*
 func (m *Minimal) listenServerEvents() {
 	for {
 		select {
@@ -146,13 +167,9 @@ func (m *Minimal) listenServerEvents() {
 			fmt.Println("NEW NODE CONNECTED. DOING NOTHING")
 			fmt.Println(evnt.Type)
 
-			/*
-				if evnt.Type == network.NodeJoin {
-					m.syncer.AddNode(evnt.Peer)
-				}
-			*/
 		case <-m.closeCh:
 			return
 		}
 	}
 }
+*/

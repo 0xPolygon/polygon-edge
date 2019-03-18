@@ -1,20 +1,16 @@
-package syncer
+package ethereum
 
 import (
-	"math/big"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
-var status = &ethereum.Status{
+/*
+var status = &Status{
 	ProtocolVersion: 63,
 	NetworkID:       1,
 	TD:              big.NewInt(1),
@@ -22,24 +18,24 @@ var status = &ethereum.Status{
 	GenesisBlock:    common.HexToHash("1"),
 }
 
-func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *network.Server, b1 *blockchain.Blockchain) (*ethereum.Ethereum, *ethereum.Ethereum) {
-	sts := func(b *blockchain.Blockchain) func() (*ethereum.Status, error) {
-		return func() (*ethereum.Status, error) {
+func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *network.Server, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
+	sts := func(b *blockchain.Blockchain) func() (*Status, error) {
+		return func() (*Status, error) {
 			s := status
 			s.CurrentBlock = b.Header().Hash()
 			return s, nil
 		}
 	}
 
-	var eth0 *ethereum.Ethereum
+	var eth0 *Ethereum
 	c0 := func(conn net.Conn, p *network.Peer) protocol.Handler {
-		eth0 = ethereum.NewEthereumProtocol(conn, p, sts(b0), b0)
+		eth0 = NewEthereumProtocol(conn, p, sts(b0), b0)
 		return eth0
 	}
 
-	var eth1 *ethereum.Ethereum
+	var eth1 *Ethereum
 	c1 := func(conn net.Conn, p *network.Peer) protocol.Handler {
-		eth1 = ethereum.NewEthereumProtocol(conn, p, sts(b1), b1)
+		eth1 = NewEthereumProtocol(conn, p, sts(b1), b1)
 		return eth1
 	}
 
@@ -60,20 +56,20 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 	time.Sleep(500 * time.Millisecond)
 	return eth0, eth1
 }
+*/
 
 func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ancestor *types.Header) {
 	b0 := blockchain.NewTestBlockchain(t, h0)
 	b1 := blockchain.NewTestBlockchain(t, h1)
 
-	syncer, err := NewSyncer(1, b0, DefaultConfig())
+	syncer, err := NewBackend(1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s0, s1 := network.TestServers(network.DefaultConfig())
-	p0, _ := testEthHandshake(t, s0, b0, s1, b1)
+	eth0, _ := ethPipe(b0, b1)
 
-	h, err := syncer.FindCommonAncestor(p0)
+	h, err := syncer.FindCommonAncestor(eth0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +102,6 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 		h1 := blockchain.NewTestHeaderChainWithSeed(100, 10)
 		testPeerAncestor(t, h0, h1, nil)
 	})
-
 	// TODO, ancestor with forked chain
 }
 
@@ -119,15 +114,13 @@ func TestPeerHeight(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	syncer, err := NewSyncer(1, b0, DefaultConfig())
+	syncer, err := NewBackend(1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	s0, s1 := network.TestServers(network.DefaultConfig())
-	p0, _ := testEthHandshake(t, s0, b0, s1, b1)
-
-	height, err := syncer.fetchHeight(p0)
+	eth0, _ := ethPipe(b0, b1)
+	height, err := syncer.fetchHeight(eth0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +133,7 @@ func newTestPeer(id string, pending int) *Peer {
 	return &Peer{id: id, active: true, pending: pending, failed: 0}
 }
 
-func dequeuePeer(t *testing.T, s *Syncer) *Peer {
+func dequeuePeer(t *testing.T, s *Backend) *Peer {
 	// dequeue peer without blocking
 	peer := make(chan *Peer, 1)
 	go func() {
@@ -158,7 +151,7 @@ func dequeuePeer(t *testing.T, s *Syncer) *Peer {
 	return nil
 }
 
-func expectDequeue(t *testing.T, s *Syncer, id string) {
+func expectDequeue(t *testing.T, s *Backend, id string) {
 	if found := dequeuePeer(t, s); found.id != id {
 		t.Fatalf("expected to dequeue %s but found %s", id, found.id)
 	}
@@ -170,7 +163,7 @@ func TestDequeueIncreasePending(t *testing.T) {
 	// b0 with only the genesis
 	b0 := blockchain.NewTestBlockchain(t, headers)
 
-	s, err := NewSyncer(1, b0, DefaultConfig())
+	s, err := NewBackend(1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +181,7 @@ func TestDequeuePeers(t *testing.T) {
 	// b0 with only the genesis
 	b0 := blockchain.NewTestBlockchain(t, headers)
 
-	s, err := NewSyncer(1, b0, DefaultConfig())
+	s, err := NewBackend(1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +201,7 @@ func TestDequeuePeerWithAwake(t *testing.T) {
 	// b0 with only the genesis
 	b0 := blockchain.NewTestBlockchain(t, headers)
 
-	s, err := NewSyncer(1, b0, DefaultConfig())
+	s, err := NewBackend(1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,4 +224,37 @@ func TestDequeuePeerWithAwake(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("it did not wake up")
 	}
+}
+
+func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
+	st0 := func() (*Status, error) {
+		s := &status
+		s.CurrentBlock = b0.Header().Hash()
+		return s, nil
+	}
+	st1 := func() (*Status, error) {
+		s := &status
+		s.CurrentBlock = b1.Header().Hash()
+		return s, nil
+	}
+
+	conn0, conn1 := net.Pipe()
+	eth0 := NewEthereumProtocol(conn0, st0, b0)
+	eth1 := NewEthereumProtocol(conn1, st1, b1)
+
+	err := make(chan error)
+	go func() {
+		err <- eth0.Init()
+	}()
+	go func() {
+		err <- eth1.Init()
+	}()
+
+	if err := <-err; err != nil {
+		panic(err)
+	}
+	if err := <-err; err != nil {
+		panic(err)
+	}
+	return eth0, eth1
 }

@@ -56,10 +56,12 @@ func DefaultConfig() *Config {
 	return c
 }
 
+/*
 type protocolStub struct {
 	protocol *protocol.Protocol
 	callback Callback
 }
+*/
 
 type EventType int
 
@@ -89,10 +91,10 @@ type MemberEvent struct {
 
 // Server is the ethereum client
 type Server struct {
-	logger    *log.Logger
-	Protocols []*protocolStub
-	Name      string
-	key       *ecdsa.PrivateKey
+	logger *log.Logger
+	// Protocols []*protocolStub
+	Name string
+	key  *ecdsa.PrivateKey
 
 	peersLock sync.Mutex
 	peers     map[string]*Peer
@@ -115,6 +117,8 @@ type Server struct {
 
 	discovery discovery.Backend
 	Enode     *enode.Enode
+
+	backends []protocol.Backend
 }
 
 // NewServer creates a new node
@@ -129,7 +133,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 	fmt.Printf("Enode: %s\n", enode.String())
 
 	s := &Server{
-		Protocols:    []*protocolStub{},
+		// Protocols:    []*protocolStub{},
 		Name:         name,
 		key:          key,
 		peers:        map[string]*Peer{},
@@ -143,6 +147,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFile),
+		backends:     []protocol.Backend{},
 	}
 
 	return s
@@ -155,8 +160,9 @@ func (s *Server) buildInfo() {
 		Name:    s.Name,
 		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
 	}
-	for _, p := range s.Protocols {
-		info.Caps = append(info.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
+	for _, p := range s.backends {
+		proto := p.Protocol()
+		info.Caps = append(info.Caps, &rlpx.Cap{Name: proto.Name, Version: proto.Version})
 	}
 	s.info = info
 }
@@ -401,19 +407,19 @@ func (s *Server) connectWithEnode(addrs string) error {
 func (s *Server) addSession(session *rlpx.Session) error {
 	p := newPeer(s.logger, session, session.RemoteInfo(), s)
 
-	instances := s.matchProtocols(p, p.Info.Caps)
-	if len(instances) == 0 {
+	backends := s.matchProtocols(p, p.Info.Caps)
+	if len(backends) == 0 {
 		return fmt.Errorf("no matching protocols found")
 	}
 
 	// There should be a better way to handle the initialization of the peer
 	// this should be done inside the peer itself not in the server.
-	for _, i := range instances {
-		if err := i.Runtime.Init(); err != nil {
+	for _, i := range backends {
+		if err := i.backend.Add(i.session, p.PrettyString()); err != nil {
 			return err
 		}
 	}
-	p.SetInstances(instances)
+	// p.SetInstances(instances)
 
 	s.peersLock.Lock()
 	s.peers[session.RemoteIDString()] = p
@@ -427,21 +433,27 @@ func (s *Server) addSession(session *rlpx.Session) error {
 	return nil
 }
 
+/*
 // Callback is the one calling whenever the protocol is used
 type Callback = func(conn net.Conn, peer *Peer) protocol.Handler
+*/
 
 // RegisterProtocol registers a protocol
-func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
-	s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
+func (s *Server) RegisterProtocol(b protocol.Backend) error {
+	// s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
+	s.backends = append(s.backends, b)
+	// TODO, check if the backend is already registered
+	return nil
 }
 
 func (s *Server) ID() enode.ID {
 	return s.Enode.ID
 }
 
-func (s *Server) getProtocol(name string, version uint) *protocolStub {
-	for _, p := range s.Protocols {
-		if p.protocol.Name == name && p.protocol.Version == version {
+func (s *Server) getProtocol(name string, version uint) protocol.Backend {
+	for _, p := range s.backends {
+		proto := p.Protocol()
+		if proto.Name == name && proto.Version == version {
 			return p
 		}
 	}
@@ -453,11 +465,20 @@ func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance 
 	protocols := []*Instance{}
 
 	for _, i := range caps {
-		if proto := s.getProtocol(i.Name, i.Version); proto != nil {
-			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.protocol.Length))
-			runtime := proto.callback(stream, peer)
-			protocols = append(protocols, &Instance{session: stream, protocol: proto.protocol, offset: uint64(offset), Runtime: runtime})
-			offset += proto.protocol.Length
+		if b := s.getProtocol(i.Name, i.Version); b != nil {
+			proto := b.Protocol()
+
+			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.Length))
+			// runtime := proto.callback(stream, peer)
+
+			instance := &Instance{
+				session: stream,
+				backend: b,
+				offset:  offset,
+			}
+
+			protocols = append(protocols, instance)
+			offset += proto.Length
 		}
 	}
 

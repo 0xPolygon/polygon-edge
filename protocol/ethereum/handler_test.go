@@ -101,8 +101,8 @@ func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Sta
 
 	conn0, conn1 := net.Pipe()
 
-	eth0 := NewEthereumProtocol(conn0, nil, st0, b0)
-	eth1 := NewEthereumProtocol(conn1, nil, st1, b1)
+	eth0 := NewEthereumProtocol(conn0, st0, b0)
+	eth1 := NewEthereumProtocol(conn1, st1, b1)
 
 	err := make(chan error)
 	go func() {

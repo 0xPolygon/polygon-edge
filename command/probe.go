@@ -7,7 +7,6 @@ import (
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -60,11 +59,11 @@ func (p *ProbeCommand) Run(args []string) int {
 
 	info := s.RemoteInfo()
 
-	proto := protocol.ETH63
+	proto := ethereum.ETH63
 	ss := s.OpenStream(uint(rlpx.BaseProtocolLength), uint(proto.Length))
 
 	// send a dummy status
-	e := ethereum.NewEthereumProtocol(ss, nil, nil, nil)
+	e := ethereum.NewEthereumProtocol(ss, nil, nil)
 
 	remoteStatus, err := e.ReadStatus()
 	if err != nil {

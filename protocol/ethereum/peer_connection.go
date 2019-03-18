@@ -1,4 +1,4 @@
-package syncer
+package ethereum
 
 import (
 	"fmt"
@@ -7,17 +7,14 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics"
-
-	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/protocol/ethereum"
 )
 
 type PeerConnection struct {
 	quota  int
-	sched  *Syncer
-	conn   *ethereum.Ethereum
+	sched  *Backend
+	conn   *Ethereum
 	peerID string
-	peer   *network.Peer
+	// peer   *network.Peer
 
 	rateLock sync.Mutex
 	rate     int

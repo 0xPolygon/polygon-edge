@@ -1,4 +1,4 @@
-package syncer
+package ethereum
 
 import (
 	"fmt"

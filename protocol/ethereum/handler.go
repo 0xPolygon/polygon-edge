@@ -56,14 +56,6 @@ type Downloader interface {
 	Data([][]byte)
 }
 
-// Blockchain is the interface the ethereum protocol needs to work
-type Blockchain interface {
-	GetHeaderByHash(hash common.Hash) *types.Header
-	GetHeaderByNumber(n *big.Int) *types.Header
-	GetReceiptsByHash(hash common.Hash) types.Receipts
-	GetBodyByHash(hash common.Hash) *types.Body
-}
-
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
 	conn     net.Conn
@@ -99,10 +91,10 @@ type NotifyMsg struct {
 type GetStatus func() (*Status, error)
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn net.Conn, peer *network.Peer, getStatus GetStatus, blockchain Blockchain) *Ethereum {
+func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain Blockchain) *Ethereum {
 	return &Ethereum{
-		conn:        conn,
-		peer:        peer,
+		conn: conn,
+		// peer:        peer,
 		getStatus:   getStatus,
 		blockchain:  blockchain,
 		pending:     make(map[string]*callback),
@@ -157,7 +149,6 @@ func (e *Ethereum) WriteMsg(code int, data interface{}) error {
 	}
 
 	e.header.Encode(uint16(code), uint32(len(r)))
-
 	if _, err := e.conn.Write(e.header[:]); err != nil {
 		return err
 	}
@@ -169,11 +160,13 @@ func (e *Ethereum) WriteMsg(code int, data interface{}) error {
 
 // RequestHeadersByNumber fetches a batch of blocks' headers based on the number of an origin block.
 func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error {
+	fmt.Println("BY NUMMBER")
 	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
 func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
+	fmt.Println("BY HASH")
 	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
@@ -195,12 +188,6 @@ func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
 // SendNewBlock propagates an entire block to a remote peer.
 func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
 	return e.WriteMsg(NewBlockMsg, []interface{}{block, td})
-}
-
-// Conn returns the connection referece
-func (e *Ethereum) Conn() *rlpx.Stream {
-	return nil
-	// return e.conn.(*rlpx.Stream)
 }
 
 func (e *Ethereum) ReadStatus() (*Status, error) {
@@ -231,6 +218,9 @@ func (e *Ethereum) ValidateStatus(remoteStatus *Status, localStatus *Status) err
 	if int(remoteStatus.ProtocolVersion) != int(localStatus.ProtocolVersion) {
 		return fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(remoteStatus.ProtocolVersion), int(localStatus.ProtocolVersion))
 	}
+
+	fmt.Println("-- current block --")
+	fmt.Println(remoteStatus.CurrentBlock)
 
 	e.HeaderHash = remoteStatus.CurrentBlock
 	e.HeaderDiff = remoteStatus.TD
@@ -328,6 +318,9 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 
 	code := msg.Code
 
+	fmt.Println("-- received code --")
+	fmt.Println(code)
+
 	switch {
 	case code == StatusMsg:
 		return fmt.Errorf("Status msg not expected after handshake")
@@ -341,8 +334,15 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 			return err
 		}
 
+		fmt.Println("-- origin --")
+		fmt.Println(query.Origin)
+
 		var origin *types.Header
 		if query.Origin.IsHash() {
+
+			fmt.Println("YY")
+			fmt.Println(query.Origin.Hash)
+
 			origin = e.blockchain.GetHeaderByHash(query.Origin.Hash)
 		} else {
 			origin = e.blockchain.GetHeaderByNumber(big.NewInt(int64(query.Origin.Number)))
@@ -377,6 +377,10 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 			headers = append(headers, origin)
 			bytes += estHeaderRlpSize
 		}
+
+		fmt.Println("-- return headers --")
+		fmt.Println(headers)
+
 		return e.sendBlockHeaders(headers)
 
 	case code == BlockHeadersMsg:
