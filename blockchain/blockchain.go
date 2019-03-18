@@ -42,18 +42,20 @@ type Blockchain struct {
 	genesis     *types.Header
 	state       map[string]*state.State
 	stateRoot   common.Hash
+	triedb      trie.Storage
 	params      *chain.Params
 	precompiled map[common.Address]*precompiled.Precompiled
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db *storage.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db *storage.Storage, triedb trie.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	return &Blockchain{
 		db:        db,
 		consensus: consensus,
 		genesis:   nil,
 		state:     map[string]*state.State{},
 		params:    params,
+		triedb:    triedb,
 	}
 }
 
@@ -79,7 +81,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	}
 
 	s := state.NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s.SetStorage(b.triedb)
 
 	txn := s.Txn()
 	for addr, account := range genesis.Alloc {
@@ -371,9 +373,27 @@ func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
 	b.db.WriteBody(block.Header().Hash(), block.Body())
 }
 
+func (b *Blockchain) AddState(root common.Hash, state *state.State) {
+	b.state[root.String()] = state
+}
+
 func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
-	s, ok := b.state[header.Root.String()]
-	return s, ok
+	root := header.Root.String()
+
+	s, ok := b.state[root]
+	if ok {
+		return s, true
+	}
+
+	// its not in the local cache, ask the state manager. NOTE: this should not be done here
+	// but in the state library itself.
+	ss, err := state.NewStateAt(b.triedb, header.Root)
+	if err != nil {
+		return nil, false
+	}
+
+	b.state[root] = ss
+	return ss, true
 }
 
 func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.State, []byte, []*types.Transaction, error) {
@@ -484,8 +504,8 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 
 	s2, root := txn.Commit(config.EIP155)
 
-	fmt.Println(s2)
-	fmt.Println(root)
+	// fmt.Println(s2)
+	// fmt.Println(root)
 
 	return s2, root, txns, nil
 }

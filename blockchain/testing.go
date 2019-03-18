@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/umbracle/minimal/state/trie"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -137,7 +139,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	b := NewBlockchain(s, &fakeConsensus{}, config)
+	b := NewBlockchain(s, trie.NewMemoryStorage(), &fakeConsensus{}, config)
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)

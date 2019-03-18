@@ -34,6 +34,10 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 
 	var t *Trie
 	if node.Len() == 0 {
+		if node.leaf == nil { // Its an empty node
+			return &Trie{root: node}, nil
+		}
+
 		// short node, we need to include another external full root node
 		// and the short node in the correct edge (i.e. the first nibble of his key)
 

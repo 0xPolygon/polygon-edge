@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,11 +29,21 @@ type Sealer struct {
 	coinbase common.Address
 
 	// sealer
-	stopFn   context.CancelFunc
-	newBlock chan struct{}
+	stopSealing context.CancelFunc
+	newBlock    chan struct{}
 
 	// commit block every n seconds if no transactions are sent
 	commitInterval *time.Timer
+
+	stopFn  context.CancelFunc
+	lock    sync.Mutex
+	enabled bool
+
+	sealedCh chan *SealedNotify
+}
+
+type SealedNotify struct {
+	Block *types.Block
 }
 
 // NewSealer creates a new sealer for a specific engine
@@ -50,6 +61,7 @@ func NewSealer(config *Config, logger *log.Logger, blockchain *blockchain.Blockc
 		newBlock:       make(chan struct{}, 1),
 		commitInterval: time.NewTimer(config.CommitInterval),
 		signer:         types.NewEIP155Signer(big.NewInt(1)),
+		sealedCh:       make(chan *SealedNotify, 1),
 	}
 	return s
 }
@@ -58,36 +70,62 @@ func (s *Sealer) SetCoinbase(coinbase common.Address) {
 	s.coinbase = coinbase
 }
 
-func (s *Sealer) Start() error {
-	go s.loop()
+func (s *Sealer) SetEnabled(enabled bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	wasRunning := s.enabled
+	s.enabled = enabled
 
-	return nil
+	if !enabled && wasRunning {
+		// stop the sealer
+		s.stopFn()
+	} else if enabled && !wasRunning {
+		// start the sealer
+		ctx, cancel := context.WithCancel(context.Background())
+		s.stopFn = cancel
+		s.run(ctx)
+	}
+}
+
+func (s *Sealer) run(ctx context.Context) {
+	for {
+		select {
+		case <-s.newBlock:
+			s.commit()
+
+		case <-s.commitInterval.C:
+			s.commit()
+
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (s *Sealer) AddTx(tx *types.Transaction) {
 	s.txPool.Add(tx)
 }
 
-func (s *Sealer) loop() {
-
-	for {
-		select {
-		case <-s.newBlock:
-			s.commit(false)
-
-		case <-s.commitInterval.C:
-			s.commit(true)
-		}
-	}
-}
-
-func (s *Sealer) commit(interval bool) {
+func (s *Sealer) commit() {
 	s.commitInterval.Reset(s.config.CommitInterval)
+
+	// Check if there is a sealing going on.
+	// If the sealing started some n seconds before we got the new message
+	// we may want to keep it sealing
+	// If the block we are sealing is way older than the current block
+	// we definitely want to remove it. Can that happen?
+	if s.stopSealing != nil {
+		s.stopSealing()
+	}
 
 	// we have been notified of another block
 	// or the time just passed
 
 	parent := s.blockchain.Header()
+
+	fmt.Println("-- Sealing --")
+	fmt.Printf("Parent number: %d\n", parent.Number)
+	fmt.Printf("Parent root: %s\n", parent.Root.String())
 
 	promoted, err := s.txPool.reset(s.lastHeader, parent)
 	if err != nil {
@@ -109,7 +147,6 @@ func (s *Sealer) commit(interval bool) {
 	}
 
 	timestamp := time.Now().Unix()
-
 	if parent.Time.Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
 		timestamp = parent.Time.Int64() + 1
 	}
@@ -127,8 +164,6 @@ func (s *Sealer) commit(interval bool) {
 	if err := s.engine.Prepare(parent, header); err != nil {
 		panic(err)
 	}
-
-	fmt.Println(header)
 
 	state, ok := s.blockchain.GetState(parent)
 	if !ok {
@@ -148,18 +183,31 @@ func (s *Sealer) commit(interval bool) {
 
 	newState, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
 
-	fmt.Println("-- tx error --")
-	fmt.Println(err)
-
-	fmt.Println(newState)
-	fmt.Println(root)
-
 	header.Root = common.BytesToHash(root)
 
-	// TODO, get uncles
+	fmt.Println("__ new state root __")
+	fmt.Println(header.Root.String())
+
+	// TODO, get uncles?
 
 	block := types.NewBlock(header, txns, nil, nil)
 	s.seal(block)
+
+	// Write the new blocks
+	if err := s.blockchain.WriteBlock(block); err != nil {
+		s.logger.Printf("ERR: %v", err)
+	}
+
+	// Write the new state
+	s.blockchain.AddState(common.BytesToHash(root), newState)
+
+	// TODO, broadcast the new block to the network
+	select {
+	case s.sealedCh <- &SealedNotify{Block: block}:
+	default:
+	}
+
+	return
 }
 
 func (s *Sealer) NotifyBlock(b *types.Block) {
@@ -170,12 +218,14 @@ func (s *Sealer) NotifyBlock(b *types.Block) {
 }
 
 func (s *Sealer) seal(b *types.Block) {
-	if s.stopFn != nil {
-		s.stopFn()
-	}
+	/*
+		if s.stopSealing != nil {
+			s.stopSealing()
+		}
+	*/
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s.stopFn = cancel
+	s.stopSealing = cancel
 
 	sealed, err := s.engine.Seal(ctx, b)
 	if err != nil {

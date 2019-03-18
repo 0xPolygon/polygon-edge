@@ -24,7 +24,7 @@ type Pow struct {
 }
 
 func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
-	return &Pow{}, nil
+	return &Pow{difficulty: big.NewInt(100)}, nil
 }
 
 func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
@@ -67,14 +67,18 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 		}
 		nonce++
 	}
+
+	// BUG: We need to modify the difficulty of the blocks
 	return types.NewBlockWithHeader(header), nil
 }
 
 func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
+	header.Difficulty = big.NewInt(1).SetBytes(header.Number.Bytes())
 	return nil
 }
 
 func (p *Pow) Finalize(txn *state.Txn, block *types.Block) error {
+	txn.AddBalance(block.Coinbase(), big.NewInt(1))
 	return nil
 }
 

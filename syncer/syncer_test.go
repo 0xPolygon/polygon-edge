@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"math/big"
+	"net"
 	"testing"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 )
@@ -32,14 +32,14 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 	}
 
 	var eth0 *ethereum.Ethereum
-	c0 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
-		eth0 = ethereum.NewEthereumProtocol(s, p, sts(b0), b0)
+	c0 := func(conn net.Conn, p *network.Peer) protocol.Handler {
+		eth0 = ethereum.NewEthereumProtocol(conn, p, sts(b0), b0)
 		return eth0
 	}
 
 	var eth1 *ethereum.Ethereum
-	c1 := func(s rlpx.Conn, p *network.Peer) protocol.Handler {
-		eth1 = ethereum.NewEthereumProtocol(s, p, sts(b1), b1)
+	c1 := func(conn net.Conn, p *network.Peer) protocol.Handler {
+		eth1 = ethereum.NewEthereumProtocol(conn, p, sts(b1), b1)
 		return eth1
 	}
 
@@ -53,7 +53,7 @@ func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchai
 		t.Fatal(err)
 	}
 
-	if err := s0.DialSync(s1.Enode); err != nil {
+	if err := s0.DialSync(s1.Enode.String()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -202,7 +202,7 @@ func TestDequeuePeers(t *testing.T) {
 	expectDequeue(t, s, "b")
 }
 
-func TestDequeuPeerWithAwake(t *testing.T) {
+func TestDequeuePeerWithAwake(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis

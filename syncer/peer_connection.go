@@ -102,7 +102,7 @@ func (p *PeerConnection) action() {
 		case *HeadersJob:
 			fmt.Printf("SYNC HEADERS (%s) (%d): %d, %d\n", p.peerID, i.id, job.block, job.count)
 
-			p.requestBandwidth(p.sched.getHeaderSize() * int(job.count))
+			// p.requestBandwidth(p.sched.getHeaderSize() * int(job.count))
 
 			data, err = p.conn.RequestHeadersSync(job.block, job.count)
 			fmt.Printf("DOWN HEADERS: (%s): %d\n", p.peerID, size)
@@ -110,7 +110,7 @@ func (p *PeerConnection) action() {
 		case *BodiesJob:
 			fmt.Printf("SYNC BODIES (%s) (%d): %d\n", p.peerID, i.id, len(job.hashes))
 
-			p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
+			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
 			data, err = p.conn.RequestBodiesSync(job.hash, job.hashes)
 			fmt.Printf("DOWN BODIES: (%s): %d\n", p.peerID, size)
@@ -118,7 +118,7 @@ func (p *PeerConnection) action() {
 		case *ReceiptsJob:
 			fmt.Printf("SYNC RECEIPTS (%s) (%d): %d\n", p.peerID, i.id, len(job.hashes))
 
-			p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
+			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
 			data, err = p.conn.RequestReceiptsSync(job.hash, job.hashes)
 			fmt.Printf("DOWN RECEIPTS: (%s): %d\n", p.peerID, size)

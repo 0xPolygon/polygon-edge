@@ -47,6 +47,9 @@ func (g *GenesisCommand) Run(args []string) int {
 		Params: &chain.Params{
 			ChainID: 100,
 			Forks:   &chain.Forks{},
+			Engine: map[string]interface{}{
+				"POW": map[string]interface{}{},
+			},
 		},
 		Bootnodes: chain.Bootnodes{},
 	}

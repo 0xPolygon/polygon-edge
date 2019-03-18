@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Chain     string `json:"chain"`
-	DataDir   string `json:"data-dir"`
-	BindAddr  string `json:"addr"`
-	BindPort  int    `json:"port"`
-	Telemetry *Telemetry
+	Chain       string `json:"chain"`
+	DataDir     string `json:"data-dir"`
+	BindAddr    string `json:"addr"`
+	BindPort    int    `json:"port"`
+	Telemetry   *Telemetry
+	ServiceName string `json:"service_name"`
 }
 
 type Telemetry struct {
@@ -29,11 +30,12 @@ func DefaultTelemetry() *Telemetry {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:     "foundation",
-		DataDir:   "./test-chain",
-		BindAddr:  "0.0.0.0",
-		BindPort:  30303,
-		Telemetry: DefaultTelemetry(),
+		Chain:       "foundation",
+		DataDir:     "./test-chain",
+		BindAddr:    "127.0.0.1",
+		BindPort:    30303,
+		ServiceName: "minimal",
+		Telemetry:   DefaultTelemetry(),
 	}
 }
 
@@ -49,6 +51,12 @@ func (c *Config) merge(c1 *Config) {
 	}
 	if c1.Chain != "" {
 		c.Chain = c1.Chain
+	}
+	if c1.ServiceName != "" {
+		c.ServiceName = c1.ServiceName
+	}
+	if c1.Telemetry.PrometheusPort != 0 {
+		c.Telemetry.PrometheusPort = c1.Telemetry.PrometheusPort
 	}
 }
 

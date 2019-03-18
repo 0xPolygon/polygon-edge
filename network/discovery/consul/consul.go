@@ -44,16 +44,21 @@ func (b *Backend) Schedule() {
 	addr := b.address.IP.String()
 	port := b.address.Port
 
+	fmt.Println("-- node name --")
+	fmt.Println(b.config.NodeName)
+
 	service := &consul.AgentServiceRegistration{
 		ID:      b.config.NodeName,
 		Name:    b.config.ServiceName,
 		Tags:    []string{"minimal"},
 		Address: addr,
 		Port:    port,
-		Check: &consul.AgentServiceCheck{
-			Interval: "5s",
-			TCP:      b.address.String(),
-		},
+		/*
+			Check: &consul.AgentServiceCheck{
+				Interval: "5s",
+				TCP:      b.address.String(),
+			},
+		*/
 		Meta: map[string]string{
 			"enode": b.enode.String(),
 		},
@@ -103,6 +108,8 @@ func (b *Backend) findNodes() error {
 				continue
 			}
 
+			fmt.Println("--- WE FOUND ONE ---")
+
 			if enode, ok := service.ServiceMeta["enode"]; ok {
 				serverServices = append(serverServices, enode)
 			}
@@ -134,6 +141,9 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 	if c.ServiceName == "" {
 		c.ServiceName = "minimal"
 	}
+
+	fmt.Println("-- node name --")
+	fmt.Println(c.NodeName)
 
 	consulConfig := consul.DefaultConfig()
 	consulConfig.Address = c.Address

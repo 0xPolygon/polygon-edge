@@ -131,12 +131,11 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if dec.Coinbase != nil {
 		g.Coinbase = *dec.Coinbase
 	}
-	if dec.Alloc == nil {
-		return errors.New("missing required field 'alloc' for Genesis")
-	}
-	g.Alloc = make(GenesisAlloc, len(dec.Alloc))
-	for k, v := range dec.Alloc {
-		g.Alloc[common.Address(k)] = v
+	if dec.Alloc != nil {
+		g.Alloc = make(GenesisAlloc, len(dec.Alloc))
+		for k, v := range dec.Alloc {
+			g.Alloc[common.Address(k)] = v
+		}
 	}
 	if dec.Number != nil {
 		g.Number = uint64(*dec.Number)

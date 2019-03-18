@@ -17,6 +17,7 @@ import (
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol/ethereum"
+	"github.com/umbracle/minimal/sealer"
 )
 
 type Config struct {
@@ -52,12 +53,16 @@ type Peer struct {
 	pending int
 }
 
+// TODO, test the syncer without creating server connections.
+// TODO, Is it possible to have differents versions of the same protocol
+// running at the same time?
+
 func newPeer(id string, peer *network.Peer) *Peer {
 	return &Peer{
 		id:     id,
 		active: true,
 		pretty: peer.PrettyString(),
-		conn:   peer.GetProtocol("eth", 63).(*ethereum.Ethereum),
+		conn:   peer.GetProtocol("eth").(*ethereum.Ethereum),
 		peer:   peer,
 	}
 }
@@ -79,41 +84,50 @@ type Syncer struct {
 
 	deliverLock sync.Mutex
 
-	// sizes
-	sizesLock     sync.Mutex
-	headerSize    int
-	headerCount   int
-	bodySize      int
-	bodyCount     int
-	receiptSize   int
-	receiptsCount int
+	/*
+		// bandwidth
+		bandwidthLock sync.Mutex
+		bandwidth     int
+	*/
 
-	// bandwidth
-	bandwidthLock sync.Mutex
-	bandwidth     int
+	watch chan *ethereum.NotifyMsg
+
+	/*
+		// sizes
+		sizesLock     sync.Mutex
+		headerSize    int
+		headerCount   int
+		bodySize      int
+		bodyCount     int
+		receiptSize   int
+		receiptsCount int
+	*/
 }
 
 // NewSyncer creates a new syncer
 func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer, error) {
 	s := &Syncer{
-		config:        config,
-		NetworkID:     networkID,
-		peers:         map[string]*Peer{},
-		peersLock:     sync.Mutex{},
-		blockchain:    blockchain,
-		queue:         newQueue(),
-		counter:       0,
-		last:          0,
-		deliverLock:   sync.Mutex{},
-		waitCh:        make([]chan struct{}, 0),
-		sizesLock:     sync.Mutex{},
-		headerSize:    300,
-		headerCount:   1,
-		bodySize:      300,
-		bodyCount:     1,
-		receiptSize:   300,
-		receiptsCount: 1,
-		bandwidthLock: sync.Mutex{},
+		config:      config,
+		NetworkID:   networkID,
+		peers:       map[string]*Peer{},
+		peersLock:   sync.Mutex{},
+		blockchain:  blockchain,
+		queue:       newQueue(),
+		counter:     0,
+		last:        0,
+		deliverLock: sync.Mutex{},
+		waitCh:      make([]chan struct{}, 0),
+		watch:       make(chan *ethereum.NotifyMsg, 100),
+		/*
+			sizesLock:     sync.Mutex{},
+			headerSize:    300,
+			headerCount:   1,
+			bodySize:      300,
+			bodyCount:     1,
+			receiptSize:   300,
+			receiptsCount: 1,
+			bandwidthLock: sync.Mutex{},
+		*/
 	}
 
 	header := blockchain.Header()
@@ -127,51 +141,40 @@ func NewSyncer(networkID uint64, blockchain Blockchain, config *Config) (*Syncer
 
 	fmt.Printf("Current header (%d): %s\n", header.Number.Uint64(), header.Hash().String())
 
-	go s.refreshBandwidth()
+	// go s.refreshBandwidth()
+	go s.watchBlockLoop()
 
 	return s, nil
 }
 
-func (s *Syncer) requestBandwidth(bytes int) (int, int) {
-	s.bandwidthLock.Lock()
-	defer s.bandwidthLock.Unlock()
+func (s *Syncer) watchMinedBlocks(watch chan sealer.SealedNotify) {
+	go func() {
+		for {
+			w := <-watch
 
-	if bytes > s.bandwidth {
-		return 0, s.bandwidth
-	}
-	s.bandwidth -= bytes
-	return bytes, s.bandwidth
-}
+			fmt.Println("-- watch --")
+			fmt.Println(w)
 
-func (s *Syncer) getHeaderSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.headerSize
-}
+			// Notify that a new block has been sealed
+			// the blockchain has been update the most likely
+			// What if we dont get the notification from the sealer but
+			// from the blockchain? Every time there is an update
+			// so that we dont have communication between the sealer
+			// and the syncer and just with the blockchain. The same way that
+			// sealer talks with the blockchain to know about updates!
 
-func (s *Syncer) getBodiesSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.bodySize
-}
+			// Not sure if it has to recompute some of the data.
+			// This is only called when the sealer is activated so it does not need
+			// to be in 'syncer' mode but in a more limited 'watch' mode.
 
-func (s *Syncer) getReceiptsSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.receiptSize
-}
-
-func (s *Syncer) refreshBandwidth() {
-	for {
-		s.bandwidthLock.Lock()
-
-		s.bandwidth += 256000
-		if s.bandwidth > 256000 {
-			s.bandwidth = 256000
+			// For now just broadcast all the nodes that arrve here.
 		}
+	}()
+}
 
-		s.bandwidthLock.Unlock()
-		time.Sleep(1 * time.Second)
+func (s *Syncer) broadcast(b *types.Block) {
+	for _, i := range s.peers {
+		i.conn.SendNewBlock(b, big.NewInt(1))
 	}
 }
 
@@ -186,6 +189,67 @@ func (s *Syncer) updateChain(block uint64) {
 	}
 }
 
+func (s *Syncer) watchBlockLoop() {
+	for {
+		w := <-s.watch
+		// there is an update from one of the peers
+		// NOTE: do some operations to check the healthiness of the update
+		// For example, check if we receive too many updates from same peer.
+
+		s.notifyNewData(w)
+	}
+}
+
+// TODO, sendBlocks for the notification does not send the full difficulty
+
+func (s *Syncer) notifyNewData(w *ethereum.NotifyMsg) {
+	fmt.Println(w)
+
+	peerEth := w.Peer.GetProtocol("eth").(*ethereum.Ethereum)
+	conn := s.peers[w.Peer.ID].conn
+
+	// check if difficulty is higher than ours
+	// it its higher do the check about the header and ancestor
+
+	// find data about the peer
+	header, err := s.fetchHeight(conn)
+	if err != nil {
+		fmt.Printf("ERR: fetch height failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Heigth: %d\n", header.Number.Uint64())
+
+	ancestor, err := s.FindCommonAncestor(peerEth)
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
+
+	ourHeader := s.blockchain.Header() // keep this header locally? maybe return the last header from blockchain
+
+	// check that the difficulty is higher than ours
+	if peerEth.HeaderDiff.Cmp(ourHeader.Difficulty) < 0 {
+		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peerEth.HeaderDiff.String(), s.blockchain.Header().Difficulty.String())
+	} else {
+		fmt.Println("Difficulty higher than ours")
+		s.updateChain(header.Number.Uint64())
+	}
+}
+
+func (s *Syncer) watchBlock(watch chan *ethereum.NotifyMsg) {
+	go func() {
+		for {
+			w := <-watch
+			select {
+			case s.watch <- w:
+			default:
+			}
+		}
+	}()
+}
+
 // AddNode is called when we connect to a new node
 func (s *Syncer) AddNode(peer *network.Peer) {
 	fmt.Println("----- ADD NODE -----")
@@ -195,47 +259,32 @@ func (s *Syncer) AddNode(peer *network.Peer) {
 			fmt.Println("Failed to check the DAO block")
 			return
 		}
-	*/
-
-	/*
 		fmt.Println("DAO Fork completed")
-
-		p := newPeer(peer.ID, peer)
-		s.peers[peer.ID] = p
-
-		// find data about the peer
-		header, err := s.fetchHeight(p.conn)
-		if err != nil {
-			fmt.Printf("ERR: fetch height failed: %v\n", err)
-			return
-		}
-
-		fmt.Printf("Heigth: %d\n", header.Number.Uint64())
-		// fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
-
-		ourHeader := s.blockchain.Header()
-
-		// check that the difficulty is higher than ours
-		if peer.HeaderDiff().Cmp(ourHeader.Difficulty) < 0 {
-			fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peer.HeaderDiff().String(), s.blockchain.Header().Difficulty.String())
-		} else {
-			fmt.Println("Difficulty higher than ours")
-			s.updateChain(header.Number.Uint64())
-		}
-
-		// wake up some task
-		// s.wakeUp()
 	*/
 
-	s.updateChain(6000000)
+	p := newPeer(peer.ID, peer)
+	s.peers[peer.ID] = p
+
+	peerEth := peer.GetProtocol("eth").(*ethereum.Ethereum)
+
+	// wake up some task
+	// s.wakeUp()
+
+	s.watchBlock(peerEth.Watch())
 
 	conn := PeerConnection{
 		peer:   peer,
-		conn:   peer.GetProtocol("eth", 63).(*ethereum.Ethereum),
+		conn:   peer.GetProtocol("eth").(*ethereum.Ethereum),
 		sched:  s,
 		peerID: peer.PrettyString(),
 	}
 	conn.Run()
+
+	// notifiy this node data
+	s.notifyNewData(&ethereum.NotifyMsg{
+		Peer: peer,
+		Diff: peerEth.HeaderDiff,
+	})
 
 	// go s.runPeer(p)
 }
@@ -293,9 +342,11 @@ type peers []*Peer
 func (p peers) Len() int {
 	return len(p)
 }
+
 func (p peers) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
+
 func (p peers) Less(i, j int) bool {
 	if p[i].failed < p[j].failed {
 		return true
@@ -339,28 +390,6 @@ SELECT:
 		<-wait
 		fmt.Println("- awake now -")
 		goto SELECT
-	}
-}
-
-// TODO, measure this every n times (i.e. epoch)
-func (s *Syncer) updateApproxSize(t string, size int, n int) {
-	// fmt.Printf("T %s, S %d, L %d, Total %d\n", t, size, n, size/n)
-
-	ss := size / n
-
-	switch t {
-	case "headers":
-		s.headerSize = s.headerSize + (ss-s.headerSize)/s.headerCount
-		s.headerCount++
-		// fmt.Printf("Header size: %d\n", s.headerSize)
-	case "bodies":
-		s.bodySize = s.bodySize + (ss-s.bodySize)/s.bodyCount
-		s.bodyCount++
-		// fmt.Printf("Body size: %d\n", s.bodySize)
-	case "receipts":
-		s.receiptSize = s.receiptSize + (ss-s.receiptSize)/s.receiptsCount
-		s.receiptsCount++
-		// fmt.Printf("Receipts size: %d\n", s.receiptSize)
 	}
 }
 
@@ -622,30 +651,82 @@ func (s *Syncer) FetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
 func (s *Syncer) fetchHeight(peer *ethereum.Ethereum) (*types.Header, error) {
 	head := peer.Header()
 
-	ack := make(chan rlpx.AckMessage, 1)
-	peer.Conn().SetHandler(ethereum.BlockHeadersMsg, ack, 30*time.Second)
-
-	if err := peer.RequestHeadersByHash(head, 1, 0, false); err != nil {
+	header, err := peer.RequestHeaderByHashSync(head)
+	if err != nil {
 		return nil, err
 	}
-
-	resp := <-ack
-	if !resp.Complete {
-		return nil, fmt.Errorf("timeout")
+	if header == nil {
+		return nil, fmt.Errorf("header not found")
 	}
-
-	var headers []*types.Header
-	if err := rlp.Decode(resp.Payload, &headers); err != nil {
-		return nil, err
-	}
-	if len(headers) != 1 {
-		return nil, fmt.Errorf("expected one but found %d", len(headers))
-	}
-
-	header := headers[0]
 	if header.Hash() != head {
 		return nil, fmt.Errorf("returned hash is not the correct one")
 	}
-
 	return header, nil
 }
+
+/*
+// TODO, measure this every n times (i.e. epoch)
+func (s *Syncer) updateApproxSize(t string, size int, n int) {
+	// fmt.Printf("T %s, S %d, L %d, Total %d\n", t, size, n, size/n)
+
+	ss := size / n
+
+	switch t {
+	case "headers":
+		s.headerSize = s.headerSize + (ss-s.headerSize)/s.headerCount
+		s.headerCount++
+		// fmt.Printf("Header size: %d\n", s.headerSize)
+	case "bodies":
+		s.bodySize = s.bodySize + (ss-s.bodySize)/s.bodyCount
+		s.bodyCount++
+		// fmt.Printf("Body size: %d\n", s.bodySize)
+	case "receipts":
+		s.receiptSize = s.receiptSize + (ss-s.receiptSize)/s.receiptsCount
+		s.receiptsCount++
+		// fmt.Printf("Receipts size: %d\n", s.receiptSize)
+	}
+}
+
+func (s *Syncer) requestBandwidth(bytes int) (int, int) {
+	s.bandwidthLock.Lock()
+	defer s.bandwidthLock.Unlock()
+
+	if bytes > s.bandwidth {
+		return 0, s.bandwidth
+	}
+	s.bandwidth -= bytes
+	return bytes, s.bandwidth
+}
+
+func (s *Syncer) getHeaderSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.headerSize
+}
+
+func (s *Syncer) getBodiesSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.bodySize
+}
+
+func (s *Syncer) getReceiptsSize() int {
+	s.sizesLock.Lock()
+	defer s.sizesLock.Unlock()
+	return s.receiptSize
+}
+
+func (s *Syncer) refreshBandwidth() {
+	for {
+		s.bandwidthLock.Lock()
+
+		s.bandwidth += 256000
+		if s.bandwidth > 256000 {
+			s.bandwidth = 256000
+		}
+
+		s.bandwidthLock.Unlock()
+		time.Sleep(1 * time.Second)
+	}
+}
+*/

@@ -37,6 +37,7 @@ type Config struct {
 	DialTasks         int
 	DialBusyInterval  time.Duration
 	DiscoveryBackends map[string]discovery.Factory
+	ServiceName       string
 }
 
 // DefaultConfig returns a default configuration
@@ -49,6 +50,7 @@ func DefaultConfig() *Config {
 		Bootnodes:        []string{},
 		DialTasks:        5,
 		DialBusyInterval: 1 * time.Minute,
+		ServiceName:      "minimal",
 	}
 
 	return c
@@ -124,6 +126,8 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		ID:  enode.PubkeyToEnode(&key.PublicKey),
 	}
 
+	fmt.Printf("Enode: %s\n", enode.String())
+
 	s := &Server{
 		Protocols:    []*protocolStub{},
 		Name:         name,
@@ -171,17 +175,11 @@ func (s *Server) Schedule() error {
 		return err
 	}
 
-	enode := &enode.Enode{
-		IP:  net.ParseIP(s.config.BindAddress),
-		TCP: uint16(s.config.BindPort),
-		UDP: uint16(s.config.BindPort),
-	}
-
 	// setup discovery factories
 	discoveryConfig := &discovery.BackendConfig{
 		Logger: s.logger,
 		Key:    s.key,
-		Enode:  enode,
+		Enode:  s.Enode,
 		Config: map[string]interface{}{},
 	}
 
@@ -199,6 +197,18 @@ func (s *Server) Schedule() error {
 
 		s.discovery = backend
 		s.discovery.Schedule()
+	}
+
+	discoveryConfig.Config["nodename"] = s.config.ServiceName
+
+	for name, disc := range s.config.DiscoveryBackends {
+		fmt.Printf("Using discovery %s\n", name)
+		backend, err := disc(context.Background(), discoveryConfig)
+		if err != nil {
+			return err
+		}
+		s.discovery = backend // NOTE: Find a way to tunnel allt he discovery results
+		backend.Schedule()
 	}
 
 	go s.dialRunner()
@@ -229,6 +239,10 @@ func (s *Server) setupTransport() error {
 
 func (s *Server) handleIncomingConn(conn *rlpx.Session) {
 	// check if we have enough incoming slots
+
+	fmt.Println("-- conn --")
+	fmt.Println(conn)
+
 	s.addSession(conn)
 }
 
@@ -306,11 +320,9 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-			/*
-				case enode := <-s.discovery.Deliver():
-					fmt.Printf("FROM DISCOVER: %s\n", enode)
-					sendToTask(enode)
-			*/
+		case enode := <-s.discovery.Deliver():
+			fmt.Printf("FROM DISCOVER: %s\n", enode)
+			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
 			sendToTask(enode.ID())
@@ -394,6 +406,8 @@ func (s *Server) addSession(session *rlpx.Session) error {
 		return fmt.Errorf("no matching protocols found")
 	}
 
+	// There should be a better way to handle the initialization of the peer
+	// this should be done inside the peer itself not in the server.
 	for _, i := range instances {
 		if err := i.Runtime.Init(); err != nil {
 			return err

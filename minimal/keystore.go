@@ -21,11 +21,13 @@ type LocalKeystore struct {
 	path string
 }
 
+// Put implements the Keystore interface
 func (k *LocalKeystore) Put(key *ecdsa.PrivateKey) error {
 	err := ioutil.WriteFile(k.path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600)
 	return err
 }
 
+// Get implements the keystore interface
 func (k *LocalKeystore) Get() (*ecdsa.PrivateKey, bool, error) {
 	_, err := os.Stat(k.path)
 	if err != nil && !os.IsNotExist(err) {
