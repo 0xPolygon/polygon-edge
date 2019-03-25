@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -19,6 +20,9 @@ type PeerConnection struct {
 	rateLock sync.Mutex
 	rate     int
 	counter  int
+
+	stopFn  context.CancelFunc
+	running bool
 }
 
 func (p *PeerConnection) requestBandwidth(bytes int) {
@@ -40,8 +44,8 @@ func (p *PeerConnection) run() {
 		p.rate = p.rate*4/5 + sample/5
 
 		// emit keys
-		metrics.SetGaugeWithLabels([]string{"syncer", "rate_2"}, float32(p.rate), []metrics.Label{{Name: "id", Value: p.peerID}})
-		metrics.SetGaugeWithLabels([]string{"syncer", "rate"}, float32(sample), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate_2"}, float32(p.rate), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate"}, float32(sample), []metrics.Label{{Name: "id", Value: p.peerID}})
 		// bytes/second
 
 		fmt.Printf("==> Rate (%s): %d\n", p.peerID, p.rate)
@@ -59,33 +63,43 @@ func (p *PeerConnection) updateRate(bytes int) {
 	p.counter += bytes
 }
 
+// Reset resets the peer connection and stops all the current connections
+func (p *PeerConnection) Reset() {
+	p.running = false // TODO, protect with lock
+	if p.stopFn != nil {
+		p.stopFn()
+	}
+
+	// Start again all the actions, TODO, dont start action() again.
+	p.Run()
+}
+
+// Run runs the action
 func (p *PeerConnection) Run() {
 
-	go p.run()
+	// go p.run()
 
-	/*
-		BACK:
-			fmt.Println("trying to fetch")
-			header, err := p.sched.FetchHeight(p.conn)
-			if err != nil {
-				time.Sleep(5 * time.Second)
-				goto BACK
-			}
+	ctx, cancel := context.WithCancel(context.Background())
+	p.stopFn = cancel
+	p.running = true
 
-			metrics.SetGaugeWithLabels([]string{"syncer", "header"}, float32(header.Number.Uint64()), []metrics.Label{{Name: "id", Value: p.peerID}})
-	*/
-
-	go p.action()
+	go p.action(ctx)
 	// go p.action()
 
 	// go p.action()
 }
 
-func (p *PeerConnection) action() {
+func (p *PeerConnection) action(ctx context.Context) {
 	fmt.Println("############## PEER CONNECTION HAS STARTED #################")
 
 	for {
+	CHECK:
 		i := p.sched.Dequeue()
+		if i == nil {
+			// No jobs waiting, sleep and check again
+			time.Sleep(5 * time.Second)
+			goto CHECK
+		}
 
 		var data interface{}
 		var err error
@@ -101,7 +115,7 @@ func (p *PeerConnection) action() {
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * int(job.count))
 
-			data, err = p.conn.RequestHeadersSync(job.block, job.count)
+			data, err = p.conn.RequestHeadersSync(ctx, job.block, job.count)
 			fmt.Printf("DOWN HEADERS: (%s): %d\n", p.peerID, size)
 			context = "headers"
 		case *BodiesJob:
@@ -109,7 +123,7 @@ func (p *PeerConnection) action() {
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
-			data, err = p.conn.RequestBodiesSync(job.hash, job.hashes)
+			data, err = p.conn.RequestBodiesSync(ctx, job.hash, job.hashes)
 			fmt.Printf("DOWN BODIES: (%s): %d\n", p.peerID, size)
 			context = "bodies"
 		case *ReceiptsJob:
@@ -117,32 +131,24 @@ func (p *PeerConnection) action() {
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
-			data, err = p.conn.RequestReceiptsSync(job.hash, job.hashes)
+			data, err = p.conn.RequestReceiptsSync(ctx, job.hash, job.hashes)
 			fmt.Printf("DOWN RECEIPTS: (%s): %d\n", p.peerID, size)
 			context = "receipts"
+		}
+
+		// Dont deliver any data
+		if !p.running {
+			return
 		}
 
 		end := time.Since(start)
 
 		p.sched.Deliver("Y", context, i.id, data, err)
-		metrics.SetGaugeWithLabels([]string{"syncer", "size"}, float32(size), []metrics.Label{{Name: "id", Value: p.peerID}})
-		metrics.SetGaugeWithLabels([]string{"syncer", "time"}, float32(end.Nanoseconds()), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "size"}, float32(size), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "time"}, float32(end.Nanoseconds()), []metrics.Label{{Name: "id", Value: p.peerID}})
 
 		if err != nil {
 			if strings.Contains(err.Error(), "session closed") {
-
-				/*
-					fmt.Println("---- DOPE ----")
-					connectedAt := p.peer.ConnectedAt()
-
-					fmt.Println(p.peerID)
-					fmt.Println(connectedAt)
-					fmt.Println(time.Since(connectedAt))
-					fmt.Println(p.peer.Info.Name)
-
-					// panic("X")
-				*/
-
 				return
 			}
 			fmt.Printf("ERR: %v\n", err)

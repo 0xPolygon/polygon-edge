@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"net"
@@ -181,11 +182,11 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			var err error
 			if reflect.TypeOf(c.Origin).Name() == "Hash" {
 				hash := c.Origin.(common.Hash)
-				eth0.setHandler(hash.String(), 1, ack)
+				eth0.setHandler(context.Background(), hash.String(), 1, ack)
 				err = eth0.RequestHeadersByHash(hash, c.Amount, c.Skip, c.Reverse)
 			} else {
 				number := uint64(c.Origin.(int))
-				eth0.setHandler(strconv.Itoa(int(number)), 1, ack)
+				eth0.setHandler(context.Background(), strconv.Itoa(int(number)), 1, ack)
 				err = eth0.RequestHeadersByNumber(number, c.Amount, c.Skip, c.Reverse)
 			}
 
@@ -222,7 +223,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// bodies
 	ack := make(chan AckMessage, 1)
-	eth0.setHandler(batch[0].String(), 1, ack)
+	eth0.setHandler(context.Background(), batch[0].String(), 1, ack)
 
 	if err := eth0.RequestBodies(batch); err != nil {
 		t.Fatal(err)
@@ -235,7 +236,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// receipts
 	ack = make(chan AckMessage, 1)
-	eth0.setHandler(batch[0].String(), 1, ack)
+	eth0.setHandler(context.Background(), batch[0].String(), 1, ack)
 
 	if err := eth0.RequestReceipts(batch); err != nil {
 		t.Fatal(err)
@@ -268,7 +269,7 @@ func TestEthereumBody(t *testing.T) {
 	// -- bodies --
 
 	ack := make(chan AckMessage, 1)
-	eth0.setHandler(hash, 1, ack)
+	eth0.setHandler(context.Background(), hash, 1, ack)
 
 	if err := eth0.RequestBodies(msg); err != nil {
 		t.Fatal(err)
@@ -361,7 +362,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 
 	for indx, i := range cases {
 		go func(indx int, i uint64) {
-			h, err := eth0.RequestHeadersSync(i, 100)
+			h, err := eth0.RequestHeadersSync(context.Background(), i, 100)
 			if err == nil {
 				if len(h) != 100 {
 					err = fmt.Errorf("length not correct")
@@ -385,7 +386,6 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	}
 }
 
-/*
 func TestPeerEmptyResponseFails(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
@@ -395,10 +395,9 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers(network.DefaultConfig())
-	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+	eth0, _ := testEthProtocol(t, b0, b1)
 
-	if _, err := p0.RequestHeadersSync(1100, 100); err == nil {
+	if _, err := eth0.RequestHeadersSync(context.Background(), 1100, 100); err == nil {
 		t.Fatal("it should fail")
 	}
 
@@ -408,9 +407,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 	// mean the peer is timing out on the responses.
 }
 
-func TestPeerCloseConnection(t *testing.T) {
-	// close the connection while doing the request
-
+func TestPeerContextCancel(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
 	// b0 with only the genesis
@@ -419,16 +416,18 @@ func TestPeerCloseConnection(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	s0, s1 := network.TestServers(network.DefaultConfig())
-	p0, _ := testEthHandshake(t, s0, &status, b0, s1, &status, b1)
+	eth0, _ := testEthProtocol(t, b0, b1)
 
-	if _, err := p0.RequestHeadersSync(0, 100); err != nil {
-		t.Fatal(err)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
 
-	s1.Close()
-	if _, err := p0.RequestHeadersSync(100, 100); err == nil {
-		t.Fatal("it should fail after the connection has been closed")
+	errr := make(chan error, 1)
+	go func() {
+		_, err := eth0.RequestHeadersSync(ctx, 1100, 100)
+		errr <- err
+	}()
+
+	cancel()
+	if err := <-errr; err.Error() != "failed" {
+		t.Fatal("it should have been canceled")
 	}
 }
-*/

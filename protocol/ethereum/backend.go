@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/big"
 	"net"
-	"sort"
 
 	"github.com/umbracle/minimal/minimal"
 
@@ -38,7 +37,9 @@ func DefaultConfig() *Config {
 type Blockchain interface {
 	Header() *types.Header
 	Genesis() *types.Header
+	GetTD(hash common.Hash) *big.Int
 	WriteHeaders(headers []*types.Header) error
+	WriteBlocks(blocks []*types.Block) error
 	CommitBodies(headers []common.Hash, bodies []*types.Body) error
 	CommitReceipts(headers []common.Hash, receipts []types.Receipts) error
 	GetHeaderByHash(hash common.Hash) *types.Header
@@ -48,32 +49,33 @@ type Blockchain interface {
 }
 
 type Peer struct {
-	pretty  string
-	id      string
-	conn    *Ethereum
-	active  bool
-	failed  int
-	pending int
+	pretty   string
+	id       string
+	conn     *Ethereum
+	peerConn *PeerConnection
+	active   bool
+	failed   int
+	pending  int
 }
 
-// TODO, test the syncer without creating server connections.
 // TODO, Is it possible to have differents versions of the same protocol
 // running at the same time?
 
-func newPeer(id string, conn *Ethereum) *Peer {
+func newPeer(id string, conn *Ethereum, peerConn *PeerConnection) *Peer {
 	return &Peer{
-		id:     id,
-		active: true,
-		pretty: id,
-		conn:   conn,
+		id:       id,
+		active:   true,
+		pretty:   id,
+		conn:     conn,
+		peerConn: peerConn,
 	}
 }
 
 // Backend is the ethereum backend
 type Backend struct {
-	NetworkID uint64
-	config    *Config
-
+	NetworkID  uint64
+	config     *Config
+	minimal    *minimal.Minimal
 	blockchain Blockchain
 	queue      *queue
 
@@ -104,17 +106,20 @@ type Backend struct {
 		receiptSize   int
 		receiptsCount int
 	*/
+
+	stopFn context.CancelFunc
 }
 
-func Factory(ctx context.Context, m interface{}) (*Backend, error) {
+func Factory(ctx context.Context, m interface{}) (protocol.Backend, error) {
 	minimal := m.(*minimal.Minimal)
-	return NewBackend(1, minimal.Blockchain, DefaultConfig())
+	return NewBackend(minimal, 1, minimal.Blockchain, DefaultConfig())
 }
 
 // NewBackend creates a new ethereum backend
-func NewBackend(networkID uint64, blockchain Blockchain, config *Config) (*Backend, error) {
+func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain Blockchain, config *Config) (*Backend, error) {
 	b := &Backend{
 		config:      config,
+		minimal:     minimal,
 		NetworkID:   networkID,
 		peers:       map[string]*Peer{},
 		peersLock:   sync.Mutex{},
@@ -151,6 +156,10 @@ func NewBackend(networkID uint64, blockchain Blockchain, config *Config) (*Backe
 	// go s.refreshBandwidth()
 	go b.watchBlockLoop()
 
+	if minimal != nil {
+		go b.WatchMinedBlocks(minimal.Sealer.SealedCh)
+	}
+
 	return b, nil
 }
 
@@ -165,34 +174,42 @@ func (b *Backend) Protocol() protocol.Protocol {
 	return ETH63
 }
 
-func (b *Backend) watchMinedBlocks(watch chan sealer.SealedNotify) {
-	go func() {
-		for {
-			w := <-watch
+func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
+	for {
+		w := <-watch
 
-			fmt.Println("-- watch --")
-			fmt.Println(w)
+		fmt.Println("-- watch --")
+		fmt.Println(w)
 
-			// Notify that a new block has been sealed
-			// the blockchain has been update the most likely
-			// What if we dont get the notification from the sealer but
-			// from the blockchain? Every time there is an update
-			// so that we dont have communication between the sealer
-			// and the syncer and just with the blockchain. The same way that
-			// sealer talks with the blockchain to know about updates!
+		// If we manage to create the headerchain data structure, the
+		// sealer is just another fork, in this case a local fork.
 
-			// Not sure if it has to recompute some of the data.
-			// This is only called when the sealer is activated so it does not need
-			// to be in 'syncer' mode but in a more limited 'watch' mode.
+		// Notify that a new block has been sealed
+		// the blockchain has been update the most likely
+		// What if we dont get the notification from the sealer but
+		// from the blockchain? Every time there is an update
+		// so that we dont have communication between the sealer
+		// and the backend and just with the blockchain. The same way that
+		// sealer talks with the blockchain to know about updates!
 
-			// For now just broadcast all the nodes that arrve here.
-		}
-	}()
+		// Not sure if it has to recompute some of the data.
+		// This is only called when the sealer is activated so it does not need
+		// to be in 'syncer' mode but in a more limited 'watch' mode.
+
+		// For now just broadcast all the nodes that arrve here.
+		go b.broadcast(w.Block)
+	}
 }
 
 func (b *Backend) broadcast(block *types.Block) {
+	// total difficulty so far at the parent
+	diff := b.blockchain.GetTD(block.ParentHash())
+
+	// total difficulty + the difficulty of the block
+	blockDiff := big.NewInt(1).Add(diff, block.Difficulty())
+
 	for _, i := range b.peers {
-		i.conn.SendNewBlock(block, big.NewInt(1))
+		i.conn.SendNewBlock(block, blockDiff)
 	}
 }
 
@@ -214,7 +231,12 @@ func (b *Backend) watchBlockLoop() {
 		// NOTE: do some operations to check the healthiness of the update
 		// For example, check if we receive too many updates from same peer.
 
-		b.notifyNewData(w)
+		fmt.Println("BLOCK UPDATE FROM THE INTERNAL CALLS")
+		fmt.Println(w.Block)
+		fmt.Println(w.Diff)
+		fmt.Println(w.Peer)
+
+		go b.notifyNewData(w)
 	}
 }
 
@@ -223,7 +245,10 @@ func (b *Backend) watchBlockLoop() {
 func (b *Backend) notifyNewData(w *NotifyMsg) {
 	fmt.Println(w)
 
-	peerEth := b.peers[w.Peer.ID].conn
+	fmt.Println("-- peer id --")
+	fmt.Println(w.Peer.id)
+
+	peerEth := b.peers[w.Peer.id].conn
 
 	// check if difficulty is higher than ours
 	// it its higher do the check about the header and ancestor
@@ -237,21 +262,102 @@ func (b *Backend) notifyNewData(w *NotifyMsg) {
 
 	fmt.Printf("Heigth: %d\n", header.Number.Uint64())
 
-	ancestor, err := b.FindCommonAncestor(peerEth)
+	// TODO, do this only if the difficulty is higher
+	ancestor, forkHeader, err := b.FindCommonAncestor(peerEth)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	fmt.Printf("Ancestor: %d\n", ancestor.Number.Uint64())
 
+	fmt.Printf("========================> Ancestor: %d\n", ancestor.Number.Uint64())
+
+	// This header will be local once we do the headerChain object
 	ourHeader := b.blockchain.Header() // keep this header locally? maybe return the last header from blockchain
 
+	// In go-ethereum this part is on the handler, we have it here to combine it with the whole sync process
+	// peerEth.HeaderDiff is the total difficulty of his chain, we need to check the difficulty of our current chain
+	// at the block number.
+
+	td := b.blockchain.GetTD(ourHeader.Hash())
+
 	// check that the difficulty is higher than ours
-	if peerEth.HeaderDiff.Cmp(ourHeader.Difficulty) < 0 {
-		fmt.Printf("Difficulty %s is lower than ours %s, skip it\n", peerEth.HeaderDiff.String(), b.blockchain.Header().Difficulty.String())
+	if peerEth.HeaderDiff.Cmp(td) < 0 {
+		fmt.Printf("====================> Difficulty %s is lower than ours %s, skip it\n", peerEth.HeaderDiff.String(), td.String())
 	} else {
+		// We discovered a new difficulty, start to query this one.
+
 		fmt.Println("Difficulty higher than ours")
+		fmt.Println(peerEth.HeaderDiff.Int64())
+		fmt.Println(td.Int64())
+
+		// IMPORTANT NOTE: if we are notified with a block
+		// that is maybe his last block sealed, then, ancestor should not be common by any means
+		// ancestor should be one before the advertised one.
+
+		if forkHeader == nil {
+			fmt.Println("- on the tip -")
+			// we are at the tip of the chain. skip
+			// we will be awaked later on with the block update
+			// difference of one block.
+			return
+		}
+
+		fmt.Printf("Fork giveaway: %s (%d)\n", forkHeader.Hash().String(), forkHeader.Number.Uint64())
+
+		fmt.Println("-- fork parent --")
+		fmt.Println(forkHeader.ParentHash.String())
+
+		fmt.Println("-- ancestor (this should be fork parent) --")
+		fmt.Println(ancestor.Hash().String())
+		fmt.Println(ancestor.Number.Uint64())
+
+		// TODO, it needs a better context of the situation, can be solved with the forks
+		// Notify the block to the sealer
+		b.minimal.Sealer.NotifyBlock(w.Block)
+
+		// hopefully, with headerChain it will be easier to mark this fork,
+		// we write this first fork to give a small pointer to the new path.
+		// We need to write block otherwise the state will not be there.
+
+		forkBlock := []*types.Block{
+			types.NewBlockWithHeader(forkHeader),
+		}
+		if err := b.blockchain.WriteBlocks(forkBlock); err != nil {
+			panic(err)
+		}
+
+		/*
+			// write the forkBlock, this creates a fork in the blockchain
+			if err := b.blockchain.WriteHeaders([]*types.Header{forkHeader}); err != nil {
+				panic(err)
+			}
+		*/
+
+		// Once everyone is trying to download
+		// Different peers may be in different forks
+		// so some of the peers may return incorrect data
+
+		// Change the queue to start to download from the ancestor position
+		b.queue = newQueue()
+		b.queue.front = b.queue.newItem(ancestor.Number.Uint64() + 1)
+		b.queue.head = ancestor.Hash()
+
+		// Wait, are we going to run this every time there is a node update from the upper layer?
+		// I mean the find ancestor one. no, you dont have to run the ancestor then.
+		// geth? There must be a second channel.
+		// The point is to check if ancestor is on our current fork or not, or if we have to change the fork
+		// If ancestor is in our current fork, we hve to stay, otherwise change the fork
+		// Maybe have the blockchain check where that ancestor belongs
+
+		// Update the chain last header
 		b.updateChain(header.Number.Uint64())
+
+		// TODO: Reset peer connections to avoid receive bad values and start the whole process
+		// Important to do it after the queue is defined
+		for _, p := range b.peers {
+			p.peerConn.Reset()
+		}
 	}
 }
 
@@ -288,173 +394,31 @@ func (b *Backend) Add(conn net.Conn, peerID string) error {
 		return err
 	}
 
-	p := newPeer(peerID, proto)
-	b.peers[peerID] = p
-
-	// wake up some task
-	// s.wakeUp()
-
-	// b.watchBlock(peerEth.Watch())
-
-	peerConn := PeerConnection{
+	peerConn := &PeerConnection{
 		conn:   proto,
 		sched:  b,
 		peerID: peerID,
 	}
-	peerConn.Run()
+	// peerConn.Run()
 
-	/*
-		// notifiy this node data
-		b.notifyNewData(&NotifyMsg{
-			Peer: peer,
-			Diff: peerEth.HeaderDiff,
-		})
-	*/
+	p := newPeer(peerID, proto, peerConn)
+	b.peers[peerID] = p
+
+	proto.peer = p
+
+	// wake up some task
+	// s.wakeUp()
+
+	b.watchBlock(proto.Watch())
+
+	// notifiy this node data
+	b.notifyNewData(&NotifyMsg{
+		Peer: p,
+		Diff: proto.HeaderDiff,
+	})
 
 	// go s.runPeer(p)
 	return nil
-}
-
-func (b *Backend) workerTask(id string) {
-	fmt.Printf("Worker task starts: %s\n", id)
-
-	for {
-		peer := b.dequeuePeer()
-
-		i := b.Dequeue()
-
-		var data interface{}
-		var err error
-		var context string
-
-		switch job := i.payload.(type) {
-		case *HeadersJob:
-			fmt.Printf("SYNC HEADERS (%s) (%d) (%s): %d, %d\n", id, i.id, peer.pretty, job.block, job.count)
-
-			data, err = peer.conn.RequestHeadersSync(job.block, job.count)
-			context = "headers"
-		case *BodiesJob:
-			fmt.Printf("SYNC BODIES (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
-
-			data, err = peer.conn.RequestBodiesSync(job.hash, job.hashes)
-			context = "bodies"
-		case *ReceiptsJob:
-			fmt.Printf("SYNC RECEIPTS (%s) (%d) (%s): %d\n", id, i.id, peer.pretty, len(job.hashes))
-
-			data, err = peer.conn.RequestReceiptsSync(job.hash, job.hashes)
-			context = "receipts"
-		}
-
-		// ack the job and enqueue again for more work
-		b.ack(peer, err != nil)
-
-		b.Deliver(peer.pretty, context, i.id, data, err)
-
-		fmt.Printf("Completed: %d\n", b.queue.NumOfCompletedBatches())
-	}
-}
-
-// Run is the main entry point
-func (b *Backend) Run() {
-	/*
-		for i := 0; i < s.config.NumWorkers; i++ {
-			go s.workerTask(strconv.Itoa(i))
-		}
-	*/
-}
-
-type peers []*Peer
-
-func (p peers) Len() int {
-	return len(p)
-}
-
-func (p peers) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-func (p peers) Less(i, j int) bool {
-	if p[i].failed < p[j].failed {
-		return true
-	}
-	return p[i].pending < p[j].pending
-}
-
-func (b *Backend) dequeuePeer() *Peer {
-SELECT:
-	//fmt.Println("-- getting peers --")
-	b.peersLock.Lock()
-	pp := peers{}
-	for _, i := range b.peers {
-		//fmt.Printf("Peer: %s %v %d %v\n", i.pretty, i.active, i.pending, i.pending <= s.config.MaxRequests-1)
-		if i.active && i.pending <= b.config.MaxRequests-1 {
-			pp = append(pp, i)
-		}
-	}
-	sort.Sort(pp)
-
-	//fmt.Println("-- pending --")
-	//fmt.Println(pp)
-
-	if len(pp) > 0 {
-		candidate := pp[0]
-		candidate.pending++
-
-		b.peersLock.Unlock()
-		return candidate
-	}
-
-	b.peersLock.Unlock()
-
-	fmt.Println("- nothign found go to sleep -")
-
-	// wait and sleep
-	wait := make(chan struct{})
-	b.waitCh = append(b.waitCh, wait)
-
-	for {
-		<-wait
-		fmt.Println("- awake now -")
-		goto SELECT
-	}
-}
-
-func (b *Backend) ack(peer *Peer, failed bool) {
-	b.peersLock.Lock()
-
-	// acknoledge a task has finished
-	peer.pending--
-
-	if failed {
-		peer.failed++
-	}
-	if peer.failed == 10 {
-		peer.active = false
-		b.retryAfter(peer, 5*time.Second)
-	}
-	b.peersLock.Unlock()
-
-	if peer.active {
-		for i := peer.pending; i < b.config.MaxRequests; i++ {
-			b.wakeUp()
-		}
-	}
-}
-
-func (b *Backend) wakeUp() {
-	//fmt.Println("- wake up -")
-	//fmt.Println(len(s.waitCh))
-
-	// wake up a task if necessary
-	if len(b.waitCh) > 0 {
-		var wake chan struct{}
-		wake, b.waitCh = b.waitCh[0], b.waitCh[1:]
-
-		select {
-		case wake <- struct{}{}:
-		default:
-		}
-	}
 }
 
 func (b *Backend) Dequeue() *Job {
@@ -521,7 +485,7 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 		panic("")
 	}
 
-	if b.queue.NumOfCompletedBatches() > 2 {
+	if b.queue.NumOfCompletedBatches() >= 1 { // force to commit data every time
 		data := b.queue.FetchCompletedData()
 
 		fmt.Printf("Commit data: %d\n", len(data)*maxElements)
@@ -529,9 +493,16 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 
 		// write the headers
 		for indx, elem := range data {
-			metrics.SetGauge([]string{"syncer", "block"}, float32(elem.headers[0].Number.Uint64()))
+			metrics.SetGauge([]string{"minimal", "protocol", "ethereum63", "block"}, float32(elem.headers[0].Number.Uint64()))
 
-			if err := b.blockchain.WriteHeaders(elem.headers); err != nil {
+			// we have to use writeblcoks because that one changes the state
+			blocks := []*types.Block{}
+			for _, i := range elem.headers {
+				blocks = append(blocks, types.NewBlockWithHeader(i))
+			}
+
+			// Write blocks and commit new data
+			if err := b.blockchain.WriteBlocks(blocks); err != nil {
 				fmt.Printf("Failed to write headers batch: %v", err)
 
 				first, last := elem.headers[0], elem.headers[len(elem.headers)-1]
@@ -542,14 +513,19 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 				panic("")
 				return
 			}
-			if err := b.blockchain.CommitBodies(elem.GetBodiesHashes(), elem.bodies); err != nil {
-				fmt.Printf("Failed to write bodies: %v", err)
-				panic("")
-			}
-			if err := b.blockchain.CommitReceipts(elem.GetReceiptsHashes(), elem.receipts); err != nil {
-				fmt.Printf("Failed to write receipts: %v", err)
-				panic("")
-			}
+
+			fmt.Printf("New header number: %d\n", b.blockchain.Header().Number.Uint64())
+
+			/*
+				if err := b.blockchain.CommitBodies(elem.GetBodiesHashes(), elem.bodies); err != nil {
+					fmt.Printf("Failed to write bodies: %v", err)
+					panic("")
+				}
+				if err := b.blockchain.CommitReceipts(elem.GetReceiptsHashes(), elem.receipts); err != nil {
+					fmt.Printf("Failed to write receipts: %v", err)
+					panic("")
+				}
+			*/
 		}
 	}
 }
@@ -558,13 +534,15 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 func (b *Backend) GetStatus() (*Status, error) {
 	header := b.blockchain.Header()
 
+	// We transmit the total difficulty of our current chain
+	td := b.blockchain.GetTD(header.Hash())
+
 	status := &Status{
 		ProtocolVersion: 63,
 		NetworkID:       b.NetworkID,
-		TD:              header.Difficulty,
+		TD:              td,
 		CurrentBlock:    header.Hash(),
-		// Hardcoded for now
-		GenesisBlock: common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"),
+		GenesisBlock:    b.blockchain.Genesis().Hash(),
 	}
 	return status, nil
 }
@@ -606,69 +584,117 @@ func (b *Backend) checkDAOHardFork(eth *Ethereum) error {
 	return nil
 }
 
-func (b *Backend) retryAfter(p *Peer, d time.Duration) {
-	time.AfterFunc(d, func() {
-		b.peersLock.Lock()
-		p.active = true
-		b.wakeUp()
-		b.peersLock.Unlock()
-	})
-}
-
 // FindCommonAncestor finds the common ancestor with the peer and the syncer connection
-func (b *Backend) FindCommonAncestor(peer *Ethereum) (*types.Header, error) {
+func (b *Backend) FindCommonAncestor(peer *Ethereum) (*types.Header, *types.Header, error) {
 	// Binary search, TODO, works but it may take a lot of time
 
 	min := 0 // genesis
 	max := int(b.blockchain.Header().Number.Uint64())
 
+	/*
+		fmt.Println("-- local max --")
+		fmt.Println(max)
+	*/
+
 	height, err := b.fetchHeight(peer)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if heightNumber := int(height.Number.Uint64()); max > heightNumber {
 		max = heightNumber
 	}
 
-	var header *types.Header
+	/*
+		fmt.Println("-- remote height --")
+		fmt.Println(height)
 
+		fmt.Println("-- max --")
+		fmt.Println(max)
+	*/
+
+	var header *types.Header
+	var ok bool
+
+	ctx := context.Background()
 	for min <= max {
 		m := uint64(math.Floor(float64(min+max) / 2))
 
-		headers, err := peer.RequestHeadersSync(m, 1)
+		fmt.Println("-- point --")
+		fmt.Println(m)
+
+		found, ok, err := peer.RequestHeaderSync(ctx, m)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		l := len(headers)
-		if l == 0 {
+		if !ok {
 			// peer does not have the m peer, search in lower bounds
 			max = int(m - 1)
-		} else if l == 1 {
-			header = headers[0]
-			if header.Number.Uint64() != m {
-				return nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
+		} else {
+			if found.Number.Uint64() != m {
+				return nil, nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
 			}
 
 			expectedHeader := b.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
 			if expectedHeader == nil {
-				return nil, fmt.Errorf("cannot find the header in local chain")
+				return nil, nil, fmt.Errorf("cannot find the header in local chain")
 			}
 
-			if expectedHeader.Hash() == header.Hash() {
+			if expectedHeader.Hash() == found.Hash() {
+				// fmt.Println("-- match --")
+
+				/*
+					fmt.Printf("Match: %d\n", m)
+					fmt.Println(found.Hash().String())
+
+					ff, ok, err := peer.RequestHeaderSync(ctx, m+1)
+					if err != nil {
+						panic(err)
+					}
+					if ok {
+						fmt.Printf("Fork: %s\n", ff.ParentHash.String())
+					}
+				*/
+
+				header = found
 				min = int(m + 1)
 			} else {
+				fmt.Println("-- dont match --")
+
 				max = int(m - 1)
 			}
-		} else {
-			return nil, fmt.Errorf("expected either 1 or 0 headers")
 		}
 	}
 
 	if min == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	return header, nil
+
+	/*
+		fmt.Println("-- final header number --")
+		fmt.Println(header.Number.Uint64())
+	*/
+
+	// Get next element, that would be the index of the fork
+	if height.Number.Uint64() == header.Number.Uint64() {
+		fmt.Println("- done -")
+		return header, nil, nil
+	}
+
+	fork, ok, err := peer.RequestHeaderSync(ctx, header.Number.Uint64()+1)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !ok { // Can this happen if we check the height point?
+		return nil, nil, fmt.Errorf("fork point not found")
+	}
+
+	fmt.Println("-- common ancestor info --")
+
+	fmt.Printf("Ancestor: hash(%s), parent(%s), number(%d)\n", header.Hash().String(), header.ParentHash.String(), header.Number.Uint64())
+	fmt.Printf("Fork: hash(%s), parent(%s), number(%d)\n", fork.Hash().String(), fork.ParentHash.String(), fork.Number.Uint64())
+
+	return header, fork, nil
 }
 
 func (b *Backend) FetchHeight(peer *Ethereum) (*types.Header, error) {
@@ -679,10 +705,7 @@ func (b *Backend) FetchHeight(peer *Ethereum) (*types.Header, error) {
 func (b *Backend) fetchHeight(peer *Ethereum) (*types.Header, error) {
 	head := peer.Header()
 
-	fmt.Println("-- head --")
-	fmt.Println(head)
-
-	header, err := peer.RequestHeaderByHashSync(head)
+	header, err := peer.RequestHeaderByHashSync(context.Background(), head)
 	if err != nil {
 		return nil, err
 	}
@@ -694,70 +717,3 @@ func (b *Backend) fetchHeight(peer *Ethereum) (*types.Header, error) {
 	}
 	return header, nil
 }
-
-/*
-// TODO, measure this every n times (i.e. epoch)
-func (b *Backend) updateApproxSize(t string, size int, n int) {
-	// fmt.Printf("T %s, S %d, L %d, Total %d\n", t, size, n, size/n)
-
-	ss := size / n
-
-	switch t {
-	case "headers":
-		s.headerSize = s.headerSize + (ss-s.headerSize)/s.headerCount
-		s.headerCount++
-		// fmt.Printf("Header size: %d\n", s.headerSize)
-	case "bodies":
-		s.bodySize = s.bodySize + (ss-s.bodySize)/s.bodyCount
-		s.bodyCount++
-		// fmt.Printf("Body size: %d\n", s.bodySize)
-	case "receipts":
-		s.receiptSize = s.receiptSize + (ss-s.receiptSize)/s.receiptsCount
-		s.receiptsCount++
-		// fmt.Printf("Receipts size: %d\n", s.receiptSize)
-	}
-}
-
-func (b *Backend) requestBandwidth(bytes int) (int, int) {
-	s.bandwidthLock.Lock()
-	defer s.bandwidthLock.Unlock()
-
-	if bytes > s.bandwidth {
-		return 0, s.bandwidth
-	}
-	s.bandwidth -= bytes
-	return bytes, s.bandwidth
-}
-
-func (b *Backend) getHeaderSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.headerSize
-}
-
-func (b *Backend) getBodiesSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.bodySize
-}
-
-func (b *Backend) getReceiptsSize() int {
-	s.sizesLock.Lock()
-	defer s.sizesLock.Unlock()
-	return s.receiptSize
-}
-
-func (b *Backend) refreshBandwidth() {
-	for {
-		s.bandwidthLock.Lock()
-
-		s.bandwidth += 256000
-		if s.bandwidth > 256000 {
-			s.bandwidth = 256000
-		}
-
-		s.bandwidthLock.Unlock()
-		time.Sleep(1 * time.Second)
-	}
-}
-*/

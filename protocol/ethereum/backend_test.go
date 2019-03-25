@@ -1,6 +1,8 @@
 package ethereum
 
 import (
+	"fmt"
+	"math/big"
 	"net"
 	"testing"
 	"time"
@@ -62,29 +64,40 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 	b0 := blockchain.NewTestBlockchain(t, h0)
 	b1 := blockchain.NewTestBlockchain(t, h1)
 
-	syncer, err := NewBackend(1, b0, DefaultConfig())
+	syncer, err := NewBackend(nil, 1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	eth0, _ := ethPipe(b0, b1)
 
-	h, err := syncer.FindCommonAncestor(eth0)
+	h, _, err := syncer.FindCommonAncestor(eth0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if ancestor == nil && h != nil {
 		t.Fatal("expected nothing but header has content")
 	}
+
+	fmt.Println(h.Hash().String())
+	fmt.Println(ancestor.Hash().String())
+
 	if h.Hash() != ancestor.Hash() {
 		t.Fatal("hash dont match")
 	}
 }
 
+// TODO, fails with odd numbers
+
 func TestPeerFindCommonAncestor(t *testing.T) {
 	t.Run("Server with shorter chain", func(t *testing.T) {
 		headers := blockchain.NewTestHeaderChain(1000)
 		testPeerAncestor(t, headers[0:5], headers, headers[4])
+	})
+
+	t.Run("Server with shorter chain odd", func(t *testing.T) {
+		headers := blockchain.NewTestHeaderChain(999)
+		testPeerAncestor(t, headers[0:7], headers, headers[6])
 	})
 
 	t.Run("Server with longer chain", func(t *testing.T) {
@@ -99,9 +112,19 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 
 	t.Run("No matches", func(t *testing.T) {
 		h0 := blockchain.NewTestHeaderChain(100)
-		h1 := blockchain.NewTestHeaderChainWithSeed(100, 10)
+		h1 := blockchain.NewTestHeaderChainWithSeed(nil, 100, 10)
 		testPeerAncestor(t, h0, h1, nil)
 	})
+
+	t.Run("Ancestor is genesis", func(t *testing.T) {
+		genesis := blockchain.NewTestHeaderChain(1)
+
+		h0 := blockchain.NewTestHeaderFromChain(genesis, 10)
+		h1 := blockchain.NewTestHeaderFromChainWithSeed(genesis, 10, 10)
+
+		testPeerAncestor(t, h0, h1, genesis[0])
+	})
+
 	// TODO, ancestor with forked chain
 }
 
@@ -114,7 +137,7 @@ func TestPeerHeight(t *testing.T) {
 	// b1 with the whole chain
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
-	syncer, err := NewBackend(1, b0, DefaultConfig())
+	syncer, err := NewBackend(nil, 1, b0, DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,6 +152,7 @@ func TestPeerHeight(t *testing.T) {
 	}
 }
 
+/*
 func newTestPeer(id string, pending int) *Peer {
 	return &Peer{id: id, active: true, pending: pending, failed: 0}
 }
@@ -225,6 +249,7 @@ func TestDequeuePeerWithAwake(t *testing.T) {
 		t.Fatal("it did not wake up")
 	}
 }
+*/
 
 func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	st0 := func() (*Status, error) {
@@ -257,4 +282,74 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 		panic(err)
 	}
 	return eth0, eth1
+}
+
+func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
+	st := func() (*Status, error) {
+		s := &status
+		s.CurrentBlock = b.Header().Hash()
+		s.GenesisBlock = b.Genesis().Hash()
+		return s, nil
+	}
+
+	eth := NewEthereumProtocol(conn, st, b)
+	if err := eth.Init(); err != nil {
+		panic(err)
+	}
+	return eth
+}
+
+func TestBackendBroadcastBlock(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(1000)
+
+	// b0 with only the genesis
+	b0 := blockchain.NewTestBlockchain(t, headers)
+
+	b, err := NewBackend(nil, 1, b0, DefaultConfig())
+	if err != nil {
+		panic(err)
+	}
+
+	c0, c1 := net.Pipe()
+
+	var eth *Ethereum
+	go func() {
+		eth = testEthereum(c1, b0)
+	}()
+	if err := b.Add(c0, "1"); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	fmt.Println("-- eth --")
+	fmt.Println(eth)
+
+	watch := eth.Watch()
+
+	req := b0.GetBlockByNumber(big.NewInt(100), true)
+	b.broadcast(req)
+
+	recv := <-watch
+	if recv.Block.Number().Uint64() != req.Number().Uint64() {
+		t.Fatal("bad")
+	}
+}
+
+func TestBackendNotify(t *testing.T) {
+
+	h0 := blockchain.NewTestHeaderChain(10)
+	h1 := blockchain.NewTestHeaderFromChain(h0[1:5], 10)
+
+	b1 := blockchain.HeadersToBlocks(h1)
+
+	b := blockchain.NewTestBlockchain(t, h0)
+	fmt.Println(b)
+
+	if err := b.WriteBlocks(b1); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("-- forks --")
+	fmt.Println(b.GetForks())
 }
