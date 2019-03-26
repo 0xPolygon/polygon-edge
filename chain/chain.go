@@ -89,6 +89,44 @@ func (g *Genesis) ToBlock() *types.Header {
 
 // Decoding
 
+// MarshalJSON implements the json interface
+func (g *Genesis) MarshalJSON() ([]byte, error) {
+	type Genesis struct {
+		Nonce      math.HexOrDecimal64                         `json:"nonce"`
+		Timestamp  math.HexOrDecimal64                         `json:"timestamp"`
+		ExtraData  hexutil.Bytes                               `json:"extraData"`
+		GasLimit   math.HexOrDecimal64                         `json:"gasLimit"`
+		Difficulty *math.HexOrDecimal256                       `json:"difficulty"`
+		Mixhash    common.Hash                                 `json:"mixHash"`
+		Coinbase   common.Address                              `json:"coinbase"`
+		Alloc      map[common.UnprefixedAddress]GenesisAccount `json:"alloc"`
+		Number     math.HexOrDecimal64                         `json:"number"`
+		GasUsed    math.HexOrDecimal64                         `json:"gasUsed"`
+		ParentHash common.Hash                                 `json:"parentHash"`
+	}
+
+	var enc Genesis
+	enc.Nonce = math.HexOrDecimal64(g.Nonce)
+	enc.Timestamp = math.HexOrDecimal64(g.Timestamp)
+	enc.ExtraData = g.ExtraData
+	enc.GasLimit = math.HexOrDecimal64(g.GasLimit)
+	enc.Difficulty = (*math.HexOrDecimal256)(g.Difficulty)
+	enc.Mixhash = g.Mixhash
+	enc.Coinbase = g.Coinbase
+	enc.Alloc = make(map[common.UnprefixedAddress]GenesisAccount, len(g.Alloc))
+	if g.Alloc != nil {
+		for k, v := range g.Alloc {
+			enc.Alloc[common.UnprefixedAddress(k)] = v
+		}
+	}
+	enc.Number = math.HexOrDecimal64(g.Number)
+	enc.GasUsed = math.HexOrDecimal64(g.GasUsed)
+	enc.ParentHash = g.ParentHash
+
+	return json.Marshal(&enc)
+}
+
+// UnmarshalJSON implements the json interface
 func (g *Genesis) UnmarshalJSON(data []byte) error {
 	type Genesis struct {
 		Nonce      *math.HexOrDecimal64                        `json:"nonce"`
