@@ -16,6 +16,7 @@ type Config struct {
 	BindPort    int    `json:"port"`
 	Telemetry   *Telemetry
 	ServiceName string `json:"service_name"`
+	Seal        bool   `json:"seal"`
 }
 
 type Telemetry struct {
@@ -57,6 +58,9 @@ func (c *Config) merge(c1 *Config) {
 	}
 	if c1.Telemetry.PrometheusPort != 0 {
 		c.Telemetry.PrometheusPort = c1.Telemetry.PrometheusPort
+	}
+	if c1.Seal {
+		c.Seal = true
 	}
 }
 

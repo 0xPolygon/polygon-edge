@@ -133,6 +133,8 @@ func TestInsertHeaders(t *testing.T) {
 		History []*header
 		Head    *header
 		Forks   []*header
+		Chain   []*header
+		TD      uint64
 	}{
 		{
 			Name: "Genesis",
@@ -140,6 +142,10 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x0),
 			},
 			Head: mock(0x0),
+			Chain: []*header{
+				mock(0x0),
+			},
+			TD: 1,
 		},
 		{
 			Name: "Linear",
@@ -149,6 +155,12 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x2),
 			},
 			Head: mock(0x2),
+			Chain: []*header{
+				mock(0x0),
+				mock(0x1),
+				mock(0x2),
+			},
+			TD: 1 + 1 + 2,
 		},
 		{
 			Name: "Keep block with higher difficulty",
@@ -160,6 +172,12 @@ func TestInsertHeaders(t *testing.T) {
 			},
 			Head:  mock(0x3),
 			Forks: []*header{mock(0x2)},
+			Chain: []*header{
+				mock(0x0),
+				mock(0x1),
+				mock(0x3).Parent(0x1).Diff(5),
+			},
+			TD: 1 + 1 + 5,
 		},
 		{
 			Name: "Reorg",
@@ -174,6 +192,13 @@ func TestInsertHeaders(t *testing.T) {
 			},
 			Head:  mock(0x5),
 			Forks: []*header{mock(0x6)},
+			Chain: []*header{
+				mock(0x0),
+				mock(0x1),
+				mock(0x4).Parent(0x1).Diff(10).Number(2),
+				mock(0x5).Parent(0x4).Diff(11).Number(3),
+			},
+			TD: 1 + 1 + 10 + 11,
 		},
 		{
 			Name: "Forks in reorgs",
@@ -188,6 +213,13 @@ func TestInsertHeaders(t *testing.T) {
 			},
 			Head:  mock(0x4),
 			Forks: []*header{mock(0x5), mock(0x6)},
+			Chain: []*header{
+				mock(0x0),
+				mock(0x1),
+				mock(0x2),
+				mock(0x4).Parent(0x2).Diff(11),
+			},
+			TD: 1 + 1 + 2 + 11,
 		},
 	}
 
@@ -243,7 +275,41 @@ func TestInsertHeaders(t *testing.T) {
 					}
 				}
 			}
+
+			// Check chain of forks
+			if cc.Chain != nil {
+				for indx, i := range cc.Chain {
+					block := b.GetBlockByNumber(big.NewInt(int64(indx)), true)
+					if block.Hash().String() != chain.headers[i.hash].Hash().String() {
+						tt.Fatal("bad")
+					}
+				}
+			}
+
+			fmt.Println("-- get total difficulty --")
+			fmt.Println(b.GetChainTD())
+
+			if cc.TD != b.GetChainTD().Uint64() {
+				tt.Fatal("bad")
+			}
 		})
+	}
+}
+
+func TestForkUnkwonParents(t *testing.T) {
+	b := NewTestBlockchain(t, nil)
+
+	h0 := NewTestHeaderChain(10)
+	h1 := NewTestHeaderFromChain(h0[:5], 10)
+
+	if err := b.WriteHeaderGenesis(h0[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.WriteHeaders(h0[1:]); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.WriteHeader(h1[12]); err != nil {
+		t.Fatal(err)
 	}
 }
 

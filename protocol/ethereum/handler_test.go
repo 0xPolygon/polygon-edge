@@ -431,3 +431,22 @@ func TestPeerContextCancel(t *testing.T) {
 		t.Fatal("it should have been canceled")
 	}
 }
+
+func TestHeight(t *testing.T) {
+	headers := blockchain.NewTestHeaderChain(111)
+
+	// b0 with only the genesis
+	b0 := blockchain.NewTestBlockchain(t, headers)
+
+	// b1 with the whole chain
+	b1 := blockchain.NewTestBlockchain(t, headers)
+
+	eth0, _ := ethPipe(b0, b1)
+	height, err := eth0.fetchHeight(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if height.Number.Uint64() != 110 {
+		t.Fatalf("it should be 110 but found %d", height.Number.Uint64())
+	}
+}

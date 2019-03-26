@@ -160,6 +160,11 @@ func (s *Server) buildInfo() {
 		Name:    s.Name,
 		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
 	}
+
+	fmt.Println("-- build info --")
+	fmt.Println("-- backends --")
+	fmt.Println(s.backends)
+
 	for _, p := range s.backends {
 		proto := p.Protocol()
 		info.Caps = append(info.Caps, &rlpx.Cap{Name: proto.Name, Version: proto.Version})
@@ -327,7 +332,7 @@ func (s *Server) dialRunner() {
 			sendToTask(enode)
 
 		case enode := <-s.discovery.Deliver():
-			fmt.Printf("FROM DISCOVER: %s\n", enode)
+			// fmt.Printf("FROM DISCOVER: %s\n", enode)
 			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
@@ -394,8 +399,26 @@ func (s *Server) connect(addrs string) error {
 	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-func (s *Server) connectWithEnode(addrs string) error {
-	ss, err := rlpx.DialEnode("tcp", addrs, &rlpx.Config{Prv: s.key, Info: s.info})
+// TODO, build a method that takes a net.Conn object
+// it will be helpful to tests protocols. connectWithEnode
+// would call this function after all the connection has been established
+
+func (s *Server) connectWithEnode(rawURL string) error {
+	// parse enode address beforehand
+	// TODO, make dial take either a rawURL or an enode
+	addr, err := enode.ParseURL(rawURL)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := s.peers[addr.ID.String()]; ok {
+		// TODO: add tests
+		// Trying to connect with an already connected id
+		// TODO, after disconnect do we remove the peer from this list?
+		return nil
+	}
+
+	ss, err := rlpx.DialEnode("tcp", rawURL, &rlpx.Config{Prv: s.key, Info: s.info})
 	if err != nil {
 		return err
 	}
@@ -407,6 +430,7 @@ func (s *Server) connectWithEnode(addrs string) error {
 func (s *Server) addSession(session *rlpx.Session) error {
 	p := newPeer(s.logger, session, session.RemoteInfo(), s)
 
+	// should match protocols be part of rlpx?
 	backends := s.matchProtocols(p, p.Info.Caps)
 	if len(backends) == 0 {
 		return fmt.Errorf("no matching protocols found")
@@ -433,14 +457,8 @@ func (s *Server) addSession(session *rlpx.Session) error {
 	return nil
 }
 
-/*
-// Callback is the one calling whenever the protocol is used
-type Callback = func(conn net.Conn, peer *Peer) protocol.Handler
-*/
-
 // RegisterProtocol registers a protocol
 func (s *Server) RegisterProtocol(b protocol.Backend) error {
-	// s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
 	s.backends = append(s.backends, b)
 	// TODO, check if the backend is already registered
 	return nil

@@ -2,11 +2,14 @@ package minimal
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"log"
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/state/trie"
 
@@ -36,13 +39,12 @@ var discoveryBackends = map[string]discovery.Factory{
 
 // Minimal is the central manager of the blockchain client
 type Minimal struct {
-	logger    *log.Logger
-	config    *Config
-	sealingCh chan bool
-	sealer    *sealer.Sealer
-	server    *network.Server
-	backends  []protocol.Backend
-	// syncer     *syncer.Syncer
+	logger     *log.Logger
+	config     *Config
+	sealingCh  chan bool
+	Sealer     *sealer.Sealer
+	server     *network.Server
+	backends   []protocol.Backend
 	consensus  consensus.Consensus
 	Blockchain *blockchain.Blockchain
 	closeCh    chan struct{}
@@ -56,8 +58,6 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		closeCh:   make(chan struct{}),
 		backends:  []protocol.Backend{},
 	}
-
-	fmt.Println(config.BindAddr)
 
 	// Start server
 	serverConfig := network.DefaultConfig()
@@ -74,7 +74,13 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	}
 
 	var err error
-	m.consensus, err = consensusBackends[config.Chain.Params.GetEngine()](context.Background(), consensusConfig)
+	engineName := config.Chain.Params.GetEngine()
+	engine, ok := consensusBackends[engineName]
+	if !ok {
+		return nil, fmt.Errorf("consensus engine '%s' not found", engineName)
+	}
+
+	m.consensus, err = engine(context.Background(), consensusConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -96,10 +102,14 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
-	// Start protocols
+	sealerConfig := &sealer.Config{
+		CommitInterval: 5 * time.Second,
+	}
+	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
+	m.Sealer.SetEnabled(m.config.Seal)
+	m.Sealer.SetCoinbase(pubkeyToAddress(m.config.Key.PublicKey))
 
-	// Register protocols in server
-
+	// Start backend protocols
 	for _, b := range config.ProtocolBackends {
 		backend, err := b(context.Background(), m)
 		if err != nil {
@@ -108,48 +118,14 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		m.backends = append(m.backends, backend)
 	}
 
+	// Register backends
 	for _, i := range m.backends {
 		if err := m.server.RegisterProtocol(i); err != nil {
 			return nil, err
 		}
 	}
 
-	/*
-		// Start syncer
-		syncerConfig := syncer.DefaultConfig()
-		syncerConfig.NumWorkers = 1
-
-		// TODO, get network id from chain object
-		m.syncer, err = syncer.NewSyncer(1, m.blockchain, syncerConfig)
-		if err != nil {
-			panic(err)
-		}
-	*/
-
-	/*
-		// register protocols
-		callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
-			return ethereum.NewEthereumProtocol(conn, peer, m.syncer.GetStatus, m.blockchain)
-		}
-		m.server.RegisterProtocol(protocol.ETH63, callback)
-	*/
-
-	// Start network server work after all the protocols have been registered
 	m.server.Schedule()
-
-	// Pipe new added nodes into syncer
-	// go m.listenServerEvents()
-
-	// Start sealer
-	sealerConfig := &sealer.Config{
-		CommitInterval: 1 * time.Second, // TODO, where does it comes from this value?
-	}
-	m.sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
-
-	// Enable the sealer by default. If new blocks arrive and he finds out he is lagging behind
-	// it will stop the sealing. NOTE: Maybe it would be better to wait for the first peer we connect?
-	m.sealer.SetEnabled(true)
-
 	return m, nil
 }
 
@@ -158,18 +134,7 @@ func (m *Minimal) Close() {
 	// TODO, add other close methods
 }
 
-/*
-func (m *Minimal) listenServerEvents() {
-	for {
-		select {
-		case evnt := <-m.server.EventCh:
-
-			fmt.Println("NEW NODE CONNECTED. DOING NOTHING")
-			fmt.Println(evnt.Type)
-
-		case <-m.closeCh:
-			return
-		}
-	}
+func pubkeyToAddress(p ecdsa.PublicKey) common.Address {
+	pubBytes := crypto.FromECDSAPub(&p)
+	return common.BytesToAddress(crypto.Keccak256(pubBytes[1:])[12:])
 }
-*/

@@ -40,15 +40,15 @@ func (g *GenesisCommand) Run(args []string) int {
 	c := &chain.Chain{
 		Name: "example",
 		Genesis: &chain.Genesis{
-			Nonce:      66,
+			Nonce:      1,
 			GasLimit:   5000,
-			Difficulty: big.NewInt(17179869184),
+			Difficulty: big.NewInt(1),
 		},
 		Params: &chain.Params{
 			ChainID: 100,
 			Forks:   &chain.Forks{},
 			Engine: map[string]interface{}{
-				"POW": map[string]interface{}{},
+				"pow": map[string]interface{}{},
 			},
 		},
 		Bootnodes: chain.Bootnodes{},

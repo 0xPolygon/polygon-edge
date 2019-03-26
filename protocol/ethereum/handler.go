@@ -61,6 +61,8 @@ type Ethereum struct {
 	conn     net.Conn
 	sendLock sync.Mutex
 
+	backend *Backend
+
 	getStatus  GetStatus
 	status     *Status // status of the remote peer
 	blockchain Blockchain
@@ -72,15 +74,16 @@ type Ethereum struct {
 	timer       *time.Timer
 
 	// header data
-	HeaderHash common.Hash
-	HeaderDiff *big.Int
+	HeaderHash   common.Hash
+	HeaderDiff   *big.Int
+	HeaderNumber *big.Int
+
 	headerLock sync.Mutex
 
 	sendHeader rlpx.Header
 	recvHeader rlpx.Header
 
-	watch chan *NotifyMsg
-	peer  *Peer
+	peer *Peer
 }
 
 // NotifyMsg notifies that there is a new block
@@ -103,7 +106,6 @@ func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain Blockcha
 		pendingLock: sync.Mutex{},
 		sendHeader:  make([]byte, rlpx.HeaderSize),
 		recvHeader:  make([]byte, rlpx.HeaderSize),
-		watch:       make(chan *NotifyMsg, 1),
 	}
 }
 
@@ -491,53 +493,27 @@ func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
 }
 
 func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
-	fmt.Println("JACKPOT")
-
 	var request newBlockData
 	if err := msg.Decode(&request); err != nil {
 		return err
 	}
 
-	// fmt.Println("-- block --")
 	a := request.Block.Number()
-
-	// fmt.Println("-- request td --")
 	b := request.TD.Int64()
-
-	// fmt.Println("-- request block diff --")
 	c := request.Block.Difficulty().Int64()
 
-	trueHead := request.Block.ParentHash()
-	trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
+	// trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
+	trueTD := request.TD
 
 	fmt.Printf("===> NOTIFY Block: %d %d. Difficulty %d. Total: %d\n", a.Uint64(), c, trueTD.Uint64(), b)
 
-	// Data about the backend (in this case ethereum) should not populate
-	// items in the peer object which only has to care about network
-	// Thus, all the items related to difficulty and last header is stored
-	// on the peer.
-
 	if trueTD.Cmp(e.HeaderDiff) > 0 {
-		fmt.Println("-- UPDATE --")
-
-		fmt.Println("-- true head updated --")
-		fmt.Println(trueHead.String())
-
 		e.headerLock.Lock()
-		// e.HeaderDiff = trueTD
-		// e.HeaderHash = trueHead
 		e.HeaderDiff = request.TD
 		e.HeaderHash = request.Block.Hash() // NOTE. not sure about this thing of not addedd yet
 		e.headerLock.Unlock()
 
-		fmt.Println("notify")
-		// TODO: notify the syncer about the new block (syncer interface as in blockchain?)
-		select {
-		case e.watch <- &NotifyMsg{Block: request.Block, Peer: e.peer, Diff: trueTD}:
-		default:
-			fmt.Println("- failed to notify -")
-		}
-
+		go e.backend.notifyNewData(&NotifyMsg{Block: request.Block, Peer: e.peer, Diff: trueTD})
 	} else {
 		fmt.Println("-- NO UPDATE --")
 		fmt.Println(trueTD.Int64())
@@ -547,9 +523,21 @@ func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
 	return nil
 }
 
-// Watch returns the watch function
-func (e *Ethereum) Watch() chan *NotifyMsg {
-	return e.watch
+// fetchHeight returns the header of the head hash of the peer
+func (e *Ethereum) fetchHeight(ctx context.Context) (*types.Header, error) {
+	head := e.HeaderHash
+
+	header, err := e.RequestHeaderByHashSync(ctx, head)
+	if err != nil {
+		return nil, err
+	}
+	if header == nil {
+		return nil, fmt.Errorf("header not found")
+	}
+	if header.Hash() != head {
+		return nil, fmt.Errorf("returned hash is not the correct one")
+	}
+	return header, nil
 }
 
 // sendBlockHeaders sends a batch of block headers to the remote peer.

@@ -23,6 +23,8 @@ type PeerConnection struct {
 
 	stopFn  context.CancelFunc
 	running bool
+
+	enabled bool
 }
 
 func (p *PeerConnection) requestBandwidth(bytes int) {
@@ -71,7 +73,9 @@ func (p *PeerConnection) Reset() {
 	}
 
 	// Start again all the actions, TODO, dont start action() again.
-	p.Run()
+	if p.enabled {
+		p.Run()
+	}
 }
 
 // Run runs the action

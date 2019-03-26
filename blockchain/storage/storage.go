@@ -176,14 +176,6 @@ func (s *Storage) WriteHeadNumber(n *big.Int) {
 // WriteForks writes the current forks
 func (s *Storage) WriteForks(forks []common.Hash) {
 	s.write(FORK, EMPTY, forks)
-
-	/*
-		data, err := rlp.EncodeToBytes(forks)
-		if err != nil {
-			return err
-		}
-		return s.set(FORK, EMPTY, data)
-	*/
 }
 
 // ReadForks read the current forks
@@ -191,16 +183,6 @@ func (s *Storage) ReadForks() []common.Hash {
 	var forks []common.Hash
 	s.read(FORK, EMPTY, &forks)
 	return forks
-
-	/*
-		data, err := s.get(FORK, EMPTY)
-		if err != nil {
-			return nil, err
-		}
-		var forks []common.Hash
-		err = rlp.DecodeBytes(data, &forks)
-		return forks, err
-	*/
 }
 
 // -- difficulty --
@@ -224,14 +206,6 @@ func (s *Storage) ReadDiff(hash common.Hash) *big.Int {
 // WriteHeader writes the header
 func (s *Storage) WriteHeader(h *types.Header) {
 	s.write(HEADER, h.Hash().Bytes(), h)
-
-	/*
-		data, err := rlp.EncodeToBytes(h)
-		if err != nil {
-			return err
-		}
-		return s.set(HEADER, h.Hash().Bytes(), data)
-	*/
 }
 
 // ReadHeader reads the header
@@ -239,16 +213,6 @@ func (s *Storage) ReadHeader(hash common.Hash) *types.Header {
 	var header *types.Header
 	s.read(HEADER, hash.Bytes(), &header)
 	return header
-
-	/*
-		data, err := s.get(HEADER, hash.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		var header *types.Header
-		err = rlp.DecodeBytes(data, &header)
-		return header, err
-	*/
 }
 
 // -- body --
@@ -256,14 +220,6 @@ func (s *Storage) ReadHeader(hash common.Hash) *types.Header {
 // WriteBody writes the body
 func (s *Storage) WriteBody(hash common.Hash, body *types.Body) {
 	s.write(BODY, hash.Bytes(), body)
-
-	/*
-		data, err := rlp.EncodeToBytes(body)
-		if err != nil {
-			return err
-		}
-		return s.set(BODY, hash.Bytes(), data)
-	*/
 }
 
 // ReadBody reads the body
@@ -271,16 +227,6 @@ func (s *Storage) ReadBody(hash common.Hash) *types.Body {
 	var body *types.Body
 	s.read(BODY, hash.Bytes(), &body)
 	return body
-
-	/*
-		data, err := s.get(BODY, hash.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		var body *types.Body
-		err = rlp.DecodeBytes(data, &body)
-		return body, err
-	*/
 }
 
 // -- receipts --
@@ -293,33 +239,12 @@ func (s *Storage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) {
 	}
 
 	s.write(RECEIPTS, hash.Bytes(), storageReceipts)
-
-	/*
-		data, err := rlp.EncodeToBytes(storageReceipts)
-		if err != nil {
-			return err
-		}
-
-		return s.set(RECEIPTS, hash.Bytes(), data)
-	*/
 }
 
 // ReadReceipts reads the receipts
 func (s *Storage) ReadReceipts(hash common.Hash) []*types.Receipt {
 	var storage []*types.ReceiptForStorage
 	s.read(RECEIPTS, hash.Bytes(), &storage)
-
-	/*
-		data, err := s.get(RECEIPTS, hash.Bytes())
-		if err != nil {
-			return nil, err
-		}
-
-		var storage []*types.ReceiptForStorage
-		if err = rlp.DecodeBytes(data, &storage); err != nil {
-			return nil, err
-		}
-	*/
 
 	receipts := make([]*types.Receipt, len(storage))
 	for i, receipt := range storage {

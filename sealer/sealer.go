@@ -39,7 +39,7 @@ type Sealer struct {
 	lock    sync.Mutex
 	enabled bool
 
-	sealedCh chan *SealedNotify
+	SealedCh chan *SealedNotify
 }
 
 type SealedNotify struct {
@@ -61,7 +61,7 @@ func NewSealer(config *Config, logger *log.Logger, blockchain *blockchain.Blockc
 		newBlock:       make(chan struct{}, 1),
 		commitInterval: time.NewTimer(config.CommitInterval),
 		signer:         types.NewEIP155Signer(big.NewInt(1)),
-		sealedCh:       make(chan *SealedNotify, 1),
+		SealedCh:       make(chan *SealedNotify, 10),
 	}
 	return s
 }
@@ -83,18 +83,20 @@ func (s *Sealer) SetEnabled(enabled bool) {
 		// start the sealer
 		ctx, cancel := context.WithCancel(context.Background())
 		s.stopFn = cancel
-		s.run(ctx)
+		go s.run(ctx)
 	}
 }
 
 func (s *Sealer) run(ctx context.Context) {
+	listener := s.blockchain.Subscribe()
+
 	for {
 		select {
-		case <-s.newBlock:
-			s.commit()
+		case <-listener:
+			go s.commit()
 
 		case <-s.commitInterval.C:
-			s.commit()
+			go s.commit()
 
 		case <-ctx.Done():
 			return
@@ -102,6 +104,7 @@ func (s *Sealer) run(ctx context.Context) {
 	}
 }
 
+// AddTx adds a new transaction to the transaction pool
 func (s *Sealer) AddTx(tx *types.Transaction) {
 	s.txPool.Add(tx)
 }
@@ -109,30 +112,19 @@ func (s *Sealer) AddTx(tx *types.Transaction) {
 func (s *Sealer) commit() {
 	s.commitInterval.Reset(s.config.CommitInterval)
 
-	// Check if there is a sealing going on.
-	// If the sealing started some n seconds before we got the new message
-	// we may want to keep it sealing
-	// If the block we are sealing is way older than the current block
-	// we definitely want to remove it. Can that happen?
 	if s.stopSealing != nil {
 		s.stopSealing()
 	}
 
-	// we have been notified of another block
-	// or the time just passed
+	ctx, cancel := context.WithCancel(context.Background())
+	s.stopSealing = cancel
 
 	parent := s.blockchain.Header()
-
-	fmt.Println("-- Sealing --")
-	fmt.Printf("Parent number: %d\n", parent.Number)
-	fmt.Printf("Parent root: %s\n", parent.Root.String())
 
 	promoted, err := s.txPool.reset(s.lastHeader, parent)
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println(promoted)
 
 	pricedTxs := newTxPriceHeap()
 	for _, tx := range promoted {
@@ -182,58 +174,42 @@ func (s *Sealer) commit() {
 	}
 
 	newState, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
-
 	header.Root = common.BytesToHash(root)
 
-	fmt.Println("__ new state root __")
-	fmt.Println(header.Root.String())
-
-	// TODO, get uncles?
+	// TODO, get uncles
 
 	block := types.NewBlock(header, txns, nil, nil)
-	s.seal(block)
+
+	// Seal
+	if _, err := s.engine.Seal(ctx, block); err != nil {
+		panic(err)
+	}
+
+	// The context was cancelled
+	if ctx.Err() != nil {
+		return
+	}
+
+	td := s.blockchain.GetTD(block.ParentHash())
+
+	fmt.Printf("===> SEAL Block: %d %d. Difficulty %d. Total: %d\n", block.Number(), block.Difficulty(), td.Int64(), big.NewInt(1).Add(td, block.Difficulty()))
 
 	// Write the new blocks
-	if err := s.blockchain.WriteBlock(block); err != nil {
+	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		s.logger.Printf("ERR: %v", err)
 	}
 
 	// Write the new state
 	s.blockchain.AddState(common.BytesToHash(root), newState)
 
-	// TODO, broadcast the new block to the network
+	// Broadcast the block to the network
 	select {
-	case s.sealedCh <- &SealedNotify{Block: block}:
+	case s.SealedCh <- &SealedNotify{Block: block}:
 	default:
+		fmt.Println("-- failed to notify --")
 	}
 
 	return
-}
-
-func (s *Sealer) NotifyBlock(b *types.Block) {
-	select {
-	case s.newBlock <- struct{}{}:
-	default:
-	}
-}
-
-func (s *Sealer) seal(b *types.Block) {
-	/*
-		if s.stopSealing != nil {
-			s.stopSealing()
-		}
-	*/
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.stopSealing = cancel
-
-	sealed, err := s.engine.Seal(ctx, b)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("-- sealed --")
-	fmt.Println(sealed)
 }
 
 func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {

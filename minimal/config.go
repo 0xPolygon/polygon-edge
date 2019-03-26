@@ -26,4 +26,5 @@ type Config struct {
 	Consensus consensus.Consensus
 
 	ServiceName string
+	Seal        bool
 }

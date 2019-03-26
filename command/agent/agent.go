@@ -13,6 +13,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/umbracle/minimal/protocol"
+	"github.com/umbracle/minimal/protocol/ethereum"
+
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -21,6 +24,10 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/minimal"
 )
+
+var protocolBackends = map[string]protocol.Factory{
+	"ethereum": ethereum.Factory,
+}
 
 // Agent is a long running daemon that is used to run
 // the ethereum client
@@ -68,12 +75,14 @@ func (a *Agent) Start() error {
 	}
 
 	config := &minimal.Config{
-		Key:         key,
-		Chain:       chain,
-		DataDir:     a.config.DataDir,
-		BindAddr:    a.config.BindAddr,
-		BindPort:    a.config.BindPort,
-		ServiceName: a.config.ServiceName,
+		Key:              key,
+		Chain:            chain,
+		DataDir:          a.config.DataDir,
+		BindAddr:         a.config.BindAddr,
+		BindPort:         a.config.BindPort,
+		ServiceName:      a.config.ServiceName,
+		ProtocolBackends: protocolBackends,
+		Seal:             a.config.Seal,
 	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
@@ -83,100 +92,6 @@ func (a *Agent) Start() error {
 	}
 
 	a.minimal = m
-
-	/*
-		consensusFactory := map[string]consensus.Factory{
-			"ethash": consensusEthash.Factory,
-			"clique": consensusClique.Factory,
-		}
-
-		chain, err := chain.ImportFromName(a.config.Chain)
-		if err != nil {
-			return fmt.Errorf("Failed to load chain %s: %v", a.config.Chain, err)
-		}
-
-		// Create data-dir if it does not exists
-		paths := []string{
-			"blockchain",
-		}
-		if err := setupDataDir(a.config.DataDir, paths); err != nil {
-			panic(err)
-		}
-
-		// Load private key from memory (TODO, do it from a file)
-		key, err := loadKey(a.config.DataDir)
-		if err != nil {
-			panic(err)
-		}
-
-		// Start server
-		serverConfig := network.DefaultConfig()
-		serverConfig.BindAddress = a.config.BindAddr
-		serverConfig.BindPort = a.config.BindPort
-		serverConfig.Bootnodes = chain.Bootnodes
-
-		serverConfig.DiscoveryBackends = map[string]discovery.Factory{
-			"devp2p": discoveryDevP2P.Factory,
-			"consul": discoveryConsul.Factory,
-		}
-
-		a.server = network.NewServer("minimal", key, serverConfig, a.logger)
-
-		consensusConfig := &consensus.Config{
-			Params: chain.Params,
-		}
-		consensus, err := consensusFactory[chain.Params.GetEngine()](context.Background(), consensusConfig)
-		if err != nil {
-			panic(err)
-		}
-
-		// blockchain storage
-		storage, err := storage.NewLevelDBStorage(filepath.Join(a.config.DataDir, "blockchain"), nil)
-		if err != nil {
-			panic(err)
-		}
-
-		// blockchain object
-		blockchain := blockchain.NewBlockchain(storage, consensus, chain.Params)
-		if err := blockchain.WriteGenesis(chain.Genesis); err != nil {
-			panic(err)
-		}
-
-		// Start syncer
-		syncerConfig := syncer.DefaultConfig()
-		syncerConfig.NumWorkers = 1
-
-		// TODO, get network id from chain object
-		a.syncer, err = syncer.NewSyncer(1, blockchain, syncerConfig)
-		if err != nil {
-			panic(err)
-		}
-
-		// register protocols
-		callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
-			return ethereum.NewEthereumProtocol(conn, peer, a.syncer.GetStatus, blockchain)
-		}
-		a.server.RegisterProtocol(protocol.ETH63, callback)
-
-		// Start network server work after all the protocols have been registered
-		a.server.Schedule()
-
-		// Start the syncer
-		go a.syncer.Run()
-
-		// Pipe new added nodes into syncer
-		go func() {
-			for {
-				select {
-				case evnt := <-a.server.EventCh:
-					if evnt.Type == network.NodeJoin {
-						a.syncer.AddNode(evnt.Peer)
-					}
-				}
-			}
-		}()
-	*/
-
 	return nil
 }
 
