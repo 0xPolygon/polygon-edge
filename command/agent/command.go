@@ -38,7 +38,7 @@ func (a *AgentCommand) Synopsis() string {
 func readConfig(args []string) (*Config, error) {
 	config := DefaultConfig()
 
-	cliConfig := &Config{}
+	cliConfig := &Config{Telemetry: &Telemetry{}}
 
 	flags := flag.NewFlagSet("agent", flag.ContinueOnError)
 	flags.Usage = func() {}
@@ -46,6 +46,9 @@ func readConfig(args []string) (*Config, error) {
 	flags.IntVar(&cliConfig.BindPort, "port", 0, "")
 	flags.StringVar(&cliConfig.BindAddr, "bind", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
+	flags.StringVar(&cliConfig.ServiceName, "service", "", "")
+	flags.IntVar(&cliConfig.Telemetry.PrometheusPort, "prometheus", 0, "")
+	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
 
 	var configFilePaths configFlag
 	flags.Var(&configFilePaths, "config", "")
@@ -53,6 +56,15 @@ func readConfig(args []string) (*Config, error) {
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+	args = flags.Args()
+
+	chain := "foundation"
+	if len(args) == 1 {
+		chain = args[0]
+	} else if len(args) > 1 {
+		return nil, fmt.Errorf("too many arguments, only expected one")
+	}
+	cliConfig.Chain = chain
 
 	// config file
 	if len(configFilePaths) != 0 {

@@ -50,10 +50,6 @@ func (b *Backend) Schedule() {
 		Tags:    []string{"minimal"},
 		Address: addr,
 		Port:    port,
-		Check: &consul.AgentServiceCheck{
-			Interval: "5s",
-			TCP:      b.address.String(),
-		},
 		Meta: map[string]string{
 			"enode": b.enode.String(),
 		},
@@ -119,7 +115,6 @@ func (b *Backend) findNodes() error {
 }
 
 func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Backend, error) {
-
 	var c config
 	if err := mapstructure.Decode(conf.Config, &c); err != nil {
 		return nil, err

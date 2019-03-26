@@ -1,6 +1,7 @@
-package syncer
+package ethereum
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -44,7 +45,7 @@ func TestQueueDeliverPartialHeaders(t *testing.T) {
 	q := newTestQueue(headers[0], 100)
 
 	job := dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 100}) {
+	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 190}) {
 		t.Fatal("bad.1")
 	}
 	elem := findElement(t, q, job.id)
@@ -57,7 +58,7 @@ func TestQueueDeliverPartialHeaders(t *testing.T) {
 	checkStatus(t, elem.headersStatus, waitingX)
 
 	job = dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{90, 11}) {
+	if !reflect.DeepEqual(job.payload, &HeadersJob{90, 101}) {
 		t.Fatal("bad.2")
 	}
 
@@ -83,7 +84,7 @@ func TestQueueReceiptsAndBodiesCompletedByDefault(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 100}) {
+	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 190}) {
 		t.Fatal("bad.1")
 	}
 	elem1 := findElement(t, q, job1.id)
@@ -93,15 +94,16 @@ func TestQueueReceiptsAndBodiesCompletedByDefault(t *testing.T) {
 	checkStatus(t, elem1.headersStatus, pendingX)
 
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{101, 100}) {
+	if !reflect.DeepEqual(job2.payload, &HeadersJob{191, 190}) {
+		fmt.Println(job2.payload)
 		t.Fatal("bad.2")
 	}
 	elem2 := findElement(t, q, job2.id)
 
-	if err := q.deliverHeaders(job2.id, headers[101:201]); err != nil {
+	if err := q.deliverHeaders(job2.id, headers[192:382]); err != nil {
 		t.Fatal(err)
 	}
-	if err := q.deliverHeaders(job1.id, headers[1:101]); err != nil {
+	if err := q.deliverHeaders(job1.id, headers[1:191]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,22 +120,22 @@ func TestQueueFetchDataWithoutPendingData(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 100}) {
+	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 190}) {
 		t.Fatal("bad.1")
 	}
-	if err := q.deliverHeaders(job1.id, headers[1:101]); err != nil {
+	if err := q.deliverHeaders(job1.id, headers[1:191]); err != nil {
 		t.Fatal(err)
 	}
 
 	if elements := q.FetchCompletedData(); len(elements) != 1 {
 		t.Fatal("it should have one element")
 	}
-	if q.head.String() != headers[100].Hash().String() {
+	if q.head.String() != headers[190].Hash().String() {
 		t.Fatal("head has not been reseted correctly")
 	}
 
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{101, 100}) {
+	if !reflect.DeepEqual(job2.payload, &HeadersJob{191, 190}) {
 		t.Fatal("bad.1")
 	}
 	if err := q.deliverHeaders(job2.id, headers[102:200]); err == nil {

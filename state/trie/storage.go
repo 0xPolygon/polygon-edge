@@ -72,6 +72,11 @@ func (m *MemStorage) Get(p []byte) ([]byte, bool) {
 
 // DecodeNode decodes bytes to his node representation
 func DecodeNode(storage Storage, hash []byte, data []byte) (*Node, error) {
+	// empty data, just return the node, not sure if this is a special case
+	if len(data) == 0 {
+		return &Node{}, nil
+	}
+
 	elems, _, err := rlp.SplitList(data)
 	if err != nil {
 		return nil, fmt.Errorf("decode error: %v", err)

@@ -37,6 +37,7 @@ type Config struct {
 	DialTasks         int
 	DialBusyInterval  time.Duration
 	DiscoveryBackends map[string]discovery.Factory
+	ServiceName       string
 }
 
 // DefaultConfig returns a default configuration
@@ -49,15 +50,18 @@ func DefaultConfig() *Config {
 		Bootnodes:        []string{},
 		DialTasks:        5,
 		DialBusyInterval: 1 * time.Minute,
+		ServiceName:      "minimal",
 	}
 
 	return c
 }
 
+/*
 type protocolStub struct {
 	protocol *protocol.Protocol
 	callback Callback
 }
+*/
 
 type EventType int
 
@@ -87,10 +91,10 @@ type MemberEvent struct {
 
 // Server is the ethereum client
 type Server struct {
-	logger    *log.Logger
-	Protocols []*protocolStub
-	Name      string
-	key       *ecdsa.PrivateKey
+	logger *log.Logger
+	// Protocols []*protocolStub
+	Name string
+	key  *ecdsa.PrivateKey
 
 	peersLock sync.Mutex
 	peers     map[string]*Peer
@@ -113,6 +117,8 @@ type Server struct {
 
 	discovery discovery.Backend
 	Enode     *enode.Enode
+
+	backends []protocol.Backend
 }
 
 // NewServer creates a new node
@@ -124,8 +130,10 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		ID:  enode.PubkeyToEnode(&key.PublicKey),
 	}
 
+	fmt.Printf("Enode: %s\n", enode.String())
+
 	s := &Server{
-		Protocols:    []*protocolStub{},
+		// Protocols:    []*protocolStub{},
 		Name:         name,
 		key:          key,
 		peers:        map[string]*Peer{},
@@ -139,6 +147,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFile),
+		backends:     []protocol.Backend{},
 	}
 
 	return s
@@ -151,8 +160,14 @@ func (s *Server) buildInfo() {
 		Name:    s.Name,
 		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
 	}
-	for _, p := range s.Protocols {
-		info.Caps = append(info.Caps, &rlpx.Cap{Name: p.protocol.Name, Version: p.protocol.Version})
+
+	fmt.Println("-- build info --")
+	fmt.Println("-- backends --")
+	fmt.Println(s.backends)
+
+	for _, p := range s.backends {
+		proto := p.Protocol()
+		info.Caps = append(info.Caps, &rlpx.Cap{Name: proto.Name, Version: proto.Version})
 	}
 	s.info = info
 }
@@ -171,17 +186,11 @@ func (s *Server) Schedule() error {
 		return err
 	}
 
-	enode := &enode.Enode{
-		IP:  net.ParseIP(s.config.BindAddress),
-		TCP: uint16(s.config.BindPort),
-		UDP: uint16(s.config.BindPort),
-	}
-
 	// setup discovery factories
 	discoveryConfig := &discovery.BackendConfig{
 		Logger: s.logger,
 		Key:    s.key,
-		Enode:  enode,
+		Enode:  s.Enode,
 		Config: map[string]interface{}{},
 	}
 
@@ -199,6 +208,18 @@ func (s *Server) Schedule() error {
 
 		s.discovery = backend
 		s.discovery.Schedule()
+	}
+
+	discoveryConfig.Config["nodename"] = s.config.ServiceName
+
+	for name, disc := range s.config.DiscoveryBackends {
+		fmt.Printf("Using discovery %s\n", name)
+		backend, err := disc(context.Background(), discoveryConfig)
+		if err != nil {
+			return err
+		}
+		s.discovery = backend // NOTE: Find a way to tunnel allt he discovery results
+		backend.Schedule()
 	}
 
 	go s.dialRunner()
@@ -229,6 +250,10 @@ func (s *Server) setupTransport() error {
 
 func (s *Server) handleIncomingConn(conn *rlpx.Session) {
 	// check if we have enough incoming slots
+
+	fmt.Println("-- conn --")
+	fmt.Println(conn)
+
 	s.addSession(conn)
 }
 
@@ -306,11 +331,9 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-			/*
-				case enode := <-s.discovery.Deliver():
-					fmt.Printf("FROM DISCOVER: %s\n", enode)
-					sendToTask(enode)
-			*/
+		case enode := <-s.discovery.Deliver():
+			// fmt.Printf("FROM DISCOVER: %s\n", enode)
+			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
 			sendToTask(enode.ID())
@@ -376,8 +399,26 @@ func (s *Server) connect(addrs string) error {
 	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-func (s *Server) connectWithEnode(addrs string) error {
-	ss, err := rlpx.DialEnode("tcp", addrs, &rlpx.Config{Prv: s.key, Info: s.info})
+// TODO, build a method that takes a net.Conn object
+// it will be helpful to tests protocols. connectWithEnode
+// would call this function after all the connection has been established
+
+func (s *Server) connectWithEnode(rawURL string) error {
+	// parse enode address beforehand
+	// TODO, make dial take either a rawURL or an enode
+	addr, err := enode.ParseURL(rawURL)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := s.peers[addr.ID.String()]; ok {
+		// TODO: add tests
+		// Trying to connect with an already connected id
+		// TODO, after disconnect do we remove the peer from this list?
+		return nil
+	}
+
+	ss, err := rlpx.DialEnode("tcp", rawURL, &rlpx.Config{Prv: s.key, Info: s.info})
 	if err != nil {
 		return err
 	}
@@ -389,17 +430,20 @@ func (s *Server) connectWithEnode(addrs string) error {
 func (s *Server) addSession(session *rlpx.Session) error {
 	p := newPeer(s.logger, session, session.RemoteInfo(), s)
 
-	instances := s.matchProtocols(p, p.Info.Caps)
-	if len(instances) == 0 {
+	// should match protocols be part of rlpx?
+	backends := s.matchProtocols(p, p.Info.Caps)
+	if len(backends) == 0 {
 		return fmt.Errorf("no matching protocols found")
 	}
 
-	for _, i := range instances {
-		if err := i.Runtime.Init(); err != nil {
+	// There should be a better way to handle the initialization of the peer
+	// this should be done inside the peer itself not in the server.
+	for _, i := range backends {
+		if err := i.backend.Add(i.session, p.PrettyString()); err != nil {
 			return err
 		}
 	}
-	p.SetInstances(instances)
+	// p.SetInstances(instances)
 
 	s.peersLock.Lock()
 	s.peers[session.RemoteIDString()] = p
@@ -413,21 +457,21 @@ func (s *Server) addSession(session *rlpx.Session) error {
 	return nil
 }
 
-// Callback is the one calling whenever the protocol is used
-type Callback = func(conn net.Conn, peer *Peer) protocol.Handler
-
 // RegisterProtocol registers a protocol
-func (s *Server) RegisterProtocol(p protocol.Protocol, callback Callback) {
-	s.Protocols = append(s.Protocols, &protocolStub{&p, callback})
+func (s *Server) RegisterProtocol(b protocol.Backend) error {
+	s.backends = append(s.backends, b)
+	// TODO, check if the backend is already registered
+	return nil
 }
 
 func (s *Server) ID() enode.ID {
 	return s.Enode.ID
 }
 
-func (s *Server) getProtocol(name string, version uint) *protocolStub {
-	for _, p := range s.Protocols {
-		if p.protocol.Name == name && p.protocol.Version == version {
+func (s *Server) getProtocol(name string, version uint) protocol.Backend {
+	for _, p := range s.backends {
+		proto := p.Protocol()
+		if proto.Name == name && proto.Version == version {
 			return p
 		}
 	}
@@ -439,11 +483,20 @@ func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance 
 	protocols := []*Instance{}
 
 	for _, i := range caps {
-		if proto := s.getProtocol(i.Name, i.Version); proto != nil {
-			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.protocol.Length))
-			runtime := proto.callback(stream, peer)
-			protocols = append(protocols, &Instance{session: stream, protocol: proto.protocol, offset: uint64(offset), Runtime: runtime})
-			offset += proto.protocol.Length
+		if b := s.getProtocol(i.Name, i.Version); b != nil {
+			proto := b.Protocol()
+
+			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.Length))
+			// runtime := proto.callback(stream, peer)
+
+			instance := &Instance{
+				session: stream,
+				backend: b,
+				offset:  offset,
+			}
+
+			protocols = append(protocols, instance)
+			offset += proto.Length
 		}
 	}
 

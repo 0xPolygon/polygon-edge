@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,11 +29,21 @@ type Sealer struct {
 	coinbase common.Address
 
 	// sealer
-	stopFn   context.CancelFunc
-	newBlock chan struct{}
+	stopSealing context.CancelFunc
+	newBlock    chan struct{}
 
 	// commit block every n seconds if no transactions are sent
 	commitInterval *time.Timer
+
+	stopFn  context.CancelFunc
+	lock    sync.Mutex
+	enabled bool
+
+	SealedCh chan *SealedNotify
+}
+
+type SealedNotify struct {
+	Block *types.Block
 }
 
 // NewSealer creates a new sealer for a specific engine
@@ -50,6 +61,7 @@ func NewSealer(config *Config, logger *log.Logger, blockchain *blockchain.Blockc
 		newBlock:       make(chan struct{}, 1),
 		commitInterval: time.NewTimer(config.CommitInterval),
 		signer:         types.NewEIP155Signer(big.NewInt(1)),
+		SealedCh:       make(chan *SealedNotify, 10),
 	}
 	return s
 }
@@ -58,34 +70,54 @@ func (s *Sealer) SetCoinbase(coinbase common.Address) {
 	s.coinbase = coinbase
 }
 
-func (s *Sealer) Start() error {
-	go s.loop()
+func (s *Sealer) SetEnabled(enabled bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	wasRunning := s.enabled
+	s.enabled = enabled
 
-	return nil
+	if !enabled && wasRunning {
+		// stop the sealer
+		s.stopFn()
+	} else if enabled && !wasRunning {
+		// start the sealer
+		ctx, cancel := context.WithCancel(context.Background())
+		s.stopFn = cancel
+		go s.run(ctx)
+	}
 }
 
-func (s *Sealer) AddTx(tx *types.Transaction) {
-	s.txPool.Add(tx)
-}
-
-func (s *Sealer) loop() {
+func (s *Sealer) run(ctx context.Context) {
+	listener := s.blockchain.Subscribe()
 
 	for {
 		select {
-		case <-s.newBlock:
-			s.commit(false)
+		case <-listener:
+			go s.commit()
 
 		case <-s.commitInterval.C:
-			s.commit(true)
+			go s.commit()
+
+		case <-ctx.Done():
+			return
 		}
 	}
 }
 
-func (s *Sealer) commit(interval bool) {
+// AddTx adds a new transaction to the transaction pool
+func (s *Sealer) AddTx(tx *types.Transaction) {
+	s.txPool.Add(tx)
+}
+
+func (s *Sealer) commit() {
 	s.commitInterval.Reset(s.config.CommitInterval)
 
-	// we have been notified of another block
-	// or the time just passed
+	if s.stopSealing != nil {
+		s.stopSealing()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.stopSealing = cancel
 
 	parent := s.blockchain.Header()
 
@@ -93,8 +125,6 @@ func (s *Sealer) commit(interval bool) {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println(promoted)
 
 	pricedTxs := newTxPriceHeap()
 	for _, tx := range promoted {
@@ -109,7 +139,6 @@ func (s *Sealer) commit(interval bool) {
 	}
 
 	timestamp := time.Now().Unix()
-
 	if parent.Time.Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
 		timestamp = parent.Time.Int64() + 1
 	}
@@ -128,8 +157,6 @@ func (s *Sealer) commit(interval bool) {
 		panic(err)
 	}
 
-	fmt.Println(header)
-
 	state, ok := s.blockchain.GetState(parent)
 	if !ok {
 		panic("state not found")
@@ -147,43 +174,42 @@ func (s *Sealer) commit(interval bool) {
 	}
 
 	newState, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
-
-	fmt.Println("-- tx error --")
-	fmt.Println(err)
-
-	fmt.Println(newState)
-	fmt.Println(root)
-
 	header.Root = common.BytesToHash(root)
 
 	// TODO, get uncles
 
 	block := types.NewBlock(header, txns, nil, nil)
-	s.seal(block)
-}
 
-func (s *Sealer) NotifyBlock(b *types.Block) {
-	select {
-	case s.newBlock <- struct{}{}:
-	default:
-	}
-}
-
-func (s *Sealer) seal(b *types.Block) {
-	if s.stopFn != nil {
-		s.stopFn()
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.stopFn = cancel
-
-	sealed, err := s.engine.Seal(ctx, b)
-	if err != nil {
+	// Seal
+	if _, err := s.engine.Seal(ctx, block); err != nil {
 		panic(err)
 	}
 
-	fmt.Println("-- sealed --")
-	fmt.Println(sealed)
+	// The context was cancelled
+	if ctx.Err() != nil {
+		return
+	}
+
+	td := s.blockchain.GetTD(block.ParentHash())
+
+	fmt.Printf("===> SEAL Block: %d %d. Difficulty %d. Total: %d\n", block.Number(), block.Difficulty(), td.Int64(), big.NewInt(1).Add(td, block.Difficulty()))
+
+	// Write the new blocks
+	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+		s.logger.Printf("ERR: %v", err)
+	}
+
+	// Write the new state
+	s.blockchain.AddState(common.BytesToHash(root), newState)
+
+	// Broadcast the block to the network
+	select {
+	case s.SealedCh <- &SealedNotify{Block: block}:
+	default:
+		fmt.Println("-- failed to notify --")
+	}
+
+	return
 }
 
 func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {

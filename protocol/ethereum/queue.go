@@ -1,4 +1,4 @@
-package syncer
+package ethereum
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
 type HeadersJob struct {
@@ -86,6 +85,18 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	}
 
 	if len(headers) > int(elem.Len())-int(elem.headersOffset) {
+
+		/*
+			fmt.Println("-- length of incoming headers --")
+			fmt.Println(len(headers))
+
+			fmt.Println("-- length of element --")
+			fmt.Println(elem.Len())
+
+			fmt.Println("-- headers offset --")
+			fmt.Println(elem.headersOffset)
+		*/
+
 		return fmt.Errorf("received more headers than expected")
 	}
 
@@ -123,7 +134,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	// check headers with next content if exists
 	if elem.next != nil && elem.next.headersStatus == completedX {
 		if elem.Last().Hash() != elem.next.headers[0].ParentHash {
-			// return fmt.Errorf("hash mismatch with next value") // FIX
+			return fmt.Errorf("hash mismatch with next value") // FIX
 		}
 	}
 
@@ -132,6 +143,8 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	elem.bodiesStatus = completedX
 	elem.receiptsStatus = completedX
 
+	// hardcoded to download only headers
+	// No transactions yet so it is not necessary to download bodies
 	return nil
 
 	bodies := []int{}
@@ -301,9 +314,15 @@ func (q *queue) Dequeue() (*Job, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	elem := q.getNextElegibleSlot()
+	elem, ok := q.getNextElegibleSlot()
+	if !ok { // no more jobs found
+		return nil, nil
+	}
 	if elem == nil {
 		return nil, fmt.Errorf("All the jobs are different from waiting")
+	}
+	if elem.Len() == 0 {
+		return nil, nil
 	}
 
 	getHashesAtIndexes := func(i []int) []common.Hash {
@@ -316,10 +335,11 @@ func (q *queue) Dequeue() (*Job, error) {
 
 	// headers job
 	if elem.headersStatus == waitingX {
+		// Request at most elem.Len() elements, the max number of elements will be maxElements
 		elem.headersStatus = pendingX
 		return &Job{
 			id:      elem.id,
-			payload: &HeadersJob{block: uint64(elem.headersOffset) + elem.block, count: uint64(maxElements - elem.headersOffset)},
+			payload: &HeadersJob{block: uint64(elem.headersOffset) + elem.block, count: elem.Len() - uint64(elem.headersOffset)},
 		}, nil
 	}
 
@@ -409,7 +429,7 @@ func contains(s []string, i string) bool {
 	return false
 }
 
-func (q *queue) getNextElegibleSlot() *element {
+func (q *queue) getNextElegibleSlot() (*element, bool) {
 	elem := q.front
 	for elem != nil {
 		if elem.headersStatus == waitingX || elem.receiptsStatus == waitingX || elem.bodiesStatus == waitingX {
@@ -418,8 +438,13 @@ func (q *queue) getNextElegibleSlot() *element {
 		elem = elem.next
 	}
 
+	if elem.next == nil {
+		// All the items have been already downloaded
+		return nil, false
+	}
+
 	if elem.Len() <= maxElements {
-		return elem
+		return elem, true
 	}
 
 	// split the item
@@ -431,7 +456,7 @@ func (q *queue) getNextElegibleSlot() *element {
 	elem.next = i
 	elem.headersStatus = waitingX
 
-	return elem
+	return elem, true
 }
 
 type elementStatus int
@@ -515,18 +540,4 @@ func hasBody(h *types.Header) bool {
 
 func hasReceipts(h *types.Header) bool {
 	return h.ReceiptHash != types.EmptyRootHash
-}
-
-func encodeHash(x common.Hash, y common.Hash) common.Hash {
-	hw := sha3.NewKeccak256()
-	if _, err := hw.Write(x.Bytes()); err != nil {
-		panic(err)
-	}
-	if _, err := hw.Write(y.Bytes()); err != nil {
-		panic(err)
-	}
-
-	var h common.Hash
-	hw.Sum(h[:0])
-	return h
 }

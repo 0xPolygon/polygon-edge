@@ -3,19 +3,18 @@ package network
 import (
 	"fmt"
 	"log"
-	"math/big"
-	"sync"
+	"net"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
 type Instance struct {
-	session  *rlpx.Stream // session of the peer with the protocoll
-	protocol *protocol.Protocol
-	Runtime  protocol.Handler
-	offset   uint64
+	session net.Conn // session of the peer with the protocoll
+	// protocol *protocol.Protocol
+	backend protocol.Backend
+	// Runtime  protocol.Handler
+	offset uint64
 }
 
 type Status int
@@ -50,25 +49,20 @@ type Peer struct {
 	Status    Status
 	logger    *log.Logger
 	conn      rlpx.Conn
-	Info      *rlpx.Info
-	protocols []*Instance
-
-	headerHash common.Hash
-	headerDiff *big.Int
-	headerLock sync.Mutex
+	Info      *rlpx.Info // remove info and conn
+	protocols map[string]*Instance
 }
 
 func newPeer(logger *log.Logger, conn rlpx.Conn, info *rlpx.Info, server *Server) *Peer {
 	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.RemoteAddr())
 
 	peer := &Peer{
-		Enode:      enode,
-		ID:         info.ID.String(),
-		logger:     logger,
-		conn:       conn,
-		Info:       info,
-		protocols:  []*Instance{},
-		headerLock: sync.Mutex{},
+		Enode:     enode,
+		ID:        info.ID.String(),
+		logger:    logger,
+		conn:      conn,
+		Info:      info,
+		protocols: map[string]*Instance{},
 	}
 
 	return peer
@@ -82,47 +76,25 @@ func (p *Peer) PrettyString() string {
 	return p.ID[:8]
 }
 
-// UpdateHeader updates the header of the peer
-func (p *Peer) UpdateHeader(h common.Hash, d *big.Int) {
-	p.headerLock.Lock()
-	p.headerHash = h
-	p.headerDiff = d
-	p.headerLock.Unlock()
-}
-
-// HeaderHash returns the header hash of the peer
-func (p *Peer) HeaderHash() common.Hash {
-	p.headerLock.Lock()
-	defer p.headerLock.Unlock()
-	return p.headerHash
-}
-
-// HeaderDiff returns the header difficulty of the peer
-func (p *Peer) HeaderDiff() *big.Int {
-	p.headerLock.Lock()
-	defer p.headerLock.Unlock()
-	return p.headerDiff
-}
-
-func (p *Peer) GetProtocol(name string, version uint) protocol.Handler {
-	for _, i := range p.protocols {
-		if i.protocol.Name == name && i.protocol.Version == version {
-			return i.Runtime
-		}
+/*
+func (p *Peer) GetProtocol(name string) protocol.Handler {
+	proto, ok := p.protocols[name]
+	if !ok {
+		return nil
 	}
-	return nil
+	return proto.Runtime
 }
+*/
 
 func (p *Peer) Close() {
 	p.conn.Close()
 }
 
-func (p *Peer) GetProtocols() []*Instance {
-	return p.protocols
-}
-
+/*
 func (p *Peer) SetInstances(protocols []*Instance) {
-	p.protocols = protocols
+	for _, i := range protocols {
+		p.protocols[i.protocol.Name] = i
+	}
 }
 
 func (p *Peer) getProtocol(msgcode uint64) *Instance {
@@ -133,3 +105,4 @@ func (p *Peer) getProtocol(msgcode uint64) *Instance {
 	}
 	return nil
 }
+*/

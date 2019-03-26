@@ -23,6 +23,12 @@ import (
 	mapset "github.com/deckarep/golang-set"
 )
 
+// TODO, fix testing with genesis
+// TODO, cleanup block transition function
+// TODO, add cache to uncles computing
+// TODO, after header chain we can figure out a better semantic relation
+// about how the blocks are processed.
+
 var (
 	errLargeBlockTime    = errors.New("timestamp too big")
 	errZeroBlockTime     = errors.New("timestamp equals parent's")
@@ -42,19 +48,33 @@ type Blockchain struct {
 	genesis     *types.Header
 	state       map[string]*state.State
 	stateRoot   common.Hash
+	triedb      trie.Storage
 	params      *chain.Params
 	precompiled map[common.Address]*precompiled.Precompiled
+	sidechainCh chan *types.Header
+
+	// listener for advancedhead subscribers
+	listeners []chan *types.Header
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db *storage.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db *storage.Storage, triedb trie.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	return &Blockchain{
-		db:        db,
-		consensus: consensus,
-		genesis:   nil,
-		state:     map[string]*state.State{},
-		params:    params,
+		db:          db,
+		consensus:   consensus,
+		genesis:     nil,
+		state:       map[string]*state.State{},
+		params:      params,
+		triedb:      triedb,
+		sidechainCh: make(chan *types.Header, 10),
+		listeners:   []chan *types.Header{},
 	}
+}
+
+func (b *Blockchain) Subscribe() chan *types.Header {
+	ch := make(chan *types.Header, 5)
+	b.listeners = append(b.listeners, ch)
+	return ch
 }
 
 func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
@@ -75,11 +95,15 @@ func (b *Blockchain) Genesis() *types.Header {
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// The chain is not empty
 	if !b.Empty() {
+		// load genesis from memory
+		genesisHash := b.db.ReadCanonicalHash(big.NewInt(0))
+		b.genesis = b.db.ReadHeader(genesisHash)
+
 		return nil
 	}
 
 	s := state.NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s.SetStorage(b.triedb)
 
 	txn := s.Txn()
 	for addr, account := range genesis.Alloc {
@@ -103,6 +127,9 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	header.Root = common.BytesToHash(root)
 
 	b.genesis = header
+
+	fmt.Printf("SET GENESIS STATE: %s\n", hexutil.Encode(root))
+
 	b.state[hexutil.Encode(root)] = ss
 	b.stateRoot = common.BytesToHash(root)
 
@@ -114,6 +141,9 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 
+	fmt.Printf("GENESIS HASH: %s\n", header.Hash().String())
+
+	b.db.WriteDiff(header.Hash(), header.Difficulty)
 	return nil
 }
 
@@ -138,6 +168,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 		return err
 	}
 
+	b.db.WriteDiff(header.Hash(), big.NewInt(1))
 	b.state[types.EmptyRootHash.String()] = state.NewState()
 	return nil
 }
@@ -151,9 +182,37 @@ func (b *Blockchain) Empty() bool {
 	return false
 }
 
+func (b *Blockchain) GetChainTD() *big.Int {
+	header := b.Header()
+	return b.GetTD(header.Hash())
+}
+
+func (b *Blockchain) GetTD(hash common.Hash) *big.Int {
+	return b.db.ReadDiff(hash)
+}
+
 func (b *Blockchain) advanceHead(h *types.Header) error {
 	b.db.WriteHeadHash(h.Hash())
 	b.db.WriteHeadNumber(h.Number)
+	b.db.WriteCanonicalHash(h.Number, h.Hash())
+
+	if h.ParentHash != common.HexToHash("") {
+		// Dont write difficulty for genesis
+		td := b.db.ReadDiff(h.ParentHash)
+		if td == nil {
+			return fmt.Errorf("parent difficulty not found")
+		}
+
+		b.db.WriteDiff(h.Hash(), big.NewInt(1).Add(td, h.Difficulty))
+	}
+
+	for _, ch := range b.listeners {
+		select {
+		case ch <- h:
+		default:
+		}
+	}
+
 	return nil
 }
 
@@ -270,7 +329,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		return fmt.Errorf("no headers found to insert")
 	}
 
-	headers := make([]*types.Header, len(blocks)-1)
+	headers := []*types.Header{}
 	for _, block := range blocks {
 		headers = append(headers, block.Header())
 	}
@@ -315,52 +374,58 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		b.db.WriteBody(block.Header().Hash(), block.Body())
 	}
 
+	// Write chain
 	for indx, h := range headers {
 
 		// Try to write first the state transition
 		parent := b.db.ReadHeader(headers[indx].ParentHash)
 		if parent == nil {
-			return fmt.Errorf("unknown ancestor")
+			return fmt.Errorf("unknown ancestor 1")
 		}
 
 		st, ok := b.getStateRoot(parent.Root)
 		if !ok {
-			return fmt.Errorf("unknown ancestor")
+			fmt.Println(parent.Root.String())
+			fmt.Println(h.Number)
+			return fmt.Errorf("unknown state root")
 		}
 
-		block := blocks[indx]
-		state, root, receipts, totalGas, err := b.Process(st, block)
-		if err != nil {
-			return err
-		}
+		if parent.Root != (common.Hash{}) {
+			// Done for testing. Remove.
 
-		// Validate the result
+			block := blocks[indx]
+			state, root, receipts, totalGas, err := b.Process(st, block)
+			if err != nil {
+				return err
+			}
 
-		if hexutil.Encode(root) != block.Root().String() {
-			return fmt.Errorf("invalid merkle root")
-		}
-		if totalGas != block.GasUsed() {
-			return fmt.Errorf("gas used is different")
-		}
+			// Validate the result
 
-		receiptSha := types.DeriveSha(receipts)
-		if receiptSha != block.ReceiptHash() {
-			return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
-		}
-		rbloom := types.CreateBloom(receipts)
-		if rbloom != block.Bloom() {
-			return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
+			if hexutil.Encode(root) != block.Root().String() {
+				return fmt.Errorf("invalid merkle root")
+			}
+			if totalGas != block.GasUsed() {
+				return fmt.Errorf("gas used is different")
+			}
+
+			receiptSha := types.DeriveSha(receipts)
+			if receiptSha != block.ReceiptHash() {
+				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
+			}
+			rbloom := types.CreateBloom(receipts)
+			if rbloom != block.Bloom() {
+				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
+			}
+
+			b.state[hexutil.Encode(root)] = state
+			b.stateRoot = common.BytesToHash(root)
+
+			fmt.Printf("State root: %s\n", b.stateRoot.String())
 		}
 
 		if err := b.WriteHeader(h); err != nil {
 			return err
 		}
-
-		// Add state if everything worked
-		b.state[hexutil.Encode(root)] = state
-
-		// b.state = state
-		b.stateRoot = common.BytesToHash(root)
 	}
 
 	// fmt.Printf("Done: last header written was %s at %s\n", headers[len(headers)-1].Hash().String(), headers[len(headers)-1].Number.String())
@@ -371,9 +436,27 @@ func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
 	b.db.WriteBody(block.Header().Hash(), block.Body())
 }
 
+func (b *Blockchain) AddState(root common.Hash, state *state.State) {
+	b.state[root.String()] = state
+}
+
 func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
-	s, ok := b.state[header.Root.String()]
-	return s, ok
+	root := header.Root.String()
+
+	s, ok := b.state[root]
+	if ok {
+		return s, true
+	}
+
+	// its not in the local cache, ask the state manager. NOTE: this should not be done here
+	// but in the state library itself.
+	ss, err := state.NewStateAt(b.triedb, header.Root)
+	if err != nil {
+		return nil, false
+	}
+
+	b.state[root] = ss
+	return ss, true
 }
 
 func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.State, []byte, []*types.Transaction, error) {
@@ -436,13 +519,6 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 
 		gasUsed, failed, err := executor.Apply(txn, &msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 
-		/*
-			gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
-			if err != nil {
-				continue
-			}
-		*/
-
 		txerr = err
 		totalGas += gasUsed
 
@@ -484,8 +560,8 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 
 	s2, root := txn.Commit(config.EIP155)
 
-	fmt.Println(s2)
-	fmt.Println(root)
+	// fmt.Println(s2)
+	// fmt.Println(root)
 
 	return s2, root, txns, nil
 }
@@ -533,13 +609,6 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 			GasLimit:   big.NewInt(int64(block.GasLimit())),
 			GasPrice:   tx.GasPrice(),
 		}
-
-		/*
-			gasUsed, failed, err := txn.Apply(&msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
-			if err != nil {
-				return nil, nil, nil, 0, err
-			}
-		*/
 
 		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
 
@@ -681,22 +750,22 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	localDiff := big.NewInt(1).Add(parent.Difficulty, header.Difficulty)
 
 	// Write the data
-	if err := b.addHeader(header); err != nil {
-		return err
-	}
+	b.db.WriteHeader(header)
 
 	if header.ParentHash == head.Hash() {
+		fmt.Println("** ADVANCE HASH **")
+
 		// advance the chain
 		if err := b.advanceHead(header); err != nil {
 			return err
 		}
 	} else if head.Difficulty.Cmp(localDiff) < 0 {
-		// reorg
+		// new block has higher difficulty than us, reorg the chain
 		if err := b.handleReorg(head, header); err != nil {
 			return err
 		}
 	} else {
-		// fork
+		// new block has lower difficulty than us, create a new fork
 		if err := b.writeFork(header); err != nil {
 			return err
 		}
@@ -705,8 +774,18 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	return nil
 }
 
+// SideChainCh returns the channel of headers
+func (b *Blockchain) SideChainCh() chan *types.Header {
+	return b.sidechainCh
+}
+
 func (b *Blockchain) writeFork(header *types.Header) error {
 	forks := b.db.ReadForks()
+
+	select {
+	case b.sidechainCh <- header:
+	default:
+	}
 
 	newForks := []common.Hash{}
 	for _, fork := range forks {
@@ -723,25 +802,44 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 	newChainHead := newHeader
 	oldChainHead := oldHeader
 
+	oldChain := []*types.Header{}
+	newChain := []*types.Header{}
+
 	for oldHeader.Number.Cmp(newHeader.Number) > 0 {
 		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
+		oldChain = append(oldChain, oldHeader)
 	}
 
 	for newHeader.Number.Cmp(oldHeader.Number) > 0 {
 		newHeader = b.db.ReadHeader(newHeader.ParentHash)
+		newChain = append(newChain, newHeader)
 	}
 
 	for oldHeader.Hash() != newHeader.Hash() {
 		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
 		newHeader = b.db.ReadHeader(newHeader.ParentHash)
+
+		oldChain = append(oldChain, oldHeader)
 	}
 
 	if err := b.writeFork(oldChainHead); err != nil {
 		return fmt.Errorf("failed to write the old header as fork: %v", err)
 	}
 
-	// NOTE. this loops are used to know the oldblocks not belonging anymore
-	// to the canonical chain and updating the tx and state
+	// Update canonical chain numbers
+	for _, h := range newChain {
+		b.db.WriteCanonicalHash(h.Number, h.Hash())
+	}
+
+	// oldChain headers can become now uncles
+	go func() {
+		for _, i := range oldChain {
+			select {
+			case b.sidechainCh <- i:
+			default:
+			}
+		}
+	}()
 
 	return b.advanceHead(newChainHead)
 }

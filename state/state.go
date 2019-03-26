@@ -25,6 +25,21 @@ func NewState() *State {
 	}
 }
 
+// NewStateAt returns the trie at a given hash. NOTE: this forgets the code completely
+func NewStateAt(storage trie.Storage, root common.Hash) (*State, error) {
+	t, err := trie.NewTrieAt(storage, root)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &State{
+		root:    unsafe.Pointer(t),
+		code:    map[string][]byte{},
+		storage: storage,
+	}
+	return s, nil
+}
+
 func (s *State) SetStorage(storage trie.Storage) {
 	s.storage = storage
 }

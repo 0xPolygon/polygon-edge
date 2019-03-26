@@ -193,6 +193,9 @@ func (n *Node) Hash(storage Storage) []byte {
 	size := n.Len()
 
 	if size == 0 {
+		if storage != nil {
+			storage.Put(emptyRoot, []byte{})
+		}
 		return emptyRoot
 	} else if size == 1 { // only one short node
 		// its a short node

@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -18,13 +19,14 @@ var (
 	two256 = new(big.Int).Exp(big.NewInt(2), big.NewInt(256), big.NewInt(0))
 )
 
-// Pow is a vanilla proof-of-work engine with a fixed difficulty
+// Pow is a vanilla proof-of-work engine
 type Pow struct {
-	difficulty *big.Int
+	min int
+	max int
 }
 
 func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
-	return &Pow{}, nil
+	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
 func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
@@ -34,9 +36,12 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return fmt.Errorf("invalid sequence")
 	}
-	target := new(big.Int).Div(two256, p.difficulty)
-	if big.NewInt(1).SetBytes(header.Hash().Bytes()).Cmp(target) > 0 {
-		return fmt.Errorf("nonce is not correct")
+	localDiff := int(header.Difficulty.Int64())
+	if localDiff < p.min {
+		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", localDiff, p.min)
+	}
+	if localDiff > p.max {
+		return fmt.Errorf("Difficulty not correct. '%d' >! '%d'", localDiff, p.min)
 	}
 	return nil
 }
@@ -56,7 +61,7 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 	rand := rand.New(rand.NewSource(seed.Int64()))
 	nonce := uint64(rand.Int63())
 
-	target := new(big.Int).Div(two256, p.difficulty)
+	target := new(big.Int).Div(two256, header.Difficulty)
 
 	for {
 		header.Nonce = types.EncodeNonce(uint64(nonce))
@@ -66,18 +71,30 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 			break
 		}
 		nonce++
+
+		if ctx.Err() != nil {
+			return nil, nil
+		}
 	}
-	return types.NewBlockWithHeader(header), nil
+
+	return types.NewBlock(header, block.Transactions(), nil, nil), nil
 }
 
 func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
+	header.Difficulty = big.NewInt(int64(randomInt(p.min, p.max)))
 	return nil
 }
 
 func (p *Pow) Finalize(txn *state.Txn, block *types.Block) error {
+	txn.AddBalance(block.Coinbase(), big.NewInt(1))
 	return nil
 }
 
 func (p *Pow) Close() error {
 	return nil
+}
+
+func randomInt(min, max int) int {
+	rand.Seed(time.Now().UnixNano())
+	return min + rand.Intn(max-min)
 }

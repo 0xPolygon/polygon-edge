@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/umbracle/minimal/state/trie"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -40,7 +42,7 @@ func (f *fakeConsensus) Close() error {
 }
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
-func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
+func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
 	head := func(i int64) *types.Header {
 		return &types.Header{
 			Number:      big.NewInt(i),
@@ -52,13 +54,17 @@ func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
 		}
 	}
 
-	genesis := head(0)
+	if genesis == nil {
+		genesis = head(0)
+	}
 	headers := []*types.Header{genesis}
 
+	count := genesis.Number.Int64() + 1
 	for i := 1; i < n; i++ {
-		header := head(int64(i))
+		header := head(count)
 		header.ParentHash = headers[i-1].Hash()
 		headers = append(headers, header)
+		count++
 	}
 
 	return headers
@@ -66,7 +72,31 @@ func NewTestHeaderChainWithSeed(n int, seed int) []*types.Header {
 
 // NewTestHeaderChain creates a chain of valid headers
 func NewTestHeaderChain(n int) []*types.Header {
-	return NewTestHeaderChainWithSeed(n, 0)
+	return NewTestHeaderChainWithSeed(nil, n, 0)
+}
+
+// NewTestHeaderFromChain creates n new headers from an already existing chain
+func NewTestHeaderFromChain(headers []*types.Header, n int) []*types.Header {
+	return NewTestHeaderFromChainWithSeed(headers, n, 0)
+}
+
+// NewTestHeaderFromChainWithSeed creates n new headers from an already existing chain
+func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed int) []*types.Header {
+	// We do +1 because the first header will be the genesis we supplied
+	newHeaders := NewTestHeaderChainWithSeed(headers[len(headers)-1], n+1, seed)
+
+	preHeaders := make([]*types.Header, len(headers))
+	copy(preHeaders, headers)
+
+	return append(preHeaders, newHeaders[1:]...)
+}
+
+func HeadersToBlocks(headers []*types.Header) []*types.Block {
+	blocks := make([]*types.Block, len(headers))
+	for indx, i := range headers {
+		blocks[indx] = types.NewBlockWithHeader(i)
+	}
+	return blocks
 }
 
 // NewTestBodyChain creates a test blockchain with headers, body and receipts
@@ -137,7 +167,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	b := NewBlockchain(s, &fakeConsensus{}, config)
+	b := NewBlockchain(s, trie.NewMemoryStorage(), &fakeConsensus{}, config)
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)
@@ -147,6 +177,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		}
 	}
 
+	b.AddState(common.Hash{}, state.NewState())
 	return b
 }
 

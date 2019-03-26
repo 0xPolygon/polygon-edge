@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -11,40 +10,31 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
+
+	"github.com/umbracle/minimal/protocol"
+	"github.com/umbracle/minimal/protocol/ethereum"
 
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
-	"github.com/hashicorp/go-discover"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/network/discovery"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/protocol/ethereum"
-	"github.com/umbracle/minimal/syncer"
-
-	consensusClique "github.com/umbracle/minimal/consensus/clique"
-	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
-
-	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
-	discoveryDevP2P "github.com/umbracle/minimal/network/discovery/devp2p"
+	"github.com/umbracle/minimal/minimal"
 )
+
+var protocolBackends = map[string]protocol.Factory{
+	"ethereum": ethereum.Factory,
+}
 
 // Agent is a long running daemon that is used to run
 // the ethereum client
 type Agent struct {
-	logger *log.Logger
-	config *Config
-
-	server   *network.Server
-	discover *discover.Discover
-	syncer   *syncer.Syncer
+	logger  *log.Logger
+	config  *Config
+	minimal *minimal.Minimal
 }
 
 func NewAgent(logger *log.Logger, config *Config) *Agent {
@@ -55,19 +45,24 @@ func NewAgent(logger *log.Logger, config *Config) *Agent {
 func (a *Agent) Start() error {
 	a.startTelemetry()
 
-	consensusFactory := map[string]consensus.Factory{
-		"ethash": consensusEthash.Factory,
-		"clique": consensusClique.Factory,
+	var f func(str string) (*chain.Chain, error)
+	if _, err := os.Stat(a.config.Chain); err == nil {
+		f = chain.ImportFromFile
+	} else if os.IsNotExist(err) {
+		f = chain.ImportFromName
+	} else {
+		return fmt.Errorf("Failed to stat (%s): %v", a.config.Chain, err)
 	}
 
-	chain, err := chain.ImportFromName(a.config.Chain)
+	chain, err := f(a.config.Chain)
 	if err != nil {
-		return fmt.Errorf("Failed to load chain %s: %v", a.config.Chain, err)
+		return fmt.Errorf("failed to load chain %s: %v", a.config.Chain, err)
 	}
 
 	// Create data-dir if it does not exists
 	paths := []string{
 		"blockchain",
+		"trie",
 	}
 	if err := setupDataDir(a.config.DataDir, paths); err != nil {
 		panic(err)
@@ -79,74 +74,29 @@ func (a *Agent) Start() error {
 		panic(err)
 	}
 
-	// Start server
-	serverConfig := network.DefaultConfig()
-	serverConfig.BindAddress = a.config.BindAddr
-	serverConfig.BindPort = a.config.BindPort
-	serverConfig.Bootnodes = chain.Bootnodes
-
-	serverConfig.DiscoveryBackends = map[string]discovery.Factory{
-		"devp2p": discoveryDevP2P.Factory,
-		"consul": discoveryConsul.Factory,
+	config := &minimal.Config{
+		Key:              key,
+		Chain:            chain,
+		DataDir:          a.config.DataDir,
+		BindAddr:         a.config.BindAddr,
+		BindPort:         a.config.BindPort,
+		ServiceName:      a.config.ServiceName,
+		ProtocolBackends: protocolBackends,
+		Seal:             a.config.Seal,
 	}
 
-	a.server = network.NewServer("minimal", key, serverConfig, a.logger)
-
-	consensusConfig := &consensus.Config{
-		Params: chain.Params,
-	}
-	consensus, err := consensusFactory[chain.Params.GetEngine()](context.Background(), consensusConfig)
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+	m, err := minimal.NewMinimal(logger, config)
 	if err != nil {
 		panic(err)
 	}
 
-	// blockchain storage
-	storage, err := storage.NewLevelDBStorage(filepath.Join(a.config.DataDir, "blockchain"), nil)
-	if err != nil {
-		panic(err)
-	}
-
-	// blockchain object
-	blockchain := blockchain.NewBlockchain(storage, consensus, chain.Params)
-	if err := blockchain.WriteGenesis(chain.Genesis); err != nil {
-		panic(err)
-	}
-
-	// Start syncer
-	syncerConfig := syncer.DefaultConfig()
-	syncerConfig.NumWorkers = 1
-
-	// TODO, get network id from chain object
-	a.syncer, err = syncer.NewSyncer(1, blockchain, syncerConfig)
-	if err != nil {
-		panic(err)
-	}
-
-	// register protocols
-	callback := func(conn net.Conn, peer *network.Peer) protocol.Handler {
-		return ethereum.NewEthereumProtocol(conn, peer, a.syncer.GetStatus, blockchain)
-	}
-	a.server.RegisterProtocol(protocol.ETH63, callback)
-
-	// Start network server work after all the protocols have been registered
-	a.server.Schedule()
-
-	// Start the syncer
-	go a.syncer.Run()
-
-	// Pipe new added nodes into syncer
-	go func() {
-		for {
-			select {
-			case evnt := <-a.server.EventCh:
-				if evnt.Type == network.NodeJoin {
-					a.syncer.AddNode(evnt.Peer)
-				}
-			}
-		}
-	}()
-
+	a.minimal = m
 	return nil
+}
+
+func (a *Agent) Close() {
+	a.minimal.Close()
 }
 
 // TODO, start the api service and connect the internal api with metrics
@@ -170,7 +120,7 @@ func (a *Agent) startTelemetry() {
 
 	metrics.NewGlobal(metricsConf, sinks)
 
-	l, err := net.Listen("tcp", "localhost:8080")
+	l, err := net.Listen("tcp", "localhost:"+strconv.Itoa(a.config.Telemetry.PrometheusPort))
 	if err != nil {
 		panic(err)
 	}
@@ -182,12 +132,6 @@ func (a *Agent) startTelemetry() {
 	})
 
 	go http.Serve(l, mux)
-}
-
-// Close stops the agent
-func (a *Agent) Close() {
-	// TODO, close syncer first
-	a.server.Close()
 }
 
 func setupDataDir(dataDir string, paths []string) error {
