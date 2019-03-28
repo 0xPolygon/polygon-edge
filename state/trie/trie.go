@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"golang.org/x/crypto/sha3"
 )
 
 // Merkle-trie based on hashicorp go-immutable-radix
@@ -289,7 +289,7 @@ func concat(a, b []byte) []byte {
 }
 
 func hashit(b []byte) []byte {
-	f := sha3.NewKeccak256()
+	f := sha3.NewLegacyKeccak256()
 	f.Write(b)
 	res := f.Sum(nil)
 	return res

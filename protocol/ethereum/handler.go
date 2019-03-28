@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/network/transport/rlpx"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -838,7 +838,7 @@ func (e *Ethereum) Data(data [][]byte) {
 }
 
 func encodeHash(x common.Hash, y common.Hash) common.Hash {
-	hw := sha3.NewKeccak256()
+	hw := sha3.NewLegacyKeccak256()
 	if _, err := hw.Write(x.Bytes()); err != nil {
 		panic(err)
 	}
