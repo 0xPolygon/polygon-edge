@@ -10,11 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/umbracle/minimal/blockchain/storage/leveldb"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/network/discovery"
@@ -86,7 +86,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	}
 
 	// blockchain storage
-	storage, err := storage.NewLevelDBStorage(filepath.Join(m.config.DataDir, "blockchain"), nil)
+	storage, err := leveldb.NewLevelDBStorage(filepath.Join(m.config.DataDir, "blockchain"), nil)
 	if err != nil {
 		return nil, err
 	}

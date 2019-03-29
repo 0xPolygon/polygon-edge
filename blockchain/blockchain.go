@@ -43,7 +43,7 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db          *storage.Storage
+	db          storage.Storage
 	consensus   consensus.Consensus
 	genesis     *types.Header
 	state       map[string]*state.State
@@ -58,7 +58,7 @@ type Blockchain struct {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db *storage.Storage, triedb trie.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db storage.Storage, triedb trie.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	return &Blockchain{
 		db:          db,
 		consensus:   consensus,

@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"io/ioutil"
 	"math/big"
-	"os"
 	"reflect"
 	"testing"
 
@@ -11,27 +9,34 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func newStorage(t *testing.T) (*Storage, func()) {
-	path, err := ioutil.TempDir("/tmp", "minimal_storage")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s, err := NewLevelDBStorage(path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	close := func() {
-		if err := os.RemoveAll(path); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return s, close
+// TestStorage tests a set of tests on a storage
+func TestStorage(t *testing.T, s Storage) {
+	t.Helper()
+
+	t.Run("", func(t *testing.T) {
+		testCanonicalChain(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testDifficulty(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testHead(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testForks(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testHeader(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testBody(t, s)
+	})
+	t.Run("", func(t *testing.T) {
+		testReceipts(t, s)
+	})
 }
 
-func TestCanonicalChain(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testCanonicalChain(t *testing.T, s Storage) {
 	var cases = []struct {
 		Number *big.Int
 		Hash   common.Hash
@@ -60,10 +65,7 @@ func TestCanonicalChain(t *testing.T) {
 	}
 }
 
-func TestDifficulty(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testDifficulty(t *testing.T, s Storage) {
 	var cases = []struct {
 		Hash common.Hash
 		Diff *big.Int
@@ -92,10 +94,7 @@ func TestDifficulty(t *testing.T) {
 	}
 }
 
-func TestHead(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testHead(t *testing.T, s Storage) {
 	var cases = []struct {
 		Hash common.Hash
 	}{
@@ -114,10 +113,7 @@ func TestHead(t *testing.T) {
 	}
 }
 
-func TestForks(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testForks(t *testing.T, s Storage) {
 	var cases = []struct {
 		Forks []common.Hash
 	}{
@@ -135,10 +131,7 @@ func TestForks(t *testing.T) {
 	}
 }
 
-func TestHeader(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testHeader(t *testing.T, s Storage) {
 	header := &types.Header{
 		Number:     big.NewInt(5),
 		Difficulty: big.NewInt(10),
@@ -155,10 +148,7 @@ func TestHeader(t *testing.T) {
 	}
 }
 
-func TestBody(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testBody(t *testing.T, s Storage) {
 	header := &types.Header{
 		Number:     big.NewInt(5),
 		Difficulty: big.NewInt(10),
@@ -188,10 +178,7 @@ func TestBody(t *testing.T) {
 	}
 }
 
-func TestReceipts(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
+func testReceipts(t *testing.T, s Storage) {
 	r0 := types.NewReceipt([]byte{1}, false, 10)
 	r0.TxHash = common.HexToHash("11")
 
@@ -212,20 +199,5 @@ func TestReceipts(t *testing.T) {
 		if i.TxHash != r[indx].TxHash {
 			t.Fatal("receipt txhash is not correct")
 		}
-	}
-}
-
-func TestEmptyData(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
-	if s.ReadBody(common.HexToHash("1")) != nil {
-		t.Fatal("body should be empty")
-	}
-	if s.ReadHeadHash() != nil {
-		t.Fatal("head hash should be nil")
-	}
-	if s.ReadHeadNumber() != nil {
-		t.Fatal("head hash should be nil")
 	}
 }
