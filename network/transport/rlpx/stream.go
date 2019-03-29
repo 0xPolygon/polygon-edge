@@ -109,6 +109,10 @@ func (s *Stream) Write(b []byte) (int, error) {
 
 // Read implements the net.Conn interface
 func (s *Stream) Read(b []byte) (n int, err error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
+
 	defer asyncNotify(s.recvNotifyCh)
 
 START:
