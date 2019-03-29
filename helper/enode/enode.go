@@ -94,10 +94,18 @@ func (n *Enode) String() string {
 
 // PublicKey returns the public key of the enode
 func (n *Enode) PublicKey() (*ecdsa.PublicKey, error) {
+	return NodeIDToPubKey(n.ID[:])
+}
+
+// NodeIDToPubKey returns the public key of the enode ID
+func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
+	if len(buf) != nodeIDBytes {
+		return nil, fmt.Errorf("not enough length: expected %d but found %d", nodeIDBytes, len(buf))
+	}
 	p := &ecdsa.PublicKey{Curve: crypto.S256(), X: new(big.Int), Y: new(big.Int)}
-	half := len(n.ID) / 2
-	p.X.SetBytes(n.ID[:half])
-	p.Y.SetBytes(n.ID[half:])
+	half := len(buf) / 2
+	p.X.SetBytes(buf[:half])
+	p.Y.SetBytes(buf[half:])
 	if !p.Curve.IsOnCurve(p.X, p.Y) {
 		return nil, errors.New("id is invalid secp256k1 curve point")
 	}
