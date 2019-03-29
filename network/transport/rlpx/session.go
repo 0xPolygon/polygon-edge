@@ -195,24 +195,16 @@ func (s *Session) RemoteIDString() string {
 	return s.id
 }
 
-func (s *Session) protocolHandshake() error {
-	info, err := doDevP2PHandshake(s, s.Info)
-	if err != nil {
-		return err
-	}
-
-	s.remoteInfo = info
-	return nil
-}
-
 // Handshake does the p2p and protocol handshake
 func (s *Session) Handshake() error {
 	if err := s.p2pHandshake(); err != nil {
 		return err
 	}
-	if err := s.protocolHandshake(); err != nil {
+	info, err := doProtocolHandshake(s, s.Info)
+	if err != nil {
 		return err
 	}
+	s.remoteInfo = info
 
 	// start ping protocol and listen for incoming messages
 	go s.keepalive()
@@ -251,6 +243,16 @@ func (s *Session) Disconnect(reason DiscReason) error {
 	close(s.shutdownCh)
 	s.conn.Close()
 	return nil
+}
+
+// SetWriteDeadline implements the net.Conn interface
+func (s *Session) SetWriteDeadline(t time.Time) error {
+	return s.conn.SetWriteDeadline(t)
+}
+
+// SetReadDeadline implements the net.Conn interface
+func (s *Session) SetReadDeadline(t time.Time) error {
+	return s.conn.SetReadDeadline(t)
 }
 
 // CloseChan returns a read-only channel which is closed as

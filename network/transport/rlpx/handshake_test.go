@@ -49,7 +49,7 @@ func TestHandshakeDevP2PTimeout(t *testing.T) {
 	errr := make(chan error, 2)
 
 	go func() {
-		_, err := doDevP2PHandshake(c0, info0)
+		_, err := doProtocolHandshake(c0, info0)
 		errr <- err
 	}()
 
@@ -74,7 +74,7 @@ func DoProtocolHandshake(c0 *Session, info0 *Info, c1 *Session, info1 *Info) err
 	errr := make(chan error, 2)
 
 	go func() {
-		info, err := doDevP2PHandshake(c0, info0)
+		info, err := doProtocolHandshake(c0, info0)
 		if err != nil {
 			errr <- err
 		} else if !reflect.DeepEqual(info.ID, info1.ID) { // reflect.DeepEqual(info, info1) does not seem to work
@@ -85,7 +85,7 @@ func DoProtocolHandshake(c0 *Session, info0 *Info, c1 *Session, info1 *Info) err
 	}()
 
 	go func() {
-		info, err := doDevP2PHandshake(c1, info1)
+		info, err := doProtocolHandshake(c1, info1)
 		if err != nil {
 			errr <- err
 		} else if !reflect.DeepEqual(info.ID, info0.ID) {
