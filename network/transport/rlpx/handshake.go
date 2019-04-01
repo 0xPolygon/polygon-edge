@@ -429,10 +429,15 @@ func readProtocolHandshake(conn *Session) (*Info, error) {
 		return nil, fmt.Errorf("expected handshake, got %x", msg.Code)
 	}
 
+	fmt.Println("-- read handshake message --")
+
 	var info Info
 	if err := msg.Decode(&info); err != nil {
 		return nil, err
 	}
+
+	fmt.Println(info)
+
 	if (info.ID == enode.ID{}) {
 		return nil, DiscInvalidIdentity
 	}

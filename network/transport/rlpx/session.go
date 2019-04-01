@@ -15,6 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/protocol"
+
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/armon/go-metrics"
@@ -67,6 +70,9 @@ func (msg Message) Decode(val interface{}) error {
 type Session struct {
 	id   string
 	conn net.Conn
+
+	// TODO, create
+	rlpx *Rlpx
 
 	config  *Config
 	streams []*Stream
@@ -247,6 +253,78 @@ func (s *Session) Read(b []byte) (int, error) {
 // Close implements the net.Conn interface
 func (s *Session) Close() error {
 	return s.Disconnect(DiscQuitting)
+}
+
+// NegociateProtocols implements the session interface
+func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, error) {
+	info := networkInfoToLocalInfo(nInfo)
+
+	offset := BaseProtocolLength
+	// protocols := []*Instance{}
+
+	type res struct { // will become matchProtocol struct in rlpx
+		offset   uint64
+		protocol protocol.Protocol
+		backend  protocol.Backend
+	}
+
+	result := []*res{}
+
+	for _, i := range info.Caps {
+		// this one from the local instances
+		if b := s.rlpx.getProtocol(i.Name, i.Version); b != nil {
+			proto := b.Protocol()
+
+			result = append(result, &res{
+				backend:  b,
+				protocol: proto,
+				offset:   offset,
+			})
+
+			offset += proto.Length
+		}
+	}
+
+	lock := sync.Mutex{}
+	activated := []*common.Instance{}
+
+	errr := make(chan error, len(result))
+	for _, r := range result {
+		go func(r *res) {
+			stream := s.OpenStream(uint(r.offset), uint(r.protocol.Length))
+
+			proto, err := r.backend.Add(stream, s.id)
+			if err != nil {
+				errr <- err
+			}
+
+			lock.Lock()
+			activated = append(activated, &common.Instance{
+				Protocol: r.protocol,
+				Handler:  proto,
+			})
+			lock.Unlock()
+			errr <- nil
+		}(r)
+	}
+
+	for i := 0; i < len(result); i++ {
+		if err := <-errr; err != nil {
+			return nil, err
+		}
+	}
+	return activated, nil
+}
+
+// GetInfo implements the session interface
+func (s *Session) GetInfo() common.Info {
+	info := common.Info{
+		Client: s.remoteInfo.Name,
+		Enode: &enode.Enode{
+			ID: enode.PubkeyToEnode(s.RemoteID),
+		},
+	}
+	return info
 }
 
 // CloseChan returns a read-only channel which is closed as

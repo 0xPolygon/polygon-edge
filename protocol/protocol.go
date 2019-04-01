@@ -5,12 +5,6 @@ import (
 	"net"
 )
 
-// Handler is the handler of the msg for the protocol
-type Handler interface {
-	Init() error
-	Close() error
-}
-
 // Protocol is a specification of an etheruem protocol
 type Protocol struct {
 	Name    string
@@ -18,10 +12,15 @@ type Protocol struct {
 	Length  uint64
 }
 
+// Handler is a backend reference of the peer
+type Handler interface {
+	Info() string
+}
+
 // Backend is a protocol backend
 type Backend interface {
 	Protocol() Protocol
-	Add(conn net.Conn, peerID string) error
+	Add(conn net.Conn, peerID string) (Handler, error)
 }
 
 // Factory is the factory method to create the protocol

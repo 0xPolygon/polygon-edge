@@ -97,6 +97,11 @@ func (n *Enode) PublicKey() (*ecdsa.PublicKey, error) {
 	return NodeIDToPubKey(n.ID[:])
 }
 
+// TCPAddr returns the TCP address
+func (n *Enode) TCPAddr() net.TCPAddr {
+	return net.TCPAddr{IP: n.IP, Port: int(n.TCP)}
+}
+
 // NodeIDToPubKey returns the public key of the enode ID
 func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
 	if len(buf) != nodeIDBytes {
