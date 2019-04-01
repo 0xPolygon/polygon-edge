@@ -168,27 +168,6 @@ func (s *Server) buildInfo() {
 	s.info = info
 }
 
-/*
-func (s *Server) buildInfo2() {
-	info := &rlpx.Info{
-		Version: rlpx.BaseProtocolVersion,
-		Caps:    rlpx.Capabilities{},
-		Name:    s.Name,
-		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
-	}
-
-	fmt.Println("-- build info --")
-	fmt.Println("-- backends --")
-	fmt.Println(s.backends)
-
-	for _, p := range s.backends {
-		proto := p.Protocol()
-		info.Caps = append(info.Caps, &rlpx.Cap{Name: proto.Name, Version: proto.Version})
-	}
-	s.info = info
-}
-*/
-
 // Schedule starts all the tasks once all the protocols have been loaded
 func (s *Server) Schedule() error {
 	// bootstrap peers
@@ -245,39 +224,6 @@ func (s *Server) Schedule() error {
 	return nil
 }
 
-/*
-func (s *Server) setupTransport2() error {
-	l, err := net.Listen("tcp", "")
-	if err != nil {
-		return err
-	}
-
-	s.lis = l
-	go s.startAccepting()
-
-	return nil
-}
-
-func (s *Server) startAccepting() {
-	for {
-		conn, err := s.lis.Accept()
-		if err != nil {
-			s.logger.Printf("[ERR]: %v", err)
-		}
-		go s.handleConn(conn)
-	}
-}
-
-func (s *Server) handleConn(conn net.Conn) {
-	session, err := s.transport.Accept(conn)
-	if err != nil {
-		s.logger.Printf("[ERR]: %v", err)
-	}
-
-	s.addSession(session)
-}
-*/
-
 func (s *Server) setupTransport() error {
 
 	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
@@ -298,24 +244,6 @@ func (s *Server) setupTransport() error {
 		}
 	}()
 
-	/*
-		s.listener, err = rlpx.Listen("tcp", addr.String(), &rlpx.Config{Prv: s.key, Info: s.info})
-		if err != nil {
-			return err
-		}
-
-		go func() {
-			for {
-				// TODO, Accept should check if we have enough slots or return tooManyPeers message
-				conn, err := s.listener.Accept()
-				if err != nil {
-					// log
-				}
-				go s.handleIncomingConn(conn)
-			}
-		}()
-	*/
-
 	return nil
 }
 
@@ -329,17 +257,6 @@ func (s *Server) handleConn(conn net.Conn) {
 		panic(err)
 	}
 }
-
-/*
-func (s *Server) handleIncomingConn(conn *rlpx.Session) {
-	// check if we have enough incoming slots
-
-	fmt.Println("-- conn --")
-	fmt.Println(conn)
-
-	s.addSession(conn)
-}
-*/
 
 // PeriodicDial is the periodic dial of busy peers
 type PeriodicDial struct {
@@ -488,10 +405,6 @@ func (s *Server) connect(addrs string) error {
 	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-// TODO, build a method that takes a net.Conn object
-// it will be helpful to tests protocols. connectWithEnode
-// would call this function after all the connection has been established
-
 func (s *Server) connectWithEnode(rawURL string) error {
 	// parse enode address beforehand
 	// TODO, make dial take either a rawURL or an enode
@@ -518,106 +431,18 @@ func (s *Server) connectWithEnode(rawURL string) error {
 		return err
 	}
 
-	/*
-		ss, err := rlpx.DialEnode("tcp", rawURL, &rlpx.Config{Prv: s.key, Info: s.info})
-		if err != nil {
-			return err
-		}
-	*/
-
 	// match protocols
 	return s.addSession(session)
 }
 
-/*
-func (s *Server) connectWithEnode2(rawURL string) error {
-	// parse enode address beforehand
-	// TODO, make dial take either a rawURL or an enode
-	enode, err := enode.ParseURL(rawURL)
-	if err != nil {
-		return err
-	}
-
-	if _, ok := s.peers[enode.ID.String()]; ok {
-		// TODO: add tests
-		// Trying to connect with an already connected id
-		// TODO, after disconnect do we remove the peer from this list?
-		return nil
-	}
-
-	conn, err := net.Dial("tcp", enode.IP.String())
-	if err != nil {
-		return err
-	}
-
-	session, err := s.transport.Connect(conn, *enode)
-	if err != nil {
-		return err
-	}
-
-	// match protocols
-	return s.addSession2(session)
-}
-
-func (s *Server) addSession2(session Session) error {
-	p := newPeer2(s.logger, session, s)
-
-	// should match protocols be part of rlpx?
-	backends := s.matchProtocols(p, p.Info.Caps)
-	if len(backends) == 0 {
-		return fmt.Errorf("no matching protocols found")
-	}
-
-	// There should be a better way to handle the initialization of the peer
-	// this should be done inside the peer itself not in the server.
-	for _, i := range backends {
-		if err := i.backend.Add(i.session, p.PrettyString()); err != nil {
-			return err
-		}
-	}
-	// p.SetInstances(instances)
-
-	s.peersLock.Lock()
-	s.peers[p.PrettyString()] = p
-	s.peersLock.Unlock()
-
-	select {
-	case s.EventCh <- MemberEvent{Type: NodeJoin, Peer: p}:
-	default:
-	}
-
-	return nil
-}
-*/
-
 func (s *Server) addSession(session common.Session) error {
-	// p := newPeer(s.logger, session, session.RemoteInfo(), s)
-	p := newPeer2(s.logger, session, s)
+	p := newPeer(s.logger, session, s)
 
-	/*
-		// should match protocols be part of rlpx?
-		backends := s.matchProtocols(p, p.Info.Caps)
-		if len(backends) == 0 {
-			return fmt.Errorf("no matching protocols found")
-		}
-
-		// There should be a better way to handle the initialization of the peer
-		// this should be done inside the peer itself not in the server.
-		for _, i := range backends {
-			if err := i.backend.Add(i.session, p.PrettyString()); err != nil {
-				return err
-			}
-		}
-	*/
-
-	// TODO, during match protocols we need to return which backend protocols have been matched
 	protos, err := session.NegociateProtocols(s.info)
 	if err != nil {
 		// send close message to the peer
 		return err
 	}
-
-	// p.SetInstances(instances)
 
 	p.protocols = protos
 
@@ -654,92 +479,6 @@ func (s *Server) getProtocol(name string, version uint) protocol.Backend {
 	}
 	return nil
 }
-
-/*
-func (s *Server) matchProtocols2(peer *Peer, caps rlpx.Capabilities) ([]*Instance, error) {
-	offset := rlpx.BaseProtocolLength
-	// protocols := []*Instance{}
-
-	type res struct { // will become matchProtocol struct in rlpx
-		offset   uint64
-		protocol protocol.Protocol
-		backend  protocol.Backend
-	}
-
-	result := []*res{}
-
-	for _, i := range caps {
-		if b := s.getProtocol(i.Name, i.Version); b != nil {
-			proto := b.Protocol()
-
-			result = append(result, &res{
-				backend:  b,
-				protocol: proto,
-				offset:   offset,
-			})
-
-			offset += proto.Length
-		}
-	}
-
-	lock := sync.Mutex{}
-	activated := []*Instance{}
-
-	errr := make(chan error, len(result))
-	for _, r := range result {
-		go func(r *res) {
-			stream := peer.conn.OpenStream(uint(r.offset), uint(r.protocol.Length))
-
-			proto, err := r.backend.Add(stream, peer.ID)
-			if err != nil {
-				errr <- err
-			}
-
-			lock.Lock()
-			activated = append(activated, &Instance{
-				protocol: r.protocol,
-				handler:  proto,
-			})
-			lock.Unlock()
-			errr <- nil
-		}(r)
-	}
-
-	for i := 0; i < len(result); i++ {
-		if err := <-errr; err != nil {
-			return nil, err
-		}
-	}
-	return activated, nil
-}
-*/
-
-/*
-func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance {
-	offset := rlpx.BaseProtocolLength
-	protocols := []*Instance{}
-
-	for _, i := range caps {
-		if b := s.getProtocol(i.Name, i.Version); b != nil {
-			proto := b.Protocol()
-
-			stream := peer.conn.OpenStream(uint(offset), uint(proto.Length))
-			// runtime := proto.callback(stream, peer)
-
-			instance := &Instance{
-				session: stream,
-				backend: b,
-				offset:  offset,
-			}
-
-			protocols = append(protocols, instance)
-			offset += proto.Length
-		}
-	}
-
-	return protocols
-}
-*/
 
 func (s *Server) Close() {
 	// close peers
