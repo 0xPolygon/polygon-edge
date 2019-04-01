@@ -30,14 +30,6 @@ $ go run main.go agent --config ./config.json --data-dir /tmp/local
 
 The values from the CLI have preference over the ones in the configuration file.
 
-### Probe
-
-Probes and returns information of a given enode:
-
-```
-$ go run main.go probe <enode://>
-```
-
 ### Genesis
 
 Generates a test genesis file:
