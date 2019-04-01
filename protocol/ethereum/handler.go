@@ -193,6 +193,11 @@ func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
 	return e.WriteMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
 }
 
+// Info implements the handler interface
+func (e *Ethereum) Info() string {
+	return "TODO. Ethereum info"
+}
+
 func (e *Ethereum) ReadStatus() (*Status, error) {
 	var status *Status
 	if _, err := e.conn.Read(e.recvHeader[:]); err != nil {

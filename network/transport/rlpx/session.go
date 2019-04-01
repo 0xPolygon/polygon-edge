@@ -15,6 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/protocol"
+
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/armon/go-metrics"
@@ -46,27 +49,6 @@ const (
 	sessionClosed
 )
 
-const (
-	// default ping interval for the rlpx protocol
-	pingInterval = 15 * time.Second
-)
-
-// AckMessage is the hook for the message handlers
-type AckMessage struct {
-	Complete bool
-	Code     uint64 // only used for tests
-	Payload  io.Reader
-}
-
-// Conn is the network Session
-type Conn interface {
-	RemoteAddr() string
-	WriteMsg(uint64, ...interface{}) error
-	ReadMsg() (Message, error)
-	SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration)
-	Close() error
-}
-
 // Message is the p2p message
 type Message struct {
 	Code       uint64
@@ -74,14 +56,6 @@ type Message struct {
 	Payload    io.Reader
 	ReceivedAt time.Time
 	Err        error
-}
-
-func (msg *Message) Copy() *Message {
-	mm := new(Message)
-	mm.Code = msg.Code
-	mm.Size = msg.Size
-	mm.Payload = msg.Payload
-	return mm
 }
 
 func (msg Message) Decode(val interface{}) error {
@@ -92,15 +66,13 @@ func (msg Message) Decode(val interface{}) error {
 	return nil
 }
 
-type handler struct {
-	callback func(io.Reader)
-	salt     uint64
-}
-
 // Session is the Session between peers (implements net.Conn)
 type Session struct {
 	id   string
 	conn net.Conn
+
+	// TODO, create
+	rlpx *Rlpx
 
 	config  *Config
 	streams []*Stream
@@ -217,10 +189,8 @@ func (s *Session) RemoteInfo() *Info {
 	return s.remoteInfo
 }
 
-func (s *Session) Close() error {
-	return s.Disconnect(DiscQuitting)
-}
-
+// Disconnect sends a disconnect message to the peer and
+// closes the session
 func (s *Session) Disconnect(reason DiscReason) error {
 	s.shutdownLock.Lock()
 	defer s.shutdownLock.Unlock()
@@ -245,6 +215,16 @@ func (s *Session) Disconnect(reason DiscReason) error {
 	return nil
 }
 
+// LocalAddr implements the net.Conn interface
+func (s *Session) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+
+// RemoteAddr implements the net.Conn interface
+func (s *Session) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
+
 // SetWriteDeadline implements the net.Conn interface
 func (s *Session) SetWriteDeadline(t time.Time) error {
 	return s.conn.SetWriteDeadline(t)
@@ -253,6 +233,98 @@ func (s *Session) SetWriteDeadline(t time.Time) error {
 // SetReadDeadline implements the net.Conn interface
 func (s *Session) SetReadDeadline(t time.Time) error {
 	return s.conn.SetReadDeadline(t)
+}
+
+// SetDeadline implements the net.Conn interface
+func (s *Session) SetDeadline(t time.Time) error {
+	return s.conn.SetDeadline(t)
+}
+
+// Write implements the net.Conn interface
+func (s *Session) Write(b []byte) (int, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
+// Read implements the net.Conn interface
+func (s *Session) Read(b []byte) (int, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
+// Close implements the net.Conn interface
+func (s *Session) Close() error {
+	return s.Disconnect(DiscQuitting)
+}
+
+// NegociateProtocols implements the session interface
+func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, error) {
+	info := networkInfoToLocalInfo(nInfo)
+
+	offset := BaseProtocolLength
+	// protocols := []*Instance{}
+
+	type res struct { // will become matchProtocol struct in rlpx
+		offset   uint64
+		protocol protocol.Protocol
+		backend  protocol.Backend
+	}
+
+	result := []*res{}
+
+	for _, i := range info.Caps {
+		// this one from the local instances
+		if b := s.rlpx.getProtocol(i.Name, i.Version); b != nil {
+			proto := b.Protocol()
+
+			result = append(result, &res{
+				backend:  b,
+				protocol: proto,
+				offset:   offset,
+			})
+
+			offset += proto.Length
+		}
+	}
+
+	lock := sync.Mutex{}
+	activated := []*common.Instance{}
+
+	errr := make(chan error, len(result))
+	for _, r := range result {
+		go func(r *res) {
+			stream := s.OpenStream(uint(r.offset), uint(r.protocol.Length))
+
+			proto, err := r.backend.Add(stream, s.id)
+			if err != nil {
+				errr <- err
+			}
+
+			lock.Lock()
+			activated = append(activated, &common.Instance{
+				Protocol: r.protocol,
+				Handler:  proto,
+			})
+			lock.Unlock()
+			errr <- nil
+		}(r)
+	}
+
+	for i := 0; i < len(result); i++ {
+		if err := <-errr; err != nil {
+			return nil, err
+		}
+	}
+	return activated, nil
+}
+
+// GetInfo implements the session interface
+func (s *Session) GetInfo() common.Info {
+	info := common.Info{
+		Client: s.remoteInfo.Name,
+		Enode: &enode.Enode{
+			ID: enode.PubkeyToEnode(s.RemoteID),
+		},
+	}
+	return info
 }
 
 // CloseChan returns a read-only channel which is closed as
@@ -278,7 +350,6 @@ func (s *Session) recv() {
 }
 
 func (s *Session) recvLoop() error {
-	// fmt.Println("-- recv --")
 	for {
 		msg, err := s.ReadMsg()
 		if err != nil {
@@ -303,20 +374,7 @@ func (s *Session) recvLoop() error {
 			fmt.Printf("DISCONNECTED: %s\n", msg.String())
 			return msg
 		default:
-			// stream message
-
 			s.handleStreamMessage(&msg)
-
-			/*
-				ss := s.getStream(msg.Code)
-
-				if ss != nil {
-					real := msg.Copy()
-					real.Code = real.Code - ss.offset
-
-					ss.deliver(real)
-				}
-			*/
 		}
 	}
 }
@@ -347,10 +405,6 @@ func (s *Session) keepalive() {
 			return
 		}
 	}
-}
-
-func (s *Session) RemoteAddr() string {
-	return s.conn.RemoteAddr().String()
 }
 
 func (s *Session) OpenStream(offset uint, length uint) *Stream {
@@ -472,7 +526,7 @@ func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 	}
 
 	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
-	return s.Write(Message{Code: msgcode, Size: uint32(size), Payload: r})
+	return s.WriteRawMsg(Message{Code: msgcode, Size: uint32(size), Payload: r})
 }
 
 func (s *Session) handleStreamMessage(msg *Message) {
@@ -480,11 +534,7 @@ func (s *Session) handleStreamMessage(msg *Message) {
 	stream.readData(msg)
 }
 
-func (s *Session) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
-	panic("handlers not available in plain Session")
-}
-
-func (s *Session) Write(msg Message) error {
+func (s *Session) WriteRawMsg(msg Message) error {
 	// check if the connection is open
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()

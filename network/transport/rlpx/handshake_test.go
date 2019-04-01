@@ -120,14 +120,14 @@ func DoP2PHandshake() (*Session, *Session, error) {
 	var c0, c1 *Session
 
 	go func() {
-		c0 = Server(conn0, prv0, nil)
+		c0 = Server(nil, conn0, prv0, nil)
 		c0.LocalID = &prv0.PublicKey
 
 		errs <- c0.p2pHandshake()
 	}()
 
 	go func() {
-		c1 = Client(conn1, prv1, &prv0.PublicKey, nil)
+		c1 = Client(nil, conn1, prv1, &prv0.PublicKey, nil)
 		c1.LocalID = &prv0.PublicKey
 
 		errs <- c1.p2pHandshake()

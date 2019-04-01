@@ -159,11 +159,11 @@ func pipe(t *testing.T) (*Session, *Session) {
 	var c0, c1 *Session
 
 	go func() {
-		c0 = Server(conn0, prv0, mockInfo(prv0))
+		c0 = Server(nil, conn0, prv0, mockInfo(prv0))
 		errs <- c0.Handshake()
 	}()
 	go func() {
-		c1 = Client(conn1, prv1, &prv0.PublicKey, mockInfo(prv1))
+		c1 = Client(nil, conn1, prv1, &prv0.PublicKey, mockInfo(prv1))
 		errs <- c1.Handshake()
 	}()
 

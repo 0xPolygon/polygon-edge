@@ -3,19 +3,9 @@ package network
 import (
 	"fmt"
 	"log"
-	"net"
 
-	"github.com/umbracle/minimal/network/transport/rlpx"
-	"github.com/umbracle/minimal/protocol"
+	"github.com/umbracle/minimal/network/common"
 )
-
-type Instance struct {
-	session net.Conn // session of the peer with the protocoll
-	// protocol *protocol.Protocol
-	backend protocol.Backend
-	// Runtime  protocol.Handler
-	offset uint64
-}
 
 type Status int
 
@@ -48,61 +38,33 @@ type Peer struct {
 	ID        string
 	Status    Status
 	logger    *log.Logger
-	conn      rlpx.Conn
-	Info      *rlpx.Info // remove info and conn
-	protocols map[string]*Instance
+	conn      common.Session
+	protocols []*common.Instance
 }
 
-func newPeer(logger *log.Logger, conn rlpx.Conn, info *rlpx.Info, server *Server) *Peer {
-	enode := fmt.Sprintf("enode://%s@%s", info.ID.String(), conn.RemoteAddr())
+func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
+	enode := conn.GetInfo().Enode.String()
 
 	peer := &Peer{
 		Enode:     enode,
-		ID:        info.ID.String(),
+		ID:        conn.GetInfo().Enode.ID.String(),
 		logger:    logger,
 		conn:      conn,
-		Info:      info,
-		protocols: map[string]*Instance{},
+		protocols: []*common.Instance{},
 	}
 
 	return peer
 }
 
 func (p *Peer) IsClosed() bool {
-	return p.conn.(*rlpx.Session).IsClosed()
+	return p.conn.IsClosed()
 }
 
 func (p *Peer) PrettyString() string {
 	return p.ID[:8]
 }
 
-/*
-func (p *Peer) GetProtocol(name string) protocol.Handler {
-	proto, ok := p.protocols[name]
-	if !ok {
-		return nil
-	}
-	return proto.Runtime
-}
-*/
-
+// Close closes the peer connection
 func (p *Peer) Close() {
 	p.conn.Close()
 }
-
-/*
-func (p *Peer) SetInstances(protocols []*Instance) {
-	for _, i := range protocols {
-		p.protocols[i.protocol.Name] = i
-	}
-}
-
-func (p *Peer) getProtocol(msgcode uint64) *Instance {
-	for _, proto := range p.protocols {
-		if msgcode >= proto.offset && msgcode < proto.offset+proto.protocol.Length {
-			return proto
-		}
-	}
-	return nil
-}
-*/

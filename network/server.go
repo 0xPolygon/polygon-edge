@@ -11,20 +11,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/umbracle/minimal/network/transport/rlpx"
+
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/armon/go-metrics"
 
 	"github.com/ferranbt/periodic-dispatcher"
 
+	"github.com/umbracle/minimal/network/common"
 	"github.com/umbracle/minimal/network/discovery"
-	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/protocol"
 )
 
 const (
-	DialTimeout = 15 * time.Second
-	peersFile   = "peers.json"
+	peersFile = "peers.json"
 )
 
 // Config is the p2p server configuration
@@ -56,13 +57,6 @@ func DefaultConfig() *Config {
 	return c
 }
 
-/*
-type protocolStub struct {
-	protocol *protocol.Protocol
-	callback Callback
-}
-*/
-
 type EventType int
 
 const (
@@ -92,14 +86,13 @@ type MemberEvent struct {
 // Server is the ethereum client
 type Server struct {
 	logger *log.Logger
-	// Protocols []*protocolStub
-	Name string
-	key  *ecdsa.PrivateKey
+	Name   string
+	key    *ecdsa.PrivateKey
 
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
-	info *rlpx.Info
+	info *common.Info
 
 	config  *Config
 	closeCh chan struct{}
@@ -113,7 +106,8 @@ type Server struct {
 	dispatcher *periodic.Dispatcher
 
 	peerStore *PeerStore
-	listener  *rlpx.Listener
+	listener  net.Listener
+	transport common.Transport
 
 	discovery discovery.Backend
 	Enode     *enode.Enode
@@ -133,7 +127,6 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 	fmt.Printf("Enode: %s\n", enode.String())
 
 	s := &Server{
-		// Protocols:    []*protocolStub{},
 		Name:         name,
 		key:          key,
 		peers:        map[string]*Peer{},
@@ -148,26 +141,27 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFile),
 		backends:     []protocol.Backend{},
+		transport:    &rlpx.Rlpx{},
 	}
 
 	return s
 }
 
 func (s *Server) buildInfo() {
-	info := &rlpx.Info{
-		Version: rlpx.BaseProtocolVersion,
-		Caps:    rlpx.Capabilities{},
-		Name:    s.Name,
-		ID:      enode.PubkeyToEnode(&s.key.PublicKey),
+	info := &common.Info{
+		Client: s.Name,
+		Enode:  s.Enode,
 	}
-
-	fmt.Println("-- build info --")
-	fmt.Println("-- backends --")
-	fmt.Println(s.backends)
 
 	for _, p := range s.backends {
 		proto := p.Protocol()
-		info.Caps = append(info.Caps, &rlpx.Cap{Name: proto.Name, Version: proto.Version})
+
+		cap := &common.Capability{
+			Protocol: proto,
+			Backend:  p,
+		}
+
+		info.Capabilities = append(info.Capabilities, cap)
 	}
 	s.info = info
 }
@@ -181,6 +175,8 @@ func (s *Server) Schedule() error {
 
 	// Create rlpx info
 	s.buildInfo()
+
+	s.transport.Setup(s.key, s.backends, s.info)
 
 	if err := s.setupTransport(); err != nil {
 		return err
@@ -218,7 +214,7 @@ func (s *Server) Schedule() error {
 		if err != nil {
 			return err
 		}
-		s.discovery = backend // NOTE: Find a way to tunnel allt he discovery results
+		s.discovery = backend // NOTE: Find a way to tunnel all the discovery results
 		backend.Schedule()
 	}
 
@@ -227,34 +223,37 @@ func (s *Server) Schedule() error {
 }
 
 func (s *Server) setupTransport() error {
+
 	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
 
 	var err error
-	s.listener, err = rlpx.Listen("tcp", addr.String(), &rlpx.Config{Prv: s.key, Info: s.info})
+	s.listener, err = net.Listen("tcp", addr.String())
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		for {
-			// TODO, Accept should check if we have enough slots or return tooManyPeers message
 			conn, err := s.listener.Accept()
 			if err != nil {
 				// log
 			}
-			go s.handleIncomingConn(conn)
+			go s.handleConn(conn)
 		}
 	}()
+
 	return nil
 }
 
-func (s *Server) handleIncomingConn(conn *rlpx.Session) {
-	// check if we have enough incoming slots
+func (s *Server) handleConn(conn net.Conn) {
+	session, err := s.transport.Accept(conn)
+	if err != nil {
+		panic(err)
+	}
 
-	fmt.Println("-- conn --")
-	fmt.Println(conn)
-
-	s.addSession(conn)
+	if err := s.addSession(session); err != nil {
+		panic(err)
+	}
 }
 
 // PeriodicDial is the periodic dial of busy peers
@@ -284,7 +283,7 @@ func (s *Server) dialTask(id string, tasks chan string) {
 			if err != nil {
 				fmt.Printf("ERR: %v\n", err)
 
-				if err == rlpx.DiscTooManyPeers {
+				if err.Error() == "too many peers" {
 					busy = true
 				}
 			}
@@ -332,7 +331,6 @@ func (s *Server) dialRunner() {
 			sendToTask(enode)
 
 		case enode := <-s.discovery.Deliver():
-			// fmt.Printf("FROM DISCOVER: %s\n", enode)
 			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
@@ -399,10 +397,6 @@ func (s *Server) connect(addrs string) error {
 	return fmt.Errorf("Cannot connect to address %s", addrs)
 }
 
-// TODO, build a method that takes a net.Conn object
-// it will be helpful to tests protocols. connectWithEnode
-// would call this function after all the connection has been established
-
 func (s *Server) connectWithEnode(rawURL string) error {
 	// parse enode address beforehand
 	// TODO, make dial take either a rawURL or an enode
@@ -418,35 +412,35 @@ func (s *Server) connectWithEnode(rawURL string) error {
 		return nil
 	}
 
-	ss, err := rlpx.DialEnode("tcp", rawURL, &rlpx.Config{Prv: s.key, Info: s.info})
+	tcpAddr := addr.TCPAddr()
+	conn, err := net.Dial("tcp", tcpAddr.String())
+	if err != nil {
+		return err
+	}
+
+	session, err := s.transport.Connect(conn, *addr)
 	if err != nil {
 		return err
 	}
 
 	// match protocols
-	return s.addSession(ss)
+	return s.addSession(session)
 }
 
-func (s *Server) addSession(session *rlpx.Session) error {
-	p := newPeer(s.logger, session, session.RemoteInfo(), s)
+func (s *Server) addSession(session common.Session) error {
+	p := newPeer(s.logger, session, s)
 
-	// should match protocols be part of rlpx?
-	backends := s.matchProtocols(p, p.Info.Caps)
-	if len(backends) == 0 {
-		return fmt.Errorf("no matching protocols found")
+	protos, err := session.NegociateProtocols(s.info)
+	if err != nil {
+		// send close message to the peer
+		return err
 	}
 
-	// There should be a better way to handle the initialization of the peer
-	// this should be done inside the peer itself not in the server.
-	for _, i := range backends {
-		if err := i.backend.Add(i.session, p.PrettyString()); err != nil {
-			return err
-		}
-	}
-	// p.SetInstances(instances)
+	p.protocols = protos
 
 	s.peersLock.Lock()
-	s.peers[session.RemoteIDString()] = p
+	// s.peers[session.RemoteIDString()] = p
+	s.peers[p.PrettyString()] = p
 	s.peersLock.Unlock()
 
 	select {
@@ -476,31 +470,6 @@ func (s *Server) getProtocol(name string, version uint) protocol.Backend {
 		}
 	}
 	return nil
-}
-
-func (s *Server) matchProtocols(peer *Peer, caps rlpx.Capabilities) []*Instance {
-	offset := rlpx.BaseProtocolLength
-	protocols := []*Instance{}
-
-	for _, i := range caps {
-		if b := s.getProtocol(i.Name, i.Version); b != nil {
-			proto := b.Protocol()
-
-			stream := peer.conn.(*rlpx.Session).OpenStream(uint(offset), uint(proto.Length))
-			// runtime := proto.callback(stream, peer)
-
-			instance := &Instance{
-				session: stream,
-				backend: b,
-				offset:  offset,
-			}
-
-			protocols = append(protocols, instance)
-			offset += proto.Length
-		}
-	}
-
-	return protocols
 }
 
 func (s *Server) Close() {

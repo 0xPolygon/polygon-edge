@@ -4,87 +4,27 @@ import (
 	"bytes"
 	"crypto/rand"
 	"io/ioutil"
-	"sort"
 	"testing"
-	"time"
 )
 
-type timestamp struct {
-	t    time.Duration
-	code uint64
-}
-
-type timestamps []*timestamp
-
-func (t *timestamps) Copy() timestamps {
-	tt := []*timestamp{}
-	for _, i := range *t {
-		tt = append(tt, &timestamp{i.t, i.code})
-	}
-	return tt
-}
-
-func (t timestamps) Len() int           { return len(t) }
-func (t timestamps) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t timestamps) Less(i, j int) bool { return t[i].t.Nanoseconds() < t[j].t.Nanoseconds() }
-
-func TestMultipleStreamHandlers(t *testing.T) {
-	s := NewStream(0, 0, nil)
-
-	tt := timestamps{
-		{1 * time.Second, 0x1},
-		{500 * time.Millisecond, 0x2},
-		{200 * time.Millisecond, 0x3},
-		{700 * time.Millisecond, 0x4},
+func readMsg(t *testing.T, s *Stream) *Message {
+	var header Header
+	header = make([]byte, HeaderSize)
+	if _, err := s.Read(header); err != nil {
+		t.Fatal(err)
 	}
 
-	expected := tt.Copy()
-	sort.Sort(expected)
+	size := header.Length()
 
-	now := time.Now()
-
-	ack := make(chan AckMessage, len(tt))
-	for _, i := range tt {
-		s.SetHandler(i.code, ack, i.t)
+	buf := make([]byte, size)
+	if _, err := s.Read(buf); err != nil {
+		t.Fatal(err)
 	}
 
-	span := time.Duration(100 * time.Millisecond).Nanoseconds()
-
-	for _, i := range expected {
-		a := <-ack
-		if a.Code != i.code {
-			t.Fatal("bad")
-		}
-
-		elapsed := time.Now().Sub(now)
-
-		d := elapsed.Nanoseconds() - i.t.Nanoseconds()
-		if d < 0 {
-			d = d * -1
-		}
-
-		if d > span {
-			t.Fatal("bad")
-		}
-	}
-}
-
-func TestStreamHandlerUpdate(t *testing.T) {
-	s := NewStream(0, 0, nil)
-
-	ack0 := make(chan AckMessage, 1)
-	s.SetHandler(1, ack0, 500*time.Millisecond)
-
-	ack1 := make(chan AckMessage, 1)
-	s.SetHandler(1, ack1, 700*time.Millisecond)
-
-	select {
-	case <-ack1:
-		// good. seconds handler updates the first one
-	case <-ack0:
-		t.Fatal("it should have been updated")
-	case <-time.After(1 * time.Second):
-		t.Fatal("bad")
+	return &Message{
+		Code:    uint64(header.MsgType()),
+		Size:    size,
+		Payload: bytes.NewBuffer(buf),
 	}
 }
 
@@ -107,11 +47,8 @@ func TestStreamMessage(t *testing.T) {
 		}
 	}()
 
-	x, err := s1.ReadMsg()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if x.Code != 0x1 {
+	msg := readMsg(t, s1)
+	if msg.Code != 0x1 {
 		t.Fatal("bad")
 	}
 }
@@ -142,10 +79,7 @@ func TestStreamMessageWithBody(t *testing.T) {
 		}
 	}()
 
-	msg, err := s1.ReadMsg()
-	if err != nil {
-		t.Fatal(err)
-	}
+	msg := readMsg(t, s1)
 	if msg.Code != 0x5 {
 		t.Fatal("bad")
 	}
@@ -156,8 +90,4 @@ func TestStreamMessageWithBody(t *testing.T) {
 	if !bytes.Equal(data, buf) {
 		t.Fatal("bad")
 	}
-}
-
-func TestSessionMultipleStreams(t *testing.T) {
-
 }

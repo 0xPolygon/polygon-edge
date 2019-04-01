@@ -5,23 +5,19 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
+// Stream represents a logic stream within a RLPx session
 type Stream struct {
 	offset uint64
 	length uint64
 
-	conn *Session
-	Msgs chan Message
-
+	conn     *Session
 	respLock sync.Mutex
-	handlers map[uint64]*handler
-	timer    *time.Timer
 
 	recvBuf  *bytes.Buffer
 	recvLock sync.Mutex
@@ -34,14 +30,13 @@ type Stream struct {
 	header Header
 }
 
+// NewStream constructs a new stream with a given offset and length
 func NewStream(offset uint64, length uint64, conn *Session) *Stream {
 	s := &Stream{
 		offset:       offset,
 		length:       length,
 		conn:         conn,
-		Msgs:         make(chan Message, 10),
 		respLock:     sync.Mutex{},
-		handlers:     map[uint64]*handler{},
 		recvNotifyCh: make(chan struct{}, 1),
 	}
 	s.readDeadline.Store(time.Time{})
@@ -49,44 +44,34 @@ func NewStream(offset uint64, length uint64, conn *Session) *Stream {
 	return s
 }
 
-// Consume consumes the handler if exists
-func (s *Stream) Consume(code uint64, payload io.Reader) bool {
-	handler, ok := s.handlers[code]
-	if !ok {
-		return false
-	}
-
-	// consume the handler
-	handler.callback(payload)
-
-	s.respLock.Lock()
-	delete(s.handlers, code)
-	s.respLock.Unlock()
-
-	return true
-}
-
 const (
 	sizeOfType   = 2
 	sizeOfLength = 4
-	HeaderSize   = sizeOfType + sizeOfLength
+
+	// HeaderSize is the size of the RLPx header
+	HeaderSize = sizeOfType + sizeOfLength
 )
 
+// Header represents an RLPx header
 type Header []byte
 
+// MsgType returns the msg code in a RLPx header
 func (h Header) MsgType() uint16 {
 	return binary.BigEndian.Uint16(h[0:2])
 }
 
+// Length returns the length of the data in a RLPx header
 func (h Header) Length() uint32 {
 	return binary.BigEndian.Uint32(h[2:6])
 }
 
+// Encode encodes a header with msg code and length
 func (h Header) Encode(msgType uint16, length uint32) {
 	binary.BigEndian.PutUint16(h[0:2], msgType)
 	binary.BigEndian.PutUint32(h[2:6], length)
 }
 
+// Write implements the net.Conn interface
 func (s *Stream) Write(b []byte) (int, error) {
 	if s.header == nil {
 		if len(b) != HeaderSize {
@@ -116,74 +101,18 @@ func (s *Stream) Write(b []byte) (int, error) {
 		Payload: bytes.NewReader(b),
 	}
 
-	if err := s.conn.Write(msg); err != nil {
+	if err := s.conn.WriteRawMsg(msg); err != nil {
 		return 0, err
 	}
-
 	return len(b), nil
 }
 
-func (s *Stream) WriteMsg(msgcode uint64, data ...interface{}) error {
-	return s.conn.WriteMsg(msgcode+s.offset, data...)
-}
-
-func (s *Stream) ReadMsg() (Message, error) {
-	msg := <-s.Msgs
-	return msg, msg.Err
-}
-
-func (s *Stream) deliver(msg *Message) {
-	if !s.Consume(msg.Code, msg.Payload) {
-		s.Msgs <- *msg
-	}
-}
-
-func (s *Stream) SetHandler(code uint64, ackCh chan AckMessage, duration time.Duration) {
-	callback := func(payload io.Reader) {
-		select {
-		case ackCh <- AckMessage{true, code, payload}:
-		default:
-		}
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	salt := rand.Uint64()
-
-	handler := &handler{
-		callback: callback,
-		salt:     salt,
-	}
-
-	s.respLock.Lock()
-	s.handlers[code] = handler
-	s.respLock.Unlock()
-
-	s.timer = time.AfterFunc(duration, func() {
-		h, ok := s.handlers[code]
-		if !ok {
-			return
-		}
-
-		if h.salt != salt {
-			return
-		}
-
-		s.respLock.Lock()
-		delete(s.handlers, code)
-		s.respLock.Unlock()
-
-		select {
-		case ackCh <- AckMessage{false, code, nil}:
-		default:
-		}
-	})
-}
-
-func (s *Stream) Close() error {
-	return s.conn.Close()
-}
-
+// Read implements the net.Conn interface
 func (s *Stream) Read(b []byte) (n int, err error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
+
 	defer asyncNotify(s.recvNotifyCh)
 
 START:
@@ -237,8 +166,6 @@ func (s *Stream) readData(msg *Message) error {
 	s.recvLock.Lock()
 
 	if s.recvBuf == nil {
-		// Allocate the receive buffer just-in-time to fit the full data frame.
-		// This way we can read in the whole packet without further allocations.
 		s.recvBuf = bytes.NewBuffer(make([]byte, 0, msg.Size+HeaderSize))
 	}
 
@@ -263,24 +190,34 @@ func (s *Stream) readData(msg *Message) error {
 	return nil
 }
 
+// RemoteAddr implements the net.Conn interface
 func (s *Stream) RemoteAddr() net.Addr {
 	return s.conn.conn.RemoteAddr()
 }
 
+// LocalAddr implements the net.Conn interface
 func (s *Stream) LocalAddr() net.Addr {
 	return s.conn.conn.LocalAddr()
 }
 
+// SetDeadline implements the net.Conn interface
 func (s *Stream) SetDeadline(t time.Time) error {
-	return nil
+	return s.conn.SetDeadline(t)
 }
 
+// SetReadDeadline implements the net.Conn interface
 func (s *Stream) SetReadDeadline(t time.Time) error {
-	return nil
+	return s.conn.SetReadDeadline(t)
 }
 
+// SetWriteDeadline implements the net.Conn interface
 func (s *Stream) SetWriteDeadline(t time.Time) error {
-	return nil
+	return s.SetWriteDeadline(t)
+}
+
+// Close implements the net.Conn interface
+func (s *Stream) Close() error {
+	return s.conn.Close()
 }
 
 func copyZeroAlloc(w io.Writer, r io.Reader) (int64, error) {

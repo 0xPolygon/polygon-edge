@@ -54,7 +54,7 @@ type handshakeConn struct {
 }
 
 func (c *handshakeConn) readMessage(m plainDecoder) ([]byte, error) {
-	var plainSize int
+	var plainSize uint16
 	switch m.(type) {
 	case *authMsgV4:
 		plainSize = encAuthMsgLen
@@ -81,7 +81,7 @@ func (c *handshakeConn) readMessage(m plainDecoder) ([]byte, error) {
 	return buf, nil
 }
 
-func (c *handshakeConn) readBytes(plainSize int) ([]byte, []byte, bool, error) {
+func (c *handshakeConn) readBytes(plainSize uint16) ([]byte, []byte, bool, error) {
 	c.conn.SetReadDeadline(time.Now().Add(handshakeReadTimeout))
 
 	buf := make([]byte, plainSize)
@@ -97,14 +97,16 @@ func (c *handshakeConn) readBytes(plainSize int) ([]byte, []byte, bool, error) {
 	// EIP-8
 	prefix := buf[:2]
 	size := binary.BigEndian.Uint16(prefix)
-	if size < uint16(plainSize) {
+	if size < plainSize {
 		return nil, nil, false, fmt.Errorf("size underflow, need at least %d bytes", plainSize)
 	}
 
-	buf = append(buf, make([]byte, size-uint16(plainSize)+2)...)
-	if _, err := c.conn.Read(buf[plainSize:]); err != nil {
+	buf2 := make([]byte, size-plainSize+2)
+	if _, err := c.conn.Read(buf2); err != nil {
 		return buf, nil, false, err
 	}
+
+	buf = append(buf, buf2...)
 	dec, err := c.local.Decrypt(buf[2:], nil, prefix)
 	if err != nil {
 		return nil, nil, false, err
@@ -121,6 +123,7 @@ func (c *handshakeConn) writeMessage(m plainDecoder) ([]byte, error) {
 	// Encode EIP8
 	pad := padSpace[:mrand.Intn(len(padSpace)-100)+100]
 	buf.Write(pad)
+
 	prefix := make([]byte, 2)
 	binary.BigEndian.PutUint16(prefix, uint16(buf.Len()+eciesOverhead))
 
@@ -426,10 +429,15 @@ func readProtocolHandshake(conn *Session) (*Info, error) {
 		return nil, fmt.Errorf("expected handshake, got %x", msg.Code)
 	}
 
+	fmt.Println("-- read handshake message --")
+
 	var info Info
 	if err := msg.Decode(&info); err != nil {
 		return nil, err
 	}
+
+	fmt.Println(info)
+
 	if (info.ID == enode.ID{}) {
 		return nil, DiscInvalidIdentity
 	}

@@ -246,7 +246,7 @@ func (b *Backend) watchBlock(watch chan *NotifyMsg) {
 }
 
 // Add is called when we connect to a new node
-func (b *Backend) Add(conn net.Conn, peerID string) error {
+func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 	fmt.Println("----- ADD NODE -----")
 
 	/*
@@ -264,7 +264,7 @@ func (b *Backend) Add(conn net.Conn, peerID string) error {
 
 	// Start the protocol handle
 	if err := proto.Init(); err != nil {
-		return err
+		return nil, err
 	}
 
 	peerConn := &PeerConnection{
@@ -290,7 +290,7 @@ func (b *Backend) Add(conn net.Conn, peerID string) error {
 	})
 
 	// go s.runPeer(p)
-	return nil
+	return proto, nil
 }
 
 func (b *Backend) Dequeue() *Job {

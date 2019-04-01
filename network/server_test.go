@@ -1,32 +1,75 @@
 package network
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math/rand"
+	"net"
 	"testing"
 	"time"
 
-	"github.com/umbracle/minimal/network/transport/rlpx"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/protocol"
 )
 
-func testProtocolSessions(t *testing.T) (*Server, rlpx.Conn, *Server, rlpx.Conn) {
-	s0, s1 := TestServers(DefaultConfig())
+type dummyHandler struct{}
 
-	// sessions
-	var e0, e1 rlpx.Conn
+func (d *dummyHandler) Init() error {
+	return nil
+}
 
-	p := protocol.Protocol{Name: "test", Version: 1, Length: 7}
+func (d *dummyHandler) Close() error {
+	return nil
+}
 
-	callback0 := func(session rlpx.Conn, peer *Peer) protocol.Handler {
-		e0 = session
-		return &dummyHandler{}
-	}
-	callback1 := func(session rlpx.Conn, peer *Peer) protocol.Handler {
-		e1 = session
-		return &dummyHandler{}
-	}
+func testServers(config *Config) (*Server, *Server) {
+	logger := log.New(ioutil.Discard, "", log.LstdFlags)
 
-	s0.RegisterProtocol(p, callback0)
-	s1.RegisterProtocol(p, callback1)
+	prv0, _ := crypto.GenerateKey()
+	prv1, _ := crypto.GenerateKey()
+
+	rand.Seed(int64(time.Now().Nanosecond()))
+	port := rand.Intn(9000-5000) + 5000 // Random port between 5000 and 9000
+
+	c0 := *config
+	c0.BindPort = port
+	s0 := NewServer("test", prv0, &c0, logger)
+
+	c1 := *config
+	c1.BindPort = port + 1
+	s1 := NewServer("test", prv1, &c1, logger)
+
+	return s0, s1
+}
+
+type handler struct {
+}
+
+func (h *handler) Info() string {
+	return "info"
+}
+
+type sampleProtocol struct {
+}
+
+func (s *sampleProtocol) Protocol() protocol.Protocol {
+	return protocol.Protocol{Name: "test", Version: 1, Length: 7}
+}
+
+func (s *sampleProtocol) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
+	h := &handler{}
+	return h, nil
+}
+
+func TestProtocolConnection(t *testing.T) {
+	s0, s1 := testServers(DefaultConfig())
+
+	p0 := &sampleProtocol{}
+	p1 := &sampleProtocol{}
+
+	s0.RegisterProtocol(p0)
+	s1.RegisterProtocol(p1)
 
 	if err := s0.Schedule(); err != nil {
 		t.Fatal(err)
@@ -35,16 +78,17 @@ func testProtocolSessions(t *testing.T) (*Server, rlpx.Conn, *Server, rlpx.Conn)
 		t.Fatal(err)
 	}
 
+	fmt.Println(s0)
+	fmt.Println(s1)
+
 	if err := s0.DialSync(s1.Enode.String()); err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(2000 * time.Millisecond)
-	return s0, e0, s1, e1
-}
+	time.Sleep(1 * time.Second)
 
-func toCap(p protocol.Protocol) *rlpx.Cap {
-	return &rlpx.Cap{Name: p.Name, Version: p.Version}
+	fmt.Println(s0.peers)
+	fmt.Println(s1.peers)
 }
 
 /*
@@ -112,107 +156,3 @@ func TestMatchProtocols(t *testing.T) {
 	}
 }
 */
-
-func TestSessionHandler(t *testing.T) {
-	_, e0, _, e1 := testProtocolSessions(t)
-
-	ack := make(chan rlpx.AckMessage, 1)
-	e0.SetHandler(0x1, ack, 1*time.Second)
-
-	if err := e1.WriteMsg(0x1, []byte{1, 2, 3}); err != nil {
-		t.Fatal(err)
-	}
-
-	readOnce := func(conn rlpx.Conn) chan rlpx.Message {
-		m := make(chan rlpx.Message, 5)
-		go func() {
-			msg, _ := conn.ReadMsg()
-			m <- msg
-		}()
-		return m
-	}
-
-	select {
-	case r := <-ack:
-		if !r.Complete {
-			t.Fatal("it should be completed")
-		}
-	case <-readOnce(e0):
-		t.Fatal("it should be received on the handler not here")
-	case <-time.After(5 * time.Second):
-		t.Fatal("timeout")
-	}
-}
-
-func TestSessionHandlerTimeout(t *testing.T) {
-	_, e0, _, _ := testProtocolSessions(t)
-
-	ack := make(chan rlpx.AckMessage, 1)
-	e0.SetHandler(0x1, ack, 1*time.Second)
-
-	select {
-	case r := <-ack:
-		if r.Complete {
-			t.Fatal("it should be incompleted")
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("timeout")
-	}
-}
-
-func TestSessionHandlerMessageAfterTimeout(t *testing.T) {
-	_, e0, _, e1 := testProtocolSessions(t)
-
-	ack := make(chan rlpx.AckMessage, 1)
-	e0.SetHandler(0x1, ack, 600*time.Millisecond)
-
-	time.Sleep(600 * time.Millisecond)
-
-	if err := e1.WriteMsg(0x1, []byte{1, 2, 3}); err != nil {
-		t.Fatal(err)
-	}
-
-	// e0 should receive the message from readMsg
-	msg, err := e0.ReadMsg()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if msg.Code != 0x1 {
-		t.Fatal("expected 0x1")
-	}
-}
-
-func TestProtocolEncoding(t *testing.T) {
-	s0, e0, s1, e1 := testProtocolSessions(t)
-
-	// s0 has s1 as a peer
-	if len(s0.peers) != 1 {
-		t.Fatal("s0 should have at least one peer")
-	}
-	for id := range s0.peers {
-		if id != s1.ID().String() {
-			t.Fatal("s0 peer is bad")
-		}
-	}
-
-	// s1 has s0 as a peer
-	if len(s1.peers) != 1 {
-		t.Fatal("s1 should have at least one peer")
-	}
-	for id := range s1.peers {
-		if id != s0.ID().String() {
-			t.Fatal("s1 peer is bad")
-		}
-	}
-
-	// send messages
-	go e0.WriteMsg(0x1)
-
-	msg, err := e1.ReadMsg()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if msg.Code != 0x1 {
-		t.Fatal("expected another msg")
-	}
-}
