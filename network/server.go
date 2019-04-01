@@ -86,9 +86,8 @@ type MemberEvent struct {
 // Server is the ethereum client
 type Server struct {
 	logger *log.Logger
-	// Protocols []*protocolStub
-	Name string
-	key  *ecdsa.PrivateKey
+	Name   string
+	key    *ecdsa.PrivateKey
 
 	peersLock sync.Mutex
 	peers     map[string]*Peer
@@ -128,7 +127,6 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 	fmt.Printf("Enode: %s\n", enode.String())
 
 	s := &Server{
-		// Protocols:    []*protocolStub{},
 		Name:         name,
 		key:          key,
 		peers:        map[string]*Peer{},
@@ -216,7 +214,7 @@ func (s *Server) Schedule() error {
 		if err != nil {
 			return err
 		}
-		s.discovery = backend // NOTE: Find a way to tunnel allt he discovery results
+		s.discovery = backend // NOTE: Find a way to tunnel all the discovery results
 		backend.Schedule()
 	}
 
@@ -285,12 +283,9 @@ func (s *Server) dialTask(id string, tasks chan string) {
 			if err != nil {
 				fmt.Printf("ERR: %v\n", err)
 
-				/*
-					if err == rlpx.DiscTooManyPeers {
-						busy = true
-					}
-					// TODO
-				*/
+				if err.Error() == "too many peers" {
+					busy = true
+				}
 			}
 
 			if busy {
@@ -335,11 +330,8 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-			/*
-				case enode := <-s.discovery.Deliver():
-					// fmt.Printf("FROM DISCOVER: %s\n", enode)
-					sendToTask(enode)
-			*/
+		case enode := <-s.discovery.Deliver():
+			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
 			sendToTask(enode.ID())

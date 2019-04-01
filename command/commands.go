@@ -25,11 +25,6 @@ func Commands() map[string]cli.CommandFactory {
 				Ui: ui,
 			}, nil
 		},
-		"probe": func() (cli.Command, error) {
-			return &ProbeCommand{
-				Meta: meta,
-			}, nil
-		},
 		"genesis": func() (cli.Command, error) {
 			return &GenesisCommand{
 				Meta: meta,
