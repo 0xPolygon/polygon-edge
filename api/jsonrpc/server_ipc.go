@@ -1,5 +1,15 @@
 package jsonrpc
 
-// IPC is an ipc process that serves jsonrpc requests
-type IPC struct {
+import "github.com/umbracle/minimal/helper/ipc"
+
+func startIPC() {
+	lis, err := ipc.Listen("minimal.ipc")
+	if err != nil {
+		panic(err)
+	}
+
+	h := HTTPServer{}
+	if err := h.serve(lis); err != nil {
+		panic(err)
+	}
 }
