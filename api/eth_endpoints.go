@@ -48,7 +48,7 @@ func (e *Eth) GetBlockByNumber(in []interface{}, out *interface{}) error {
 		return fmt.Errorf("cannot provide yet this data")
 	}
 
-	block := e.s.blockchain.GetBlockByNumber(big.NewInt(int64(blocknumber)), full)
+	block := e.s.minimal.Blockchain.GetBlockByNumber(big.NewInt(int64(blocknumber)), full)
 	if block != nil {
 		*out = *block
 	} else {
@@ -79,7 +79,7 @@ func (e *Eth) GetBlockByHash(in []interface{}, out *interface{}) error {
 	}
 	hash := common.HexToHash(hashStr)
 
-	block := e.s.blockchain.GetBlockByHash(hash, full)
+	block := e.s.minimal.Blockchain.GetBlockByHash(hash, full)
 	if block != nil {
 		*out = *block
 	} else {
@@ -89,7 +89,7 @@ func (e *Eth) GetBlockByHash(in []interface{}, out *interface{}) error {
 }
 
 func (e *Eth) BlockNumber(in interface{}, out *string) error {
-	header := e.s.blockchain.Header()
+	header := e.s.minimal.Blockchain.Header()
 	if header == nil {
 		*out = ""
 	} else {

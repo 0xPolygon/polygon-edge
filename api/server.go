@@ -1,22 +1,20 @@
 package api
 
 import (
-	"log"
-	"net/http"
-	"net/rpc"
+	"fmt"
 
 	"github.com/umbracle/minimal/api/jsonrpc"
-	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/minimal"
 )
 
 // Server exposes the api interfaces
 type Server struct {
-	blockchain *blockchain.Blockchain
-	endpoints  endpoints
+	minimal   *minimal.Minimal
+	endpoints endpoints
 }
 
-func NewServer(blockchain *blockchain.Blockchain) (*Server, error) {
-	s := &Server{blockchain: blockchain}
+func NewServer(minimal *minimal.Minimal) (*Server, error) {
+	s := &Server{minimal: minimal}
 
 	s.endpoints = endpoints{
 		Eth: &Eth{s},
@@ -27,15 +25,8 @@ func NewServer(blockchain *blockchain.Blockchain) (*Server, error) {
 }
 
 func (s *Server) start() {
-	r := rpc.NewServer()
-	r.Register(s.endpoints.Eth)
-
-	// JsonRPC server
-	http.Handle("/jrpc", jsonrpc.ServeHttp(r))
-
-	if err := http.ListenAndServe(":8081", http.DefaultServeMux); err != nil {
-		log.Fatalln(err)
-	}
+	ss := jsonrpc.Server{}
+	fmt.Println(ss)
 }
 
 type endpoints struct {
