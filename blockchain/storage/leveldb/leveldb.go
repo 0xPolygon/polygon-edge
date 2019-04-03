@@ -65,7 +65,7 @@ var (
 // KV is a key value storage interface
 type KV interface {
 	set(p []byte, v []byte) error
-	get(p []byte) ([]byte, error)
+	get(p []byte) ([]byte, bool, error)
 }
 
 // levelDBKV is the leveldb implementation of the kv storage
@@ -77,14 +77,15 @@ func (l *levelDBKV) set(p []byte, v []byte) error {
 	return l.db.Put(p, v, nil)
 }
 
-func (l *levelDBKV) get(p []byte) ([]byte, error) {
+func (l *levelDBKV) get(p []byte) ([]byte, bool, error) {
 	data, err := l.db.Get(p, nil)
 	if err != nil {
 		if err.Error() == "leveldb: not found" {
-			return nil, ErrNotFound
+			return nil, false, ErrNotFound
 		}
+		return nil, false, err
 	}
-	return data, err
+	return data, true, nil
 }
 
 // memoryKV is an in memory implementation of the kv storage
@@ -97,19 +98,18 @@ func (m *memoryKV) set(p []byte, v []byte) error {
 	return nil
 }
 
-func (m *memoryKV) get(p []byte) ([]byte, error) {
+func (m *memoryKV) get(p []byte) ([]byte, bool, error) {
 	v, ok := m.db[hexutil.Encode(p)]
 	if !ok {
-		return []byte{}, ErrNotFound
+		return nil, false, nil
 	}
-	return v, nil
+	return v, true, nil
 }
 
 // Storage is the blockchain storage using boltdb
 type Storage struct {
 	logger *log.Logger
-	// db     *leveldb.DB
-	db KV
+	db     KV
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb
@@ -140,55 +140,54 @@ func (s *Storage) Close() error {
 // -- canonical hash --
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain
-func (s *Storage) ReadCanonicalHash(n *big.Int) common.Hash {
-	data := s.get(CANONICAL, n.Bytes())
-	if len(data) == 0 {
-		return common.Hash{}
+func (s *Storage) ReadCanonicalHash(n *big.Int) (common.Hash, bool) {
+	data, ok := s.get(CANONICAL, n.Bytes())
+	if !ok {
+		return common.Hash{}, false
 	}
-	return common.BytesToHash(data)
+	return common.BytesToHash(data), true
 }
 
 // WriteCanonicalHash writes a hash for a number block in the canonical chain
-func (s *Storage) WriteCanonicalHash(n *big.Int, hash common.Hash) {
-	s.set(CANONICAL, n.Bytes(), hash.Bytes())
+func (s *Storage) WriteCanonicalHash(n *big.Int, hash common.Hash) error {
+	return s.set(CANONICAL, n.Bytes(), hash.Bytes())
 }
 
 // -- head --
 
 // ReadHeadHash returns the hash of the head
-func (s *Storage) ReadHeadHash() *common.Hash {
-	data := s.get(HEAD, HASH)
-	if len(data) == 0 {
-		return nil
+func (s *Storage) ReadHeadHash() (common.Hash, bool) {
+	data, ok := s.get(HEAD, HASH)
+	if !ok {
+		return common.Hash{}, false
 	}
-	hash := common.BytesToHash(data)
-	return &hash
+	return common.BytesToHash(data), true
 }
 
 // ReadHeadNumber returns the number of the head
-func (s *Storage) ReadHeadNumber() *big.Int {
-	data := s.get(HEAD, HASH)
-	if len(data) == 0 {
-		return nil
+func (s *Storage) ReadHeadNumber() (*big.Int, bool) {
+	data, ok := s.get(HEAD, HASH)
+	if !ok {
+		return nil, false
 	}
-	return big.NewInt(1).SetBytes(data)
+	return big.NewInt(1).SetBytes(data), true
 }
 
 // WriteHeadHash writes the hash of the head
-func (s *Storage) WriteHeadHash(h common.Hash) {
-	s.set(HEAD, HASH, h.Bytes())
+func (s *Storage) WriteHeadHash(h common.Hash) error {
+	return s.set(HEAD, HASH, h.Bytes())
 }
 
 // WriteHeadNumber writes the number of the head
-func (s *Storage) WriteHeadNumber(n *big.Int) {
-	s.set(HEAD, NUMBER, n.Bytes())
+func (s *Storage) WriteHeadNumber(n *big.Int) error {
+	return s.set(HEAD, NUMBER, n.Bytes())
 }
 
 // -- fork --
 
 // WriteForks writes the current forks
-func (s *Storage) WriteForks(forks []common.Hash) {
-	s.write(FORK, EMPTY, forks)
+func (s *Storage) WriteForks(forks []common.Hash) error {
+	return s.write(FORK, EMPTY, forks)
 }
 
 // ReadForks read the current forks
@@ -201,57 +200,56 @@ func (s *Storage) ReadForks() []common.Hash {
 // -- difficulty --
 
 // WriteDiff writes the difficulty
-func (s *Storage) WriteDiff(hash common.Hash, diff *big.Int) {
-	s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
+func (s *Storage) WriteDiff(hash common.Hash, diff *big.Int) error {
+	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 
 // ReadDiff reads the difficulty
-func (s *Storage) ReadDiff(hash common.Hash) *big.Int {
-	v := s.get(DIFFICULTY, hash.Bytes())
-	if len(v) == 0 {
-		return nil
+func (s *Storage) ReadDiff(hash common.Hash) (*big.Int, bool) {
+	v, ok := s.get(DIFFICULTY, hash.Bytes())
+	if !ok {
+		return nil, false
 	}
-	return big.NewInt(0).SetBytes(v)
+	return big.NewInt(0).SetBytes(v), true
 }
 
 // -- header --
 
 // WriteHeader writes the header
-func (s *Storage) WriteHeader(h *types.Header) {
-	s.write(HEADER, h.Hash().Bytes(), h)
+func (s *Storage) WriteHeader(h *types.Header) error {
+	return s.write(HEADER, h.Hash().Bytes(), h)
 }
 
 // ReadHeader reads the header
-func (s *Storage) ReadHeader(hash common.Hash) *types.Header {
+func (s *Storage) ReadHeader(hash common.Hash) (*types.Header, bool) {
 	var header *types.Header
-	s.read(HEADER, hash.Bytes(), &header)
-	return header
+	ok := s.read(HEADER, hash.Bytes(), &header)
+	return header, ok
 }
 
 // -- body --
 
 // WriteBody writes the body
-func (s *Storage) WriteBody(hash common.Hash, body *types.Body) {
-	s.write(BODY, hash.Bytes(), body)
+func (s *Storage) WriteBody(hash common.Hash, body *types.Body) error {
+	return s.write(BODY, hash.Bytes(), body)
 }
 
 // ReadBody reads the body
-func (s *Storage) ReadBody(hash common.Hash) *types.Body {
+func (s *Storage) ReadBody(hash common.Hash) (*types.Body, bool) {
 	var body *types.Body
-	s.read(BODY, hash.Bytes(), &body)
-	return body
+	ok := s.read(BODY, hash.Bytes(), &body)
+	return body, ok
 }
 
 // -- receipts --
 
 // WriteReceipts writes the receipts
-func (s *Storage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) {
+func (s *Storage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) error {
 	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
 	for i, receipt := range receipts {
 		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
 	}
-
-	s.write(RECEIPTS, hash.Bytes(), storageReceipts)
+	return s.write(RECEIPTS, hash.Bytes(), storageReceipts)
 }
 
 // ReadReceipts reads the receipts
@@ -269,38 +267,37 @@ func (s *Storage) ReadReceipts(hash common.Hash) []*types.Receipt {
 
 // -- write ops --
 
-func (s *Storage) write(p []byte, k []byte, obj interface{}) {
+func (s *Storage) write(p []byte, k []byte, obj interface{}) error {
 	data, err := rlp.EncodeToBytes(obj)
 	if err != nil {
-		s.logger.Printf("failed to encode rlp: %v", err)
-	} else {
-		s.set(p, k, data)
+		return fmt.Errorf("failed to encode rlp: %v", err)
 	}
+	return s.set(p, k, data)
 }
 
-func (s *Storage) read(p []byte, k []byte, obj interface{}) {
-	data := s.get(p, k)
-	if len(data) != 0 {
-		if err := rlp.DecodeBytes(data, obj); err != nil {
-			s.logger.Printf("failed to decode rlp: %v", err)
-		}
+func (s *Storage) read(p []byte, k []byte, obj interface{}) bool {
+	data, ok := s.get(p, k)
+	if !ok {
+		return false
 	}
+	if err := rlp.DecodeBytes(data, obj); err != nil {
+		s.logger.Printf("failed to decode rlp: %v", err)
+		return false
+	}
+	return true
 }
 
-func (s *Storage) set(p []byte, k []byte, v []byte) {
+func (s *Storage) set(p []byte, k []byte, v []byte) error {
 	p = append(p, k...)
-	if err := s.db.set(p, v); err != nil {
-		s.logger.Printf("failed to write: %v", err)
-	}
+	return s.db.set(p, v)
 }
 
-func (s *Storage) get(p []byte, k []byte) []byte {
+func (s *Storage) get(p []byte, k []byte) ([]byte, bool) {
 	p = append(p, k...)
-	data, err := s.db.get(p)
+	data, ok, err := s.db.get(p)
 	if err != nil {
-		if err != ErrNotFound {
-			s.logger.Printf("failed to read: %v", err)
-		}
+		s.logger.Printf("failed to read: %v", err)
+		return nil, false
 	}
-	return data
+	return data, ok
 }

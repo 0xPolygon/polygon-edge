@@ -7,13 +7,13 @@ import (
 	"math/big"
 	"net"
 
+	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/minimal"
 
 	"sync"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/sealer"
@@ -30,21 +30,6 @@ func DefaultConfig() *Config {
 		NumWorkers:  2,
 	}
 	return c
-}
-
-// Blockchain is the reference the syncer needs to connect to the blockchain
-type Blockchain interface {
-	Header() *types.Header
-	Genesis() *types.Header
-	GetTD(hash common.Hash) *big.Int
-	WriteHeaders(headers []*types.Header) error
-	WriteBlocks(blocks []*types.Block) error
-	CommitBodies(headers []common.Hash, bodies []*types.Body) error
-	CommitReceipts(headers []common.Hash, receipts []types.Receipts) error
-	GetHeaderByHash(hash common.Hash) *types.Header
-	GetHeaderByNumber(n *big.Int) *types.Header
-	GetReceiptsByHash(hash common.Hash) types.Receipts
-	GetBodyByHash(hash common.Hash) *types.Body
 }
 
 type Peer struct {
@@ -72,7 +57,7 @@ type Backend struct {
 	NetworkID  uint64
 	config     *Config
 	minimal    *minimal.Minimal
-	blockchain Blockchain
+	blockchain *blockchain.Blockchain
 	queue      *queue
 
 	counter int
@@ -93,7 +78,7 @@ func Factory(ctx context.Context, m interface{}) (protocol.Backend, error) {
 }
 
 // NewBackend creates a new ethereum backend
-func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain Blockchain, config *Config) (*Backend, error) {
+func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain *blockchain.Blockchain, config *Config) (*Backend, error) {
 	b := &Backend{
 		config:      config,
 		minimal:     minimal,
@@ -108,7 +93,10 @@ func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain Blockchai
 		waitCh:      make([]chan struct{}, 0),
 	}
 
-	header := blockchain.Header()
+	header, ok := blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("header not found")
+	}
 
 	fmt.Println(header)
 
@@ -145,7 +133,11 @@ func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 
 func (b *Backend) broadcast(block *types.Block) {
 	// total difficulty so far at the parent
-	diff := b.blockchain.GetTD(block.ParentHash())
+	diff, ok := b.blockchain.GetTD(block.ParentHash())
+	if !ok {
+		// log error
+		return
+	}
 
 	// total difficulty + the difficulty of the block
 	blockDiff := big.NewInt(1).Add(diff, block.Difficulty())
@@ -180,9 +172,8 @@ func (b *Backend) notifyNewData(w *NotifyMsg) {
 		panic(err)
 	}
 
-	ourHeader := b.blockchain.Header()
-
-	td := b.blockchain.GetTD(ourHeader.Hash())
+	ourHeader, _ := b.blockchain.Header()
+	td, _ := b.blockchain.GetTD(ourHeader.Hash())
 
 	// check that the difficulty is higher than ours
 	if w.Diff.Cmp(td) < 0 {
@@ -379,7 +370,8 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 				return
 			}
 
-			fmt.Printf("New header number: %d\n", b.blockchain.Header().Number.Uint64())
+			h, _ := b.blockchain.Header()
+			fmt.Printf("New header number: %d\n", h.Number.Uint64())
 
 			/*
 				if err := b.blockchain.CommitBodies(elem.GetBodiesHashes(), elem.bodies); err != nil {
@@ -397,10 +389,16 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 
 // GetStatus returns the current ethereum status
 func (b *Backend) GetStatus() (*Status, error) {
-	header := b.blockchain.Header()
+	header, ok := b.blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("header not found")
+	}
 
 	// We transmit the total difficulty of our current chain
-	td := b.blockchain.GetTD(header.Hash())
+	td, ok := b.blockchain.GetTD(header.Hash())
+	if !ok {
+		return nil, fmt.Errorf("header difficulty not found")
+	}
 
 	status := &Status{
 		ProtocolVersion: 63,
@@ -453,8 +451,10 @@ func (b *Backend) checkDAOHardFork(eth *Ethereum) error {
 func (b *Backend) FindCommonAncestor(peer *Ethereum) (*types.Header, *types.Header, error) {
 	// Binary search, TODO, works but it may take a lot of time
 
+	h, _ := b.blockchain.Header()
+
 	min := 0 // genesis
-	max := int(b.blockchain.Header().Number.Uint64())
+	max := int(h.Number.Uint64())
 
 	height, err := peer.fetchHeight(context.Background())
 	if err != nil {
@@ -484,8 +484,8 @@ func (b *Backend) FindCommonAncestor(peer *Ethereum) (*types.Header, *types.Head
 				return nil, nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
 			}
 
-			expectedHeader := b.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
-			if expectedHeader == nil {
+			expectedHeader, ok := b.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
+			if !ok {
 				return nil, nil, fmt.Errorf("cannot find the header in local chain")
 			}
 

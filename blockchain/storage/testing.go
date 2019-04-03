@@ -57,8 +57,10 @@ func testCanonicalChain(t *testing.T, s Storage) {
 
 	for _, cc := range cases {
 		s.WriteCanonicalHash(cc.Number, cc.Hash)
-		data := s.ReadCanonicalHash(cc.Number)
-
+		data, ok := s.ReadCanonicalHash(cc.Number)
+		if !ok {
+			t.Fatal("not found")
+		}
 		if !reflect.DeepEqual(data, cc.Hash) {
 			t.Fatal("not match")
 		}
@@ -86,8 +88,10 @@ func testDifficulty(t *testing.T, s Storage) {
 
 	for _, cc := range cases {
 		s.WriteDiff(cc.Hash, cc.Diff)
-		diff := s.ReadDiff(cc.Hash)
-
+		diff, ok := s.ReadDiff(cc.Hash)
+		if !ok {
+			t.Fatal("not found")
+		}
 		if !reflect.DeepEqual(cc.Diff, diff) {
 			t.Fatal("bad")
 		}
@@ -105,9 +109,11 @@ func testHead(t *testing.T, s Storage) {
 
 	for _, cc := range cases {
 		s.WriteHeadHash(cc.Hash)
-		hash := s.ReadHeadHash()
-
-		if !reflect.DeepEqual(cc.Hash, *hash) {
+		hash, ok := s.ReadHeadHash()
+		if !ok {
+			t.Fatal("not found")
+		}
+		if !reflect.DeepEqual(cc.Hash, hash) {
 			t.Fatal("bad")
 		}
 	}
@@ -141,8 +147,10 @@ func testHeader(t *testing.T, s Storage) {
 	}
 
 	s.WriteHeader(header)
-	header1 := s.ReadHeader(header.Hash())
-
+	header1, ok := s.ReadHeader(header.Hash())
+	if !ok {
+		t.Fatal("not found")
+	}
 	if !reflect.DeepEqual(header.Hash(), header1.Hash()) {
 		t.Fatal("bad")
 	}
@@ -164,7 +172,10 @@ func testBody(t *testing.T, s Storage) {
 	hash := block.Hash()
 
 	s.WriteBody(hash, block.Body())
-	body := s.ReadBody(hash)
+	body, ok := s.ReadBody(hash)
+	if !ok {
+		t.Fatal("not found")
+	}
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
 	tx0, tx1 := block.Body().Transactions, body.Transactions
