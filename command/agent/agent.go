@@ -1,10 +1,7 @@
 package agent
 
 import (
-	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/umbracle/minimal/minimal/keystore"
+
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/protocol/ethereum"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/minimal"
 )
@@ -68,14 +66,8 @@ func (a *Agent) Start() error {
 		panic(err)
 	}
 
-	// Load private key from memory (TODO, do it from a file)
-	key, err := loadKey(a.config.DataDir)
-	if err != nil {
-		panic(err)
-	}
-
 	config := &minimal.Config{
-		Key:              key,
+		Keystore:         keystore.NewLocalKeystore(a.config.DataDir),
 		Chain:            chain,
 		DataDir:          a.config.DataDir,
 		BindAddr:         a.config.BindAddr,
@@ -159,36 +151,4 @@ func createDir(path string) error {
 		}
 	}
 	return nil
-}
-
-func loadKey(dataDir string) (*ecdsa.PrivateKey, error) {
-	path := filepath.Join(dataDir, "./key")
-
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("Failed to stat (%s): %v", path, err)
-	}
-	if !os.IsNotExist(err) {
-		// exists
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		key, err := hex.DecodeString(string(data))
-		if err != nil {
-			return nil, err
-		}
-		return crypto.ToECDSA(key)
-	}
-
-	// it does not exists
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
-	if err := ioutil.WriteFile(path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600); err != nil {
-		return nil, err
-	}
-
-	return key, nil
 }

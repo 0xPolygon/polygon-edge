@@ -1,10 +1,9 @@
 package minimal
 
 import (
-	"crypto/ecdsa"
-
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/minimal/keystore"
 	"github.com/umbracle/minimal/network/discovery"
 	"github.com/umbracle/minimal/protocol"
 )
@@ -15,8 +14,8 @@ type Config struct {
 
 	ProtocolBackends map[string]protocol.Factory
 
-	Key   *ecdsa.PrivateKey
-	Chain *chain.Chain
+	Keystore keystore.Keystore
+	Chain    *chain.Chain
 
 	BindAddr string
 	BindPort int

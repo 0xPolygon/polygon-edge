@@ -48,6 +48,7 @@ type Minimal struct {
 	consensus  consensus.Consensus
 	Blockchain *blockchain.Blockchain
 	closeCh    chan struct{}
+	Key        *ecdsa.PrivateKey
 }
 
 func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
@@ -59,6 +60,16 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		backends:  []protocol.Backend{},
 	}
 
+	key, ok, err := config.Keystore.Get()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key: %v", err)
+	}
+	if !ok {
+		return nil, fmt.Errorf("private key does not exists")
+	}
+
+	m.Key = key
+
 	// Start server
 	serverConfig := network.DefaultConfig()
 	serverConfig.BindAddress = config.BindAddr
@@ -67,13 +78,12 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	serverConfig.DiscoveryBackends = discoveryBackends
 	serverConfig.ServiceName = config.ServiceName
 
-	m.server = network.NewServer("minimal", config.Key, serverConfig, logger)
+	m.server = network.NewServer("minimal", m.Key, serverConfig, logger)
 
 	consensusConfig := &consensus.Config{
 		Params: config.Chain.Params,
 	}
 
-	var err error
 	engineName := config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[engineName]
 	if !ok {
@@ -107,7 +117,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	}
 	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
 	m.Sealer.SetEnabled(m.config.Seal)
-	m.Sealer.SetCoinbase(pubkeyToAddress(m.config.Key.PublicKey))
+	m.Sealer.SetCoinbase(pubkeyToAddress(m.Key.PublicKey))
 
 	// Start backend protocols
 	for _, b := range config.ProtocolBackends {
