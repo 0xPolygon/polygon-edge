@@ -60,11 +60,6 @@ func NewKeyValueStorage(logger *log.Logger, db KV) Storage {
 	return &KeyValueStorage{logger: logger, db: db}
 }
 
-// Close closes the storage connection
-func (s *KeyValueStorage) Close() error {
-	return s.Close()
-}
-
 // -- canonical hash --
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain

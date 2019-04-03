@@ -5,14 +5,13 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
-
-	"github.com/umbracle/minimal/blockchain/storage/leveldb"
 )
 
 type fakeConsensus struct {
@@ -156,7 +155,7 @@ func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [
 
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
-	s, err := leveldb.NewMemoryStorage(nil)
+	s, err := memory.NewMemoryStorage(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
