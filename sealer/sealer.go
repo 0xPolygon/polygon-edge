@@ -119,8 +119,10 @@ func (s *Sealer) commit() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.stopSealing = cancel
 
-	parent := s.blockchain.Header()
-
+	parent, ok := s.blockchain.Header()
+	if !ok {
+		return
+	}
 	promoted, err := s.txPool.reset(s.lastHeader, parent)
 	if err != nil {
 		panic(err)
@@ -190,7 +192,10 @@ func (s *Sealer) commit() {
 		return
 	}
 
-	td := s.blockchain.GetTD(block.ParentHash())
+	td, ok := s.blockchain.GetTD(block.ParentHash())
+	if !ok {
+		return
+	}
 
 	fmt.Printf("===> SEAL Block: %d %d. Difficulty %d. Total: %d\n", block.Number(), block.Difficulty(), td.Int64(), big.NewInt(1).Add(td, block.Difficulty()))
 

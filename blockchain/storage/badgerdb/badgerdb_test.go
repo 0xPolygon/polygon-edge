@@ -1,4 +1,4 @@
-package leveldb
+package badgerdb
 
 import (
 	"io/ioutil"
@@ -13,7 +13,7 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewLevelDBStorage(path, nil)
+	s, err := NewBadgerDBStorage(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

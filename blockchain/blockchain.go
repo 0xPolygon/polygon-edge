@@ -82,7 +82,7 @@ func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*precompiled.
 }
 
 // GetParent return the parent
-func (b *Blockchain) GetParent(header *types.Header) *types.Header {
+func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 	return b.db.ReadHeader(header.ParentHash)
 }
 
@@ -96,9 +96,14 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// The chain is not empty
 	if !b.Empty() {
 		// load genesis from memory
-		genesisHash := b.db.ReadCanonicalHash(big.NewInt(0))
-		b.genesis = b.db.ReadHeader(genesisHash)
-
+		genesisHash, ok := b.db.ReadCanonicalHash(big.NewInt(0))
+		if !ok {
+			return fmt.Errorf("genesis hash not found")
+		}
+		b.genesis, ok = b.db.ReadHeader(genesisHash)
+		if !ok {
+			return fmt.Errorf("genesis header '%s' not found", genesisHash.String())
+		}
 		return nil
 	}
 
@@ -175,19 +180,19 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 
 // Empty checks if the blockchain is empty
 func (b *Blockchain) Empty() bool {
-	hash := b.db.ReadHeadHash()
-	if hash == nil {
-		return true
-	}
-	return false
+	_, ok := b.db.ReadHeadHash()
+	return ok
 }
 
-func (b *Blockchain) GetChainTD() *big.Int {
-	header := b.Header()
+func (b *Blockchain) GetChainTD() (*big.Int, bool) {
+	header, ok := b.Header()
+	if !ok {
+		return nil, false
+	}
 	return b.GetTD(header.Hash())
 }
 
-func (b *Blockchain) GetTD(hash common.Hash) *big.Int {
+func (b *Blockchain) GetTD(hash common.Hash) (*big.Int, bool) {
 	return b.db.ReadDiff(hash)
 }
 
@@ -198,8 +203,8 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 
 	if h.ParentHash != common.HexToHash("") {
 		// Dont write difficulty for genesis
-		td := b.db.ReadDiff(h.ParentHash)
-		if td == nil {
+		td, ok := b.db.ReadDiff(h.ParentHash)
+		if !ok {
 			return fmt.Errorf("parent difficulty not found")
 		}
 
@@ -217,13 +222,19 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 }
 
 // Header returns the header of the blockchain
-func (b *Blockchain) Header() *types.Header {
-	hash := b.db.ReadHeadHash()
-	if hash == nil {
-		return nil
+func (b *Blockchain) Header() (*types.Header, bool) {
+	// TODO, We may get better insight about the error if we know in which specific
+	// step it failed. Not sure yet if this expression will be a storage interface in itself
+	// in the future.
+	hash, ok := b.db.ReadHeadHash()
+	if !ok {
+		return nil, false
 	}
-	header := b.db.ReadHeader(*hash)
-	return header
+	header, ok := b.db.ReadHeader(hash)
+	if !ok {
+		return nil, false
+	}
+	return header, true
 }
 
 // CommitBodies writes the bodies
@@ -283,20 +294,26 @@ func (b *Blockchain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 }
 
 // GetBodyByHash returns the body by their hash
-func (b *Blockchain) GetBodyByHash(hash common.Hash) *types.Body {
+func (b *Blockchain) GetBodyByHash(hash common.Hash) (*types.Body, bool) {
 	return b.db.ReadBody(hash)
 }
 
 // GetHeaderByHash returns the header by his hash
-func (b *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
+func (b *Blockchain) GetHeaderByHash(hash common.Hash) (*types.Header, bool) {
 	return b.db.ReadHeader(hash)
 }
 
 // GetHeaderByNumber returns the header by his number
-func (b *Blockchain) GetHeaderByNumber(n *big.Int) *types.Header {
-	hash := b.db.ReadCanonicalHash(n)
-	h := b.db.ReadHeader(hash)
-	return h
+func (b *Blockchain) GetHeaderByNumber(n *big.Int) (*types.Header, bool) {
+	hash, ok := b.db.ReadCanonicalHash(n)
+	if !ok {
+		return nil, false
+	}
+	h, ok := b.db.ReadHeader(hash)
+	if !ok {
+		return nil, false
+	}
+	return h, true
 }
 
 func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
@@ -334,8 +351,8 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		headers = append(headers, block.Header())
 	}
 
-	parent := b.db.ReadHeader(headers[0].ParentHash)
-	if parent == nil {
+	parent, ok := b.db.ReadHeader(headers[0].ParentHash)
+	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found", headers[0].Hash().String(), headers[0].Number.Uint64())
 	}
 
@@ -378,8 +395,8 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	for indx, h := range headers {
 
 		// Try to write first the state transition
-		parent := b.db.ReadHeader(headers[indx].ParentHash)
-		if parent == nil {
+		parent, ok := b.db.ReadHeader(headers[indx].ParentHash)
+		if !ok {
 			return fmt.Errorf("unknown ancestor 1")
 		}
 
@@ -669,8 +686,8 @@ func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) [
 }
 
 func (b *Blockchain) GetHashByNumber(i uint64) common.Hash {
-	block := b.GetBlockByNumber(big.NewInt(int64(i)), false)
-	if block == nil {
+	block, ok := b.GetBlockByNumber(big.NewInt(int64(i)), false)
+	if !ok {
 		return common.Hash{}
 	}
 	return block.Hash()
@@ -688,8 +705,8 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 
 	number, parent := block.NumberU64()-1, block.ParentHash()
 	for i := 0; i < 7; i++ {
-		ancestor := b.GetBlockByHash(parent, true)
-		if ancestor == nil {
+		ancestor, ok := b.GetBlockByHash(parent, true)
+		if !ok {
 			break
 		}
 		ancestors[ancestor.Hash()] = ancestor.Header()
@@ -739,10 +756,13 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) WriteHeader(header *types.Header) error {
-	head := b.Header()
+	head, ok := b.Header()
+	if !ok {
+		return fmt.Errorf("header not found")
+	}
 
-	parent := b.db.ReadHeader(header.ParentHash)
-	if parent == nil {
+	parent, ok := b.db.ReadHeader(header.ParentHash)
+	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found", header.Hash().String(), header.Number.Uint64())
 	}
 
@@ -805,19 +825,33 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 	oldChain := []*types.Header{}
 	newChain := []*types.Header{}
 
+	var ok bool
+
 	for oldHeader.Number.Cmp(newHeader.Number) > 0 {
-		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
+		oldHeader, ok = b.db.ReadHeader(oldHeader.ParentHash)
+		if !ok {
+			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
+		}
 		oldChain = append(oldChain, oldHeader)
 	}
 
 	for newHeader.Number.Cmp(oldHeader.Number) > 0 {
-		newHeader = b.db.ReadHeader(newHeader.ParentHash)
+		newHeader, ok = b.db.ReadHeader(newHeader.ParentHash)
+		if !ok {
+			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
+		}
 		newChain = append(newChain, newHeader)
 	}
 
 	for oldHeader.Hash() != newHeader.Hash() {
-		oldHeader = b.db.ReadHeader(oldHeader.ParentHash)
-		newHeader = b.db.ReadHeader(newHeader.ParentHash)
+		oldHeader, ok = b.db.ReadHeader(oldHeader.ParentHash)
+		if !ok {
+			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
+		}
+		newHeader, ok = b.db.ReadHeader(newHeader.ParentHash)
+		if !ok {
+			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
+		}
 
 		oldChain = append(oldChain, oldHeader)
 	}
@@ -850,23 +884,27 @@ func (b *Blockchain) GetForks() []common.Hash {
 }
 
 // GetBlockByHash returns the block by their hash
-func (b *Blockchain) GetBlockByHash(hash common.Hash, full bool) *types.Block {
-	header := b.db.ReadHeader(hash)
-	if header == nil {
-		return nil
+func (b *Blockchain) GetBlockByHash(hash common.Hash, full bool) (*types.Block, bool) {
+	header, ok := b.db.ReadHeader(hash)
+	if !ok {
+		return nil, false
 	}
 	block := types.NewBlockWithHeader(header)
 	if !full {
-		return block
+		return block, true
 	}
-	body := b.db.ReadBody(hash)
-	if body == nil {
-		return block
+	body, ok := b.db.ReadBody(hash)
+	if !ok {
+		return block, true
 	}
-	return block.WithBody(body.Transactions, body.Uncles)
+	return block.WithBody(body.Transactions, body.Uncles), true
 }
 
 // GetBlockByNumber returns the block by their number
-func (b *Blockchain) GetBlockByNumber(n *big.Int, full bool) *types.Block {
-	return b.GetBlockByHash(b.db.ReadCanonicalHash(n), full)
+func (b *Blockchain) GetBlockByNumber(n *big.Int, full bool) (*types.Block, bool) {
+	hash, ok := b.db.ReadCanonicalHash(n)
+	if !ok {
+		return nil, false
+	}
+	return b.GetBlockByHash(hash, full)
 }

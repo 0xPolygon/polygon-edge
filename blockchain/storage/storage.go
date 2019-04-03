@@ -10,27 +10,27 @@ import (
 
 // Storage is a generic blockchain storage
 type Storage interface {
-	ReadCanonicalHash(n *big.Int) common.Hash
-	WriteCanonicalHash(n *big.Int, hash common.Hash)
+	ReadCanonicalHash(n *big.Int) (common.Hash, bool)
+	WriteCanonicalHash(n *big.Int, hash common.Hash) error
 
-	ReadHeadHash() *common.Hash
-	ReadHeadNumber() *big.Int
-	WriteHeadHash(h common.Hash)
-	WriteHeadNumber(n *big.Int)
+	ReadHeadHash() (common.Hash, bool)
+	ReadHeadNumber() (*big.Int, bool)
+	WriteHeadHash(h common.Hash) error
+	WriteHeadNumber(n *big.Int) error
 
-	WriteForks(forks []common.Hash)
+	WriteForks(forks []common.Hash) error
 	ReadForks() []common.Hash
 
-	WriteDiff(hash common.Hash, diff *big.Int)
-	ReadDiff(hash common.Hash) *big.Int
+	WriteDiff(hash common.Hash, diff *big.Int) error
+	ReadDiff(hash common.Hash) (*big.Int, bool)
 
-	WriteHeader(h *types.Header)
-	ReadHeader(hash common.Hash) *types.Header
+	WriteHeader(h *types.Header) error
+	ReadHeader(hash common.Hash) (*types.Header, bool)
 
-	WriteBody(hash common.Hash, body *types.Body)
-	ReadBody(hash common.Hash) *types.Body
+	WriteBody(hash common.Hash, body *types.Body) error
+	ReadBody(hash common.Hash) (*types.Body, bool)
 
-	WriteReceipts(hash common.Hash, receipts []*types.Receipt)
+	WriteReceipts(hash common.Hash, receipts []*types.Receipt) error
 	ReadReceipts(hash common.Hash) []*types.Receipt
 }
 

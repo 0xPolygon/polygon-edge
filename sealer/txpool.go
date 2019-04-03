@@ -78,25 +78,43 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
 		var discarded, included types.Transactions
 
-		oldHeader := t.blockchain.GetBlockByHash(oldHead.Hash(), true)
-		newHeader := t.blockchain.GetBlockByHash(newHead.Hash(), true)
+		oldHeader, ok := t.blockchain.GetBlockByHash(oldHead.Hash(), true)
+		if !ok {
+			return nil, fmt.Errorf("block by hash '%s' not found", oldHead.Hash().String())
+		}
+		newHeader, ok := t.blockchain.GetBlockByHash(newHead.Hash(), true)
+		if !ok {
+			return nil, fmt.Errorf("block by hash '%s' not found", newHead.Hash().String())
+		}
 
 		for oldHeader.Number().Cmp(newHeader.Number()) > 0 {
 			discarded = append(discarded, oldHeader.Transactions()...)
-			oldHeader = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
+			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
+			if !ok {
+				return nil, fmt.Errorf("block by hash '%s' not found", oldHeader.ParentHash().String())
+			}
 		}
 
 		for newHeader.Number().Cmp(oldHeader.Number()) > 0 {
 			included = append(included, newHeader.Transactions()...)
-			newHeader = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
+			newHeader, ok = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
+			if !ok {
+				return nil, fmt.Errorf("block by hash '%s' not found", newHeader.ParentHash().String())
+			}
 		}
 
 		for oldHeader.Hash() != newHeader.Hash() {
 			discarded = append(discarded, oldHeader.Transactions()...)
 			included = append(included, newHeader.Transactions()...)
 
-			oldHeader = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
-			newHeader = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
+			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
+			if !ok {
+				return nil, fmt.Errorf("block by hash '%s' not found", oldHeader.ParentHash().String())
+			}
+			newHeader, ok = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
+			if !ok {
+				return nil, fmt.Errorf("block by hash '%s' not found", newHeader.ParentHash().String())
+			}
 		}
 
 		reinject = types.TxDifference(discarded, included)

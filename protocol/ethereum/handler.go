@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
 	multierror "github.com/hashicorp/go-multierror"
+	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/network/transport/rlpx"
 	"golang.org/x/crypto/sha3"
 )
@@ -65,7 +66,7 @@ type Ethereum struct {
 
 	getStatus  GetStatus
 	status     *Status // status of the remote peer
-	blockchain Blockchain
+	blockchain *blockchain.Blockchain
 	downloader Downloader
 
 	// pending objects
@@ -97,7 +98,7 @@ type NotifyMsg struct {
 type GetStatus func() (*Status, error)
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain Blockchain) *Ethereum {
+func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain *blockchain.Blockchain) *Ethereum {
 	return &Ethereum{
 		conn:        conn,
 		getStatus:   getStatus,
@@ -338,13 +339,14 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		}
 
 		var origin *types.Header
+		var ok bool
 		if query.Origin.IsHash() {
-			origin = e.blockchain.GetHeaderByHash(query.Origin.Hash)
+			origin, ok = e.blockchain.GetHeaderByHash(query.Origin.Hash)
 		} else {
-			origin = e.blockchain.GetHeaderByNumber(big.NewInt(int64(query.Origin.Number)))
+			origin, ok = e.blockchain.GetHeaderByNumber(big.NewInt(int64(query.Origin.Number)))
 		}
 
-		if origin == nil {
+		if !ok {
 			return e.sendBlockHeaders([]*types.Header{})
 		}
 
@@ -365,8 +367,8 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 			if block < 0 {
 				break
 			}
-			origin = e.blockchain.GetHeaderByNumber(big.NewInt(block))
-			if origin == nil {
+			origin, ok = e.blockchain.GetHeaderByNumber(big.NewInt(block))
+			if !ok {
 				break
 			}
 
@@ -398,8 +400,8 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(bodies) < downloader.MaxBlockFetch; i++ {
 			hash := hashes[i]
 
-			body := e.blockchain.GetBodyByHash(hash)
-			if body != nil {
+			body, ok := e.blockchain.GetBodyByHash(hash)
+			if ok {
 				data, err := rlp.EncodeToBytes(body)
 				if err != nil {
 					return err
@@ -449,8 +451,8 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 
 			res := e.blockchain.GetReceiptsByHash(hash)
 			if res == nil {
-				header := e.blockchain.GetHeaderByHash(hash)
-				if header == nil || header.ReceiptHash != types.EmptyRootHash {
+				header, ok := e.blockchain.GetHeaderByHash(hash)
+				if !ok || header.ReceiptHash != types.EmptyRootHash {
 					continue
 				}
 			}
