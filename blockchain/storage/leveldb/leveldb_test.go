@@ -8,7 +8,7 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 )
 
-func newStorage(t *testing.T) (*Storage, func()) {
+func newStorage(t *testing.T) (storage.Storage, func()) {
 	path, err := ioutil.TempDir("/tmp", "minimal_storage")
 	if err != nil {
 		t.Fatal(err)

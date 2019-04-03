@@ -3,20 +3,11 @@ package leveldb
 import (
 	"fmt"
 	"log"
-	"math/big"
 	"os"
 
-	"github.com/umbracle/minimal/blockchain/storage"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/umbracle/minimal/blockchain/storage"
 )
-
-// TODO, move memory database out of here
 
 // Factory creates a leveldb storage
 func Factory(config map[string]string, logger *log.Logger) (storage.Storage, error) {
@@ -27,93 +18,8 @@ func Factory(config map[string]string, logger *log.Logger) (storage.Storage, err
 	return NewLevelDBStorage(path, logger)
 }
 
-var ErrNotFound = fmt.Errorf("not found")
-
-// prefix
-
-var (
-	// DIFFICULTY is the difficulty prefix
-	DIFFICULTY = []byte("d")
-
-	// HEADER is the header prefix
-	HEADER = []byte("h")
-
-	// HEAD is the chain head prefix
-	HEAD = []byte("o")
-
-	// FORK is the entry to store forks
-	FORK = []byte("f")
-
-	// CANONICAL is the prefix for the canonical chain numbers
-	CANONICAL = []byte("c")
-
-	// BODY is the prefix for bodies
-	BODY = []byte("b")
-
-	// RECEIPTS is the prefix for receipts
-	RECEIPTS = []byte("r")
-)
-
-// sub-prefix
-
-var (
-	HASH   = []byte("hash")
-	NUMBER = []byte("number")
-	EMPTY  = []byte("empty")
-)
-
-// KV is a key value storage interface
-type KV interface {
-	set(p []byte, v []byte) error
-	get(p []byte) ([]byte, bool, error)
-}
-
-// levelDBKV is the leveldb implementation of the kv storage
-type levelDBKV struct {
-	db *leveldb.DB
-}
-
-func (l *levelDBKV) set(p []byte, v []byte) error {
-	return l.db.Put(p, v, nil)
-}
-
-func (l *levelDBKV) get(p []byte) ([]byte, bool, error) {
-	data, err := l.db.Get(p, nil)
-	if err != nil {
-		if err.Error() == "leveldb: not found" {
-			return nil, false, ErrNotFound
-		}
-		return nil, false, err
-	}
-	return data, true, nil
-}
-
-// memoryKV is an in memory implementation of the kv storage
-type memoryKV struct {
-	db map[string][]byte
-}
-
-func (m *memoryKV) set(p []byte, v []byte) error {
-	m.db[hexutil.Encode(p)] = v
-	return nil
-}
-
-func (m *memoryKV) get(p []byte) ([]byte, bool, error) {
-	v, ok := m.db[hexutil.Encode(p)]
-	if !ok {
-		return nil, false, nil
-	}
-	return v, true, nil
-}
-
-// Storage is the blockchain storage using boltdb
-type Storage struct {
-	logger *log.Logger
-	db     KV
-}
-
 // NewLevelDBStorage creates the new storage reference with leveldb
-func NewLevelDBStorage(path string, logger *log.Logger) (*Storage, error) {
+func NewLevelDBStorage(path string, logger *log.Logger) (storage.Storage, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
@@ -123,181 +29,25 @@ func NewLevelDBStorage(path string, logger *log.Logger) (*Storage, error) {
 	}
 
 	kv := &levelDBKV{db}
-	return &Storage{logger, kv}, nil
+	return storage.NewKeyValueStorage(logger, kv), nil
 }
 
-// NewMemoryStorage creates the new storage reference with inmemory
-func NewMemoryStorage(logger *log.Logger) (*Storage, error) {
-	db := &memoryKV{map[string][]byte{}}
-	return &Storage{logger, db}, nil
+// levelDBKV is the leveldb implementation of the kv storage
+type levelDBKV struct {
+	db *leveldb.DB
 }
 
-// Close closes the storage connection
-func (s *Storage) Close() error {
-	return s.Close()
+func (l *levelDBKV) Set(p []byte, v []byte) error {
+	return l.db.Put(p, v, nil)
 }
 
-// -- canonical hash --
-
-// ReadCanonicalHash gets the hash from the number of the canonical chain
-func (s *Storage) ReadCanonicalHash(n *big.Int) (common.Hash, bool) {
-	data, ok := s.get(CANONICAL, n.Bytes())
-	if !ok {
-		return common.Hash{}, false
-	}
-	return common.BytesToHash(data), true
-}
-
-// WriteCanonicalHash writes a hash for a number block in the canonical chain
-func (s *Storage) WriteCanonicalHash(n *big.Int, hash common.Hash) error {
-	return s.set(CANONICAL, n.Bytes(), hash.Bytes())
-}
-
-// -- head --
-
-// ReadHeadHash returns the hash of the head
-func (s *Storage) ReadHeadHash() (common.Hash, bool) {
-	data, ok := s.get(HEAD, HASH)
-	if !ok {
-		return common.Hash{}, false
-	}
-	return common.BytesToHash(data), true
-}
-
-// ReadHeadNumber returns the number of the head
-func (s *Storage) ReadHeadNumber() (*big.Int, bool) {
-	data, ok := s.get(HEAD, HASH)
-	if !ok {
-		return nil, false
-	}
-	return big.NewInt(1).SetBytes(data), true
-}
-
-// WriteHeadHash writes the hash of the head
-func (s *Storage) WriteHeadHash(h common.Hash) error {
-	return s.set(HEAD, HASH, h.Bytes())
-}
-
-// WriteHeadNumber writes the number of the head
-func (s *Storage) WriteHeadNumber(n *big.Int) error {
-	return s.set(HEAD, NUMBER, n.Bytes())
-}
-
-// -- fork --
-
-// WriteForks writes the current forks
-func (s *Storage) WriteForks(forks []common.Hash) error {
-	return s.write(FORK, EMPTY, forks)
-}
-
-// ReadForks read the current forks
-func (s *Storage) ReadForks() []common.Hash {
-	var forks []common.Hash
-	s.read(FORK, EMPTY, &forks)
-	return forks
-}
-
-// -- difficulty --
-
-// WriteDiff writes the difficulty
-func (s *Storage) WriteDiff(hash common.Hash, diff *big.Int) error {
-	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
-}
-
-// ReadDiff reads the difficulty
-func (s *Storage) ReadDiff(hash common.Hash) (*big.Int, bool) {
-	v, ok := s.get(DIFFICULTY, hash.Bytes())
-	if !ok {
-		return nil, false
-	}
-	return big.NewInt(0).SetBytes(v), true
-}
-
-// -- header --
-
-// WriteHeader writes the header
-func (s *Storage) WriteHeader(h *types.Header) error {
-	return s.write(HEADER, h.Hash().Bytes(), h)
-}
-
-// ReadHeader reads the header
-func (s *Storage) ReadHeader(hash common.Hash) (*types.Header, bool) {
-	var header *types.Header
-	ok := s.read(HEADER, hash.Bytes(), &header)
-	return header, ok
-}
-
-// -- body --
-
-// WriteBody writes the body
-func (s *Storage) WriteBody(hash common.Hash, body *types.Body) error {
-	return s.write(BODY, hash.Bytes(), body)
-}
-
-// ReadBody reads the body
-func (s *Storage) ReadBody(hash common.Hash) (*types.Body, bool) {
-	var body *types.Body
-	ok := s.read(BODY, hash.Bytes(), &body)
-	return body, ok
-}
-
-// -- receipts --
-
-// WriteReceipts writes the receipts
-func (s *Storage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) error {
-	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
-	for i, receipt := range receipts {
-		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
-	}
-	return s.write(RECEIPTS, hash.Bytes(), storageReceipts)
-}
-
-// ReadReceipts reads the receipts
-func (s *Storage) ReadReceipts(hash common.Hash) []*types.Receipt {
-	var storage []*types.ReceiptForStorage
-	s.read(RECEIPTS, hash.Bytes(), &storage)
-
-	receipts := make([]*types.Receipt, len(storage))
-	for i, receipt := range storage {
-		receipts[i] = (*types.Receipt)(receipt)
-	}
-
-	return receipts
-}
-
-// -- write ops --
-
-func (s *Storage) write(p []byte, k []byte, obj interface{}) error {
-	data, err := rlp.EncodeToBytes(obj)
+func (l *levelDBKV) Get(p []byte) ([]byte, bool, error) {
+	data, err := l.db.Get(p, nil)
 	if err != nil {
-		return fmt.Errorf("failed to encode rlp: %v", err)
+		if err.Error() == "leveldb: not found" {
+			return nil, false, nil
+		}
+		return nil, false, err
 	}
-	return s.set(p, k, data)
-}
-
-func (s *Storage) read(p []byte, k []byte, obj interface{}) bool {
-	data, ok := s.get(p, k)
-	if !ok {
-		return false
-	}
-	if err := rlp.DecodeBytes(data, obj); err != nil {
-		s.logger.Printf("failed to decode rlp: %v", err)
-		return false
-	}
-	return true
-}
-
-func (s *Storage) set(p []byte, k []byte, v []byte) error {
-	p = append(p, k...)
-	return s.db.set(p, v)
-}
-
-func (s *Storage) get(p []byte, k []byte) ([]byte, bool) {
-	p = append(p, k...)
-	data, ok, err := s.db.get(p)
-	if err != nil {
-		s.logger.Printf("failed to read: %v", err)
-		return nil, false
-	}
-	return data, ok
+	return data, true, nil
 }
