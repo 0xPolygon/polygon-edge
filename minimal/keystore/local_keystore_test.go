@@ -18,7 +18,7 @@ func TestLocalKeystore(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	keystore := LocalKeystore{
-		path: filepath.Join(dir, "key"),
+		Path: filepath.Join(dir, "key"),
 	}
 
 	key, exists, err := keystore.Get()

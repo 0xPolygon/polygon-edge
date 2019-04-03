@@ -21,34 +21,35 @@ func NewLocalKeystore(path string) *LocalKeystore {
 	return &LocalKeystore{filepath.Join(path, "key")}
 }
 
-// Put implements the Keystore interface
-func (k *LocalKeystore) Put(key *ecdsa.PrivateKey) error {
-	err := ioutil.WriteFile(k.Path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600)
-	return err
-}
-
 // Get implements the keystore interface
-func (k *LocalKeystore) Get() (*ecdsa.PrivateKey, bool, error) {
+func (k *LocalKeystore) Get() (*ecdsa.PrivateKey, error) {
 	_, err := os.Stat(k.Path)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, false, fmt.Errorf("Failed to stat (%s): %v", k.Path, err)
+		return nil, fmt.Errorf("Failed to stat (%s): %v", k.Path, err)
 	}
 	if os.IsNotExist(err) {
-		return nil, false, nil
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(k.Path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600); err != nil {
+			return nil, err
+		}
+		return key, nil
 	}
 
 	// exists
 	data, err := ioutil.ReadFile(k.Path)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	keyStr, err := hex.DecodeString(string(data))
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	key, err := crypto.ToECDSA(keyStr)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return key, true, nil
+	return key, nil
 }

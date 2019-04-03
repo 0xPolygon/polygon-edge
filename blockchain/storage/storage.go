@@ -35,4 +35,4 @@ type Storage interface {
 }
 
 // Factory is a factory method to create a blockchain storage
-type Factory func(config map[string]string, logger *log.Logger) (Storage, error)
+type Factory func(config map[string]interface{}, logger *log.Logger) (Storage, error)

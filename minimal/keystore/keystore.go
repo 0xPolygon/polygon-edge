@@ -6,6 +6,5 @@ import (
 
 // Keystore stores the key for the enode
 type Keystore interface {
-	Put(*ecdsa.PrivateKey) error
-	Get() (*ecdsa.PrivateKey, bool, error)
+	Get() (*ecdsa.PrivateKey, error)
 }

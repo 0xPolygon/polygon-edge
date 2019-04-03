@@ -6,14 +6,15 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/minimal/keystore"
+	"github.com/umbracle/minimal/network/discovery"
 
 	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/protocol/ethereum"
 
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
@@ -21,10 +22,36 @@ import (
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/minimal"
+
+	consensusClique "github.com/umbracle/minimal/consensus/clique"
+	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
+	consensusPOW "github.com/umbracle/minimal/consensus/pow"
+
+	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
+	discoveryDevP2P "github.com/umbracle/minimal/network/discovery/devp2p"
+
+	protocolEthereum "github.com/umbracle/minimal/protocol/ethereum"
+
+	storageLevelDB "github.com/umbracle/minimal/blockchain/storage/leveldb"
 )
 
+var blockchainBackends = map[string]storage.Factory{
+	"leveldb": storageLevelDB.Factory,
+}
+
+var consensusBackends = map[string]consensus.Factory{
+	"clique": consensusClique.Factory,
+	"ethash": consensusEthash.Factory,
+	"pow":    consensusPOW.Factory,
+}
+
+var discoveryBackends = map[string]discovery.Factory{
+	"consul": discoveryConsul.Factory,
+	"devp2p": discoveryDevP2P.Factory,
+}
+
 var protocolBackends = map[string]protocol.Factory{
-	"ethereum": ethereum.Factory,
+	"ethereum": protocolEthereum.Factory,
 }
 
 // Agent is a long running daemon that is used to run
@@ -57,24 +84,53 @@ func (a *Agent) Start() error {
 		return fmt.Errorf("failed to load chain %s: %v", a.config.Chain, err)
 	}
 
-	// Create data-dir if it does not exists
-	paths := []string{
-		"blockchain",
-		"trie",
+	// protocolBackends
+	protocolEntries := map[string]*minimal.Entry{
+		"ethereum": &minimal.Entry{
+			Config: map[string]interface{}{},
+		},
 	}
-	if err := setupDataDir(a.config.DataDir, paths); err != nil {
-		panic(err)
+
+	// discoveryBackends
+	discoveryEntries := map[string]*minimal.Entry{
+		// "devp2p": &minimal.Entry{},
+		"consul": &minimal.Entry{
+			Config: map[string]interface{}{},
+		},
+	}
+
+	// blockchainBackend
+	blockchainEntry := map[string]*minimal.Entry{
+		"leveldb": &minimal.Entry{
+			Config: map[string]interface{}{},
+		},
+	}
+
+	consensusEntry := &minimal.Entry{
+		Config: map[string]interface{}{},
 	}
 
 	config := &minimal.Config{
-		Keystore:         keystore.NewLocalKeystore(a.config.DataDir),
-		Chain:            chain,
-		DataDir:          a.config.DataDir,
-		BindAddr:         a.config.BindAddr,
-		BindPort:         a.config.BindPort,
-		ServiceName:      a.config.ServiceName,
+		Keystore:    keystore.NewLocalKeystore(a.config.DataDir),
+		Chain:       chain,
+		DataDir:     a.config.DataDir,
+		BindAddr:    a.config.BindAddr,
+		BindPort:    a.config.BindPort,
+		ServiceName: a.config.ServiceName,
+		Seal:        a.config.Seal,
+
+		// Entries (TODO, take from config)
 		ProtocolBackends: protocolBackends,
-		Seal:             a.config.Seal,
+		ProtocolEntries:  protocolEntries,
+
+		DiscoveryBackends: discoveryBackends,
+		DiscoveryEntries:  discoveryEntries,
+
+		BlockchainBackends: blockchainBackends,
+		BlockchainEntries:  blockchainEntry,
+
+		ConsensusBackends: consensusBackends,
+		ConsensusEntry:    consensusEntry,
 	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
@@ -124,31 +180,4 @@ func (a *Agent) startTelemetry() {
 	})
 
 	go http.Serve(l, mux)
-}
-
-func setupDataDir(dataDir string, paths []string) error {
-	if err := createDir(dataDir); err != nil {
-		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
-	}
-
-	for _, path := range paths {
-		path := filepath.Join(dataDir, path)
-		if err := createDir(path); err != nil {
-			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
-		}
-	}
-	return nil
-}
-
-func createDir(path string) error {
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(path, os.ModePerm); err != nil {
-			return err
-		}
-	}
-	return nil
 }

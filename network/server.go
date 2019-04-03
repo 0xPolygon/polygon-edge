@@ -1,7 +1,6 @@
 package network
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"log"
@@ -30,15 +29,14 @@ const (
 
 // Config is the p2p server configuration
 type Config struct {
-	Name              string
-	BindAddress       string
-	BindPort          int
-	MaxPeers          int
-	Bootnodes         []string
-	DialTasks         int
-	DialBusyInterval  time.Duration
-	DiscoveryBackends map[string]discovery.Factory
-	ServiceName       string
+	Name             string
+	BindAddress      string
+	BindPort         int
+	MaxPeers         int
+	Bootnodes        []string
+	DialTasks        int
+	DialBusyInterval time.Duration
+	ServiceName      string
 }
 
 // DefaultConfig returns a default configuration
@@ -109,7 +107,7 @@ type Server struct {
 	listener  net.Listener
 	transport common.Transport
 
-	discovery discovery.Backend
+	Discovery discovery.Backend
 	Enode     *enode.Enode
 
 	backends []protocol.Backend
@@ -180,42 +178,6 @@ func (s *Server) Schedule() error {
 
 	if err := s.setupTransport(); err != nil {
 		return err
-	}
-
-	// setup discovery factories
-	discoveryConfig := &discovery.BackendConfig{
-		Logger: s.logger,
-		Key:    s.key,
-		Enode:  s.Enode,
-		Config: map[string]interface{}{},
-	}
-
-	disc, ok := s.config.DiscoveryBackends["devp2p"]
-	if ok {
-		// Add the bootnodes. Maybe do this is a prestep in agent. If there are any bootnodes
-		// in genesis file create a devp2p config with the list so that
-		// server does not know about any bootnodes.
-		discoveryConfig.Config["bootnodes"] = s.config.Bootnodes
-
-		backend, err := disc(context.Background(), discoveryConfig)
-		if err != nil {
-			return err
-		}
-
-		s.discovery = backend
-		s.discovery.Schedule()
-	}
-
-	discoveryConfig.Config["nodename"] = s.config.ServiceName
-
-	for name, disc := range s.config.DiscoveryBackends {
-		fmt.Printf("Using discovery %s\n", name)
-		backend, err := disc(context.Background(), discoveryConfig)
-		if err != nil {
-			return err
-		}
-		s.discovery = backend // NOTE: Find a way to tunnel all the discovery results
-		backend.Schedule()
 	}
 
 	go s.dialRunner()
@@ -330,7 +292,7 @@ func (s *Server) dialRunner() {
 		case enode := <-s.addPeer:
 			sendToTask(enode)
 
-		case enode := <-s.discovery.Deliver():
+		case enode := <-s.Discovery.Deliver():
 			sendToTask(enode)
 
 		case enode := <-s.dispatcher.Events():
