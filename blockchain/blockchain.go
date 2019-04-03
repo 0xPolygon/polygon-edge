@@ -95,6 +95,7 @@ func (b *Blockchain) Genesis() *types.Header {
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// The chain is not empty
 	if !b.Empty() {
+		fmt.Println("-- empty --")
 		// load genesis from memory
 		genesisHash, ok := b.db.ReadCanonicalHash(big.NewInt(0))
 		if !ok {
@@ -181,7 +182,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 // Empty checks if the blockchain is empty
 func (b *Blockchain) Empty() bool {
 	_, ok := b.db.ReadHeadHash()
-	return ok
+	return !ok
 }
 
 func (b *Blockchain) GetChainTD() (*big.Int, bool) {

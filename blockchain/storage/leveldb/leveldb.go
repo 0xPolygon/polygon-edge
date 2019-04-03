@@ -10,12 +10,16 @@ import (
 )
 
 // Factory creates a leveldb storage
-func Factory(config map[string]string, logger *log.Logger) (storage.Storage, error) {
+func Factory(config map[string]interface{}, logger *log.Logger) (storage.Storage, error) {
 	path, ok := config["path"]
 	if !ok {
 		return nil, fmt.Errorf("path not found")
 	}
-	return NewLevelDBStorage(path, logger)
+	pathStr, ok := path.(string)
+	if !ok {
+		return nil, fmt.Errorf("path is not a string")
+	}
+	return NewLevelDBStorage(pathStr, logger)
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb

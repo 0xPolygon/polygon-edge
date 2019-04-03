@@ -5,37 +5,23 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/network/discovery"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/umbracle/minimal/blockchain/storage/leveldb"
 	"github.com/umbracle/minimal/protocol"
 	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/discovery"
 	"github.com/umbracle/minimal/sealer"
-
-	consensusClique "github.com/umbracle/minimal/consensus/clique"
-	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
-	consensusPOW "github.com/umbracle/minimal/consensus/pow"
-	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
 )
-
-var consensusBackends = map[string]consensus.Factory{
-	"clique": consensusClique.Factory,
-	"ethash": consensusEthash.Factory,
-	"pow":    consensusPOW.Factory,
-}
-
-var discoveryBackends = map[string]discovery.Factory{
-	"consul": discoveryConsul.Factory,
-	// "devp2p": discoveryDevP2P.Factory,
-}
 
 // Minimal is the central manager of the blockchain client
 type Minimal struct {
@@ -60,12 +46,50 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		backends:  []protocol.Backend{},
 	}
 
-	key, ok, err := config.Keystore.Get()
+	// Check if the consensus engine exists
+	engineName := config.Chain.Params.GetEngine()
+	engine, ok := config.ConsensusBackends[engineName]
+	if !ok {
+		return nil, fmt.Errorf("consensus engine '%s' not found", engineName)
+	}
+
+	// Only one blockchain backend is allowed
+	if len(config.BlockchainEntries) > 1 {
+		return nil, fmt.Errorf("Only one blockchain backend allowed")
+	}
+	// Only one discovery backend is allowed (for now)
+	if len(config.DiscoveryEntries) > 1 {
+		return nil, fmt.Errorf("Only one discovery mechanism is allowed")
+	}
+
+	// Build necessary paths
+	paths := []string{}
+	paths = addPath(paths, "blockchain", nil)
+	paths = addPath(paths, "consensus", nil)
+
+	// Create paths
+	if err := setupDataDir(config.DataDir, paths); err != nil {
+		return nil, fmt.Errorf("failed to create data directories: %v", err)
+	}
+
+	key, err := config.Keystore.Get()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key: %v", err)
 	}
-	if !ok {
-		return nil, fmt.Errorf("private key does not exists")
+
+	// Build storage backend
+	var storage storage.Storage
+	for name, entry := range config.BlockchainEntries {
+		storageFunc, ok := config.BlockchainBackends[name]
+		if !ok {
+			return nil, fmt.Errorf("storage '%s' not found", name)
+		}
+
+		entry.addPath(filepath.Join(config.DataDir, "blockchain"))
+		storage, err = storageFunc(entry.Config, logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	m.Key = key
@@ -75,28 +99,40 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	serverConfig.BindAddress = config.BindAddr
 	serverConfig.BindPort = config.BindPort
 	serverConfig.Bootnodes = config.Chain.Bootnodes
-	serverConfig.DiscoveryBackends = discoveryBackends
 	serverConfig.ServiceName = config.ServiceName
 
 	m.server = network.NewServer("minimal", m.Key, serverConfig, logger)
+
+	// Build discovery backend
+	for name, entry := range config.DiscoveryEntries {
+		backend, ok := config.DiscoveryBackends[name]
+		if !ok {
+			return nil, fmt.Errorf("discovery '%s' not found", name)
+		}
+
+		conf := entry.Config
+		conf["bootnodes"] = config.Chain.Bootnodes
+
+		// setup discovery factories
+		discoveryConfig := &discovery.BackendConfig{
+			Logger: logger,
+			Key:    key,
+			Enode:  m.server.Enode,
+			Config: conf,
+		}
+
+		discovery, err := backend(context.Background(), discoveryConfig)
+		if err != nil {
+			return nil, err
+		}
+		m.server.Discovery = discovery
+	}
 
 	consensusConfig := &consensus.Config{
 		Params: config.Chain.Params,
 	}
 
-	engineName := config.Chain.Params.GetEngine()
-	engine, ok := consensusBackends[engineName]
-	if !ok {
-		return nil, fmt.Errorf("consensus engine '%s' not found", engineName)
-	}
-
 	m.consensus, err = engine(context.Background(), consensusConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// blockchain storage
-	storage, err := leveldb.NewLevelDBStorage(filepath.Join(m.config.DataDir, "blockchain"), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +155,18 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	m.Sealer.SetEnabled(m.config.Seal)
 	m.Sealer.SetCoinbase(pubkeyToAddress(m.Key.PublicKey))
 
-	// Start backend protocols
-	for _, b := range config.ProtocolBackends {
-		backend, err := b(context.Background(), m)
+	// Start protocol backends
+	for name := range config.ProtocolEntries {
+		backend, ok := config.ProtocolBackends[name]
+		if !ok {
+			return nil, fmt.Errorf("protocol '%s' not found", name)
+		}
+
+		proto, err := backend(context.Background(), m)
 		if err != nil {
 			return nil, err
 		}
-		m.backends = append(m.backends, backend)
+		m.backends = append(m.backends, proto)
 	}
 
 	// Register backends
@@ -147,4 +188,57 @@ func (m *Minimal) Close() {
 func pubkeyToAddress(p ecdsa.PublicKey) common.Address {
 	pubBytes := crypto.FromECDSAPub(&p)
 	return common.BytesToAddress(crypto.Keccak256(pubBytes[1:])[12:])
+}
+
+// Entry is a backend configuration entry
+type Entry struct {
+	Enabled bool
+	Config  map[string]interface{}
+}
+
+func (e *Entry) addPath(path string) {
+	e.Config["path"] = path
+}
+
+func addPath(paths []string, path string, entries map[string]*Entry) []string {
+	newpath := paths[0:]
+	newpath = append(newpath, path)
+	for name := range entries {
+		newpath = append(newpath, filepath.Join(path, name))
+	}
+	return newpath
+}
+
+func setupDataDir(dataDir string, paths []string) error {
+	if err := createDir(dataDir); err != nil {
+		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+	}
+
+	for _, path := range paths {
+		path := filepath.Join(dataDir, path)
+		if err := createDir(path); err != nil {
+			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+		}
+	}
+	return nil
+}
+
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getSingleKey(i map[string]*Entry) string {
+	for k := range i {
+		return k
+	}
+	panic("internal. key not found")
 }
