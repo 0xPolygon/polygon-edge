@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,13 +31,13 @@ const (
 // Config is the p2p server configuration
 type Config struct {
 	Name             string
+	DataDir          string
 	BindAddress      string
 	BindPort         int
 	MaxPeers         int
 	Bootnodes        []string
 	DialTasks        int
 	DialBusyInterval time.Duration
-	ServiceName      string
 }
 
 // DefaultConfig returns a default configuration
@@ -49,9 +50,7 @@ func DefaultConfig() *Config {
 		Bootnodes:        []string{},
 		DialTasks:        5,
 		DialBusyInterval: 1 * time.Minute,
-		ServiceName:      "minimal",
 	}
-
 	return c
 }
 
@@ -124,6 +123,8 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 
 	fmt.Printf("Enode: %s\n", enode.String())
 
+	peersFilePath := filepath.Join(config.DataDir, peersFile)
+
 	s := &Server{
 		Name:         name,
 		key:          key,
@@ -137,7 +138,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		pendingNodes: sync.Map{},
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
-		peerStore:    NewPeerStore(peersFile),
+		peerStore:    NewPeerStore(peersFilePath),
 		backends:     []protocol.Backend{},
 		transport:    &rlpx.Rlpx{},
 	}
@@ -179,6 +180,9 @@ func (s *Server) Schedule() error {
 	if err := s.setupTransport(); err != nil {
 		return err
 	}
+
+	// Start discovery process
+	s.Discovery.Schedule()
 
 	go s.dialRunner()
 	return nil
@@ -441,9 +445,6 @@ func (s *Server) Close() {
 	}
 
 	for _, i := range s.peers {
-		fmt.Println("-- update --")
-		fmt.Println(i.Enode)
-
 		s.peerStore.Update(i.Enode, i.Status)
 	}
 	if err := s.peerStore.Save(); err != nil {
