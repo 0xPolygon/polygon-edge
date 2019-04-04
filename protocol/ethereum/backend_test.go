@@ -227,21 +227,23 @@ func TestDequeuePeerWithAwake(t *testing.T) {
 
 func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	st0 := func() (*Status, error) {
+		h0, _ := b0.Header()
 		s := &Status{
 			ProtocolVersion: 63,
 			NetworkID:       1,
 			TD:              big.NewInt(1),
-			CurrentBlock:    b0.Header().Hash(),
+			CurrentBlock:    h0.Hash(),
 			GenesisBlock:    b0.Genesis().Hash(),
 		}
 		return s, nil
 	}
 	st1 := func() (*Status, error) {
+		h1, _ := b1.Header()
 		s := &Status{
 			ProtocolVersion: 63,
 			NetworkID:       1,
 			TD:              big.NewInt(1),
-			CurrentBlock:    b1.Header().Hash(),
+			CurrentBlock:    h1.Hash(),
 			GenesisBlock:    b1.Genesis().Hash(),
 		}
 		return s, nil
@@ -270,8 +272,9 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 
 func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	st := func() (*Status, error) {
+		h, _ := b.Header()
 		s := &status
-		s.CurrentBlock = b.Header().Hash()
+		s.CurrentBlock = h.Hash()
 		s.GenesisBlock = b.Genesis().Hash()
 		return s, nil
 	}
@@ -300,7 +303,7 @@ func TestBackendBroadcastBlock(t *testing.T) {
 	go func() {
 		eth = testEthereum(c1, b0)
 	}()
-	if err := b.Add(c0, "1"); err != nil {
+	if _, err := b.Add(c0, "1"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -364,11 +367,13 @@ func TestBackendStuff(t *testing.T) {
 
 	fmt.Println(b)
 
-	target := b1.GetBlockByNumber(big.NewInt(11), true)
+	target, _ := b1.GetBlockByNumber(big.NewInt(11), true)
+	diff, _ := b1.GetTD(target.Hash())
+
 	b.notifyNewData(&NotifyMsg{
 		Block: target,
 		Peer:  p1,
-		Diff:  b1.GetTD(target.Hash()),
+		Diff:  diff,
 	})
 
 	// The head has to be correct
