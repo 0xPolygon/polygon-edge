@@ -182,11 +182,11 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			var err error
 			if reflect.TypeOf(c.Origin).Name() == "Hash" {
 				hash := c.Origin.(common.Hash)
-				eth0.setHandler(context.Background(), hash.String(), 1, ack)
+				eth0.setHandler(context.Background(), headerMsg, hash.String(), ack)
 				err = eth0.RequestHeadersByHash(hash, c.Amount, c.Skip, c.Reverse)
 			} else {
 				number := uint64(c.Origin.(int))
-				eth0.setHandler(context.Background(), strconv.Itoa(int(number)), 1, ack)
+				eth0.setHandler(context.Background(), headerMsg, strconv.Itoa(int(number)), ack)
 				err = eth0.RequestHeadersByNumber(number, c.Amount, c.Skip, c.Reverse)
 			}
 
@@ -223,7 +223,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// bodies
 	ack := make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), batch[0].String(), 1, ack)
+	eth0.setHandler(context.Background(), bodyMsg, batch[0].String(), ack)
 
 	if err := eth0.RequestBodies(batch); err != nil {
 		t.Fatal(err)
@@ -236,7 +236,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	// receipts
 	ack = make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), batch[0].String(), 1, ack)
+	eth0.setHandler(context.Background(), receiptsMsg, batch[0].String(), ack)
 
 	if err := eth0.RequestReceipts(batch); err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func TestEthereumBody(t *testing.T) {
 	// -- bodies --
 
 	ack := make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), hash, 1, ack)
+	eth0.setHandler(context.Background(), bodyMsg, hash, ack)
 
 	if err := eth0.RequestBodies(msg); err != nil {
 		t.Fatal(err)
@@ -448,5 +448,105 @@ func TestHeight(t *testing.T) {
 	}
 	if height.Number.Uint64() != 110 {
 		t.Fatalf("it should be 110 but found %d", height.Number.Uint64())
+	}
+}
+
+func TestPendingQueue(t *testing.T) {
+	ack := make(chan AckMessage)
+	c := &callback{ack}
+
+	p := newPending()
+	p.add("1", c)
+	p.add("2", c)
+
+	if p.pending != 2 {
+		t.Fatal()
+	}
+	if _, ok := p.consume("1"); !ok {
+		t.Fatal("failed to consume '1' the first time")
+	}
+	if _, ok := p.consume("1"); ok {
+		t.Fatal("it consumed '1' twice")
+	}
+	if p.pending != 1 {
+		t.Fatal()
+	}
+
+	// Consumes "2" because is the only one pending
+	p.consume("")
+
+	// Consume 2 should return false because has already been consumed
+	if _, ok := p.consume("2"); ok {
+		t.Fatal("'2' has already been consumed")
+	}
+
+	// Pending is empty, it should not consume more
+	p.consume("")
+	if p.pending != 0 {
+		t.Fatal()
+	}
+}
+
+func TestFailedQueries(t *testing.T) {
+	upperBound := 100
+
+	h0 := blockchain.NewTestHeaderChain(500)
+	h1 := blockchain.NewTestHeaderChain(upperBound)
+
+	b0 := blockchain.NewTestBlockchain(t, h0)
+	b1 := blockchain.NewTestBlockchain(t, h1)
+
+	eth0, _ := ethPipe(b0, b1)
+
+	cases := [][]int{
+		[]int{
+			10, 200, 5,
+		},
+		[]int{
+			5, 10, 200,
+		},
+		[]int{
+			5, 200, 10,
+		},
+		[]int{
+			200, 201, 202,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run("", func(t *testing.T) {
+			done := make(chan error, len(c))
+			res := make([]error, len(c))
+
+			for indx, step := range c {
+				go func(indx, step int) {
+					header, ok := b0.GetHeaderByNumber(big.NewInt(int64(step)))
+					if !ok {
+						done <- fmt.Errorf("header not found")
+						return
+					}
+
+					_, err := eth0.RequestHeaderByHashSync(context.Background(), header.Hash())
+					res[indx] = err
+
+					done <- nil
+				}(indx, step)
+			}
+
+			for i := 0; i < len(c); i++ {
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			for indx, step := range c {
+				if step > upperBound && res[indx] == nil {
+					t.Fatal()
+				}
+				if step < upperBound && res[indx] != nil {
+					t.Fatal()
+				}
+			}
+		})
 	}
 }
