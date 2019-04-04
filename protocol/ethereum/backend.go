@@ -33,7 +33,6 @@ func DefaultConfig() *Config {
 }
 
 type Peer struct {
-	pretty   string
 	id       string
 	conn     *Ethereum
 	peerConn *PeerConnection
@@ -46,7 +45,6 @@ func newPeer(id string, conn *Ethereum, peerConn *PeerConnection) *Peer {
 	return &Peer{
 		id:       id,
 		active:   true,
-		pretty:   id,
 		conn:     conn,
 		peerConn: peerConn,
 	}

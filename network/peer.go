@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network/common"
 )
 
@@ -34,8 +35,10 @@ func (s Status) String() string {
 
 // Peer is each of the connected peers
 type Peer struct {
-	Enode     string
+	Enode     *enode.Enode
+	Info      common.Info
 	ID        string
+	prettyID  string
 	Status    Status
 	logger    *log.Logger
 	conn      common.Session
@@ -43,11 +46,14 @@ type Peer struct {
 }
 
 func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
-	enode := conn.GetInfo().Enode.String()
+	info := conn.GetInfo()
+	id := info.Enode.ID.String()
 
 	peer := &Peer{
-		Enode:     enode,
-		ID:        conn.GetInfo().Enode.ID.String(),
+		Enode:     info.Enode,
+		Info:      info,
+		ID:        id,
+		prettyID:  id[:8],
 		logger:    logger,
 		conn:      conn,
 		protocols: []*common.Instance{},
@@ -56,15 +62,17 @@ func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
 	return peer
 }
 
+// IsClosed checks if the connection is closed
 func (p *Peer) IsClosed() bool {
 	return p.conn.IsClosed()
 }
 
-func (p *Peer) PrettyString() string {
-	return p.ID[:8]
+// PrettyID returns a pretty version of the id
+func (p *Peer) PrettyID() string {
+	return p.prettyID
 }
 
 // Close closes the peer connection
-func (p *Peer) Close() {
-	p.conn.Close()
+func (p *Peer) Close() error {
+	return p.conn.Close()
 }

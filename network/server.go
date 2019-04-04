@@ -202,7 +202,7 @@ func (s *Server) setupTransport() error {
 		for {
 			conn, err := s.listener.Accept()
 			if err != nil {
-				// log
+				return
 			}
 			go s.handleConn(conn)
 		}
@@ -405,8 +405,7 @@ func (s *Server) addSession(session common.Session) error {
 	p.protocols = protos
 
 	s.peersLock.Lock()
-	// s.peers[session.RemoteIDString()] = p
-	s.peers[p.PrettyString()] = p
+	s.peers[p.ID] = p
 	s.peersLock.Unlock()
 
 	select {
@@ -445,7 +444,7 @@ func (s *Server) Close() {
 	}
 
 	for _, i := range s.peers {
-		s.peerStore.Update(i.Enode, i.Status)
+		s.peerStore.Update(i.Enode.String(), i.Status)
 	}
 	if err := s.peerStore.Save(); err != nil {
 		panic(err)
