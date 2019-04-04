@@ -33,7 +33,6 @@ type Minimal struct {
 	backends   []protocol.Backend
 	consensus  consensus.Consensus
 	Blockchain *blockchain.Blockchain
-	closeCh    chan struct{}
 	Key        *ecdsa.PrivateKey
 }
 
@@ -42,7 +41,6 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		logger:    logger,
 		config:    config,
 		sealingCh: make(chan bool, 1),
-		closeCh:   make(chan struct{}),
 		backends:  []protocol.Backend{},
 	}
 
@@ -66,6 +64,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	paths := []string{}
 	paths = addPath(paths, "blockchain", nil)
 	paths = addPath(paths, "consensus", nil)
+	paths = addPath(paths, "network", nil)
 
 	// Create paths
 	if err := setupDataDir(config.DataDir, paths); err != nil {
@@ -99,7 +98,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	serverConfig.BindAddress = config.BindAddr
 	serverConfig.BindPort = config.BindPort
 	serverConfig.Bootnodes = config.Chain.Bootnodes
-	serverConfig.ServiceName = config.ServiceName
+	serverConfig.DataDir = filepath.Join(config.DataDir, "network")
 
 	m.server = network.NewServer("minimal", m.Key, serverConfig, logger)
 
@@ -128,9 +127,14 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		m.server.Discovery = discovery
 	}
 
+	// Build consensus
 	consensusConfig := &consensus.Config{
 		Params: config.Chain.Params,
 	}
+	if config.ConsensusEntry != nil {
+		config.ConsensusEntry.addPath(filepath.Join(m.config.DataDir, "consensus"))
+	}
+	consensusConfig.Config = config.ConsensusEntry.Config
 
 	m.consensus, err = engine(context.Background(), consensusConfig)
 	if err != nil {
@@ -181,8 +185,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 }
 
 func (m *Minimal) Close() {
-	close(m.closeCh)
-	// TODO, add other close methods
+	m.server.Close()
 }
 
 func pubkeyToAddress(p ecdsa.PublicKey) common.Address {
@@ -197,7 +200,12 @@ type Entry struct {
 }
 
 func (e *Entry) addPath(path string) {
-	e.Config["path"] = path
+	if len(e.Config) == 0 {
+		e.Config = map[string]interface{}{}
+	}
+	if _, ok := e.Config["path"]; !ok {
+		e.Config["path"] = path
+	}
 }
 
 func addPath(paths []string, path string, entries map[string]*Entry) []string {

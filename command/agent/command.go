@@ -73,12 +73,14 @@ func readConfig(args []string) (*Config, error) {
 			if err != nil {
 				return nil, err
 			}
-			config.Merge(configFile)
+			if err := config.Merge(configFile); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	config.Merge(cliConfig)
-	return config, nil
+	err := config.Merge(cliConfig)
+	return config, err
 }
 
 func (a *AgentCommand) Run(args []string) int {

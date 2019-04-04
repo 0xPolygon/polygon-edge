@@ -84,30 +84,41 @@ func (a *Agent) Start() error {
 		return fmt.Errorf("failed to load chain %s: %v", a.config.Chain, err)
 	}
 
-	// protocolBackends
-	protocolEntries := map[string]*minimal.Entry{
-		"ethereum": &minimal.Entry{
-			Config: map[string]interface{}{},
-		},
+	// protocol backends
+	protocolEntries := map[string]*minimal.Entry{}
+	for name, conf := range a.config.Protocols {
+		protocolEntries[name] = &minimal.Entry{
+			Config: conf,
+		}
 	}
 
-	// discoveryBackends
-	discoveryEntries := map[string]*minimal.Entry{
-		// "devp2p": &minimal.Entry{},
-		"consul": &minimal.Entry{
+	// Add by default the ethereum backend if not found
+	if _, ok := protocolEntries["ethereum"]; !ok {
+		protocolEntries["ethereum"] = &minimal.Entry{
 			Config: map[string]interface{}{},
-		},
+		}
 	}
 
-	// blockchainBackend
+	discoveryEntries := map[string]*minimal.Entry{}
+	for name, conf := range a.config.Discovery {
+		discoveryEntries[name] = &minimal.Entry{
+			Config: conf,
+		}
+	}
+
+	// blockchain backend
+	if a.config.Blockchain == nil {
+		return fmt.Errorf("blockchain config not found")
+	}
 	blockchainEntry := map[string]*minimal.Entry{
-		"leveldb": &minimal.Entry{
-			Config: map[string]interface{}{},
+		a.config.Blockchain.Backend: &minimal.Entry{
+			Config: a.config.Blockchain.Config,
 		},
 	}
 
+	// consensus backend
 	consensusEntry := &minimal.Entry{
-		Config: map[string]interface{}{},
+		Config: a.config.Consensus,
 	}
 
 	config := &minimal.Config{
@@ -119,7 +130,6 @@ func (a *Agent) Start() error {
 		ServiceName: a.config.ServiceName,
 		Seal:        a.config.Seal,
 
-		// Entries (TODO, take from config)
 		ProtocolBackends: protocolBackends,
 		ProtocolEntries:  protocolEntries,
 
