@@ -64,7 +64,7 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 	b0 := blockchain.NewTestBlockchain(t, h0)
 	b1 := blockchain.NewTestBlockchain(t, h1)
 
-	syncer, err := NewBackend(nil, 1, b0, DefaultConfig())
+	syncer, err := NewBackend(nil, b0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,39 +226,34 @@ func TestDequeuePeerWithAwake(t *testing.T) {
 */
 
 func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
-	st0 := func() (*Status, error) {
-		h0, _ := b0.Header()
-		s := &Status{
-			ProtocolVersion: 63,
-			NetworkID:       1,
-			TD:              big.NewInt(1),
-			CurrentBlock:    h0.Hash(),
-			GenesisBlock:    b0.Genesis().Hash(),
-		}
-		return s, nil
+	h0, _ := b0.Header()
+	st0 := &Status{
+		ProtocolVersion: 63,
+		NetworkID:       1,
+		TD:              big.NewInt(1),
+		CurrentBlock:    h0.Hash(),
+		GenesisBlock:    b0.Genesis().Hash(),
 	}
-	st1 := func() (*Status, error) {
-		h1, _ := b1.Header()
-		s := &Status{
-			ProtocolVersion: 63,
-			NetworkID:       1,
-			TD:              big.NewInt(1),
-			CurrentBlock:    h1.Hash(),
-			GenesisBlock:    b1.Genesis().Hash(),
-		}
-		return s, nil
+
+	h1, _ := b1.Header()
+	st1 := &Status{
+		ProtocolVersion: 63,
+		NetworkID:       1,
+		TD:              big.NewInt(1),
+		CurrentBlock:    h1.Hash(),
+		GenesisBlock:    b1.Genesis().Hash(),
 	}
 
 	conn0, conn1 := net.Pipe()
-	eth0 := NewEthereumProtocol(conn0, st0, b0)
-	eth1 := NewEthereumProtocol(conn1, st1, b1)
+	eth0 := NewEthereumProtocol(conn0, b0)
+	eth1 := NewEthereumProtocol(conn1, b1)
 
 	err := make(chan error)
 	go func() {
-		err <- eth0.Init()
+		err <- eth0.Init(st0)
 	}()
 	go func() {
-		err <- eth1.Init()
+		err <- eth1.Init(st1)
 	}()
 
 	if err := <-err; err != nil {
@@ -271,16 +266,13 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 }
 
 func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
-	st := func() (*Status, error) {
-		h, _ := b.Header()
-		s := &status
-		s.CurrentBlock = h.Hash()
-		s.GenesisBlock = b.Genesis().Hash()
-		return s, nil
-	}
+	h, _ := b.Header()
+	st := &status
+	st.CurrentBlock = h.Hash()
+	st.GenesisBlock = b.Genesis().Hash()
 
-	eth := NewEthereumProtocol(conn, st, b)
-	if err := eth.Init(); err != nil {
+	eth := NewEthereumProtocol(conn, b)
+	if err := eth.Init(st); err != nil {
 		panic(err)
 	}
 	return eth
@@ -292,7 +284,7 @@ func TestBackendBroadcastBlock(t *testing.T) {
 	// b0 with only the genesis
 	b0 := blockchain.NewTestBlockchain(t, headers)
 
-	b, err := NewBackend(nil, 1, b0, DefaultConfig())
+	b, err := NewBackend(nil, b0)
 	if err != nil {
 		panic(err)
 	}
@@ -352,17 +344,17 @@ func TestBackendStuff(t *testing.T) {
 
 	eth0, _ := ethPipe(b0, b1)
 
-	b, err := NewBackend(nil, 1, b0, nil)
+	b, err := NewBackend(nil, b0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	p1 := newPeer("1", eth0, &PeerConnection{
+	p1 := &PeerConnection{
 		conn:    eth0,
 		sched:   b,
-		peerID:  "1",
+		id:      "1",
 		enabled: false, // stop from running
-	})
+	}
 	b.peers["1"] = p1
 
 	fmt.Println(b)

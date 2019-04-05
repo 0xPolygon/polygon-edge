@@ -19,41 +19,9 @@ import (
 	"github.com/umbracle/minimal/sealer"
 )
 
-type Config struct {
-	MaxRequests int
-	NumWorkers  int
-}
-
-func DefaultConfig() *Config {
-	c := &Config{
-		MaxRequests: 5,
-		NumWorkers:  2,
-	}
-	return c
-}
-
-type Peer struct {
-	id       string
-	conn     *Ethereum
-	peerConn *PeerConnection
-	active   bool
-	failed   int
-	pending  int
-}
-
-func newPeer(id string, conn *Ethereum, peerConn *PeerConnection) *Peer {
-	return &Peer{
-		id:       id,
-		active:   true,
-		conn:     conn,
-		peerConn: peerConn,
-	}
-}
-
 // Backend is the ethereum backend
 type Backend struct {
 	NetworkID  uint64
-	config     *Config
 	minimal    *minimal.Minimal
 	blockchain *blockchain.Blockchain
 	queue      *queue
@@ -61,7 +29,7 @@ type Backend struct {
 	counter int
 	last    int
 
-	peers     map[string]*Peer
+	peers     map[string]*PeerConnection
 	peersLock sync.Mutex
 	waitCh    []chan struct{}
 
@@ -70,18 +38,16 @@ type Backend struct {
 	stopFn      context.CancelFunc
 }
 
-func Factory(ctx context.Context, m interface{}) (protocol.Backend, error) {
+func Factory(ctx context.Context, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
 	minimal := m.(*minimal.Minimal)
-	return NewBackend(minimal, 1, minimal.Blockchain, DefaultConfig())
+	return NewBackend(minimal, minimal.Blockchain)
 }
 
 // NewBackend creates a new ethereum backend
-func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain *blockchain.Blockchain, config *Config) (*Backend, error) {
+func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*Backend, error) {
 	b := &Backend{
-		config:      config,
 		minimal:     minimal,
-		NetworkID:   networkID,
-		peers:       map[string]*Peer{},
+		peers:       map[string]*PeerConnection{},
 		peersLock:   sync.Mutex{},
 		blockchain:  blockchain,
 		queue:       newQueue(),
@@ -96,7 +62,7 @@ func NewBackend(minimal *minimal.Minimal, networkID uint64, blockchain *blockcha
 		return nil, fmt.Errorf("header not found")
 	}
 
-	fmt.Println(header)
+	b.NetworkID = uint64(minimal.Chain().Params.ChainID)
 
 	b.queue.front = b.queue.newItem(header.Number.Uint64() + 1)
 	b.queue.head = header.Hash()
@@ -217,7 +183,7 @@ func (b *Backend) notifyNewData(w *NotifyMsg) {
 		// TODO: Reset peer connections to avoid receive bad values and start the whole process
 		// Important to do it after the queue is defined
 		for _, p := range b.peers {
-			p.peerConn.Reset()
+			p.Reset()
 		}
 	}
 }
@@ -248,33 +214,40 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 
 	// use handler to create the connection
 
-	proto := NewEthereumProtocol(conn, b.GetStatus, b.blockchain)
+	status, err := b.GetStatus()
+	if err != nil {
+		return nil, err
+	}
+
+	proto := NewEthereumProtocol(conn, b.blockchain)
 	proto.backend = b
 
 	// Start the protocol handle
-	if err := proto.Init(); err != nil {
+	if err := proto.Init(status); err != nil {
 		return nil, err
 	}
 
 	peerConn := &PeerConnection{
 		conn:    proto,
 		sched:   b,
-		peerID:  peerID,
+		id:      peerID,
 		enabled: true,
 	}
 	// peerConn.Run()
 
-	p := newPeer(peerID, proto, peerConn)
-	b.peers[peerID] = p
+	/*
+		p := newPeer(peerID, proto, peerConn)
+		b.peers[peerID] = p
+	*/
 
-	proto.peer = p
+	proto.peer = peerConn
 
 	// wake up some task
 	// s.wakeUp()
 
 	// notifiy this node data
 	b.notifyNewData(&NotifyMsg{
-		Peer: p,
+		Peer: peerConn,
 		Diff: proto.HeaderDiff,
 	})
 

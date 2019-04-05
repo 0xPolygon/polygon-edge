@@ -62,6 +62,16 @@ func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
 	return peer
 }
 
+// GetProtocol returns the protocol by name
+func (p *Peer) GetProtocol(name string) (*common.Instance, bool) {
+	for _, i := range p.protocols {
+		if i.Protocol.Name == name {
+			return i, true
+		}
+	}
+	return nil, false
+}
+
 // IsClosed checks if the connection is closed
 func (p *Peer) IsClosed() bool {
 	return p.conn.IsClosed()

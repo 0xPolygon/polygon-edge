@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mitchellh/mapstructure"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/armon/go-metrics"
@@ -48,14 +50,6 @@ const (
 	GetReceiptsMsg = 0x0f
 	ReceiptsMsg    = 0x10
 )
-
-// Downloader ingest the data
-type Downloader interface {
-	Headers([]*types.Header)
-	Receipts([][]*types.Receipt)
-	Bodies(BlockBodiesData)
-	Data([][]byte)
-}
 
 type messageType int
 
@@ -133,10 +127,8 @@ type Ethereum struct {
 
 	backend *Backend
 
-	getStatus  GetStatus
 	status     *Status // status of the remote peer
 	blockchain *blockchain.Blockchain
-	downloader Downloader
 
 	// pending objects
 	pending map[messageType]*pending
@@ -150,24 +142,20 @@ type Ethereum struct {
 	sendHeader rlpx.Header
 	recvHeader rlpx.Header
 
-	peer *Peer
+	peer *PeerConnection
 }
 
 // NotifyMsg notifies that there is a new block
 type NotifyMsg struct {
 	Block *types.Block
-	Peer  *Peer
+	Peer  *PeerConnection
 	Diff  *big.Int
 }
 
-// GetStatus is the interface that gives the eth protocol the information it needs
-type GetStatus func() (*Status, error)
-
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain *blockchain.Blockchain) *Ethereum {
+func NewEthereumProtocol(conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
 	e := &Ethereum{
 		conn:       conn,
-		getStatus:  getStatus,
 		blockchain: blockchain,
 		sendHeader: make([]byte, rlpx.HeaderSize),
 		recvHeader: make([]byte, rlpx.HeaderSize),
@@ -179,11 +167,6 @@ func NewEthereumProtocol(conn net.Conn, getStatus GetStatus, blockchain *blockch
 		dataMsg:     newPending(),
 	}
 	return e
-}
-
-// SetDownloader changes the downloader that ingests the data
-func (e *Ethereum) SetDownloader(downloader Downloader) {
-	e.downloader = downloader
 }
 
 func (e *Ethereum) Header() common.Hash {
@@ -199,15 +182,6 @@ type Status struct {
 	GenesisBlock    common.Hash
 }
 
-// Requester is the etheruem protocol interface
-type Requester interface {
-	RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error
-	RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error
-	RequestBodies(hashes []common.Hash) error
-	RequestNodeData(hashes []common.Hash) error
-	RequestReceipts(hashes []common.Hash) error
-}
-
 // getBlockHeadersData represents a block header query.
 type getBlockHeadersData struct {
 	Origin  hashOrNumber
@@ -216,7 +190,7 @@ type getBlockHeadersData struct {
 	Reverse bool
 }
 
-func (e *Ethereum) WriteMsg(code int, data interface{}) error {
+func (e *Ethereum) writeMsg(code int, data interface{}) error {
 	e.sendLock.Lock()
 	defer e.sendLock.Unlock()
 
@@ -237,82 +211,78 @@ func (e *Ethereum) WriteMsg(code int, data interface{}) error {
 
 // RequestHeadersByNumber fetches a batch of blocks' headers based on the number of an origin block.
 func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error {
-	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
+	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
 func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
-	return e.WriteMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestBodies fetches a batch of blocks' bodies based on a set of hashes.
 func (e *Ethereum) RequestBodies(hashes []common.Hash) error {
-	return e.WriteMsg(GetBlockBodiesMsg, hashes)
+	return e.writeMsg(GetBlockBodiesMsg, hashes)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state.
 func (e *Ethereum) RequestNodeData(hashes []common.Hash) error {
-	return e.WriteMsg(GetNodeDataMsg, hashes)
+	return e.writeMsg(GetNodeDataMsg, hashes)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
 func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
-	return e.WriteMsg(GetReceiptsMsg, hashes)
+	return e.writeMsg(GetReceiptsMsg, hashes)
 }
 
 // SendNewBlock propagates an entire block to a remote peer.
 func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
-	return e.WriteMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
+	return e.writeMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
+}
+
+func (e *Ethereum) sendStatus(status *Status) error {
+	return e.writeMsg(StatusMsg, status)
 }
 
 // Info implements the handler interface
-func (e *Ethereum) Info() string {
-	return "TODO. Ethereum info"
+func (e *Ethereum) Info() (map[string]interface{}, error) {
+	var msg map[string]interface{}
+	err := mapstructure.Decode(e.status, &msg)
+	return msg, err
 }
 
-func (e *Ethereum) ReadStatus() (*Status, error) {
-	var status *Status
+func (e *Ethereum) readStatus(localStatus *Status) error {
 	if _, err := e.conn.Read(e.recvHeader[:]); err != nil {
-		return nil, err
+		return err
 	}
 	if code := e.recvHeader.MsgType(); code != StatusMsg {
-		return nil, fmt.Errorf("Message code is not statusMsg but %d", code)
+		return fmt.Errorf("Message code is not statusMsg but %d", code)
 	}
 	buf := make([]byte, e.recvHeader.Length())
+
 	_, err := e.conn.Read(buf)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := rlp.DecodeBytes(buf, &status); err != nil {
-		return nil, err
-	}
-	return status, nil
-}
-
-func (e *Ethereum) ValidateStatus(remoteStatus *Status, localStatus *Status) error {
-	if remoteStatus.NetworkID != localStatus.NetworkID {
-		return fmt.Errorf("Network id does not match. Found %d but expected %d", remoteStatus.NetworkID, localStatus.NetworkID)
-	}
-	if remoteStatus.GenesisBlock != localStatus.GenesisBlock {
-		return fmt.Errorf("Genesis block does not match. Found %s but expected %s", remoteStatus.GenesisBlock.String(), localStatus.GenesisBlock.String())
-	}
-	if int(remoteStatus.ProtocolVersion) != int(localStatus.ProtocolVersion) {
-		return fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(remoteStatus.ProtocolVersion), int(localStatus.ProtocolVersion))
+	if err := rlp.DecodeBytes(buf, &e.status); err != nil {
+		return err
 	}
 
-	e.HeaderHash = remoteStatus.CurrentBlock
-	e.HeaderDiff = remoteStatus.TD
+	// Validate status
+
+	if e.status.NetworkID != localStatus.NetworkID {
+		return fmt.Errorf("Network id does not match. Found %d but expected %d", e.status.NetworkID, localStatus.NetworkID)
+	}
+	if e.status.GenesisBlock != localStatus.GenesisBlock {
+		return fmt.Errorf("Genesis block does not match. Found %s but expected %s", e.status.GenesisBlock.String(), localStatus.GenesisBlock.String())
+	}
+	if int(e.status.ProtocolVersion) != int(localStatus.ProtocolVersion) {
+		return fmt.Errorf("Protocol version does not match. Found %d but expected %d", int(e.status.ProtocolVersion), int(localStatus.ProtocolVersion))
+	}
+
+	e.HeaderHash = e.status.CurrentBlock
+	e.HeaderDiff = e.status.TD
 
 	return nil
-}
-
-func (e *Ethereum) ReadAndValidateStatus(localStatus *Status) error {
-	var err error
-	e.status, err = e.ReadStatus()
-	if err != nil {
-		return fmt.Errorf("failed to decode status: %v", err)
-	}
-	return e.ValidateStatus(e.status, localStatus)
 }
 
 // Close the protocol
@@ -325,20 +295,15 @@ func (e *Ethereum) Status() *Status {
 }
 
 // Init starts the protocol
-func (e *Ethereum) Init() error {
-	status, err := e.getStatus()
-	if err != nil {
-		return err
-	}
-
+func (e *Ethereum) Init(status *Status) error {
 	errr := make(chan error, 2)
 
 	go func() {
-		errr <- e.ReadAndValidateStatus(status)
+		errr <- e.readStatus(status)
 	}()
 
 	go func() {
-		errr <- e.WriteMsg(StatusMsg, status)
+		errr <- e.sendStatus(status)
 	}()
 
 	var errors error
@@ -355,8 +320,6 @@ func (e *Ethereum) Init() error {
 	if errors != nil {
 		return errors
 	}
-
-	// e.peer.UpdateHeader(e.status.CurrentBlock, e.status.TD)
 
 	// handshake was correct, start to listen for packets
 	go e.listen()
@@ -378,7 +341,6 @@ func (e *Ethereum) listen() {
 			Code:    uint64(e.recvHeader.MsgType()),
 			Payload: bytes.NewReader(buf),
 		}
-
 		if err := e.HandleMsg(msg); err != nil {
 			panic(err)
 		}
@@ -620,7 +582,7 @@ func (e *Ethereum) fetchHeight(ctx context.Context) (*types.Header, error) {
 
 // sendBlockHeaders sends a batch of block headers to the remote peer.
 func (e *Ethereum) sendBlockHeaders(headers []*types.Header) error {
-	return e.WriteMsg(BlockHeadersMsg, headers)
+	return e.writeMsg(BlockHeadersMsg, headers)
 }
 
 // blockBody represents the data content of a single block.
@@ -633,11 +595,11 @@ type blockBody struct {
 type BlockBodiesData []*blockBody
 
 func (e *Ethereum) sendBlockBodies(bodies []rlp.RawValue) error {
-	return e.WriteMsg(BlockBodiesMsg, bodies)
+	return e.writeMsg(BlockBodiesMsg, bodies)
 }
 
 func (e *Ethereum) sendReceipts(receipts []rlp.RawValue) error {
-	return e.WriteMsg(ReceiptsMsg, receipts)
+	return e.writeMsg(ReceiptsMsg, receipts)
 }
 
 // -- handlers --
@@ -844,9 +806,6 @@ func (e *Ethereum) Headers(headers []*types.Header) {
 
 	// Neither hash nor number found. Consume empty response.
 	e.consumeHandler("", headerMsg, nil)
-	if e.downloader != nil {
-		e.downloader.Headers(headers)
-	}
 }
 
 // Receipts receives the receipts
@@ -857,9 +816,6 @@ func (e *Ethereum) Receipts(receipts [][]*types.Receipt) {
 	}
 	if e.consumeHandler(origin, receiptsMsg, receipts) {
 		return
-	}
-	if e.downloader != nil {
-		e.downloader.Receipts(receipts)
 	}
 }
 
@@ -873,9 +829,6 @@ func (e *Ethereum) Bodies(bodies BlockBodiesData) {
 	if e.consumeHandler(origin, bodyMsg, bodies) {
 		return
 	}
-	if e.downloader != nil {
-		e.downloader.Bodies(bodies)
-	}
 }
 
 // Data receives the node state data
@@ -886,9 +839,6 @@ func (e *Ethereum) Data(data [][]byte) {
 	}
 	if e.consumeHandler(origin, dataMsg, data) {
 		return
-	}
-	if e.downloader != nil {
-		e.downloader.Data(data)
 	}
 }
 

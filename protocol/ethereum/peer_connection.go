@@ -11,10 +11,10 @@ import (
 )
 
 type PeerConnection struct {
-	quota  int
-	sched  *Backend
-	conn   *Ethereum
-	peerID string
+	quota int
+	sched *Backend
+	conn  *Ethereum
+	id    string
 	// peer   *network.Peer
 
 	rateLock sync.Mutex
@@ -46,18 +46,18 @@ func (p *PeerConnection) run() {
 		p.rate = p.rate*4/5 + sample/5
 
 		// emit keys
-		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate_2"}, float32(p.rate), []metrics.Label{{Name: "id", Value: p.peerID}})
-		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate"}, float32(sample), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate_2"}, float32(p.rate), []metrics.Label{{Name: "id", Value: p.id}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "rate"}, float32(sample), []metrics.Label{{Name: "id", Value: p.id}})
 		// bytes/second
 
-		fmt.Printf("==> Rate (%s): %d\n", p.peerID, p.rate)
+		fmt.Printf("==> Rate (%s): %d\n", p.id, p.rate)
 		p.counter = 0
 		p.rateLock.Unlock()
 	}
 }
 
 func (p *PeerConnection) updateRate(bytes int) {
-	fmt.Printf("Update rate (%s): %d\n", p.peerID, bytes)
+	fmt.Printf("Update rate (%s): %d\n", p.id, bytes)
 
 	p.rateLock.Lock()
 	defer p.rateLock.Unlock()
@@ -115,28 +115,28 @@ func (p *PeerConnection) action(ctx context.Context) {
 
 		switch job := i.payload.(type) {
 		case *HeadersJob:
-			fmt.Printf("SYNC HEADERS (%s) (%d): %d, %d\n", p.peerID, i.id, job.block, job.count)
+			fmt.Printf("SYNC HEADERS (%s) (%d): %d, %d\n", p.id, i.id, job.block, job.count)
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * int(job.count))
 
 			data, err = p.conn.RequestHeadersSync(ctx, job.block, job.count)
-			fmt.Printf("DOWN HEADERS: (%s): %d\n", p.peerID, size)
+			fmt.Printf("DOWN HEADERS: (%s): %d\n", p.id, size)
 			context = "headers"
 		case *BodiesJob:
-			fmt.Printf("SYNC BODIES (%s) (%d): %d\n", p.peerID, i.id, len(job.hashes))
+			fmt.Printf("SYNC BODIES (%s) (%d): %d\n", p.id, i.id, len(job.hashes))
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
 			data, err = p.conn.RequestBodiesSync(ctx, job.hash, job.hashes)
-			fmt.Printf("DOWN BODIES: (%s): %d\n", p.peerID, size)
+			fmt.Printf("DOWN BODIES: (%s): %d\n", p.id, size)
 			context = "bodies"
 		case *ReceiptsJob:
-			fmt.Printf("SYNC RECEIPTS (%s) (%d): %d\n", p.peerID, i.id, len(job.hashes))
+			fmt.Printf("SYNC RECEIPTS (%s) (%d): %d\n", p.id, i.id, len(job.hashes))
 
 			// p.requestBandwidth(p.sched.getHeaderSize() * len(job.hashes))
 
 			data, err = p.conn.RequestReceiptsSync(ctx, job.hash, job.hashes)
-			fmt.Printf("DOWN RECEIPTS: (%s): %d\n", p.peerID, size)
+			fmt.Printf("DOWN RECEIPTS: (%s): %d\n", p.id, size)
 			context = "receipts"
 		}
 
@@ -148,8 +148,8 @@ func (p *PeerConnection) action(ctx context.Context) {
 		end := time.Since(start)
 
 		p.sched.Deliver("Y", context, i.id, data, err)
-		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "size"}, float32(size), []metrics.Label{{Name: "id", Value: p.peerID}})
-		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "time"}, float32(end.Nanoseconds()), []metrics.Label{{Name: "id", Value: p.peerID}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "size"}, float32(size), []metrics.Label{{Name: "id", Value: p.id}})
+		metrics.SetGaugeWithLabels([]string{"minimal", "protocol", "ethereum63", "time"}, float32(end.Nanoseconds()), []metrics.Label{{Name: "id", Value: p.id}})
 
 		if err != nil {
 			if strings.Contains(err.Error(), "session closed") {

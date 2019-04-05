@@ -14,7 +14,7 @@ type Protocol struct {
 
 // Handler is a backend reference of the peer
 type Handler interface {
-	Info() string
+	Info() (map[string]interface{}, error)
 }
 
 // Backend is a protocol backend
@@ -24,4 +24,4 @@ type Backend interface {
 }
 
 // Factory is the factory method to create the protocol
-type Factory func(ctx context.Context, m interface{}) (Backend, error)
+type Factory func(ctx context.Context, m interface{}, config map[string]interface{}) (Backend, error)

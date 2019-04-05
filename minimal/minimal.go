@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/umbracle/minimal/chain"
+
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/network/discovery"
 
@@ -34,6 +36,7 @@ type Minimal struct {
 	consensus  consensus.Consensus
 	Blockchain *blockchain.Blockchain
 	Key        *ecdsa.PrivateKey
+	chain      *chain.Chain
 }
 
 func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
@@ -42,6 +45,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		config:    config,
 		sealingCh: make(chan bool, 1),
 		backends:  []protocol.Backend{},
+		chain:     config.Chain,
 	}
 
 	// Check if the consensus engine exists
@@ -160,13 +164,13 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	m.Sealer.SetCoinbase(pubkeyToAddress(m.Key.PublicKey))
 
 	// Start protocol backends
-	for name := range config.ProtocolEntries {
+	for name, entry := range config.ProtocolEntries {
 		backend, ok := config.ProtocolBackends[name]
 		if !ok {
 			return nil, fmt.Errorf("protocol '%s' not found", name)
 		}
 
-		proto, err := backend(context.Background(), m)
+		proto, err := backend(context.Background(), m, entry.Config)
 		if err != nil {
 			return nil, err
 		}
@@ -182,6 +186,11 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 	m.server.Schedule()
 	return m, nil
+}
+
+// Chain returns the chain object of the client
+func (m *Minimal) Chain() *chain.Chain {
+	return m.chain
 }
 
 func (m *Minimal) Close() {

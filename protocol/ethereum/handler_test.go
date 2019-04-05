@@ -93,24 +93,17 @@ func TestHandshake(t *testing.T) {
 }
 
 func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, error, *Ethereum, error) {
-	st0 := func() (*Status, error) {
-		return ss0, nil
-	}
-	st1 := func() (*Status, error) {
-		return ss1, nil
-	}
-
 	conn0, conn1 := net.Pipe()
 
-	eth0 := NewEthereumProtocol(conn0, st0, b0)
-	eth1 := NewEthereumProtocol(conn1, st1, b1)
+	eth0 := NewEthereumProtocol(conn0, b0)
+	eth1 := NewEthereumProtocol(conn1, b1)
 
 	err := make(chan error)
 	go func() {
-		err <- eth0.Init()
+		err <- eth0.Init(ss0)
 	}()
 	go func() {
-		err <- eth1.Init()
+		err <- eth1.Init(ss1)
 	}()
 
 	err0 := <-err
