@@ -107,7 +107,9 @@ func (b *Backend) broadcast(block *types.Block) {
 	blockDiff := big.NewInt(1).Add(diff, block.Difficulty())
 
 	for _, i := range b.peers {
-		i.conn.SendNewBlock(block, blockDiff)
+		if err := i.conn.SendNewBlock(block, blockDiff); err != nil {
+			fmt.Printf("Failed to send send block to peer %s: %v\n", i.id, err)
+		}
 	}
 }
 
@@ -233,17 +235,9 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 		id:      peerID,
 		enabled: true,
 	}
-	// peerConn.Run()
 
-	/*
-		p := newPeer(peerID, proto, peerConn)
-		b.peers[peerID] = p
-	*/
-
+	b.peers[peerID] = peerConn
 	proto.peer = peerConn
-
-	// wake up some task
-	// s.wakeUp()
 
 	// notifiy this node data
 	b.notifyNewData(&NotifyMsg{
@@ -251,7 +245,6 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 		Diff: proto.HeaderDiff,
 	})
 
-	// go s.runPeer(p)
 	return proto, nil
 }
 

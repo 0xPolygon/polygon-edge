@@ -189,7 +189,6 @@ func (s *Server) Schedule() error {
 }
 
 func (s *Server) setupTransport() error {
-
 	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
 
 	var err error

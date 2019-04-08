@@ -97,6 +97,10 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 	m.Key = key
 
+	fmt.Println("-- addr --")
+	fmt.Println(config.BindAddr)
+	fmt.Println(config.BindPort)
+
 	// Start server
 	serverConfig := network.DefaultConfig()
 	serverConfig.BindAddress = config.BindAddr
@@ -108,6 +112,8 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 	// Build discovery backend
 	for name, entry := range config.DiscoveryEntries {
+		fmt.Printf("Discovery entry: %s\n", name)
+
 		backend, ok := config.DiscoveryBackends[name]
 		if !ok {
 			return nil, fmt.Errorf("discovery '%s' not found", name)
@@ -184,7 +190,9 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		}
 	}
 
-	m.server.Schedule()
+	if err := m.server.Schedule(); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 

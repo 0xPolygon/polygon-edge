@@ -13,8 +13,8 @@ import (
 type Config struct {
 	Chain       string     `json:"chain"`
 	DataDir     string     `json:"data_dir"`
-	BindAddr    string     `json:"addr"`
-	BindPort    int        `json:"port"`
+	BindAddr    string     `json:"bind_addr"`
+	BindPort    int        `json:"bind_port"`
 	Telemetry   *Telemetry `json:"telemetry"`
 	ServiceName string     `json:"service_name"`
 	Seal        bool       `json:"seal"`
