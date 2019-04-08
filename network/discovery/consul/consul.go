@@ -16,9 +16,9 @@ import (
 )
 
 type config struct {
-	Address     string `json:"endpoint"`
-	NodeName    string `json:"nodename"`
-	ServiceName string `json:"servicename"`
+	Address     string `mapstructure:"endpoint"`
+	NodeName    string `mapstructure:"node_name"`
+	ServiceName string `mapstructure:"service_name"`
 }
 
 // Backend is the consul discovery backend

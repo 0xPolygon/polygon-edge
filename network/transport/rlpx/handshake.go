@@ -381,9 +381,7 @@ func doProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	errr := make(chan error, 2)
 	var peerInfo *Info
 
-	deadline := time.Now().Add(protocolDeadline)
-	conn.SetWriteDeadline(deadline)
-	conn.SetReadDeadline(deadline)
+	conn.SetDeadline(time.Now().Add(protocolDeadline))
 
 	go func() {
 		errr <- conn.WriteMsg(handshakeMsg, nodeInfo)
@@ -409,6 +407,8 @@ func doProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	if peerInfo.Version >= snappyProtocolVersion {
 		conn.Snappy = true
 	}
+
+	conn.SetDeadline(time.Time{})
 	return peerInfo, nil
 }
 
@@ -429,14 +429,10 @@ func readProtocolHandshake(conn *Session) (*Info, error) {
 		return nil, fmt.Errorf("expected handshake, got %x", msg.Code)
 	}
 
-	fmt.Println("-- read handshake message --")
-
 	var info Info
 	if err := msg.Decode(&info); err != nil {
 		return nil, err
 	}
-
-	fmt.Println(info)
 
 	if (info.ID == enode.ID{}) {
 		return nil, DiscInvalidIdentity

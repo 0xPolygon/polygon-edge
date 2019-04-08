@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -47,6 +48,7 @@ type Blockchain struct {
 	consensus   consensus.Consensus
 	genesis     *types.Header
 	state       map[string]*state.State
+	stateLock   sync.Mutex
 	stateRoot   common.Hash
 	triedb      trie.Storage
 	params      *chain.Params
@@ -136,8 +138,10 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 
 	fmt.Printf("SET GENESIS STATE: %s\n", hexutil.Encode(root))
 
+	b.stateLock.Lock()
 	b.state[hexutil.Encode(root)] = ss
 	b.stateRoot = common.BytesToHash(root)
+	b.stateLock.Unlock()
 
 	// add genesis block
 	if err := b.addHeader(header); err != nil {
@@ -154,8 +158,23 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 }
 
 func (b *Blockchain) getStateRoot(root common.Hash) (*state.State, bool) {
+	b.stateLock.Lock()
+	defer b.stateLock.Unlock()
+
 	s, ok := b.state[root.String()]
-	return s, ok
+	if ok {
+		return s, true
+	}
+
+	// its not in the local cache, ask the state manager. NOTE: this should not be done here
+	// but in the state library itself.
+	ss, err := state.NewStateAt(b.triedb, root)
+	if err != nil {
+		return nil, false
+	}
+
+	b.state[root.String()] = ss
+	return ss, true
 }
 
 // WriteHeaderGenesis writes the genesis without any state allocation
@@ -175,7 +194,10 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	}
 
 	b.db.WriteDiff(header.Hash(), big.NewInt(1))
+
+	b.stateLock.Lock()
 	b.state[types.EmptyRootHash.String()] = state.NewState()
+	b.stateLock.Unlock()
 	return nil
 }
 
@@ -396,20 +418,18 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	for indx, h := range headers {
 
 		// Try to write first the state transition
-		parent, ok := b.db.ReadHeader(headers[indx].ParentHash)
+		parent, ok := b.db.ReadHeader(h.ParentHash)
 		if !ok {
 			return fmt.Errorf("unknown ancestor 1")
 		}
 
 		st, ok := b.getStateRoot(parent.Root)
 		if !ok {
-			fmt.Println(parent.Root.String())
-			fmt.Println(h.Number)
 			return fmt.Errorf("unknown state root")
 		}
 
 		if parent.Root != (common.Hash{}) {
-			// Done for testing. Remove.
+			// Done for testing. TODO, remove.
 
 			block := blocks[indx]
 			state, root, receipts, totalGas, err := b.Process(st, block)
@@ -435,8 +455,10 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
 			}
 
+			b.stateLock.Lock()
 			b.state[hexutil.Encode(root)] = state
 			b.stateRoot = common.BytesToHash(root)
+			b.stateLock.Unlock()
 
 			fmt.Printf("State root: %s\n", b.stateRoot.String())
 		}
@@ -455,26 +477,13 @@ func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
 }
 
 func (b *Blockchain) AddState(root common.Hash, state *state.State) {
+	b.stateLock.Lock()
 	b.state[root.String()] = state
+	b.stateLock.Unlock()
 }
 
 func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
-	root := header.Root.String()
-
-	s, ok := b.state[root]
-	if ok {
-		return s, true
-	}
-
-	// its not in the local cache, ask the state manager. NOTE: this should not be done here
-	// but in the state library itself.
-	ss, err := state.NewStateAt(b.triedb, header.Root)
-	if err != nil {
-		return nil, false
-	}
-
-	b.state[root] = ss
-	return ss, true
+	return b.getStateRoot(header.Root)
 }
 
 func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.State, []byte, []*types.Transaction, error) {
