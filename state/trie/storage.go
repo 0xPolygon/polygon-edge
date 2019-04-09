@@ -234,9 +234,14 @@ func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) 
 		}
 
 		n, err := DecodeNode(storage, hash, realVal)
+
+		// fmt.Println("-- val --")
+		// fmt.Println(val)
+
+		n.hash = val
 		return n, rest, err
 
-		// return &Node{leaf: &leafNode{hashed: true, val: val}}, rest, nil
+		// return &Node{leaf: &leafNode{val: val}}, rest, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid RLP string size %d (want 0 or 32)", len(val))
 	}

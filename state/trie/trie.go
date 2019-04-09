@@ -30,6 +30,7 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 	if err != nil {
 		return nil, err
 	}
+	node.hash = root.Bytes()
 
 	var t *Trie
 	if node.Len() == 0 {
@@ -286,15 +287,6 @@ func concat(a, b []byte) []byte {
 	copy(c[len(a):], b)
 	return c
 }
-
-/*
-func hashit(b []byte) []byte {
-	f := sha3.NewLegacyKeccak256()
-	f.Write(b)
-	res := f.Sum(nil)
-	return res
-}
-*/
 
 func (t *Txn) Hash(storage KVWriter) []byte {
 	return t.root.Hash(storage)

@@ -40,6 +40,7 @@ type Node struct {
 	leaf   *leafNode
 	prefix []byte
 	edges  [17]*Node
+	hash   []byte
 }
 
 func (n *Node) Equal(nn *Node) bool {
@@ -47,10 +48,12 @@ func (n *Node) Equal(nn *Node) bool {
 	nnVals := []*Node{}
 
 	n.WalkNode(func(n *Node) bool {
+		n.hash = nil // dont compare the hashed cache
 		nVals = append(nVals, n)
 		return false
 	})
 	nn.WalkNode(func(n *Node) bool {
+		n.hash = nil
 		nnVals = append(nnVals, n)
 		return false
 	})
@@ -60,7 +63,8 @@ func (n *Node) Equal(nn *Node) bool {
 	}
 
 	for indx, v := range nVals {
-		if !reflect.DeepEqual(v, nnVals[indx]) {
+		v1 := nnVals[indx]
+		if !reflect.DeepEqual(v, v1) {
 			return false
 		}
 	}
@@ -216,7 +220,7 @@ func (n *Node) Hash(storage KVWriter) []byte {
 	}
 
 	if len(x) > 32 || !ok {
-		return hasher.hashitAndStore(storage, x)
+		return hasher.hashitAndStore(n, storage, x)
 	}
 
 	// hasherPool.Put(hasher)
@@ -240,24 +244,16 @@ func (n *Node) delEdge(label byte) {
 
 func (n *Node) Show() {
 	show(n, 0, 0, false)
-
-	/*
-		size := n.Len()
-
-		if size == 1 {
-			fmt.Println("-- ONE --")
-			show(n.First(), 0, 0, false)
-		} else {
-			fmt.Println("-- TWO --")
-			show(n, 0, 0, false)
-		}
-	*/
 }
 
 func show(n *Node, d int, label byte, handlePrefix bool) {
 	if n.leaf != nil {
 		k, v := hexutil.Encode(n.leaf.key), hexutil.Encode(n.leaf.val)
-		fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
+		if n.leaf.hashed {
+			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, v)
+		} else {
+			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
+		}
 	} else {
 
 		p := n.prefix
@@ -320,8 +316,11 @@ var hasherPool = sync.Pool{
 }
 
 func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
-	if n.leaf != nil {
+	if n.hash != nil {
+		return n.hash, true
+	}
 
+	if n.leaf != nil {
 		p := n.prefix
 
 		if handlePrefix {
@@ -335,10 +334,11 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 			return encodeItem(v), false
 		}
 
+		// Short node
 		key := hexToCompact(p)
 		val := encodeKeyValue(key, v)
 		if len(val) >= 32 {
-			return h.hashitAndStore(storage, val), true
+			return h.hashitAndStore(n, storage, val), true
 		}
 
 		return val, false
@@ -362,7 +362,7 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 		hashed := false
 
 		if len(val) >= 32 {
-			val = h.hashitAndStore(storage, val)
+			val = h.hashitAndStore(n, storage, val)
 			hashed = true
 		}
 
@@ -386,7 +386,7 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 
 		if len(val2) >= 32 {
 			hashed = true
-			val2 = h.hashitAndStore(storage, val2)
+			val2 = h.hashitAndStore(n, storage, val2)
 		}
 
 		return val2, hashed
@@ -395,12 +395,16 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 	panic("XX")
 }
 
-func (h *Hasher) hashitAndStore(storage KVWriter, val []byte) []byte {
+func (h *Hasher) hashitAndStore(n *Node, storage KVWriter, val []byte) []byte {
 	// kk := hashit(val)
 
 	h.hash.Reset()
 	h.hash.Write(val)
 	h.hash.Read(h.tmp[:])
+
+	// Cache the hash
+	n.hash = make([]byte, 32)
+	copy(n.hash[:], h.tmp[:])
 
 	if storage != nil {
 
