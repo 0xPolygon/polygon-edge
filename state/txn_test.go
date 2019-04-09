@@ -78,6 +78,8 @@ func TestWriteState(t *testing.T) {
 func TestWriteEmptyState(t *testing.T) {
 	// Create account and write empty state
 	s := NewState()
+	s.SetStorage(trie.NewMemoryStorage())
+
 	txn := s.Txn()
 
 	// Without EIP150 the data is added
@@ -90,6 +92,8 @@ func TestWriteEmptyState(t *testing.T) {
 	}
 
 	s = NewState()
+	s.SetStorage(trie.NewMemoryStorage())
+
 	txn = s.Txn()
 
 	// With EIP150 the empty data is removed

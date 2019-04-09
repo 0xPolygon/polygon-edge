@@ -11,15 +11,39 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+type Batch interface {
+	Put(k, v []byte)
+	Write()
+}
+
 // Storage stores the trie
 type Storage interface {
 	Put(k, v []byte)
 	Get(k []byte) ([]byte, bool)
+	Batch() Batch
 }
 
 // KVStorage is a k/v storage on memory using leveldb
 type KVStorage struct {
 	db *leveldb.DB
+}
+
+// KVBatch is a batch write for leveldb
+type KVBatch struct {
+	db    *leveldb.DB
+	batch *leveldb.Batch
+}
+
+func (b *KVBatch) Put(k, v []byte) {
+	b.batch.Put(k, v)
+}
+
+func (b *KVBatch) Write() {
+	b.db.Write(b.batch, nil)
+}
+
+func (kv *KVStorage) Batch() Batch {
+	return &KVBatch{db: kv.db, batch: &leveldb.Batch{}}
 }
 
 func (kv *KVStorage) Put(k, v []byte) {
@@ -49,20 +73,35 @@ func NewLevelDBStorage(path string, logger *log.Logger) (Storage, error) {
 	return &KVStorage{db}, nil
 }
 
-// MemStorage stores the trie on memory
-type MemStorage struct {
+type memStorage struct {
 	db map[string][]byte
 }
 
-func NewMemoryStorage() Storage {
-	return &MemStorage{map[string][]byte{}}
+type memBatch struct {
+	db *map[string][]byte
 }
 
-func (m *MemStorage) Put(p []byte, v []byte) {
+func (m *memBatch) Put(p, v []byte) {
+	(*m.db)[hexutil.Encode(p)] = v
+}
+
+func (m *memBatch) Write() {
+}
+
+// NewMemoryStorage creates an inmemory trie storage
+func NewMemoryStorage() Storage {
+	return &memStorage{map[string][]byte{}}
+}
+
+func (m *memStorage) Batch() Batch {
+	return &memBatch{db: &m.db}
+}
+
+func (m *memStorage) Put(p []byte, v []byte) {
 	m.db[hexutil.Encode(p)] = v
 }
 
-func (m *MemStorage) Get(p []byte) ([]byte, bool) {
+func (m *memStorage) Get(p []byte) ([]byte, bool) {
 	v, ok := m.db[hexutil.Encode(p)]
 	if !ok {
 		return []byte{}, false
@@ -185,18 +224,19 @@ func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) 
 		// empty node
 		return nil, rest, nil
 	case kind == rlp.String && len(val) == 32:
+
+		// NOTE, it fully expands all the internal nodes
+		// only for testing now.
+
 		realVal, ok := storage.Get(val)
 		if !ok {
 			return nil, nil, fmt.Errorf("Value could not be expanded")
 		}
 
-		// NOTE, it fully expands all the internal nodes
-		// only for testing now.
-
 		n, err := DecodeNode(storage, hash, realVal)
 		return n, rest, err
 
-		// return &Node{leaf: &leafNode{val: val}}, rest, nil
+		// return &Node{leaf: &leafNode{hashed: true, val: val}}, rest, nil
 	default:
 		return nil, nil, fmt.Errorf("invalid RLP string size %d (want 0 or 32)", len(val))
 	}

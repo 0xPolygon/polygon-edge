@@ -3,7 +3,9 @@ package state
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
+	"time"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -62,156 +64,6 @@ func newTxn(state *State) *Txn {
 		txn:       i.Txn(),
 	}
 }
-
-/*
-func (txn *Txn) Apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
-	s := txn.Snapshot()
-	gas, failed, err := txn.apply(msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
-	if err != nil {
-		txn.RevertToSnapshot(s)
-	}
-
-	//fmt.Println("-- failed --")
-	//fmt.Println(failed)
-
-	return gas, failed, err
-}
-
-func (txn *Txn) apply(msg *types.Message, env *evm.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
-	// transition
-	s := txn.Snapshot()
-
-	// check nonce is correct (pre-check)
-	if msg.CheckNonce() {
-		nonce := txn.GetNonce(msg.From())
-		if nonce < msg.Nonce() {
-			return 0, false, fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
-		} else if nonce > msg.Nonce() {
-			return 0, false, fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
-		}
-	}
-
-	// buy gas
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
-	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
-		return 0, false, ErrInsufficientBalanceForGas
-	}
-
-	// check if there is space for this tx in the gaspool
-	if err := gasPool.SubGas(msg.Gas()); err != nil {
-		return 0, false, err
-	}
-
-	// restart the txn gas
-	txn.gas = msg.Gas()
-
-	txn.initialGas = msg.Gas()
-	txn.SubBalance(msg.From(), mgval)
-
-	contractCreation := msg.To() == nil
-
-	// compute intrinsic gas for the tx (data, contract creation, call...)
-	var txGas uint64
-	if contractCreation && config.Homestead { // TODO, homestead thing
-		txGas = chain.TxGasContractCreation
-	} else {
-		txGas = chain.TxGas
-	}
-
-	data := msg.Data()
-	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
-		// Zero and non-zero bytes are priced differently
-		var nz uint64
-		for _, byt := range data {
-			if byt != 0 {
-				nz++
-			}
-		}
-		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-txGas)/chain.TxDataNonZeroGas < nz {
-			return 0, false, vm.ErrOutOfGas
-		}
-		txGas += nz * chain.TxDataNonZeroGas
-
-		z := uint64(len(data)) - nz
-		if (math.MaxUint64-txGas)/chain.TxDataZeroGas < z {
-			return 0, false, vm.ErrOutOfGas
-		}
-		txGas += z * chain.TxDataZeroGas
-	}
-
-	// reduce the intrinsic gas from the total gas
-	if txn.gas < txGas {
-		return 0, false, vm.ErrOutOfGas
-	}
-
-	txn.gas -= txGas
-
-	sender := msg.From()
-
-	var vmerr error
-
-	if !dryRun {
-		e := evm.NewEVM(txn, env, config, gasTable, getHash)
-		e.SetPrecompiled(builtins)
-
-		if contractCreation {
-			//fmt.Println("- one ")
-			_, txn.gas, vmerr = e.Create(sender, msg.Data(), msg.Value(), txn.gas)
-		} else {
-			//fmt.Println("- two")
-			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
-			_, txn.gas, vmerr = e.Call(sender, *msg.To(), msg.Data(), msg.Value(), txn.gas)
-		}
-
-		//fmt.Println("-- vm err --")
-		//fmt.Println(vmerr)
-
-		if vmerr != nil {
-			if vmerr == evm.ErrNotEnoughFunds {
-				txn.RevertToSnapshot(s)
-				return 0, false, vmerr
-			}
-		}
-	}
-
-	// refund
-	// Apply refund counter, capped to half of the used gas.
-	refund := txn.gasUsed() / 2
-
-	if refund > txn.GetRefund() {
-		refund = txn.GetRefund()
-	}
-
-	txn.gas += refund
-
-	//fmt.Println("-- get refund --")
-	//fmt.Println(txn.GetRefund())
-
-	//fmt.Println("-- refund --")
-	//fmt.Println(refund)
-
-	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice())
-
-	//fmt.Println("-- remaining --")
-	// fmt.Println(remaining)
-
-	txn.AddBalance(msg.From(), remaining)
-
-	// pay the coinbase
-	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), msg.GasPrice()))
-
-	// Return remaining gas to the pool for the block
-	gasPool.AddGas(txn.gas)
-
-	//fmt.Println("-- ## VMerr --")
-	//fmt.Println(vmerr)
-
-	return txn.gasUsed(), vmerr != nil, nil
-}
-*/
 
 // gasUsed returns the amount of gas used up by the state transition.
 func (txn *Txn) gasUsed() uint64 {
@@ -668,7 +520,11 @@ func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
 }
 
 func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
+
+	aa := time.Now()
 	txn.IntermediateCommit(deleteEmptyObjects)
+
+	fmt.Printf("Time to intermediate root: %s\n", time.Since(aa))
 
 	x := txn.txn.Commit()
 
@@ -706,6 +562,10 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 		fmt.Println("##################################################################################")
 	*/
 
+	batch := txn.state.storage.Batch()
+
+	bb := time.Now()
+
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*stateObject)
 		if !ok {
@@ -734,7 +594,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 			})
 
 			subTrie := localTxn.Commit()
-			accountStateRoot := subTrie.Root().Hash(txn.state.storage)
+			accountStateRoot := subTrie.Root().Hash(batch)
 
 			a.account.Root = common.BytesToHash(accountStateRoot)
 			a.account.trie = subTrie
@@ -753,8 +613,25 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 		return false
 	})
 
+	fmt.Printf("Time to walk: %s\n", time.Since(bb))
+
+	cc := time.Now()
+
 	t := tt.Commit()
-	hash := tt.Hash(txn.state.storage)
+
+	fmt.Printf("Time to commit 1: %s\n", time.Since(cc))
+
+	dd := time.Now()
+
+	hash := tt.Hash(batch)
+
+	fmt.Printf("Time to hash: %s\n", time.Since(dd))
+
+	ee := time.Now()
+
+	batch.Write()
+
+	fmt.Printf("Time to batch: %s\n", time.Since(ee))
 
 	newState := &State{
 		storage: txn.state.storage,
@@ -763,6 +640,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 	}
 
 	// copy all the code
+	// TODO, Move to trie
 	for k, v := range txn.state.code {
 		newState.code[k] = v
 	}

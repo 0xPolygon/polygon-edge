@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -31,15 +32,9 @@ import (
 // about how the blocks are processed.
 
 var (
-	errLargeBlockTime    = errors.New("timestamp too big")
-	errZeroBlockTime     = errors.New("timestamp equals parent's")
-	errTooManyUncles     = errors.New("too many uncles")
-	errDuplicateUncle    = errors.New("duplicate uncle")
-	errUncleIsAncestor   = errors.New("uncle is ancestor")
-	errDanglingUncle     = errors.New("uncle's parent is not ancestor")
-	errInvalidDifficulty = errors.New("non-positive difficulty")
-	errInvalidMixDigest  = errors.New("invalid mix digest")
-	errInvalidPoW        = errors.New("invalid proof-of-work")
+	errDuplicateUncle  = errors.New("duplicate uncle")
+	errUncleIsAncestor = errors.New("uncle is ancestor")
+	errDanglingUncle   = errors.New("uncle's parent is not ancestor")
 )
 
 // Blockchain is a blockchain reference
@@ -607,6 +602,8 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 	receipts := types.Receipts{}
 
+	one := time.Now()
+
 	// apply the transactions
 	for indx, tx := range block.Transactions() {
 		legacyConfig := &params.ChainConfig{
@@ -673,7 +670,13 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 		panic(err)
 	}
 
+	fmt.Printf("Time to process: %s\n", time.Since(one))
+
+	two := time.Now()
+
 	s2, root := txn.Commit(config.EIP155)
+
+	fmt.Printf("Time to commit: %s\n", time.Since(two))
 
 	return s2, root, receipts, totalGas, nil
 }
