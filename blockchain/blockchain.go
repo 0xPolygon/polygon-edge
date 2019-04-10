@@ -89,6 +89,20 @@ func (b *Blockchain) Genesis() *types.Header {
 
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
+	// Build precompiled contracts
+	prec := map[common.Address]*precompiled.Precompiled{}
+	for addr, i := range genesis.Alloc {
+		if i.Builtin != nil {
+			j, err := precompiled.CreatePrecompiled(i.Builtin)
+			if err != nil {
+				return err
+			}
+			prec[addr] = j
+		}
+	}
+
+	b.SetPrecompiled(prec)
+
 	// The chain is not empty
 	if !b.Empty() {
 		// load genesis from memory
