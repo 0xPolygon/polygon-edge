@@ -91,7 +91,6 @@ func (b *Blockchain) Genesis() *types.Header {
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// The chain is not empty
 	if !b.Empty() {
-		fmt.Println("-- empty --")
 		// load genesis from memory
 		genesisHash, ok := b.db.ReadCanonicalHash(big.NewInt(0))
 		if !ok {
@@ -634,11 +633,14 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 		logs := txn.Logs()
 
-		ss, root := txn.Commit(config.EIP155)
-		txn = ss.Txn()
+		var root []byte
 
 		if config.Byzantium {
 			root = []byte{}
+		} else {
+			ss, aux := txn.Commit(config.EIP155)
+			txn = ss.Txn()
+			root = aux
 		}
 
 		// Create receipt

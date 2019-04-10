@@ -364,9 +364,7 @@ func Transfer(state *Txn, from common.Address, to common.Address, amount *big.In
 		return runtime.ErrNotEnoughFunds
 	}
 
-	x := big.NewInt(amount.Int64())
-
-	state.SubBalance(from, x)
-	state.AddBalance(to, x)
+	state.SubBalance(from, amount)
+	state.AddBalance(to, amount)
 	return nil
 }

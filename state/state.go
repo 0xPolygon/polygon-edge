@@ -82,7 +82,7 @@ func (a *Account) Trie() *trie.Trie {
 }
 
 func (a *Account) String() string {
-	return fmt.Sprintf("%d %d", a.Nonce, a.Balance.Uint64())
+	return fmt.Sprintf("%d %s", a.Nonce, a.Balance.String())
 }
 
 func (a *Account) Copy() *Account {
