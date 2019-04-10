@@ -44,6 +44,10 @@ func (s *State) SetStorage(storage trie.Storage) {
 	s.storage = storage
 }
 
+func (s *State) GetRoot() *trie.Trie {
+	return s.getRoot()
+}
+
 // getRoot is used to do an atomic load of the root pointer
 func (s *State) getRoot() *trie.Trie {
 	root := (*trie.Trie)(atomic.LoadPointer(&s.root))

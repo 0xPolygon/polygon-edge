@@ -26,9 +26,8 @@ type WalkFn func(k []byte, v []byte) bool
 type WalkFnNode func(v *Node) bool
 
 type leafNode struct {
-	hashed bool
-	key    []byte
-	val    []byte
+	key []byte
+	val []byte
 }
 
 type edge struct {
@@ -220,7 +219,7 @@ func (n *Node) Hash(storage KVWriter) []byte {
 	}
 
 	if len(x) > 32 || !ok {
-		return hasher.hashitAndStore(n, storage, x)
+		return hasher.hashitAndStore(nil, storage, x)
 	}
 
 	// hasherPool.Put(hasher)
@@ -249,8 +248,10 @@ func (n *Node) Show() {
 func show(n *Node, d int, label byte, handlePrefix bool) {
 	if n.leaf != nil {
 		k, v := hexutil.Encode(n.leaf.key), hexutil.Encode(n.leaf.val)
-		if n.leaf.hashed {
-			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, v)
+
+		if n.hash != nil {
+			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d+1), label, k, v)
 		} else {
 			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
 		}
@@ -259,6 +260,11 @@ func show(n *Node, d int, label byte, handlePrefix bool) {
 		p := n.prefix
 		if handlePrefix {
 			p = n.prefix[1:]
+		}
+
+		if n.hash != nil {
+			fmt.Printf("%s(%d) FULL HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			return
 		}
 
 		if len(p) == 0 {
@@ -322,7 +328,6 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 
 	if n.leaf != nil {
 		p := n.prefix
-
 		if handlePrefix {
 			p = n.prefix[1:]
 		}
@@ -338,7 +343,8 @@ func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix
 		key := hexToCompact(p)
 		val := encodeKeyValue(key, v)
 		if len(val) >= 32 {
-			return h.hashitAndStore(n, storage, val), true
+			hh := h.hashitAndStore(n, storage, val)
+			return hh, true
 		}
 
 		return val, false
@@ -402,13 +408,12 @@ func (h *Hasher) hashitAndStore(n *Node, storage KVWriter, val []byte) []byte {
 	h.hash.Write(val)
 	h.hash.Read(h.tmp[:])
 
-	// Cache the hash
-	n.hash = make([]byte, 32)
-	copy(n.hash[:], h.tmp[:])
+	if n != nil {
+		n.hash = make([]byte, 32)
+		copy(n.hash[:], h.tmp[:])
+	}
 
 	if storage != nil {
-
-		fmt.Println("-- put --")
 		storage.Put(h.tmp[:], val)
 	}
 	return h.tmp[:]

@@ -7,8 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/state/trie"
 )
 
 type fakeConsensus struct {
@@ -152,34 +154,30 @@ func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [
 
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
-	panic("FIX URGENT")
+	s, err := memory.NewMemoryStorage(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	/*
-		s, err := memory.NewMemoryStorage(nil)
-		if err != nil {
+	config := &chain.Params{
+		Forks: &chain.Forks{
+			EIP155:    chain.NewFork(0),
+			Homestead: chain.NewFork(0),
+		},
+	}
+
+	b := NewBlockchain(s, trie.NewMemoryStorage(), &fakeConsensus{}, config)
+	if headers != nil {
+		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)
 		}
-
-		config := &chain.Params{
-			Forks: &chain.Forks{
-				EIP155:    chain.NewFork(0),
-				Homestead: chain.NewFork(0),
-			},
+		if err := b.WriteHeaders(headers[1:]); err != nil {
+			t.Fatal(err)
 		}
+	}
 
-		b := NewBlockchain(s, trie.NewMemoryStorage(), &fakeConsensus{}, config)
-		if headers != nil {
-			if err := b.WriteHeaderGenesis(headers[0]); err != nil {
-				t.Fatal(err)
-			}
-			if err := b.WriteHeaders(headers[1:]); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		b.AddState(common.Hash{}, state.NewState())
-		return b
-	*/
+	b.AddState(common.Hash{}, state.NewState())
+	return b
 }
 
 func createGenesis(header *types.Header) *chain.Genesis {

@@ -3,9 +3,7 @@ package state
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
-	"time"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -491,9 +489,6 @@ func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
 		if !ok {
 			return false
 		}
-
-		// fmt.Println(hexutil.Encode(k))
-
 		if a.suicide || a.Empty() && deleteEmptyObjects {
 			remove = append(remove, k)
 		}
@@ -520,15 +515,9 @@ func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
 }
 
 func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
-
-	aa := time.Now()
 	txn.IntermediateCommit(deleteEmptyObjects)
 
-	fmt.Printf("Time to intermediate root: %s\n", time.Since(aa))
-
 	x := txn.txn.Commit()
-
-	// fmt.Printf("EIP enabled: %v\n", deleteEmptyObjects)
 
 	tt := txn.state.getRoot().Txn()
 
@@ -564,8 +553,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 
 	batch := txn.state.storage.Batch()
 
-	bb := time.Now()
-
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*stateObject)
 		if !ok {
@@ -593,8 +580,8 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 				return false
 			})
 
+			accountStateRoot := localTxn.Hash(batch)
 			subTrie := localTxn.Commit()
-			accountStateRoot := subTrie.Root().Hash(batch)
 
 			a.account.Root = common.BytesToHash(accountStateRoot)
 			a.account.trie = subTrie
@@ -613,25 +600,11 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 		return false
 	})
 
-	fmt.Printf("Time to walk: %s\n", time.Since(bb))
-
-	cc := time.Now()
-
 	t := tt.Commit()
-
-	fmt.Printf("Time to commit 1: %s\n", time.Since(cc))
-
-	dd := time.Now()
 
 	hash := tt.Hash(batch)
 
-	fmt.Printf("Time to hash: %s\n", time.Since(dd))
-
-	ee := time.Now()
-
 	batch.Write()
-
-	fmt.Printf("Time to batch: %s\n", time.Since(ee))
 
 	newState := &State{
 		storage: txn.state.storage,

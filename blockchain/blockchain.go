@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -131,8 +130,6 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 
 	b.genesis = header
 
-	fmt.Printf("SET GENESIS STATE: %s\n", hexutil.Encode(root))
-
 	b.stateLock.Lock()
 	b.state[hexutil.Encode(root)] = ss
 	b.stateRoot = common.BytesToHash(root)
@@ -145,8 +142,6 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	if err := b.advanceHead(header); err != nil {
 		return err
 	}
-
-	fmt.Printf("GENESIS HASH: %s\n", header.Hash().String())
 
 	b.db.WriteDiff(header.Hash(), header.Difficulty)
 	return nil
@@ -455,7 +450,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			b.stateRoot = common.BytesToHash(root)
 			b.stateLock.Unlock()
 
-			fmt.Printf("State root: %s\n", b.stateRoot.String())
 		}
 
 		if err := b.WriteHeader(h); err != nil {
@@ -602,8 +596,6 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 	receipts := types.Receipts{}
 
-	one := time.Now()
-
 	// apply the transactions
 	for indx, tx := range block.Transactions() {
 		legacyConfig := &params.ChainConfig{
@@ -670,13 +662,7 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 		panic(err)
 	}
 
-	fmt.Printf("Time to process: %s\n", time.Since(one))
-
-	two := time.Now()
-
 	s2, root := txn.Commit(config.EIP155)
-
-	fmt.Printf("Time to commit: %s\n", time.Since(two))
 
 	return s2, root, receipts, totalGas, nil
 }
@@ -786,7 +772,6 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	b.db.WriteHeader(header)
 
 	if header.ParentHash == head.Hash() {
-		fmt.Println("** ADVANCE HASH **")
 
 		// advance the chain
 		if err := b.advanceHead(header); err != nil {

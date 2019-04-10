@@ -139,6 +139,10 @@ func (t *Txn) insert(n *Node, k, search []byte, v []byte) (*Node, []byte, bool) 
 
 	// No edge, create one
 	if child == nil {
+		if n.Len() == 1 {
+			// it was short before, we need to remove the hash from that one
+			n.First().hash = nil
+		}
 		e := edge{
 			label: search[0],
 			node: &Node{
@@ -256,12 +260,16 @@ func (t *Txn) delete(parent, n *Node, search []byte) (*Node, *leafNode) {
 	// Delete the edge if the node has no edges
 	if newChild.leaf == nil && newChild.Len() == 0 {
 		nc.delEdge(label)
-
 		if n != t.root && nc.Len() == 1 && !nc.isLeaf() {
 			t.mergeChild(nc)
 		}
 	} else {
 		nc.edges[idx] = newChild
+	}
+
+	if nc.Len() == 1 {
+		// Only one, its a short node now
+		nc.First().hash = nil
 	}
 	return nc, leaf
 }

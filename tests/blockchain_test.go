@@ -8,16 +8,18 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/minimal/state/trie"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
 
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -79,7 +81,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 
 	builtins := buildBuiltins(t, config)
-	s, err := storage.NewMemoryStorage(nil)
+	s, err := memory.NewMemoryStorage(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +98,9 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	engine := ethash.NewEthHash(params, fakePow)
 	genesis := c.buildGenesis()
 
-	b := blockchain.NewBlockchain(s, engine, params)
+	trieDB := trie.NewMemoryStorage()
+
+	b := blockchain.NewBlockchain(s, trieDB, engine, params)
 	b.SetPrecompiled(builtins)
 
 	if err := b.WriteGenesis(genesis); err != nil {
@@ -135,14 +139,14 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		}
 
 		// validate header
-		if !reflect.DeepEqual(entry.Header.header, b.Header()) {
+		header, _ := b.Header()
+		if !reflect.DeepEqual(entry.Header.header, header) {
 			t.Fatal("Header is not correct")
 		}
 		validBlocks[block.Hash()] = block
 	}
 
-	lastBlock := b.Header()
-
+	lastBlock, _ := b.Header()
 	// Validate last block
 	if hash := lastBlock.Hash().String(); hash != c.LastBlockHash {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
@@ -172,7 +176,8 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 
 	// Validate imported headers
-	for current := b.Header(); current != nil && current.Number.Uint64() != 0; current = b.GetHeaderByHash(current.ParentHash) {
+	header, _ := b.Header()
+	for current := header; current != nil && current.Number.Uint64() != 0; current, _ = b.GetHeaderByHash(current.ParentHash) {
 		valid, ok := validBlocks[current.Hash()]
 		if !ok {
 			t.Fatalf("Block from chain %s not found", current.Hash())
