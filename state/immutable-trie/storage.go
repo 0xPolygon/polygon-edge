@@ -11,15 +11,54 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+var (
+	// CODE is the code prefix
+	CODE = []byte("code")
+)
+
+type Batch interface {
+	Put(k, v []byte)
+	Write()
+}
+
 // Storage stores the trie
 type Storage interface {
 	Put(k, v []byte)
 	Get(k []byte) ([]byte, bool)
+	Batch() Batch
+	SetCode(hash common.Hash, code []byte)
+	GetCode(hash common.Hash) ([]byte, bool)
 }
 
 // KVStorage is a k/v storage on memory using leveldb
 type KVStorage struct {
 	db *leveldb.DB
+}
+
+// KVBatch is a batch write for leveldb
+type KVBatch struct {
+	db    *leveldb.DB
+	batch *leveldb.Batch
+}
+
+func (b *KVBatch) Put(k, v []byte) {
+	b.batch.Put(k, v)
+}
+
+func (kv *KVStorage) SetCode(hash common.Hash, code []byte) {
+	kv.Put(append(CODE, hash.Bytes()...), code)
+}
+
+func (kv *KVStorage) GetCode(hash common.Hash) ([]byte, bool) {
+	return kv.Get(append(CODE, hash.Bytes()...))
+}
+
+func (b *KVBatch) Write() {
+	b.db.Write(b.batch, nil)
+}
+
+func (kv *KVStorage) Batch() Batch {
+	return &KVBatch{db: kv.db, batch: &leveldb.Batch{}}
 }
 
 func (kv *KVStorage) Put(k, v []byte) {
@@ -49,20 +88,45 @@ func NewLevelDBStorage(path string, logger *log.Logger) (Storage, error) {
 	return &KVStorage{db}, nil
 }
 
-// MemStorage stores the trie on memory
-type MemStorage struct {
-	db map[string][]byte
+type memStorage struct {
+	db   map[string][]byte
+	code map[common.Hash][]byte
 }
 
+type memBatch struct {
+	db *map[string][]byte
+}
+
+func (m *memBatch) Put(p, v []byte) {
+	(*m.db)[hexutil.Encode(p)] = v
+}
+
+func (m *memBatch) Write() {
+}
+
+// NewMemoryStorage creates an inmemory trie storage
 func NewMemoryStorage() Storage {
-	return &MemStorage{map[string][]byte{}}
+	return &memStorage{db: map[string][]byte{}, code: map[common.Hash][]byte{}}
 }
 
-func (m *MemStorage) Put(p []byte, v []byte) {
+func (m *memStorage) SetCode(hash common.Hash, code []byte) {
+	m.code[hash] = code
+}
+
+func (m *memStorage) GetCode(hash common.Hash) ([]byte, bool) {
+	code, ok := m.code[hash]
+	return code, ok
+}
+
+func (m *memStorage) Batch() Batch {
+	return &memBatch{db: &m.db}
+}
+
+func (m *memStorage) Put(p []byte, v []byte) {
 	m.db[hexutil.Encode(p)] = v
 }
 
-func (m *MemStorage) Get(p []byte) ([]byte, bool) {
+func (m *memStorage) Get(p []byte) ([]byte, bool) {
 	v, ok := m.db[hexutil.Encode(p)]
 	if !ok {
 		return []byte{}, false
@@ -185,15 +249,21 @@ func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) 
 		// empty node
 		return nil, rest, nil
 	case kind == rlp.String && len(val) == 32:
+
+		// NOTE, it fully expands all the internal nodes
+		// only for testing now.
+
 		realVal, ok := storage.Get(val)
 		if !ok {
 			return nil, nil, fmt.Errorf("Value could not be expanded")
 		}
 
-		// NOTE, it fully expands all the internal nodes
-		// only for testing now.
-
 		n, err := DecodeNode(storage, hash, realVal)
+
+		// fmt.Println("-- val --")
+		// fmt.Println(val)
+
+		n.hash = val
 		return n, rest, err
 
 		// return &Node{leaf: &leafNode{val: val}}, rest, nil

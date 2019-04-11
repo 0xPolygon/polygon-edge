@@ -4,14 +4,19 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
+	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/umbracle/minimal/state/shared"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Merkle-trie based on hashicorp go-immutable-radix
 
 type Trie struct {
-	root *Node
+	root  *Node
+	state *State
 }
 
 func NewTrie() *Trie {
@@ -31,6 +36,7 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 	if err != nil {
 		return nil, err
 	}
+	node.hash = root.Bytes()
 
 	var t *Trie
 	if node.Len() == 0 {
@@ -61,6 +67,7 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 
 func (t *Trie) Txn() *Txn {
 	return &Txn{
+		trie: t,
 		root: t.root,
 	}
 }
@@ -70,6 +77,7 @@ func (t *Trie) Root() *Node {
 }
 
 type Txn struct {
+	trie *Trie
 	root *Node
 }
 
@@ -84,7 +92,13 @@ func (t *Txn) Copy() *Txn {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{t.root}
+	// TODO, not sure if this is necessary anymore, it was useful before because blockchain was storing the states
+	// now that is the states are stored in another place this may not be necessary anymore.
+	// If thats the case, just join hash and commit.
+	return &Trie{
+		root:  t.root,
+		state: t.trie.state,
+	}
 }
 
 func (t *Txn) Insert(key []byte, v []byte) {
@@ -139,6 +153,10 @@ func (t *Txn) insert(n *Node, k, search []byte, v []byte) (*Node, []byte, bool) 
 
 	// No edge, create one
 	if child == nil {
+		if n.Len() == 1 {
+			// it was short before, we need to remove the hash from that one
+			n.First().hash = nil
+		}
 		e := edge{
 			label: search[0],
 			node: &Node{
@@ -256,12 +274,16 @@ func (t *Txn) delete(parent, n *Node, search []byte) (*Node, *leafNode) {
 	// Delete the edge if the node has no edges
 	if newChild.leaf == nil && newChild.Len() == 0 {
 		nc.delEdge(label)
-
 		if n != t.root && nc.Len() == 1 && !nc.isLeaf() {
 			t.mergeChild(nc)
 		}
 	} else {
 		nc.edges[idx] = newChild
+	}
+
+	if nc.Len() == 1 {
+		// Only one, its a short node now
+		nc.First().hash = nil
 	}
 	return nc, leaf
 }
@@ -288,15 +310,17 @@ func concat(a, b []byte) []byte {
 	return c
 }
 
-func hashit(b []byte) []byte {
-	f := sha3.NewLegacyKeccak256()
-	f.Write(b)
-	res := f.Sum(nil)
-	return res
-}
+func (t *Txn) Hash(storage KVWriter) []byte {
+	root := t.root.Hash(storage)
 
-func (t *Txn) Hash(storage Storage) []byte {
-	return t.root.Hash(storage)
+	tr := &Trie{
+		root:  t.root,
+		state: t.trie.state,
+	}
+
+	// Save locally the new computed trie
+	t.trie.state.addState(common.BytesToHash(root), tr)
+	return root
 }
 
 func (t *Txn) writeNode(n *Node, x bool) *Node {
@@ -324,4 +348,78 @@ func longestPrefix(k1, k2 []byte) int {
 		}
 	}
 	return i
+}
+
+func (t *Trie) Commit(x *iradix.Tree) (shared.Trie, []byte) {
+	// this commit runs the transactions and creates a new trie
+	// this is done for at the transaction/block level and deals with updating
+	// internal nodes if necessary, this is, internal account tries dont run
+	// this method
+
+	// tt := txn.state.getRoot().Txn()
+	tt := t.Txn()
+
+	batch := t.state.Storage().Batch()
+	// batch := txn.state.storage.Batch()
+
+	x.Root().Walk(func(k []byte, v interface{}) bool {
+		a, ok := v.(*shared.StateObject)
+		if !ok {
+			// We also have logs, avoid those
+			return false
+		}
+
+		if a.Deleted {
+			tt.Delete(hashit(k))
+			return false
+		}
+
+		// compute first the state changes
+		if a.Txn != nil {
+			localTxn := a.Account.Trie.(*Trie).Txn()
+
+			// Apply all the changes
+			a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+				if v == nil {
+					localTxn.Delete(k)
+				} else {
+					vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
+					localTxn.Insert(k, vv)
+				}
+				return false
+			})
+
+			accountStateRoot := localTxn.Hash(batch)
+			// subTrie := localTxn.Commit()
+
+			a.Account.Root = common.BytesToHash(accountStateRoot)
+			// a.Account.trie = subTrie
+		}
+
+		if a.DirtyCode {
+			t.state.SetCode(common.BytesToHash(a.Account.CodeHash), a.Code)
+			// txn.state.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
+			// txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
+		}
+
+		data, err := rlp.EncodeToBytes(a.Account)
+		if err != nil {
+			panic(err)
+		}
+
+		tt.Insert(hashit(k), data)
+		return false
+	})
+
+	tNew := tt.Commit()
+	hash := tt.Hash(batch)
+	batch.Write()
+
+	return tNew, hash
+}
+
+func hashit(k []byte) []byte {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(k)
+	return h.Sum(nil)
 }

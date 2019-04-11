@@ -10,17 +10,17 @@ import (
 	"strings"
 	"testing"
 
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
-	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/rlp"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -182,11 +182,11 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) {
-	state := state.NewState()
-	state.SetStorage(trie.NewMemoryStorage())
+func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.Snapshot, []byte) {
+	state := state.NewState(trie.NewState(trie.NewMemoryStorage()))
 
-	txn := state.Txn()
+	snap, _ := state.NewSnapshot(common.Hash{})
+	txn := snap.Txn()
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)
@@ -206,7 +206,7 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) 
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewKeccak256()
+	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h

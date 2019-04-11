@@ -175,7 +175,7 @@ func (s *Sealer) commit() {
 		return tx.tx, true
 	}
 
-	newState, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
+	_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
 	header.Root = common.BytesToHash(root)
 
 	// TODO, get uncles
@@ -205,7 +205,7 @@ func (s *Sealer) commit() {
 	}
 
 	// Write the new state
-	s.blockchain.AddState(common.BytesToHash(root), newState)
+	// s.blockchain.AddState(common.BytesToHash(root), newState)
 
 	// Broadcast the block to the network
 	select {

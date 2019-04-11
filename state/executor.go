@@ -87,16 +87,10 @@ func (e *Executor) Apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 	if err != nil {
 		txn.RevertToSnapshot(s)
 	}
-
-	//fmt.Println("-- failed --")
-	//fmt.Println(failed)
-
 	return gas, failed, err
 }
 
 func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
-	// transition
-	// transition
 	e.SetPrecompiled(builtins)
 
 	s := txn.Snapshot()
@@ -180,17 +174,11 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 		e.runtime = evm.NewEVM(e, txn, env, config, gasTable, getHash)
 
 		if contractCreation {
-			//fmt.Println("- one ")
 			_, txn.gas, vmerr = e.Create2(sender, msg.Data(), msg.Value(), txn.gas)
 		} else {
-			//fmt.Println("- two")
 			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
 			_, txn.gas, vmerr = e.Call2(sender, *msg.To(), msg.Data(), msg.Value(), txn.gas)
 		}
-
-		//fmt.Println("-- vm err --")
-		//fmt.Println(vmerr)
-
 		if vmerr != nil {
 			if vmerr == runtime.ErrNotEnoughFunds {
 				txn.RevertToSnapshot(s)
@@ -209,17 +197,8 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 
 	txn.gas += refund
 
-	//fmt.Println("-- get refund --")
-	//fmt.Println(txn.GetRefund())
-
-	//fmt.Println("-- refund --")
-	//fmt.Println(refund)
-
 	// Return ETH for remaining gas, exchanged at the original rate.
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice())
-
-	//fmt.Println("-- remaining --")
-	// fmt.Println(remaining)
 
 	txn.AddBalance(msg.From(), remaining)
 
@@ -228,9 +207,6 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 
 	// Return remaining gas to the pool for the block
 	gasPool.AddGas(txn.gas)
-
-	//fmt.Println("-- ## VMerr --")
-	//fmt.Println(vmerr)
 
 	return txn.gasUsed(), vmerr != nil, nil
 }
@@ -262,7 +238,6 @@ func (e *Executor) Call(c *runtime.Contract, t runtime.CallType) ([]byte, uint64
 	snapshot := e.state.Snapshot()
 
 	if t == runtime.Call {
-
 		_, isPrecompiled := e.getPrecompiled(c.CodeAddress)
 		if !e.state.Exist(c.Address) {
 			if !isPrecompiled && e.config.EIP158 && c.Value.Sign() == 0 {
@@ -389,9 +364,7 @@ func Transfer(state *Txn, from common.Address, to common.Address, amount *big.In
 		return runtime.ErrNotEnoughFunds
 	}
 
-	x := big.NewInt(amount.Int64())
-
-	state.SubBalance(from, x)
-	state.AddBalance(to, x)
+	state.SubBalance(from, amount)
+	state.AddBalance(to, amount)
 	return nil
 }

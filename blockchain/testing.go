@@ -5,13 +5,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain/storage/memory"
-	"github.com/umbracle/minimal/state/trie"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 )
 
 type fakeConsensus struct {
@@ -167,7 +166,9 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	b := NewBlockchain(s, trie.NewMemoryStorage(), &fakeConsensus{}, config)
+	state := state.NewState(trie.NewState(trie.NewMemoryStorage()))
+
+	b := NewBlockchain(s, state, &fakeConsensus{}, config)
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)
@@ -177,7 +178,8 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		}
 	}
 
-	b.AddState(common.Hash{}, state.NewState())
+	// TODO, find a way to add the snapshot, this will fail until that is fixed.
+	// snap, _ := state.NewSnapshot(common.Hash{})
 	return b
 }
 

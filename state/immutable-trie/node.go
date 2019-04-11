@@ -3,9 +3,12 @@ package trie
 import (
 	"bytes"
 	"fmt"
+	"hash"
 	"reflect"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -36,6 +39,7 @@ type Node struct {
 	leaf   *leafNode
 	prefix []byte
 	edges  [17]*Node
+	hash   []byte
 }
 
 func (n *Node) Equal(nn *Node) bool {
@@ -43,10 +47,12 @@ func (n *Node) Equal(nn *Node) bool {
 	nnVals := []*Node{}
 
 	n.WalkNode(func(n *Node) bool {
+		n.hash = nil // dont compare the hashed cache
 		nVals = append(nVals, n)
 		return false
 	})
 	nn.WalkNode(func(n *Node) bool {
+		n.hash = nil
 		nnVals = append(nnVals, n)
 		return false
 	})
@@ -56,7 +62,8 @@ func (n *Node) Equal(nn *Node) bool {
 	}
 
 	for indx, v := range nVals {
-		if !reflect.DeepEqual(v, nnVals[indx]) {
+		v1 := nnVals[indx]
+		if !reflect.DeepEqual(v, v1) {
 			return false
 		}
 	}
@@ -186,11 +193,18 @@ func (n *Node) Len() int {
 	return l
 }
 
-func (n *Node) Hash(storage Storage) []byte {
+type KVWriter interface {
+	Put(k, v []byte)
+}
+
+func (n *Node) Hash(storage KVWriter) []byte {
 	var x []byte
 	var ok bool
 
 	size := n.Len()
+
+	hasher := newHasher()
+	// hasher := hasherPool.Get().(*Hasher)
 
 	if size == 0 {
 		if storage != nil {
@@ -199,14 +213,16 @@ func (n *Node) Hash(storage Storage) []byte {
 		return emptyRoot
 	} else if size == 1 { // only one short node
 		// its a short node
-		x, ok = Hash(storage, n.First(), 0, 0, false)
+		x, ok = hasher.Hash(storage, n.First(), 0, 0, false)
 	} else {
-		x, ok = Hash(storage, n, 0, 0, false)
+		x, ok = hasher.Hash(storage, n, 0, 0, false)
 	}
 
 	if len(x) > 32 || !ok {
-		return hashitAndStore(storage, x)
+		return hasher.hashitAndStore(nil, storage, x)
 	}
+
+	// hasherPool.Put(hasher)
 	return x
 }
 
@@ -227,29 +243,28 @@ func (n *Node) delEdge(label byte) {
 
 func (n *Node) Show() {
 	show(n, 0, 0, false)
-
-	/*
-		size := n.Len()
-
-		if size == 1 {
-			fmt.Println("-- ONE --")
-			show(n.First(), 0, 0, false)
-		} else {
-			fmt.Println("-- TWO --")
-			show(n, 0, 0, false)
-		}
-	*/
 }
 
 func show(n *Node, d int, label byte, handlePrefix bool) {
 	if n.leaf != nil {
 		k, v := hexutil.Encode(n.leaf.key), hexutil.Encode(n.leaf.val)
-		fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
+
+		if n.hash != nil {
+			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d+1), label, k, v)
+		} else {
+			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
+		}
 	} else {
 
 		p := n.prefix
 		if handlePrefix {
 			p = n.prefix[1:]
+		}
+
+		if n.hash != nil {
+			fmt.Printf("%s(%d) FULL HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			return
 		}
 
 		if len(p) == 0 {
@@ -282,41 +297,54 @@ type node []byte
 
 const valueEdge = 16
 
-func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
+type hashWithReader interface {
+	hash.Hash
+	Read([]byte) (int, error)
+}
+
+// Hasher hashes the trie
+type Hasher struct {
+	tmp  [32]byte // last hashed value
+	hash hashWithReader
+}
+
+func newHasher() *Hasher {
+	hash := sha3.NewLegacyKeccak256().(hashWithReader)
+	return &Hasher{hash: hash}
+}
+
+var hasherPool = sync.Pool{
+	New: func() interface{} {
+		return &Hasher{
+			hash: sha3.NewLegacyKeccak256().(hashWithReader),
+		}
+	},
+}
+
+func (h *Hasher) Hash(storage KVWriter, n *Node, d int, label byte, handlePrefix bool) ([]byte, bool) {
+	if n.hash != nil {
+		return n.hash, true
+	}
+
 	if n.leaf != nil {
-
 		p := n.prefix
-
 		if handlePrefix {
 			p = n.prefix[1:]
 		}
 
-		// var v []byte
-		// var err error
-
 		v := n.leaf.val
-
-		/*
-			if b, ok := n.leaf.val.([]byte); ok {
-				v, _ = rlp.EncodeToBytes(bytes.TrimLeft(b[:], "\x00"))
-			} else {
-				v, err = rlp.EncodeToBytes(n.leaf.val)
-				if err != nil {
-					panic(err)
-				}
-			}
-		*/
-
 		if label == valueEdge {
 			// its a leaf, only encode with rlp and dont hash
 			// false because it does not need to be encoded again as rlp
 			return encodeItem(v), false
 		}
 
+		// Short node
 		key := hexToCompact(p)
 		val := encodeKeyValue(key, v)
 		if len(val) >= 32 {
-			return hashitAndStore(storage, val), true
+			hh := h.hashitAndStore(n, storage, val)
+			return hh, true
 		}
 
 		return val, false
@@ -327,7 +355,7 @@ func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byt
 
 		for label, e := range n.edges {
 			if e != nil {
-				r, ok := Hash(storage, e, d+1, byte(label), true)
+				r, ok := h.Hash(storage, e, d+1, byte(label), true)
 				if ok {
 					vals[label] = encodeItem(r)
 				} else {
@@ -340,7 +368,7 @@ func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byt
 		hashed := false
 
 		if len(val) >= 32 {
-			val = hashitAndStore(storage, val)
+			val = h.hashitAndStore(n, storage, val)
 			hashed = true
 		}
 
@@ -364,7 +392,7 @@ func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byt
 
 		if len(val2) >= 32 {
 			hashed = true
-			val2 = hashitAndStore(storage, val2)
+			val2 = h.hashitAndStore(n, storage, val2)
 		}
 
 		return val2, hashed
@@ -373,12 +401,22 @@ func Hash(storage Storage, n *Node, d int, label byte, handlePrefix bool) ([]byt
 	panic("XX")
 }
 
-func hashitAndStore(storage Storage, val []byte) []byte {
-	kk := hashit(val)
-	if storage != nil {
-		storage.Put(kk, val)
+func (h *Hasher) hashitAndStore(n *Node, storage KVWriter, val []byte) []byte {
+	// kk := hashit(val)
+
+	h.hash.Reset()
+	h.hash.Write(val)
+	h.hash.Read(h.tmp[:])
+
+	if n != nil {
+		n.hash = make([]byte, 32)
+		copy(n.hash[:], h.tmp[:])
 	}
-	return kk
+
+	if storage != nil {
+		storage.Put(h.tmp[:], val)
+	}
+	return h.tmp[:]
 }
 
 func encodeListOfBytes(vals [17]node) []byte {

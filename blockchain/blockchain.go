@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -17,9 +16,9 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
-	"github.com/umbracle/minimal/state/trie"
 
 	mapset "github.com/deckarep/golang-set"
 )
@@ -31,25 +30,20 @@ import (
 // about how the blocks are processed.
 
 var (
-	errLargeBlockTime    = errors.New("timestamp too big")
-	errZeroBlockTime     = errors.New("timestamp equals parent's")
-	errTooManyUncles     = errors.New("too many uncles")
-	errDuplicateUncle    = errors.New("duplicate uncle")
-	errUncleIsAncestor   = errors.New("uncle is ancestor")
-	errDanglingUncle     = errors.New("uncle's parent is not ancestor")
-	errInvalidDifficulty = errors.New("non-positive difficulty")
-	errInvalidMixDigest  = errors.New("invalid mix digest")
-	errInvalidPoW        = errors.New("invalid proof-of-work")
+	errDuplicateUncle  = errors.New("duplicate uncle")
+	errUncleIsAncestor = errors.New("uncle is ancestor")
+	errDanglingUncle   = errors.New("uncle's parent is not ancestor")
 )
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db          storage.Storage
-	consensus   consensus.Consensus
-	genesis     *types.Header
-	state       map[string]*state.State
-	stateLock   sync.Mutex
-	stateRoot   common.Hash
+	db        storage.Storage
+	consensus consensus.Consensus
+	genesis   *types.Header
+	state     *state.State
+	// stateRoot     common.Hash
+	// snapshots     map[string]*state.Snapshot
+	// snapshotsLock sync.Mutex
 	triedb      trie.Storage
 	params      *chain.Params
 	precompiled map[common.Address]*precompiled.Precompiled
@@ -60,14 +54,14 @@ type Blockchain struct {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db storage.Storage, triedb trie.Storage, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db storage.Storage, st *state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	return &Blockchain{
-		db:          db,
-		consensus:   consensus,
-		genesis:     nil,
-		state:       map[string]*state.State{},
+		db:        db,
+		consensus: consensus,
+		genesis:   nil,
+		state:     st,
+		// snapshots:   map[string]*state.Snapshot{},
 		params:      params,
-		triedb:      triedb,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
 	}
@@ -95,9 +89,22 @@ func (b *Blockchain) Genesis() *types.Header {
 
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
+	// Build precompiled contracts
+	prec := map[common.Address]*precompiled.Precompiled{}
+	for addr, i := range genesis.Alloc {
+		if i.Builtin != nil {
+			j, err := precompiled.CreatePrecompiled(i.Builtin)
+			if err != nil {
+				return err
+			}
+			prec[addr] = j
+		}
+	}
+
+	b.SetPrecompiled(prec)
+
 	// The chain is not empty
 	if !b.Empty() {
-		fmt.Println("-- empty --")
 		// load genesis from memory
 		genesisHash, ok := b.db.ReadCanonicalHash(big.NewInt(0))
 		if !ok {
@@ -110,10 +117,12 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return nil
 	}
 
-	s := state.NewState()
-	s.SetStorage(b.triedb)
+	// s := state.NewState()
+	// s.SetStorage(b.triedb)
 
-	txn := s.Txn()
+	snap, _ := b.state.NewSnapshot(common.Hash{})
+
+	txn := snap.Txn()
 	for addr, account := range genesis.Alloc {
 		if account.Balance != nil {
 			txn.AddBalance(addr, account.Balance)
@@ -129,19 +138,19 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		}
 	}
 
-	ss, root := txn.Commit(false)
+	_, root := txn.Commit(false)
 
 	header := genesis.ToBlock()
 	header.Root = common.BytesToHash(root)
 
 	b.genesis = header
 
-	fmt.Printf("SET GENESIS STATE: %s\n", hexutil.Encode(root))
-
-	b.stateLock.Lock()
-	b.state[hexutil.Encode(root)] = ss
-	b.stateRoot = common.BytesToHash(root)
-	b.stateLock.Unlock()
+	/*
+		b.snapshotsLock.Lock()
+		b.snapshots[hexutil.Encode(root)] = ss
+		b.stateRoot = common.BytesToHash(root)
+		b.snapshotsLock.Unlock()
+	*/
 
 	// add genesis block
 	if err := b.addHeader(header); err != nil {
@@ -151,29 +160,31 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 
-	fmt.Printf("GENESIS HASH: %s\n", header.Hash().String())
-
 	b.db.WriteDiff(header.Hash(), header.Difficulty)
 	return nil
 }
 
-func (b *Blockchain) getStateRoot(root common.Hash) (*state.State, bool) {
-	b.stateLock.Lock()
-	defer b.stateLock.Unlock()
+func (b *Blockchain) getStateRoot(root common.Hash) (*state.Snapshot, bool) {
+	/*
+		b.snapshotsLock.Lock()
+		defer b.snapshotsLock.Unlock()
 
-	s, ok := b.state[root.String()]
-	if ok {
-		return s, true
-	}
+		s, ok := b.snapshots[root.String()]
+		if ok {
+			return s, true
+		}
+	*/
 
 	// its not in the local cache, ask the state manager. NOTE: this should not be done here
 	// but in the state library itself.
-	ss, err := state.NewStateAt(b.triedb, root)
-	if err != nil {
+	ss, ok := b.state.NewSnapshot(root)
+
+	// ss, err := state.NewStateAt(b.triedb, root)
+	if !ok {
 		return nil, false
 	}
 
-	b.state[root.String()] = ss
+	// b.snapshots[root.String()] = ss
 	return ss, true
 }
 
@@ -195,9 +206,14 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 
 	b.db.WriteDiff(header.Hash(), big.NewInt(1))
 
-	b.stateLock.Lock()
-	b.state[types.EmptyRootHash.String()] = state.NewState()
-	b.stateLock.Unlock()
+	// snap, _ := b.state.NewSnapshot(common.Hash{})
+
+	/*
+		b.snapshotsLock.Lock()
+		b.snapshots[types.EmptyRootHash.String()] = snap
+		b.snapshotsLock.Unlock()
+	*/
+
 	return nil
 }
 
@@ -432,7 +448,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			// Done for testing. TODO, remove.
 
 			block := blocks[indx]
-			state, root, receipts, totalGas, err := b.Process(st, block)
+			_, root, receipts, totalGas, err := b.Process(st, block)
 			if err != nil {
 				return err
 			}
@@ -455,12 +471,13 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
 			}
 
-			b.stateLock.Lock()
-			b.state[hexutil.Encode(root)] = state
-			b.stateRoot = common.BytesToHash(root)
-			b.stateLock.Unlock()
+			/*
+				b.snapshotsLock.Lock()
+				b.snapshots[hexutil.Encode(root)] = state
+				b.stateRoot = common.BytesToHash(root)
+				b.snapshotsLock.Unlock()
+			*/
 
-			fmt.Printf("State root: %s\n", b.stateRoot.String())
 		}
 
 		if err := b.WriteHeader(h); err != nil {
@@ -476,17 +493,19 @@ func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
 	b.db.WriteBody(block.Header().Hash(), block.Body())
 }
 
-func (b *Blockchain) AddState(root common.Hash, state *state.State) {
-	b.stateLock.Lock()
-	b.state[root.String()] = state
-	b.stateLock.Unlock()
+/*
+func (b *Blockchain) AddState(root common.Hash, state *state.Snapshot) {
+	b.snapshotsLock.Lock()
+	b.snapshots[root.String()] = state
+	b.snapshotsLock.Unlock()
 }
+*/
 
-func (b *Blockchain) GetState(header *types.Header) (*state.State, bool) {
+func (b *Blockchain) GetState(header *types.Header) (*state.Snapshot, bool) {
 	return b.getStateRoot(header.Root)
 }
 
-func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.State, []byte, []*types.Transaction, error) {
+func (b *Blockchain) BlockIterator(s *state.Snapshot, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.Snapshot, []byte, []*types.Transaction, error) {
 
 	// add the rewards
 	txn := s.Txn()
@@ -593,7 +612,7 @@ func (b *Blockchain) BlockIterator(s *state.State, header *types.Header, getTx f
 	return s2, root, txns, nil
 }
 
-func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, []byte, types.Receipts, uint64, error) {
+func (b *Blockchain) Process(s *state.Snapshot, block *types.Block) (*state.Snapshot, []byte, types.Receipts, uint64, error) {
 	// add the rewards
 	txn := s.Txn()
 
@@ -645,8 +664,10 @@ func (b *Blockchain) Process(s *state.State, block *types.Block) (*state.State, 
 
 		logs := txn.Logs()
 
-		ss, root := txn.Commit(config.EIP155)
+		// TODO, Only do commit pre-byzantine
+		ss, aux := txn.Commit(config.EIP155)
 		txn = ss.Txn()
+		root := aux
 
 		if config.Byzantium {
 			root = []byte{}
@@ -783,7 +804,6 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	b.db.WriteHeader(header)
 
 	if header.ParentHash == head.Hash() {
-		fmt.Println("** ADVANCE HASH **")
 
 		// advance the chain
 		if err := b.advanceHead(header); err != nil {

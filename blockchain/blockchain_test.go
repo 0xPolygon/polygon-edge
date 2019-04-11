@@ -16,7 +16,7 @@ func TestGenesis(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
 	// no genesis block yet
-	if b.Header() != nil {
+	if _, ok := b.Header(); !ok {
 		t.Fatal("it shoudl be empty")
 	}
 
@@ -26,7 +26,7 @@ func TestGenesis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	header := b.Header()
+	header, _ := b.Header()
 	if header.Hash() != genesis.Hash() {
 		t.Fatal("bad")
 	}
@@ -248,7 +248,7 @@ func TestInsertHeaders(t *testing.T) {
 				}
 			}
 
-			head := b.Header()
+			head, _ := b.Header()
 
 			expected, ok := chain.headers[cc.Head.hash]
 			if !ok {
@@ -279,7 +279,7 @@ func TestInsertHeaders(t *testing.T) {
 			// Check chain of forks
 			if cc.Chain != nil {
 				for indx, i := range cc.Chain {
-					block := b.GetBlockByNumber(big.NewInt(int64(indx)), true)
+					block, _ := b.GetBlockByNumber(big.NewInt(int64(indx)), true)
 					if block.Hash().String() != chain.headers[i.hash].Hash().String() {
 						tt.Fatal("bad")
 					}
@@ -289,7 +289,7 @@ func TestInsertHeaders(t *testing.T) {
 			fmt.Println("-- get total difficulty --")
 			fmt.Println(b.GetChainTD())
 
-			if cc.TD != b.GetChainTD().Uint64() {
+			if td, _ := b.GetChainTD(); cc.TD != td.Uint64() {
 				tt.Fatal("bad")
 			}
 		})
@@ -327,7 +327,7 @@ func TestCommitChain(t *testing.T) {
 		block := blocks[i]
 
 		// check blocks
-		i := b.db.ReadBody(block.Hash())
+		i, _ := b.db.ReadBody(block.Hash())
 		if len(i.Transactions) != 1 {
 			t.Fatal("should have 1 tx")
 		}
