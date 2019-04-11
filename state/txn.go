@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
-	"unsafe"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"golang.org/x/crypto/sha3"
 
@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/minimal/state/trie"
 )
 
 var (
@@ -38,13 +37,9 @@ type GasPool interface {
 	AddGas(uint64)
 }
 
-// Trie references the underlaying trie storage
-type Trie interface {
-	Get(k []byte) (interface{}, bool)
-}
-
 // Txn is a reference of the state
 type Txn struct {
+	snapshot   *Snapshot
 	state      *State
 	snapshots  []*iradix.Tree
 	txn        *iradix.Txn
@@ -52,11 +47,11 @@ type Txn struct {
 	initialGas uint64
 }
 
-// newTxn creates a new state reference
-func newTxn(state *State) *Txn {
+func newTxn(state *State, snapshot *Snapshot) *Txn {
 	i := iradix.New()
 
 	return &Txn{
+		snapshot:  snapshot,
 		state:     state,
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
@@ -156,8 +151,9 @@ func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 		return obj.Copy(), true
 	}
 
+	data, ok := txn.snapshot.Get(hashit(addr.Bytes()))
 	// From the state we get the account object
-	data, ok := txn.state.getRoot().Get(hashit(addr.Bytes()))
+	// data, ok := txn.state.getRoot().Get(hashit(addr.Bytes()))
 	if !ok {
 		return nil, false
 	}
@@ -173,7 +169,8 @@ func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 		account.trie = trie.NewTrie()
 	} else {
 		// TODO, load from state that keeps a cache of tries
-		account.trie, err = trie.NewTrieAt(txn.state.storage, account.Root)
+		// account.trie, err = trie.NewTrieAt(txn.state.storage, account.Root)
+		account.trie, err = txn.state.state.NewTrieAt(account.Root)
 		if err != nil {
 			return nil, false
 		}
@@ -219,8 +216,11 @@ func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
-	//fmt.Printf("ADD BALANCE: %s %d\n", addr.String(), balance.Uint64())
-
+	/*
+		if balance.Sign() == 0 {
+			return
+		}
+	*/
 	txn.upsertAccount(addr, true, func(object *stateObject) {
 		object.account.Balance.Add(object.account.Balance, balance)
 	})
@@ -228,6 +228,9 @@ func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
 
 // SubBalance reduces the balance
 func (txn *Txn) SubBalance(addr common.Address, balance *big.Int) {
+	if balance.Sign() == 0 {
+		return
+	}
 	txn.upsertAccount(addr, true, func(object *stateObject) {
 		object.account.Balance.Sub(object.account.Balance, balance)
 	})
@@ -348,7 +351,8 @@ func (txn *Txn) GetCode(addr common.Address) []byte {
 	if object.dirtyCode {
 		return object.code
 	}
-	code, _ := txn.state.GetCode(common.BytesToHash(object.account.CodeHash))
+	code, _ := txn.state.state.GetCode(common.BytesToHash(object.account.CodeHash))
+	// code, _ := txn.state.GetCode(common.BytesToHash(object.account.CodeHash))
 	return code
 }
 
@@ -477,12 +481,7 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
-// IntermediateCommit runs after each tx is completed to set to false those accounts that
-// have been deleted
-func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
-	// between different transactions and before the final commit we must
-	// check all the txns and mark as deleted the ones removed
-
+func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*stateObject)
@@ -514,12 +513,13 @@ func (txn *Txn) IntermediateCommit(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
-	txn.IntermediateCommit(deleteEmptyObjects)
+func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
+	txn.cleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
 
-	tt := txn.state.getRoot().Txn()
+	// tt := txn.state.getRoot().Txn()
+	tt := txn.snapshot.tt.Txn()
 
 	/*
 		fmt.Println("##################################################################################")
@@ -532,7 +532,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 			}
 			fmt.Printf("# ----------------- %s -------------------\n", hexutil.Encode(k))
 			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.deleted, a.suicide)
-			fmt.Printf("# Balance: %d\n", a.account.Balance.Uint64())
+			fmt.Printf("# Balance: %s\n", a.account.Balance.String())
 			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.account.Nonce)))
 			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.account.CodeHash))
 			fmt.Printf("# State root: %s\n", a.account.Root.String())
@@ -551,7 +551,8 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 		fmt.Println("##################################################################################")
 	*/
 
-	batch := txn.state.storage.Batch()
+	batch := txn.state.state.Storage().Batch()
+	// batch := txn.state.storage.Batch()
 
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*stateObject)
@@ -588,7 +589,8 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 		}
 
 		if a.dirtyCode {
-			txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
+			txn.state.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
+			// txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
 		}
 
 		data, err := rlp.EncodeToBytes(a.account)
@@ -606,17 +608,21 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*State, []byte) {
 
 	batch.Write()
 
-	newState := &State{
-		storage: txn.state.storage,
-		root:    unsafe.Pointer(t),
-		code:    map[string][]byte{},
+	newState := &Snapshot{
+		state: txn.state,
+		tt:    t,
+		// storage: txn.state.storage,
+		// root:    t,
+		// code:    map[string][]byte{},
 	}
 
-	// copy all the code
-	// TODO, Move to trie
-	for k, v := range txn.state.code {
-		newState.code[k] = v
-	}
+	/*
+		// copy all the code
+		// TODO, Move to trie
+		for k, v := range txn.state.code {
+			newState.code[k] = v
+		}
+	*/
 
 	// atomic.StorePointer(&txn.state.root, unsafe.Pointer(t))
 	return newState, hash

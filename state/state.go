@@ -3,23 +3,52 @@ package state
 import (
 	"fmt"
 	"math/big"
-	"sync/atomic"
-	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/umbracle/minimal/state/trie"
+
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 )
 
+type State struct {
+	state *trie.State
+}
+
+func NewState(state *trie.State) *State {
+	return &State{state: state}
+}
+
+func (s *State) NewSnapshot(root common.Hash) (*Snapshot, bool) {
+	t, err := s.state.NewTrieAt(root)
+	if err != nil {
+		panic(err)
+	}
+	return &Snapshot{state: s, tt: t}, true
+}
+
+type Snapshot struct {
+	state *State
+	tt    *trie.Trie
+}
+
+func (s *Snapshot) Txn() *Txn {
+	return newTxn(s.state, s)
+}
+
+func (s *Snapshot) Get(k []byte) ([]byte, bool) {
+	return s.tt.Get(k)
+}
+
+/*
 // State is the ethereum state reference
 type State struct {
-	root    unsafe.Pointer
+	root    *trie.Trie
 	storage trie.Storage
 }
 
 // NewState creates a new state
 func NewState() *State {
 	return &State{
-		root: unsafe.Pointer(trie.NewTrie()),
+		root: trie.NewTrie(),
 	}
 }
 
@@ -31,7 +60,7 @@ func NewStateAt(storage trie.Storage, root common.Hash) (*State, error) {
 	}
 
 	s := &State{
-		root:    unsafe.Pointer(t),
+		root:    t,
 		storage: storage,
 	}
 	return s, nil
@@ -47,8 +76,7 @@ func (s *State) GetRoot() *trie.Trie {
 
 // getRoot is used to do an atomic load of the root pointer
 func (s *State) getRoot() *trie.Trie {
-	root := (*trie.Trie)(atomic.LoadPointer(&s.root))
-	return root
+	return s.root
 }
 
 // Txn creates a Txn for the state
@@ -63,6 +91,7 @@ func (s *State) SetCode(hash common.Hash, code []byte) {
 func (s *State) GetCode(hash common.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
+*/
 
 // Account is the account reference in the ethereum state
 type Account struct {

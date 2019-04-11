@@ -10,7 +10,8 @@ import (
 // Merkle-trie based on hashicorp go-immutable-radix
 
 type Trie struct {
-	root *Node
+	root  *Node
+	state *State
 }
 
 func NewTrie() *Trie {
@@ -61,6 +62,7 @@ func (t *Trie) Get(k []byte) ([]byte, bool) {
 
 func (t *Trie) Txn() *Txn {
 	return &Txn{
+		trie: t,
 		root: t.root,
 	}
 }
@@ -70,6 +72,7 @@ func (t *Trie) Root() *Node {
 }
 
 type Txn struct {
+	trie *Trie
 	root *Node
 }
 
@@ -84,7 +87,10 @@ func (t *Txn) Copy() *Txn {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{t.root}
+	// TODO, not sure if this is necessary anymore, it was useful before because blockchain was storing the states
+	// now that is the states are stored in another place this may not be necessary anymore.
+	// If thats the case, just join hash and commit.
+	return &Trie{root: t.root}
 }
 
 func (t *Txn) Insert(key []byte, v []byte) {
@@ -297,7 +303,16 @@ func concat(a, b []byte) []byte {
 }
 
 func (t *Txn) Hash(storage KVWriter) []byte {
-	return t.root.Hash(storage)
+	root := t.root.Hash(storage)
+
+	tr := &Trie{
+		root:  t.root,
+		state: t.trie.state,
+	}
+
+	// Save locally the new computed trie
+	t.trie.state.addState(common.BytesToHash(root), tr)
+	return root
 }
 
 func (t *Txn) writeNode(n *Node, x bool) *Node {

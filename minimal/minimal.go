@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/umbracle/minimal/state"
+
 	"github.com/umbracle/minimal/chain"
 
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -17,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/state/trie"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
@@ -156,8 +158,10 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
+	st := state.NewState(trie.NewState(trieDB))
+
 	// blockchain object
-	m.Blockchain = blockchain.NewBlockchain(storage, trieDB, m.consensus, config.Chain.Params)
+	m.Blockchain = blockchain.NewBlockchain(storage, st, m.consensus, config.Chain.Params)
 	if err := m.Blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
 		return nil, err
 	}
