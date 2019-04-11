@@ -1,32 +1,29 @@
 package trie
 
 import (
-	"sync"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/umbracle/minimal/state/shared"
 )
 
 type State struct {
-	storage       Storage
-	snapshots     map[common.Hash]*Trie
-	snapshotsLock sync.Mutex
+	storage Storage
+	cache   *lru.Cache
 }
 
 func NewState(storage Storage) *State {
+	cache, _ := lru.New(128)
+
 	s := &State{
-		storage:       storage,
-		snapshots:     map[common.Hash]*Trie{},
-		snapshotsLock: sync.Mutex{},
+		storage: storage,
+		cache:   cache,
 	}
 	return s
 }
 
 func (s *State) addState(root common.Hash, t *Trie) {
-	s.snapshotsLock.Lock()
-	defer s.snapshotsLock.Unlock()
-
-	s.snapshots[root] = t
+	s.cache.Add(root, t)
 }
 
 func (s *State) NewTrie() shared.Trie {
@@ -37,12 +34,9 @@ func (s *State) NewTrie() shared.Trie {
 
 func (s *State) NewTrieAt(root common.Hash) (shared.Trie, error) {
 	// Check locally.
-	s.snapshotsLock.Lock()
-	t, ok := s.snapshots[root]
-	s.snapshotsLock.Unlock()
-
+	tt, ok := s.cache.Get(root)
 	if ok {
-		return t, nil
+		return tt.(*Trie), nil
 	}
 
 	t, err := s.newTrieAtImpl(root)
