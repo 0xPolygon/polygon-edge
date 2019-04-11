@@ -1,14 +1,17 @@
 module github.com/umbracle/minimal
 
 require (
+	github.com/AndreasBriese/bbloom v0.0.0-20190306092124-e2d15f34fcf9 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
 	github.com/allegro/bigcache v1.1.0 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190204200901-2166578f3448 // indirect
 	github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
 	github.com/btcsuite/btcd v0.0.0-20190115013929-ed77733ec07d // indirect
 	github.com/deckarep/golang-set v1.7.1
+	github.com/dgraph-io/badger v1.5.4
+	github.com/dgryski/go-farm v0.0.0-20190323231341-8198c7b169ec // indirect
 	github.com/edsrzf/mmap-go v1.0.0
-	github.com/ethereum/go-ethereum v1.8.20
+	github.com/ethereum/go-ethereum v1.8.23
 	github.com/ferranbt/periodic-dispatcher v0.0.0-20181108165813-15a0c0298473
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gobuffalo/packr v1.22.0
@@ -23,6 +26,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/serf v0.8.2 // indirect
+	github.com/imdario/mergo v0.3.7
 	github.com/ipfs/go-ipfs-util v1.2.8 // indirect
 	github.com/ipfs/go-log v1.5.7 // indirect
 	github.com/libp2p/go-libp2p-crypto v2.0.1+incompatible // indirect
@@ -47,6 +51,7 @@ require (
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
 	github.com/syndtr/goleveldb v0.0.0-20190203031304-2f17a3356c66
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc // indirect
-	golang.org/x/crypto v0.0.0-20190131182504-b8fe1690c613
+	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
