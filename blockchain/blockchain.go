@@ -664,14 +664,13 @@ func (b *Blockchain) Process(s *state.Snapshot, block *types.Block) (*state.Snap
 
 		logs := txn.Logs()
 
-		var root []byte
+		// TODO, Only do commit pre-byzantine
+		ss, aux := txn.Commit(config.EIP155)
+		txn = ss.Txn()
+		root := aux
 
 		if config.Byzantium {
 			root = []byte{}
-		} else {
-			ss, aux := txn.Commit(config.EIP155)
-			txn = ss.Txn()
-			root = aux
 		}
 
 		// Create receipt

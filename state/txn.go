@@ -1,12 +1,11 @@
 package state
 
 import (
-	"bytes"
 	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/umbracle/minimal/state/shared"
 
 	"golang.org/x/crypto/sha3"
 
@@ -88,64 +87,19 @@ func (txn *Txn) RevertToSnapshot(id int) {
 }
 
 // GetAccount returns an account
-func (txn *Txn) GetAccount(addr common.Address) (*Account, bool) {
+func (txn *Txn) GetAccount(addr common.Address) (*shared.Account, bool) {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil, false
 	}
-	return object.account, true
+	return object.Account, true
 }
 
-// stateObject is the internal representation of the account
-type stateObject struct {
-	account   *Account
-	code      []byte
-	suicide   bool
-	deleted   bool
-	dirtyCode bool
-	txn       *iradix.Txn
-}
-
-func (s *stateObject) Empty() bool {
-	return s.account.Nonce == 0 && s.account.Balance.Sign() == 0 && bytes.Equal(s.account.CodeHash, emptyCodeHash)
-}
-
-func (s *stateObject) GetCommitedState(hash common.Hash) common.Hash {
-	val, ok := s.account.trie.Get(hash.Bytes())
-	if !ok {
-		return common.Hash{}
-	}
-	_, content, _, err := rlp.Split(val)
-	if err != nil {
-		return common.Hash{}
-	}
-	return common.BytesToHash(content)
-}
-
-// Copy makes a copy of the state object
-func (s *stateObject) Copy() *stateObject {
-	ss := new(stateObject)
-
-	// copy account
-	ss.account = s.account.Copy()
-
-	ss.suicide = s.suicide
-	ss.deleted = s.deleted
-	ss.dirtyCode = s.dirtyCode
-	ss.code = s.code
-
-	if s.txn != nil {
-		ss.txn = s.txn.CommitOnly().Txn()
-	}
-
-	return ss
-}
-
-func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
+func (txn *Txn) getStateObject(addr common.Address) (*shared.StateObject, bool) {
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
-		obj := val.(*stateObject)
-		if obj.deleted {
+		obj := val.(*shared.StateObject)
+		if obj.Deleted {
 			return nil, false
 		}
 		return obj.Copy(), true
@@ -158,7 +112,7 @@ func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 		return nil, false
 	}
 
-	var account Account
+	var account shared.Account
 	err := rlp.DecodeBytes(data, &account)
 	if err != nil {
 		return nil, false
@@ -166,29 +120,31 @@ func (txn *Txn) getStateObject(addr common.Address) (*stateObject, bool) {
 
 	// Load trie from memory if there is some state
 	if account.Root == emptyStateHash {
-		account.trie = trie.NewTrie()
+		// account.trie = trie.NewTrie()
+		account.Trie = txn.state.state.NewTrie()
 	} else {
 		// TODO, load from state that keeps a cache of tries
 		// account.trie, err = trie.NewTrieAt(txn.state.storage, account.Root)
-		account.trie, err = txn.state.state.NewTrieAt(account.Root)
+		account.Trie, err = txn.state.state.NewTrieAt(account.Root)
 		if err != nil {
 			return nil, false
 		}
 	}
 
-	obj := &stateObject{
-		account: account.Copy(),
+	obj := &shared.StateObject{
+		Account: account.Copy(),
 	}
 	return obj, true
 }
 
-func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *stateObject)) {
+func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *shared.StateObject)) {
 	object, exists := txn.getStateObject(addr)
 	if !exists && create {
-		object = &stateObject{
-			account: &Account{
-				Balance:  big.NewInt(0),
-				trie:     trie.NewTrie(),
+		object = &shared.StateObject{
+			Account: &shared.Account{
+				Balance: big.NewInt(0),
+				// trie:     trie.NewTrie(),
+				Trie:     txn.state.state.NewTrie(),
 				CodeHash: emptyCodeHash,
 				Root:     emptyStateHash,
 			},
@@ -204,12 +160,12 @@ func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *s
 }
 
 func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		if object.suicide {
-			*object = *newStateObject()
-			object.account.Balance.SetBytes(balance.Bytes())
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		if object.Suicide {
+			*object = *newStateObject(txn)
+			object.Account.Balance.SetBytes(balance.Bytes())
 		} else {
-			object.account.Balance.Add(object.account.Balance, balance)
+			object.Account.Balance.Add(object.Account.Balance, balance)
 		}
 	})
 }
@@ -221,8 +177,8 @@ func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
 			return
 		}
 	*/
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		object.account.Balance.Add(object.account.Balance, balance)
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
 
@@ -231,15 +187,15 @@ func (txn *Txn) SubBalance(addr common.Address, balance *big.Int) {
 	if balance.Sign() == 0 {
 		return
 	}
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		object.account.Balance.Sub(object.account.Balance, balance)
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		object.Account.Balance.Sub(object.Account.Balance, balance)
 	})
 }
 
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr common.Address, balance *big.Int) {
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		object.account.Balance.SetBytes(balance.Bytes())
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		object.Account.Balance.SetBytes(balance.Bytes())
 	})
 }
 
@@ -249,7 +205,7 @@ func (txn *Txn) GetBalance(addr common.Address) *big.Int {
 	if !exists {
 		return big.NewInt(0)
 	}
-	return object.account.Balance
+	return object.Account.Balance
 }
 
 // AddLog adds a new log
@@ -280,15 +236,15 @@ func isZeros(b []byte) bool {
 
 // SetState change the state of an address
 func (txn *Txn) SetState(addr common.Address, key, value common.Hash) {
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		if object.txn == nil {
-			object.txn = iradix.New().Txn()
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		if object.Txn == nil {
+			object.Txn = iradix.New().Txn()
 		}
 
 		if isZeros(value.Bytes()) {
-			object.txn.Insert(hashit(key.Bytes()), nil)
+			object.Txn.Insert(hashit(key.Bytes()), nil)
 		} else {
-			object.txn.Insert(hashit(key.Bytes()), value.Bytes())
+			object.Txn.Insert(hashit(key.Bytes()), value.Bytes())
 		}
 	})
 }
@@ -302,8 +258,8 @@ func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 	k := hashit(hash.Bytes())
 
-	if object.txn != nil {
-		if val, ok := object.txn.Get(k); ok {
+	if object.Txn != nil {
+		if val, ok := object.Txn.Get(k); ok {
 			if val == nil {
 				return common.Hash{}
 			}
@@ -317,8 +273,8 @@ func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
 
 // SetNonce reduces the balance
 func (txn *Txn) SetNonce(addr common.Address, nonce uint64) {
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		object.account.Nonce = nonce
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		object.Account.Nonce = nonce
 	})
 }
 
@@ -328,17 +284,17 @@ func (txn *Txn) GetNonce(addr common.Address) uint64 {
 	if !exists {
 		return 0
 	}
-	return object.account.Nonce
+	return object.Account.Nonce
 }
 
 // Code
 
 // SetCode sets the code for an address
 func (txn *Txn) SetCode(addr common.Address, code []byte) {
-	txn.upsertAccount(addr, true, func(object *stateObject) {
-		object.account.CodeHash = crypto.Keccak256Hash(code).Bytes()
-		object.dirtyCode = true
-		object.code = code
+	txn.upsertAccount(addr, true, func(object *shared.StateObject) {
+		object.Account.CodeHash = crypto.Keccak256Hash(code).Bytes()
+		object.DirtyCode = true
+		object.Code = code
 	})
 }
 
@@ -348,11 +304,11 @@ func (txn *Txn) GetCode(addr common.Address) []byte {
 		return nil
 	}
 
-	if object.dirtyCode {
-		return object.code
+	if object.DirtyCode {
+		return object.Code
 	}
-	code, _ := txn.state.state.GetCode(common.BytesToHash(object.account.CodeHash))
-	// code, _ := txn.state.GetCode(common.BytesToHash(object.account.CodeHash))
+	code, _ := txn.state.state.GetCode(common.BytesToHash(object.Account.CodeHash))
+	// code, _ := txn.state.GetCode(common.BytesToHash(object.Account.CodeHash))
 	return code
 }
 
@@ -365,7 +321,7 @@ func (txn *Txn) GetCodeHash(addr common.Address) common.Hash {
 	if !exists {
 		return common.Hash{}
 	}
-	return common.BytesToHash(object.account.CodeHash)
+	return common.BytesToHash(object.Account.CodeHash)
 }
 
 // Suicide
@@ -373,13 +329,13 @@ func (txn *Txn) GetCodeHash(addr common.Address) common.Hash {
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr common.Address) bool {
 	var suicided bool
-	txn.upsertAccount(addr, false, func(object *stateObject) {
-		if object == nil || object.suicide {
+	txn.upsertAccount(addr, false, func(object *shared.StateObject) {
+		if object == nil || object.Suicide {
 			suicided = false
 		} else {
 			suicided = true
-			object.suicide = true
-			object.account.Balance = new(big.Int)
+			object.Suicide = true
+			object.Account.Balance = new(big.Int)
 		}
 	})
 	return suicided
@@ -388,7 +344,7 @@ func (txn *Txn) Suicide(addr common.Address) bool {
 // HasSuicided returns true if the account suicided
 func (txn *Txn) HasSuicided(addr common.Address) bool {
 	object, exists := txn.getStateObject(addr)
-	return exists && object.suicide
+	return exists && object.Suicide
 }
 
 // Refund
@@ -446,11 +402,12 @@ func (txn *Txn) Empty(addr common.Address) bool {
 	return obj.Empty()
 }
 
-func newStateObject() *stateObject {
-	return &stateObject{
-		account: &Account{
-			Balance:  big.NewInt(0),
-			trie:     trie.NewTrie(),
+func newStateObject(txn *Txn) *shared.StateObject {
+	return &shared.StateObject{
+		Account: &shared.Account{
+			Balance: big.NewInt(0),
+			// trie:     trie.NewTrie(),
+			Trie:     txn.state.state.NewTrie(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -458,10 +415,11 @@ func newStateObject() *stateObject {
 }
 
 func (txn *Txn) CreateAccount(addr common.Address) {
-	obj := &stateObject{
-		account: &Account{
-			Balance:  big.NewInt(0),
-			trie:     trie.NewTrie(),
+	obj := &shared.StateObject{
+		Account: &shared.Account{
+			Balance: big.NewInt(0),
+			// trie:     trie.NewTrie(),
+			Trie:     txn.state.state.NewTrie(),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
 		},
@@ -469,7 +427,7 @@ func (txn *Txn) CreateAccount(addr common.Address) {
 
 	prev, ok := txn.getStateObject(addr)
 	if ok {
-		obj.account.Balance.SetBytes(prev.account.Balance.Bytes())
+		obj.Account.Balance.SetBytes(prev.Account.Balance.Bytes())
 	}
 
 	txn.txn.Insert(addr.Bytes(), obj)
@@ -484,11 +442,11 @@ func hashit(k []byte) []byte {
 func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*stateObject)
+		a, ok := v.(*shared.StateObject)
 		if !ok {
 			return false
 		}
-		if a.suicide || a.Empty() && deleteEmptyObjects {
+		if a.Suicide || a.Empty() && deleteEmptyObjects {
 			remove = append(remove, k)
 		}
 		return false
@@ -499,13 +457,13 @@ func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 		if !ok {
 			panic("it should not happen")
 		}
-		obj, ok := v.(*stateObject)
+		obj, ok := v.(*shared.StateObject)
 		if !ok {
 			panic("it should not happen")
 		}
 
 		obj2 := obj.Copy()
-		obj2.deleted = true
+		obj2.Deleted = true
 		txn.txn.Insert(k, obj2)
 	}
 
@@ -518,26 +476,23 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
 
 	x := txn.txn.Commit()
 
-	// tt := txn.state.getRoot().Txn()
-	tt := txn.snapshot.tt.Txn()
-
 	/*
 		fmt.Println("##################################################################################")
 
 		x.Root().Walk(func(k []byte, v interface{}) bool {
-			a, ok := v.(*stateObject)
+			a, ok := v.(*shared.StateObject)
 			if !ok {
 				// We also have logs, avoid those
 				return false
 			}
 			fmt.Printf("# ----------------- %s -------------------\n", hexutil.Encode(k))
-			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.deleted, a.suicide)
-			fmt.Printf("# Balance: %s\n", a.account.Balance.String())
-			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.account.Nonce)))
-			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.account.CodeHash))
-			fmt.Printf("# State root: %s\n", a.account.Root.String())
-			if a.txn != nil {
-				a.txn.Root().Walk(func(k []byte, v interface{}) bool {
+			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
+			fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
+			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
+			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.Account.CodeHash))
+			fmt.Printf("# State root: %s\n", a.Account.Root.String())
+			if a.Txn != nil {
+				a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
 					if v == nil {
 						fmt.Printf("#\t%s: EMPTY\n", hexutil.Encode(k))
 					} else {
@@ -551,79 +506,12 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (*Snapshot, []byte) {
 		fmt.Println("##################################################################################")
 	*/
 
-	batch := txn.state.state.Storage().Batch()
-	// batch := txn.state.storage.Batch()
-
-	x.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*stateObject)
-		if !ok {
-			// We also have logs, avoid those
-			return false
-		}
-
-		if a.deleted {
-			tt.Delete(hashit(k))
-			return false
-		}
-
-		// compute first the state changes
-		if a.txn != nil {
-			localTxn := a.account.trie.Txn()
-
-			// Apply all the changes
-			a.txn.Root().Walk(func(k []byte, v interface{}) bool {
-				if v == nil {
-					localTxn.Delete(k)
-				} else {
-					vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
-					localTxn.Insert(k, vv)
-				}
-				return false
-			})
-
-			accountStateRoot := localTxn.Hash(batch)
-			subTrie := localTxn.Commit()
-
-			a.account.Root = common.BytesToHash(accountStateRoot)
-			a.account.trie = subTrie
-		}
-
-		if a.dirtyCode {
-			txn.state.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
-			// txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
-		}
-
-		data, err := rlp.EncodeToBytes(a.account)
-		if err != nil {
-			panic(err)
-		}
-
-		tt.Insert(hashit(k), data)
-		return false
-	})
-
-	t := tt.Commit()
-
-	hash := tt.Hash(batch)
-
-	batch.Write()
+	t, hash := txn.snapshot.tt.Commit(x)
 
 	newState := &Snapshot{
 		state: txn.state,
 		tt:    t,
-		// storage: txn.state.storage,
-		// root:    t,
-		// code:    map[string][]byte{},
 	}
 
-	/*
-		// copy all the code
-		// TODO, Move to trie
-		for k, v := range txn.state.code {
-			newState.code[k] = v
-		}
-	*/
-
-	// atomic.StorePointer(&txn.state.root, unsafe.Pointer(t))
 	return newState, hash
 }

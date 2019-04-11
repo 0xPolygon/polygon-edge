@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/umbracle/minimal/chain"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/evm"
 )
@@ -20,8 +21,9 @@ func TestExecutor(t *testing.T) {
 	addr1 := common.HexToAddress("1")
 	addr2 := common.HexToAddress("2")
 
-	s := NewState()
-	txn := s.Txn()
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	txn := snap.Txn()
 
 	env := &runtime.Env{}
 

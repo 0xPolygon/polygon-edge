@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
-	"github.com/umbracle/minimal/state/trie"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
@@ -182,11 +182,11 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.State, []byte) {
-	state := state.NewState()
-	state.SetStorage(trie.NewMemoryStorage())
+func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.Snapshot, []byte) {
+	state := state.NewState(trie.NewState(trie.NewMemoryStorage()))
 
-	txn := state.Txn()
+	snap, _ := state.NewSnapshot(common.Hash{})
+	txn := snap.Txn()
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)

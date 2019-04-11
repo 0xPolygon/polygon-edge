@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/umbracle/minimal/state/shared"
 )
 
 type State struct {
@@ -28,7 +29,13 @@ func (s *State) addState(root common.Hash, t *Trie) {
 	s.snapshots[root] = t
 }
 
-func (s *State) NewTrieAt(root common.Hash) (*Trie, error) {
+func (s *State) NewTrie() shared.Trie {
+	t, _ := s.newTrieAtImpl(common.Hash{})
+	t.state = s
+	return t
+}
+
+func (s *State) NewTrieAt(root common.Hash) (shared.Trie, error) {
 	// Check locally.
 	s.snapshotsLock.Lock()
 	t, ok := s.snapshots[root]

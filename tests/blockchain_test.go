@@ -8,8 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/umbracle/minimal/state/trie"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -18,6 +16,8 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus/ethash"
+	"github.com/umbracle/minimal/state"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/blockchain"
 )
@@ -98,15 +98,14 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	engine := ethash.NewEthHash(params, fakePow)
 	genesis := c.buildGenesis()
 
-	trieDB := trie.NewMemoryStorage()
+	st := state.NewState(trie.NewState(trie.NewMemoryStorage()))
 
-	b := blockchain.NewBlockchain(s, trieDB, engine, params)
-	b.SetPrecompiled(builtins)
-
+	b := blockchain.NewBlockchain(s, st, engine, params)
 	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}
 
+	b.SetPrecompiled(builtins)
 	if hash := b.Genesis().Hash(); hash != c.Genesis.header.Hash() {
 		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash(), hash.String())
 	}

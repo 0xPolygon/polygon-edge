@@ -4,11 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/umbracle/minimal/state/trie"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 )
 
 var addr1 = common.HexToAddress("1")
@@ -26,7 +24,7 @@ var defaultPreState = map[common.Address]*PreState{
 	},
 }
 
-func buildPreState(s *State, preState map[common.Address]*PreState) *State {
+func buildPreState(s *Snapshot, preState map[common.Address]*PreState) *Snapshot {
 	txn := s.Txn()
 	for i, j := range preState {
 		txn.SetNonce(i, j.Nonce)
@@ -47,12 +45,10 @@ type PreState struct {
 
 func TestWriteState(t *testing.T) {
 	// write new state
-	ss := trie.NewMemoryStorage()
 
-	s := NewState()
-	s.SetStorage(ss)
-
-	txn := s.Txn()
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	txn := snap.Txn()
 
 	txn.SetState(addr1, hash1, hash1)
 	txn.SetState(addr1, hash2, hash2)
@@ -64,9 +60,9 @@ func TestWriteState(t *testing.T) {
 		t.Fatal()
 	}
 
-	s, _ = txn.Commit(false)
+	snap, _ = txn.Commit(false)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.GetState(addr1, hash1) != hash1 {
 		t.Fatal()
 	}
@@ -77,30 +73,30 @@ func TestWriteState(t *testing.T) {
 
 func TestWriteEmptyState(t *testing.T) {
 	// Create account and write empty state
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
 
-	txn := s.Txn()
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	txn := snap.Txn()
 
 	// Without EIP150 the data is added
 	txn.SetState(addr1, hash1, hash0)
-	s, _ = txn.Commit(false)
+	snap, _ = txn.Commit(false)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if !txn.Exist(addr1) {
 		t.Fatal()
 	}
 
-	s = NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s = NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ = s.NewSnapshot(common.Hash{})
 
-	txn = s.Txn()
+	txn = snap.Txn()
 
 	// With EIP150 the empty data is removed
 	txn.SetState(addr1, hash1, hash0)
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -108,19 +104,20 @@ func TestWriteEmptyState(t *testing.T) {
 
 func TestUpdateStateInPreState(t *testing.T) {
 	// update state that was already set in prestate
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
-	s = buildPreState(s, defaultPreState)
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	snap = buildPreState(snap, defaultPreState)
+
+	txn := snap.Txn()
 	if txn.GetState(addr1, hash1) != hash1 {
 		t.Fatal()
 	}
 
 	txn.SetState(addr1, hash1, hash2)
-	s, _ = txn.Commit(false)
+	snap, _ = txn.Commit(false)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.GetState(addr1, hash1) != hash2 {
 		t.Fatal()
 	}
@@ -128,18 +125,19 @@ func TestUpdateStateInPreState(t *testing.T) {
 
 func TestUpdateStateWithEmpty(t *testing.T) {
 	// If the state (in prestate) is updated to empty it should be removed
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
-	s = buildPreState(s, defaultPreState)
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	snap = buildPreState(snap, defaultPreState)
+
+	txn := snap.Txn()
 	txn.SetState(addr1, hash1, hash0)
 
 	// TODO, test with false (should not be deleted)
 	// TODO, test with balance on the account and nonce
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -147,15 +145,15 @@ func TestUpdateStateWithEmpty(t *testing.T) {
 
 func TestSuicideAccountInPreState(t *testing.T) {
 	// Suicide an account created in the prestate
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
-	s = buildPreState(s, defaultPreState)
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	snap = buildPreState(snap, defaultPreState)
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.Suicide(addr1)
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -163,10 +161,10 @@ func TestSuicideAccountInPreState(t *testing.T) {
 
 func TestSuicideAccount(t *testing.T) {
 	// Create a new account and suicide it
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.SetState(addr1, hash1, hash1)
 	txn.Suicide(addr1)
 
@@ -175,9 +173,9 @@ func TestSuicideAccount(t *testing.T) {
 		t.Fatal()
 	}
 
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -185,10 +183,10 @@ func TestSuicideAccount(t *testing.T) {
 
 func TestSuicideAccountWithData(t *testing.T) {
 	// Data (nonce, balance, code) from a suicided account should be empty
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	txn := snap.Txn()
 
 	txn.SetNonce(addr1, 10)
 	txn.SetBalance(addr1, big.NewInt(100))
@@ -196,9 +194,9 @@ func TestSuicideAccountWithData(t *testing.T) {
 	txn.SetState(addr1, hash1, hash1)
 
 	txn.Suicide(addr1)
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 
 	if balance := txn.GetBalance(addr1); balance.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("balance should be zero but found: %d", balance)
@@ -222,16 +220,16 @@ func TestSuicideAccountWithData(t *testing.T) {
 
 func TestSuicideCoinbase(t *testing.T) {
 	// Suicide the coinbase of the block
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
-	buildPreState(s, defaultPreState)
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	snap = buildPreState(snap, defaultPreState)
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.Suicide(addr1)
 	txn.AddSealingReward(addr1, big.NewInt(10))
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.GetBalance(addr1).Cmp(big.NewInt(10)) != 0 {
 		t.Fatal()
 	}
@@ -239,10 +237,11 @@ func TestSuicideCoinbase(t *testing.T) {
 
 func TestSuicideWithIntermediateCommit(t *testing.T) {
 	// Legacy
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	snap = buildPreState(snap, defaultPreState)
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.SetNonce(addr1, 10)
 	txn.Suicide(addr1)
 
@@ -250,7 +249,7 @@ func TestSuicideWithIntermediateCommit(t *testing.T) {
 		t.Fatal()
 	}
 
-	txn.IntermediateCommit(true)
+	txn.cleanDeleteObjects(true)
 
 	if txn.GetNonce(addr1) == 10 {
 		t.Fatal()
@@ -265,10 +264,10 @@ func TestSuicideWithIntermediateCommit(t *testing.T) {
 func TestRestartRefunds(t *testing.T) {
 	// refunds are only valid per single txn so after each
 	// intermediateCommit they have to be restarted
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	txn := snap.Txn()
 
 	txn.AddRefund(1000)
 	if txn.GetRefund() != 1000 {
@@ -289,14 +288,15 @@ func TestChangePrestateAccountBalanceToZero(t *testing.T) {
 		},
 	}
 
-	s := NewState()
-	s = buildPreState(s, preState)
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+	snap = buildPreState(snap, preState)
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.SetBalance(addr1, big.NewInt(0))
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -304,15 +304,15 @@ func TestChangePrestateAccountBalanceToZero(t *testing.T) {
 
 func TestChangeAccountBalanceToZero(t *testing.T) {
 	// If the balance of the account changes to zero the account is deleted
-	s := NewState()
-	s.SetStorage(trie.NewMemoryStorage())
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
 
-	txn := s.Txn()
+	txn := snap.Txn()
 	txn.SetBalance(addr1, big.NewInt(10))
 	txn.SetBalance(addr1, big.NewInt(0))
-	s, _ = txn.Commit(true)
+	snap, _ = txn.Commit(true)
 
-	txn = s.Txn()
+	txn = snap.Txn()
 	if txn.Exist(addr1) {
 		t.Fatal()
 	}
@@ -321,8 +321,10 @@ func TestChangeAccountBalanceToZero(t *testing.T) {
 func TestSnapshotUpdateData(t *testing.T) {
 	// Snapshots should keep the data
 
-	s := NewState()
-	txn := s.Txn()
+	s := NewState(trie.NewState(trie.NewMemoryStorage()))
+	snap, _ := s.NewSnapshot(common.Hash{})
+
+	txn := snap.Txn()
 
 	txn.SetState(addr1, hash1, hash1)
 	if txn.GetState(addr1, hash1) != hash1 {
