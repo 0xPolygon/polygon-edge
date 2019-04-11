@@ -13,7 +13,6 @@ import (
 // State is the ethereum state reference
 type State struct {
 	root    unsafe.Pointer
-	code    map[string][]byte
 	storage trie.Storage
 }
 
@@ -21,7 +20,6 @@ type State struct {
 func NewState() *State {
 	return &State{
 		root: unsafe.Pointer(trie.NewTrie()),
-		code: map[string][]byte{},
 	}
 }
 
@@ -34,7 +32,6 @@ func NewStateAt(storage trie.Storage, root common.Hash) (*State, error) {
 
 	s := &State{
 		root:    unsafe.Pointer(t),
-		code:    map[string][]byte{},
 		storage: storage,
 	}
 	return s, nil
@@ -60,12 +57,11 @@ func (s *State) Txn() *Txn {
 }
 
 func (s *State) SetCode(hash common.Hash, code []byte) {
-	s.code[hash.String()] = code
+	s.storage.SetCode(hash, code)
 }
 
 func (s *State) GetCode(hash common.Hash) ([]byte, bool) {
-	code, ok := s.code[hash.String()]
-	return code, ok
+	return s.storage.GetCode(hash)
 }
 
 // Account is the account reference in the ethereum state

@@ -11,6 +11,11 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+var (
+	// CODE is the code prefix
+	CODE = []byte("code")
+)
+
 type Batch interface {
 	Put(k, v []byte)
 	Write()
@@ -21,6 +26,8 @@ type Storage interface {
 	Put(k, v []byte)
 	Get(k []byte) ([]byte, bool)
 	Batch() Batch
+	SetCode(hash common.Hash, code []byte)
+	GetCode(hash common.Hash) ([]byte, bool)
 }
 
 // KVStorage is a k/v storage on memory using leveldb
@@ -36,6 +43,14 @@ type KVBatch struct {
 
 func (b *KVBatch) Put(k, v []byte) {
 	b.batch.Put(k, v)
+}
+
+func (kv *KVStorage) SetCode(hash common.Hash, code []byte) {
+	kv.Put(append(CODE, hash.Bytes()...), code)
+}
+
+func (kv *KVStorage) GetCode(hash common.Hash) ([]byte, bool) {
+	return kv.Get(append(CODE, hash.Bytes()...))
 }
 
 func (b *KVBatch) Write() {
@@ -74,7 +89,8 @@ func NewLevelDBStorage(path string, logger *log.Logger) (Storage, error) {
 }
 
 type memStorage struct {
-	db map[string][]byte
+	db   map[string][]byte
+	code map[common.Hash][]byte
 }
 
 type memBatch struct {
@@ -90,7 +106,16 @@ func (m *memBatch) Write() {
 
 // NewMemoryStorage creates an inmemory trie storage
 func NewMemoryStorage() Storage {
-	return &memStorage{map[string][]byte{}}
+	return &memStorage{db: map[string][]byte{}, code: map[common.Hash][]byte{}}
+}
+
+func (m *memStorage) SetCode(hash common.Hash, code []byte) {
+	m.code[hash] = code
+}
+
+func (m *memStorage) GetCode(hash common.Hash) ([]byte, bool) {
+	code, ok := m.code[hash]
+	return code, ok
 }
 
 func (m *memStorage) Batch() Batch {
