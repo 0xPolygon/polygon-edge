@@ -9,16 +9,11 @@ import (
 
 // Server exposes the api interfaces
 type Server struct {
-	minimal   *minimal.Minimal
-	endpoints endpoints
+	minimal *minimal.Minimal
 }
 
 func NewServer(minimal *minimal.Minimal) (*Server, error) {
 	s := &Server{minimal: minimal}
-
-	s.endpoints = endpoints{
-		Eth: &Eth{s},
-	}
 
 	go s.start()
 	return s, nil
@@ -27,8 +22,4 @@ func NewServer(minimal *minimal.Minimal) (*Server, error) {
 func (s *Server) start() {
 	ss := jsonrpc.Server{}
 	fmt.Println(ss)
-}
-
-type endpoints struct {
-	Eth *Eth
 }
