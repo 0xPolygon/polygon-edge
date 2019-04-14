@@ -52,6 +52,12 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 			root: &Node{},
 		}
 		t.root.edges[indx] = node
+	} else if node.prefix != nil {
+		indx := int(node.prefix[0])
+		t = &Trie{
+			root: &Node{},
+		}
+		t.root.edges[indx] = node
 	} else {
 		t = &Trie{
 			root: node,
@@ -59,6 +65,10 @@ func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
 	}
 
 	return t, nil
+}
+
+func (t *Trie) SetState(state *State) {
+	t.state = state
 }
 
 func (t *Trie) Get(k []byte) ([]byte, bool) {

@@ -148,6 +148,14 @@ func (n *Node) Get(k []byte) ([]byte, bool) {
 
 func (n *Node) get(k []byte) ([]byte, bool) {
 	search := k
+	if n.prefix != nil {
+		if bytes.HasPrefix(search, n.prefix) {
+			search = search[len(n.prefix):]
+		} else {
+			return nil, false
+		}
+	}
+
 	for {
 		// Check for key exhaustion
 		if len(search) == 0 {

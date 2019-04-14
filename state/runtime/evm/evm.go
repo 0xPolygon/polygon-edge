@@ -258,32 +258,8 @@ func NewEVM(executor runtime.Executor, state runtime.State, env *runtime.Env, co
 		state:          state,
 		env:            env,
 		getHash:        getHash,
-		// returnData:     []byte{},
-		// CanTransfer: CanTransfer,
-		// Transfer:    Transfer,
 	}
 }
-
-/*
-// Call calls a specific contract
-func (e *EVM) Call(caller common.Address, to common.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
-	contract := newContractCall(e, 1, caller, caller, to, value, gas, e.state.GetCode(to), input)
-
-	ret, err := contract.call(contract, CALL)
-	return ret, contract.gas, err
-}
-
-var emptyCodeHash = crypto.Keccak256Hash(nil)
-
-// Create creates a new contract
-func (e *EVM) Create(caller common.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
-	address := crypto.CreateAddress(caller, e.state.GetNonce(caller))
-	contract := newContractCreation(e, 1, caller, caller, address, value, gas, code)
-
-	_, err := contract.create(contract)
-	return nil, contract.gas, err
-}
-*/
 
 func (c *Contract) calculateFixedGasUsage(op OpCode) uint64 {
 	if isPush(op) || isSwap(op) || isDup(op) {
@@ -1035,7 +1011,7 @@ func (c *Contract) executeCreateOperation(op OpCode) ([]byte, error) {
 
 	if op == CREATE && c.evm.config.Homestead && err == vm.ErrCodeStoreOutOfGas {
 		c.push(big.NewInt(0))
-	} else if err != nil {
+	} else if err != nil && err != vm.ErrCodeStoreOutOfGas {
 		c.push(big.NewInt(0))
 	} else {
 		c.push(addr.Big())
