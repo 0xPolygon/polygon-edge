@@ -58,8 +58,9 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return nil
 	}
 
-	s, _ := buildState(t, c.Pre)
-	txn := s.Txn()
+	s, snap, _ := buildState(t, c.Pre)
+	// txn := s.Txn()
+	txn := state.NewTxn(s, snap)
 
 	/*
 		evm := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)

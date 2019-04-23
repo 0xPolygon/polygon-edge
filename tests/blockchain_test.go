@@ -98,7 +98,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	engine := ethash.NewEthHash(params, fakePow)
 	genesis := c.buildGenesis()
 
-	st := state.NewState(trie.NewState(trie.NewMemoryStorage()))
+	st := trie.NewState(trie.NewMemoryStorage())
 
 	b := blockchain.NewBlockchain(s, st, engine, params)
 	if err := b.WriteGenesis(genesis); err != nil {
@@ -151,13 +151,15 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
 	}
 
-	state, ok := b.GetState(lastBlock)
+	snap, ok := b.GetState(lastBlock)
 	if !ok {
 		t.Fatalf("state of last block not found")
 	}
 
 	// Validate post state, TODO account state and code
-	txn := state.Txn()
+	// txn := state.Txn()
+	txn := state.NewTxn(st, snap)
+
 	for k, v := range c.Post {
 		obj, ok := txn.GetAccount(k)
 		if !ok {

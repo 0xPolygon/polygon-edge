@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/minimal/state/shared"
+	"github.com/umbracle/minimal/state"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -360,7 +360,7 @@ func longestPrefix(k1, k2 []byte) int {
 	return i
 }
 
-func (t *Trie) Commit(x *iradix.Tree) (shared.Trie, []byte) {
+func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	// this commit runs the transactions and creates a new trie
 	// this is done for at the transaction/block level and deals with updating
 	// internal nodes if necessary, this is, internal account tries dont run
@@ -373,7 +373,7 @@ func (t *Trie) Commit(x *iradix.Tree) (shared.Trie, []byte) {
 	// batch := txn.state.storage.Batch()
 
 	x.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*shared.StateObject)
+		a, ok := v.(*state.StateObject)
 		if !ok {
 			// We also have logs, avoid those
 			return false

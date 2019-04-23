@@ -37,13 +37,10 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db        storage.Storage
-	consensus consensus.Consensus
-	genesis   *types.Header
-	state     *state.State
-	// stateRoot     common.Hash
-	// snapshots     map[string]*state.Snapshot
-	// snapshotsLock sync.Mutex
+	db          storage.Storage
+	consensus   consensus.Consensus
+	genesis     *types.Header
+	state       state.State
 	triedb      trie.Storage
 	params      *chain.Params
 	precompiled map[common.Address]*precompiled.Precompiled
@@ -54,13 +51,12 @@ type Blockchain struct {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db storage.Storage, st *state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	return &Blockchain{
-		db:        db,
-		consensus: consensus,
-		genesis:   nil,
-		state:     st,
-		// snapshots:   map[string]*state.Snapshot{},
+		db:          db,
+		consensus:   consensus,
+		genesis:     nil,
+		state:       st,
 		params:      params,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
@@ -117,12 +113,9 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return nil
 	}
 
-	// s := state.NewState()
-	// s.SetStorage(b.triedb)
+	snap := b.state.NewSnapshot()
 
-	snap, _ := b.state.NewSnapshot(common.Hash{})
-
-	txn := snap.Txn()
+	txn := state.NewTxn(b.state, snap)
 	for addr, account := range genesis.Alloc {
 		if account.Balance != nil {
 			txn.AddBalance(addr, account.Balance)
@@ -145,13 +138,6 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 
 	b.genesis = header
 
-	/*
-		b.snapshotsLock.Lock()
-		b.snapshots[hexutil.Encode(root)] = ss
-		b.stateRoot = common.BytesToHash(root)
-		b.snapshotsLock.Unlock()
-	*/
-
 	// add genesis block
 	if err := b.addHeader(header); err != nil {
 		return err
@@ -164,27 +150,11 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	return nil
 }
 
-func (b *Blockchain) getStateRoot(root common.Hash) (*state.Snapshot, bool) {
-	/*
-		b.snapshotsLock.Lock()
-		defer b.snapshotsLock.Unlock()
-
-		s, ok := b.snapshots[root.String()]
-		if ok {
-			return s, true
-		}
-	*/
-
-	// its not in the local cache, ask the state manager. NOTE: this should not be done here
-	// but in the state library itself.
-	ss, ok := b.state.NewSnapshot(root)
-
-	// ss, err := state.NewStateAt(b.triedb, root)
-	if !ok {
+func (b *Blockchain) getStateRoot(root common.Hash) (state.Snapshot, bool) {
+	ss, err := b.state.NewSnapshotAt(root)
+	if err != nil {
 		return nil, false
 	}
-
-	// b.snapshots[root.String()] = ss
 	return ss, true
 }
 
@@ -205,15 +175,6 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	}
 
 	b.db.WriteDiff(header.Hash(), big.NewInt(1))
-
-	// snap, _ := b.state.NewSnapshot(common.Hash{})
-
-	/*
-		b.snapshotsLock.Lock()
-		b.snapshots[types.EmptyRootHash.String()] = snap
-		b.snapshotsLock.Unlock()
-	*/
-
 	return nil
 }
 
@@ -470,14 +431,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			if rbloom != block.Bloom() {
 				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
 			}
-
-			/*
-				b.snapshotsLock.Lock()
-				b.snapshots[hexutil.Encode(root)] = state
-				b.stateRoot = common.BytesToHash(root)
-				b.snapshotsLock.Unlock()
-			*/
-
 		}
 
 		if err := b.WriteHeader(h); err != nil {
@@ -493,22 +446,15 @@ func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
 	b.db.WriteBody(block.Header().Hash(), block.Body())
 }
 
-/*
-func (b *Blockchain) AddState(root common.Hash, state *state.Snapshot) {
-	b.snapshotsLock.Lock()
-	b.snapshots[root.String()] = state
-	b.snapshotsLock.Unlock()
-}
-*/
-
-func (b *Blockchain) GetState(header *types.Header) (*state.Snapshot, bool) {
+func (b *Blockchain) GetState(header *types.Header) (state.Snapshot, bool) {
 	return b.getStateRoot(header.Root)
 }
 
-func (b *Blockchain) BlockIterator(s *state.Snapshot, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (*state.Snapshot, []byte, []*types.Transaction, error) {
+func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (state.Snapshot, []byte, []*types.Transaction, error) {
 
 	// add the rewards
-	txn := s.Txn()
+	// txn := s.Txn()
+	txn := state.NewTxn(b.state, s)
 
 	// start the gasPool
 	config := b.params.Forks.At(header.Number.Uint64())
@@ -571,7 +517,8 @@ func (b *Blockchain) BlockIterator(s *state.Snapshot, header *types.Header, getT
 		logs := txn.Logs()
 
 		ss, root := txn.Commit(config.EIP155)
-		txn = ss.Txn()
+		// txn = ss.Txn()
+		txn = state.NewTxn(b.state, ss)
 
 		if config.Byzantium {
 			root = []byte{}
@@ -612,9 +559,10 @@ func (b *Blockchain) BlockIterator(s *state.Snapshot, header *types.Header, getT
 	return s2, root, txns, nil
 }
 
-func (b *Blockchain) Process(s *state.Snapshot, block *types.Block) (*state.Snapshot, []byte, types.Receipts, uint64, error) {
+func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapshot, []byte, types.Receipts, uint64, error) {
 	// add the rewards
-	txn := s.Txn()
+	// txn := s.Txn()
+	txn := state.NewTxn(b.state, s)
 
 	// start the gasPool
 	config := b.params.Forks.At(block.Number().Uint64())
@@ -666,7 +614,8 @@ func (b *Blockchain) Process(s *state.Snapshot, block *types.Block) (*state.Snap
 
 		// TODO, Only do commit pre-byzantine
 		ss, aux := txn.Commit(config.EIP155)
-		txn = ss.Txn()
+		// txn = ss.Txn()
+		txn = state.NewTxn(b.state, ss)
 		root := aux
 
 		if config.Byzantium {

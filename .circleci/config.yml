@@ -14,7 +14,10 @@ jobs:
           command: |
             git submodule init
             git submodule update
-      - run: go test -v ./tests/... -test.short
+      - run:
+          command: |
+            go test -v ./tests/... -test.short
+            go test -v ./state/...
 
       - save_cache:
           key: go-mod-v1-{{ checksum "go.sum" }}

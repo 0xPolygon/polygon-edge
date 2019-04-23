@@ -2,10 +2,14 @@ package evm
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state/runtime"
 )
 
 func mustDecode(s string) []byte {
@@ -27,14 +31,6 @@ func newTestContract(code []byte) *Contract {
 	f.memory = newMemory(f)
 	return f
 }
-
-/*
-func testEVM(code []byte) *EVM {
-	evm := NewEVM(nil, nil, chain.ForksInTime{}, chain.GasTableHomestead, nil)
-	// evm.pushContract(newTestContract(code))
-	return evm
-}
-*/
 
 func TestStackOperators(t *testing.T) {
 	cases := []struct {
@@ -266,20 +262,21 @@ type intTestCase struct {
 }
 
 func testIntTestCases(t *testing.T, instruction OpCode, cases []intTestCase) {
-	/*
-		for _, cc := range cases {
-			t.Run(instruction.String(), func(t *testing.T) {
-				evm := testEVM(Instructions{byte(instruction)})
-				evm.push(big.NewInt(cc.x))
-				evm.push(big.NewInt(cc.y))
+	for _, cc := range cases {
+		t.Run(instruction.String(), func(t *testing.T) {
+			c := newTestContract(Instructions{byte(instruction)})
+			c.push(big.NewInt(cc.x))
+			c.push(big.NewInt(cc.y))
 
-				peek := evm.peek()
-				if peek.Int64() != cc.expected {
-					t.Fatalf("expected %d but found %d", peek.Int64(), cc.expected)
-				}
-			})
-		}
-	*/
+			if _, err := c.Run(); err != nil {
+				t.Fatal(err)
+			}
+			peek := c.peek()
+			if peek.Int64() != cc.expected {
+				t.Fatalf("expected %d but found %d", peek.Int64(), cc.expected)
+			}
+		})
+	}
 }
 
 type stringTestCase struct {
@@ -287,26 +284,30 @@ type stringTestCase struct {
 }
 
 func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCase) {
-	/*
-		for _, cc := range cases {
-			t.Run(instruction.String(), func(t *testing.T) {
-				evm := testEVM(Instructions{byte(instruction)})
-				evm.config = chain.ForksInTime{Constantinople: true}
-				evm.env = &Env{Number: big.NewInt(0)}
+	for _, cc := range cases {
+		t.Run(instruction.String(), func(t *testing.T) {
+			c := newTestContract(Instructions{byte(instruction)})
+			c.evm = &EVM{
+				config: chain.ForksInTime{Constantinople: true},
+				env:    &runtime.Env{Number: big.NewInt(0)},
+			}
 
-				evm.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.x)))
-				evm.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.y)))
+			c.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.x)))
+			c.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.y)))
 
-				// remove 0x prefix and pad zeros to the left
-				found := strings.Replace(hexutil.Encode(evm.peek().Bytes()), "0x", "", -1)
-				found = fmt.Sprintf("%064s", found)
+			if _, err := c.Run(); err != nil {
+				t.Fatal(err)
+			}
 
-				if !strings.Contains(found, cc.expected) {
-					t.Fatalf("not equal. Found %s and expected %s", found, cc.expected)
-				}
-			})
-		}
-	*/
+			// remove 0x prefix and pad zeros to the left
+			found := strings.Replace(hexutil.Encode(c.peek().Bytes()), "0x", "", -1)
+			found = fmt.Sprintf("%064s", found)
+
+			if !strings.Contains(found, cc.expected) {
+				t.Fatalf("not equal. Found %s and expected %s", found, cc.expected)
+			}
+		})
+	}
 }
 
 func equalBytes(t *testing.T, a, b []byte) {

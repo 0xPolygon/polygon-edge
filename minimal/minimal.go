@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/umbracle/minimal/state"
-
 	"github.com/umbracle/minimal/chain"
 
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -158,7 +156,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
-	st := state.NewState(trie.NewState(trieDB))
+	st := trie.NewState(trieDB)
 
 	// blockchain object
 	m.Blockchain = blockchain.NewBlockchain(storage, st, m.consensus, config.Chain.Params)

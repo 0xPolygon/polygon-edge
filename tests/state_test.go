@@ -39,14 +39,15 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	}
 	env.GasPrice = msg.GasPrice()
 
-	s, _ := buildState(t, c.Pre)
+	s, snap, _ := buildState(t, c.Pre)
 
 	forks := config.At(env.Number.Uint64())
 	gasTable := config.GasTable(env.Number)
 
 	var root []byte
 
-	txn := s.Txn()
+	// txn := s.Txn()
+	txn := state.NewTxn(s, snap)
 
 	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
 

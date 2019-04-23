@@ -8,41 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/umbracle/minimal/chain"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/state/runtime/evm"
 )
-
-func TestExecutor(t *testing.T) {
-	fmt.Println("-- executor --")
-
-	addr1 := common.HexToAddress("1")
-	addr2 := common.HexToAddress("2")
-
-	s := NewState(trie.NewState(trie.NewMemoryStorage()))
-	snap, _ := s.NewSnapshot(common.Hash{})
-	txn := snap.Txn()
-
-	env := &runtime.Env{}
-
-	e := NewExecutor(txn, env, chain.ForksInTime{}, chain.GasTableHomestead, nil)
-
-	fmt.Println(e)
-
-	input := []byte{
-		byte(evm.CALL),
-	}
-	c := runtime.NewContract(1, addr1, addr1, addr2, big.NewInt(100), 0, input)
-
-	ret, gas, err := e.Call(c, runtime.Call)
-
-	fmt.Println(ret)
-	fmt.Println(gas)
-	fmt.Println(err)
-
-}
 
 type Transaction struct {
 	From     common.Address
@@ -134,27 +102,24 @@ func TestTransition(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			fmt.Println(c)
+			txn := newTestTxn(c.PreState)
 
-			/*
-				s := NewState()
-				s = buildPreState(s, c.PreState)
+			env := &runtime.Env{}
+			config := chain.ForksInTime{}
 
-				txn := s.Txn()
-				_, _, err := txn.Apply(c.Transaction.ToMessage(), &evm.Env{}, chain.GasTableHomestead, chain.ForksInTime{}, vmTestBlockHash, newGasPool(1000), true, nil)
+			exec := NewExecutor(txn, env, config, chain.GasTableHomestead, vmTestBlockHash)
 
-				if err != nil {
-					if c.Err == "" {
-						t.Fatalf("Error not expected: %v", err)
-					}
-					if c.Err != err.Error() {
-						t.Fatalf("Errors dont match: %s and %v", c.Err, err)
-					}
-				} else if c.Err != "" {
-					t.Fatalf("It did not failed (%s)", c.Err)
+			_, _, err := exec.Apply(txn, c.Transaction.ToMessage(), env, chain.GasTableHomestead, config, vmTestBlockHash, newGasPool(1000), false, nil)
+			if err != nil {
+				if c.Err == "" {
+					t.Fatalf("Error not expected: %v", err)
 				}
-			*/
-
+				if c.Err != err.Error() {
+					t.Fatalf("Errors dont match: expected '%s' but found '%v'", c.Err, err)
+				}
+			} else if c.Err != "" {
+				t.Fatalf("It did not failed (%s)", c.Err)
+			}
 		})
 	}
 }

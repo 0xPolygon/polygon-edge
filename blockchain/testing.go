@@ -166,7 +166,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	state := state.NewState(trie.NewState(trie.NewMemoryStorage()))
+	state := trie.NewState(trie.NewMemoryStorage())
 
 	b := NewBlockchain(s, state, &fakeConsensus{}, config)
 	if headers != nil {

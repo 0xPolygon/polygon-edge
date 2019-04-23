@@ -2,9 +2,9 @@ package trie
 
 import (
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/umbracle/minimal/state/shared"
 )
 
 type State struct {
@@ -26,13 +26,13 @@ func (s *State) addState(root common.Hash, t *Trie) {
 	s.cache.Add(root, t)
 }
 
-func (s *State) NewTrie() shared.Trie {
+func (s *State) NewSnapshot() state.Snapshot {
 	t, _ := s.newTrieAtImpl(common.Hash{})
 	t.state = s
 	return t
 }
 
-func (s *State) NewTrieAt(root common.Hash) (shared.Trie, error) {
+func (s *State) NewSnapshotAt(root common.Hash) (state.Snapshot, error) {
 	// Check locally.
 	tt, ok := s.cache.Get(root)
 	if ok {

@@ -182,11 +182,11 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.Snapshot, []byte) {
-	state := state.NewState(trie.NewState(trie.NewMemoryStorage()))
+func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot, []byte) {
+	s := trie.NewState(trie.NewMemoryStorage())
+	snap := s.NewSnapshot()
 
-	snap, _ := state.NewSnapshot(common.Hash{})
-	txn := snap.Txn()
+	txn := state.NewTxn(s, snap)
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)
@@ -202,7 +202,8 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (*state.Snapshot, []byt
 		}
 	}
 
-	return txn.Commit(false)
+	snap, root := txn.Commit(false)
+	return s, snap, root
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
