@@ -16,6 +16,8 @@ github.com/beorn7/perks/quantile
 github.com/bgentry/speakeasy
 # github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32
 github.com/btcsuite/btcd/btcec
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
 # github.com/deckarep/golang-set v1.7.1
 github.com/deckarep/golang-set
 # github.com/dgraph-io/badger v1.5.5-0.20190226225317-8115aed38f8f
@@ -170,6 +172,8 @@ github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
 # github.com/posener/complete v1.1.1
 github.com/posener/complete
 github.com/posener/complete/cmd/install
@@ -198,6 +202,8 @@ github.com/rogpeppe/go-internal/semver
 github.com/rs/cors
 # github.com/ryanuber/columnize v2.1.0+incompatible
 github.com/ryanuber/columnize
+# github.com/stretchr/testify v1.3.0
+github.com/stretchr/testify/assert
 # github.com/syndtr/goleveldb v1.0.0
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache

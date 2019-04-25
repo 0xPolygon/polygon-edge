@@ -29,6 +29,7 @@ require (
 	github.com/prometheus/client_golang v0.9.2
 	github.com/rs/cors v1.6.0 // indirect
 	github.com/ryanuber/columnize v2.1.0+incompatible
+	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/valyala/fasthttp v1.2.0
 	golang.org/x/crypto v0.0.0-20190417174047-f416ebab96af
