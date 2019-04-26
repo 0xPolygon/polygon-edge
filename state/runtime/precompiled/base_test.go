@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 )
 
 type precompiledTest struct {
@@ -16,12 +17,9 @@ func testPrecompiled(t *testing.T, p Backend, cases []precompiledTest) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			found, err := p.Call(common.Hex2Bytes(c.Input))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if common.Bytes2Hex(found) != c.Expected {
-				t.Fatal("bad")
-			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, c.Expected, common.Bytes2Hex(found))
 		})
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/assert"
 )
 
 var addr1 = common.HexToAddress("1")
@@ -84,22 +84,14 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 	txn.SetState(addr1, hash1, hash1)
 	txn.SetState(addr1, hash2, hash2)
 
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fatal()
-	}
-	if txn.GetState(addr1, hash2) != hash2 {
-		t.Fatal()
-	}
+	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
+	assert.Equal(t, hash2, txn.GetState(addr1, hash2))
 
 	snap, _ = txn.Commit(false)
 
 	txn = newTxn(state, snap)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fatal()
-	}
-	if txn.GetState(addr1, hash2) != hash2 {
-		t.Fatal()
-	}
+	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
+	assert.Equal(t, hash2, txn.GetState(addr1, hash2))
 }
 
 func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
@@ -112,9 +104,7 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(false)
 
 	txn = newTxn(state, snap)
-	if !txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.True(t, txn.Exist(addr1))
 
 	_, snap = buildPreState(nil)
 	txn = newTxn(state, snap)
@@ -124,9 +114,7 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
@@ -134,17 +122,13 @@ func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
 	state, snap := buildPreState(defaultPreState)
 
 	txn := newTxn(state, snap)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fatal()
-	}
+	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 
 	txn.SetState(addr1, hash1, hash2)
 	snap, _ = txn.Commit(false)
 
 	txn = newTxn(state, snap)
-	if txn.GetState(addr1, hash1) != hash2 {
-		t.Fatal()
-	}
+	assert.Equal(t, hash2, txn.GetState(addr1, hash1))
 }
 
 func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
@@ -159,9 +143,7 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
@@ -173,9 +155,7 @@ func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
@@ -187,16 +167,12 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 	txn.Suicide(addr1)
 
 	// Note, even if has commit suicide it still exists in the current txn
-	if !txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.True(t, txn.Exist(addr1))
 
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
@@ -205,9 +181,10 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 
 	txn := newTxn(state, snap)
 
+	code := []byte{0x1, 0x2, 0x3}
 	txn.SetNonce(addr1, 10)
 	txn.SetBalance(addr1, big.NewInt(100))
-	txn.SetCode(addr1, []byte{0x1, 0x2, 0x3})
+	txn.SetCode(addr1, code)
 	txn.SetState(addr1, hash1, hash1)
 
 	txn.Suicide(addr1)
@@ -215,24 +192,15 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 
 	txn = newTxn(state, snap)
 
-	if balance := txn.GetBalance(addr1); balance.Cmp(big.NewInt(0)) != 0 {
-		t.Fatalf("balance should be zero but found: %d", balance)
-	}
-	if nonce := txn.GetNonce(addr1); nonce != 0 {
-		t.Fatalf("nonce should be zero but found %d", nonce)
-	}
-	if code := txn.GetCode(addr1); len(code) != 0 {
-		t.Fatalf("code should be empty but found: %s", hexutil.Encode(code))
-	}
-	if codeHash := txn.GetCodeHash(addr1); codeHash != (common.Hash{}) {
-		t.Fatalf("code hash should be empty but found: %s", codeHash.String())
-	}
-	if size := txn.GetCodeSize(addr1); size != 0 {
-		t.Fatalf("code size should be zero but found %d", size)
-	}
-	if value := txn.GetState(addr1, hash1); value != (common.Hash{}) {
-		t.Fatalf("value should be empty but found: %s", value.String())
-	}
+	assert.Equal(t, big.NewInt(0), txn.GetBalance(addr1))
+	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
+
+	// code is not yet on the state
+	assert.Nil(t, txn.GetCode(addr1))
+	assert.Equal(t, (common.Hash{}), txn.GetCodeHash(addr1))
+	assert.Equal(t, int(0), txn.GetCodeSize(addr1))
+
+	assert.Equal(t, (common.Hash{}), txn.GetState(addr1, hash1))
 }
 
 func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
@@ -245,9 +213,7 @@ func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.GetBalance(addr1).Cmp(big.NewInt(10)) != 0 {
-		t.Fatal()
-	}
+	assert.Equal(t, big.NewInt(10), txn.GetBalance(addr1))
 }
 
 func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState) {
@@ -257,20 +223,13 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 	txn.SetNonce(addr1, 10)
 	txn.Suicide(addr1)
 
-	if txn.GetNonce(addr1) != 10 { // it is still 'active'
-		t.Fatal()
-	}
+	assert.Equal(t, uint64(10), txn.GetNonce(addr1))
 
 	txn.cleanDeleteObjects(true)
-
-	if txn.GetNonce(addr1) == 10 {
-		t.Fatal()
-	}
+	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
 
 	txn.Commit(true)
-	if txn.GetNonce(addr1) == 10 {
-		t.Fatal()
-	}
+	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
 }
 
 func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
@@ -281,14 +240,12 @@ func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 	txn := newTxn(state, snap)
 
 	txn.AddRefund(1000)
-	if txn.GetRefund() != 1000 {
-		t.Fatal()
-	}
+	assert.Equal(t, uint64(1000), txn.GetRefund())
 
 	txn.Commit(false)
-	if refunds := txn.GetRefund(); refunds == 1000 {
-		t.Fatalf("refunds should be empty buf founds: %d", refunds)
-	}
+
+	// refund should be empty after the commit
+	assert.Equal(t, uint64(0), txn.GetRefund())
 }
 
 func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
@@ -306,9 +263,7 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
@@ -321,7 +276,5 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 	snap, _ = txn.Commit(true)
 
 	txn = newTxn(state, snap)
-	if txn.Exist(addr1) {
-		t.Fatal()
-	}
+	assert.False(t, txn.Exist(addr1))
 }

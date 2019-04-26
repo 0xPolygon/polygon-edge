@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/stretchr/testify/assert"
 )
 
 type mockState struct {
@@ -111,18 +112,12 @@ func TestSnapshotUpdateData(t *testing.T) {
 	txn := newTestTxn(defaultPreState)
 
 	txn.SetState(addr1, hash1, hash1)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fail()
-	}
+	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 
 	ss := txn.Snapshot()
 	txn.SetState(addr1, hash1, hash2)
-	if txn.GetState(addr1, hash1) != hash2 {
-		t.Fail()
-	}
+	assert.Equal(t, hash2, txn.GetState(addr1, hash1))
 
 	txn.RevertToSnapshot(ss)
-	if txn.GetState(addr1, hash1) != hash1 {
-		t.Fail()
-	}
+	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 }
