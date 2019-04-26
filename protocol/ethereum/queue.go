@@ -143,10 +143,6 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	elem.bodiesStatus = completedX
 	elem.receiptsStatus = completedX
 
-	// hardcoded to download only headers
-	// No transactions yet so it is not necessary to download bodies
-	return nil
-
 	bodies := []int{}
 	receipts := []int{}
 
@@ -240,6 +236,7 @@ func (q *queue) deliverReceipts(id uint32, receipts [][]*types.Receipt) error {
 	}
 
 	if len(elem.receipts) == len(elem.receiptsHeaders) {
+		elem.receiptsOffset = 0
 		elem.receiptsStatus = completedX
 		return nil
 	}
@@ -289,6 +286,7 @@ func (q *queue) deliverBodies(id uint32, bodies []*types.Body) error {
 	}
 
 	if len(elem.bodies) == len(elem.bodiesHeaders) {
+		elem.bodiesOffset = 0
 		elem.bodiesStatus = completedX
 		return nil
 	}

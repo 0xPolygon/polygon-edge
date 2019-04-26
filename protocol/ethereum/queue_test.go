@@ -1,13 +1,11 @@
 package ethereum
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/stretchr/testify/assert"
 )
 
 func newTestQueue(head *types.Header, to uint64) *queue {
@@ -34,46 +32,32 @@ func dequeue(t *testing.T, q *queue) *Job {
 	return job
 }
 
-func checkStatus(t *testing.T, status elementStatus, expected elementStatus) {
-	if status != expected {
-		t.Fatalf("expected status %s but found %s", expected.String(), status.String())
-	}
-}
-
 func TestQueueDeliverPartialHeaders(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 	q := newTestQueue(headers[0], 100)
 
 	job := dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 190}) {
-		t.Fatal("bad.1")
-	}
+	assert.Equal(t, job.payload, &HeadersJob{1, 99})
+
 	elem := findElement(t, q, job.id)
+	assert.Equal(t, elem.headersStatus, pendingX)
 
-	checkStatus(t, elem.headersStatus, pendingX)
-
-	if err := q.deliverHeaders(job.id, headers[1:90]); err != nil {
-		t.Fatal(err)
-	}
-	checkStatus(t, elem.headersStatus, waitingX)
+	// Deliver partial number of headers
+	assert.NoError(t, q.deliverHeaders(job.id, headers[1:90]))
+	assert.Equal(t, elem.headersStatus, waitingX)
 
 	job = dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{90, 101}) {
-		t.Fatal("bad.2")
-	}
+	assert.Equal(t, job.payload, &HeadersJob{90, 10})
 
-	// deliver partial headers with wrong order
-	if err := q.deliverHeaders(job.id, headers[91:101]); err == nil {
-		t.Fatal("it should fail")
-	}
-	if err := q.deliverHeaders(job.id, headers[90:100]); err != nil {
-		t.Fatal(err)
-	}
-	checkStatus(t, elem.headersStatus, completedX)
+	// Deliver wrong number of headers fails
+	assert.Error(t, q.deliverHeaders(job.id, headers[91:101]))
 
-	if !elem.Completed() {
-		t.Fatal("it should be completed")
-	}
+	// Deliver the correct number
+	assert.NoError(t, q.deliverHeaders(job.id, headers[90:100]))
+
+	// The element is completed
+	assert.Equal(t, elem.headersStatus, completedX)
+	assert.True(t, elem.Completed())
 }
 
 func TestQueueReceiptsAndBodiesCompletedByDefault(t *testing.T) {
@@ -84,35 +68,26 @@ func TestQueueReceiptsAndBodiesCompletedByDefault(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 190}) {
-		t.Fatal("bad.1")
-	}
+	assert.Equal(t, job1.payload, &HeadersJob{1, 190})
+
 	elem1 := findElement(t, q, job1.id)
 
-	checkStatus(t, elem1.receiptsStatus, completedX)
-	checkStatus(t, elem1.bodiesStatus, completedX)
-	checkStatus(t, elem1.headersStatus, pendingX)
+	assert.Equal(t, elem1.receiptsStatus, completedX)
+	assert.Equal(t, elem1.bodiesStatus, completedX)
+	assert.Equal(t, elem1.headersStatus, pendingX)
 
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{191, 190}) {
-		fmt.Println(job2.payload)
-		t.Fatal("bad.2")
-	}
+	assert.Equal(t, job2.payload, &HeadersJob{191, 190})
+	
 	elem2 := findElement(t, q, job2.id)
 
-	if err := q.deliverHeaders(job2.id, headers[192:382]); err != nil {
-		t.Fatal(err)
-	}
-	if err := q.deliverHeaders(job1.id, headers[1:191]); err != nil {
-		t.Fatal(err)
-	}
+	// Deliver job 2
+	assert.NoError(t, q.deliverHeaders(job2.id, headers[191:381]))
+	// Deliver job 1
+	assert.NoError(t, q.deliverHeaders(job1.id, headers[1:191]))
 
-	if !elem1.Completed() {
-		t.Fatal("batch 1 should be completed")
-	}
-	if !elem2.Completed() {
-		t.Fatal("batch 2 should be completed")
-	}
+	assert.True(t, elem1.Completed())
+	assert.True(t, elem2.Completed())
 }
 
 func TestQueueFetchDataWithoutPendingData(t *testing.T) {
@@ -120,30 +95,20 @@ func TestQueueFetchDataWithoutPendingData(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 190}) {
-		t.Fatal("bad.1")
-	}
-	if err := q.deliverHeaders(job1.id, headers[1:191]); err != nil {
-		t.Fatal(err)
-	}
+	assert.Equal(t, job1.payload, &HeadersJob{1, 190})
+	assert.NoError(t, q.deliverHeaders(job1.id, headers[1:191]))
 
-	if elements := q.FetchCompletedData(); len(elements) != 1 {
-		t.Fatal("it should have one element")
-	}
-	if q.head.String() != headers[190].Hash().String() {
-		t.Fatal("head has not been reseted correctly")
-	}
+	// Get one completed element and reset the head hash of the queue
+	assert.Len(t, q.FetchCompletedData(), 1)
+	assert.Equal(t, q.head, headers[190].Hash())
 
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{191, 190}) {
-		t.Fatal("bad.1")
-	}
-	if err := q.deliverHeaders(job2.id, headers[102:200]); err == nil {
-		t.Fatal(err)
-	}
-	if err := q.deliverHeaders(job2.id, headers[101:200]); err != nil {
-		t.Fatal(err)
-	}
+	assert.Equal(t, job2.payload, &HeadersJob{191, 190})
+
+	// Wrong head hash
+	assert.Error(t, q.deliverHeaders(job2.id, headers[102:200]))
+	// Correct head hash
+	assert.NoError(t, q.deliverHeaders(job2.id, headers[191:200]))
 }
 
 func TestQueueFetchCompletedData(t *testing.T) {
@@ -152,50 +117,28 @@ func TestQueueFetchCompletedData(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 100}) {
-		t.Fatal("bad.1")
-	}
+	assert.Equal(t, job1.payload, &HeadersJob{1, 190})
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{101, 100}) {
-		t.Fatal("bad.2")
-	}
+	assert.Equal(t, job2.payload, &HeadersJob{191, 190})
 	job3 := dequeue(t, q)
-	if !reflect.DeepEqual(job3.payload, &HeadersJob{201, 100}) {
-		t.Fatal("bad.3")
-	}
+	assert.Equal(t, job3.payload, &HeadersJob{381, 190})
 
-	if err := q.deliverHeaders(job1.id, headers[1:101]); err != nil {
-		t.Fatal(err)
-	}
-	if err := q.deliverHeaders(job2.id, headers[101:201]); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, q.deliverHeaders(job1.id, headers[1:191]))
+	assert.NoError(t, q.deliverHeaders(job2.id, headers[191:381]))
 
-	if q.NumOfCompletedBatches() != 2 {
-		t.Fatal("it should have 2 batches completed")
-	}
-
-	q.FetchCompletedData()
-	if q.head.String() != headers[200].Hash().String() {
-		t.Fatal("head has not been reseted correctly")
-	}
+	// Fetch new data and reset head
+	assert.Len(t, q.FetchCompletedData(), 2)
+	assert.Equal(t, q.head, headers[380].Hash())
 
 	job4 := dequeue(t, q)
-	if !reflect.DeepEqual(job4.payload, &HeadersJob{301, 100}) {
-		t.Fatal("bad.4")
-	}
+	assert.Equal(t, job4.payload, &HeadersJob{571, 190})
 
-	// deliver with wrong header
-	if err := q.deliverHeaders(job3.id, headers[205:301]); err == nil {
-		t.Fatal("it should have failed")
-	}
+	// Deliver wrong result for job3
+	assert.Error(t, q.deliverHeaders(job3.id, headers[205:301]))
 
-	if err := q.deliverHeaders(job3.id, headers[201:301]); err != nil {
-		t.Fatal(err)
-	}
-	if err := q.deliverHeaders(job4.id, headers[301:401]); err != nil {
-		t.Fatal(err)
-	}
+	// Deliver good result for job3 and job4
+	assert.NoError(t, q.deliverHeaders(job3.id, headers[381:571]))
+	assert.NoError(t, q.deliverHeaders(job4.id, headers[571:761]))
 }
 
 func TestQueueDeliverHeaderInWrongOrder(t *testing.T) {
@@ -204,52 +147,30 @@ func TestQueueDeliverHeaderInWrongOrder(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job1 := dequeue(t, q)
-	if !reflect.DeepEqual(job1.payload, &HeadersJob{1, 100}) {
-		t.Fatal("bad.1")
-	}
+	assert.Equal(t, job1.payload, &HeadersJob{1, 190})
 	elem1 := findElement(t, q, job1.id)
 
 	job2 := dequeue(t, q)
-	if !reflect.DeepEqual(job2.payload, &HeadersJob{101, 100}) {
-		t.Fatal("bad.2")
-	}
+	assert.Equal(t, job2.payload, &HeadersJob{191, 190})
 	elem2 := findElement(t, q, job2.id)
 
 	job3 := dequeue(t, q)
-	if !reflect.DeepEqual(job3.payload, &HeadersJob{201, 100}) {
-		t.Fatal("bad.3")
-	}
+	assert.Equal(t, job3.payload, &HeadersJob{381, 190})
 	elem3 := findElement(t, q, job3.id)
 
 	// deliver job1 with wrong content
-	if err := q.deliverHeaders(job1.id, headers[2:102]); err == nil {
-		t.Fatal("it should fail")
-	}
+	assert.Error(t, q.deliverHeaders(job1.id, headers[2:102]))
 
-	if err := q.deliverHeaders(job3.id, headers[201:301]); err != nil {
-		t.Fatal(err)
-	}
-	if err := q.deliverHeaders(job1.id, headers[1:101]); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, q.deliverHeaders(job3.id, headers[381:571]))
+	assert.NoError(t, q.deliverHeaders(job1.id, headers[1:191]))
 
 	// deliver job2 with wrong chain on the front
-	if err := q.deliverHeaders(job2.id, headers[102:201]); err == nil {
-		t.Fatal("it should fail")
-	}
-	if err := q.deliverHeaders(job2.id, headers[101:201]); err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, q.deliverHeaders(job2.id, headers[192:381]))
+	assert.NoError(t, q.deliverHeaders(job2.id, headers[191:381]))
 
-	if !elem1.Completed() {
-		t.Fatal("batch 1 should be completed")
-	}
-	if !elem2.Completed() {
-		t.Fatal("batch 1 should be completed")
-	}
-	if !elem3.Completed() {
-		t.Fatal("batch 1 should be completed")
-	}
+	assert.True(t, elem1.Completed())
+	assert.True(t, elem2.Completed())
+	assert.True(t, elem3.Completed())
 }
 
 func TestQueueDeliverTotalHeaders(t *testing.T) {
@@ -257,21 +178,14 @@ func TestQueueDeliverTotalHeaders(t *testing.T) {
 	q := newTestQueue(headers[0], 100)
 
 	job := dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 100}) {
-		t.Fatal("bad.1")
-	}
+	assert.Equal(t, job.payload, &HeadersJob{1, 99})
 
 	elem := findElement(t, q, job.id)
-	checkStatus(t, elem.headersStatus, pendingX)
+	assert.Equal(t, elem.headersStatus, pendingX)
 
-	if err := q.deliverHeaders(job.id, headers[1:100]); err != nil {
-		t.Fatal(err)
-	}
-	checkStatus(t, elem.headersStatus, completedX)
-
-	if !elem.Completed() {
-		t.Fatal("it should be completed")
-	}
+	assert.NoError(t, q.deliverHeaders(job.id, headers[1:100]))
+	assert.Equal(t, elem.headersStatus, completedX)
+	assert.True(t, elem.Completed())
 }
 
 func headersToHashes(headers []*types.Header) []common.Hash {
@@ -291,89 +205,62 @@ func TestQueueDeliverReceiptsAndBodies(t *testing.T) {
 		bodies = append(bodies, block.Body())
 	}
 
-	// ask for headers from 1 to 100
+	// ask for headers from 1 to 190
 	job := dequeue(t, q)
+	assert.Equal(t, job.payload, &HeadersJob{1, 190})
 
 	elem := findElement(t, q, job.id)
-	if err := q.deliverHeaders(job.id, headers[1:101]); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, q.deliverHeaders(job.id, headers[1:191]))
+	assert.False(t, elem.Completed())
 
-	if elem.Completed() {
-		t.Fatal("receipts and bodies have not been fetched yet")
-	}
-	checkStatus(t, elem.receiptsStatus, waitingX)
-	checkStatus(t, elem.bodiesStatus, waitingX)
-	checkStatus(t, elem.headersStatus, completedX)
+	assert.Equal(t, elem.receiptsStatus, waitingX)
+	assert.Equal(t, elem.bodiesStatus, waitingX)
+	assert.Equal(t, elem.headersStatus, completedX)
 
 	receiptsJob := dequeue(t, q)
 
-	hashes1 := headersToHashes(headers[1:101])
-
-	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, hashes1) {
-		t.Fatal("bad receipts job")
-	}
-	checkStatus(t, elem.receiptsStatus, pendingX)
+	hashes1 := headersToHashes(headers[1:191])
+	assert.Equal(t, receiptsJob.payload.(*ReceiptsJob).hashes, hashes1)
+	assert.Equal(t, elem.receiptsStatus, pendingX)
 
 	// dequeue another job for bodies at the same time
 	bodiesJob := dequeue(t, q)
-	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, hashes1) {
-		t.Fatal("bad bodies job")
-	}
-	checkStatus(t, elem.bodiesStatus, pendingX)
+	assert.Equal(t, bodiesJob.payload.(*BodiesJob).hashes, hashes1)
+	assert.Equal(t, elem.bodiesStatus, pendingX)
 
 	// deliver half the receipts
-	if err := q.deliverReceipts(receiptsJob.id, receipts[1:50]); err != nil {
-		t.Fatal(err)
-	}
-	if elem.receiptsOffset != 49 {
-		t.Fatal("offset should be 49")
-	}
+	assert.NoError(t, q.deliverReceipts(receiptsJob.id, receipts[1:50]))
+	assert.Equal(t, elem.receiptsOffset, uint32(49))
 
-	hashes2 := headersToHashes(headers[50:101])
-
+	hashes2 := headersToHashes(headers[50:191])
 	receiptsJob = dequeue(t, q)
-	if !reflect.DeepEqual((receiptsJob.payload.(*ReceiptsJob)).hashes, hashes2) {
-		t.Fatal("bad receipts job")
-	}
-	// deliver incorrect receipts
-	if err := q.deliverReceipts(receiptsJob.id, receipts[1:50]); err == nil {
-		t.Fatal("incorrect receipts delivered, it should have failed")
-	}
-	if err := q.deliverReceipts(receiptsJob.id, receipts[50:101]); err != nil {
-		t.Fatal(err)
-	}
-	checkStatus(t, elem.receiptsStatus, completedX)
+	assert.Equal(t, receiptsJob.payload.(*ReceiptsJob).hashes, hashes2)
 
-	// bodies still pending, dequeue another job, has to be one for headers
+	// Deliver incorrect receipts first
+	assert.Error(t, q.deliverReceipts(receiptsJob.id, receipts[1:50]))
+	// Deliver correct receipts
+	assert.NoError(t, q.deliverReceipts(receiptsJob.id, receipts[50:191]))
+	assert.Equal(t, elem.receiptsOffset, uint32(0))
+	assert.Equal(t, elem.receiptsStatus, completedX)
+
+	// Bodies are still pending, next job is a headers query
 	job = dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{101, 100}) {
-		t.Fatal("bad headers jobs")
-	}
+	assert.Equal(t, job.payload, &HeadersJob{191, 190})
 
-	// deliver bodies in parts as well
-	// make it fail first
-	if err := q.deliverBodies(bodiesJob.id, bodies[51:60]); err == nil {
-		t.Fatal("it should have failed")
-	}
-	if err := q.deliverBodies(bodiesJob.id, bodies[1:50]); err != nil {
-		t.Fatal(err)
-	}
-	if elem.receiptsOffset != 49 {
-		t.Fatal("offset should be 49")
-	}
+	// Deliver wrong bodies
+	assert.Error(t, q.deliverBodies(bodiesJob.id, bodies[51:60]))
+	// Deliver correct number of bodies
+	assert.NoError(t, q.deliverBodies(bodiesJob.id, bodies[1:50]))
+	assert.Equal(t, elem.bodiesOffset, uint32(49))
+
 	bodiesJob = dequeue(t, q)
-	if !reflect.DeepEqual((bodiesJob.payload.(*BodiesJob)).hashes, hashes2) {
-		t.Fatal("bad receipts job")
-	}
-	if err := q.deliverBodies(bodiesJob.id, bodies[50:101]); err != nil {
-		t.Fatal(err)
-	}
+	assert.Equal(t, bodiesJob.payload.(*BodiesJob).hashes, hashes2)
 
-	// now is completed
-	if !elem.Completed() {
-		t.Fatal("it should be completed now")
-	}
+	assert.NoError(t, q.deliverBodies(bodiesJob.id, bodies[50:191]))
+	assert.Equal(t, elem.bodiesOffset, uint32(0))
+	assert.Equal(t, elem.bodiesStatus, completedX)
+
+	assert.True(t, elem.Completed())
 }
 
 func TestQueueMemoryRelease(t *testing.T) {
@@ -381,25 +268,15 @@ func TestQueueMemoryRelease(t *testing.T) {
 	q := newTestQueue(headers[0], 1000)
 
 	job := dequeue(t, q)
-	if !reflect.DeepEqual(job.payload, &HeadersJob{1, 100}) {
-		t.Fatal("bad.1")
-	}
-	if err := q.deliverHeaders(job.id, headers[1:101]); err != nil {
-		t.Fatal(err)
-	}
+	assert.Equal(t, job.payload, &HeadersJob{1, 190})
+	assert.NoError(t, q.deliverHeaders(job.id, headers[1:191]))
 
 	job2 := dequeue(t, q)
 	completed := q.FetchCompletedData()
 
-	if len(completed) != 1 {
-		t.Fatal("completed should be equal to 1")
-	}
-	if completed[0].next != nil {
-		t.Fatal("completed should not have next element")
-	}
+	assert.Len(t, completed, 1)
+	assert.Nil(t, completed[0].next)
 
 	elem := findElement(t, q, job2.id)
-	if elem.prev != nil {
-		t.Fatal("prev element should be nil")
-	}
+	assert.Nil(t, elem.prev)
 }
