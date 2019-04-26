@@ -33,7 +33,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Chain:       "foundation",
 		DataDir:     "./test-chain",
-		BindAddr:    "127.0.0.1",
+		BindAddr:    "0.0.0.0",
 		BindPort:    30303,
 		ServiceName: "minimal",
 		Telemetry: &Telemetry{

@@ -26,6 +26,8 @@ import (
 
 const (
 	peersFile = "peers.json"
+	defaultDialTimeout = 10 * time.Second
+	defaultDialTasks = 15
 )
 
 // Config is the p2p server configuration
@@ -48,7 +50,7 @@ func DefaultConfig() *Config {
 		BindPort:         30304,
 		MaxPeers:         10,
 		Bootnodes:        []string{},
-		DialTasks:        5,
+		DialTasks:        defaultDialTasks,
 		DialBusyInterval: 1 * time.Minute,
 	}
 	return c
@@ -246,7 +248,7 @@ func (s *Server) dialTask(id string, tasks chan string) {
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				fmt.Printf("ERR: %v\n", err)
+				s.logger.Printf("Err %v", err)
 
 				if err.Error() == "too many peers" {
 					busy = true
@@ -378,7 +380,7 @@ func (s *Server) connectWithEnode(rawURL string) error {
 	}
 
 	tcpAddr := addr.TCPAddr()
-	conn, err := net.Dial("tcp", tcpAddr.String())
+	conn, err := net.DialTimeout("tcp", tcpAddr.String(), defaultDialTimeout)
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	flags.IntVar(&cliConfig.BindPort, "port", 0, "")
-	flags.StringVar(&cliConfig.BindAddr, "bind", "", "")
+	flags.StringVar(&cliConfig.BindAddr, "addr", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
 	flags.StringVar(&cliConfig.ServiceName, "service", "", "")
 	flags.IntVar(&cliConfig.Telemetry.PrometheusPort, "prometheus", 0, "")

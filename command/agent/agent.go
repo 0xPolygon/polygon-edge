@@ -106,6 +106,13 @@ func (a *Agent) Start() error {
 		}
 	}
 
+	// If no discovery is specified, set devp2p as default
+	if len(discoveryEntries) == 0 {
+		discoveryEntries["devp2p"] = &minimal.Entry{
+			Config: map[string]interface{}{},
+		}
+	}
+
 	// blockchain backend
 	if a.config.Blockchain == nil {
 		return fmt.Errorf("blockchain config not found")
