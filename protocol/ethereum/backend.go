@@ -62,7 +62,11 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 		return nil, fmt.Errorf("header not found")
 	}
 
-	b.NetworkID = uint64(minimal.Chain().Params.ChainID)
+	if minimal != nil {
+		b.NetworkID = uint64(minimal.Chain().Params.ChainID)
+	} else {
+		b.NetworkID = 1
+	}
 
 	b.queue.front = b.queue.newItem(header.Number.Uint64() + 1)
 	b.queue.head = header.Hash()
