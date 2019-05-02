@@ -32,7 +32,7 @@ func (p *PeerStore) Update(addr string, status Status) {
 }
 
 func (p *PeerStore) Load() []string {
-	if _, err := os.Stat(peersFile); os.IsNotExist(err) {
+	if _, err := os.Stat(p.path); os.IsNotExist(err) {
 		return []string{}
 	}
 
