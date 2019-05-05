@@ -245,8 +245,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	}
 
 	conn0, conn1 := net.Pipe()
-	eth0 := NewEthereumProtocol(conn0, b0)
-	eth1 := NewEthereumProtocol(conn1, b1)
+	eth0 := NewEthereumProtocol("", conn0, b0)
+	eth1 := NewEthereumProtocol("", conn1, b1)
 
 	err := make(chan error)
 	go func() {
@@ -271,7 +271,7 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	st.CurrentBlock = h.Hash()
 	st.GenesisBlock = b.Genesis().Hash()
 
-	eth := NewEthereumProtocol(conn, b)
+	eth := NewEthereumProtocol("", conn, b)
 	if err := eth.Init(st); err != nil {
 		panic(err)
 	}
@@ -335,6 +335,7 @@ func TestBackendNotify(t *testing.T) {
 	fmt.Println(b.GetForks())
 }
 
+/*
 func TestBackendStuff(t *testing.T) {
 	h0 := blockchain.NewTestHeaderChain(10)
 	h1 := blockchain.NewTestHeaderFromChainWithSeed(h0[0:5], 10, 10)
@@ -379,3 +380,4 @@ func TestBackendStuff(t *testing.T) {
 		t.Fatal("bad")
 	}
 }
+*/

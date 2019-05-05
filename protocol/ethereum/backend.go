@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"container/heap"
 	"context"
 	"fmt"
 	"math"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/minimal"
+	"github.com/umbracle/minimal/sealer"
 
 	"sync"
 	"time"
@@ -16,7 +18,6 @@ import (
 	metrics "github.com/armon/go-metrics"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/sealer"
 )
 
 // Backend is the ethereum backend
@@ -29,13 +30,19 @@ type Backend struct {
 	counter int
 	last    int
 
-	peers     map[string]*PeerConnection
+	peers     map[string]*Ethereum
 	peersLock sync.Mutex
 	waitCh    []chan struct{}
 
 	deliverLock sync.Mutex
 	watch       chan *NotifyMsg
 	stopFn      context.CancelFunc
+
+	// -- new fields
+	heap   *workersHeap
+	tasks  []*task
+	wakeCh chan struct{}
+	taskCh chan struct{}
 }
 
 func Factory(ctx context.Context, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
@@ -47,7 +54,7 @@ func Factory(ctx context.Context, m interface{}, config map[string]interface{}) 
 func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*Backend, error) {
 	b := &Backend{
 		minimal:     minimal,
-		peers:       map[string]*PeerConnection{},
+		peers:       map[string]*Ethereum{},
 		peersLock:   sync.Mutex{},
 		blockchain:  blockchain,
 		queue:       newQueue(),
@@ -55,6 +62,15 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 		last:        0,
 		deliverLock: sync.Mutex{},
 		waitCh:      make([]chan struct{}, 0),
+
+		// -- new fields
+		heap: &workersHeap{
+			index: map[string]*worker{},
+			heap:  workersHeapImpl{},
+		},
+		tasks:  []*task{},
+		wakeCh: make(chan struct{}, 10),
+		taskCh: make(chan struct{}, maxConcurrentTasks),
 	}
 
 	header, ok := blockchain.Header()
@@ -77,6 +93,9 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 		go b.WatchMinedBlocks(minimal.Sealer.SealedCh)
 	}
 
+	// start the process
+	go b.runSync()
+
 	return b, nil
 }
 
@@ -89,6 +108,141 @@ var ETH63 = protocol.Protocol{
 
 func (b *Backend) Protocol() protocol.Protocol {
 	return ETH63
+}
+
+// -- setup --
+
+func (b *Backend) addPeer(id string, proto *Ethereum) {
+	fmt.Println("## ADD PEER ##")
+
+	b.heap.Push(id, proto)
+	b.notifyAvailablePeer()
+}
+
+func (b *Backend) peek() *worker {
+	<-b.taskCh // acquire a task
+
+PEEK:
+	w := b.heap.Peek()
+	if w != nil && w.outstanding < maxOutstandingRequests {
+		return w
+	}
+
+	// Best peer has too many open requests. Wait until
+	// there is some other to query
+
+	select {
+	case <-b.wakeCh:
+		goto PEEK
+	}
+}
+
+func (b *Backend) runTask(t *task) {
+	// run logic
+	failed := b.runTaskImpl(t)
+
+	if !failed {
+		outstanding, _ := b.heap.Update(t.peerID, -1)
+		if outstanding == maxOutstandingRequests-1 {
+			b.notifyAvailablePeer()
+		}
+	} else {
+		// peer has failed, remove it from the list
+		b.heap.Remove(t.peerID)
+	}
+
+	// release task
+	b.taskCh <- struct{}{}
+}
+
+func (b *Backend) runTaskImpl(t *task) bool {
+	id := t.peerID
+	ctx := context.Background()
+
+	var data interface{}
+	var err error
+	var context string
+
+	conn, ok := b.peers[t.peerID]
+	if !ok {
+		panic("not found")
+	}
+
+	switch job := t.job.payload.(type) {
+	case *HeadersJob:
+		fmt.Printf("SYNC HEADERS (%s): %d %d\n", id, job.block, job.count)
+
+		data, err = conn.RequestHeadersSync(ctx, job.block, job.count)
+		context = "headers"
+	case *BodiesJob:
+		fmt.Printf("SYNC BODIES (%s): %d\n", id, len(job.hashes))
+
+		data, err = conn.RequestBodiesSync(ctx, job.hash, job.hashes)
+		context = "bodies"
+	case *ReceiptsJob:
+		fmt.Printf("SYNC RECEIPTS (%s): %d\n", id, len(job.hashes))
+
+		data, err = conn.RequestReceiptsSync(ctx, job.hash, job.hashes)
+		context = "receipts"
+	}
+
+	if err != nil {
+		if err.Error() == "session closed" {
+			// remove the peer from the list of peers if the session has been closed
+			return true
+		}
+	}
+
+	b.Deliver("Y", context, t.job.id, data, err)
+	return false
+}
+
+func (b *Backend) notifyAvailablePeer() {
+	select {
+	case b.wakeCh <- struct{}{}:
+	default:
+	}
+}
+
+func (b *Backend) dequeueJob() *Job {
+WAIT:
+	job, err := b.queue.Dequeue()
+	if err != nil {
+		panic(err)
+	}
+
+	if job != nil {
+		return job
+	}
+
+	// TODO, use a channel to nofify new jobs
+	// That channel will be used by syncer and watcher
+	time.Sleep(5 * time.Second)
+	goto WAIT
+}
+
+func (b *Backend) runSync() {
+	for i := 0; i < maxConcurrentTasks; i++ {
+		b.taskCh <- struct{}{}
+	}
+
+	for {
+		w := b.peek()
+
+		fmt.Printf("Worker: %s\n", w.id)
+
+		job := b.dequeueJob()
+
+		t := &task{
+			peerID: w.id,
+			job:    job,
+		}
+
+		b.heap.Update(t.peerID, 1)
+		b.tasks = append(b.tasks, t)
+
+		go b.runTask(t)
+	}
 }
 
 func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
@@ -111,8 +265,8 @@ func (b *Backend) broadcast(block *types.Block) {
 	blockDiff := big.NewInt(1).Add(diff, block.Difficulty())
 
 	for _, i := range b.peers {
-		if err := i.conn.SendNewBlock(block, blockDiff); err != nil {
-			fmt.Printf("Failed to send send block to peer %s: %v\n", i.id, err)
+		if err := i.SendNewBlock(block, blockDiff); err != nil {
+			fmt.Printf("Failed to send send block to peer %s: %v\n", i.peerID, err)
 		}
 	}
 }
@@ -128,6 +282,7 @@ func (b *Backend) updateChain(block uint64) {
 	}
 }
 
+/*
 func (b *Backend) notifyNewData(w *NotifyMsg) {
 	peerEth := b.peers[w.Peer.id].conn
 
@@ -193,7 +348,9 @@ func (b *Backend) notifyNewData(w *NotifyMsg) {
 		}
 	}
 }
+*/
 
+/*
 func (b *Backend) watchBlock(watch chan *NotifyMsg) {
 	go func() {
 		for {
@@ -205,18 +362,12 @@ func (b *Backend) watchBlock(watch chan *NotifyMsg) {
 		}
 	}()
 }
+*/
 
 // Add is called when we connect to a new node
 func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 	fmt.Println("----- ADD NODE -----")
-
-	/*
-		if err := s.checkDAOHardFork(peer.GetProtocol("eth", 63).(*Ethereum)); err != nil {
-			fmt.Println("Failed to check the DAO block")
-			return
-		}
-		fmt.Println("DAO Fork completed")
-	*/
+	fmt.Println(peerID)
 
 	// use handler to create the connection
 
@@ -225,31 +376,54 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
 		return nil, err
 	}
 
-	proto := NewEthereumProtocol(conn, b.blockchain)
+	proto := NewEthereumProtocol(peerID, conn, b.blockchain)
 	proto.backend = b
+
+	b.peersLock.Lock()
+	b.peers[peerID] = proto
+	b.peersLock.Unlock()
 
 	// Start the protocol handle
 	if err := proto.Init(status); err != nil {
 		return nil, err
 	}
 
-	peerConn := &PeerConnection{
-		conn:    proto,
-		sched:   b,
-		id:      peerID,
-		enabled: true,
+	// Only validate for the DAO Fork on Ethereum mainnet
+	if b.NetworkID == 1 {
+		if err := proto.ValidateDAOBlock(); err != nil {
+			return nil, err
+		}
 	}
 
-	b.peers[peerID] = peerConn
-	proto.peer = peerConn
+	header, err := proto.fetchHeight(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch height: %v", err)
+	}
 
-	// notifiy this node data
-	b.notifyNewData(&NotifyMsg{
-		Peer: peerConn,
-		Diff: proto.HeaderDiff,
-	})
+	b.updateChain(header.Number.Uint64())
+	b.addPeer(peerID, proto)
 
 	return proto, nil
+
+	/*
+		peerConn := &PeerConnection{
+			conn:    proto,
+			sched:   b,
+			id:      peerID,
+			enabled: true,
+		}
+
+		b.peers[peerID] = peerConn
+		proto.peer = peerConn
+
+		// notifiy this node data
+		b.notifyNewData(&NotifyMsg{
+			Peer: peerConn,
+			Diff: proto.HeaderDiff,
+		})
+
+		return proto, nil
+	*/
 }
 
 func (b *Backend) Dequeue() *Job {
@@ -266,7 +440,7 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 
 	if err != nil {
 		// TODO, we need to set here the thing that was not deliver as waiting to be dequeued again
-		fmt.Printf("==================================> Failed to deliver (%d): %v\n", id, err)
+		fmt.Printf("=> Failed to deliver (%d): %v\n", id, err)
 		if err := b.queue.updateFailedElem(peer, id, context); err != nil {
 			fmt.Printf("Could not be updated: %v\n", err)
 		}
@@ -309,7 +483,10 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 		panic("")
 	}
 
-	if b.queue.NumOfCompletedBatches() >= 1 { // force to commit data every time
+	fmt.Println("-- batches --")
+	fmt.Println(b.queue.NumOfCompletedBatches())
+
+	if b.queue.NumOfCompletedBatches() >= 5 { // force to commit data every time
 		data := b.queue.FetchCompletedData()
 
 		fmt.Printf("Commit data: %d\n", len(data)*maxElements)
@@ -323,6 +500,12 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 			blocks := []*types.Block{}
 			for _, i := range elem.headers {
 				blocks = append(blocks, types.NewBlockWithHeader(i))
+			}
+
+			// Add transactions and uncles
+			for indx, i := range elem.bodiesHeaders {
+				body := elem.bodies[indx]
+				blocks[i] = blocks[i].WithBody(body.Transactions, body.Uncles)
 			}
 
 			// Write blocks and commit new data
@@ -340,17 +523,6 @@ func (b *Backend) Deliver(peer string, context string, id uint32, data interface
 
 			h, _ := b.blockchain.Header()
 			fmt.Printf("New header number: %d\n", h.Number.Uint64())
-
-			/*
-				if err := b.blockchain.CommitBodies(elem.GetBodiesHashes(), elem.bodies); err != nil {
-					fmt.Printf("Failed to write bodies: %v", err)
-					panic("")
-				}
-				if err := b.blockchain.CommitReceipts(elem.GetReceiptsHashes(), elem.receipts); err != nil {
-					fmt.Printf("Failed to write receipts: %v", err)
-					panic("")
-				}
-			*/
 		}
 	}
 }
@@ -376,43 +548,6 @@ func (b *Backend) GetStatus() (*Status, error) {
 		GenesisBlock:    b.blockchain.Genesis().Hash(),
 	}
 	return status, nil
-}
-
-var (
-	daoBlock            = uint64(1920000)
-	daoChallengeTimeout = 5 * time.Second
-)
-
-func (b *Backend) checkDAOHardFork(eth *Ethereum) error {
-	return nil // hack
-
-	if b.NetworkID == 1 {
-		/*
-			ack := make(chan rlpx.AckMessage, 1)
-			eth.Conn().SetHandler(BlockHeadersMsg, ack, daoChallengeTimeout)
-
-			// check the DAO block
-			if err := eth.RequestHeadersByNumber(daoBlock, 1, 0, false); err != nil {
-				return err
-			}
-
-			resp := <-ack
-			if resp.Complete {
-				var headers []*types.Header
-				if err := rlp.Decode(resp.Payload, &headers); err != nil {
-					return err
-				}
-
-				// TODO. check that daoblock is correct
-				fmt.Println(headers)
-
-			} else {
-				return fmt.Errorf("timeout")
-			}
-		*/
-	}
-
-	return nil
 }
 
 // FindCommonAncestor finds the common ancestor with the peer and the syncer connection
@@ -484,4 +619,102 @@ func (b *Backend) FindCommonAncestor(peer *Ethereum) (*types.Header, *types.Head
 	}
 
 	return header, fork, nil
+}
+
+const (
+	maxOutstandingRequests = 4
+	maxConcurrentTasks     = 10
+)
+
+// worker represents a queryable peer
+type worker struct {
+	id          string
+	index       int
+	outstanding int
+	proto       *Ethereum
+}
+
+type workersHeap struct {
+	index map[string]*worker
+	heap  workersHeapImpl
+}
+
+func (w *workersHeap) Remove(id string) {
+	wrk, ok := w.index[id]
+	if !ok {
+		return
+	}
+	heap.Remove(&w.heap, wrk.index)
+	return
+}
+
+func (w *workersHeap) Push(id string, proto *Ethereum) error {
+	if _, ok := w.index[id]; ok {
+		return fmt.Errorf("peer '%s' already exists", id)
+	}
+
+	wrk := &worker{
+		id:          id,
+		index:       0,
+		proto:       proto,
+		outstanding: 0, // start with zero outstanding requests
+	}
+	w.index[id] = wrk
+	heap.Push(&w.heap, wrk)
+	return nil
+}
+
+func (w *workersHeap) Update(id string, outstanding int) (int, error) {
+	wrk, ok := w.index[id]
+	if !ok {
+		return 0, fmt.Errorf("peer '%s' not found", id)
+	}
+
+	wrk.outstanding += outstanding
+	heap.Fix(&w.heap, wrk.index)
+	return wrk.outstanding, nil
+}
+
+func (w *workersHeap) Peek() *worker {
+	if len(w.heap) == 0 {
+		return nil
+	}
+	return w.heap[0]
+}
+
+type workersHeapImpl []*worker
+
+func (w workersHeapImpl) Len() int {
+	return len(w)
+}
+
+func (w workersHeapImpl) Less(i, j int) bool {
+	return w[i].outstanding < w[j].outstanding
+}
+
+func (w workersHeapImpl) Swap(i, j int) {
+	w[i], w[j] = w[j], w[i]
+	w[i].index = i
+	w[j].index = j
+}
+
+func (w *workersHeapImpl) Push(x interface{}) {
+	n := len(*w)
+	pJob := x.(*worker)
+	pJob.index = n
+	*w = append(*w, pJob)
+}
+
+func (w *workersHeapImpl) Pop() interface{} {
+	old := *w
+	n := len(old)
+	pJob := old[n-1]
+	pJob.index = -1
+	*w = old[0 : n-1]
+	return pJob
+}
+
+type task struct {
+	job    *Job
+	peerID string
 }

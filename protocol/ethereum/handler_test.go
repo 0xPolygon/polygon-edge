@@ -95,8 +95,8 @@ func TestHandshake(t *testing.T) {
 func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, error, *Ethereum, error) {
 	conn0, conn1 := net.Pipe()
 
-	eth0 := NewEthereumProtocol(conn0, b0)
-	eth1 := NewEthereumProtocol(conn1, b1)
+	eth0 := NewEthereumProtocol("", conn0, b0)
+	eth1 := NewEthereumProtocol("", conn1, b1)
 
 	err := make(chan error)
 	go func() {
@@ -188,7 +188,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			}
 
 			resp := <-ack
-			if resp.Complete {
+			if resp.Completed() {
 				if !reflect.DeepEqual(headersToNumbers(resp.Result.([]*types.Header)), c.Expected) {
 					t.Fatal("expected numbers dont match")
 				}
@@ -223,7 +223,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	}
 	// NOTE, we cannot know if something failed yet, so empty response
 	// means checking if the timeout fails
-	if resp := <-ack; resp.Complete {
+	if resp := <-ack; resp.Completed() {
 		t.Fatal("bad")
 	}
 
@@ -234,7 +234,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	if err := eth0.RequestReceipts(batch); err != nil {
 		t.Fatal(err)
 	}
-	if resp := <-ack; resp.Complete {
+	if resp := <-ack; resp.Completed() {
 		t.Fatal("bad")
 	}
 }
@@ -269,7 +269,7 @@ func TestEthereumBody(t *testing.T) {
 	}
 
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		t.Fatal("not completed")
 	}
 	bodies := resp.Result.(BlockBodiesData)

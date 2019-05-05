@@ -370,11 +370,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
-		// verify uncles
-		if err := b.VerifyUncles(block); err != nil {
-			return err
-		}
-
 		// verify body data
 		if hash := types.CalcUncleHash(block.Uncles()); hash != headers[i].UncleHash {
 			return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, headers[i].UncleHash)
@@ -382,17 +377,19 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if hash := types.DeriveSha(block.Transactions()); hash != headers[i].TxHash {
 			return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, headers[i].TxHash)
 		}
-
 		parent = headers[i]
 	}
 
-	// NOTE: This is only done for the tests for now, write all the blocks to memory
-	for _, block := range blocks {
-		b.db.WriteBody(block.Header().Hash(), block.Body())
-	}
-
 	// Write chain
-	for indx, h := range headers {
+	for indx, block := range blocks {
+		h := block.Header()
+
+		b.db.WriteBody(block.Header().Hash(), block.Body())
+
+		// verify uncles. It requires to have the bodies in memory. TODO: Part of the consensus? Only required on POW.
+		if err := b.VerifyUncles(block); err != nil {
+			return err
+		}
 
 		// Try to write first the state transition
 		parent, ok := b.db.ReadHeader(h.ParentHash)
