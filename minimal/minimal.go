@@ -182,6 +182,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		if err != nil {
 			return nil, err
 		}
+		proto.Run()
 		m.backends = append(m.backends, proto)
 	}
 

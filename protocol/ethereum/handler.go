@@ -67,6 +67,11 @@ type pending struct {
 	pending int
 }
 
+var (
+	errorTimeoutQuery = fmt.Errorf("timeout")
+	errorEmptyQuery   = fmt.Errorf("empty response")
+)
+
 func newPending() *pending {
 	return &pending{
 		handler: map[string]*callback{},
@@ -85,7 +90,7 @@ func (p *pending) add(id string, c *callback) {
 func (p *pending) freeHandlersLocked() {
 	for origin, i := range p.handler {
 		select {
-		case i.ack <- AckMessage{Complete: false}:
+		case i.ack <- AckMessage{Error: errorEmptyQuery}:
 		default:
 		}
 		delete(p.handler, origin)
@@ -142,19 +147,21 @@ type Ethereum struct {
 	sendHeader rlpx.Header
 	recvHeader rlpx.Header
 
-	peer *PeerConnection
+	// peer *PeerConnection
+	peerID string
 }
 
 // NotifyMsg notifies that there is a new block
 type NotifyMsg struct {
 	Block *types.Block
-	Peer  *PeerConnection
-	Diff  *big.Int
+	// Peer  *PeerConnection
+	Diff *big.Int
 }
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
+func NewEthereumProtocol(peerID string, conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
 	e := &Ethereum{
+		peerID:     peerID,
 		conn:       conn,
 		blockchain: blockchain,
 		sendHeader: make([]byte, rlpx.HeaderSize),
@@ -237,6 +244,13 @@ func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
 // SendNewBlock propagates an entire block to a remote peer.
 func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
 	return e.writeMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
+}
+
+// SendNewHash propagates a new block by hash and number
+func (e *Ethereum) SendNewHash(hash common.Hash, number uint64) error {
+	return e.writeMsg(NewBlockHashesMsg, []*announcement{
+		{hash, number},
+	})
 }
 
 func (e *Ethereum) sendStatus(status *Status) error {
@@ -528,7 +542,26 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	return nil
 }
 
+type announcement struct {
+	Hash   common.Hash
+	Number uint64
+}
+
 func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
+
+	fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
+
+	var announces []*announcement
+	if err := msg.Decode(&announces); err != nil {
+		panic(err)
+	}
+
+	/*
+		for _, i := range announces {
+			e.backend.watcher.notifyHash(i.Hash, i.Number)
+		}
+	*/
+
 	return nil
 }
 
@@ -539,26 +572,28 @@ func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
 	}
 
 	a := request.Block.Number()
-	b := request.TD.Int64()
-	c := request.Block.Difficulty().Int64()
+	b := request.TD.String()
+	c := request.Block.Difficulty().String()
 
 	// trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
-	trueTD := request.TD
+	// trueTD := request.TD
 
-	fmt.Printf("===> NOTIFY Block: %d %d. Difficulty %d. Total: %d\n", a.Uint64(), c, trueTD.Uint64(), b)
+	fmt.Printf("===> NOTIFY (%s) Block: %d Difficulty %s. Total: %s\n", e.peerID, a.Uint64(), c, b)
 
-	if trueTD.Cmp(e.HeaderDiff) > 0 {
-		e.headerLock.Lock()
-		e.HeaderDiff = request.TD
-		e.HeaderHash = request.Block.Hash() // NOTE. not sure about this thing of not addedd yet
-		e.headerLock.Unlock()
+	/*
+		if trueTD.Cmp(e.HeaderDiff) > 0 {
+			e.headerLock.Lock()
+			e.HeaderDiff = request.TD
+			e.HeaderHash = request.Block.Hash() // NOTE. not sure about this thing of not addedd yet
+			e.headerLock.Unlock()
 
-		go e.backend.notifyNewData(&NotifyMsg{Block: request.Block, Peer: e.peer, Diff: trueTD})
-	} else {
-		fmt.Println("-- NO UPDATE --")
-		fmt.Println(trueTD.Int64())
-		fmt.Println(e.HeaderDiff.Int64())
-	}
+			// go e.backend.notifyNewData(&NotifyMsg{Block: request.Block, Peer: e.peer, Diff: trueTD})
+		} else {
+			fmt.Println("-- NO UPDATE --")
+			fmt.Println(trueTD.Int64())
+			fmt.Println(e.HeaderDiff.Int64())
+		}
+	*/
 
 	return nil
 }
@@ -606,15 +641,54 @@ func (e *Ethereum) sendReceipts(receipts []rlp.RawValue) error {
 
 // AckMessage is the ack message
 type AckMessage struct {
-	Complete bool
-	Result   interface{}
+	Error  error
+	Result interface{}
+}
+
+// TODO: AckMessage with two fields one for error and another
+// to handle empty responses. The api functions could return now
+// three fields (result, ok, error) to represent empty data.
+
+// Completed returns true if there is a value in the response
+func (a *AckMessage) Completed() bool {
+	return a.Error == nil
 }
 
 type callback struct {
 	ack chan AckMessage
 }
 
-// RequestHeaderByHashSync requests a header hash synchronously
+var (
+	// TODO, there are still a couple of DAO validations to perform
+	// on the ethash consensus algorithm
+	daoBlock            = uint64(1920000)
+	daoChallengeTimeout = 15 * time.Second
+	daoForkBlockExtra   = common.FromHex("0x64616f2d686172642d666f726b")
+)
+
+// ValidateDAOBlock queries the DAO block
+func (e *Ethereum) ValidateDAOBlock() error {
+	ctx, cancel := context.WithTimeout(context.Background(), daoChallengeTimeout)
+	defer cancel()
+
+	header, ok, err := e.RequestHeaderSync(ctx, daoBlock)
+	if err != nil {
+		// We accept peers that return empty queries
+		if err != errorEmptyQuery {
+			return err
+		}
+	}
+
+	// If it returns nothing it means the node does not have the dao block yet
+	if ok {
+		if !bytes.Equal(header.Extra, daoForkBlockExtra) {
+			return fmt.Errorf("Dao extra data does not match")
+		}
+	}
+	return nil
+}
+
+// RequestHeaderByHashSync requests a header by hash synchronously
 func (e *Ethereum) RequestHeaderByHashSync(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	ack := make(chan AckMessage, 1)
 	e.setHandler(ctx, headerMsg, hash.String(), ack)
@@ -623,7 +697,7 @@ func (e *Ethereum) RequestHeaderByHashSync(ctx context.Context, hash common.Hash
 		return nil, err
 	}
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		return nil, fmt.Errorf("failed")
 	}
 
@@ -641,8 +715,8 @@ func (e *Ethereum) RequestHeaderSync(ctx context.Context, origin uint64) (*types
 		return nil, false, err
 	}
 	resp := <-ack
-	if !resp.Complete {
-		return nil, false, fmt.Errorf("failed")
+	if !resp.Completed() {
+		return nil, false, resp.Error
 	}
 
 	response := resp.Result.([]*types.Header)
@@ -655,18 +729,23 @@ func (e *Ethereum) RequestHeaderSync(ctx context.Context, origin uint64) (*types
 	return response[0], true, nil
 }
 
+// RequestHeadersRangeSync requests a range of headers syncronously
+func (e *Ethereum) RequestHeadersRangeSync(ctx context.Context, origin uint64, count uint64) ([]*types.Header, error) {
+	return e.RequestHeadersSync(ctx, origin, 0, count)
+}
+
 // RequestHeadersSync requests headers and waits for the response
-func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, count uint64) ([]*types.Header, error) {
+func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, skip uint64, count uint64) ([]*types.Header, error) {
 	hash := strconv.Itoa(int(origin))
 
 	ack := make(chan AckMessage, 1)
 	e.setHandler(ctx, headerMsg, hash, ack)
 
-	if err := e.RequestHeadersByNumber(origin, count, 0, false); err != nil {
+	if err := e.RequestHeadersByNumber(origin, count, skip, false); err != nil {
 		return nil, err
 	}
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		return nil, fmt.Errorf("failed")
 	}
 
@@ -687,7 +766,7 @@ func (e *Ethereum) RequestReceiptsSync(ctx context.Context, hash string, hashes 
 		return nil, err
 	}
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		return nil, fmt.Errorf("failed")
 	}
 
@@ -709,7 +788,7 @@ func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []
 		return nil, err
 	}
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		return nil, fmt.Errorf("failed")
 	}
 
@@ -733,7 +812,7 @@ func (e *Ethereum) RequestNodeDataSync(ctx context.Context, hashes []common.Hash
 		return nil, err
 	}
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		return nil, fmt.Errorf("failed")
 	}
 
@@ -760,7 +839,7 @@ func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, 
 		}
 
 		select {
-		case ack <- AckMessage{false, nil}:
+		case ack <- AckMessage{Error: errorTimeoutQuery, Result: nil}:
 		default:
 		}
 	}()
@@ -781,7 +860,7 @@ func (e *Ethereum) consumeHandler(origin string, typ messageType, result interfa
 
 	// notify its over
 	select {
-	case callback.ack <- AckMessage{Complete: true, Result: result}:
+	case callback.ack <- AckMessage{Result: result}:
 	default:
 	}
 	return true
@@ -803,7 +882,6 @@ func (e *Ethereum) Headers(headers []*types.Header) {
 			return
 		}
 	}
-
 	// Neither hash nor number found. Consume empty response.
 	e.consumeHandler("", headerMsg, nil)
 }

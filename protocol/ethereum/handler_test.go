@@ -95,8 +95,8 @@ func TestHandshake(t *testing.T) {
 func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, error, *Ethereum, error) {
 	conn0, conn1 := net.Pipe()
 
-	eth0 := NewEthereumProtocol(conn0, b0)
-	eth1 := NewEthereumProtocol(conn1, b1)
+	eth0 := NewEthereumProtocol("", conn0, b0)
+	eth1 := NewEthereumProtocol("", conn1, b1)
 
 	err := make(chan error)
 	go func() {
@@ -188,7 +188,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 			}
 
 			resp := <-ack
-			if resp.Complete {
+			if resp.Completed() {
 				if !reflect.DeepEqual(headersToNumbers(resp.Result.([]*types.Header)), c.Expected) {
 					t.Fatal("expected numbers dont match")
 				}
@@ -223,7 +223,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	}
 	// NOTE, we cannot know if something failed yet, so empty response
 	// means checking if the timeout fails
-	if resp := <-ack; resp.Complete {
+	if resp := <-ack; resp.Completed() {
 		t.Fatal("bad")
 	}
 
@@ -234,7 +234,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 	if err := eth0.RequestReceipts(batch); err != nil {
 		t.Fatal(err)
 	}
-	if resp := <-ack; resp.Complete {
+	if resp := <-ack; resp.Completed() {
 		t.Fatal("bad")
 	}
 }
@@ -269,7 +269,7 @@ func TestEthereumBody(t *testing.T) {
 	}
 
 	resp := <-ack
-	if !resp.Complete {
+	if !resp.Completed() {
 		t.Fatal("not completed")
 	}
 	bodies := resp.Result.(BlockBodiesData)
@@ -281,59 +281,7 @@ func TestEthereumBody(t *testing.T) {
 			t.Fatal("numbers dont match")
 		}
 	}
-
-	// -- receipts --
-	/*
-		hash = types.DeriveSha(types.Receipts(receipts[0])).String()
-
-		ack = make(chan AckMessage, 1)
-		eth0.setHandler(hash, 1, ack)
-
-		if err := eth0.RequestReceipts(msg); err != nil {
-			t.Fatal(err)
-		}
-
-		resp = <-ack
-		if !resp.Complete {
-			t.Fatal("not completed")
-		}
-		receiptsResp := resp.Result.([][]*types.Receipt)
-		if len(receiptsResp) != len(batch) {
-			t.Fatal("receipts: length is not correct")
-		}
-		for indx, i := range batch {
-			// cumulativegasused is the index of the block to which the receipt belongs
-			if i != receiptsResp[indx][0].CumulativeGasUsed {
-				t.Fatal("error")
-			}
-		}
-	*/
 }
-
-/*
-func TestHandshakeMsgPostHandshake(t *testing.T) {
-	// After the handshake we dont accept more handshake messages
-	s0, s1 := network.TestServers(network.DefaultConfig())
-	eth0, _ := testEthHandshake(t, s0, &status, nil, s1, &status, nil)
-
-	if err := eth0.conn.WriteMsg(StatusMsg); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(500 * time.Millisecond)
-
-	// Check if they are still connected
-	p0 := s0.GetPeer(s1.ID().String())
-	if !p0.IsClosed() {
-		t.Fatal("p0 should be disconnected")
-	}
-
-	p1 := s1.GetPeer(s0.ID().String())
-	if !p1.IsClosed() {
-		t.Fatal("p1 should be disconnected")
-	}
-}
-*/
 
 func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
@@ -355,7 +303,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 
 	for indx, i := range cases {
 		go func(indx int, i uint64) {
-			h, err := eth0.RequestHeadersSync(context.Background(), i, 100)
+			h, err := eth0.RequestHeadersRangeSync(context.Background(), i, 100)
 			if err == nil {
 				if len(h) != 100 {
 					err = fmt.Errorf("length not correct")
@@ -390,7 +338,7 @@ func TestPeerEmptyResponseFails(t *testing.T) {
 
 	eth0, _ := testEthProtocol(t, b0, b1)
 
-	if _, err := eth0.RequestHeadersSync(context.Background(), 1100, 100); err == nil {
+	if _, err := eth0.RequestHeadersRangeSync(context.Background(), 1100, 100); err == nil {
 		t.Fatal("it should fail")
 	}
 
@@ -415,7 +363,7 @@ func TestPeerContextCancel(t *testing.T) {
 
 	errr := make(chan error, 1)
 	go func() {
-		_, err := eth0.RequestHeadersSync(ctx, 1100, 100)
+		_, err := eth0.RequestHeadersRangeSync(ctx, 1100, 100)
 		errr <- err
 	}()
 

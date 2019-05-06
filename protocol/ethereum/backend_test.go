@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"net"
@@ -8,57 +9,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/blockchain"
 )
-
-/*
-var status = &Status{
-	ProtocolVersion: 63,
-	NetworkID:       1,
-	TD:              big.NewInt(1),
-	CurrentBlock:    common.HexToHash("1"),
-	GenesisBlock:    common.HexToHash("1"),
-}
-
-func testEthHandshake(t *testing.T, s0 *network.Server, b0 *blockchain.Blockchain, s1 *network.Server, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
-	sts := func(b *blockchain.Blockchain) func() (*Status, error) {
-		return func() (*Status, error) {
-			s := status
-			s.CurrentBlock = b.Header().Hash()
-			return s, nil
-		}
-	}
-
-	var eth0 *Ethereum
-	c0 := func(conn net.Conn, p *network.Peer) protocol.Handler {
-		eth0 = NewEthereumProtocol(conn, p, sts(b0), b0)
-		return eth0
-	}
-
-	var eth1 *Ethereum
-	c1 := func(conn net.Conn, p *network.Peer) protocol.Handler {
-		eth1 = NewEthereumProtocol(conn, p, sts(b1), b1)
-		return eth1
-	}
-
-	s0.RegisterProtocol(protocol.ETH63, c0)
-	s1.RegisterProtocol(protocol.ETH63, c1)
-
-	if err := s0.Schedule(); err != nil {
-		t.Fatal(err)
-	}
-	if err := s1.Schedule(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := s0.DialSync(s1.Enode.String()); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(500 * time.Millisecond)
-	return eth0, eth1
-}
-*/
 
 func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ancestor *types.Header) {
 	b0 := blockchain.NewTestBlockchain(t, h0)
@@ -71,7 +24,11 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 
 	eth0, _ := ethPipe(b0, b1)
 
-	h, _, err := syncer.FindCommonAncestor(eth0)
+	height, err := eth0.fetchHeight(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, _, err := syncer.FindCommonAncestor(eth0, height)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,104 +83,73 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 	// TODO, ancestor with forked chain
 }
 
-/*
-func newTestPeer(id string, pending int) *Peer {
-	return &Peer{id: id, active: true, pending: pending, failed: 0}
-}
+func TestMaxConcurrentTasks(t *testing.T) {
+	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(1000))
 
-func dequeuePeer(t *testing.T, s *Backend) *Peer {
-	// dequeue peer without blocking
-	peer := make(chan *Peer, 1)
-	go func() {
-		p := s.dequeuePeer()
-		peer <- p
-	}()
+	b, err := NewBackend(nil, b0)
+	assert.NoError(t, err)
 
-	select {
-	case p := <-peer:
-		return p
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("it did not wake up")
-	}
+	peekCh := func(b *Backend) bool {
+		workerCh := make(chan *worker)
+		go func() {
+			w := b.peek()
+			workerCh <- w
+		}()
 
-	return nil
-}
-
-func expectDequeue(t *testing.T, s *Backend, id string) {
-	if found := dequeuePeer(t, s); found.id != id {
-		t.Fatalf("expected to dequeue %s but found %s", id, found.id)
-	}
-}
-
-func TestDequeueIncreasePending(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers)
-
-	s, err := NewBackend(1, b0, DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.peers["a"] = newTestPeer("a", 0)
-
-	expectDequeue(t, s, "a")
-	if pending := s.peers["a"].pending; pending != 1 {
-		t.Fatalf("pending should have been increased, expected 1 but found %d", pending)
-	}
-}
-
-func TestDequeuePeers(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers)
-
-	s, err := NewBackend(1, b0, DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.peers["a"] = newTestPeer("a", 0)
-	s.peers["b"] = newTestPeer("b", 3)
-
-	expectDequeue(t, s, "a")
-	expectDequeue(t, s, "a")
-	expectDequeue(t, s, "a")
-	expectDequeue(t, s, "a")
-	expectDequeue(t, s, "b")
-}
-
-func TestDequeuePeerWithAwake(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers)
-
-	s, err := NewBackend(1, b0, DefaultConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.peers["a"] = newTestPeer("a", 5)
-
-	peer := make(chan *Peer, 1)
-	go func() {
-		p := s.dequeuePeer()
-		peer <- p
-	}()
-
-	// awake peer a
-	s.ack(s.peers["a"], false)
-
-	select {
-	case p := <-peer:
-		if p.id != "a" {
-			t.Fatalf("wrong peer woke up, expected a but found %s", p.id)
+		select {
+		case <-workerCh:
+			return true
+		case <-time.After(10 * time.Millisecond):
+			return false
 		}
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("it did not wake up")
+	}
+
+	// Add enough peers to reach max concurrent tasks
+	for _, p := range []string{"1", "2", "3", "4"} {
+		b.addPeer(p, nil)
+	}
+	for i := 0; i < maxConcurrentTasks; i++ {
+		b.peek()
+	}
+
+	// No peek if maxConcurrentTasks reached
+	assert.False(t, peekCh(b))
+
+	b, err = NewBackend(nil, b0)
+	assert.NoError(t, err)
+
+	// Add enough peers to reach max concurrent tasks
+	for _, p := range []string{"1", "2"} {
+		b.addPeer(p, nil)
+	}
+	for i := 0; i < maxOutstandingRequests*2; i++ {
+		b.peek()
+	}
+
+	// No peek if all the peers are busy
+	assert.False(t, peekCh(b))
+}
+
+func TestPeerDequeueIncreaseOutstandingCount(t *testing.T) {
+	// Every new peek should increase the outstanding request count
+
+	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(1000))
+
+	b, err := NewBackend(nil, b0)
+	assert.NoError(t, err)
+
+	peers := map[string]int{}
+	for _, p := range []string{"1", "2"} {
+		b.addPeer(p, nil)
+		peers[p] = 1
+	}
+
+	for i := 0; i < maxOutstandingRequests*2; i++ {
+		w := b.peek()
+		assert.Equal(t, peers[w.id], w.outstanding)
+		peers[w.id]++
 	}
 }
-*/
 
 func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	h0, _ := b0.Header()
@@ -245,8 +171,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	}
 
 	conn0, conn1 := net.Pipe()
-	eth0 := NewEthereumProtocol(conn0, b0)
-	eth1 := NewEthereumProtocol(conn1, b1)
+	eth0 := NewEthereumProtocol("", conn0, b0)
+	eth1 := NewEthereumProtocol("", conn1, b1)
 
 	err := make(chan error)
 	go func() {
@@ -271,7 +197,7 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	st.CurrentBlock = h.Hash()
 	st.GenesisBlock = b.Genesis().Hash()
 
-	eth := NewEthereumProtocol(conn, b)
+	eth := NewEthereumProtocol("", conn, b)
 	if err := eth.Init(st); err != nil {
 		panic(err)
 	}
@@ -333,49 +259,4 @@ func TestBackendNotify(t *testing.T) {
 
 	fmt.Println("-- forks --")
 	fmt.Println(b.GetForks())
-}
-
-func TestBackendStuff(t *testing.T) {
-	h0 := blockchain.NewTestHeaderChain(10)
-	h1 := blockchain.NewTestHeaderFromChainWithSeed(h0[0:5], 10, 10)
-
-	b0 := blockchain.NewTestBlockchain(t, h0)
-	b1 := blockchain.NewTestBlockchain(t, h1)
-
-	eth0, _ := ethPipe(b0, b1)
-
-	b, err := NewBackend(nil, b0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	p1 := &PeerConnection{
-		conn:    eth0,
-		sched:   b,
-		id:      "1",
-		enabled: false, // stop from running
-	}
-	b.peers["1"] = p1
-
-	fmt.Println(b)
-
-	target, _ := b1.GetBlockByNumber(big.NewInt(11), true)
-	diff, _ := b1.GetTD(target.Hash())
-
-	b.notifyNewData(&NotifyMsg{
-		Block: target,
-		Peer:  p1,
-		Diff:  diff,
-	})
-
-	// The head has to be correct
-	if b.queue.head.String() != h1[4].Hash().String() {
-		t.Fatalf("bad")
-	}
-
-	// One of the forks is the fork between h0 and h1, since they dont have any
-	// difficulty during tests, they are a match and nothign changes
-	if b0.GetForks()[0].String() != h1[5].Hash().String() {
-		t.Fatal("bad")
-	}
 }

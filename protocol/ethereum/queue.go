@@ -168,7 +168,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	return nil
 }
 
-func (q *queue) updateFailedElem(peer string, id uint32, context string) error {
+func (q *queue) updateFailedElem(id uint32, context string) error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
