@@ -246,6 +246,13 @@ func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
 	return e.writeMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
 }
 
+// SendNewHash propagates a new block by hash and number
+func (e *Ethereum) SendNewHash(hash common.Hash, number uint64) error {
+	return e.writeMsg(NewBlockHashesMsg, []*announcement{
+		{hash, number},
+	})
+}
+
 func (e *Ethereum) sendStatus(status *Status) error {
 	return e.writeMsg(StatusMsg, status)
 }
@@ -535,17 +542,16 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	return nil
 }
 
-// newBlockHashesData is the network packet for the block announcements.
-type newBlockHashesData []struct {
-	Hash   common.Hash // Hash of one particular block being announced
-	Number uint64      // Number of one particular block being announced
+type announcement struct {
+	Hash   common.Hash
+	Number uint64
 }
 
 func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
 
 	fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
 
-	var announces newBlockHashesData
+	var announces []*announcement
 	if err := msg.Decode(&announces); err != nil {
 		panic(err)
 	}
@@ -710,7 +716,7 @@ func (e *Ethereum) RequestHeaderSync(ctx context.Context, origin uint64) (*types
 	}
 	resp := <-ack
 	if !resp.Completed() {
-		return nil, false, fmt.Errorf("failed")
+		return nil, false, resp.Error
 	}
 
 	response := resp.Result.([]*types.Header)
@@ -723,14 +729,19 @@ func (e *Ethereum) RequestHeaderSync(ctx context.Context, origin uint64) (*types
 	return response[0], true, nil
 }
 
+// RequestHeadersRangeSync requests a range of headers syncronously
+func (e *Ethereum) RequestHeadersRangeSync(ctx context.Context, origin uint64, count uint64) ([]*types.Header, error) {
+	return e.RequestHeadersSync(ctx, origin, 0, count)
+}
+
 // RequestHeadersSync requests headers and waits for the response
-func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, count uint64) ([]*types.Header, error) {
+func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, skip uint64, count uint64) ([]*types.Header, error) {
 	hash := strconv.Itoa(int(origin))
 
 	ack := make(chan AckMessage, 1)
 	e.setHandler(ctx, headerMsg, hash, ack)
 
-	if err := e.RequestHeadersByNumber(origin, count, 0, false); err != nil {
+	if err := e.RequestHeadersByNumber(origin, count, skip, false); err != nil {
 		return nil, err
 	}
 	resp := <-ack

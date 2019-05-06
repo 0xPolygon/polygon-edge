@@ -20,6 +20,7 @@ type Handler interface {
 // Backend is a protocol backend
 type Backend interface {
 	Protocol() Protocol
+	Run()
 	Add(conn net.Conn, peerID string) (Handler, error)
 }
 

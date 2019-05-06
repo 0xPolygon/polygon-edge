@@ -79,6 +79,7 @@ type Session struct {
 
 	Info       *Info
 	remoteInfo *Info
+	enode      *enode.Enode
 
 	isClient bool
 
@@ -159,6 +160,13 @@ func (s *Session) p2pHandshake() error {
 
 	s.stateLock = sync.Mutex{}
 	s.state = sessionEstablished
+
+	enodeStr := fmt.Sprintf("enode://%s@%s", s.id, s.RemoteAddr().String())
+	enode, err := enode.ParseURL(enodeStr)
+	if err != nil {
+		return err
+	}
+	s.enode = enode
 
 	return nil
 }
@@ -320,9 +328,7 @@ func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, er
 func (s *Session) GetInfo() common.Info {
 	info := common.Info{
 		Client: s.remoteInfo.Name,
-		Enode: &enode.Enode{
-			ID: enode.PubkeyToEnode(s.RemoteID),
-		},
+		Enode:  s.enode,
 	}
 	return info
 }
@@ -371,7 +377,7 @@ func (s *Session) recvLoop() error {
 		case msg.Code == discMsg:
 			msg := decodeDiscMsg(msg.Payload)
 
-			fmt.Printf("DISCONNECTED: %s\n", msg.String())
+			fmt.Printf("DISCONNECTED: %s %s\n", s.id, msg.String())
 			return msg
 		default:
 			s.handleStreamMessage(&msg)

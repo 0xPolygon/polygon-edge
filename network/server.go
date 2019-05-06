@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	peersFile = "peers.json"
+	peersFile          = "peers.json"
 	defaultDialTimeout = 10 * time.Second
-	defaultDialTasks = 15
+	defaultDialTasks   = 15
 )
 
 // Config is the p2p server configuration
@@ -236,19 +236,19 @@ func (p *PeriodicDial) ID() string {
 // -- DIALING --
 
 func (s *Server) dialTask(id string, tasks chan string) {
-	s.logger.Printf("Dial task %s running", id)
+	// s.logger.Printf("Dial task %s running", id)
 
 	for {
 		select {
 		case task := <-tasks:
-			s.logger.Printf("DIAL (%s): %s", id, task)
+			// s.logger.Printf("DIAL (%s): %s", id, task)
 
 			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				s.logger.Printf("Err %v", err)
+				// s.logger.Printf("Err %v", id, err)
 
 				if err.Error() == "too many peers" {
 					busy = true
