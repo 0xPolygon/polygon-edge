@@ -35,11 +35,50 @@ func numWords(n uint64) uint64 {
 	return (n + 31) / 32
 }
 
+func memoryGasCost(mem *Memory, newMemSize uint64) (uint64, error) {
+	if newMemSize == 0 {
+		return 0, nil
+	}
+
+	if newMemSize > 0xffffffffe0 {
+		return 0, ErrGasOverflow
+	}
+
+	newMemSizeWords := numWords(newMemSize)
+	newMemSize = newMemSizeWords * 32
+
+	if newMemSize > uint64(mem.Len()) {
+		square := newMemSizeWords * newMemSizeWords
+		linCoef := newMemSizeWords * MemoryGas
+		quadCoef := square / QuadCoeffDiv
+		newTotalFee := linCoef + quadCoef
+
+		fee := newTotalFee - mem.lastGasCost
+		mem.lastGasCost = newTotalFee
+
+		return fee, nil
+	}
+	return 0, nil
+}
+
+func (m *Memory) Set(offset, size uint64, value []byte) {
+	if size > 0 {
+		if offset+size > uint64(len(m.store)) {
+			panic("invalid memory: store empty")
+		}
+		copy(m.store[offset:offset+size], value)
+	}
+}
+
+func (m *Memory) ResizeOnly(size uint64) {
+	if uint64(m.Len()) < size {
+		m.store = append(m.store, make([]byte, size-uint64(m.Len()))...)
+	}
+}
+
 func (m *Memory) Resize(size uint64) (uint64, error) {
-	fee := uint64(0)
-
+	var fee uint64
 	if uint64(len(m.store)) < size {
-
 		// expand in slots of 32 bytes
 		words := numWords(size)
 		size = roundUpToWord(size)
@@ -57,7 +96,6 @@ func (m *Memory) Resize(size uint64) (uint64, error) {
 		}
 
 		m.lastGasCost = newTotalFee
-
 		m.store = append(m.store, make([]byte, size-uint64(len(m.store)))...)
 	}
 
@@ -104,29 +142,6 @@ func (m *Memory) Set32(o *big.Int, val *big.Int) (uint64, error) {
 
 	copy(m.store[offset:offset+32], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	math.ReadBits(val, m.store[offset:offset+32])
-	return gas, nil
-}
-
-func (m *Memory) Set(o *big.Int, l *big.Int, data []byte) (uint64, error) {
-	offset := o.Uint64()
-	length := l.Uint64()
-
-	// length is zero
-	if l.Sign() == 0 {
-		return 0, nil
-	}
-
-	size, overflow := bigUint64(big.NewInt(1).Add(o, l))
-	if overflow {
-		return 0, ErrMemoryOverflow
-	}
-
-	gas, err := m.Resize(size)
-	if err != nil {
-		return 0, err
-	}
-
-	copy(m.store[offset:offset+length], data)
 	return gas, nil
 }
 

@@ -214,11 +214,8 @@ type EVM struct {
 	CanTransfer CanTransferFunc
 	Transfer    TransferFunc
 
-	// returnData []byte
-
 	executor runtime.Executor
 	snapshot int
-	// precompiled map[common.Address]*precompiled.Precompiled
 }
 
 func (e *EVM) Run(c *runtime.Contract) ([]byte, uint64, error) {
@@ -806,7 +803,6 @@ func (c *Contract) sha3() error {
 
 	data, gas, err := c.memory.Get(offset, size)
 	if err != nil {
-
 		return err
 	}
 
@@ -817,17 +813,7 @@ func (c *Contract) sha3() error {
 	if gas, overflow = math.SafeAdd(gas, Sha3Gas); overflow {
 		return ErrGasOverflow
 	}
-
-	wordGas, overflow := bigUint64(size)
-	if overflow {
-		return ErrGasOverflow
-	}
-
-	if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
-		return ErrGasOverflow
-	}
-
-	if gas, overflow = math.SafeAdd(gas, wordGas); overflow {
+	if gas, overflow = calculateSha3GasCost(gas, size); overflow {
 		return ErrGasOverflow
 	}
 
@@ -837,76 +823,20 @@ func (c *Contract) sha3() error {
 	return nil
 }
 
-/*
-func (c *Contract) create(contract *Contract) ([]byte, error) {
-	// Check if its too deep
-	if c.Depth() > int(CallCreateDepth) {
-		return nil, ErrDepth
+func calculateSha3GasCost(gasCost uint64, size *big.Int) (uint64, bool) {
+	wordGas, overflow := bigUint64(size)
+	if overflow {
+		return 0, true
 	}
-
-	caller, address, value := contract.caller, contract.address, contract.value
-
-	// Check if the values can be transfered
-	if !c.evm.CanTransfer(c.evm.state, caller, value) {
-		return nil, ErrNotEnoughFunds
+	if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
+		return 0, true
 	}
-
-	// Increase the nonce of the caller
-	nonce := c.evm.state.GetNonce(caller)
-	c.evm.state.SetNonce(caller, nonce+1)
-
-	// Check for address collisions
-	contractHash := c.evm.state.GetCodeHash(address)
-	if c.evm.state.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
-		contract.consumeAllGas()
-		return nil, ErrContractAddressCollision
+	gasCost, overflow = math.SafeAdd(gasCost, wordGas)
+	if overflow {
+		return 0, true
 	}
-
-	// Take snapshot of the current state
-	contract.snapshot = c.evm.state.Snapshot()
-
-	// Create the new account for the contract
-	c.evm.state.CreateAccount(address)
-	if c.evm.config.EIP158 {
-		c.evm.state.SetNonce(address, 1)
-	}
-
-	// Transfer the value
-	if value != nil {
-		if err := c.evm.Transfer(c.evm.state, caller, address, value); err != nil {
-			return nil, ErrNotEnoughFunds
-		}
-	}
-
-	// run the code here
-	ret, err := contract.Run()
-
-	maxCodeSizeExceeded := c.evm.config.EIP158 && len(ret) > MaxCodeSize
-
-	if err == nil && !maxCodeSizeExceeded {
-		createDataGas := uint64(len(ret)) * params.CreateDataGas
-		if contract.consumeGas(createDataGas) {
-			c.evm.state.SetCode(address, ret)
-		} else {
-			err = vm.ErrCodeStoreOutOfGas
-		}
-	}
-
-	if maxCodeSizeExceeded || (err != nil && (c.evm.config.Homestead || err != vm.ErrCodeStoreOutOfGas)) {
-		c.evm.state.RevertToSnapshot(contract.snapshot)
-		if err != ErrExecutionReverted {
-			contract.consumeAllGas()
-		}
-	}
-
-	// Assign err if contract code size exceeds the max while the err is still empty.
-	if maxCodeSizeExceeded && err == nil {
-		err = ErrMaxCodeSizeExceeded
-	}
-
-	return ret, err
+	return gasCost, false
 }
-*/
 
 func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Address, error) {
 	var expected int
@@ -944,18 +874,9 @@ func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Add
 
 	gasParam := CreateGas
 	if op == CREATE2 {
-		// Need to add the sha3 gas cost
-		wordGas, overflow := bigUint64(size)
-		if overflow {
+		if gasCost, overflow = calculateSha3GasCost(gasCost, size); overflow {
 			return nil, common.Address{}, ErrGasOverflow
 		}
-		if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
-			return nil, common.Address{}, ErrGasOverflow
-		}
-		if gasCost, overflow = math.SafeAdd(gasCost, wordGas); overflow {
-			return nil, common.Address{}, ErrGasOverflow
-		}
-
 		gasParam = Create2Gas
 	}
 
@@ -1072,7 +993,7 @@ func (c *Contract) executeCallOperation(op OpCode) ([]byte, error) {
 
 	if err == nil || err == runtime.ErrExecutionReverted {
 		// TODO, change retOffset
-		c.memory.Set(big.NewInt(int64(contract.RetOffset)), big.NewInt(int64(contract.RetSize)), ret)
+		c.memory.Set(contract.RetOffset, contract.RetSize, ret)
 	}
 
 	c.gas += gas
@@ -1082,87 +1003,6 @@ func (c *Contract) executeCallOperation(op OpCode) ([]byte, error) {
 func (c *Contract) Depth() int {
 	return c.depth
 }
-
-/*
-// SetPrecompiled sets the precompiled contracts
-func (e *EVM) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
-	e.precompiled = precompiled
-}
-
-func (e *EVM) getPrecompiled(addr common.Address) (precompiled.Backend, bool) {
-	p, ok := e.precompiled[addr]
-	if !ok {
-		return nil, false
-	}
-	if p.ActiveAt > e.env.Number.Uint64() {
-		return nil, false
-	}
-	return p.Backend, true
-}
-*/
-
-/*
-func (c *Contract) call(contract *Contract, op OpCode) ([]byte, error) {
-	// Check if its too deep
-	if c.Depth() > int(CallCreateDepth) {
-		//fmt.Println("TOO DEEP")
-		return nil, ErrDepth
-	}
-
-	// Check if there is enough balance
-	if op == CALL || op == CALLCODE {
-		if !c.evm.CanTransfer(c.evm.state, contract.caller, contract.value) {
-			return nil, ErrNotEnoughFunds
-		}
-	}
-
-	contract.snapshot = c.evm.state.Snapshot()
-
-	precompiled, isPrecompiled := c.evm.getPrecompiled(contract.codeAddress)
-
-	if op == CALL {
-		if !c.evm.state.Exist(contract.address) {
-			if !isPrecompiled && c.evm.config.EIP158 && contract.value.Sign() == 0 {
-				// calling an unexisting account
-				return nil, nil
-			}
-
-			// Not sure why but the address has to be created for the precompiled contracts
-			c.evm.state.CreateAccount(contract.address)
-		}
-
-		// Try to transfer
-		if err := c.evm.Transfer(c.evm.state, contract.caller, contract.address, contract.value); err != nil {
-			return nil, err
-		}
-	}
-
-	var ret []byte
-	var err error
-
-	if isPrecompiled {
-		if !contract.consumeGas(precompiled.Gas(contract.input)) {
-			c.evm.state.RevertToSnapshot(contract.snapshot) // SKETCHY
-			contract.consumeAllGas()
-
-			return nil, ErrGasOverflow
-		}
-
-		ret, err = precompiled.Call(contract.input)
-	} else {
-		ret, err = contract.Run()
-	}
-
-	if err != nil {
-		c.evm.state.RevertToSnapshot(contract.snapshot)
-		if err != ErrExecutionReverted {
-			contract.consumeAllGas()
-		}
-	}
-
-	return ret, err
-}
-*/
 
 func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 	var expected int
@@ -1387,33 +1227,58 @@ func (c *Contract) executeExtCodeCopy() error {
 
 	address, memOffset, codeOffset, length := c.pop(), c.pop(), c.pop(), c.pop()
 
-	codeCopy := getSlice(c.evm.state.GetCode(common.BigToAddress(address)), codeOffset, length)
-
-	gas, err := c.memory.Set(memOffset, length, codeCopy)
-	if err != nil {
+	if err := c.memoryResize(c.evm.gasTable.ExtcodeCopy, memOffset, length); err != nil {
 		return err
 	}
 
-	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, c.evm.gasTable.ExtcodeCopy); overflow {
-		return ErrGasOverflow
+	codeCopy := getSlice(c.evm.state.GetCode(common.BigToAddress(address)), codeOffset, length)
+	c.memory.Set(memOffset.Uint64(), length.Uint64(), codeCopy)
+	return nil
+}
+
+func (c *Contract) memoryResize(gasPrice uint64, offset *big.Int, length *big.Int) error {
+	totalSize := big.NewInt(0)
+	if length.Sign() != 0 {
+		totalSize.Add(offset, length)
 	}
 
-	words, overflow := bigUint64(length)
+	// Check that the new size of the memory does not overflow
+	words, overflow := bigUint64(totalSize)
 	if overflow {
 		return ErrGasOverflow
 	}
 
+	// Check if there is enough gas to resize the memory
+	memorySize, overflow := math.SafeMul(numWords(words), 32)
+	if overflow {
+		return ErrGasOverflow
+	}
+	gas, err := memoryGasCost(c.memory, memorySize)
+	if err != nil {
+		return err
+	}
+
+	// Calculate the gas of the resize
+	if gas, overflow = math.SafeAdd(gas, gasPrice); overflow {
+		return ErrGasOverflow
+	}
+	words, overflow = bigUint64(length)
+	if overflow {
+		return ErrGasOverflow
+	}
 	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
-
 	if gas, overflow = math.SafeAdd(gas, words); overflow {
 		return ErrGasOverflow
 	}
-
 	if !c.consumeGas(gas) {
-		return ErrGasConsumed
+		return ErrGasOverflow
+	}
+
+	// Resize memory to length
+	if memorySize > 0 {
+		c.memory.ResizeOnly(memorySize)
 	}
 	return nil
 }
@@ -1425,59 +1290,34 @@ func (c *Contract) executeContextCopyOperations(op OpCode) error {
 	}
 
 	memOffset, dataOffset, length := c.pop(), c.pop(), c.pop()
+	if err := c.memoryResize(GasFastestStep, memOffset, length); err != nil {
+		return err
+	}
 
-	var gas uint64
-	var err error
+	var data []byte
 
 	switch op {
 	case CALLDATACOPY:
-		gas, err = c.memory.Set(memOffset, length, getSlice(c.input, dataOffset, length))
+		data = getSlice(c.input, dataOffset, length)
 
 	case RETURNDATACOPY:
 		if !c.evm.config.Byzantium {
 			return ErrOpcodeNotFound
 		}
-
 		end := big.NewInt(1).Add(dataOffset, length)
 		if end.BitLen() > 64 || uint64(len(c.returnData)) < end.Uint64() {
 			return fmt.Errorf("out of bounds")
 		}
-		gas, err = c.memory.Set(memOffset, length, c.returnData[dataOffset.Uint64():end.Uint64()])
+		data = c.returnData[dataOffset.Uint64():end.Uint64()]
 
 	case CODECOPY:
-		gas, err = c.memory.Set(memOffset, length, getSlice(c.code, dataOffset, length))
+		data = getSlice(c.code, dataOffset, length)
 
 	default:
 		return fmt.Errorf("copy bad opcode found: %s", op.String())
 	}
 
-	if err != nil {
-		return err
-	}
-
-	// calculate gas
-
-	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, GasFastestStep); overflow {
-		return ErrGasOverflow
-	}
-
-	words, overflow := bigUint64(length)
-	if overflow {
-		return ErrGasOverflow
-	}
-
-	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
-		return ErrGasOverflow
-	}
-
-	if gas, overflow = math.SafeAdd(gas, words); overflow {
-		return ErrGasOverflow
-	}
-
-	if !c.consumeGas(gas) {
-		return ErrGasOverflow
-	}
+	c.memory.Set(memOffset.Uint64(), length.Uint64(), data)
 	return nil
 }
 

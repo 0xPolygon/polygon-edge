@@ -17,7 +17,8 @@ func TestMemorySetResize(t *testing.T) {
 	m := newMemory(newTestContract([]byte{}))
 	data := mustDecode("0x123456")
 
-	m.Set(c(0), c(3), data)
+	m.Resize(0 + 3)
+	m.Set(0, 3, data)
 	expectLength(t, m, 32)
 
 	equalBytes(t, m.store, common.RightPadBytes(data, 32))
@@ -28,14 +29,16 @@ func TestMemorySetResize(t *testing.T) {
 	equalBytes(t, found, data)
 
 	// resize not necessary
-	m.Set(c(10), c(3), data)
+	m.Set(10, 3, data)
 	expectLength(t, m, 32)
 
-	m.Set(c(65), c(10), data)
+	m.Resize(65 + 10)
+	m.Set(65, 10, data)
 	expectLength(t, m, 96)
 
 	// take two more slots
-	m.Set(c(129), c(65), data)
+	m.Resize(129 + 65)
+	m.Set(129, 65, data)
 	expectLength(t, m, 224)
 }
 
