@@ -462,7 +462,8 @@ func (c *Contract) Run() ([]byte, error) {
 				vmerr = ErrStackUnderflow
 				goto END
 			}
-			c.push(c.peekAt(n))
+			val := c.peekAt(n)
+			c.push(big.NewInt(0).SetBytes(val.Bytes()))
 
 		// Swap operations
 
@@ -1499,6 +1500,16 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 		base, exponent := x, y
 
 		expByteLen := uint64((exponent.BitLen() + 7) / 8)
+		gas := expByteLen * c.evm.gasTable.ExpByte
+
+		var overflow bool
+		if gas, overflow = math.SafeAdd(gas, GasSlowStep); overflow {
+			return nil, ErrGasOverflow
+		}
+		if !c.consumeGas(gas) {
+			return nil, ErrGasConsumed
+		}
+
 		cmpToOne := exponent.Cmp(big.NewInt(1))
 
 		var res *big.Int
@@ -1511,17 +1522,6 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 		} else {
 			res = math.Exp(base, exponent)
 		}
-
-		gas := expByteLen * c.evm.gasTable.ExpByte
-		overflow := false
-
-		if gas, overflow = math.SafeAdd(gas, GasSlowStep); overflow {
-			return nil, ErrGasOverflow
-		}
-		if !c.consumeGas(gas) {
-			return nil, ErrGasConsumed
-		}
-
 		return res, nil
 
 	default:
