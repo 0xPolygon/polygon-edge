@@ -609,14 +609,19 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 
 		logs := txn.Logs()
 
-		// TODO, Only do commit pre-byzantine
-		ss, aux := txn.Commit(config.EIP155)
-		// txn = ss.Txn()
-		txn = state.NewTxn(b.state, ss)
-		root := aux
+		// Pre-Byzantium. Compute state root after each transaction. That root is included in the receipt
+		// of the transaction.
+		// Post-Byzantium. Compute one single state root after all the transactions.
+
+		var root []byte
 
 		if config.Byzantium {
-			root = []byte{}
+			// The suicided accounts are set as deleted for the next iteration
+			txn.CleanDeleteObjects(true)
+		} else {
+			ss, aux := txn.Commit(config.EIP155)
+			txn = state.NewTxn(b.state, ss)
+			root = aux
 		}
 
 		// Create receipt

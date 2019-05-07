@@ -433,7 +433,7 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
+func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*StateObject)
@@ -466,7 +466,7 @@ func (txn *Txn) cleanDeleteObjects(deleteEmptyObjects bool) {
 }
 
 func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
-	txn.cleanDeleteObjects(deleteEmptyObjects)
+	txn.CleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
 
