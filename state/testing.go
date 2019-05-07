@@ -225,7 +225,7 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 
 	assert.Equal(t, uint64(10), txn.GetNonce(addr1))
 
-	txn.cleanDeleteObjects(true)
+	txn.CleanDeleteObjects(true)
 	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
 
 	txn.Commit(true)
