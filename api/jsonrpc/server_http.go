@@ -3,36 +3,85 @@ package jsonrpc
 import (
 	"fmt"
 	"net"
+	"reflect"
+	"strconv"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/valyala/fasthttp"
 )
 
 // HTTPServer is an http server that serves jsonrpc requests
 type HTTPServer struct {
-	s    *Server
-	http *fasthttp.Server
+	logger hclog.Logger
+	s      *Server
+	http   *fasthttp.Server
 }
 
-// StartHTTP starts an http connection
-func StartHTTP(s *Server) {
-	lis, err := net.Listen("tcp", "localhost:8080")
+func startHTTPTransport(s *Server, logger hclog.Logger, config TransportConfig) (Transport, error) {
+	addr := "127.0.0.1"
+	port := 8080
+
+	addrRaw, ok := config["addr"]
+	if ok {
+		addr, ok = addrRaw.(string)
+		if !ok {
+			return nil, fmt.Errorf("could not convert addr '%s' to string", addrRaw)
+		}
+	}
+
+	var err error
+	portRaw, ok := config["port"]
+	if ok {
+		switch obj := portRaw.(type) {
+		case string:
+			port, err = strconv.Atoi(obj)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert port '%s' to int", portRaw)
+			}
+		case int:
+			port = obj
+		case float64:
+			port = int(obj)
+		default:
+			return nil, fmt.Errorf("could not parse port from '%s' of type %s", portRaw, reflect.TypeOf(portRaw).String())
+		}
+	}
+
+	ipAddr := net.ParseIP(addr)
+	if ipAddr == nil {
+		return nil, fmt.Errorf("could not parse addr '%s'", addr)
+	}
+
+	tcpAddr := net.TCPAddr{
+		IP:   ipAddr,
+		Port: port,
+	}
+	lis, err := net.Listen("tcp", tcpAddr.String())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	h := HTTPServer{
-		s: s,
+	httpLogger := logger.Named("JsonRPC-HTTP")
+	httpLogger.Info("Running", "addr", tcpAddr.String())
+
+	h := &HTTPServer{
+		logger: httpLogger,
+		s:      s,
 	}
-	if err := h.serve(lis); err != nil {
-		panic(err)
-	}
+	h.serve(lis)
+	return h, nil
 }
 
-func (h *HTTPServer) serve(lis net.Listener) error {
+func (h *HTTPServer) serve(lis net.Listener) {
 	h.http = &fasthttp.Server{
 		Handler: h.handler,
 	}
-	return h.http.Serve(lis)
+
+	go func() {
+		if err := h.http.Serve(lis); err != nil {
+			h.logger.Info("Jsonrpc http closed: %v", err)
+		}
+	}()
 }
 
 func (h *HTTPServer) handler(ctx *fasthttp.RequestCtx) {
@@ -49,7 +98,7 @@ func (h *HTTPServer) handler(ctx *fasthttp.RequestCtx) {
 	}
 }
 
-// Close closes the http server
+// Close implements the transport interface
 func (h *HTTPServer) Close() error {
 	return h.http.Shutdown()
 }

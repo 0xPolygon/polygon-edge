@@ -8,6 +8,7 @@ import (
 
 	"reflect"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/minimal"
 )
 
@@ -51,12 +52,32 @@ const (
 	serverWS
 )
 
+// NOTE: this names may change in the future
+
+var defaultTransports = map[serverType]TransportFactory{
+	serverHTTP: startHTTPTransport,
+	serverIPC:  startIPCTransport,
+}
+
+// TransportConfig is the configuration for each transport
+type TransportConfig map[string]interface{}
+
+// TransportFactory is a factory method to create transports
+type TransportFactory func(s *Server, logger hclog.Logger, config TransportConfig) (Transport, error)
+
+// Transport is a communication interface for the server
+type Transport interface {
+	// Close shutdowns the transport and closes any open connection
+	Close() error
+}
+
 // Server is an Ethereum server that handles jsonrpc requests
 type Server struct {
 	minimal          *minimal.Minimal
 	serviceMap       map[string]*serviceData
 	endpoints        endpoints
 	enabledEndpoints map[serverType]enabledEndpoints
+	transports       map[serverType]Transport
 }
 
 func newServer() *Server {
