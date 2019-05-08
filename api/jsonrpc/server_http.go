@@ -44,7 +44,7 @@ func (h *HTTPServer) handler(ctx *fasthttp.RequestCtx) {
 		fmt.Fprintf(ctx, "method %s not allowed", ctx.Method())
 		return
 	}
-	if _, err := h.s.handle(ctx.PostBody()); err != nil {
+	if _, err := h.s.handle(serverHTTP, ctx.PostBody()); err != nil {
 		fmt.Fprintf(ctx, err.Error())
 	}
 }
