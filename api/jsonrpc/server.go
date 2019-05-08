@@ -8,6 +8,7 @@ import (
 
 	"reflect"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/minimal"
 )
 
@@ -51,22 +52,56 @@ const (
 	serverWS
 )
 
+// NOTE: this names may change in the future
+
+var defaultTransports = map[serverType]TransportFactory{
+	serverHTTP: startHTTPTransport,
+	serverIPC:  startIPCTransport,
+}
+
+// TransportConfig is the configuration for each transport
+type TransportConfig map[string]interface{}
+
+// TransportFactory is a factory method to create transports
+type TransportFactory func(s *Server, logger hclog.Logger, config TransportConfig) (Transport, error)
+
+// Transport is a communication interface for the server
+type Transport interface {
+	// Close shutdowns the transport and closes any open connection
+	Close() error
+}
+
 // Server is an Ethereum server that handles jsonrpc requests
 type Server struct {
 	minimal          *minimal.Minimal
 	serviceMap       map[string]*serviceData
 	endpoints        endpoints
 	enabledEndpoints map[serverType]enabledEndpoints
+	transports       map[serverType]Transport
 }
 
 func newServer() *Server {
-	s := &Server{}
+	s := &Server{
+		enabledEndpoints: map[serverType]enabledEndpoints{},
+	}
 
 	s.enabledEndpoints[serverIPC] = enabledEndpoints{}
 	s.enabledEndpoints[serverHTTP] = enabledEndpoints{}
 	s.enabledEndpoints[serverWS] = enabledEndpoints{}
 
 	return s
+}
+
+func (s *Server) disableEndpoints(typ serverType, endpoints []string) {
+	for _, i := range endpoints {
+		delete(s.enabledEndpoints[typ], i)
+	}
+}
+
+func (s *Server) enableEndpoints(typ serverType, endpoints []string) {
+	for _, i := range endpoints {
+		s.enabledEndpoints[typ][i] = struct{}{}
+	}
 }
 
 func (s *Server) registerEndpoints() {
@@ -79,7 +114,34 @@ func (s *Server) registerEndpoints() {
 	s.registerService("web3", s.endpoints.Web3)
 }
 
-func (s *Server) handle(reqBody []byte) ([]byte, error) {
+func (s *Server) getFnHandler(typ serverType, req Request, params int) (*serviceData, *funcData, error) {
+	callName := strings.SplitN(req.Method, "_", 2)
+	if len(callName) != 2 {
+		return nil, nil, invalidMethod(req.Method)
+	}
+
+	serviceName, funcName := callName[0], callName[1]
+
+	// check that the serviceName is enabled for this source
+	if _, ok := s.enabledEndpoints[typ][serviceName]; !ok {
+		return nil, nil, invalidMethod(req.Method)
+	}
+
+	service, ok := s.serviceMap[serviceName]
+	if !ok {
+		return nil, nil, invalidMethod(req.Method)
+	}
+	fd, ok := service.funcMap[funcName]
+	if !ok {
+		return nil, nil, invalidMethod(req.Method)
+	}
+	if params != fd.inNum-1 {
+		return nil, nil, invalidArguments(req.Method)
+	}
+	return service, fd, nil
+}
+
+func (s *Server) handle(typ serverType, reqBody []byte) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
@@ -89,23 +151,9 @@ func (s *Server) handle(reqBody []byte) ([]byte, error) {
 		return nil, invalidJSONRequest
 	}
 
-	callName := strings.SplitN(req.Method, "_", 2)
-	if len(callName) != 2 {
-		return nil, invalidMethod(req.Method)
-	}
-
-	serviceName, funcName := callName[0], callName[1]
-	service, ok := s.serviceMap[serviceName]
-	if !ok {
-		return nil, invalidMethod(req.Method)
-	}
-	fd, ok := service.funcMap[funcName]
-	if !ok {
-		return nil, invalidMethod(req.Method)
-	}
-
-	if len(params) != fd.inNum-1 {
-		return nil, invalidArguments(req.Method)
+	service, fd, err := s.getFnHandler(typ, req, len(params))
+	if err != nil {
+		return nil, err
 	}
 
 	inArgs := make([]reflect.Value, fd.inNum)
@@ -120,7 +168,7 @@ func (s *Server) handle(reqBody []byte) ([]byte, error) {
 	}
 
 	output := fd.fv.Call(inArgs)
-	err := getError(output[1])
+	err = getError(output[1])
 	if err != nil {
 		return nil, internalError
 	}
@@ -145,6 +193,9 @@ func (s *Server) handle(reqBody []byte) ([]byte, error) {
 }
 
 func (s *Server) registerService(serviceName string, service interface{}) {
+	if s.serviceMap == nil {
+		s.serviceMap = map[string]*serviceData{}
+	}
 	if serviceName == "" {
 		panic(fmt.Sprintf("jsonrpc: serviceName cannot be empty"))
 	}
