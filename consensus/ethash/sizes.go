@@ -2,8 +2,6 @@ package ethash
 
 const maxEpoch = 2048
 
-// datasetSizes is a lookup table for the ethash dataset size for the first 2048
-// epochs (i.e. 61440000 blocks).
 var datasetSizes = [maxEpoch]uint64{
 	1073739904, 1082130304, 1090514816, 1098906752, 1107293056,
 	1115684224, 1124070016, 1132461952, 1140849536, 1149232768,
@@ -416,8 +414,6 @@ var datasetSizes = [maxEpoch]uint64{
 	18186498944, 18194886784, 18203275648, 18211666048, 18220048768,
 	18228444544, 18236833408, 18245220736}
 
-// cacheSizes is a lookup table for the ethash verification cache size for the
-// first 2048 epochs (i.e. 61440000 blocks).
 var cacheSizes = [maxEpoch]uint64{
 	16776896, 16907456, 17039296, 17170112, 17301056, 17432512, 17563072,
 	17693888, 17824192, 17955904, 18087488, 18218176, 18349504, 18481088,
