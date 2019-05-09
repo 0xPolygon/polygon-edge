@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestServer(endpoints ...string) *Server {
-	s := newServer()
+func newTestDispatcher(endpoints ...string) *Dispatcher {
+	s := newDispatcher()
 	s.registerEndpoints()
 	s.enableEndpoints(serverHTTP, endpoints)
 	return s
@@ -49,7 +49,7 @@ func expectJSONResult(data []byte, v interface{}) error {
 }
 
 func TestServerEnableEndpoints(t *testing.T) {
-	s := newServer()
+	s := newDispatcher()
 	s.registerEndpoints()
 
 	req := []byte(`{

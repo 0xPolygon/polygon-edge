@@ -8,7 +8,7 @@ import (
 
 // Web3 is the web3 jsonrpc endpoint
 type Web3 struct {
-	s *Server
+	d *Dispatcher
 }
 
 // ClientVersion returns the current client version

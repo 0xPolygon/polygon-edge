@@ -2,7 +2,7 @@ package jsonrpc
 
 // Net is the net jsonrpc endpoint
 type Net struct {
-	s *Server
+	d *Dispatcher
 }
 
 // Version returns the current network id

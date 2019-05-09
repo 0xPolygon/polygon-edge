@@ -7,7 +7,7 @@ import (
 
 // Eth is the eth jsonrpc endpoint
 type Eth struct {
-	s *Server
+	d *Dispatcher
 }
 
 // GetBlockByNumber returns information about a block by block number
@@ -21,7 +21,7 @@ func (e *Eth) GetBlockByNumber(blockNumber string, full bool) (interface{}, erro
 	}
 
 	// TODO, show full blocks
-	header, _ := e.s.minimal.Blockchain.GetHeaderByNumber(big.NewInt(int64(block)))
+	header, _ := e.d.minimal.Blockchain.GetHeaderByNumber(big.NewInt(int64(block)))
 	return header, nil
 }
 

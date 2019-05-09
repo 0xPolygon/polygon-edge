@@ -13,11 +13,11 @@ import (
 // HTTPServer is an http server that serves jsonrpc requests
 type HTTPServer struct {
 	logger hclog.Logger
-	s      *Server
+	d      *Dispatcher
 	http   *fasthttp.Server
 }
 
-func startHTTPTransport(s *Server, logger hclog.Logger, config TransportConfig) (Transport, error) {
+func startHTTPServer(d *Dispatcher, logger hclog.Logger, config ServerConfig) (Server, error) {
 	addr := "127.0.0.1"
 	port := 8080
 
@@ -66,7 +66,7 @@ func startHTTPTransport(s *Server, logger hclog.Logger, config TransportConfig) 
 
 	h := &HTTPServer{
 		logger: httpLogger,
-		s:      s,
+		d:      d,
 	}
 	h.serve(lis)
 	return h, nil
@@ -93,7 +93,7 @@ func (h *HTTPServer) handler(ctx *fasthttp.RequestCtx) {
 		fmt.Fprintf(ctx, "method %s not allowed", ctx.Method())
 		return
 	}
-	if _, err := h.s.handle(serverHTTP, ctx.PostBody()); err != nil {
+	if _, err := h.d.handle(serverHTTP, ctx.PostBody()); err != nil {
 		fmt.Fprintf(ctx, err.Error())
 	}
 }
