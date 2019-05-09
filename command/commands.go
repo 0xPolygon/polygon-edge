@@ -30,5 +30,20 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
+		"peers": func() (cli.Command, error) {
+			return &PeersCommand{
+				Meta: meta,
+			}, nil
+		},
+		"peers list": func() (cli.Command, error) {
+			return &PeersListCommand{
+				Meta: meta,
+			}, nil
+		},
+		"peers info": func() (cli.Command, error) {
+			return &PeersInfoCommand{
+				Meta: meta,
+			}, nil
+		},
 	}
 }

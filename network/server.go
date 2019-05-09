@@ -148,6 +148,18 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 	return s
 }
 
+// GetPeers returns a copy of list of peers
+func (s *Server) GetPeers() []string {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	ids := []string{}
+	for id := range s.peers {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (s *Server) buildInfo() {
 	info := &common.Info{
 		Client: s.Name,
@@ -320,6 +332,19 @@ func (s *Server) Dial(enode string) {
 // DialSync dials and waits for the result
 func (s *Server) DialSync(enode string) error {
 	return s.connectWithEnode(enode)
+}
+
+// GetPeerByPrefix searches a peer by his prefix
+func (s *Server) GetPeerByPrefix(search string) (*Peer, bool) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	for id, peer := range s.peers {
+		if strings.HasPrefix(id, search) {
+			return peer, true
+		}
+	}
+	return nil, false
 }
 
 func (s *Server) GetPeer(id string) *Peer {

@@ -62,6 +62,11 @@ func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
 	return peer
 }
 
+// GetProtocols returns all the protocols of the peer
+func (p *Peer) GetProtocols() []*common.Instance {
+	return p.protocols
+}
+
 // GetProtocol returns the protocol by name
 func (p *Peer) GetProtocol(name string) (*common.Instance, bool) {
 	for _, i := range p.protocols {
