@@ -14,7 +14,7 @@ func TestEthEndpointGetBlockByNumber(t *testing.T) {
 	minimal := &minimal.Minimal{
 		Blockchain: blockchain,
 	}
-	s := newTestServer("eth")
+	s := newTestDispatcher("eth")
 	s.minimal = minimal
 
 	resp, err := s.handle(serverHTTP, []byte(`{

@@ -7,7 +7,7 @@ import (
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	s := newTestServer("web3")
+	s := newTestDispatcher("web3")
 
 	resp, err := s.handle(serverHTTP, []byte(`{
 		"method": "web3_sha3",

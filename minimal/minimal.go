@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/chain"
 
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -37,6 +39,7 @@ type Minimal struct {
 	Blockchain *blockchain.Blockchain
 	Key        *ecdsa.PrivateKey
 	chain      *chain.Chain
+	apis       []api.API
 }
 
 func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
@@ -45,6 +48,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		config:    config,
 		sealingCh: make(chan bool, 1),
 		backends:  []protocol.Backend{},
+		apis:      []api.API{},
 		chain:     config.Chain,
 	}
 
@@ -193,6 +197,29 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		}
 	}
 
+	// TODO, move this logger to minimal
+	hcLogger := hclog.New(&hclog.LoggerOptions{
+		Level: hclog.LevelFromString("INFO"),
+	})
+
+	fmt.Println("-- api backend --")
+	fmt.Println(config.APIEntries)
+
+	// Start api backends
+	for name, entry := range config.APIEntries {
+		backend, ok := config.APIBackends[name]
+		if !ok {
+			return nil, fmt.Errorf("api '%s' not found", name)
+		}
+
+		fmt.Println("-- move more -")
+		api, err := backend(hcLogger, m, entry.Config)
+		if err != nil {
+			return nil, err
+		}
+		m.apis = append(m.apis, api)
+	}
+
 	if err := m.server.Schedule(); err != nil {
 		return nil, err
 	}
@@ -206,6 +233,13 @@ func (m *Minimal) Chain() *chain.Chain {
 
 func (m *Minimal) Close() {
 	m.server.Close()
+
+	// TODO, close the backends
+
+	// close the apis
+	for _, i := range m.apis {
+		i.Close()
+	}
 }
 
 func pubkeyToAddress(p ecdsa.PublicKey) common.Address {

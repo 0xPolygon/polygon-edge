@@ -9,7 +9,7 @@ import (
 
 const defaultIPCPath = "/tmp/minimal.ipc"
 
-func startIPCTransport(server *Server, logger hclog.Logger, config TransportConfig) (Transport, error) {
+func startIPCServer(d *Dispatcher, logger hclog.Logger, config ServerConfig) (Server, error) {
 	path := defaultIPCPath
 
 	pathRaw, ok := config["path"]
@@ -30,7 +30,7 @@ func startIPCTransport(server *Server, logger hclog.Logger, config TransportConf
 
 	h := &HTTPServer{
 		logger: ipcLogger,
-		s:      server,
+		d:      d,
 	}
 	h.serve(lis)
 	return h, nil

@@ -8,7 +8,6 @@ import (
 
 	"reflect"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/minimal"
 )
 
@@ -44,77 +43,50 @@ type endpoints struct {
 
 type enabledEndpoints map[string]struct{}
 
-type serverType int
-
-const (
-	serverIPC serverType = iota
-	serverHTTP
-	serverWS
-)
-
-// NOTE: this names may change in the future
-
-var defaultTransports = map[serverType]TransportFactory{
-	serverHTTP: startHTTPTransport,
-	serverIPC:  startIPCTransport,
-}
-
-// TransportConfig is the configuration for each transport
-type TransportConfig map[string]interface{}
-
-// TransportFactory is a factory method to create transports
-type TransportFactory func(s *Server, logger hclog.Logger, config TransportConfig) (Transport, error)
-
-// Transport is a communication interface for the server
-type Transport interface {
-	// Close shutdowns the transport and closes any open connection
-	Close() error
-}
-
-// Server is an Ethereum server that handles jsonrpc requests
-type Server struct {
+// Dispatcher handles jsonrpc requests
+type Dispatcher struct {
 	minimal          *minimal.Minimal
 	serviceMap       map[string]*serviceData
 	endpoints        endpoints
 	enabledEndpoints map[serverType]enabledEndpoints
-	transports       map[serverType]Transport
 }
 
-func newServer() *Server {
-	s := &Server{
+func newDispatcher() *Dispatcher {
+	d := &Dispatcher{
 		enabledEndpoints: map[serverType]enabledEndpoints{},
 	}
 
-	s.enabledEndpoints[serverIPC] = enabledEndpoints{}
-	s.enabledEndpoints[serverHTTP] = enabledEndpoints{}
-	s.enabledEndpoints[serverWS] = enabledEndpoints{}
+	d.enabledEndpoints[serverIPC] = enabledEndpoints{}
+	d.enabledEndpoints[serverHTTP] = enabledEndpoints{}
+	d.enabledEndpoints[serverWS] = enabledEndpoints{}
 
-	return s
+	d.registerEndpoints()
+	return d
 }
 
-func (s *Server) disableEndpoints(typ serverType, endpoints []string) {
+func (d *Dispatcher) disableEndpoints(typ serverType, endpoints []string) {
 	for _, i := range endpoints {
-		delete(s.enabledEndpoints[typ], i)
+		delete(d.enabledEndpoints[typ], i)
 	}
 }
 
-func (s *Server) enableEndpoints(typ serverType, endpoints []string) {
+func (d *Dispatcher) enableEndpoints(typ serverType, endpoints []string) {
 	for _, i := range endpoints {
-		s.enabledEndpoints[typ][i] = struct{}{}
+		d.enabledEndpoints[typ][i] = struct{}{}
 	}
 }
 
-func (s *Server) registerEndpoints() {
-	s.endpoints.Eth = &Eth{s}
-	s.endpoints.Net = &Net{s}
-	s.endpoints.Web3 = &Web3{s}
+func (d *Dispatcher) registerEndpoints() {
+	d.endpoints.Eth = &Eth{d}
+	d.endpoints.Net = &Net{d}
+	d.endpoints.Web3 = &Web3{d}
 
-	s.registerService("eth", s.endpoints.Eth)
-	s.registerService("net", s.endpoints.Net)
-	s.registerService("web3", s.endpoints.Web3)
+	d.registerService("eth", d.endpoints.Eth)
+	d.registerService("net", d.endpoints.Net)
+	d.registerService("web3", d.endpoints.Web3)
 }
 
-func (s *Server) getFnHandler(typ serverType, req Request, params int) (*serviceData, *funcData, error) {
+func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*serviceData, *funcData, error) {
 	callName := strings.SplitN(req.Method, "_", 2)
 	if len(callName) != 2 {
 		return nil, nil, invalidMethod(req.Method)
@@ -123,11 +95,11 @@ func (s *Server) getFnHandler(typ serverType, req Request, params int) (*service
 	serviceName, funcName := callName[0], callName[1]
 
 	// check that the serviceName is enabled for this source
-	if _, ok := s.enabledEndpoints[typ][serviceName]; !ok {
+	if _, ok := d.enabledEndpoints[typ][serviceName]; !ok {
 		return nil, nil, invalidMethod(req.Method)
 	}
 
-	service, ok := s.serviceMap[serviceName]
+	service, ok := d.serviceMap[serviceName]
 	if !ok {
 		return nil, nil, invalidMethod(req.Method)
 	}
@@ -141,7 +113,7 @@ func (s *Server) getFnHandler(typ serverType, req Request, params int) (*service
 	return service, fd, nil
 }
 
-func (s *Server) handle(typ serverType, reqBody []byte) ([]byte, error) {
+func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
@@ -151,7 +123,7 @@ func (s *Server) handle(typ serverType, reqBody []byte) ([]byte, error) {
 		return nil, invalidJSONRequest
 	}
 
-	service, fd, err := s.getFnHandler(typ, req, len(params))
+	service, fd, err := d.getFnHandler(typ, req, len(params))
 	if err != nil {
 		return nil, err
 	}
@@ -192,9 +164,9 @@ func (s *Server) handle(typ serverType, reqBody []byte) ([]byte, error) {
 	return respBytes, nil
 }
 
-func (s *Server) registerService(serviceName string, service interface{}) {
-	if s.serviceMap == nil {
-		s.serviceMap = map[string]*serviceData{}
+func (d *Dispatcher) registerService(serviceName string, service interface{}) {
+	if d.serviceMap == nil {
+		d.serviceMap = map[string]*serviceData{}
 	}
 	if serviceName == "" {
 		panic(fmt.Sprintf("jsonrpc: serviceName cannot be empty"))
@@ -225,7 +197,7 @@ func (s *Server) registerService(serviceName string, service interface{}) {
 		funcMap[name] = fd
 	}
 
-	s.serviceMap[serviceName] = &serviceData{
+	d.serviceMap[serviceName] = &serviceData{
 		sv:      reflect.ValueOf(service),
 		funcMap: funcMap,
 	}
@@ -275,7 +247,7 @@ func isErrorType(t reflect.Type) bool {
 	return t.Implements(errt)
 }
 
-func (s *Server) funcExample(b string) (interface{}, error) {
+func (d *Dispatcher) funcExample(b string) (interface{}, error) {
 	return nil, nil
 }
 

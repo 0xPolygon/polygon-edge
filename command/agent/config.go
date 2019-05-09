@@ -23,6 +23,7 @@ type Config struct {
 	Protocols  map[string]BackendConfig `json:"protocols"`
 	Discovery  map[string]BackendConfig `json:"discovery"`
 	Consensus  BackendConfig            `json:"consensus"`
+	API        map[string]BackendConfig `json:"api"`
 }
 
 type Telemetry struct {
@@ -46,6 +47,7 @@ func DefaultConfig() *Config {
 		Protocols: map[string]BackendConfig{},
 		Discovery: map[string]BackendConfig{},
 		Consensus: BackendConfig{},
+		API:       map[string]BackendConfig{},
 	}
 }
 

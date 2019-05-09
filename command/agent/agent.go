@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/minimal/keystore"
@@ -33,6 +34,8 @@ import (
 	protocolEthereum "github.com/umbracle/minimal/protocol/ethereum"
 
 	storageLevelDB "github.com/umbracle/minimal/blockchain/storage/leveldb"
+
+	apiJsonRPC "github.com/umbracle/minimal/api/jsonrpc"
 )
 
 var blockchainBackends = map[string]storage.Factory{
@@ -52,6 +55,10 @@ var discoveryBackends = map[string]discovery.Factory{
 
 var protocolBackends = map[string]protocol.Factory{
 	"ethereum": protocolEthereum.Factory,
+}
+
+var apiBackends = map[string]api.Factory{
+	"jsonrpc": apiJsonRPC.Factory,
 }
 
 // Agent is a long running daemon that is used to run
@@ -128,6 +135,20 @@ func (a *Agent) Start() error {
 		Config: a.config.Consensus,
 	}
 
+	// api backends
+	apiEntries := map[string]*minimal.Entry{}
+	for name, conf := range a.config.API {
+		apiEntries[name] = &minimal.Entry{
+			Config: conf,
+		}
+	}
+	// jsonrpc api set by default, can be disabled explicitely on the configuration
+	if _, ok := apiEntries["jsonrpc"]; !ok {
+		apiEntries["jsonrpc"] = &minimal.Entry{
+			Config: map[string]interface{}{},
+		}
+	}
+
 	config := &minimal.Config{
 		Keystore:    keystore.NewLocalKeystore(a.config.DataDir),
 		Chain:       chain,
@@ -148,6 +169,9 @@ func (a *Agent) Start() error {
 
 		ConsensusBackends: consensusBackends,
 		ConsensusEntry:    consensusEntry,
+
+		APIBackends: apiBackends,
+		APIEntries:  apiEntries,
 	}
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
