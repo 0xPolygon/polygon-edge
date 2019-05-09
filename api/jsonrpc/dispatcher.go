@@ -60,6 +60,7 @@ func newDispatcher() *Dispatcher {
 	d.enabledEndpoints[serverHTTP] = enabledEndpoints{}
 	d.enabledEndpoints[serverWS] = enabledEndpoints{}
 
+	d.registerEndpoints()
 	return d
 }
 

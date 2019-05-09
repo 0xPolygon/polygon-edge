@@ -1,6 +1,7 @@
 package minimal
 
 import (
+	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
@@ -22,6 +23,9 @@ type Config struct {
 
 	ConsensusBackends map[string]consensus.Factory
 	ConsensusEntry    *Entry
+
+	APIBackends map[string]api.Factory
+	APIEntries  map[string]*Entry
 
 	Keystore keystore.Keystore
 	Chain    *chain.Chain
