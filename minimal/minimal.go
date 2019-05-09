@@ -201,18 +201,12 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	hcLogger := hclog.New(&hclog.LoggerOptions{
 		Level: hclog.LevelFromString("INFO"),
 	})
-
-	fmt.Println("-- api backend --")
-	fmt.Println(config.APIEntries)
-
 	// Start api backends
 	for name, entry := range config.APIEntries {
 		backend, ok := config.APIBackends[name]
 		if !ok {
 			return nil, fmt.Errorf("api '%s' not found", name)
 		}
-
-		fmt.Println("-- move more -")
 		api, err := backend(hcLogger, m, entry.Config)
 		if err != nil {
 			return nil, err
@@ -224,6 +218,11 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+// Server returns the p2p server
+func (m *Minimal) Server() *network.Server {
+	return m.server
 }
 
 // Chain returns the chain object of the client

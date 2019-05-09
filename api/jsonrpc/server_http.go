@@ -3,11 +3,15 @@ package jsonrpc
 import (
 	"fmt"
 	"net"
-	"reflect"
-	"strconv"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/api"
 	"github.com/valyala/fasthttp"
+)
+
+const (
+	defaultHTTAddr  = "127.0.0.1"
+	defaultPortAddr = 8545
 )
 
 // HTTPServer is an http server that serves jsonrpc requests
@@ -18,43 +22,9 @@ type HTTPServer struct {
 }
 
 func startHTTPServer(d *Dispatcher, logger hclog.Logger, config ServerConfig) (Server, error) {
-	addr := "127.0.0.1"
-	port := 8545
-
-	addrRaw, ok := config["addr"]
-	if ok {
-		addr, ok = addrRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("could not convert addr '%s' to string", addrRaw)
-		}
-	}
-
-	var err error
-	portRaw, ok := config["port"]
-	if ok {
-		switch obj := portRaw.(type) {
-		case string:
-			port, err = strconv.Atoi(obj)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert port '%s' to int", portRaw)
-			}
-		case int:
-			port = obj
-		case float64:
-			port = int(obj)
-		default:
-			return nil, fmt.Errorf("could not parse port from '%s' of type %s", portRaw, reflect.TypeOf(portRaw).String())
-		}
-	}
-
-	ipAddr := net.ParseIP(addr)
-	if ipAddr == nil {
-		return nil, fmt.Errorf("could not parse addr '%s'", addr)
-	}
-
-	tcpAddr := net.TCPAddr{
-		IP:   ipAddr,
-		Port: port,
+	tcpAddr, err := api.ReadAddrFromConfig(defaultHTTAddr, defaultPortAddr, config)
+	if err != nil {
+		return nil, err
 	}
 	lis, err := net.Listen("tcp", tcpAddr.String())
 	if err != nil {

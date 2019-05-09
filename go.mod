@@ -6,6 +6,7 @@ require (
 	github.com/allegro/bigcache v1.2.0 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190409235741-55bc7be9dd31 // indirect
 	github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
+	github.com/buaazp/fasthttprouter v0.1.1 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgraph-io/badger v1.5.5-0.20190226225317-8115aed38f8f
 	github.com/edsrzf/mmap-go v1.0.0
