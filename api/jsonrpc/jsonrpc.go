@@ -63,16 +63,7 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 			return nil, err
 		}
 
-		fmt.Println("-- conf --")
-		fmt.Println(conf)
-		fmt.Println(endpoints)
-		fmt.Println(disabled)
-		fmt.Println(endpoints)
-
 		if !disabled {
-
-			fmt.Println("-- start server --")
-
 			server, err := f(dispatcher, logger, conf)
 			if err != nil {
 				return nil, err

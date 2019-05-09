@@ -35,6 +35,7 @@ import (
 
 	storageLevelDB "github.com/umbracle/minimal/blockchain/storage/leveldb"
 
+	apiHTTP "github.com/umbracle/minimal/api/http"
 	apiJsonRPC "github.com/umbracle/minimal/api/jsonrpc"
 )
 
@@ -59,6 +60,7 @@ var protocolBackends = map[string]protocol.Factory{
 
 var apiBackends = map[string]api.Factory{
 	"jsonrpc": apiJsonRPC.Factory,
+	"http":    apiHTTP.Factory,
 }
 
 // Agent is a long running daemon that is used to run
@@ -145,6 +147,12 @@ func (a *Agent) Start() error {
 	// jsonrpc api set by default, can be disabled explicitely on the configuration
 	if _, ok := apiEntries["jsonrpc"]; !ok {
 		apiEntries["jsonrpc"] = &minimal.Entry{
+			Config: map[string]interface{}{},
+		}
+	}
+	// http set by default
+	if _, ok := apiEntries["http"]; !ok {
+		apiEntries["http"] = &minimal.Entry{
 			Config: map[string]interface{}{},
 		}
 	}
