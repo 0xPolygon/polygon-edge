@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
@@ -15,11 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/consensus/ethash"
-	"github.com/umbracle/minimal/state"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/state"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -95,7 +97,11 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		fakePow = false
 	}
 
-	engine := ethash.NewEthHash(params, fakePow)
+	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: params})
+	if fakePow {
+		engine.(*ethash.Ethash).SetFakePow()
+	}
+
 	genesis := c.buildGenesis()
 
 	st := trie.NewState(trie.NewMemoryStorage())

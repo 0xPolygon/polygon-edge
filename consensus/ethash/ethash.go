@@ -3,140 +3,161 @@ package ethash
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
-	"runtime"
-	"sync"
 	"time"
-
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/state"
 )
 
 var (
-	errLargeBlockTime    = errors.New("timestamp too big")
-	errTooManyUncles     = errors.New("too many uncles")
-	errInvalidDifficulty = errors.New("non-positive difficulty")
-	errInvalidMixDigest  = errors.New("invalid mix digest")
-	errInvalidPoW        = errors.New("invalid proof-of-work")
-	errFutureBlock       = errors.New("future block")
+	two256 = new(big.Int).Exp(big.NewInt(2), big.NewInt(256), big.NewInt(0))
 )
 
-var (
-	// FrontierBlockReward is the block reward in wei for successfully mining a block
-	FrontierBlockReward = big.NewInt(5e+18)
-	// ByzantiumBlockReward is the block reward in wei for successfully mining a block upward from Byzantium
-	ByzantiumBlockReward = big.NewInt(3e+18)
-	// ConstantinopleBlockReward is the block reward in wei for successfully mining a block upward from Constantinople
-	ConstantinopleBlockReward = big.NewInt(2e+18)
-	// maxUncles is the maximum number of uncles allowed in a single block
-	maxUncles = 2
-	// allowedFutureBlockTime is the max time from current time allowed for blocks, before they're considered future blocks
-	allowedFutureBlockTime = 15 * time.Second
-)
-
-// EthHash consensus algorithm
+// Ethash is the ethash consensus algorithm
 type Ethash struct {
 	config  *chain.Params
-	lock    sync.Mutex
-	rand    *rand.Rand
-	threads int
-
-	DatasetDir     string
-	DatasetsOnDisk int
-
-	CacheDir     string
-	CachesOnDisk int
-
-	Test bool
-
-	FakePow  bool
-	caches   *lru // In memory caches to avoid regenerating too often
-	datasets *lru // In memory datasets to avoid regenerating too often
+	cache   *lru.Cache
+	fakePow bool
 }
 
+// Factory is the factory method to create an Ethash consensus
 func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+	cache, _ := lru.New(2)
 	e := &Ethash{
-		config:   config.Params,
-		caches:   newlru("cache", 1, newCache),
-		datasets: newlru("dataset", 1, newDataset),
+		config: config.Params,
+		cache:  cache,
 	}
 	return e, nil
 }
 
-// NewEthHash creates a new ethash consensus
-func NewEthHash(config *chain.Params, FakePow bool) *Ethash {
-	e := &Ethash{
-		config:   config,
-		caches:   newlru("cache", 1, newCache),
-		datasets: newlru("dataset", 1, newDataset),
-		FakePow:  FakePow,
-	}
-	return e
-}
-
 // VerifyHeader verifies the header is correct
 func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
-	// Ensure that the header's extra-data section is of a reasonable size
+	headerNum := header.Number.Uint64()
+	parentNum := parent.Number.Uint64()
+
+	if headerNum != parentNum+1 {
+		return fmt.Errorf("header and parent are non sequential")
+	}
+	if header.Time.Cmp(parent.Time) <= 0 {
+		return fmt.Errorf("incorrect timestamp")
+	}
+
+	if header.Difficulty.Sign() <= 0 {
+		return fmt.Errorf("difficulty cannot be negative")
+	}
+
 	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
-		return fmt.Errorf("Extra data too long")
+		return fmt.Errorf("extradata is too long")
 	}
 
 	if uncle {
 		if header.Time.Cmp(math.MaxBig256) > 0 {
-			return errLargeBlockTime
+			return fmt.Errorf("incorrect uncle timestamp")
 		}
 	} else {
-		if header.Time.Cmp(big.NewInt(time.Now().Add(allowedFutureBlockTime).Unix())) > 0 {
-			return errFutureBlock
+		if header.Time.Cmp(big.NewInt(time.Now().Add(15*time.Second).Unix())) > 0 {
+			return fmt.Errorf("future block")
 		}
 	}
 
-	if header.Time.Cmp(parent.Time) <= 0 {
-		return fmt.Errorf("timestamp lower or equal than parent")
+	diff := e.CalcDifficulty(header.Time.Uint64(), parent)
+	if diff.Cmp(header.Difficulty) != 0 {
+		return fmt.Errorf("incorrect difficulty")
 	}
-	// Verify the block's difficulty based in it's timestamp and parent's difficulty
-	expected := e.CalcDifficulty(header.Time.Uint64(), parent)
-	if expected.Cmp(header.Difficulty) != 0 {
-		return fmt.Errorf("difficulty not correct: expected %d but found %d", expected.Uint64(), header.Difficulty.Uint64())
-	}
-	// Verify that the gas limit is <= 2^63-1
+
 	cap := uint64(0x7fffffffffffffff)
 	if header.GasLimit > cap {
-		return fmt.Errorf("gas limit not correct: have %v, want %v", header.GasLimit, cap)
+		return fmt.Errorf("incorrect gas limit")
 	}
-	// Verify that the gasUsed is <= gasLimit
+
 	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("gas used not correct: have %v, want %v", header.GasUsed, header.GasLimit)
+		return fmt.Errorf("incorrect gas used")
 	}
-	// Verify that the gas limit remains within allowed bounds
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
-	if diff < 0 {
-		diff *= -1
+
+	gas := int64(parent.GasLimit) - int64(header.GasLimit)
+	if gas < 0 {
+		gas *= -1
 	}
+
 	limit := parent.GasLimit / chain.GasLimitBoundDivisor
-
-	if uint64(diff) >= limit || header.GasLimit < chain.MinGasLimit {
-		return fmt.Errorf("gas limit not correct")
-	}
-	// Verify that the block number is parent's +1
-	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-		return fmt.Errorf("invalid sequence")
+	if uint64(gas) >= limit || header.GasLimit < chain.MinGasLimit {
+		return fmt.Errorf("incorrect gas limit")
 	}
 
-	// Verify the engine specific seal securing the block
-	if seal {
-		if err := e.verifySeal(header); err != nil {
-			return err
+	if !e.fakePow {
+		// Verify the seal
+		number := header.Number.Uint64()
+		cache := e.getCache(number)
+
+		digest, result := cache.hashimoto(sealHash(header).Bytes(), header.Nonce.Uint64())
+
+		if !bytes.Equal(header.MixDigest[:], digest) {
+			return fmt.Errorf("incorrect digest")
+		}
+
+		target := new(big.Int).Div(two256, header.Difficulty)
+		if new(big.Int).SetBytes(result).Cmp(target) > 0 {
+			return fmt.Errorf("incorrect pow")
 		}
 	}
+
+	return nil
+}
+
+func (e *Ethash) getCache(blockNumber uint64) *Cache {
+	epoch := blockNumber / uint64(epochLength)
+	cache, ok := e.cache.Get(epoch)
+	if ok {
+		return cache.(*Cache)
+	}
+
+	cc := newCache(int(epoch))
+	e.cache.Add(epoch, cc)
+	return cc
+}
+
+// SetFakePow sets the fakePow flag to true, only used on tests.
+func (e *Ethash) SetFakePow() {
+	e.fakePow = true
+}
+
+// CalcDifficulty calculates the difficulty at a given time.
+func (e *Ethash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
+	next := parent.Number.Uint64() + 1
+	switch {
+	case e.config.Forks.IsConstantinople(next):
+		return MetropolisDifficulty(time, parent, ConstantinopleBombDelay)
+
+	case e.config.Forks.IsByzantium(next):
+		return MetropolisDifficulty(time, parent, ByzantiumBombDelay)
+
+	case e.config.Forks.IsHomestead(next):
+		return HomesteadDifficulty(time, parent)
+
+	default:
+		return FrontierDifficulty(time, parent)
+	}
+}
+
+// Author checks the author of the header
+func (e *Ethash) Author(header *types.Header) (common.Address, error) {
+	return common.Address{}, nil
+}
+
+// Seal seals the block
+func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+	return nil, nil
+}
+
+// Prepare runs before processing the head during mining.
+func (e *Ethash) Prepare(parent *types.Header, header *types.Header) error {
 	return nil
 }
 
@@ -145,19 +166,32 @@ var (
 	big32 = big.NewInt(32)
 )
 
+// Block rewards at different forks
+var (
+	// FrontierBlockReward is the block reward for the Frontier fork
+	FrontierBlockReward = big.NewInt(5e+18)
+
+	// ByzantiumBlockReward is the block reward for the Byzantium fork
+	ByzantiumBlockReward = big.NewInt(3e+18)
+
+	// ConstantinopleBlockReward is the block reward for the Constantinople fork
+	ConstantinopleBlockReward = big.NewInt(2e+18)
+)
+
+// Finalize runs after the block has been processed
 func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
 	number := block.Number()
 
-	// Select the correct block reward based on chain progression
-	blockReward := FrontierBlockReward
-	if e.config.Forks.IsByzantium(number.Uint64()) {
-		blockReward = ByzantiumBlockReward
-	}
-	if e.config.Forks.IsConstantinople(number.Uint64()) {
+	var blockReward *big.Int
+	switch num := number.Uint64(); {
+	case e.config.Forks.IsConstantinople(num):
 		blockReward = ConstantinopleBlockReward
+	case e.config.Forks.IsByzantium(num):
+		blockReward = ByzantiumBlockReward
+	default:
+		blockReward = FrontierBlockReward
 	}
 
-	// Accumulate the rewards for the miner and any included uncles
 	reward := new(big.Int).Set(blockReward)
 
 	r := new(big.Int)
@@ -175,62 +209,6 @@ func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
 
 	txn.AddBalance(block.Coinbase(), reward)
 	return nil
-}
-
-func (e *Ethash) verifySeal(header *types.Header) error {
-	if e.FakePow {
-		return nil
-	}
-
-	// Ensure that we have a valid difficulty for the block
-	if header.Difficulty.Sign() <= 0 {
-		return errInvalidDifficulty
-	}
-	// Recompute the digest and PoW values
-	number := header.Number.Uint64()
-
-	var (
-		digest []byte
-		result []byte
-	)
-
-	cache := e.cache(number)
-
-	size := datasetSize(number)
-	digest, result = hashimotoLight(size, cache.cache, e.sealHash(header).Bytes(), header.Nonce.Uint64())
-
-	// Caches are unmapped in a finalizer. Ensure that the cache stays alive
-	// until after the call to hashimotoLight so it's not unmapped while being used.
-	runtime.KeepAlive(cache)
-
-	// Verify the calculated values against the ones provided in the header
-	if !bytes.Equal(header.MixDigest[:], digest) {
-		return errInvalidMixDigest
-	}
-	target := new(big.Int).Div(two256, header.Difficulty)
-	if new(big.Int).SetBytes(result).Cmp(target) > 0 {
-		return errInvalidPoW
-	}
-	return nil
-}
-
-// Author checks the author of the header
-func (e *Ethash) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
-}
-
-func (e *Ethash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
-	next := parent.Number.Uint64() + 1
-	switch {
-	case e.config.Forks.IsConstantinople(next):
-		return calcDifficultyConstantinople(time, parent)
-	case e.config.Forks.IsByzantium(next):
-		return calcDifficultyByzantium(time, parent)
-	case e.config.Forks.IsHomestead(next):
-		return calcDifficultyHomestead(time, parent)
-	default:
-		return calcDifficultyFrontier(time, parent)
-	}
 }
 
 // Close closes the connection

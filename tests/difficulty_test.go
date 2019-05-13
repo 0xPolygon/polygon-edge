@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/consensus"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -121,7 +123,9 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 		t.Fatal(err)
 	}
 
-	engine := ethash.NewEthHash(&chain.Params{Forks: config}, false)
+	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: &chain.Params{Forks: config}})
+	engineEthash := engine.(*ethash.Ethash)
+
 	for name, i := range cases {
 		t.Run(name, func(t *testing.T) {
 			if i.ParentDifficulty.Cmp(params.MinimumDifficulty) < 0 {
@@ -138,7 +142,7 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 				UncleHash:  i.UncleHash,
 			}
 
-			difficulty := engine.CalcDifficulty(i.CurrentTimestamp.Uint64(), parent)
+			difficulty := engineEthash.CalcDifficulty(i.CurrentTimestamp.Uint64(), parent)
 			if difficulty.Cmp(i.CurrentDifficulty) != 0 {
 				t.Fatal()
 			}
