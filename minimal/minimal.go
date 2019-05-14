@@ -200,7 +200,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 	// Register backends
 	for _, i := range m.backends {
-		if err := m.server.RegisterProtocol(i); err != nil {
+		if err := m.server.RegisterProtocol(i.Protocols()); err != nil {
 			return nil, err
 		}
 	}

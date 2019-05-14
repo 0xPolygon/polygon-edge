@@ -5,19 +5,15 @@ import (
 	"net"
 
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/protocol"
 )
 
 type Instance struct {
-	Protocol protocol.Protocol
-	Handler  protocol.Handler
+	Protocol *Protocol
+	Handler  ProtocolHandler
 }
 
 // Session is an open connection between two peers
 type Session interface {
-	// OpenStream opens a new stream within the session
-	// OpenStream() (net.Conn, error)
-
 	// NegociateProtocols negociates the sub-protocols
 	NegociateProtocols(info *Info) ([]*Instance, error)
 
@@ -34,7 +30,7 @@ type Session interface {
 // Transport is a generic network transport protocol
 type Transport interface {
 	// Setup starts the protocol with the given private key
-	Setup(priv *ecdsa.PrivateKey, backends []protocol.Backend, info *Info)
+	Setup(priv *ecdsa.PrivateKey, backends []*Protocol, info *Info)
 
 	// Connect connects with the remove connection
 	Connect(net.Conn, enode.Enode) (Session, error)

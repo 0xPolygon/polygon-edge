@@ -3,7 +3,7 @@ package http
 import (
 	"fmt"
 
-	"github.com/umbracle/minimal/protocol"
+	"github.com/umbracle/minimal/network/common"
 	"github.com/valyala/fasthttp"
 )
 
@@ -26,9 +26,9 @@ func (h *HTTP) PeersPeerID(ctx *fasthttp.RequestCtx) (interface{}, error) {
 	}
 
 	// format data
-	protocols := []protocol.Protocol{}
+	protocols := []*common.Instance{}
 	for _, p := range peer.GetProtocols() {
-		protocols = append(protocols, p.Protocol)
+		protocols = append(protocols, p)
 	}
 	info := map[string]interface{}{
 		"client":    peer.Info.Client,

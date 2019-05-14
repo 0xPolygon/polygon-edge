@@ -1,9 +1,28 @@
 package common
 
 import (
+	"net"
+
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/protocol"
 )
+
+// Protocol is a wire protocol
+type Protocol struct {
+	Spec      ProtocolSpec
+	HandlerFn func(conn net.Conn, peerID string) (ProtocolHandler, error)
+}
+
+// ProtocolHandler is the handler of the protocol
+type ProtocolHandler interface {
+	Info() (map[string]interface{}, error)
+}
+
+// ProtocolSpec is a specification of an etheruem protocol
+type ProtocolSpec struct {
+	Name    string
+	Version uint
+	Length  uint64
+}
 
 // Info is the information of a peer
 type Info struct {
@@ -15,8 +34,7 @@ type Info struct {
 
 // Capability is a feature of the peer
 type Capability struct {
-	Protocol protocol.Protocol
-	Backend  protocol.Backend
+	Protocol Protocol
 }
 
 // Capabilities is a list of capabilities of the peer

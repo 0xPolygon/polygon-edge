@@ -70,7 +70,7 @@ func (p *Peer) GetProtocols() []*common.Instance {
 // GetProtocol returns the protocol by name
 func (p *Peer) GetProtocol(name string) (*common.Instance, bool) {
 	for _, i := range p.protocols {
-		if i.Protocol.Name == name {
+		if i.Protocol.Spec.Name == name {
 			return i, true
 		}
 	}

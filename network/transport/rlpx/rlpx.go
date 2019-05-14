@@ -6,20 +6,19 @@ import (
 
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network/common"
-	"github.com/umbracle/minimal/protocol"
 )
 
 // Rlpx is the RLPx transport protocol
 type Rlpx struct {
 	priv     *ecdsa.PrivateKey
-	backends []protocol.Backend
+	backends []*common.Protocol
 	info     *common.Info
 }
 
 // getProtocol returns a protocol
-func (r *Rlpx) getProtocol(name string, version uint) protocol.Backend {
+func (r *Rlpx) getProtocol(name string, version uint) *common.Protocol {
 	for _, p := range r.backends {
-		proto := p.Protocol()
+		proto := p.Spec
 		if proto.Name == name && proto.Version == version {
 			return p
 		}
@@ -53,7 +52,7 @@ func (r *Rlpx) Accept(rawConn net.Conn) (common.Session, error) {
 }
 
 // Setup implements the transport interface
-func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []protocol.Backend, info *common.Info) {
+func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []*common.Protocol, info *common.Info) {
 	r.priv = priv
 	r.backends = backends
 	r.info = info
@@ -78,7 +77,7 @@ func networkInfoToLocalInfo(info *common.Info) *Info {
 		ID:         info.Enode.ID,
 	}
 	for _, cap := range info.Capabilities {
-		p := cap.Protocol
+		p := cap.Protocol.Spec
 		rlpxInfo.Caps = append(rlpxInfo.Caps, &Cap{Name: p.Name, Version: p.Version})
 	}
 	return rlpxInfo
