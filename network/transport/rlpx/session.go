@@ -161,7 +161,12 @@ func (s *Session) p2pHandshake() error {
 	s.stateLock = sync.Mutex{}
 	s.state = sessionEstablished
 
-	enodeStr := fmt.Sprintf("enode://%s@%s", s.id, s.RemoteAddr().String())
+	remoteAddr := "127.0.0.1:30303"
+	if addr := s.RemoteAddr().String(); addr != "pipe" {
+		remoteAddr = addr
+	}
+
+	enodeStr := fmt.Sprintf("enode://%s@%s", s.id, remoteAddr)
 	enode, err := enode.ParseURL(enodeStr)
 	if err != nil {
 		return err
@@ -377,7 +382,8 @@ func (s *Session) recvLoop() error {
 		case msg.Code == discMsg:
 			msg := decodeDiscMsg(msg.Payload)
 
-			fmt.Printf("DISCONNECTED: %s %s\n", s.id, msg.String())
+			// TODO, logger
+			// fmt.Printf("DISCONNECTED: %s %s\n", s.id, msg.String())
 			return msg
 		default:
 			s.handleStreamMessage(&msg)

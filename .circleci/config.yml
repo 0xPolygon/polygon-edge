@@ -16,9 +16,7 @@ jobs:
             git submodule update
       - run:
           command: |
-            go test -v ./tests/... -test.short
-            go test -v ./state/...
-            go test -v ./protocol/...
+            go test -v ./... -test.short
 
       - save_cache:
           key: go-mod-v1-{{ checksum "go.sum" }}

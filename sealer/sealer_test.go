@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/minimal/state/trie"
-
+	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
+	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -52,10 +52,8 @@ func (h *hookSealer) Close() error {
 }
 
 func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, func()) {
-	s, err := storage.NewMemoryStorage(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	storage, err := memory.NewMemoryStorage(nil)
+	assert.NoError(t, err)
 
 	engine := newHookSealer(hook)
 	config := &chain.Params{
@@ -65,13 +63,12 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		},
 	}
 
-	b := blockchain.NewBlockchain(s, trie.NewMemoryStorage(), engine, config)
-
-	// dummy state
-	b.AddState(common.Hash{}, state.NewState())
+	st := trie.NewState(trie.NewMemoryStorage())
+	b := blockchain.NewBlockchain(storage, st, engine, config)
 
 	advanceChain := func() {
-		parent := b.Header()
+		header, _ := b.Header()
+		parent := header
 		num := parent.Number
 
 		newHeader := &types.Header{
