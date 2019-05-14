@@ -44,10 +44,9 @@ func (c *Cache) calcDatasetItem(i uint32) []uint32 {
 
 	for j := 0; j < datasetParents; j++ {
 		cacheIndex := fnvOp(i^uint32(j), mix[j%r])
-
-		// fnv map
+		aux := c.cache[cacheIndex%n]
 		for o := 0; o < 16; o++ {
-			mix[o] = fnvOp(mix[o], c.cache[cacheIndex%n][o])
+			mix[o] = fnvOp(mix[o], aux[o])
 		}
 	}
 
