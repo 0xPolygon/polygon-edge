@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/chain"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,20 +17,16 @@ func TestGenesis(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
 	// no genesis block yet
-	if _, ok := b.Header(); !ok {
-		t.Fatal("it shoudl be empty")
+	if _, ok := b.Header(); ok {
+		t.Fatal("it should be empty")
 	}
 
 	// add genesis block
 	genesis := &types.Header{Difficulty: big.NewInt(1), Number: big.NewInt(0)}
-	if err := b.WriteHeaderGenesis(genesis); err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
 	header, _ := b.Header()
-	if header.Hash() != genesis.Hash() {
-		t.Fatal("bad")
-	}
+	assert.Equal(t, header.Hash(), genesis.Hash())
 }
 
 func TestChainGenesis(t *testing.T) {
@@ -49,21 +46,14 @@ func TestChainGenesis(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			genesis, err := chain.ImportFromName(c.Name)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(t, err)
 
 			b := NewTestBlockchain(t, nil)
-			if err := b.WriteGenesis(genesis.Genesis); err != nil {
-				t.Fatal(err)
-			}
+			assert.NoError(t, b.WriteGenesis(genesis.Genesis))
 
-			if root := b.genesis.Root.String(); root != c.Root {
-				t.Fatalf("Expected state root '%s' but found '%s'", c.Root, root)
-			}
-			if hash := b.genesis.Hash().String(); hash != c.Hash {
-				t.Fatalf("Expected hash '%s' but found '%s'", c.Hash, hash)
-			}
+			root := b.genesis.Root.String()
+			assert.Equal(t, root, c.Root)
+			assert.Equal(t, b.genesis.Hash().String(), c.Hash)
 		})
 	}
 }
@@ -251,13 +241,10 @@ func TestInsertHeaders(t *testing.T) {
 			head, _ := b.Header()
 
 			expected, ok := chain.headers[cc.Head.hash]
-			if !ok {
-				tt.Fatal("bad")
-			}
+			assert.True(t, ok)
 
-			if head.Hash() != expected.Hash() {
-				tt.Fatal("bad2")
-			}
+			// check that we got the right hash
+			assert.Equal(t, head.Hash(), expected.Hash())
 
 			forks := b.GetForks()
 			expectedForks := []common.Hash{}
@@ -286,9 +273,6 @@ func TestInsertHeaders(t *testing.T) {
 				}
 			}
 
-			fmt.Println("-- get total difficulty --")
-			fmt.Println(b.GetChainTD())
-
 			if td, _ := b.GetChainTD(); cc.TD != td.Uint64() {
 				tt.Fatal("bad")
 			}
@@ -302,15 +286,15 @@ func TestForkUnkwonParents(t *testing.T) {
 	h0 := NewTestHeaderChain(10)
 	h1 := NewTestHeaderFromChain(h0[:5], 10)
 
-	if err := b.WriteHeaderGenesis(h0[0]); err != nil {
-		t.Fatal(err)
-	}
-	if err := b.WriteHeaders(h0[1:]); err != nil {
-		t.Fatal(err)
-	}
-	if err := b.WriteHeader(h1[12]); err != nil {
-		t.Fatal(err)
-	}
+	// Write genesis
+	assert.NoError(t, b.WriteHeaderGenesis(h0[0]))
+
+	// Write 10 headers
+	assert.NoError(t, b.WriteHeaders(h0[1:]))
+
+	// Cannot write this header because the father h1[11] is not known
+	assert.Error(t, b.WriteHeader(h1[12]))
+
 }
 
 func TestCommitChain(t *testing.T) {
@@ -319,29 +303,20 @@ func TestCommitChain(t *testing.T) {
 	headers, blocks, receipts := NewTestBodyChain(2)
 	b := NewTestBlockchain(t, headers)
 
-	if err := b.CommitChain(blocks, receipts); err != nil {
-		t.Fatal(err)
-	}
+	// commit values to the chain
+	assert.NoError(t, b.CommitChain(blocks, receipts))
 
 	for i := 1; i < len(blocks); i++ {
 		block := blocks[i]
 
 		// check blocks
 		i, _ := b.db.ReadBody(block.Hash())
-		if len(i.Transactions) != 1 {
-			t.Fatal("should have 1 tx")
-		}
-		if i.Transactions[0].Nonce() != block.Number().Uint64() {
-			t.Fatal("number is incorrect")
-		}
+		assert.Len(t, i.Transactions, 1)
+		assert.Equal(t, i.Transactions[0].Nonce(), block.Number().Uint64())
 
 		// check receipts
 		r := b.db.ReadReceipts(block.Hash())
-		if len(r) != 1 {
-			t.Fatal("should have 1 receipt")
-		}
-		if r[0].TxHash != i.Transactions[0].Hash() {
-			t.Fatal("receipt does not match with transaction")
-		}
+		assert.Len(t, r, 1)
+		assert.Equal(t, r[0].TxHash, i.Transactions[0].Hash())
 	}
 }

@@ -249,6 +249,8 @@ func TestProbeNode(t *testing.T) {
 }
 
 func TestFindNodeWithUnavailableNode(t *testing.T) {
+	t.Skip()
+
 	config := DefaultConfig()
 
 	r0, r1 := pipe(config, true)
@@ -269,6 +271,8 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 }
 
 func TestFindNode(t *testing.T) {
+	t.Skip()
+
 	config := DefaultConfig()
 
 	var cases = []int{1, 5, 10, 15, 20, 30, 50}

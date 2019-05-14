@@ -260,7 +260,8 @@ func (b *Blockchain) CommitReceipts(headers []common.Hash, receipts []types.Rece
 	return nil
 }
 
-// CommitChain writes all the other data related to the chain (body and receipts)
+// CommitChain writes all the other data related to the chain (body and receipts).
+// TODO: I think this function is not used anymore.
 func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Receipt) error {
 	if len(blocks) != len(receipts) {
 		return fmt.Errorf("length dont match. %d and %d", len(blocks), len(receipts))
