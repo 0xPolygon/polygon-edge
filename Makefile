@@ -1,4 +1,9 @@
 
+.PHONY: build
+build: static-assets
+	@echo "--> Build"
+	@sh -c ./scripts/build.sh
+
 .PHONY: static-assets
 static-assets:
 	@echo "--> Generating static assets for the json chains"
