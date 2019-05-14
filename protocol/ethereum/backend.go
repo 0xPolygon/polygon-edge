@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	protoCommon "github.com/umbracle/minimal/network/common"
+
 	metrics "github.com/armon/go-metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -112,16 +114,23 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 }
 
 // ETH63 is the Fast synchronization protocol
-var ETH63 = protocol.Protocol{
+var ETH63 = protoCommon.ProtocolSpec{
 	Name:    "eth",
 	Version: 63,
 	Length:  17,
 }
 
-func (b *Backend) Protocol() protocol.Protocol {
-	return ETH63
+// Protocols implements the protocol interface
+func (b *Backend) Protocols() []*protoCommon.Protocol {
+	return []*protoCommon.Protocol{
+		&protoCommon.Protocol{
+			Spec:      ETH63,
+			HandlerFn: b.Add,
+		},
+	}
 }
 
+// Run implements the protocol interface
 func (b *Backend) Run() {
 	go b.runSync()
 	go b.commitData()
@@ -294,7 +303,7 @@ func (b *Backend) updateChain(block uint64) {
 }
 
 // Add is called when we connect to a new node
-func (b *Backend) Add(conn net.Conn, peerID string) (protocol.Handler, error) {
+func (b *Backend) Add(conn net.Conn, peerID string) (protoCommon.ProtocolHandler, error) {
 	fmt.Println("----- ADD NODE -----")
 	fmt.Println(peerID)
 

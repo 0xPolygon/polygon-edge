@@ -15,10 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/umbracle/minimal/network/common"
-	"github.com/umbracle/minimal/protocol"
-
 	"github.com/umbracle/minimal/helper/enode"
+	"github.com/umbracle/minimal/network/common"
 
 	"github.com/armon/go-metrics"
 
@@ -272,8 +270,7 @@ func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, er
 
 	type res struct { // will become matchProtocol struct in rlpx
 		offset   uint64
-		protocol protocol.Protocol
-		backend  protocol.Backend
+		protocol *common.Protocol
 	}
 
 	result := []*res{}
@@ -281,15 +278,12 @@ func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, er
 	for _, i := range info.Caps {
 		// this one from the local instances
 		if b := s.rlpx.getProtocol(i.Name, i.Version); b != nil {
-			proto := b.Protocol()
-
 			result = append(result, &res{
-				backend:  b,
-				protocol: proto,
+				protocol: b,
 				offset:   offset,
 			})
 
-			offset += proto.Length
+			offset += b.Spec.Length
 		}
 	}
 
@@ -299,9 +293,12 @@ func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, er
 	errr := make(chan error, len(result))
 	for _, r := range result {
 		go func(r *res) {
-			stream := s.OpenStream(uint(r.offset), uint(r.protocol.Length))
+			spec := r.protocol.Spec
 
-			proto, err := r.backend.Add(stream, s.id)
+			stream := s.OpenStream(uint(r.offset), uint(spec.Length))
+
+			proto, err := r.protocol.HandlerFn(stream, s.id)
+			// proto, err := r.backend.Add(stream, s.id)
 			if err != nil {
 				errr <- err
 			}

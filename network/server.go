@@ -21,7 +21,6 @@ import (
 
 	"github.com/umbracle/minimal/network/common"
 	"github.com/umbracle/minimal/network/discovery"
-	"github.com/umbracle/minimal/protocol"
 )
 
 const (
@@ -111,7 +110,7 @@ type Server struct {
 	Discovery discovery.Backend
 	Enode     *enode.Enode
 
-	backends []protocol.Backend
+	backends []*common.Protocol
 }
 
 // NewServer creates a new node
@@ -141,7 +140,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFilePath),
-		backends:     []protocol.Backend{},
+		backends:     []*common.Protocol{},
 		transport:    &rlpx.Rlpx{},
 	}
 
@@ -167,11 +166,8 @@ func (s *Server) buildInfo() {
 	}
 
 	for _, p := range s.backends {
-		proto := p.Protocol()
-
 		cap := &common.Capability{
-			Protocol: proto,
-			Backend:  p,
+			Protocol: *p,
 		}
 
 		info.Capabilities = append(info.Capabilities, cap)
@@ -443,8 +439,8 @@ func (s *Server) addSession(session common.Session) error {
 }
 
 // RegisterProtocol registers a protocol
-func (s *Server) RegisterProtocol(b protocol.Backend) error {
-	s.backends = append(s.backends, b)
+func (s *Server) RegisterProtocol(b []*common.Protocol) error {
+	s.backends = append(s.backends, b...)
 	// TODO, check if the backend is already registered
 	return nil
 }
@@ -453,9 +449,9 @@ func (s *Server) ID() enode.ID {
 	return s.Enode.ID
 }
 
-func (s *Server) getProtocol(name string, version uint) protocol.Backend {
+func (s *Server) getProtocol(name string, version uint) *common.Protocol {
 	for _, p := range s.backends {
-		proto := p.Protocol()
+		proto := p.Spec
 		if proto.Name == name && proto.Version == version {
 			return p
 		}
