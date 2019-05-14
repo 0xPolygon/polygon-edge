@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/buaazp/fasthttprouter"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/minimal"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 )
 
 const (
@@ -24,6 +26,14 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 		m: m.(*minimal.Minimal),
 	}
 
+	var enableDebug bool
+	debugRaw, ok := config["debug"]
+	if ok {
+		if enableDebug, ok = debugRaw.(bool); !ok {
+			return nil, fmt.Errorf("could not convert debug flag to bool")
+		}
+	}
+
 	tcpAddr, err := api.ReadAddrFromConfig(defaultHTTPAddr, defaultHTTPPort, config)
 	if err != nil {
 		return nil, err
@@ -32,6 +42,14 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 	router := fasthttprouter.New()
 	router.GET("/v1/peers", h.wrap(h.PeersList))
 	router.GET("/v1/peers/:peerid", h.wrap(h.PeersPeerID))
+
+	if enableDebug {
+		router.GET("/debug/pprof/", fastAdapt(pprof.Index))
+		router.GET("/debug/pprof/cmdline", fastAdapt(pprof.Cmdline))
+		router.GET("/debug/pprof/profile", fastAdapt(pprof.Profile))
+		router.GET("/debug/pprof/symbol", fastAdapt(pprof.Symbol))
+		router.GET("/debug/pprof/trace", fastAdapt(pprof.Trace))
+	}
 
 	lis, err := net.Listen("tcp", tcpAddr.String())
 	if err != nil {
@@ -48,6 +66,10 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 	}()
 
 	return h, nil
+}
+
+func fastAdapt(f func(w http.ResponseWriter, r *http.Request)) fasthttp.RequestHandler {
+	return fasthttpadaptor.NewFastHTTPHandlerFunc(f)
 }
 
 // HTTP is an Api backend
