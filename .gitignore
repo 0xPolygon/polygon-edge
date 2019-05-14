@@ -2,3 +2,6 @@ peers.json
 genesis.json
 *-packr.go
 config*.json
+
+bin/
+pkg/
