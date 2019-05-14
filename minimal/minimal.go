@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/chain"
@@ -40,6 +42,7 @@ type Minimal struct {
 	Key        *ecdsa.PrivateKey
 	chain      *chain.Chain
 	apis       []api.API
+	InmemSink  *metrics.InmemSink
 }
 
 func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
@@ -82,6 +85,11 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	key, err := config.Keystore.Get()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key: %v", err)
+	}
+
+	// setup telemetry
+	if err := m.startTelemetry(); err != nil {
+		return nil, err
 	}
 
 	// Build storage backend
@@ -302,4 +310,26 @@ func getSingleKey(i map[string]*Entry) string {
 		return k
 	}
 	panic("internal. key not found")
+}
+
+func (m *Minimal) startTelemetry() error {
+	m.InmemSink = metrics.NewInmemSink(10*time.Second, time.Minute)
+	metrics.DefaultInmemSignal(m.InmemSink)
+
+	metricsConf := metrics.DefaultConfig("minimal")
+	metricsConf.EnableHostnameLabel = false
+	metricsConf.HostName = ""
+
+	var sinks metrics.FanoutSink
+
+	prom, err := prometheus.NewPrometheusSink()
+	if err != nil {
+		return err
+	}
+
+	sinks = append(sinks, prom)
+	sinks = append(sinks, m.InmemSink)
+
+	metrics.NewGlobal(metricsConf, sinks)
+	return nil
 }
