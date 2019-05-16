@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/minimal/crypto"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
@@ -18,7 +19,6 @@ import (
 	"github.com/umbracle/minimal/state"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 
@@ -317,11 +317,11 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	t.From = common.Address{}
 	if len(dec.SecretKey) > 0 {
-		key, err := crypto.ToECDSA(dec.SecretKey)
+		key, err := crypto.ParsePrivateKey(dec.SecretKey)
 		if err != nil {
 			return fmt.Errorf("invalid private key: %v", err)
 		}
-		t.From = crypto.PubkeyToAddress(key.PublicKey)
+		t.From = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
 	if dec.To != "" {

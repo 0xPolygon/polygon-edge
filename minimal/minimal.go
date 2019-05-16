@@ -18,13 +18,12 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/network/discovery"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/protocol"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/sealer"
 )
@@ -181,7 +180,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	}
 	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
 	m.Sealer.SetEnabled(m.config.Seal)
-	m.Sealer.SetCoinbase(pubkeyToAddress(m.Key.PublicKey))
+	m.Sealer.SetCoinbase(crypto.PubKeyToAddress(&m.Key.PublicKey))
 
 	// Start protocol backends
 	for name, entry := range config.ProtocolEntries {
@@ -247,11 +246,6 @@ func (m *Minimal) Close() {
 	for _, i := range m.apis {
 		i.Close()
 	}
-}
-
-func pubkeyToAddress(p ecdsa.PublicKey) common.Address {
-	pubBytes := crypto.FromECDSAPub(&p)
-	return common.BytesToAddress(crypto.Keccak256(pubBytes[1:])[12:])
 }
 
 // Entry is a backend configuration entry

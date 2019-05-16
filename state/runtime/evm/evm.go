@@ -6,16 +6,13 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/state/runtime"
-
-	// "github.com/umbracle/minimal/state/runtime/evm/precompiled"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // IMPORTANT. Memory access needs more overflow protection, right now, only calls and returns are protected
@@ -807,7 +804,7 @@ func (c *Contract) sha3() error {
 		return err
 	}
 
-	hash := crypto.Keccak256Hash(data)
+	hash := common.BytesToHash(crypto.Keccak256(data))
 	c.push(hash.Big())
 
 	var overflow bool
@@ -906,7 +903,7 @@ func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Add
 	if op == CREATE {
 		address = crypto.CreateAddress(c.address, c.evm.state.GetNonce(c.address))
 	} else {
-		address = crypto.CreateAddress2(c.address, common.BigToHash(salt), crypto.Keccak256Hash(input).Bytes())
+		address = crypto.CreateAddress2(c.address, common.BigToHash(salt), input)
 	}
 
 	contract := runtime.NewContractCreation(c.depth+1, c.origin, c.address, address, value, gas, input)

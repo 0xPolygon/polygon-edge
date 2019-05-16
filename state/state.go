@@ -6,9 +6,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/umbracle/minimal/crypto"
 )
 
 type State interface {

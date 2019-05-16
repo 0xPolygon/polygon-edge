@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/umbracle/minimal/crypto"
 )
 
 var (
@@ -289,7 +289,7 @@ func (txn *Txn) GetNonce(addr common.Address) uint64 {
 // SetCode sets the code for an address
 func (txn *Txn) SetCode(addr common.Address, code []byte) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
-		object.Account.CodeHash = crypto.Keccak256Hash(code).Bytes()
+		object.Account.CodeHash = crypto.Keccak256(code)
 		object.DirtyCode = true
 		object.Code = code
 	})

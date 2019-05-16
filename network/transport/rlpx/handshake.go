@@ -14,10 +14,9 @@ import (
 
 	mrand "math/rand"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/umbracle/ecies"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 
 	"golang.org/x/crypto/sha3"
@@ -90,7 +89,7 @@ func (c *handshakeConn) readBytes(plainSize uint16) ([]byte, []byte, bool, error
 	}
 
 	// pre-EIP-8
-	if dec, err := c.local.Decrypt(buf, nil, nil); err == nil {
+	if dec, err := c.local.Decrypt(rand.Reader, buf, nil, nil); err == nil {
 		return buf, dec, true, nil
 	}
 
@@ -107,7 +106,7 @@ func (c *handshakeConn) readBytes(plainSize uint16) ([]byte, []byte, bool, error
 	}
 
 	buf = append(buf, buf2...)
-	dec, err := c.local.Decrypt(buf[2:], nil, prefix)
+	dec, err := c.local.Decrypt(rand.Reader, buf[2:], nil, prefix)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -229,7 +228,7 @@ func (h *handshakeState) makeAuthMsg(prv *ecdsa.PrivateKey) (*authMsgV4, error) 
 	}
 	// Generate random keypair to for ECDH.
 	var err error
-	h.randomPrivKey, err = ecies.GenerateKey(rand.Reader, crypto.S256(), nil)
+	h.randomPrivKey, err = ecies.GenerateKey(rand.Reader, crypto.S256, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +239,8 @@ func (h *handshakeState) makeAuthMsg(prv *ecdsa.PrivateKey) (*authMsgV4, error) 
 		return nil, err
 	}
 	signed := xor(token, h.initNonce)
-	signature, err := crypto.Sign(signed, h.randomPrivKey.ExportECDSA())
+
+	signature, err := crypto.Sign(h.randomPrivKey.ExportECDSA(), signed)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (h *handshakeState) makeAuthMsg(prv *ecdsa.PrivateKey) (*authMsgV4, error) 
 		Version: 4,
 	}
 	copy(msg.Signature[:], signature)
-	copy(msg.InitiatorPubkey[:], crypto.FromECDSAPub(&prv.PublicKey)[1:])
+	copy(msg.InitiatorPubkey[:], crypto.MarshallPublicKey(&prv.PublicKey)[1:])
 	copy(msg.Nonce[:], h.initNonce)
 
 	return msg, nil
@@ -283,7 +283,7 @@ func (h *handshakeState) handleAuthMsg(msg *authMsgV4, prv *ecdsa.PrivateKey) er
 	// Generate random keypair for ECDH.
 	// If a private key is already set, use it instead of generating one (for testing).
 	if h.randomPrivKey == nil {
-		h.randomPrivKey, err = ecies.GenerateKey(rand.Reader, crypto.S256(), nil)
+		h.randomPrivKey, err = ecies.GenerateKey(rand.Reader, crypto.S256, nil)
 		if err != nil {
 			return err
 		}
@@ -295,11 +295,13 @@ func (h *handshakeState) handleAuthMsg(msg *authMsgV4, prv *ecdsa.PrivateKey) er
 		return err
 	}
 	signedMsg := xor(token, h.initNonce)
-	remoteRandomPub, err := secp256k1.RecoverPubkey(signedMsg, msg.Signature[:])
+
+	remoteRandomPub, err := crypto.RecoverPubkey(msg.Signature[:], signedMsg)
 	if err != nil {
 		return err
 	}
-	h.remoteRandomPub, _ = importPublicKey(remoteRandomPub)
+
+	h.remoteRandomPub, _ = importPublicKey(crypto.MarshallPublicKey(remoteRandomPub))
 	return nil
 }
 
@@ -314,8 +316,8 @@ func importPublicKey(pubKey []byte) (*ecies.PublicKey, error) {
 	default:
 		return nil, fmt.Errorf("invalid public key length %v (expect 64/65)", len(pubKey))
 	}
-	// TODO: fewer pointless conversions
-	pub, err := crypto.UnmarshalPubkey(pubKey65)
+
+	pub, err := crypto.ParsePublicKey(pubKey65)
 	if err != nil {
 		return nil, err
 	}

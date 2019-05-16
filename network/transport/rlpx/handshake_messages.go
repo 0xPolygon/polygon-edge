@@ -3,8 +3,8 @@ package rlpx
 import (
 	"crypto/rand"
 
-	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/ecies"
 )
 
 type plainDecoder interface {

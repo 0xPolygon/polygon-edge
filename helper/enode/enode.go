@@ -2,7 +2,6 @@ package enode
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -13,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/umbracle/minimal/crypto"
 )
 
 const nodeIDBytes = 512 / 8
@@ -107,7 +106,7 @@ func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
 	if len(buf) != nodeIDBytes {
 		return nil, fmt.Errorf("not enough length: expected %d but found %d", nodeIDBytes, len(buf))
 	}
-	p := &ecdsa.PublicKey{Curve: crypto.S256(), X: new(big.Int), Y: new(big.Int)}
+	p := &ecdsa.PublicKey{Curve: crypto.S256, X: new(big.Int), Y: new(big.Int)}
 	half := len(buf) / 2
 	p.X.SetBytes(buf[:half])
 	p.Y.SetBytes(buf[half:])
@@ -120,10 +119,7 @@ func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
 // PubkeyToEnode converts a public key to an enode
 func PubkeyToEnode(pub *ecdsa.PublicKey) ID {
 	var id ID
-	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-	if len(pbytes)-1 != len(id) {
-		panic(fmt.Errorf("need %d bit pubkey, got %d bits", (len(id)+1)*8, len(pbytes)))
-	}
+	pbytes := crypto.MarshallPublicKey(pub)
 	copy(id[:], pbytes[1:])
 	return id
 }

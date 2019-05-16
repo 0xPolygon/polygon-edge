@@ -10,18 +10,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/state"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
 )
 
 var key1, _ = crypto.GenerateKey()
-var addr1 = crypto.PubkeyToAddress(key1.PublicKey)
+var addr1 = crypto.PubKeyToAddress(&key1.PublicKey)
 
 var key2, _ = crypto.GenerateKey()
-var addr2 = crypto.PubkeyToAddress(key2.PublicKey)
+var addr2 = crypto.PubKeyToAddress(&key2.PublicKey)
 
 func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot) {
 	st := trie.NewState(trie.NewMemoryStorage())

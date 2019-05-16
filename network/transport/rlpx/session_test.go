@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/crypto"
 )
 
 const (

@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/armon/go-metrics"
@@ -22,8 +23,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	crand "crypto/rand"
@@ -553,13 +552,11 @@ func decodePacket(payload []byte) ([]byte, []byte, []byte, error) {
 		return nil, nil, nil, fmt.Errorf("macs do not match")
 	}
 
-	// create the peer object
-	pubkey, err := secp256k1.RecoverPubkey(crypto.Keccak256(sigdata), sig)
+	pubkey, err := crypto.RecoverPubkey(sig, crypto.Keccak256(sigdata))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	return mac, sigdata, pubkey, nil
+	return mac, sigdata, crypto.MarshallPublicKey(pubkey), nil
 }
 
 // Used in tests
@@ -935,7 +932,8 @@ func (b *Backend) encodePacket(code byte, payload interface{}) ([]byte, error) {
 	}
 
 	packet := buf.Bytes()
-	sig, err := crypto.Sign(crypto.Keccak256(packet[headSize:]), b.ID)
+
+	sig, err := crypto.Sign(b.ID, crypto.Keccak256(packet[headSize:]))
 	if err != nil {
 		return nil, err
 	}

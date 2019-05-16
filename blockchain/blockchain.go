@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/crypto"
 
 	"github.com/umbracle/minimal/consensus"
 

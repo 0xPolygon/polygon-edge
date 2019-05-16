@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/umbracle/minimal/crypto"
 )
 
 // LocalKeystore loads the key from a local file
@@ -32,22 +32,22 @@ func (k *LocalKeystore) Get() (*ecdsa.PrivateKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := ioutil.WriteFile(k.Path, []byte(hex.EncodeToString(crypto.FromECDSA(key))), 0600); err != nil {
+		buf, err := crypto.MarshallPrivateKey(key)
+		if err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(k.Path, []byte(hex.EncodeToString(buf)), 0600); err != nil {
 			return nil, err
 		}
 		return key, nil
 	}
 
 	// exists
-	data, err := ioutil.ReadFile(k.Path)
+	buf, err := ioutil.ReadFile(k.Path)
 	if err != nil {
 		return nil, err
 	}
-	keyStr, err := hex.DecodeString(string(data))
-	if err != nil {
-		return nil, err
-	}
-	key, err := crypto.ToECDSA(keyStr)
+	key, err := crypto.ParsePrivateKey(buf)
 	if err != nil {
 		return nil, err
 	}

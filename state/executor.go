@@ -8,9 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/evm"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
@@ -21,7 +22,7 @@ const (
 	MaxCodeSize            = 24576
 )
 
-var emptyCodeHashTwo = crypto.Keccak256Hash(nil)
+var emptyCodeHashTwo = common.BytesToHash(crypto.Keccak256(nil))
 
 var builtinRuntimes = map[string]runtime.Runtime{
 	"evm": &evm.EVM{},

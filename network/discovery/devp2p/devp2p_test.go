@@ -13,7 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/umbracle/minimal/crypto"
 )
 
 func newTestDiscovery(config *Config, capturePacket bool) *Backend {
