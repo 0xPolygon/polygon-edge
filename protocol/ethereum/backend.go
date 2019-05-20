@@ -74,10 +74,7 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 		waitCh:      make([]chan struct{}, 0),
 
 		// -- new fields
-		heap: &workersHeap{
-			index: map[string]*worker{},
-			heap:  workersHeapImpl{},
-		},
+		heap:      newWorkersHeap(),
 		tasks:     map[uint64]*task{},
 		tasksLock: sync.Mutex{},
 		wakeCh:    make(chan struct{}, 10),
@@ -558,6 +555,13 @@ type worker struct {
 	proto       *Ethereum
 }
 
+func newWorkersHeap() *workersHeap {
+	return &workersHeap{
+		index: map[string]*worker{},
+		heap:  workersHeapImpl{},
+	}
+}
+
 type workersHeap struct {
 	index map[string]*worker
 	heap  workersHeapImpl
@@ -568,6 +572,7 @@ func (w *workersHeap) Remove(id string) {
 	if !ok {
 		return
 	}
+	delete(w.index, id)
 	heap.Remove(&w.heap, wrk.index)
 	return
 }

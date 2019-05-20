@@ -260,3 +260,22 @@ func TestBackendNotify(t *testing.T) {
 	fmt.Println("-- forks --")
 	fmt.Println(b.GetForks())
 }
+
+func TestWorkerPool(t *testing.T) {
+	pool := newWorkersHeap()
+
+	// pool is nil the first time
+	assert.Nil(t, pool.Peek())
+
+	// push and peek
+	assert.NoError(t, pool.Push("1", nil))
+	assert.Equal(t, pool.Peek().id, "1")
+
+	assert.NoError(t, pool.Push("2", nil))
+	assert.Len(t, pool.index, 2)
+
+	// Remove '1'. Only one element left
+	pool.Remove("1")
+	assert.Len(t, pool.index, 1)
+	assert.Equal(t, pool.Peek().id, "2")
+}
