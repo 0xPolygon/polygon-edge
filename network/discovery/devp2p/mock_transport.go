@@ -14,16 +14,27 @@ type MockNetwork struct {
 	port       int
 }
 
+func newMockNetwork() *MockNetwork {
+	return &MockNetwork{
+		transports: map[string]*MockTransport{},
+		port:       0,
+	}
+}
+
 // NewTransport creates a new mockup transport
 func (m *MockNetwork) NewTransport() Transport {
 	m.port++
-	addr := &net.UDPAddr{IP: net.IP("127.0.0.1"), Port: int(m.port)}
+	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(m.port)}
 
 	t := &MockTransport{
 		net:      m,
 		addr:     addr,
 		packetCh: make(chan *Packet),
 	}
+	if m.transports == nil {
+		m.transports = make(map[string]*MockTransport)
+	}
+	m.transports[addr.String()] = t
 	return t
 }
 
@@ -32,6 +43,11 @@ type MockTransport struct {
 	net      *MockNetwork
 	addr     *net.UDPAddr
 	packetCh chan *Packet
+}
+
+// Addr implements the transport interface
+func (m *MockTransport) Addr() *net.UDPAddr {
+	return m.addr
 }
 
 // PacketCh implements the transport interface
@@ -56,4 +72,5 @@ func (m *MockTransport) WriteTo(b []byte, addr string) (time.Time, error) {
 }
 
 // Shutdown implements the transport interface
-func (m *MockTransport) Shutdown() {}
+func (m *MockTransport) Shutdown() {
+}

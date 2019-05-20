@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 
@@ -174,7 +175,6 @@ type rpcEndpoint struct {
 type Backend struct {
 	logger     *log.Logger
 	ID         *ecdsa.PrivateKey
-	config     *Config
 	timer      *time.Timer
 	handlers   map[string]func(payload []byte, timestamp *time.Time)
 	respLock   sync.Mutex
@@ -189,31 +189,42 @@ type Backend struct {
 	tasks      chan *Peer
 	inlookup   int32
 	addr       *net.UDPAddr
-	listener   *net.UDPConn
-	packetCh   chan *Packet
+	// listener   *net.UDPConn
+	transport Transport
+	packetCh  chan *Packet
+
+	bootnodes []string
 }
 
 func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Backend, error) {
-	config, err := readConfig(conf.Config)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to read config: %v", err)
+	addr := conf.Enode.IP.String()
+	port := int(conf.Enode.UDP)
+
+	bootnodes := []string{}
+	bootnodesRaw, ok := conf.Config["bootnodes"]
+	if ok {
+		bootnodes, ok = bootnodesRaw.(chain.Bootnodes)
+		if !ok {
+			return nil, fmt.Errorf("could not convert %s to a list of bootnodes", bootnodesRaw)
+		}
 	}
 
-	// TODO, remove this fields from read config
-	config.BindAddr = conf.Enode.IP.String()
-	config.BindPort = int(conf.Enode.UDP)
-
-	d, err := NewBackend(conf.Logger, conf.Key, config)
+	udpAddr := &net.UDPAddr{IP: net.ParseIP(addr), Port: port}
+	transport, err := newUDPTransport(udpAddr)
 	if err != nil {
 		return nil, err
 	}
-
+	d, err := NewBackend(conf.Logger, conf.Key, transport)
+	if err != nil {
+		return nil, err
+	}
+	d.SetBootnodes(bootnodes)
 	return d, nil
 }
 
 // NewBackend creates a new p2p discovery protocol
-func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, config *Config) (*Backend, error) {
-	addr := &net.UDPAddr{IP: net.ParseIP(config.BindAddr), Port: config.BindPort}
+func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, transport Transport) (*Backend, error) {
+	addr := transport.Addr()
 
 	pub := &key.PublicKey
 	id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
@@ -224,9 +235,9 @@ func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, config *Config) (*Bac
 	}
 
 	r := &Backend{
-		logger:     logger,
-		ID:         key,
-		config:     config,
+		logger: logger,
+		ID:     key,
+		// config:     config,
 		addr:       addr,
 		handlers:   map[string]func(payload []byte, timestamp *time.Time){},
 		respLock:   sync.Mutex{},
@@ -238,14 +249,8 @@ func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, config *Config) (*Bac
 		eventCh:    make(chan string, 10),
 		tasks:      make(chan *Peer, 100),
 		inlookup:   0,
+		transport:  transport,
 	}
-
-	l, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to start UDP listener on %q: %v", addr.String(), err)
-	}
-
-	r.listener = l
 
 	go r.listen()
 
@@ -257,48 +262,27 @@ func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, config *Config) (*Bac
 	return r, nil
 }
 
+// SetBootnodes sets the bootnodes
+func (b *Backend) SetBootnodes(bootnodes []string) {
+	b.bootnodes = bootnodes
+}
+
 func (b *Backend) listen() {
-	pool := sync.Pool{
-		New: func() interface{} {
-			return make([]byte, udpPacketBufSize)
-		},
-	}
-
 	for {
-		vbuf := pool.Get()
-		buf := vbuf.([]byte)
-
-		n, addr, err := b.listener.ReadFrom(buf)
-		ts := time.Now()
-		if err != nil {
-			if s := atomic.LoadInt32(&b.shutdown); s == 1 {
-				break
-			}
-			b.logger.Printf("Error reading UDP packet: %v", err)
-			continue
-		}
-
-		// Check the length - it needs to have at least one byte
-		if n < 1 {
-			b.logger.Printf("UDP packet too short (%d bytes) %s", len(buf), addr)
-			continue
-		}
-
-		packet := &Packet{
-			Buf:       buf[:n],
-			From:      addr,
-			Timestamp: ts,
-		}
-		go func() {
-			if b.packetCh != nil {
-				b.packetCh <- packet
-			} else {
-				if err := b.HandlePacket(packet); err != nil {
-					b.logger.Printf(err.Error())
+		select {
+		case packet := <-b.transport.PacketCh():
+			go func() {
+				if b.packetCh != nil {
+					b.packetCh <- packet
+				} else {
+					if err := b.HandlePacket(packet); err != nil {
+						b.logger.Printf(err.Error())
+					}
 				}
-				pool.Put(vbuf)
-			}
-		}()
+			}()
+		case <-b.shutdownCh:
+			return
+		}
 	}
 }
 
@@ -329,16 +313,16 @@ func (b *Backend) Schedule() {
 
 func (b *Backend) loadBootnodes() {
 	// load bootnodes
-	errr := make(chan error, len(b.config.Bootnodes))
+	errr := make(chan error, len(b.bootnodes))
 
-	for _, p := range b.config.Bootnodes {
+	for _, p := range b.bootnodes {
 		go func(p string) {
 			err := b.AddNode(p)
 			errr <- err
 		}(p)
 	}
 
-	for i := 0; i < len(b.config.Bootnodes); i++ {
+	for i := 0; i < len(b.bootnodes); i++ {
 		<-errr
 	}
 
@@ -352,8 +336,8 @@ func (b *Backend) loadBootnodes() {
 // Close closes the discover
 func (b *Backend) Close() error {
 	close(b.shutdownCh)
-	atomic.StoreInt32(&b.shutdown, 1)
-	return b.listener.Close()
+	b.transport.Shutdown()
+	return nil
 }
 
 func (b *Backend) schedule() {
@@ -892,21 +876,11 @@ func (b *Backend) sendPacket(peer *Peer, code byte, payload interface{}) error {
 		return err
 	}
 
-	if _, err := b.WriteTo(data, peer.addr()); err != nil {
+	if _, err := b.transport.WriteTo(data, peer.addr()); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// WriteTo sends b to addrs with an udp packet
-func (b *Backend) WriteTo(data []byte, addr string) (time.Time, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return time.Time{}, err
-	}
-	_, err = b.listener.WriteTo(data, udpAddr)
-	return time.Now(), err
 }
 
 func (b *Backend) encodePacket(code byte, payload interface{}) ([]byte, error) {
