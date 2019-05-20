@@ -4,7 +4,6 @@ import (
 	"crypto/elliptic"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"reflect"
 	"strings"
@@ -12,35 +11,31 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/umbracle/minimal/crypto"
 )
 
-func newTestDiscovery(config *Config, capturePacket bool) *Backend {
+func newTestDiscovery(t *testing.T, transport Transport, capturePacket bool) *Backend {
 	logger := log.New(ioutil.Discard, "", log.LstdFlags)
 	prv0, _ := crypto.GenerateKey()
 
-PORT:
-	rand.Seed(time.Now().Unix())
-	port := rand.Intn(9000-5000) + 5000 // Random port between 5000 and 9000
-
-	config.BindPort = port
-	config.BindAddr = "127.0.0.1"
-
-	r, err := NewBackend(logger, prv0, config)
-	if err != nil {
-		goto PORT
-	}
+	r, err := NewBackend(logger, prv0, transport)
+	assert.NoError(t, err)
 
 	if capturePacket {
 		r.packetCh = make(chan *Packet, 10)
 	}
-
 	return r
 }
 
-func pipe(config *Config, capturePacket bool) (*Backend, *Backend) {
-	return newTestDiscovery(config, capturePacket), newTestDiscovery(config, capturePacket)
+func pipe(t *testing.T, capturePacket bool) (*Backend, *Backend) {
+	network := newMockNetwork()
+
+	d0 := newTestDiscovery(t, network.NewTransport(), capturePacket)
+	d1 := newTestDiscovery(t, network.NewTransport(), capturePacket)
+
+	return d0, d1
 }
 
 func TestPeerExpired(t *testing.T) {
@@ -87,7 +82,7 @@ func TestPeerExpired(t *testing.T) {
 }
 
 func TestExpiredPacket(t *testing.T) {
-	r0, r1 := pipe(DefaultConfig(), true)
+	r0, r1 := pipe(t, true)
 
 	expiration := uint64(time.Now().Unix())
 
@@ -112,7 +107,7 @@ func TestExpiredPacket(t *testing.T) {
 }
 
 func TestNotExpectedPacket(t *testing.T) {
-	r0, r1 := pipe(DefaultConfig(), true)
+	r0, r1 := pipe(t, true)
 
 	r0.sendPacket(r1.local, pongPacket, pongResponse{
 		To:         r1.local.toRPCEndpoint(),
@@ -132,7 +127,7 @@ func TestNotExpectedPacket(t *testing.T) {
 }
 
 func TestPingPong(t *testing.T) {
-	r0, r1 := pipe(DefaultConfig(), true)
+	r0, r1 := pipe(t, true)
 
 	r0.sendPacket(r1.local, pingPacket, pingRequest{
 		Version:    4,
@@ -244,16 +239,14 @@ func testProbeNode(t *testing.T, r0 *Backend, r1 *Backend) {
 }
 
 func TestProbeNode(t *testing.T) {
-	r0, r1 := pipe(DefaultConfig(), true)
+	r0, r1 := pipe(t, true)
 	testProbeNode(t, r0, r1)
 }
 
 func TestFindNodeWithUnavailableNode(t *testing.T) {
 	t.Skip()
 
-	config := DefaultConfig()
-
-	r0, r1 := pipe(config, true)
+	r0, r1 := pipe(t, true)
 
 	testProbeNode(t, r0, r1)
 	r0.packetCh, r1.packetCh = nil, nil
@@ -273,13 +266,11 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 func TestFindNode(t *testing.T) {
 	t.Skip()
 
-	config := DefaultConfig()
-
 	var cases = []int{1, 5, 10, 15, 20, 30, 50}
 
 	for _, cc := range cases {
 		t.Run("", func(t *testing.T) {
-			r0, r1 := pipe(config, true)
+			r0, r1 := pipe(t, true)
 
 			testProbeNode(t, r0, r1)
 			r0.packetCh, r1.packetCh = nil, nil
