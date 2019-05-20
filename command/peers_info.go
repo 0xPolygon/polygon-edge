@@ -55,9 +55,9 @@ func (p *PeersInfoCommand) formatInfo(info map[string]interface{}) int {
 	p.Ui.Output(p.Colorize().Color("[bold]Info[reset]"))
 	p.Ui.Output(formatKV(data))
 
-	var protos []common.Instance
+	var protos []common.ProtocolSpec
 	if err := mapstructure.Decode(info["protocols"], &protos); err != nil {
-		// TODO, handle this error
+		p.Ui.Error(err.Error())
 		return 1
 	}
 
@@ -65,7 +65,7 @@ func (p *PeersInfoCommand) formatInfo(info map[string]interface{}) int {
 	caps[0] = "Name|Version"
 
 	for indx, c := range protos {
-		caps[indx+1] = fmt.Sprintf("%s|%d", c.Protocol.Spec.Name, c.Protocol.Spec.Version)
+		caps[indx+1] = fmt.Sprintf("%s|%d", c.Name, c.Version)
 	}
 
 	p.Ui.Output(p.Colorize().Color("\n[bold]Capabilities[reset]"))

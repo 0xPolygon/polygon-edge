@@ -26,9 +26,9 @@ func (h *HTTP) PeersPeerID(ctx *fasthttp.RequestCtx) (interface{}, error) {
 	}
 
 	// format data
-	protocols := []*common.Instance{}
+	protocols := []common.ProtocolSpec{}
 	for _, p := range peer.GetProtocols() {
-		protocols = append(protocols, p)
+		protocols = append(protocols, p.Protocol.Spec)
 	}
 	info := map[string]interface{}{
 		"client":    peer.Info.Client,
