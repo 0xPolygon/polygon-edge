@@ -42,12 +42,6 @@ var (
 )
 
 const (
-	// udpPacketBufSize is used to buffer incoming packets during read
-	// operations.
-	udpPacketBufSize = 1280
-)
-
-const (
 	nodeIDBytes  = 512 / 8
 	maxNeighbors = 6
 	alpha        = 3
@@ -197,13 +191,6 @@ type Backend struct {
 	addr       *net.UDPAddr
 	listener   *net.UDPConn
 	packetCh   chan *Packet
-}
-
-// Packet is used to provide some metadata about incoming packets from peers
-type Packet struct {
-	Buf       []byte
-	From      net.Addr
-	Timestamp time.Time
 }
 
 func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Backend, error) {
