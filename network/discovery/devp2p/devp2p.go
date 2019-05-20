@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
@@ -173,7 +173,7 @@ type rpcEndpoint struct {
 
 // Backend is the p2p discover backend
 type Backend struct {
-	logger     *log.Logger
+	logger     hclog.Logger
 	ID         *ecdsa.PrivateKey
 	timer      *time.Timer
 	handlers   map[string]func(payload []byte, timestamp *time.Time)
@@ -223,7 +223,7 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 }
 
 // NewBackend creates a new p2p discovery protocol
-func NewBackend(logger *log.Logger, key *ecdsa.PrivateKey, transport Transport) (*Backend, error) {
+func NewBackend(logger hclog.Logger, key *ecdsa.PrivateKey, transport Transport) (*Backend, error) {
 	addr := transport.Addr()
 
 	pub := &key.PublicKey
@@ -276,7 +276,7 @@ func (b *Backend) listen() {
 					b.packetCh <- packet
 				} else {
 					if err := b.HandlePacket(packet); err != nil {
-						b.logger.Printf(err.Error())
+						b.logger.Info("failed to handle packet", "err", err.Error())
 					}
 				}
 			}()
@@ -329,7 +329,7 @@ func (b *Backend) loadBootnodes() {
 	// start the initial lookup
 	b.active = true
 
-	b.logger.Printf("Finished probing bootnodes")
+	b.logger.Info("Finished probing bootnodes")
 	b.Lookup()
 }
 

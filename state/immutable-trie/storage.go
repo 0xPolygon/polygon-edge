@@ -18,12 +18,11 @@ package trie
 
 import (
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -93,13 +92,10 @@ func (kv *KVStorage) Get(k []byte) ([]byte, bool) {
 	return data, true
 }
 
-func NewLevelDBStorage(path string, logger *log.Logger) (Storage, error) {
+func NewLevelDBStorage(path string, logger hclog.Logger) (Storage, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
-	}
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 	return &KVStorage{db}, nil
 }
@@ -275,10 +271,6 @@ func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) 
 		}
 
 		n, err := DecodeNode(storage, hash, realVal)
-
-		// fmt.Println("-- val --")
-		// fmt.Println(val)
-
 		n.hash = val
 		return n, rest, err
 

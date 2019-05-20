@@ -3,24 +3,34 @@ package ethereum
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/blockchain"
 )
+
+func newTestBackend(t *testing.T, b0 *blockchain.Blockchain) *Backend {
+	logger := hclog.New(&hclog.LoggerOptions{
+		Output: ioutil.Discard,
+	})
+
+	syncer, err := NewBackend(nil, logger, b0)
+	assert.NoError(t, err)
+
+	return syncer
+}
 
 func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ancestor *types.Header) {
 	b0 := blockchain.NewTestBlockchain(t, h0)
 	b1 := blockchain.NewTestBlockchain(t, h1)
 
-	syncer, err := NewBackend(nil, b0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	syncer := newTestBackend(t, b0)
 
 	eth0, _ := ethPipe(b0, b1)
 
@@ -86,8 +96,7 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 func TestMaxConcurrentTasks(t *testing.T) {
 	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(1000))
 
-	b, err := NewBackend(nil, b0)
-	assert.NoError(t, err)
+	b := newTestBackend(t, b0)
 
 	peekCh := func(b *Backend) bool {
 		workerCh := make(chan *worker)
@@ -115,8 +124,7 @@ func TestMaxConcurrentTasks(t *testing.T) {
 	// No peek if maxConcurrentTasks reached
 	assert.False(t, peekCh(b))
 
-	b, err = NewBackend(nil, b0)
-	assert.NoError(t, err)
+	b = newTestBackend(t, b0)
 
 	// Add enough peers to reach max concurrent tasks
 	for _, p := range []string{"1", "2"} {
@@ -134,9 +142,7 @@ func TestPeerDequeueIncreaseOutstandingCount(t *testing.T) {
 	// Every new peek should increase the outstanding request count
 
 	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(1000))
-
-	b, err := NewBackend(nil, b0)
-	assert.NoError(t, err)
+	b := newTestBackend(t, b0)
 
 	peers := map[string]int{}
 	for _, p := range []string{"1", "2"} {
@@ -171,8 +177,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 	}
 
 	conn0, conn1 := net.Pipe()
-	eth0 := NewEthereumProtocol("", conn0, b0)
-	eth1 := NewEthereumProtocol("", conn1, b1)
+	eth0 := newTestEthereumProto("", conn0, b0)
+	eth1 := newTestEthereumProto("", conn1, b1)
 
 	err := make(chan error)
 	go func() {
@@ -197,7 +203,7 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	st.CurrentBlock = h.Hash()
 	st.GenesisBlock = b.Genesis().Hash()
 
-	eth := NewEthereumProtocol("", conn, b)
+	eth := newTestEthereumProto("", conn, b)
 	if err := eth.Init(st); err != nil {
 		panic(err)
 	}
@@ -210,10 +216,7 @@ func TestBackendBroadcastBlock(t *testing.T) {
 	// b0 with only the genesis
 	b0 := blockchain.NewTestBlockchain(t, headers)
 
-	b, err := NewBackend(nil, b0)
-	if err != nil {
-		panic(err)
-	}
+	b := newTestBackend(t, b0)
 
 	c0, c1 := net.Pipe()
 
@@ -251,14 +254,10 @@ func TestBackendNotify(t *testing.T) {
 	b1 := blockchain.HeadersToBlocks(h1)
 
 	b := blockchain.NewTestBlockchain(t, h0)
-	fmt.Println(b)
 
 	if err := b.WriteBlocks(b1); err != nil {
 		panic(err)
 	}
-
-	fmt.Println("-- forks --")
-	fmt.Println(b.GetForks())
 }
 
 func TestWorkerPool(t *testing.T) {

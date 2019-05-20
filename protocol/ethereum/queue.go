@@ -85,18 +85,6 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 	}
 
 	if len(headers) > int(elem.Len())-int(elem.headersOffset) {
-
-		/*
-			fmt.Println("-- length of incoming headers --")
-			fmt.Println(len(headers))
-
-			fmt.Println("-- length of element --")
-			fmt.Println(elem.Len())
-
-			fmt.Println("-- headers offset --")
-			fmt.Println(elem.headersOffset)
-		*/
-
 		return fmt.Errorf("received more headers than expected")
 	}
 

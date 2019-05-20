@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/consensus"
@@ -173,7 +174,11 @@ func (a *Agent) Start() error {
 		APIEntries:  apiEntries,
 	}
 
-	logger := log.New(os.Stderr, "", log.LstdFlags)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "minimal",
+		Level: hclog.LevelFromString(a.config.LogLevel),
+	})
+
 	m, err := minimal.NewMinimal(logger, config)
 	if err != nil {
 		panic(err)

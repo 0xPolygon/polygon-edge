@@ -28,7 +28,7 @@ The configuration file can be specified either in HCL or JSON format:
 Some attributes can be also set from the command line:
 
 ```
-$ go run main.go agent --config ./config.json --data-dir /tmp/local --port 30304
+$ go run main.go agent --config ./config.json --data-dir /tmp/local --port 30304 --log-level TRACE
 ```
 
 The values from the CLI have preference over the ones in the configuration file.

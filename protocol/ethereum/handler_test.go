@@ -3,6 +3,7 @@ package ethereum
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net"
 	"reflect"
@@ -11,8 +12,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
 )
+
+func newTestEthereumProto(peerID string, conn net.Conn, b *blockchain.Blockchain) *Ethereum {
+	logger := hclog.New(&hclog.LoggerOptions{
+		Output: ioutil.Discard,
+	})
+
+	if peerID == "" {
+		peerID = "1"
+	}
+	return NewEthereumProtocol(peerID, logger, conn, b)
+}
 
 var status = Status{
 	ProtocolVersion: 63,
@@ -95,8 +108,8 @@ func TestHandshake(t *testing.T) {
 func testEthHandshakeWithStatus(ss0 *Status, b0 *blockchain.Blockchain, ss1 *Status, b1 *blockchain.Blockchain) (*Ethereum, error, *Ethereum, error) {
 	conn0, conn1 := net.Pipe()
 
-	eth0 := NewEthereumProtocol("", conn0, b0)
-	eth1 := NewEthereumProtocol("", conn1, b1)
+	eth0 := newTestEthereumProto("", conn0, b0)
+	eth1 := newTestEthereumProto("", conn1, b1)
 
 	err := make(chan error)
 	go func() {

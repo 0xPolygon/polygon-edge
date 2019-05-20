@@ -3,7 +3,6 @@ package network
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"net"
 	"path/filepath"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/network/transport/rlpx"
 
 	"github.com/umbracle/minimal/helper/enode"
@@ -83,7 +83,7 @@ type MemberEvent struct {
 
 // Server is the ethereum client
 type Server struct {
-	logger *log.Logger
+	logger hclog.Logger
 	Name   string
 	key    *ecdsa.PrivateKey
 
@@ -114,7 +114,7 @@ type Server struct {
 }
 
 // NewServer creates a new node
-func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.Logger) *Server {
+func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.Logger) *Server {
 	enode := &enode.Enode{
 		IP:  net.ParseIP(config.BindAddress),
 		TCP: uint16(config.BindPort),
@@ -122,7 +122,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger *log.L
 		ID:  enode.PubkeyToEnode(&key.PublicKey),
 	}
 
-	fmt.Printf("Enode: %s\n", enode.String())
+	logger.Info("ID", "enode", enode.String())
 
 	peersFilePath := filepath.Join(config.DataDir, peersFile)
 
@@ -200,6 +200,8 @@ func (s *Server) Schedule() error {
 
 func (s *Server) setupTransport() error {
 	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
+
+	s.logger.Info("setup transport", "addr", addr.String())
 
 	var err error
 	s.listener, err = net.Listen("tcp", addr.String())
@@ -416,7 +418,7 @@ func (s *Server) connectWithEnode(rawURL string) error {
 }
 
 func (s *Server) addSession(session common.Session) error {
-	p := newPeer(s.logger, session, s)
+	p := newPeer(session, s)
 
 	protos, err := session.NegociateProtocols(s.info)
 	if err != nil {

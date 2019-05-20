@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -30,7 +29,7 @@ import (
 
 // Minimal is the central manager of the blockchain client
 type Minimal struct {
-	logger     *log.Logger
+	logger     hclog.Logger
 	config     *Config
 	sealingCh  chan bool
 	Sealer     *sealer.Sealer
@@ -44,7 +43,7 @@ type Minimal struct {
 	InmemSink  *metrics.InmemSink
 }
 
-func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
+func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	m := &Minimal{
 		logger:    logger,
 		config:    config,
@@ -108,10 +107,6 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 	m.Key = key
 
-	fmt.Println("-- addr --")
-	fmt.Println(config.BindAddr)
-	fmt.Println(config.BindPort)
-
 	// Start server
 	serverConfig := network.DefaultConfig()
 	serverConfig.BindAddress = config.BindAddr
@@ -119,12 +114,10 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 	serverConfig.Bootnodes = config.Chain.Bootnodes
 	serverConfig.DataDir = filepath.Join(config.DataDir, "network")
 
-	m.server = network.NewServer("minimal", m.Key, serverConfig, logger)
+	m.server = network.NewServer("minimal", m.Key, serverConfig, logger.Named("server"))
 
 	// Build discovery backend
 	for name, entry := range config.DiscoveryEntries {
-		fmt.Printf("Discovery entry: %s\n", name)
-
 		backend, ok := config.DiscoveryBackends[name]
 		if !ok {
 			return nil, fmt.Errorf("discovery '%s' not found", name)
@@ -135,7 +128,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 
 		// setup discovery factories
 		discoveryConfig := &discovery.BackendConfig{
-			Logger: logger,
+			Logger: logger.Named(name),
 			Key:    key,
 			Enode:  m.server.Enode,
 			Config: conf,
@@ -189,7 +182,7 @@ func NewMinimal(logger *log.Logger, config *Config) (*Minimal, error) {
 			return nil, fmt.Errorf("protocol '%s' not found", name)
 		}
 
-		proto, err := backend(context.Background(), m, entry.Config)
+		proto, err := backend(context.Background(), logger.Named(name), m, entry.Config)
 		if err != nil {
 			return nil, err
 		}

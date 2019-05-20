@@ -18,6 +18,7 @@ type Config struct {
 	Telemetry   *Telemetry `json:"telemetry"`
 	ServiceName string     `json:"service_name"`
 	Seal        bool       `json:"seal"`
+	LogLevel    string     `json:"log_level"`
 
 	Blockchain *BlockchainConfig        `json:"blockchain"`
 	Protocols  map[string]BackendConfig `json:"protocols"`
@@ -40,7 +41,8 @@ func DefaultConfig() *Config {
 		Telemetry: &Telemetry{
 			PrometheusPort: 8080,
 		},
-		Seal: false,
+		Seal:     false,
+		LogLevel: "INFO",
 		Blockchain: &BlockchainConfig{
 			Backend: "leveldb",
 		},
@@ -74,6 +76,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.Seal {
 		c.Seal = true
+	}
+	if c1.LogLevel != "" {
+		c.LogLevel = c1.LogLevel
 	}
 	if err := mergo.Merge(&c.Protocols, c1.Protocols, mergo.WithOverride); err != nil {
 		return err

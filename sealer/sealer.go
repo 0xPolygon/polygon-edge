@@ -3,7 +3,6 @@ package sealer
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
 )
@@ -18,7 +18,7 @@ import (
 // Sealer seals blocks
 type Sealer struct {
 	config     *Config
-	logger     *log.Logger
+	logger     hclog.Logger
 	lastHeader *types.Header
 
 	blockchain *blockchain.Blockchain
@@ -47,7 +47,7 @@ type SealedNotify struct {
 }
 
 // NewSealer creates a new sealer for a specific engine
-func NewSealer(config *Config, logger *log.Logger, blockchain *blockchain.Blockchain, engine consensus.Consensus) *Sealer {
+func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Blockchain, engine consensus.Consensus) *Sealer {
 	if config.CommitInterval < minCommitInterval {
 		config.CommitInterval = minCommitInterval
 	}
@@ -201,7 +201,7 @@ func (s *Sealer) commit() {
 
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		s.logger.Printf("ERR: %v", err)
+		s.logger.Error("failed to write sealed block: %v", err)
 	}
 
 	// Write the new state

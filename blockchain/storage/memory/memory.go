@@ -1,14 +1,13 @@
 package memory
 
 import (
-	"log"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 // NewMemoryStorage creates the new storage reference with inmemory
-func NewMemoryStorage(logger *log.Logger) (storage.Storage, error) {
+func NewMemoryStorage(logger hclog.Logger) (storage.Storage, error) {
 	db := &memoryKV{map[string][]byte{}}
 	return storage.NewKeyValueStorage(logger, db), nil
 }

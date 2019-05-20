@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/network/common"
 )
 
@@ -13,4 +14,4 @@ type Backend interface {
 }
 
 // Factory is the factory method to create the protocol
-type Factory func(ctx context.Context, m interface{}, config map[string]interface{}) (Backend, error)
+type Factory func(ctx context.Context, logger hclog.Logger, m interface{}, config map[string]interface{}) (Backend, error)

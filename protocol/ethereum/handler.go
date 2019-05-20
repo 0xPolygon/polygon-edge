@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/hashicorp/go-hclog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/crypto"
@@ -127,6 +128,7 @@ func (p *pending) consume(id string) (*callback, bool) {
 
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
+	logger   hclog.Logger
 	conn     net.Conn
 	sendLock sync.Mutex
 
@@ -159,8 +161,9 @@ type NotifyMsg struct {
 }
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(peerID string, conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
+func NewEthereumProtocol(peerID string, logger hclog.Logger, conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
 	e := &Ethereum{
+		logger:     logger,
 		peerID:     peerID,
 		conn:       conn,
 		blockchain: blockchain,
@@ -340,23 +343,35 @@ func (e *Ethereum) Init(status *Status) error {
 	return nil
 }
 
+func (e *Ethereum) readMsg() (*rlpx.Message, error) {
+	if _, err := e.conn.Read(e.recvHeader[:]); err != nil {
+		return nil, err
+	}
+
+	// TODO, reuse buffer
+	buf := make([]byte, e.recvHeader.Length())
+	if _, err := e.conn.Read(buf); err != nil {
+		return nil, err
+	}
+
+	msg := &rlpx.Message{
+		Code:    uint64(e.recvHeader.MsgType()),
+		Payload: bytes.NewReader(buf),
+	}
+	return msg, nil
+}
+
 func (e *Ethereum) listen() {
 	for {
-		if _, err := e.conn.Read(e.recvHeader[:]); err != nil {
-			panic(err)
+		msg, err := e.readMsg()
+		if err != nil {
+			e.logger.Warn("failed to read msg", err.Error())
+			break
 		}
 
-		buf := make([]byte, e.recvHeader.Length())
-		if _, err := e.conn.Read(buf); err != nil {
-			panic(err)
-		}
-
-		msg := rlpx.Message{
-			Code:    uint64(e.recvHeader.MsgType()),
-			Payload: bytes.NewReader(buf),
-		}
-		if err := e.HandleMsg(msg); err != nil {
-			panic(err)
+		if err := e.HandleMsg(*msg); err != nil {
+			e.logger.Warn("failed to handle msg", err.Error())
+			break
 		}
 	}
 }
@@ -473,9 +488,6 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	case code == NodeDataMsg:
 		var data [][]byte
 
-		fmt.Println("-- size --")
-		fmt.Println(msg.Size)
-
 		if err := msg.Decode(&data); err != nil {
 			panic(err)
 		}
@@ -549,7 +561,7 @@ type announcement struct {
 
 func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
 
-	fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
+	// fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
 
 	var announces []*announcement
 	if err := msg.Decode(&announces); err != nil {
@@ -571,14 +583,16 @@ func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
 		return err
 	}
 
-	a := request.Block.Number()
-	b := request.TD.String()
-	c := request.Block.Difficulty().String()
+	/*
+		a := request.Block.Number()
+		b := request.TD.String()
+		c := request.Block.Difficulty().String()
+	*/
 
 	// trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
 	// trueTD := request.TD
 
-	fmt.Printf("===> NOTIFY (%s) Block: %d Difficulty %s. Total: %s\n", e.peerID, a.Uint64(), c, b)
+	// fmt.Printf("===> NOTIFY (%s) Block: %d Difficulty %s. Total: %s\n", e.peerID, a.Uint64(), c, b)
 
 	/*
 		if trueTD.Cmp(e.HeaderDiff) > 0 {

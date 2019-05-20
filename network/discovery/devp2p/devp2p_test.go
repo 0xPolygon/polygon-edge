@@ -3,7 +3,6 @@ package discv4
 import (
 	"crypto/elliptic"
 	"io/ioutil"
-	"log"
 	"net"
 	"reflect"
 	"strings"
@@ -11,13 +10,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/umbracle/minimal/crypto"
 )
 
 func newTestDiscovery(t *testing.T, transport Transport, capturePacket bool) *Backend {
-	logger := log.New(ioutil.Discard, "", log.LstdFlags)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Output: ioutil.Discard,
+	})
+
 	prv0, _ := crypto.GenerateKey()
 
 	r, err := NewBackend(logger, prv0, transport)

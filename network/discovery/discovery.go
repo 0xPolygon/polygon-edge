@@ -3,8 +3,8 @@ package discovery
 import (
 	"context"
 	"crypto/ecdsa"
-	"log"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/helper/enode"
 )
 
@@ -30,7 +30,7 @@ type Backend interface {
 // BackendConfig contains configuration parameters
 type BackendConfig struct {
 	// Logger to be used by the backend
-	Logger *log.Logger
+	Logger hclog.Logger
 
 	// Enode is the identification of the node
 	Enode *enode.Enode

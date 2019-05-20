@@ -49,6 +49,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.ServiceName, "service", "", "")
 	flags.IntVar(&cliConfig.Telemetry.PrometheusPort, "prometheus", 0, "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
+	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 
 	var configFilePaths configFlag
 	flags.Var(&configFilePaths, "config", "")

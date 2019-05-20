@@ -9,6 +9,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/minimal"
 	"github.com/umbracle/minimal/sealer"
@@ -30,6 +31,8 @@ type Backend struct {
 	minimal    *minimal.Minimal
 	blockchain *blockchain.Blockchain
 	queue      *queue
+
+	logger hclog.Logger
 
 	seq     uint64
 	counter int
@@ -54,14 +57,15 @@ type Backend struct {
 	commitCh chan []*element
 }
 
-func Factory(ctx context.Context, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
+func Factory(ctx context.Context, logger hclog.Logger, m interface{}, config map[string]interface{}) (protocol.Backend, error) {
 	minimal := m.(*minimal.Minimal)
-	return NewBackend(minimal, minimal.Blockchain)
+	return NewBackend(minimal, logger, minimal.Blockchain)
 }
 
 // NewBackend creates a new ethereum backend
-func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*Backend, error) {
+func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *blockchain.Blockchain) (*Backend, error) {
 	b := &Backend{
+		logger:      logger,
 		minimal:     minimal,
 		peers:       map[string]*Ethereum{},
 		peersLock:   sync.Mutex{},
@@ -96,7 +100,7 @@ func NewBackend(minimal *minimal.Minimal, blockchain *blockchain.Blockchain) (*B
 	b.queue.front = b.queue.newItem(header.Number.Uint64() + 1)
 	b.queue.head = header.Hash()
 
-	fmt.Printf("Current header (%d): %s\n", header.Number.Uint64(), header.Hash().String())
+	logger.Info("Header", "num", header.Number.Uint64(), "hash", header.Hash().String())
 
 	if minimal != nil {
 		go b.WatchMinedBlocks(minimal.Sealer.SealedCh)
@@ -136,8 +140,6 @@ func (b *Backend) Run() {
 // -- setup --
 
 func (b *Backend) addPeer(id string, proto *Ethereum) {
-	fmt.Println("## ADD PEER ##")
-
 	b.heap.Push(id, proto)
 	b.notifyAvailablePeer()
 }
@@ -301,8 +303,9 @@ func (b *Backend) updateChain(block uint64) {
 
 // Add is called when we connect to a new node
 func (b *Backend) Add(conn net.Conn, peerID string) (protoCommon.ProtocolHandler, error) {
-	fmt.Println("----- ADD NODE -----")
-	fmt.Println(peerID)
+	if len(peerID) > 10 {
+		peerID = peerID[0:10]
+	}
 
 	// use handler to create the connection
 
@@ -311,7 +314,9 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protoCommon.ProtocolHandler
 		return nil, err
 	}
 
-	proto := NewEthereumProtocol(peerID, conn, b.blockchain)
+	logger := b.logger.Named(fmt.Sprintf("peer-%s", peerID))
+
+	proto := NewEthereumProtocol(peerID, logger, conn, b.blockchain)
 	proto.backend = b
 
 	b.peersLock.Lock()
@@ -337,6 +342,7 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protoCommon.ProtocolHandler
 
 	b.updateChain(header.Number.Uint64())
 	b.addPeer(peerID, proto)
+	b.logger.Trace("add node", "id", peerID)
 
 	return proto, nil
 }
@@ -364,19 +370,25 @@ func (b *Backend) Deliver(context string, id uint32, data interface{}, err error
 
 	switch obj := data.(type) {
 	case []*types.Header:
-		fmt.Printf("deliver headers %d: %d\n", id, len(obj))
+		b.logger.Trace("deliver headers", "count", len(obj))
+
+		// fmt.Printf("deliver headers %d: %d\n", id, len(obj))
 		if err := b.queue.deliverHeaders(id, obj); err != nil {
 			panic(fmt.Errorf("Failed to deliver headers (%d): %v", id, err))
 		}
 
 	case []*types.Body:
-		fmt.Printf("deliver bodies %d: %d\n", id, len(obj))
+		b.logger.Trace("deliver bodies", "count", len(obj))
+
+		// fmt.Printf("deliver bodies %d: %d\n", id, len(obj))
 		if err := b.queue.deliverBodies(id, obj); err != nil {
 			panic(fmt.Errorf("Failed to deliver bodies (%d): %v", id, err))
 		}
 
 	case [][]*types.Receipt:
-		fmt.Printf("deliver receipts %d: %d\n", id, len(obj))
+		b.logger.Trace("deliver receipts", "count", len(obj))
+
+		// fmt.Printf("deliver receipts %d: %d\n", id, len(obj))
 		if err := b.queue.deliverReceipts(id, obj); err != nil {
 			panic(fmt.Errorf("Failed to deliver receipts (%d): %v", id, err))
 		}
@@ -441,7 +453,7 @@ func (b *Backend) commitData() {
 				}
 
 				h, _ := b.blockchain.Header()
-				fmt.Printf("New header number: %d\n", h.Number.Uint64())
+				b.logger.Info("new header number", "num", h.Number.Uint64())
 			}
 		}
 	}
@@ -667,17 +679,23 @@ func (t *task) Run() bool {
 
 	switch job := t.job.payload.(type) {
 	case *HeadersJob:
-		fmt.Printf("SYNC HEADERS (%s): %d %d\n", id, job.block, job.count)
+		// fmt.Printf("SYNC HEADERS (%s): %d %d\n", id, job.block, job.count)
+
+		t.backend.logger.Trace("sync headers", "id", id, "from", job.block, "count", job.count)
 
 		data, err = conn.RequestHeadersRangeSync(ctx, job.block, job.count)
 		context = "headers"
 	case *BodiesJob:
-		fmt.Printf("SYNC BODIES (%s): %d\n", id, len(job.hashes))
+		// fmt.Printf("SYNC BODIES (%s): %d\n", id, len(job.hashes))
+
+		t.backend.logger.Trace("sync bodies", "id", id, "num", len(job.hashes))
 
 		data, err = conn.RequestBodiesSync(ctx, job.hash, job.hashes)
 		context = "bodies"
 	case *ReceiptsJob:
-		fmt.Printf("SYNC RECEIPTS (%s): %d\n", id, len(job.hashes))
+		// fmt.Printf("SYNC RECEIPTS (%s): %d\n", id, len(job.hashes))
+
+		t.backend.logger.Trace("sync receipts", "id", id, "num", len(job.hashes))
 
 		data, err = conn.RequestReceiptsSync(ctx, job.hash, job.hashes)
 		context = "receipts"

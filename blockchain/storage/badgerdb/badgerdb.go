@@ -2,15 +2,14 @@ package badgerdb
 
 import (
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/dgraph-io/badger"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 // Factory creates a leveldb storage
-func Factory(config map[string]string, logger *log.Logger) (storage.Storage, error) {
+func Factory(config map[string]string, logger hclog.Logger) (storage.Storage, error) {
 	path, ok := config["path"]
 	if !ok {
 		return nil, fmt.Errorf("path not found")
@@ -19,17 +18,13 @@ func Factory(config map[string]string, logger *log.Logger) (storage.Storage, err
 }
 
 // NewBadgerDBStorage creates the new storage reference with badgerDB
-func NewBadgerDBStorage(path string, logger *log.Logger) (storage.Storage, error) {
+func NewBadgerDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
 	opts := badger.DefaultOptions
 	opts.Dir = path
 	opts.ValueDir = path
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
-	}
-
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	kv := &badgerDBKV{db}

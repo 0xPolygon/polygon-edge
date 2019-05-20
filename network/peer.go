@@ -2,7 +2,6 @@ package network
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network/common"
@@ -40,12 +39,11 @@ type Peer struct {
 	ID        string
 	prettyID  string
 	Status    Status
-	logger    *log.Logger
 	conn      common.Session
 	protocols []*common.Instance
 }
 
-func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
+func newPeer(conn common.Session, server *Server) *Peer {
 	info := conn.GetInfo()
 	id := info.Enode.ID.String()
 
@@ -54,7 +52,6 @@ func newPeer(logger *log.Logger, conn common.Session, server *Server) *Peer {
 		Info:      info,
 		ID:        id,
 		prettyID:  id[:8],
-		logger:    logger,
 		conn:      conn,
 		protocols: []*common.Instance{},
 	}

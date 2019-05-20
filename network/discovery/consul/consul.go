@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/umbracle/minimal/helper/enode"
 
 	consul "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/network/discovery"
 )
 
@@ -23,7 +23,7 @@ type config struct {
 
 // Backend is the consul discovery backend
 type Backend struct {
-	logger  *log.Logger
+	logger  hclog.Logger
 	config  config
 	client  *consul.Client
 	eventCh chan string
@@ -56,13 +56,13 @@ func (b *Backend) Schedule() {
 	}
 
 	if err := b.client.Agent().ServiceRegister(service); err != nil {
-		b.logger.Printf("Failed to register service: %v\n", err)
+		b.logger.Error("Failed to register service: %v\n", err)
 	}
 
 	go func() {
 		for {
 			if err := b.findNodes(); err != nil {
-				b.logger.Printf("Failed to find nodes: %v", err)
+				b.logger.Error("Failed to find nodes: %v", err)
 			}
 			time.Sleep(10 * time.Second)
 		}

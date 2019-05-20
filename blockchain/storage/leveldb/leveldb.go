@@ -2,15 +2,14 @@ package leveldb
 
 import (
 	"fmt"
-	"log"
-	"os"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 // Factory creates a leveldb storage
-func Factory(config map[string]interface{}, logger *log.Logger) (storage.Storage, error) {
+func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storage, error) {
 	path, ok := config["path"]
 	if !ok {
 		return nil, fmt.Errorf("path not found")
@@ -23,13 +22,10 @@ func Factory(config map[string]interface{}, logger *log.Logger) (storage.Storage
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb
-func NewLevelDBStorage(path string, logger *log.Logger) (storage.Storage, error) {
+func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
-	}
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	kv := &levelDBKV{db}

@@ -380,7 +380,6 @@ func (s *Session) recvLoop() error {
 			msg := decodeDiscMsg(msg.Payload)
 
 			// TODO, logger
-			// fmt.Printf("DISCONNECTED: %s %s\n", s.id, msg.String())
 			return msg
 		default:
 			s.handleStreamMessage(&msg)

@@ -436,7 +436,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 	}
 
-	// fmt.Printf("Done: last header written was %s at %s\n", headers[len(headers)-1].Hash().String(), headers[len(headers)-1].Number.String())
 	return nil
 }
 
@@ -550,10 +549,6 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 	}
 
 	s2, root := txn.Commit(config.EIP155)
-
-	// fmt.Println(s2)
-	// fmt.Println(root)
-
 	return s2, root, txns, nil
 }
 

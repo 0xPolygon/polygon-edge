@@ -48,7 +48,6 @@ func (j *JSONRPC) Close() error {
 
 // Factory is the factory method for the api backend
 func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) (api.API, error) {
-	fmt.Println("go on")
 	handler := &JSONRPC{
 		servers: map[serverType]Server{},
 	}

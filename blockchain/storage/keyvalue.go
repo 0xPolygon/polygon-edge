@@ -2,12 +2,12 @@ package storage
 
 import (
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/hashicorp/go-hclog"
 )
 
 // prefix
@@ -51,12 +51,12 @@ type KV interface {
 
 // KeyValueStorage is a generic storage for kv databases
 type KeyValueStorage struct {
-	logger *log.Logger
+	logger hclog.Logger
 	db     KV
 	Db     KV
 }
 
-func NewKeyValueStorage(logger *log.Logger, db KV) Storage {
+func NewKeyValueStorage(logger hclog.Logger, db KV) Storage {
 	return &KeyValueStorage{logger: logger, db: db}
 }
 
@@ -204,7 +204,7 @@ func (s *KeyValueStorage) read(p []byte, k []byte, obj interface{}) bool {
 		return false
 	}
 	if err := rlp.DecodeBytes(data, obj); err != nil {
-		s.logger.Printf("failed to decode rlp: %v", err)
+		s.logger.Warn("failed to decode rlp: %v", err)
 		return false
 	}
 	return true
@@ -219,7 +219,7 @@ func (s *KeyValueStorage) get(p []byte, k []byte) ([]byte, bool) {
 	p = append(p, k...)
 	data, ok, err := s.db.Get(p)
 	if err != nil {
-		s.logger.Printf("failed to read: %v", err)
+		s.logger.Warn("failed to read: %v", err)
 		return nil, false
 	}
 	return data, ok
