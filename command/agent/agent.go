@@ -172,6 +172,8 @@ func (a *Agent) Start() error {
 
 		APIBackends: apiBackends,
 		APIEntries:  apiEntries,
+
+		StateStorage: a.config.StateStorage,
 	}
 
 	logger := hclog.New(&hclog.LoggerOptions{

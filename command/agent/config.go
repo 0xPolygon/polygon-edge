@@ -25,6 +25,8 @@ type Config struct {
 	Discovery  map[string]BackendConfig `json:"discovery"`
 	Consensus  BackendConfig            `json:"consensus"`
 	API        map[string]BackendConfig `json:"api"`
+
+	StateStorage string `json:"state_storage"`
 }
 
 type Telemetry struct {
@@ -46,10 +48,11 @@ func DefaultConfig() *Config {
 		Blockchain: &BlockchainConfig{
 			Backend: "leveldb",
 		},
-		Protocols: map[string]BackendConfig{},
-		Discovery: map[string]BackendConfig{},
-		Consensus: BackendConfig{},
-		API:       map[string]BackendConfig{},
+		Protocols:    map[string]BackendConfig{},
+		Discovery:    map[string]BackendConfig{},
+		Consensus:    BackendConfig{},
+		API:          map[string]BackendConfig{},
+		StateStorage: "leveldb",
 	}
 }
 
@@ -79,6 +82,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.LogLevel != "" {
 		c.LogLevel = c1.LogLevel
+	}
+	if c1.StateStorage != "" {
+		c.StateStorage = c1.StateStorage
 	}
 	if err := mergo.Merge(&c.Protocols, c1.Protocols, mergo.WithOverride); err != nil {
 		return err

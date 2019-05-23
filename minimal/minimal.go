@@ -155,12 +155,19 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
-	trieDB, err := trie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
-	if err != nil {
-		return nil, err
+	var stateStorage trie.Storage
+
+	switch config.StateStorage {
+	case "leveldb":
+		stateStorage, err = trie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("state storage '%s' not found", config.StateStorage)
 	}
 
-	st := trie.NewState(trieDB)
+	st := trie.NewState(stateStorage)
 
 	// blockchain object
 	m.Blockchain = blockchain.NewBlockchain(storage, st, m.consensus, config.Chain.Params)
