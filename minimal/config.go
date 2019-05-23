@@ -36,4 +36,6 @@ type Config struct {
 	DataDir     string
 	ServiceName string
 	Seal        bool
+
+	StateStorage string
 }
