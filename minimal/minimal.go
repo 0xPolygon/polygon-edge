@@ -74,6 +74,7 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	paths = addPath(paths, "blockchain", nil)
 	paths = addPath(paths, "consensus", nil)
 	paths = addPath(paths, "network", nil)
+	paths = addPath(paths, "trie", nil)
 
 	// Create paths
 	if err := setupDataDir(config.DataDir, paths); err != nil {
@@ -160,6 +161,11 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	switch config.StateStorage {
 	case "leveldb":
 		stateStorage, err = trie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
+		if err != nil {
+			return nil, err
+		}
+	case "boltdb":
+		stateStorage, err = trie.NewBoltDBStorage(filepath.Join(filepath.Join(m.config.DataDir, "trie"), "db"), logger)
 		if err != nil {
 			return nil, err
 		}
