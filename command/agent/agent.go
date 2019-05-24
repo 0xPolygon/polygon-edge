@@ -26,6 +26,7 @@ import (
 
 	protocolEthereum "github.com/umbracle/minimal/protocol/ethereum"
 
+	storageBoltDB "github.com/umbracle/minimal/blockchain/storage/boltdb"
 	storageLevelDB "github.com/umbracle/minimal/blockchain/storage/leveldb"
 
 	apiHTTP "github.com/umbracle/minimal/api/http"
@@ -34,6 +35,7 @@ import (
 
 var blockchainBackends = map[string]storage.Factory{
 	"leveldb": storageLevelDB.Factory,
+	"boltdb":  storageBoltDB.Factory,
 }
 
 var consensusBackends = map[string]consensus.Factory{

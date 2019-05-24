@@ -24,6 +24,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/hashicorp/hcl v1.0.0
 	github.com/imdario/mergo v0.3.7
+	github.com/ledgerwatch/bolt v1.4.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.1.1
 	github.com/libp2p/go-libp2p-peer v0.1.0
 	github.com/libp2p/go-libp2p-peerstore v0.0.2
