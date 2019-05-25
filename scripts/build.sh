@@ -16,6 +16,9 @@ DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 # Change into that directory
 cd "$DIR"
 
+GIT_COMMIT="$(git rev-parse HEAD)"
+GO_LDFLAGS="-X github.com/umbracle/minimal/version.GitCommit=${GIT_COMMIT}"
+
 # Determine the arch/os combos we're building for
 XC_ARCH=${XC_ARCH:-"amd64"}
 XC_OS=${XC_OS:-"linux"}
@@ -32,7 +35,7 @@ echo "==> Building..."
     -os="${XC_OS}" \
     -arch="${XC_ARCH}" \
     -osarch="!darwin/arm !darwin/arm64" \
-    -ldflags "${GOLDFLAGS}" \
+    -ldflags "${GO_LDFLAGS}" \
     -output "pkg/{{.OS}}_{{.Arch}}/minimal" \
     -tags="${GOTAGS}" \
     -cgo \
