@@ -6,7 +6,6 @@ import (
 
 	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/types"
@@ -70,7 +69,7 @@ func (f *FrontierSigner) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (
 
 	h := f.Hash(tx)
 
-	sig, err := crypto.Sign(h[:], priv)
+	sig, err := Sign(priv, h[:])
 	if err != nil {
 		return nil, err
 	}
