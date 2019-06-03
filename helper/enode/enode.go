@@ -2,17 +2,15 @@ package enode
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 const nodeIDBytes = 512 / 8
@@ -21,7 +19,7 @@ const nodeIDBytes = 512 / 8
 type ID [nodeIDBytes]byte
 
 func (i ID) String() string {
-	return strings.TrimPrefix(hexutil.Encode(i[:]), "0x")
+	return hex.EncodeToString(i[:])
 }
 
 // Enode is the URL scheme description of an ethereum node.

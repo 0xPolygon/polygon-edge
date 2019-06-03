@@ -1,9 +1,9 @@
 package trie
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/ledgerwatch/bolt"
+	"github.com/umbracle/minimal/types"
 )
 
 // KVStorage is a k/v storage on memory using boltdb
@@ -37,11 +37,11 @@ func (batch *BoltKVBatch) Put(k, v []byte) {
 	}
 }
 
-func (kv *BoltKVStorage) SetCode(hash common.Hash, code []byte) {
+func (kv *BoltKVStorage) SetCode(hash types.Hash, code []byte) {
 	kv.Put(append(CODE, hash.Bytes()...), code)
 }
 
-func (kv *BoltKVStorage) GetCode(hash common.Hash) ([]byte, bool) {
+func (kv *BoltKVStorage) GetCode(hash types.Hash) ([]byte, bool) {
 	return kv.Get(append(CODE, hash.Bytes()...))
 }
 

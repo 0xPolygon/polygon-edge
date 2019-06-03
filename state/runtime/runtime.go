@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -22,6 +21,7 @@ var (
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrOpcodeNotFound           = errors.New("opcode not found")
 	ErrExecutionReverted        = errors.New("execution was reverted")
+	ErrCodeStoreOutOfGas        = fmt.Errorf("code storage out of gas")
 )
 
 type CallType int
@@ -47,10 +47,10 @@ type Executor interface {
 type Contract struct {
 	Code []byte
 
-	CodeAddress common.Address
-	Address     common.Address // address of the contract
-	Origin      common.Address // origin is where the storage is taken from
-	Caller      common.Address // caller is the one calling the contract
+	CodeAddress types.Address
+	Address     types.Address // address of the contract
+	Origin      types.Address // origin is where the storage is taken from
+	Caller      types.Address // caller is the one calling the contract
 	depth       int
 
 	// inputs
@@ -81,7 +81,7 @@ func (c *Contract) ConsumeAllGas() {
 	c.Gas = 0
 }
 
-func NewContract(depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func NewContract(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	f := &Contract{
 		Caller:      from,
 		Origin:      origin,
@@ -95,12 +95,12 @@ func NewContract(depth int, origin common.Address, from common.Address, to commo
 	return f
 }
 
-func NewContractCreation(depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func NewContractCreation(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	return c
 }
 
-func NewContractCall(depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
+func NewContractCall(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	c.Input = input
 	return c
@@ -109,9 +109,9 @@ func NewContractCall(depth int, origin common.Address, from common.Address, to c
 // Env refers to the block information the transactions runs in
 // it is shared for all the contracts executed so its in the EVM.
 type Env struct {
-	Coinbase   common.Address
-	Timestamp  *big.Int
-	Number     *big.Int
+	Coinbase   types.Address
+	Timestamp  uint64
+	Number     uint64
 	Difficulty *big.Int
 	GasLimit   *big.Int
 	GasPrice   *big.Int
@@ -121,10 +121,10 @@ type Env struct {
 type State interface {
 
 	// Balance
-	AddBalance(addr common.Address, amount *big.Int)
-	SubBalance(addr common.Address, amount *big.Int)
-	SetBalance(addr common.Address, amount *big.Int)
-	GetBalance(addr common.Address) *big.Int
+	AddBalance(addr types.Address, amount *big.Int)
+	SubBalance(addr types.Address, amount *big.Int)
+	SetBalance(addr types.Address, amount *big.Int)
+	GetBalance(addr types.Address) *big.Int
 
 	// Snapshot
 	Snapshot() int
@@ -135,31 +135,31 @@ type State interface {
 	Logs() []*types.Log
 
 	// State
-	SetState(addr common.Address, key, value common.Hash)
-	GetState(addr common.Address, hash common.Hash) common.Hash
+	SetState(addr types.Address, key, value types.Hash)
+	GetState(addr types.Address, hash types.Hash) types.Hash
 
 	// Nonce
-	SetNonce(addr common.Address, nonce uint64)
-	GetNonce(addr common.Address) uint64
+	SetNonce(addr types.Address, nonce uint64)
+	GetNonce(addr types.Address) uint64
 
 	// Code
-	SetCode(addr common.Address, code []byte)
-	GetCode(addr common.Address) []byte
-	GetCodeSize(addr common.Address) int
-	GetCodeHash(addr common.Address) common.Hash
+	SetCode(addr types.Address, code []byte)
+	GetCode(addr types.Address) []byte
+	GetCodeSize(addr types.Address) int
+	GetCodeHash(addr types.Address) types.Hash
 
 	// Suicide
-	HasSuicided(addr common.Address) bool
-	Suicide(addr common.Address) bool
+	HasSuicided(addr types.Address) bool
+	Suicide(addr types.Address) bool
 
 	// Refund
 	AddRefund(gas uint64)
 	SubRefund(gas uint64)
 	GetRefund() uint64
-	GetCommittedState(addr common.Address, hash common.Hash) common.Hash
+	GetCommittedState(addr types.Address, hash types.Hash) types.Hash
 
 	// Others
-	Exist(addr common.Address) bool
-	Empty(addr common.Address) bool
-	CreateAccount(addr common.Address)
+	Exist(addr types.Address) bool
+	Empty(addr types.Address) bool
+	CreateAccount(addr types.Address)
 }

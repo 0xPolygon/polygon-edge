@@ -3,10 +3,9 @@ package clique
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 // Clique is a consensus algorithm for the clique protocol
@@ -24,8 +23,8 @@ func (c *Clique) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 }
 
 // Author checks the author of the header
-func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
+func (c *Clique) Author(header *types.Header) (types.Address, error) {
+	return types.Address{}, nil
 }
 
 // Seal seals the block

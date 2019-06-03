@@ -8,17 +8,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/umbracle/minimal/types"
 )
 
-var emptyAddr common.Address
+var emptyAddr types.Address
 
-func addr(str string) common.Address {
-	return common.HexToAddress(str)
+func addr(str string) types.Address {
+	return types.StringToAddress(str)
 }
 
-func hash(str string) common.Hash {
-	return common.HexToHash(str)
+func hash(str string) types.Hash {
+	return types.StringToHash(str)
 }
 
 func TestGenesisAlloc(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGenesisAlloc(t *testing.T) {
 				emptyAddr: GenesisAccount{
 					Balance: big.NewInt(17),
 					Nonce:   256,
-					Storage: map[common.Hash]common.Hash{
+					Storage: map[types.Hash]types.Hash{
 						hash("1"): hash("3"),
 						hash("2"): hash("4"),
 					},

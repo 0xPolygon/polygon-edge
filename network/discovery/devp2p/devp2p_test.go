@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 func newTestDiscovery(t *testing.T, transport Transport, capturePacket bool) *Backend {
@@ -69,7 +69,7 @@ func TestPeerExpired(t *testing.T) {
 			prv0, _ := crypto.GenerateKey()
 
 			pub := &prv0.PublicKey
-			id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
+			id := hex.EncodeToHex(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
 			p, err := newPeer(id, nil, 0)
 			if err != nil {
@@ -282,7 +282,7 @@ func TestFindNode(t *testing.T) {
 			for i := 0; i < cc; i++ {
 				prv, _ := crypto.GenerateKey()
 				pub := &prv.PublicKey
-				id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
+				id := hex.EncodeToHex(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
 				addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}
 				p, err := newPeer(id, addr, 0)

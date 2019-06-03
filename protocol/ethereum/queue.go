@@ -5,8 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/types"
 )
 
 type HeadersJob struct {
@@ -16,12 +16,12 @@ type HeadersJob struct {
 
 type BodiesJob struct {
 	hash   string
-	hashes []common.Hash
+	hashes []types.Hash
 }
 
 type ReceiptsJob struct {
 	hash   string
-	hashes []common.Hash
+	hashes []types.Hash
 }
 
 // Job is the syncer job
@@ -37,7 +37,7 @@ const (
 type queue struct {
 	front, back *element
 	seq         uint32
-	head        common.Hash // head of the sync chain
+	head        types.Hash // head of the sync chain
 	lock        *sync.Mutex
 }
 
@@ -213,8 +213,8 @@ func (q *queue) deliverReceipts(id uint32, receipts [][]*types.Receipt) error {
 	// check if the value is correct
 	offset := elem.receiptsOffset
 	for indx, receipt := range receipts {
-		if types.DeriveSha(types.Receipts(receipt)) != elem.headers[elem.receiptsHeaders[offset+uint32(indx)]].ReceiptHash {
-			return fmt.Errorf("")
+		if derivesha.CalcReceiptRoot(receipt) != elem.headers[elem.receiptsHeaders[offset+uint32(indx)]].ReceiptsRoot {
+			return fmt.Errorf("receipt root is not correct")
 		}
 	}
 
@@ -260,10 +260,10 @@ func (q *queue) deliverBodies(id uint32, bodies []*types.Body) error {
 	// check if the value is correct
 	offset := elem.bodiesOffset
 	for indx, body := range bodies {
-		if types.DeriveSha(types.Transactions(body.Transactions)) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].TxHash {
+		if derivesha.CalcTxsRoot(body.Transactions) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].TxRoot {
 			return fmt.Errorf("tx hash not correct")
 		}
-		if types.CalcUncleHash(body.Uncles) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].UncleHash {
+		if derivesha.CalcUncleRoot(body.Uncles) != elem.headers[elem.bodiesHeaders[offset+uint32(indx)]].Sha3Uncles {
 			return fmt.Errorf("uncle hash not correct")
 		}
 	}
@@ -311,8 +311,8 @@ func (q *queue) Dequeue() (*Job, error) {
 		return nil, nil
 	}
 
-	getHashesAtIndexes := func(i []int) []common.Hash {
-		res := []common.Hash{}
+	getHashesAtIndexes := func(i []int) []types.Hash {
+		res := []types.Hash{}
 		for _, j := range i {
 			res = append(res, elem.headers[j].Hash())
 		}
@@ -334,7 +334,7 @@ func (q *queue) Dequeue() (*Job, error) {
 		elem.receiptsStatus = pendingX
 
 		hashes := getHashesAtIndexes(elem.receiptsHeaders[elem.receiptsOffset:])
-		hash := elem.headers[elem.receiptsHeaders[elem.receiptsOffset]].ReceiptHash.String()
+		hash := elem.headers[elem.receiptsHeaders[elem.receiptsOffset]].ReceiptsRoot.String()
 
 		return &Job{
 			id:      elem.id,
@@ -349,7 +349,7 @@ func (q *queue) Dequeue() (*Job, error) {
 		hashes := getHashesAtIndexes(elem.bodiesHeaders[elem.bodiesOffset:])
 
 		first := elem.headers[elem.bodiesHeaders[elem.bodiesOffset]]
-		hash := encodeHash(first.UncleHash, first.TxHash).String()
+		hash := encodeHash(first.Sha3Uncles, first.TxRoot).String()
 
 		return &Job{
 			id:      elem.id,
@@ -485,22 +485,22 @@ type element struct {
 	bodiesStatus  elementStatus
 
 	// receipts
-	receipts        []types.Receipts
+	receipts        [][]*types.Receipt
 	receiptsHeaders []int
 	receiptsOffset  uint32
 	receiptsStatus  elementStatus
 }
 
-func (e *element) GetBodiesHashes() []common.Hash {
-	h := []common.Hash{}
+func (e *element) GetBodiesHashes() []types.Hash {
+	h := []types.Hash{}
 	for _, i := range e.bodiesHeaders {
 		h = append(h, e.headers[i].Hash())
 	}
 	return h
 }
 
-func (e *element) GetReceiptsHashes() []common.Hash {
-	h := []common.Hash{}
+func (e *element) GetReceiptsHashes() []types.Hash {
+	h := []types.Hash{}
 	for _, i := range e.receiptsHeaders {
 		h = append(h, e.headers[i].Hash())
 	}
@@ -521,9 +521,9 @@ func (e *element) Len() uint64 {
 }
 
 func hasBody(h *types.Header) bool {
-	return h.TxHash != types.EmptyRootHash || h.UncleHash != types.EmptyUncleHash
+	return h.TxRoot != types.EmptyRootHash || h.Sha3Uncles != types.EmptyUncleHash
 }
 
 func hasReceipts(h *types.Header) bool {
-	return h.ReceiptHash != types.EmptyRootHash
+	return h.ReceiptsRoot != types.EmptyRootHash
 }

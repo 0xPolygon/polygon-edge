@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/crypto"
 )
 
@@ -46,7 +46,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env.GasPrice = c.Exec.GasPrice
 
 	initialCall := true
-	canTransfer := func(txn *state.Txn, address common.Address, amount *big.Int) bool {
+	canTransfer := func(txn *state.Txn, address types.Address, amount *big.Int) bool {
 		if initialCall {
 			initialCall = false
 			return true
@@ -54,7 +54,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		return state.CanTransfer(txn, address, amount)
 	}
 
-	transfer := func(state *state.Txn, from, to common.Address, amount *big.Int) error {
+	transfer := func(state *state.Txn, from, to types.Address, amount *big.Int) error {
 		return nil
 	}
 
@@ -69,7 +69,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		ret, gas, err := evm.Run(contract)
 	*/
 
-	e := state.NewExecutor(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
+	e := state.NewExecutor(txn, env, mainnetChainConfig.Forks.At(env.Number), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer
 
@@ -89,12 +89,12 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if c.Out == "" {
 		c.Out = "0x"
 	}
-	if ret := hexutil.Encode(ret); ret != c.Out {
+	if ret := hex.EncodeToHex(ret); ret != c.Out {
 		t.Fatalf("return mismatch: got %s, want %s", ret, c.Out)
 	}
 
 	// check logs
-	if logs := rlpHash(txn.Logs()); logs != common.HexToHash(c.Logs) {
+	if logs := rlpHashLogs(txn.Logs()); logs != types.StringToHash(c.Logs) {
 		t.Fatalf("logs hash mismatch: got %x, want %x", logs, c.Logs)
 	}
 
@@ -111,6 +111,19 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if expected := stringToUint64T(t, c.Gas); gas != expected {
 		t.Fatalf("gas remaining mismatch: got %d want %d", gas, expected)
 	}
+}
+
+func rlpHashLogs(logs []*types.Log) types.Hash {
+	alias := []interface{}{}
+	for _, log := range logs {
+		alias = append(alias, []interface{}{
+			log.Address,
+			log.Topics,
+			log.Data,
+		})
+	}
+
+	return rlpHash(alias)
 }
 
 func TestEVM(t *testing.T) {
@@ -157,6 +170,6 @@ func TestEVM(t *testing.T) {
 	}
 }
 
-func vmTestBlockHash(n uint64) common.Hash {
-	return common.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
+func vmTestBlockHash(n uint64) types.Hash {
+	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
 }

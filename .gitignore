@@ -5,3 +5,5 @@ config*.json
 
 bin/
 pkg/
+
+test-chain

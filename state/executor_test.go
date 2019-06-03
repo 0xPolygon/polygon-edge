@@ -5,16 +5,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/types"
 )
 
 type Transaction struct {
-	From     common.Address
-	To       common.Address
+	From     types.Address
+	To       types.Address
 	Nonce    uint64
 	Amount   uint64
 	GasLimit uint64
@@ -22,13 +21,21 @@ type Transaction struct {
 	Data     []byte
 }
 
-func (t *Transaction) ToMessage() *types.Message {
-	msg := types.NewMessage(t.From, &t.To, t.Nonce, big.NewInt(int64(t.Amount)), t.GasLimit, big.NewInt(int64(t.GasPrice)), t.Data, true)
-	return &msg
+func (t *Transaction) ToMessage() *types.Transaction {
+	tt := &types.Transaction{
+		To:       &t.To,
+		Nonce:    t.Nonce,
+		Value:    new(big.Int).SetUint64(t.Amount),
+		Gas:      t.GasLimit,
+		GasPrice: new(big.Int).SetUint64(t.GasPrice),
+		Input:    t.Data,
+	}
+	tt.SetFrom(t.From)
+	return tt
 }
 
-func vmTestBlockHash(n uint64) common.Hash {
-	return common.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
+func vmTestBlockHash(n uint64) types.Hash {
+	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
 }
 
 type gasPool struct {
@@ -52,17 +59,17 @@ func newGasPool(gas uint64) *gasPool {
 }
 
 func TestTransition(t *testing.T) {
-	addr1 := common.HexToAddress("1")
+	addr1 := types.StringToAddress("1")
 
 	type Case struct {
-		PreState    map[common.Address]*PreState
+		PreState    map[types.Address]*PreState
 		Transaction *Transaction
 		Err         string
 	}
 
 	var cases = map[string]*Case{
 		"Nonce too low": {
-			PreState: map[common.Address]*PreState{
+			PreState: map[types.Address]*PreState{
 				addr1: {
 					Nonce: 10,
 				},
@@ -74,7 +81,7 @@ func TestTransition(t *testing.T) {
 			Err: "too low 10 > 5",
 		},
 		"Nonce too high": {
-			PreState: map[common.Address]*PreState{
+			PreState: map[types.Address]*PreState{
 				addr1: {
 					Nonce: 5,
 				},
@@ -86,7 +93,7 @@ func TestTransition(t *testing.T) {
 			Err: "too high 5 < 10",
 		},
 		"Insuficient balance to pay gas": {
-			PreState: map[common.Address]*PreState{
+			PreState: map[types.Address]*PreState{
 				addr1: {
 					Balance: 50,
 				},

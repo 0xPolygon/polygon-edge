@@ -5,8 +5,8 @@ import (
 	"hash/fnv"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 func TestCache(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCache(t *testing.T) {
 					hash.Write(b)
 				}
 			}
-			assert.Equal(t, c.hash, hexutil.Encode(hash.Sum(nil)))
+			assert.Equal(t, c.hash, hex.EncodeToHex(hash.Sum(nil)))
 		})
 	}
 }

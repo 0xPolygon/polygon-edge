@@ -40,7 +40,6 @@ func (g *GenesisCommand) Run(args []string) int {
 	c := &chain.Chain{
 		Name: "example",
 		Genesis: &chain.Genesis{
-			Nonce:      1,
 			GasLimit:   5000,
 			Difficulty: big.NewInt(1),
 		},

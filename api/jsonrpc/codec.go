@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/types"
 )
 
 // Request is a jsonrpc request
@@ -64,7 +64,7 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 		}
 	}
 
-	n, err := hexutil.DecodeUint64(str)
+	n, err := types.ParseUint64orHex(&str)
 	if err != nil {
 		return 0, err
 	}

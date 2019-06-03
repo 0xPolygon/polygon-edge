@@ -2,15 +2,15 @@ package ethereum
 
 import (
 	"testing"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/umbracle/minimal/blockchain"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/types"
 )
 
 func newTestQueue(head *types.Header, to uint64) *queue {
 	q := newQueue()
-	q.front = q.newItem(head.Number.Uint64() + 1)
+	q.front = q.newItem(head.Number + 1)
 	q.head = head.Hash()
 	q.addBack(to)
 	return q
@@ -78,7 +78,7 @@ func TestQueueReceiptsAndBodiesCompletedByDefault(t *testing.T) {
 
 	job2 := dequeue(t, q)
 	assert.Equal(t, job2.payload, &HeadersJob{191, 190})
-	
+
 	elem2 := findElement(t, q, job2.id)
 
 	// Deliver job 2
@@ -188,8 +188,8 @@ func TestQueueDeliverTotalHeaders(t *testing.T) {
 	assert.True(t, elem.Completed())
 }
 
-func headersToHashes(headers []*types.Header) []common.Hash {
-	res := []common.Hash{}
+func headersToHashes(headers []*types.Header) []types.Hash {
+	res := []types.Hash{}
 	for _, i := range headers {
 		res = append(res, i.Hash())
 	}

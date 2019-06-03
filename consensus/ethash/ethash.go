@@ -3,17 +3,16 @@ package ethash
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -39,13 +38,13 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 
 // VerifyHeader verifies the header is correct
 func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
-	headerNum := header.Number.Uint64()
-	parentNum := parent.Number.Uint64()
+	headerNum := header.Number
+	parentNum := parent.Number
 
 	if headerNum != parentNum+1 {
 		return fmt.Errorf("header and parent are non sequential")
 	}
-	if header.Time.Cmp(parent.Time) <= 0 {
+	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("incorrect timestamp")
 	}
 
@@ -53,21 +52,19 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("difficulty cannot be negative")
 	}
 
-	if uint64(len(header.Extra)) > chain.MaximumExtraDataSize {
+	if uint64(len(header.ExtraData)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("extradata is too long")
 	}
 
 	if uncle {
-		if header.Time.Cmp(math.MaxBig256) > 0 {
-			return fmt.Errorf("incorrect uncle timestamp")
-		}
+		// TODO
 	} else {
-		if header.Time.Cmp(big.NewInt(time.Now().Add(15*time.Second).Unix())) > 0 {
+		if int64(header.Timestamp) > time.Now().Add(15*time.Second).Unix() {
 			return fmt.Errorf("future block")
 		}
 	}
 
-	diff := e.CalcDifficulty(header.Time.Uint64(), parent)
+	diff := e.CalcDifficulty(int64(header.Timestamp), parent)
 	if diff.Cmp(header.Difficulty) != 0 {
 		return fmt.Errorf("incorrect difficulty")
 	}
@@ -93,12 +90,13 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 
 	if !e.fakePow {
 		// Verify the seal
-		number := header.Number.Uint64()
+		number := header.Number
 		cache := e.getCache(number)
 
-		digest, result := cache.hashimoto(sealHash(header).Bytes(), header.Nonce.Uint64())
+		nonce := binary.BigEndian.Uint64(header.Nonce[:])
+		digest, result := cache.hashimoto(sealHash(header).Bytes(), nonce)
 
-		if !bytes.Equal(header.MixDigest[:], digest) {
+		if !bytes.Equal(header.MixHash[:], digest) {
 			return fmt.Errorf("incorrect digest")
 		}
 
@@ -129,8 +127,9 @@ func (e *Ethash) SetFakePow() {
 }
 
 // CalcDifficulty calculates the difficulty at a given time.
-func (e *Ethash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
-	next := parent.Number.Uint64() + 1
+func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) *big.Int {
+	next := parent.Number + 1
+
 	switch {
 	case e.config.Forks.IsConstantinople(next):
 		return MetropolisDifficulty(time, parent, ConstantinopleBombDelay)
@@ -147,8 +146,8 @@ func (e *Ethash) CalcDifficulty(time uint64, parent *types.Header) *big.Int {
 }
 
 // Author checks the author of the header
-func (e *Ethash) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
+func (e *Ethash) Author(header *types.Header) (types.Address, error) {
+	return types.Address{}, nil
 }
 
 // Seal seals the block
@@ -181,9 +180,10 @@ var (
 // Finalize runs after the block has been processed
 func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
 	number := block.Number()
+	numberBigInt := big.NewInt(int64(number))
 
 	var blockReward *big.Int
-	switch num := number.Uint64(); {
+	switch num := number; {
 	case e.config.Forks.IsConstantinople(num):
 		blockReward = ConstantinopleBlockReward
 	case e.config.Forks.IsByzantium(num):
@@ -195,19 +195,19 @@ func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
 	reward := new(big.Int).Set(blockReward)
 
 	r := new(big.Int)
-	for _, uncle := range block.Uncles() {
-		r.Add(uncle.Number, big8)
-		r.Sub(r, number)
+	for _, uncle := range block.Uncles {
+		r.Add(big.NewInt(int64(uncle.Number)), big8)
+		r.Sub(r, numberBigInt)
 		r.Mul(r, blockReward)
 		r.Div(r, big8)
 
-		txn.AddBalance(uncle.Coinbase, r)
+		txn.AddBalance(uncle.Miner, r)
 
 		r.Div(blockReward, big32)
 		reward.Add(reward, r)
 	}
 
-	txn.AddBalance(block.Coinbase(), reward)
+	txn.AddBalance(block.Header.Miner, reward)
 	return nil
 }
 

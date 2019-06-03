@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/types"
 )
 
 type State interface {
-	NewSnapshotAt(common.Hash) (Snapshot, error)
+	NewSnapshotAt(types.Hash) (Snapshot, error)
 	NewSnapshot() Snapshot
-	GetCode(hash common.Hash) ([]byte, bool)
+	GetCode(hash types.Hash) ([]byte, bool)
 }
 
 type Snapshot interface {
@@ -31,7 +31,7 @@ type accountTrie interface {
 type Account struct {
 	Nonce    uint64
 	Balance  *big.Int
-	Root     common.Hash
+	Root     types.Hash
 	CodeHash []byte
 	Trie     accountTrie `rlp:"-"`
 }
@@ -68,16 +68,16 @@ func (s *StateObject) Empty() bool {
 	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
 }
 
-func (s *StateObject) GetCommitedState(hash common.Hash) common.Hash {
+func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
 	val, ok := s.Account.Trie.Get(hash.Bytes())
 	if !ok {
-		return common.Hash{}
+		return types.Hash{}
 	}
 	_, content, _, err := rlp.Split(val)
 	if err != nil {
-		return common.Hash{}
+		return types.Hash{}
 	}
-	return common.BytesToHash(content)
+	return types.BytesToHash(content)
 }
 
 // Copy makes a copy of the state object

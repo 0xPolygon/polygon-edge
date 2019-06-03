@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
@@ -18,14 +20,9 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // TESTS is the default location of the tests folder
@@ -54,11 +51,11 @@ func remove0xPrefix(str string) string {
 	return str
 }
 
-func stringToAddress(str string) (common.Address, error) {
+func stringToAddress(str string) (types.Address, error) {
 	if str == "" {
-		return common.Address{}, fmt.Errorf("value not found")
+		return types.Address{}, fmt.Errorf("value not found")
 	}
-	return common.HexToAddress(str), nil
+	return types.StringToAddress(str), nil
 }
 
 func stringToBigInt(str string) (*big.Int, error) {
@@ -76,7 +73,7 @@ func stringToBigInt(str string) (*big.Int, error) {
 	return n, nil
 }
 
-func stringToAddressT(t *testing.T, str string) common.Address {
+func stringToAddressT(t *testing.T, str string) types.Address {
 	address, err := stringToAddress(str)
 	if err != nil {
 		t.Fatal(err)
@@ -113,15 +110,15 @@ func (e *env) ToEnv(t *testing.T) *runtime.Env {
 		Coinbase:   stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToBigIntT(t, e.Difficulty),
 		GasLimit:   stringToBigIntT(t, e.GasLimit),
-		Number:     stringToBigIntT(t, e.Number),
-		Timestamp:  stringToBigIntT(t, e.Timestamp),
+		Number:     stringToUint64T(t, e.Number),
+		Timestamp:  stringToUint64T(t, e.Timestamp),
 	}
 }
 
 type exec struct {
-	Address  common.Address
-	Caller   common.Address
-	Origin   common.Address
+	Address  types.Address
+	Caller   types.Address
+	Origin   types.Address
 	Code     []byte
 	Data     []byte
 	Value    *big.Int
@@ -131,14 +128,14 @@ type exec struct {
 
 func (e *exec) UnmarshalJSON(input []byte) error {
 	type execUnmarshall struct {
-		Address  string `json:"address"`
-		Caller   string `json:"caller"`
-		Code     string `json:"code"`
-		Data     string `json:"data"`
-		Gas      string `json:"gas"`
-		GasPrice string `json:"gasPrice"`
-		Origin   string `json:"origin"`
-		Value    string `json:"value"`
+		Address  types.Address `json:"address"`
+		Caller   types.Address `json:"caller"`
+		Origin   types.Address `json:"origin"`
+		Code     string        `json:"code"`
+		Data     string        `json:"data"`
+		Value    string        `json:"value"`
+		Gas      string        `json:"gas"`
+		GasPrice string        `json:"gasPrice"`
 	}
 
 	var dec execUnmarshall
@@ -147,38 +144,32 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	e.Address, err = stringToAddress(dec.Address)
+	e.Address = dec.Address
+	e.Caller = dec.Caller
+	e.Origin = dec.Origin
+
+	e.Code, err = types.ParseBytes(&dec.Code)
 	if err != nil {
 		return err
 	}
-	e.Caller, err = stringToAddress(dec.Caller)
+	e.Data, err = types.ParseBytes(&dec.Data)
 	if err != nil {
 		return err
 	}
-	e.Code, err = hexutil.Decode(dec.Code)
+
+	e.Value, err = types.ParseUint256orHex(&dec.Value)
 	if err != nil {
 		return err
 	}
-	e.Data, err = hexutil.Decode(dec.Data)
+	e.GasLimit, err = types.ParseUint64orHex(&dec.Gas)
 	if err != nil {
 		return err
 	}
-	e.GasLimit, err = stringToUint64(dec.Gas)
+	e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice)
 	if err != nil {
 		return err
 	}
-	e.GasPrice, err = stringToBigInt(dec.GasPrice)
-	if err != nil {
-		return err
-	}
-	e.Origin, err = stringToAddress(dec.Origin)
-	if err != nil {
-		return err
-	}
-	e.Value, err = stringToBigInt(dec.Value)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -206,7 +197,7 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Sna
 	return s, snap, root
 }
 
-func rlpHash(x interface{}) (h common.Hash) {
+func rlpHash(x interface{}) (h types.Hash) {
 	hw := sha3.NewLegacyKeccak256()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
@@ -220,8 +211,8 @@ type indexes struct {
 }
 
 type postEntry struct {
-	Root    common.Hash
-	Logs    common.Hash
+	Root    types.Hash
+	Logs    types.Hash
 	Indexes indexes
 }
 
@@ -239,24 +230,24 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	p.Root = common.HexToHash(dec.Root)
-	p.Logs = common.HexToHash(dec.Logs)
+	p.Root = types.StringToHash(dec.Root)
+	p.Logs = types.StringToHash(dec.Logs)
 	p.Indexes = dec.Indexes
 
 	return nil
 }
 
 type stTransaction struct {
-	Data     []string        `json:"data"`
-	GasLimit []uint64        `json:"gasLimit"`
-	Value    []*big.Int      `json:"value"`
-	GasPrice *big.Int        `json:"gasPrice"`
-	Nonce    uint64          `json:"nonce"`
-	From     common.Address  `json:"secretKey"`
-	To       *common.Address `json:"to"`
+	Data     []string       `json:"data"`
+	GasLimit []uint64       `json:"gasLimit"`
+	Value    []*big.Int     `json:"value"`
+	GasPrice *big.Int       `json:"gasPrice"`
+	Nonce    uint64         `json:"nonce"`
+	From     types.Address  `json:"secretKey"`
+	To       *types.Address `json:"to"`
 }
 
-func (t *stTransaction) At(i indexes) (*types.Message, error) {
+func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	if i.Data > len(t.Data) {
 		return nil, fmt.Errorf("data index %d out of bounds (%d)", i.Data, len(t.Data))
 	}
@@ -267,19 +258,28 @@ func (t *stTransaction) At(i indexes) (*types.Message, error) {
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
-	msg := types.NewMessage(t.From, t.To, t.Nonce, t.Value[i.Value], t.GasLimit[i.Gas], t.GasPrice, hexutil.MustDecode(t.Data[i.Data]), true)
-	return &msg, nil
+	msg := &types.Transaction{
+		To:       t.To,
+		Nonce:    t.Nonce,
+		Value:    t.Value[i.Value],
+		Gas:      t.GasLimit[i.Gas],
+		GasPrice: t.GasPrice,
+		Input:    hex.MustDecodeHex(t.Data[i.Data]),
+	}
+
+	msg.SetFrom(t.From)
+	return msg, nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	type txUnmarshall struct {
-		Data      []string      `json:"data"`
-		GasLimit  []string      `json:"gasLimit"`
-		Value     []string      `json:"value"`
-		GasPrice  string        `json:"gasPrice"`
-		Nonce     string        `json:"nonce"`
-		SecretKey hexutil.Bytes `json:"secretKey"`
-		To        string        `json:"to"`
+		Data      []string `json:"data"`
+		GasLimit  []string `json:"gasLimit"`
+		Value     []string `json:"value"`
+		GasPrice  string   `json:"gasPrice"`
+		Nonce     string   `json:"nonce"`
+		SecretKey string   `json:"secretKey"`
+		To        string   `json:"to"`
 	}
 
 	var dec txUnmarshall
@@ -300,10 +300,16 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	for _, i := range dec.Value {
 		value := new(big.Int)
 		if i != "0x" {
-			v, ok := math.ParseBig256(i)
-			if !ok {
-				return fmt.Errorf("invalid tx value %q", i)
+			v, err := types.ParseUint256orHex(&i)
+			if err != nil {
+				return err
 			}
+			/*
+				v, ok := math.ParseBig256(i)
+				if !ok {
+					return fmt.Errorf("invalid tx value %q", i)
+				}
+			*/
 			value = v
 		}
 		t.Value = append(t.Value, value)
@@ -315,9 +321,13 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	t.From = common.Address{}
+	t.From = types.Address{}
 	if len(dec.SecretKey) > 0 {
-		key, err := crypto.ParsePrivateKey(dec.SecretKey)
+		secretKey, err := types.ParseBytes(&dec.SecretKey)
+		if err != nil {
+			return err
+		}
+		key, err := crypto.ParsePrivateKey(secretKey)
 		if err != nil {
 			return fmt.Errorf("invalid private key: %v", err)
 		}
@@ -325,7 +335,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	if dec.To != "" {
-		address := common.HexToAddress(dec.To)
+		address := types.StringToAddress(dec.To)
 		t.To = &address
 	}
 	return nil
@@ -395,22 +405,24 @@ func (h *header) UnmarshalJSON(input []byte) error {
 
 	type headerUnmarshall struct {
 		Bloom            *types.Bloom
-		Coinbase         *common.Address
-		MixHash          *common.Hash
-		Nonce            *types.BlockNonce
-		Number           *math.HexOrDecimal256
-		Hash             *common.Hash
-		ParentHash       *common.Hash
-		ReceiptTrie      *common.Hash
-		StateRoot        *common.Hash
-		TransactionsTrie *common.Hash
-		UncleHash        *common.Hash
-		ExtraData        *hexutil.Bytes
-		Difficulty       *math.HexOrDecimal256
-		GasLimit         *math.HexOrDecimal64
-		GasUsed          *math.HexOrDecimal64
-		Timestamp        *math.HexOrDecimal256
+		Coinbase         *types.Address
+		MixHash          *types.Hash
+		Nonce            *string
+		Number           *string
+		Hash             *types.Hash
+		ParentHash       *types.Hash
+		ReceiptTrie      *types.Hash
+		StateRoot        *types.Hash
+		TransactionsTrie *types.Hash
+		UncleHash        *types.Hash
+		ExtraData        *string
+		Difficulty       *string
+		GasLimit         *string
+		GasUsed          *string
+		Timestamp        *string
 	}
+
+	var err error
 
 	var dec headerUnmarshall
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -418,49 +430,65 @@ func (h *header) UnmarshalJSON(input []byte) error {
 	}
 
 	if dec.Bloom != nil {
-		h.header.Bloom = *dec.Bloom
+		h.header.LogsBloom = *dec.Bloom
 	}
 	if dec.Coinbase != nil {
-		h.header.Coinbase = *dec.Coinbase
+		h.header.Miner = *dec.Coinbase
 	}
 	if dec.MixHash != nil {
-		h.header.MixDigest = *dec.MixHash
+		h.header.MixHash = *dec.MixHash
 	}
-	if dec.Nonce != nil {
-		h.header.Nonce = *dec.Nonce
+
+	nonce, err := types.ParseUint64orHex(dec.Nonce)
+	if err != nil {
+		return err
 	}
-	if dec.Number != nil {
-		h.header.Number = (*big.Int)(dec.Number)
+	if nonce != 0 {
+		binary.BigEndian.PutUint64(h.header.Nonce[:], nonce)
 	}
+
+	h.header.Number, err = types.ParseUint64orHex(dec.Number)
+	if err != nil {
+		return err
+	}
+
 	if dec.ParentHash != nil {
 		h.header.ParentHash = *dec.ParentHash
 	}
 	if dec.ReceiptTrie != nil {
-		h.header.ReceiptHash = *dec.ReceiptTrie
+		h.header.ReceiptsRoot = *dec.ReceiptTrie
 	}
 	if dec.StateRoot != nil {
-		h.header.Root = *dec.StateRoot
+		h.header.StateRoot = *dec.StateRoot
 	}
 	if dec.TransactionsTrie != nil {
-		h.header.TxHash = *dec.TransactionsTrie
+		h.header.TxRoot = *dec.TransactionsTrie
 	}
 	if dec.UncleHash != nil {
-		h.header.UncleHash = *dec.UncleHash
+		h.header.Sha3Uncles = *dec.UncleHash
 	}
-	if dec.ExtraData != nil {
-		h.header.Extra = *dec.ExtraData
+
+	h.header.ExtraData, err = types.ParseBytes(dec.ExtraData)
+	if err != nil {
+		return err
 	}
-	if dec.Difficulty != nil {
-		h.header.Difficulty = (*big.Int)(dec.Difficulty)
+
+	h.header.Difficulty, err = types.ParseUint256orHex(dec.Difficulty)
+	if err != nil {
+		return err
 	}
-	if dec.GasLimit != nil {
-		h.header.GasLimit = uint64(*dec.GasLimit)
+
+	h.header.GasLimit, err = types.ParseUint64orHex(dec.GasLimit)
+	if err != nil {
+		return err
 	}
-	if dec.GasUsed != nil {
-		h.header.GasUsed = uint64(*dec.GasUsed)
+	h.header.GasUsed, err = types.ParseUint64orHex(dec.GasUsed)
+	if err != nil {
+		return err
 	}
-	if dec.Timestamp != nil {
-		h.header.Time = (*big.Int)(dec.Timestamp)
+	h.header.Timestamp, err = types.ParseUint64orHex(dec.Timestamp)
+	if err != nil {
+		return err
 	}
 
 	if dec.Hash != nil {
@@ -524,10 +552,10 @@ func init() {
 	}
 }
 
-func buildBuiltins(t *testing.T, forks *chain.Forks) map[common.Address]*precompiled.Precompiled {
-	p := map[common.Address]*precompiled.Precompiled{}
+func buildBuiltins(t *testing.T, forks *chain.Forks) map[types.Address]*precompiled.Precompiled {
+	p := map[types.Address]*precompiled.Precompiled{}
 
-	addBuiltin := func(active uint64, addr common.Address, b *chain.Builtin) {
+	addBuiltin := func(active uint64, addr types.Address, b *chain.Builtin) {
 		aux, err := precompiled.CreatePrecompiled(b)
 		if err != nil {
 			t.Fatal(err)
@@ -550,7 +578,7 @@ func buildBuiltins(t *testing.T, forks *chain.Forks) map[common.Address]*precomp
 	return p
 }
 
-var homesteadBuiltins map[common.Address]*chain.GenesisAccount
+var homesteadBuiltins map[types.Address]*chain.GenesisAccount
 
 var homesteadBuiltinsStr = `{
 	"0x0000000000000000000000000000000000000001": {
@@ -567,7 +595,7 @@ var homesteadBuiltinsStr = `{
 	}
 }`
 
-var byzantiumBuiltins map[common.Address]*chain.GenesisAccount
+var byzantiumBuiltins map[types.Address]*chain.GenesisAccount
 
 var byzantiumBuiltinsStr = `{
 	"0x0000000000000000000000000000000000000005": {

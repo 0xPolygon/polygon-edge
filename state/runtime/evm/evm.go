@@ -6,13 +6,19 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper"
 	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/types"
+)
+
+var (
+	big0   = big.NewInt(0)
+	big1   = big.NewInt(1)
+	big32  = big.NewInt(32)
+	big256 = big.NewInt(256)
+	big257 = big.NewInt(257)
 )
 
 // IMPORTANT. Memory access needs more overflow protection, right now, only calls and returns are protected
@@ -35,7 +41,7 @@ var (
 )
 
 var (
-	tt255 = math.BigPow(2, 255)
+	tt255 = BigPow(2, 255)
 )
 
 const StackSize = 2048
@@ -44,9 +50,9 @@ const MaxContracts = 1030
 // Instructions is the code of instructions
 type Instructions []byte
 
-type CanTransferFunc func(runtime.State, common.Address, *big.Int) bool
+type CanTransferFunc func(runtime.State, types.Address, *big.Int) bool
 
-type TransferFunc func(state runtime.State, from common.Address, to common.Address, amount *big.Int) error
+type TransferFunc func(state runtime.State, from types.Address, to types.Address, amount *big.Int) error
 
 // Contract is each value from the caller stack
 type Contract struct {
@@ -58,10 +64,10 @@ type Contract struct {
 	stack  []*big.Int
 	sp     int
 
-	codeAddress common.Address
-	address     common.Address // address of the contract
-	origin      common.Address // origin is where the storage is taken from
-	caller      common.Address // caller is the one calling the contract
+	codeAddress types.Address
+	address     types.Address // address of the contract
+	origin      types.Address // origin is where the storage is taken from
+	caller      types.Address // caller is the one calling the contract
 
 	// remove later
 	evm *EVM
@@ -107,6 +113,18 @@ func (c *Contract) Instructions() Instructions {
 	return c.code
 }
 
+func (c *Contract) pushInt(i int64) {
+	c.push(big.NewInt(i))
+}
+
+func (c *Contract) pushHash(hash types.Hash) {
+	c.push(hashToBig(hash))
+}
+
+func (c *Contract) pushAddr(addr types.Address) {
+	c.push(addressToBig(addr))
+}
+
 func (c *Contract) push(val *big.Int) {
 	c.stack[c.sp] = val
 	c.sp++
@@ -114,6 +132,15 @@ func (c *Contract) push(val *big.Int) {
 
 func (c *Contract) stackAtLeast(n int) bool {
 	return c.sp >= n
+}
+
+func (c *Contract) popAddr() (types.Address, bool) {
+	b := c.pop()
+	if b == nil {
+		return types.Address{}, false
+	}
+
+	return types.BytesToAddress(b.Bytes()), true
 }
 
 func (c *Contract) pop() *big.Int {
@@ -158,7 +185,7 @@ func (c *Contract) showStack() string {
 	return "Stack: " + strings.Join(str, ",")
 }
 
-func newContract(evm *EVM, depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func newContract(evm *EVM, depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	f := &Contract{
 		ip:          -1,
 		depth:       depth,
@@ -180,23 +207,23 @@ func newContract(evm *EVM, depth int, origin common.Address, from common.Address
 	return f
 }
 
-func newContractCreation(evm *EVM, depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func newContractCreation(evm *EVM, depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
 	c := newContract(evm, depth, origin, from, to, value, gas, code)
 	return c
 }
 
-func newContractCall(evm *EVM, depth int, origin common.Address, from common.Address, to common.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
+func newContractCall(evm *EVM, depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
 	c := newContract(evm, depth, origin, from, to, value, gas, code)
 	c.input = input
 	return c
 }
 
 // GetHashByNumber returns the hash function of a block number
-type GetHashByNumber = func(i uint64) common.Hash
+type GetHashByNumber = func(i uint64) types.Hash
 
 // EVM is the ethereum virtual machine
 type EVM struct {
-	created []common.Address
+	created []types.Address
 
 	contracts      []*Contract
 	contractsIndex int
@@ -443,7 +470,7 @@ func (c *Contract) Run() ([]byte, error) {
 
 			var data []byte
 			if ip+1+n > len(ins) {
-				data = common.RightPadBytes(ins[ip+1:len(ins)], n)
+				data = helper.RightPadBytes(ins[ip+1:len(ins)], n)
 			} else {
 				data = ins[ip+1 : ip+1+n]
 			}
@@ -530,7 +557,7 @@ func (c *Contract) Run() ([]byte, error) {
 			}
 			c.push(big.NewInt(1).SetBytes(data))
 
-			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			gas, overflow := SafeAdd(gas, GasFastestStep)
 			if overflow {
 				vmerr = ErrGasOverflow
 				goto END
@@ -555,7 +582,7 @@ func (c *Contract) Run() ([]byte, error) {
 				goto END
 			}
 
-			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			gas, overflow := SafeAdd(gas, GasFastestStep)
 			if overflow {
 				vmerr = ErrGasConsumed
 				goto END
@@ -579,7 +606,7 @@ func (c *Contract) Run() ([]byte, error) {
 				vmerr = err
 				goto END
 			}
-			gas, overflow := math.SafeAdd(gas, GasFastestStep)
+			gas, overflow := SafeAdd(gas, GasFastestStep)
 			if overflow {
 				vmerr = ErrGasOverflow
 				goto END
@@ -598,8 +625,8 @@ func (c *Contract) Run() ([]byte, error) {
 				vmerr = ErrStackUnderflow
 				goto END
 			}
-			val := c.evm.state.GetState(c.address, common.BigToHash(loc))
-			c.push(val.Big())
+			val := c.evm.state.GetState(c.address, bigToHash(loc))
+			c.pushHash(val)
 
 		case SSTORE:
 			vmerr = c.executeSStoreOperation()
@@ -680,14 +707,14 @@ func (c *Contract) executeSStoreOperation() error {
 
 	var gas uint64
 
-	current := c.evm.state.GetState(address, common.BigToHash(loc))
+	current := c.evm.state.GetState(address, bigToHash(loc))
 
 	// discount gas (constantinople)
 	if !c.evm.config.Constantinople {
 		switch {
-		case current == (common.Hash{}) && val.Sign() != 0: // 0 => non 0
+		case current == (types.Hash{}) && val.Sign() != 0: // 0 => non 0
 			gas = SstoreSetGas
-		case current != (common.Hash{}) && val.Sign() == 0: // non 0 => 0
+		case current != (types.Hash{}) && val.Sign() == 0: // non 0 => 0
 			c.evm.state.AddRefund(SstoreRefundGas)
 			gas = SstoreClearGas
 		default: // non 0 => non 0 (or 0 => 0)
@@ -697,29 +724,29 @@ func (c *Contract) executeSStoreOperation() error {
 
 		getGas := func() uint64 {
 			// non constantinople gas
-			value := common.BigToHash(val)
+			value := bigToHash(val)
 			if current == value { // noop (1)
 				return NetSstoreNoopGas
 			}
-			original := c.evm.state.GetCommittedState(address, common.BigToHash(loc))
+			original := c.evm.state.GetCommittedState(address, bigToHash(loc))
 			if original == current {
-				if original == (common.Hash{}) { // create slot (2.1.1)
+				if original == (types.Hash{}) { // create slot (2.1.1)
 					return NetSstoreInitGas
 				}
-				if value == (common.Hash{}) { // delete slot (2.1.2b)
+				if value == (types.Hash{}) { // delete slot (2.1.2b)
 					c.evm.state.AddRefund(NetSstoreClearRefund)
 				}
 				return NetSstoreCleanGas // write existing slot (2.1.2)
 			}
-			if original != (common.Hash{}) {
-				if current == (common.Hash{}) { // recreate slot (2.2.1.1)
+			if original != (types.Hash{}) {
+				if current == (types.Hash{}) { // recreate slot (2.2.1.1)
 					c.evm.state.SubRefund(NetSstoreClearRefund)
-				} else if value == (common.Hash{}) { // delete slot (2.2.1.2)
+				} else if value == (types.Hash{}) { // delete slot (2.2.1.2)
 					c.evm.state.AddRefund(NetSstoreClearRefund)
 				}
 			}
 			if original == value {
-				if original == (common.Hash{}) { // reset to original inexistent slot (2.2.2.1)
+				if original == (types.Hash{}) { // reset to original inexistent slot (2.2.2.1)
 					c.evm.state.AddRefund(NetSstoreResetClearRefund)
 				} else { // reset to original existing slot (2.2.2.2)
 					c.evm.state.AddRefund(NetSstoreResetRefund)
@@ -734,7 +761,7 @@ func (c *Contract) executeSStoreOperation() error {
 		return ErrGasOverflow
 	}
 
-	c.evm.state.SetState(address, common.BigToHash(loc), common.BigToHash(val))
+	c.evm.state.SetState(address, bigToHash(loc), bigToHash(val))
 	return nil
 }
 
@@ -744,7 +771,7 @@ func (c *Contract) executeLogsOperation(op OpCode) error {
 	}
 
 	size := int(op - LOG)
-	topics := make([]common.Hash, size)
+	topics := make([]types.Hash, size)
 
 	if !c.stackAtLeast(2 + size) {
 		return ErrStackUnderflow
@@ -752,7 +779,7 @@ func (c *Contract) executeLogsOperation(op OpCode) error {
 
 	mStart, mSize := c.pop(), c.pop()
 	for i := 0; i < size; i++ {
-		topics[i] = common.BigToHash(c.pop())
+		topics[i] = bigToHash(c.pop())
 	}
 
 	data, gas, err := c.memory.Get(mStart, mSize)
@@ -763,7 +790,7 @@ func (c *Contract) executeLogsOperation(op OpCode) error {
 		Address:     c.address,
 		Topics:      topics,
 		Data:        data,
-		BlockNumber: c.evm.env.Number.Uint64(),
+		BlockNumber: c.evm.env.Number,
 	})
 
 	requestedSize, overflow := bigUint64(mSize)
@@ -771,18 +798,18 @@ func (c *Contract) executeLogsOperation(op OpCode) error {
 		return ErrGasOverflow
 	}
 
-	if gas, overflow = math.SafeAdd(gas, LogGas); overflow {
+	if gas, overflow = SafeAdd(gas, LogGas); overflow {
 		return ErrGasOverflow
 	}
-	if gas, overflow = math.SafeAdd(gas, uint64(size)*LogTopicGas); overflow {
+	if gas, overflow = SafeAdd(gas, uint64(size)*LogTopicGas); overflow {
 		return ErrGasOverflow
 	}
 
 	var memorySizeGas uint64
-	if memorySizeGas, overflow = math.SafeMul(requestedSize, LogDataGas); overflow {
+	if memorySizeGas, overflow = SafeMul(requestedSize, LogDataGas); overflow {
 		return ErrGasOverflow
 	}
-	if gas, overflow = math.SafeAdd(gas, memorySizeGas); overflow {
+	if gas, overflow = SafeAdd(gas, memorySizeGas); overflow {
 		return ErrGasOverflow
 	}
 
@@ -804,11 +831,11 @@ func (c *Contract) sha3() error {
 		return err
 	}
 
-	hash := common.BytesToHash(crypto.Keccak256(data))
-	c.push(hash.Big())
+	hash := types.BytesToHash(crypto.Keccak256(data))
+	c.pushHash(hash)
 
 	var overflow bool
-	if gas, overflow = math.SafeAdd(gas, Sha3Gas); overflow {
+	if gas, overflow = SafeAdd(gas, Sha3Gas); overflow {
 		return ErrGasOverflow
 	}
 	if gas, overflow = calculateSha3GasCost(gas, size); overflow {
@@ -826,17 +853,17 @@ func calculateSha3GasCost(gasCost uint64, size *big.Int) (uint64, bool) {
 	if overflow {
 		return 0, true
 	}
-	if wordGas, overflow = math.SafeMul(numWords(wordGas), Sha3WordGas); overflow {
+	if wordGas, overflow = SafeMul(numWords(wordGas), Sha3WordGas); overflow {
 		return 0, true
 	}
-	gasCost, overflow = math.SafeAdd(gasCost, wordGas)
+	gasCost, overflow = SafeAdd(gasCost, wordGas)
 	if overflow {
 		return 0, true
 	}
 	return gasCost, false
 }
 
-func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Address, error) {
+func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, types.Address, error) {
 	var expected int
 	if op == CREATE {
 		expected = 3
@@ -847,7 +874,7 @@ func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Add
 	}
 
 	if !c.stackAtLeast(expected) {
-		return nil, common.Address{}, ErrStackUnderflow
+		return nil, types.Address{}, ErrStackUnderflow
 	}
 
 	// Pop input arguments
@@ -867,23 +894,23 @@ func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Add
 	// Both CREATE and CREATE2 use memory
 	input, gasCost, err := c.memory.Get(offset, size)
 	if err != nil {
-		return nil, common.Address{}, err
+		return nil, types.Address{}, err
 	}
 
 	gasParam := CreateGas
 	if op == CREATE2 {
 		if gasCost, overflow = calculateSha3GasCost(gasCost, size); overflow {
-			return nil, common.Address{}, ErrGasOverflow
+			return nil, types.Address{}, ErrGasOverflow
 		}
 		gasParam = Create2Gas
 	}
 
-	if gasCost, overflow = math.SafeAdd(gasCost, gasParam); overflow {
-		return nil, common.Address{}, ErrGasOverflow
+	if gasCost, overflow = SafeAdd(gasCost, gasParam); overflow {
+		return nil, types.Address{}, ErrGasOverflow
 	}
 
 	if !c.consumeGas(gasCost) {
-		return nil, common.Address{}, ErrGasOverflow
+		return nil, types.Address{}, ErrGasOverflow
 	}
 
 	// Calculate and consume gas for the call
@@ -895,15 +922,15 @@ func (c *Contract) buildCreateContract(op OpCode) (*runtime.Contract, common.Add
 	}
 
 	if !c.consumeGas(gas) {
-		return nil, common.Address{}, ErrGasOverflow
+		return nil, types.Address{}, ErrGasOverflow
 	}
 
 	// Calculate address
-	var address common.Address
+	var address types.Address
 	if op == CREATE {
 		address = crypto.CreateAddress(c.address, c.evm.state.GetNonce(c.address))
 	} else {
-		address = crypto.CreateAddress2(c.address, common.BigToHash(salt), input)
+		address = crypto.CreateAddress2(c.address, bigToHash(salt), input)
 	}
 
 	contract := runtime.NewContractCreation(c.depth+1, c.origin, c.address, address, value, gas, input)
@@ -928,12 +955,12 @@ func (c *Contract) executeCreateOperation(op OpCode) ([]byte, error) {
 
 	ret, gas, err := c.evm.executor.Create(contract)
 
-	if op == CREATE && c.evm.config.Homestead && err == vm.ErrCodeStoreOutOfGas {
-		c.push(big.NewInt(0))
-	} else if err != nil && err != vm.ErrCodeStoreOutOfGas {
-		c.push(big.NewInt(0))
+	if op == CREATE && c.evm.config.Homestead && err == runtime.ErrCodeStoreOutOfGas {
+		c.pushInt(0)
+	} else if err != nil && err != runtime.ErrCodeStoreOutOfGas {
+		c.pushInt(0)
 	} else {
-		c.push(addr.Big())
+		c.pushAddr(addr)
 	}
 
 	c.gas += gas
@@ -1016,7 +1043,7 @@ func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 
 	// Pop input arguments
 	initialGas := c.pop()
-	addr := common.BigToAddress(c.pop())
+	addr, _ := c.popAddr()
 
 	var value *big.Int
 	if op == CALL || op == CALLCODE {
@@ -1032,14 +1059,14 @@ func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 	in := calcMemSize(inOffset, inSize)
 	ret := calcMemSize(retOffset, retSize)
 
-	max := math.BigMax(in, ret)
+	max := BigMax(in, ret)
 
 	memSize, overflow := bigUint64(max)
 	if overflow {
 		return nil, ErrGasOverflow
 	}
 
-	if _, overflow := math.SafeMul(numWords(memSize), 32); overflow {
+	if _, overflow := SafeMul(numWords(memSize), 32); overflow {
 		return nil, ErrGasOverflow
 	}
 
@@ -1072,7 +1099,7 @@ func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 		}
 	}
 
-	if gasCost, overflow = math.SafeAdd(gasCost, memoryGas); overflow {
+	if gasCost, overflow = SafeAdd(gasCost, memoryGas); overflow {
 		return nil, ErrGasOverflow
 	}
 
@@ -1081,7 +1108,7 @@ func (c *Contract) buildCallContract(op OpCode) (*runtime.Contract, error) {
 		return nil, err
 	}
 
-	if gasCost, overflow = math.SafeAdd(gasCost, gas); overflow {
+	if gasCost, overflow = SafeAdd(gasCost, gas); overflow {
 		return nil, ErrGasOverflow
 	}
 
@@ -1122,12 +1149,11 @@ func (c *Contract) executeExtCodeHashOperation() error {
 		return ErrOpcodeNotFound
 	}
 
-	addr := c.pop()
-	if addr == nil {
+	address, ok := c.popAddr()
+	if !ok {
 		return ErrStackUnderflow
 	}
 
-	address := common.BigToAddress(addr)
 	if c.evm.state.Empty(address) {
 		c.push(big.NewInt(0))
 	} else {
@@ -1172,13 +1198,10 @@ func (c *Contract) executeHaltOperations(op OpCode) ([]byte, error) {
 }
 
 func (c *Contract) selfDestruct() error {
-
-	addr := c.pop()
-	if addr == nil {
+	address, ok := c.popAddr()
+	if !ok {
 		return ErrStackUnderflow
 	}
-
-	address := common.BigToAddress(addr)
 
 	// try to remove the gas first
 	var gas uint64
@@ -1223,13 +1246,14 @@ func (c *Contract) executeExtCodeCopy() error {
 		return ErrStackUnderflow
 	}
 
-	address, memOffset, codeOffset, length := c.pop(), c.pop(), c.pop(), c.pop()
+	address, _ := c.popAddr()
+	memOffset, codeOffset, length := c.pop(), c.pop(), c.pop()
 
 	if err := c.memoryResize(c.evm.gasTable.ExtcodeCopy, memOffset, length); err != nil {
 		return err
 	}
 
-	codeCopy := getSlice(c.evm.state.GetCode(common.BigToAddress(address)), codeOffset, length)
+	codeCopy := getSlice(c.evm.state.GetCode(address), codeOffset, length)
 	c.memory.Set(memOffset.Uint64(), length.Uint64(), codeCopy)
 	return nil
 }
@@ -1247,7 +1271,7 @@ func (c *Contract) memoryResize(gasPrice uint64, offset *big.Int, length *big.In
 	}
 
 	// Check if there is enough gas to resize the memory
-	memorySize, overflow := math.SafeMul(numWords(words), 32)
+	memorySize, overflow := SafeMul(numWords(words), 32)
 	if overflow {
 		return ErrGasOverflow
 	}
@@ -1257,17 +1281,17 @@ func (c *Contract) memoryResize(gasPrice uint64, offset *big.Int, length *big.In
 	}
 
 	// Calculate the gas of the resize
-	if gas, overflow = math.SafeAdd(gas, gasPrice); overflow {
+	if gas, overflow = SafeAdd(gas, gasPrice); overflow {
 		return ErrGasOverflow
 	}
 	words, overflow = bigUint64(length)
 	if overflow {
 		return ErrGasOverflow
 	}
-	if words, overflow = math.SafeMul(numWords(words), CopyGas); overflow {
+	if words, overflow = SafeMul(numWords(words), CopyGas); overflow {
 		return ErrGasOverflow
 	}
-	if gas, overflow = math.SafeAdd(gas, words); overflow {
+	if gas, overflow = SafeAdd(gas, words); overflow {
 		return ErrGasOverflow
 	}
 	if !c.consumeGas(gas) {
@@ -1328,34 +1352,34 @@ func getData(data []byte, start uint64, size uint64) []byte {
 	if end > length {
 		end = length
 	}
-	return common.RightPadBytes(data[start:end], int(size))
+	return helper.RightPadBytes(data[start:end], int(size))
 }
 
 func getSlice(data []byte, start *big.Int, size *big.Int) []byte {
 	dlen := big.NewInt(int64(len(data)))
 
-	s := math.BigMin(start, dlen)
-	e := math.BigMin(new(big.Int).Add(s, size), dlen)
-	return common.RightPadBytes(data[s.Uint64():e.Uint64()], int(size.Uint64()))
+	s := BigMin(start, dlen)
+	e := BigMin(new(big.Int).Add(s, size), dlen)
+	return helper.RightPadBytes(data[s.Uint64():e.Uint64()], int(size.Uint64()))
 }
 
 func (c *Contract) executeContextOperations(op OpCode) (*big.Int, error) {
 	switch op {
 	case ADDRESS:
-		return c.address.Big(), nil
+		return addressToBig(c.address), nil
 
 	case BALANCE:
-		addr := c.pop()
-		if addr == nil {
+		addr, ok := c.popAddr()
+		if !ok {
 			return nil, ErrStackUnderflow
 		}
-		return c.evm.state.GetBalance(common.BigToAddress(addr)), nil
+		return c.evm.state.GetBalance(addr), nil
 
 	case ORIGIN:
-		return c.origin.Big(), nil
+		return addressToBig(c.origin), nil
 
 	case CALLER:
-		return c.caller.Big(), nil
+		return addressToBig(c.caller), nil
 
 	case CALLVALUE:
 		value := c.value
@@ -1380,11 +1404,11 @@ func (c *Contract) executeContextOperations(op OpCode) (*big.Int, error) {
 		return big.NewInt(int64(len(c.code))), nil
 
 	case EXTCODESIZE:
-		addr := c.pop()
-		if addr == nil {
+		addr, ok := c.popAddr()
+		if !ok {
 			return nil, ErrStackUnderflow
 		}
-		return big.NewInt(int64(c.evm.state.GetCodeSize(common.BigToAddress(addr)))), nil
+		return big.NewInt(int64(c.evm.state.GetCodeSize(addr))), nil
 
 	case GASPRICE:
 		return c.evm.env.GasPrice, nil
@@ -1407,26 +1431,28 @@ func (c *Contract) executeBlockInformation(op OpCode) (*big.Int, error) {
 		if num == nil {
 			return nil, ErrStackUnderflow
 		}
-		n := big.NewInt(1).Sub(c.evm.env.Number, common.Big257)
-		if num.Cmp(n) > 0 && num.Cmp(c.evm.env.Number) < 0 {
-			return c.evm.getHash(num.Uint64()).Big(), nil
+
+		blockNum := big.NewInt(int64(c.evm.env.Number))
+		n := big.NewInt(1).Sub(blockNum, big257)
+		if num.Cmp(n) > 0 && num.Cmp(blockNum) < 0 {
+			return hashToBig(c.evm.getHash(num.Uint64())), nil
 		}
 		return big.NewInt(0), nil
 
 	case COINBASE:
-		return c.evm.env.Coinbase.Big(), nil
+		return addressToBig(c.evm.env.Coinbase), nil
 
 	case TIMESTAMP:
-		return math.U256(c.evm.env.Timestamp), nil
+		return U256(big.NewInt(int64(c.evm.env.Timestamp))), nil
 
 	case NUMBER:
-		return math.U256(c.evm.env.Number), nil
+		return U256(big.NewInt(int64(c.evm.env.Number))), nil
 
 	case DIFFICULTY:
-		return math.U256(c.evm.env.Difficulty), nil
+		return U256(c.evm.env.Difficulty), nil
 
 	case GASLIMIT:
-		return math.U256(c.evm.env.GasLimit), nil
+		return U256(c.evm.env.GasLimit), nil
 
 	default:
 		return nil, fmt.Errorf("arithmetic bad opcode found: %s", op.String())
@@ -1443,22 +1469,24 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 
 	switch op {
 	case ADD:
-		return math.U256(big.NewInt(0).Add(x, y)), nil
+		// return big.NewInt(0).Add(x, y), nil
+
+		return U256(big.NewInt(0).Add(x, y)), nil
 
 	case MUL:
-		return math.U256(big.NewInt(0).Mul(x, y)), nil
+		return U256(big.NewInt(0).Mul(x, y)), nil
 
 	case SUB:
-		return math.U256(big.NewInt(0).Sub(x, y)), nil
+		return U256(big.NewInt(0).Sub(x, y)), nil
 
 	case DIV:
 		if y.Sign() == 0 {
 			return big.NewInt(0), nil
 		}
-		return math.U256(big.NewInt(0).Div(x, y)), nil
+		return U256(big.NewInt(0).Div(x, y)), nil
 
 	case SDIV:
-		x, y = math.S256(x), math.S256(y)
+		x, y = S256(x), S256(y)
 		res := big.NewInt(0)
 
 		if y.Sign() == 0 || x.Sign() == 0 {
@@ -1469,16 +1497,16 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 		} else {
 			res.Div(x.Abs(x), y.Abs(y))
 		}
-		return math.U256(res), nil
+		return U256(res), nil
 
 	case MOD:
 		if y.Sign() == 0 {
 			return big.NewInt(0), nil
 		}
-		return math.U256(big.NewInt(0).Mod(x, y)), nil
+		return U256(big.NewInt(0).Mod(x, y)), nil
 
 	case SMOD:
-		x, y = math.S256(x), math.S256(y)
+		x, y = S256(x), S256(y)
 		res := big.NewInt(0)
 
 		if y.Sign() == 0 {
@@ -1491,7 +1519,7 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 			res.Mod(x.Abs(x), y.Abs(y))
 		}
 
-		return math.U256(res), nil
+		return U256(res), nil
 
 	case EXP:
 		base, exponent := x, y
@@ -1500,7 +1528,7 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 		gas := expByteLen * c.evm.gasTable.ExpByte
 
 		var overflow bool
-		if gas, overflow = math.SafeAdd(gas, GasSlowStep); overflow {
+		if gas, overflow = SafeAdd(gas, GasSlowStep); overflow {
 			return nil, ErrGasOverflow
 		}
 		if !c.consumeGas(gas) {
@@ -1517,7 +1545,7 @@ func (c *Contract) executeUnsignedArithmeticOperations(op OpCode) (*big.Int, err
 		} else if cmpToOne == 0 {
 			res = base
 		} else {
-			res = math.Exp(base, exponent)
+			res = Exp(base, exponent)
 		}
 		return res, nil
 
@@ -1539,8 +1567,8 @@ func (c *Contract) executeSignExtension() (*big.Int, error) {
 			return nil, ErrStackUnderflow
 		}
 
-		mask := big.NewInt(1).Lsh(common.Big1, bit)
-		mask = big.NewInt(1).Sub(mask, common.Big1)
+		mask := big.NewInt(1).Lsh(big1, bit)
+		mask = big.NewInt(1).Sub(mask, big1)
 
 		res := big.NewInt(1)
 		if num.Bit(int(bit)) > 0 {
@@ -1548,7 +1576,7 @@ func (c *Contract) executeSignExtension() (*big.Int, error) {
 		} else {
 			res.And(num, mask)
 		}
-		return math.U256(res), nil
+		return U256(res), nil
 	}
 
 	return nil, nil
@@ -1567,7 +1595,7 @@ func (c *Contract) executeModularOperations(op OpCode) (*big.Int, error) {
 		if z.Cmp(big.NewInt(0)) > 0 {
 			res.Add(x, y)
 			res.Mod(res, z)
-			return math.U256(res), nil
+			return U256(res), nil
 		}
 		return big.NewInt(0), nil
 
@@ -1575,7 +1603,7 @@ func (c *Contract) executeModularOperations(op OpCode) (*big.Int, error) {
 		if z.Cmp(big.NewInt(0)) > 0 {
 			res.Mul(x, y)
 			res.Mod(res, z)
-			return math.U256(res), nil
+			return U256(res), nil
 		}
 		return big.NewInt(0), nil
 
@@ -1598,7 +1626,7 @@ func (c *Contract) executeBitWiseOperations1(op OpCode) (*big.Int, error) {
 		return big.NewInt(1), nil
 
 	case NOT:
-		return math.U256(big.NewInt(1).Not(x)), nil
+		return U256(big.NewInt(1).Not(x)), nil
 
 	default:
 		return nil, fmt.Errorf("bitwise1 bad opcode found: %s", op.String())
@@ -1623,8 +1651,8 @@ func (c *Contract) executeBitWiseOperations2(op OpCode) (*big.Int, error) {
 		return big.NewInt(0).Xor(x, y), nil
 
 	case BYTE:
-		if x.Cmp(common.Big32) < 0 {
-			return big.NewInt(1).SetUint64(uint64(math.Byte(y, 32, int(x.Int64())))), nil
+		if x.Cmp(big32) < 0 {
+			return big.NewInt(1).SetUint64(uint64(Byte(y, 32, int(x.Int64())))), nil
 		}
 		return big.NewInt(0), nil
 
@@ -1644,32 +1672,32 @@ func (c *Contract) executeShiftOperations(op OpCode) (*big.Int, error) {
 
 	x, y := c.pop(), c.pop()
 
-	shift := math.U256(x)
+	shift := U256(x)
 
 	switch op {
 	case SHL:
-		value := math.U256(y)
-		if shift.Cmp(common.Big256) >= 0 {
+		value := U256(y)
+		if shift.Cmp(big256) >= 0 {
 			return big.NewInt(0), nil
 		}
-		return math.U256(value.Lsh(value, uint(shift.Uint64()))), nil
+		return U256(value.Lsh(value, uint(shift.Uint64()))), nil
 
 	case SHR:
-		value := math.U256(y)
-		if shift.Cmp(common.Big256) >= 0 {
+		value := U256(y)
+		if shift.Cmp(big256) >= 0 {
 			return big.NewInt(0), nil
 		}
-		return math.U256(value.Rsh(value, uint(shift.Uint64()))), nil
+		return U256(value.Rsh(value, uint(shift.Uint64()))), nil
 
 	case SAR:
-		value := math.S256(y)
-		if shift.Cmp(common.Big256) >= 0 {
+		value := S256(y)
+		if shift.Cmp(big256) >= 0 {
 			if value.Sign() >= 0 {
-				return math.U256(big.NewInt(0)), nil
+				return U256(big.NewInt(0)), nil
 			}
-			return math.U256(big.NewInt(-1)), nil
+			return U256(big.NewInt(-1)), nil
 		}
-		return math.U256(value.Rsh(value, uint(shift.Uint64()))), nil
+		return U256(value.Rsh(value, uint(shift.Uint64()))), nil
 
 	default:
 		return nil, fmt.Errorf("shift bad opcode found: %s", op.String())
@@ -1806,4 +1834,16 @@ func callGas(gasTable chain.GasTable, availableGas, base uint64, callCost *big.I
 	}
 
 	return callCost.Uint64(), nil
+}
+
+func bigToHash(b *big.Int) types.Hash {
+	return types.BytesToHash(b.Bytes())
+}
+
+func addressToBig(addr types.Address) *big.Int {
+	return new(big.Int).SetBytes(addr[:])
+}
+
+func hashToBig(hash types.Hash) *big.Int {
+	return new(big.Int).SetBytes(hash[:])
 }

@@ -4,20 +4,20 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/types"
 )
 
-var addr1 = common.HexToAddress("1")
-var addr2 = common.HexToAddress("2")
+var addr1 = types.StringToAddress("1")
+var addr2 = types.StringToAddress("2")
 
-var hash0 = common.HexToHash("0")
-var hash1 = common.HexToHash("1")
-var hash2 = common.HexToHash("2")
+var hash0 = types.StringToHash("0")
+var hash1 = types.StringToHash("1")
+var hash2 = types.StringToHash("2")
 
-var defaultPreState = map[common.Address]*PreState{
+var defaultPreState = map[types.Address]*PreState{
 	addr1: {
-		State: map[common.Hash]common.Hash{
+		State: map[types.Hash]types.Hash{
 			hash1: hash1,
 		},
 	},
@@ -27,11 +27,11 @@ var defaultPreState = map[common.Address]*PreState{
 type PreState struct {
 	Nonce   uint64
 	Balance uint64
-	State   map[common.Hash]common.Hash
+	State   map[types.Hash]types.Hash
 }
 
 // PreStates is a set of pre states
-type PreStates map[common.Address]*PreState
+type PreStates map[types.Address]*PreState
 
 type buildPreState func(p PreStates) (State, Snapshot)
 
@@ -197,10 +197,10 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 
 	// code is not yet on the state
 	assert.Nil(t, txn.GetCode(addr1))
-	assert.Equal(t, (common.Hash{}), txn.GetCodeHash(addr1))
+	assert.Equal(t, (types.Hash{}), txn.GetCodeHash(addr1))
 	assert.Equal(t, int(0), txn.GetCodeSize(addr1))
 
-	assert.Equal(t, (common.Hash{}), txn.GetState(addr1, hash1))
+	assert.Equal(t, (types.Hash{}), txn.GetState(addr1, hash1))
 }
 
 func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
@@ -250,7 +250,7 @@ func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 
 func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 	// If the balance of the account changes to zero the account is deleted
-	preState := map[common.Address]*PreState{
+	preState := map[types.Address]*PreState{
 		addr1: {
 			Balance: 10,
 		},

@@ -3,7 +3,7 @@ package ethash
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -20,15 +20,15 @@ const ConstantinopleBombDelay = 5000000
 const ByzantiumBombDelay = 3000000
 
 // MetropolisDifficulty is the difficulty calculation for the metropolis forks
-func MetropolisDifficulty(time uint64, parent *types.Header, bombDelay uint64) *big.Int {
+func MetropolisDifficulty(time int64, parent *types.Header, bombDelay uint64) *big.Int {
 	diff := new(big.Int)
 	aux := new(big.Int)
 
 	uncles := int64(1)
-	if parent.UncleHash != types.EmptyUncleHash {
+	if parent.Sha3Uncles != types.EmptyUncleHash {
 		uncles = 2
 	}
-	if val := uncles - int64(time-parent.Time.Uint64())/9; val < -99 {
+	if val := uncles - (time-int64(parent.Timestamp))/9; val < -99 {
 		aux.Set(bigNeg99)
 	} else {
 		aux.SetInt64(val)
@@ -44,7 +44,7 @@ func MetropolisDifficulty(time uint64, parent *types.Header, bombDelay uint64) *
 
 	// bomb-delay
 	period := uint64(0)
-	if num := (parent.Number.Uint64() + 1); num >= bombDelay {
+	if num := (parent.Number + 1); num >= bombDelay {
 		period = num - bombDelay
 	}
 	if period := (period / 100000); period > 1 {
@@ -56,11 +56,11 @@ func MetropolisDifficulty(time uint64, parent *types.Header, bombDelay uint64) *
 }
 
 // HomesteadDifficulty is the difficulty calculation for the homestead fork
-func HomesteadDifficulty(time uint64, parent *types.Header) *big.Int {
+func HomesteadDifficulty(time int64, parent *types.Header) *big.Int {
 	diff := new(big.Int)
 	aux := new(big.Int)
 
-	if val := (1 - int64((time-parent.Time.Uint64())/10)); val > -99 {
+	if val := (1 - int64((time-int64(parent.Timestamp))/10)); val > -99 {
 		aux.SetInt64(val)
 	} else {
 		aux.Set(bigNeg99)
@@ -74,7 +74,7 @@ func HomesteadDifficulty(time uint64, parent *types.Header) *big.Int {
 		diff.Set(minDiff)
 	}
 
-	if period := ((parent.Number.Uint64() + 1) / 100000); period > 1 {
+	if period := ((parent.Number + 1) / 100000); period > 1 {
 		aux.SetUint64(period - 2)
 		aux.Exp(big2, aux, nil)
 		diff.Add(diff, aux)
@@ -83,11 +83,11 @@ func HomesteadDifficulty(time uint64, parent *types.Header) *big.Int {
 }
 
 // FrontierDifficulty is the difficulty calculation for the frontier fork
-func FrontierDifficulty(time uint64, parent *types.Header) *big.Int {
+func FrontierDifficulty(time int64, parent *types.Header) *big.Int {
 	diff := new(big.Int).SetBytes(parent.Difficulty.Bytes())
 
 	aux := big.NewInt(1).Div(diff, big2048)
-	if time-parent.Time.Uint64() < 13 {
+	if time-int64(parent.Timestamp) < 13 {
 		diff.Add(diff, aux)
 	} else {
 		diff.Sub(diff, aux)
@@ -96,7 +96,7 @@ func FrontierDifficulty(time uint64, parent *types.Header) *big.Int {
 		diff.Set(minDiff)
 	}
 
-	if period := ((parent.Number.Uint64() + 1) / 100000); period > 1 {
+	if period := ((parent.Number + 1) / 100000); period > 1 {
 		aux.SetUint64(period - 2)
 		aux.Exp(big2, aux, nil)
 		diff.Add(diff, aux)

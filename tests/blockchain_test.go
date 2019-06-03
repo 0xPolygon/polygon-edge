@@ -9,15 +9,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/consensus/ethash"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/state"
@@ -36,7 +35,7 @@ type block struct {
 }
 
 func (b *block) decode() (*types.Block, error) {
-	data, err := hexutil.Decode(b.Rlp)
+	data, err := hex.DecodeHex(b.Rlp)
 	if err != nil {
 		return nil, err
 	}
@@ -63,15 +62,15 @@ type BlockchainTest struct {
 
 func (b *BlockchainTest) buildGenesis() *chain.Genesis {
 	return &chain.Genesis{
-		Nonce:      b.Genesis.header.Nonce.Uint64(),
-		Timestamp:  b.Genesis.header.Time.Uint64(),
+		Nonce:      b.Genesis.header.Nonce,
+		Timestamp:  b.Genesis.header.Timestamp,
 		ParentHash: b.Genesis.header.ParentHash,
-		ExtraData:  b.Genesis.header.Extra,
+		ExtraData:  b.Genesis.header.ExtraData,
 		GasLimit:   b.Genesis.header.GasLimit,
 		GasUsed:    b.Genesis.header.GasUsed,
 		Difficulty: b.Genesis.header.Difficulty,
-		Mixhash:    b.Genesis.header.MixDigest,
-		Coinbase:   b.Genesis.header.Coinbase,
+		Mixhash:    b.Genesis.header.MixHash,
+		Coinbase:   b.Genesis.header.Miner,
 		Alloc:      b.Pre,
 	}
 }
@@ -115,12 +114,12 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	if hash := b.Genesis().Hash(); hash != c.Genesis.header.Hash() {
 		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash(), hash.String())
 	}
-	if stateRoot := b.Genesis().Root; stateRoot != c.Genesis.header.Root {
-		t.Fatalf("genesis state root mismatch: expected %s but found %s", c.Genesis.header.Root.String(), stateRoot.String())
+	if stateRoot := b.Genesis().StateRoot; stateRoot != c.Genesis.header.StateRoot {
+		t.Fatalf("genesis state root mismatch: expected %s but found %s", c.Genesis.header.StateRoot.String(), stateRoot.String())
 	}
 
 	// Write blocks
-	validBlocks := map[common.Hash]*types.Block{}
+	validBlocks := map[types.Hash]*types.Block{}
 	for _, entry := range c.Blocks {
 		block, err := entry.decode()
 		if err != nil {
@@ -145,6 +144,8 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 
 		// validate header
 		header, _ := b.Header()
+		header.Hash()
+
 		if !reflect.DeepEqual(entry.Header.header, header) {
 			t.Fatal("Header is not correct")
 		}
@@ -184,12 +185,12 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 
 	// Validate imported headers
 	header, _ := b.Header()
-	for current := header; current != nil && current.Number.Uint64() != 0; current, _ = b.GetHeaderByHash(current.ParentHash) {
+	for current := header; current != nil && current.Number != 0; current, _ = b.GetHeaderByHash(current.ParentHash) {
 		valid, ok := validBlocks[current.Hash()]
 		if !ok {
 			t.Fatalf("Block from chain %s not found", current.Hash())
 		}
-		if !reflect.DeepEqual(current, valid.Header()) {
+		if !reflect.DeepEqual(current, valid.Header) {
 			t.Fatalf("Headers are not equal")
 		}
 	}

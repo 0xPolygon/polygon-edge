@@ -2,11 +2,12 @@ package crypto
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 )
 
 func TestKeyEncoding(t *testing.T) {
@@ -85,10 +86,10 @@ func TestCreate2(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
-			address := common.HexToAddress(c.address)
-			initCode := hexutil.MustDecode(c.initCode)
+			address := types.StringToAddress(c.address)
+			initCode := hex.MustDecodeHex(c.initCode)
 
-			saltRaw := hexutil.MustDecode(c.salt)
+			saltRaw := hex.MustDecodeHex(c.salt)
 			if len(saltRaw) != 32 {
 				t.Fatal("Salt length must be 32 bytes")
 			}
@@ -97,7 +98,10 @@ func TestCreate2(t *testing.T) {
 			copy(salt[:], saltRaw[:])
 
 			res := CreateAddress2(address, salt, initCode)
-			assert.Equal(t, c.result, res.String())
+
+			// values in the test cases are in EIP155 format, toLower until
+			// the EIP155 is done.
+			assert.Equal(t, strings.ToLower(c.result), strings.ToLower(res.String()))
 		})
 	}
 }
@@ -107,7 +111,7 @@ func TestValidateSignatureValues(t *testing.T) {
 	zero := big.NewInt(0)
 
 	limit := secp256k1N
-	limitMinus1 := new(big.Int).Sub(secp256k1N, common.Big1)
+	limitMinus1 := new(big.Int).Sub(secp256k1N, big1)
 
 	cases := []struct {
 		homestead bool

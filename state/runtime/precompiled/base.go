@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper"
 
 	"golang.org/x/crypto/ripemd160"
 )
@@ -21,7 +21,7 @@ func (c *ecrecover) Gas(input []byte) uint64 {
 func (c *ecrecover) Call(input []byte) ([]byte, error) {
 	const ecRecoverInputLength = 128
 
-	input = common.RightPadBytes(input, ecRecoverInputLength)
+	input = helper.RightPadBytes(input, ecRecoverInputLength)
 	// "input" is (hash, v, r, s), each 32 bytes
 	// but for ecrecover we want (r, s, v)
 
@@ -41,7 +41,7 @@ func (c *ecrecover) Call(input []byte) ([]byte, error) {
 	}
 
 	// the first byte of pubkey is bitcoin heritage
-	return common.LeftPadBytes(crypto.Keccak256(pubKey[1:])[12:], 32), nil
+	return helper.LeftPadBytes(crypto.Keccak256(pubKey[1:])[12:], 32), nil
 }
 
 func allZero(b []byte) bool {
@@ -94,5 +94,5 @@ func (c *ripemd160hash) Gas(input []byte) uint64 {
 func (c *ripemd160hash) Call(input []byte) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
-	return common.LeftPadBytes(ripemd.Sum(nil), 32), nil
+	return helper.LeftPadBytes(ripemd.Sum(nil), 32), nil
 }

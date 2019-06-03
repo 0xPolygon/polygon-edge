@@ -3,8 +3,8 @@ package precompiled
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
+	"math"
+
 	"github.com/umbracle/minimal/helper"
 )
 
@@ -26,6 +26,14 @@ var (
 	big3072   = big.NewInt(3072)
 	big199680 = big.NewInt(199680)
 )
+
+// BigMax returns the larger of x or y.
+func BigMax(x, y *big.Int) *big.Int {
+	if x.Cmp(y) < 0 {
+		return y
+	}
+	return x
+}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 func (c *modExp) Gas(input []byte) uint64 {
@@ -63,7 +71,7 @@ func (c *modExp) Gas(input []byte) uint64 {
 	adjExpLen.Add(adjExpLen, big.NewInt(int64(msb)))
 
 	// Calculate the gas cost of the operation
-	gas := new(big.Int).Set(math.BigMax(modLen, baseLen))
+	gas := new(big.Int).Set(BigMax(modLen, baseLen))
 	switch {
 	case gas.Cmp(big64) <= 0:
 		gas.Mul(gas, gas)
@@ -78,7 +86,7 @@ func (c *modExp) Gas(input []byte) uint64 {
 			new(big.Int).Sub(new(big.Int).Mul(big480, gas), big199680),
 		)
 	}
-	gas.Mul(gas, math.BigMax(adjExpLen, big1))
+	gas.Mul(gas, BigMax(adjExpLen, big1))
 	gas.Div(gas, new(big.Int).SetUint64(c.Divisor))
 
 	if gas.BitLen() > 64 {
@@ -110,7 +118,7 @@ func (c *modExp) Call(input []byte) ([]byte, error) {
 	)
 	if mod.BitLen() == 0 {
 		// Modulo 0 is undefined, return zero
-		return common.LeftPadBytes([]byte{}, int(modLen)), nil
+		return helper.LeftPadBytes([]byte{}, int(modLen)), nil
 	}
-	return common.LeftPadBytes(base.Exp(base, exp, mod).Bytes(), int(modLen)), nil
+	return helper.LeftPadBytes(base.Exp(base, exp, mod).Bytes(), int(modLen)), nil
 }

@@ -8,11 +8,15 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
 	"github.com/umbracle/ecies"
+	"github.com/umbracle/minimal/types"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/rlp"
+)
+
+var (
+	big1 = big.NewInt(1)
 )
 
 func init() {
@@ -32,29 +36,29 @@ func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
 	if v > 1 {
 		return false
 	}
-	if r.Cmp(secp256k1N) >= 0 || r.Cmp(common.Big1) < 0 {
+	if r.Cmp(secp256k1N) >= 0 || r.Cmp(big1) < 0 {
 		return false
 	}
-	if s.Cmp(secp256k1N) >= 0 || s.Cmp(common.Big1) < 0 {
+	if s.Cmp(secp256k1N) >= 0 || s.Cmp(big1) < 0 {
 		return false
 	}
 	return true
 }
 
 // CreateAddress creates an Ethereum address.
-func CreateAddress(addr common.Address, nonce uint64) common.Address {
+func CreateAddress(addr types.Address, nonce uint64) types.Address {
 	buf, _ := rlp.EncodeToBytes([]interface{}{
 		addr,
 		nonce,
 	})
-	return common.BytesToAddress(Keccak256(buf)[12:])
+	return types.BytesToAddress(Keccak256(buf)[12:])
 }
 
 var create2Prefix = []byte{0xff}
 
 // CreateAddress2 creates an Ethereum address following the CREATE2 Opcode.
-func CreateAddress2(addr common.Address, salt [32]byte, inithash []byte) common.Address {
-	return common.BytesToAddress(Keccak256(create2Prefix, addr.Bytes(), salt[:], Keccak256(inithash))[12:])
+func CreateAddress2(addr types.Address, salt [32]byte, inithash []byte) types.Address {
+	return types.BytesToAddress(Keccak256(create2Prefix, addr.Bytes(), salt[:], Keccak256(inithash))[12:])
 }
 
 func ParsePrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
@@ -134,7 +138,7 @@ func Keccak256(v ...[]byte) []byte {
 }
 
 // PubKeyToAddress returns the Ethereum address of a public key
-func PubKeyToAddress(pub *ecdsa.PublicKey) common.Address {
+func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	buf := Keccak256(MarshallPublicKey(pub)[1:])[12:]
-	return common.BytesToAddress(buf)
+	return types.BytesToAddress(buf)
 }

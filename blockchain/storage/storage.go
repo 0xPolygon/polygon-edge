@@ -3,35 +3,34 @@ package storage
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/types"
 )
 
 // Storage is a generic blockchain storage
 type Storage interface {
-	ReadCanonicalHash(n *big.Int) (common.Hash, bool)
-	WriteCanonicalHash(n *big.Int, hash common.Hash) error
+	ReadCanonicalHash(n uint64) (types.Hash, bool)
+	WriteCanonicalHash(n uint64, hash types.Hash) error
 
-	ReadHeadHash() (common.Hash, bool)
-	ReadHeadNumber() (*big.Int, bool)
-	WriteHeadHash(h common.Hash) error
-	WriteHeadNumber(n *big.Int) error
+	ReadHeadHash() (types.Hash, bool)
+	ReadHeadNumber() (uint64, bool)
+	WriteHeadHash(h types.Hash) error
+	WriteHeadNumber(uint64) error
 
-	WriteForks(forks []common.Hash) error
-	ReadForks() []common.Hash
+	WriteForks(forks []types.Hash) error
+	ReadForks() []types.Hash
 
-	WriteDiff(hash common.Hash, diff *big.Int) error
-	ReadDiff(hash common.Hash) (*big.Int, bool)
+	WriteDiff(hash types.Hash, diff *big.Int) error
+	ReadDiff(hash types.Hash) (*big.Int, bool)
 
 	WriteHeader(h *types.Header) error
-	ReadHeader(hash common.Hash) (*types.Header, bool)
+	ReadHeader(hash types.Hash) (*types.Header, bool)
 
-	WriteBody(hash common.Hash, body *types.Body) error
-	ReadBody(hash common.Hash) (*types.Body, bool)
+	WriteBody(hash types.Hash, body *types.Body) error
+	ReadBody(hash types.Hash) (*types.Body, bool)
 
-	WriteReceipts(hash common.Hash, receipts []*types.Receipt) error
-	ReadReceipts(hash common.Hash) []*types.Receipt
+	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
+	ReadReceipts(hash types.Hash) []*types.Receipt
 }
 
 // Factory is a factory method to create a blockchain storage

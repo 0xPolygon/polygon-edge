@@ -5,10 +5,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
@@ -22,18 +19,27 @@ const (
 	MaxCodeSize            = 24576
 )
 
-var emptyCodeHashTwo = common.BytesToHash(crypto.Keccak256(nil))
+var (
+	errorVMOutOfGas = fmt.Errorf("out of gas")
+)
+
+const (
+	// CreateDataGas paid for the return data in a contract-creation
+	CreateDataGas uint64 = 200
+)
+
+var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
 
 var builtinRuntimes = map[string]runtime.Runtime{
 	"evm": &evm.EVM{},
 }
 
 // GetHashByNumber returns the hash function of a block number
-type GetHashByNumber = func(i uint64) common.Hash
+type GetHashByNumber = func(i uint64) types.Hash
 
-type CanTransferFunc func(*Txn, common.Address, *big.Int) bool
+type CanTransferFunc func(*Txn, types.Address, *big.Int) bool
 
-type TransferFunc func(state *Txn, from common.Address, to common.Address, amount *big.Int) error
+type TransferFunc func(state *Txn, from types.Address, to types.Address, amount *big.Int) error
 
 type Executor struct {
 	runtime runtime.Runtime
@@ -48,7 +54,7 @@ type Executor struct {
 	CanTransfer CanTransferFunc
 	Transfer    TransferFunc
 
-	precompiled map[common.Address]*precompiled.Precompiled
+	precompiled map[types.Address]*precompiled.Precompiled
 }
 
 func NewExecutor(state *Txn, env *runtime.Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *Executor {
@@ -67,22 +73,22 @@ func NewExecutor(state *Txn, env *runtime.Env, config chain.ForksInTime, gasTabl
 }
 
 // SetPrecompiled sets the precompiled contracts
-func (e *Executor) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
+func (e *Executor) SetPrecompiled(precompiled map[types.Address]*precompiled.Precompiled) {
 	e.precompiled = precompiled
 }
 
-func (e *Executor) getPrecompiled(addr common.Address) (precompiled.Backend, bool) {
+func (e *Executor) getPrecompiled(addr types.Address) (precompiled.Backend, bool) {
 	p, ok := e.precompiled[addr]
 	if !ok {
 		return nil, false
 	}
-	if p.ActiveAt > e.env.Number.Uint64() {
+	if p.ActiveAt > e.env.Number {
 		return nil, false
 	}
 	return p.Backend, true
 }
 
-func (e *Executor) Apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
+func (e *Executor) Apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[types.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	s := txn.Snapshot()
 	gas, failed, err := e.apply(txn, msg, env, gasTable, config, getHash, gasPool, dryRun, builtins)
 	if err != nil {
@@ -91,39 +97,37 @@ func (e *Executor) Apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 	return gas, failed, err
 }
 
-func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[common.Address]*precompiled.Precompiled) (uint64, bool, error) {
+func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gasTable chain.GasTable, config chain.ForksInTime, getHash evm.GetHashByNumber, gasPool GasPool, dryRun bool, builtins map[types.Address]*precompiled.Precompiled) (uint64, bool, error) {
 	e.SetPrecompiled(builtins)
 
 	s := txn.Snapshot()
 
 	// check nonce is correct (pre-check)
-	if msg.CheckNonce() {
-		nonce := txn.GetNonce(msg.From())
-		if nonce < msg.Nonce() {
-			return 0, false, fmt.Errorf("too high %d < %d", nonce, msg.Nonce())
-		} else if nonce > msg.Nonce() {
-			return 0, false, fmt.Errorf("too low %d > %d", nonce, msg.Nonce())
-		}
+	nonce := txn.GetNonce(msg.From())
+	if nonce < msg.Nonce {
+		return 0, false, fmt.Errorf("too high %d < %d", nonce, msg.Nonce)
+	} else if nonce > msg.Nonce {
+		return 0, false, fmt.Errorf("too low %d > %d", nonce, msg.Nonce)
 	}
 
 	// buy gas
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
+	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GasPrice)
 	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
 		return 0, false, ErrInsufficientBalanceForGas
 	}
 
 	// check if there is space for this tx in the gaspool
-	if err := gasPool.SubGas(msg.Gas()); err != nil {
+	if err := gasPool.SubGas(msg.Gas); err != nil {
 		return 0, false, err
 	}
 
 	// restart the txn gas
-	txn.gas = msg.Gas()
+	txn.gas = msg.Gas
 
-	txn.initialGas = msg.Gas()
+	txn.initialGas = msg.Gas
 	txn.SubBalance(msg.From(), mgval)
 
-	contractCreation := msg.To() == nil
+	contractCreation := msg.To == nil
 
 	// compute intrinsic gas for the tx (data, contract creation, call...)
 	var txGas uint64
@@ -133,7 +137,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 		txGas = chain.TxGas
 	}
 
-	data := msg.Data()
+	data := msg.Input
 	// Bump the required gas by the amount of transactional data
 	if len(data) > 0 {
 		// Zero and non-zero bytes are priced differently
@@ -145,20 +149,20 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 		}
 		// Make sure we don't exceed uint64 for all data combinations
 		if (math.MaxUint64-txGas)/chain.TxDataNonZeroGas < nz {
-			return 0, false, vm.ErrOutOfGas
+			return 0, false, errorVMOutOfGas
 		}
 		txGas += nz * chain.TxDataNonZeroGas
 
 		z := uint64(len(data)) - nz
 		if (math.MaxUint64-txGas)/chain.TxDataZeroGas < z {
-			return 0, false, vm.ErrOutOfGas
+			return 0, false, errorVMOutOfGas
 		}
 		txGas += z * chain.TxDataZeroGas
 	}
 
 	// reduce the intrinsic gas from the total gas
 	if txn.gas < txGas {
-		return 0, false, vm.ErrOutOfGas
+		return 0, false, errorVMOutOfGas
 	}
 
 	txn.gas -= txGas
@@ -175,10 +179,10 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 		e.runtime = evm.NewEVM(e, txn, env, config, gasTable, getHash)
 
 		if contractCreation {
-			_, txn.gas, vmerr = e.Create2(sender, msg.Data(), msg.Value(), txn.gas)
+			_, txn.gas, vmerr = e.Create2(sender, msg.Input, msg.Value, txn.gas)
 		} else {
 			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
-			_, txn.gas, vmerr = e.Call2(sender, *msg.To(), msg.Data(), msg.Value(), txn.gas)
+			_, txn.gas, vmerr = e.Call2(sender, *msg.To, msg.Input, msg.Value, txn.gas)
 		}
 		if vmerr != nil {
 			if vmerr == runtime.ErrNotEnoughFunds {
@@ -199,12 +203,12 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 	txn.gas += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice())
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice)
 
 	txn.AddBalance(msg.From(), remaining)
 
 	// pay the coinbase
-	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), msg.GasPrice()))
+	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), msg.GasPrice))
 
 	// Return remaining gas to the pool for the block
 	gasPool.AddGas(txn.gas)
@@ -212,13 +216,13 @@ func (e *Executor) apply(txn *Txn, msg *types.Message, env *runtime.Env, gasTabl
 	return txn.gasUsed(), vmerr != nil, nil
 }
 
-func (e *Executor) Create2(caller common.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
+func (e *Executor) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
 	address := crypto.CreateAddress(caller, e.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
 	return e.Create(contract)
 }
 
-func (e *Executor) Call2(caller common.Address, to common.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
+func (e *Executor) Call2(caller types.Address, to types.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, e.state.GetCode(to), input)
 	return e.Call(c, runtime.Call)
 }
@@ -306,7 +310,7 @@ func (e *Executor) Create(contract *runtime.Contract) ([]byte, uint64, error) {
 
 	// Check for address collisions
 	contractHash := e.state.GetCodeHash(address)
-	if e.state.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHashTwo) {
+	if e.state.GetNonce(address) != 0 || (contractHash != (types.Hash{}) && contractHash != emptyCodeHashTwo) {
 		return nil, 0, runtime.ErrContractAddressCollision
 	}
 
@@ -333,15 +337,15 @@ func (e *Executor) Create(contract *runtime.Contract) ([]byte, uint64, error) {
 	maxCodeSizeExceeded := e.config.EIP158 && len(ret) > MaxCodeSize
 
 	if err == nil && !maxCodeSizeExceeded {
-		createDataGas := uint64(len(ret)) * params.CreateDataGas
+		createDataGas := uint64(len(ret)) * CreateDataGas
 		if contract.ConsumeGas(createDataGas) {
 			e.state.SetCode(address, ret)
 		} else {
-			err = vm.ErrCodeStoreOutOfGas
+			err = runtime.ErrCodeStoreOutOfGas
 		}
 	}
 
-	if maxCodeSizeExceeded || (err != nil && (e.config.Homestead || err != vm.ErrCodeStoreOutOfGas)) {
+	if maxCodeSizeExceeded || (err != nil && (e.config.Homestead || err != runtime.ErrCodeStoreOutOfGas)) {
 		e.state.RevertToSnapshot(snapshot)
 		if err != runtime.ErrExecutionReverted {
 			contract.ConsumeAllGas()
@@ -356,11 +360,11 @@ func (e *Executor) Create(contract *runtime.Contract) ([]byte, uint64, error) {
 	return ret, contract.Gas, err
 }
 
-func CanTransfer(state *Txn, from common.Address, amount *big.Int) bool {
+func CanTransfer(state *Txn, from types.Address, amount *big.Int) bool {
 	return state.GetBalance(from).Cmp(amount) >= 0
 }
 
-func Transfer(state *Txn, from common.Address, to common.Address, amount *big.Int) error {
+func Transfer(state *Txn, from types.Address, to types.Address, amount *big.Int) error {
 	if balance := state.GetBalance(from); balance.Cmp(amount) < 0 {
 		return runtime.ErrNotEnoughFunds
 	}

@@ -7,18 +7,18 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 )
 
 type mockState struct {
-	snapshots map[common.Hash]Snapshot
+	snapshots map[types.Hash]Snapshot
 }
 
-func (m *mockState) NewSnapshotAt(root common.Hash) (Snapshot, error) {
+func (m *mockState) NewSnapshotAt(root types.Hash) (Snapshot, error) {
 	t, ok := m.snapshots[root]
 	if !ok {
 		return nil, fmt.Errorf("not found")
@@ -30,7 +30,7 @@ func (m *mockState) NewSnapshot() Snapshot {
 	return &mockSnapshot{data: map[string][]byte{}}
 }
 
-func (m *mockState) GetCode(hash common.Hash) ([]byte, bool) {
+func (m *mockState) GetCode(hash types.Hash) ([]byte, bool) {
 	panic("Not implemented in tests")
 }
 
@@ -39,7 +39,7 @@ type mockSnapshot struct {
 }
 
 func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
-	v, ok := m.data[hexutil.Encode(k)]
+	v, ok := m.data[hex.EncodeToHex(k)]
 	return v, ok
 }
 
@@ -47,9 +47,9 @@ func (m *mockSnapshot) Commit(x *iradix.Tree) (Snapshot, []byte) {
 	panic("Not implemented in tests")
 }
 
-func newStateWithPreState(preState map[common.Address]*PreState) (*mockState, *mockSnapshot) {
+func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mockSnapshot) {
 	state := &mockState{
-		snapshots: map[common.Hash]Snapshot{},
+		snapshots: map[types.Hash]Snapshot{},
 	}
 	snapshot := &mockSnapshot{
 		data: map[string][]byte{},
@@ -64,13 +64,13 @@ func newStateWithPreState(preState map[common.Address]*PreState) (*mockState, *m
 		if err != nil {
 			panic(err)
 		}
-		snapshot.data[hexutil.Encode(hashit(addr.Bytes()))] = accountRlp
+		snapshot.data[hex.EncodeToHex(hashit(addr.Bytes()))] = accountRlp
 	}
 
 	return state, snapshot
 }
 
-func newTestTxn(p map[common.Address]*PreState) *Txn {
+func newTestTxn(p map[types.Address]*PreState) *Txn {
 	return newTxn(newStateWithPreState(p))
 }
 
@@ -100,12 +100,12 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 
 const letterBytes = "0123456789ABCDEF"
 
-func randomHash() common.Hash {
-	b := make([]byte, common.HashLength)
+func randomHash() types.Hash {
+	b := make([]byte, types.HashLength)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
-	return common.BytesToHash(b)
+	return types.BytesToHash(b)
 }
 
 func TestSnapshotUpdateData(t *testing.T) {

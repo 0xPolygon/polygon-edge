@@ -2,7 +2,6 @@ package jsonrpc
 
 import (
 	"fmt"
-	"math/big"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -21,7 +20,7 @@ func (e *Eth) GetBlockByNumber(blockNumber string, full bool) (interface{}, erro
 	}
 
 	// TODO, show full blocks
-	header, _ := e.d.minimal.Blockchain.GetHeaderByNumber(big.NewInt(int64(block)))
+	header, _ := e.d.minimal.Blockchain.GetHeaderByNumber(uint64(block))
 	return header, nil
 }
 
