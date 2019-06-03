@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/state/runtime"
 )
 
 func mustDecode(s string) []byte {
-	res, err := hexutil.Decode(s)
+	res, err := hex.DecodeHex(s)
 	if err != nil {
 		panic(err)
 	}
@@ -289,7 +289,7 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 			c := newTestContract(Instructions{byte(instruction)})
 			c.evm = &EVM{
 				config: chain.ForksInTime{Constantinople: true},
-				env:    &runtime.Env{Number: big.NewInt(0)},
+				env:    &runtime.Env{Number: 0},
 			}
 
 			c.push(big.NewInt(1).SetBytes(mustDecode("0x" + cc.x)))
@@ -300,7 +300,7 @@ func testStringTestCases(t *testing.T, instruction OpCode, cases []stringTestCas
 			}
 
 			// remove 0x prefix and pad zeros to the left
-			found := strings.Replace(hexutil.Encode(c.peek().Bytes()), "0x", "", -1)
+			found := strings.Replace(hex.EncodeToHex(c.peek().Bytes()), "0x", "", -1)
 			found = fmt.Sprintf("%064s", found)
 
 			if !strings.Contains(found, cc.expected) {

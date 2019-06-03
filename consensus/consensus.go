@@ -4,10 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 // Consensus is the interface for consensus
@@ -16,7 +15,7 @@ type Consensus interface {
 	VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error
 
 	// Author checks the author of the header
-	Author(header *types.Header) (common.Address, error)
+	Author(header *types.Header) (types.Address, error)
 
 	// Seal seals the block
 	Seal(ctx context.Context, block *types.Block) (*types.Block, error)

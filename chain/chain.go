@@ -1,19 +1,16 @@
 package chain
 
 import (
-	"bytes"
-	"encoding/hex"
+	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/gobuffalo/packr"
+	"github.com/hashicorp/go-multierror"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 )
 
 const (
@@ -47,36 +44,36 @@ type Bootnodes []string
 
 // Genesis specifies the header fields, state of a genesis block
 type Genesis struct {
-	Nonce      uint64         `json:"nonce"`
-	Timestamp  uint64         `json:"timestamp"`
-	ExtraData  []byte         `json:"extraData,omitempty"`
-	GasLimit   uint64         `json:"gasLimit"`
-	Difficulty *big.Int       `json:"difficulty"`
-	Mixhash    common.Hash    `json:"mixHash"`
-	Coinbase   common.Address `json:"coinbase"`
-	Alloc      GenesisAlloc   `json:"alloc,omitempty"`
+	Nonce      [8]byte       `json:"nonce"`
+	Timestamp  uint64        `json:"timestamp"`
+	ExtraData  []byte        `json:"extraData,omitempty"`
+	GasLimit   uint64        `json:"gasLimit"`
+	Difficulty *big.Int      `json:"difficulty"`
+	Mixhash    types.Hash    `json:"mixHash"`
+	Coinbase   types.Address `json:"coinbase"`
+	Alloc      GenesisAlloc  `json:"alloc,omitempty"`
 
 	// Only for testing
-	Number     uint64      `json:"number"`
-	GasUsed    uint64      `json:"gasUsed"`
-	ParentHash common.Hash `json:"parentHash"`
+	Number     uint64     `json:"number"`
+	GasUsed    uint64     `json:"gasUsed"`
+	ParentHash types.Hash `json:"parentHash"`
 }
 
 func (g *Genesis) ToBlock() *types.Header {
 	head := &types.Header{
-		Number:      new(big.Int).SetUint64(g.Number),
-		Nonce:       types.EncodeNonce(g.Nonce),
-		Time:        new(big.Int).SetUint64(g.Timestamp),
-		ParentHash:  g.ParentHash,
-		Extra:       g.ExtraData,
-		GasLimit:    g.GasLimit,
-		GasUsed:     g.GasUsed,
-		Difficulty:  g.Difficulty,
-		MixDigest:   g.Mixhash,
-		Coinbase:    g.Coinbase,
-		UncleHash:   types.EmptyUncleHash,
-		ReceiptHash: types.EmptyRootHash,
-		TxHash:      types.EmptyRootHash,
+		Number:       g.Number,
+		Nonce:        g.Nonce,
+		Timestamp:    g.Timestamp,
+		ParentHash:   g.ParentHash,
+		ExtraData:    g.ExtraData,
+		GasLimit:     g.GasLimit,
+		GasUsed:      g.GasUsed,
+		Difficulty:   g.Difficulty,
+		MixHash:      g.Mixhash,
+		Miner:        g.Coinbase,
+		Sha3Uncles:   types.EmptyUncleHash,
+		ReceiptsRoot: types.EmptyRootHash,
+		TxRoot:       types.EmptyRootHash,
 	}
 	if g.GasLimit == 0 {
 		head.GasLimit = GenesisGasLimit
@@ -89,38 +86,68 @@ func (g *Genesis) ToBlock() *types.Header {
 
 // Decoding
 
+func encodeUint64(i uint64) *string {
+	if i == 0 {
+		return nil
+	}
+
+	bs := make([]byte, 8)
+	binary.BigEndian.PutUint64(bs, i)
+
+	res := hex.EncodeToHex(bs)
+	return &res
+}
+
+func encodeBytes(b []byte) *string {
+	if len(b) == 0 {
+		return nil
+	}
+
+	res := hex.EncodeToHex(b[:])
+	return &res
+}
+
 // MarshalJSON implements the json interface
 func (g *Genesis) MarshalJSON() ([]byte, error) {
 	type Genesis struct {
-		Nonce      math.HexOrDecimal64                         `json:"nonce"`
-		Timestamp  math.HexOrDecimal64                         `json:"timestamp"`
-		ExtraData  hexutil.Bytes                               `json:"extraData"`
-		GasLimit   math.HexOrDecimal64                         `json:"gasLimit"`
-		Difficulty *math.HexOrDecimal256                       `json:"difficulty"`
-		Mixhash    common.Hash                                 `json:"mixHash"`
-		Coinbase   common.Address                              `json:"coinbase"`
-		Alloc      map[common.UnprefixedAddress]GenesisAccount `json:"alloc"`
-		Number     math.HexOrDecimal64                         `json:"number"`
-		GasUsed    math.HexOrDecimal64                         `json:"gasUsed"`
-		ParentHash common.Hash                                 `json:"parentHash"`
+		Nonce      string                     `json:"nonce"`
+		Timestamp  *string                    `json:"timestamp,omitempty"`
+		ExtraData  *string                    `json:"extraData,omitempty"`
+		GasLimit   *string                    `json:"gasLimit,omitempty"`
+		Difficulty *string                    `json:"difficulty,omitempty"`
+		Mixhash    types.Hash                 `json:"mixHash"`
+		Coinbase   types.Address              `json:"coinbase"`
+		Alloc      *map[string]GenesisAccount `json:"alloc,omitempty"`
+		Number     *string                    `json:"number,omitempty"`
+		GasUsed    *string                    `json:"gasUsed,omitempty"`
+		ParentHash types.Hash                 `json:"parentHash"`
 	}
 
 	var enc Genesis
-	enc.Nonce = math.HexOrDecimal64(g.Nonce)
-	enc.Timestamp = math.HexOrDecimal64(g.Timestamp)
-	enc.ExtraData = g.ExtraData
-	enc.GasLimit = math.HexOrDecimal64(g.GasLimit)
-	enc.Difficulty = (*math.HexOrDecimal256)(g.Difficulty)
+	enc.Nonce = hex.EncodeToHex(g.Nonce[:])
+
+	enc.Timestamp = encodeUint64(g.Timestamp)
+	enc.ExtraData = encodeBytes(g.ExtraData)
+
+	enc.GasLimit = encodeUint64(g.GasLimit)
+	if g.Difficulty != nil {
+		res := hex.EncodeToHex(g.Difficulty.Bytes())
+		enc.Difficulty = &res
+	}
+
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
-	enc.Alloc = make(map[common.UnprefixedAddress]GenesisAccount, len(g.Alloc))
+
 	if g.Alloc != nil {
+		alloc := make(map[string]GenesisAccount, len(g.Alloc))
 		for k, v := range g.Alloc {
-			enc.Alloc[common.UnprefixedAddress(k)] = v
+			alloc[hex.EncodeToString(k[:])] = v
 		}
+		enc.Alloc = &alloc
 	}
-	enc.Number = math.HexOrDecimal64(g.Number)
-	enc.GasUsed = math.HexOrDecimal64(g.GasUsed)
+
+	enc.Number = encodeUint64(g.Number)
+	enc.GasUsed = encodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
 
 	return json.Marshal(&enc)
@@ -129,40 +156,59 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements the json interface
 func (g *Genesis) UnmarshalJSON(data []byte) error {
 	type Genesis struct {
-		Nonce      *math.HexOrDecimal64                        `json:"nonce"`
-		Timestamp  *math.HexOrDecimal64                        `json:"timestamp"`
-		ExtraData  *hexutil.Bytes                              `json:"extraData"`
-		GasLimit   *math.HexOrDecimal64                        `json:"gasLimit"`
-		Difficulty *math.HexOrDecimal256                       `json:"difficulty"`
-		Mixhash    *common.Hash                                `json:"mixHash"`
-		Coinbase   *common.Address                             `json:"coinbase"`
-		Alloc      map[common.UnprefixedAddress]GenesisAccount `json:"alloc"`
-		Number     *math.HexOrDecimal64                        `json:"number"`
-		GasUsed    *math.HexOrDecimal64                        `json:"gasUsed"`
-		ParentHash *common.Hash                                `json:"parentHash"`
+		Nonce      *string                   `json:"nonce"`
+		Timestamp  *string                   `json:"timestamp"`
+		ExtraData  *string                   `json:"extraData"`
+		GasLimit   *string                   `json:"gasLimit"`
+		Difficulty *string                   `json:"difficulty"`
+		Mixhash    *types.Hash               `json:"mixHash"`
+		Coinbase   *types.Address            `json:"coinbase"`
+		Alloc      map[string]GenesisAccount `json:"alloc"`
+		Number     *string                   `json:"number"`
+		GasUsed    *string                   `json:"gasUsed"`
+		ParentHash *types.Hash               `json:"parentHash"`
 	}
 
 	var dec Genesis
 	if err := json.Unmarshal(data, &dec); err != nil {
 		return err
 	}
-	if dec.Nonce != nil {
-		g.Nonce = uint64(*dec.Nonce)
+
+	var err, subErr error
+	parseError := func(field string, subErr error) {
+		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
 	}
-	if dec.Timestamp != nil {
-		g.Timestamp = uint64(*dec.Timestamp)
+
+	nonce, subErr := types.ParseUint64orHex(dec.Nonce)
+	if subErr != nil {
+		parseError("nonce", subErr)
 	}
+	binary.BigEndian.PutUint64(g.Nonce[:], nonce)
+
+	g.Timestamp, subErr = types.ParseUint64orHex(dec.Timestamp)
+	if subErr != nil {
+		parseError("timestamp", subErr)
+	}
+
 	if dec.ExtraData != nil {
-		g.ExtraData = *dec.ExtraData
+		g.ExtraData, subErr = types.ParseBytes(dec.ExtraData)
+		if subErr != nil {
+			parseError("extradata", subErr)
+		}
 	}
+
 	if dec.GasLimit == nil {
-		return errors.New("missing required field 'gasLimit' for Genesis")
+		return fmt.Errorf("field 'gaslimit' is required")
 	}
-	g.GasLimit = uint64(*dec.GasLimit)
-	if dec.Difficulty == nil {
-		return errors.New("missing required field 'difficulty' for Genesis")
+	g.GasLimit, subErr = types.ParseUint64orHex(dec.GasLimit)
+	if subErr != nil {
+		parseError("gaslimit", subErr)
 	}
-	g.Difficulty = (*big.Int)(dec.Difficulty)
+	g.Difficulty, subErr = types.ParseUint256orHex(dec.Difficulty)
+	if subErr != nil {
+		parseError("difficulty", subErr)
+	}
+
 	if dec.Mixhash != nil {
 		g.Mixhash = *dec.Mixhash
 	}
@@ -172,19 +218,23 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if dec.Alloc != nil {
 		g.Alloc = make(GenesisAlloc, len(dec.Alloc))
 		for k, v := range dec.Alloc {
-			g.Alloc[common.Address(k)] = v
+			g.Alloc[types.StringToAddress(k)] = v
 		}
 	}
-	if dec.Number != nil {
-		g.Number = uint64(*dec.Number)
+
+	g.Number, subErr = types.ParseUint64orHex(dec.Number)
+	if subErr != nil {
+		parseError("number", subErr)
 	}
-	if dec.GasUsed != nil {
-		g.GasUsed = uint64(*dec.GasUsed)
+	g.GasUsed, subErr = types.ParseUint64orHex(dec.GasUsed)
+	if subErr != nil {
+		parseError("gasused", subErr)
 	}
+
 	if dec.ParentHash != nil {
 		g.ParentHash = *dec.ParentHash
 	}
-	return nil
+	return err
 }
 
 // Genesis alloc
@@ -192,7 +242,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 // GenesisAccount is an account in the state of the genesis block.
 type GenesisAccount struct {
 	Code       []byte
-	Storage    map[common.Hash]common.Hash
+	Storage    map[types.Hash]types.Hash
 	Balance    *big.Int
 	Nonce      uint64
 	Builtin    *Builtin
@@ -207,18 +257,18 @@ type Builtin struct {
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
-type GenesisAlloc map[common.Address]GenesisAccount
+type GenesisAlloc map[types.Address]GenesisAccount
 
 // Decoding
 
 func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
-		Code       *hexutil.Bytes              `json:"code,omitempty"`
-		Storage    map[storageJSON]storageJSON `json:"storage,omitempty"`
-		Balance    *math.HexOrDecimal256       `json:"balance"`
-		Nonce      *math.HexOrDecimal64        `json:"nonce,omitempty"`
-		Builtin    *Builtin                    `json:"builtin,omitempty"`
-		PrivateKey *hexutil.Bytes              `json:"secretKey,omitempty"`
+		Code       *string                   `json:"code,omitempty"`
+		Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
+		Balance    *string                   `json:"balance"`
+		Nonce      *string                   `json:"nonce,omitempty"`
+		Builtin    *Builtin                  `json:"builtin,omitempty"`
+		PrivateKey *string                   `json:"secretKey,omitempty"`
 	}
 
 	var dec GenesisAccount
@@ -226,41 +276,45 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if dec.Code != nil {
-		g.Code = *dec.Code
+	var err error
+	var subErr error
+
+	parseError := func(field string, subErr error) {
+		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
 	}
-	if dec.Storage != nil {
-		g.Storage = make(map[common.Hash]common.Hash, len(dec.Storage))
-		for k, v := range dec.Storage {
-			g.Storage[common.Hash(k)] = common.Hash(v)
+
+	if dec.Code != nil {
+		g.Code, subErr = types.ParseBytes(dec.Code)
+		if subErr != nil {
+			parseError("code", subErr)
 		}
 	}
-	g.Balance = (*big.Int)(dec.Balance)
-	if dec.Nonce != nil {
-		g.Nonce = uint64(*dec.Nonce)
+
+	if dec.Storage != nil {
+		g.Storage = dec.Storage
 	}
+
+	g.Balance, subErr = types.ParseUint256orHex(dec.Balance)
+	if subErr != nil {
+		parseError("balance", subErr)
+	}
+	g.Nonce, subErr = types.ParseUint64orHex(dec.Nonce)
+	if subErr != nil {
+		parseError("nonce", subErr)
+	}
+
 	if dec.Builtin != nil {
 		g.Builtin = dec.Builtin
 	}
+
 	if dec.PrivateKey != nil {
-		g.PrivateKey = *dec.PrivateKey
-	}
-	return nil
-}
-
-type storageJSON common.Hash
-
-func (h *storageJSON) UnmarshalText(text []byte) error {
-	text = bytes.TrimPrefix(text, []byte("0x"))
-	if len(text) > 64 {
-		return fmt.Errorf("too many hex characters in storage key/value %q", text)
+		g.PrivateKey, subErr = types.ParseBytes(dec.PrivateKey)
+		if subErr != nil {
+			parseError("privatekey", subErr)
+		}
 	}
 
-	offset := len(h) - len(text)/2 // pad on the left
-	if _, err := hex.Decode(h[offset:], text); err != nil {
-		return fmt.Errorf("invalid hex storage key/value %q", text)
-	}
-	return nil
+	return err
 }
 
 // ImportFromName imports a chain from the precompiled json chains (i.e. foundation)

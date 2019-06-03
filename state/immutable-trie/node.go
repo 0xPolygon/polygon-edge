@@ -7,15 +7,15 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var (
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421").Bytes()
+	emptyRoot = types.StringToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421").Bytes()
 )
 
 // WalkFn is used when walking the tree. Takes a
@@ -255,10 +255,10 @@ func (n *Node) Show() {
 
 func show(n *Node, d int, label byte, handlePrefix bool) {
 	if n.leaf != nil {
-		k, v := hexutil.Encode(n.leaf.key), hexutil.Encode(n.leaf.val)
+		k, v := hex.EncodeToHex(n.leaf.key), hex.EncodeToHex(n.leaf.val)
 
 		if n.hash != nil {
-			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			fmt.Printf("%s(%d) HASH: %s\n", depth(d), label, hex.EncodeToHex(n.hash))
 			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d+1), label, k, v)
 		} else {
 			fmt.Printf("%s(%d) LEAF: %s => %s\n", depth(d), label, k, v)
@@ -271,14 +271,14 @@ func show(n *Node, d int, label byte, handlePrefix bool) {
 		}
 
 		if n.hash != nil {
-			fmt.Printf("%s(%d) FULL HASH: %s\n", depth(d), label, hexutil.Encode(n.hash))
+			fmt.Printf("%s(%d) FULL HASH: %s\n", depth(d), label, hex.EncodeToHex(n.hash))
 			return
 		}
 
 		if len(p) == 0 {
 			fmt.Printf("%s(%d) EDGES: %d\n", depth(d), label, n.Len())
 		} else {
-			fmt.Printf("%s(%d) SHORT: %s\n", depth(d), label, hexutil.Encode(p))
+			fmt.Printf("%s(%d) SHORT: %s\n", depth(d), label, hex.EncodeToHex(p))
 		}
 
 		for label, e := range n.edges {

@@ -11,34 +11,30 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/consensus/ethash"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 )
 
 const difficultyTests = "BasicTests"
 
 type difficultyCase struct {
-	ParentTimestamp    *big.Int
+	ParentTimestamp    int64
 	ParentDifficulty   *big.Int
-	UncleHash          common.Hash
-	CurrentTimestamp   *big.Int
+	UncleHash          types.Hash
+	CurrentTimestamp   int64
 	CurrentBlockNumber uint64
 	CurrentDifficulty  *big.Int
 }
 
 func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 	type difUnmarshall struct {
-		ParentTimestamp    *math.HexOrDecimal256 `json:"parentTimestamp"`
-		ParentDifficulty   *math.HexOrDecimal256 `json:"parentDifficulty"`
-		UncleHash          *common.Hash          `json:"parentUncles"`
-		CurrentTimestamp   *math.HexOrDecimal256 `json:"currentTimestamp"`
-		CurrentBlockNumber *math.HexOrDecimal64  `json:"currentBlockNumber"`
-		CurrentDifficulty  *math.HexOrDecimal256 `json:"currentDifficulty"`
+		ParentTimestamp    *string     `json:"parentTimestamp"`
+		ParentDifficulty   *string     `json:"parentDifficulty"`
+		UncleHash          *types.Hash `json:"parentUncles"`
+		CurrentTimestamp   *string     `json:"currentTimestamp"`
+		CurrentBlockNumber *string     `json:"currentBlockNumber"`
+		CurrentDifficulty  *string     `json:"currentDifficulty"`
 	}
 
 	var dec difUnmarshall
@@ -46,23 +42,31 @@ func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	if dec.ParentTimestamp != nil {
-		d.ParentTimestamp = (*big.Int)(dec.ParentTimestamp)
+	var err error
+
+	d.ParentTimestamp, err = types.ParseInt64orHex(dec.ParentTimestamp)
+	if err != nil {
+		return err
 	}
-	if dec.ParentDifficulty != nil {
-		d.ParentDifficulty = (*big.Int)(dec.ParentDifficulty)
+	d.ParentDifficulty, err = types.ParseUint256orHex(dec.ParentDifficulty)
+	if err != nil {
+		return err
 	}
 	if dec.UncleHash != nil {
 		d.UncleHash = *dec.UncleHash
 	}
-	if dec.CurrentTimestamp != nil {
-		d.CurrentTimestamp = (*big.Int)(dec.CurrentTimestamp)
+
+	d.CurrentTimestamp, err = types.ParseInt64orHex(dec.CurrentTimestamp)
+	if err != nil {
+		return err
 	}
-	if dec.CurrentBlockNumber != nil {
-		d.CurrentBlockNumber = uint64(*dec.CurrentBlockNumber)
+	d.CurrentBlockNumber, err = types.ParseUint64orHex(dec.CurrentBlockNumber)
+	if err != nil {
+		return err
 	}
-	if dec.CurrentDifficulty != nil {
-		d.CurrentDifficulty = (*big.Int)(dec.CurrentDifficulty)
+	d.CurrentDifficulty, err = types.ParseUint256orHex(dec.CurrentDifficulty)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -112,6 +116,8 @@ func TestDifficultyConstantinople(t *testing.T) {
 	})
 }
 
+var minimumDifficulty = big.NewInt(131072)
+
 func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 	data, err := ioutil.ReadFile(filepath.Join(TESTS, difficultyTests, file))
 	if err != nil {
@@ -128,21 +134,19 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 
 	for name, i := range cases {
 		t.Run(name, func(t *testing.T) {
-			if i.ParentDifficulty.Cmp(params.MinimumDifficulty) < 0 {
+			if i.ParentDifficulty.Cmp(minimumDifficulty) < 0 {
 				t.Skip("difficulty below minimum")
 				return
 			}
 
-			parentNumber := big.NewInt(int64(i.CurrentBlockNumber - 1))
-
 			parent := &types.Header{
 				Difficulty: i.ParentDifficulty,
-				Time:       i.ParentTimestamp,
-				Number:     parentNumber,
-				UncleHash:  i.UncleHash,
+				Timestamp:  uint64(i.ParentTimestamp),
+				Number:     i.CurrentBlockNumber - 1,
+				Sha3Uncles: i.UncleHash,
 			}
 
-			difficulty := engineEthash.CalcDifficulty(i.CurrentTimestamp.Uint64(), parent)
+			difficulty := engineEthash.CalcDifficulty(i.CurrentTimestamp, parent)
 			if difficulty.Cmp(i.CurrentDifficulty) != 0 {
 				t.Fatal()
 			}

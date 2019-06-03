@@ -9,10 +9,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -30,12 +29,14 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 }
 
 func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
-	if header.Time.Cmp(parent.Time) <= 0 {
+	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
+	/*
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return fmt.Errorf("invalid sequence")
 	}
+	*/
 	localDiff := int(header.Difficulty.Int64())
 	if localDiff < p.min {
 		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", localDiff, p.min)
@@ -46,12 +47,12 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	return nil
 }
 
-func (p *Pow) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
+func (p *Pow) Author(header *types.Header) (types.Address, error) {
+	return types.Address{}, nil
 }
 
 func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
-	header := block.Header()
+	header := block.Header
 
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -64,7 +65,8 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 	target := new(big.Int).Div(two256, header.Difficulty)
 
 	for {
-		header.Nonce = types.EncodeNonce(uint64(nonce))
+		// header.Nonce = types.EncodeNonce(uint64(nonce))
+
 		hash := header.Hash()
 
 		if big.NewInt(1).SetBytes(hash.Bytes()).Cmp(target) < 0 {
@@ -77,7 +79,11 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 		}
 	}
 
-	return types.NewBlock(header, block.Transactions(), nil, nil), nil
+	block = &types.Block{
+		Header:       header.Copy(),
+		Transactions: block.Transactions,
+	}
+	return block, nil
 }
 
 func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
@@ -86,7 +92,7 @@ func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
 }
 
 func (p *Pow) Finalize(txn *state.Txn, block *types.Block) error {
-	txn.AddBalance(block.Coinbase(), big.NewInt(1))
+	txn.AddBalance(block.Header.Miner, big.NewInt(1))
 	return nil
 }
 

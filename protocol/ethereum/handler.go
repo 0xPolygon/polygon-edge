@@ -3,6 +3,7 @@ package ethereum
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net"
@@ -12,20 +13,25 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/helper/hex"
 
 	"github.com/armon/go-metrics"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/network/transport/rlpx"
+	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
+)
+
+const (
+	defaultMaxHeaderFetch  = 192
+	defaultMaxBlockFetch   = 128
+	defaultMaxReceiptFetch = 256
 )
 
 const (
@@ -141,7 +147,7 @@ type Ethereum struct {
 	pending map[messageType]*pending
 
 	// header data
-	HeaderHash   common.Hash
+	HeaderHash   types.Hash
 	HeaderDiff   *big.Int
 	HeaderNumber *big.Int
 	headerLock   sync.Mutex
@@ -179,7 +185,7 @@ func NewEthereumProtocol(peerID string, logger hclog.Logger, conn net.Conn, bloc
 	return e
 }
 
-func (e *Ethereum) Header() common.Hash {
+func (e *Ethereum) Header() types.Hash {
 	return e.HeaderHash
 }
 
@@ -188,13 +194,13 @@ type Status struct {
 	ProtocolVersion uint32
 	NetworkID       uint64
 	TD              *big.Int
-	CurrentBlock    common.Hash
-	GenesisBlock    common.Hash
+	CurrentBlock    types.Hash
+	GenesisBlock    types.Hash
 }
 
 // getBlockHeadersData represents a block header query.
 type getBlockHeadersData struct {
-	Origin  hashOrNumber
+	Origin  interface{}
 	Amount  uint64
 	Skip    uint64
 	Reverse bool
@@ -221,26 +227,26 @@ func (e *Ethereum) writeMsg(code int, data interface{}) error {
 
 // RequestHeadersByNumber fetches a batch of blocks' headers based on the number of an origin block.
 func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error {
-	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: number}, Amount: amount, Skip: skip, Reverse: reverse})
+	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: number, Amount: amount, Skip: skip, Reverse: reverse})
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
-func (e *Ethereum) RequestHeadersByHash(origin common.Hash, amount uint64, skip uint64, reverse bool) error {
-	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+func (e *Ethereum) RequestHeadersByHash(origin types.Hash, amount uint64, skip uint64, reverse bool) error {
+	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: origin, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestBodies fetches a batch of blocks' bodies based on a set of hashes.
-func (e *Ethereum) RequestBodies(hashes []common.Hash) error {
+func (e *Ethereum) RequestBodies(hashes []types.Hash) error {
 	return e.writeMsg(GetBlockBodiesMsg, hashes)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state.
-func (e *Ethereum) RequestNodeData(hashes []common.Hash) error {
+func (e *Ethereum) RequestNodeData(hashes []types.Hash) error {
 	return e.writeMsg(GetNodeDataMsg, hashes)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
-func (e *Ethereum) RequestReceipts(hashes []common.Hash) error {
+func (e *Ethereum) RequestReceipts(hashes []types.Hash) error {
 	return e.writeMsg(GetReceiptsMsg, hashes)
 }
 
@@ -250,7 +256,7 @@ func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
 }
 
 // SendNewHash propagates a new block by hash and number
-func (e *Ethereum) SendNewHash(hash common.Hash, number uint64) error {
+func (e *Ethereum) SendNewHash(hash types.Hash, number uint64) error {
 	return e.writeMsg(NewBlockHashesMsg, []*announcement{
 		{hash, number},
 	})
@@ -381,6 +387,27 @@ type newBlockData struct {
 	TD    *big.Int
 }
 
+func parseOrigin(i interface{}) (interface{}, bool, error) {
+	buf, ok := i.([]byte)
+	if !ok {
+		return nil, false, fmt.Errorf("could not convert to bytes")
+	}
+
+	size := len(buf)
+	if size == 32 {
+		// hash
+		return types.BytesToHash(buf), true, nil
+	} else if size <= 8 {
+		// number (uint64). TODO. Optimize
+		aux := make([]byte, 8)
+		copy(aux[8-size:], buf[:])
+
+		return binary.BigEndian.Uint64(aux[:]), false, nil
+	}
+
+	return nil, false, fmt.Errorf("bad")
+}
+
 // HandleMsg handles a message from ethereum
 func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	metrics.IncrCounterWithLabels([]string{"minimal", "protocol", "ethereum63", "msg"}, float32(1.0), []metrics.Label{{Name: "Code", Value: strconv.Itoa(int(msg.Code))}})
@@ -402,10 +429,15 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 
 		var origin *types.Header
 		var ok bool
-		if query.Origin.IsHash() {
-			origin, ok = e.blockchain.GetHeaderByHash(query.Origin.Hash)
+
+		start, isHash, err := parseOrigin(query.Origin)
+		if err != nil {
+			panic(err)
+		}
+		if isHash {
+			origin, ok = e.blockchain.GetHeaderByHash(start.(types.Hash))
 		} else {
-			origin, ok = e.blockchain.GetHeaderByNumber(big.NewInt(int64(query.Origin.Number)))
+			origin, ok = e.blockchain.GetHeaderByNumber(start.(uint64))
 		}
 
 		if !ok {
@@ -419,17 +451,17 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 
 		dir := int64(1)
 		if query.Reverse {
-			dir = int64(-1)
+			dir = -1
 		}
 
-		for len(headers) < int(query.Amount) && bytes < softResponseLimit && len(headers) < downloader.MaxHeaderFetch {
-			block := origin.Number.Int64()
+		for len(headers) < int(query.Amount) && bytes < softResponseLimit && len(headers) < defaultMaxHeaderFetch {
+			block := int64(origin.Number)
 			block = block + (dir)*skip
 
 			if block < 0 {
 				break
 			}
-			origin, ok = e.blockchain.GetHeaderByNumber(big.NewInt(block))
+			origin, ok = e.blockchain.GetHeaderByNumber(uint64(block))
 			if !ok {
 				break
 			}
@@ -450,7 +482,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	case code == GetBlockBodiesMsg:
 		defer metrics.MeasureSince([]string{"minimal", "protocol", "ethereum63", "getBodies"}, time.Now())
 
-		var hashes []common.Hash
+		var hashes []types.Hash
 		if err := msg.Decode(&hashes); err != nil {
 			return err
 		}
@@ -459,7 +491,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		bodies := []rlp.RawValue{}
 		bytes := 0
 
-		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(bodies) < downloader.MaxBlockFetch; i++ {
+		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(bodies) < defaultMaxBlockFetch; i++ {
 			hash := hashes[i]
 
 			body, ok := e.blockchain.GetBodyByHash(hash)
@@ -496,7 +528,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 	case code == GetReceiptsMsg:
 		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getReceipts"}, time.Now())
 
-		var hashes []common.Hash
+		var hashes []types.Hash
 		if err := msg.Decode(&hashes); err != nil {
 			return err
 		}
@@ -505,13 +537,13 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		receipts := []rlp.RawValue{}
 		bytes := 0
 
-		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(receipts) < downloader.MaxReceiptFetch; i++ {
+		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(receipts) < defaultMaxReceiptFetch; i++ {
 			hash := hashes[i]
 
 			res := e.blockchain.GetReceiptsByHash(hash)
 			if res == nil {
 				header, ok := e.blockchain.GetHeaderByHash(hash)
-				if !ok || header.ReceiptHash != types.EmptyRootHash {
+				if !ok || header.ReceiptsRoot != types.EmptyRootHash {
 					continue
 				}
 			}
@@ -555,7 +587,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 }
 
 type announcement struct {
-	Hash   common.Hash
+	Hash   types.Hash
 	Number uint64
 }
 
@@ -677,7 +709,7 @@ var (
 	// on the ethash consensus algorithm
 	daoBlock            = uint64(1920000)
 	daoChallengeTimeout = 15 * time.Second
-	daoForkBlockExtra   = common.FromHex("0x64616f2d686172642d666f726b")
+	daoForkBlockExtra   = types.StringToHash("0x64616f2d686172642d666f726b")
 )
 
 // ValidateDAOBlock queries the DAO block
@@ -695,7 +727,7 @@ func (e *Ethereum) ValidateDAOBlock() error {
 
 	// If it returns nothing it means the node does not have the dao block yet
 	if ok {
-		if !bytes.Equal(header.Extra, daoForkBlockExtra) {
+		if !bytes.Equal(header.ExtraData, daoForkBlockExtra[:]) {
 			return fmt.Errorf("Dao extra data does not match")
 		}
 	}
@@ -703,7 +735,7 @@ func (e *Ethereum) ValidateDAOBlock() error {
 }
 
 // RequestHeaderByHashSync requests a header by hash synchronously
-func (e *Ethereum) RequestHeaderByHashSync(ctx context.Context, hash common.Hash) (*types.Header, error) {
+func (e *Ethereum) RequestHeaderByHashSync(ctx context.Context, hash types.Hash) (*types.Header, error) {
 	ack := make(chan AckMessage, 1)
 	e.setHandler(ctx, headerMsg, hash.String(), ack)
 
@@ -768,7 +800,7 @@ func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, skip u
 }
 
 // RequestReceiptsSync requests receipts and waits for the response
-func (e *Ethereum) RequestReceiptsSync(ctx context.Context, hash string, hashes []common.Hash) ([][]*types.Receipt, error) {
+func (e *Ethereum) RequestReceiptsSync(ctx context.Context, hash string, hashes []types.Hash) ([][]*types.Receipt, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
@@ -790,7 +822,7 @@ func (e *Ethereum) RequestReceiptsSync(ctx context.Context, hash string, hashes 
 }
 
 // RequestBodiesSync requests bodies and waits for the response
-func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []common.Hash) ([]*types.Body, error) {
+func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []types.Hash) ([]*types.Body, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
@@ -818,7 +850,7 @@ func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []
 }
 
 // RequestNodeDataSync requests node data and waits for the response
-func (e *Ethereum) RequestNodeDataSync(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
+func (e *Ethereum) RequestNodeDataSync(ctx context.Context, hashes []types.Hash) ([][]byte, error) {
 	ack := make(chan AckMessage, 1)
 	e.setHandler(ctx, dataMsg, hashes[0].String(), ack)
 
@@ -886,7 +918,7 @@ func (e *Ethereum) consumeHandler(origin string, typ messageType, result interfa
 func (e *Ethereum) Headers(headers []*types.Header) {
 	if len(headers) != 0 {
 		// request the header by number registers the number of the peer
-		number := headers[0].Number.String()
+		number := strconv.Itoa(int(headers[0].Number))
 		if e.consumeHandler(number, headerMsg, headers) {
 			return
 		}
@@ -904,7 +936,7 @@ func (e *Ethereum) Headers(headers []*types.Header) {
 func (e *Ethereum) Receipts(receipts [][]*types.Receipt) {
 	origin := ""
 	if len(receipts) != 0 {
-		origin = types.DeriveSha(types.Receipts(receipts[0])).String()
+		origin = derivesha.CalcReceiptRoot(receipts[0]).String()
 	}
 	if e.consumeHandler(origin, receiptsMsg, receipts) {
 		return
@@ -916,7 +948,9 @@ func (e *Ethereum) Bodies(bodies BlockBodiesData) {
 	origin := ""
 	if len(bodies) != 0 {
 		first := bodies[0]
-		origin = encodeHash(types.CalcUncleHash(first.Uncles), types.DeriveSha(types.Transactions(first.Transactions))).String()
+
+		hash := derivesha.CalcTxsRoot(first.Transactions)
+		origin = encodeHash(derivesha.CalcUncleRoot(first.Uncles), hash).String()
 	}
 	if e.consumeHandler(origin, bodyMsg, bodies) {
 		return
@@ -927,14 +961,14 @@ func (e *Ethereum) Bodies(bodies BlockBodiesData) {
 func (e *Ethereum) Data(data [][]byte) {
 	origin := ""
 	if len(data) != 0 {
-		origin = hexutil.Encode(crypto.Keccak256(data[0]))
+		origin = hex.EncodeToHex(crypto.Keccak256(data[0]))
 	}
 	if e.consumeHandler(origin, dataMsg, data) {
 		return
 	}
 }
 
-func encodeHash(x common.Hash, y common.Hash) common.Hash {
+func encodeHash(x types.Hash, y types.Hash) types.Hash {
 	hw := sha3.NewLegacyKeccak256()
 	if _, err := hw.Write(x.Bytes()); err != nil {
 		panic(err)
@@ -943,7 +977,7 @@ func encodeHash(x common.Hash, y common.Hash) common.Hash {
 		panic(err)
 	}
 
-	var h common.Hash
+	var h types.Hash
 	hw.Sum(h[:0])
 	return h
 }

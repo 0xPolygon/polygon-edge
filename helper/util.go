@@ -1,7 +1,5 @@
 package helper
 
-import "github.com/ethereum/go-ethereum/common"
-
 func GetData(data []byte, start uint64, size uint64) []byte {
 	length := uint64(len(data))
 	if start > length {
@@ -11,5 +9,27 @@ func GetData(data []byte, start uint64, size uint64) []byte {
 	if end > length {
 		end = length
 	}
-	return common.RightPadBytes(data[start:end], int(size))
+	return RightPadBytes(data[start:end], int(size))
+}
+
+func RightPadBytes(b []byte, size int) []byte {
+	l := len(b)
+	if l > size {
+		return b
+	}
+
+	tmp := make([]byte, size)
+	copy(tmp[0:], b)
+	return tmp
+}
+
+func LeftPadBytes(b []byte, size int) []byte {
+	l := len(b)
+	if l > size {
+		return b
+	}
+
+	tmp := make([]byte, size)
+	copy(tmp[size-l:], b)
+	return tmp
 }

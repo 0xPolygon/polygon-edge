@@ -2,17 +2,16 @@ package ethereum
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/types"
 )
 
 func newTestBackend(t *testing.T, b0 *blockchain.Blockchain) *Backend {
@@ -46,9 +45,6 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 		t.Fatal("expected nothing but header has content")
 	}
 
-	fmt.Println(h.Hash().String())
-	fmt.Println(ancestor.Hash().String())
-
 	if h.Hash() != ancestor.Hash() {
 		t.Fatal("hash dont match")
 	}
@@ -73,12 +69,6 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 	t.Run("Same chain", func(t *testing.T) {
 		headers := blockchain.NewTestHeaderChain(100)
 		testPeerAncestor(t, headers, headers, headers[len(headers)-1])
-	})
-
-	t.Run("No matches", func(t *testing.T) {
-		h0 := blockchain.NewTestHeaderChain(100)
-		h1 := blockchain.NewTestHeaderChainWithSeed(nil, 100, 10)
-		testPeerAncestor(t, h0, h1, nil)
 	})
 
 	t.Run("Ancestor is genesis", func(t *testing.T) {
@@ -208,42 +198,6 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 		panic(err)
 	}
 	return eth
-}
-
-func TestBackendBroadcastBlock(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers)
-
-	b := newTestBackend(t, b0)
-
-	c0, c1 := net.Pipe()
-
-	var eth *Ethereum
-	go func() {
-		eth = testEthereum(c1, b0)
-	}()
-	if _, err := b.Add(c0, "1"); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(1 * time.Second)
-
-	fmt.Println("-- eth --")
-	fmt.Println(eth)
-
-	/*
-		watch := eth.Watch()
-
-		req := b0.GetBlockByNumber(big.NewInt(100), true)
-		b.broadcast(req)
-
-		recv := <-watch
-		if recv.Block.Number().Uint64() != req.Number().Uint64() {
-			t.Fatal("bad")
-		}
-	*/
 }
 
 func TestBackendNotify(t *testing.T) {

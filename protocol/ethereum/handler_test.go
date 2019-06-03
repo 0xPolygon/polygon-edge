@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/types"
 )
 
 func newTestEthereumProto(peerID string, conn net.Conn, b *blockchain.Blockchain) *Ethereum {
@@ -31,8 +31,8 @@ var status = Status{
 	ProtocolVersion: 63,
 	NetworkID:       1,
 	TD:              big.NewInt(1),
-	CurrentBlock:    common.HexToHash("1"),
-	GenesisBlock:    common.HexToHash("1"),
+	CurrentBlock:    types.StringToHash("1"),
+	GenesisBlock:    types.StringToHash("1"),
 }
 
 func TestHandshake(t *testing.T) {
@@ -42,11 +42,11 @@ func TestHandshake(t *testing.T) {
 
 	// Current block is different
 	status2 := status
-	status2.CurrentBlock = common.HexToHash("2")
+	status2.CurrentBlock = types.StringToHash("2")
 
 	// Genesis block is different
 	status3 := status
-	status3.GenesisBlock = common.HexToHash("2")
+	status3.GenesisBlock = types.StringToHash("2")
 
 	cases := []struct {
 		Name    string
@@ -136,7 +136,7 @@ func testEthProtocol(t *testing.T, b0 *blockchain.Blockchain, b1 *blockchain.Blo
 func headersToNumbers(headers []*types.Header) []int {
 	n := []int{}
 	for _, h := range headers {
-		n = append(n, int(h.Number.Int64()))
+		n = append(n, int(h.Number))
 	}
 	return n
 }
@@ -187,7 +187,7 @@ func TestEthereumBlockHeadersMsg(t *testing.T) {
 
 			var err error
 			if reflect.TypeOf(c.Origin).Name() == "Hash" {
-				hash := c.Origin.(common.Hash)
+				hash := c.Origin.(types.Hash)
 				eth0.setHandler(context.Background(), headerMsg, hash.String(), ack)
 				err = eth0.RequestHeadersByHash(hash, c.Amount, c.Skip, c.Reverse)
 			} else {
@@ -221,7 +221,7 @@ func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
 
 	eth0, _ := testEthProtocol(t, b0, b1)
 
-	batch := []common.Hash{
+	batch := []types.Hash{
 		headers[0].Hash(),
 		headers[5].Hash(),
 		headers[10].Hash(),
@@ -264,13 +264,13 @@ func TestEthereumBody(t *testing.T) {
 	// have any tx so if we use that one it will fail
 	batch := []uint64{2}
 
-	msg := []common.Hash{}
+	msg := []types.Hash{}
 	for _, i := range batch {
 		msg = append(msg, headers[i].Hash())
 	}
 
 	first := blocks[batch[0]]
-	hash := encodeHash(types.CalcUncleHash(first.Uncles()), types.DeriveSha(types.Transactions(first.Transactions()))).String()
+	hash := encodeHash(derivesha.CalcUncleRoot(first.Uncles), derivesha.CalcTxsRoot(first.Transactions)).String()
 
 	// -- bodies --
 
@@ -290,7 +290,7 @@ func TestEthereumBody(t *testing.T) {
 		t.Fatal("bodies: length is not correct")
 	}
 	for indx := range batch {
-		if batch[indx] != bodies[indx].Transactions[0].Nonce() {
+		if batch[indx] != bodies[indx].Transactions[0].Nonce {
 			t.Fatal("numbers dont match")
 		}
 	}
@@ -322,7 +322,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 					err = fmt.Errorf("length not correct")
 				} else {
 					for indx, j := range h {
-						if j.Number.Uint64() != i+uint64(indx) {
+						if j.Number != i+uint64(indx) {
 							err = fmt.Errorf("numbers dont match")
 							break
 						}
@@ -400,8 +400,8 @@ func TestHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if height.Number.Uint64() != 110 {
-		t.Fatalf("it should be 110 but found %d", height.Number.Uint64())
+	if height.Number != 110 {
+		t.Fatalf("it should be 110 but found %d", height.Number)
 	}
 }
 
@@ -474,7 +474,7 @@ func TestFailedQueries(t *testing.T) {
 
 			for indx, step := range c {
 				go func(indx, step int) {
-					header, ok := b0.GetHeaderByNumber(big.NewInt(int64(step)))
+					header, ok := b0.GetHeaderByNumber(uint64(step))
 					if !ok {
 						done <- fmt.Errorf("header not found")
 						return

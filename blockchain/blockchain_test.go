@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/chain"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/types"
 )
 
 func TestGenesis(t *testing.T) {
@@ -22,7 +21,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// add genesis block
-	genesis := &types.Header{Difficulty: big.NewInt(1), Number: big.NewInt(0)}
+	genesis := &types.Header{Difficulty: big.NewInt(1), Number: 0}
 	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
 	header, _ := b.Header()
@@ -51,7 +50,7 @@ func TestChainGenesis(t *testing.T) {
 			b := NewTestBlockchain(t, nil)
 			assert.NoError(t, b.WriteGenesis(genesis.Genesis))
 
-			root := b.genesis.Root.String()
+			root := b.genesis.StateRoot.String()
 			assert.Equal(t, root, c.Root)
 			assert.Equal(t, b.genesis.Hash().String(), c.Hash)
 		})
@@ -67,7 +66,7 @@ func (c *dummyChain) add(h *header) error {
 		return fmt.Errorf("hash already imported")
 	}
 
-	var parent common.Hash
+	var parent types.Hash
 	if h.number != 0 {
 		p, ok := c.headers[h.parent]
 		if !ok {
@@ -78,9 +77,9 @@ func (c *dummyChain) add(h *header) error {
 
 	c.headers[h.hash] = &types.Header{
 		ParentHash: parent,
-		Number:     big.NewInt(int64(h.number)),
+		Number:     h.number,
 		Difficulty: big.NewInt(int64(h.diff)),
-		Extra:      []byte{h.hash},
+		ExtraData:  []byte{h.hash},
 	}
 	return nil
 }
@@ -247,7 +246,7 @@ func TestInsertHeaders(t *testing.T) {
 			assert.Equal(t, head.Hash(), expected.Hash())
 
 			forks := b.GetForks()
-			expectedForks := []common.Hash{}
+			expectedForks := []types.Hash{}
 
 			for _, i := range cc.Forks {
 				expectedForks = append(expectedForks, chain.headers[i.hash].Hash())
@@ -266,7 +265,7 @@ func TestInsertHeaders(t *testing.T) {
 			// Check chain of forks
 			if cc.Chain != nil {
 				for indx, i := range cc.Chain {
-					block, _ := b.GetBlockByNumber(big.NewInt(int64(indx)), true)
+					block, _ := b.GetBlockByNumber(uint64(indx), true)
 					if block.Hash().String() != chain.headers[i.hash].Hash().String() {
 						tt.Fatal("bad")
 					}
@@ -303,16 +302,20 @@ func TestCommitChain(t *testing.T) {
 	headers, blocks, receipts := NewTestBodyChain(2)
 	b := NewTestBlockchain(t, headers)
 
-	// commit values to the chain
+	// commit values to the chain, skip first block (genesis)
 	assert.NoError(t, b.CommitChain(blocks, receipts))
 
 	for i := 1; i < len(blocks); i++ {
 		block := blocks[i]
 
 		// check blocks
-		i, _ := b.db.ReadBody(block.Hash())
+		i, ok := b.db.ReadBody(block.Hash())
+		if !ok {
+			t.Fatal("it should exists")
+		}
+
 		assert.Len(t, i.Transactions, 1)
-		assert.Equal(t, i.Transactions[0].Nonce(), block.Number().Uint64())
+		assert.Equal(t, i.Transactions[0].Nonce, block.Number())
 
 		// check receipts
 		r := b.db.ReadReceipts(block.Hash())

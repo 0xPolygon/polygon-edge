@@ -4,9 +4,8 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -153,23 +152,23 @@ func hashimoto(header []byte, nonce uint64, fullSize int, sha512, sha256 hashFn,
 }
 
 // TODO
-func sealHash(header *types.Header) (hash common.Hash) {
+func sealHash(header *types.Header) (hash types.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
+		header.Sha3Uncles,
+		header.Miner,
+		header.StateRoot,
+		header.TxRoot,
+		header.ReceiptsRoot,
+		header.LogsBloom,
 		header.Difficulty,
 		header.Number,
 		header.GasLimit,
 		header.GasUsed,
-		header.Time,
-		header.Extra,
+		header.Timestamp,
+		header.ExtraData,
 	})
 	hasher.Sum(hash[:0])
 	return hash

@@ -1,9 +1,9 @@
 package memory
 
 import (
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 // NewMemoryStorage creates the new storage reference with inmemory
@@ -18,12 +18,12 @@ type memoryKV struct {
 }
 
 func (m *memoryKV) Set(p []byte, v []byte) error {
-	m.db[hexutil.Encode(p)] = v
+	m.db[hex.EncodeToHex(p)] = v
 	return nil
 }
 
 func (m *memoryKV) Get(p []byte) ([]byte, bool, error) {
-	v, ok := m.db[hexutil.Encode(p)]
+	v, ok := m.db[hex.EncodeToHex(p)]
 	if !ok {
 		return nil, false, nil
 	}

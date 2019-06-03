@@ -3,8 +3,8 @@ package ethash
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 func TestSizes(t *testing.T) {
@@ -49,8 +49,8 @@ func TestBlockSeed(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
-			assert.Equal(t, c.seed, hexutil.Encode(getSeedHash(c.block)))
-			assert.Equal(t, c.seed, hexutil.Encode(getSeedHashByEpoch(c.block/epochLength)))
+			assert.Equal(t, c.seed, hex.EncodeToHex(getSeedHash(c.block)))
+			assert.Equal(t, c.seed, hex.EncodeToHex(getSeedHashByEpoch(c.block/epochLength)))
 		})
 	}
 }

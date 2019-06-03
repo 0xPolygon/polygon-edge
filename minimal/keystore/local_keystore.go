@@ -2,13 +2,13 @@ package keystore
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 // LocalKeystore loads the key from a local file

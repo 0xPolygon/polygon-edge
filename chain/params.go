@@ -19,12 +19,7 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
-func (p *Params) GasTable(num *big.Int) GasTable {
-	if num == nil {
-		return GasTableHomestead
-	}
-
-	number := num.Uint64()
+func (p *Params) GasTable(number uint64) GasTable {
 	switch {
 	case p.Forks.IsConstantinople(number):
 		return GasTableConstantinople
@@ -47,12 +42,7 @@ type Forks struct {
 	EIP155         *Fork `json:"EIP155,omitempty"`
 }
 
-func (f *Forks) GasTable(num *big.Int) GasTable {
-	if num == nil {
-		return GasTableHomestead
-	}
-
-	n := num.Uint64()
+func (f *Forks) GasTable(n uint64) GasTable {
 	switch {
 	case f.IsConstantinople(n):
 		return GasTableConstantinople

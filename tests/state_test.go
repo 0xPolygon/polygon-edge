@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/state"
 )
 
@@ -37,11 +37,11 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	env.GasPrice = msg.GasPrice()
+	env.GasPrice = msg.GasPrice
 
 	s, snap, _ := buildState(t, c.Pre)
 
-	forks := config.At(env.Number.Uint64())
+	forks := config.At(env.Number)
 	gasTable := config.GasTable(env.Number)
 
 	var root []byte
@@ -61,10 +61,10 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	_, root = txn.Commit(forks.EIP158)
 
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hexutil.Encode(root))
+		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hex.EncodeToHex(root))
 	}
 
-	if logs := rlpHash(txn.Logs()); logs != p.Logs {
+	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
 		t.Fatalf("logs mismatch (%s, %s %d): expected %s but found %s", name, fork, index, p.Logs.String(), logs.String())
 	}
 }

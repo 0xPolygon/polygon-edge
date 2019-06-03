@@ -1,13 +1,13 @@
 package storage
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/types"
 )
 
 // prefix
@@ -60,62 +60,75 @@ func NewKeyValueStorage(logger hclog.Logger, db KV) Storage {
 	return &KeyValueStorage{logger: logger, db: db}
 }
 
+func (s *KeyValueStorage) encodeUint(n uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b[:], n)
+	return b[:]
+}
+
+func (s *KeyValueStorage) decodeUint(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b[:])
+}
+
 // -- canonical hash --
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain
-func (s *KeyValueStorage) ReadCanonicalHash(n *big.Int) (common.Hash, bool) {
-	data, ok := s.get(CANONICAL, n.Bytes())
+func (s *KeyValueStorage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
+	data, ok := s.get(CANONICAL, s.encodeUint(n))
 	if !ok {
-		return common.Hash{}, false
+		return types.Hash{}, false
 	}
-	return common.BytesToHash(data), true
+	return types.BytesToHash(data), true
 }
 
 // WriteCanonicalHash writes a hash for a number block in the canonical chain
-func (s *KeyValueStorage) WriteCanonicalHash(n *big.Int, hash common.Hash) error {
-	return s.set(CANONICAL, n.Bytes(), hash.Bytes())
+func (s *KeyValueStorage) WriteCanonicalHash(n uint64, hash types.Hash) error {
+	return s.set(CANONICAL, s.encodeUint(n), hash.Bytes())
 }
 
 // -- head --
 
 // ReadHeadHash returns the hash of the head
-func (s *KeyValueStorage) ReadHeadHash() (common.Hash, bool) {
+func (s *KeyValueStorage) ReadHeadHash() (types.Hash, bool) {
 	data, ok := s.get(HEAD, HASH)
 	if !ok {
-		return common.Hash{}, false
+		return types.Hash{}, false
 	}
-	return common.BytesToHash(data), true
+	return types.BytesToHash(data), true
 }
 
 // ReadHeadNumber returns the number of the head
-func (s *KeyValueStorage) ReadHeadNumber() (*big.Int, bool) {
+func (s *KeyValueStorage) ReadHeadNumber() (uint64, bool) {
 	data, ok := s.get(HEAD, HASH)
 	if !ok {
-		return nil, false
+		return 0, false
 	}
-	return big.NewInt(1).SetBytes(data), true
+	if len(data) != 8 {
+		return 0, false
+	}
+	return s.decodeUint(data), true
 }
 
 // WriteHeadHash writes the hash of the head
-func (s *KeyValueStorage) WriteHeadHash(h common.Hash) error {
+func (s *KeyValueStorage) WriteHeadHash(h types.Hash) error {
 	return s.set(HEAD, HASH, h.Bytes())
 }
 
 // WriteHeadNumber writes the number of the head
-func (s *KeyValueStorage) WriteHeadNumber(n *big.Int) error {
-	return s.set(HEAD, NUMBER, n.Bytes())
+func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
+	return s.set(HEAD, NUMBER, s.encodeUint(n))
 }
 
 // -- fork --
 
 // WriteForks writes the current forks
-func (s *KeyValueStorage) WriteForks(forks []common.Hash) error {
+func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
 	return s.write(FORK, EMPTY, forks)
 }
 
 // ReadForks read the current forks
-func (s *KeyValueStorage) ReadForks() []common.Hash {
-	var forks []common.Hash
+func (s *KeyValueStorage) ReadForks() []types.Hash {
+	var forks []types.Hash
 	s.read(FORK, EMPTY, &forks)
 	return forks
 }
@@ -123,12 +136,12 @@ func (s *KeyValueStorage) ReadForks() []common.Hash {
 // -- difficulty --
 
 // WriteDiff writes the difficulty
-func (s *KeyValueStorage) WriteDiff(hash common.Hash, diff *big.Int) error {
+func (s *KeyValueStorage) WriteDiff(hash types.Hash, diff *big.Int) error {
 	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 
 // ReadDiff reads the difficulty
-func (s *KeyValueStorage) ReadDiff(hash common.Hash) (*big.Int, bool) {
+func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
 	v, ok := s.get(DIFFICULTY, hash.Bytes())
 	if !ok {
 		return nil, false
@@ -144,7 +157,7 @@ func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
 }
 
 // ReadHeader reads the header
-func (s *KeyValueStorage) ReadHeader(hash common.Hash) (*types.Header, bool) {
+func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, bool) {
 	var header *types.Header
 	ok := s.read(HEADER, hash.Bytes(), &header)
 	return header, ok
@@ -153,12 +166,12 @@ func (s *KeyValueStorage) ReadHeader(hash common.Hash) (*types.Header, bool) {
 // -- body --
 
 // WriteBody writes the body
-func (s *KeyValueStorage) WriteBody(hash common.Hash, body *types.Body) error {
+func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
 	return s.write(BODY, hash.Bytes(), body)
 }
 
 // ReadBody reads the body
-func (s *KeyValueStorage) ReadBody(hash common.Hash) (*types.Body, bool) {
+func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, bool) {
 	var body *types.Body
 	ok := s.read(BODY, hash.Bytes(), &body)
 	return body, ok
@@ -167,24 +180,14 @@ func (s *KeyValueStorage) ReadBody(hash common.Hash) (*types.Body, bool) {
 // -- receipts --
 
 // WriteReceipts writes the receipts
-func (s *KeyValueStorage) WriteReceipts(hash common.Hash, receipts []*types.Receipt) error {
-	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
-	for i, receipt := range receipts {
-		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
-	}
-	return s.write(RECEIPTS, hash.Bytes(), storageReceipts)
+func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
+	return s.write(RECEIPTS, hash.Bytes(), receipts)
 }
 
 // ReadReceipts reads the receipts
-func (s *KeyValueStorage) ReadReceipts(hash common.Hash) []*types.Receipt {
-	var storage []*types.ReceiptForStorage
-	s.read(RECEIPTS, hash.Bytes(), &storage)
-
-	receipts := make([]*types.Receipt, len(storage))
-	for i, receipt := range storage {
-		receipts[i] = (*types.Receipt)(receipt)
-	}
-
+func (s *KeyValueStorage) ReadReceipts(hash types.Hash) []*types.Receipt {
+	var receipts []*types.Receipt
+	s.read(RECEIPTS, hash.Bytes(), &receipts)
 	return receipts
 }
 

@@ -8,10 +8,9 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -20,14 +19,14 @@ var (
 
 // var emptyCodeHash = crypto.Keccak256(nil)
 
-var emptyStateHash = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 var (
 	// logIndex is the index of the logs in the trie
-	logIndex = common.BytesToHash([]byte{2}).Bytes()
+	logIndex = types.BytesToHash([]byte{2}).Bytes()
 
 	// refundIndex is the index of the refund
-	refundIndex = common.BytesToHash([]byte{3}).Bytes()
+	refundIndex = types.BytesToHash([]byte{3}).Bytes()
 )
 
 type GasPool interface {
@@ -90,7 +89,7 @@ func (txn *Txn) RevertToSnapshot(id int) {
 }
 
 // GetAccount returns an account
-func (txn *Txn) GetAccount(addr common.Address) (*Account, bool) {
+func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil, false
@@ -98,7 +97,7 @@ func (txn *Txn) GetAccount(addr common.Address) (*Account, bool) {
 	return object.Account, true
 }
 
-func (txn *Txn) getStateObject(addr common.Address) (*StateObject, bool) {
+func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
 		obj := val.(*StateObject)
@@ -135,7 +134,7 @@ func (txn *Txn) getStateObject(addr common.Address) (*StateObject, bool) {
 	return obj, true
 }
 
-func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *StateObject)) {
+func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *StateObject)) {
 	object, exists := txn.getStateObject(addr)
 	if !exists && create {
 		object = &StateObject{
@@ -156,7 +155,7 @@ func (txn *Txn) upsertAccount(addr common.Address, create bool, f func(object *S
 	}
 }
 
-func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
+func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Suicide {
 			*object = *newStateObject(txn)
@@ -168,7 +167,7 @@ func (txn *Txn) AddSealingReward(addr common.Address, balance *big.Int) {
 }
 
 // AddBalance adds balance
-func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
+func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
 	/*
 		if balance.Sign() == 0 {
 			return
@@ -180,7 +179,7 @@ func (txn *Txn) AddBalance(addr common.Address, balance *big.Int) {
 }
 
 // SubBalance reduces the balance
-func (txn *Txn) SubBalance(addr common.Address, balance *big.Int) {
+func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
 	if balance.Sign() == 0 {
 		return
 	}
@@ -190,14 +189,14 @@ func (txn *Txn) SubBalance(addr common.Address, balance *big.Int) {
 }
 
 // SetBalance sets the balance
-func (txn *Txn) SetBalance(addr common.Address, balance *big.Int) {
+func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
 	})
 }
 
 // GetBalance returns the balance of an address
-func (txn *Txn) GetBalance(addr common.Address) *big.Int {
+func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return big.NewInt(0)
@@ -232,7 +231,7 @@ func isZeros(b []byte) bool {
 }
 
 // SetState change the state of an address
-func (txn *Txn) SetState(addr common.Address, key, value common.Hash) {
+func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Txn == nil {
 			object.Txn = iradix.New().Txn()
@@ -247,10 +246,10 @@ func (txn *Txn) SetState(addr common.Address, key, value common.Hash) {
 }
 
 // GetState returns the state of the address at a given hash
-func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
+func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
-		return common.Hash{}
+		return types.Hash{}
 	}
 
 	k := hashit(hash.Bytes())
@@ -258,25 +257,25 @@ func (txn *Txn) GetState(addr common.Address, hash common.Hash) common.Hash {
 	if object.Txn != nil {
 		if val, ok := object.Txn.Get(k); ok {
 			if val == nil {
-				return common.Hash{}
+				return types.Hash{}
 			}
-			return common.BytesToHash(val.([]byte))
+			return types.BytesToHash(val.([]byte))
 		}
 	}
-	return object.GetCommitedState(common.BytesToHash(k))
+	return object.GetCommitedState(types.BytesToHash(k))
 }
 
 // Nonce
 
 // SetNonce reduces the balance
-func (txn *Txn) SetNonce(addr common.Address, nonce uint64) {
+func (txn *Txn) SetNonce(addr types.Address, nonce uint64) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce = nonce
 	})
 }
 
 // GetNonce returns the nonce of an addr
-func (txn *Txn) GetNonce(addr common.Address) uint64 {
+func (txn *Txn) GetNonce(addr types.Address) uint64 {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return 0
@@ -287,7 +286,7 @@ func (txn *Txn) GetNonce(addr common.Address) uint64 {
 // Code
 
 // SetCode sets the code for an address
-func (txn *Txn) SetCode(addr common.Address, code []byte) {
+func (txn *Txn) SetCode(addr types.Address, code []byte) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.CodeHash = crypto.Keccak256(code)
 		object.DirtyCode = true
@@ -295,7 +294,7 @@ func (txn *Txn) SetCode(addr common.Address, code []byte) {
 	})
 }
 
-func (txn *Txn) GetCode(addr common.Address) []byte {
+func (txn *Txn) GetCode(addr types.Address) []byte {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil
@@ -304,26 +303,26 @@ func (txn *Txn) GetCode(addr common.Address) []byte {
 	if object.DirtyCode {
 		return object.Code
 	}
-	code, _ := txn.state.GetCode(common.BytesToHash(object.Account.CodeHash))
+	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
 	return code
 }
 
-func (txn *Txn) GetCodeSize(addr common.Address) int {
+func (txn *Txn) GetCodeSize(addr types.Address) int {
 	return len(txn.GetCode(addr))
 }
 
-func (txn *Txn) GetCodeHash(addr common.Address) common.Hash {
+func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
-		return common.Hash{}
+		return types.Hash{}
 	}
-	return common.BytesToHash(object.Account.CodeHash)
+	return types.BytesToHash(object.Account.CodeHash)
 }
 
 // Suicide
 
 // Suicide marks the given account as suicided
-func (txn *Txn) Suicide(addr common.Address) bool {
+func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
 	txn.upsertAccount(addr, false, func(object *StateObject) {
 		if object == nil || object.Suicide {
@@ -338,7 +337,7 @@ func (txn *Txn) Suicide(addr common.Address) bool {
 }
 
 // HasSuicided returns true if the account suicided
-func (txn *Txn) HasSuicided(addr common.Address) bool {
+func (txn *Txn) HasSuicided(addr types.Address) bool {
 	object, exists := txn.getStateObject(addr)
 	return exists && object.Suicide
 }
@@ -370,27 +369,27 @@ func (txn *Txn) GetRefund() uint64 {
 	return data.(uint64)
 }
 
-func (txn *Txn) IntermediateRoot(bool) common.Hash {
-	return common.Hash{}
+func (txn *Txn) IntermediateRoot(bool) types.Hash {
+	return types.Hash{}
 }
 
 // GetCommittedState returns the state of the address in the trie
-func (txn *Txn) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
+func (txn *Txn) GetCommittedState(addr types.Address, hash types.Hash) types.Hash {
 	obj, ok := txn.getStateObject(addr)
 	if !ok {
-		return common.Hash{}
+		return types.Hash{}
 	}
-	return obj.GetCommitedState(common.BytesToHash(hashit(hash.Bytes())))
+	return obj.GetCommitedState(types.BytesToHash(hashit(hash.Bytes())))
 }
 
 // TODO, check panics with this ones
 
-func (txn *Txn) Exist(addr common.Address) bool {
+func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
 	return exists
 }
 
-func (txn *Txn) Empty(addr common.Address) bool {
+func (txn *Txn) Empty(addr types.Address) bool {
 	obj, exists := txn.getStateObject(addr)
 	if !exists {
 		return true
@@ -409,7 +408,7 @@ func newStateObject(txn *Txn) *StateObject {
 	}
 }
 
-func (txn *Txn) CreateAccount(addr common.Address) {
+func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
@@ -479,18 +478,18 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 				// We also have logs, avoid those
 				return false
 			}
-			fmt.Printf("# ----------------- %s -------------------\n", hexutil.Encode(k))
+			fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
 			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
 			fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
 			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
-			fmt.Printf("# Code hash: %s\n", hexutil.Encode(a.Account.CodeHash))
+			fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
 			fmt.Printf("# State root: %s\n", a.Account.Root.String())
 			if a.Txn != nil {
 				a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
 					if v == nil {
-						fmt.Printf("#\t%s: EMPTY\n", hexutil.Encode(k))
+						fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
 					} else {
-						fmt.Printf("#\t%s: %s\n", hexutil.Encode(k), hexutil.Encode(v.([]byte)))
+						fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
 					}
 					return false
 				})

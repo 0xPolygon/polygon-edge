@@ -6,9 +6,9 @@ import (
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -25,7 +25,7 @@ func NewTrie() *Trie {
 	}
 }
 
-func NewTrieAt(storage Storage, root common.Hash) (*Trie, error) {
+func NewTrieAt(storage Storage, root types.Hash) (*Trie, error) {
 	data, ok := storage.Get(root.Bytes())
 	if !ok {
 		return nil, fmt.Errorf("root not found")
@@ -329,7 +329,9 @@ func (t *Txn) Hash(storage KVWriter) []byte {
 	}
 
 	// Save locally the new computed trie
-	t.trie.state.addState(common.BytesToHash(root), tr)
+	if t.trie.state != nil {
+		t.trie.state.addState(types.BytesToHash(root), tr)
+	}
 	return root
 }
 
@@ -402,14 +404,14 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 			accountStateRoot := localTxn.Hash(batch)
 			// subTrie := localTxn.Commit()
 
-			a.Account.Root = common.BytesToHash(accountStateRoot)
+			a.Account.Root = types.BytesToHash(accountStateRoot)
 			// a.Account.trie = subTrie
 		}
 
 		if a.DirtyCode {
-			t.state.SetCode(common.BytesToHash(a.Account.CodeHash), a.Code)
-			// txn.state.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
-			// txn.state.SetCode(common.BytesToHash(a.account.CodeHash), a.code)
+			t.state.SetCode(types.BytesToHash(a.Account.CodeHash), a.Code)
+			// txn.state.state.SetCode(types.BytesToHash(a.account.CodeHash), a.code)
+			// txn.state.SetCode(types.BytesToHash(a.account.CodeHash), a.code)
 		}
 
 		data, err := rlp.EncodeToBytes(a.Account)

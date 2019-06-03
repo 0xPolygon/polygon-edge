@@ -20,9 +20,8 @@ import (
 	protoCommon "github.com/umbracle/minimal/network/common"
 
 	metrics "github.com/armon/go-metrics"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/protocol"
+	"github.com/umbracle/minimal/types"
 )
 
 // Backend is the ethereum backend
@@ -97,10 +96,10 @@ func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *block
 		b.NetworkID = 1
 	}
 
-	b.queue.front = b.queue.newItem(header.Number.Uint64() + 1)
+	b.queue.front = b.queue.newItem(header.Number + 1)
 	b.queue.head = header.Hash()
 
-	logger.Info("Header", "num", header.Number.Uint64(), "hash", header.Hash().String())
+	logger.Info("Header", "num", header.Number, "hash", header.Hash().String())
 
 	if minimal != nil {
 		go b.WatchMinedBlocks(minimal.Sealer.SealedCh)
@@ -260,7 +259,7 @@ func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 	}
 }
 
-func (b *Backend) broadcastHashMsg(hash common.Hash, number uint64) {
+func (b *Backend) broadcastHashMsg(hash types.Hash, number uint64) {
 	// TODO, should the access to b.peers be locked?
 
 	for _, i := range b.peers {
@@ -279,7 +278,7 @@ func (b *Backend) broadcastBlockMsg(block *types.Block) {
 	}
 
 	// total difficulty + the difficulty of the block
-	blockDiff := big.NewInt(1).Add(diff, block.Difficulty())
+	blockDiff := big.NewInt(1).Add(diff, block.Header.Difficulty)
 
 	// TODO, broadcast to only a subset of the peers
 
@@ -340,7 +339,7 @@ func (b *Backend) Add(conn net.Conn, peerID string) (protoCommon.ProtocolHandler
 		return nil, fmt.Errorf("failed to fetch height: %v", err)
 	}
 
-	b.updateChain(header.Number.Uint64())
+	b.updateChain(header.Number)
 	b.addPeer(peerID, proto)
 	b.logger.Trace("add node", "id", peerID)
 
@@ -426,18 +425,23 @@ func (b *Backend) commitData() {
 
 			// write the headers
 			for indx, elem := range data {
-				metrics.SetGauge([]string{"minimal", "protocol", "ethereum63", "block"}, float32(elem.headers[0].Number.Uint64()))
+				metrics.SetGauge([]string{"minimal", "protocol", "ethereum63", "block"}, float32(elem.headers[0].Number))
 
 				// we have to use writeblcoks because that one changes the state
 				blocks := []*types.Block{}
 				for _, i := range elem.headers {
-					blocks = append(blocks, types.NewBlockWithHeader(i))
+					blocks = append(blocks, &types.Block{
+						Header: i,
+					})
 				}
 
 				// Add transactions and uncles
 				for indx, i := range elem.bodiesHeaders {
 					body := elem.bodies[indx]
-					blocks[i] = blocks[i].WithBody(body.Transactions, body.Uncles)
+					// blocks[i] = blocks[i].WithBody(body.Transactions, body.Uncles)
+
+					blocks[i].Transactions = body.Transactions
+					blocks[i].Uncles = body.Uncles
 				}
 
 				// Write blocks and commit new data
@@ -447,13 +451,13 @@ func (b *Backend) commitData() {
 					first, last := elem.headers[0], elem.headers[len(elem.headers)-1]
 
 					fmt.Printf("Error at step: %d\n", indx)
-					fmt.Printf("First block we have is %s (%s) %s (%s)\n", first.Hash().String(), first.Number.String(), last.Hash().String(), last.Number.String())
+					fmt.Printf("First block we have is %s (%d) %s (%d)\n", first.Hash().String(), first.Number, last.Hash().String(), last.Number)
 
 					panic("Unhandled error")
 				}
 
 				h, _ := b.blockchain.Header()
-				b.logger.Info("new header number", "num", h.Number.Uint64())
+				b.logger.Info("new header number", "num", h.Number)
 			}
 		}
 	}
@@ -493,10 +497,10 @@ func (b *Backend) FindCommonAncestor(peer *Ethereum, height *types.Header) (*typ
 
 	h, _ := b.blockchain.Header()
 
-	min := 0 // genesis
-	max := int(h.Number.Uint64())
+	min := uint64(0) // genesis
+	max := h.Number
 
-	if heightNumber := int(height.Number.Uint64()); max > heightNumber {
+	if heightNumber := height.Number; max > heightNumber {
 		max = heightNumber
 	}
 
@@ -514,22 +518,22 @@ func (b *Backend) FindCommonAncestor(peer *Ethereum, height *types.Header) (*typ
 
 		if !ok {
 			// peer does not have the m peer, search in lower bounds
-			max = int(m - 1)
+			max = m - 1
 		} else {
-			if found.Number.Uint64() != m {
-				return nil, nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number.Uint64())
+			if found.Number != m {
+				return nil, nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number)
 			}
 
-			expectedHeader, ok := b.blockchain.GetHeaderByNumber(big.NewInt(int64(m)))
+			expectedHeader, ok := b.blockchain.GetHeaderByNumber(m)
 			if !ok {
 				return nil, nil, fmt.Errorf("cannot find the header in local chain")
 			}
 
 			if expectedHeader.Hash() == found.Hash() {
 				header = found
-				min = int(m + 1)
+				min = m + 1
 			} else {
-				max = int(m - 1)
+				max = m - 1
 			}
 		}
 	}
@@ -539,11 +543,11 @@ func (b *Backend) FindCommonAncestor(peer *Ethereum, height *types.Header) (*typ
 	}
 
 	// Get next element, that would be the index of the fork
-	if height.Number.Uint64() == header.Number.Uint64() {
+	if height.Number == header.Number {
 		return header, nil, nil
 	}
 
-	fork, ok, err := peer.RequestHeaderSync(ctx, header.Number.Uint64()+1)
+	fork, ok, err := peer.RequestHeaderSync(ctx, header.Number+1)
 	if err != nil {
 		return nil, nil, err
 	}

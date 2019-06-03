@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 var err = fmt.Errorf("NoProof consensus only meant to be used to verify headers only")
@@ -21,8 +20,8 @@ func (n *NoProof) VerifyHeader(parent *types.Header, header *types.Header, uncle
 }
 
 // Author checks the author of the header
-func (n *NoProof) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, err
+func (n *NoProof) Author(header *types.Header) (types.Address, error) {
+	return types.Address{}, err
 }
 
 // Seal seals the block

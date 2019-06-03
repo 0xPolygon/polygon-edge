@@ -5,20 +5,19 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/helper/hex"
 
 	"github.com/umbracle/minimal/consensus"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/types"
 
 	mapset "github.com/deckarep/golang-set"
 )
@@ -43,7 +42,7 @@ type Blockchain struct {
 	state       state.State
 	triedb      trie.Storage
 	params      *chain.Params
-	precompiled map[common.Address]*precompiled.Precompiled
+	precompiled map[types.Address]*precompiled.Precompiled
 	sidechainCh chan *types.Header
 
 	// listener for advancedhead subscribers
@@ -69,7 +68,7 @@ func (b *Blockchain) Subscribe() chan *types.Header {
 	return ch
 }
 
-func (b *Blockchain) SetPrecompiled(precompiled map[common.Address]*precompiled.Precompiled) {
+func (b *Blockchain) SetPrecompiled(precompiled map[types.Address]*precompiled.Precompiled) {
 	b.precompiled = precompiled
 }
 
@@ -86,7 +85,7 @@ func (b *Blockchain) Genesis() *types.Header {
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// Build precompiled contracts
-	prec := map[common.Address]*precompiled.Precompiled{}
+	prec := map[types.Address]*precompiled.Precompiled{}
 	for addr, i := range genesis.Alloc {
 		if i.Builtin != nil {
 			j, err := precompiled.CreatePrecompiled(i.Builtin)
@@ -102,7 +101,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// The chain is not empty
 	if !b.Empty() {
 		// load genesis from memory
-		genesisHash, ok := b.db.ReadCanonicalHash(big.NewInt(0))
+		genesisHash, ok := b.db.ReadCanonicalHash(0)
 		if !ok {
 			return fmt.Errorf("genesis hash not found")
 		}
@@ -134,7 +133,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	_, root := txn.Commit(false)
 
 	header := genesis.ToBlock()
-	header.Root = common.BytesToHash(root)
+	header.StateRoot = types.BytesToHash(root)
 
 	b.genesis = header
 
@@ -150,7 +149,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	return nil
 }
 
-func (b *Blockchain) getStateRoot(root common.Hash) (state.Snapshot, bool) {
+func (b *Blockchain) getStateRoot(root types.Hash) (state.Snapshot, bool) {
 	ss, err := b.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, false
@@ -174,6 +173,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 		return err
 	}
 
+	b.genesis = header.Copy()
 	b.db.WriteDiff(header.Hash(), big.NewInt(1))
 	return nil
 }
@@ -192,7 +192,7 @@ func (b *Blockchain) GetChainTD() (*big.Int, bool) {
 	return b.GetTD(header.Hash())
 }
 
-func (b *Blockchain) GetTD(hash common.Hash) (*big.Int, bool) {
+func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return b.db.ReadDiff(hash)
 }
 
@@ -201,7 +201,7 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 	b.db.WriteHeadNumber(h.Number)
 	b.db.WriteCanonicalHash(h.Number, h.Hash())
 
-	if h.ParentHash != common.HexToHash("") {
+	if h.ParentHash != types.StringToHash("") {
 		// Dont write difficulty for genesis
 		td, ok := b.db.ReadDiff(h.ParentHash)
 		if !ok {
@@ -238,7 +238,7 @@ func (b *Blockchain) Header() (*types.Header, bool) {
 }
 
 // CommitBodies writes the bodies
-func (b *Blockchain) CommitBodies(headers []common.Hash, bodies []*types.Body) error {
+func (b *Blockchain) CommitBodies(headers []types.Hash, bodies []*types.Body) error {
 	if len(headers) != len(bodies) {
 		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(bodies))
 	}
@@ -250,7 +250,7 @@ func (b *Blockchain) CommitBodies(headers []common.Hash, bodies []*types.Body) e
 }
 
 // CommitReceipts writes the receipts
-func (b *Blockchain) CommitReceipts(headers []common.Hash, receipts []types.Receipts) error {
+func (b *Blockchain) CommitReceipts(headers []types.Hash, receipts [][]*types.Receipt) error {
 	if len(headers) != len(receipts) {
 		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(receipts))
 	}
@@ -268,20 +268,24 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 	}
 
 	for i := 1; i < len(blocks); i++ {
-		if blocks[i].Number().Uint64()-1 != blocks[i-1].Number().Uint64() {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number().Uint64(), blocks[i-1].Number().Uint64())
+		if blocks[i].Number()-1 != blocks[i-1].Number() {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number(), blocks[i-1].Number())
 		}
 		if blocks[i].ParentHash() != blocks[i-1].Hash() {
 			return fmt.Errorf("parent hash not correct")
 		}
-		// TODO, validate bodies
 	}
 
 	for indx, block := range blocks {
 		r := receipts[indx]
 
 		hash := block.Hash()
-		b.db.WriteBody(hash, block.Body())
+
+		body := &types.Body{
+			Transactions: block.Transactions,
+			Uncles:       block.Uncles,
+		}
+		b.db.WriteBody(hash, body)
 		b.db.WriteReceipts(hash, r)
 	}
 
@@ -289,23 +293,23 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 }
 
 // GetReceiptsByHash returns the receipts by their hash
-func (b *Blockchain) GetReceiptsByHash(hash common.Hash) types.Receipts {
+func (b *Blockchain) GetReceiptsByHash(hash types.Hash) []*types.Receipt {
 	r := b.db.ReadReceipts(hash)
 	return r
 }
 
 // GetBodyByHash returns the body by their hash
-func (b *Blockchain) GetBodyByHash(hash common.Hash) (*types.Body, bool) {
+func (b *Blockchain) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 	return b.db.ReadBody(hash)
 }
 
 // GetHeaderByHash returns the header by his hash
-func (b *Blockchain) GetHeaderByHash(hash common.Hash) (*types.Header, bool) {
+func (b *Blockchain) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return b.db.ReadHeader(hash)
 }
 
 // GetHeaderByNumber returns the header by his number
-func (b *Blockchain) GetHeaderByNumber(n *big.Int) (*types.Header, bool) {
+func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	hash, ok := b.db.ReadCanonicalHash(n)
 	if !ok {
 		return nil, false
@@ -325,8 +329,8 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	// validate chain
 	for i := 1; i < len(headers); i++ {
-		if headers[i].Number.Uint64()-1 != headers[i-1].Number.Uint64() {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number.Uint64(), headers[i-1].Number.Uint64())
+		if headers[i].Number-1 != headers[i-1].Number {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number, headers[i-1].Number)
 		}
 		if headers[i].ParentHash != headers[i-1].Hash() {
 			return fmt.Errorf("parent hash not correct")
@@ -349,20 +353,20 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 	headers := []*types.Header{}
 	for _, block := range blocks {
-		headers = append(headers, block.Header())
+		headers = append(headers, block.Header)
 	}
 
 	parent, ok := b.db.ReadHeader(headers[0].ParentHash)
 	if !ok {
-		return fmt.Errorf("parent of %s (%d) not found", headers[0].Hash().String(), headers[0].Number.Uint64())
+		return fmt.Errorf("parent of %s (%d) not found", headers[0].Hash().String(), headers[0].Number)
 	}
 
 	// validate chain
 	for i := 0; i < len(headers); i++ {
 		block := blocks[i]
 
-		if headers[i].Number.Uint64()-1 != parent.Number.Uint64() {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number.Uint64(), parent.Number.Uint64())
+		if headers[i].Number-1 != parent.Number {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number, parent.Number)
 		}
 		if headers[i].ParentHash != parent.Hash() {
 			return fmt.Errorf("parent hash not correct")
@@ -372,20 +376,21 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 
 		// verify body data
-		if hash := types.CalcUncleHash(block.Uncles()); hash != headers[i].UncleHash {
-			return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, headers[i].UncleHash)
+		if hash := derivesha.CalcUncleRoot(block.Uncles); hash != headers[i].Sha3Uncles {
+			return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, headers[i].Sha3Uncles)
 		}
-		if hash := types.DeriveSha(block.Transactions()); hash != headers[i].TxHash {
-			return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, headers[i].TxHash)
+		// TODO, the wrapper around transactions
+		if hash := derivesha.CalcTxsRoot(block.Transactions); hash != headers[i].TxRoot {
+			return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, headers[i].TxRoot)
 		}
 		parent = headers[i]
 	}
 
 	// Write chain
 	for indx, block := range blocks {
-		h := block.Header()
+		header := block.Header
 
-		b.db.WriteBody(block.Header().Hash(), block.Body())
+		b.db.WriteBody(block.Header.Hash(), block.Body())
 
 		// verify uncles. It requires to have the bodies in memory. TODO: Part of the consensus? Only required on POW.
 		if err := b.VerifyUncles(block); err != nil {
@@ -393,17 +398,17 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 
 		// Try to write first the state transition
-		parent, ok := b.db.ReadHeader(h.ParentHash)
+		parent, ok := b.db.ReadHeader(header.ParentHash)
 		if !ok {
 			return fmt.Errorf("unknown ancestor 1")
 		}
 
-		st, ok := b.getStateRoot(parent.Root)
+		st, ok := b.getStateRoot(parent.StateRoot)
 		if !ok {
 			return fmt.Errorf("unknown state root")
 		}
 
-		if parent.Root != (common.Hash{}) {
+		if parent.StateRoot != (types.Hash{}) {
 			// Done for testing. TODO, remove.
 
 			block := blocks[indx]
@@ -414,24 +419,24 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 			// Validate the result
 
-			if hexutil.Encode(root) != block.Root().String() {
+			if hex.EncodeToHex(root) != header.StateRoot.String() {
 				return fmt.Errorf("invalid merkle root")
 			}
-			if totalGas != block.GasUsed() {
+			if totalGas != header.GasUsed {
 				return fmt.Errorf("gas used is different")
 			}
 
-			receiptSha := types.DeriveSha(receipts)
-			if receiptSha != block.ReceiptHash() {
-				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", block.ReceiptHash(), receiptSha)
+			receiptSha := derivesha.CalcReceiptRoot(receipts)
+			if receiptSha != header.ReceiptsRoot {
+				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptsRoot, receiptSha)
 			}
 			rbloom := types.CreateBloom(receipts)
-			if rbloom != block.Bloom() {
-				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", block.Bloom(), rbloom)
+			if rbloom != header.LogsBloom {
+				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.LogsBloom, rbloom)
 			}
 		}
 
-		if err := b.WriteHeader(h); err != nil {
+		if err := b.WriteHeader(header); err != nil {
 			return err
 		}
 	}
@@ -440,11 +445,11 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 }
 
 func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
-	b.db.WriteBody(block.Header().Hash(), block.Body())
+	b.db.WriteBody(block.Header.Hash(), block.Body())
 }
 
 func (b *Blockchain) GetState(header *types.Header) (state.Snapshot, bool) {
-	return b.getStateRoot(header.Root)
+	return b.getStateRoot(header.StateRoot)
 }
 
 func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (state.Snapshot, []byte, []*types.Transaction, error) {
@@ -454,26 +459,14 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 	txn := state.NewTxn(b.state, s)
 
 	// start the gasPool
-	config := b.params.Forks.At(header.Number.Uint64())
+	config := b.params.Forks.At(header.Number)
 
 	// gasPool
 	gasPool := NewGasPool(header.GasLimit)
 
 	totalGas := uint64(0)
 
-	receipts := types.Receipts{}
-
-	legacyConfig := &params.ChainConfig{
-		ChainID:        big.NewInt(1), // TODO, Always 1 in tests
-		EIP155Block:    nil,
-		HomesteadBlock: nil,
-	}
-	if b.params.Forks.EIP155 != nil {
-		legacyConfig.EIP155Block = b.params.Forks.EIP155.Int()
-	}
-	if b.params.Forks.Homestead != nil {
-		legacyConfig.HomesteadBlock = b.params.Forks.Homestead.Int()
-	}
+	receipts := []*types.Receipt{}
 
 	var txerr error
 
@@ -488,25 +481,29 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 			break
 		}
 
-		msg, err := tx.AsMessage(types.MakeSigner(legacyConfig, header.Number))
+		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
+		from, err := signer.Sender(tx)
 		if err != nil {
 			panic(err)
 		}
 
+		msg := tx.Copy()
+		msg.SetFrom(from)
+
 		gasTable := b.params.GasTable(header.Number)
 
 		env := &runtime.Env{
-			Coinbase:   header.Coinbase,
-			Timestamp:  header.Time,
+			Coinbase:   header.Miner,
+			Timestamp:  header.Timestamp,
 			Number:     header.Number,
 			Difficulty: header.Difficulty,
 			GasLimit:   big.NewInt(int64(header.GasLimit)),
-			GasPrice:   tx.GasPrice(),
+			GasPrice:   tx.GasPrice,
 		}
 
 		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
 
-		gasUsed, failed, err := executor.Apply(txn, &msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
+		gasUsed, failed, err := executor.Apply(txn, msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 
 		txerr = err
 		totalGas += gasUsed
@@ -514,7 +511,6 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 		logs := txn.Logs()
 
 		ss, root := txn.Commit(config.EIP155)
-		// txn = ss.Txn()
 		txn = state.NewTxn(b.state, ss)
 
 		if config.Byzantium {
@@ -523,18 +519,26 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 
 		// Create receipt
 
-		receipt := types.NewReceipt(root, failed, totalGas)
-		receipt.TxHash = tx.Hash()
-		receipt.GasUsed = gasUsed
+		receipt := &types.Receipt{
+			Root:              root,
+			CumulativeGasUsed: totalGas,
+			TxHash:            tx.Hash(),
+			GasUsed:           gasUsed,
+		}
+		if failed {
+			receipt.Status = types.ReceiptFailed
+		} else {
+			receipt.Status = types.ReceiptSuccess
+		}
 
 		// if the transaction created a contract, store the creation address in the receipt.
-		if msg.To() == nil {
-			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce())
+		if msg.To == nil {
+			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce)
 		}
 
 		// Set the receipt logs and create a bloom for filtering
 		receipt.Logs = buildLogs(logs, tx.Hash(), header.Hash(), uint(count))
-		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 		receipts = append(receipts, receipt)
 
 		count++
@@ -544,7 +548,7 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 	}
 
 	// without uncles
-	if err := b.consensus.Finalize(txn, types.NewBlock(header, nil, nil, nil)); err != nil {
+	if err := b.consensus.Finalize(txn, &types.Block{Header: header}); err != nil {
 		panic(err)
 	}
 
@@ -552,54 +556,50 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 	return s2, root, txns, nil
 }
 
-func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapshot, []byte, types.Receipts, uint64, error) {
+func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapshot, []byte, []*types.Receipt, uint64, error) {
+	header := block.Header
+
 	// add the rewards
 	// txn := s.Txn()
 	txn := state.NewTxn(b.state, s)
 
 	// start the gasPool
-	config := b.params.Forks.At(block.Number().Uint64())
+	config := b.params.Forks.At(block.Number())
 
 	// gasPool
-	gasPool := NewGasPool(block.GasLimit())
+	gasPool := NewGasPool(header.GasLimit)
 
 	totalGas := uint64(0)
 
-	receipts := types.Receipts{}
+	receipts := []*types.Receipt{}
+
+	// chainID := big.NewInt(int64(b.params.ChainID))
 
 	// apply the transactions
-	for indx, tx := range block.Transactions() {
-		legacyConfig := &params.ChainConfig{
-			ChainID:        big.NewInt(1), // TODO, Always 1 in tests
-			EIP155Block:    nil,
-			HomesteadBlock: nil,
-		}
-		if b.params.Forks.EIP155 != nil {
-			legacyConfig.EIP155Block = b.params.Forks.EIP155.Int()
-		}
-		if b.params.Forks.Homestead != nil {
-			legacyConfig.HomesteadBlock = b.params.Forks.Homestead.Int()
-		}
-
-		msg, err := tx.AsMessage(types.MakeSigner(legacyConfig, block.Number()))
+	for indx, tx := range block.Transactions {
+		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
+		from, err := signer.Sender(tx)
 		if err != nil {
 			panic(err)
 		}
 
+		msg := tx.Copy()
+		msg.SetFrom(from)
+
 		gasTable := b.params.GasTable(block.Number())
 
 		env := &runtime.Env{
-			Coinbase:   block.Coinbase(),
-			Timestamp:  block.Time(),
-			Number:     block.Number(),
-			Difficulty: block.Difficulty(),
-			GasLimit:   big.NewInt(int64(block.GasLimit())),
-			GasPrice:   tx.GasPrice(),
+			Coinbase:   header.Miner,
+			Timestamp:  header.Timestamp,
+			Number:     header.Number,
+			Difficulty: header.Difficulty,
+			GasLimit:   big.NewInt(int64(header.GasLimit)),
+			GasPrice:   tx.GasPrice,
 		}
 
 		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
 
-		gasUsed, failed, err := executor.Apply(txn, &msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
+		gasUsed, failed, err := executor.Apply(txn, msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
 
 		totalGas += gasUsed
 
@@ -611,6 +611,17 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 
 		var root []byte
 
+		receipt := &types.Receipt{
+			CumulativeGasUsed: totalGas,
+			TxHash:            tx.Hash(),
+			GasUsed:           gasUsed,
+		}
+		if failed {
+			receipt.Status = types.ReceiptFailed
+		} else {
+			receipt.Status = types.ReceiptSuccess
+		}
+
 		if config.Byzantium {
 			// The suicided accounts are set as deleted for the next iteration
 			txn.CleanDeleteObjects(true)
@@ -618,22 +629,19 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 			ss, aux := txn.Commit(config.EIP155)
 			txn = state.NewTxn(b.state, ss)
 			root = aux
+			receipt.Root = root
 		}
 
 		// Create receipt
 
-		receipt := types.NewReceipt(root, failed, totalGas)
-		receipt.TxHash = tx.Hash()
-		receipt.GasUsed = gasUsed
-
 		// if the transaction created a contract, store the creation address in the receipt.
-		if msg.To() == nil {
-			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce())
+		if msg.To == nil {
+			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce)
 		}
 
 		// Set the receipt logs and create a bloom for filtering
 		receipt.Logs = buildLogs(logs, tx.Hash(), block.Hash(), uint(indx))
-		receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+		receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 		receipts = append(receipts, receipt)
 	}
 
@@ -646,7 +654,7 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 	return s2, root, receipts, totalGas, nil
 }
 
-func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) []*types.Log {
+func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
 	newLogs := []*types.Log{}
 
 	for indx, log := range logs {
@@ -655,7 +663,7 @@ func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) [
 		newLog.TxHash = txHash
 		newLog.BlockHash = blockHash
 		newLog.TxIndex = txIndex
-		newLog.Index = uint(indx)
+		newLog.LogIndex = uint(indx)
 
 		newLogs = append(newLogs, newLog)
 	}
@@ -663,10 +671,10 @@ func buildLogs(logs []*types.Log, txHash, blockHash common.Hash, txIndex uint) [
 	return newLogs
 }
 
-func (b *Blockchain) GetHashByNumber(i uint64) common.Hash {
-	block, ok := b.GetBlockByNumber(big.NewInt(int64(i)), false)
+func (b *Blockchain) GetHashByNumber(i uint64) types.Hash {
+	block, ok := b.GetBlockByNumber(i, false)
 	if !ok {
-		return common.Hash{}
+		return types.Hash{}
 	}
 	return block.Hash()
 }
@@ -674,30 +682,30 @@ func (b *Blockchain) GetHashByNumber(i uint64) common.Hash {
 func (b *Blockchain) VerifyUncles(block *types.Block) error {
 
 	// Verify that there are at most 2 uncles included in this block
-	if len(block.Uncles()) > 2 {
+	if len(block.Uncles) > 2 {
 		return fmt.Errorf("too many uncles")
 	}
 
 	// Gather the set of past uncles and ancestors
-	uncles, ancestors := mapset.NewSet(), make(map[common.Hash]*types.Header)
+	uncles, ancestors := mapset.NewSet(), make(map[types.Hash]*types.Header)
 
-	number, parent := block.NumberU64()-1, block.ParentHash()
+	number, parent := block.Number()-1, block.ParentHash()
 	for i := 0; i < 7; i++ {
 		ancestor, ok := b.GetBlockByHash(parent, true)
 		if !ok {
 			break
 		}
-		ancestors[ancestor.Hash()] = ancestor.Header()
-		for _, uncle := range ancestor.Uncles() {
+		ancestors[ancestor.Hash()] = ancestor.Header
+		for _, uncle := range ancestor.Uncles {
 			uncles.Add(uncle.Hash())
 		}
 		parent, number = ancestor.ParentHash(), number-1
 	}
-	ancestors[block.Hash()] = block.Header()
+	ancestors[block.Hash()] = block.Header
 	uncles.Add(block.Hash())
 
 	// Verify each of the uncles that it's recent, but not an ancestor
-	for _, uncle := range block.Uncles() {
+	for _, uncle := range block.Uncles {
 		// Make sure every uncle is rewarded only once
 		hash := uncle.Hash()
 		if uncles.Contains(hash) {
@@ -729,7 +737,7 @@ func (b *Blockchain) addHeader(header *types.Header) error {
 
 // WriteBlock writes a block of data
 func (b *Blockchain) WriteBlock(block *types.Block) error {
-	return b.WriteHeader(block.Header())
+	return b.WriteHeader(block.Header)
 }
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
@@ -741,7 +749,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 
 	parent, ok := b.db.ReadHeader(header.ParentHash)
 	if !ok {
-		return fmt.Errorf("parent of %s (%d) not found", header.Hash().String(), header.Number.Uint64())
+		return fmt.Errorf("parent of %s (%d) not found", header.Hash().String(), header.Number)
 	}
 
 	// local difficulty of the block
@@ -784,7 +792,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	default:
 	}
 
-	newForks := []common.Hash{}
+	newForks := []types.Hash{}
 	for _, fork := range forks {
 		if fork != header.ParentHash {
 			newForks = append(newForks, fork)
@@ -804,7 +812,7 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 
 	var ok bool
 
-	for oldHeader.Number.Cmp(newHeader.Number) > 0 {
+	for oldHeader.Number > newHeader.Number {
 		oldHeader, ok = b.db.ReadHeader(oldHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
@@ -812,7 +820,7 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 		oldChain = append(oldChain, oldHeader)
 	}
 
-	for newHeader.Number.Cmp(oldHeader.Number) > 0 {
+	for newHeader.Number > oldHeader.Number {
 		newHeader, ok = b.db.ReadHeader(newHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
@@ -856,17 +864,20 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 }
 
 // GetForks returns the forks
-func (b *Blockchain) GetForks() []common.Hash {
+func (b *Blockchain) GetForks() []types.Hash {
 	return b.db.ReadForks()
 }
 
 // GetBlockByHash returns the block by their hash
-func (b *Blockchain) GetBlockByHash(hash common.Hash, full bool) (*types.Block, bool) {
+func (b *Blockchain) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
 	header, ok := b.db.ReadHeader(hash)
 	if !ok {
 		return nil, false
 	}
-	block := types.NewBlockWithHeader(header)
+
+	block := &types.Block{
+		Header: header,
+	}
 	if !full {
 		return block, true
 	}
@@ -874,11 +885,16 @@ func (b *Blockchain) GetBlockByHash(hash common.Hash, full bool) (*types.Block, 
 	if !ok {
 		return block, true
 	}
-	return block.WithBody(body.Transactions, body.Uncles), true
+
+	block.Transactions = body.Transactions
+	block.Uncles = body.Uncles
+	return block, true
+
+	// return block.WithBody(body.Transactions, body.Uncles), true
 }
 
 // GetBlockByNumber returns the block by their number
-func (b *Blockchain) GetBlockByNumber(n *big.Int, full bool) (*types.Block, bool) {
+func (b *Blockchain) GetBlockByNumber(n uint64, full bool) (*types.Block, bool) {
 	hash, ok := b.db.ReadCanonicalHash(n)
 	if !ok {
 		return nil, false

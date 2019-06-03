@@ -19,11 +19,11 @@ package trie
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 )
 
 var (
@@ -41,8 +41,8 @@ type Storage interface {
 	Put(k, v []byte)
 	Get(k []byte) ([]byte, bool)
 	Batch() Batch
-	SetCode(hash common.Hash, code []byte)
-	GetCode(hash common.Hash) ([]byte, bool)
+	SetCode(hash types.Hash, code []byte)
+	GetCode(hash types.Hash) ([]byte, bool)
 }
 
 // KVStorage is a k/v storage on memory using leveldb
@@ -60,11 +60,11 @@ func (b *KVBatch) Put(k, v []byte) {
 	b.batch.Put(k, v)
 }
 
-func (kv *KVStorage) SetCode(hash common.Hash, code []byte) {
+func (kv *KVStorage) SetCode(hash types.Hash, code []byte) {
 	kv.Put(append(CODE, hash.Bytes()...), code)
 }
 
-func (kv *KVStorage) GetCode(hash common.Hash) ([]byte, bool) {
+func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
 	return kv.Get(append(CODE, hash.Bytes()...))
 }
 
@@ -102,7 +102,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (Storage, error) {
 
 type memStorage struct {
 	db   map[string][]byte
-	code map[common.Hash][]byte
+	code map[types.Hash][]byte
 }
 
 type memBatch struct {
@@ -110,7 +110,7 @@ type memBatch struct {
 }
 
 func (m *memBatch) Put(p, v []byte) {
-	(*m.db)[hexutil.Encode(p)] = v
+	(*m.db)[hex.EncodeToHex(p)] = v
 }
 
 func (m *memBatch) Write() {
@@ -118,14 +118,14 @@ func (m *memBatch) Write() {
 
 // NewMemoryStorage creates an inmemory trie storage
 func NewMemoryStorage() Storage {
-	return &memStorage{db: map[string][]byte{}, code: map[common.Hash][]byte{}}
+	return &memStorage{db: map[string][]byte{}, code: map[types.Hash][]byte{}}
 }
 
-func (m *memStorage) SetCode(hash common.Hash, code []byte) {
+func (m *memStorage) SetCode(hash types.Hash, code []byte) {
 	m.code[hash] = code
 }
 
-func (m *memStorage) GetCode(hash common.Hash) ([]byte, bool) {
+func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
 	code, ok := m.code[hash]
 	return code, ok
 }
@@ -135,11 +135,11 @@ func (m *memStorage) Batch() Batch {
 }
 
 func (m *memStorage) Put(p []byte, v []byte) {
-	m.db[hexutil.Encode(p)] = v
+	m.db[hex.EncodeToHex(p)] = v
 }
 
 func (m *memStorage) Get(p []byte) ([]byte, bool) {
-	v, ok := m.db[hexutil.Encode(p)]
+	v, ok := m.db[hex.EncodeToHex(p)]
 	if !ok {
 		return []byte{}, false
 	}
@@ -241,7 +241,7 @@ func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
 	return n, nil
 }
 
-const hashLen = len(common.Hash{})
+const hashLen = len(types.Hash{})
 
 func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) {
 	kind, val, rest, err := rlp.Split(buf)

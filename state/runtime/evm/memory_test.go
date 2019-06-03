@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/umbracle/minimal/helper"
 )
 
 func expectLength(t *testing.T, m *Memory, len int) {
@@ -21,7 +21,7 @@ func TestMemorySetResize(t *testing.T) {
 	m.Set(0, 3, data)
 	expectLength(t, m, 32)
 
-	equalBytes(t, m.store, common.RightPadBytes(data, 32))
+	equalBytes(t, m.store, helper.RightPadBytes(data, 32))
 	found, _, err := m.Get(c(0), c(3))
 	if err != nil {
 		t.Fatal(err)

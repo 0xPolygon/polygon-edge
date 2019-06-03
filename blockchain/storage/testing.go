@@ -5,8 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/umbracle/minimal/types"
 )
 
 // TestStorage tests a set of tests on a storage
@@ -38,20 +37,20 @@ func TestStorage(t *testing.T, s Storage) {
 
 func testCanonicalChain(t *testing.T, s Storage) {
 	var cases = []struct {
-		Number *big.Int
-		Hash   common.Hash
+		Number uint64
+		Hash   types.Hash
 	}{
 		{
-			Number: big.NewInt(1),
-			Hash:   common.HexToHash("111"),
+			Number: 1,
+			Hash:   types.StringToHash("111"),
 		},
 		{
-			Number: big.NewInt(1),
-			Hash:   common.HexToHash("222"),
+			Number: 1,
+			Hash:   types.StringToHash("222"),
 		},
 		{
-			Number: big.NewInt(2),
-			Hash:   common.HexToHash("111"),
+			Number: 2,
+			Hash:   types.StringToHash("111"),
 		},
 	}
 
@@ -69,19 +68,19 @@ func testCanonicalChain(t *testing.T, s Storage) {
 
 func testDifficulty(t *testing.T, s Storage) {
 	var cases = []struct {
-		Hash common.Hash
+		Hash types.Hash
 		Diff *big.Int
 	}{
 		{
-			Hash: common.HexToHash("0x1"),
+			Hash: types.StringToHash("0x1"),
 			Diff: big.NewInt(10),
 		},
 		{
-			Hash: common.HexToHash("0x1"),
+			Hash: types.StringToHash("0x1"),
 			Diff: big.NewInt(11),
 		},
 		{
-			Hash: common.HexToHash("0x2"),
+			Hash: types.StringToHash("0x2"),
 			Diff: big.NewInt(12),
 		},
 	}
@@ -100,11 +99,11 @@ func testDifficulty(t *testing.T, s Storage) {
 
 func testHead(t *testing.T, s Storage) {
 	var cases = []struct {
-		Hash common.Hash
+		Hash types.Hash
 	}{
-		{common.HexToHash("111")},
-		{common.HexToHash("222")},
-		{common.HexToHash("222")},
+		{types.StringToHash("111")},
+		{types.StringToHash("222")},
+		{types.StringToHash("222")},
 	}
 
 	for _, cc := range cases {
@@ -121,10 +120,10 @@ func testHead(t *testing.T, s Storage) {
 
 func testForks(t *testing.T, s Storage) {
 	var cases = []struct {
-		Forks []common.Hash
+		Forks []types.Hash
 	}{
-		{[]common.Hash{common.HexToHash("111"), common.HexToHash("222")}},
-		{[]common.Hash{common.HexToHash("111")}},
+		{[]types.Hash{types.StringToHash("111"), types.StringToHash("222")}},
+		{[]types.Hash{types.StringToHash("111")}},
 	}
 
 	for _, cc := range cases {
@@ -139,11 +138,11 @@ func testForks(t *testing.T, s Storage) {
 
 func testHeader(t *testing.T, s Storage) {
 	header := &types.Header{
-		Number:     big.NewInt(5),
+		Number:     5,
 		Difficulty: big.NewInt(10),
-		ParentHash: common.HexToHash("11"),
-		Time:       big.NewInt(10),
-		Extra:      []byte{}, // if not set it will fail
+		ParentHash: types.StringToHash("11"),
+		Timestamp:  10,
+		ExtraData:  []byte{}, // if not set it will fail
 	}
 
 	s.WriteHeader(header)
@@ -158,27 +157,49 @@ func testHeader(t *testing.T, s Storage) {
 
 func testBody(t *testing.T, s Storage) {
 	header := &types.Header{
-		Number:     big.NewInt(5),
+		Number:     5,
 		Difficulty: big.NewInt(10),
-		ParentHash: common.HexToHash("11"),
-		Time:       big.NewInt(10),
-		Extra:      []byte{}, // if not set it will fail
+		ParentHash: types.StringToHash("11"),
+		Timestamp:  10,
+		ExtraData:  []byte{}, // if not set it will fail
 	}
 
-	t0 := types.NewTransaction(0, common.HexToAddress("11"), big.NewInt(1), 11, big.NewInt(11), []byte{1, 2})
-	t1 := types.NewTransaction(1, common.HexToAddress("22"), big.NewInt(1), 22, big.NewInt(11), []byte{4, 5})
+	addr1 := types.StringToAddress("11")
+	t0 := &types.Transaction{
+		Nonce:    0,
+		To:       &addr1,
+		Value:    big.NewInt(1),
+		Gas:      11,
+		GasPrice: big.NewInt(11),
+		Input:    []byte{1, 2},
+	}
 
-	block := types.NewBlock(header, []*types.Transaction{t0, t1}, nil, nil)
+	addr2 := types.StringToAddress("22")
+	t1 := &types.Transaction{
+		Nonce:    0,
+		To:       &addr2,
+		Value:    big.NewInt(1),
+		Gas:      22,
+		GasPrice: big.NewInt(11),
+		Input:    []byte{4, 5},
+	}
+
+	block := types.Block{
+		Header:       header,
+		Transactions: []*types.Transaction{t0, t1},
+	}
 	hash := block.Hash()
 
-	s.WriteBody(hash, block.Body())
-	body, ok := s.ReadBody(hash)
+	body0 := block.Body()
+	s.WriteBody(hash, body0)
+
+	body1, ok := s.ReadBody(hash)
 	if !ok {
 		t.Fatal("not found")
 	}
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
-	tx0, tx1 := block.Body().Transactions, body.Transactions
+	tx0, tx1 := body0.Transactions, body1.Transactions
 	if len(tx0) != len(tx1) {
 		t.Fatal("lengths are different")
 	}
@@ -190,14 +211,23 @@ func testBody(t *testing.T, s Storage) {
 }
 
 func testReceipts(t *testing.T, s Storage) {
-	r0 := types.NewReceipt([]byte{1}, false, 10)
-	r0.TxHash = common.HexToHash("11")
 
-	r1 := types.NewReceipt([]byte{1}, false, 10)
-	r1.TxHash = common.HexToHash("33")
+	r0 := &types.Receipt{
+		Root:              []byte{1},
+		Status:            types.ReceiptFailed,
+		CumulativeGasUsed: 10,
+		TxHash:            types.StringToHash("11"),
+	}
+
+	r1 := &types.Receipt{
+		Root:              []byte{1},
+		Status:            types.ReceiptFailed,
+		CumulativeGasUsed: 10,
+		TxHash:            types.StringToHash("33"),
+	}
 
 	receipts := []*types.Receipt{r0, r1}
-	hash := common.HexToHash("11")
+	hash := types.StringToHash("11")
 
 	s.WriteReceipts(hash, receipts)
 	r := s.ReadReceipts(hash)

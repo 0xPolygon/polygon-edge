@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
+	"math"
+
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 type Memory struct {
@@ -105,7 +105,7 @@ func (m *Memory) Resize(size uint64) (uint64, error) {
 // calculates the memory size required for a step
 func calcMemSize(off, l *big.Int) *big.Int {
 	if l.Sign() == 0 {
-		return common.Big0
+		return big0
 	}
 
 	return new(big.Int).Add(off, l)
@@ -141,7 +141,7 @@ func (m *Memory) Set32(o *big.Int, val *big.Int) (uint64, error) {
 	}
 
 	copy(m.store[offset:offset+32], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
-	math.ReadBits(val, m.store[offset:offset+32])
+	ReadBits(val, m.store[offset:offset+32])
 	return gas, nil
 }
 
@@ -185,7 +185,7 @@ func (m *Memory) Show() string {
 			j = len(m.store)
 		}
 
-		str = append(str, hexutil.Encode(m.store[i:j]))
+		str = append(str, hex.EncodeToHex(m.store[i:j]))
 	}
 	return strings.Join(str, "\n")
 }

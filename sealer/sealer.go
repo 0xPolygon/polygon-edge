@@ -3,16 +3,16 @@ package sealer
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/types"
 )
 
 // Sealer seals blocks
@@ -25,8 +25,8 @@ type Sealer struct {
 	engine     consensus.Consensus
 	txPool     *TxPool
 
-	signer   types.Signer
-	coinbase common.Address
+	signer   crypto.TxSigner
+	coinbase types.Address
 
 	// sealer
 	stopSealing context.CancelFunc
@@ -60,13 +60,13 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		txPool:         NewTxPool(blockchain),
 		newBlock:       make(chan struct{}, 1),
 		commitInterval: time.NewTimer(config.CommitInterval),
-		signer:         types.NewEIP155Signer(big.NewInt(1)),
+		signer:         crypto.NewEIP155Signer(1),
 		SealedCh:       make(chan *SealedNotify, 10),
 	}
 	return s
 }
 
-func (s *Sealer) SetCoinbase(coinbase common.Address) {
+func (s *Sealer) SetCoinbase(coinbase types.Address) {
 	s.coinbase = coinbase
 }
 
@@ -109,6 +109,19 @@ func (s *Sealer) AddTx(tx *types.Transaction) {
 	s.txPool.Add(tx)
 }
 
+func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Block {
+	if len(txs) == 0 {
+		header.TxRoot = types.EmptyRootHash
+	} else {
+		header.TxRoot = derivesha.CalcTxsRoot(txs)
+	}
+
+	return &types.Block{
+		Header:       header,
+		Transactions: txs,
+	}
+}
+
 func (s *Sealer) commit() {
 	s.commitInterval.Reset(s.config.CommitInterval)
 
@@ -130,29 +143,33 @@ func (s *Sealer) commit() {
 
 	pricedTxs := newTxPriceHeap()
 	for _, tx := range promoted {
-		from, err := types.Sender(s.signer, tx)
+		from, err := s.signer.Sender(tx)
 		if err != nil {
 			panic("invalid sender")
 		}
 
-		if err := pricedTxs.Push(from, tx, tx.GasPrice().Uint64()); err != nil {
+		// NOTE, we need to sort with big.Int instead of uint64
+		if err := pricedTxs.Push(from, tx, tx.GasPrice.Uint64()); err != nil {
 			panic(err)
 		}
 	}
 
 	timestamp := time.Now().Unix()
-	if parent.Time.Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
-		timestamp = parent.Time.Int64() + 1
-	}
+
+	/*
+		if parent.Time.Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
+			timestamp = parent.Time.Int64() + 1
+		}
+	*/
 
 	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
+		Number:     num + 1,
 		GasLimit:   calcGasLimit(parent, 8000000, 8000000),
-		Extra:      []byte{},
-		Time:       big.NewInt(timestamp),
-		Coinbase:   s.coinbase,
+		ExtraData:  []byte{},
+		Timestamp:  uint64(timestamp),
+		Miner:      s.coinbase,
 	}
 
 	if err := s.engine.Prepare(parent, header); err != nil {
@@ -165,7 +182,7 @@ func (s *Sealer) commit() {
 	}
 
 	txIterator := func(err error, gas uint64) (*types.Transaction, bool) {
-		if gas < params.TxGas {
+		if gas < chain.TxGas {
 			return nil, false
 		}
 		tx := pricedTxs.Pop()
@@ -176,11 +193,11 @@ func (s *Sealer) commit() {
 	}
 
 	_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
-	header.Root = common.BytesToHash(root)
+	header.StateRoot = types.BytesToHash(root)
 
 	// TODO, get uncles
 
-	block := types.NewBlock(header, txns, nil, nil)
+	block := generateNewBlock(header, txns)
 
 	// Seal
 	if _, err := s.engine.Seal(ctx, block); err != nil {
@@ -192,12 +209,12 @@ func (s *Sealer) commit() {
 		return
 	}
 
-	td, ok := s.blockchain.GetTD(block.ParentHash())
-	if !ok {
-		return
-	}
-
-	fmt.Printf("===> SEAL Block: %d %d. Difficulty %d. Total: %d\n", block.Number(), block.Difficulty(), td.Int64(), big.NewInt(1).Add(td, block.Difficulty()))
+	/*
+		td, ok := s.blockchain.GetTD(block.ParentHash())
+		if !ok {
+			return
+		}
+	*/
 
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
@@ -205,7 +222,7 @@ func (s *Sealer) commit() {
 	}
 
 	// Write the new state
-	// s.blockchain.AddState(common.BytesToHash(root), newState)
+	// s.blockchain.AddState(types.BytesToHash(root), newState)
 
 	// Broadcast the block to the network
 	select {
@@ -219,14 +236,14 @@ func (s *Sealer) commit() {
 
 func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {
 	// contrib = (parentGasUsed * 3 / 2) / 1024
-	contrib := (parent.GasUsed + parent.GasUsed/2) / params.GasLimitBoundDivisor
+	contrib := (parent.GasUsed + parent.GasUsed/2) / chain.GasLimitBoundDivisor
 
 	// decay = parentGasLimit / 1024 -1
-	decay := parent.GasLimit/params.GasLimitBoundDivisor - 1
+	decay := parent.GasLimit/chain.GasLimitBoundDivisor - 1
 
 	limit := parent.GasLimit - decay + contrib
-	if limit < params.MinGasLimit {
-		limit = params.MinGasLimit
+	if limit < chain.MinGasLimit {
+		limit = chain.MinGasLimit
 	}
 	// If we're outside our allowed gas range, we try to hone towards them
 	if limit < gasFloor {
@@ -241,4 +258,22 @@ func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {
 		}
 	}
 	return limit
+}
+
+// TxDifference returns a new set which is the difference between a and b.
+func txDifference(a, b []*types.Transaction) []*types.Transaction {
+	keep := make([]*types.Transaction, 0, len(a))
+
+	remove := make(map[types.Hash]struct{})
+	for _, tx := range b {
+		remove[tx.Hash()] = struct{}{}
+	}
+
+	for _, tx := range a {
+		if _, ok := remove[tx.Hash()]; !ok {
+			keep = append(keep, tx)
+		}
+	}
+
+	return keep
 }

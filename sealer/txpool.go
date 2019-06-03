@@ -3,13 +3,12 @@ package sealer
 import (
 	"container/heap"
 	"fmt"
-	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain"
+	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 )
 
 const (
@@ -18,28 +17,28 @@ const (
 
 // TxPool is a pool of transactions
 type TxPool struct {
-	signer     types.Signer
+	signer     crypto.TxSigner
 	state      *state.Txn
 	blockchain *blockchain.Blockchain
 	idlePeriod time.Duration
 
 	pending []*types.Transaction
-	queue   map[common.Address]*txQueue
+	queue   map[types.Address]*txQueue
 }
 
 // NewTxPool creates a new pool of transactios
 func NewTxPool(blockchain *blockchain.Blockchain) *TxPool {
 	txPool := &TxPool{
-		signer:     types.NewEIP155Signer(big.NewInt(1)),
+		signer:     crypto.NewEIP155Signer(1),
 		blockchain: blockchain,
 		idlePeriod: defaultIdlePeriod,
-		queue:      make(map[common.Address]*txQueue, 0),
+		queue:      make(map[types.Address]*txQueue, 0),
 	}
 	return txPool
 }
 
 // SetSigner changes the signer
-func (t *TxPool) SetSigner(signer types.Signer) {
+func (t *TxPool) SetSigner(signer crypto.TxSigner) {
 	t.signer = signer
 }
 
@@ -48,7 +47,7 @@ func (t *TxPool) Add(tx *types.Transaction) error {
 	if err := t.validateTx(tx); err != nil {
 		return err
 	}
-	from, err := types.Sender(t.signer, tx)
+	from, err := t.signer.Sender(tx)
 	if err != nil {
 		return fmt.Errorf("invalid sender")
 	}
@@ -76,7 +75,7 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 	var reinject []*types.Transaction
 
 	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
-		var discarded, included types.Transactions
+		var discarded, included []*types.Transaction
 
 		oldHeader, ok := t.blockchain.GetBlockByHash(oldHead.Hash(), true)
 		if !ok {
@@ -87,16 +86,16 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 			return nil, fmt.Errorf("block by hash '%s' not found", newHead.Hash().String())
 		}
 
-		for oldHeader.Number().Cmp(newHeader.Number()) > 0 {
-			discarded = append(discarded, oldHeader.Transactions()...)
+		for oldHeader.Number() > newHeader.Number() {
+			discarded = append(discarded, oldHeader.Transactions...)
 			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
 			if !ok {
 				return nil, fmt.Errorf("block by hash '%s' not found", oldHeader.ParentHash().String())
 			}
 		}
 
-		for newHeader.Number().Cmp(oldHeader.Number()) > 0 {
-			included = append(included, newHeader.Transactions()...)
+		for newHeader.Number() > oldHeader.Number() {
+			included = append(included, newHeader.Transactions...)
 			newHeader, ok = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
 			if !ok {
 				return nil, fmt.Errorf("block by hash '%s' not found", newHeader.ParentHash().String())
@@ -104,8 +103,8 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 		}
 
 		for oldHeader.Hash() != newHeader.Hash() {
-			discarded = append(discarded, oldHeader.Transactions()...)
-			included = append(included, newHeader.Transactions()...)
+			discarded = append(discarded, oldHeader.Transactions...)
+			included = append(included, newHeader.Transactions...)
 
 			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
 			if !ok {
@@ -117,7 +116,7 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 			}
 		}
 
-		reinject = types.TxDifference(discarded, included)
+		reinject = txDifference(discarded, included)
 	}
 
 	// reinject all the transactions into the blocks
@@ -142,10 +141,12 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 }
 
 func (t *TxPool) validateTx(tx *types.Transaction) error {
-	if tx.Size() > 32*1024 {
-		return fmt.Errorf("oversize data")
-	}
-	if tx.Value().Sign() < 0 {
+	/*
+		if tx.Size() > 32*1024 {
+			return fmt.Errorf("oversize data")
+		}
+	*/
+	if tx.Value.Sign() < 0 {
 		return fmt.Errorf("negative value")
 	}
 	return nil
@@ -180,7 +181,7 @@ func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
 	// Remove elements lower than nonce
 	for {
 		tx := t.Peek()
-		if tx == nil || tx.Nonce() >= nextNonce {
+		if tx == nil || tx.Nonce >= nextNonce {
 			break
 		}
 		t.Pop()
@@ -188,7 +189,7 @@ func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
 
 	// Promote elements
 	tx := t.Peek()
-	if tx == nil || tx.Nonce() != nextNonce {
+	if tx == nil || tx.Nonce != nextNonce {
 		return nil
 	}
 
@@ -198,7 +199,7 @@ func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
 		t.Pop()
 
 		tx2 := t.Peek()
-		if tx2 == nil || tx.Nonce()+1 != tx2.Nonce() {
+		if tx2 == nil || tx.Nonce+1 != tx2.Nonce {
 			break
 		}
 		tx = tx2
@@ -243,7 +244,7 @@ func (t *txHeap) Swap(i, j int) {
 }
 
 func (t *txHeap) Less(i, j int) bool {
-	return (*t)[i].Nonce() < (*t)[j].Nonce()
+	return (*t)[i].Nonce < (*t)[j].Nonce
 }
 
 func (t *txHeap) Push(x interface{}) {
@@ -262,24 +263,24 @@ func (t *txHeap) Pop() interface{} {
 
 type pricedTx struct {
 	tx    *types.Transaction
-	from  common.Address
+	from  types.Address
 	price uint64
 	index int
 }
 
 type txPriceHeap struct {
-	index map[common.Hash]*pricedTx
+	index map[types.Hash]*pricedTx
 	heap  txPriceHeapImpl
 }
 
 func newTxPriceHeap() *txPriceHeap {
 	return &txPriceHeap{
-		index: make(map[common.Hash]*pricedTx),
+		index: make(map[types.Hash]*pricedTx),
 		heap:  make(txPriceHeapImpl, 0),
 	}
 }
 
-func (t *txPriceHeap) Push(from common.Address, tx *types.Transaction, price uint64) error {
+func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price uint64) error {
 	if _, ok := t.index[tx.Hash()]; ok {
 		return fmt.Errorf("tx %s already exists", tx.Hash())
 	}
@@ -314,7 +315,7 @@ func (t txPriceHeapImpl) Len() int { return len(t) }
 
 func (t txPriceHeapImpl) Less(i, j int) bool {
 	if t[i].from == t[j].from {
-		return t[i].tx.Nonce() < t[j].tx.Nonce()
+		return t[i].tx.Nonce < t[j].tx.Nonce
 	}
 	return t[i].price > (t[j].price)
 }

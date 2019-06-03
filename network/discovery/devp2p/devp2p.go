@@ -17,12 +17,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/helper/enode"
 
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discovery"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -59,7 +58,7 @@ type Peer struct {
 
 // Enode returns an enode address
 func (p *Peer) Enode() string {
-	id := strings.Replace(hexutil.Encode(p.Bytes), "0x", "", -1)
+	id := strings.Replace(hex.EncodeToHex(p.Bytes), "0x", "", -1)
 	return fmt.Sprintf("enode://%s@%s:%d", id, p.UDPAddr.IP.String(), p.TCP)
 }
 
@@ -99,7 +98,7 @@ func newPeer(id string, addr *net.UDPAddr, tcp uint16) (*Peer, error) {
 		return nil, fmt.Errorf("id should be 128 in length not %d", len(id))
 	}
 
-	bytes, err := hexutil.Decode("0x" + id)
+	bytes, err := hex.DecodeHex("0x" + id)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +161,7 @@ type rpcNode struct {
 }
 
 func (r *rpcNode) toPeer() (*Peer, error) {
-	return newPeer(hexutil.Encode(r.ID), &net.UDPAddr{IP: r.IP, Port: int(r.UDP)}, r.TCP)
+	return newPeer(hex.EncodeToHex(r.ID), &net.UDPAddr{IP: r.IP, Port: int(r.UDP)}, r.TCP)
 }
 
 type rpcEndpoint struct {
@@ -227,7 +226,7 @@ func NewBackend(logger hclog.Logger, key *ecdsa.PrivateKey, transport Transport)
 	addr := transport.Addr()
 
 	pub := &key.PublicKey
-	id := hexutil.Encode(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
+	id := hex.EncodeToHex(elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
 	localPeer, err := newPeer(id, addr, 0)
 	if err != nil {
@@ -380,7 +379,7 @@ func (b *Backend) NearestPeers() ([]*Peer, error) {
 }
 
 func (b *Backend) NearestPeersFromTarget(target []byte) ([]*Peer, error) {
-	key := peer.ID(hexutil.Encode(target))
+	key := peer.ID(hex.EncodeToHex(target))
 
 	peers := []*Peer{}
 	for _, p := range b.table.NearestPeers(kb.ConvertPeerID(key), bucketSize) {
@@ -542,7 +541,7 @@ func decodePeerFromPacket(packet *Packet) (*Peer, error) {
 		return nil, fmt.Errorf("expected udp addr")
 	}
 
-	peer, err := newPeer(hexutil.Encode(pubkey[1:]), addr, 0)
+	peer, err := newPeer(hex.EncodeToHex(pubkey[1:]), addr, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -562,7 +561,7 @@ func (b *Backend) HandlePacket(packet *Packet) error {
 		return fmt.Errorf("expected udp addr")
 	}
 
-	peer, err := newPeer(hexutil.Encode(pubkey[1:]), addr, 0)
+	peer, err := newPeer(hex.EncodeToHex(pubkey[1:]), addr, 0)
 	if err != nil {
 		return err
 	}
@@ -588,7 +587,7 @@ func (b *Backend) HandlePacket(packet *Packet) error {
 	case neighborsPacket:
 		return fmt.Errorf("neighborsPacket not expected")
 	case pongPacket:
-		return fmt.Errorf("pongPacket not expected %20s %20s %s", peer.addr(), peer.ID, hexutil.Encode(peer.Bytes))
+		return fmt.Errorf("pongPacket not expected %20s %20s %s", peer.addr(), peer.ID, hex.EncodeToHex(peer.Bytes))
 	default:
 		return fmt.Errorf("message code %d not found", msgcode)
 	}
@@ -700,7 +699,7 @@ func (b *Backend) AddNode(nodeStr string) error {
 		id[i] = node.ID[i]
 	}
 
-	peer, err := newPeer(hexutil.Encode(id), &net.UDPAddr{IP: node.IP, Port: int(node.UDP)}, node.TCP)
+	peer, err := newPeer(hex.EncodeToHex(id), &net.UDPAddr{IP: node.IP, Port: int(node.UDP)}, node.TCP)
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,7 @@ package jsonrpc
 
 import (
 	"golang.org/x/crypto/sha3"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/umbracle/minimal/helper/hex"
 )
 
 // Web3 is the web3 jsonrpc endpoint
@@ -18,12 +17,12 @@ func (w *Web3) ClientVersion() (interface{}, error) {
 
 // Sha3 returns Keccak-256 (not the standardized SHA3-256) of the given data
 func (w *Web3) Sha3(val string) (interface{}, error) {
-	v, err := hexutil.Decode(val)
+	v, err := hex.DecodeHex(val)
 	if err != nil {
 		return nil, err
 	}
 
 	h := sha3.NewLegacyKeccak256()
 	h.Write(v)
-	return hexutil.Encode(h.Sum(nil)), nil
+	return hex.EncodeToHex(h.Sum(nil)), nil
 }

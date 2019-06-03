@@ -5,12 +5,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/umbracle/minimal/types"
 )
 
 type fakeConsensus struct {
@@ -20,8 +20,8 @@ func (f *fakeConsensus) VerifyHeader(parent *types.Header, header *types.Header,
 	return nil
 }
 
-func (f *fakeConsensus) Author(header *types.Header) (common.Address, error) {
-	return common.Address{}, nil
+func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
+	return types.Address{}, nil
 }
 
 func (f *fakeConsensus) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
@@ -44,12 +44,12 @@ func (f *fakeConsensus) Close() error {
 func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
 	head := func(i int64) *types.Header {
 		return &types.Header{
-			Number:      big.NewInt(i),
-			GasLimit:    uint64(seed),
-			TxHash:      types.EmptyRootHash,
-			UncleHash:   types.EmptyUncleHash,
-			ReceiptHash: types.EmptyRootHash,
-			Difficulty:  big.NewInt(int64(i)),
+			Number:       uint64(i),
+			GasLimit:     uint64(seed),
+			TxRoot:       types.EmptyRootHash,
+			Sha3Uncles:   types.EmptyUncleHash,
+			ReceiptsRoot: types.EmptyRootHash,
+			Difficulty:   big.NewInt(int64(i)),
 		}
 	}
 
@@ -58,7 +58,7 @@ func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types
 	}
 	headers := []*types.Header{genesis}
 
-	count := genesis.Number.Int64() + 1
+	count := int64(genesis.Number) + 1
 	for i := 1; i < n; i++ {
 		header := head(count)
 		header.ParentHash = headers[i-1].Hash()
@@ -93,37 +93,62 @@ func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed int) []
 func HeadersToBlocks(headers []*types.Header) []*types.Block {
 	blocks := make([]*types.Block, len(headers))
 	for indx, i := range headers {
-		blocks[indx] = types.NewBlockWithHeader(i)
+		blocks[indx] = &types.Block{Header: i}
 	}
 	return blocks
 }
 
 // NewTestBodyChain creates a test blockchain with headers, body and receipts
 func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receipt) {
-	genesis := types.NewBlockWithHeader(&types.Header{Number: big.NewInt(0), GasLimit: uint64(0)})
+	genesis := &types.Block{
+		Header: &types.Header{
+			Number:   0,
+			GasLimit: uint64(0),
+		},
+	}
 
 	blocks := []*types.Block{genesis}
-	receipts := [][]*types.Receipt{types.Receipts{}} // genesis does not have tx
+	receipts := [][]*types.Receipt{nil} // genesis does not have tx
 
 	for i := 1; i < n; i++ {
 		header := &types.Header{
 			ParentHash: blocks[i-1].Hash(),
-			Number:     big.NewInt(int64(i)),
+			Number:     uint64(i),
 			Difficulty: big.NewInt(int64(i)),
-			Extra:      []byte{},
+			ExtraData:  []byte{},
 		}
 
 		// -- txs ---
-		t0 := types.NewTransaction(uint64(i), common.HexToAddress("00"), big.NewInt(0), 0, big.NewInt(0), header.Hash().Bytes())
+
+		addr0 := types.StringToAddress("00")
+		t0 := &types.Transaction{
+			Nonce:    uint64(i),
+			To:       &addr0,
+			Value:    big.NewInt(0),
+			Gas:      0,
+			GasPrice: big.NewInt(0),
+			Input:    header.Hash().Bytes(),
+		}
+
 		txs := []*types.Transaction{t0}
 
 		// -- receipts --
-		r0 := types.NewReceipt([]byte{1}, false, uint64(i))
-		r0.TxHash = t0.Hash()
+		r0 := &types.Receipt{
+			GasUsed:           uint64(i),
+			TxHash:            t0.Hash(),
+			CumulativeGasUsed: uint64(i), // this value changes the rlpHash
+		}
+		localReceipts := []*types.Receipt{r0}
 
-		localReceipts := types.Receipts{r0}
+		header.TxRoot = derivesha.CalcTxsRoot(txs)
+		header.ReceiptsRoot = derivesha.CalcReceiptRoot(localReceipts)
+		header.LogsBloom = types.CreateBloom(localReceipts)
+		header.Sha3Uncles = types.EmptyUncleHash
 
-		block := types.NewBlock(header, txs, nil, localReceipts)
+		block := &types.Block{
+			Header:       header,
+			Transactions: txs,
+		}
 
 		blocks = append(blocks, block)
 		receipts = append(receipts, localReceipts)
@@ -131,7 +156,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 	headers := []*types.Header{}
 	for _, block := range blocks {
-		headers = append(headers, block.Header())
+		headers = append(headers, block.Header)
 	}
 
 	return headers, blocks, receipts
@@ -141,7 +166,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) *Blockchain {
 	headers := []*types.Header{}
 	for _, block := range blocks {
-		headers = append(headers, block.Header())
+		headers = append(headers, block.Header)
 	}
 
 	b := NewTestBlockchain(t, headers)
@@ -179,23 +204,21 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	// TODO, find a way to add the snapshot, this will fail until that is fixed.
-	// snap, _ := state.NewSnapshot(common.Hash{})
+	// snap, _ := state.NewSnapshot(types.Hash{})
 	return b
 }
 
 func createGenesis(header *types.Header) *chain.Genesis {
 	genesis := &chain.Genesis{
-		Nonce:      header.Nonce.Uint64(),
-		ExtraData:  header.Extra,
+		Nonce:      header.Nonce,
+		ExtraData:  header.ExtraData,
 		GasLimit:   header.GasLimit,
 		Difficulty: header.Difficulty,
-		Mixhash:    header.MixDigest,
-		Coinbase:   header.Coinbase,
+		Mixhash:    header.MixHash,
+		Coinbase:   header.Miner,
 		ParentHash: header.ParentHash,
-		Number:     header.Number.Uint64(),
-	}
-	if header.Time != nil {
-		genesis.Timestamp = header.Time.Uint64()
+		Number:     header.Number,
+		Timestamp:  header.Timestamp,
 	}
 	return genesis
 }

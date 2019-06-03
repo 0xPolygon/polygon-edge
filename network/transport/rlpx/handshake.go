@@ -14,8 +14,8 @@ import (
 
 	mrand "math/rand"
 
-	"github.com/umbracle/ecies"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/ecies"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 
