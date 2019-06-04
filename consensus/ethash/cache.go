@@ -12,9 +12,10 @@ import (
 type Cache struct {
 	cacheSize   uint32
 	datasetSize int
-	cache       [][]uint32
+	cache       []uint32
 	sha512      hash.Hash
 	sha256      hash.Hash
+	mix         [16]uint32
 }
 
 func newCache(epoch int) *Cache {
@@ -35,23 +36,24 @@ func newCache(epoch int) *Cache {
 
 func (c *Cache) calcDatasetItem(i uint32) []uint32 {
 	n := c.cacheSize
+	m := uint32(len(c.cache) / 16)
 	r := hashBytes / wordBytes
 
-	mix := make([]uint32, len(c.cache[0]))
-	copy(mix[:], c.cache[i%n])
-	mix[0] ^= i
-	c.sha512Int(mix)
+	copy(c.mix[:], c.cache[(i*16)%n:])
+	c.mix[0] ^= i
+	c.sha512Int(c.mix[:])
 
 	for j := 0; j < datasetParents; j++ {
-		cacheIndex := fnvOp(i^uint32(j), mix[j%r])
-		aux := c.cache[cacheIndex%n]
+		cacheIndex := (fnvOp(i^uint32(j), c.mix[j%r]) % m) * 16
+
+		aux := c.cache[cacheIndex : cacheIndex+16]
 		for o := 0; o < 16; o++ {
-			mix[o] = fnvOp(mix[o], aux[o])
+			c.mix[o] = fnvOp(c.mix[o], aux[o])
 		}
 	}
 
-	c.sha512Int(mix)
-	return mix
+	c.sha512Int(c.mix[:])
+	return c.mix[:]
 }
 
 func (c *Cache) sha512Aux(p []byte) []byte {
@@ -99,13 +101,13 @@ func (c *Cache) mkcache(cacheSize int, seed []byte) {
 	}
 
 	// Convert bytes to words
-	resInt := [][]uint32{}
+	resInt := []uint32{}
 	for _, i := range res {
 		entry := make([]uint32, 16)
 		for indx := range entry {
 			entry[indx] = binary.LittleEndian.Uint32(i[indx*4:])
 		}
-		resInt = append(resInt, entry)
+		resInt = append(resInt, entry...)
 	}
 
 	c.cache = resInt
