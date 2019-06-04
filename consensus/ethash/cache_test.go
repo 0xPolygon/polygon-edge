@@ -9,6 +9,37 @@ import (
 	"github.com/umbracle/minimal/helper/hex"
 )
 
+func TestHashimotoLight(t *testing.T) {
+	cases := []struct {
+		epoch  int
+		digest string
+		result string
+	}{
+		{
+			epoch:  0,
+			digest: "0xa2b2199089a71759688bbac4ac27d289d6fb08095b177631a6a74b4fb4b933f3",
+			result: "0xd60e5e7cda364597214232e28b5673c59d93eb2cc0885df097269fa726cc0a35",
+		},
+		{
+			epoch:  1,
+			digest: "0x1f741fbcbd6ada281642dc589cc1b51d8a8648562df26d2cf58777ba43819dd5",
+			result: "0x25d1d046befe65c2a6dd5574dfb56155fd3ed31c156a67a9a12882a70bd016ed",
+		},
+	}
+
+	header := make([]byte, 32)
+
+	for _, c := range cases {
+		t.Run("", func(t *testing.T) {
+			cache := newCache(c.epoch)
+			digest, result := cache.hashimoto(header, 100)
+
+			assert.Equal(t, c.digest, hex.EncodeToHex(digest))
+			assert.Equal(t, c.result, hex.EncodeToHex(result))
+		})
+	}
+}
+
 func TestCache(t *testing.T) {
 	cases := []struct {
 		epoch int
@@ -38,10 +69,8 @@ func TestCache(t *testing.T) {
 			hash := fnv.New128()
 			b := make([]byte, 4)
 			for _, i := range cache.cache {
-				for _, j := range i {
-					binary.BigEndian.PutUint32(b, j)
-					hash.Write(b)
-				}
+				binary.BigEndian.PutUint32(b, i)
+				hash.Write(b)
 			}
 			assert.Equal(t, c.hash, hex.EncodeToHex(hash.Sum(nil)))
 		})

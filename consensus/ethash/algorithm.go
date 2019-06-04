@@ -151,7 +151,6 @@ func hashimoto(header []byte, nonce uint64, fullSize int, sha512, sha256 hashFn,
 	return digest, result
 }
 
-// TODO
 func sealHash(header *types.Header) (hash types.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 

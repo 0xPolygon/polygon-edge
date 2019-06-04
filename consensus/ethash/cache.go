@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
+	"sync"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -12,9 +13,10 @@ import (
 type Cache struct {
 	cacheSize   uint32
 	datasetSize int
-	cache       [][]uint32
+	cache       []uint32
 	sha512      hash.Hash
 	sha256      hash.Hash
+	mix         [16]uint32
 }
 
 func newCache(epoch int) *Cache {
@@ -35,23 +37,24 @@ func newCache(epoch int) *Cache {
 
 func (c *Cache) calcDatasetItem(i uint32) []uint32 {
 	n := c.cacheSize
+	m := uint32(len(c.cache) / 16)
 	r := hashBytes / wordBytes
 
-	mix := make([]uint32, len(c.cache[0]))
-	copy(mix[:], c.cache[i%n])
-	mix[0] ^= i
-	c.sha512Int(mix)
+	copy(c.mix[:], c.cache[(i*16)%n:])
+	c.mix[0] ^= i
+	c.sha512Int(c.mix[:])
 
 	for j := 0; j < datasetParents; j++ {
-		cacheIndex := fnvOp(i^uint32(j), mix[j%r])
-		aux := c.cache[cacheIndex%n]
+		cacheIndex := (fnvOp(i^uint32(j), c.mix[j%r]) % m) * 16
+
+		aux := c.cache[cacheIndex : cacheIndex+16]
 		for o := 0; o < 16; o++ {
-			mix[o] = fnvOp(mix[o], aux[o])
+			c.mix[o] = fnvOp(c.mix[o], aux[o])
 		}
 	}
 
-	c.sha512Int(mix)
-	return mix
+	c.sha512Int(c.mix[:])
+	return c.mix[:]
 }
 
 func (c *Cache) sha512Aux(p []byte) []byte {
@@ -80,34 +83,51 @@ func (c *Cache) sha512Int(p []uint32) {
 	}
 }
 
+var bytePool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 128)
+	},
+}
+
+func extendByteSlice(b []byte, needLen int) []byte {
+	b = b[:cap(b)]
+	if n := needLen - cap(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+	return b[:needLen]
+}
+
 func (c *Cache) mkcache(cacheSize int, seed []byte) {
 	n := cacheSize / hashBytes
 
-	res := [][]byte{}
-	res = append(res, c.sha512Aux(seed))
+	res := bytePool.Get().([]byte)
+	res = extendByteSlice(res, n*hashBytes)
+
+	copy(res[0:], c.sha512Aux(seed))
 	for i := 1; i < n; i++ {
-		aux := c.sha512Aux(res[i-1])
-		res = append(res, aux)
+		indx := (i - 1) * hashBytes
+		copy(res[i*hashBytes:], c.sha512Aux(res[indx:indx+hashBytes]))
 	}
 
 	for j := 0; j < cacheRounds; j++ {
 		for i := 0; i < n; i++ {
-			v := binary.LittleEndian.Uint32(res[i]) % uint32(n)
-			temp := xorBytes(res[(i-1+n)%n], res[v])
-			res[i] = c.sha512Aux(temp)
+			indx := i * hashBytes
+			offset := ((i - 1 + n) % n) * hashBytes
+
+			v := int(binary.LittleEndian.Uint32(res[indx:indx+hashBytes])) % n * hashBytes
+
+			temp := xorBytes(res[offset:offset+hashBytes], res[v:v+hashBytes])
+			copy(res[indx:], c.sha512Aux(temp))
 		}
 	}
 
 	// Convert bytes to words
-	resInt := [][]uint32{}
-	for _, i := range res {
-		entry := make([]uint32, 16)
-		for indx := range entry {
-			entry[indx] = binary.LittleEndian.Uint32(i[indx*4:])
-		}
-		resInt = append(resInt, entry)
+	resInt := make([]uint32, n*16)
+	for i := 0; i < len(resInt); i++ {
+		resInt[i] = binary.LittleEndian.Uint32(res[i*4:])
 	}
 
+	bytePool.Put(res)
 	c.cache = resInt
 }
 
