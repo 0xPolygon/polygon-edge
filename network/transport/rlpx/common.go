@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/enode"
 )
 
@@ -75,7 +75,7 @@ func (d DiscReason) Error() string {
 
 func decodeDiscMsg(msg io.Reader) DiscReason {
 	var reason [1]DiscReason
-	if err := rlp.Decode(msg, &reason); err != nil {
+	if err := rlp.DecodeReader(msg, &reason); err != nil {
 		return DiscUnknown
 	}
 	return reason[0]
@@ -123,8 +123,8 @@ type Info struct {
 	Name       string
 	Caps       Capabilities
 	ListenPort uint64
-	ID         enode.ID
+	ID         enode.ID `rlp:"tail"`
 
 	// Ignore additional fields (for forward compatibility).
-	Rest []rlp.RawValue `rlp:"tail"`
+	// Rest []rlp.RawValue `rlp:"tail"`
 }

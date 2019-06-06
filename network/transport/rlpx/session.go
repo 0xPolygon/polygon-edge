@@ -17,10 +17,10 @@ import (
 
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/rlp"
 
 	"github.com/armon/go-metrics"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/snappy"
 )
 
@@ -57,8 +57,7 @@ type Message struct {
 }
 
 func (msg Message) Decode(val interface{}) error {
-	s := rlp.NewStream(msg.Payload, uint64(msg.Size))
-	if err := s.Decode(val); err != nil {
+	if err := rlp.DecodeReader(msg.Payload, val); err != nil {
 		return fmt.Errorf("failed to decode rlp: %v", err)
 	}
 	return nil
@@ -268,6 +267,7 @@ func (s *Session) Close() error {
 
 // NegociateProtocols implements the session interface
 func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, error) {
+	fmt.Println("-- negociate --")
 	info := networkInfoToLocalInfo(nInfo)
 
 	offset := BaseProtocolLength
@@ -475,9 +475,10 @@ func (s *Session) ReadMsg() (msg Message, err error) {
 
 	// decode message code
 	content := bytes.NewReader(framebuf[:fsize])
-	if err := rlp.Decode(content, &msg.Code); err != nil {
+	if err := rlp.DecodeReader(content, &msg.Code); err != nil {
 		return msg, err
 	}
+
 	msg.Size = uint32(content.Len())
 	msg.Payload = content
 

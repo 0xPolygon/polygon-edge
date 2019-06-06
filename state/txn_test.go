@@ -7,9 +7,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 )

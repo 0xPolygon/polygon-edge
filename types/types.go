@@ -9,7 +9,7 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"golang.org/x/crypto/sha3"
 )
@@ -244,12 +244,14 @@ func (r *Receipt) ConsensusEncode() ([]byte, error) {
 		root = r.Root
 	}
 
-	return rlp.EncodeToBytes([]interface{}{
+	obj := []interface{}{
 		root,
 		r.CumulativeGasUsed,
 		r.LogsBloom,
 		logs,
-	})
+	}
+
+	return rlp.EncodeToBytes(obj)
 }
 
 type Log struct {

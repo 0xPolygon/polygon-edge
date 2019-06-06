@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 )
 

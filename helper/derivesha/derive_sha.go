@@ -3,7 +3,7 @@ package derivesha
 import (
 	"bytes"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"

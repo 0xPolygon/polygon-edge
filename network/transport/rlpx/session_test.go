@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
 )
 
@@ -71,7 +71,7 @@ func testConn(c0, c1 *Session, msgs []req) error {
 						r.err = msg.Err
 					} else {
 						var payload []byte
-						if err := rlp.Decode(msg.Payload, &payload); err != nil {
+						if err := rlp.DecodeReader(msg.Payload, &payload); err != nil {
 							r.err = err
 						} else {
 							r.msg = message{code: msg.Code, payload: payload}

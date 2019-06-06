@@ -4,13 +4,13 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"golang.org/x/crypto/sha3"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/types"
+
+	"github.com/umbracle/minimal/rlp"
 )
 
 var (

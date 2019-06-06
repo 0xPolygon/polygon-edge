@@ -14,8 +14,8 @@ import (
 
 	mrand "math/rand"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/ecies"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 
@@ -72,8 +72,13 @@ func (c *handshakeConn) readMessage(m plainDecoder) ([]byte, error) {
 		m.decodePlain(dec)
 	} else {
 		// EIP-8
-		s := rlp.NewStream(bytes.NewReader(dec), 0)
-		if err := s.Decode(m); err != nil {
+		/*
+			s := rlp.NewStream(bytes.NewReader(dec), 0)
+			if err := s.Decode(m); err != nil {
+				return nil, err
+			}
+		*/
+		if err := rlp.DecodeBytes(dec, m); err != nil {
 			return nil, err
 		}
 	}

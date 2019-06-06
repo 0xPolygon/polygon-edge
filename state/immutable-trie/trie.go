@@ -9,7 +9,7 @@ import (
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 )
 
 // Merkle-trie based on hashicorp go-immutable-radix

@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
@@ -21,6 +19,8 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/state"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
+
+	"github.com/umbracle/minimal/rlp"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -40,6 +40,7 @@ func (b *block) decode() (*types.Block, error) {
 		return nil, err
 	}
 	var bb types.Block
+
 	err = rlp.DecodeBytes(data, &bb)
 	return &bb, err
 }

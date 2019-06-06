@@ -3,7 +3,6 @@ package rlpx
 import (
 	"crypto/rand"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/ecies"
 )
 
@@ -18,10 +17,10 @@ type authMsgV4 struct {
 	Signature       [sigLen]byte
 	InitiatorPubkey [pubLen]byte
 	Nonce           [shaLen]byte
-	Version         uint
+	Version         uint `rlp:"tail"`
 
 	// Ignore additional fields
-	Rest []rlp.RawValue `rlp:"tail"`
+	// Rest []rlp.RawValue `rlp:"tail"`
 }
 
 // seal in pre-eip8 format
@@ -48,10 +47,10 @@ func (msg *authMsgV4) decodePlain(input []byte) {
 type authRespV4 struct {
 	RandomPubkey [pubLen]byte
 	Nonce        [shaLen]byte
-	Version      uint
+	Version      uint `rlp:"tail"`
 
 	// Ignore additional fields
-	Rest []rlp.RawValue `rlp:"tail"`
+	// Rest []rlp.RawValue `rlp:"tail"`
 }
 
 func (msg *authRespV4) sealPlain(hs *handshakeState) ([]byte, error) {

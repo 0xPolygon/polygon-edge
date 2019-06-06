@@ -4,9 +4,10 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/umbracle/minimal/rlp"
 )
 
 // REVISION is the spec revision number of Ethash

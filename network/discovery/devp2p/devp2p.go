@@ -15,15 +15,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/helper/enode"
+	"github.com/umbracle/minimal/helper/hex"
 
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discovery"
-
-	"github.com/ethereum/go-ethereum/rlp"
 
 	crand "crypto/rand"
 
@@ -128,29 +127,29 @@ type pingRequest struct {
 	Version    uint
 	From       rpcEndpoint
 	To         rpcEndpoint
-	Expiration uint64
-	Rest       []rlp.RawValue `rlp:"tail"`
+	Expiration uint64 `rlp:"tail"`
+	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 // pong is the reply to ping. call is response
 type pongResponse struct {
 	To         rpcEndpoint
 	ReplyTok   []byte
-	Expiration uint64
-	Rest       []rlp.RawValue `rlp:"tail"`
+	Expiration uint64 `rlp:"tail"`
+	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 type findNodeRequest struct {
 	Target     []byte
-	Expiration uint64
-	Rest       []rlp.RawValue `rlp:"tail"`
+	Expiration uint64 `rlp:"tail"`
+	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 // reply to findnode
 type neighborsResponse struct {
 	Nodes      []rpcNode
-	Expiration uint64
-	Rest       []rlp.RawValue `rlp:"tail"`
+	Expiration uint64 `rlp:"tail"`
+	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 type rpcNode struct {

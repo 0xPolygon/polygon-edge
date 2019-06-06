@@ -251,14 +251,14 @@ func (s *Server) dialTask(id string, tasks chan string) {
 	for {
 		select {
 		case task := <-tasks:
-			// s.logger.Printf("DIAL (%s): %s", id, task)
+			s.logger.Info("DIAL", "id", id, "task", task)
 
 			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				// s.logger.Printf("Err %v", id, err)
+				s.logger.Info("Err", "id", id, "err", err)
 
 				if err.Error() == "too many peers" {
 					busy = true

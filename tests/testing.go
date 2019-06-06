@@ -20,7 +20,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )

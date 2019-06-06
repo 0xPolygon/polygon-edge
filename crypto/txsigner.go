@@ -6,10 +6,11 @@ import (
 
 	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/umbracle/minimal/rlp"
 )
 
 // TxSigner recovers data from a transaction

@@ -19,9 +19,9 @@ package trie
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 )
@@ -153,12 +153,17 @@ func DecodeNode(storage Storage, hash []byte, data []byte) (*Node, error) {
 		return &Node{}, nil
 	}
 
-	elems, _, err := rlp.SplitList(data)
-	if err != nil {
-		return nil, fmt.Errorf("decode error: %v", err)
+	i := rlp.NewIterator(data)
+	if _, err := i.List(); err != nil {
+		return nil, err
 	}
 
-	count, _ := rlp.CountValues(elems)
+	count, err := rlp.NewIterator(data).Count()
+	if err != nil {
+		return nil, err
+	}
+
+	elems := i.Raw()
 	if count == 2 {
 		return decodeShort(storage, hash, elems)
 	} else if count == 17 {
@@ -169,17 +174,19 @@ func DecodeNode(storage Storage, hash []byte, data []byte) (*Node, error) {
 }
 
 func decodeShort(storage Storage, hash []byte, data []byte) (*Node, error) {
-	kbuf, rest, err := rlp.SplitString(data)
+	i := rlp.NewIterator(data)
+
+	kbuf, err := i.Bytes()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	key := compactToHex(kbuf)
 
 	if hasTerm(key) {
 		// value node
-		val, _, err := rlp.SplitString(rest)
+		val, err := i.Bytes()
 		if err != nil {
-			return nil, fmt.Errorf("invalid value node: %v", err)
+			panic(err)
 		}
 
 		h := make([]byte, len(hash))
@@ -194,6 +201,8 @@ func decodeShort(storage Storage, hash []byte, data []byte) (*Node, error) {
 		}
 		return n, nil
 	}
+
+	rest := i.Raw()
 	r, _, err := decodeRef(storage, append(hash, key...), rest)
 	if err != nil {
 		return nil, err
@@ -220,11 +229,12 @@ func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
 		data = rest
 	}
 
-	// value node
-	val, _, err := rlp.SplitString(data)
+	i := rlp.NewIterator(data)
+	val, err := i.Bytes()
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
+
 	if len(val) > 0 {
 		edges[16] = &Node{
 			prefix: []byte{0x10},
@@ -244,38 +254,54 @@ func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
 const hashLen = len(types.Hash{})
 
 func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) {
-	kind, val, rest, err := rlp.Split(buf)
+
+	i := rlp.NewIterator(buf)
+	isList, err := i.IsListNext()
 	if err != nil {
-		return nil, buf, err
+		panic(err)
 	}
-	switch {
-	case kind == rlp.List:
+
+	if isList {
+		if !isList {
+			panic("YY")
+		}
+
+		size, err := i.List()
+		if err != nil {
+			panic(err)
+		}
+		size = size + 1
+
 		// 'embedded' node
-		if size := len(buf) - len(rest); size > hashLen {
+		if int(size) > hashLen {
 			err := fmt.Errorf("oversized embedded node (size is %d bytes, want size < %d)", size, hashLen)
 			return nil, buf, err
 		}
 		n, err := DecodeNode(storage, hash, buf)
+
+		rest := buf[size:]
 		return n, rest, err
-	case kind == rlp.String && len(val) == 0:
-		// empty node
-		return nil, rest, nil
-	case kind == rlp.String && len(val) == 32:
-
-		// NOTE, it fully expands all the internal nodes
-		// only for testing now.
-
-		realVal, ok := storage.Get(val)
-		if !ok {
-			return nil, nil, fmt.Errorf("Value could not be expanded")
-		}
-
-		n, err := DecodeNode(storage, hash, realVal)
-		n.hash = val
-		return n, rest, err
-
-		// return &Node{leaf: &leafNode{val: val}}, rest, nil
-	default:
-		return nil, nil, fmt.Errorf("invalid RLP string size %d (want 0 or 32)", len(val))
 	}
+
+	val, err := i.Bytes()
+	if err != nil {
+		panic(err)
+	}
+
+	if len(val) == 0 {
+		return nil, i.Raw(), nil
+	}
+	if len(val) != 32 {
+		panic("XX")
+	}
+
+	realVal, ok := storage.Get(val)
+	if !ok {
+		return nil, nil, fmt.Errorf("Value could not be expanded")
+	}
+
+	n, err := DecodeNode(storage, hash, realVal)
+	n.hash = val
+
+	return n, i.Raw(), err
 }

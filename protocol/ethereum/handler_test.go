@@ -285,7 +285,7 @@ func TestEthereumBody(t *testing.T) {
 	if !resp.Completed() {
 		t.Fatal("not completed")
 	}
-	bodies := resp.Result.(BlockBodiesData)
+	bodies := resp.Result.([]*types.Body)
 	if len(bodies) != len(batch) {
 		t.Fatal("bodies: length is not correct")
 	}

@@ -18,12 +18,12 @@ import (
 
 	"github.com/armon/go-metrics"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/hashicorp/go-hclog"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/network/transport/rlpx"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
@@ -488,27 +488,19 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		}
 
 		// need to use the encoded version to keep track of the byte size
-		bodies := []rlp.RawValue{}
-		bytes := 0
-
-		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(bodies) < defaultMaxBlockFetch; i++ {
+		bodies := []*types.Body{}
+		for i := 0; i < len(hashes) && len(bodies) < defaultMaxBlockFetch; i++ {
 			hash := hashes[i]
 
 			body, ok := e.blockchain.GetBodyByHash(hash)
 			if ok {
-				data, err := rlp.EncodeToBytes(body)
-				if err != nil {
-					return err
-				}
-
-				bodies = append(bodies, data)
-				bytes += len(data)
+				bodies = append(bodies, body)
 			}
 		}
 		return e.sendBlockBodies(bodies)
 
 	case code == BlockBodiesMsg:
-		var bodies BlockBodiesData
+		var bodies []*types.Body
 		if err := msg.Decode(&bodies); err != nil {
 			return err
 		}
@@ -534,7 +526,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 		}
 
 		// need to use the encoded version to keep track of the byte size
-		receipts := []rlp.RawValue{}
+		receipts := [][]*types.Receipt{}
 		bytes := 0
 
 		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(receipts) < defaultMaxReceiptFetch; i++ {
@@ -547,13 +539,7 @@ func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
 					continue
 				}
 			}
-
-			data, err := rlp.EncodeToBytes(res)
-			if err != nil {
-				return err // log
-			}
-			receipts = append(receipts, data)
-			bytes += len(data)
+			receipts = append(receipts, res)
 		}
 		return e.sendReceipts(receipts)
 
@@ -666,20 +652,11 @@ func (e *Ethereum) sendBlockHeaders(headers []*types.Header) error {
 	return e.writeMsg(BlockHeadersMsg, headers)
 }
 
-// blockBody represents the data content of a single block.
-type blockBody struct {
-	Transactions []*types.Transaction // Transactions contained within a block
-	Uncles       []*types.Header      // Uncles contained within a block
-}
-
-// BlockBodiesData is the network packet for block content distribution.
-type BlockBodiesData []*blockBody
-
-func (e *Ethereum) sendBlockBodies(bodies []rlp.RawValue) error {
+func (e *Ethereum) sendBlockBodies(bodies []*types.Body) error {
 	return e.writeMsg(BlockBodiesMsg, bodies)
 }
 
-func (e *Ethereum) sendReceipts(receipts []rlp.RawValue) error {
+func (e *Ethereum) sendReceipts(receipts [][]*types.Receipt) error {
 	return e.writeMsg(ReceiptsMsg, receipts)
 }
 
@@ -709,7 +686,7 @@ var (
 	// on the ethash consensus algorithm
 	daoBlock            = uint64(1920000)
 	daoChallengeTimeout = 15 * time.Second
-	daoForkBlockExtra   = types.StringToHash("0x64616f2d686172642d666f726b")
+	daoForkBlockExtra   = hex.MustDecodeHex("0x64616f2d686172642d666f726b")
 )
 
 // ValidateDAOBlock queries the DAO block
@@ -839,7 +816,7 @@ func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []
 	}
 
 	// TODO. handle malformed response in the bodies
-	response := resp.Result.(BlockBodiesData)
+	response := resp.Result.([]*types.Body)
 
 	res := []*types.Body{}
 	for _, r := range response {
@@ -944,7 +921,7 @@ func (e *Ethereum) Receipts(receipts [][]*types.Receipt) {
 }
 
 // Bodies receives the bodies
-func (e *Ethereum) Bodies(bodies BlockBodiesData) {
+func (e *Ethereum) Bodies(bodies []*types.Body) {
 	origin := ""
 	if len(bodies) != 0 {
 		first := bodies[0]

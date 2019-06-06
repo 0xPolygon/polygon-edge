@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/types"
 )
@@ -73,10 +73,14 @@ func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
 	if !ok {
 		return types.Hash{}
 	}
-	_, content, _, err := rlp.Split(val)
+
+	i := rlp.NewIterator(val)
+
+	content, err := i.Bytes()
 	if err != nil {
 		return types.Hash{}
 	}
+
 	return types.BytesToHash(content)
 }
 
