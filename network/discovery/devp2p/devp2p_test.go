@@ -145,24 +145,37 @@ func TestPingPong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p = <-r0.packetCh
+	getPacket := func() byte {
+		select {
+		case p := <-r0.packetCh:
+			_, sigdata, _, err := decodePacket(p.Buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return sigdata[0]
 
-	_, sigdata, _, err := decodePacket(p.Buf)
-	if err != nil {
-		t.Fatal(err)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("timeout")
+		}
+		return 0
 	}
-	if sigdata[0] != pongPacket {
-		t.Fatal("expected pong packet")
+
+	if getPacket() != pongPacket {
+		t.Fatal("pong packet expected")
+	}
+	if getPacket() != pingPacket {
+		t.Fatal("ping packet expected")
 	}
 }
 
 func testProbeNode(t *testing.T, r0 *Backend, r1 *Backend) {
 	// --- 0 probe starts ---
-	// r0.Schedule()
-	// r1.Schedule()
 
 	// 0. send ping packet
-	go r0.probeNode(r1.local)
+	done := make(chan bool, 1)
+	go func() {
+		done <- r0.probeNode(r1.local)
+	}()
 
 	// 1. receive ping packet (send pong packet)
 	p := <-r1.packetCh
@@ -176,8 +189,17 @@ func testProbeNode(t *testing.T, r0 *Backend, r1 *Backend) {
 		t.Fatal(err)
 	}
 
+	select {
+	case ok := <-done:
+		if !ok {
+			t.Fatal("bad")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
 	// r0 should have now r1 as a peer
-	time.Sleep(200 * time.Millisecond)
+	// time.Sleep(200 * time.Millisecond)
 
 	peers := r0.GetPeers()
 	if len(peers) != 1 {
@@ -230,6 +252,11 @@ func testProbeNode(t *testing.T, r0 *Backend, r1 *Backend) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Since the probeNode in r1 has been spawn in parallel
+	// we need to wait for the HandlePacket callback to update
+	// the probe and add the peer
+	time.Sleep(100 * time.Millisecond)
 
 	// the timestamp of the peer should be updated
 	peer1, ok = r1.getPeer(peer.ID)

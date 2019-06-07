@@ -29,7 +29,7 @@ func (m *MockNetwork) NewTransport() Transport {
 	t := &MockTransport{
 		net:      m,
 		addr:     addr,
-		packetCh: make(chan *Packet),
+		packetCh: make(chan *Packet, 10),
 	}
 	if m.transports == nil {
 		m.transports = make(map[string]*MockTransport)

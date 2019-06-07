@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/rlp"
 
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discovery"
@@ -269,15 +269,15 @@ func (b *Backend) listen() {
 	for {
 		select {
 		case packet := <-b.transport.PacketCh():
-			go func() {
-				if b.packetCh != nil {
-					b.packetCh <- packet
-				} else {
+			if b.packetCh != nil {
+				b.packetCh <- packet
+			} else {
+				go func() {
 					if err := b.HandlePacket(packet); err != nil {
 						b.logger.Info("failed to handle packet", "err", err.Error())
 					}
-				}
-			}()
+				}()
+			}
 		case <-b.shutdownCh:
 			return
 		}
@@ -620,7 +620,6 @@ func (b *Backend) handlePingPacket(payload []byte, mac []byte, peer *Peer) error
 
 	// received a ping, probe back it it has expired
 	if b.hasExpired(peer) {
-		// go b.probeNode(peer)
 		b.sendTask(peer)
 	} else {
 		b.updatePeer(peer)
@@ -711,15 +710,15 @@ func (b *Backend) probeNode(peer *Peer) bool {
 	metrics.IncrCounter([]string{"discover", "probe"}, 1.0)
 
 	// Send ping packet
+	ack := make(chan respMessage)
+	b.setHandler(peer.ID, pongPacket, ack, respTimeout)
+
 	b.sendPacket(peer, pingPacket, pingRequest{
 		Version:    4,
 		From:       b.local.toRPCEndpoint(),
 		To:         peer.toRPCEndpoint(),
 		Expiration: uint64(time.Now().Add(10 * time.Second).Unix()),
 	})
-
-	ack := make(chan respMessage)
-	b.setHandler(peer.ID, pongPacket, ack, respTimeout)
 
 	resp := <-ack
 
@@ -787,13 +786,13 @@ func (b *Backend) findNodes(peer *Peer, target []byte) ([]*Peer, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	ack := make(chan respMessage)
+	b.setHandler(peer.ID, neighborsPacket, ack, respTimeout)
+
 	b.sendPacket(peer, findnodePacket, &findNodeRequest{
 		Target:     b.local.Bytes,
 		Expiration: uint64(time.Now().Add(20 * time.Second).Unix()),
 	})
-
-	ack := make(chan respMessage)
-	b.setHandler(peer.ID, neighborsPacket, ack, respTimeout)
 
 	peers := []*Peer{}
 	atLeastOne := false
