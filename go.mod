@@ -37,6 +37,7 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
+	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/valyala/fasthttp v1.2.0
 	golang.org/x/crypto v0.0.0-20190417174047-f416ebab96af
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce

@@ -266,6 +266,8 @@ github.com/umbracle/ecies v0.0.0-20190516104245-dd705a067904 h1:uV2LU49T39X2YYpK
 github.com/umbracle/ecies v0.0.0-20190516104245-dd705a067904/go.mod h1:Kr+nyw5nWGn6d7EH+yyfway8bj0jgS2ZGMLDkIgiGfI=
 github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50 h1:x4PE3nuIwRylLUGumEXvpSuEzQeiJUL1a3RGSPpmTlc=
 github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50/go.mod h1:Kr+nyw5nWGn6d7EH+yyfway8bj0jgS2ZGMLDkIgiGfI=
+github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b h1:t3nz9xXkLZJz+ZlTGFT3ixsCGO5AHx1Yift2EAfjnnc=
+github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b/go.mod h1:B2zj4f3YmUPeyCNSlAEgOf6tuGzeYKvIxAZzwy9PxPA=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.2.0 h1:dzZJf2IuMiclVjdw0kkT+f9u4YdrapbNyGAN47E/qnk=

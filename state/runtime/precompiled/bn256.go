@@ -4,7 +4,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto/bn256"
+	bn256 "github.com/umbracle/go-eth-bn256"
+	// bn256 "github.com/ethereum/go-ethereum/crypto/bn256/cloudflare"
 	"github.com/umbracle/minimal/helper"
 )
 
