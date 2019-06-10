@@ -31,6 +31,8 @@ type Storage interface {
 
 	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
 	ReadReceipts(hash types.Hash) []*types.Receipt
+
+	Close() error
 }
 
 // Factory is a factory method to create a blockchain storage

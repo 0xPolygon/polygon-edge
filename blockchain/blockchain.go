@@ -901,3 +901,7 @@ func (b *Blockchain) GetBlockByNumber(n uint64, full bool) (*types.Block, bool) 
 	}
 	return b.GetBlockByHash(hash, full)
 }
+
+func (b *Blockchain) Close() error {
+	return b.db.Close()
+}

@@ -246,6 +246,10 @@ func (m *Minimal) Chain() *chain.Chain {
 func (m *Minimal) Close() {
 	m.server.Close()
 
+	if err := m.Blockchain.Close(); err != nil {
+		m.logger.Error("failed to close blockchain", "err", err.Error())
+	}
+
 	// TODO, close the backends
 
 	// close the apis
