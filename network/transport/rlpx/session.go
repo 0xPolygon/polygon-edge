@@ -274,8 +274,8 @@ func (s *Session) Protocols() []*network.Instance {
 }
 
 // NegociateProtocols implements the session interface
-func (s *Session) negociateProtocols(nInfo *network.Info) error {
-	info := networkInfoToLocalInfo(nInfo)
+func (s *Session) negociateProtocols() error {
+	info := s.remoteInfo
 
 	offset := BaseProtocolLength
 	// protocols := []*Instance{}
