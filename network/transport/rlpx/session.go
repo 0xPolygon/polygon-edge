@@ -276,6 +276,10 @@ func (s *Session) negotiateProtocols() error {
 			offset += b.Spec.Length
 		}
 	}
+
+	if len(s.streams) == 0 {
+		return fmt.Errorf("no matching protocols")
+	}
 	return nil
 }
 

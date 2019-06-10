@@ -449,17 +449,30 @@ func (s *Server) addSession(session Session) error {
 				Handler:  handler,
 			})
 			instanceLock.Unlock()
+			errs <- nil
 		}(stream)
 	}
 
-	p.protocols = instances
-
-	for i := 0; i < len(errs); i++ {
+	for i := 0; i < len(streams); i++ {
 		if err := <-errs; err != nil {
 			p.Close()
 			return err
 		}
 	}
+
+	p.protocols = instances
+
+	// Remove peer from list if the session is closed
+	go func() {
+		<-session.CloseChan()
+
+		fmt.Println(p.ID)
+		panic("Closed")
+
+		s.peersLock.Lock()
+		delete(s.peers, p.ID)
+		s.peersLock.Unlock()
+	}()
 
 	s.peersLock.Lock()
 	s.peers[p.ID] = p
