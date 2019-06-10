@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/rlp"
 
 	"github.com/armon/go-metrics"
@@ -112,7 +112,7 @@ type Session struct {
 	stateLock sync.Mutex
 
 	// protocols are the set of protocols that implements
-	protocols []*common.Instance
+	protocols []*network.Instance
 }
 
 func (s *Session) p2pHandshake() error {
@@ -269,20 +269,20 @@ func (s *Session) Close() error {
 }
 
 // Protocols implements the session interface
-func (s *Session) Protocols() []*common.Instance {
+func (s *Session) Protocols() []*network.Instance {
 	return s.protocols
 }
 
 // NegociateProtocols implements the session interface
-func (s *Session) negociateProtocols(nInfo *common.Info) error {
-	info := networkInfoToLocalInfo(nInfo)
+func (s *Session) negociateProtocols() error {
+	info := s.remoteInfo
 
 	offset := BaseProtocolLength
 	// protocols := []*Instance{}
 
 	type res struct { // will become matchProtocol struct in rlpx
 		offset   uint64
-		protocol *common.Protocol
+		protocol *network.Protocol
 	}
 
 	result := []*res{}
@@ -300,7 +300,7 @@ func (s *Session) negociateProtocols(nInfo *common.Info) error {
 	}
 
 	lock := sync.Mutex{}
-	activated := []*common.Instance{}
+	activated := []*network.Instance{}
 
 	errr := make(chan error, len(result))
 	for _, r := range result {
@@ -316,7 +316,7 @@ func (s *Session) negociateProtocols(nInfo *common.Info) error {
 			}
 
 			lock.Lock()
-			activated = append(activated, &common.Instance{
+			activated = append(activated, &network.Instance{
 				Protocol: r.protocol,
 				Handler:  proto,
 			})
@@ -336,8 +336,8 @@ func (s *Session) negociateProtocols(nInfo *common.Info) error {
 }
 
 // GetInfo implements the session interface
-func (s *Session) GetInfo() common.Info {
-	info := common.Info{
+func (s *Session) GetInfo() network.Info {
+	info := network.Info{
 		Client: s.remoteInfo.Name,
 		Enode:  s.enode,
 	}

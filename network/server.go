@@ -18,9 +18,47 @@ import (
 
 	"github.com/ferranbt/periodic-dispatcher"
 
-	"github.com/umbracle/minimal/network/common"
 	"github.com/umbracle/minimal/network/discovery"
 )
+
+// Protocol is a wire protocol
+type Protocol struct {
+	Spec      ProtocolSpec
+	HandlerFn func(conn net.Conn, peer string) (ProtocolHandler, error)
+}
+
+// ProtocolHandler is the handler of the protocol
+type ProtocolHandler interface {
+	Info() (map[string]interface{}, error)
+}
+
+// ProtocolSpec is a specification of an etheruem protocol
+type ProtocolSpec struct {
+	Name    string
+	Version uint
+	Length  uint64
+}
+
+// Info is the information of a peer
+type Info struct {
+	Client       string
+	Enode        *enode.Enode
+	Capabilities Capabilities
+	ListenPort   uint64
+}
+
+// Capability is a feature of the peer
+type Capability struct {
+	Protocol Protocol
+}
+
+// Capabilities is a list of capabilities of the peer
+type Capabilities []*Capability
+
+type Instance struct {
+	Protocol *Protocol
+	Handler  ProtocolHandler
+}
 
 const (
 	peersFile          = "peers.json"
@@ -89,7 +127,7 @@ type Server struct {
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
-	info *common.Info
+	info *Info
 
 	config  *Config
 	closeCh chan struct{}
@@ -103,16 +141,16 @@ type Server struct {
 	dispatcher *periodic.Dispatcher
 
 	peerStore *PeerStore
-	transport common.Transport
+	transport Transport
 
 	Discovery discovery.Backend
 	Enode     *enode.Enode
 
-	backends []*common.Protocol
+	backends []*Protocol
 }
 
 // NewServer creates a new node
-func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.Logger, transport common.Transport) *Server {
+func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.Logger, transport Transport) *Server {
 	enode := &enode.Enode{
 		IP:  net.ParseIP(config.BindAddress),
 		TCP: uint16(config.BindPort),
@@ -138,7 +176,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFilePath),
-		backends:     []*common.Protocol{},
+		backends:     []*Protocol{},
 		transport:    transport,
 	}
 
@@ -158,13 +196,13 @@ func (s *Server) GetPeers() []string {
 }
 
 func (s *Server) buildInfo() {
-	info := &common.Info{
+	info := &Info{
 		Client: s.Name,
 		Enode:  s.Enode,
 	}
 
 	for _, p := range s.backends {
-		cap := &common.Capability{
+		cap := &Capability{
 			Protocol: *p,
 		}
 
@@ -379,7 +417,7 @@ func (s *Server) connectWithEnode(rawURL string) error {
 	return s.addSession(session)
 }
 
-func (s *Server) addSession(session common.Session) error {
+func (s *Server) addSession(session Session) error {
 	p := newPeer(session, s)
 
 	/*
@@ -405,7 +443,7 @@ func (s *Server) addSession(session common.Session) error {
 }
 
 // RegisterProtocol registers a protocol
-func (s *Server) RegisterProtocol(b []*common.Protocol) error {
+func (s *Server) RegisterProtocol(b []*Protocol) error {
 	s.backends = append(s.backends, b...)
 	// TODO, check if the backend is already registered
 	return nil
@@ -415,7 +453,7 @@ func (s *Server) ID() enode.ID {
 	return s.Enode.ID
 }
 
-func (s *Server) getProtocol(name string, version uint) *common.Protocol {
+func (s *Server) getProtocol(name string, version uint) *Protocol {
 	for _, p := range s.backends {
 		proto := p.Spec
 		if proto.Name == name && proto.Version == version {

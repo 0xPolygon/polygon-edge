@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/network"
 )
 
 type PeersInfoCommand struct {
@@ -55,7 +55,7 @@ func (p *PeersInfoCommand) formatInfo(info map[string]interface{}) int {
 	p.Ui.Output(p.Colorize().Color("[bold]Info[reset]"))
 	p.Ui.Output(formatKV(data))
 
-	var protos []common.ProtocolSpec
+	var protos []network.ProtocolSpec
 	if err := mapstructure.Decode(info["protocols"], &protos); err != nil {
 		p.Ui.Error(err.Error())
 		return 1

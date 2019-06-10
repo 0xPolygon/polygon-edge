@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/network"
 )
 
 // Backend is a protocol backend
 type Backend interface {
-	Protocols() []*common.Protocol
+	Protocols() []*network.Protocol
 	Run()
 }
 
