@@ -58,3 +58,7 @@ func (b *badgerDBKV) Get(p []byte) ([]byte, bool, error) {
 	})
 	return val, true, err
 }
+
+func (b *badgerDBKV) Close() error {
+	return b.db.Close()
+}

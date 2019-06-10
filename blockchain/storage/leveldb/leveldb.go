@@ -51,3 +51,7 @@ func (l *levelDBKV) Get(p []byte) ([]byte, bool, error) {
 	}
 	return data, true, nil
 }
+
+func (l *levelDBKV) Close() error {
+	return l.db.Close()
+}

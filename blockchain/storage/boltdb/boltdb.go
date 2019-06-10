@@ -68,3 +68,7 @@ func (l *boltDBKV) Get(p []byte) ([]byte, bool, error) {
 	})
 	return data, found, err
 }
+
+func (l *boltDBKV) Close() error {
+	return l.db.Close()
+}
