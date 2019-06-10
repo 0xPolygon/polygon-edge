@@ -20,6 +20,10 @@ type Session interface {
 	// Info returns the information of the network
 	GetInfo() Info
 
+	// CloseChan returns a read-only channel which is closed as
+	// soon as the session is closed.
+	CloseChan() <-chan struct{}
+
 	// IsClosed returns if the session has been closed
 	IsClosed() bool
 
