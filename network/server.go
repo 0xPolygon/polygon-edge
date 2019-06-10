@@ -226,14 +226,14 @@ func (s *Server) dialTask(id string, tasks chan string) {
 	for {
 		select {
 		case task := <-tasks:
-			s.logger.Info("DIAL", "id", id, "task", task)
+			s.logger.Trace("DIAL", "id", id, "task", task)
 
 			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				s.logger.Info("Err", "id", id, "err", err)
+				s.logger.Trace("Err", "id", id, "err", err)
 
 				if err.Error() == "too many peers" {
 					busy = true
@@ -382,13 +382,15 @@ func (s *Server) connectWithEnode(rawURL string) error {
 func (s *Server) addSession(session common.Session) error {
 	p := newPeer(session, s)
 
-	protos, err := session.NegociateProtocols(s.info)
-	if err != nil {
-		// send close message to the peer
-		return err
-	}
+	/*
+		protos, err := session.NegociateProtocols(s.info)
+		if err != nil {
+			// send close message to the peer
+			return err
+		}
+	*/
 
-	p.protocols = protos
+	p.protocols = session.Protocols()
 
 	s.peersLock.Lock()
 	s.peers[p.ID] = p

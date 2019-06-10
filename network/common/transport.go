@@ -12,8 +12,8 @@ type Instance struct {
 
 // Session is an open connection between two peers
 type Session interface {
-	// NegociateProtocols negociates the sub-protocols
-	NegociateProtocols(info *Info) ([]*Instance, error)
+	// Protocols returns the set of protocols the session uses
+	Protocols() []*Instance
 
 	// Info returns the information of the network
 	GetInfo() Info

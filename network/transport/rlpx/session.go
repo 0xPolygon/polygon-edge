@@ -110,6 +110,9 @@ type Session struct {
 	// state
 	state     sessionState
 	stateLock sync.Mutex
+
+	// protocols are the set of protocols that implements
+	protocols []*common.Instance
 }
 
 func (s *Session) p2pHandshake() error {
@@ -265,8 +268,13 @@ func (s *Session) Close() error {
 	return s.Disconnect(DiscQuitting)
 }
 
+// Protocols implements the session interface
+func (s *Session) Protocols() []*common.Instance {
+	return s.protocols
+}
+
 // NegociateProtocols implements the session interface
-func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, error) {
+func (s *Session) negociateProtocols(nInfo *common.Info) error {
 	info := networkInfoToLocalInfo(nInfo)
 
 	offset := BaseProtocolLength
@@ -319,10 +327,12 @@ func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, er
 
 	for i := 0; i < len(result); i++ {
 		if err := <-errr; err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return activated, nil
+
+	s.protocols = activated
+	return nil
 }
 
 // GetInfo implements the session interface

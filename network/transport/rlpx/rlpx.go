@@ -39,7 +39,7 @@ func (r *Rlpx) getProtocol(name string, version uint) *common.Protocol {
 }
 
 // Connect implements the connect interface
-func (r *Rlpx) Connect(rawConn net.Conn, enode enode.Enode) (common.Session, error) {
+func (r *Rlpx) connect(rawConn net.Conn, enode enode.Enode) (common.Session, error) {
 	pub, err := enode.PublicKey()
 	if err != nil {
 		return nil, err
@@ -50,6 +50,9 @@ func (r *Rlpx) Connect(rawConn net.Conn, enode enode.Enode) (common.Session, err
 		rawConn.Close()
 		return conn, err
 	}
+	if err := conn.negociateProtocols(r.info); err != nil {
+		return nil, err
+	}
 	return conn, nil
 }
 
@@ -57,6 +60,9 @@ func (r *Rlpx) accept(rawConn net.Conn) (common.Session, error) {
 	conn := Server(r, rawConn, r.priv, networkInfoToLocalInfo(r.info))
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
+		return nil, err
+	}
+	if err := conn.negociateProtocols(r.info); err != nil {
 		return nil, err
 	}
 	return conn, nil
@@ -132,7 +138,7 @@ func (r *Rlpx) DialTimeout(address string, timeout time.Duration) (common.Sessio
 		return nil, err
 	}
 
-	session, err := r.Connect(conn, *addr)
+	session, err := r.connect(conn, *addr)
 	if err != nil {
 		return nil, err
 	}
