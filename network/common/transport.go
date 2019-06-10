@@ -2,9 +2,7 @@ package common
 
 import (
 	"crypto/ecdsa"
-	"net"
-
-	"github.com/umbracle/minimal/helper/enode"
+	"time"
 )
 
 type Instance struct {
@@ -14,8 +12,8 @@ type Instance struct {
 
 // Session is an open connection between two peers
 type Session interface {
-	// NegociateProtocols negociates the sub-protocols
-	NegociateProtocols(info *Info) ([]*Instance, error)
+	// Protocols returns the set of protocols the session uses
+	Protocols() []*Instance
 
 	// Info returns the information of the network
 	GetInfo() Info
@@ -30,11 +28,14 @@ type Session interface {
 // Transport is a generic network transport protocol
 type Transport interface {
 	// Setup starts the protocol with the given private key
-	Setup(priv *ecdsa.PrivateKey, backends []*Protocol, info *Info)
+	Setup(priv *ecdsa.PrivateKey, backends []*Protocol, info *Info, config map[string]interface{}) error
 
-	// Connect connects with the remove connection
-	Connect(net.Conn, enode.Enode) (Session, error)
+	// DialTimeout connects to the address within a given timeout.
+	DialTimeout(addr string, timeout time.Duration) (Session, error)
 
-	// Accept accepts the new connection
-	Accept(net.Conn) (Session, error)
+	// Accept accepts the new session
+	Accept() (Session, error)
+
+	// Close closes the transport
+	Close() error
 }
