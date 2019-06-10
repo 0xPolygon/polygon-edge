@@ -208,7 +208,6 @@ func (s *KeyValueStorage) read(p []byte, k []byte, obj interface{}) bool {
 		return false
 	}
 	if err := rlp.DecodeBytes(data, obj); err != nil {
-		s.logger.Warn("failed to decode rlp: %v", err)
 		return false
 	}
 	return true
@@ -223,7 +222,6 @@ func (s *KeyValueStorage) get(p []byte, k []byte) ([]byte, bool) {
 	p = append(p, k...)
 	data, ok, err := s.db.Get(p)
 	if err != nil {
-		s.logger.Warn("failed to read: %v", err)
 		return nil, false
 	}
 	return data, ok
