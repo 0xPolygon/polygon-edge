@@ -320,6 +320,5 @@ func TestCommitChain(t *testing.T) {
 		// check receipts
 		r := b.db.ReadReceipts(block.Hash())
 		assert.Len(t, r, 1)
-		assert.Equal(t, r[0].TxHash, i.Transactions[0].Hash())
 	}
 }

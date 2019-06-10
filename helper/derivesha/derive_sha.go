@@ -29,7 +29,7 @@ func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
 		keybuf.Reset()
 		rlp.Encode(keybuf, uint(indx))
 
-		enc, _ := receipt.ConsensusEncode()
+		enc, _ := rlp.EncodeToBytes(receipt)
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 
