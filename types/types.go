@@ -9,8 +9,8 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/rlp"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -204,7 +204,7 @@ func (b *Block) Body() *Body {
 	}
 }
 
-var receiptSuccessBytes = []byte{0x01}
+var ReceiptSuccessBytes = []byte{0x01}
 
 type ReceiptStatus uint64
 
@@ -215,55 +215,25 @@ const (
 
 type Receipt struct {
 	Root              []byte        `json:"root"`
-	Status            ReceiptStatus `json:"status"`
 	CumulativeGasUsed uint64        `json:"cumulativeGasUsed"`
 	LogsBloom         Bloom         `json:"logsBloom"`
 	Logs              []*Log        `json:"logs"`
-	TxHash            Hash          `json:"transactionHash"`
-	ContractAddress   Address       `json:"contractAddress"`
-	GasUsed           uint64        `json:"gasUsed"`
-}
-
-// ConsensusEncode encodes the receipt given the consensus rules
-func (r *Receipt) ConsensusEncode() ([]byte, error) {
-	logs := []interface{}{}
-	for _, log := range r.Logs {
-		logs = append(logs, []interface{}{
-			log.Address,
-			log.Topics,
-			log.Data,
-		})
-	}
-
-	var root []byte
-	if r.Root == nil {
-		if r.Status == ReceiptSuccess {
-			root = receiptSuccessBytes
-		}
-	} else {
-		root = r.Root
-	}
-
-	obj := []interface{}{
-		root,
-		r.CumulativeGasUsed,
-		r.LogsBloom,
-		logs,
-	}
-
-	return rlp.EncodeToBytes(obj)
+	Status            ReceiptStatus `json:"status" rlp:"-"`
+	TxHash            Hash          `json:"transactionHash" rlp:"-"`
+	ContractAddress   Address       `json:"contractAddress" rlp:"-"`
+	GasUsed           uint64        `json:"gasUsed" rlp:"-"`
 }
 
 type Log struct {
 	Address     Address `json:"address"`
 	Topics      []Hash  `json:"topics"`
 	Data        []byte  `json:"data"`
-	BlockNumber uint64  `json:"blockNumber"`
-	TxHash      Hash    `json:"transactionHash"`
-	TxIndex     uint    `json:"transactionIndex"`
-	BlockHash   Hash    `json:"blockHash"`
-	LogIndex    uint    `json:"logIndex"`
-	Removed     bool    `json:"removed"`
+	BlockNumber uint64  `json:"blockNumber" rlp:"-"`
+	TxHash      Hash    `json:"transactionHash" rlp:"-"`
+	TxIndex     uint    `json:"transactionIndex" rlp:"-"`
+	BlockHash   Hash    `json:"blockHash" rlp:"-"`
+	LogIndex    uint    `json:"logIndex" rlp:"-"`
+	Removed     bool    `json:"removed" rlp:"-"`
 }
 
 const BloomByteLength = 256

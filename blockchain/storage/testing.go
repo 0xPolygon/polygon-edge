@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"math/big"
 	"reflect"
 	"testing"
@@ -237,7 +238,7 @@ func testReceipts(t *testing.T, s Storage) {
 		t.Fatal("lengths are different")
 	}
 	for indx, i := range receipts {
-		if i.TxHash != r[indx].TxHash {
+		if !bytes.Equal(i.Root, r[indx].Root) {
 			t.Fatal("receipt txhash is not correct")
 		}
 	}

@@ -529,6 +529,7 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 			receipt.Status = types.ReceiptFailed
 		} else {
 			receipt.Status = types.ReceiptSuccess
+			receipt.Root = types.ReceiptSuccessBytes
 		}
 
 		// if the transaction created a contract, store the creation address in the receipt.
@@ -620,6 +621,7 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 			receipt.Status = types.ReceiptFailed
 		} else {
 			receipt.Status = types.ReceiptSuccess
+			receipt.Root = types.ReceiptSuccessBytes
 		}
 
 		if config.Byzantium {
