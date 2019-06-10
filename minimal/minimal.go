@@ -16,6 +16,7 @@ import (
 
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/network/discovery"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 
 	"github.com/umbracle/minimal/protocol"
 	trie "github.com/umbracle/minimal/state/immutable-trie"
@@ -115,7 +116,11 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	serverConfig.Bootnodes = config.Chain.Bootnodes
 	serverConfig.DataDir = filepath.Join(config.DataDir, "network")
 
-	m.server = network.NewServer("minimal", m.Key, serverConfig, logger.Named("server"))
+	transport := &rlpx.Rlpx{
+		Logger: logger.Named("Rlpx"),
+	}
+
+	m.server = network.NewServer("minimal", m.Key, serverConfig, logger.Named("server"), transport)
 
 	// Build discovery backend
 	for name, entry := range config.DiscoveryEntries {

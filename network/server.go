@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/network/transport/rlpx"
 
 	"github.com/umbracle/minimal/helper/enode"
 
@@ -104,7 +103,6 @@ type Server struct {
 	dispatcher *periodic.Dispatcher
 
 	peerStore *PeerStore
-	listener  net.Listener
 	transport common.Transport
 
 	Discovery discovery.Backend
@@ -114,7 +112,7 @@ type Server struct {
 }
 
 // NewServer creates a new node
-func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.Logger) *Server {
+func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.Logger, transport common.Transport) *Server {
 	enode := &enode.Enode{
 		IP:  net.ParseIP(config.BindAddress),
 		TCP: uint16(config.BindPort),
@@ -141,7 +139,7 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.
 		dispatcher:   periodic.NewDispatcher(),
 		peerStore:    NewPeerStore(peersFilePath),
 		backends:     []*common.Protocol{},
-		transport:    &rlpx.Rlpx{},
+		transport:    transport,
 	}
 
 	return s
@@ -185,52 +183,29 @@ func (s *Server) Schedule() error {
 	// Create rlpx info
 	s.buildInfo()
 
-	s.transport.Setup(s.key, s.backends, s.info)
+	config := map[string]interface{}{
+		"addr": s.config.BindAddress,
+		"port": s.config.BindPort,
+	}
 
-	if err := s.setupTransport(); err != nil {
+	if err := s.transport.Setup(s.key, s.backends, s.info, config); err != nil {
 		return err
 	}
+
+	go func() {
+		session, err := s.transport.Accept()
+		if err == nil {
+			if err := s.addSession(session); err != nil {
+				// log
+			}
+		}
+	}()
 
 	// Start discovery process
 	s.Discovery.Schedule()
 
 	go s.dialRunner()
 	return nil
-}
-
-func (s *Server) setupTransport() error {
-	addr := net.TCPAddr{IP: net.ParseIP(s.config.BindAddress), Port: s.config.BindPort}
-
-	s.logger.Info("setup transport", "addr", addr.String())
-
-	var err error
-	s.listener, err = net.Listen("tcp", addr.String())
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			conn, err := s.listener.Accept()
-			if err != nil {
-				return
-			}
-			go s.handleConn(conn)
-		}
-	}()
-
-	return nil
-}
-
-func (s *Server) handleConn(conn net.Conn) {
-	session, err := s.transport.Accept(conn)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := s.addSession(session); err != nil {
-		panic(err)
-	}
 }
 
 // PeriodicDial is the periodic dial of busy peers
@@ -388,27 +363,14 @@ func (s *Server) connect(addrs string) error {
 }
 
 func (s *Server) connectWithEnode(rawURL string) error {
-	// parse enode address beforehand
-	// TODO, make dial take either a rawURL or an enode
-	addr, err := enode.ParseURL(rawURL)
-	if err != nil {
-		return err
-	}
-
-	if _, ok := s.peers[addr.ID.String()]; ok {
+	if _, ok := s.peers[rawURL]; ok {
 		// TODO: add tests
 		// Trying to connect with an already connected id
 		// TODO, after disconnect do we remove the peer from this list?
 		return nil
 	}
 
-	tcpAddr := addr.TCPAddr()
-	conn, err := net.DialTimeout("tcp", tcpAddr.String(), defaultDialTimeout)
-	if err != nil {
-		return err
-	}
-
-	session, err := s.transport.Connect(conn, *addr)
+	session, err := s.transport.DialTimeout(rawURL, defaultDialTimeout)
 	if err != nil {
 		return err
 	}
@@ -474,8 +436,8 @@ func (s *Server) Close() {
 		panic(err)
 	}
 
-	// close listener transport
-	if err := s.listener.Close(); err != nil {
-		// log
+	// close transport
+	if err := s.transport.Close(); err != nil {
+		s.logger.Error("failed to close transport", "err", err.Error())
 	}
 }

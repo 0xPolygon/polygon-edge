@@ -267,7 +267,6 @@ func (s *Session) Close() error {
 
 // NegociateProtocols implements the session interface
 func (s *Session) NegociateProtocols(nInfo *common.Info) ([]*common.Instance, error) {
-	fmt.Println("-- negociate --")
 	info := networkInfoToLocalInfo(nInfo)
 
 	offset := BaseProtocolLength
