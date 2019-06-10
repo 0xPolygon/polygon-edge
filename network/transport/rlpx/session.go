@@ -110,9 +110,6 @@ type Session struct {
 	// state
 	state     sessionState
 	stateLock sync.Mutex
-
-	// protocols are the set of protocols that implements
-	protocols []*network.Instance
 }
 
 func (s *Session) p2pHandshake() error {
@@ -268,70 +265,17 @@ func (s *Session) Close() error {
 	return s.Disconnect(DiscQuitting)
 }
 
-// Protocols implements the session interface
-func (s *Session) Protocols() []*network.Instance {
-	return s.protocols
-}
-
-// NegociateProtocols implements the session interface
-func (s *Session) negociateProtocols() error {
+// NegotiateProtocols implements the session interface
+func (s *Session) negotiateProtocols() error {
 	info := s.remoteInfo
 
 	offset := BaseProtocolLength
-	// protocols := []*Instance{}
-
-	type res struct { // will become matchProtocol struct in rlpx
-		offset   uint64
-		protocol *network.Protocol
-	}
-
-	result := []*res{}
-
 	for _, i := range info.Caps {
-		// this one from the local instances
 		if b := s.rlpx.getProtocol(i.Name, i.Version); b != nil {
-			result = append(result, &res{
-				protocol: b,
-				offset:   offset,
-			})
-
+			s.OpenStream(uint(offset), uint(b.Spec.Length), b.Spec)
 			offset += b.Spec.Length
 		}
 	}
-
-	lock := sync.Mutex{}
-	activated := []*network.Instance{}
-
-	errr := make(chan error, len(result))
-	for _, r := range result {
-		go func(r *res) {
-			spec := r.protocol.Spec
-
-			stream := s.OpenStream(uint(r.offset), uint(spec.Length))
-
-			proto, err := r.protocol.HandlerFn(stream, s.id)
-			// proto, err := r.backend.Add(stream, s.id)
-			if err != nil {
-				errr <- err
-			}
-
-			lock.Lock()
-			activated = append(activated, &network.Instance{
-				Protocol: r.protocol,
-				Handler:  proto,
-			})
-			lock.Unlock()
-			errr <- nil
-		}(r)
-	}
-
-	for i := 0; i < len(result); i++ {
-		if err := <-errr; err != nil {
-			return err
-		}
-	}
-
-	s.protocols = activated
 	return nil
 }
 
@@ -424,8 +368,18 @@ func (s *Session) keepalive() {
 	}
 }
 
-func (s *Session) OpenStream(offset uint, length uint) *Stream {
+// Streams implements the transport interface
+func (s *Session) Streams() []network.Stream {
+	b := make([]network.Stream, len(s.streams))
+	for i := range s.streams {
+		b[i] = s.streams[i]
+	}
+	return b
+}
+
+func (s *Session) OpenStream(offset uint, length uint, spec network.ProtocolSpec) *Stream {
 	ss := NewStream(uint64(offset), uint64(length), s)
+	ss.protocol = spec
 	s.streams = append(s.streams, ss)
 	return ss
 }

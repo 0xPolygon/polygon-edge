@@ -50,7 +50,7 @@ func (r *Rlpx) connect(rawConn net.Conn, enode enode.Enode) (network.Session, er
 		rawConn.Close()
 		return conn, err
 	}
-	if err := conn.negociateProtocols(); err != nil {
+	if err := conn.negotiateProtocols(); err != nil {
 		return nil, err
 	}
 	return conn, nil
@@ -62,7 +62,7 @@ func (r *Rlpx) accept(rawConn net.Conn) (network.Session, error) {
 		rawConn.Close()
 		return nil, err
 	}
-	if err := conn.negociateProtocols(); err != nil {
+	if err := conn.negotiateProtocols(); err != nil {
 		return nil, err
 	}
 	return conn, nil

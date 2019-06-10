@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"io/ioutil"
 	"testing"
+
+	"github.com/umbracle/minimal/network"
 )
 
 func readMsg(t *testing.T, s *Stream) *Message {
@@ -33,8 +35,8 @@ func TestStreamMessage(t *testing.T) {
 	defer c0.Close()
 	defer c1.Close()
 
-	s0 := c0.OpenStream(5, 10)
-	s1 := c1.OpenStream(5, 10)
+	s0 := c0.OpenStream(5, 10, network.ProtocolSpec{})
+	s1 := c1.OpenStream(5, 10, network.ProtocolSpec{})
 
 	var h Header
 
@@ -58,8 +60,8 @@ func TestStreamMessageWithBody(t *testing.T) {
 	defer c0.Close()
 	defer c1.Close()
 
-	s0 := c0.OpenStream(5, 10)
-	s1 := c1.OpenStream(5, 10)
+	s0 := c0.OpenStream(5, 10, network.ProtocolSpec{})
+	s1 := c1.OpenStream(5, 10, network.ProtocolSpec{})
 
 	var h Header
 

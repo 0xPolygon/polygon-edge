@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/umbracle/minimal/network"
 )
 
 // Stream represents a logic stream within a RLPx session
@@ -27,7 +29,8 @@ type Stream struct {
 	readDeadline  atomic.Value // time.Time
 	writeDeadline atomic.Value // time.Time
 
-	header Header
+	header   Header
+	protocol network.ProtocolSpec
 }
 
 // NewStream constructs a new stream with a given offset and length
@@ -69,6 +72,10 @@ func (h Header) Length() uint32 {
 func (h Header) Encode(msgType uint16, length uint32) {
 	binary.BigEndian.PutUint16(h[0:2], msgType)
 	binary.BigEndian.PutUint32(h[2:6], length)
+}
+
+func (s *Stream) Protocol() network.ProtocolSpec {
+	return s.protocol
 }
 
 // Write implements the net.Conn interface

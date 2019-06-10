@@ -2,13 +2,20 @@ package network
 
 import (
 	"crypto/ecdsa"
+	"net"
 	"time"
 )
 
+// Stream is a stream inside a session
+type Stream interface {
+	net.Conn
+	Protocol() ProtocolSpec
+}
+
 // Session is an open connection between two peers
 type Session interface {
-	// Protocols returns the set of protocols the session uses
-	Protocols() []*Instance
+	// Stream returns the set of streams inside the session
+	Streams() []Stream
 
 	// Info returns the information of the network
 	GetInfo() Info

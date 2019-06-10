@@ -301,10 +301,8 @@ func (b *Backend) updateChain(block uint64) {
 }
 
 // Add is called when we connect to a new node
-func (b *Backend) Add(conn net.Conn, peerID string) (network.ProtocolHandler, error) {
-	if len(peerID) > 10 {
-		peerID = peerID[0:10]
-	}
+func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandler, error) {
+	peerID := peer.PrettyID()
 
 	// use handler to create the connection
 

@@ -24,7 +24,7 @@ import (
 // Protocol is a wire protocol
 type Protocol struct {
 	Spec      ProtocolSpec
-	HandlerFn func(conn net.Conn, peer string) (ProtocolHandler, error)
+	HandlerFn func(conn net.Conn, peer *Peer) (ProtocolHandler, error)
 }
 
 // ProtocolHandler is the handler of the protocol
@@ -420,15 +420,46 @@ func (s *Server) connectWithEnode(rawURL string) error {
 func (s *Server) addSession(session Session) error {
 	p := newPeer(session, s)
 
-	/*
-		protos, err := session.NegociateProtocols(s.info)
-		if err != nil {
-			// send close message to the peer
+	instances := []*Instance{}
+	var instanceLock sync.Mutex
+
+	streams := session.Streams()
+	errs := make(chan error, len(streams))
+
+	for _, stream := range streams {
+		go func(stream Stream) {
+			spec := stream.Protocol()
+
+			proto, ok := s.getProtocol(spec.Name, spec.Version)
+			if !ok {
+				// This should not happen, its an internal error
+				errs <- fmt.Errorf("protocol does not exists")
+				return
+			}
+
+			handler, err := proto.HandlerFn(stream, p)
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			instanceLock.Lock()
+			instances = append(instances, &Instance{
+				Protocol: proto,
+				Handler:  handler,
+			})
+			instanceLock.Unlock()
+		}(stream)
+	}
+
+	p.protocols = instances
+
+	for i := 0; i < len(errs); i++ {
+		if err := <-errs; err != nil {
+			p.Close()
 			return err
 		}
-	*/
-
-	p.protocols = session.Protocols()
+	}
 
 	s.peersLock.Lock()
 	s.peers[p.ID] = p
@@ -453,14 +484,14 @@ func (s *Server) ID() enode.ID {
 	return s.Enode.ID
 }
 
-func (s *Server) getProtocol(name string, version uint) *Protocol {
+func (s *Server) getProtocol(name string, version uint) (*Protocol, bool) {
 	for _, p := range s.backends {
 		proto := p.Spec
 		if proto.Name == name && proto.Version == version {
-			return p
+			return p, true
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (s *Server) Close() {
