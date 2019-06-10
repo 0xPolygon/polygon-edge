@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/network/common"
+	"github.com/umbracle/minimal/network"
 )
 
 // Rlpx is the RLPx transport protocol
@@ -16,19 +16,19 @@ type Rlpx struct {
 	Logger hclog.Logger
 
 	priv     *ecdsa.PrivateKey
-	backends []*common.Protocol
-	info     *common.Info
+	backends []*network.Protocol
+	info     *network.Info
 
 	addr string
 	port int
 
 	listener   net.Listener
-	sessionCh  chan common.Session
+	sessionCh  chan network.Session
 	shutdownCh chan struct{}
 }
 
 // getProtocol returns a protocol
-func (r *Rlpx) getProtocol(name string, version uint) *common.Protocol {
+func (r *Rlpx) getProtocol(name string, version uint) *network.Protocol {
 	for _, p := range r.backends {
 		proto := p.Spec
 		if proto.Name == name && proto.Version == version {
@@ -39,7 +39,7 @@ func (r *Rlpx) getProtocol(name string, version uint) *common.Protocol {
 }
 
 // Connect implements the connect interface
-func (r *Rlpx) connect(rawConn net.Conn, enode enode.Enode) (common.Session, error) {
+func (r *Rlpx) connect(rawConn net.Conn, enode enode.Enode) (network.Session, error) {
 	pub, err := enode.PublicKey()
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (r *Rlpx) connect(rawConn net.Conn, enode enode.Enode) (common.Session, err
 	return conn, nil
 }
 
-func (r *Rlpx) accept(rawConn net.Conn) (common.Session, error) {
+func (r *Rlpx) accept(rawConn net.Conn) (network.Session, error) {
 	conn := Server(r, rawConn, r.priv, networkInfoToLocalInfo(r.info))
 	if err := conn.Handshake(); err != nil {
 		rawConn.Close()
@@ -69,7 +69,7 @@ func (r *Rlpx) accept(rawConn net.Conn) (common.Session, error) {
 }
 
 // Setup implements the transport interface
-func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []*common.Protocol, info *common.Info, config map[string]interface{}) error {
+func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []*network.Protocol, info *network.Info, config map[string]interface{}) error {
 	r.priv = priv
 	r.backends = backends
 	r.info = info
@@ -90,7 +90,7 @@ func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []*common.Protocol, info *
 		return err
 	}
 
-	r.sessionCh = make(chan common.Session, 10)
+	r.sessionCh = make(chan network.Session, 10)
 
 	go func() {
 		for {
@@ -126,7 +126,7 @@ func Client(rlpx *Rlpx, conn net.Conn, prv *ecdsa.PrivateKey, pub *ecdsa.PublicK
 }
 
 // DialTimeout implements the transport interface
-func (r *Rlpx) DialTimeout(address string, timeout time.Duration) (common.Session, error) {
+func (r *Rlpx) DialTimeout(address string, timeout time.Duration) (network.Session, error) {
 	addr, err := enode.ParseURL(address)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (r *Rlpx) DialTimeout(address string, timeout time.Duration) (common.Sessio
 }
 
 // Accept accepts a new incomming connection
-func (r *Rlpx) Accept() (common.Session, error) {
+func (r *Rlpx) Accept() (network.Session, error) {
 	select {
 	case s := <-r.sessionCh:
 		return s, nil
@@ -162,7 +162,7 @@ func (r *Rlpx) Close() error {
 }
 
 // networkInfoToLocalInfo converts the network info message into rlpx.Info
-func networkInfoToLocalInfo(info *common.Info) *Info {
+func networkInfoToLocalInfo(info *network.Info) *Info {
 	rlpxInfo := &Info{
 		Version:    BaseProtocolVersion,
 		Name:       info.Client,

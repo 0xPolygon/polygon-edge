@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/network/common"
 )
 
 type Status int
@@ -35,15 +34,15 @@ func (s Status) String() string {
 // Peer is each of the connected peers
 type Peer struct {
 	Enode     *enode.Enode
-	Info      common.Info
+	Info      Info
 	ID        string
 	prettyID  string
 	Status    Status
-	conn      common.Session
-	protocols []*common.Instance
+	conn      Session
+	protocols []*Instance
 }
 
-func newPeer(conn common.Session, server *Server) *Peer {
+func newPeer(conn Session, server *Server) *Peer {
 	info := conn.GetInfo()
 	id := info.Enode.ID.String()
 
@@ -53,19 +52,19 @@ func newPeer(conn common.Session, server *Server) *Peer {
 		ID:        id,
 		prettyID:  id[:8],
 		conn:      conn,
-		protocols: []*common.Instance{},
+		protocols: []*Instance{},
 	}
 
 	return peer
 }
 
 // GetProtocols returns all the protocols of the peer
-func (p *Peer) GetProtocols() []*common.Instance {
+func (p *Peer) GetProtocols() []*Instance {
 	return p.protocols
 }
 
 // GetProtocol returns the protocol by name
-func (p *Peer) GetProtocol(name string) (*common.Instance, bool) {
+func (p *Peer) GetProtocol(name string) (*Instance, bool) {
 	for _, i := range p.protocols {
 		if i.Protocol.Spec.Name == name {
 			return i, true
