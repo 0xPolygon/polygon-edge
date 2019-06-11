@@ -242,6 +242,11 @@ func (e *Executor) Call(c *runtime.Contract, t runtime.CallType) ([]byte, uint64
 
 	snapshot := e.state.Snapshot()
 
+	if t == runtime.StaticCall {
+		// Add zero to touch the account
+		e.state.AddBalance(c.Address, big.NewInt(0))
+	}
+
 	if t == runtime.Call {
 		_, isPrecompiled := e.getPrecompiled(c.CodeAddress)
 		if !e.state.Exist(c.Address) {

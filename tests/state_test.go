@@ -79,7 +79,6 @@ func TestState(t *testing.T) {
 
 	skip := []string{
 		"failed_tx_xcf416c53",
-		"sstore_combinations_initial",
 	}
 
 	folders, err := listFolders(stateTests)
