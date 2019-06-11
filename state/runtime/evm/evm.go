@@ -710,7 +710,7 @@ func (c *Contract) executeSStoreOperation() error {
 	current := c.evm.state.GetState(address, bigToHash(loc))
 
 	// discount gas (constantinople)
-	if !c.evm.config.Constantinople {
+	if c.evm.config.Petersburg || !c.evm.config.Constantinople {
 		switch {
 		case current == (types.Hash{}) && val.Sign() != 0: // 0 => non 0
 			gas = SstoreSetGas
@@ -721,7 +721,6 @@ func (c *Contract) executeSStoreOperation() error {
 			gas = SstoreResetGas
 		}
 	} else {
-
 		getGas := func() uint64 {
 			// non constantinople gas
 			value := bigToHash(val)

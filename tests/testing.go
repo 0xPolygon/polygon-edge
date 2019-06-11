@@ -394,6 +394,15 @@ var Forks = map[string]*chain.Forks{
 		Byzantium:      chain.NewFork(0),
 		Constantinople: chain.NewFork(5),
 	},
+	"ConstantinopleFix": {
+		Homestead:      chain.NewFork(0),
+		EIP150:         chain.NewFork(0),
+		EIP155:         chain.NewFork(0),
+		EIP158:         chain.NewFork(0),
+		Byzantium:      chain.NewFork(0),
+		Constantinople: chain.NewFork(0),
+		Petersburg:     chain.NewFork(0),
+	},
 }
 
 type header struct {
