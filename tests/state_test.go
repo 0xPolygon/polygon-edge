@@ -81,6 +81,11 @@ func TestState(t *testing.T) {
 		"failed_tx_xcf416c53",
 	}
 
+	// failed_tx_xcf416c53 calls several precompiled contracts (adds the address to the transaction, i.e 'touch')
+	// and then reverts. However, in the case of ripemd (0x0...03), it has to keep the precompiled in the transaction.
+	// https://github.com/ethereum/yellowpaper/pull/288/files#diff-9f702e1491c55da9d76a68d651278764R2259.
+	// This means we have to include some extra functions on the immutable-radix transaction.
+
 	folders, err := listFolders(stateTests)
 	if err != nil {
 		t.Fatal(err)
