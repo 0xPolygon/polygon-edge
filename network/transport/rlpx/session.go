@@ -350,6 +350,13 @@ func (s *Session) exitErr(err error) {
 		s.shutdownErr = err
 	}
 	s.shutdownLock.Unlock()
+
+	for _, i := range s.streams {
+		select {
+		case i.errorCh <- err:
+		default:
+		}
+	}
 	s.Close()
 }
 

@@ -25,6 +25,7 @@ type Stream struct {
 	recvLock sync.Mutex
 
 	recvNotifyCh chan struct{}
+	errorCh      chan error
 
 	readDeadline  atomic.Value // time.Time
 	writeDeadline atomic.Value // time.Time
@@ -41,6 +42,7 @@ func NewStream(offset uint64, length uint64, conn *Session) *Stream {
 		conn:         conn,
 		respLock:     sync.Mutex{},
 		recvNotifyCh: make(chan struct{}, 1),
+		errorCh:      make(chan error, 1),
 	}
 	s.readDeadline.Store(time.Time{})
 	s.writeDeadline.Store(time.Time{})
@@ -149,6 +151,8 @@ WAIT:
 	}
 
 	select {
+	case err := <-s.errorCh:
+		return n, err
 	case <-s.recvNotifyCh:
 		if timer != nil {
 			timer.Stop()
