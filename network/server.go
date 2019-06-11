@@ -466,9 +466,6 @@ func (s *Server) addSession(session Session) error {
 	go func() {
 		<-session.CloseChan()
 
-		fmt.Println(p.ID)
-		panic("Closed")
-
 		s.peersLock.Lock()
 		delete(s.peers, p.ID)
 		s.peersLock.Unlock()

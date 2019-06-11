@@ -19,7 +19,6 @@ import (
 	"github.com/armon/go-metrics"
 
 	"github.com/hashicorp/go-hclog"
-	multierror "github.com/hashicorp/go-multierror"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/network/transport/rlpx"
@@ -329,19 +328,15 @@ func (e *Ethereum) Init(status *Status) error {
 		errr <- e.sendStatus(status)
 	}()
 
-	var errors error
 	for i := 0; i < 2; i++ {
 		select {
 		case err := <-errr:
 			if err != nil {
-				errors = multierror.Append(errors, err)
+				return err
 			}
 		case <-time.After(5 * time.Second):
 			return fmt.Errorf("ethereum protocol handshake timeout")
 		}
-	}
-	if errors != nil {
-		return errors
 	}
 
 	// handshake was correct, start to listen for packets
