@@ -14,21 +14,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	kbucket "github.com/ferranbt/go-kademlia-bucket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/rlp"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/armon/go-metrics"
 	"github.com/umbracle/minimal/network/discovery"
 
 	crand "crypto/rand"
-
-	kb "github.com/libp2p/go-libp2p-kbucket"
-	peer "github.com/libp2p/go-libp2p-peer"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 var (
@@ -48,7 +46,7 @@ const (
 
 // Peer is the discovery peer
 type Peer struct {
-	ID      peer.ID
+	ID      string
 	Bytes   []byte
 	UDPAddr *net.UDPAddr
 	Last    *time.Time // last time pinged
@@ -102,7 +100,7 @@ func newPeer(id string, addr *net.UDPAddr, tcp uint16) (*Peer, error) {
 		return nil, err
 	}
 
-	return &Peer{peer.ID(id), bytes, addr, nil, tcp}, nil
+	return &Peer{id, bytes, addr, nil, tcp}, nil
 }
 
 const (
@@ -128,7 +126,6 @@ type pingRequest struct {
 	From       rpcEndpoint
 	To         rpcEndpoint
 	Expiration uint64 `rlp:"tail"`
-	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 // pong is the reply to ping. call is response
@@ -136,20 +133,17 @@ type pongResponse struct {
 	To         rpcEndpoint
 	ReplyTok   []byte
 	Expiration uint64 `rlp:"tail"`
-	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 type findNodeRequest struct {
 	Target     []byte
 	Expiration uint64 `rlp:"tail"`
-	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 // reply to findnode
 type neighborsResponse struct {
 	Nodes      []rpcNode
 	Expiration uint64 `rlp:"tail"`
-	// Rest       []rlp.RawValue `rlp:"tail"`
 }
 
 type rpcNode struct {
@@ -177,8 +171,8 @@ type Backend struct {
 	handlers   map[string]func(payload []byte, timestamp *time.Time)
 	respLock   sync.Mutex
 	validLock  sync.Mutex
-	table      *kb.RoutingTable
-	nodes      map[peer.ID]*Peer
+	table      *kbucket.RoutingTable
+	nodes      map[string]*Peer
 	local      *Peer
 	shutdownCh chan bool
 	shutdown   int32
@@ -232,17 +226,18 @@ func NewBackend(logger hclog.Logger, key *ecdsa.PrivateKey, transport Transport)
 		return nil, err
 	}
 
+	hashFn := sha3.NewLegacyKeccak256()
+
 	r := &Backend{
-		logger: logger,
-		ID:     key,
-		// config:     config,
+		logger:     logger,
+		ID:         key,
 		addr:       addr,
 		handlers:   map[string]func(payload []byte, timestamp *time.Time){},
 		respLock:   sync.Mutex{},
 		validLock:  sync.Mutex{},
-		nodes:      map[peer.ID]*Peer{},
+		nodes:      map[string]*Peer{},
 		local:      localPeer,
-		table:      kb.NewRoutingTable(bucketSize, kb.ConvertPeerID(localPeer.ID), 1000*time.Second, peerstore.NewMetrics()),
+		table:      kbucket.NewRoutingTable(bucketSize, localPeer.ID, 1000*time.Second, hashFn),
 		shutdownCh: make(chan bool),
 		eventCh:    make(chan string, 10),
 		tasks:      make(chan *Peer, 100),
@@ -357,7 +352,7 @@ func (b *Backend) schedule() {
 }
 
 func (b *Backend) revalidatePeer() {
-	var id peer.ID
+	var id string
 	for _, i := range rand.Perm(len(b.table.Buckets)) {
 		if bucket := b.table.Buckets[i]; bucket.Len() != 0 {
 			id = bucket.Peers()[bucket.Len()-1]
@@ -378,10 +373,10 @@ func (b *Backend) NearestPeers() ([]*Peer, error) {
 }
 
 func (b *Backend) NearestPeersFromTarget(target []byte) ([]*Peer, error) {
-	key := peer.ID(hex.EncodeToHex(target))
+	key := hex.EncodeToHex(target)
 
 	peers := []*Peer{}
-	for _, p := range b.table.NearestPeers(kb.ConvertPeerID(key), bucketSize) {
+	for _, p := range b.table.NearestPeers(key, bucketSize) {
 		peer, ok := b.getPeer(p)
 		if !ok {
 			return nil, fmt.Errorf("peer %s not found", p)
@@ -432,7 +427,7 @@ func (b *Backend) LookupTarget(target []byte) ([]*Peer, error) {
 		return []*Peer{}, nil
 	}
 
-	visited := map[peer.ID]bool{}
+	visited := map[string]bool{}
 
 	// initialize the queue
 	queue, err := b.NearestPeersFromTarget(target)
@@ -592,7 +587,7 @@ func (b *Backend) HandlePacket(packet *Packet) error {
 	}
 }
 
-func (b *Backend) getCallback(id peer.ID, code byte) (func([]byte, *time.Time), bool) {
+func (b *Backend) getCallback(id string, code byte) (func([]byte, *time.Time), bool) {
 	key := fmt.Sprintf("%s_%v", id, code)
 	b.respLock.Lock()
 	c, ok := b.handlers[key]
@@ -740,7 +735,7 @@ func (b *Backend) Deliver() chan string {
 	return b.eventCh
 }
 
-func (b *Backend) getPeer(id peer.ID) (*Peer, bool) {
+func (b *Backend) getPeer(id string) (*Peer, bool) {
 	b.validLock.Lock()
 	defer b.validLock.Unlock()
 
@@ -841,7 +836,7 @@ type respMessage struct {
 	Timestamp *time.Time
 }
 
-func (b *Backend) setHandler(id peer.ID, code byte, ackCh chan respMessage, expiration time.Duration) {
+func (b *Backend) setHandler(id string, code byte, ackCh chan respMessage, expiration time.Duration) {
 	key := fmt.Sprintf("%s_%v", id, code)
 
 	callback := func(payload []byte, timestamp *time.Time) {
