@@ -19,7 +19,7 @@ import (
 	"github.com/umbracle/minimal/network/transport/rlpx"
 
 	"github.com/umbracle/minimal/protocol"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
@@ -161,24 +161,12 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
-	var stateStorage trie.Storage
-
-	switch config.StateStorage {
-	case "leveldb":
-		stateStorage, err = trie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
-		if err != nil {
-			return nil, err
-		}
-	case "boltdb":
-		stateStorage, err = trie.NewBoltDBStorage(filepath.Join(filepath.Join(m.config.DataDir, "trie"), "db"), logger)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("state storage '%s' not found", config.StateStorage)
+	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
+	if err != nil {
+		return nil, err
 	}
 
-	st := trie.NewState(stateStorage)
+	st := itrie.NewState(stateStorage)
 
 	// blockchain object
 	m.Blockchain = blockchain.NewBlockchain(storage, st, m.consensus, config.Chain.Params)

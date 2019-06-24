@@ -59,6 +59,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	s, snap, _ := buildState(t, c.Pre)
+
 	// txn := s.Txn()
 	txn := state.NewTxn(s, snap)
 

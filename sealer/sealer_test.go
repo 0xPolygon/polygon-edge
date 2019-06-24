@@ -13,7 +13,7 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
@@ -66,7 +66,7 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		},
 	}
 
-	st := trie.NewState(trie.NewMemoryStorage())
+	st := itrie.NewState(itrie.NewMemoryStorage())
 	b := blockchain.NewBlockchain(storage, st, engine, config)
 
 	advanceChain := func() {

@@ -13,7 +13,7 @@ import (
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -24,7 +24,7 @@ var key2, _ = crypto.GenerateKey()
 var addr2 = crypto.PubKeyToAddress(&key2.PublicKey)
 
 func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot) {
-	st := trie.NewState(trie.NewMemoryStorage())
+	st := itrie.NewState(itrie.NewMemoryStorage())
 	snap := st.NewSnapshot()
 
 	txn := state.NewTxn(st, snap)

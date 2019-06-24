@@ -9,7 +9,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -191,7 +191,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	state := trie.NewState(trie.NewMemoryStorage())
+	state := itrie.NewState(itrie.NewMemoryStorage())
 
 	b := NewBlockchain(s, state, &fakeConsensus{}, config)
 	if headers != nil {

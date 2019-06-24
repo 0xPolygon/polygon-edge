@@ -18,7 +18,7 @@ import (
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/state"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 
 	"github.com/umbracle/minimal/rlp"
 )
@@ -104,7 +104,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 
 	genesis := c.buildGenesis()
 
-	st := trie.NewState(trie.NewMemoryStorage())
+	st := itrie.NewState(itrie.NewMemoryStorage())
 
 	b := blockchain.NewBlockchain(s, st, engine, params)
 	if err := b.WriteGenesis(genesis); err != nil {

@@ -200,20 +200,6 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	return eth
 }
 
-func TestBackendNotify(t *testing.T) {
-
-	h0 := blockchain.NewTestHeaderChain(10)
-	h1 := blockchain.NewTestHeaderFromChain(h0[1:5], 10)
-
-	b1 := blockchain.HeadersToBlocks(h1)
-
-	b := blockchain.NewTestBlockchain(t, h0)
-
-	if err := b.WriteBlocks(b1); err != nil {
-		panic(err)
-	}
-}
-
 func TestWorkerPool(t *testing.T) {
 	pool := newWorkersHeap()
 
