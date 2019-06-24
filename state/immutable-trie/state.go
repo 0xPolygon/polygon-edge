@@ -1,6 +1,8 @@
-package trie
+package itrie
 
 import (
+	"fmt"
+
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
@@ -21,36 +23,11 @@ func NewState(storage Storage) *State {
 	return s
 }
 
-func (s *State) addState(root types.Hash, t *Trie) {
-	s.cache.Add(root, t)
-}
-
 func (s *State) NewSnapshot() state.Snapshot {
-	t, _ := s.newTrieAtImpl(types.Hash{})
+	t := NewTrie()
 	t.state = s
+	t.storage = s.storage
 	return t
-}
-
-func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
-	// Check locally.
-	tt, ok := s.cache.Get(root)
-	if ok {
-		return tt.(*Trie), nil
-	}
-
-	t, err := s.newTrieAtImpl(root)
-	if err != nil {
-		return nil, err
-	}
-	t.state = s
-	return t, nil
-}
-
-func (s *State) newTrieAtImpl(root types.Hash) (*Trie, error) {
-	if (root == types.Hash{}) {
-		return NewTrie(), nil
-	}
-	return NewTrieAt(s.storage, root)
 }
 
 func (s *State) SetCode(hash types.Hash, code []byte) {
@@ -61,6 +38,28 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.storage.GetCode(hash)
 }
 
-func (s *State) Storage() Storage {
-	return s.storage
+func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+	tt, ok := s.cache.Get(root)
+	if ok {
+		t := tt.(*Trie)
+		t.state = s
+		return tt.(*Trie), nil
+	}
+	n, ok, err := GetNode(root.Bytes(), s.storage)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	t := &Trie{
+		root:    n,
+		state:   s,
+		storage: s.storage,
+	}
+	return t, nil
+}
+
+func (s *State) AddState(root types.Hash, t *Trie) {
+	s.cache.Add(root, t)
 }

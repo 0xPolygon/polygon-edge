@@ -33,7 +33,7 @@ func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 
-	root := txn.Hash(nil)
+	root, _ := txn.Hash()
 	return types.BytesToHash(root)
 }
 
@@ -51,7 +51,7 @@ func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 
-	root := txn.Hash(nil)
+	root, _ := txn.Hash()
 	return types.BytesToHash(root)
 }
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/hex"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
 
@@ -174,7 +174,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 }
 
 func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot, []byte) {
-	s := trie.NewState(trie.NewMemoryStorage())
+	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
 	txn := state.NewTxn(s, snap)

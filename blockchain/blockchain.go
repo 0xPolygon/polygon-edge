@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	// "time"
 
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/derivesha"
@@ -14,7 +15,7 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
-	trie "github.com/umbracle/minimal/state/immutable-trie"
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
 	"github.com/umbracle/minimal/types"
@@ -40,7 +41,7 @@ type Blockchain struct {
 	consensus   consensus.Consensus
 	genesis     *types.Header
 	state       state.State
-	triedb      trie.Storage
+	triedb      itrie.Storage
 	params      *chain.Params
 	precompiled map[types.Address]*precompiled.Precompiled
 	sidechainCh chan *types.Header

@@ -167,7 +167,6 @@ func (e *Encoder) writeSize(size uint64, short byte, long byte) {
 		e.writeByte(short + byte(size))
 		return
 	}
-
 	intSize := intsize(size)
 	binary.BigEndian.PutUint64(e.intBuf[1:], size)
 

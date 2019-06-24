@@ -1,34 +1,17 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
-package trie
+package itrie
 
 import (
 	"fmt"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 )
 
 var (
-	// CODE is the code prefix
-	CODE = []byte("code")
+	// codePrefix is the code prefix for leveldb
+	codePrefix = []byte("code")
 )
 
 type Batch interface {
@@ -60,16 +43,16 @@ func (b *KVBatch) Put(k, v []byte) {
 	b.batch.Put(k, v)
 }
 
+func (b *KVBatch) Write() {
+	b.db.Write(b.batch, nil)
+}
+
 func (kv *KVStorage) SetCode(hash types.Hash, code []byte) {
-	kv.Put(append(CODE, hash.Bytes()...), code)
+	kv.Put(append(codePrefix, hash.Bytes()...), code)
 }
 
 func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	return kv.Get(append(CODE, hash.Bytes()...))
-}
-
-func (b *KVBatch) Write() {
-	b.db.Write(b.batch, nil)
+	return kv.Get(append(codePrefix, hash.Bytes()...))
 }
 
 func (kv *KVStorage) Batch() Batch {
@@ -102,40 +85,22 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (Storage, error) {
 
 type memStorage struct {
 	db   map[string][]byte
-	code map[types.Hash][]byte
+	code map[string][]byte
 }
 
 type memBatch struct {
 	db *map[string][]byte
 }
 
-func (m *memBatch) Put(p, v []byte) {
-	(*m.db)[hex.EncodeToHex(p)] = v
-}
-
-func (m *memBatch) Write() {
-}
-
 // NewMemoryStorage creates an inmemory trie storage
 func NewMemoryStorage() Storage {
-	return &memStorage{db: map[string][]byte{}, code: map[types.Hash][]byte{}}
-}
-
-func (m *memStorage) SetCode(hash types.Hash, code []byte) {
-	m.code[hash] = code
-}
-
-func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	code, ok := m.code[hash]
-	return code, ok
-}
-
-func (m *memStorage) Batch() Batch {
-	return &memBatch{db: &m.db}
+	return &memStorage{db: map[string][]byte{}, code: map[string][]byte{}}
 }
 
 func (m *memStorage) Put(p []byte, v []byte) {
-	m.db[hex.EncodeToHex(p)] = v
+	buf := make([]byte, len(v))
+	copy(buf[:], v[:])
+	m.db[hex.EncodeToHex(p)] = buf
 }
 
 func (m *memStorage) Get(p []byte) ([]byte, bool) {
@@ -146,162 +111,110 @@ func (m *memStorage) Get(p []byte) ([]byte, bool) {
 	return v, true
 }
 
-// DecodeNode decodes bytes to his node representation
-func DecodeNode(storage Storage, hash []byte, data []byte) (*Node, error) {
-	// empty data, just return the node, not sure if this is a special case
-	if len(data) == 0 {
-		return &Node{}, nil
-	}
-
-	i := rlp.NewIterator(data)
-	if _, err := i.List(); err != nil {
-		return nil, err
-	}
-
-	count, err := rlp.NewIterator(data).Count()
-	if err != nil {
-		return nil, err
-	}
-
-	elems := i.Raw()
-	if count == 2 {
-		return decodeShort(storage, hash, elems)
-	} else if count == 17 {
-		return decodeFull(storage, hash, elems)
-	}
-
-	return nil, fmt.Errorf("invalid number of list elements: %v", count)
+func (m *memStorage) SetCode(hash types.Hash, code []byte) {
+	m.code[hash.String()] = code
 }
 
-func decodeShort(storage Storage, hash []byte, data []byte) (*Node, error) {
-	i := rlp.NewIterator(data)
-
-	kbuf, err := i.Bytes()
-	if err != nil {
-		panic(err)
-	}
-	key := compactToHex(kbuf)
-
-	if hasTerm(key) {
-		// value node
-		val, err := i.Bytes()
-		if err != nil {
-			panic(err)
-		}
-
-		h := make([]byte, len(hash))
-		copy(h[:], hash[:])
-
-		n := &Node{
-			prefix: key,
-			leaf: &leafNode{
-				key: append(h, key...),
-				val: val,
-			},
-		}
-		return n, nil
-	}
-
-	rest := i.Raw()
-	r, _, err := decodeRef(storage, append(hash, key...), rest)
-	if err != nil {
-		return nil, err
-	}
-	r.prefix = key
-	return r, nil
+func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
+	code, ok := m.code[hash.String()]
+	return code, ok
 }
 
-func decodeFull(storage Storage, hash []byte, data []byte) (*Node, error) {
-	edges := [17]*Node{}
-
-	h := make([]byte, len(hash))
-	copy(h[:], hash[:])
-
-	for i := 0; i < 16; i++ {
-		n, rest, err := decodeRef(storage, append(hash, []byte{byte(i)}...), data)
-		if err != nil {
-			return nil, err
-		}
-		if n != nil {
-			n.prefix = append([]byte{byte(i)}, n.prefix...)
-		}
-		edges[i] = n
-		data = rest
-	}
-
-	i := rlp.NewIterator(data)
-	val, err := i.Bytes()
-	if err != nil {
-		panic(err)
-	}
-
-	if len(val) > 0 {
-		edges[16] = &Node{
-			prefix: []byte{0x10},
-			leaf: &leafNode{
-				key: append(h, []byte{0x10}...),
-				val: val,
-			},
-		}
-	}
-
-	n := &Node{
-		edges: edges,
-	}
-	return n, nil
+func (m *memStorage) Batch() Batch {
+	return &memBatch{db: &m.db}
 }
 
-const hashLen = len(types.Hash{})
+func (m *memBatch) Put(p, v []byte) {
+	buf := make([]byte, len(v))
+	copy(buf[:], v[:])
+	(*m.db)[hex.EncodeToHex(p)] = buf
+}
 
-func decodeRef(storage Storage, hash []byte, buf []byte) (*Node, []byte, error) {
+func (m *memBatch) Write() {
+}
 
-	i := rlp.NewIterator(buf)
-	isList, err := i.IsListNext()
-	if err != nil {
-		panic(err)
-	}
-
-	if isList {
-		if !isList {
-			panic("YY")
-		}
-
-		size, err := i.List()
-		if err != nil {
-			panic(err)
-		}
-		size = size + 1
-
-		// 'embedded' node
-		if int(size) > hashLen {
-			err := fmt.Errorf("oversized embedded node (size is %d bytes, want size < %d)", size, hashLen)
-			return nil, buf, err
-		}
-		n, err := DecodeNode(storage, hash, buf)
-
-		rest := buf[size:]
-		return n, rest, err
-	}
-
-	val, err := i.Bytes()
-	if err != nil {
-		panic(err)
-	}
-
-	if len(val) == 0 {
-		return nil, i.Raw(), nil
-	}
-	if len(val) != 32 {
-		panic("XX")
-	}
-
-	realVal, ok := storage.Get(val)
+// GetNode retrieves a node from storage
+func GetNode(root []byte, storage Storage) (Node, bool, error) {
+	data, ok := storage.Get(root)
 	if !ok {
-		return nil, nil, fmt.Errorf("Value could not be expanded")
+		return nil, false, nil
 	}
 
-	n, err := DecodeNode(storage, hash, realVal)
-	n.hash = val
+	p := &Parser{}
+	v, err := p.Parse(data)
+	if err != nil {
+		return nil, false, err
+	}
 
-	return n, i.Raw(), err
+	if v.t != TypeArray {
+		return nil, false, fmt.Errorf("storage item should be an array")
+	}
+
+	n, err := decodeNode(v, storage)
+	return n, err == nil, err
+}
+
+func decodeNode(v *Value, s Storage) (Node, error) {
+	if v.t == TypeBytes {
+		return &ValueNode{
+			buf:  v.Bytes(),
+			hash: true,
+		}, nil
+	}
+
+	var err error
+
+	ll := len(v.a)
+	if ll == 2 {
+		key := v.a[0]
+		if key.t != TypeBytes {
+			return nil, fmt.Errorf("short key expected to be bytes")
+		}
+
+		// this can be either an array (extension node)
+		// or bytes (leaf node)
+		nc := &ShortNode{}
+		nc.key = compactToHex(key.Bytes())
+		if hasTerm(nc.key) {
+			// value node
+			if v.a[1].t != TypeBytes {
+				return nil, fmt.Errorf("short leaf value expected to be bytes")
+			}
+			vv := &ValueNode{
+				buf: v.a[1].Bytes(),
+			}
+			nc.child = vv
+		} else {
+			nc.child, err = decodeNode(v.a[1], s)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return nc, nil
+	} else if ll == 17 {
+		// full node
+		nc := &FullNode{}
+		for i := 0; i < 16; i++ {
+			if v.a[i].t == TypeBytes && len(v.a[i].Bytes()) == 0 {
+				// empty
+				continue
+			}
+			nc.children[i], err = decodeNode(v.a[i], s)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if v.a[16].t != TypeBytes {
+			return nil, fmt.Errorf("full node value expected to be bytes")
+		}
+		if len(v.a[16].Bytes()) != 0 {
+			vv := &ValueNode{
+				buf: v.a[16].Bytes(),
+			}
+			nc.value = vv
+		}
+		return nc, nil
+	}
+	return nil, fmt.Errorf("node has incorrect number of leafs")
 }
