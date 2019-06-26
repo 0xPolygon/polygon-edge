@@ -9,13 +9,18 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+type hashRead interface {
+	hash.Hash
+	Read(b []byte) (int, error)
+}
+
 // Cache is a 16 MB pseudorandom cache.
 type Cache struct {
 	cacheSize   uint32
 	datasetSize int
 	cache       []uint32
-	sha512      hash.Hash
-	sha256      hash.Hash
+	sha512      hashRead
+	sha256      hashRead
 	mix         [16]uint32
 }
 
@@ -25,8 +30,8 @@ func newCache(epoch int) *Cache {
 	seed := getSeedHashByEpoch(epoch)
 
 	c := &Cache{
-		sha512:      sha3.NewLegacyKeccak512(),
-		sha256:      sha3.NewLegacyKeccak256(),
+		sha512:      sha3.NewLegacyKeccak512().(hashRead),
+		sha256:      sha3.NewLegacyKeccak256().(hashRead),
 		datasetSize: int(datasetSize),
 	}
 
@@ -55,6 +60,15 @@ func (c *Cache) calcDatasetItem(i uint32) []uint32 {
 
 	c.sha512Int(c.mix[:])
 	return c.mix[:]
+}
+
+func (c *Cache) sha512NoCopy(r []byte, p []byte) {
+	c.sha512.Reset()
+	c.sha512.Write(p)
+	n, _ := c.sha512.Read(r)
+	if n != 64 {
+		panic("wrong size")
+	}
 }
 
 func (c *Cache) sha512Aux(p []byte) []byte {
@@ -103,11 +117,14 @@ func (c *Cache) mkcache(cacheSize int, seed []byte) {
 	res := bytePool.Get().([]byte)
 	res = extendByteSlice(res, n*hashBytes)
 
-	copy(res[0:], c.sha512Aux(seed))
+	c.sha512NoCopy(res[0:64], seed)
+
 	for i := 1; i < n; i++ {
 		indx := (i - 1) * hashBytes
-		copy(res[i*hashBytes:], c.sha512Aux(res[indx:indx+hashBytes]))
+		c.sha512NoCopy(res[i*hashBytes:i*hashBytes+64], res[indx:indx+hashBytes])
 	}
+
+	xorTmp := make([]byte, hashBytes)
 
 	for j := 0; j < cacheRounds; j++ {
 		for i := 0; i < n; i++ {
@@ -116,8 +133,8 @@ func (c *Cache) mkcache(cacheSize int, seed []byte) {
 
 			v := int(binary.LittleEndian.Uint32(res[indx:indx+hashBytes])) % n * hashBytes
 
-			temp := xorBytes(res[offset:offset+hashBytes], res[v:v+hashBytes])
-			copy(res[indx:], c.sha512Aux(temp))
+			xorBytes(xorTmp, res[offset:offset+hashBytes], res[v:v+hashBytes])
+			c.sha512NoCopy(res[indx:indx+64], xorTmp)
 		}
 	}
 
@@ -135,13 +152,11 @@ func (c *Cache) hashimoto(header []byte, nonce uint64) ([]byte, []byte) {
 	return hashimoto(header, nonce, c.datasetSize, c.sha512Aux, c.sha256Aux, c.calcDatasetItem)
 }
 
-func xorBytes(a, b []byte) []byte {
+func xorBytes(res, a, b []byte) {
 	if len(a) != len(b) {
 		panic(fmt.Sprintf("length of byte slices is not equivalent: %d != %d", len(a), len(b)))
 	}
-	buf := make([]byte, len(a))
 	for i := range a {
-		buf[i] = a[i] ^ b[i]
+		res[i] = a[i] ^ b[i]
 	}
-	return buf
 }
