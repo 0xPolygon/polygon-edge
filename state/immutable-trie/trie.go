@@ -458,6 +458,20 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 
 		// Only one value left at indx
 		nc := n.children[indx]
+
+		if vv, ok := nc.(*ValueNode); ok && vv.hash {
+			// If the value is a hash, we have to resolve it first.
+			// This needs better testing
+			aux, ok, err := GetNode(vv.buf, t.storage)
+			if err != nil {
+				panic(err)
+			}
+			if !ok {
+				return nil, false
+			}
+			nc = aux
+		}
+
 		obj, ok := nc.(*ShortNode)
 		if !ok {
 			obj := &ShortNode{}
