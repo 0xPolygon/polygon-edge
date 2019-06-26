@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	// "time"
 
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/derivesha"
