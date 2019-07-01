@@ -1,14 +1,56 @@
-package itrie
+package rlpv2
 
 import (
 	"encoding/binary"
 	"fmt"
+	"math/big"
+	"sync"
 )
 
 // Optimized RLP encoding library based on fastjson. It will likely replace minimal/rlp in the future.
 
+type ArenaPool struct {
+	pool sync.Pool
+}
+
+func (ap *ArenaPool) Get() *Arena {
+	v := ap.pool.Get()
+	if v == nil {
+		return &Arena{}
+	}
+	return v.(*Arena)
+}
+
+func (ap *ArenaPool) Put(a *Arena) {
+	a.Reset()
+	ap.pool.Put(a)
+}
+
+var arenaPool = sync.Pool{
+	New: func() interface{} {
+		return new(Arena)
+	},
+}
+
+func AcquireArena() *Arena {
+	return arenaPool.Get().(*Arena)
+}
+
+func ReleaseArena(a *Arena) {
+	a.Reset()
+	arenaPool.Put(a)
+}
+
+// bufPool to convert int to bytes
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 8)
+	},
+}
+
 type cache struct {
-	vs []Value
+	buf [8]byte
+	vs  []Value
 }
 
 func (c *cache) reset() {
@@ -33,15 +75,19 @@ const (
 	TypeArrayNull // 0xC0
 )
 
-var typeStr = [...]string{
-	"array",
-	"bytes",
-	"null",
-	"nullArray",
-}
-
 func (t Type) String() string {
-	return typeStr[t]
+	switch t {
+	case TypeArray:
+		return "array"
+	case TypeBytes:
+		return "bytes"
+	case TypeNull:
+		return "null"
+	case TypeArrayNull:
+		return "null-array"
+	default:
+		panic(fmt.Errorf("BUG: unknown Value type: %d", t))
+	}
 }
 
 // Value is an RLP value
@@ -49,11 +95,28 @@ type Value struct {
 	a []*Value
 	t Type
 	b []byte
-	l int
+	l uint64
+}
+
+func (v *Value) Type() Type {
+	return v.t
+}
+
+// Get returns the item at index i in the array
+func (v *Value) Get(i int) *Value {
+	if i > len(v.a) {
+		return nil
+	}
+	return v.a[i]
+}
+
+// Elems returns the number of elements if its an array
+func (v *Value) Elems() int {
+	return len(v.a)
 }
 
 // Len returns the size of the value
-func (v *Value) Len() int {
+func (v *Value) Len() uint64 {
 	if v.t == TypeArray {
 		return v.l + intsize(v.l)
 	}
@@ -77,12 +140,47 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	return b[:needLen]
 }
 
+func (a *Arena) NewString(s string) *Value {
+	return a.NewBytes([]byte(s))
+}
+
+func (a *Arena) NewBigInt(b *big.Int) *Value {
+	if b == nil {
+		return valueNull
+	}
+	return a.NewBytes(b.Bytes())
+}
+
 func (a *Arena) NewCopyBytes(b []byte) *Value {
 	v := a.c.getValue()
 	v.t = TypeBytes
 	v.b = extendByteSlice(v.b, len(b))
 	copy(v.b, b)
-	v.l = len(b)
+	v.l = uint64(len(b))
+	return v
+}
+
+func (a *Arena) NewBool(b bool) *Value {
+	if b {
+		return valueTrue
+	}
+	return valueFalse
+}
+
+func (a *Arena) NewUint(i uint64) *Value {
+	if i == 0 {
+		return valueNull
+	}
+
+	intSize := intsize(i)
+	binary.BigEndian.PutUint64(a.c.buf[:], i)
+
+	v := a.c.getValue()
+	v.t = TypeBytes
+	v.b = extendByteSlice(v.b, int(intSize))
+	copy(v.b, a.c.buf[8-intSize:])
+	v.l = intSize
+
 	return v
 }
 
@@ -90,7 +188,7 @@ func (a *Arena) NewBytes(b []byte) *Value {
 	v := a.c.getValue()
 	v.t = TypeBytes
 	v.b = b
-	v.l = len(b)
+	v.l = uint64(len(b))
 	return v
 }
 
@@ -132,14 +230,15 @@ func (v *Value) Set(vv *Value) {
 			v.l = v.l + 1 + intsize(size) + size
 		}
 	} else {
-		v.l = v.l + intsize(vv.l) + vv.l
+		if vv.l < 56 {
+			v.l = v.l + 1 + vv.l
+		} else {
+			v.l = v.l + intsize(vv.l) + 1 + vv.l
+		}
 	}
+
 	v.a = append(v.a, vv)
 }
-
-// This works now because we only use RLP encoding sequentially on the hasher.
-// It will need to change if we want to use it as a replacement for the rlp decoder.
-var intBuf = make([]byte, 9)
 
 func (v *Value) marshalLongSize(dst []byte) []byte {
 	return v.marshalSize(dst, 0xC0, 0xF7)
@@ -155,10 +254,15 @@ func (v *Value) marshalSize(dst []byte, short, long byte) []byte {
 	}
 
 	intSize := intsize(v.l)
-	binary.BigEndian.PutUint64(intBuf[1:], uint64(v.l))
 
-	intBuf[8-intSize] = long + byte(intSize)
-	return append(dst, intBuf[8-intSize:]...)
+	buf := bufPool.Get().([]byte)
+	binary.BigEndian.PutUint64(buf[:], uint64(v.l))
+
+	dst = append(dst, long+byte(intSize))
+	dst = append(dst, buf[8-intSize:]...)
+
+	bufPool.Put(buf)
+	return dst
 }
 
 // MarshalTo appends marshaled v to dst and returns the result.
@@ -186,11 +290,13 @@ func (v *Value) MarshalTo(dst []byte) []byte {
 }
 
 var (
-	valueArrayNull = &Value{t: TypeArrayNull}
-	valueNull      = &Value{t: TypeNull}
+	valueArrayNull = &Value{t: TypeArrayNull, l: 1}
+	valueNull      = &Value{t: TypeNull, l: 1}
+	valueFalse     = valueNull
+	valueTrue      = &Value{t: TypeBytes, b: []byte{0x1}, l: 1}
 )
 
-func intsize(val int) int {
+func intsize(val uint64) uint64 {
 	switch {
 	case val < (1 << 8):
 		return 1

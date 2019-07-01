@@ -1,26 +1,38 @@
-package itrie
+package rlpv2
 
 import (
 	"encoding/binary"
 	"fmt"
+	"sync"
 )
+
+type ParserPool struct {
+	pool sync.Pool
+}
+
+func (pp *ParserPool) Get() *Parser {
+	v := pp.pool.Get()
+	if v == nil {
+		return &Parser{}
+	}
+	return v.(*Parser)
+}
+
+func (pp *ParserPool) Put(p *Parser) {
+	pp.pool.Put(p)
+}
 
 // Optimized RLP decoding library based on fastjson. It will likely replace minimal/rlp in the future.
 // Note, The content marshalled may not be correct marshalled again. For now, that is not an intended use.
 
 type Parser struct {
-	// b contains working copy of the string to be parsed.
-	b []byte
-
-	// c is a cache for json values.
 	c cache
 }
 
 func (p *Parser) Parse(b []byte) (*Value, error) {
-	p.b = append(p.b[:0], b...)
 	p.c.reset()
 
-	v, _, err := parseValue(p.b, &p.c)
+	v, _, err := parseValue(b, &p.c)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse RLP: %s", err)
 	}
@@ -47,7 +59,7 @@ func parseValue(b []byte, c *cache) (*Value, []byte, error) {
 		return v, tail, nil
 	}
 	if cur < 0xC0 {
-		size, tail, err := readUint(b[1:], int(cur-0xB7))
+		size, tail, err := readUint(b[1:], int(cur-0xB7), c)
 		if err != nil {
 			return nil, tail, fmt.Errorf("cannot read size of long bytes: %s", err)
 		}
@@ -66,7 +78,7 @@ func parseValue(b []byte, c *cache) (*Value, []byte, error) {
 	}
 
 	// long array
-	size, tail, err := readUint(b[1:], int(cur-0xf7))
+	size, tail, err := readUint(b[1:], int(cur-0xf7), c)
 	if err != nil {
 		return nil, tail, fmt.Errorf("cannot read size of long array: %s", err)
 	}
@@ -85,7 +97,7 @@ func parseBytes(b []byte, size int, c *cache) (*Value, []byte, error) {
 	v := c.getValue()
 	v.t = TypeBytes
 	v.b = b[:size]
-	v.l = size
+	v.l = uint64(size)
 	return v, b[size:], nil
 }
 
@@ -113,9 +125,13 @@ func parseList(b []byte, size int, c *cache) (*Value, []byte, error) {
 	return a, b, nil
 }
 
-func readUint(b []byte, size int) (int, []byte, error) {
-	buf := make([]byte, 8)
-	copy(buf[8-size:], b[:size])
-	i := binary.BigEndian.Uint64(buf)
+func readUint(b []byte, size int, c *cache) (int, []byte, error) {
+	// clean the half that we wont use
+	ini := 8 - size
+	for i := 0; i < ini; i++ {
+		c.buf[i] = 0
+	}
+	copy(c.buf[ini:], b[:size])
+	i := binary.BigEndian.Uint64(c.buf[:])
 	return int(i), b[size:], nil
 }
