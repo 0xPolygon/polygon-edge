@@ -9,6 +9,8 @@ import (
 
 // Optimized RLP encoding library based on fastjson. It will likely replace minimal/rlp in the future.
 
+var DefaultArenaPool ArenaPool
+
 type ArenaPool struct {
 	pool sync.Pool
 }

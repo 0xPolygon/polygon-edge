@@ -12,7 +12,7 @@ import (
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/umbracle/minimal/rlp"
+	rlpv2 "github.com/umbracle/minimal/rlpv2"
 )
 
 var (
@@ -47,11 +47,17 @@ func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
 
 // CreateAddress creates an Ethereum address.
 func CreateAddress(addr types.Address, nonce uint64) types.Address {
-	buf, _ := rlp.EncodeToBytes([]interface{}{
-		addr,
-		nonce,
-	})
-	return types.BytesToAddress(Keccak256(buf)[12:])
+	a := rlpv2.DefaultArenaPool.Get()
+	defer rlpv2.DefaultArenaPool.Put(a)
+
+	v := a.NewArray()
+	v.Set(a.NewBytes(addr.Bytes()))
+	v.Set(a.NewUint(nonce))
+
+	dst := v.MarshalTo(nil)
+	dst = Keccak256(dst)[12:]
+
+	return types.BytesToAddress(dst)
 }
 
 var create2Prefix = []byte{0xff}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/rlp"
+	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
@@ -121,6 +122,9 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	tt := t.Txn()
 	tt.batch = batch
 
+	arena := rlpv2.DefaultArenaPool.Get()
+	defer rlpv2.DefaultArenaPool.Put(arena)
+
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*state.StateObject)
 		if !ok {
@@ -162,12 +166,16 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 			t.state.SetCode(types.BytesToHash(a.Account.CodeHash), a.Code)
 		}
 
-		data, err := rlp.EncodeToBytes(a.Account)
-		if err != nil {
-			panic(err)
-		}
+		vv := arena.NewArray()
+		vv.Set(arena.NewUint(a.Account.Nonce))
+		vv.Set(arena.NewBigInt(a.Account.Balance))
+		vv.Set(arena.NewBytes(a.Account.Root.Bytes()))
+		vv.Set(arena.NewBytes(a.Account.CodeHash))
+
+		data := vv.MarshalTo(nil)
 
 		tt.Insert(hashit(k), data)
+		arena.Reset()
 		return false
 	})
 
