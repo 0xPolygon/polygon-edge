@@ -5,41 +5,12 @@ import (
 	"hash"
 	"sync"
 
+	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
 
-type ArenaPool struct {
-	pool sync.Pool
-}
-
-func (ap *ArenaPool) Get() *Arena {
-	v := ap.pool.Get()
-	if v == nil {
-		return &Arena{}
-	}
-	return v.(*Arena)
-}
-
-func (ap *ArenaPool) Put(a *Arena) {
-	a.Reset()
-	ap.pool.Put(a)
-}
-
-var arenaPool = sync.Pool{
-	New: func() interface{} {
-		return new(Arena)
-	},
-}
-
-func AcquireArena() *Arena {
-	return arenaPool.Get().(*Arena)
-}
-
-func ReleaseArena(a *Arena) {
-	a.Reset()
-	arenaPool.Put(a)
-}
+var arenaPool rlpv2.ArenaPool
 
 var (
 	emptyRoot = types.StringToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421").Bytes()
@@ -59,8 +30,7 @@ type hashImpl interface {
 }
 
 type hasher struct {
-	pool  ArenaPool
-	arena []*Arena
+	arena []*rlpv2.Arena
 	buf   []byte
 	hash  hashImpl
 	tmp   [32]byte
@@ -74,18 +44,18 @@ func (h *hasher) Reset() {
 
 func (h *hasher) ReleaseArenas(idx int) {
 	for i := idx; i < len(h.arena); i++ {
-		h.pool.Put(h.arena[i])
+		arenaPool.Put(h.arena[i])
 	}
 	h.arena = h.arena[:idx]
 }
 
-func (h *hasher) ReleaseArena(a *Arena) {
+func (h *hasher) ReleaseArena(a *rlpv2.Arena) {
 	a.Reset()
-	h.pool.Put(a)
+	arenaPool.Put(a)
 }
 
-func (h *hasher) AcquireArena() (*Arena, int) {
-	v := h.pool.Get()
+func (h *hasher) AcquireArena() (*rlpv2.Arena, int) {
+	v := arenaPool.Get()
 	idx := len(h.arena)
 	h.arena = append(h.arena, v)
 	return v, idx
@@ -117,7 +87,7 @@ func (t *Txn) Hash() ([]byte, error) {
 	val := t.hash(t.root, h, arena, 0)
 
 	// REDO
-	if val.t == TypeBytes {
+	if val.Type() == rlpv2.TypeBytes {
 		if val.Len() != 32 {
 			h.hash.Reset()
 			h.hash.Write(val.Bytes())
@@ -149,10 +119,10 @@ func (t *Txn) Hash() ([]byte, error) {
 	return root, nil
 }
 
-func (t *Txn) hash(node Node, h *hasher, a *Arena, d int) *Value {
-	var val *Value
+func (t *Txn) hash(node Node, h *hasher, a *rlpv2.Arena, d int) *rlpv2.Value {
+	var val *rlpv2.Value
 
-	var aa *Arena
+	var aa *rlpv2.Arena
 	var idx int
 
 	if h, ok := node.Hash(); ok {
@@ -214,4 +184,3 @@ func (t *Txn) hash(node Node, h *hasher, a *Arena, d int) *Value {
 
 	return a.NewCopyBytes(hh)
 }
-

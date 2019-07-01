@@ -6,8 +6,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/types"
 )
+
+var parserPool rlpv2.ParserPool
 
 var (
 	// codePrefix is the code prefix for leveldb
@@ -140,13 +143,17 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 		return nil, false, nil
 	}
 
-	p := &Parser{}
+	// NOTE. We dont need to make copies of the bytes because the nodes
+	// take the reference from data itself which is a safe copy.
+	p := parserPool.Get()
+	defer parserPool.Put(p)
+
 	v, err := p.Parse(data)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if v.t != TypeArray {
+	if v.Type() != rlpv2.TypeArray {
 		return nil, false, fmt.Errorf("storage item should be an array")
 	}
 
@@ -154,8 +161,8 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	return n, err == nil, err
 }
 
-func decodeNode(v *Value, s Storage) (Node, error) {
-	if v.t == TypeBytes {
+func decodeNode(v *rlpv2.Value, s Storage) (Node, error) {
+	if v.Type() == rlpv2.TypeBytes {
 		return &ValueNode{
 			buf:  v.Bytes(),
 			hash: true,
@@ -164,10 +171,10 @@ func decodeNode(v *Value, s Storage) (Node, error) {
 
 	var err error
 
-	ll := len(v.a)
+	ll := v.Elems()
 	if ll == 2 {
-		key := v.a[0]
-		if key.t != TypeBytes {
+		key := v.Get(0)
+		if key.Type() != rlpv2.TypeBytes {
 			return nil, fmt.Errorf("short key expected to be bytes")
 		}
 
@@ -177,15 +184,15 @@ func decodeNode(v *Value, s Storage) (Node, error) {
 		nc.key = compactToHex(key.Bytes())
 		if hasTerm(nc.key) {
 			// value node
-			if v.a[1].t != TypeBytes {
+			if v.Get(1).Type() != rlpv2.TypeBytes {
 				return nil, fmt.Errorf("short leaf value expected to be bytes")
 			}
 			vv := &ValueNode{
-				buf: v.a[1].Bytes(),
+				buf: v.Get(1).Bytes(),
 			}
 			nc.child = vv
 		} else {
-			nc.child, err = decodeNode(v.a[1], s)
+			nc.child, err = decodeNode(v.Get(1), s)
 			if err != nil {
 				return nil, err
 			}
@@ -195,22 +202,22 @@ func decodeNode(v *Value, s Storage) (Node, error) {
 		// full node
 		nc := &FullNode{}
 		for i := 0; i < 16; i++ {
-			if v.a[i].t == TypeBytes && len(v.a[i].Bytes()) == 0 {
+			if v.Get(i).Type() == rlpv2.TypeBytes && len(v.Get(i).Bytes()) == 0 {
 				// empty
 				continue
 			}
-			nc.children[i], err = decodeNode(v.a[i], s)
+			nc.children[i], err = decodeNode(v.Get(i), s)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		if v.a[16].t != TypeBytes {
+		if v.Get(16).Type() != rlpv2.TypeBytes {
 			return nil, fmt.Errorf("full node value expected to be bytes")
 		}
-		if len(v.a[16].Bytes()) != 0 {
+		if len(v.Get(16).Bytes()) != 0 {
 			vv := &ValueNode{
-				buf: v.a[16].Bytes(),
+				buf: v.Get(16).Bytes(),
 			}
 			nc.value = vv
 		}

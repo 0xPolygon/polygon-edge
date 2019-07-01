@@ -269,9 +269,9 @@ func encodeBool(val reflect.Value, e *Encoder) (*Value, uint, error) {
 	a := e.getValue()
 
 	if val.Bool() {
-		a.buf = boolTrue
+		a.buf = append(a.buf, boolTrue...)
 	} else {
-		a.buf = boolFalse
+		a.buf = append(a.buf, boolFalse...)
 	}
 
 	return a, 0, nil
