@@ -3,8 +3,11 @@ package rlpv2
 import (
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"math/big"
 	"sync"
+
+	"golang.org/x/crypto/sha3"
 )
 
 // Optimized RLP encoding library based on fastjson. It will likely replace minimal/rlp in the future.
@@ -18,7 +21,7 @@ type ArenaPool struct {
 func (ap *ArenaPool) Get() *Arena {
 	v := ap.pool.Get()
 	if v == nil {
-		return &Arena{}
+		return &Arena{hash: sha3.NewLegacyKeccak256().(hashImpl)}
 	}
 	return v.(*Arena)
 }
@@ -26,21 +29,6 @@ func (ap *ArenaPool) Get() *Arena {
 func (ap *ArenaPool) Put(a *Arena) {
 	a.Reset()
 	ap.pool.Put(a)
-}
-
-var arenaPool = sync.Pool{
-	New: func() interface{} {
-		return new(Arena)
-	},
-}
-
-func AcquireArena() *Arena {
-	return arenaPool.Get().(*Arena)
-}
-
-func ReleaseArena(a *Arena) {
-	a.Reset()
-	arenaPool.Put(a)
 }
 
 // bufPool to convert int to bytes
@@ -125,13 +113,33 @@ func (v *Value) Len() uint64 {
 	return v.l
 }
 
+type hashImpl interface {
+	hash.Hash
+	Read(b []byte) (int, error)
+}
+
 // Arena is an RLP object arena
 type Arena struct {
-	c cache
+	c    cache
+	buf  []byte
+	hash hashImpl
 }
 
 func (a *Arena) Reset() {
+	if a.hash != nil {
+		a.hash.Reset()
+	}
+	a.buf = a.buf[:0]
 	a.c.reset()
+}
+
+func (a *Arena) HashTo(dst []byte, v *Value) []byte {
+	a.buf = v.MarshalTo(a.buf[:0])
+	a.hash.Write(a.buf)
+
+	dst = extendByteSlice(dst, 32)
+	a.hash.Read(dst)
+	return dst
 }
 
 func extendByteSlice(b []byte, needLen int) []byte {

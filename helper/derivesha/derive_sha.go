@@ -4,20 +4,17 @@ import (
 	"bytes"
 
 	"github.com/umbracle/minimal/rlp"
+	"github.com/umbracle/minimal/rlpv2"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
-	"golang.org/x/crypto/sha3"
 )
 
-func rlpHash(x interface{}) (h types.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	err := rlp.Encode(hw, x)
-	if err != nil {
-		panic(err)
-	}
-	hw.Sum(h[:0])
-	return h
-}
+var (
+	// EmptyUncleHash is the root when there are no uncles
+	EmptyUncleHash = types.StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+)
+
+var receiptArenaPool rlpv2.ArenaPool
 
 func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
 	keybuf := new(bytes.Buffer)
@@ -29,7 +26,7 @@ func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
 		keybuf.Reset()
 		rlp.Encode(keybuf, uint(indx))
 
-		enc, _ := rlp.EncodeToBytes(receipt)
+		enc := receipt.Marshal()
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 
@@ -37,7 +34,12 @@ func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
 	return types.BytesToHash(root)
 }
 
+var txArenaPool rlpv2.ArenaPool
+
 func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
+	arena := txArenaPool.Get()
+	defer txArenaPool.Put(arena)
+
 	keybuf := new(bytes.Buffer)
 
 	t := itrie.NewTrie()
@@ -47,7 +49,9 @@ func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
 		keybuf.Reset()
 		rlp.Encode(keybuf, uint(indx))
 
-		enc, _ := rlp.EncodeToBytes(transaction)
+		v := transaction.MarshalWith(arena)
+		enc := v.MarshalTo(nil)
+
 		txn.Insert(keybuf.Bytes(), enc)
 	}
 
@@ -55,6 +59,20 @@ func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
 	return types.BytesToHash(root)
 }
 
+var uncleArenaPool rlpv2.ArenaPool
+
 func CalcUncleRoot(uncles []*types.Header) types.Hash {
-	return rlpHash(uncles)
+	if len(uncles) == 0 {
+		return EmptyUncleHash
+	}
+
+	a := uncleArenaPool.Get()
+	defer uncleArenaPool.Put(a)
+
+	v := a.NewArray()
+	for _, i := range uncles {
+		v.Set(i.MarshalWith(a))
+	}
+
+	return types.BytesToHash(a.HashTo(nil, v))
 }

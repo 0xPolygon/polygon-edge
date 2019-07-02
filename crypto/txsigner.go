@@ -7,10 +7,8 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/umbracle/minimal/chain"
+	rlpv2 "github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/types"
-	"golang.org/x/crypto/sha3"
-
-	"github.com/umbracle/minimal/rlp"
 )
 
 // TxSigner recovers data from a transaction
@@ -39,15 +37,37 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 type FrontierSigner struct {
 }
 
+var signerPool rlpv2.ArenaPool
+
+func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
+	a := signerPool.Get()
+	defer signerPool.Put(a)
+
+	v := a.NewArray()
+	v.Set(a.NewUint(tx.Nonce))
+	v.Set(a.NewBigInt(tx.GasPrice))
+	v.Set(a.NewUint(tx.Gas))
+	if tx.To == nil {
+		v.Set(a.NewNull())
+	} else {
+		v.Set(a.NewBytes((*tx.To).Bytes()))
+	}
+	v.Set(a.NewBigInt(tx.Value))
+	v.Set(a.NewBytes(tx.Input))
+
+	// EIP155
+	if chainID != 0 {
+		v.Set(a.NewUint(chainID))
+		v.Set(a.NewUint(0))
+		v.Set(a.NewUint(0))
+	}
+
+	buf := a.HashTo(nil, v)
+	return types.BytesToHash(buf)
+}
+
 func (f *FrontierSigner) Hash(tx *types.Transaction) types.Hash {
-	return rlpHash([]interface{}{
-		tx.Nonce,
-		tx.GasPrice,
-		tx.Gas,
-		tx.To,
-		tx.Value,
-		tx.Input,
-	})
+	return calcTxHash(tx, 0)
 }
 
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
@@ -91,17 +111,7 @@ type EIP155Signer struct {
 }
 
 func (e *EIP155Signer) Hash(tx *types.Transaction) types.Hash {
-	return rlpHash([]interface{}{
-		tx.Nonce,
-		tx.GasPrice,
-		tx.Gas,
-		tx.To,
-		tx.Value,
-		tx.Input,
-		e.chainID,
-		uint(0),
-		uint(0),
-	})
+	return calcTxHash(tx, e.chainID)
 }
 
 func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
@@ -133,14 +143,4 @@ func encodeSignature(R, S *big.Int, V byte) ([]byte, error) {
 	copy(sig[64-len(s):64], s)
 	sig[64] = V
 	return sig, nil
-}
-
-func rlpHash(x interface{}) (h types.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	err := rlp.Encode(hw, x)
-	if err != nil {
-		panic(err)
-	}
-	hw.Sum(h[:0])
-	return h
 }

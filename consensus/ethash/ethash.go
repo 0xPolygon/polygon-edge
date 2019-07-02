@@ -24,6 +24,9 @@ type Ethash struct {
 	config  *chain.Params
 	cache   *lru.Cache
 	fakePow bool
+
+	// tmp is the seal hash tmp variable
+	tmp []byte
 }
 
 // Factory is the factory method to create an Ethash consensus
@@ -94,7 +97,8 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		cache := e.getCache(number)
 
 		nonce := binary.BigEndian.Uint64(header.Nonce[:])
-		digest, result := cache.hashimoto(sealHash(header).Bytes(), nonce)
+		hash := e.sealHash(header)
+		digest, result := cache.hashimoto(hash, nonce)
 
 		if !bytes.Equal(header.MixHash[:], digest) {
 			return fmt.Errorf("incorrect digest")
