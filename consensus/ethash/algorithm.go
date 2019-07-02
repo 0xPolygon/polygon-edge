@@ -4,10 +4,9 @@ import (
 	"encoding/binary"
 	"math/big"
 
+	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
-
-	"github.com/umbracle/minimal/rlp"
 )
 
 // REVISION is the spec revision number of Ethash
@@ -152,24 +151,28 @@ func hashimoto(header []byte, nonce uint64, fullSize int, sha512, sha256 hashFn,
 	return digest, result
 }
 
-func sealHash(header *types.Header) (hash types.Hash) {
-	hasher := sha3.NewLegacyKeccak256()
+var sealArenaPool rlpv2.ArenaPool
 
-	rlp.Encode(hasher, []interface{}{
-		header.ParentHash,
-		header.Sha3Uncles,
-		header.Miner,
-		header.StateRoot,
-		header.TxRoot,
-		header.ReceiptsRoot,
-		header.LogsBloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Timestamp,
-		header.ExtraData,
-	})
-	hasher.Sum(hash[:0])
-	return hash
+func (e *Ethash) sealHash(h *types.Header) []byte {
+	arena := sealArenaPool.Get()
+	defer sealArenaPool.Put(arena)
+
+	vv := arena.NewArray()
+
+	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewBytes(h.Miner.Bytes()))
+	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.LogsBloom[:]))
+	vv.Set(arena.NewBigInt(h.Difficulty))
+	vv.Set(arena.NewUint(h.Number))
+	vv.Set(arena.NewUint(h.GasLimit))
+	vv.Set(arena.NewUint(h.GasUsed))
+	vv.Set(arena.NewUint(h.Timestamp))
+	vv.Set(arena.NewCopyBytes(h.ExtraData))
+
+	e.tmp = arena.HashTo(e.tmp[:0], vv)
+	return e.tmp
 }

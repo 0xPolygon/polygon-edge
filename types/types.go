@@ -10,7 +10,7 @@ import (
 	goHex "encoding/hex"
 
 	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/rlp"
+	"github.com/umbracle/minimal/rlpv2"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -142,11 +142,47 @@ type Header struct {
 	hash atomic.Value
 }
 
+var headerArenaPool rlpv2.ArenaPool
+
+func (h *Header) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
+	vv := arena.NewArray()
+
+	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewBytes(h.Miner.Bytes()))
+	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.LogsBloom[:]))
+
+	vv.Set(arena.NewBigInt(h.Difficulty))
+
+	vv.Set(arena.NewUint(h.Number))
+	vv.Set(arena.NewUint(h.GasLimit))
+	vv.Set(arena.NewUint(h.GasUsed))
+	vv.Set(arena.NewUint(h.Timestamp))
+
+	vv.Set(arena.NewCopyBytes(h.ExtraData))
+	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Nonce[:]))
+
+	return vv
+}
+
+func (h *Header) computeHash() Hash {
+	arena := headerArenaPool.Get()
+	defer headerArenaPool.Put(arena)
+	v := h.MarshalWith(arena)
+
+	return BytesToHash(arena.HashTo(nil, v))
+}
+
 func (h *Header) Hash() Hash {
 	if hash := h.hash.Load(); hash != nil {
 		return hash.(Hash)
 	}
-	v := rlpHash(h)
+
+	v := h.computeHash()
 	h.hash.Store(v)
 	return v
 }
@@ -162,16 +198,6 @@ func (h *Header) Copy() *Header {
 	hh.ExtraData = make([]byte, len(h.ExtraData))
 	copy(hh.ExtraData[:], h.ExtraData[:])
 	return hh
-}
-
-func rlpHash(x interface{}) (h Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	err := rlp.Encode(hw, x)
-	if err != nil {
-		panic(err)
-	}
-	hw.Sum(h[:0])
-	return h
 }
 
 type Body struct {
@@ -223,6 +249,44 @@ type Receipt struct {
 	ContractAddress   Address       `json:"contractAddress" rlp:"-"`
 	GasUsed           uint64        `json:"gasUsed" rlp:"-"`
 }
+
+var receiptArenaPool rlpv2.ArenaPool
+
+func (r *Receipt) Marshal() []byte {
+	a := receiptArenaPool.Get()
+	defer receiptArenaPool.Put(a)
+
+	vv := a.NewArray()
+	vv.Set(a.NewBytes(r.Root))
+	vv.Set(a.NewUint(r.CumulativeGasUsed))
+	vv.Set(a.NewBytes(r.LogsBloom[:]))
+
+	if len(r.Logs) == 0 {
+		// There are no receipts, write the RLP null array entry
+		vv.Set(a.NewNullArray())
+	} else {
+		logs := a.NewArray()
+		for _, l := range r.Logs {
+
+			log := a.NewArray()
+			log.Set(a.NewBytes(l.Address.Bytes()))
+
+			topics := a.NewArray()
+			for _, t := range l.Topics {
+				topics.Set(a.NewBytes(t.Bytes()))
+			}
+			log.Set(topics)
+			log.Set(a.NewBytes(l.Data))
+			logs.Set(log)
+		}
+		vv.Set(logs)
+	}
+
+	dst := vv.MarshalTo(nil)
+	return dst
+}
+
+// TODO, remove the rlp tags
 
 type Log struct {
 	Address     Address `json:"address"`
@@ -300,12 +364,50 @@ func (t *Transaction) From() Address {
 	return t.from
 }
 
-func (tx *Transaction) Hash() Hash {
-	if hash := tx.hash.Load(); hash != nil {
+var txArenaPool rlpv2.ArenaPool
+
+func (t *Transaction) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
+	vv := arena.NewArray()
+
+	vv.Set(arena.NewUint(t.Nonce))
+	vv.Set(arena.NewBigInt(t.GasPrice))
+	vv.Set(arena.NewUint(t.Gas))
+
+	// Address may be empty
+	if t.To != nil {
+		vv.Set(arena.NewBytes((*t.To).Bytes()))
+	} else {
+		vv.Set(arena.NewNull())
+	}
+
+	vv.Set(arena.NewBigInt(t.Value))
+	vv.Set(arena.NewCopyBytes(t.Input))
+
+	// signature values
+	vv.Set(arena.NewBigInt(t.V))
+	vv.Set(arena.NewBigInt(t.R))
+	vv.Set(arena.NewBigInt(t.S))
+
+	return vv
+}
+
+func (t *Transaction) computeHash() Hash {
+	arena := txArenaPool.Get()
+	defer txArenaPool.Put(arena)
+
+	v := t.MarshalWith(arena)
+
+	buf := arena.HashTo(nil, v)
+	return BytesToHash(buf)
+}
+
+func (t *Transaction) Hash() Hash {
+	if hash := t.hash.Load(); hash != nil {
 		return hash.(Hash)
 	}
-	v := rlpHash(tx)
-	tx.hash.Store(v)
+
+	v := t.computeHash()
+	t.hash.Store(v)
 	return v
 }
 

@@ -115,6 +115,8 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
+var accountArenaPool rlpv2.ArenaPool
+
 func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
@@ -122,8 +124,8 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	tt := t.Txn()
 	tt.batch = batch
 
-	arena := rlpv2.DefaultArenaPool.Get()
-	defer rlpv2.DefaultArenaPool.Put(arena)
+	arena := accountArenaPool.Get()
+	defer accountArenaPool.Put(arena)
 
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*state.StateObject)
