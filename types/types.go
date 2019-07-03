@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	"hash"
-	"math/big"
 	"strings"
 	"sync/atomic"
 
@@ -123,21 +122,21 @@ var (
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash     `json:"parentHash"`
-	Sha3Uncles   Hash     `json:"sha3Uncles"`
-	Miner        Address  `json:"miner"`
-	StateRoot    Hash     `json:"stateRoot"`
-	TxRoot       Hash     `json:"transactionsRoot"`
-	ReceiptsRoot Hash     `json:"receiptsRoot"`
-	LogsBloom    Bloom    `json:"logsBloom"`
-	Difficulty   *big.Int `json:"difficulty"`
-	Number       uint64   `json:"number"`
-	GasLimit     uint64   `json:"gasLimit"`
-	GasUsed      uint64   `json:"gasUsed"`
-	Timestamp    uint64   `json:"timestamp"`
-	ExtraData    []byte   `json:"extraData"`
-	MixHash      Hash     `json:"mixHash"`
-	Nonce        [8]byte  `json:"nonce"`
+	ParentHash   Hash    `json:"parentHash"`
+	Sha3Uncles   Hash    `json:"sha3Uncles"`
+	Miner        Address `json:"miner"`
+	StateRoot    Hash    `json:"stateRoot"`
+	TxRoot       Hash    `json:"transactionsRoot"`
+	ReceiptsRoot Hash    `json:"receiptsRoot"`
+	LogsBloom    Bloom   `json:"logsBloom"`
+	Difficulty   uint64  `json:"difficulty"`
+	Number       uint64  `json:"number"`
+	GasLimit     uint64  `json:"gasLimit"`
+	GasUsed      uint64  `json:"gasUsed"`
+	Timestamp    uint64  `json:"timestamp"`
+	ExtraData    []byte  `json:"extraData"`
+	MixHash      Hash    `json:"mixHash"`
+	Nonce        [8]byte `json:"nonce"`
 
 	hash atomic.Value
 }
@@ -155,8 +154,7 @@ func (h *Header) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.LogsBloom[:]))
 
-	vv.Set(arena.NewBigInt(h.Difficulty))
-
+	vv.Set(arena.NewUint(h.Difficulty))
 	vv.Set(arena.NewUint(h.Number))
 	vv.Set(arena.NewUint(h.GasLimit))
 	vv.Set(arena.NewUint(h.GasUsed))
@@ -164,7 +162,7 @@ func (h *Header) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
-	vv.Set(arena.NewBytes(h.Nonce[:]))
+	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
 
 	return vv
 }
@@ -190,10 +188,6 @@ func (h *Header) Hash() Hash {
 func (h *Header) Copy() *Header {
 	hh := new(Header)
 	*hh = *h
-
-	if h.Difficulty != nil {
-		hh.Difficulty = new(big.Int).Set(h.Difficulty)
-	}
 
 	hh.ExtraData = make([]byte, len(h.ExtraData))
 	copy(hh.ExtraData[:], h.ExtraData[:])
@@ -342,15 +336,15 @@ func (b *Bloom) setEncode(hasher hash.Hash, h []byte) {
 
 type Transaction struct {
 	Nonce    uint64   `json:"nonce"`
-	GasPrice *big.Int `json:"gasPrice"`
+	GasPrice []byte   `json:"gasPrice"`
 	Gas      uint64   `json:"gas"`
 	To       *Address `json:"to" rlp:"nil"`
-	Value    *big.Int `json:"value"`
+	Value    []byte   `json:"value"`
 	Input    []byte   `json:"input"`
 
-	V *big.Int `json:"v"`
-	R *big.Int `json:"r"`
-	S *big.Int `json:"s"`
+	V byte   `json:"v"`
+	R []byte `json:"r"`
+	S []byte `json:"s"`
 
 	hash atomic.Value
 	from Address
@@ -370,7 +364,7 @@ func (t *Transaction) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 	vv := arena.NewArray()
 
 	vv.Set(arena.NewUint(t.Nonce))
-	vv.Set(arena.NewBigInt(t.GasPrice))
+	vv.Set(arena.NewCopyBytes(t.GasPrice))
 	vv.Set(arena.NewUint(t.Gas))
 
 	// Address may be empty
@@ -380,13 +374,13 @@ func (t *Transaction) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 		vv.Set(arena.NewNull())
 	}
 
-	vv.Set(arena.NewBigInt(t.Value))
+	vv.Set(arena.NewCopyBytes(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
 
 	// signature values
-	vv.Set(arena.NewBigInt(t.V))
-	vv.Set(arena.NewBigInt(t.R))
-	vv.Set(arena.NewBigInt(t.S))
+	vv.Set(arena.NewUint(uint64(t.V)))
+	vv.Set(arena.NewBytes(t.R))
+	vv.Set(arena.NewBytes(t.S))
 
 	return vv
 }
@@ -415,11 +409,16 @@ func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
 	*tt = *t
 
-	tt.GasPrice = new(big.Int).Set(t.GasPrice)
-	tt.Value = new(big.Int).Set(t.Value)
-	tt.V = new(big.Int).Set(t.V)
-	tt.R = new(big.Int).Set(t.R)
-	tt.S = new(big.Int).Set(t.S)
+	tt.GasPrice = make([]byte, len(t.GasPrice))
+	copy(tt.GasPrice[:], t.GasPrice[:])
+
+	tt.Value = make([]byte, len(t.Value))
+	copy(tt.Value[:], t.Value[:])
+
+	tt.R = make([]byte, len(t.R))
+	copy(tt.R[:], t.R[:])
+	tt.S = make([]byte, len(t.S))
+	copy(tt.S[:], t.S[:])
 
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])

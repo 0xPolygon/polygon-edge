@@ -102,6 +102,9 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 
 	s := txn.Snapshot()
 
+	gasPrice := new(big.Int).SetBytes(msg.GasPrice)
+	value := new(big.Int).SetBytes(msg.Value)
+
 	// check nonce is correct (pre-check)
 	nonce := txn.GetNonce(msg.From())
 	if nonce < msg.Nonce {
@@ -111,7 +114,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 	}
 
 	// buy gas
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GasPrice)
+	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), gasPrice)
 	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
 		return 0, false, ErrInsufficientBalanceForGas
 	}
@@ -179,10 +182,10 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 		e.runtime = evm.NewEVM(e, txn, env, config, gasTable, getHash)
 
 		if contractCreation {
-			_, txn.gas, vmerr = e.Create2(sender, msg.Input, msg.Value, txn.gas)
+			_, txn.gas, vmerr = e.Create2(sender, msg.Input, value, txn.gas)
 		} else {
 			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
-			_, txn.gas, vmerr = e.Call2(sender, *msg.To, msg.Input, msg.Value, txn.gas)
+			_, txn.gas, vmerr = e.Call2(sender, *msg.To, msg.Input, value, txn.gas)
 		}
 		if vmerr != nil {
 			if vmerr == runtime.ErrNotEnoughFunds {
@@ -203,12 +206,12 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 	txn.gas += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), msg.GasPrice)
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), gasPrice)
 
 	txn.AddBalance(msg.From(), remaining)
 
 	// pay the coinbase
-	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), msg.GasPrice))
+	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), gasPrice))
 
 	// Return remaining gas to the pool for the block
 	gasPool.AddGas(txn.gas)

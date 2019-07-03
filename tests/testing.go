@@ -261,9 +261,9 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	msg := &types.Transaction{
 		To:       t.To,
 		Nonce:    t.Nonce,
-		Value:    t.Value[i.Value],
+		Value:    t.Value[i.Value].Bytes(),
 		Gas:      t.GasLimit[i.Gas],
-		GasPrice: t.GasPrice,
+		GasPrice: t.GasPrice.Bytes(),
 		Input:    hex.MustDecodeHex(t.Data[i.Data]),
 	}
 
@@ -482,7 +482,7 @@ func (h *header) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	h.header.Difficulty, err = types.ParseUint256orHex(dec.Difficulty)
+	h.header.Difficulty, err = types.ParseUint64orHex(dec.Difficulty)
 	if err != nil {
 		return err
 	}

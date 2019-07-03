@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"fmt"
-	"math/big"
 	"reflect"
 	"testing"
 
@@ -21,7 +20,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// add genesis block
-	genesis := &types.Header{Difficulty: big.NewInt(1), Number: 0}
+	genesis := &types.Header{Difficulty: 1, Number: 0}
 	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
 	header, _ := b.Header()
@@ -78,7 +77,7 @@ func (c *dummyChain) add(h *header) error {
 	c.headers[h.hash] = &types.Header{
 		ParentHash: parent,
 		Number:     h.number,
-		Difficulty: big.NewInt(int64(h.diff)),
+		Difficulty: h.diff,
 		ExtraData:  []byte{h.hash},
 	}
 	return nil

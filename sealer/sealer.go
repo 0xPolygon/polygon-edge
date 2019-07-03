@@ -3,6 +3,7 @@ package sealer
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -149,7 +150,7 @@ func (s *Sealer) commit() {
 		}
 
 		// NOTE, we need to sort with big.Int instead of uint64
-		if err := pricedTxs.Push(from, tx, tx.GasPrice.Uint64()); err != nil {
+		if err := pricedTxs.Push(from, tx, new(big.Int).SetBytes(tx.GasPrice)); err != nil {
 			panic(err)
 		}
 	}

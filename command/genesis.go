@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 
 	"github.com/umbracle/minimal/chain"
@@ -41,7 +40,7 @@ func (g *GenesisCommand) Run(args []string) int {
 		Name: "example",
 		Genesis: &chain.Genesis{
 			GasLimit:   5000,
-			Difficulty: big.NewInt(1),
+			Difficulty: 1,
 		},
 		Params: &chain.Params{
 			ChainID: 100,

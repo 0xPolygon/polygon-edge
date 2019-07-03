@@ -20,8 +20,8 @@ var (
 
 // Pow is a vanilla proof-of-work engine
 type Pow struct {
-	min int
-	max int
+	min uint64
+	max uint64
 }
 
 func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
@@ -33,16 +33,15 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
 	/*
-	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-		return fmt.Errorf("invalid sequence")
-	}
+		if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
+			return fmt.Errorf("invalid sequence")
+		}
 	*/
-	localDiff := int(header.Difficulty.Int64())
-	if localDiff < p.min {
-		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", localDiff, p.min)
+	if header.Difficulty < p.min {
+		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", header.Difficulty, p.min)
 	}
-	if localDiff > p.max {
-		return fmt.Errorf("Difficulty not correct. '%d' >! '%d'", localDiff, p.min)
+	if header.Difficulty > p.max {
+		return fmt.Errorf("Difficulty not correct. '%d' >! '%d'", header.Difficulty, p.min)
 	}
 	return nil
 }
@@ -62,8 +61,7 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 	rand := rand.New(rand.NewSource(seed.Int64()))
 	nonce := uint64(rand.Int63())
 
-	target := new(big.Int).Div(two256, header.Difficulty)
-
+	target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
 	for {
 		// header.Nonce = types.EncodeNonce(uint64(nonce))
 
@@ -87,7 +85,7 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 }
 
 func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = big.NewInt(int64(randomInt(p.min, p.max)))
+	header.Difficulty = randomInt(p.min, p.max)
 	return nil
 }
 
@@ -100,7 +98,7 @@ func (p *Pow) Close() error {
 	return nil
 }
 
-func randomInt(min, max int) int {
+func randomInt(min, max uint64) uint64 {
 	rand.Seed(time.Now().UnixNano())
-	return min + rand.Intn(max-min)
+	return min + uint64(rand.Intn(int(max-min)))
 }

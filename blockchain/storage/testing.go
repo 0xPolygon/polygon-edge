@@ -140,7 +140,7 @@ func testForks(t *testing.T, s Storage) {
 func testHeader(t *testing.T, s Storage) {
 	header := &types.Header{
 		Number:     5,
-		Difficulty: big.NewInt(10),
+		Difficulty: 10,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
 		ExtraData:  []byte{}, // if not set it will fail
@@ -159,7 +159,7 @@ func testHeader(t *testing.T, s Storage) {
 func testBody(t *testing.T, s Storage) {
 	header := &types.Header{
 		Number:     5,
-		Difficulty: big.NewInt(10),
+		Difficulty: 10,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
 		ExtraData:  []byte{}, // if not set it will fail
@@ -169,9 +169,9 @@ func testBody(t *testing.T, s Storage) {
 	t0 := &types.Transaction{
 		Nonce:    0,
 		To:       &addr1,
-		Value:    big.NewInt(1),
+		Value:    big.NewInt(1).Bytes(),
 		Gas:      11,
-		GasPrice: big.NewInt(11),
+		GasPrice: big.NewInt(11).Bytes(),
 		Input:    []byte{1, 2},
 	}
 
@@ -179,9 +179,9 @@ func testBody(t *testing.T, s Storage) {
 	t1 := &types.Transaction{
 		Nonce:    0,
 		To:       &addr2,
-		Value:    big.NewInt(1),
+		Value:    big.NewInt(1).Bytes(),
 		Gas:      22,
-		GasPrice: big.NewInt(11),
+		GasPrice: big.NewInt(11).Bytes(),
 		Input:    []byte{4, 5},
 	}
 
