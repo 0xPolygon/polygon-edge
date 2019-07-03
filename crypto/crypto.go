@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/umbracle/ecies"
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
@@ -27,19 +29,21 @@ func init() {
 var S256 = btcec.S256()
 
 var (
-	secp256k1N, _ = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+	secp256k1N = hex.MustDecodeHex("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
+	one        = []byte{0x01}
 )
 
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
+func ValidateSignatureValues(v byte, r, s []byte, homestead bool) bool {
 	// TODO: ECDSA malleability
 	if v > 1 {
 		return false
 	}
-	if r.Cmp(secp256k1N) >= 0 || r.Cmp(big1) < 0 {
+
+	if bytes.Compare(r, secp256k1N) >= 0 || bytes.Compare(r, one) < 0 {
 		return false
 	}
-	if s.Cmp(secp256k1N) >= 0 || s.Cmp(big1) < 0 {
+	if bytes.Compare(s, secp256k1N) >= 0 || bytes.Compare(s, one) < 0 {
 		return false
 	}
 	return true

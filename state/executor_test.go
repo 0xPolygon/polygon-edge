@@ -25,9 +25,9 @@ func (t *Transaction) ToMessage() *types.Transaction {
 	tt := &types.Transaction{
 		To:       &t.To,
 		Nonce:    t.Nonce,
-		Value:    new(big.Int).SetUint64(t.Amount),
+		Value:    new(big.Int).SetUint64(t.Amount).Bytes(),
 		Gas:      t.GasLimit,
-		GasPrice: new(big.Int).SetUint64(t.GasPrice),
+		GasPrice: new(big.Int).SetUint64(t.GasPrice).Bytes(),
 		Input:    t.Data,
 	}
 	tt.SetFrom(t.From)

@@ -37,7 +37,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	env.GasPrice = msg.GasPrice
+	env.GasPrice = new(big.Int).SetBytes(msg.GasPrice)
 
 	s, snap, _ := buildState(t, c.Pre)
 

@@ -137,7 +137,7 @@ func TestGenesis(t *testing.T) {
 				}
 			}`,
 			output: &Genesis{
-				Difficulty: big.NewInt(18),
+				Difficulty: 18,
 				GasLimit:   17,
 				Alloc: GenesisAlloc{
 					emptyAddr: GenesisAccount{

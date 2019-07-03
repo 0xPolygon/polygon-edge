@@ -70,28 +70,28 @@ BYTES:
 
 func TestDecode(t *testing.T) {
 	for i := 0; i < 10000; i++ {
-		t.Run("", func(t *testing.T) {
-			tt := pickRandomType(0)
-			input := generateRandomType(tt)
+		// t.Run("", func(t *testing.T) {
+		tt := pickRandomType(0)
+		input := generateRandomType(tt)
 
-			data, err := rlp.EncodeToBytes(input)
-			if err != nil {
-				t.Fatal(err)
-			}
+		data, err := rlp.EncodeToBytes(input)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			v2 := reflect.New(tt.Type()).Interface()
-			if err := rlp.Decode(data, &v2); err != nil {
-				t.Fatal(err)
-			}
+		v2 := reflect.New(tt.Type()).Interface()
+		if err := rlp.Decode(data, &v2); err != nil {
+			t.Fatal(err)
+		}
 
-			p := Parser{}
-			v, err := p.Parse(data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := compare(v2, v); err != nil {
-				t.Fatal(err)
-			}
-		})
+		p := Parser{}
+		v, err := p.Parse(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := compare(v2, v); err != nil {
+			t.Fatal(err)
+		}
+		// })
 	}
 }

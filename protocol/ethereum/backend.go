@@ -278,7 +278,7 @@ func (b *Backend) broadcastBlockMsg(block *types.Block) {
 	}
 
 	// total difficulty + the difficulty of the block
-	blockDiff := big.NewInt(1).Add(diff, block.Header.Difficulty)
+	blockDiff := big.NewInt(1).Add(diff, new(big.Int).SetUint64(block.Header.Difficulty))
 
 	// TODO, broadcast to only a subset of the peers
 

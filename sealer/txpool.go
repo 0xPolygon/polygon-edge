@@ -3,6 +3,7 @@ package sealer
 import (
 	"container/heap"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/umbracle/minimal/blockchain"
@@ -146,9 +147,11 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 			return fmt.Errorf("oversize data")
 		}
 	*/
-	if tx.Value.Sign() < 0 {
-		return fmt.Errorf("negative value")
-	}
+	/*
+		if tx.Value.Sign() < 0 {
+			return fmt.Errorf("negative value")
+		}
+	*/
 	return nil
 }
 
@@ -264,7 +267,7 @@ func (t *txHeap) Pop() interface{} {
 type pricedTx struct {
 	tx    *types.Transaction
 	from  types.Address
-	price uint64
+	price *big.Int
 	index int
 }
 
@@ -280,7 +283,7 @@ func newTxPriceHeap() *txPriceHeap {
 	}
 }
 
-func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price uint64) error {
+func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price *big.Int) error {
 	if _, ok := t.index[tx.Hash()]; ok {
 		return fmt.Errorf("tx %s already exists", tx.Hash())
 	}
@@ -317,7 +320,7 @@ func (t txPriceHeapImpl) Less(i, j int) bool {
 	if t[i].from == t[j].from {
 		return t[i].tx.Nonce < t[j].tx.Nonce
 	}
-	return t[i].price > (t[j].price)
+	return t[i].price.Cmp((t[j].price)) < 0
 }
 
 func (t txPriceHeapImpl) Swap(i, j int) {
