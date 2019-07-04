@@ -6,6 +6,7 @@ import (
 	"github.com/umbracle/minimal/command"
 	_ "github.com/umbracle/minimal/command/peers"
 	_ "github.com/umbracle/minimal/command/genesis"
+	_ "github.com/umbracle/minimal/command/agent"
 )
 
 func main() {

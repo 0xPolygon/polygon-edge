@@ -18,6 +18,8 @@ var peersListCmd = &cobra.Command{
 }
 
 func init() {
+	peersListCmd.Flags().BoolP("format", "f", false, "Format...")
+
 	peersCmd.AddCommand(peersListCmd)
 }
 
