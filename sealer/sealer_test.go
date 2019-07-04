@@ -42,7 +42,7 @@ func (h *hookSealer) Seal(ctx context.Context, block *types.Block) (*types.Block
 }
 
 func (h *hookSealer) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = big.NewInt(0)
+	header.Difficulty = 0
 	return nil
 }
 
@@ -79,7 +79,7 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 			Number:     num + 1,
 			GasLimit:   calcGasLimit(parent, 8000000, 8000000),
 			ExtraData:  []byte{},
-			Difficulty: big.NewInt(10),
+			Difficulty: 10,
 		}
 
 		if err := b.WriteHeader(newHeader); err != nil {
@@ -91,7 +91,7 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 
 	genesis := &chain.Genesis{
 		GasLimit:   5000,
-		Difficulty: big.NewInt(17179869184),
+		Difficulty: 17179869184,
 		Alloc: chain.GenesisAlloc{
 			addr1: chain.GenesisAccount{
 				Balance: big.NewInt(10),

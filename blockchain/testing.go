@@ -49,7 +49,7 @@ func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types
 			TxRoot:       types.EmptyRootHash,
 			Sha3Uncles:   types.EmptyUncleHash,
 			ReceiptsRoot: types.EmptyRootHash,
-			Difficulty:   big.NewInt(int64(i)),
+			Difficulty:   uint64(i),
 		}
 	}
 
@@ -114,7 +114,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 		header := &types.Header{
 			ParentHash: blocks[i-1].Hash(),
 			Number:     uint64(i),
-			Difficulty: big.NewInt(int64(i)),
+			Difficulty: uint64(i),
 			ExtraData:  []byte{},
 		}
 
@@ -124,9 +124,9 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 		t0 := &types.Transaction{
 			Nonce:    uint64(i),
 			To:       &addr0,
-			Value:    big.NewInt(0),
+			Value:    big.NewInt(0).Bytes(),
 			Gas:      0,
-			GasPrice: big.NewInt(0),
+			GasPrice: big.NewInt(0).Bytes(),
 			Input:    header.Hash().Bytes(),
 		}
 

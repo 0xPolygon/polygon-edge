@@ -51,10 +51,6 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("incorrect timestamp")
 	}
 
-	if header.Difficulty.Sign() <= 0 {
-		return fmt.Errorf("difficulty cannot be negative")
-	}
-
 	if uint64(len(header.ExtraData)) > chain.MaximumExtraDataSize {
 		return fmt.Errorf("extradata is too long")
 	}
@@ -68,7 +64,7 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 	}
 
 	diff := e.CalcDifficulty(int64(header.Timestamp), parent)
-	if diff.Cmp(header.Difficulty) != 0 {
+	if diff != header.Difficulty {
 		return fmt.Errorf("incorrect difficulty")
 	}
 
@@ -104,7 +100,7 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 			return fmt.Errorf("incorrect digest")
 		}
 
-		target := new(big.Int).Div(two256, header.Difficulty)
+		target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
 		if new(big.Int).SetBytes(result).Cmp(target) > 0 {
 			return fmt.Errorf("incorrect pow")
 		}
@@ -131,7 +127,7 @@ func (e *Ethash) SetFakePow() {
 }
 
 // CalcDifficulty calculates the difficulty at a given time.
-func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) *big.Int {
+func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 	next := parent.Number + 1
 
 	switch {

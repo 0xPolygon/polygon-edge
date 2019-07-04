@@ -70,20 +70,20 @@ func TestEncode(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	for i := 0; i < 10000; i++ {
-		t.Run("", func(t *testing.T) {
-			tt := pickRandomType(0)
-			input := generateRandomType(tt)
+		// t.Run("", func(t *testing.T) {
+		tt := pickRandomType(0)
+		input := generateRandomType(tt)
 
-			out1, err := rlp.EncodeToBytes(input)
-			if err != nil {
-				t.Fatal(err)
-			}
+		out1, err := rlp.EncodeToBytes(input)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			out2 := testEncode(t, input)
-			if !bytes.Equal(out1, out2) {
-				panic("X")
-			}
-		})
+		out2 := testEncode(t, input)
+		if !bytes.Equal(out1, out2) {
+			panic("X")
+		}
+		// })
 	}
 }
 

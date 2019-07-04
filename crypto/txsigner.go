@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"fmt"
-	"math/big"
+	"math/bits"
 
 	"crypto/ecdsa"
 
@@ -45,14 +45,14 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewBigInt(tx.GasPrice))
+	v.Set(a.NewBytes(tx.GasPrice))
 	v.Set(a.NewUint(tx.Gas))
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewBytes((*tx.To).Bytes()))
 	}
-	v.Set(a.NewBigInt(tx.Value))
+	v.Set(a.NewBytes(tx.Value))
 	v.Set(a.NewBytes(tx.Input))
 
 	// EIP155
@@ -71,7 +71,7 @@ func (f *FrontierSigner) Hash(tx *types.Transaction) types.Hash {
 }
 
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	sig, err := encodeSignature(tx.R, tx.S, byte(tx.V.Uint64()-27))
+	sig, err := encodeSignature(tx.R, tx.S, tx.V-27)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -95,9 +95,9 @@ func (f *FrontierSigner) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes([]byte{sig[64] + 27})
+	tx.R = sig[:32]
+	tx.S = sig[32:64]
+	tx.V = byte(sig[64] + 27)
 
 	return tx, nil
 }
@@ -116,9 +116,9 @@ func (e *EIP155Signer) Hash(tx *types.Transaction) types.Hash {
 
 func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	protected := true
-	if tx.V.BitLen() <= 8 {
-		v := tx.V.Uint64()
-		protected = v != 27 && v != 28
+
+	if vv := uint(tx.V); bits.Len(vv) <= 8 {
+		protected = vv != 27 && vv != 28
 	}
 
 	if !protected {
@@ -132,15 +132,14 @@ func (e *EIP155Signer) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*t
 	return nil, fmt.Errorf("not implemented")
 }
 
-func encodeSignature(R, S *big.Int, V byte) ([]byte, error) {
+func encodeSignature(R, S []byte, V byte) ([]byte, error) {
 	if !ValidateSignatureValues(V, R, S, false) {
 		return nil, fmt.Errorf("invalid signature")
 	}
 
-	r, s := R.Bytes(), S.Bytes()
 	sig := make([]byte, 65)
-	copy(sig[32-len(r):32], r)
-	copy(sig[64-len(s):64], s)
+	copy(sig[32-len(R):32], R)
+	copy(sig[64-len(S):64], S)
 	sig[64] = V
 	return sig, nil
 }

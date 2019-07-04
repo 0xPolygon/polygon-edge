@@ -145,7 +145,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 
-	b.db.WriteDiff(header.Hash(), header.Difficulty)
+	b.db.WriteDiff(header.Hash(), new(big.Int).SetUint64(header.Difficulty))
 	return nil
 }
 
@@ -208,7 +208,7 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 			return fmt.Errorf("parent difficulty not found")
 		}
 
-		b.db.WriteDiff(h.Hash(), big.NewInt(1).Add(td, h.Difficulty))
+		b.db.WriteDiff(h.Hash(), big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty)))
 	}
 
 	for _, ch := range b.listeners {
@@ -496,9 +496,9 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 			Coinbase:   header.Miner,
 			Timestamp:  header.Timestamp,
 			Number:     header.Number,
-			Difficulty: header.Difficulty,
+			Difficulty: new(big.Int).SetUint64(header.Difficulty),
 			GasLimit:   big.NewInt(int64(header.GasLimit)),
-			GasPrice:   tx.GasPrice,
+			GasPrice:   new(big.Int).SetBytes(tx.GasPrice),
 		}
 
 		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
@@ -593,9 +593,9 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 			Coinbase:   header.Miner,
 			Timestamp:  header.Timestamp,
 			Number:     header.Number,
-			Difficulty: header.Difficulty,
+			Difficulty: new(big.Int).SetUint64(header.Difficulty),
 			GasLimit:   big.NewInt(int64(header.GasLimit)),
-			GasPrice:   tx.GasPrice,
+			GasPrice:   new(big.Int).SetBytes(tx.GasPrice),
 		}
 
 		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
@@ -755,7 +755,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	}
 
 	// local difficulty of the block
-	localDiff := big.NewInt(1).Add(parent.Difficulty, header.Difficulty)
+	localDiff := parent.Difficulty + header.Difficulty
 
 	// Write the data
 	b.db.WriteHeader(header)
@@ -766,7 +766,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		if err := b.advanceHead(header); err != nil {
 			return err
 		}
-	} else if head.Difficulty.Cmp(localDiff) < 0 {
+	} else if head.Difficulty < localDiff {
 		// new block has higher difficulty than us, reorg the chain
 		if err := b.handleReorg(head, header); err != nil {
 			return err

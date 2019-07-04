@@ -48,7 +48,7 @@ type Genesis struct {
 	Timestamp  uint64        `json:"timestamp"`
 	ExtraData  []byte        `json:"extraData,omitempty"`
 	GasLimit   uint64        `json:"gasLimit"`
-	Difficulty *big.Int      `json:"difficulty"`
+	Difficulty uint64        `json:"difficulty"`
 	Mixhash    types.Hash    `json:"mixHash"`
 	Coinbase   types.Address `json:"coinbase"`
 	Alloc      GenesisAlloc  `json:"alloc,omitempty"`
@@ -78,8 +78,8 @@ func (g *Genesis) ToBlock() *types.Header {
 	if g.GasLimit == 0 {
 		head.GasLimit = GenesisGasLimit
 	}
-	if g.Difficulty == nil {
-		head.Difficulty = GenesisDifficulty
+	if g.Difficulty == 0 {
+		head.Difficulty = GenesisDifficulty.Uint64()
 	}
 	return head
 }
@@ -130,10 +130,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	enc.ExtraData = encodeBytes(g.ExtraData)
 
 	enc.GasLimit = encodeUint64(g.GasLimit)
-	if g.Difficulty != nil {
-		res := hex.EncodeToHex(g.Difficulty.Bytes())
-		enc.Difficulty = &res
-	}
+	enc.Difficulty = encodeUint64(g.Difficulty)
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
@@ -204,7 +201,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if subErr != nil {
 		parseError("gaslimit", subErr)
 	}
-	g.Difficulty, subErr = types.ParseUint256orHex(dec.Difficulty)
+	g.Difficulty, subErr = types.ParseUint64orHex(dec.Difficulty)
 	if subErr != nil {
 		parseError("difficulty", subErr)
 	}

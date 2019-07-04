@@ -107,17 +107,19 @@ func TestCreate2(t *testing.T) {
 }
 
 func TestValidateSignatureValues(t *testing.T) {
-	one := big.NewInt(1)
-	zero := big.NewInt(0)
+	one := big.NewInt(1).Bytes()
+	zero := big.NewInt(0).Bytes()
 
-	limit := secp256k1N
-	limitMinus1 := new(big.Int).Sub(secp256k1N, big1)
+	secp256k1N, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+
+	limit := secp256k1N.Bytes()
+	limitMinus1 := new(big.Int).Sub(secp256k1N, big1).Bytes()
 
 	cases := []struct {
 		homestead bool
 		v         byte
-		r         *big.Int
-		s         *big.Int
+		r         []byte
+		s         []byte
 		res       bool
 	}{
 		// correct v, r, s

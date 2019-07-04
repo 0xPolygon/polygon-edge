@@ -67,9 +67,9 @@ func buildTxn(nonce uint64, key *ecdsa.PrivateKey) *types.Transaction {
 	txn := &types.Transaction{
 		Nonce:    nonce,
 		To:       &addr,
-		Value:    big.NewInt(1),
+		Value:    []byte{0x1},
 		Gas:      10,
-		GasPrice: big.NewInt(1),
+		GasPrice: []byte{0x1},
 		Input:    []byte{},
 	}
 
@@ -141,7 +141,7 @@ func (c *dummyChain) add(h *header) error {
 	header := &types.Header{
 		ParentHash: parent,
 		Number:     h.number,
-		Difficulty: big.NewInt(int64(h.diff)),
+		Difficulty: h.diff,
 		TxRoot:     derivesha.CalcTxsRoot(h.txs),
 		ExtraData:  []byte{h.hash},
 	}
@@ -354,13 +354,13 @@ func TestPricedTxs(t *testing.T) {
 
 	pool := newTxPriceHeap()
 
-	if err := pool.Push(addr1, buildTxn(1, key1), 100); err != nil {
+	if err := pool.Push(addr1, buildTxn(1, key1), big.NewInt(100)); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.Push(addr1, buildTxn(2, key1), 1000); err != nil {
+	if err := pool.Push(addr1, buildTxn(2, key1), big.NewInt(1000)); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.Push(addr2, buildTxn(3, key2), 1001); err != nil {
+	if err := pool.Push(addr2, buildTxn(3, key2), big.NewInt(1001)); err != nil {
 		t.Fatal(err)
 	}
 

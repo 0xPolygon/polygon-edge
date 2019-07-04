@@ -166,7 +166,7 @@ func (e *Ethash) sealHash(h *types.Header) []byte {
 	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.LogsBloom[:]))
-	vv.Set(arena.NewBigInt(h.Difficulty))
+	vv.Set(arena.NewUint(h.Difficulty))
 	vv.Set(arena.NewUint(h.Number))
 	vv.Set(arena.NewUint(h.GasLimit))
 	vv.Set(arena.NewUint(h.GasUsed))

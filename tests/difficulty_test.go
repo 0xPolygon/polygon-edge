@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"math/big"
 	"path/filepath"
 	"testing"
 
@@ -20,11 +19,11 @@ const difficultyTests = "BasicTests"
 
 type difficultyCase struct {
 	ParentTimestamp    int64
-	ParentDifficulty   *big.Int
+	ParentDifficulty   uint64
 	UncleHash          types.Hash
 	CurrentTimestamp   int64
 	CurrentBlockNumber uint64
-	CurrentDifficulty  *big.Int
+	CurrentDifficulty  uint64
 }
 
 func (d *difficultyCase) UnmarshalJSON(input []byte) error {
@@ -48,7 +47,7 @@ func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
-	d.ParentDifficulty, err = types.ParseUint256orHex(dec.ParentDifficulty)
+	d.ParentDifficulty, err = types.ParseUint64orHex(dec.ParentDifficulty)
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func (d *difficultyCase) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
-	d.CurrentDifficulty, err = types.ParseUint256orHex(dec.CurrentDifficulty)
+	d.CurrentDifficulty, err = types.ParseUint64orHex(dec.CurrentDifficulty)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func TestDifficultyConstantinople(t *testing.T) {
 	})
 }
 
-var minimumDifficulty = big.NewInt(131072)
+var minimumDifficulty = uint64(131072)
 
 func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 	data, err := ioutil.ReadFile(filepath.Join(TESTS, difficultyTests, file))
@@ -133,23 +132,20 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 	engineEthash := engine.(*ethash.Ethash)
 
 	for name, i := range cases {
-		t.Run(name, func(t *testing.T) {
-			if i.ParentDifficulty.Cmp(minimumDifficulty) < 0 {
-				t.Skip("difficulty below minimum")
-				return
-			}
+		if i.ParentDifficulty < minimumDifficulty {
+			continue
+		}
 
-			parent := &types.Header{
-				Difficulty: i.ParentDifficulty,
-				Timestamp:  uint64(i.ParentTimestamp),
-				Number:     i.CurrentBlockNumber - 1,
-				Sha3Uncles: i.UncleHash,
-			}
+		parent := &types.Header{
+			Difficulty: i.ParentDifficulty,
+			Timestamp:  uint64(i.ParentTimestamp),
+			Number:     i.CurrentBlockNumber - 1,
+			Sha3Uncles: i.UncleHash,
+		}
 
-			difficulty := engineEthash.CalcDifficulty(i.CurrentTimestamp, parent)
-			if difficulty.Cmp(i.CurrentDifficulty) != 0 {
-				t.Fatal()
-			}
-		})
+		difficulty := engineEthash.CalcDifficulty(i.CurrentTimestamp, parent)
+		if difficulty != i.CurrentDifficulty {
+			t.Fatal(name)
+		}
 	}
 }
