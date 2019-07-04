@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -45,7 +44,7 @@ func genesisRunE(cmd *cobra.Command, args []string) (err error) {
 		Name: "example",
 		Genesis: &chain.Genesis{
 			GasLimit:   5000,
-			Difficulty: big.NewInt(1),
+			Difficulty: 1,
 		},
 		Params: &chain.Params{
 			ChainID: 100,
