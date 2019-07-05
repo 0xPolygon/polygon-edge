@@ -27,8 +27,5 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 }
 
 func TestStorage(t *testing.T) {
-	s, close := newStorage(t)
-	defer close()
-
-	storage.TestStorage(t, s)
+	storage.TestStorage(t, newStorage)
 }

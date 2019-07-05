@@ -100,7 +100,7 @@ func (s *KeyValueStorage) ReadHeadHash() (types.Hash, bool) {
 
 // ReadHeadNumber returns the number of the head
 func (s *KeyValueStorage) ReadHeadNumber() (uint64, bool) {
-	data, ok := s.get(HEAD, HASH)
+	data, ok := s.get(HEAD, NUMBER)
 	if !ok {
 		return 0, false
 	}
@@ -186,10 +186,10 @@ func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Recei
 }
 
 // ReadReceipts reads the receipts
-func (s *KeyValueStorage) ReadReceipts(hash types.Hash) []*types.Receipt {
+func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool) {
 	var receipts []*types.Receipt
-	s.read(RECEIPTS, hash.Bytes(), &receipts)
-	return receipts
+	ok := s.read(RECEIPTS, hash.Bytes(), &receipts)
+	return receipts, ok
 }
 
 // -- write ops --

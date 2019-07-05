@@ -20,6 +20,7 @@ import (
 	"github.com/umbracle/minimal/types"
 
 	mapset "github.com/deckarep/golang-set"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // TODO, fix testing with genesis
@@ -47,11 +48,13 @@ type Blockchain struct {
 
 	// listener for advancedhead subscribers
 	listeners []chan *types.Header
+
+	headersCache *lru.Cache
 }
 
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
-	return &Blockchain{
+	b := &Blockchain{
 		db:          db,
 		consensus:   consensus,
 		genesis:     nil,
@@ -60,6 +63,8 @@ func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Conse
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
 	}
+	b.headersCache, _ = lru.New(100)
+	return b
 }
 
 func (b *Blockchain) Subscribe() chan *types.Header {
@@ -74,7 +79,7 @@ func (b *Blockchain) SetPrecompiled(precompiled map[types.Address]*precompiled.P
 
 // GetParent return the parent
 func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
-	return b.db.ReadHeader(header.ParentHash)
+	return b.readHeader(header.ParentHash)
 }
 
 // Genesis returns the genesis block
@@ -105,7 +110,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		if !ok {
 			return fmt.Errorf("genesis hash not found")
 		}
-		b.genesis, ok = b.db.ReadHeader(genesisHash)
+		b.genesis, ok = b.readHeader(genesisHash)
 		if !ok {
 			return fmt.Errorf("genesis header '%s' not found", genesisHash.String())
 		}
@@ -145,7 +150,9 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 
-	b.db.WriteDiff(header.Hash(), new(big.Int).SetUint64(header.Difficulty))
+	if err := b.db.WriteDiff(header.Hash(), new(big.Int).SetUint64(header.Difficulty)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -174,7 +181,9 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	}
 
 	b.genesis = header.Copy()
-	b.db.WriteDiff(header.Hash(), big.NewInt(1))
+	if err := b.db.WriteDiff(header.Hash(), big.NewInt(1)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -197,9 +206,15 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 }
 
 func (b *Blockchain) advanceHead(h *types.Header) error {
-	b.db.WriteHeadHash(h.Hash())
-	b.db.WriteHeadNumber(h.Number)
-	b.db.WriteCanonicalHash(h.Number, h.Hash())
+	if err := b.db.WriteHeadHash(h.Hash()); err != nil {
+		return err
+	}
+	if err := b.db.WriteHeadNumber(h.Number); err != nil {
+		return err
+	}
+	if err := b.db.WriteCanonicalHash(h.Number, h.Hash()); err != nil {
+		return err
+	}
 
 	if h.ParentHash != types.StringToHash("") {
 		// Dont write difficulty for genesis
@@ -208,7 +223,9 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 			return fmt.Errorf("parent difficulty not found")
 		}
 
-		b.db.WriteDiff(h.Hash(), big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty)))
+		if err := b.db.WriteDiff(h.Hash(), big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))); err != nil {
+			return err
+		}
 	}
 
 	for _, ch := range b.listeners {
@@ -230,7 +247,7 @@ func (b *Blockchain) Header() (*types.Header, bool) {
 	if !ok {
 		return nil, false
 	}
-	header, ok := b.db.ReadHeader(hash)
+	header, ok := b.readHeader(hash)
 	if !ok {
 		return nil, false
 	}
@@ -244,7 +261,9 @@ func (b *Blockchain) CommitBodies(headers []types.Hash, bodies []*types.Body) er
 	}
 
 	for indx, hash := range headers {
-		b.db.WriteBody(hash, bodies[indx])
+		if err := b.db.WriteBody(hash, bodies[indx]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -255,7 +274,9 @@ func (b *Blockchain) CommitReceipts(headers []types.Hash, receipts [][]*types.Re
 		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(receipts))
 	}
 	for indx, hash := range headers {
-		b.db.WriteReceipts(hash, receipts[indx])
+		if err := b.db.WriteReceipts(hash, receipts[indx]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -285,8 +306,12 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 			Transactions: block.Transactions,
 			Uncles:       block.Uncles,
 		}
-		b.db.WriteBody(hash, body)
-		b.db.WriteReceipts(hash, r)
+		if err := b.db.WriteBody(hash, body); err != nil {
+			return err
+		}
+		if err := b.db.WriteReceipts(hash, r); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -294,7 +319,7 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 
 // GetReceiptsByHash returns the receipts by their hash
 func (b *Blockchain) GetReceiptsByHash(hash types.Hash) []*types.Receipt {
-	r := b.db.ReadReceipts(hash)
+	r, _ := b.db.ReadReceipts(hash)
 	return r
 }
 
@@ -305,7 +330,20 @@ func (b *Blockchain) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 
 // GetHeaderByHash returns the header by his hash
 func (b *Blockchain) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
-	return b.db.ReadHeader(hash)
+	return b.readHeader(hash)
+}
+
+func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
+	h, ok := b.headersCache.Get(hash)
+	if ok {
+		return h.(*types.Header), true
+	}
+	hh, ok := b.db.ReadHeader(hash)
+	if !ok {
+		return nil, false
+	}
+	b.headersCache.Add(hash, hh)
+	return hh, true
 }
 
 // GetHeaderByNumber returns the header by his number
@@ -314,7 +352,7 @@ func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	if !ok {
 		return nil, false
 	}
-	h, ok := b.db.ReadHeader(hash)
+	h, ok := b.readHeader(hash)
 	if !ok {
 		return nil, false
 	}
@@ -356,7 +394,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		headers = append(headers, block.Header)
 	}
 
-	parent, ok := b.db.ReadHeader(headers[0].ParentHash)
+	parent, ok := b.readHeader(headers[0].ParentHash)
 	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found", headers[0].Hash().String(), headers[0].Number)
 	}
@@ -390,7 +428,9 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	for indx, block := range blocks {
 		header := block.Header
 
-		b.db.WriteBody(block.Header.Hash(), block.Body())
+		if err := b.db.WriteBody(block.Header.Hash(), block.Body()); err != nil {
+			return err
+		}
 
 		// verify uncles. It requires to have the bodies in memory. TODO: Part of the consensus? Only required on POW.
 		if err := b.VerifyUncles(block); err != nil {
@@ -398,14 +438,14 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 
 		// Try to write first the state transition
-		parent, ok := b.db.ReadHeader(header.ParentHash)
+		parent, ok := b.readHeader(header.ParentHash)
 		if !ok {
 			return fmt.Errorf("unknown ancestor 1")
 		}
 
 		st, ok := b.getStateRoot(parent.StateRoot)
 		if !ok {
-			return fmt.Errorf("unknown state root")
+			return fmt.Errorf("unknown state root: %s", parent.StateRoot.String())
 		}
 
 		if parent.StateRoot != (types.Hash{}) {
@@ -732,8 +772,12 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 }
 
 func (b *Blockchain) addHeader(header *types.Header) error {
-	b.db.WriteHeader(header)
-	b.db.WriteCanonicalHash(header.Number, header.Hash())
+	if err := b.db.WriteHeader(header); err != nil {
+		return err
+	}
+	if err := b.db.WriteCanonicalHash(header.Number, header.Hash()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -749,7 +793,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		return fmt.Errorf("header not found")
 	}
 
-	parent, ok := b.db.ReadHeader(header.ParentHash)
+	parent, ok := b.readHeader(header.ParentHash)
 	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found", header.Hash().String(), header.Number)
 	}
@@ -758,10 +802,12 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	localDiff := parent.Difficulty + header.Difficulty
 
 	// Write the data
-	b.db.WriteHeader(header)
+
+	if err := b.db.WriteHeader(header); err != nil {
+		return err
+	}
 
 	if header.ParentHash == head.Hash() {
-
 		// advance the chain
 		if err := b.advanceHead(header); err != nil {
 			return err
@@ -801,7 +847,9 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 		}
 	}
 	newForks = append(newForks, header.Hash())
-	b.db.WriteForks(newForks)
+	if err := b.db.WriteForks(newForks); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -815,7 +863,7 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 	var ok bool
 
 	for oldHeader.Number > newHeader.Number {
-		oldHeader, ok = b.db.ReadHeader(oldHeader.ParentHash)
+		oldHeader, ok = b.readHeader(oldHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
 		}
@@ -823,7 +871,7 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 	}
 
 	for newHeader.Number > oldHeader.Number {
-		newHeader, ok = b.db.ReadHeader(newHeader.ParentHash)
+		newHeader, ok = b.readHeader(newHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
 		}
@@ -831,11 +879,11 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 	}
 
 	for oldHeader.Hash() != newHeader.Hash() {
-		oldHeader, ok = b.db.ReadHeader(oldHeader.ParentHash)
+		oldHeader, ok = b.readHeader(oldHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", oldHeader.ParentHash.String())
 		}
-		newHeader, ok = b.db.ReadHeader(newHeader.ParentHash)
+		newHeader, ok = b.readHeader(newHeader.ParentHash)
 		if !ok {
 			return fmt.Errorf("header '%s' not found", newHeader.ParentHash.String())
 		}
@@ -849,7 +897,9 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 
 	// Update canonical chain numbers
 	for _, h := range newChain {
-		b.db.WriteCanonicalHash(h.Number, h.Hash())
+		if err := b.db.WriteCanonicalHash(h.Number, h.Hash()); err != nil {
+			return err
+		}
 	}
 
 	// oldChain headers can become now uncles
@@ -872,7 +922,7 @@ func (b *Blockchain) GetForks() []types.Hash {
 
 // GetBlockByHash returns the block by their hash
 func (b *Blockchain) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
-	header, ok := b.db.ReadHeader(hash)
+	header, ok := b.readHeader(hash)
 	if !ok {
 		return nil, false
 	}
