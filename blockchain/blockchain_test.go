@@ -317,7 +317,7 @@ func TestCommitChain(t *testing.T) {
 		assert.Equal(t, i.Transactions[0].Nonce, block.Number())
 
 		// check receipts
-		r := b.db.ReadReceipts(block.Hash())
+		r, _ := b.db.ReadReceipts(block.Hash())
 		assert.Len(t, r, 1)
 	}
 }

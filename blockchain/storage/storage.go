@@ -30,7 +30,7 @@ type Storage interface {
 	ReadBody(hash types.Hash) (*types.Body, bool)
 
 	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
-	ReadReceipts(hash types.Hash) []*types.Receipt
+	ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 
 	Close() error
 }

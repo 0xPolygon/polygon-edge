@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"hash"
 	"strings"
@@ -47,6 +48,16 @@ func (h Hash) String() string {
 	return hex.EncodeToHex(h[:])
 }
 
+func (h Hash) Value() (driver.Value, error) {
+	return h.String(), nil
+}
+
+func (h *Hash) Scan(src interface{}) error {
+	hh := hex.MustDecodeHex(string(src.([]byte)))
+	copy(h[:], hh[:])
+	return nil
+}
+
 func (a Address) EIP55() string {
 	// TODO
 	return hex.EncodeToHex(a[:])
@@ -58,6 +69,42 @@ func (a Address) String() string {
 
 func (a Address) Bytes() []byte {
 	return a[:]
+}
+
+func (a Address) Value() (driver.Value, error) {
+	return a.String(), nil
+}
+
+func (a *Address) Scan(src interface{}) error {
+	aa := hex.MustDecodeHex(string(src.([]byte)))
+	copy(a[:], aa[:])
+	return nil
+}
+
+type HexBytes []byte
+
+func (h HexBytes) String() string {
+	return hex.EncodeToHex(h)
+}
+
+func (h HexBytes) Bytes() []byte {
+	return h[:]
+}
+
+func (h HexBytes) Value() (driver.Value, error) {
+	return h.String(), nil
+}
+
+func (h *HexBytes) Scan(src interface{}) error {
+	str, ok := src.(string)
+	if !ok {
+		str = string(src.([]byte))
+	}
+	hh := hex.MustDecodeHex(str)
+	aux := make([]byte, len(hh))
+	copy(aux[:], hh[:])
+	*h = aux
+	return nil
 }
 
 func StringToHash(str string) Hash {
@@ -122,23 +169,39 @@ var (
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash    `json:"parentHash"`
-	Sha3Uncles   Hash    `json:"sha3Uncles"`
-	Miner        Address `json:"miner"`
-	StateRoot    Hash    `json:"stateRoot"`
-	TxRoot       Hash    `json:"transactionsRoot"`
-	ReceiptsRoot Hash    `json:"receiptsRoot"`
-	LogsBloom    Bloom   `json:"logsBloom"`
-	Difficulty   uint64  `json:"difficulty"`
-	Number       uint64  `json:"number"`
-	GasLimit     uint64  `json:"gasLimit"`
-	GasUsed      uint64  `json:"gasUsed"`
-	Timestamp    uint64  `json:"timestamp"`
-	ExtraData    []byte  `json:"extraData"`
-	MixHash      Hash    `json:"mixHash"`
-	Nonce        [8]byte `json:"nonce"`
+	ParentHash   Hash     `json:"parentHash" db:"parent_hash"`
+	Sha3Uncles   Hash     `json:"sha3Uncles" db:"sha3_uncles"`
+	Miner        Address  `json:"miner" db:"miner"`
+	StateRoot    Hash     `json:"stateRoot" db:"state_root"`
+	TxRoot       Hash     `json:"transactionsRoot" db:"transactions_root"`
+	ReceiptsRoot Hash     `json:"receiptsRoot" db:"receipts_root"`
+	LogsBloom    Bloom    `json:"logsBloom" db:"logs_bloom"`
+	Difficulty   uint64   `json:"difficulty" db:"difficulty"`
+	Number       uint64   `json:"number" db:"number"`
+	GasLimit     uint64   `json:"gasLimit" db:"gas_limit"`
+	GasUsed      uint64   `json:"gasUsed" db:"gas_used"`
+	Timestamp    uint64   `json:"timestamp" db:"timestamp"`
+	ExtraData    HexBytes `json:"extraData" db:"extradata"`
+	MixHash      Hash     `json:"mixHash" db:"mixhash"`
+	Nonce        Nonce    `json:"nonce" db:"nonce"`
 
 	hash atomic.Value
+}
+
+type Nonce [8]byte
+
+func (n Nonce) String() string {
+	return hex.EncodeToHex(n[:])
+}
+
+func (n Nonce) Value() (driver.Value, error) {
+	return n.String(), nil
+}
+
+func (n *Nonce) Scan(src interface{}) error {
+	nn := hex.MustDecodeHex(string(src.([]byte)))
+	copy(n[:], nn[:])
+	return nil
 }
 
 var headerArenaPool rlpv2.ArenaPool
@@ -234,17 +297,40 @@ const (
 )
 
 type Receipt struct {
-	Root              []byte        `json:"root"`
-	CumulativeGasUsed uint64        `json:"cumulativeGasUsed"`
-	LogsBloom         Bloom         `json:"logsBloom"`
+	Root              HexBytes      `json:"root" db:"root"`
+	CumulativeGasUsed uint64        `json:"cumulativeGasUsed" db:"cumulative_gas_used"`
+	LogsBloom         Bloom         `json:"logsBloom" db:"bloom"`
 	Logs              []*Log        `json:"logs"`
 	Status            ReceiptStatus `json:"status" rlp:"-"`
-	TxHash            Hash          `json:"transactionHash" rlp:"-"`
-	ContractAddress   Address       `json:"contractAddress" rlp:"-"`
-	GasUsed           uint64        `json:"gasUsed" rlp:"-"`
+	TxHash            Hash          `json:"transactionHash" rlp:"-" db:"txhash"`
+	ContractAddress   Address       `json:"contractAddress" rlp:"-" db:"contract_address"`
+	GasUsed           uint64        `json:"gasUsed" rlp:"-" db:"gas_used"`
 }
 
 var receiptArenaPool rlpv2.ArenaPool
+
+func (r *Receipt) MarshalLogsWith(a *rlpv2.Arena) *rlpv2.Value {
+	if len(r.Logs) == 0 {
+		// There are no receipts, write the RLP null array entry
+		return a.NewNullArray()
+	}
+
+	logs := a.NewArray()
+	for _, l := range r.Logs {
+
+		log := a.NewArray()
+		log.Set(a.NewBytes(l.Address.Bytes()))
+
+		topics := a.NewArray()
+		for _, t := range l.Topics {
+			topics.Set(a.NewBytes(t.Bytes()))
+		}
+		log.Set(topics)
+		log.Set(a.NewBytes(l.Data))
+		logs.Set(log)
+	}
+	return logs
+}
 
 func (r *Receipt) Marshal() []byte {
 	a := receiptArenaPool.Get()
@@ -254,27 +340,7 @@ func (r *Receipt) Marshal() []byte {
 	vv.Set(a.NewBytes(r.Root))
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
 	vv.Set(a.NewBytes(r.LogsBloom[:]))
-
-	if len(r.Logs) == 0 {
-		// There are no receipts, write the RLP null array entry
-		vv.Set(a.NewNullArray())
-	} else {
-		logs := a.NewArray()
-		for _, l := range r.Logs {
-
-			log := a.NewArray()
-			log.Set(a.NewBytes(l.Address.Bytes()))
-
-			topics := a.NewArray()
-			for _, t := range l.Topics {
-				topics.Set(a.NewBytes(t.Bytes()))
-			}
-			log.Set(topics)
-			log.Set(a.NewBytes(l.Data))
-			logs.Set(log)
-		}
-		vv.Set(logs)
-	}
+	vv.Set(r.MarshalLogsWith(a))
 
 	dst := vv.MarshalTo(nil)
 	return dst
@@ -283,15 +349,15 @@ func (r *Receipt) Marshal() []byte {
 // TODO, remove the rlp tags
 
 type Log struct {
-	Address     Address `json:"address"`
-	Topics      []Hash  `json:"topics"`
-	Data        []byte  `json:"data"`
-	BlockNumber uint64  `json:"blockNumber" rlp:"-"`
-	TxHash      Hash    `json:"transactionHash" rlp:"-"`
-	TxIndex     uint    `json:"transactionIndex" rlp:"-"`
-	BlockHash   Hash    `json:"blockHash" rlp:"-"`
-	LogIndex    uint    `json:"logIndex" rlp:"-"`
-	Removed     bool    `json:"removed" rlp:"-"`
+	Address     Address  `json:"address"`
+	Topics      []Hash   `json:"topics"`
+	Data        HexBytes `json:"data"`
+	BlockNumber uint64   `json:"blockNumber" rlp:"-"`
+	TxHash      Hash     `json:"transactionHash" rlp:"-"`
+	TxIndex     uint     `json:"transactionIndex" rlp:"-"`
+	BlockHash   Hash     `json:"blockHash" rlp:"-"`
+	LogIndex    uint     `json:"logIndex" rlp:"-"`
+	Removed     bool     `json:"removed" rlp:"-"`
 }
 
 const BloomByteLength = 256
@@ -303,6 +369,20 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (b Bloom) String() string {
+	return hex.EncodeToHex(b[:])
+}
+
+func (b Bloom) Value() (driver.Value, error) {
+	return b.String(), nil
+}
+
+func (b *Bloom) Scan(src interface{}) error {
+	bb := hex.MustDecodeHex(string(src.([]byte)))
+	copy(b[:], bb[:])
 	return nil
 }
 
@@ -335,16 +415,16 @@ func (b *Bloom) setEncode(hasher hash.Hash, h []byte) {
 }
 
 type Transaction struct {
-	Nonce    uint64   `json:"nonce"`
-	GasPrice []byte   `json:"gasPrice"`
-	Gas      uint64   `json:"gas"`
-	To       *Address `json:"to" rlp:"nil"`
-	Value    []byte   `json:"value"`
-	Input    []byte   `json:"input"`
+	Nonce    uint64   `json:"nonce" db:"nonce"`
+	GasPrice HexBytes `json:"gasPrice" db:"gas_price"`
+	Gas      uint64   `json:"gas" db:"gas"`
+	To       *Address `json:"to" rlp:"nil" db:"dst"`
+	Value    HexBytes `json:"value" db:"value"`
+	Input    HexBytes `json:"input" db:"input"`
 
-	V byte   `json:"v"`
-	R []byte `json:"r"`
-	S []byte `json:"s"`
+	V byte     `json:"v" db:"v"`
+	R HexBytes `json:"r" db:"r"`
+	S HexBytes `json:"s" db:"s"`
 
 	hash atomic.Value
 	from Address
@@ -379,8 +459,8 @@ func (t *Transaction) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 
 	// signature values
 	vv.Set(arena.NewUint(uint64(t.V)))
-	vv.Set(arena.NewBytes(t.R))
-	vv.Set(arena.NewBytes(t.S))
+	vv.Set(arena.NewCopyBytes(t.R))
+	vv.Set(arena.NewCopyBytes(t.S))
 
 	return vv
 }

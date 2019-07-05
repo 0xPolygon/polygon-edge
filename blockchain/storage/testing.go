@@ -6,89 +6,118 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 )
 
+type MockStorage func(t *testing.T) (Storage, func())
+
 // TestStorage tests a set of tests on a storage
-func TestStorage(t *testing.T, s Storage) {
+func TestStorage(t *testing.T, m MockStorage) {
 	t.Helper()
 
 	t.Run("", func(t *testing.T) {
-		testCanonicalChain(t, s)
+		testCanonicalChain(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testDifficulty(t, s)
+		testDifficulty(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testHead(t, s)
+		testHead(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testForks(t, s)
+		testForks(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testHeader(t, s)
+		testHeader(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testBody(t, s)
+		testBody(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testReceipts(t, s)
+		testReceipts(t, m)
 	})
 }
 
-func testCanonicalChain(t *testing.T, s Storage) {
+func testCanonicalChain(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
 	var cases = []struct {
-		Number uint64
-		Hash   types.Hash
+		Number     uint64
+		ParentHash types.Hash
+		Hash       types.Hash
 	}{
 		{
-			Number: 1,
-			Hash:   types.StringToHash("111"),
+			Number:     1,
+			ParentHash: types.StringToHash("111"),
 		},
 		{
-			Number: 1,
-			Hash:   types.StringToHash("222"),
+			Number:     1,
+			ParentHash: types.StringToHash("222"),
 		},
 		{
-			Number: 2,
-			Hash:   types.StringToHash("111"),
+			Number:     2,
+			ParentHash: types.StringToHash("111"),
 		},
 	}
 
 	for _, cc := range cases {
-		s.WriteCanonicalHash(cc.Number, cc.Hash)
+		h := &types.Header{
+			Number:     cc.Number,
+			ParentHash: cc.ParentHash,
+			ExtraData:  []byte{0x1},
+		}
+
+		hash := h.Hash()
+		if err := s.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.WriteCanonicalHash(cc.Number, hash); err != nil {
+			t.Fatal(err)
+		}
 		data, ok := s.ReadCanonicalHash(cc.Number)
 		if !ok {
 			t.Fatal("not found")
 		}
-		if !reflect.DeepEqual(data, cc.Hash) {
+		if !reflect.DeepEqual(data, hash) {
 			t.Fatal("not match")
 		}
 	}
 }
 
-func testDifficulty(t *testing.T, s Storage) {
+func testDifficulty(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
 	var cases = []struct {
-		Hash types.Hash
 		Diff *big.Int
 	}{
 		{
-			Hash: types.StringToHash("0x1"),
 			Diff: big.NewInt(10),
 		},
 		{
-			Hash: types.StringToHash("0x1"),
 			Diff: big.NewInt(11),
 		},
 		{
-			Hash: types.StringToHash("0x2"),
 			Diff: big.NewInt(12),
 		},
 	}
 
-	for _, cc := range cases {
-		s.WriteDiff(cc.Hash, cc.Diff)
-		diff, ok := s.ReadDiff(cc.Hash)
+	for indx, cc := range cases {
+		h := &types.Header{
+			Number:    uint64(indx),
+			ExtraData: []byte{},
+		}
+
+		hash := h.Hash()
+		if err := s.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.WriteDiff(hash, cc.Diff); err != nil {
+			t.Fatal(err)
+		}
+		diff, ok := s.ReadDiff(hash)
 		if !ok {
 			t.Fatal("not found")
 		}
@@ -98,28 +127,50 @@ func testDifficulty(t *testing.T, s Storage) {
 	}
 }
 
-func testHead(t *testing.T, s Storage) {
-	var cases = []struct {
-		Hash types.Hash
-	}{
-		{types.StringToHash("111")},
-		{types.StringToHash("222")},
-		{types.StringToHash("222")},
-	}
+func testHead(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
 
-	for _, cc := range cases {
-		s.WriteHeadHash(cc.Hash)
-		hash, ok := s.ReadHeadHash()
-		if !ok {
-			t.Fatal("not found")
+	for i := uint64(0); i < 5; i++ {
+		h := &types.Header{
+			Number:    i,
+			ExtraData: []byte{},
 		}
-		if !reflect.DeepEqual(cc.Hash, hash) {
+		hash := h.Hash()
+
+		if err := s.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := s.WriteHeadNumber(i); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.WriteHeadHash(hash); err != nil {
+			t.Fatal(err)
+		}
+
+		n2, ok := s.ReadHeadNumber()
+		if !ok {
+			t.Fatal("num not found")
+		}
+		if n2 != i {
+			t.Fatal("bad")
+		}
+
+		hash1, ok := s.ReadHeadHash()
+		if !ok {
+			t.Fatal("hash not found")
+		}
+		if !reflect.DeepEqual(hash1, hash) {
 			t.Fatal("bad")
 		}
 	}
 }
 
-func testForks(t *testing.T, s Storage) {
+func testForks(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
 	var cases = []struct {
 		Forks []types.Hash
 	}{
@@ -128,25 +179,32 @@ func testForks(t *testing.T, s Storage) {
 	}
 
 	for _, cc := range cases {
-		s.WriteForks(cc.Forks)
-		forks := s.ReadForks()
+		if err := s.WriteForks(cc.Forks); err != nil {
+			t.Fatal(err)
+		}
 
+		forks := s.ReadForks()
 		if !reflect.DeepEqual(cc.Forks, forks) {
 			t.Fatal("bad")
 		}
 	}
 }
 
-func testHeader(t *testing.T, s Storage) {
+func testHeader(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
 	header := &types.Header{
 		Number:     5,
-		Difficulty: 10,
+		Difficulty: 17179869184,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
-		ExtraData:  []byte{}, // if not set it will fail
+		ExtraData:  hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"), // if not set it will fail
 	}
 
-	s.WriteHeader(header)
+	if err := s.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
 	header1, ok := s.ReadHeader(header.Hash())
 	if !ok {
 		t.Fatal("not found")
@@ -156,13 +214,19 @@ func testHeader(t *testing.T, s Storage) {
 	}
 }
 
-func testBody(t *testing.T, s Storage) {
+func testBody(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
 	header := &types.Header{
 		Number:     5,
 		Difficulty: 10,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
 		ExtraData:  []byte{}, // if not set it will fail
+	}
+	if err := s.WriteHeader(header); err != nil {
+		t.Fatal(err)
 	}
 
 	addr1 := types.StringToAddress("11")
@@ -189,12 +253,13 @@ func testBody(t *testing.T, s Storage) {
 		Header:       header,
 		Transactions: []*types.Transaction{t0, t1},
 	}
-	hash := block.Hash()
 
 	body0 := block.Body()
-	s.WriteBody(hash, body0)
+	if err := s.WriteBody(header.Hash(), body0); err != nil {
+		t.Fatal(err)
+	}
 
-	body1, ok := s.ReadBody(hash)
+	body1, ok := s.ReadBody(header.Hash())
 	if !ok {
 		t.Fatal("not found")
 	}
@@ -211,28 +276,54 @@ func testBody(t *testing.T, s Storage) {
 	}
 }
 
-func testReceipts(t *testing.T, s Storage) {
+func testReceipts(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
+	h := &types.Header{
+		Difficulty: 133,
+		Number:     11,
+		ExtraData:  []byte{},
+	}
+	if err := s.WriteHeader(h); err != nil {
+		t.Fatal(err)
+	}
+
+	txn := &types.Transaction{
+		Nonce:    1000,
+		Gas:      50,
+		GasPrice: new(big.Int).SetUint64(100).Bytes(),
+		V:        11,
+	}
+	body := &types.Body{
+		Transactions: []*types.Transaction{txn},
+	}
+	if err := s.WriteBody(h.Hash(), body); err != nil {
+		t.Fatal(err)
+	}
 
 	r0 := &types.Receipt{
 		Root:              []byte{1},
 		Status:            types.ReceiptFailed,
 		CumulativeGasUsed: 10,
-		TxHash:            types.StringToHash("11"),
+		TxHash:            txn.Hash(),
 	}
-
 	r1 := &types.Receipt{
 		Root:              []byte{1},
 		Status:            types.ReceiptFailed,
 		CumulativeGasUsed: 10,
-		TxHash:            types.StringToHash("33"),
+		TxHash:            txn.Hash(),
 	}
 
 	receipts := []*types.Receipt{r0, r1}
-	hash := types.StringToHash("11")
 
-	s.WriteReceipts(hash, receipts)
-	r := s.ReadReceipts(hash)
-
+	if err := s.WriteReceipts(h.Hash(), receipts); err != nil {
+		t.Fatal(err)
+	}
+	r, ok := s.ReadReceipts(h.Hash())
+	if !ok {
+		t.Fatal("not found")
+	}
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the receipt
 	if len(r) != len(receipts) {
 		t.Fatal("lengths are different")
