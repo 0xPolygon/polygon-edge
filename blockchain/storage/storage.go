@@ -26,6 +26,8 @@ type Storage interface {
 	WriteHeader(h *types.Header) error
 	ReadHeader(hash types.Hash) (*types.Header, bool)
 
+	WriteCanonicalHeader(h *types.Header, diff *big.Int) error
+
 	WriteBody(hash types.Hash, body *types.Body) error
 	ReadBody(hash types.Hash) (*types.Body, bool)
 

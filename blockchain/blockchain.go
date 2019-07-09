@@ -49,7 +49,9 @@ type Blockchain struct {
 	// listener for advancedhead subscribers
 	listeners []chan *types.Header
 
-	headersCache *lru.Cache
+	headersCache    *lru.Cache
+	bodiesCache     *lru.Cache
+	difficultyCache *lru.Cache
 }
 
 // NewBlockchain creates a new blockchain object
@@ -64,6 +66,8 @@ func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Conse
 		listeners:   []chan *types.Header{},
 	}
 	b.headersCache, _ = lru.New(100)
+	b.bodiesCache, _ = lru.New(100)
+	b.difficultyCache, _ = lru.New(100)
 	return b
 }
 
@@ -150,9 +154,12 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 
-	if err := b.db.WriteDiff(header.Hash(), new(big.Int).SetUint64(header.Difficulty)); err != nil {
+	diff := new(big.Int).SetUint64(header.Difficulty)
+	if err := b.db.WriteDiff(header.Hash(), diff); err != nil {
 		return err
 	}
+	b.difficultyCache.Add(header.Hash(), diff)
+
 	return nil
 }
 
@@ -202,7 +209,20 @@ func (b *Blockchain) GetChainTD() (*big.Int, bool) {
 }
 
 func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
-	return b.db.ReadDiff(hash)
+	return b.readDiff(hash)
+}
+
+func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
+	td, ok := b.readDiff(h.ParentHash)
+	if !ok {
+		return fmt.Errorf("parent difficulty not found")
+	}
+
+	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteCanonicalHeader(h, diff); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *Blockchain) advanceHead(h *types.Header) error {
@@ -218,7 +238,7 @@ func (b *Blockchain) advanceHead(h *types.Header) error {
 
 	if h.ParentHash != types.StringToHash("") {
 		// Dont write difficulty for genesis
-		td, ok := b.db.ReadDiff(h.ParentHash)
+		td, ok := b.readDiff(h.ParentHash)
 		if !ok {
 			return fmt.Errorf("parent difficulty not found")
 		}
@@ -325,7 +345,7 @@ func (b *Blockchain) GetReceiptsByHash(hash types.Hash) []*types.Receipt {
 
 // GetBodyByHash returns the body by their hash
 func (b *Blockchain) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
-	return b.db.ReadBody(hash)
+	return b.readBody(hash)
 }
 
 // GetHeaderByHash returns the header by his hash
@@ -344,6 +364,32 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	}
 	b.headersCache.Add(hash, hh)
 	return hh, true
+}
+
+func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
+	body, ok := b.bodiesCache.Get(hash)
+	if ok {
+		return body.(*types.Body), true
+	}
+	bb, ok := b.db.ReadBody(hash)
+	if !ok {
+		return nil, false
+	}
+	b.bodiesCache.Add(hash, bb)
+	return bb, true
+}
+
+func (b *Blockchain) readDiff(hash types.Hash) (*big.Int, bool) {
+	d, ok := b.difficultyCache.Get(hash)
+	if ok {
+		return d.(*big.Int), true
+	}
+	dd, ok := b.db.ReadDiff(hash)
+	if !ok {
+		return nil, false
+	}
+	b.difficultyCache.Add(hash, dd)
+	return dd, true
 }
 
 // GetHeaderByNumber returns the header by his number
@@ -389,48 +435,45 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		return fmt.Errorf("no headers found to insert")
 	}
 
-	headers := []*types.Header{}
-	for _, block := range blocks {
-		headers = append(headers, block.Header)
-	}
-
-	parent, ok := b.readHeader(headers[0].ParentHash)
+	parent, ok := b.readHeader(blocks[0].ParentHash())
 	if !ok {
-		return fmt.Errorf("parent of %s (%d) not found", headers[0].Hash().String(), headers[0].Number)
+		return fmt.Errorf("parent of %s (%d) not found", blocks[0].Hash().String(), blocks[0].Number())
 	}
 
 	// validate chain
-	for i := 0; i < len(headers); i++ {
+	for i := 0; i < len(blocks); i++ {
 		block := blocks[i]
 
-		if headers[i].Number-1 != parent.Number {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, headers[i].Number, parent.Number)
+		if blocks[i].Number()-1 != parent.Number {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number(), parent.Number)
 		}
-		if headers[i].ParentHash != parent.Hash() {
+		if blocks[i].ParentHash() != parent.Hash() {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(parent, headers[i], false, true); err != nil {
+		if err := b.consensus.VerifyHeader(parent, blocks[i].Header, false, true); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
 		// verify body data
-		if hash := derivesha.CalcUncleRoot(block.Uncles); hash != headers[i].Sha3Uncles {
-			return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, headers[i].Sha3Uncles)
+		if hash := derivesha.CalcUncleRoot(block.Uncles); hash != blocks[i].Header.Sha3Uncles {
+			return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, blocks[i].Header.Sha3Uncles)
 		}
 		// TODO, the wrapper around transactions
-		if hash := derivesha.CalcTxsRoot(block.Transactions); hash != headers[i].TxRoot {
-			return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, headers[i].TxRoot)
+		if hash := derivesha.CalcTxsRoot(block.Transactions); hash != blocks[i].Header.TxRoot {
+			return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, blocks[i].Header.TxRoot)
 		}
-		parent = headers[i]
+		parent = blocks[i].Header
 	}
 
 	// Write chain
 	for indx, block := range blocks {
 		header := block.Header
 
+		body := block.Body()
 		if err := b.db.WriteBody(block.Header.Hash(), block.Body()); err != nil {
 			return err
 		}
+		b.bodiesCache.Add(block.Header.Hash(), body)
 
 		// verify uncles. It requires to have the bodies in memory. TODO: Part of the consensus? Only required on POW.
 		if err := b.VerifyUncles(block); err != nil {
@@ -722,8 +765,9 @@ func (b *Blockchain) GetHashByNumber(i uint64) types.Hash {
 }
 
 func (b *Blockchain) VerifyUncles(block *types.Block) error {
-
-	// Verify that there are at most 2 uncles included in this block
+	if len(block.Uncles) == 0 {
+		return nil
+	}
 	if len(block.Uncles) > 2 {
 		return fmt.Errorf("too many uncles")
 	}
@@ -772,6 +816,8 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 }
 
 func (b *Blockchain) addHeader(header *types.Header) error {
+	b.headersCache.Add(header.Hash(), header)
+
 	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
@@ -803,16 +849,17 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 
 	// Write the data
 
+	if header.ParentHash == head.Hash() {
+		// Fast path to save the new canonical header
+		return b.writeCanonicalHeader(header)
+	}
+
 	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
+	b.headersCache.Add(header.Hash(), header)
 
-	if header.ParentHash == head.Hash() {
-		// advance the chain
-		if err := b.advanceHead(header); err != nil {
-			return err
-		}
-	} else if head.Difficulty < localDiff {
+	if head.Difficulty < localDiff {
 		// new block has higher difficulty than us, reorg the chain
 		if err := b.handleReorg(head, header); err != nil {
 			return err
@@ -933,7 +980,7 @@ func (b *Blockchain) GetBlockByHash(hash types.Hash, full bool) (*types.Block, b
 	if !full {
 		return block, true
 	}
-	body, ok := b.db.ReadBody(hash)
+	body, ok := b.readBody(hash)
 	if !ok {
 		return block, true
 	}

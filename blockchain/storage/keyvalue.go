@@ -164,6 +164,26 @@ func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, bool) {
 	return header, ok
 }
 
+// WriteCanonicalHeader implements the storage interface
+func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
+	if err := s.WriteHeader(h); err != nil {
+		return err
+	}
+	if err := s.WriteHeadHash(h.Hash()); err != nil {
+		return err
+	}
+	if err := s.WriteHeadNumber(h.Number); err != nil {
+		return err
+	}
+	if err := s.WriteCanonicalHash(h.Number, h.Hash()); err != nil {
+		return err
+	}
+	if err := s.WriteDiff(h.Hash(), diff); err != nil {
+		return err
+	}
+	return nil
+}
+
 // -- body --
 
 // WriteBody writes the body
