@@ -2,7 +2,11 @@ package ethash
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/fnv"
+	"io/ioutil"
+	"os"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +36,8 @@ func TestHashimotoLight(t *testing.T) {
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
 			cache := newCache(c.epoch)
+			cache.Build()
+
 			digest, result := cache.hashimoto(header, 100)
 
 			assert.Equal(t, c.digest, hex.EncodeToHex(digest))
@@ -66,6 +72,8 @@ func TestCache(t *testing.T) {
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
 			cache := newCache(c.epoch)
+			cache.Build()
+
 			hash := fnv.New128()
 			b := make([]byte, 4)
 			for _, i := range cache.cache {
@@ -74,5 +82,54 @@ func TestCache(t *testing.T) {
 			}
 			assert.Equal(t, c.hash, hex.EncodeToHex(hash.Sum(nil)))
 		})
+	}
+}
+
+func TestSaveCache(t *testing.T) {
+	dir, err := ioutil.TempDir("/tmp", "ethash-cache-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	epoch := 100
+
+	c := newCache(epoch)
+	c.Build()
+	if err := c.Save(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	// check that there is content
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 {
+		t.Fatal("only one file expected")
+	}
+	if files[0].Name() != fmt.Sprintf("cache-%d", epoch) {
+		t.Fatal("unexpected name")
+	}
+
+	cc := newCache(epoch)
+	defer cc.Close()
+
+	ok, err := cc.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("it should load the cache")
+	}
+
+	if c.cacheSize != cc.cacheSize {
+		t.Fatal("bad")
+	}
+	if c.datasetSize != cc.datasetSize {
+		t.Fatal("bad")
+	}
+	if !reflect.DeepEqual(c.cache, cc.cache) {
+		t.Fatal("bad")
 	}
 }

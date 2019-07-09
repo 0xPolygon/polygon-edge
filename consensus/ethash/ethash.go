@@ -24,6 +24,7 @@ type Ethash struct {
 	config  *chain.Params
 	cache   *lru.Cache
 	fakePow bool
+	path    string
 
 	// tmp is the seal hash tmp variable
 	tmp []byte
@@ -31,10 +32,20 @@ type Ethash struct {
 
 // Factory is the factory method to create an Ethash consensus
 func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+	var pathStr string
+	path, ok := config.Config["path"]
+	if ok {
+		pathStr, ok = path.(string)
+		if !ok {
+			return nil, fmt.Errorf("could not convert path to string")
+		}
+	}
+
 	cache, _ := lru.New(2)
 	e := &Ethash{
 		config: config.Params,
 		cache:  cache,
+		path:   pathStr,
 	}
 	return e, nil
 }
@@ -90,7 +101,10 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 	if !e.fakePow {
 		// Verify the seal
 		number := header.Number
-		cache := e.getCache(number)
+		cache, err := e.getCache(number)
+		if err != nil {
+			return err
+		}
 
 		nonce := binary.BigEndian.Uint64(header.Nonce[:])
 		hash := e.sealHash(header)
@@ -109,16 +123,36 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 	return nil
 }
 
-func (e *Ethash) getCache(blockNumber uint64) *Cache {
+func (e *Ethash) getCache(blockNumber uint64) (*Cache, error) {
 	epoch := blockNumber / uint64(epochLength)
 	cache, ok := e.cache.Get(epoch)
 	if ok {
-		return cache.(*Cache)
+		return cache.(*Cache), nil
 	}
 
 	cc := newCache(int(epoch))
+
+	if e.path != "" {
+		ok, err := cc.Load(e.path)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			e.cache.Add(epoch, cc)
+			return cc, nil
+		}
+	}
+
+	// Cache not loaded from memory
+	cc.Build()
 	e.cache.Add(epoch, cc)
-	return cc
+
+	if e.path != "" {
+		if err := cc.Save(e.path); err != nil {
+			return nil, err
+		}
+	}
+	return cc, nil
 }
 
 // SetFakePow sets the fakePow flag to true, only used on tests.
