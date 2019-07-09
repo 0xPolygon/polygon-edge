@@ -37,6 +37,9 @@ func TestStorage(t *testing.T, m MockStorage) {
 	t.Run("", func(t *testing.T) {
 		testReceipts(t, m)
 	})
+	t.Run("", func(t *testing.T) {
+		testWriteCanonicalHeader(t, m)
+	})
 }
 
 func testCanonicalChain(t *testing.T, m MockStorage) {
@@ -332,5 +335,55 @@ func testReceipts(t *testing.T, m MockStorage) {
 		if !bytes.Equal(i.Root, r[indx].Root) {
 			t.Fatal("receipt txhash is not correct")
 		}
+	}
+}
+
+func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
+	s, close := m(t)
+	defer close()
+
+	h := &types.Header{
+		Number:    100,
+		ExtraData: []byte{0x1},
+	}
+
+	diff := new(big.Int).SetUint64(100)
+
+	if err := s.WriteCanonicalHeader(h, diff); err != nil {
+		t.Fatal(err)
+	}
+
+	hh, ok := s.ReadHeader(h.Hash())
+	if !ok {
+		t.Fatal("not found header")
+	}
+
+	hh.Hash() // load the hash in the struct
+	if !reflect.DeepEqual(h, hh) {
+		t.Fatal("bad header")
+	}
+
+	headHash, ok := s.ReadHeadHash()
+	if !ok {
+		t.Fatal("not found head hash")
+	}
+	if headHash != h.Hash() {
+		t.Fatal("head hash not correct")
+	}
+
+	headNum, ok := s.ReadHeadNumber()
+	if !ok {
+		t.Fatal("not found head num")
+	}
+	if headNum != h.Number {
+		t.Fatal("head num not correct")
+	}
+
+	canHash, ok := s.ReadCanonicalHash(h.Number)
+	if !ok {
+		t.Fatal("not found can hash")
+	}
+	if canHash != h.Hash() {
+		t.Fatal("canonical hash not correct")
 	}
 }

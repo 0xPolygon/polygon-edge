@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/types"
 
@@ -19,6 +20,8 @@ import (
 type Backend struct {
 	db *sqlx.DB
 }
+
+var _ storage.Storage = &Backend{}
 
 // Factory creates a PostgreSQL storage
 func Factory(config map[string]interface{}, logger hclog.Logger) (*Backend, error) {
@@ -210,9 +213,23 @@ func (b *Backend) ReadCanonicalHash(n uint64) (types.Hash, bool) {
 
 // WriteCanonicalHash implements the storage backend
 func (b *Backend) WriteCanonicalHash(n uint64, hash types.Hash) error {
+	tx, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+	if err := b.writeCanonicalHashImpl(tx, n, hash); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *Backend) writeCanonicalHashImpl(tx *sql.Tx, n uint64, hash types.Hash) error {
 	query := "INSERT INTO canonical (hash, number) VALUES ($1, $2) ON CONFLICT (number) DO UPDATE SET hash = $1"
 
-	if _, err := b.db.Exec(query, hash.String(), n); err != nil {
+	if _, err := tx.Exec(query, hash.String(), n); err != nil {
 		return err
 	}
 	return nil
@@ -298,6 +315,10 @@ func (b *Backend) WriteHeadNumber(n uint64) error {
 
 // WriteBody implements the storage backend
 func (b *Backend) WriteBody(hash types.Hash, body *types.Body) error {
+	if len(body.Uncles) == 0 && len(body.Transactions) == 0 {
+		return nil
+	}
+
 	tx, err := b.db.Begin()
 	if err != nil {
 		return err
@@ -347,4 +368,30 @@ func (b *Backend) ReadBody(hash types.Hash) (*types.Body, bool) {
 		Transactions: transactions,
 	}
 	return body, true
+}
+
+// WriteCanonicalHeader implements the storage backend
+func (b *Backend) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
+	tx, err := b.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if err := b.writeHeaderImpl(tx, h); err != nil {
+		return err
+	}
+	if err := b.writeCanonicalHashImpl(tx, h.Number, h.Hash()); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("UPDATE header SET hash=$1, number=$2", h.Hash(), h.Number); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("INSERT INTO difficulty (hash, difficulty) VALUES ($1, $2)", h.Hash(), diff.String()); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
