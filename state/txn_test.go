@@ -9,9 +9,10 @@ import (
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
+	"golang.org/x/crypto/sha3"
 )
 
 type mockState struct {
@@ -120,4 +121,10 @@ func TestSnapshotUpdateData(t *testing.T) {
 
 	txn.RevertToSnapshot(ss)
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
+}
+
+func hashit(k []byte) []byte {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(k)
+	return h.Sum(nil)
 }
