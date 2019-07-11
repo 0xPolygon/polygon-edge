@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 )
 

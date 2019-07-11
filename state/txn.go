@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/types"
 
@@ -42,6 +43,7 @@ type Txn struct {
 	txn        *iradix.Txn
 	gas        uint64
 	initialGas uint64
+	codeCache  *lru.Cache
 }
 
 func NewTxn(state State, snapshot Snapshot) *Txn {
@@ -51,11 +53,14 @@ func NewTxn(state State, snapshot Snapshot) *Txn {
 func newTxn(state State, snapshot Snapshot) *Txn {
 	i := iradix.New()
 
+	codeCache, _ := lru.New(20)
+
 	return &Txn{
 		snapshot:  snapshot,
 		state:     state,
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
+		codeCache: codeCache,
 	}
 }
 
@@ -299,11 +304,16 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	if !exists {
 		return nil
 	}
-
 	if object.DirtyCode {
 		return object.Code
 	}
+	// TODO; Should we move this to state?
+	v, ok := txn.codeCache.Get(addr)
+	if ok {
+		return v.([]byte)
+	}
 	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
+	txn.codeCache.Add(addr, code)
 	return code
 }
 
@@ -367,10 +377,6 @@ func (txn *Txn) GetRefund() uint64 {
 		return 0
 	}
 	return data.(uint64)
-}
-
-func (txn *Txn) IntermediateRoot(bool) types.Hash {
-	return types.Hash{}
 }
 
 // GetCommittedState returns the state of the address in the trie
