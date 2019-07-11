@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"hash"
 	"math/big"
 
 	"golang.org/x/crypto/sha3"
@@ -44,6 +45,7 @@ type Txn struct {
 	gas        uint64
 	initialGas uint64
 	codeCache  *lru.Cache
+	hash       hashImpl
 }
 
 func NewTxn(state State, snapshot Snapshot) *Txn {
@@ -61,7 +63,16 @@ func newTxn(state State, snapshot Snapshot) *Txn {
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
+		hash:      sha3.NewLegacyKeccak256().(hashImpl),
 	}
+}
+
+func (txn *Txn) hashit(dst, src []byte) []byte {
+	dst = extendByteSlice(dst, 32)
+	txn.hash.Reset()
+	txn.hash.Write(src)
+	txn.hash.Read(dst)
+	return dst
 }
 
 // gasUsed returns the amount of gas used up by the state transition.
@@ -112,7 +123,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
-	data, ok := txn.snapshot.Get(hashit(addr.Bytes()))
+	data, ok := txn.snapshot.Get(txn.hashit(nil, addr.Bytes()))
 	if !ok {
 		return nil, false
 	}
@@ -243,9 +254,9 @@ func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
 		}
 
 		if isZeros(value.Bytes()) {
-			object.Txn.Insert(hashit(key.Bytes()), nil)
+			object.Txn.Insert(txn.hashit(nil, key.Bytes()), nil)
 		} else {
-			object.Txn.Insert(hashit(key.Bytes()), value.Bytes())
+			object.Txn.Insert(txn.hashit(nil, key.Bytes()), value.Bytes())
 		}
 	})
 }
@@ -257,7 +268,7 @@ func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 		return types.Hash{}
 	}
 
-	k := hashit(hash.Bytes())
+	k := txn.hashit(nil, hash.Bytes())
 
 	if object.Txn != nil {
 		if val, ok := object.Txn.Get(k); ok {
@@ -385,7 +396,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, hash types.Hash) types.Has
 	if !ok {
 		return types.Hash{}
 	}
-	return obj.GetCommitedState(types.BytesToHash(hashit(hash.Bytes())))
+	return obj.GetCommitedState(types.BytesToHash(txn.hashit(nil, hash.Bytes())))
 }
 
 // TODO, check panics with this ones
@@ -430,12 +441,6 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 	}
 
 	txn.txn.Insert(addr.Bytes(), obj)
-}
-
-func hashit(k []byte) []byte {
-	h := sha3.NewLegacyKeccak256()
-	h.Write(k)
-	return h.Sum(nil)
 }
 
 func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
@@ -507,4 +512,17 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 
 	t, hash := txn.snapshot.Commit(x)
 	return t, hash
+}
+
+type hashImpl interface {
+	hash.Hash
+	Read(b []byte) (int, error)
+}
+
+func extendByteSlice(b []byte, needLen int) []byte {
+	b = b[:cap(b)]
+	if n := needLen - cap(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+	return b[:needLen]
 }
