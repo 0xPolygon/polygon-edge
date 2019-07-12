@@ -31,13 +31,11 @@ func genesisRun(cmd *cobra.Command, args []string) {
 
 func genesisRunE(cmd *cobra.Command, args []string) (err error) {
 	_, err = os.Stat(genesisPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			err = fmt.Errorf("Genesis (%s) already exists", genesisPath)
-		} else {
-			err = fmt.Errorf("Failed to stat (%s): %v", genesisPath, err)
-		}
-		return err
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Failed to stat (%s): %v", genesisPath, err)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("Genesis (%s) already exists", genesisPath)
 	}
 
 	c := &chain.Chain{
