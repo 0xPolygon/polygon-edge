@@ -1,31 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	logger "github.com/hashicorp/go-hclog"
 
-	"github.com/mitchellh/cli"
 	"github.com/umbracle/minimal/command"
+	_ "github.com/umbracle/minimal/command/version"
+	_ "github.com/umbracle/minimal/command/peers"
+	_ "github.com/umbracle/minimal/command/genesis"
+	_ "github.com/umbracle/minimal/command/agent"
 )
 
 func main() {
-	os.Exit(Run(os.Args[1:]))
-}
-
-func Run(args []string) int {
-	commands := command.Commands()
-
-	cli := &cli.CLI{
-		Name:     "minimal",
-		Args:     args,
-		Commands: commands,
+	// TODO: Change time format for the logger?
+	if err := command.Run(); err != nil {
+		logger.Default().Error(err.Error())
 	}
-
-	exitCode, err := cli.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error executing CLI: %s\n", err.Error())
-		return 1
-	}
-
-	return exitCode
 }
