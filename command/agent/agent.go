@@ -67,7 +67,9 @@ type Agent struct {
 }
 
 func NewAgent(logger *log.Logger, config *Config) *Agent {
-	return &Agent{logger: logger, config: config}
+	return &Agent{
+		logger: logger, config: config,
+	}
 }
 
 // Start starts the agent
