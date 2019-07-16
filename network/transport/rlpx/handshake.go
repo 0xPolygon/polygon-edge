@@ -15,16 +15,14 @@ import (
 	mrand "math/rand"
 
 	"github.com/umbracle/ecies"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
+	"github.com/umbracle/minimal/rlp"
 
 	"golang.org/x/crypto/sha3"
 )
 
 const (
-	maxUint24 = ^uint32(0) >> 8
-
 	sskLen = 16 // ecies.MaxSharedKeyLength(pubKey) / 2
 	sigLen = 65 // elliptic S256
 	pubLen = 64 // 512 bit pubkey in uncompressed representation without format byte
@@ -345,7 +343,11 @@ func (h *handshakeState) Secrets(auth, authResp []byte) (Secrets, error) {
 		MAC:      crypto.Keccak256(ecdheSecret, aesSecret),
 	}
 
-	// setup sha3 instances for the MACs
+	// We cannot use a hashImpl version (use Read and avoid memory copying)
+	// because everytime Reset is called all the state is cleared.
+	// But, these mac functions need to keep the previous states.
+	// There is not enough flexibility on sha3.NewLegacyKeccak256 to do this right now.
+
 	mac1 := sha3.NewLegacyKeccak256()
 	mac1.Write(xor(s.MAC, h.respNonce))
 	mac1.Write(auth)
@@ -412,7 +414,7 @@ func doProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	}
 
 	if peerInfo.Version >= snappyProtocolVersion {
-		conn.Snappy = true
+		conn.SetSnappy()
 	}
 
 	conn.SetDeadline(time.Time{})
@@ -420,24 +422,25 @@ func doProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 }
 
 func readProtocolHandshake(conn *Session) (*Info, error) {
-	msg, err := conn.ReadMsg()
+	code, buf, err := conn.ReadMsg()
 	if err != nil {
 		return nil, err
 	}
 
-	if msg.Size > baseProtocolMaxMsgSize {
+	size := len(buf)
+	if size > baseProtocolMaxMsgSize {
 		return nil, fmt.Errorf("message too big")
 	}
 
-	if msg.Code == discMsg {
-		return nil, decodeDiscMsg(msg.Payload)
+	if code == discMsg {
+		return nil, decodeDiscMsg(buf)
 	}
-	if msg.Code != handshakeMsg {
-		return nil, fmt.Errorf("expected handshake, got %x", msg.Code)
+	if code != handshakeMsg {
+		return nil, fmt.Errorf("expected handshake, got %x", code)
 	}
 
 	var info Info
-	if err := msg.Decode(&info); err != nil {
+	if err := rlp.DecodeBytes(buf, &info); err != nil {
 		return nil, err
 	}
 

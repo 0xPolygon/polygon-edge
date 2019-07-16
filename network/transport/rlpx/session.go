@@ -1,7 +1,6 @@
 package rlpx
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -10,18 +9,14 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/golang/snappy"
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/rlp"
-
-	"github.com/armon/go-metrics"
-
-	"github.com/golang/snappy"
 )
 
 const (
@@ -80,23 +75,11 @@ type Session struct {
 
 	isClient bool
 
-	enc cipher.Stream
-	dec cipher.Stream
-
-	macCipher  cipher.Block
-	egressMAC  hash.Hash
-	ingressMAC hash.Hash
-
-	rmu *sync.Mutex
-	wmu *sync.Mutex
-
 	RemoteID *ecdsa.PublicKey
 	LocalID  *ecdsa.PublicKey
 
 	prv *ecdsa.PrivateKey
 	pub *ecdsa.PublicKey
-
-	Snappy bool
 
 	// shutdown
 	shutdown     bool
@@ -110,6 +93,8 @@ type Session struct {
 	// state
 	state     sessionState
 	stateLock sync.Mutex
+
+	in, out halfConn
 }
 
 func (s *Session) p2pHandshake() error {
@@ -125,27 +110,8 @@ func (s *Session) p2pHandshake() error {
 		return err
 	}
 
-	s.macCipher, err = aes.NewCipher(secrets.MAC)
-	if err != nil {
-		return err
-	}
-	encc, err := aes.NewCipher(secrets.AES)
-	if err != nil {
-		return err
-	}
-
-	iv := make([]byte, encc.BlockSize())
-	s.enc = cipher.NewCTR(encc, iv)
-	s.dec = cipher.NewCTR(encc, iv)
-
-	s.egressMAC = secrets.EgressMAC
-	s.ingressMAC = secrets.IngressMAC
-
 	s.RemoteID = secrets.RemoteID
 	s.id = enode.PubkeyToEnode(secrets.RemoteID).String()
-
-	s.rmu = &sync.Mutex{}
-	s.wmu = &sync.Mutex{}
 
 	s.streams = []*Stream{}
 	s.shutdownCh = make(chan struct{})
@@ -170,7 +136,38 @@ func (s *Session) p2pHandshake() error {
 	}
 	s.enode = enode
 
+	macCipher, err := aes.NewCipher(secrets.MAC)
+	if err != nil {
+		return err
+	}
+	encc, err := aes.NewCipher(secrets.AES)
+	if err != nil {
+		return err
+	}
+
+	// tmp buffer for the CTR cipher. It gets cloned
+	// inside so its safe to reuse it for both in/out
+	tmp := make([]byte, encc.BlockSize())
+
+	s.in = halfConn{
+		conn:   s.conn,
+		block:  macCipher,
+		stream: cipher.NewCTR(encc, tmp),
+		mac:    secrets.IngressMAC,
+	}
+	s.out = halfConn{
+		conn:   s.conn,
+		block:  macCipher,
+		stream: cipher.NewCTR(encc, tmp),
+		mac:    secrets.EgressMAC,
+	}
+
 	return nil
+}
+
+func (s *Session) SetSnappy() {
+	s.in.snappy = true
+	s.out.snappy = true
 }
 
 func (s *Session) RemoteIDString() string {
@@ -316,7 +313,7 @@ func (s *Session) recv() {
 
 func (s *Session) recvLoop() error {
 	for {
-		msg, err := s.ReadMsg()
+		code, buf, err := s.ReadMsg()
 		if err != nil {
 			return err
 		}
@@ -325,21 +322,21 @@ func (s *Session) recvLoop() error {
 		s.pongTimeout.Reset(defaultPongTimeout)
 
 		switch {
-		case msg.Code == pingMsg:
+		case code == pingMsg:
 			if err := s.WriteMsg(pongMsg); err != nil {
 				return err
 			}
 
-		case msg.Code == pongMsg:
+		case code == pongMsg:
 			// Already handled
 
-		case msg.Code == discMsg:
-			msg := decodeDiscMsg(msg.Payload)
+		case code == discMsg:
+			msg := decodeDiscMsg(buf)
 
 			// TODO, logger
 			return msg
 		default:
-			s.handleStreamMessage(&msg)
+			s.handleStreamMessage(code, buf)
 		}
 	}
 }
@@ -405,89 +402,12 @@ func (s *Session) getStream(code uint64) *Stream {
 }
 
 // ReadMsg from the Session
-func (s *Session) ReadMsg() (msg Message, err error) {
-	s.rmu.Lock()
-	defer s.rmu.Unlock()
+func (s *Session) ReadMsg() (uint64, []byte, error) {
+	s.in.Lock()
+	defer s.in.Unlock()
 
-	// read the header
-	headbuf := make([]byte, 32)
-	if _, err := io.ReadFull(s.conn, headbuf); err != nil {
-		return msg, err
-	}
-	// verify header mac
-	shouldMAC := updateMAC(s.ingressMAC, s.macCipher, headbuf[:16])
-	if !hmac.Equal(shouldMAC, headbuf[16:]) {
-		return msg, errors.New("bad header MAC")
-	}
-	s.dec.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now decrypted
-	fsize := readInt24(headbuf)
-	// ignore protocol type for now
-
-	// read the frame content
-	var rsize = fsize // frame size rounded up to 16 byte boundary
-	if padding := fsize % 16; padding > 0 {
-		rsize += 16 - padding
-	}
-	framebuf := make([]byte, rsize)
-	if _, err := io.ReadFull(s.conn, framebuf); err != nil {
-		return msg, err
-	}
-
-	// read and validate frame MAC. we can re-use headbuf for that.
-	s.ingressMAC.Write(framebuf)
-	fmacseed := s.ingressMAC.Sum(nil)
-	if _, err := io.ReadFull(s.conn, headbuf[:16]); err != nil {
-		return msg, err
-	}
-	shouldMAC = updateMAC(s.ingressMAC, s.macCipher, fmacseed)
-	if !hmac.Equal(shouldMAC, headbuf[:16]) {
-		return msg, errors.New("bad frame MAC")
-	}
-
-	// decrypt frame content
-	s.dec.XORKeyStream(framebuf, framebuf)
-
-	// decode message code
-	content := bytes.NewReader(framebuf[:fsize])
-	if err := rlp.DecodeReader(content, &msg.Code); err != nil {
-		return msg, err
-	}
-
-	msg.Size = uint32(content.Len())
-	msg.Payload = content
-
-	// if snappy is enabled, verify and decompress message
-	if s.Snappy {
-		payload, err := ioutil.ReadAll(msg.Payload)
-		if err != nil {
-			return msg, err
-		}
-		size, err := snappy.DecodedLen(payload)
-		if err != nil {
-			return msg, err
-		}
-		if size > int(maxUint24) {
-			return msg, errPlainMessageTooLarge
-		}
-
-		payload, err = snappy.Decode(nil, payload)
-		if err != nil {
-			return msg, err
-		}
-		msg.Size, msg.Payload = uint32(size), bytes.NewReader(payload)
-	}
-
-	metrics.SetGaugeWithLabels([]string{"conn", "inbound"}, float32(msg.Size), []metrics.Label{{Name: "id", Value: s.id}})
-	return msg, nil
+	return s.in.read()
 }
-
-var (
-	// this is used in place of actual frame header data.
-	// TODO: replace this when Msg contains the protocol type code.
-	zeroHeader = []byte{0xC2, 0x80, 0x80}
-	// sixteen zero bytes
-	zero16 = make([]byte, 16)
-)
 
 var errPlainMessageTooLarge = errors.New("message length >= 16MB")
 
@@ -503,21 +423,21 @@ func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 		panic("two messages not allowed")
 	}
 
-	size, r, err := rlp.EncodeToReader(data)
+	buf, err := rlp.EncodeToBytes(data)
 	if err != nil {
 		return err
 	}
 
-	metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
-	return s.WriteRawMsg(Message{Code: msgcode, Size: uint32(size), Payload: r})
+	// metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
+	return s.WriteRawMsg(msgcode, buf)
 }
 
-func (s *Session) handleStreamMessage(msg *Message) {
-	stream := s.getStream(msg.Code)
-	stream.readData(msg)
+func (s *Session) handleStreamMessage(code uint64, buf []byte) {
+	stream := s.getStream(code)
+	stream.readData(code, buf)
 }
 
-func (s *Session) WriteRawMsg(msg Message) error {
+func (s *Session) WriteRawMsg(code uint64, buf []byte) error {
 	// check if the connection is open
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
@@ -526,87 +446,223 @@ func (s *Session) WriteRawMsg(msg Message) error {
 		return ErrStreamClosed
 	}
 
-	s.wmu.Lock()
-	defer s.wmu.Unlock()
+	s.out.Lock()
+	defer s.out.Unlock()
 
-	ptype, err := rlp.EncodeToBytes(msg.Code)
+	return s.out.write(code, buf)
+}
+
+const (
+	maxUint24 = 1<<24 - 1
+)
+
+var (
+	empty = make([]byte, 16)
+)
+
+func extendByteSlice(b []byte, needLen int) []byte {
+	b = b[:cap(b)]
+	if n := needLen - cap(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+	return b[:needLen]
+}
+
+type halfConn struct {
+	sync.Mutex
+
+	conn io.ReadWriter
+
+	snappy bool
+	buf    []byte
+	tmp    []byte
+
+	aes    [aes.BlockSize]byte
+	header [32]byte
+
+	stream cipher.Stream
+	block  cipher.Block
+	mac    hash.Hash
+}
+
+func (s *halfConn) read() (uint64, []byte, error) {
+	// read the header
+	if _, err := io.ReadFull(s.conn, s.header[:]); err != nil {
+		return 0, nil, err
+	}
+
+	// verify header mac (16..32)
+	if !hmac.Equal(s.updateMacWithHeader(), s.header[16:]) {
+		return 0, nil, fmt.Errorf("incorrect header mac")
+	}
+	// decrypt header
+	s.stream.XORKeyStream(s.header[:16], s.header[:16])
+
+	// Decode the size (24 bits)
+	size := uint32(s.header[2]) | uint32(s.header[1])<<8 | uint32(s.header[0])<<16
+
+	// Consider padding to decode full size
+	fullSize := size
+	if padding := size % 16; padding > 0 {
+		fullSize += 16 - padding
+	}
+
+	s.buf = extendByteSlice(s.buf, int(fullSize))
+	if _, err := io.ReadFull(s.conn, s.buf[:]); err != nil {
+		return 0, nil, err
+	}
+	s.mac.Write(s.buf)
+
+	// read payload mac
+	if _, err := io.ReadFull(s.conn, s.header[:16]); err != nil {
+		return 0, nil, err
+	}
+
+	// verify payload mac
+	if !hmac.Equal(s.updateMac(), s.header[:16]) {
+		return 0, nil, fmt.Errorf("incorrect payload mac")
+	}
+	// decrypt payload
+	s.stream.XORKeyStream(s.buf, s.buf)
+
+	// read the rlp code at the beginning. Note, since current eth63 messages are not
+	// bigger than one byte, we only expect codes of one byte, otherwise it will return error.
+	code, content, err := s.readCode(s.buf[:size])
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if s.snappy {
+		size, err := snappy.DecodedLen(content)
+		if err != nil {
+			return 0, nil, err
+		}
+		s.tmp = extendByteSlice(s.tmp, size)
+		s.tmp, err = snappy.Decode(s.tmp, content)
+		if err != nil {
+			return 0, nil, fmt.Errorf("failed to decode snappy: %v", err)
+		}
+		content = s.tmp
+	}
+	return code, content, nil
+}
+
+// readCode in Rlp format
+func (s *halfConn) readCode(buf []byte) (uint64, []byte, error) {
+	cur := buf[0]
+	if cur < 0x80 {
+		return uint64(cur), buf[1:], nil
+	}
+	if cur < 0xB8 {
+		size := int(cur - 0x80)
+		if size > len(buf) {
+			return 0, nil, fmt.Errorf("incorrect length")
+		}
+		if size == 0 {
+			return 0, buf[1:], nil
+		}
+	}
+	return 0, nil, fmt.Errorf("rlpx msg code is too big")
+}
+
+func (s *halfConn) write(code uint64, buf []byte) error {
+	ptype, err := rlp.EncodeToBytes(code)
 	if err != nil {
 		return err
 	}
 
-	// if snappy is enabled, compress message now
-	if s.Snappy {
-		if msg.Size > maxUint24 {
-			return errPlainMessageTooLarge
-		}
-		payload, _ := ioutil.ReadAll(msg.Payload)
-		payload = snappy.Encode(nil, payload)
+	size := len(buf)
+	var payload []byte
 
-		msg.Payload = bytes.NewReader(payload)
-		msg.Size = uint32(len(payload))
+	// if snappy is enabled, compress message now
+	if s.snappy {
+		s.buf = extendByteSlice(s.buf, snappy.MaxEncodedLen(size))
+		s.buf = snappy.Encode(s.buf, buf)
+
+		size = len(s.buf)
+		payload = s.buf
+	} else {
+		s.buf = extendByteSlice(s.buf, size)
+		copy(s.buf, buf)
+		payload = s.buf
 	}
 
-	// write header
-	headbuf := make([]byte, 32)
-	fsize := uint32(len(ptype)) + msg.Size
-	if fsize > maxUint24 {
+	fullSize := len(ptype) + size
+	if fullSize > maxUint24 {
 		return errors.New("message size overflows uint24")
 	}
 
-	putInt24(fsize, headbuf) // TODO: check overflow
-	copy(headbuf[3:], zeroHeader)
-	s.enc.XORKeyStream(headbuf[:16], headbuf[:16]) // first half is now encrypted
+	// Encode the size as uint24
+	s.header[0] = byte(fullSize >> 16)
+	s.header[1] = byte(fullSize >> 8)
+	s.header[2] = byte(fullSize)
 
-	// write header MAC
-	copy(headbuf[16:], updateMAC(s.egressMAC, s.macCipher, headbuf[:16]))
-	if _, err := s.conn.Write(headbuf); err != nil {
+	// Encode 'zero' header
+	s.header[3] = 0xC0
+	s.header[4] = 0x80
+	s.header[5] = 0x80
+
+	// first half is encrypted
+	s.stream.XORKeyStream(s.header[:16], s.header[:16])
+
+	// send the first half part of the header
+	if _, err := s.conn.Write(s.header[:16]); err != nil {
+		return err
+	}
+	// send the mac of the header (16 bytes)
+	if _, err := s.conn.Write(s.updateMacWithHeader()); err != nil {
 		return err
 	}
 
-	// write encrypted frame, updating the egress MAC hash with
-	// the data written to conn.
-	tee := cipher.StreamWriter{S: s.enc, W: io.MultiWriter(s.conn, s.egressMAC)}
-	if _, err := tee.Write(ptype); err != nil {
+	// write the payload
+	if err := s.writeData(ptype); err != nil {
 		return err
 	}
-	if _, err := io.Copy(tee, msg.Payload); err != nil {
+	if err := s.writeData(payload); err != nil {
 		return err
 	}
-	if padding := fsize % 16; padding > 0 {
-		if _, err := tee.Write(zero16[:16-padding]); err != nil {
+	if padding := fullSize % 16; padding > 0 {
+		if err := s.writeData(append([]byte{}, empty[:16-padding]...)); err != nil {
 			return err
 		}
 	}
 
-	// write frame MAC. egress MAC hash is up to date because
-	// frame content was written to it as well.
-	fmacseed := s.egressMAC.Sum(nil)
-	mac := updateMAC(s.egressMAC, s.macCipher, fmacseed)
-	if _, err := s.conn.Write(mac); err != nil {
+	// write the mac of the payload
+	if _, err := s.conn.Write(s.updateMac()); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// updateMAC reseeds the given hash with encrypted seed.
-// it returns the first 16 bytes of the hash sum after seeding.
-func updateMAC(mac hash.Hash, block cipher.Block, seed []byte) []byte {
-	aesbuf := make([]byte, aes.BlockSize)
-	block.Encrypt(aesbuf, mac.Sum(nil))
-	for i := range aesbuf {
-		aesbuf[i] ^= seed[i]
+func (s *halfConn) writeData(b []byte) error {
+	// first make the xor
+	s.stream.XORKeyStream(b, b)
+
+	// write to connection
+	if _, err := s.conn.Write(b); err != nil {
+		return err
 	}
-	mac.Write(aesbuf)
-	return mac.Sum(nil)[:16]
+	// write to mac
+	if _, err := s.mac.Write(b); err != nil {
+		return err
+	}
+	return nil
 }
 
-func readInt24(b []byte) uint32 {
-	return uint32(b[2]) | uint32(b[1])<<8 | uint32(b[0])<<16
+func (s *halfConn) updateMacWithHeader() []byte {
+	return s.updateMacImpl(s.mac.Sum(nil), s.header[:16])
 }
 
-func putInt24(v uint32, b []byte) {
-	b[0] = byte(v >> 16)
-	b[1] = byte(v >> 8)
-	b[2] = byte(v)
+func (s *halfConn) updateMac() []byte {
+	src := s.mac.Sum(nil)
+	return s.updateMacImpl(src, src)
+}
+
+func (s *halfConn) updateMacImpl(src []byte, seed []byte) []byte {
+	s.block.Encrypt(s.aes[:], src)
+	for i := range s.aes {
+		s.aes[i] ^= seed[i]
+	}
+	s.mac.Write(s.aes[:])
+	return s.mac.Sum(nil)[:16]
 }
