@@ -62,6 +62,7 @@ func readConfig(cmd *cobra.Command, args []string) (*Config, error) {
 
 		cliConfig.Chain = chain
 		cliConfig.BindAddr, _ = cmd.Flags().GetString("addr")
+		cliConfig.BindPort, _ = cmd.Flags().GetInt("port")
 		cliConfig.DataDir, _ = cmd.Flags().GetString("data-dir")
 		cliConfig.ServiceName, _ = cmd.Flags().GetString("service")
 		cliConfig.Telemetry.PrometheusPort, _ = cmd.Flags().GetInt("prometheus")

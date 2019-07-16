@@ -103,14 +103,7 @@ func (s *Stream) Write(b []byte) (int, error) {
 	if len(b) != int(size) {
 		return 0, fmt.Errorf("Expected message of length %d but found %d", size, len(b))
 	}
-
-	msg := Message{
-		Code:    uint64(code) + s.offset,
-		Size:    size,
-		Payload: bytes.NewReader(b),
-	}
-
-	if err := s.conn.WriteRawMsg(msg); err != nil {
+	if err := s.conn.WriteRawMsg(uint64(code)+s.offset, b); err != nil {
 		return 0, err
 	}
 	return len(b), nil
@@ -172,28 +165,29 @@ func asyncNotify(ch chan struct{}) {
 }
 
 // readData is used to handle a data frame
-func (s *Stream) readData(msg *Message) error {
+func (s *Stream) readData(code uint64, buf []byte) error {
 	// Copy into buffer
 	s.recvLock.Lock()
 
+	size := len(buf)
+
 	if s.recvBuf == nil {
-		s.recvBuf = bytes.NewBuffer(make([]byte, 0, msg.Size+HeaderSize))
+		s.recvBuf = bytes.NewBuffer(make([]byte, 0, size+HeaderSize))
 	}
 
 	var h Header
 	h = make([]byte, HeaderSize)
-	h.Encode(uint16(msg.Code-uint64(s.offset)), msg.Size)
+	h.Encode(uint16(code-uint64(s.offset)), uint32(size))
 
 	if _, err := s.recvBuf.Write(h); err != nil {
 		s.recvLock.Unlock()
 		return err
 	}
 
-	if _, err := copyZeroAlloc(s.recvBuf, msg.Payload); err != nil {
+	if _, err := s.recvBuf.Write(buf); err != nil {
 		s.recvLock.Unlock()
 		return err
 	}
-
 	s.recvLock.Unlock()
 
 	// Unblock any readers

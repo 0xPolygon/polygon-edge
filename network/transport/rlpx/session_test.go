@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/rlp"
 )
 
 const (
@@ -19,6 +19,7 @@ const (
 type message struct {
 	code    uint64
 	payload []byte
+	err     error
 }
 
 type req struct {
@@ -32,13 +33,14 @@ type resp struct {
 	err error
 }
 
-func readMsgCh(conn *Session) chan Message {
-	msgs := make(chan Message, 10)
+func readMsgCh(conn *Session) chan message {
+	msgs := make(chan message, 10)
 	go func() {
 		for {
-			msg, err := conn.ReadMsg()
+			code, buf, err := conn.ReadMsg()
+			msg := message{code: code, payload: buf}
 			if err != nil {
-				msg.Err = err
+				msg.err = err
 			}
 			msgs <- msg
 		}
@@ -67,14 +69,14 @@ func testConn(c0, c1 *Session, msgs []req) error {
 				case msg := <-msgs:
 					r := &resp{id: id}
 
-					if msg.Err != nil {
-						r.err = msg.Err
+					if msg.err != nil {
+						r.err = msg.err
 					} else {
 						var payload []byte
-						if err := rlp.DecodeReader(msg.Payload, &payload); err != nil {
+						if err := rlp.DecodeBytes(msg.payload, &payload); err != nil {
 							r.err = err
 						} else {
-							r.msg = message{code: msg.Code, payload: payload}
+							r.msg = message{code: msg.code, payload: payload}
 						}
 					}
 					responses <- r
@@ -132,8 +134,8 @@ func TestNonSnappyConn(t *testing.T) {
 func TestSnappyConn(t *testing.T) {
 	c0, c1 := testP2PHandshake(t)
 
-	c0.Snappy = true
-	c1.Snappy = true
+	c0.SetSnappy()
+	c1.SetSnappy()
 
 	if err := testConn(c0, c1, connCases); err != nil {
 		t.Fatal(err.Error())
@@ -142,7 +144,7 @@ func TestSnappyConn(t *testing.T) {
 
 func TestOnlyOneSnappyConn(t *testing.T) {
 	c0, c1 := testP2PHandshake(t)
-	c0.Snappy = true
+	c0.SetSnappy()
 
 	if err := testConn(c0, c1, connCases); err == nil {
 		t.Fatal("Only conn0 with snappy enabled, it should fail")

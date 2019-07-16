@@ -2,11 +2,10 @@ package rlpx
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/helper/enode"
+	"github.com/umbracle/minimal/rlp"
 )
 
 const (
@@ -73,9 +72,9 @@ func (d DiscReason) Error() string {
 	return d.String()
 }
 
-func decodeDiscMsg(msg io.Reader) DiscReason {
+func decodeDiscMsg(buf []byte) DiscReason {
 	var reason [1]DiscReason
-	if err := rlp.DecodeReader(msg, &reason); err != nil {
+	if err := rlp.DecodeBytes(buf, &reason); err != nil {
 		return DiscUnknown
 	}
 	return reason[0]
