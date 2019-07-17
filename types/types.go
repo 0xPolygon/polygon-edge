@@ -215,7 +215,7 @@ func (h *Header) MarshalWith(arena *rlpv2.Arena) *rlpv2.Value {
 	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
 	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.LogsBloom[:]))
+	vv.Set(arena.NewCopyBytes(h.LogsBloom[:]))
 
 	vv.Set(arena.NewUint(h.Difficulty))
 	vv.Set(arena.NewUint(h.Number))
