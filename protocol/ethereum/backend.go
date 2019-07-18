@@ -352,13 +352,16 @@ func (b *Backend) Dequeue() *Job {
 	return job
 }
 
-func (b *Backend) Deliver(context string, id uint32, data interface{}, err error) {
+func (b *Backend) Deliver(context string, peerID string, id uint32, data interface{}, err error) {
 	b.deliverLock.Lock()
 	defer b.deliverLock.Unlock()
 
 	if err != nil {
 		// TODO, we need to set here the thing that was not deliver as waiting to be dequeued again
-		fmt.Printf("=> Failed to deliver (%d): %v\n", id, err)
+		fmt.Printf("=> Failed to deliver peer %s %s (%d): %v\n", context, peerID, id, err)
+
+		// b.logger.Trace("failed to deliver", context, "peer", peerID, "job", id)
+
 		if err := b.queue.updateFailedElem(id, context); err != nil {
 			fmt.Printf("Could not be updated: %v\n", err)
 		}
@@ -367,7 +370,7 @@ func (b *Backend) Deliver(context string, id uint32, data interface{}, err error
 
 	switch obj := data.(type) {
 	case []*types.Header:
-		b.logger.Trace("deliver headers", "count", len(obj))
+		b.logger.Trace("deliver headers", "peerID", peerID, "job", id, "count", len(obj))
 
 		// fmt.Printf("deliver headers %d: %d\n", id, len(obj))
 		if err := b.queue.deliverHeaders(id, obj); err != nil {
@@ -375,7 +378,7 @@ func (b *Backend) Deliver(context string, id uint32, data interface{}, err error
 		}
 
 	case []*types.Body:
-		b.logger.Trace("deliver bodies", "count", len(obj))
+		b.logger.Trace("deliver bodies", "peerID", peerID, "job", id, "count", len(obj))
 
 		// fmt.Printf("deliver bodies %d: %d\n", id, len(obj))
 		if err := b.queue.deliverBodies(id, obj); err != nil {
@@ -383,7 +386,7 @@ func (b *Backend) Deliver(context string, id uint32, data interface{}, err error
 		}
 
 	case [][]*types.Receipt:
-		b.logger.Trace("deliver receipts", "count", len(obj))
+		b.logger.Trace("deliver receipts", "peerID", peerID, "job", id, "count", len(obj))
 
 		// fmt.Printf("deliver receipts %d: %d\n", id, len(obj))
 		if err := b.queue.deliverReceipts(id, obj); err != nil {
@@ -683,25 +686,27 @@ func (t *task) Run() bool {
 	case *HeadersJob:
 		// fmt.Printf("SYNC HEADERS (%s): %d %d\n", id, job.block, job.count)
 
-		t.backend.logger.Trace("sync headers", "id", id, "from", job.block, "count", job.count)
+		t.backend.logger.Trace("sync headers", "peerID", id, "job", t.job.id, "from", job.block, "count", job.count)
 
 		data, err = conn.RequestHeadersRangeSync(ctx, job.block, job.count)
 		context = "headers"
 	case *BodiesJob:
 		// fmt.Printf("SYNC BODIES (%s): %d\n", id, len(job.hashes))
 
-		t.backend.logger.Trace("sync bodies", "id", id, "num", len(job.hashes))
+		t.backend.logger.Trace("sync bodies", "peerID", id, "job", t.job.id, "num", len(job.hashes))
 
 		data, err = conn.RequestBodiesSync(ctx, job.hash, job.hashes)
 		context = "bodies"
 	case *ReceiptsJob:
 		// fmt.Printf("SYNC RECEIPTS (%s): %d\n", id, len(job.hashes))
 
-		t.backend.logger.Trace("sync receipts", "id", id, "num", len(job.hashes))
+		t.backend.logger.Trace("sync receipts", "peerID", id, "job", t.job.id, "num", len(job.hashes))
 
 		data, err = conn.RequestReceiptsSync(ctx, job.hash, job.hashes)
 		context = "receipts"
 	}
+
+	var failed bool
 
 	// set the error to the context content
 	if ctx.Err() != nil {
@@ -712,12 +717,12 @@ func (t *task) Run() bool {
 	if err != nil {
 		if err.Error() == "session closed" {
 			// remove the peer from the list of peers if the session has been closed
-			return true
+			failed = true
 		}
 	}
 
-	t.backend.Deliver(context, t.job.id, data, err)
-	return false
+	t.backend.Deliver(context, t.peerID, t.job.id, data, err)
+	return failed
 }
 
 func (t *task) Close() {
