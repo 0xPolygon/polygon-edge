@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/helper/hex"
 
@@ -52,6 +53,8 @@ type Blockchain struct {
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
+
+	daoBlock uint64
 }
 
 // NewBlockchain creates a new blockchain object
@@ -64,6 +67,7 @@ func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Conse
 		params:      params,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
+		daoBlock:    dao.DAOForkBlock,
 	}
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
@@ -640,12 +644,25 @@ func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx
 	return s2, root, txns, nil
 }
 
+// SetDAOBlock sets the dao block, only to be used during tests
+func (b *Blockchain) SetDAOBlock(n uint64) {
+	b.daoBlock = n
+}
+
 func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapshot, []byte, []*types.Receipt, uint64, error) {
 	header := block.Header
-
-	// add the rewards
-	// txn := s.Txn()
 	txn := state.NewTxn(b.state, s)
+
+	// Mainnet
+	if b.params.ChainID == 1 && block.Number() == b.daoBlock {
+		// Apply the DAO hard fork. Move all the balances from 'drain accounts'
+		// to a single refund contract.
+		for _, i := range dao.DAODrainAccounts {
+			addr := types.StringToAddress(i)
+			txn.AddBalance(dao.DAORefundContract, txn.GetBalance(addr))
+			txn.SetBalance(addr, big.NewInt(0))
+		}
+	}
 
 	// start the gasPool
 	config := b.params.Forks.At(block.Number())
@@ -656,8 +673,6 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 	totalGas := uint64(0)
 
 	receipts := []*types.Receipt{}
-
-	// chainID := big.NewInt(int64(b.params.ChainID))
 
 	// apply the transactions
 	for indx, tx := range block.Transactions {

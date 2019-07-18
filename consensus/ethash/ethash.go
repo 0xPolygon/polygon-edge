@@ -11,6 +11,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 )
@@ -21,10 +22,11 @@ var (
 
 // Ethash is the ethash consensus algorithm
 type Ethash struct {
-	config  *chain.Params
-	cache   *lru.Cache
-	fakePow bool
-	path    string
+	config   *chain.Params
+	cache    *lru.Cache
+	fakePow  bool
+	path     string
+	daoBlock uint64
 
 	// tmp is the seal hash tmp variable
 	tmp []byte
@@ -43,9 +45,10 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 
 	cache, _ := lru.New(2)
 	e := &Ethash{
-		config: config.Params,
-		cache:  cache,
-		path:   pathStr,
+		config:   config.Params,
+		cache:    cache,
+		path:     pathStr,
+		daoBlock: dao.DAOForkBlock,
 	}
 	return e, nil
 }
@@ -120,7 +123,18 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		}
 	}
 
+	// Verify dao hard fork
+	if e.config.ChainID == 1 && header.Number-e.daoBlock < dao.DAOForkExtraDataRange {
+		if !bytes.Equal(header.ExtraData[:], dao.DAOForkExtraData) {
+			return fmt.Errorf("dao hard fork extradata is not correct")
+		}
+	}
 	return nil
+}
+
+// SetDAOBlock sets the dao block, only to be used during tests
+func (e *Ethash) SetDAOBlock(n uint64) {
+	e.daoBlock = n
 }
 
 func (e *Ethash) getCache(blockNumber uint64) (*Cache, error) {

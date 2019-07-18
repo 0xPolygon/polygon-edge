@@ -88,7 +88,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatal(err)
 	}
 
-	params := &chain.Params{Forks: config}
+	params := &chain.Params{Forks: config, ChainID: 1}
 
 	var fakePow bool
 	if c.SealEngine == "NoProof" {
@@ -109,6 +109,12 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	b := blockchain.NewBlockchain(s, st, engine, params)
 	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
+	}
+
+	// Change the dao block
+	if c.Network == "HomesteadToDaoAt5" {
+		b.SetDAOBlock(5)
+		engine.(*ethash.Ethash).SetDAOBlock(5)
 	}
 
 	b.SetPrecompiled(builtins)
@@ -294,8 +300,7 @@ func TestBlockchainWallet(t *testing.T) {
 
 func TestBlockchainTransitionTests(t *testing.T) {
 	testBlockChainCases(t, "TransitionTests", []string{
-		"blockChainFrontier",
-		"DaoTransactions", // TODO
+		"blockChainFrontier", // TODO
 	})
 }
 
