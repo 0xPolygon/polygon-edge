@@ -313,7 +313,7 @@ func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandle
 
 	logger := b.logger.Named(fmt.Sprintf("peer-%s", peerID))
 
-	proto := NewEthereumProtocol(peerID, logger, conn, b.blockchain)
+	proto := NewEthereumProtocol(peer.Session(), peerID, logger, conn, b.blockchain)
 	proto.backend = b
 
 	b.peersLock.Lock()

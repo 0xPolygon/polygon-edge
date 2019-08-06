@@ -418,7 +418,7 @@ func (s *Server) connectWithEnode(rawURL string) error {
 }
 
 func (s *Server) addSession(session Session) error {
-	p := newPeer(session, s)
+	p := newPeer(session)
 
 	instances := []*Instance{}
 	var instanceLock sync.Mutex

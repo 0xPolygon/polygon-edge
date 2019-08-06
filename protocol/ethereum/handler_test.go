@@ -1,6 +1,7 @@
 package ethereum
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -9,10 +10,13 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -24,7 +28,7 @@ func newTestEthereumProto(peerID string, conn net.Conn, b *blockchain.Blockchain
 	if peerID == "" {
 		peerID = "1"
 	}
-	return NewEthereumProtocol(peerID, logger, conn, b)
+	return NewEthereumProtocol(&mockSession{}, peerID, logger, conn, b)
 }
 
 var status = Status{
@@ -503,4 +507,70 @@ func TestFailedQueries(t *testing.T) {
 			}
 		})
 	}
+}
+
+func pipeMock() (*mockSession, *mockSession) {
+	closeCh := make(chan struct{})
+
+	conn0, conn1 := net.Pipe()
+	return &mockSession{closeCh, conn0}, &mockSession{closeCh, conn1}
+}
+
+type mockSession struct {
+	closeCh chan struct{}
+	conn    net.Conn
+}
+
+func (m *mockSession) Streams() []network.Stream {
+	return nil
+}
+
+func (m *mockSession) GetInfo() network.Info {
+	return network.Info{}
+}
+
+func (m *mockSession) CloseChan() <-chan struct{} {
+	return m.closeCh
+}
+
+func (m *mockSession) IsClosed() bool {
+	if m.closeCh == nil {
+		return false
+	}
+	select {
+	case <-m.closeCh:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *mockSession) Close() error {
+	close(m.closeCh)
+	m.conn.Close()
+	return nil
+}
+
+func TestPeerDisconnection(t *testing.T) {
+	// Do not show a warn message if we were aware of the disconnection
+	in, out := pipeMock()
+
+	buf := bytes.NewBuffer(nil)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Output: buf,
+	})
+
+	e := &Ethereum{}
+	e.logger = logger
+	e.session = in
+	e.conn = in.conn
+
+	go func() {
+		e.listen()
+	}()
+
+	out.Close()
+
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, 0, buf.Len())
 }

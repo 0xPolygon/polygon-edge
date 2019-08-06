@@ -42,7 +42,7 @@ type Peer struct {
 	protocols []*Instance
 }
 
-func newPeer(conn Session, server *Server) *Peer {
+func newPeer(conn Session) *Peer {
 	info := conn.GetInfo()
 	id := info.Enode.ID.String()
 
@@ -56,6 +56,11 @@ func newPeer(conn Session, server *Server) *Peer {
 	}
 
 	return peer
+}
+
+// Session returns the session of the peer
+func (p *Peer) Session() Session {
+	return p.conn
 }
 
 // GetProtocols returns all the protocols of the peer

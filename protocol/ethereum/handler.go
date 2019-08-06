@@ -15,6 +15,7 @@ import (
 
 	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/network"
 
 	"github.com/armon/go-metrics"
 
@@ -155,19 +156,20 @@ type Ethereum struct {
 	recvHeader rlpx.Header
 
 	// peer *PeerConnection
-	peerID string
+	session network.Session
+	peerID  string
 }
 
 // NotifyMsg notifies that there is a new block
 type NotifyMsg struct {
 	Block *types.Block
-	// Peer  *PeerConnection
-	Diff *big.Int
+	Diff  *big.Int
 }
 
 // NewEthereumProtocol creates the ethereum protocol
-func NewEthereumProtocol(peerID string, logger hclog.Logger, conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
+func NewEthereumProtocol(session network.Session, peerID string, logger hclog.Logger, conn net.Conn, blockchain *blockchain.Blockchain) *Ethereum {
 	e := &Ethereum{
+		session:    session,
 		logger:     logger,
 		peerID:     peerID,
 		conn:       conn,
@@ -366,7 +368,9 @@ func (e *Ethereum) listen() {
 	for {
 		msg, err := e.readMsg()
 		if err != nil {
-			e.logger.Warn("failed to read msg", err.Error())
+			if !e.session.IsClosed() {
+				e.logger.Warn("failed to read msg", err.Error())
+			}
 			break
 		}
 
