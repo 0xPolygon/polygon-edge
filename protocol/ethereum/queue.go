@@ -35,14 +35,19 @@ const (
 )
 
 type queue struct {
-	front, back *element
-	seq         uint32
-	head        types.Hash // head of the sync chain
-	lock        *sync.Mutex
+	front, back     *element
+	seq             uint32
+	head            types.Hash // head of the sync chain
+	lock            *sync.Mutex
+	disableReceipts bool
 }
 
 func newQueue() *queue {
 	return &queue{lock: &sync.Mutex{}}
+}
+
+func (q *queue) DisableReceipts() {
+	q.disableReceipts = true
 }
 
 func (q *queue) addBack(block uint64) {
@@ -143,7 +148,7 @@ func (q *queue) deliverHeaders(id uint32, headers []*types.Header) error {
 		}
 	}
 
-	if len(receipts) != 0 {
+	if !q.disableReceipts && len(receipts) != 0 {
 		elem.receiptsStatus = waitingX
 		elem.receiptsHeaders = receipts
 	}
