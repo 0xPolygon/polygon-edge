@@ -98,6 +98,7 @@ func NewBackend(minimal *minimal.Minimal, logger hclog.Logger, blockchain *block
 
 	b.queue.front = b.queue.newItem(header.Number + 1)
 	b.queue.head = header.Hash()
+	b.queue.DisableReceipts()
 
 	logger.Info("Header", "num", header.Number, "hash", header.Hash().String())
 
