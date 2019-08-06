@@ -4,220 +4,282 @@ import (
 	"fmt"
 )
 
-// From geth
+// OpCode is the EVM operation code
+type OpCode int
 
-// OpCode is an EVM opcode
-type OpCode byte
-
-// 0x0 range - arithmetic ops.
 const (
-	STOP OpCode = iota
-	ADD
-	MUL
-	SUB
-	DIV
-	SDIV
-	MOD
-	SMOD
-	ADDMOD
-	MULMOD
-	EXP
-	SIGNEXTEND
-)
+	// STOP halts execution of the contract
+	STOP OpCode = 0x0
 
-// 0x10 range - comparison ops.
-const (
-	LT OpCode = iota + 0x10
-	GT
-	SLT
-	SGT
-	EQ
-	ISZERO
-	AND
-	OR
-	XOR
-	NOT
-	BYTE
-	SHL
-	SHR
-	SAR
+	// ADD performs (u)int256 addition modulo 2**256
+	ADD = 0x01
 
+	// MUL performs (u)int256 multiplication modulo 2**256
+	MUL = 0x02
+
+	// SUB performs (u)int256 subtraction modulo 2**256
+	SUB = 0x03
+
+	// DIV performs uint256 division
+	DIV = 0x04
+
+	// SDIV performs int256 division
+	SDIV = 0x05
+
+	// MOD performs uint256 modulus
+	MOD = 0x06
+
+	// SMOD performs int256 modulus
+	SMOD = 0x07
+
+	// ADDMOD performs (u)int256 addition modulo N
+	ADDMOD = 0x08
+
+	// MULMOD performs (u)int256 multiplication modulo N
+	MULMOD = 0x09
+
+	// EXP performs uint256 exponentiation modulo 2**256
+	EXP = 0x0A
+
+	// SIGNEXTEND performs sign extends x from (b + 1) * 8 bits to 256 bits.
+	SIGNEXTEND = 0x0B
+
+	// LT performs int256 comparison
+	LT = 0x10
+
+	// GT performs int256 comparison
+	GT = 0x11
+
+	// SLT performs int256 comparison
+	SLT = 0x12
+
+	// SGT performs int256 comparison
+	SGT = 0x13
+
+	// EQ performs (u)int256 equality
+	EQ = 0x14
+
+	// ISZERO checks if (u)int256 is zero
+	ISZERO = 0x15
+
+	// AND performs 256-bit bitwise and
+	AND = 0x16
+
+	// OR performs 256-bit bitwise or
+	OR = 0x17
+
+	// XOR performs 256-bit bitwise xor
+	XOR = 0x18
+
+	// NOT performs 256-bit bitwise not
+	NOT = 0x19
+
+	// BYTE returns the ith byte of (u)int256 x counting from most significant byte
+	BYTE = 0x1A
+
+	// SHL performs a shift left
+	SHL = 0x1B
+
+	// SHR performs a logical shift right
+	SHR = 0x1C
+
+	// SAR performs an arithmetic shift right
+	SAR = 0x1D
+
+	// SHA3 performs the keccak256 hash function
 	SHA3 = 0x20
+
+	// ADDRESS returns the address of the executing contract
+	ADDRESS = 0x30
+
+	// BALANCE returns the address balance in wei
+	BALANCE = 0x31
+
+	// ORIGIN returns the transaction origin address
+	ORIGIN = 0x32
+
+	// CALLER returns the message caller address
+	CALLER = 0x33
+
+	// CALLVALUE returns the message funds in wei
+	CALLVALUE = 0x34
+
+	// CALLDATALOAD reads a (u)int256 from message data
+	CALLDATALOAD = 0x35
+
+	// CALLDATASIZE returns the message data length in bytes
+	CALLDATASIZE = 0x36
+
+	// CALLDATACOPY copies the message data
+	CALLDATACOPY = 0x37
+
+	// CODESIZE returns the length of the executing contract's code in bytes
+	CODESIZE = 0x38
+
+	// CODECOPY copies the executing contract bytecode
+	CODECOPY = 0x39
+
+	// GASPRICE returns the gas price of the executing transaction, in wei per unit of gas
+	GASPRICE = 0x3A
+
+	// EXTCODESIZE returns the length of the contract bytecode at addr
+	EXTCODESIZE = 0x3B
+
+	// EXTCODECOPY copies the contract bytecode
+	EXTCODECOPY = 0x3C
+
+	// RETURNDATASIZE returns the size of the returned data from the last external call in bytes
+	RETURNDATASIZE = 0x3D
+
+	// RETURNDATACOPY copies the returned data
+	RETURNDATACOPY = 0x3E
+
+	// EXTCODEHASH returns the hash of the specified contract bytecode
+	EXTCODEHASH = 0x3F
+
+	// BLOCKHASH returns the hash of the specific block. Only valid for the last 256 most recent blocks
+	BLOCKHASH = 0x40
+
+	// COINBASE returns the address of the current block's miner
+	COINBASE = 0x41
+
+	// TIMESTAMP returns the current block's Unix timestamp in seconds
+	TIMESTAMP = 0x42
+
+	// NUMBER returns the current block's number
+	NUMBER = 0x43
+
+	// DIFFICULTY returns the current block's difficulty
+	DIFFICULTY = 0x44
+
+	// GASLIMIT returns the current block's gas limit
+	GASLIMIT = 0x45
+
+	// POP pops a (u)int256 off the stack and discards it
+	POP = 0x50
+
+	// MLOAD reads a (u)int256 from memory
+	MLOAD = 0x51
+
+	// MSTORE writes a (u)int256 to memory
+	MSTORE = 0x52
+
+	// MSTORE8 writes a uint8 to memory
+	MSTORE8 = 0x53
+
+	// SLOAD reads a (u)int256 from storage
+	SLOAD = 0x54
+
+	// SSTORE writes a (u)int256 to storage
+	SSTORE = 0x55
+
+	// JUMP performs an unconditional jump
+	JUMP = 0x56
+
+	// JUMPI performs a conditional jump if condition is truthy
+	JUMPI = 0x57
+
+	// PC returns the program counter
+	PC = 0x58
+
+	// MSIZE returns the size of memory for this contract execution, in bytes
+	MSIZE = 0x59
+
+	// GAS returns the remaining gas
+	GAS = 0x5A
+
+	// JUMPDEST corresponds to a possible jump destination
+	JUMPDEST = 0x5B
+
+	// PUSH1 pushes a 1-byte value onto the stack
+	PUSH1 = 0x60
+
+	// PUSH32 pushes a 32-byte value onto the stack
+	PUSH32 = 0x7F
+
+	// DUP1 clones the last value on the stack
+	DUP1 = 0x80
+
+	// DUP16 clones the 16th last value on the stack
+	DUP16 = 0x8F
+
+	// SWAP1 swaps the last two values on the stack
+	SWAP1 = 0x90
+
+	// SWAP16 swaps the top of the stack with the 17th last element
+	SWAP16 = 0x9F
+
+	// LOG0 fires an event without topics
+	LOG0 = 0xA0
+
+	// LOG1 fires an event with one topic
+	LOG1 = 0xA1
+
+	// LOG2 fires an event with two topics
+	LOG2 = 0xA2
+
+	// LOG3 fires an event with three topics
+	LOG3 = 0xA3
+
+	// LOG4 fires an event with four topics
+	LOG4 = 0xA4
+
+	// CREATE creates a child contract
+	CREATE = 0xF0
+
+	// CALL calls a method in another contract
+	CALL = 0xF1
+
+	// CALLCODE calls a method in another contract
+	CALLCODE = 0xF2
+
+	// RETURN returns from this contract call
+	RETURN = 0xF3
+
+	// DELEGATECALL calls a method in another contract using the storage of the current contract
+	DELEGATECALL = 0xF4
+
+	// CREATE2 creates a child contract with a salt
+	CREATE2 = 0xF5
+
+	// STATICCALL calls a method in another contract
+	STATICCALL = 0xFA
+
+	// REVERT reverts with return data
+	REVERT = 0xFD
+
+	// SELFDESTRUCT destroys the contract and sends all funds to addr
+	SELFDESTRUCT = 0xFF
 )
 
-// 0x30 range - closure state.
-const (
-	ADDRESS OpCode = 0x30 + iota
-	BALANCE
-	ORIGIN
-	CALLER
-	CALLVALUE
-	CALLDATALOAD
-	CALLDATASIZE
-	CALLDATACOPY
-	CODESIZE
-	CODECOPY
-	GASPRICE
-	EXTCODESIZE
-	EXTCODECOPY
-	RETURNDATASIZE
-	RETURNDATACOPY
-	EXTCODEHASH
-)
-
-// 0x40 range - block operations.
-const (
-	BLOCKHASH OpCode = 0x40 + iota
-	COINBASE
-	TIMESTAMP
-	NUMBER
-	DIFFICULTY
-	GASLIMIT
-)
-
-// 0x50 range - 'storage' and execution.
-const (
-	POP OpCode = 0x50 + iota
-	MLOAD
-	MSTORE
-	MSTORE8
-	SLOAD
-	SSTORE
-	JUMP
-	JUMPI
-	PC
-	MSIZE
-	GAS
-	JUMPDEST
-)
-
-// 0x60 range.
-const (
-	PUSH1 OpCode = 0x60 + iota
-	PUSH2
-	PUSH3
-	PUSH4
-	PUSH5
-	PUSH6
-	PUSH7
-	PUSH8
-	PUSH9
-	PUSH10
-	PUSH11
-	PUSH12
-	PUSH13
-	PUSH14
-	PUSH15
-	PUSH16
-	PUSH17
-	PUSH18
-	PUSH19
-	PUSH20
-	PUSH21
-	PUSH22
-	PUSH23
-	PUSH24
-	PUSH25
-	PUSH26
-	PUSH27
-	PUSH28
-	PUSH29
-	PUSH30
-	PUSH31
-	PUSH32
-	DUP1
-	DUP2
-	DUP3
-	DUP4
-	DUP5
-	DUP6
-	DUP7
-	DUP8
-	DUP9
-	DUP10
-	DUP11
-	DUP12
-	DUP13
-	DUP14
-	DUP15
-	DUP16
-	SWAP1
-	SWAP2
-	SWAP3
-	SWAP4
-	SWAP5
-	SWAP6
-	SWAP7
-	SWAP8
-	SWAP9
-	SWAP10
-	SWAP11
-	SWAP12
-	SWAP13
-	SWAP14
-	SWAP15
-	SWAP16
-)
-
-// 0xa0 range - logging ops.
-const (
-	LOG0 OpCode = 0xa0 + iota
-	LOG1
-	LOG2
-	LOG3
-	LOG4
-)
-
-// 0xf0 range - closures.
-const (
-	CREATE OpCode = 0xf0 + iota
-	CALL
-	CALLCODE
-	RETURN
-	DELEGATECALL
-	CREATE2
-	STATICCALL = 0xfa
-
-	REVERT       = 0xfd
-	SELFDESTRUCT = 0xff
-)
-
-// Since the opcodes aren't all in order we can't use a regular slice.
 var opCodeToString = map[OpCode]string{
-	// 0x0 range - arithmetic ops.
-	STOP:       "STOP",
-	ADD:        "ADD",
-	MUL:        "MUL",
-	SUB:        "SUB",
-	DIV:        "DIV",
-	SDIV:       "SDIV",
-	MOD:        "MOD",
-	SMOD:       "SMOD",
-	EXP:        "EXP",
-	NOT:        "NOT",
-	LT:         "LT",
-	GT:         "GT",
-	SLT:        "SLT",
-	SGT:        "SGT",
-	EQ:         "EQ",
-	ISZERO:     "ISZERO",
-	SIGNEXTEND: "SIGNEXTEND",
-
-	// 0x10 range - bit ops.
-	AND:    "AND",
-	OR:     "OR",
-	XOR:    "XOR",
-	BYTE:   "BYTE",
-	SHL:    "SHL",
-	SHR:    "SHR",
-	SAR:    "SAR",
-	ADDMOD: "ADDMOD",
-	MULMOD: "MULMOD",
-
-	// 0x20 range - crypto.
-	SHA3: "SHA3",
-
-	// 0x30 range - closure state.
+	STOP:           "STOP",
+	ADD:            "ADD",
+	MUL:            "MUL",
+	SUB:            "SUB",
+	DIV:            "DIV",
+	SDIV:           "SDIV",
+	MOD:            "MOD",
+	SMOD:           "SMOD",
+	EXP:            "EXP",
+	NOT:            "NOT",
+	LT:             "LT",
+	GT:             "GT",
+	SLT:            "SLT",
+	SGT:            "SGT",
+	EQ:             "EQ",
+	ISZERO:         "ISZERO",
+	SIGNEXTEND:     "SIGNEXTEND",
+	AND:            "AND",
+	OR:             "OR",
+	XOR:            "XOR",
+	BYTE:           "BYTE",
+	SHL:            "SHL",
+	SHR:            "SHR",
+	SAR:            "SAR",
+	ADDMOD:         "ADDMOD",
+	MULMOD:         "MULMOD",
+	SHA3:           "SHA3",
 	ADDRESS:        "ADDRESS",
 	BALANCE:        "BALANCE",
 	ORIGIN:         "ORIGIN",
@@ -234,129 +296,57 @@ var opCodeToString = map[OpCode]string{
 	RETURNDATASIZE: "RETURNDATASIZE",
 	RETURNDATACOPY: "RETURNDATACOPY",
 	EXTCODEHASH:    "EXTCODEHASH",
+	BLOCKHASH:      "BLOCKHASH",
+	COINBASE:       "COINBASE",
+	TIMESTAMP:      "TIMESTAMP",
+	NUMBER:         "NUMBER",
+	DIFFICULTY:     "DIFFICULTY",
+	GASLIMIT:       "GASLIMIT",
+	POP:            "POP",
+	MLOAD:          "MLOAD",
+	MSTORE:         "MSTORE",
+	MSTORE8:        "MSTORE8",
+	SLOAD:          "SLOAD",
+	SSTORE:         "SSTORE",
+	JUMP:           "JUMP",
+	JUMPI:          "JUMPI",
+	PC:             "PC",
+	MSIZE:          "MSIZE",
+	GAS:            "GAS",
+	JUMPDEST:       "JUMPDEST",
+	CREATE:         "CREATE",
+	CALL:           "CALL",
+	RETURN:         "RETURN",
+	CALLCODE:       "CALLCODE",
+	DELEGATECALL:   "DELEGATECALL",
+	CREATE2:        "CREATE2",
+	STATICCALL:     "STATICCALL",
+	REVERT:         "REVERT",
+	SELFDESTRUCT:   "SELFDESTRUCT",
+}
 
-	// 0x40 range - block operations.
-	BLOCKHASH:  "BLOCKHASH",
-	COINBASE:   "COINBASE",
-	TIMESTAMP:  "TIMESTAMP",
-	NUMBER:     "NUMBER",
-	DIFFICULTY: "DIFFICULTY",
-	GASLIMIT:   "GASLIMIT",
+func opCodesToString(from, to OpCode, str string) {
+	c := 1
+	if from == LOG0 {
+		c = 0
+	}
+	for i := from; i <= to; i++ {
+		opCodeToString[i] = fmt.Sprintf("%s%d", str, c)
+		c++
+	}
+}
 
-	// 0x50 range - 'storage' and execution.
-	POP: "POP",
-	//DUP:     "DUP",
-	//SWAP:    "SWAP",
-	MLOAD:    "MLOAD",
-	MSTORE:   "MSTORE",
-	MSTORE8:  "MSTORE8",
-	SLOAD:    "SLOAD",
-	SSTORE:   "SSTORE",
-	JUMP:     "JUMP",
-	JUMPI:    "JUMPI",
-	PC:       "PC",
-	MSIZE:    "MSIZE",
-	GAS:      "GAS",
-	JUMPDEST: "JUMPDEST",
-
-	// 0x60 range - push.
-	PUSH1:  "PUSH1",
-	PUSH2:  "PUSH2",
-	PUSH3:  "PUSH3",
-	PUSH4:  "PUSH4",
-	PUSH5:  "PUSH5",
-	PUSH6:  "PUSH6",
-	PUSH7:  "PUSH7",
-	PUSH8:  "PUSH8",
-	PUSH9:  "PUSH9",
-	PUSH10: "PUSH10",
-	PUSH11: "PUSH11",
-	PUSH12: "PUSH12",
-	PUSH13: "PUSH13",
-	PUSH14: "PUSH14",
-	PUSH15: "PUSH15",
-	PUSH16: "PUSH16",
-	PUSH17: "PUSH17",
-	PUSH18: "PUSH18",
-	PUSH19: "PUSH19",
-	PUSH20: "PUSH20",
-	PUSH21: "PUSH21",
-	PUSH22: "PUSH22",
-	PUSH23: "PUSH23",
-	PUSH24: "PUSH24",
-	PUSH25: "PUSH25",
-	PUSH26: "PUSH26",
-	PUSH27: "PUSH27",
-	PUSH28: "PUSH28",
-	PUSH29: "PUSH29",
-	PUSH30: "PUSH30",
-	PUSH31: "PUSH31",
-	PUSH32: "PUSH32",
-
-	DUP1:  "DUP1",
-	DUP2:  "DUP2",
-	DUP3:  "DUP3",
-	DUP4:  "DUP4",
-	DUP5:  "DUP5",
-	DUP6:  "DUP6",
-	DUP7:  "DUP7",
-	DUP8:  "DUP8",
-	DUP9:  "DUP9",
-	DUP10: "DUP10",
-	DUP11: "DUP11",
-	DUP12: "DUP12",
-	DUP13: "DUP13",
-	DUP14: "DUP14",
-	DUP15: "DUP15",
-	DUP16: "DUP16",
-
-	SWAP1:  "SWAP1",
-	SWAP2:  "SWAP2",
-	SWAP3:  "SWAP3",
-	SWAP4:  "SWAP4",
-	SWAP5:  "SWAP5",
-	SWAP6:  "SWAP6",
-	SWAP7:  "SWAP7",
-	SWAP8:  "SWAP8",
-	SWAP9:  "SWAP9",
-	SWAP10: "SWAP10",
-	SWAP11: "SWAP11",
-	SWAP12: "SWAP12",
-	SWAP13: "SWAP13",
-	SWAP14: "SWAP14",
-	SWAP15: "SWAP15",
-	SWAP16: "SWAP16",
-	LOG0:   "LOG0",
-	LOG1:   "LOG1",
-	LOG2:   "LOG2",
-	LOG3:   "LOG3",
-	LOG4:   "LOG4",
-
-	// 0xf0 range.
-	CREATE:       "CREATE",
-	CALL:         "CALL",
-	RETURN:       "RETURN",
-	CALLCODE:     "CALLCODE",
-	DELEGATECALL: "DELEGATECALL",
-	CREATE2:      "CREATE2",
-	STATICCALL:   "STATICCALL",
-	REVERT:       "REVERT",
-	SELFDESTRUCT: "SELFDESTRUCT",
+func init() {
+	// write push
+	opCodesToString(PUSH1, PUSH32, "PUSH")
+	// write dup
+	opCodesToString(DUP1, DUP16, "DUP")
+	// write log
+	opCodesToString(LOG0, LOG4, "LOG")
+	// write swap
+	opCodesToString(SWAP1, SWAP16, "SWAP")
 }
 
 func (op OpCode) String() string {
-	str := opCodeToString[op]
-	if len(str) == 0 {
-		return fmt.Sprintf("Missing opcode 0x%x", int(op))
-	}
-
-	return str
+	return opCodeToString[op]
 }
-
-// TODO, change with the hex values, its better, add log
-const (
-	LOG  = 0xa0
-	PUSH = 0x5f
-	DUP  = PUSH32
-	SWAP = DUP16
-)
