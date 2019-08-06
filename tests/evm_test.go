@@ -63,13 +63,6 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	// txn := s.Txn()
 	txn := state.NewTxn(s, snap)
 
-	/*
-		evm := evm.NewEVM(txn, env, mainnetChainConfig.Forks.At(env.Number.Uint64()), chain.GasTableHomestead, vmTestBlockHash)
-		contract := runtime.NewContract(c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, c.Exec.Data)
-
-		ret, gas, err := evm.Run(contract)
-	*/
-
 	e := state.NewExecutor(txn, env, mainnetChainConfig.Forks.At(env.Number), chain.GasTableHomestead, vmTestBlockHash)
 	e.CanTransfer = canTransfer
 	e.Transfer = transfer

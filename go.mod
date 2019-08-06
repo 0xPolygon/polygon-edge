@@ -13,6 +13,7 @@ require (
 	github.com/dgraph-io/badger v1.5.5-0.20190226225317-8115aed38f8f
 	github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/edsrzf/mmap-go v1.0.0
 	github.com/ethereum/go-ethereum v1.8.23
 	github.com/ferranbt/go-kademlia-bucket v0.2.1-0.20190612080044-d5ef9cf1cf01
 	github.com/ferranbt/periodic-dispatcher v0.0.0-20181108165813-15a0c0298473
