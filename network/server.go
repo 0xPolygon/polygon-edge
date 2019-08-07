@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"net"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -61,7 +60,6 @@ type Instance struct {
 }
 
 const (
-	peersFile          = "peers.json"
 	defaultDialTimeout = 10 * time.Second
 	defaultDialTasks   = 15
 )
@@ -140,7 +138,7 @@ type Server struct {
 
 	dispatcher *periodic.Dispatcher
 
-	peerStore *PeerStore
+	peerStore PeerStore
 	transport Transport
 
 	Discovery discovery.Backend
@@ -160,8 +158,6 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.
 
 	logger.Info("ID", "enode", enode.String())
 
-	peersFilePath := filepath.Join(config.DataDir, peersFile)
-
 	s := &Server{
 		Name:         name,
 		key:          key,
@@ -175,12 +171,17 @@ func NewServer(name string, key *ecdsa.PrivateKey, config *Config, logger hclog.
 		pendingNodes: sync.Map{},
 		addPeer:      make(chan string, 20),
 		dispatcher:   periodic.NewDispatcher(),
-		peerStore:    NewPeerStore(peersFilePath),
+		peerStore:    &NoopPeerStore{},
 		backends:     []*Protocol{},
 		transport:    transport,
 	}
 
 	return s
+}
+
+// SetPeerStore sets the peerstore
+func (s *Server) SetPeerStore(p PeerStore) {
+	s.peerStore = p
 }
 
 // GetPeers returns a copy of list of peers
@@ -214,7 +215,11 @@ func (s *Server) buildInfo() {
 // Schedule starts all the tasks once all the protocols have been loaded
 func (s *Server) Schedule() error {
 	// bootstrap peers
-	for _, peer := range s.peerStore.Load() {
+	storedPeers, err := s.peerStore.Load()
+	if err != nil {
+		return err
+	}
+	for _, peer := range storedPeers {
 		s.Dial(peer)
 	}
 
@@ -292,6 +297,11 @@ func (s *Server) dialTask(id string, tasks chan string) {
 						// log
 					}
 				}
+			}
+
+			if err == nil {
+				// update the peerstore
+				s.peerStore.Update(task, 0)
 			}
 
 			metrics.IncrCounter([]string{"server", "dial task"}, 1.0)
@@ -510,10 +520,7 @@ func (s *Server) Close() {
 		i.Close()
 	}
 
-	for _, i := range s.peers {
-		s.peerStore.Update(i.Enode.String(), i.Status)
-	}
-	if err := s.peerStore.Save(); err != nil {
+	if err := s.peerStore.Close(); err != nil {
 		panic(err)
 	}
 
