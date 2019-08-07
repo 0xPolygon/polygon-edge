@@ -122,6 +122,15 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 
 	m.server = network.NewServer("minimal", m.Key, serverConfig, logger.Named("server"), transport)
 
+	// set the peerstore
+	// peerstore := network.NewJSONPeerStore(serverConfig.DataDir)
+	peerstore, err := network.NewBoltDBPeerStore(serverConfig.DataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	m.server.SetPeerStore(peerstore)
+
 	// Build discovery backend
 	for name, entry := range config.DiscoveryEntries {
 		backend, ok := config.DiscoveryBackends[name]
