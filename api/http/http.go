@@ -42,6 +42,7 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 	router := fasthttprouter.New()
 	router.GET("/v1/peers", h.wrap(h.PeersList))
 	router.GET("/v1/peers/:peerid", h.wrap(h.PeersPeerID))
+	router.POST("/v1/peers", h.wrap(h.PeersAdd))
 	router.GET("/v1/metrics", h.wrap(h.Metrics))
 
 	if enableDebug {
