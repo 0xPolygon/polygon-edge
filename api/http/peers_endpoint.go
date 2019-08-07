@@ -39,3 +39,14 @@ func (h *HTTP) PeersPeerID(ctx *fasthttp.RequestCtx) (interface{}, error) {
 
 	return info, nil
 }
+
+// PeersAdd connects to a new peer synchronously
+func (h *HTTP) PeersAdd(ctx *fasthttp.RequestCtx) (interface{}, error) {
+	val := ctx.PostArgs().Peek("peer")
+	if len(val) == 0 {
+		return nil, fmt.Errorf("peer not found in post args")
+	}
+
+	err := h.m.Server().DialSync(string(val))
+	return nil, err
+}

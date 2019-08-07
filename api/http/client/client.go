@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/valyala/fasthttp"
 )
@@ -20,12 +21,38 @@ func NewClient(addr string) *Client {
 	}
 }
 
-func (c *Client) get(uri string, out interface{}) error {
-	req := fasthttp.AcquireRequest()
-	res := fasthttp.AcquireResponse()
+func (c *Client) post(uri string, input map[string]string) error {
+	req, res := fasthttp.AcquireRequest(), fasthttp.AcquireResponse()
 
-	defer fasthttp.ReleaseRequest(req)
-	defer fasthttp.ReleaseResponse(res)
+	defer func() {
+		fasthttp.ReleaseRequest(req)
+		fasthttp.ReleaseResponse(res)
+	}()
+
+	args := req.PostArgs()
+	for k, v := range input {
+		args.Set(k, v)
+	}
+
+	req.SetRequestURI(c.addr + uri)
+	req.Header.SetMethod("POST")
+
+	if err := c.client.Do(req, res); err != nil {
+		return err
+	}
+	if len(res.Body()) != 0 {
+		return fmt.Errorf(string(res.Body()))
+	}
+	return nil
+}
+
+func (c *Client) get(uri string, out interface{}) error {
+	req, res := fasthttp.AcquireRequest(), fasthttp.AcquireResponse()
+
+	defer func() {
+		fasthttp.ReleaseRequest(req)
+		fasthttp.ReleaseResponse(res)
+	}()
 
 	req.SetRequestURI(c.addr + uri)
 	req.Header.SetMethod("GET")
@@ -53,4 +80,11 @@ func (c *Client) PeersInfo(peerid string) (map[string]interface{}, error) {
 	var out map[string]interface{}
 	err := c.get("/v1/peers/"+peerid, &out)
 	return out, err
+}
+
+// PeersAdd adds a new peer
+func (c *Client) PeersAdd(peerid string) error {
+	return c.post("/v1/peers", map[string]string{
+		"peer": peerid,
+	})
 }
