@@ -68,6 +68,13 @@ type FullNode struct {
 	children [16]Node
 }
 
+func (f *FullNode) copy() *FullNode {
+	nc := &FullNode{}
+	nc.value = f.value
+	copy(nc.children[:], f.children[:])
+	return nc
+}
+
 func (f *FullNode) replaceEdge(idx byte, e Node) {
 	if idx == 16 {
 		f.value = e
@@ -214,13 +221,14 @@ func (t *Txn) Commit() *Trie {
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
-	return t.lookup(t.root, keybytesToHex(key))
+	_, res := t.lookup(t.root, keybytesToHex(key))
+	return res
 }
 
-func (t *Txn) lookup(node interface{}, key []byte) []byte {
+func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 	switch n := node.(type) {
 	case nil:
-		return nil
+		return nil, nil
 
 	case *ValueNode:
 		if n.hash {
@@ -229,32 +237,37 @@ func (t *Txn) lookup(node interface{}, key []byte) []byte {
 				panic(err)
 			}
 			if !ok {
-				return nil
+				return nil, nil
 			}
-			node = nc
-			return t.lookup(node, key)
+			_, res := t.lookup(nc, key)
+			return nc, res
 		}
-
 		if len(key) == 0 {
-			return n.buf
+			return nil, n.buf
 		} else {
-			return nil
+			return nil, nil
 		}
 
 	case *ShortNode:
 		plen := len(n.key)
 		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
-			return nil
-		} else {
-			return t.lookup(n.child, key[plen:])
+			return nil, nil
 		}
+		child, res := t.lookup(n.child, key[plen:])
+		if child != nil {
+			n.child = child
+		}
+		return nil, res
 
 	case *FullNode:
 		if len(key) == 0 {
 			return t.lookup(n.value, key)
-		} else {
-			return t.lookup(n.getEdge(key[0]), key[1:])
 		}
+		child, res := t.lookup(n.getEdge(key[0]), key[1:])
+		if child != nil {
+			n.children[key[0]] = child
+		}
+		return nil, res
 
 	default:
 		panic(fmt.Sprintf("unknown node type %v", n))
@@ -403,8 +416,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			return &ShortNode{key: concat(n.key, short.key), child: short.child}, true
 		} else {
 			// full node
-			n.child = child
-			return n, true
+			return &ShortNode{key: n.key, child: child}, true
 		}
 
 	case *ValueNode:
@@ -416,8 +428,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			if !ok {
 				return nil, false
 			}
-			node = nc
-			return t.delete(node, search)
+			return t.delete(nc, search)
 		}
 		if len(search) != 0 {
 			return nil, false
@@ -425,6 +436,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		return nil, true
 
 	case *FullNode:
+		n = n.copy()
 		n.hash = n.hash[:0]
 
 		key := search[0]
@@ -490,13 +502,11 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			return obj, true
 		}
 
-		// Its a short node, compress the full node (now a short node) with the short in children.
-		obj.key = concat([]byte{byte(indx)}, obj.key)
+		ncc := &ShortNode{}
+		ncc.key = concat([]byte{byte(indx)}, obj.key)
+		ncc.child = obj.child
 
-		// You are using the child as the new node, but if this one has a hash it belongs
-		// to his position in a lower part of the trie, reset the value
-		obj.hash = obj.hash[:0]
-		return obj, true
+		return ncc, true
 	}
 
 	// fmt.Println(node)
@@ -566,7 +576,7 @@ func show(obj interface{}, label int, d int) {
 			fmt.Printf("%s%d  Value: %s\n", depth(d), label, hex.EncodeToHex(n.buf))
 		}
 	default:
-		panic("not expected")
+		fmt.Printf("%s Nil\n", depth(d))
 	}
 }
 

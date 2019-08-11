@@ -318,8 +318,6 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 		c.lastGasCost = newCost
 
 		if !c.consumeGas(cost) {
-			fmt.Println(cost)
-
 			c.exit(errOutOfGas)
 			return false
 		}
