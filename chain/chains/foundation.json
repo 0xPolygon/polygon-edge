@@ -3,7 +3,8 @@
     "params": {
         "forks": {
             "homestead": 1150000,
-            "byzantium": 4370000
+            "byzantium": 4370000,
+            "eip150": 2463000
         },
         "chainID": 1,
         "engine": {
