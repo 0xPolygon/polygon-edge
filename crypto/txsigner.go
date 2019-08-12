@@ -125,7 +125,20 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 		return (&FrontierSigner{}).Sender(tx)
 	}
 
-	return types.Address{}, fmt.Errorf("EIP155 signer not implemented yet")
+	v := tx.V - byte(e.chainID*2)
+	v -= 8
+	v -= 27
+
+	sig, err := encodeSignature(tx.R, tx.S, v)
+	if err != nil {
+		return types.Address{}, err
+	}
+	pub, err := Ecrecover(e.Hash(tx).Bytes(), sig)
+	if err != nil {
+		return types.Address{}, err
+	}
+	buf := Keccak256(pub[1:])[12:]
+	return types.BytesToAddress(buf), nil
 }
 
 func (e *EIP155Signer) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*types.Transaction, error) {
