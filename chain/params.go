@@ -19,10 +19,14 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
+// TODO, Add a SpuriousDragon EIP to join both EIP155 and EIP158
+
 func (p *Params) GasTable(number uint64) GasTable {
 	switch {
 	case p.Forks.IsConstantinople(number):
 		return GasTableConstantinople
+	case p.Forks.IsEIP155(number):
+		return GasTableEIP158
 	case p.Forks.IsEIP158(number):
 		return GasTableEIP158
 	case p.Forks.IsEIP150(number):
