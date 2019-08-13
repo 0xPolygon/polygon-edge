@@ -406,10 +406,10 @@ func (b *Backend) Deliver(context string, peerID string, id uint32, data interfa
 	}
 
 	if b.counter == 1000 {
-		b.queue.printQueue()
+		// b.queue.printQueue()
 		// TODO, slots in the queue can be parsed again if they are taking too long to query by some peers
 		// We should limit the number of elements on the fly at any time
-		panic("Some of the data has been pending for too long!")
+		// panic("Some of the data has been pending for too long!")
 	}
 
 	if b.queue.NumOfCompletedBatches() >= 1 { // force to commit data every time
