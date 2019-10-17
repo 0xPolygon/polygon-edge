@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/rlp"
-	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
@@ -122,7 +121,9 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
-var accountArenaPool rlpv2.ArenaPool
+var accountArenaPool fastrlp.ArenaPool
+
+var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
 func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	// Create an insertion batch for all the entries
@@ -133,6 +134,9 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 
 	arena := accountArenaPool.Get()
 	defer accountArenaPool.Put(arena)
+
+	ar1 := stateArenaPool.Get()
+	defer stateArenaPool.Put(ar1)
 
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*state.StateObject)
@@ -156,8 +160,8 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 				if v == nil {
 					localTxn.Delete(k)
 				} else {
-					vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.([]byte), "\x00"))
-					localTxn.Insert(k, vv)
+					vv := ar1.NewBytes(bytes.TrimLeft(v.([]byte), "\x00"))
+					localTxn.Insert(k, vv.MarshalTo(nil))
 				}
 				return false
 			})
@@ -175,11 +179,15 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 			t.state.SetCode(types.BytesToHash(a.Account.CodeHash), a.Code)
 		}
 
-		vv := arena.NewArray()
-		vv.Set(arena.NewUint(a.Account.Nonce))
-		vv.Set(arena.NewBigInt(a.Account.Balance))
-		vv.Set(arena.NewBytes(a.Account.Root.Bytes()))
-		vv.Set(arena.NewBytes(a.Account.CodeHash))
+		vv := a.Account.MarshalWith(arena)
+
+		/*
+			vv := arena.NewArray()
+			vv.Set(arena.NewUint(a.Account.Nonce))
+			vv.Set(arena.NewBigInt(a.Account.Balance))
+			vv.Set(arena.NewBytes(a.Account.Root.Bytes()))
+			vv.Set(arena.NewBytes(a.Account.CodeHash))
+		*/
 
 		data := vv.MarshalTo(nil)
 
@@ -551,14 +559,14 @@ func show(obj interface{}, label int, d int) {
 	case *ShortNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d SHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			//return
 		}
 		fmt.Printf("%s%d Short: %s\n", depth(d), label, hex.EncodeToHex(n.key))
 		show(n.child, 0, d)
 	case *FullNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d FHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			return
+			//return
 		}
 		fmt.Printf("%s%d Full\n", depth(d), label)
 		for indx, i := range n.children {

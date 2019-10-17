@@ -5,12 +5,12 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/rlpv2"
 	"github.com/umbracle/minimal/types"
 )
 
-var parserPool rlpv2.ParserPool
+var parserPool fastrlp.ParserPool
 
 var (
 	// codePrefix is the code prefix for leveldb
@@ -153,7 +153,7 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 		return nil, false, err
 	}
 
-	if v.Type() != rlpv2.TypeArray {
+	if v.Type() != fastrlp.TypeArray {
 		return nil, false, fmt.Errorf("storage item should be an array")
 	}
 
@@ -161,12 +161,13 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	return n, err == nil, err
 }
 
-func decodeNode(v *rlpv2.Value, s Storage) (Node, error) {
-	if v.Type() == rlpv2.TypeBytes {
-		return &ValueNode{
-			buf:  v.Bytes(),
+func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
+	if v.Type() == fastrlp.TypeBytes {
+		vv := &ValueNode{
 			hash: true,
-		}, nil
+		}
+		vv.buf = append(vv.buf[:0], v.Raw()...)
+		return vv, nil
 	}
 
 	var err error
@@ -174,22 +175,21 @@ func decodeNode(v *rlpv2.Value, s Storage) (Node, error) {
 	ll := v.Elems()
 	if ll == 2 {
 		key := v.Get(0)
-		if key.Type() != rlpv2.TypeBytes {
+		if key.Type() != fastrlp.TypeBytes {
 			return nil, fmt.Errorf("short key expected to be bytes")
 		}
 
 		// this can be either an array (extension node)
 		// or bytes (leaf node)
 		nc := &ShortNode{}
-		nc.key = compactToHex(key.Bytes())
+		nc.key = compactToHex(key.Raw())
 		if hasTerm(nc.key) {
 			// value node
-			if v.Get(1).Type() != rlpv2.TypeBytes {
+			if v.Get(1).Type() != fastrlp.TypeBytes {
 				return nil, fmt.Errorf("short leaf value expected to be bytes")
 			}
-			vv := &ValueNode{
-				buf: v.Get(1).Bytes(),
-			}
+			vv := &ValueNode{}
+			vv.buf = append(vv.buf, v.Get(1).Raw()...)
 			nc.child = vv
 		} else {
 			nc.child, err = decodeNode(v.Get(1), s)
@@ -202,7 +202,7 @@ func decodeNode(v *rlpv2.Value, s Storage) (Node, error) {
 		// full node
 		nc := &FullNode{}
 		for i := 0; i < 16; i++ {
-			if v.Get(i).Type() == rlpv2.TypeBytes && len(v.Get(i).Bytes()) == 0 {
+			if v.Get(i).Type() == fastrlp.TypeBytes && len(v.Get(i).Raw()) == 0 {
 				// empty
 				continue
 			}
@@ -212,13 +212,12 @@ func decodeNode(v *rlpv2.Value, s Storage) (Node, error) {
 			}
 		}
 
-		if v.Get(16).Type() != rlpv2.TypeBytes {
+		if v.Get(16).Type() != fastrlp.TypeBytes {
 			return nil, fmt.Errorf("full node value expected to be bytes")
 		}
-		if len(v.Get(16).Bytes()) != 0 {
-			vv := &ValueNode{
-				buf: v.Get(16).Bytes(),
-			}
+		if len(v.Get(16).Raw()) != 0 {
+			vv := &ValueNode{}
+			vv.buf = append(vv.buf[:0], v.Get(16).Raw()...)
 			nc.value = vv
 		}
 		return nc, nil

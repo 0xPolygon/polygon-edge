@@ -14,7 +14,7 @@ import (
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
-	rlpv2 "github.com/umbracle/minimal/rlpv2"
+	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -49,10 +49,12 @@ func ValidateSignatureValues(v byte, r, s []byte, homestead bool) bool {
 	return true
 }
 
+var addressPool fastrlp.ArenaPool
+
 // CreateAddress creates an Ethereum address.
 func CreateAddress(addr types.Address, nonce uint64) types.Address {
-	a := rlpv2.DefaultArenaPool.Get()
-	defer rlpv2.DefaultArenaPool.Put(a)
+	a := addressPool.Get()
+	defer addressPool.Put(a)
 
 	v := a.NewArray()
 	v.Set(a.NewBytes(addr.Bytes()))

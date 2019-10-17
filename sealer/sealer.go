@@ -53,6 +53,8 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		config.CommitInterval = minCommitInterval
 	}
 
+	fmt.Println(config.CommitInterval)
+
 	s := &Sealer{
 		blockchain:     blockchain,
 		engine:         engine,
@@ -60,7 +62,7 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		logger:         logger,
 		txPool:         NewTxPool(blockchain),
 		newBlock:       make(chan struct{}, 1),
-		commitInterval: time.NewTimer(config.CommitInterval),
+		commitInterval: time.NewTimer(minCommitInterval),
 		signer:         crypto.NewEIP155Signer(1),
 		SealedCh:       make(chan *SealedNotify, 10),
 	}
@@ -94,6 +96,7 @@ func (s *Sealer) run(ctx context.Context) {
 	for {
 		select {
 		case <-listener:
+			fmt.Println("==> listener")
 			go s.commit()
 
 		case <-s.commitInterval.C:
@@ -117,6 +120,9 @@ func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Blo
 		header.TxRoot = derivesha.CalcTxsRoot(txs)
 	}
 
+	header.Sha3Uncles = types.EmptyUncleHash
+	header.ReceiptsRoot = types.EmptyRootHash
+
 	return &types.Block{
 		Header:       header,
 		Transactions: txs,
@@ -124,9 +130,13 @@ func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Blo
 }
 
 func (s *Sealer) commit() {
+	fmt.Println("- commit interval -")
+
+	//fmt.Println("- commit -")
 	s.commitInterval.Reset(s.config.CommitInterval)
 
 	if s.stopSealing != nil {
+		fmt.Println("_ STOP _")
 		s.stopSealing()
 	}
 
@@ -142,6 +152,8 @@ func (s *Sealer) commit() {
 		panic(err)
 	}
 
+	fmt.Println("Sealing block: ", parent.Number+1)
+
 	pricedTxs := newTxPriceHeap()
 	for _, tx := range promoted {
 		from, err := s.signer.Sender(tx)
@@ -150,26 +162,24 @@ func (s *Sealer) commit() {
 		}
 
 		// NOTE, we need to sort with big.Int instead of uint64
-		if err := pricedTxs.Push(from, tx, new(big.Int).SetBytes(tx.GasPrice)); err != nil {
+		if err := pricedTxs.Push(from, tx, new(big.Int).SetBytes(tx.GetGasPrice())); err != nil {
 			panic(err)
 		}
 	}
 
-	timestamp := time.Now().Unix()
-
-	/*
-		if parent.Time.Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
-			timestamp = parent.Time.Int64() + 1
-		}
-	*/
+	// not sure about this
+	timestamp := uint64(time.Now().Unix())
+	if parent.Timestamp >= timestamp {
+		timestamp = parent.Timestamp + 1
+	}
 
 	num := parent.Number
 	header := &types.Header{
-		ParentHash: parent.Hash(),
+		ParentHash: parent.Hash,
 		Number:     num + 1,
 		GasLimit:   calcGasLimit(parent, 8000000, 8000000),
 		ExtraData:  []byte{},
-		Timestamp:  uint64(timestamp),
+		Timestamp:  timestamp,
 		Miner:      s.coinbase,
 	}
 
@@ -177,28 +187,49 @@ func (s *Sealer) commit() {
 		panic(err)
 	}
 
+	//fmt.Println("- post difficulty -")
+	//fmt.Println(header.Difficulty)
+
+	//fmt.Println("-- parent --")
+	//fmt.Println(parent.StateRoot)
+
 	state, ok := s.blockchain.GetState(parent)
 	if !ok {
 		panic("state not found")
 	}
 
-	txIterator := func(err error, gas uint64) (*types.Transaction, bool) {
-		if gas < chain.TxGas {
-			return nil, false
+	/*
+		txIterator := func(err error, gas uint64) (*types.Transaction, bool) {
+			if gas < chain.TxGas {
+				return nil, false
+			}
+			tx := pricedTxs.Pop()
+			if tx == nil {
+				return nil, false
+			}
+			return tx.tx, true
 		}
-		tx := pricedTxs.Pop()
-		if tx == nil {
-			return nil, false
-		}
-		return tx.tx, true
+	*/
+
+	//fmt.Println(state)
+
+	root, err := s.blockchain.SimpleIteration(state, header)
+	if err != nil {
+		panic(err)
 	}
 
-	_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
-	header.StateRoot = types.BytesToHash(root)
+	//fmt.Println("-- root --")
+	//fmt.Println(root)
+
+	/*
+		_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
+		header.StateRoot = types.BytesToHash(root)
+	*/
 
 	// TODO, get uncles
 
-	block := generateNewBlock(header, txns)
+	header.StateRoot = types.BytesToHash(root)
+	block := generateNewBlock(header, nil)
 
 	// Seal
 	if _, err := s.engine.Seal(ctx, block); err != nil {
@@ -217,10 +248,17 @@ func (s *Sealer) commit() {
 		}
 	*/
 
+	//fmt.Println("-- write block --")
+	//fmt.Println(block.Header.Print())
+	//fmt.Println(block.Header.Hash().Bytes())
+
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		s.logger.Error("failed to write sealed block: %v", err)
+		s.logger.Error("failed to write sealed block", "err", err)
+		return
 	}
+
+	s.logger.Info("Block sealed", "number", num+1, "hash", header.Hash)
 
 	// Write the new state
 	// s.blockchain.AddState(types.BytesToHash(root), newState)
@@ -267,11 +305,11 @@ func txDifference(a, b []*types.Transaction) []*types.Transaction {
 
 	remove := make(map[types.Hash]struct{})
 	for _, tx := range b {
-		remove[tx.Hash()] = struct{}{}
+		remove[tx.Hash] = struct{}{}
 	}
 
 	for _, tx := range a {
-		if _, ok := remove[tx.Hash()]; !ok {
+		if _, ok := remove[tx.Hash]; !ok {
 			keep = append(keep, tx)
 		}
 	}

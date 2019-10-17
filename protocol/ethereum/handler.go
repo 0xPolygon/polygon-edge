@@ -13,49 +13,41 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/network"
-
-	"github.com/armon/go-metrics"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/network/transport/rlpx"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
-	"golang.org/x/crypto/sha3"
 )
 
-const (
-	defaultMaxHeaderFetch  = 192
-	defaultMaxBlockFetch   = 128
-	defaultMaxReceiptFetch = 256
+var (
+	errEmpty   = fmt.Errorf("empty")
+	errTimeout = fmt.Errorf("timeout")
 )
 
 const (
 	softResponseLimit = 2 * 1024 * 1024
-	estHeaderRlpSize  = 500
 )
 
-// eth protocol message codes
-const (
-	// Protocol messages belonging to eth/62
-	StatusMsg          = 0x00
-	NewBlockHashesMsg  = 0x01
-	TxMsg              = 0x02
-	GetBlockHeadersMsg = 0x03
-	BlockHeadersMsg    = 0x04
-	GetBlockBodiesMsg  = 0x05
-	BlockBodiesMsg     = 0x06
-	NewBlockMsg        = 0x07
+type ethMessage int16
 
-	// Protocol messages belonging to eth/63
-	GetNodeDataMsg = 0x0d
-	NodeDataMsg    = 0x0e
-	GetReceiptsMsg = 0x0f
-	ReceiptsMsg    = 0x10
+const (
+	StatusMsg          ethMessage = 0x00
+	NewBlockHashesMsg             = 0x01
+	TxMsg                         = 0x02
+	GetBlockHeadersMsg            = 0x03
+	BlockHeadersMsg               = 0x04
+	GetBlockBodiesMsg             = 0x05
+	BlockBodiesMsg                = 0x06
+	NewBlockMsg                   = 0x07
+	GetNodeDataMsg                = 0x0d
+	NodeDataMsg                   = 0x0e
+	GetReceiptsMsg                = 0x0f
+	ReceiptsMsg                   = 0x10
 )
 
 type messageType int
@@ -104,6 +96,8 @@ func (p *pending) freeHandlersLocked() {
 	}
 }
 
+const empty = ""
+
 func (p *pending) consume(id string) (*callback, bool) {
 	p.Lock()
 	defer p.Unlock()
@@ -132,16 +126,23 @@ func (p *pending) consume(id string) (*callback, bool) {
 	return handler, true
 }
 
+// Blockchain interface are the methods required by the handler
+type Blockchain interface {
+	GetReceiptsByHash(types.Hash) []*types.Receipt
+	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
+	GetHeaderByNumber(number uint64) (*types.Header, bool)
+	GetBodyByHash(types.Hash) (*types.Body, bool)
+}
+
 // Ethereum is the protocol for etheruem
 type Ethereum struct {
-	logger   hclog.Logger
-	conn     net.Conn
-	sendLock sync.Mutex
+	logger hclog.Logger
+	conn   net.Conn
 
 	backend *Backend
 
 	status     *Status // status of the remote peer
-	blockchain *blockchain.Blockchain
+	blockchain Blockchain
 
 	// pending objects
 	pending map[messageType]*pending
@@ -152,12 +153,21 @@ type Ethereum struct {
 	HeaderNumber *big.Int
 	headerLock   sync.Mutex
 
-	sendHeader rlpx.Header
-	recvHeader rlpx.Header
+	in, out halfConn
 
-	// peer *PeerConnection
 	session network.Session
 	peerID  string
+}
+
+type halfConn struct {
+	sync.Mutex
+
+	buf    []byte
+	header rlpx.Header
+}
+
+func (h *halfConn) encode(code uint16, length int) {
+	h.header.Encode(code, uint32(length))
 }
 
 // NotifyMsg notifies that there is a new block
@@ -174,8 +184,6 @@ func NewEthereumProtocol(session network.Session, peerID string, logger hclog.Lo
 		peerID:     peerID,
 		conn:       conn,
 		blockchain: blockchain,
-		sendHeader: make([]byte, rlpx.HeaderSize),
-		recvHeader: make([]byte, rlpx.HeaderSize),
 	}
 	e.pending = map[messageType]*pending{
 		headerMsg:   newPending(),
@@ -192,79 +200,70 @@ func (e *Ethereum) Header() types.Hash {
 
 // Status is the object for the status message.
 type Status struct {
-	ProtocolVersion uint32
+	ProtocolVersion uint64
 	NetworkID       uint64
 	TD              *big.Int
 	CurrentBlock    types.Hash
 	GenesisBlock    types.Hash
 }
 
-// getBlockHeadersData represents a block header query.
-type getBlockHeadersData struct {
-	Origin  interface{}
-	Amount  uint64
-	Skip    uint64
-	Reverse bool
-}
+var statusParserPool fastrlp.ParserPool
 
-func (e *Ethereum) writeMsg(code int, data interface{}) error {
-	e.sendLock.Lock()
-	defer e.sendLock.Unlock()
+func (s *Status) UnmarshalRLP(buf []byte) error {
+	p := statusParserPool.Get()
+	defer statusParserPool.Put(p)
 
-	r, err := rlp.EncodeToBytes(data)
+	v, err := p.Parse(buf)
 	if err != nil {
 		return err
 	}
-
-	e.sendHeader.Encode(uint16(code), uint32(len(r)))
-	if _, err := e.conn.Write(e.sendHeader[:]); err != nil {
+	elems, err := v.GetElems()
+	if err != nil {
 		return err
 	}
-	if _, err := e.conn.Write(r); err != nil {
+	if len(elems) != 5 {
+		return fmt.Errorf("bad length, expected 5 items but found %d", len(elems))
+	}
+
+	if s.ProtocolVersion, err = elems[0].GetUint64(); err != nil {
+		return err
+	}
+	if s.NetworkID, err = elems[1].GetUint64(); err != nil {
+		return err
+	}
+	s.TD = new(big.Int)
+	if err := elems[2].GetBigInt(s.TD); err != nil {
+		return err
+	}
+	if err = elems[3].GetHash(s.CurrentBlock[:]); err != nil {
+		return err
+	}
+	if err = elems[4].GetHash(s.GenesisBlock[:]); err != nil {
 		return err
 	}
 	return nil
 }
 
-// RequestHeadersByNumber fetches a batch of blocks' headers based on the number of an origin block.
-func (e *Ethereum) RequestHeadersByNumber(number uint64, amount uint64, skip uint64, reverse bool) error {
-	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: number, Amount: amount, Skip: skip, Reverse: reverse})
-}
+var statusArenaPool fastrlp.ArenaPool
 
-// RequestHeadersByHash fetches a batch of blocks' headers based on the hash of an origin block.
-func (e *Ethereum) RequestHeadersByHash(origin types.Hash, amount uint64, skip uint64, reverse bool) error {
-	return e.writeMsg(GetBlockHeadersMsg, &getBlockHeadersData{Origin: origin, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
-}
+func (s *Status) MarshalRLP() []byte {
+	a := statusArenaPool.Get()
 
-// RequestBodies fetches a batch of blocks' bodies based on a set of hashes.
-func (e *Ethereum) RequestBodies(hashes []types.Hash) error {
-	return e.writeMsg(GetBlockBodiesMsg, hashes)
-}
+	v := a.NewArray()
+	v.Set(a.NewUint(s.ProtocolVersion))
+	v.Set(a.NewUint(s.NetworkID))
+	v.Set(a.NewBigInt(s.TD))
+	v.Set(a.NewBytes(s.CurrentBlock[:]))
+	v.Set(a.NewBytes(s.GenesisBlock[:]))
 
-// RequestNodeData fetches a batch of arbitrary data from a node's known state.
-func (e *Ethereum) RequestNodeData(hashes []types.Hash) error {
-	return e.writeMsg(GetNodeDataMsg, hashes)
-}
-
-// RequestReceipts fetches a batch of transaction receipts from a remote node.
-func (e *Ethereum) RequestReceipts(hashes []types.Hash) error {
-	return e.writeMsg(GetReceiptsMsg, hashes)
-}
-
-// SendNewBlock propagates an entire block to a remote peer.
-func (e *Ethereum) SendNewBlock(block *types.Block, td *big.Int) error {
-	return e.writeMsg(NewBlockMsg, &newBlockData{Block: block, TD: td})
-}
-
-// SendNewHash propagates a new block by hash and number
-func (e *Ethereum) SendNewHash(hash types.Hash, number uint64) error {
-	return e.writeMsg(NewBlockHashesMsg, []*announcement{
-		{hash, number},
-	})
+	dst := v.MarshalTo(nil)
+	statusArenaPool.Put(a)
+	return dst
 }
 
 func (e *Ethereum) sendStatus(status *Status) error {
-	return e.writeMsg(StatusMsg, status)
+	buf := status.MarshalRLP()
+	return e.writeRaw(StatusMsg, buf)
 }
 
 // Info implements the handler interface
@@ -275,21 +274,19 @@ func (e *Ethereum) Info() (map[string]interface{}, error) {
 }
 
 func (e *Ethereum) readStatus(localStatus *Status) error {
-	if _, err := e.conn.Read(e.recvHeader[:]); err != nil {
-		return err
-	}
-	if code := e.recvHeader.MsgType(); code != StatusMsg {
-		return fmt.Errorf("Message code is not statusMsg but %d", code)
-	}
-	buf := make([]byte, e.recvHeader.Length())
-
-	_, err := e.conn.Read(buf)
+	buf, code, err := e.readMsg()
 	if err != nil {
 		return err
 	}
-	if err := rlp.DecodeBytes(buf, &e.status); err != nil {
-		return err
+	if ethMessage(code) != StatusMsg {
+		return fmt.Errorf("Message code is not statusMsg but %d", code)
 	}
+
+	var ss Status
+	if err := ss.UnmarshalRLP(buf); err != nil {
+		panic(err)
+	}
+	e.status = &ss
 
 	// Validate status
 
@@ -346,38 +343,503 @@ func (e *Ethereum) Init(status *Status) error {
 	return nil
 }
 
-func (e *Ethereum) readMsg() (*rlpx.Message, error) {
-	if _, err := e.conn.Read(e.recvHeader[:]); err != nil {
-		return nil, err
+func extendByteSlice(b []byte, needLen int) []byte {
+	b = b[:cap(b)]
+	if n := needLen - cap(b); n > 0 {
+		b = append(b, make([]byte, n)...)
 	}
-
-	// TODO, reuse buffer
-	buf := make([]byte, e.recvHeader.Length())
-	if _, err := e.conn.Read(buf); err != nil {
-		return nil, err
-	}
-
-	msg := &rlpx.Message{
-		Code:    uint64(e.recvHeader.MsgType()),
-		Payload: bytes.NewReader(buf),
-	}
-	return msg, nil
+	return b[:needLen]
 }
+
+func (e *Ethereum) readMsg() ([]byte, uint16, error) {
+	if e.in.header == nil {
+		e.in.header = make([]byte, rlpx.HeaderSize)
+	}
+	if _, err := e.conn.Read(e.in.header[:]); err != nil {
+		return nil, 0, err
+	}
+	e.in.buf = extendByteSlice(e.in.buf, int(e.in.header.Length()))
+	if _, err := e.conn.Read(e.in.buf); err != nil {
+		return nil, 0, err
+	}
+	return e.in.buf, e.in.header.MsgType(), nil
+}
+
+func (e *Ethereum) writeRaw(code ethMessage, b []byte) error {
+	e.out.Lock()
+	defer e.out.Unlock()
+
+	if e.out.header == nil {
+		e.out.header = make([]byte, rlpx.HeaderSize)
+	}
+
+	// write the header
+	e.out.encode(uint16(code), len(b))
+
+	// write to the connection
+	if _, err := e.conn.Write(e.out.header); err != nil {
+		return err
+	}
+	if _, err := e.conn.Write(b); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *Ethereum) writeRLP(code uint16, v *fastrlp.Value) error {
+	e.out.Lock()
+	defer e.out.Unlock()
+
+	if e.out.header == nil {
+		e.out.header = make([]byte, rlpx.HeaderSize)
+	}
+
+	// convert rlp data to bytes
+	e.out.buf = v.MarshalTo(e.out.buf[:0])
+
+	// write the header
+	e.out.encode(code, len(e.out.buf))
+
+	// write to the connection
+	if _, err := e.conn.Write(e.out.header); err != nil {
+		return err
+	}
+	if _, err := e.conn.Write(e.out.buf); err != nil {
+		return err
+	}
+	return nil
+}
+
+var (
+	handlers = map[uint16]func(*Ethereum, *fastrlp.Parser, *fastrlp.Value) error{
+		// responses from other peers
+		BlockHeadersMsg: (*Ethereum).handleHeader,
+		BlockBodiesMsg:  (*Ethereum).handleBodies,
+		ReceiptsMsg:     (*Ethereum).handleReceipts,
+		NodeDataMsg:     (*Ethereum).handlerNodeData,
+
+		// requests from other peers
+		GetBlockHeadersMsg: (*Ethereum).handleGetHeader,
+		GetBlockBodiesMsg:  (*Ethereum).handleGetBodies,
+		GetReceiptsMsg:     (*Ethereum).handleGetReceipts,
+		GetNodeDataMsg:     (*Ethereum).handleGetNodeData,
+
+		// notifications
+		TxMsg:             (*Ethereum).handleTxnMessage,
+		NewBlockHashesMsg: (*Ethereum).handleNewBlockHashesMsg,
+		NewBlockMsg:       (*Ethereum).handleNewBlockMsg,
+	}
+)
+
+func (e *Ethereum) dispatchMsg(code uint16, p *fastrlp.Parser, v *fastrlp.Value) error {
+	handler, ok := handlers[code]
+	if !ok {
+		return fmt.Errorf("handler not found for code %d", code)
+	}
+	if err := handler(e, p, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *Ethereum) fetchBlock(hash types.Hash) (*types.Block, error) {
+	headers, err := e.requestHeaderByNumber2(0, &hash, 1, 0, false)
+	if err != nil {
+		return nil, err
+	}
+
+	header := headers[0]
+	block := &types.Block{Header: header}
+
+	// check if its necessary to download receipts and transactions
+	if hasBody(*header) {
+		body, err := e.requestBody(hash, types.BytesToHash(xor(header.TxRoot, header.Sha3Uncles)))
+		if err != nil {
+			return nil, err
+		}
+		block.Transactions = body.Transactions
+		block.Uncles = body.Uncles
+	}
+
+	return block, nil
+}
+
+func (e *Ethereum) handleNewBlockMsg(p *fastrlp.Parser, v *fastrlp.Value) error {
+	return e.backend.announceNewBlock(e, p, v)
+}
+
+func (e *Ethereum) handleNewBlockHashesMsg(p *fastrlp.Parser, v *fastrlp.Value) error {
+	// expects an array of structs {hash and number}
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	// prevalidate the input
+	for _, i := range elems {
+		tuple, err := i.GetElems()
+		if err != nil {
+			return err
+		}
+		if err := validateHash(tuple[0]); err != nil {
+			return err
+		}
+		if err := validateUint64(tuple[1]); err != nil {
+			return err
+		}
+	}
+	return e.backend.announceNewBlocksHashes(e, v)
+}
+
+func validateHash(v *fastrlp.Value) error {
+	if v.Type() != fastrlp.TypeBytes {
+		return fmt.Errorf("bad")
+	}
+	if v.Len() != 32 {
+		return fmt.Errorf("bad length")
+	}
+	return nil
+}
+
+func validateUint64(v *fastrlp.Value) error {
+	if v.Type() != fastrlp.TypeBytes {
+		return fmt.Errorf("bad")
+	}
+	if v.Len() > 8 {
+		return fmt.Errorf("bad length")
+	}
+	return nil
+}
+
+func (e *Ethereum) handleTxnMessage(p *fastrlp.Parser, v *fastrlp.Value) error {
+	return nil
+}
+
+func (e *Ethereum) handleHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
+	// receives a header from some peer
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	// no headers found
+	if len(elems) == 0 {
+		e.consumeHandler(empty, headerMsg, nil)
+		return nil
+	}
+
+	// decode the first header to search the beacon
+	var header types.Header
+	if err := header.UnmarshalRLP(p, elems[0]); err != nil {
+		return err
+	}
+
+	// check if the number is found
+	if handler := e.getHandler(strconv.Itoa(int(header.Number)), headerMsg); handler != nil {
+		return handler(p, v)
+	}
+
+	hash := keccak.DefaultKeccakPool.Get()
+	kk := hash.WriteRlp(nil, elems[0])
+	keccak.DefaultKeccakPool.Put(hash)
+
+	if handler := e.getHandler(hex.EncodeToHex(kk), headerMsg); handler != nil {
+		return handler(p, v)
+	}
+	return nil
+}
+
+func (e *Ethereum) handleBodies(p *fastrlp.Parser, v *fastrlp.Value) error {
+	bodies, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(bodies) == 0 {
+		e.consumeHandler(empty, bodyMsg, nil)
+		return nil
+	}
+
+	// In the bodies we use the txroot + the sha3uncles of the first body as a beacon
+	// Note that we always ask for entries that have either one of those things
+
+	items, err := bodies[0].GetElems()
+	if err != nil {
+		return err
+	}
+	if len(items) != 2 {
+		return fmt.Errorf("bad entry in bodies")
+	}
+	txns, err := items[0].GetElems()
+	if err != nil {
+		return err
+	}
+
+	txnsRoot := deriveRoot(p, txns, types.EmptyRootHash)
+
+	var unclesRoot types.Hash
+	hash := keccak.DefaultKeccakPool.Get()
+	hash.WriteRlp(unclesRoot[:0], items[1])
+	keccak.DefaultKeccakPool.Put(hash)
+
+	// Use xor to encode both roots in a single hash
+	root := xor(txnsRoot, unclesRoot)
+
+	if handler := e.getHandler(hex.EncodeToHex(root), bodyMsg); handler != nil {
+		return handler(p, v)
+	}
+	return nil
+}
+
+func (e *Ethereum) handleReceipts(p *fastrlp.Parser, v *fastrlp.Value) error {
+	// same thing applies to bodies but with a bit more playing
+	receipts, err := v.GetElems()
+	if err != nil {
+		return err // failed to parse
+	}
+	if len(receipts) == 0 {
+		e.consumeHandler(empty, receiptsMsg, nil)
+		return nil
+	}
+
+	elems, err := receipts[0].GetElems()
+	if err != nil {
+		return err
+	}
+
+	beacon := deriveRoot(p, elems, types.EmptyRootHash)
+	if handler := e.getHandler(beacon.String(), receiptsMsg); handler != nil {
+		return handler(p, v)
+	}
+
+	return nil
+}
+
+func (e *Ethereum) handlerNodeData(p *fastrlp.Parser, v *fastrlp.Value) error {
+	return nil
+}
+
+func validateHashesReq(elems []*fastrlp.Value) error {
+	for _, elem := range elems {
+		buf, err := elem.Bytes()
+		if err != nil {
+			return err
+		}
+		if len(buf) != 32 {
+			return fmt.Errorf("incorrect size")
+		}
+	}
+	return nil
+}
+
+func minUint64(i, j uint64) uint64 {
+	if i < j {
+		return i
+	}
+	return j
+}
+
+func min(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
+}
+
+const maxReceiptsAmount = 100
+
+var receiptsArenaPool fastrlp.ArenaPool
+
+func (e *Ethereum) handleGetReceipts(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	// validate that all the elements are hashes
+	if err := validateHashesReq(elems); err != nil {
+		return err
+	}
+
+	// limit the number of receipts
+	amount := min(len(elems), maxReceiptsAmount)
+
+	ar := receiptsArenaPool.Get()
+	res := ar.NewArray()
+
+	for _, elem := range elems[:amount] {
+		hash := types.BytesToHash(elem.Raw())
+
+		receipts := e.blockchain.GetReceiptsByHash(hash)
+		if res == nil {
+			header, ok := e.blockchain.GetHeaderByHash(hash)
+			if !ok || header.ReceiptsRoot != types.EmptyRootHash {
+				continue
+			}
+		}
+
+		vv := ar.NewArray()
+		for _, receipt := range receipts {
+			vv.Set(receipt.MarshalWith(ar))
+		}
+		res.Set(vv)
+	}
+
+	e.writeRLP(ReceiptsMsg, res)
+	receiptsArenaPool.Put(ar)
+	return nil
+}
+
+const maxBodiesAmount = 100
+
+var bodyArenaPool fastrlp.ArenaPool
+
+func (e *Ethereum) handleGetBodies(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	// validate that all the elements are hashes
+	if err := validateHashesReq(elems); err != nil {
+		return err
+	}
+
+	ar := bodyArenaPool.Get()
+	res := ar.NewArray()
+
+	// limit the number of elements
+	amount := min(len(elems), maxBodiesAmount)
+
+	// TODO, limit size
+	for _, elem := range elems[:amount] {
+		body, ok := e.blockchain.GetBodyByHash(types.BytesToHash(elem.Raw()))
+		if ok {
+			res.Set(body.MarshalWith(ar))
+		} else {
+			res.Set(ar.NewNullArray())
+		}
+	}
+
+	e.writeRLP(BlockBodiesMsg, res)
+	bodyArenaPool.Put(ar)
+	return nil
+}
+
+func (e *Ethereum) handleGetNodeData(p *fastrlp.Parser, v *fastrlp.Value) error {
+	// TODO
+	return nil
+}
+
+const maxHeadersAmount = 190
+
+var headerArenaPool fastrlp.ArenaPool
+
+func (e *Ethereum) handleGetHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	amount, err := elems[1].GetUint64()
+	if err != nil {
+		return err
+	}
+	skipU, err := elems[2].GetUint64()
+	if err != nil {
+		return err
+	}
+	reverse, err := elems[3].GetBool()
+	if err != nil {
+		return err
+	}
+
+	ar := headerArenaPool.Get()
+
+	var origin *types.Header
+	var ok bool
+
+	buf, err := elems[0].Bytes()
+	if err != nil {
+		return err
+	}
+	if len(buf) == 32 {
+		// hash
+		origin, ok = e.blockchain.GetHeaderByHash(types.BytesToHash(buf))
+	} else {
+		// number
+		num, err := elems[0].GetUint64()
+		if err != nil {
+			return err
+		}
+		origin, ok = e.blockchain.GetHeaderByNumber(num)
+	}
+
+	if !ok {
+		// origin is unknown, return an empty array set
+		e.writeRLP(BlockHeadersMsg, ar.NewNullArray())
+		headerArenaPool.Put(ar)
+		return nil
+	}
+
+	skip := int64(skipU) + 1
+	dir := int64(1)
+	if reverse {
+		dir = -1
+	}
+
+	// clap to max amount
+	if amount > maxHeadersAmount {
+		amount = maxHeadersAmount
+	}
+
+	res := ar.NewArray()
+	res.Set(origin.MarshalWith(ar)) // add origin
+
+	count := uint64(1)
+	for count < amount {
+		block := int64(origin.Number)
+		block = block + (dir)*skip
+
+		if block < 0 {
+			break
+		}
+		origin, ok = e.blockchain.GetHeaderByNumber(uint64(block))
+		if !ok {
+			break
+		}
+		count++
+		res.Set(origin.MarshalWith(ar))
+	}
+
+	e.writeRLP(BlockHeadersMsg, res)
+	headerArenaPool.Put(ar)
+	return nil
+}
+
+// defPool is the default rlp parser pool to use if no specific parser if found in the msg pools
+var defPool fastrlp.ParserPool
 
 func (e *Ethereum) listen() {
 	for {
-		msg, err := e.readMsg()
+		// read the message
+		buf, code, err := e.readMsg()
 		if err != nil {
-			if !e.session.IsClosed() {
-				e.logger.Warn("failed to read msg", err.Error())
-			}
-			break
+			e.logger.Error("failed to read msg", err.Error())
+			return
 		}
 
-		if err := e.HandleMsg(*msg); err != nil {
-			e.logger.Warn("failed to handle msg", err.Error())
-			break
+		p := defPool.Get()
+		v, err := p.Parse(buf)
+		if err != nil {
+			e.logger.Error("failed to parse msg", err.Error())
+			continue
 		}
+
+		// dispatch the message in a go routine
+		go func() {
+			if err := e.dispatchMsg(code, p, v); err != nil {
+				e.logger.Error("failed to handle msg", err.Error())
+			}
+			// return the parser to the pool
+			defPool.Put(p)
+		}()
 	}
 }
 
@@ -404,262 +866,187 @@ func parseOrigin(i interface{}) (interface{}, bool, error) {
 		return binary.BigEndian.Uint64(aux[:]), false, nil
 	}
 
-	return nil, false, fmt.Errorf("bad")
+	return nil, false, fmt.Errorf("bad 3")
 }
 
-// HandleMsg handles a message from ethereum
-func (e *Ethereum) HandleMsg(msg rlpx.Message) error {
-	metrics.IncrCounterWithLabels([]string{"minimal", "protocol", "ethereum63", "msg"}, float32(1.0), []metrics.Label{{Name: "Code", Value: strconv.Itoa(int(msg.Code))}})
+func reqHeadersQuery2(dst []byte, originN uint64, originH *types.Hash, amount, skip uint64, reverse bool) []byte {
+	a := reqHeadersPool.Get()
 
-	code := msg.Code
+	v := a.NewArray()
+	if originH != nil {
+		v.Set(a.NewCopyBytes(originH.Bytes())) // origin is a hash
+	} else {
+		v.Set(a.NewUint(originN)) // origin is a number
+	}
+	v.Set(a.NewUint(amount))  // amount
+	v.Set(a.NewUint(skip))    // skip
+	v.Set(a.NewBool(reverse)) // reverse
 
-	switch {
-	case code == StatusMsg:
-		return fmt.Errorf("Status msg not expected after handshake")
+	dst = v.MarshalTo(dst)
+	reqHeadersPool.Put(a)
+	return dst
+}
 
-	case code == GetBlockHeadersMsg:
-		defer metrics.MeasureSince([]string{"minimal", "protocol", "ethereum63", "getHeaders"}, time.Now())
+// var kPool keccakPool
 
-		var query getBlockHeadersData
-		err := msg.Decode(&query)
+var defaultArenaPool fastrlp.ArenaPool
+
+func (e *Ethereum) requestBody(hash types.Hash, beacon types.Hash) (*types.Body, error) {
+	ack := make(chan AckMessage, 1)
+
+	body := new(types.Body)
+	e.setHandler2(context.Background(), bodyMsg, beacon.String(), ack, func(p *fastrlp.Parser, v *fastrlp.Value) error {
+		// We already know this data is valid because otherwise there would not have been any match in the beacon
+
+		items, err := v.GetElems()
+		if err != nil {
+			return err
+		}
+		if len(items) != 1 {
+			return fmt.Errorf("there should be only one")
+		}
+
+		elems, err := items[0].GetElems()
+		if err != nil {
+			return err
+		}
+		if len(elems) != 2 {
+			return fmt.Errorf("expected 2")
+		}
+
+		txns, err := elems[0].GetElems()
 		if err != nil {
 			return err
 		}
 
-		var origin *types.Header
-		var ok bool
+		transactions := []*types.Transaction{}
+		for _, i := range txns {
+			txn := new(types.Transaction)
+			if err := txn.UnmarshalRLP(p, i); err != nil {
+				return err
+			}
+			transactions = append(transactions, txn)
+		}
 
-		start, isHash, err := parseOrigin(query.Origin)
+		uncles, err := elems[1].GetElems()
 		if err != nil {
-			panic(err)
-		}
-		if isHash {
-			origin, ok = e.blockchain.GetHeaderByHash(start.(types.Hash))
-		} else {
-			origin, ok = e.blockchain.GetHeaderByNumber(start.(uint64))
+			return err
 		}
 
-		if !ok {
-			return e.sendBlockHeaders([]*types.Header{})
-		}
-
-		headers := []*types.Header{origin}
-		bytes := 0
-
-		skip := int64(query.Skip) + 1
-
-		dir := int64(1)
-		if query.Reverse {
-			dir = -1
-		}
-
-		for len(headers) < int(query.Amount) && bytes < softResponseLimit && len(headers) < defaultMaxHeaderFetch {
-			block := int64(origin.Number)
-			block = block + (dir)*skip
-
-			if block < 0 {
-				break
+		unclesX := []*types.Header{}
+		for _, i := range uncles {
+			uncle := new(types.Header)
+			if err := uncle.UnmarshalRLP(p, i); err != nil {
+				return err
 			}
-			origin, ok = e.blockchain.GetHeaderByNumber(uint64(block))
-			if !ok {
-				break
-			}
-
-			headers = append(headers, origin)
-			bytes += estHeaderRlpSize
+			unclesX = append(unclesX, uncle)
 		}
 
-		return e.sendBlockHeaders(headers)
+		body.Transactions = transactions
+		body.Uncles = unclesX
 
-	case code == BlockHeadersMsg:
-		var headers []*types.Header
-		if err := msg.Decode(&headers); err != nil {
-			return err
-		}
-		e.Headers(headers)
+		return nil
+	})
 
-	case code == GetBlockBodiesMsg:
-		defer metrics.MeasureSince([]string{"minimal", "protocol", "ethereum63", "getBodies"}, time.Now())
+	a := defaultArenaPool.Get()
+	defer defaultArenaPool.Put(a)
 
-		var hashes []types.Hash
-		if err := msg.Decode(&hashes); err != nil {
-			return err
-		}
+	v := a.NewArray()
+	v.Set(a.NewCopyBytes(hash.Bytes()))
 
-		// need to use the encoded version to keep track of the byte size
-		bodies := []*types.Body{}
-		for i := 0; i < len(hashes) && len(bodies) < defaultMaxBlockFetch; i++ {
-			hash := hashes[i]
-
-			body, ok := e.blockchain.GetBodyByHash(hash)
-			if ok {
-				bodies = append(bodies, body)
-			}
-		}
-		return e.sendBlockBodies(bodies)
-
-	case code == BlockBodiesMsg:
-		var bodies []*types.Body
-		if err := msg.Decode(&bodies); err != nil {
-			return err
-		}
-		e.Bodies(bodies)
-
-	case code == GetNodeDataMsg:
-		// TODO. send
-
-	case code == NodeDataMsg:
-		var data [][]byte
-
-		if err := msg.Decode(&data); err != nil {
-			panic(err)
-		}
-		e.Data(data)
-
-	case code == GetReceiptsMsg:
-		defer metrics.MeasureSince([]string{"minimal", "ethereum", "getReceipts"}, time.Now())
-
-		var hashes []types.Hash
-		if err := msg.Decode(&hashes); err != nil {
-			return err
-		}
-
-		// need to use the encoded version to keep track of the byte size
-		receipts := [][]*types.Receipt{}
-		bytes := 0
-
-		for i := 0; i < len(hashes) && bytes < softResponseLimit && len(receipts) < defaultMaxReceiptFetch; i++ {
-			hash := hashes[i]
-
-			res := e.blockchain.GetReceiptsByHash(hash)
-			if res == nil {
-				header, ok := e.blockchain.GetHeaderByHash(hash)
-				if !ok || header.ReceiptsRoot != types.EmptyRootHash {
-					continue
-				}
-			}
-			receipts = append(receipts, res)
-		}
-		return e.sendReceipts(receipts)
-
-	case code == ReceiptsMsg:
-		var receipts [][]*types.Receipt
-		if err := msg.Decode(&receipts); err != nil {
-			return err
-		}
-		e.Receipts(receipts)
-
-	case code == NewBlockHashesMsg:
-		// We are notified about the new peer blocks.
-		if err := e.handleNewBlockHashesMsg(msg); err != nil {
-			return err
-		}
-
-	case code == NewBlockMsg:
-		// This is the last block of the peer
-		if err := e.handleNewBlockMsg(msg); err != nil {
-			return err
-		}
-
-	case code == TxMsg:
-		// TODO: deliver
-
-	default:
-		return fmt.Errorf("Message code %d not found", code)
+	if err := e.writeRLP(GetBlockBodiesMsg, v); err != nil {
+		return nil, err
 	}
 
-	return nil
+	resp := <-ack
+	if resp.Error != nil {
+		return nil, resp.Error
+	}
+	return body, nil
 }
 
-type announcement struct {
-	Hash   types.Hash
-	Number uint64
-}
+func (e *Ethereum) requestHeaderByNumber2(originN uint64, originH *types.Hash, amount, skip uint64, reverse bool) ([]*types.Header, error) {
+	buf := reqHeadersQuery2(nil, originN, originH, amount, skip, reverse)
 
-func (e *Ethereum) handleNewBlockHashesMsg(msg rlpx.Message) error {
+	var headers []*types.Header
+	ack := make(chan AckMessage, 1)
 
-	// fmt.Printf("===> NOTIFY (%s) HASHES\n", e.peerID)
-
-	var announces []*announcement
-	if err := msg.Decode(&announces); err != nil {
-		panic(err)
+	var beacon string
+	if originH != nil {
+		beacon = originH.String()
+	} else {
+		beacon = strconv.Itoa(int(originN))
 	}
 
-	/*
-		for _, i := range announces {
-			e.backend.watcher.notifyHash(i.Hash, i.Number)
+	e.setHandler2(context.Background(), headerMsg, beacon, ack, func(p *fastrlp.Parser, v *fastrlp.Value) error {
+		elems, err := v.GetElems()
+		if err != nil {
+			return err
 		}
-	*/
+		if len(elems) == 0 {
+			return errEmpty
+		}
+		if len(elems) > int(amount) {
+			return fmt.Errorf("returned more elements than requested")
+		}
 
-	return nil
-}
+		hash := keccak.DefaultKeccakPool.Get()
+		defer keccak.DefaultKeccakPool.Put(hash)
 
-func (e *Ethereum) handleNewBlockMsg(msg rlpx.Message) error {
-	var request newBlockData
-	if err := msg.Decode(&request); err != nil {
-		return err
+		headers = make([]*types.Header, len(elems))
+		for indx := range headers {
+			header := new(types.Header)
+
+			// unmarshal the header
+			if err := header.UnmarshalRLP(p, elems[indx]); err != nil {
+				return err
+			}
+			// decode the hash
+			buf := p.Raw(elems[indx])
+
+			hash.Write(buf)
+			hash.Sum(header.Hash[:0])
+			hash.Reset()
+
+			//keccak.Hash(header.SHash[:], buf)
+			//keccak.Reset()
+
+			headers[indx] = header
+		}
+
+		// TODO, validate response
+		return nil
+	})
+	if err := e.writeRaw(GetBlockHeadersMsg, buf); err != nil {
+		return nil, err
 	}
 
-	/*
-		a := request.Block.Number()
-		b := request.TD.String()
-		c := request.Block.Difficulty().String()
-	*/
-
-	// trueTD := new(big.Int).Sub(request.TD, request.Block.Difficulty())
-	// trueTD := request.TD
-
-	// fmt.Printf("===> NOTIFY (%s) Block: %d Difficulty %s. Total: %s\n", e.peerID, a.Uint64(), c, b)
-
-	/*
-		if trueTD.Cmp(e.HeaderDiff) > 0 {
-			e.headerLock.Lock()
-			e.HeaderDiff = request.TD
-			e.HeaderHash = request.Block.Hash() // NOTE. not sure about this thing of not addedd yet
-			e.headerLock.Unlock()
-
-			// go e.backend.notifyNewData(&NotifyMsg{Block: request.Block, Peer: e.peer, Diff: trueTD})
-		} else {
-			fmt.Println("-- NO UPDATE --")
-			fmt.Println(trueTD.Int64())
-			fmt.Println(e.HeaderDiff.Int64())
-		}
-	*/
-
-	return nil
+	resp := <-ack
+	if resp.Error != nil {
+		return nil, resp.Error
+	}
+	return headers, nil
 }
 
-// fetchHeight returns the header of the head hash of the peer
-func (e *Ethereum) fetchHeight(ctx context.Context) (*types.Header, error) {
-	head := e.HeaderHash
-
-	header, err := e.RequestHeaderByHashSync(ctx, head)
+func (e *Ethereum) requestHeaderByNumber(num uint64) (*types.Header, error) {
+	headers, err := e.requestHeaderByNumber2(num, nil, 1, 0, false)
 	if err != nil {
 		return nil, err
 	}
-	if header == nil {
-		return nil, fmt.Errorf("header not found")
+	return headers[0], nil
+}
+
+func (e *Ethereum) fetchHeight2() (*types.Header, error) {
+	headers, err := e.requestHeaderByNumber2(0, &e.HeaderHash, 1, 0, false)
+	if err != nil {
+		return nil, err
 	}
-	if header.Hash() != head {
-		return nil, fmt.Errorf("returned hash is not the correct one")
-	}
-	return header, nil
-}
-
-// sendBlockHeaders sends a batch of block headers to the remote peer.
-func (e *Ethereum) sendBlockHeaders(headers []*types.Header) error {
-	return e.writeMsg(BlockHeadersMsg, headers)
-}
-
-func (e *Ethereum) sendBlockBodies(bodies []*types.Body) error {
-	return e.writeMsg(BlockBodiesMsg, bodies)
-}
-
-func (e *Ethereum) sendReceipts(receipts [][]*types.Receipt) error {
-	return e.writeMsg(ReceiptsMsg, receipts)
+	return headers[0], nil
 }
 
 // -- handlers --
+
+type rawFunc func(p *fastrlp.Parser, v *fastrlp.Value) error
 
 // AckMessage is the ack message
 type AckMessage struct {
@@ -677,12 +1064,11 @@ func (a *AckMessage) Completed() bool {
 }
 
 type callback struct {
+	raw rawFunc
 	ack chan AckMessage
 }
 
 var (
-	// TODO, there are still a couple of DAO validations to perform
-	// on the ethash consensus algorithm
 	daoBlock            = uint64(1920000)
 	daoChallengeTimeout = 15 * time.Second
 	daoForkBlockExtra   = hex.MustDecodeHex("0x64616f2d686172642d666f726b")
@@ -690,19 +1076,15 @@ var (
 
 // ValidateDAOBlock queries the DAO block
 func (e *Ethereum) ValidateDAOBlock() error {
-	ctx, cancel := context.WithTimeout(context.Background(), daoChallengeTimeout)
-	defer cancel()
-
-	header, ok, err := e.RequestHeaderSync(ctx, daoBlock)
+	header, err := e.requestHeaderByNumber(daoBlock)
 	if err != nil {
-		// We accept peers that return empty queries
 		if err != errorEmptyQuery {
 			return err
 		}
 	}
 
 	// If it returns nothing it means the node does not have the dao block yet
-	if ok {
+	if err == nil {
 		if !bytes.Equal(header.ExtraData, daoForkBlockExtra[:]) {
 			return fmt.Errorf("Dao extra data does not match")
 		}
@@ -710,135 +1092,71 @@ func (e *Ethereum) ValidateDAOBlock() error {
 	return nil
 }
 
-// RequestHeaderByHashSync requests a header by hash synchronously
-func (e *Ethereum) RequestHeaderByHashSync(ctx context.Context, hash types.Hash) (*types.Header, error) {
-	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, headerMsg, hash.String(), ack)
+// DoRequest is an adhoc method to do Skeleton requests
+func (e *Ethereum) DoRequest(req *Request, q *Queue3) error {
 
-	if err := e.RequestHeadersByHash(hash, 1, 0, false); err != nil {
-		return nil, err
+	var msg messageType // find a better way for this
+	switch req.typ {
+	case Headers:
+		msg = headerMsg
+	case Bodies:
+		msg = bodyMsg
+	case Receipts:
+		msg = receiptsMsg
 	}
-	resp := <-ack
-	if !resp.Completed() {
-		return nil, fmt.Errorf("failed")
-	}
+	// still need to get the code of the request
 
-	response := resp.Result.([]*types.Header)
-	return response[0], nil
-}
-
-func (e *Ethereum) RequestHeaderSync(ctx context.Context, origin uint64) (*types.Header, bool, error) {
-	hash := strconv.Itoa(int(origin))
-
-	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, headerMsg, hash, ack)
-
-	if err := e.RequestHeadersByNumber(origin, 1, 0, false); err != nil {
-		return nil, false, err
-	}
-	resp := <-ack
-	if !resp.Completed() {
-		return nil, false, resp.Error
-	}
-
-	response := resp.Result.([]*types.Header)
-	if len(response) > 1 {
-		return nil, false, fmt.Errorf("too many responses")
-	}
-	if len(response) == 0 {
-		return nil, false, nil
-	}
-	return response[0], true, nil
-}
-
-// RequestHeadersRangeSync requests a range of headers syncronously
-func (e *Ethereum) RequestHeadersRangeSync(ctx context.Context, origin uint64, count uint64) ([]*types.Header, error) {
-	return e.RequestHeadersSync(ctx, origin, 0, count)
-}
-
-// RequestHeadersSync requests headers and waits for the response
-func (e *Ethereum) RequestHeadersSync(ctx context.Context, origin uint64, skip uint64, count uint64) ([]*types.Header, error) {
-	hash := strconv.Itoa(int(origin))
-
-	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, headerMsg, hash, ack)
-
-	if err := e.RequestHeadersByNumber(origin, count, skip, false); err != nil {
-		return nil, err
-	}
-	resp := <-ack
-	if !resp.Completed() {
-		return nil, fmt.Errorf("failed")
-	}
-
-	response := resp.Result.([]*types.Header)
-	return response, nil
-}
-
-// RequestReceiptsSync requests receipts and waits for the response
-func (e *Ethereum) RequestReceiptsSync(ctx context.Context, hash string, hashes []types.Hash) ([][]*types.Receipt, error) {
-	if len(hashes) == 0 {
-		return nil, nil
+	f := func(p *fastrlp.Parser, v *fastrlp.Value) error {
+		return q.DeliverJob(req, p, v)
 	}
 
 	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, receiptsMsg, hash, ack)
+	// fmt.Printf("Handler: %s %s\n", e.peerID, req.origin)
+	e.setHandler2(context.Background(), msg, req.origin, ack, f)
 
-	if err := e.RequestReceipts(hashes); err != nil {
-		return nil, err
+	var code uint16
+	switch req.typ {
+	case Headers:
+		code = GetBlockHeadersMsg
+	case Bodies:
+		code = GetBlockBodiesMsg
+	case Receipts:
+		code = GetReceiptsMsg
 	}
+
+	if err := e.writeRaw(ethMessage(code), req.buf); err != nil {
+		return err
+	}
+
 	resp := <-ack
-	if !resp.Completed() {
-		return nil, fmt.Errorf("failed")
+	if resp.Error != nil {
+		return resp.Error
 	}
-
-	// TODO. handle malformed response in the receipts
-	response := resp.Result.([][]*types.Receipt)
-	return response, nil
+	return nil
 }
 
-// RequestBodiesSync requests bodies and waits for the response
-func (e *Ethereum) RequestBodiesSync(ctx context.Context, hash string, hashes []types.Hash) ([]*types.Body, error) {
-	if len(hashes) == 0 {
-		return nil, nil
+func (e *Ethereum) setHandler2(ctx context.Context, typ messageType, key string, ack chan AckMessage, raw rawFunc) {
+	queue, ok := e.pending[typ]
+	if !ok {
+		panic("internal. message type not found")
 	}
+	queue.add(key, &callback{raw: raw, ack: ack})
 
-	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, bodyMsg, hash, ack)
+	go func() {
+		select {
+		case <-time.After(5 * time.Second):
+		}
 
-	if err := e.RequestBodies(hashes); err != nil {
-		return nil, err
-	}
-	resp := <-ack
-	if !resp.Completed() {
-		return nil, fmt.Errorf("failed")
-	}
+		if _, ok := queue.consume(key); !ok {
+			// The key has already been consumed
+			return
+		}
 
-	// TODO. handle malformed response in the bodies
-	response := resp.Result.([]*types.Body)
-
-	res := []*types.Body{}
-	for _, r := range response {
-		res = append(res, &types.Body{Transactions: r.Transactions, Uncles: r.Uncles})
-	}
-
-	return res, nil
-}
-
-// RequestNodeDataSync requests node data and waits for the response
-func (e *Ethereum) RequestNodeDataSync(ctx context.Context, hashes []types.Hash) ([][]byte, error) {
-	ack := make(chan AckMessage, 1)
-	e.setHandler(ctx, dataMsg, hashes[0].String(), ack)
-
-	if err := e.RequestNodeData(hashes); err != nil {
-		return nil, err
-	}
-	resp := <-ack
-	if !resp.Completed() {
-		return nil, fmt.Errorf("failed")
-	}
-
-	return resp.Result.([][]byte), nil
+		select {
+		case ack <- AckMessage{Error: errorTimeoutQuery}:
+		default:
+		}
+	}()
 }
 
 func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, ack chan AckMessage) error {
@@ -847,7 +1165,7 @@ func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, 
 		panic("internal. message type not found")
 	}
 
-	queue.add(key, &callback{ack})
+	queue.add(key, &callback{ack: ack})
 
 	go func() {
 		select {
@@ -869,6 +1187,27 @@ func (e *Ethereum) setHandler(ctx context.Context, typ messageType, key string, 
 	return nil
 }
 
+func (e *Ethereum) getHandler(origin string, typ messageType) rawFunc {
+	queue, ok := e.pending[typ]
+	if !ok {
+		panic("internal. message type not found")
+	}
+	callback, ok := queue.consume(origin)
+	if !ok {
+		return nil
+	}
+
+	return func(p *fastrlp.Parser, v *fastrlp.Value) error {
+		err := callback.raw(p, v)
+		if err != nil {
+			callback.ack <- AckMessage{Error: err}
+		} else {
+			callback.ack <- AckMessage{Error: nil}
+		}
+		return err
+	}
+}
+
 func (e *Ethereum) consumeHandler(origin string, typ messageType, result interface{}) bool {
 	queue, ok := e.pending[typ]
 	if !ok {
@@ -888,72 +1227,15 @@ func (e *Ethereum) consumeHandler(origin string, typ messageType, result interfa
 	return true
 }
 
-// -- downloader --
-
-// Headers receives the headers
-func (e *Ethereum) Headers(headers []*types.Header) {
-	if len(headers) != 0 {
-		// request the header by number registers the number of the peer
-		number := strconv.Itoa(int(headers[0].Number))
-		if e.consumeHandler(number, headerMsg, headers) {
-			return
-		}
-		// reqest the header by hash registers the hash of the peer
-		hash := headers[0].Hash().String()
-		if e.consumeHandler(hash, headerMsg, headers) {
-			return
-		}
+func xor(a, b types.Hash) []byte {
+	// TODO; avoid allocation
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
 	}
-	// Neither hash nor number found. Consume empty response.
-	e.consumeHandler("", headerMsg, nil)
-}
-
-// Receipts receives the receipts
-func (e *Ethereum) Receipts(receipts [][]*types.Receipt) {
-	origin := ""
-	if len(receipts) != 0 {
-		origin = derivesha.CalcReceiptRoot(receipts[0]).String()
+	buf := make([]byte, n)
+	for i := 0; i < n; i++ {
+		buf[i] = a[i] ^ b[i]
 	}
-	if e.consumeHandler(origin, receiptsMsg, receipts) {
-		return
-	}
-}
-
-// Bodies receives the bodies
-func (e *Ethereum) Bodies(bodies []*types.Body) {
-	origin := ""
-	if len(bodies) != 0 {
-		first := bodies[0]
-
-		hash := derivesha.CalcTxsRoot(first.Transactions)
-		origin = encodeHash(derivesha.CalcUncleRoot(first.Uncles), hash).String()
-	}
-	if e.consumeHandler(origin, bodyMsg, bodies) {
-		return
-	}
-}
-
-// Data receives the node state data
-func (e *Ethereum) Data(data [][]byte) {
-	origin := ""
-	if len(data) != 0 {
-		origin = hex.EncodeToHex(crypto.Keccak256(data[0]))
-	}
-	if e.consumeHandler(origin, dataMsg, data) {
-		return
-	}
-}
-
-func encodeHash(x types.Hash, y types.Hash) types.Hash {
-	hw := sha3.NewLegacyKeccak256()
-	if _, err := hw.Write(x.Bytes()); err != nil {
-		panic(err)
-	}
-	if _, err := hw.Write(y.Bytes()); err != nil {
-		panic(err)
-	}
-
-	var h types.Hash
-	hw.Sum(h[:0])
-	return h
+	return buf
 }

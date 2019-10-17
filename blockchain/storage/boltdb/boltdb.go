@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	"github.com/hashicorp/go-hclog"
-	"github.com/ledgerwatch/bolt"
 	"github.com/umbracle/minimal/blockchain/storage"
 )
 
@@ -42,7 +42,7 @@ var bucket []byte = []byte{'b'}
 
 func (l *boltDBKV) Set(p []byte, v []byte) error {
 	err := l.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(bucket, false)
+		b, err := tx.CreateBucketIfNotExists(bucket)
 		if err != nil {
 			return err
 		}
@@ -57,8 +57,7 @@ func (l *boltDBKV) Get(p []byte) ([]byte, bool, error) {
 	err := l.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucket)
 		if b != nil {
-			if v, _ := b.Get(p); v != nil { // second argument is "rank"
-				// v is only valid for the lifetime of the tx, therefore copying
+			if v := b.Get(p); v != nil {
 				data = make([]byte, len(v))
 				copy(data, v)
 				found = true

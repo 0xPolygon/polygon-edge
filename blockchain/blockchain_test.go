@@ -24,7 +24,7 @@ func TestGenesis(t *testing.T) {
 	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
 	header, _ := b.Header()
-	assert.Equal(t, header.Hash(), genesis.Hash())
+	assert.Equal(t, header.Hash, genesis.Hash)
 }
 
 func TestChainGenesis(t *testing.T) {
@@ -51,7 +51,7 @@ func TestChainGenesis(t *testing.T) {
 
 			root := b.genesis.StateRoot.String()
 			assert.Equal(t, root, c.Root)
-			assert.Equal(t, b.genesis.Hash().String(), c.Hash)
+			assert.Equal(t, b.genesis.Hash.String(), c.Hash)
 		})
 	}
 }
@@ -71,15 +71,17 @@ func (c *dummyChain) add(h *header) error {
 		if !ok {
 			return fmt.Errorf("parent not found %v", h.parent)
 		}
-		parent = p.Hash()
+		parent = p.Hash
 	}
 
-	c.headers[h.hash] = &types.Header{
+	hh := &types.Header{
 		ParentHash: parent,
 		Number:     h.number,
 		Difficulty: h.diff,
 		ExtraData:  []byte{h.hash},
 	}
+	hh.ComputeHash()
+	c.headers[h.hash] = hh
 	return nil
 }
 
@@ -242,13 +244,13 @@ func TestInsertHeaders(t *testing.T) {
 			assert.True(t, ok)
 
 			// check that we got the right hash
-			assert.Equal(t, head.Hash(), expected.Hash())
+			assert.Equal(t, head.Hash, expected.Hash)
 
 			forks := b.GetForks()
 			expectedForks := []types.Hash{}
 
 			for _, i := range cc.Forks {
-				expectedForks = append(expectedForks, chain.headers[i.hash].Hash())
+				expectedForks = append(expectedForks, chain.headers[i.hash].Hash)
 			}
 
 			if len(forks) != 0 {
@@ -265,7 +267,7 @@ func TestInsertHeaders(t *testing.T) {
 			if cc.Chain != nil {
 				for indx, i := range cc.Chain {
 					block, _ := b.GetBlockByNumber(uint64(indx), true)
-					if block.Hash().String() != chain.headers[i.hash].Hash().String() {
+					if block.Hash().String() != chain.headers[i.hash].Hash.String() {
 						tt.Fatal("bad")
 					}
 				}

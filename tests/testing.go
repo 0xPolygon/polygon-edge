@@ -20,9 +20,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
 
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
-	"golang.org/x/crypto/sha3"
 )
 
 // TESTS is the default location of the tests folder
@@ -198,10 +196,14 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Sna
 }
 
 func rlpHash(x interface{}) (h types.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
+	panic("TODO")
+
+	/*
+		hw := sha3.NewLegacyKeccak256()
+		rlp.Encode(hw, x)
+		hw.Sum(h[:0])
+		return h
+	*/
 }
 
 type indexes struct {
@@ -267,7 +269,7 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 		Input:    hex.MustDecodeHex(t.Data[i.Data]),
 	}
 
-	msg.SetFrom(t.From)
+	msg.From = t.From
 	return msg, nil
 }
 
@@ -500,8 +502,9 @@ func (h *header) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
+	h.header.ComputeHash()
 	if dec.Hash != nil {
-		if hash := h.header.Hash(); hash != *dec.Hash {
+		if hash := h.header.Hash; hash != *dec.Hash {
 			return fmt.Errorf("hash mismatch: found %s but expected %s", hash.String(), (*dec.Hash).String())
 		}
 	}

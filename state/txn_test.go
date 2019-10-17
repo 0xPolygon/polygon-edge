@@ -9,8 +9,8 @@ import (
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
@@ -55,16 +55,22 @@ func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mo
 	snapshot := &mockSnapshot{
 		data: map[string][]byte{},
 	}
+
+	ar := &fastrlp.Arena{}
 	for addr, p := range preState {
 		account, snap := buildMockPreState(p)
 		if snap != nil {
 			state.snapshots[account.Root] = snap
 		}
 
-		accountRlp, err := rlp.EncodeToBytes(account)
-		if err != nil {
-			panic(err)
-		}
+		v := account.MarshalWith(ar)
+		accountRlp := v.MarshalTo(nil)
+		/*
+			accountRlp, err := rlp.EncodeToBytes(account)
+			if err != nil {
+				panic(err)
+			}
+		*/
 		snapshot.data[hex.EncodeToHex(hashit(addr.Bytes()))] = accountRlp
 	}
 
@@ -79,11 +85,12 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 	var snap *mockSnapshot
 	root := emptyStateHash
 
+	ar := &fastrlp.Arena{}
 	if p.State != nil {
 		data := map[string][]byte{}
 		for k, v := range p.State {
-			vv, _ := rlp.EncodeToBytes(bytes.TrimLeft(v.Bytes(), "\x00"))
-			data[k.String()] = vv
+			vv := ar.NewBytes(bytes.TrimLeft(v.Bytes(), "\x00"))
+			data[k.String()] = vv.MarshalTo(nil)
 		}
 		root = randomHash()
 		snap = &mockSnapshot{

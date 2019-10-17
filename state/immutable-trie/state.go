@@ -39,6 +39,11 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 }
 
 func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
+	if root == types.EmptyRootHash {
+		// empty state
+		return s.NewSnapshot(), nil
+	}
+
 	tt, ok := s.cache.Get(root)
 	if ok {
 		t := tt.(*Trie)

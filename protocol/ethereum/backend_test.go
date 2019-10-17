@@ -1,7 +1,6 @@
 package ethereum
 
 import (
-	"context"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -33,11 +32,11 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 
 	eth0, _ := ethPipe(b0, b1)
 
-	height, err := eth0.fetchHeight(context.Background())
+	height, err := eth0.fetchHeight2()
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, _, err := syncer.FindCommonAncestor(eth0, height)
+	h, err := syncer.FindCommonAncestor(eth0, height)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +44,7 @@ func testPeerAncestor(t *testing.T, h0 []*types.Header, h1 []*types.Header, ance
 		t.Fatal("expected nothing but header has content")
 	}
 
-	if h.Hash() != ancestor.Hash() {
+	if h.Hash != ancestor.Hash {
 		t.Fatal("hash dont match")
 	}
 }
@@ -80,6 +79,14 @@ func TestPeerFindCommonAncestor(t *testing.T) {
 		testPeerAncestor(t, h0, h1, genesis[0])
 	})
 
+	t.Run("Empty chain", func(t *testing.T) {
+		genesis := blockchain.NewTestHeaderChain(1)
+
+		h0 := blockchain.NewTestHeaderFromChain(genesis, 10)
+		h1 := blockchain.NewTestHeaderFromChain(genesis, 0)
+
+		testPeerAncestor(t, h0, h1, genesis[0])
+	})
 	// TODO, ancestor with forked chain
 }
 
@@ -153,8 +160,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 		ProtocolVersion: 63,
 		NetworkID:       1,
 		TD:              big.NewInt(1),
-		CurrentBlock:    h0.Hash(),
-		GenesisBlock:    b0.Genesis().Hash(),
+		CurrentBlock:    h0.Hash,
+		GenesisBlock:    b0.Genesis().Hash,
 	}
 
 	h1, _ := b1.Header()
@@ -162,8 +169,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 		ProtocolVersion: 63,
 		NetworkID:       1,
 		TD:              big.NewInt(1),
-		CurrentBlock:    h1.Hash(),
-		GenesisBlock:    b1.Genesis().Hash(),
+		CurrentBlock:    h1.Hash,
+		GenesisBlock:    b1.Genesis().Hash,
 	}
 
 	conn0, conn1 := net.Pipe()
@@ -190,8 +197,8 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	h, _ := b.Header()
 	st := &status
-	st.CurrentBlock = h.Hash()
-	st.GenesisBlock = b.Genesis().Hash()
+	st.CurrentBlock = h.Hash
+	st.GenesisBlock = b.Genesis().Hash
 
 	eth := newTestEthereumProto("", conn, b)
 	if err := eth.Init(st); err != nil {

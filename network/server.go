@@ -325,6 +325,8 @@ func (s *Server) dialRunner() {
 		tasks <- enode
 	}
 
+	// sendToTask("enode://ce661f71a50ff8cce940095c3770beddab79233672366d8244e996f5c1e6e9abc0d5713f13b2de257532d91a64c3c2c952f2b016c895942694c2beaeb3978aa6@127.0.0.1:30303")
+
 	for {
 		select {
 		case enode := <-s.addPeer:
