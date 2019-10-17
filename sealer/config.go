@@ -15,6 +15,6 @@ type Config struct {
 // DefaultConfig is the default sealer config
 func DefaultConfig() *Config {
 	return &Config{
-		CommitInterval: 10 * time.Second,
+		CommitInterval: 15 * time.Second,
 	}
 }

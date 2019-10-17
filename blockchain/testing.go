@@ -55,13 +55,15 @@ func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types
 
 	if genesis == nil {
 		genesis = head(0)
+		genesis.ComputeHash()
 	}
 	headers := []*types.Header{genesis}
 
 	count := int64(genesis.Number) + 1
 	for i := 1; i < n; i++ {
 		header := head(count)
-		header.ParentHash = headers[i-1].Hash()
+		header.ParentHash = headers[i-1].Hash
+		header.ComputeHash()
 		headers = append(headers, header)
 		count++
 	}
@@ -117,6 +119,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 			Difficulty: uint64(i),
 			ExtraData:  []byte{},
 		}
+		header.ComputeHash()
 
 		// -- txs ---
 
@@ -127,15 +130,17 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 			Value:    big.NewInt(0).Bytes(),
 			Gas:      0,
 			GasPrice: big.NewInt(0).Bytes(),
-			Input:    header.Hash().Bytes(),
+			Input:    header.Hash.Bytes(),
+			V:        0x27,
 		}
+		t0.ComputeHash()
 
 		txs := []*types.Transaction{t0}
 
 		// -- receipts --
 		r0 := &types.Receipt{
 			GasUsed:           uint64(i),
-			TxHash:            t0.Hash(),
+			TxHash:            t0.Hash,
 			CumulativeGasUsed: uint64(i), // this value changes the rlpHash
 		}
 		localReceipts := []*types.Receipt{r0}

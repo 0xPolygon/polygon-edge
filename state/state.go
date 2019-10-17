@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/rlp"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -34,6 +34,55 @@ type Account struct {
 	Root     types.Hash
 	CodeHash []byte
 	Trie     accountTrie `rlp:"-"`
+}
+
+func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
+	v := ar.NewArray()
+	v.Set(ar.NewUint(a.Nonce))
+	v.Set(ar.NewBigInt(a.Balance))
+	v.Set(ar.NewBytes(a.Root.Bytes()))
+	v.Set(ar.NewBytes(a.CodeHash))
+	return v
+}
+
+var accountParserPool fastrlp.ParserPool
+
+func (a *Account) UnmarshalRlp(b []byte) error {
+	p := accountParserPool.Get()
+	defer accountParserPool.Put(p)
+
+	v, err := p.Parse(b)
+	if err != nil {
+		return err
+	}
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) != 4 {
+		return fmt.Errorf("bad")
+	}
+
+	// nonce
+	if a.Nonce, err = elems[0].GetUint64(); err != nil {
+		return err
+	}
+	// balance
+	if a.Balance == nil {
+		a.Balance = new(big.Int)
+	}
+	if err = elems[1].GetBigInt(a.Balance); err != nil {
+		return err
+	}
+	// root
+	if err = elems[2].GetHash(a.Root[:]); err != nil {
+		return err
+	}
+	// codeHash
+	if a.CodeHash, err = elems[3].GetBytes(a.CodeHash[:0]); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *Account) String() string {
@@ -68,20 +117,36 @@ func (s *StateObject) Empty() bool {
 	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
 }
 
+var stateStateParserPool fastrlp.ParserPool
+
 func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
 	val, ok := s.Account.Trie.Get(hash.Bytes())
 	if !ok {
 		return types.Hash{}
 	}
 
-	i := rlp.NewIterator(val)
+	/*
+		i := rlp.NewIterator(val)
+		content, err := i.Bytes()
+		if err != nil {
+			return types.Hash{}
+		}
+	*/
 
-	content, err := i.Bytes()
+	p := stateStateParserPool.Get()
+	defer stateStateParserPool.Put(p)
+
+	v, err := p.Parse(val)
 	if err != nil {
 		return types.Hash{}
 	}
 
-	return types.BytesToHash(content)
+	res := []byte{}
+	if res, err = v.GetBytes(res[:0]); err != nil {
+		return types.Hash{}
+	}
+
+	return types.BytesToHash(res)
 }
 
 // Copy makes a copy of the state object

@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/golang/snappy"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/rlp"
 )
 
 const (
@@ -51,12 +51,14 @@ type Message struct {
 	Err        error
 }
 
+/*
 func (msg Message) Decode(val interface{}) error {
 	if err := rlp.DecodeReader(msg.Payload, val); err != nil {
 		return fmt.Errorf("failed to decode rlp: %v", err)
 	}
 	return nil
 }
+*/
 
 // Session is the Session between peers (implements net.Conn)
 type Session struct {
@@ -210,7 +212,9 @@ func (s *Session) Disconnect(reason DiscReason) error {
 		s.shutdownErr = reason
 	}
 
-	s.WriteMsg(discMsg, []DiscReason{reason})
+	// disconnect message is an array with one value
+	s.WriteRawMsg(discMsg, []byte{0xc1, byte(reason)})
+	// s.WriteMsg(discMsg, []DiscReason{reason})
 
 	s.stateLock.Lock()
 	s.state = sessionClosed
@@ -268,7 +272,7 @@ func (s *Session) negotiateProtocols() error {
 
 	offset := BaseProtocolLength
 	for _, i := range info.Caps {
-		if b := s.rlpx.getProtocol(i.Name, i.Version); b != nil {
+		if b := s.rlpx.getProtocol(i.Name, uint(i.Version)); b != nil {
 			s.OpenStream(uint(offset), uint(b.Spec.Length), b.Spec)
 			offset += b.Spec.Length
 		}
@@ -311,6 +315,12 @@ func (s *Session) recv() {
 	}
 }
 
+var emptyRlp = []byte{0xC0}
+
+func (s *Session) writeCode(code uint64) error {
+	return s.WriteRawMsg(code, emptyRlp)
+}
+
 func (s *Session) recvLoop() error {
 	for {
 		code, buf, err := s.ReadMsg()
@@ -323,7 +333,7 @@ func (s *Session) recvLoop() error {
 
 		switch {
 		case code == pingMsg:
-			if err := s.WriteMsg(pongMsg); err != nil {
+			if err := s.writeCode(pongMsg); err != nil {
 				return err
 			}
 
@@ -361,7 +371,7 @@ func (s *Session) keepalive() {
 	for {
 		select {
 		case <-time.After(defaultPingInterval):
-			if err := s.WriteMsg(pingMsg); err != nil {
+			if err := s.writeCode(pingMsg); err != nil {
 				s.exitErr(err)
 				return
 			}
@@ -411,6 +421,8 @@ func (s *Session) ReadMsg() (uint64, []byte, error) {
 
 var errPlainMessageTooLarge = errors.New("message length >= 16MB")
 
+/*
+// TODO, remove
 func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 	var data interface{}
 
@@ -428,9 +440,19 @@ func (s *Session) WriteMsg(msgcode uint64, input ...interface{}) error {
 		return err
 	}
 
+	fmt.Println("-- msg code --")
+	fmt.Println(msgcode)
+	fmt.Println("-- input --")
+	fmt.Println(input)
+	fmt.Println("-- buf --")
+	fmt.Println(buf)
+
+	panic("X")
+
 	// metrics.SetGaugeWithLabels([]string{"conn", "outbound"}, float32(size), []metrics.Label{{Name: "id", Value: s.id}})
 	return s.WriteRawMsg(msgcode, buf)
 }
+*/
 
 func (s *Session) handleStreamMessage(code uint64, buf []byte) {
 	stream := s.getStream(code)
@@ -471,7 +493,8 @@ func extendByteSlice(b []byte, needLen int) []byte {
 type halfConn struct {
 	sync.Mutex
 
-	conn io.ReadWriter
+	conn  io.ReadWriter
+	arena fastrlp.Arena
 
 	snappy bool
 	buf    []byte
@@ -566,10 +589,10 @@ func (s *halfConn) readCode(buf []byte) (uint64, []byte, error) {
 }
 
 func (s *halfConn) write(code uint64, buf []byte) error {
-	ptype, err := rlp.EncodeToBytes(code)
-	if err != nil {
-		return err
-	}
+	// encode the code as rlp. TODO, Remove once we do update in fastrlp
+	v := s.arena.NewUint(code)
+	ptype := v.MarshalTo(nil)
+	s.arena.Reset()
 
 	size := len(buf)
 	var payload []byte

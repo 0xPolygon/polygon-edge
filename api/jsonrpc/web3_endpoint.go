@@ -1,8 +1,8 @@
 package jsonrpc
 
 import (
-	"golang.org/x/crypto/sha3"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/helper/keccak"
 )
 
 // Web3 is the web3 jsonrpc endpoint
@@ -22,7 +22,10 @@ func (w *Web3) Sha3(val string) (interface{}, error) {
 		return nil, err
 	}
 
-	h := sha3.NewLegacyKeccak256()
+	h := keccak.DefaultKeccakPool.Get()
 	h.Write(v)
-	return hex.EncodeToHex(h.Sum(nil)), nil
+	dst := h.Sum(nil)
+	keccak.DefaultKeccakPool.Put(h)
+
+	return hex.EncodeToHex(dst), nil
 }

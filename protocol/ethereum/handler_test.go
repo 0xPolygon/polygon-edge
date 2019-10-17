@@ -1,22 +1,20 @@
 package ethereum
 
 import (
-	"bytes"
-	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"reflect"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/network"
+	"github.com/umbracle/minimal/network/transport/rlpx"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -145,161 +143,6 @@ func headersToNumbers(headers []*types.Header) []int {
 	return n
 }
 
-func TestEthereumBlockHeadersMsg(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(100)
-
-	b0 := blockchain.NewTestBlockchain(t, headers)
-	b1 := blockchain.NewTestBlockchain(t, headers)
-
-	eth0, _ := testEthProtocol(t, b0, b1)
-
-	var cases = []struct {
-		Origin   interface{}
-		Amount   uint64
-		Skip     uint64
-		Reverse  bool
-		Expected []int
-	}{
-		/*
-			{
-				Origin:   headers[1].Hash(),
-				Amount:   10,
-				Skip:     4,
-				Reverse:  false,
-				Expected: []int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
-			},
-		*/
-		{
-			Origin:   1,
-			Amount:   10,
-			Skip:     4,
-			Reverse:  false,
-			Expected: []int{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
-		},
-		{
-			Origin:   1,
-			Amount:   10,
-			Skip:     0,
-			Reverse:  false,
-			Expected: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		},
-	}
-
-	for _, c := range cases {
-		t.Run("", func(t *testing.T) {
-			ack := make(chan AckMessage, 1)
-
-			var err error
-			if reflect.TypeOf(c.Origin).Name() == "Hash" {
-				hash := c.Origin.(types.Hash)
-				eth0.setHandler(context.Background(), headerMsg, hash.String(), ack)
-				err = eth0.RequestHeadersByHash(hash, c.Amount, c.Skip, c.Reverse)
-			} else {
-				number := uint64(c.Origin.(int))
-				eth0.setHandler(context.Background(), headerMsg, strconv.Itoa(int(number)), ack)
-				err = eth0.RequestHeadersByNumber(number, c.Amount, c.Skip, c.Reverse)
-			}
-
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			resp := <-ack
-			if resp.Completed() {
-				if !reflect.DeepEqual(headersToNumbers(resp.Result.([]*types.Header)), c.Expected) {
-					t.Fatal("expected numbers dont match")
-				}
-			} else {
-				t.Fatal("failed to receive the headers")
-			}
-		})
-	}
-}
-
-func TestEthereumEmptyResponseBodyAndReceipts(t *testing.T) {
-	// There are no body and no receipts, the answer is empty
-	headers := blockchain.NewTestHeaderChain(100)
-
-	b0 := blockchain.NewTestBlockchain(t, headers)
-	b1 := blockchain.NewTestBlockchain(t, headers)
-
-	eth0, _ := testEthProtocol(t, b0, b1)
-
-	batch := []types.Hash{
-		headers[0].Hash(),
-		headers[5].Hash(),
-		headers[10].Hash(),
-	}
-
-	// bodies
-	ack := make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), bodyMsg, batch[0].String(), ack)
-
-	if err := eth0.RequestBodies(batch); err != nil {
-		t.Fatal(err)
-	}
-	// NOTE, we cannot know if something failed yet, so empty response
-	// means checking if the timeout fails
-	if resp := <-ack; resp.Completed() {
-		t.Fatal("bad")
-	}
-
-	// receipts
-	ack = make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), receiptsMsg, batch[0].String(), ack)
-
-	if err := eth0.RequestReceipts(batch); err != nil {
-		t.Fatal(err)
-	}
-	if resp := <-ack; resp.Completed() {
-		t.Fatal("bad")
-	}
-}
-
-func TestEthereumBody(t *testing.T) {
-	b0 := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(100))
-
-	headers, blocks, receipts := blockchain.NewTestBodyChain(3) // only s1 needs to have bodies and receipts
-	b1 := blockchain.NewTestBlockchainWithBlocks(t, blocks, receipts)
-
-	eth0, _ := testEthProtocol(t, b0, b1)
-
-	// NOTE, we use tx to check if the response is correct, genesis does not
-	// have any tx so if we use that one it will fail
-	batch := []uint64{2}
-
-	msg := []types.Hash{}
-	for _, i := range batch {
-		msg = append(msg, headers[i].Hash())
-	}
-
-	first := blocks[batch[0]]
-	hash := encodeHash(derivesha.CalcUncleRoot(first.Uncles), derivesha.CalcTxsRoot(first.Transactions)).String()
-
-	// -- bodies --
-
-	ack := make(chan AckMessage, 1)
-	eth0.setHandler(context.Background(), bodyMsg, hash, ack)
-
-	if err := eth0.RequestBodies(msg); err != nil {
-		t.Fatal(err)
-	}
-
-	resp := <-ack
-	if !resp.Completed() {
-		t.Fatal("not completed")
-	}
-	bodies := resp.Result.([]*types.Body)
-	if len(bodies) != len(batch) {
-		t.Fatal("bodies: length is not correct")
-	}
-	for indx := range batch {
-		if batch[indx] != bodies[indx].Transactions[0].Nonce {
-			t.Fatal("numbers dont match")
-		}
-	}
-}
-
 func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(1000)
 
@@ -320,7 +163,7 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 
 	for indx, i := range cases {
 		go func(indx int, i uint64) {
-			h, err := eth0.RequestHeadersRangeSync(context.Background(), i, 100)
+			h, err := eth0.requestHeaderByNumber2(i, nil, 100, 0, false)
 			if err == nil {
 				if len(h) != 100 {
 					err = fmt.Errorf("length not correct")
@@ -344,52 +187,6 @@ func TestPeerConcurrentHeaderCalls(t *testing.T) {
 	}
 }
 
-func TestPeerEmptyResponseFails(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers[0:5])
-
-	// b1 with the whole chain
-	b1 := blockchain.NewTestBlockchain(t, headers)
-
-	eth0, _ := testEthProtocol(t, b0, b1)
-
-	if _, err := eth0.RequestHeadersRangeSync(context.Background(), 1100, 100); err == nil {
-		t.Fatal("it should fail")
-	}
-
-	// NOTE: We cannot know from an empty response which is the
-	// pending block it belongs to (because we use the first block to know the origin)
-	// Thus, the query will fail with a timeout message but it does not
-	// mean the peer is timing out on the responses.
-}
-
-func TestPeerContextCancel(t *testing.T) {
-	headers := blockchain.NewTestHeaderChain(1000)
-
-	// b0 with only the genesis
-	b0 := blockchain.NewTestBlockchain(t, headers[0:5])
-
-	// b1 with the whole chain
-	b1 := blockchain.NewTestBlockchain(t, headers)
-
-	eth0, _ := testEthProtocol(t, b0, b1)
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	errr := make(chan error, 1)
-	go func() {
-		_, err := eth0.RequestHeadersRangeSync(ctx, 1100, 100)
-		errr <- err
-	}()
-
-	cancel()
-	if err := <-errr; err.Error() != "failed" {
-		t.Fatal("it should have been canceled")
-	}
-}
-
 func TestHeight(t *testing.T) {
 	headers := blockchain.NewTestHeaderChain(111)
 
@@ -400,7 +197,7 @@ func TestHeight(t *testing.T) {
 	b1 := blockchain.NewTestBlockchain(t, headers)
 
 	eth0, _ := ethPipe(b0, b1)
-	height, err := eth0.fetchHeight(context.Background())
+	height, err := eth0.fetchHeight2()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,7 +208,7 @@ func TestHeight(t *testing.T) {
 
 func TestPendingQueue(t *testing.T) {
 	ack := make(chan AckMessage)
-	c := &callback{ack}
+	c := &callback{ack: ack}
 
 	p := newPending()
 	p.add("1", c)
@@ -442,70 +239,6 @@ func TestPendingQueue(t *testing.T) {
 	p.consume("")
 	if p.pending != 0 {
 		t.Fatal()
-	}
-}
-
-func TestFailedQueries(t *testing.T) {
-	upperBound := 100
-
-	h0 := blockchain.NewTestHeaderChain(500)
-	h1 := blockchain.NewTestHeaderChain(upperBound)
-
-	b0 := blockchain.NewTestBlockchain(t, h0)
-	b1 := blockchain.NewTestBlockchain(t, h1)
-
-	eth0, _ := ethPipe(b0, b1)
-
-	cases := [][]int{
-		[]int{
-			10, 200, 5,
-		},
-		[]int{
-			5, 10, 200,
-		},
-		[]int{
-			5, 200, 10,
-		},
-		[]int{
-			200, 201, 202,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run("", func(t *testing.T) {
-			done := make(chan error, len(c))
-			res := make([]error, len(c))
-
-			for indx, step := range c {
-				go func(indx, step int) {
-					header, ok := b0.GetHeaderByNumber(uint64(step))
-					if !ok {
-						done <- fmt.Errorf("header not found")
-						return
-					}
-
-					_, err := eth0.RequestHeaderByHashSync(context.Background(), header.Hash())
-					res[indx] = err
-
-					done <- nil
-				}(indx, step)
-			}
-
-			for i := 0; i < len(c); i++ {
-				if err := <-done; err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			for indx, step := range c {
-				if step > upperBound && res[indx] == nil {
-					t.Fatal()
-				}
-				if step < upperBound && res[indx] != nil {
-					t.Fatal()
-				}
-			}
-		})
 	}
 }
 
@@ -551,26 +284,100 @@ func (m *mockSession) Close() error {
 	return nil
 }
 
-func TestPeerDisconnection(t *testing.T) {
-	// Do not show a warn message if we were aware of the disconnection
-	in, out := pipeMock()
-
-	buf := bytes.NewBuffer(nil)
-	logger := hclog.New(&hclog.LoggerOptions{
-		Output: buf,
-	})
-
-	e := &Ethereum{}
-	e.logger = logger
-	e.session = in
-	e.conn = in.conn
-
+func readRlpxMsg(t *testing.T, r io.Reader) <-chan []byte {
+	res := make(chan []byte)
 	go func() {
-		e.listen()
+		for {
+			// read header
+			var recv rlpx.Header
+			recv = make([]byte, rlpx.HeaderSize)
+			if _, err := r.Read(recv); err != nil {
+				t.Fatal(err)
+			}
+			// read the content
+			buf := make([]byte, recv.Length())
+			if _, err := r.Read(buf); err != nil {
+				t.Fatal(err)
+			}
+			res <- buf
+		}
 	}()
+	return res
+}
 
-	out.Close()
+func parse(t *testing.T, query []byte) (*fastrlp.Parser, *fastrlp.Value) {
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p, v
+}
 
-	time.Sleep(200 * time.Millisecond)
-	assert.Equal(t, 0, buf.Len())
+func TestHandleGetBlockHeaders(t *testing.T) {
+	p0, p1 := net.Pipe()
+
+	chain := blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChain(100))
+	e := &Ethereum{
+		blockchain: chain,
+		conn:       p1,
+	}
+
+	resp := readRlpxMsg(t, p0)
+
+	cases := []struct {
+		Origin   uint64
+		Amount   uint64
+		Skip     uint64
+		Reverse  bool
+		Expected []uint64
+	}{
+		{
+			1, 10, 0, false,
+			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			10, 10, 0, true,
+			[]uint64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1},
+		},
+		{
+			1, 10, 4, false,
+			[]uint64{1, 6, 11, 16, 21, 26, 31, 36, 41, 46},
+		},
+		{
+			1, 1, 0, false,
+			[]uint64{1},
+		},
+		{
+			10000, 10, 0, false,
+			[]uint64{},
+		},
+		{
+			98, 10, 0, false,
+			[]uint64{98, 99},
+		},
+	}
+
+	for _, i := range cases {
+		t.Run("", func(t *testing.T) {
+			query := reqHeadersQuery(nil, i.Origin, i.Amount, i.Skip, i.Reverse)
+			if err := e.handleGetHeader(parse(t, query)); err != nil {
+				t.Fatal(err)
+			}
+
+			buf0 := <-resp
+
+			_, v := parse(t, buf0)
+			elems, _ := v.GetElems()
+			assert.Equal(t, len(i.Expected), len(elems))
+
+			headers := make([]types.Header, len(elems))
+			for indx, header := range headers {
+				if err := header.UnmarshalRLP(nil, elems[indx]); err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, header.Number, i.Expected[indx])
+			}
+		})
+	}
 }

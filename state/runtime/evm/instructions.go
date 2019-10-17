@@ -793,7 +793,14 @@ func opBlockHash(c *state) {
 		ok = n > lastBlock-257
 	}
 
+	//fmt.Println("-- num --")
+	//fmt.Println(num)
+
 	if n < lastBlock && ok {
+
+		//fmt.Println("-- hash --")
+		//fmt.Println(c.evm.getHash(num.Uint64()).String())
+
 		num.SetBytes(c.evm.getHash(num.Uint64()).Bytes())
 	} else {
 		num.Set(zero)

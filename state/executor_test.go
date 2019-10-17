@@ -30,7 +30,7 @@ func (t *Transaction) ToMessage() *types.Transaction {
 		GasPrice: new(big.Int).SetUint64(t.GasPrice).Bytes(),
 		Input:    t.Data,
 	}
-	tt.SetFrom(t.From)
+	tt.From = t.From
 	return tt
 }
 

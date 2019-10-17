@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/umbracle/minimal/rlpv2"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
@@ -151,14 +151,12 @@ func hashimoto(header []byte, nonce uint64, fullSize int, sha512, sha256 hashFn,
 	return digest, result
 }
 
-var sealArenaPool rlpv2.ArenaPool
+var sealArenaPool fastrlp.ArenaPool
 
 func (e *Ethash) sealHash(h *types.Header) []byte {
 	arena := sealArenaPool.Get()
-	defer sealArenaPool.Put(arena)
 
 	vv := arena.NewArray()
-
 	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
 	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
 	vv.Set(arena.NewBytes(h.Miner.Bytes()))
@@ -173,6 +171,11 @@ func (e *Ethash) sealHash(h *types.Header) []byte {
 	vv.Set(arena.NewUint(h.Timestamp))
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 
-	e.tmp = arena.HashTo(e.tmp[:0], vv)
+	//e.tmp = arena.HashTo(e.tmp[:0], vv)
+
+	e.tmp = e.keccak256.WriteRlp(e.tmp[:0], vv)
+	e.keccak256.Reset()
+
+	sealArenaPool.Put(arena)
 	return e.tmp
 }

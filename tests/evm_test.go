@@ -7,8 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 
@@ -107,17 +110,33 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 }
 
-func rlpHashLogs(logs []*types.Log) types.Hash {
-	alias := []interface{}{}
-	for _, log := range logs {
-		alias = append(alias, []interface{}{
-			log.Address,
-			log.Topics,
-			log.Data,
-		})
+func rlpHashLogs(logs []*types.Log) (res types.Hash) {
+	r := &types.Receipt{
+		Logs: logs,
 	}
 
-	return rlpHash(alias)
+	h := keccak.DefaultKeccakPool.Get()
+
+	ar := &fastrlp.Arena{}
+	v := r.MarshalLogsWith(ar)
+	h.WriteRlp(res[:0], v)
+
+	keccak.DefaultKeccakPool.Put(h)
+
+	/*
+		alias := []interface{}{}
+		for _, log := range logs {
+			alias = append(alias, []interface{}{
+				log.Address,
+				log.Topics,
+				log.Data,
+			})
+		}
+
+		return rlpHash(alias)
+	*/
+
+	return
 }
 
 func TestEVM(t *testing.T) {

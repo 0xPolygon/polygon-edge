@@ -230,8 +230,8 @@ func (c *state) Run() ([]byte, error) {
 
 		op := OpCode(c.code[c.ip])
 
-		// fmt.Printf("OP [%d]: %s (%d)\n", c.depth, op.String(), c.gas)
-		// fmt.Println(c.showStack())
+		//fmt.Printf("OP [%d]: %s (%d)\n", c.depth, op.String(), c.gas)
+		//fmt.Println(c.showStack())
 
 		inst := dispatchTable[op]
 		if inst.inst == nil {

@@ -75,7 +75,7 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		num := parent.Number
 
 		newHeader := &types.Header{
-			ParentHash: parent.Hash(),
+			ParentHash: parent.Hash,
 			Number:     num + 1,
 			GasLimit:   calcGasLimit(parent, 8000000, 8000000),
 			ExtraData:  []byte{},

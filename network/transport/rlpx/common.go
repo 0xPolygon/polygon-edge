@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/rlp"
 )
 
 const (
@@ -72,12 +72,30 @@ func (d DiscReason) Error() string {
 	return d.String()
 }
 
+var discReasonParserPool fastrlp.ParserPool
+
 func decodeDiscMsg(buf []byte) DiscReason {
-	var reason [1]DiscReason
-	if err := rlp.DecodeBytes(buf, &reason); err != nil {
+	p := discReasonParserPool.Get()
+	defer discReasonParserPool.Put(p)
+
+	v, err := p.Parse(buf)
+	if err != nil {
 		return DiscUnknown
 	}
-	return reason[0]
+	elems, err := v.GetElems()
+	if err != nil {
+		return DiscUnknown
+	}
+	if len(elems) != 1 {
+		return DiscUnknown
+	}
+	num, err := elems[0].GetUint64()
+	if err != nil {
+		return DiscUnknown
+	}
+
+	reason := DiscReason(num)
+	return reason
 }
 
 const (
@@ -91,7 +109,24 @@ const (
 // Cap is the peer capability.
 type Cap struct {
 	Name    string
-	Version uint
+	Version uint64
+}
+
+func (c *Cap) unmarshalRLP(v *fastrlp.Value) error {
+	fields, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(fields) != 2 {
+		return fmt.Errorf("bad parsing")
+	}
+	if c.Name, err = fields[0].GetString(); err != nil {
+		return err
+	}
+	if c.Version, err = fields[1].GetUint64(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Cap) less(cc *Cap) bool {
@@ -126,4 +161,90 @@ type Info struct {
 
 	// Ignore additional fields (for forward compatibility).
 	// Rest []rlp.RawValue `rlp:"tail"`
+}
+
+const nodeIDBytes = 512 / 8
+
+var infoArenaPool fastrlp.ArenaPool
+
+func (i *Info) MarshalRLP(dst []byte) []byte {
+	a := infoArenaPool.Get()
+
+	v := a.NewArray()
+	v.Set(a.NewUint(i.Version))
+	v.Set(a.NewString(i.Name))
+	if len(i.Caps) == 0 {
+		v.Set(a.NewNullArray())
+	} else {
+		caps := a.NewArray()
+		for _, cap := range i.Caps {
+			elem := a.NewArray()
+			elem.Set(a.NewString(cap.Name))
+			elem.Set(a.NewUint(cap.Version))
+			caps.Set(elem)
+		}
+		v.Set(caps)
+	}
+	v.Set(a.NewUint(i.ListenPort))
+	v.Set(a.NewBytes(i.ID[:]))
+
+	dst = v.MarshalTo(dst)
+	infoArenaPool.Put(a)
+	return dst
+}
+
+var infoParserPool fastrlp.ParserPool
+
+func (i *Info) UnmarshalRLP(b []byte) error {
+	p := infoParserPool.Get()
+	defer infoParserPool.Put(p)
+
+	v, err := p.Parse(b)
+	if err != nil {
+		return err
+	}
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) < 5 {
+		// there might be additional fields for forward compatibility
+		return fmt.Errorf("bad length cc")
+	}
+
+	if i.Version, err = elems[0].GetUint64(); err != nil {
+		return err
+	}
+	if i.Name, err = elems[1].GetString(); err != nil {
+		return err
+	}
+
+	// array of capabilities
+	caps, err := elems[2].GetElems()
+	if err != nil {
+		return err
+	}
+	for _, elem := range caps {
+		cap := &Cap{}
+		if err := cap.unmarshalRLP(elem); err != nil {
+			return err
+		}
+		i.Caps = append(i.Caps, cap)
+	}
+
+	// listen port
+	if i.ListenPort, err = elems[3].GetUint64(); err != nil {
+		return err
+	}
+
+	// enode
+	if elems[4].Type() != fastrlp.TypeBytes {
+		return fmt.Errorf("bad")
+	}
+	if len(elems[4].Raw()) != nodeIDBytes {
+		return fmt.Errorf("bad.2")
+	}
+	copy(i.ID[:], elems[4].Raw())
+
+	return nil
 }

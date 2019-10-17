@@ -7,7 +7,8 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/umbracle/minimal/chain"
-	rlpv2 "github.com/umbracle/minimal/rlpv2"
+	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -37,23 +38,23 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 type FrontierSigner struct {
 }
 
-var signerPool rlpv2.ArenaPool
+var signerPool fastrlp.ArenaPool
 
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
-	defer signerPool.Put(a)
+	hash := keccak.DefaultKeccakPool.Get()
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewBytes(tx.GasPrice))
+	v.Set(a.NewCopyBytes(tx.GetGasPrice()))
 	v.Set(a.NewUint(tx.Gas))
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
-		v.Set(a.NewBytes((*tx.To).Bytes()))
+		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
 	}
-	v.Set(a.NewBytes(tx.Value))
-	v.Set(a.NewBytes(tx.Input))
+	v.Set(a.NewCopyBytes(tx.Value))
+	v.Set(a.NewCopyBytes(tx.Input))
 
 	// EIP155
 	if chainID != 0 {
@@ -62,7 +63,11 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		v.Set(a.NewUint(0))
 	}
 
-	buf := a.HashTo(nil, v)
+	buf := hash.WriteRlp(nil, v)
+
+	signerPool.Put(a)
+	keccak.DefaultKeccakPool.Put(hash)
+
 	return types.BytesToHash(buf)
 }
 

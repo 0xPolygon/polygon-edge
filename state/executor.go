@@ -102,11 +102,11 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 
 	s := txn.Snapshot()
 
-	gasPrice := new(big.Int).SetBytes(msg.GasPrice)
+	gasPrice := new(big.Int).SetBytes(msg.GetGasPrice())
 	value := new(big.Int).SetBytes(msg.Value)
 
 	// check nonce is correct (pre-check)
-	nonce := txn.GetNonce(msg.From())
+	nonce := txn.GetNonce(msg.From)
 	if nonce < msg.Nonce {
 		return 0, false, fmt.Errorf("too high %d < %d", nonce, msg.Nonce)
 	} else if nonce > msg.Nonce {
@@ -115,7 +115,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 
 	// buy gas
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), gasPrice)
-	if txn.GetBalance(msg.From()).Cmp(mgval) < 0 {
+	if txn.GetBalance(msg.From).Cmp(mgval) < 0 {
 		return 0, false, ErrInsufficientBalanceForGas
 	}
 
@@ -128,7 +128,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 	txn.gas = msg.Gas
 
 	txn.initialGas = msg.Gas
-	txn.SubBalance(msg.From(), mgval)
+	txn.SubBalance(msg.From, mgval)
 
 	contractCreation := msg.To == nil
 
@@ -170,7 +170,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 
 	txn.gas -= txGas
 
-	sender := msg.From()
+	sender := msg.From
 
 	var vmerr error
 
@@ -184,7 +184,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 		if contractCreation {
 			_, txn.gas, vmerr = e.Create2(sender, msg.Input, value, txn.gas)
 		} else {
-			txn.SetNonce(msg.From(), txn.GetNonce(msg.From())+1)
+			txn.SetNonce(msg.From, txn.GetNonce(msg.From)+1)
 			_, txn.gas, vmerr = e.Call2(sender, *msg.To, msg.Input, value, txn.gas)
 		}
 		if vmerr != nil {
@@ -208,7 +208,7 @@ func (e *Executor) apply(txn *Txn, msg *types.Transaction, env *runtime.Env, gas
 	// Return ETH for remaining gas, exchanged at the original rate.
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(txn.gas), gasPrice)
 
-	txn.AddBalance(msg.From(), remaining)
+	txn.AddBalance(msg.From, remaining)
 
 	// pay the coinbase
 	txn.AddBalance(env.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(txn.gasUsed()), gasPrice))

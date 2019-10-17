@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -11,6 +12,14 @@ import (
 )
 
 type MockStorage func(t *testing.T) (Storage, func())
+
+var (
+	addr1 = types.StringToAddress("1")
+	addr2 = types.StringToAddress("2")
+
+	hash1 = types.StringToHash("1")
+	hash2 = types.StringToHash("2")
+)
 
 // TestStorage tests a set of tests on a storage
 func TestStorage(t *testing.T, m MockStorage) {
@@ -72,7 +81,7 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 			ExtraData:  []byte{0x1},
 		}
 
-		hash := h.Hash()
+		hash := h.Hash
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +122,7 @@ func testDifficulty(t *testing.T, m MockStorage) {
 			ExtraData: []byte{},
 		}
 
-		hash := h.Hash()
+		hash := h.Hash
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +148,7 @@ func testHead(t *testing.T, m MockStorage) {
 			Number:    i,
 			ExtraData: []byte{},
 		}
-		hash := h.Hash()
+		hash := h.Hash
 
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
@@ -204,15 +213,17 @@ func testHeader(t *testing.T, m MockStorage) {
 		Timestamp:  10,
 		ExtraData:  hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"), // if not set it will fail
 	}
+	header.ComputeHash()
 
 	if err := s.WriteHeader(header); err != nil {
 		t.Fatal(err)
 	}
-	header1, ok := s.ReadHeader(header.Hash())
+	header1, ok := s.ReadHeader(header.Hash)
 	if !ok {
 		t.Fatal("not found")
 	}
-	if !reflect.DeepEqual(header.Hash(), header1.Hash()) {
+
+	if !reflect.DeepEqual(header, header1) {
 		t.Fatal("bad")
 	}
 }
@@ -240,7 +251,9 @@ func testBody(t *testing.T, m MockStorage) {
 		Gas:      11,
 		GasPrice: big.NewInt(11).Bytes(),
 		Input:    []byte{1, 2},
+		V:        1,
 	}
+	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
 	t1 := &types.Transaction{
@@ -250,7 +263,9 @@ func testBody(t *testing.T, m MockStorage) {
 		Gas:      22,
 		GasPrice: big.NewInt(11).Bytes(),
 		Input:    []byte{4, 5},
+		V:        2,
 	}
+	t1.ComputeHash()
 
 	block := types.Block{
 		Header:       header,
@@ -258,11 +273,11 @@ func testBody(t *testing.T, m MockStorage) {
 	}
 
 	body0 := block.Body()
-	if err := s.WriteBody(header.Hash(), body0); err != nil {
+	if err := s.WriteBody(header.Hash, body0); err != nil {
 		t.Fatal(err)
 	}
 
-	body1, ok := s.ReadBody(header.Hash())
+	body1, ok := s.ReadBody(header.Hash)
 	if !ok {
 		t.Fatal("not found")
 	}
@@ -273,7 +288,7 @@ func testBody(t *testing.T, m MockStorage) {
 		t.Fatal("lengths are different")
 	}
 	for indx, i := range tx0 {
-		if i.Hash() != tx1[indx].Hash() {
+		if i.Hash != tx1[indx].Hash {
 			t.Fatal("tx not correct")
 		}
 	}
@@ -301,29 +316,39 @@ func testReceipts(t *testing.T, m MockStorage) {
 	body := &types.Body{
 		Transactions: []*types.Transaction{txn},
 	}
-	if err := s.WriteBody(h.Hash(), body); err != nil {
+	if err := s.WriteBody(h.Hash, body); err != nil {
 		t.Fatal(err)
 	}
 
 	r0 := &types.Receipt{
-		Root:              []byte{1},
-		Status:            types.ReceiptFailed,
+		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash(),
+		TxHash:            txn.Hash,
+		Logs: []*types.Log{
+			&types.Log{
+				Address: addr1,
+				Topics:  []types.Hash{hash1, hash2},
+				Data:    []byte{0x1, 0x2},
+			},
+			&types.Log{
+				Address: addr2,
+				Topics:  []types.Hash{hash1},
+			},
+		},
 	}
 	r1 := &types.Receipt{
-		Root:              []byte{1},
-		Status:            types.ReceiptFailed,
+		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
-		TxHash:            txn.Hash(),
+		TxHash:            txn.Hash,
+		Logs:              []*types.Log{},
 	}
 
 	receipts := []*types.Receipt{r0, r1}
 
-	if err := s.WriteReceipts(h.Hash(), receipts); err != nil {
+	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
-	r, ok := s.ReadReceipts(h.Hash())
+	r, ok := s.ReadReceipts(h.Hash)
 	if !ok {
 		t.Fatal("not found")
 	}
@@ -332,7 +357,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 		t.Fatal("lengths are different")
 	}
 	for indx, i := range receipts {
-		if !bytes.Equal(i.Root, r[indx].Root) {
+		if !bytes.Equal(i.Root[:], r[indx].Root[:]) {
 			t.Fatal("receipt txhash is not correct")
 		}
 	}
@@ -346,6 +371,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 		Number:    100,
 		ExtraData: []byte{0x1},
 	}
+	h.ComputeHash()
 
 	diff := new(big.Int).SetUint64(100)
 
@@ -353,13 +379,18 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 		t.Fatal(err)
 	}
 
-	hh, ok := s.ReadHeader(h.Hash())
+	hh, ok := s.ReadHeader(h.Hash)
 	if !ok {
 		t.Fatal("not found header")
 	}
 
-	hh.Hash() // load the hash in the struct
 	if !reflect.DeepEqual(h, hh) {
+
+		fmt.Println("-- valid --")
+		fmt.Println(h)
+		fmt.Println("-- found --")
+		fmt.Println(hh)
+
 		t.Fatal("bad header")
 	}
 
@@ -367,7 +398,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found head hash")
 	}
-	if headHash != h.Hash() {
+	if headHash != h.Hash {
 		t.Fatal("head hash not correct")
 	}
 
@@ -383,7 +414,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found can hash")
 	}
-	if canHash != h.Hash() {
+	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")
 	}
 }

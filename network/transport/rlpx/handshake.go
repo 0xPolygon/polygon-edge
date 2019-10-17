@@ -1,7 +1,7 @@
 package rlpx
 
 import (
-	"bytes"
+	// "bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -17,7 +17,6 @@ import (
 	"github.com/umbracle/ecies"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/rlp"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -76,9 +75,22 @@ func (c *handshakeConn) readMessage(m plainDecoder) ([]byte, error) {
 				return nil, err
 			}
 		*/
-		if err := rlp.DecodeBytes(dec, m); err != nil {
+
+		// fmt.Println("-- unmarshal --")
+
+		/*
+			if err := rlp.DecodeBytes(dec, m); err != nil {
+				panic(err)
+				return nil, err
+			}
+		*/
+
+		if err := m.UnmarshalRLP(dec); err != nil {
 			return nil, err
 		}
+
+		// fmt.Println(m)
+
 	}
 	return buf, nil
 }
@@ -117,19 +129,30 @@ func (c *handshakeConn) readBytes(plainSize uint16) ([]byte, []byte, bool, error
 }
 
 func (c *handshakeConn) writeMessage(m plainDecoder) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := rlp.Encode(buf, m); err != nil {
-		return nil, err
-	}
+	buf := m.MarshalRLP(nil)
+
+	/*
+		buf2 := new(bytes.Buffer)
+		if err := rlp.Encode(buf2, m); err != nil {
+			return nil, err
+		}
+
+		if !bytes.Equal(buf2.Bytes(), buf) {
+			panic("XX")
+		}
+	*/
 
 	// Encode EIP8
 	pad := padSpace[:mrand.Intn(len(padSpace)-100)+100]
-	buf.Write(pad)
+	buf = append(buf, pad...)
+	// buf.Write(pad)
 
 	prefix := make([]byte, 2)
-	binary.BigEndian.PutUint16(prefix, uint16(buf.Len()+eciesOverhead))
+	binary.BigEndian.PutUint16(prefix, uint16(len(buf)+eciesOverhead))
+	// binary.BigEndian.PutUint16(prefix, uint16(buf.Len()+eciesOverhead))
 
-	enc, err := ecies.Encrypt(rand.Reader, c.remote, buf.Bytes(), nil, prefix)
+	enc, err := ecies.Encrypt(rand.Reader, c.remote, buf, nil, prefix)
+	// enc, err := ecies.Encrypt(rand.Reader, c.remote, buf.Bytes(), nil, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -251,9 +274,13 @@ func (h *handshakeState) makeAuthMsg(prv *ecdsa.PrivateKey) (*authMsgV4, error) 
 	msg := &authMsgV4{
 		Version: 4,
 	}
-	copy(msg.Signature[:], signature)
-	copy(msg.InitiatorPubkey[:], crypto.MarshallPublicKey(&prv.PublicKey)[1:])
-	copy(msg.Nonce[:], h.initNonce)
+	msg.Signature = append(msg.Signature, signature...)
+	msg.InitiatorPubkey = append(msg.InitiatorPubkey, crypto.MarshallPublicKey(&prv.PublicKey)[1:]...)
+	msg.Nonce = append(msg.Nonce, h.initNonce...)
+
+	//copy(msg.Signature[:], signature)
+	//copy(msg.InitiatorPubkey[:], crypto.MarshallPublicKey(&prv.PublicKey)[1:])
+	//copy(msg.Nonce[:], h.initNonce)
 
 	return msg, nil
 }
@@ -376,8 +403,11 @@ func (h *handshakeState) makeAuthResp() (*authRespV4, error) {
 	msg := &authRespV4{
 		Version: 4,
 	}
-	copy(msg.Nonce[:], h.respNonce)
-	copy(msg.RandomPubkey[:], elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
+	msg.Nonce = append(msg.Nonce, h.respNonce...)
+	msg.RandomPubkey = append(msg.RandomPubkey, elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:]...)
+
+	//copy(msg.Nonce[:], h.respNonce)
+	//copy(msg.RandomPubkey[:], elliptic.Marshal(pub.Curve, pub.X, pub.Y)[1:])
 
 	return msg, nil
 }
@@ -393,7 +423,24 @@ func doProtocolHandshake(conn *Session, nodeInfo *Info) (*Info, error) {
 	conn.SetDeadline(time.Now().Add(protocolDeadline))
 
 	go func() {
-		errr <- conn.WriteMsg(handshakeMsg, nodeInfo)
+		/*
+			buf2, err := rlp.EncodeToBytes(nodeInfo)
+			if err != nil {
+				panic(err)
+			}
+		*/
+
+		buf := nodeInfo.MarshalRLP(nil)
+
+		/*
+			if !bytes.Equal(buf, buf2) {
+				fmt.Println(buf)
+				fmt.Println(buf2)
+				panic("bad")
+			}
+		*/
+
+		errr <- conn.WriteRawMsg(handshakeMsg, buf)
 	}()
 
 	go func() {
@@ -440,9 +487,19 @@ func readProtocolHandshake(conn *Session) (*Info, error) {
 	}
 
 	var info Info
-	if err := rlp.DecodeBytes(buf, &info); err != nil {
-		return nil, err
+	if err := info.UnmarshalRLP(buf); err != nil {
+		panic(err)
 	}
+
+	/*
+		var info2 Info
+		if err := rlp.DecodeBytes(buf, &info); err != nil {
+			return nil, err
+		}
+		if !reflect.DeepEqual(info, info2) {
+			panic("not equal")
+		}
+	*/
 
 	if (info.ID == enode.ID{}) {
 		return nil, DiscInvalidIdentity

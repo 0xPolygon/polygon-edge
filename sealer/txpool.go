@@ -75,16 +75,16 @@ func (t *TxPool) Update(b *types.Block, state *state.Txn) error {
 func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, error) {
 	var reinject []*types.Transaction
 
-	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
+	if oldHead != nil && oldHead.Hash != newHead.ParentHash {
 		var discarded, included []*types.Transaction
 
-		oldHeader, ok := t.blockchain.GetBlockByHash(oldHead.Hash(), true)
+		oldHeader, ok := t.blockchain.GetBlockByHash(oldHead.Hash, true)
 		if !ok {
-			return nil, fmt.Errorf("block by hash '%s' not found", oldHead.Hash().String())
+			return nil, fmt.Errorf("block by hash '%s' not found", oldHead.Hash.String())
 		}
-		newHeader, ok := t.blockchain.GetBlockByHash(newHead.Hash(), true)
+		newHeader, ok := t.blockchain.GetBlockByHash(newHead.Hash, true)
 		if !ok {
-			return nil, fmt.Errorf("block by hash '%s' not found", newHead.Hash().String())
+			return nil, fmt.Errorf("block by hash '%s' not found", newHead.Hash.String())
 		}
 
 		for oldHeader.Number() > newHeader.Number() {
@@ -284,8 +284,8 @@ func newTxPriceHeap() *txPriceHeap {
 }
 
 func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price *big.Int) error {
-	if _, ok := t.index[tx.Hash()]; ok {
-		return fmt.Errorf("tx %s already exists", tx.Hash())
+	if _, ok := t.index[tx.Hash]; ok {
+		return fmt.Errorf("tx %s already exists", tx.Hash)
 	}
 
 	pTx := &pricedTx{
@@ -293,7 +293,7 @@ func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price *big
 		from:  from,
 		price: price,
 	}
-	t.index[tx.Hash()] = pTx
+	t.index[tx.Hash] = pTx
 	heap.Push(&t.heap, pTx)
 	return nil
 }
@@ -303,12 +303,12 @@ func (t *txPriceHeap) Pop() *pricedTx {
 		return nil
 	}
 	tx := heap.Pop(&t.heap).(*pricedTx)
-	delete(t.index, tx.tx.Hash())
+	delete(t.index, tx.tx.Hash)
 	return tx
 }
 
 func (t *txPriceHeap) Contains(tx *types.Transaction) bool {
-	_, ok := t.index[tx.Hash()]
+	_, ok := t.index[tx.Hash]
 	return ok
 }
 

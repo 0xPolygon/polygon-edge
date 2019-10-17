@@ -89,7 +89,7 @@ func TestExpiredPacket(t *testing.T) {
 
 	expiration := uint64(time.Now().Unix())
 
-	r0.sendPacket(r1.local, pingPacket, pingRequest{
+	r0.sendPacket(r1.local, pingPacket, &pingRequest{
 		Version:    4,
 		From:       r0.local.toRPCEndpoint(),
 		To:         r1.local.toRPCEndpoint(),
@@ -112,7 +112,7 @@ func TestExpiredPacket(t *testing.T) {
 func TestNotExpectedPacket(t *testing.T) {
 	r0, r1 := pipe(t, true)
 
-	r0.sendPacket(r1.local, pongPacket, pongResponse{
+	r0.sendPacket(r1.local, pongPacket, &pongResponse{
 		To:         r1.local.toRPCEndpoint(),
 		ReplyTok:   []byte{},
 		Expiration: uint64(time.Now().Add(20 * time.Second).Unix()),
@@ -132,7 +132,7 @@ func TestNotExpectedPacket(t *testing.T) {
 func TestPingPong(t *testing.T) {
 	r0, r1 := pipe(t, true)
 
-	r0.sendPacket(r1.local, pingPacket, pingRequest{
+	r0.sendPacket(r1.local, pingPacket, &pingRequest{
 		Version:    4,
 		From:       r0.local.toRPCEndpoint(),
 		To:         r1.local.toRPCEndpoint(),
@@ -294,7 +294,7 @@ func TestFindNodeWithUnavailableNode(t *testing.T) {
 }
 
 func TestFindNode(t *testing.T) {
-	t.Skip()
+	// t.Skip()
 
 	var cases = []int{1, 5, 10, 15, 20, 30, 50}
 

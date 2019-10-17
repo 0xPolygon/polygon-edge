@@ -62,12 +62,14 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 	nonce := uint64(rand.Int63())
 
 	target := new(big.Int).Div(two256, new(big.Int).SetUint64(header.Difficulty))
+	aux := big.NewInt(1)
+
 	for {
-		// header.Nonce = types.EncodeNonce(uint64(nonce))
+		header.SetNonce(nonce)
+		header.ComputeHash()
 
-		hash := header.Hash()
-
-		if big.NewInt(1).SetBytes(hash.Bytes()).Cmp(target) < 0 {
+		aux.SetBytes(header.Hash.Bytes())
+		if aux.Cmp(target) < 0 {
 			break
 		}
 		nonce++

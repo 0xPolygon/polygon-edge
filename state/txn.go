@@ -11,8 +11,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/types"
-
-	"github.com/umbracle/minimal/rlp"
 )
 
 var (
@@ -128,11 +126,25 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return nil, false
 	}
 
-	var account Account
-	err := rlp.DecodeBytes(data, &account)
-	if err != nil {
+	var err error
+
+	/*
+	var account2 Account
+	if err = rlp.DecodeBytes(data, &account); err != nil {
 		return nil, false
 	}
+	*/
+
+	var account Account
+	if err = account.UnmarshalRlp(data); err != nil {
+		return nil, false
+	}
+
+	/*
+	if reflect.DeepEqual(account, account2) {
+		panic("XXX")
+	}
+	*/
 
 	// Load trie from memory if there is some state
 	if account.Root == emptyStateHash {

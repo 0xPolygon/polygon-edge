@@ -114,7 +114,7 @@ func (b *Backend) WriteTransaction(hash types.Hash, t *types.Transaction) error 
 func (b *Backend) writeTransactionImpl(tx *sql.Tx, hash types.Hash, t *types.Transaction) error {
 	query := "INSERT INTO transactions (hash, txhash, nonce, gas_price, gas, dst, value, input, v, r, s) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
 
-	if _, err := b.db.Exec(query, hash, t.Hash(), t.Nonce, t.GasPrice, t.Gas, t.To, t.Value.String(), t.Input.String(), int(t.V), t.R.String(), t.S.String()); err != nil {
+	if _, err := b.db.Exec(query, hash, t.Hash, t.Nonce, t.GasPrice, t.Gas, t.To, t.Value.String(), t.Input.String(), int(t.V), t.R.String(), t.S.String()); err != nil {
 		return err
 	}
 	return nil
@@ -129,7 +129,7 @@ func (b *Backend) ReadTransaction(hash types.Hash) (*types.Transaction, bool) {
 		return nil, false
 	}
 
-	hh := txn.Hash()
+	hh := txn.Hash
 	if hh != hash {
 		return nil, false
 	}
@@ -146,7 +146,7 @@ func (b *Backend) ReadHeader(hash types.Hash) (*types.Header, bool) {
 		return nil, false
 	}
 
-	hh := header.Hash()
+	hh := header.Hash
 	if hh != hash {
 		return nil, false
 	}
@@ -171,7 +171,7 @@ func (b *Backend) WriteHeader(h *types.Header) error {
 func (b *Backend) writeHeaderImpl(tx *sql.Tx, h *types.Header) error {
 	query := `INSERT INTO headers (hash, parent_hash, sha3_uncles, miner, state_root, transactions_root, receipts_root, logs_bloom, difficulty, number, gas_limit, gas_used, timestamp, extradata, mixhash, nonce) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
 
-	if _, err := tx.Exec(query, h.Hash(), h.ParentHash, h.Sha3Uncles, h.Miner, h.StateRoot, h.TxRoot, h.ReceiptsRoot, h.LogsBloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Timestamp, h.ExtraData, h.MixHash, hex.EncodeToHex(h.Nonce[:])); err != nil {
+	if _, err := tx.Exec(query, h.Hash, h.ParentHash, h.Sha3Uncles, h.Miner, h.StateRoot, h.TxRoot, h.ReceiptsRoot, h.LogsBloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Timestamp, h.ExtraData, h.MixHash, hex.EncodeToHex(h.Nonce[:])); err != nil {
 		return err
 	}
 	return nil
@@ -329,7 +329,7 @@ func (b *Backend) WriteBody(hash types.Hash, body *types.Body) error {
 		if err := b.writeHeaderImpl(tx, u); err != nil {
 			return err
 		}
-		if _, err := tx.Exec("INSERT INTO uncles (hash, uncle) VALUES ($1, $2)", hash, u.Hash()); err != nil {
+		if _, err := tx.Exec("INSERT INTO uncles (hash, uncle) VALUES ($1, $2)", hash, u.Hash); err != nil {
 			return err
 		}
 	}
@@ -380,13 +380,13 @@ func (b *Backend) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
 	if err := b.writeHeaderImpl(tx, h); err != nil {
 		return err
 	}
-	if err := b.writeCanonicalHashImpl(tx, h.Number, h.Hash()); err != nil {
+	if err := b.writeCanonicalHashImpl(tx, h.Number, h.Hash); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("UPDATE header SET hash=$1, number=$2", h.Hash(), h.Number); err != nil {
+	if _, err := tx.Exec("UPDATE header SET hash=$1, number=$2", h.Hash, h.Number); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("INSERT INTO difficulty (hash, difficulty) VALUES ($1, $2)", h.Hash(), diff.String()); err != nil {
+	if _, err := tx.Exec("INSERT INTO difficulty (hash, difficulty) VALUES ($1, $2)", h.Hash, diff.String()); err != nil {
 		return err
 	}
 

@@ -2,11 +2,10 @@ package storage
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/big"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/rlp"
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -124,13 +123,40 @@ func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
 
 // WriteForks writes the current forks
 func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
-	return s.write(FORK, EMPTY, forks)
+	ar := &fastrlp.Arena{}
+
+	var vr *fastrlp.Value
+	if len(forks) == 0 {
+		vr = ar.NewNullArray()
+	} else {
+		vr = ar.NewArray()
+		for _, fork := range forks {
+			vr.Set(ar.NewCopyBytes(fork[:]))
+		}
+	}
+
+	return s.write2(FORK, EMPTY, vr)
 }
 
 // ReadForks read the current forks
 func (s *KeyValueStorage) ReadForks() []types.Hash {
-	var forks []types.Hash
-	s.read(FORK, EMPTY, &forks)
+	parser := &fastrlp.Parser{}
+	v := s.read2(FORK, EMPTY, parser)
+	if v == nil {
+		return nil
+	}
+
+	elems, err := v.GetElems()
+	if err != nil {
+		panic(err)
+	}
+	forks := make([]types.Hash, len(elems))
+	for indx, elem := range elems {
+		if err := elem.GetHash(forks[indx][:]); err != nil {
+			panic(err)
+		}
+	}
+
 	return forks
 }
 
@@ -154,14 +180,26 @@ func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
 
 // WriteHeader writes the header
 func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
-	return s.write(HEADER, h.Hash().Bytes(), h)
+	ar := &fastrlp.Arena{}
+	v := h.MarshalWith(ar)
+
+	return s.write2(HEADER, h.Hash.Bytes(), v)
 }
 
 // ReadHeader reads the header
 func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, bool) {
-	var header *types.Header
-	ok := s.read(HEADER, hash.Bytes(), &header)
-	return header, ok
+	p := &fastrlp.Parser{}
+	v := s.read2(HEADER, hash.Bytes(), p)
+	if v == nil {
+		return nil, false
+	}
+
+	header2 := &types.Header{}
+	if err := header2.UnmarshalRLP(p, v); err != nil {
+		panic(err)
+	}
+
+	return header2, true
 }
 
 // WriteCanonicalHeader implements the storage interface
@@ -169,16 +207,16 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 	if err := s.WriteHeader(h); err != nil {
 		return err
 	}
-	if err := s.WriteHeadHash(h.Hash()); err != nil {
+	if err := s.WriteHeadHash(h.Hash); err != nil {
 		return err
 	}
 	if err := s.WriteHeadNumber(h.Number); err != nil {
 		return err
 	}
-	if err := s.WriteCanonicalHash(h.Number, h.Hash()); err != nil {
+	if err := s.WriteCanonicalHash(h.Number, h.Hash); err != nil {
 		return err
 	}
-	if err := s.WriteDiff(h.Hash(), diff); err != nil {
+	if err := s.WriteDiff(h.Hash, diff); err != nil {
 		return err
 	}
 	return nil
@@ -188,49 +226,90 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 
 // WriteBody writes the body
 func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
-	return s.write(BODY, hash.Bytes(), body)
+	ar := &fastrlp.Arena{}
+	v := body.MarshalWith(ar)
+
+	return s.write2(BODY, hash.Bytes(), v)
 }
 
 // ReadBody reads the body
 func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, bool) {
-	var body *types.Body
-	ok := s.read(BODY, hash.Bytes(), &body)
-	return body, ok
+	body2 := &types.Body{}
+	parser := &fastrlp.Parser{}
+
+	v := s.read2(BODY, hash.Bytes(), parser)
+	if v == nil {
+		return nil, false
+	}
+	if err := body2.UnmarshalRLP(parser, v); err != nil {
+		panic(err)
+	}
+
+	return body2, true
 }
 
 // -- receipts --
 
 // WriteReceipts writes the receipts
 func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
-	return s.write(RECEIPTS, hash.Bytes(), receipts)
+	ar := &fastrlp.Arena{}
+
+	var vr *fastrlp.Value
+	if len(receipts) == 0 {
+		vr = ar.NewNullArray()
+	} else {
+		vr = ar.NewArray()
+		for _, receipt := range receipts {
+			vr.Set(receipt.MarshalWith(ar))
+		}
+	}
+
+	return s.write2(RECEIPTS, hash.Bytes(), vr)
 }
 
 // ReadReceipts reads the receipts
 func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool) {
-	var receipts []*types.Receipt
-	ok := s.read(RECEIPTS, hash.Bytes(), &receipts)
-	return receipts, ok
+	receipts2 := []*types.Receipt{}
+	parser := &fastrlp.Parser{}
+	v := s.read2(RECEIPTS, hash.Bytes(), parser)
+	if v == nil {
+		return nil, false
+	}
+
+	elems, err := v.GetElems()
+	if err != nil {
+		panic(err)
+	}
+	for _, elem := range elems {
+		receipt := &types.Receipt{}
+		if err := receipt.UnmarshalRLP(elem); err != nil {
+			panic(err)
+		}
+		receipts2 = append(receipts2, receipt)
+	}
+
+	return receipts2, true
 }
 
 // -- write ops --
 
-func (s *KeyValueStorage) write(p []byte, k []byte, obj interface{}) error {
-	data, err := rlp.EncodeToBytes(obj)
-	if err != nil {
-		return fmt.Errorf("failed to encode rlp: %v", err)
-	}
-	return s.set(p, k, data)
-}
-
-func (s *KeyValueStorage) read(p []byte, k []byte, obj interface{}) bool {
+func (s *KeyValueStorage) read2(p, k []byte, parser *fastrlp.Parser) *fastrlp.Value {
 	data, ok := s.get(p, k)
 	if !ok {
-		return false
+		return nil
 	}
-	if err := rlp.DecodeBytes(data, obj); err != nil {
-		return false
+
+	v, err := parser.Parse(data)
+	if err != nil {
+		return nil
 	}
-	return true
+	return v
+}
+
+func (s *KeyValueStorage) write2(p, k []byte, v *fastrlp.Value) error {
+	dst := v.MarshalTo(nil)
+
+	return s.set(p, k, dst)
 }
 
 func (s *KeyValueStorage) set(p []byte, k []byte, v []byte) error {

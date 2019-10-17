@@ -20,7 +20,8 @@ import (
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/enode"
 	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/rlp"
+
+	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/armon/go-metrics"
@@ -121,11 +122,60 @@ const (
 	neighborsPacket
 )
 
+type rlpMessage interface {
+	MarshalRLP(dst []byte) []byte
+}
+
+// default rlp arena pool for discovery messages
+var defaultArenaPool fastrlp.ArenaPool
+
+// default rlp parser pool for discovery messages
+var defaultParserPool fastrlp.ParserPool
+
 type pingRequest struct {
-	Version    uint
+	Version    uint64
 	From       rpcEndpoint
 	To         rpcEndpoint
 	Expiration uint64 `rlp:"tail"`
+}
+
+func (p *pingRequest) UnmarshalRLP(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) < 4 {
+		return fmt.Errorf("bad")
+	}
+	p.Version, err = elems[0].GetUint64()
+	if err != nil {
+		return err
+	}
+	if err := p.From.UnmarshalRLP(elems[1]); err != nil {
+		return err
+	}
+	if err := p.To.UnmarshalRLP(elems[2]); err != nil {
+		return err
+	}
+	p.Expiration, err = elems[3].GetUint64()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *pingRequest) MarshalRLP(dst []byte) []byte {
+	a := defaultArenaPool.Get()
+
+	v := a.NewArray()
+	v.Set(a.NewUint(p.Version))
+	v.Set(p.From.MarshalRLP(a))
+	v.Set(p.To.MarshalRLP(a))
+	v.Set(a.NewUint(p.Expiration))
+
+	dst = v.MarshalTo(dst)
+	defaultArenaPool.Put(a)
+	return dst
 }
 
 // pong is the reply to ping. call is response
@@ -135,9 +185,53 @@ type pongResponse struct {
 	Expiration uint64 `rlp:"tail"`
 }
 
+func (p *pongResponse) MarshalRLP(dst []byte) []byte {
+	a := defaultArenaPool.Get()
+
+	v := a.NewArray()
+	v.Set(p.To.MarshalRLP(a))
+	v.Set(a.NewCopyBytes(p.ReplyTok))
+	v.Set(a.NewUint(p.Expiration))
+
+	dst = v.MarshalTo(dst)
+	defaultArenaPool.Put(a)
+	return dst
+}
+
 type findNodeRequest struct {
 	Target     []byte
 	Expiration uint64 `rlp:"tail"`
+}
+
+func (f *findNodeRequest) UnmarshalRLP(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) < 2 {
+		return fmt.Errorf("bad")
+	}
+	f.Target, err = elems[0].GetBytes(f.Target[:0])
+	if err != nil {
+		return err
+	}
+	f.Expiration, err = elems[1].GetUint64()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *findNodeRequest) MarshalRLP(dst []byte) []byte {
+	a := defaultArenaPool.Get()
+
+	v := a.NewArray()
+	v.Set(a.NewCopyBytes(f.Target))
+	v.Set(a.NewUint(f.Expiration))
+
+	dst = v.MarshalTo(dst)
+	defaultArenaPool.Put(a)
+	return dst
 }
 
 // reply to findnode
@@ -146,11 +240,97 @@ type neighborsResponse struct {
 	Expiration uint64 `rlp:"tail"`
 }
 
+func (n *neighborsResponse) UnmarshalRLP(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) < 2 {
+		return fmt.Errorf("bad")
+	}
+	n.Nodes = n.Nodes[:0]
+
+	nodes, err := elems[0].GetElems()
+	if err != nil {
+		return err
+	}
+	for _, i := range nodes {
+		node := rpcNode{}
+		if err := node.UnmarshalRLP(i); err != nil {
+			return err
+		}
+		n.Nodes = append(n.Nodes, node)
+	}
+
+	n.Expiration, err = elems[1].GetUint64()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (n *neighborsResponse) MarshalRLP(dst []byte) []byte {
+	a := defaultArenaPool.Get()
+
+	v := a.NewArray()
+	if len(n.Nodes) == 0 {
+		v.Set(a.NewNullArray())
+	} else {
+		vv := a.NewArray()
+		for _, i := range n.Nodes {
+			vv.Set(i.MarshalRLP(a))
+		}
+		v.Set(vv)
+	}
+	v.Set(a.NewUint(n.Expiration))
+
+	dst = v.MarshalTo(dst)
+	defaultArenaPool.Put(a)
+	return dst
+}
+
 type rpcNode struct {
 	IP  net.IP // len 4 for IPv4 or 16 for IPv6
 	UDP uint16 // for discovery protocol
 	TCP uint16 // for RLPx protocol
 	ID  []byte
+}
+
+func (r *rpcNode) UnmarshalRLP(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	r.IP, err = elems[0].GetBytes(r.IP[:0])
+	if err != nil {
+		return fmt.Errorf("failed to decode ip")
+	}
+	udp, err := elems[1].GetUint64()
+	if err != nil {
+		return err
+	}
+	tcp, err := elems[2].GetUint64()
+	if err != nil {
+		return err
+	}
+	r.ID, err = elems[3].GetBytes(r.ID[:0])
+	if err != nil {
+		return err
+	}
+
+	r.UDP = uint16(udp)
+	r.TCP = uint16(tcp)
+	return nil
+}
+
+func (r *rpcNode) MarshalRLP(a *fastrlp.Arena) *fastrlp.Value {
+	v := a.NewArray()
+	v.Set(a.NewCopyBytes(r.IP))
+	v.Set(a.NewUint(uint64(r.UDP)))
+	v.Set(a.NewUint(uint64(r.TCP)))
+	v.Set(a.NewCopyBytes(r.ID))
+	return v
 }
 
 func (r *rpcNode) toPeer() (*Peer, error) {
@@ -161,6 +341,38 @@ type rpcEndpoint struct {
 	IP  net.IP // len 4 for IPv4 or 16 for IPv6
 	UDP uint16 // for discovery protocol
 	TCP uint16 // for RLPx protocol
+}
+
+func (r *rpcEndpoint) UnmarshalRLP(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	r.IP, err = elems[0].GetBytes(r.IP[:0])
+	if err != nil {
+		return err
+	}
+	udp, err := elems[1].GetUint64()
+	if err != nil {
+		return err
+	}
+	tcp, err := elems[2].GetUint64()
+	if err != nil {
+		return err
+	}
+
+	r.UDP = uint16(udp)
+	r.TCP = uint16(tcp)
+	return nil
+}
+
+func (r *rpcEndpoint) MarshalRLP(a *fastrlp.Arena) *fastrlp.Value {
+	v := a.NewArray()
+	v.Set(a.NewCopyBytes(r.IP))
+	v.Set(a.NewUint(uint64(r.UDP)))
+	v.Set(a.NewUint(uint64(r.TCP)))
+	return v
 }
 
 // Backend is the p2p discover backend
@@ -181,9 +393,8 @@ type Backend struct {
 	tasks      chan *Peer
 	inlookup   int32
 	addr       *net.UDPAddr
-	// listener   *net.UDPConn
-	transport Transport
-	packetCh  chan *Packet
+	transport  Transport
+	packetCh   chan *Packet
 
 	bootnodes []string
 }
@@ -202,6 +413,7 @@ func Factory(ctx context.Context, conf *discovery.BackendConfig) (discovery.Back
 	}
 
 	udpAddr := &net.UDPAddr{IP: net.ParseIP(addr), Port: port}
+
 	transport, err := newUDPTransport(udpAddr)
 	if err != nil {
 		return nil, err
@@ -268,8 +480,12 @@ func (b *Backend) listen() {
 				b.packetCh <- packet
 			} else {
 				go func() {
+
+					// fmt.Println("-- packet --")
+					// fmt.Println(packet)
+
 					if err := b.HandlePacket(packet); err != nil {
-						b.logger.Info("failed to handle packet", "err", err.Error())
+						b.logger.Trace("failed to handle packet", "err", err.Error())
 					}
 				}()
 			}
@@ -596,16 +812,38 @@ func (b *Backend) getCallback(id string, code byte) (func([]byte, *time.Time), b
 }
 
 func (b *Backend) handlePingPacket(payload []byte, mac []byte, peer *Peer) error {
+	/*
+		var req pingRequest
+		if err := rlp.DecodeBytes(payload, &req); err != nil {
+			panic(err)
+		}
+	*/
+
 	var req pingRequest
-	if err := rlp.DecodeBytes(payload, &req); err != nil {
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(payload)
+	if err != nil {
 		panic(err)
 	}
+	if err := req.UnmarshalRLP(v); err != nil {
+		panic(err)
+	}
+
+	/*
+		if !reflect.DeepEqual(req, req2) {
+			fmt.Println("__ BAD RLP ENCODING __")
+			fmt.Println(payload)
+			fmt.Println(req)
+			fmt.Println(req2)
+			panic("Xa")
+		}
+	*/
 
 	if hasExpired(req.Expiration) {
 		return fmt.Errorf("ping: Message has expired")
 	}
 
-	reply := pongResponse{
+	reply := &pongResponse{
 		To:         peer.toRPCEndpoint(),
 		ReplyTok:   mac,
 		Expiration: uint64(time.Now().Add(20 * time.Second).Unix()),
@@ -647,10 +885,27 @@ func (b *Backend) handleFindNodePacket(payload []byte, peer *Peer) error {
 		return nil
 	}
 
+	/*
+		var req2 findNodeRequest
+		if err := rlp.DecodeBytes(payload, &req); err != nil {
+			return err
+		}
+	*/
+
 	var req findNodeRequest
-	if err := rlp.DecodeBytes(payload, &req); err != nil {
-		return err
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(payload)
+	if err != nil {
+		panic(err)
 	}
+	if err := req.UnmarshalRLP(v); err != nil {
+		panic(err)
+	}
+	/*
+		if !reflect.DeepEqual(req, req2) {
+			panic("panic: findNodeRequest")
+		}
+	*/
 
 	peers, err := b.NearestPeersFromTarget(req.Target)
 	if err != nil {
@@ -708,7 +963,7 @@ func (b *Backend) probeNode(peer *Peer) bool {
 	ack := make(chan respMessage)
 	b.setHandler(peer.ID, pongPacket, ack, respTimeout)
 
-	b.sendPacket(peer, pingPacket, pingRequest{
+	b.sendPacket(peer, pingPacket, &pingRequest{
 		Version:    4,
 		From:       b.local.toRPCEndpoint(),
 		To:         peer.toRPCEndpoint(),
@@ -797,10 +1052,49 @@ func (b *Backend) findNodes(peer *Peer, target []byte) ([]*Peer, error) {
 		if resp.Complete {
 			atLeastOne = true
 
+			/*
+				var req2 neighborsResponse
+				if err := rlp.DecodeBytes(resp.Payload, &neighbors); err != nil {
+					panic(err)
+				}
+			*/
+
 			var neighbors neighborsResponse
-			if err := rlp.DecodeBytes(resp.Payload, &neighbors); err != nil {
+			p := &fastrlp.Parser{}
+			v, err := p.Parse(resp.Payload)
+			if err != nil {
 				panic(err)
 			}
+			if err := neighbors.UnmarshalRLP(v); err != nil {
+				panic(err)
+			}
+
+			/*
+				if !reflect.DeepEqual(neighbors, req2) {
+
+					fmt.Println("-- payload --")
+					fmt.Println(resp.Payload)
+
+					fmt.Println("-- expected --")
+					fmt.Println(neighbors)
+					fmt.Println(neighbors.Nodes)
+					fmt.Println(neighbors.Expiration)
+
+					fmt.Println("-- found --")
+					fmt.Println(req2)
+					fmt.Println(req2.Nodes)
+					fmt.Println(req2.Expiration)
+
+					fmt.Println(reflect.DeepEqual(neighbors.Nodes, req2.Nodes))
+					fmt.Println(reflect.DeepEqual(neighbors.Expiration, req2.Expiration))
+
+					if len(neighbors.Nodes) == len(req2.Nodes) && len(req2.Nodes) == 0 {
+						//
+					} else {
+						panic("panic: neighborsResponse")
+					}
+				}
+			*/
 
 			for _, n := range neighbors.Nodes {
 				p, err := n.toPeer()
@@ -862,7 +1156,7 @@ func (b *Backend) setHandler(id string, code byte, ackCh chan respMessage, expir
 	})
 }
 
-func (b *Backend) sendPacket(peer *Peer, code byte, payload interface{}) error {
+func (b *Backend) sendPacket(peer *Peer, code byte, payload rlpMessage) error {
 	data, err := b.encodePacket(code, payload)
 	if err != nil {
 		return err
@@ -875,16 +1169,59 @@ func (b *Backend) sendPacket(peer *Peer, code byte, payload interface{}) error {
 	return nil
 }
 
-func (b *Backend) encodePacket(code byte, payload interface{}) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	buf.Write(headSpace)
-	buf.WriteByte(code)
+func (b *Backend) encodePacket(code byte, payload rlpMessage) ([]byte, error) {
 
-	if err := rlp.Encode(buf, payload); err != nil {
-		return nil, err
-	}
+	/*
+		buf := new(bytes.Buffer)
+		buf.Write(headSpace)
+		buf.WriteByte(code)
 
-	packet := buf.Bytes()
+		if err := rlp.Encode(buf, payload); err != nil {
+			return nil, err
+		}
+	*/
+
+	/*
+		buf := new(bytes.Buffer)
+		buf.Write(headSpace)
+		buf.WriteByte(code)
+
+		if err := rlp.Encode(buf, payload); err != nil {
+			return nil, err
+		}
+
+		extra, err := rlp.EncodeToBytes(payload)
+		if err != nil {
+			panic(err)
+		}
+
+		extra1 := payload.MarshalRLP(nil)
+
+		if !bytes.Equal(extra, extra1) {
+
+			fmt.Println("__ BAD RLP ENCODING __")
+			fmt.Println(payload)
+			fmt.Println(extra)
+			fmt.Println(extra1)
+
+			panic("Xb")
+		}
+	*/
+
+	packet := []byte{}
+	packet = append(packet, headSpace...)
+	packet = append(packet, code)
+
+	packet = payload.MarshalRLP(packet)
+	// TODO, not sure about this one
+
+	// packet := buf.Bytes()
+
+	/*
+		if !bytes.Equal(packet, buf.Bytes()) {
+			panic("XX")
+		}
+	*/
 
 	sig, err := crypto.Sign(b.ID, crypto.Keccak256(packet[headSize:]))
 	if err != nil {

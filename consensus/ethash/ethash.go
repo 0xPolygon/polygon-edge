@@ -12,6 +12,7 @@ import (
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/helper/dao"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 )
@@ -27,6 +28,8 @@ type Ethash struct {
 	fakePow  bool
 	path     string
 	daoBlock uint64
+
+	keccak256 *keccak.Keccak
 
 	// tmp is the seal hash tmp variable
 	tmp []byte
@@ -45,10 +48,11 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 
 	cache, _ := lru.New(2)
 	e := &Ethash{
-		config:   config.Params,
-		cache:    cache,
-		path:     pathStr,
-		daoBlock: dao.DAOForkBlock,
+		config:    config.Params,
+		cache:     cache,
+		path:      pathStr,
+		daoBlock:  dao.DAOForkBlock,
+		keccak256: keccak.NewKeccak256(),
 	}
 	return e, nil
 }
@@ -198,13 +202,45 @@ func (e *Ethash) Author(header *types.Header) (types.Address, error) {
 	return types.Address{}, nil
 }
 
+const maxUint = ^uint(0)
+const maxInt = int64(maxUint >> 1)
+
+var maxBigUint64 = big.NewInt(maxInt)
+
 // Seal seals the block
 func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
-	return nil, nil
+	/*
+		// initial random value
+		nonceBig, err := crand.Int(crand.Reader, maxBigUint64)
+		if err != nil {
+			panic(err)
+		}
+
+		header := block.Header
+		cache, err := e.getCache(header.Number)
+		if err != nil {
+			return nil, err
+		}
+
+		nonce := nonceBig.Uint64()
+		hash := e.sealHash(header)
+
+		//for {
+		digest, result := cache.hashimoto(hash, nonce)
+
+		fmt.Println(digest)
+		fmt.Println(result)
+		fmt.Println(header.Difficulty)
+
+		nonce++
+		//}
+	*/
+	panic("NOT IMPLEMENTED")
 }
 
 // Prepare runs before processing the head during mining.
 func (e *Ethash) Prepare(parent *types.Header, header *types.Header) error {
+	header.Difficulty = e.CalcDifficulty(int64(header.Timestamp), parent)
 	return nil
 }
 

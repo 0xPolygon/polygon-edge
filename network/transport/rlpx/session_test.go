@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/rlp"
 )
 
 const (
@@ -63,22 +62,28 @@ func testConn(c0, c1 *Session, msgs []req) error {
 			for {
 				select {
 				case req := <-requests:
-					if err := conn.WriteMsg(req.code, req.payload); err != nil {
+					if err := conn.WriteRawMsg(req.code, req.payload); err != nil {
 						panic(err)
 					}
 				case msg := <-msgs:
 					r := &resp{id: id}
-
 					if msg.err != nil {
 						r.err = msg.err
 					} else {
-						var payload []byte
-						if err := rlp.DecodeBytes(msg.payload, &payload); err != nil {
-							r.err = err
-						} else {
-							r.msg = message{code: msg.code, payload: payload}
-						}
+						r.msg = msg
 					}
+					/*
+						if msg.err != nil {
+							r.err = msg.err
+						} else {
+							var payload []byte
+							if err := rlp.DecodeBytes(msg.payload, &payload); err != nil {
+								r.err = err
+							} else {
+								r.msg = message{code: msg.code, payload: payload}
+							}
+						}
+					*/
 					responses <- r
 
 				case <-closeCh:
@@ -241,7 +246,7 @@ func TestSessionWriteClosedConnection(t *testing.T) {
 	c1.CloseChan() // wait till is closed
 	time.Sleep(100 * time.Millisecond)
 
-	if err := c1.WriteMsg(0x10); err != ErrStreamClosed {
+	if err := c1.WriteRawMsg(0x10, emptyRlp); err != ErrStreamClosed {
 		t.Fatalf("It should be ErrStreamClosed but found %v", err)
 	}
 }

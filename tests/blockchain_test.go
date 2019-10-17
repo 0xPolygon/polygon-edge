@@ -19,8 +19,6 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/state"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
-
-	"github.com/umbracle/minimal/rlp"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -39,10 +37,11 @@ func (b *block) decode() (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	var bb types.Block
-
-	err = rlp.DecodeBytes(data, &bb)
-	return &bb, err
+	var bb1 types.Block
+	if err := bb1.UnmarshalRLP(data); err != nil {
+		return nil, err
+	}
+	return &bb1, err
 }
 
 type BlockchainTest struct {
@@ -118,8 +117,8 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 
 	b.SetPrecompiled(builtins)
-	if hash := b.Genesis().Hash(); hash != c.Genesis.header.Hash() {
-		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash(), hash.String())
+	if hash := b.Genesis().Hash; hash != c.Genesis.header.Hash {
+		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash, hash.String())
 	}
 	if stateRoot := b.Genesis().StateRoot; stateRoot != c.Genesis.header.StateRoot {
 		t.Fatalf("genesis state root mismatch: expected %s but found %s", c.Genesis.header.StateRoot.String(), stateRoot.String())
@@ -148,20 +147,12 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		if entry.Header == nil {
 			t.Fatal("Block insertion should have failed")
 		}
-
-		// validate header
-		header, _ := b.Header()
-		header.Hash()
-
-		if !reflect.DeepEqual(entry.Header.header, header) {
-			t.Fatal("Header is not correct")
-		}
 		validBlocks[block.Hash()] = block
 	}
 
 	lastBlock, _ := b.Header()
 	// Validate last block
-	if hash := lastBlock.Hash().String(); hash != c.LastBlockHash {
+	if hash := lastBlock.Hash.String(); hash != c.LastBlockHash {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
 	}
 
@@ -193,9 +184,9 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	// Validate imported headers
 	header, _ := b.Header()
 	for current := header; current != nil && current.Number != 0; current, _ = b.GetHeaderByHash(current.ParentHash) {
-		valid, ok := validBlocks[current.Hash()]
+		valid, ok := validBlocks[current.Hash]
 		if !ok {
-			t.Fatalf("Block from chain %s not found", current.Hash())
+			t.Fatalf("Block from chain %s not found", current.Hash)
 		}
 		if !reflect.DeepEqual(current, valid.Header) {
 			t.Fatalf("Headers are not equal")
@@ -290,15 +281,15 @@ func TestBlockchainUncleTest(t *testing.T) {
 	testBlockChainCases(t, "bcUncleTest", none)
 }
 
-func TestBlockchainValidBlockTest(t *testing.T) {
+func TestBlockchainValidBlockTest(t *testing.T) { // x
 	testBlockChainCases(t, "bcValidBlockTest", none)
 }
 
-func TestBlockchainWallet(t *testing.T) {
+func TestBlockchainWallet(t *testing.T) { // x
 	testBlockChainCases(t, "bcWalletTest", none)
 }
 
-func TestBlockchainTransitionTests(t *testing.T) {
+func TestBlockchainTransitionTests(t *testing.T) { // x
 	testBlockChainCases(t, "TransitionTests", []string{
 		"blockChainFrontier", // TODO
 	})

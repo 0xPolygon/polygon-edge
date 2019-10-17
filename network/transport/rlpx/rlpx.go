@@ -171,7 +171,7 @@ func networkInfoToLocalInfo(info *network.Info) *Info {
 	}
 	for _, cap := range info.Capabilities {
 		p := cap.Protocol.Spec
-		rlpxInfo.Caps = append(rlpxInfo.Caps, &Cap{Name: p.Name, Version: p.Version})
+		rlpxInfo.Caps = append(rlpxInfo.Caps, &Cap{Name: p.Name, Version: uint64(p.Version)})
 	}
 	return rlpxInfo
 }

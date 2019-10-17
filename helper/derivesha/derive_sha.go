@@ -1,10 +1,8 @@
 package derivesha
 
 import (
-	"bytes"
-
-	"github.com/umbracle/minimal/rlp"
-	"github.com/umbracle/minimal/rlpv2"
+	"github.com/umbracle/fastrlp"
+	"github.com/umbracle/minimal/helper/keccak"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 )
@@ -14,65 +12,75 @@ var (
 	EmptyUncleHash = types.StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
 )
 
-var receiptArenaPool rlpv2.ArenaPool
+var receiptArenaPool fastrlp.ArenaPool
 
 func CalcReceiptRoot(receipts []*types.Receipt) types.Hash {
-	keybuf := new(bytes.Buffer)
+	// keybuf := new(bytes.Buffer)
+
+	ar := receiptArenaPool.Get()
+	defer receiptArenaPool.Put(ar)
 
 	t := itrie.NewTrie()
 	txn := t.Txn()
 
 	for indx, receipt := range receipts {
-		keybuf.Reset()
-		rlp.Encode(keybuf, uint(indx))
+		v0 := ar.NewUint(uint64(indx))
+		v1 := receipt.MarshalWith(ar)
 
-		enc := receipt.Marshal()
-		txn.Insert(keybuf.Bytes(), enc)
+		//enc := receipt.MarshalWith()
+		//txn.Insert(keybuf.Bytes(), enc)
+		txn.Insert(v0.MarshalTo(nil), v1.MarshalTo(nil))
 	}
 
 	root, _ := txn.Hash()
 	return types.BytesToHash(root)
 }
 
-var txArenaPool rlpv2.ArenaPool
+var txArenaPool fastrlp.ArenaPool
 
 func CalcTxsRoot(transactions []*types.Transaction) types.Hash {
-	arena := txArenaPool.Get()
-	defer txArenaPool.Put(arena)
+	// fmt.Println("-- calc txn root --")
 
-	keybuf := new(bytes.Buffer)
+	ar := txArenaPool.Get()
+	defer txArenaPool.Put(ar)
+
+	// keybuf := new(bytes.Buffer)
 
 	t := itrie.NewTrie()
 	txn := t.Txn()
 
 	for indx, transaction := range transactions {
-		keybuf.Reset()
-		rlp.Encode(keybuf, uint(indx))
+		// keybuf.Reset()
+		// rlp.Encode(keybuf, uint(indx))
+		v0 := ar.NewUint(uint64(indx))
+		v1 := transaction.MarshalWith(ar)
 
-		v := transaction.MarshalWith(arena)
-		enc := v.MarshalTo(nil)
-
-		txn.Insert(keybuf.Bytes(), enc)
+		txn.Insert(v0.MarshalTo(nil), v1.MarshalTo(nil))
 	}
 
 	root, _ := txn.Hash()
 	return types.BytesToHash(root)
 }
 
-var uncleArenaPool rlpv2.ArenaPool
+var uncleArenaPool fastrlp.ArenaPool
 
 func CalcUncleRoot(uncles []*types.Header) types.Hash {
 	if len(uncles) == 0 {
 		return EmptyUncleHash
 	}
 
+	hash := keccak.DefaultKeccakPool.Get()
 	a := uncleArenaPool.Get()
-	defer uncleArenaPool.Put(a)
 
 	v := a.NewArray()
 	for _, i := range uncles {
 		v.Set(i.MarshalWith(a))
 	}
 
-	return types.BytesToHash(a.HashTo(nil, v))
+	dst := hash.WriteRlp(nil, v)
+
+	keccak.DefaultKeccakPool.Put(hash)
+	uncleArenaPool.Put(a)
+
+	return types.BytesToHash(dst)
 }
