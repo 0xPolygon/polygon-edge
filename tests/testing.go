@@ -15,7 +15,6 @@ import (
 	"github.com/umbracle/minimal/helper/hex"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/state/runtime/precompiled"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
@@ -56,6 +55,13 @@ func stringToAddress(str string) (types.Address, error) {
 	return types.StringToAddress(str), nil
 }
 
+func stringToHash(str string) (types.Hash, error) {
+	if str == "" {
+		return types.Hash{}, fmt.Errorf("value not found")
+	}
+	return types.StringToHash(str), nil
+}
+
 func stringToBigInt(str string) (*big.Int, error) {
 	if str == "" {
 		return nil, fmt.Errorf("value not found")
@@ -73,6 +79,14 @@ func stringToBigInt(str string) (*big.Int, error) {
 
 func stringToAddressT(t *testing.T, str string) types.Address {
 	address, err := stringToAddress(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return address
+}
+
+func stringToHashT(t *testing.T, str string) types.Hash {
+	address, err := stringToHash(str)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,13 +117,21 @@ func stringToUint64T(t *testing.T, str string) uint64 {
 	return n
 }
 
-func (e *env) ToEnv(t *testing.T) *runtime.Env {
-	return &runtime.Env{
+func stringToInt64T(t *testing.T, str string) int64 {
+	n, err := stringToUint64(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int64(n)
+}
+
+func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
-		Difficulty: stringToBigIntT(t, e.Difficulty),
-		GasLimit:   stringToBigIntT(t, e.GasLimit),
-		Number:     stringToUint64T(t, e.Number),
-		Timestamp:  stringToUint64T(t, e.Timestamp),
+		Difficulty: stringToHashT(t, e.Difficulty),
+		GasLimit:   stringToInt64T(t, e.GasLimit),
+		Number:     stringToInt64T(t, e.Number),
+		Timestamp:  stringToInt64T(t, e.Timestamp),
 	}
 }
 
@@ -193,17 +215,6 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Sna
 
 	snap, root := txn.Commit(false)
 	return s, snap, root
-}
-
-func rlpHash(x interface{}) (h types.Hash) {
-	panic("TODO")
-
-	/*
-		hw := sha3.NewLegacyKeccak256()
-		rlp.Encode(hw, x)
-		hw.Sum(h[:0])
-		return h
-	*/
 }
 
 type indexes struct {
@@ -554,72 +565,3 @@ func listFiles(folder string) ([]string, error) {
 	})
 	return files, err
 }
-
-func init() {
-	if err := json.Unmarshal([]byte(homesteadBuiltinsStr), &homesteadBuiltins); err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal([]byte(byzantiumBuiltinsStr), &byzantiumBuiltins); err != nil {
-		panic(err)
-	}
-}
-
-func buildBuiltins(t *testing.T, forks *chain.Forks) map[types.Address]*precompiled.Precompiled {
-	p := map[types.Address]*precompiled.Precompiled{}
-
-	addBuiltin := func(active uint64, addr types.Address, b *chain.Builtin) {
-		aux, err := precompiled.CreatePrecompiled(b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		aux.ActiveAt = active
-		p[addr] = aux
-	}
-
-	for addr, b := range homesteadBuiltins {
-		addBuiltin(0, addr, b.Builtin)
-	}
-
-	if forks.Byzantium != nil {
-		byzantiumFork := forks.Byzantium.Int().Uint64()
-		for addr, b := range byzantiumBuiltins {
-			addBuiltin(byzantiumFork, addr, b.Builtin)
-		}
-	}
-
-	return p
-}
-
-var homesteadBuiltins map[types.Address]*chain.GenesisAccount
-
-var homesteadBuiltinsStr = `{
-	"0x0000000000000000000000000000000000000001": {
-		"builtin": { "name": "ecrecover", "pricing": { "base": 3000 } } 
-	},
-	"0x0000000000000000000000000000000000000002": { 
-		"builtin": { "name": "sha256", "pricing": { "base": 60, "word": 12 } } 
-	},
-	"0x0000000000000000000000000000000000000003": {
-		"builtin": { "name": "ripemd160", "pricing": { "base": 600, "word": 120 } } 
-	},
-	"0x0000000000000000000000000000000000000004": {
-		"builtin": { "name": "identity", "pricing": { "base": 15, "word": 3 } } 
-	}
-}`
-
-var byzantiumBuiltins map[types.Address]*chain.GenesisAccount
-
-var byzantiumBuiltinsStr = `{
-	"0x0000000000000000000000000000000000000005": {
-		"builtin": { "name": "modexp", "activate_at": 4370000, "pricing": { "divisor": 20 }}
-	},
-	"0x0000000000000000000000000000000000000006": {
-		"builtin": { "name": "alt_bn128_add", "activate_at": 4370000, "pricing": { "base": 500 } }
-	},
-	"0x0000000000000000000000000000000000000007": {
-		"builtin": { "name": "alt_bn128_mul", "activate_at": 4370000, "pricing": { "base": 40000 } }
-	},
-	"0x0000000000000000000000000000000000000008": {
-		"builtin": { "name": "alt_bn128_pairing", "activate_at": 4370000, "pricing": { "base": 100000, "pair": 80000 } }
-	}
-}`

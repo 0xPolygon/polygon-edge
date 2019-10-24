@@ -5,8 +5,71 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/types"
 )
+
+// TxContext is the context of the transaction
+type TxContext struct {
+	GasPrice   types.Hash
+	Origin     types.Address
+	Coinbase   types.Address
+	Number     int64
+	Timestamp  int64
+	GasLimit   int64
+	Difficulty types.Hash
+}
+
+// StorageStatus is the status of the storage access
+type StorageStatus int
+
+const (
+	// StorageUnchanged if the data has not changed
+	StorageUnchanged StorageStatus = iota
+	// StorageModified if the value has been modified
+	StorageModified
+	// StorageModifiedAgain if the value has been modified before in the txn
+	StorageModifiedAgain
+	// StorageAdded if this is a new entry in the storage
+	StorageAdded
+	// StorageDeleted if the storage was deleted
+	StorageDeleted
+)
+
+func (s StorageStatus) String() string {
+	switch s {
+	case StorageUnchanged:
+		return "StorageUnchanged"
+	case StorageModified:
+		return "StorageModified"
+	case StorageModifiedAgain:
+		return "StorageModifiedAgain"
+	case StorageAdded:
+		return "StorageAdded"
+	case StorageDeleted:
+		return "StorageDeleted"
+	default:
+		panic("BUG: storage status not found")
+	}
+}
+
+// Host is the execution host
+type Host interface {
+	AccountExists(addr types.Address) bool
+	GetStorage(addr types.Address, key types.Hash) types.Hash
+	SetStorage(addr types.Address, key types.Hash, value types.Hash, discount bool) StorageStatus
+	GetBalance(addr types.Address) *big.Int
+	GetCodeSize(addr types.Address) int
+	GetCodeHash(addr types.Address) types.Hash
+	GetCode(addr types.Address) []byte
+	Selfdestruct(addr types.Address, beneficiary types.Address)
+	GetTxContext() TxContext
+	GetBlockHash(number int64) types.Hash
+	EmitLog(addr types.Address, topics []types.Hash, data []byte)
+	Callx(*Contract, Host) ([]byte, uint64, error)
+	Empty(addr types.Address) bool
+	GetNonce(addr types.Address) uint64
+}
 
 var (
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")
@@ -31,54 +94,29 @@ const (
 	CallCode
 	DelegateCall
 	StaticCall
+	Create
+	Create2
 )
 
 // Runtime can process contracts
 type Runtime interface {
-	Run(c *Contract) ([]byte, uint64, error)
-}
-
-type Executor interface {
-	Call(c *Contract, t CallType) ([]byte, uint64, error)
-	Create(c *Contract) ([]byte, uint64, error)
+	Run(c *Contract, host Host, config *chain.ForksInTime) ([]byte, uint64, error)
+	CanRun(c *Contract, host Host, config *chain.ForksInTime) bool
 }
 
 // Contract is the instance being called
 type Contract struct {
-	Code []byte
-
+	Code        []byte
+	Type        CallType
 	CodeAddress types.Address
-	Address     types.Address // address of the contract
-	Origin      types.Address // origin is where the storage is taken from
-	Caller      types.Address // caller is the one calling the contract
-	depth       int
-
-	// inputs
-	Value *big.Int // value of the tx
-	Input []byte   // Input of the tx
-	Gas   uint64
-
-	RetOffset uint64
-	RetSize   uint64
-
-	Static bool
-}
-
-func (c *Contract) Depth() int {
-	return c.depth
-}
-
-func (c *Contract) ConsumeGas(gas uint64) bool {
-	if c.Gas < gas {
-		return false
-	}
-
-	c.Gas -= gas
-	return true
-}
-
-func (c *Contract) ConsumeAllGas() {
-	c.Gas = 0
+	Address     types.Address
+	Origin      types.Address
+	Caller      types.Address
+	Depth       int
+	Value       *big.Int
+	Input       []byte
+	Gas         uint64
+	Static      bool
 }
 
 func NewContract(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
@@ -90,7 +128,7 @@ func NewContract(depth int, origin types.Address, from types.Address, to types.A
 		Gas:         gas,
 		Value:       value,
 		Code:        code,
-		depth:       depth,
+		Depth:       depth,
 	}
 	return f
 }
@@ -104,62 +142,4 @@ func NewContractCall(depth int, origin types.Address, from types.Address, to typ
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	c.Input = input
 	return c
-}
-
-// Env refers to the block information the transactions runs in
-// it is shared for all the contracts executed so its in the EVM.
-type Env struct {
-	Coinbase   types.Address
-	Timestamp  uint64
-	Number     uint64
-	Difficulty *big.Int
-	GasLimit   *big.Int
-	GasPrice   *big.Int
-}
-
-// State is the state interface for the ethereum protocol
-type State interface {
-
-	// Balance
-	AddBalance(addr types.Address, amount *big.Int)
-	SubBalance(addr types.Address, amount *big.Int)
-	SetBalance(addr types.Address, amount *big.Int)
-	GetBalance(addr types.Address) *big.Int
-
-	// Snapshot
-	Snapshot() int
-	RevertToSnapshot(int)
-
-	// Logs
-	AddLog(log *types.Log)
-	Logs() []*types.Log
-
-	// State
-	SetState(addr types.Address, key, value types.Hash)
-	GetState(addr types.Address, hash types.Hash) types.Hash
-
-	// Nonce
-	SetNonce(addr types.Address, nonce uint64)
-	GetNonce(addr types.Address) uint64
-
-	// Code
-	SetCode(addr types.Address, code []byte)
-	GetCode(addr types.Address) []byte
-	GetCodeSize(addr types.Address) int
-	GetCodeHash(addr types.Address) types.Hash
-
-	// Suicide
-	HasSuicided(addr types.Address) bool
-	Suicide(addr types.Address) bool
-
-	// Refund
-	AddRefund(gas uint64)
-	SubRefund(gas uint64)
-	GetRefund() uint64
-	GetCommittedState(addr types.Address, hash types.Hash) types.Hash
-
-	// Others
-	Exist(addr types.Address) bool
-	Empty(addr types.Address) bool
-	CreateAccount(addr types.Address)
 }

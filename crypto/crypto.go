@@ -33,16 +33,29 @@ var (
 	one        = []byte{0x01}
 )
 
+func trimLeftZeros(b []byte) []byte {
+	i := 0
+	for i = range b {
+		if b[i] != 0 {
+			break
+		}
+	}
+	return b[i:]
+}
+
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s []byte, homestead bool) bool {
+func ValidateSignatureValues(v byte, r, s []byte) bool {
 	// TODO: ECDSA malleability
 	if v > 1 {
 		return false
 	}
 
+	r = trimLeftZeros(r)
 	if bytes.Compare(r, secp256k1N) >= 0 || bytes.Compare(r, one) < 0 {
 		return false
 	}
+
+	s = trimLeftZeros(s)
 	if bytes.Compare(s, secp256k1N) >= 0 || bytes.Compare(s, one) < 0 {
 		return false
 	}

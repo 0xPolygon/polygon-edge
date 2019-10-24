@@ -13,6 +13,8 @@ import (
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/state/runtime/evm"
 	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/crypto"
@@ -42,35 +44,25 @@ type VMCase struct {
 	Pre  chain.GenesisAlloc `json:"pre"`
 }
 
-// NOTE: maybe we can just test the EVM here without the executor
-
 func testVMCase(t *testing.T, name string, c *VMCase) {
 	env := c.Env.ToEnv(t)
-	env.GasPrice = c.Exec.GasPrice
-
-	initialCall := true
-	canTransfer := func(txn *state.Txn, address types.Address, amount *big.Int) bool {
-		if initialCall {
-			initialCall = false
-			return true
-		}
-		return state.CanTransfer(txn, address, amount)
-	}
-
-	transfer := func(state *state.Txn, from, to types.Address, amount *big.Int) error {
-		return nil
-	}
+	env.GasPrice = types.BytesToHash(c.Exec.GasPrice.Bytes())
+	env.Origin = c.Exec.Origin
 
 	s, snap, _ := buildState(t, c.Pre)
-
-	// txn := s.Txn()
 	txn := state.NewTxn(s, snap)
 
-	e := state.NewExecutor(txn, env, mainnetChainConfig.Forks.At(env.Number), chain.GasTableHomestead, vmTestBlockHash)
-	e.CanTransfer = canTransfer
-	e.Transfer = transfer
+	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 
-	ret, gas, err := e.Call2(c.Exec.Caller, c.Exec.Address, c.Exec.Data, c.Exec.Value, c.Exec.GasLimit)
+	executor := state.NewExecutor()
+	e := executor.NewTransition(txn, vmTestBlockHash, env, config)
+
+	evmR := evm.NewEVM()
+
+	code := e.GetCode(c.Exec.Address)
+	contract := runtime.NewContractCall(1, c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, code, c.Exec.Data)
+
+	ret, gas, err := evmR.Run(contract, e, &config)
 
 	if c.Gas == "" {
 		if err == nil {
@@ -122,20 +114,6 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 	h.WriteRlp(res[:0], v)
 
 	keccak.DefaultKeccakPool.Put(h)
-
-	/*
-		alias := []interface{}{}
-		for _, log := range logs {
-			alias = append(alias, []interface{}{
-				log.Address,
-				log.Topics,
-				log.Data,
-			})
-		}
-
-		return rlpHash(alias)
-	*/
-
 	return
 }
 

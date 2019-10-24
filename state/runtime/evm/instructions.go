@@ -1,13 +1,13 @@
 package evm
 
 import (
+	"fmt"
 	"math/big"
 	"math/bits"
 	"sync"
 
-	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/types"
 )
@@ -92,16 +92,16 @@ func opSMod(c *state) {
 	b := to256(c.top())
 
 	if b.Sign() == 0 {
+		// division by zero
 		b.Set(zero)
-		return
+	} else {
+		neg := a.Sign() < 0
+		b.Mod(a.Abs(a), b.Abs(b))
+		if neg {
+			b.Neg(b)
+		}
+		toU256(b)
 	}
-
-	neg := a.Sign() < 0
-	b.Mod(a.Abs(a), b.Abs(b))
-	if neg {
-		b.Neg(b)
-	}
-	toU256(b)
 }
 
 var bigPool = sync.Pool{
@@ -122,8 +122,14 @@ func opExp(c *state) {
 	x := c.pop()
 	y := c.top()
 
-	gas := uint64((y.BitLen()+7)/8) * c.evm.gasTable.ExpByte
-	if !c.consumeGas(gas) {
+	var gas uint64
+	if c.config.EIP158 {
+		gas = 50
+	} else {
+		gas = 10
+	}
+	gasCost := uint64((y.BitLen()+7)/8) * gas
+	if !c.consumeGas(gasCost) {
 		return
 	}
 
@@ -131,7 +137,7 @@ func opExp(c *state) {
 
 	// https://www.programminglogic.com/fast-exponentiation-algorithms/
 	for _, d := range y.Bits() {
-		for i := 0; i < W; i++ {
+		for i := 0; i < _W; i++ {
 			if d&1 == 1 {
 				toU256(z.Mul(z, x))
 			}
@@ -296,7 +302,6 @@ func opSignExtension(c *state) {
 	bit := uint(ext.Uint64()*8 + 7)
 
 	mask := acquireBig().Set(one)
-
 	mask.Lsh(mask, bit)
 	mask.Sub(mask, one)
 
@@ -306,8 +311,8 @@ func opSignExtension(c *state) {
 	} else {
 		x.And(x, mask)
 	}
-	toU256(x)
 
+	toU256(x)
 	releaseBig(mask)
 }
 
@@ -316,7 +321,7 @@ func equalOrOverflowsUint256(b *big.Int) bool {
 }
 
 func opShl(c *state) {
-	if !c.evm.config.Constantinople {
+	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
 		return
 	}
@@ -333,7 +338,7 @@ func opShl(c *state) {
 }
 
 func opShr(c *state) {
-	if !c.evm.config.Constantinople {
+	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
 		return
 	}
@@ -350,7 +355,7 @@ func opShr(c *state) {
 }
 
 func opSar(c *state) {
-	if !c.evm.config.Constantinople {
+	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
 		return
 	}
@@ -381,21 +386,17 @@ var bufPool = sync.Pool{
 func opMload(c *state) {
 	offset := c.pop()
 
-	buf := bufPool.Get().([]byte)
-
 	var ok bool
-	buf, ok = c.get2(buf[:0], offset, wordSize)
+	c.tmp, ok = c.get2(c.tmp[:0], offset, wordSize)
 	if !ok {
 		return
 	}
-
-	c.push1().SetBytes(buf)
-	bufPool.Put(buf)
+	c.push1().SetBytes(c.tmp)
 }
 
 var (
-	W = bits.UintSize
-	S = W / 8
+	_W = bits.UintSize
+	_S = _W / 8
 )
 
 func opMStore(c *state) {
@@ -414,7 +415,7 @@ func opMStore(c *state) {
 	// convert big.int to bytes
 	// https://golang.org/src/math/big/nat.go#L1284
 	for _, d := range val.Bits() {
-		for j := 0; j < S; j++ {
+		for j := 0; j < _S; j++ {
 			i--
 			buf[i] = byte(d)
 			d >>= 8
@@ -443,11 +444,17 @@ func opMStore8(c *state) {
 func opSload(c *state) {
 	loc := c.top()
 
-	if !c.consumeGas(c.evm.gasTable.SLoad) {
+	var gas uint64
+	if c.config.EIP150 {
+		gas = 200
+	} else {
+		gas = 50
+	}
+	if !c.consumeGas(gas) {
 		return
 	}
 
-	val := c.evm.state.GetState(c.address, bigToHash(loc))
+	val := c.host.GetStorage(c.msg.Address, bigToHash(loc))
 	loc.SetBytes(val.Bytes())
 }
 
@@ -457,67 +464,40 @@ func opSStore(c *state) {
 		return
 	}
 
-	address := c.address
+	key := c.popHash()
+	val := c.popHash()
 
-	loc, val := c.pop(), c.pop()
+	discount := c.config.Constantinople && !c.config.Petersburg
 
-	var gas uint64
+	status := c.host.SetStorage(c.msg.Address, key, val, discount)
+	cost := uint64(0)
 
-	current := c.evm.state.GetState(address, bigToHash(loc))
-
-	// discount gas (constantinople)
-	if c.evm.config.Petersburg || !c.evm.config.Constantinople {
-		switch {
-		case current == (types.Hash{}) && val.Sign() != 0: // 0 => non 0
-			gas = SstoreSetGas
-		case current != (types.Hash{}) && val.Sign() == 0: // non 0 => 0
-			c.evm.state.AddRefund(SstoreRefundGas)
-			gas = SstoreClearGas
-		default: // non 0 => non 0 (or 0 => 0)
-			gas = SstoreResetGas
+	switch status {
+	case runtime.StorageUnchanged:
+		if !discount {
+			cost = 5000
+		} else {
+			cost = 200
 		}
-	} else {
-		getGas := func() uint64 {
-			// non constantinople gas
-			value := bigToHash(val)
-			if current == value { // noop (1)
-				return NetSstoreNoopGas
-			}
-			original := c.evm.state.GetCommittedState(address, bigToHash(loc))
-			if original == current {
-				if original == (types.Hash{}) { // create slot (2.1.1)
-					return NetSstoreInitGas
-				}
-				if value == (types.Hash{}) { // delete slot (2.1.2b)
-					c.evm.state.AddRefund(NetSstoreClearRefund)
-				}
-				return NetSstoreCleanGas // write existing slot (2.1.2)
-			}
-			if original != (types.Hash{}) {
-				if current == (types.Hash{}) { // recreate slot (2.2.1.1)
-					c.evm.state.SubRefund(NetSstoreClearRefund)
-				} else if value == (types.Hash{}) { // delete slot (2.2.1.2)
-					c.evm.state.AddRefund(NetSstoreClearRefund)
-				}
-			}
-			if original == value {
-				if original == (types.Hash{}) { // reset to original inexistent slot (2.2.2.1)
-					c.evm.state.AddRefund(NetSstoreResetClearRefund)
-				} else { // reset to original existing slot (2.2.2.2)
-					c.evm.state.AddRefund(NetSstoreResetRefund)
-				}
-			}
-			return NetSstoreDirtyGas
+	case runtime.StorageModified:
+		cost = 5000
+	case runtime.StorageModifiedAgain:
+		if !discount {
+			cost = 5000
+		} else {
+			cost = 200
 		}
-		gas = getGas()
+	case runtime.StorageAdded:
+		cost = 20000
+	case runtime.StorageDeleted:
+		cost = 5000
 	}
-
-	if !c.consumeGas(gas) {
+	if !c.consumeGas(cost) {
 		return
 	}
-
-	c.evm.state.SetState(address, bigToHash(loc), bigToHash(val))
 }
+
+const sha3WordGas uint64 = 6
 
 func opSha3(c *state) {
 	offset := c.pop()
@@ -528,15 +508,18 @@ func opSha3(c *state) {
 		return
 	}
 
-	hash := types.BytesToHash(crypto.Keccak256(c.tmp))
+	k := keccak.DefaultKeccakPool.Get()
+	k.Write(c.tmp)
+	c.tmp = k.Sum(c.tmp[:0])
+	keccak.DefaultKeccakPool.Put(k)
 
 	size := length.Uint64()
-	if !c.consumeGas(((size + 31) / 32) * Sha3WordGas) {
+	if !c.consumeGas(((size + 31) / 32) * sha3WordGas) {
 		return
 	}
 
 	v := c.push1()
-	v.SetBytes(hash.Bytes())
+	v.SetBytes(c.tmp)
 }
 
 func opPop(c *state) {
@@ -546,30 +529,36 @@ func opPop(c *state) {
 // context operations
 
 func opAddress(c *state) {
-	c.push1().SetBytes(c.address.Bytes())
+	c.push1().SetBytes(c.msg.Address.Bytes())
 }
 
 func opBalance(c *state) {
 	addr, _ := c.popAddr()
 
-	if !c.consumeGas(c.evm.gasTable.Balance) {
+	var gas uint64
+	if c.config.EIP150 {
+		gas = 400
+	} else {
+		gas = 20
+	}
+	if !c.consumeGas(gas) {
 		return
 	}
 
-	c.push1().Set(c.evm.state.GetBalance(addr))
+	c.push1().Set(c.host.GetBalance(addr))
 }
 
 func opOrigin(c *state) {
-	c.push1().SetBytes(c.origin.Bytes())
+	c.push1().SetBytes(c.host.GetTxContext().Origin.Bytes())
 }
 
 func opCaller(c *state) {
-	c.push1().SetBytes(c.caller.Bytes())
+	c.push1().SetBytes(c.msg.Caller.Bytes())
 }
 
 func opCallValue(c *state) {
 	v := c.push1()
-	if value := c.value; value != nil {
+	if value := c.msg.Value; value != nil {
 		v.Set(value)
 	} else {
 		v.Set(zero)
@@ -587,13 +576,13 @@ func opCallDataLoad(c *state) {
 	offset := c.top()
 
 	buf := bufPool.Get().([]byte)
-	c.setBytes(buf[:32], c.input, 32, offset)
+	c.setBytes(buf[:32], c.msg.Input, 32, offset)
 	offset.SetBytes(buf[:32])
 	bufPool.Put(buf)
 }
 
 func opCallDataSize(c *state) {
-	c.push1().SetUint64(uint64(len(c.input)))
+	c.push1().SetUint64(uint64(len(c.msg.Input)))
 }
 
 func opCodeSize(c *state) {
@@ -603,19 +592,25 @@ func opCodeSize(c *state) {
 func opExtCodeSize(c *state) {
 	addr, _ := c.popAddr()
 
-	if !c.consumeGas(c.evm.gasTable.ExtcodeSize) {
+	var gas uint64
+	if c.config.EIP150 {
+		gas = 700
+	} else {
+		gas = 20
+	}
+	if !c.consumeGas(gas) {
 		return
 	}
 
-	c.push1().SetUint64(uint64(c.evm.state.GetCodeSize(addr)))
+	c.push1().SetUint64(uint64(c.host.GetCodeSize(addr)))
 }
 
 func opGasPrice(c *state) {
-	c.push1().Set(c.evm.env.GasPrice)
+	c.push1().SetBytes(c.host.GetTxContext().GasPrice.Bytes())
 }
 
 func opReturnDataSize(c *state) {
-	if !c.evm.config.Byzantium {
+	if !c.config.Byzantium {
 		c.exit(errOpCodeNotFound)
 	} else {
 		c.push1().SetUint64(uint64(len(c.returnData)))
@@ -623,22 +618,18 @@ func opReturnDataSize(c *state) {
 }
 
 func opExtCodeHash(c *state) {
-	if !c.evm.config.Constantinople {
+	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
 		return
 	}
 
 	address, _ := c.popAddr()
 
-	if !c.consumeGas(c.evm.gasTable.ExtcodeHash) {
-		return
-	}
-
 	v := c.push1()
-	if c.evm.state.Empty(address) {
+	if c.host.Empty(address) {
 		v.Set(zero)
 	} else {
-		v.SetBytes(c.evm.state.GetCodeHash(address).Bytes())
+		v.SetBytes(c.host.GetCodeHash(address).Bytes())
 	}
 }
 
@@ -678,6 +669,8 @@ func (c *state) setBytes(dst, input []byte, size uint64, dataOffset *big.Int) {
 	}
 }
 
+const copyGas uint64 = 3
+
 func opExtCodeCopy(c *state) {
 	address, _ := c.popAddr()
 	memOffset := c.pop()
@@ -689,14 +682,21 @@ func opExtCodeCopy(c *state) {
 	}
 
 	size := length.Uint64()
-	if !c.consumeGas(((size + 31) / 32) * CopyGas) {
-		return
-	}
-	if !c.consumeGas(c.evm.gasTable.ExtcodeCopy) {
+	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
 
-	code := c.evm.state.GetCode(address)
+	var gas uint64
+	if c.config.EIP150 {
+		gas = 700
+	} else {
+		gas = 20
+	}
+	if !c.consumeGas(gas) {
+		return
+	}
+
+	code := c.host.GetCode(address)
 	if size != 0 {
 		c.setBytes(c.memory[memOffset.Uint64():], code, size, codeOffset)
 	}
@@ -712,17 +712,17 @@ func opCallDataCopy(c *state) {
 	}
 
 	size := length.Uint64()
-	if !c.consumeGas(((size + 31) / 32) * CopyGas) {
+	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
 
 	if size != 0 {
-		c.setBytes(c.memory[memOffset.Uint64():], c.input, size, dataOffset)
+		c.setBytes(c.memory[memOffset.Uint64():], c.msg.Input, size, dataOffset)
 	}
 }
 
 func opReturnDataCopy(c *state) {
-	if !c.evm.config.Byzantium {
+	if !c.config.Byzantium {
 		c.exit(errOpCodeNotFound)
 		return
 	}
@@ -736,7 +736,7 @@ func opReturnDataCopy(c *state) {
 	}
 
 	size := length.Uint64()
-	if !c.consumeGas(((size + 31) / 32) * CopyGas) {
+	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
 
@@ -765,7 +765,7 @@ func opCodeCopy(c *state) {
 	}
 
 	size := length.Uint64()
-	if !c.consumeGas(((size + 31) / 32) * CopyGas) {
+	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
 	if size != 0 {
@@ -778,57 +778,39 @@ func opCodeCopy(c *state) {
 func opBlockHash(c *state) {
 	num := c.top()
 
-	if !num.IsUint64() {
+	if !num.IsInt64() {
 		num.Set(zero)
 		return
 	}
 
-	n := num.Uint64()
-	lastBlock := c.evm.env.Number
+	n := num.Int64()
+	lastBlock := c.host.GetTxContext().Number
 
-	var ok bool
-	if lastBlock <= 257 {
-		ok = true
-	} else {
-		ok = n > lastBlock-257
-	}
-
-	//fmt.Println("-- num --")
-	//fmt.Println(num)
-
-	if n < lastBlock && ok {
-
-		//fmt.Println("-- hash --")
-		//fmt.Println(c.evm.getHash(num.Uint64()).String())
-
-		num.SetBytes(c.evm.getHash(num.Uint64()).Bytes())
+	if lastBlock-257 < n && n < lastBlock {
+		num.SetBytes(c.host.GetBlockHash(n).Bytes())
 	} else {
 		num.Set(zero)
 	}
 }
 
 func opCoinbase(c *state) {
-	c.push1().SetBytes(c.evm.env.Coinbase.Bytes())
+	c.push1().SetBytes(c.host.GetTxContext().Coinbase.Bytes())
 }
 
 func opTimestamp(c *state) {
-	c.push1().SetUint64(c.evm.env.Timestamp)
+	c.push1().SetInt64(c.host.GetTxContext().Timestamp)
 }
 
 func opNumber(c *state) {
-	c.push1().SetUint64(c.evm.env.Number)
+	c.push1().SetInt64(c.host.GetTxContext().Number)
 }
 
 func opDifficulty(c *state) {
-	v := c.push1()
-	v.Set(c.evm.env.Difficulty)
-	toU256(v)
+	c.push1().SetBytes(c.host.GetTxContext().Difficulty.Bytes())
 }
 
 func opGasLimit(c *state) {
-	v := c.push1()
-	v.Set(c.evm.env.GasLimit)
-	toU256(v)
+	c.push1().SetInt64(c.host.GetTxContext().GasLimit)
 }
 
 func opSelfDestruct(c *state) {
@@ -842,17 +824,16 @@ func opSelfDestruct(c *state) {
 	// try to remove the gas first
 	var gas uint64
 
-	// EIP150 homestead gas reprice fork:
-	if c.evm.config.EIP150 {
-		gas = c.evm.gasTable.Suicide
-
-		if c.evm.config.EIP158 {
+	// EIP150 reprice fork
+	if c.config.EIP150 {
+		gas = 5000
+		if c.config.EIP158 {
 			// if empty and transfers value
-			if c.evm.state.Empty(address) && c.evm.state.GetBalance(c.address).Sign() != 0 {
-				gas += c.evm.gasTable.CreateBySuicide
+			if c.host.Empty(address) && c.host.GetBalance(c.msg.Address).Sign() != 0 {
+				gas += 25000
 			}
-		} else if !c.evm.state.Exist(address) {
-			gas += c.evm.gasTable.CreateBySuicide
+		} else if !c.host.AccountExists(address) {
+			gas += 25000
 		}
 	}
 
@@ -860,14 +841,7 @@ func opSelfDestruct(c *state) {
 		return
 	}
 
-	if !c.evm.state.HasSuicided(c.address) {
-		c.evm.state.AddRefund(SuicideRefundGas)
-	}
-
-	balance := c.evm.state.GetBalance(c.address)
-	c.evm.state.AddBalance(address, balance)
-	c.evm.state.Suicide(c.address)
-
+	c.host.Selfdestruct(c.msg.Address, address)
 	c.halt()
 }
 
@@ -904,7 +878,7 @@ func opPush(n int) instruction {
 
 		v := c.push1()
 		if ip+1+n > len(ins) {
-			v.SetBytes(helper.RightPadBytes(ins[ip+1:len(ins)], n))
+			v.SetBytes(append(ins[ip+1:len(ins)], make([]byte, n)...))
 		} else {
 			v.SetBytes(ins[ip+1 : ip+1+n])
 		}
@@ -955,23 +929,18 @@ func opLog(size int) instruction {
 			topics[i] = bigToHash(c.pop())
 		}
 
-		log := &types.Log{
-			Address:     c.address,
-			Topics:      topics,
-			BlockNumber: c.evm.env.Number,
-		}
-
 		var ok bool
-		log.Data, ok = c.get2(log.Data[:0], mStart, mSize)
+		c.tmp, ok = c.get2(c.tmp[:0], mStart, mSize)
 		if !ok {
 			return
 		}
 
-		c.evm.state.AddLog(log)
-		if !c.consumeGas(uint64(size) * LogTopicGas) {
+		c.host.EmitLog(c.msg.Address, topics, c.tmp)
+
+		if !c.consumeGas(uint64(size) * 375) {
 			return
 		}
-		if !c.consumeGas(mSize.Uint64() * LogDataGas) {
+		if !c.consumeGas(mSize.Uint64() * 8) {
 			return
 		}
 	}
@@ -989,21 +958,34 @@ func opCreate(op OpCode) instruction {
 		}
 
 		if op == CREATE2 {
-			if !c.evm.config.Constantinople {
+			if !c.config.Constantinople {
 				c.exit(errOpCodeNotFound)
 				return
 			}
 		}
 
-		contract := c.buildCreateContract(op)
+		// reset the return data
+		c.resetReturnData()
+
+		contract, err := c.buildCreateContract(op)
+		if err != nil {
+			c.push1().Set(zero)
+			if contract != nil {
+				c.gas += contract.Gas
+			}
+			return
+		}
 		if contract == nil {
 			return
 		}
 
-		ret, gas, err := c.evm.executor.Create(contract)
+		contract.Type = runtime.Create
+
+		// Correct call
+		ret, gas, err := c.host.Callx(contract, c.host)
 
 		v := c.push1()
-		if op == CREATE && c.evm.config.Homestead && err == runtime.ErrCodeStoreOutOfGas {
+		if op == CREATE && c.config.Homestead && err == runtime.ErrCodeStoreOutOfGas {
 			v.Set(zero)
 		} else if err != nil && err != runtime.ErrCodeStoreOutOfGas {
 			v.Set(zero)
@@ -1013,16 +995,14 @@ func opCreate(op OpCode) instruction {
 
 		c.gas += gas
 		if err == runtime.ErrExecutionReverted {
-			c.returnData = ret
-		} else {
-			c.returnData = nil
+			c.returnData = append(c.returnData[:0], ret...)
 		}
 	}
 }
 
 func opCall(op OpCode) instruction {
 	return func(c *state) {
-		c.returnData = nil
+		c.resetReturnData()
 
 		if op == CALL && c.inStaticCall() {
 			if val := c.peekAt(3); val != nil && val.BitLen() > 0 {
@@ -1031,11 +1011,11 @@ func opCall(op OpCode) instruction {
 			}
 		}
 
-		if op == DELEGATECALL && !c.evm.config.Homestead {
+		if op == DELEGATECALL && !c.config.Homestead {
 			c.exit(errOpCodeNotFound)
 			return
 		}
-		if op == STATICCALL && !c.evm.config.Byzantium {
+		if op == STATICCALL && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
 			return
 		}
@@ -1058,12 +1038,21 @@ func opCall(op OpCode) instruction {
 			panic("not expected")
 		}
 
-		contract := c.buildCallContract(op)
+		contract, offset, size, err := c.buildCallContract(op)
+		if err != nil {
+			c.push1().Set(zero)
+			if contract != nil {
+				c.gas += contract.Gas
+			}
+			return
+		}
 		if contract == nil {
 			return
 		}
 
-		ret, gas, err := c.evm.executor.Call(contract, callType)
+		contract.Type = callType
+
+		ret, gas, err := c.host.Callx(contract, c.host)
 
 		v := c.push1()
 		if err != nil {
@@ -1073,20 +1062,17 @@ func opCall(op OpCode) instruction {
 		}
 
 		if err == nil || err == runtime.ErrExecutionReverted {
-			// TODO, change retOffset
-			// c.Set(contract.RetOffset, contract.RetSize, ret)
 			if len(ret) != 0 {
-				offset := contract.RetOffset
-				copy(c.memory[offset:offset+contract.RetSize], ret)
+				copy(c.memory[offset:offset+size], ret)
 			}
 		}
 
 		c.gas += gas
-		c.returnData = ret
+		c.returnData = append(c.returnData[:0], ret...)
 	}
 }
 
-func (c *state) buildCallContract(op OpCode) *runtime.Contract {
+func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64, error) {
 	// Pop input arguments
 	initialGas := c.pop()
 	addr, _ := c.popAddr()
@@ -1104,104 +1090,93 @@ func (c *state) buildCallContract(op OpCode) *runtime.Contract {
 	retOffset := c.pop()
 	retSize := c.pop()
 
-	// Calculate and consume gas cost
-
-	// Memory cost needs to consider both input and output resizes (HACK)
-	in := calcMemSize(inOffset, inSize)
-	ret := calcMemSize(retOffset, retSize)
-
-	max := in
-	if in.Cmp(ret) < 0 {
-		max = ret
+	// Get the input arguments
+	args, ok := c.get2(nil, inOffset, inSize)
+	if !ok {
+		return nil, 0, 0, nil
 	}
-	if !max.IsUint64() {
-		c.exit(errOutOfGas)
-		return nil
-	}
-	if !c.checkMemory(zero, max) {
-		return nil
+	// Check if the memory return offsets are out of bounds
+	if !c.checkMemory(retOffset, retSize) {
+		return nil, 0, 0, nil
 	}
 
-	args := c.Get(inOffset, inSize)
+	var gasCost uint64
+	if c.config.EIP150 {
+		gasCost = 700
+	} else {
+		gasCost = 40
+	}
 
-	gasCost := c.evm.gasTable.Calls
-	eip158 := c.evm.config.EIP158
-	transfersValue := value != nil && value.Sign() != 0
+	eip158 := c.config.EIP158
+	transfersValue := (op == CALL || op == CALLCODE) && value != nil && value.Sign() != 0
 
 	if op == CALL {
 		if eip158 {
-			if transfersValue && c.evm.state.Empty(addr) {
-				gasCost += CallNewAccountGas
+			if transfersValue && c.host.Empty(addr) {
+				gasCost += 25000
 			}
-		} else if !c.evm.state.Exist(addr) {
-			gasCost += CallNewAccountGas
+		} else if !c.host.AccountExists(addr) {
+			gasCost += 25000
 		}
 	}
-	if op == CALL || op == CALLCODE {
-		if transfersValue {
-			gasCost += CallValueTransferGas
-		}
+	if transfersValue {
+		gasCost += 9000
 	}
 
-	gas, ok := callGas(c.evm.gasTable, c.gas, gasCost, initialGas)
-	if !ok {
-		c.exit(errOutOfGas)
-		return nil
+	var gas uint64
+
+	ok = initialGas.IsUint64()
+	if c.config.EIP150 {
+		availableGas := c.gas - gasCost
+		availableGas = availableGas - availableGas/64
+
+		if !ok || availableGas < initialGas.Uint64() {
+			gas = availableGas
+		} else {
+			gas = initialGas.Uint64()
+		}
+	} else {
+		if !ok {
+			c.exit(errOutOfGas)
+			return nil, 0, 0, nil
+		}
+		gas = initialGas.Uint64()
 	}
 
 	gasCost = gasCost + gas
 
 	// Consume gas cost
 	if !c.consumeGas(gasCost) {
-		return nil
+		return nil, 0, 0, nil
 	}
-
-	if op == CALL || op == CALLCODE {
-		if transfersValue {
-			gas += CallStipend
-		}
+	if transfersValue {
+		gas += 2300
 	}
 
 	parent := c
 
-	contract := runtime.NewContractCall(c.depth+1, parent.origin, parent.address, addr, value, gas, c.evm.state.GetCode(addr), args)
+	contract := runtime.NewContractCall(c.msg.Depth+1, parent.msg.Origin, parent.msg.Address, addr, value, gas, c.host.GetCode(addr), args)
 
-	contract.RetOffset = retOffset.Uint64()
-	contract.RetSize = retSize.Uint64()
-
-	if op == STATICCALL || parent.static {
+	if op == STATICCALL || parent.msg.Static {
 		contract.Static = true
 	}
 	if op == CALLCODE || op == DELEGATECALL {
-		contract.Address = parent.address
+		contract.Address = parent.msg.Address
 		if op == DELEGATECALL {
-			contract.Value = parent.value
-			contract.Caller = parent.caller
+			contract.Value = parent.msg.Value
+			contract.Caller = parent.msg.Caller
 		}
 	}
 
-	return contract
-}
-
-func callGas(gasTable chain.GasTable, availableGas, base uint64, callCost *big.Int) (uint64, bool) {
-	if gasTable.CreateBySuicide > 0 {
-		availableGas = availableGas - base
-		gas := availableGas - availableGas/64
-		// If the bit length exceeds 64 bit we know that the newly calculated "gas" for EIP150
-		// is smaller than the requested amount. Therefor we return the new gas instead
-		// of returning an error.
-		if callCost.BitLen() > 64 || gas < callCost.Uint64() {
-			return gas, true
+	if transfersValue {
+		if c.host.GetBalance(c.msg.Address).Cmp(value) < 0 {
+			return contract, 0, 0, fmt.Errorf("bad")
 		}
 	}
-	if !callCost.IsUint64() {
-		return 0, false
-	}
-
-	return callCost.Uint64(), true
+	return contract, retOffset.Uint64(), retSize.Uint64(), nil
 }
 
-func (c *state) buildCreateContract(op OpCode) *runtime.Contract {
+func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 	// Pop input arguments
 	value := c.pop()
 	offset := c.pop()
@@ -1212,28 +1187,39 @@ func (c *state) buildCreateContract(op OpCode) *runtime.Contract {
 		salt = c.pop()
 	}
 
+	// check if the value can be transfered
+	hasTransfer := value != nil && value.Sign() != 0
+
 	// Calculate and consume gas cost
 
 	// var overflow bool
 	var gasCost uint64
 
-	if !c.checkMemory(offset, length) {
-		return nil
-	}
-
 	// Both CREATE and CREATE2 use memory
-	input := c.Get(offset, length)
+	var input []byte
+	var ok bool
+
+	input, ok = c.get2(input[:0], offset, length) // Does the memory check
+	if !ok {
+		return nil, nil
+	}
 
 	// Consume memory resize gas (TODO, change with get2)
 	if !c.consumeGas(gasCost) {
-		return nil
+		return nil, nil
+	}
+
+	if hasTransfer {
+		if c.host.GetBalance(c.msg.Address).Cmp(value) < 0 {
+			return nil, fmt.Errorf("bad")
+		}
 	}
 
 	if op == CREATE2 {
 		// Consume sha3 gas cost
 		size := length.Uint64()
-		if !c.consumeGas(((size + 31) / 32) * Sha3WordGas) {
-			return nil
+		if !c.consumeGas(((size + 31) / 32) * sha3WordGas) {
+			return nil, nil
 		}
 	}
 
@@ -1241,29 +1227,28 @@ func (c *state) buildCreateContract(op OpCode) *runtime.Contract {
 	gas := c.gas
 
 	// CREATE2 uses by default EIP150
-	if c.evm.config.EIP150 || op == CREATE2 {
+	if c.config.EIP150 || op == CREATE2 {
 		gas -= gas / 64
 	}
 
 	if !c.consumeGas(gas) {
-		return nil
+		return nil, nil
 	}
 
 	// Calculate address
 	var address types.Address
 	if op == CREATE {
-		address = crypto.CreateAddress(c.address, c.evm.state.GetNonce(c.address))
+		address = crypto.CreateAddress(c.msg.Address, c.host.GetNonce(c.msg.Address))
 	} else {
-		address = crypto.CreateAddress2(c.address, bigToHash(salt), input)
+		address = crypto.CreateAddress2(c.msg.Address, bigToHash(salt), input)
 	}
-
-	contract := runtime.NewContractCreation(c.depth+1, c.origin, c.address, address, value, gas, input)
-	return contract
+	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input)
+	return contract, nil
 }
 
 func opHalt(op OpCode) instruction {
 	return func(c *state) {
-		if op == REVERT && !c.evm.config.Byzantium {
+		if op == REVERT && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
 			return
 		}

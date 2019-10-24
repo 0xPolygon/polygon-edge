@@ -4,13 +4,10 @@ import (
 	"math/big"
 
 	"math"
-
-	"github.com/umbracle/minimal/helper"
 )
 
-// modExp implements a native big integer exponential modular operation.
 type modExp struct {
-	Divisor uint64
+	p *Precompiled
 }
 
 var (
@@ -27,98 +24,139 @@ var (
 	big199680 = big.NewInt(199680)
 )
 
-// BigMax returns the larger of x or y.
-func BigMax(x, y *big.Int) *big.Int {
-	if x.Cmp(y) < 0 {
-		return y
+var (
+	divisor = big.NewInt(20)
+)
+
+func adjustedExponentLength(len, head *big.Int) *big.Int {
+	bitlength := uint64(0)
+	if head.Sign() != 0 {
+		bitlength = uint64(head.BitLen() - 1)
+	}
+
+	if len.Cmp(big32) <= 0 {
+		// return the index of the highest bit
+		return new(big.Int).SetUint64(bitlength)
+	}
+
+	head.Sub(len, big32)
+	head.Mul(head, big8)
+	head.Add(head, new(big.Int).SetUint64(bitlength))
+	return head
+}
+
+func subMul(x, a, b, c *big.Int) *big.Int {
+	// x ** 2 // a + b * x - c
+	tmp := new(big.Int)
+
+	// x ** 2 / a
+	tmp.Mul(x, x)
+	tmp.Div(tmp, a)
+
+	// b * x - c
+	x.Mul(x, b)
+	x.Sub(x, c)
+
+	return x.Add(x, tmp)
+}
+
+func multComplexity(x *big.Int) *big.Int {
+	if x.Cmp(big64) <= 0 {
+		// x ** x
+		x.Mul(x, x)
+	} else if x.Cmp(big1024) <= 0 {
+		// x ** 2 // 4 + 96 * x - 3072
+		x = subMul(x, big4, big96, big3072)
+	} else {
+		// x ** 2 // 16 + 480 * x - 199680
+		x = subMul(x, big16, big480, big199680)
 	}
 	return x
 }
 
-// RequiredGas returns the gas required to execute the pre-compiled contract.
-func (c *modExp) Gas(input []byte) uint64 {
-	var (
-		baseLen = new(big.Int).SetBytes(helper.GetData(input, 0, 32))
-		expLen  = new(big.Int).SetBytes(helper.GetData(input, 32, 32))
-		modLen  = new(big.Int).SetBytes(helper.GetData(input, 64, 32))
-	)
+func (m *modExp) gas(input []byte) uint64 {
+	var val, tail []byte
+
+	val, tail = m.p.get(input, 32)
+	baseLen := new(big.Int).SetBytes(val)
+
+	val, tail = m.p.get(tail, 32)
+	expLen := new(big.Int).SetBytes(val)
+
+	val, tail = m.p.get(tail, 32)
+	modLen := new(big.Int).SetBytes(val)
+
 	if len(input) > 96 {
 		input = input[96:]
 	} else {
 		input = input[:0]
 	}
-	// Retrieve the head 32 bytes of exp for the adjusted exponent length
-	var expHead *big.Int
-	if big.NewInt(int64(len(input))).Cmp(baseLen) <= 0 {
-		expHead = new(big.Int)
+
+	expHeadLen := uint64(32)
+	if expLen.Cmp(big32) < 0 {
+		expHeadLen = expLen.Uint64()
+	}
+
+	expHead := new(big.Int)
+	if bLen := baseLen.Uint64(); bLen < uint64(len(input)) {
+		val, _ = m.p.get(input[bLen:], int(expHeadLen))
+		expHead.SetBytes(val)
+	}
+
+	// a := mult_complexity(max(length_of_MODULUS, length_of_BASE)
+	gasCost := new(big.Int)
+	if modLen.Cmp(baseLen) >= 0 {
+		gasCost.Set(modLen)
 	} else {
-		if expLen.Cmp(big32) > 0 {
-			expHead = new(big.Int).SetBytes(helper.GetData(input, baseLen.Uint64(), 32))
-		} else {
-			expHead = new(big.Int).SetBytes(helper.GetData(input, baseLen.Uint64(), expLen.Uint64()))
-		}
+		gasCost.Set(baseLen)
 	}
-	// Calculate the adjusted exponent length
-	var msb int
-	if bitlen := expHead.BitLen(); bitlen > 0 {
-		msb = bitlen - 1
-	}
-	adjExpLen := new(big.Int)
-	if expLen.Cmp(big32) > 0 {
-		adjExpLen.Sub(expLen, big32)
-		adjExpLen.Mul(big8, adjExpLen)
-	}
-	adjExpLen.Add(adjExpLen, big.NewInt(int64(msb)))
+	gasCost = multComplexity(gasCost)
 
-	// Calculate the gas cost of the operation
-	gas := new(big.Int).Set(BigMax(modLen, baseLen))
-	switch {
-	case gas.Cmp(big64) <= 0:
-		gas.Mul(gas, gas)
-	case gas.Cmp(big1024) <= 0:
-		gas = new(big.Int).Add(
-			new(big.Int).Div(new(big.Int).Mul(gas, gas), big4),
-			new(big.Int).Sub(new(big.Int).Mul(big96, gas), big3072),
-		)
-	default:
-		gas = new(big.Int).Add(
-			new(big.Int).Div(new(big.Int).Mul(gas, gas), big16),
-			new(big.Int).Sub(new(big.Int).Mul(big480, gas), big199680),
-		)
+	// a = a * max(ADJUSTED_EXPONENT_LENGTH, 1)
+	adjExpLen := adjustedExponentLength(expLen, expHead)
+	if adjExpLen.Cmp(big1) >= 0 {
+		gasCost.Mul(gasCost, adjExpLen)
+	} else {
+		gasCost.Mul(gasCost, big1)
 	}
-	gas.Mul(gas, BigMax(adjExpLen, big1))
-	gas.Div(gas, new(big.Int).SetUint64(c.Divisor))
 
-	if gas.BitLen() > 64 {
+	// a = a / div
+	gasCost.Div(gasCost, divisor)
+
+	// cap to the max uint64
+	if !gasCost.IsUint64() {
 		return math.MaxUint64
 	}
-	return gas.Uint64()
+	return gasCost.Uint64()
 }
 
-func (c *modExp) Call(input []byte) ([]byte, error) {
-	var (
-		baseLen = new(big.Int).SetBytes(helper.GetData(input, 0, 32)).Uint64()
-		expLen  = new(big.Int).SetBytes(helper.GetData(input, 32, 32)).Uint64()
-		modLen  = new(big.Int).SetBytes(helper.GetData(input, 64, 32)).Uint64()
-	)
-	if len(input) > 96 {
-		input = input[96:]
-	} else {
-		input = input[:0]
+func (m *modExp) run(input []byte) ([]byte, error) {
+	// get the lengths
+	var baseLen, exponentLen, modulusLen uint64
+
+	baseLen, input = m.p.getUint64(input)
+	exponentLen, input = m.p.getUint64(input)
+	modulusLen, input = m.p.getUint64(input)
+
+	if baseLen == 0 && modulusLen == 0 {
+		return nil, nil
 	}
-	// Handle a special case when both the base and mod length is zero
-	if baseLen == 0 && modLen == 0 {
-		return []byte{}, nil
+
+	// get the values
+	var val []byte
+
+	val, input = m.p.get(input, int(baseLen))
+	base := new(big.Int).SetBytes(val)
+
+	val, input = m.p.get(input, int(exponentLen))
+	exponent := new(big.Int).SetBytes(val)
+
+	val, input = m.p.get(input, int(modulusLen))
+	modulus := new(big.Int).SetBytes(val)
+
+	var res []byte
+	if modulus.Sign() != 0 {
+		res = base.Exp(base, exponent, modulus).Bytes()
 	}
-	// Retrieve the operands and execute the exponentiation
-	var (
-		base = new(big.Int).SetBytes(helper.GetData(input, 0, baseLen))
-		exp  = new(big.Int).SetBytes(helper.GetData(input, baseLen, expLen))
-		mod  = new(big.Int).SetBytes(helper.GetData(input, baseLen+expLen, modLen))
-	)
-	if mod.BitLen() == 0 {
-		// Modulo 0 is undefined, return zero
-		return helper.LeftPadBytes([]byte{}, int(modLen)), nil
-	}
-	return helper.LeftPadBytes(base.Exp(base, exp, mod).Bytes(), int(modLen)), nil
+	return m.p.leftPad(res, int(modulusLen)), nil
 }

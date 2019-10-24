@@ -13,11 +13,11 @@ type precompiledTest struct {
 	Expected string
 }
 
-func testPrecompiled(t *testing.T, p Backend, cases []precompiledTest) {
+func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h, _ := hex.DecodeString(c.Input)
-			found, err := p.Call(h)
+			found, err := p.run(h)
 
 			assert.NoError(t, err)
 			assert.Equal(t, c.Expected, hex.EncodeToString(found))
@@ -33,7 +33,9 @@ func TestECRecover(t *testing.T) {
 			Name:     "",
 		},
 	}
-	testPrecompiled(t, &ecrecover{}, tests)
+
+	p := &Precompiled{}
+	testPrecompiled(t, &ecrecover{p}, tests)
 }
 
 func TestSha256(t *testing.T) {
@@ -44,7 +46,7 @@ func TestSha256(t *testing.T) {
 			Name:     "128",
 		},
 	}
-	testPrecompiled(t, &sha256hash{}, tests)
+	testPrecompiled(t, &sha256h{}, tests)
 }
 
 func TestRipeMD(t *testing.T) {
@@ -55,7 +57,7 @@ func TestRipeMD(t *testing.T) {
 			Name:     "128",
 		},
 	}
-	testPrecompiled(t, &ripemd160hash{}, tests)
+	testPrecompiled(t, &ripemd160h{}, tests)
 }
 
 func TestIdentity(t *testing.T) {
@@ -66,5 +68,5 @@ func TestIdentity(t *testing.T) {
 			Name:     "128",
 		},
 	}
-	testPrecompiled(t, &dataCopy{}, tests)
+	testPrecompiled(t, &identity{}, tests)
 }

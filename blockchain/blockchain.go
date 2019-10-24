@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/helper/hex"
 
-	"github.com/umbracle/minimal/consensus"
-
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/consensus"
+	"github.com/umbracle/minimal/crypto"
+
 	"github.com/umbracle/minimal/state"
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/state/runtime/evm"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+
+	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 
 	mapset "github.com/deckarep/golang-set"
@@ -44,7 +46,6 @@ type Blockchain struct {
 	state       state.State
 	triedb      itrie.Storage
 	params      *chain.Params
-	precompiled map[types.Address]*precompiled.Precompiled
 	sidechainCh chan *types.Header
 
 	// listener for advancedhead subscribers
@@ -53,6 +54,9 @@ type Blockchain struct {
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
+
+	// executor of the transition
+	executor *state.Executor
 
 	daoBlock uint64
 }
@@ -68,7 +72,13 @@ func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Conse
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
 		daoBlock:    dao.DAOForkBlock,
+		executor:    state.NewExecutor(),
 	}
+
+	// setup the executor
+	b.executor.SetRuntime(precompiled.NewPrecompiled())
+	b.executor.SetRuntime(evm.NewEVM())
+
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
@@ -79,10 +89,6 @@ func (b *Blockchain) Subscribe() chan *types.Header {
 	ch := make(chan *types.Header, 5)
 	b.listeners = append(b.listeners, ch)
 	return ch
-}
-
-func (b *Blockchain) SetPrecompiled(precompiled map[types.Address]*precompiled.Precompiled) {
-	b.precompiled = precompiled
 }
 
 // GetParent return the parent
@@ -98,18 +104,20 @@ func (b *Blockchain) Genesis() *types.Header {
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	// Build precompiled contracts
-	prec := map[types.Address]*precompiled.Precompiled{}
-	for addr, i := range genesis.Alloc {
-		if i.Builtin != nil {
-			j, err := precompiled.CreatePrecompiled(i.Builtin)
-			if err != nil {
-				return err
+	/*
+		prec := map[types.Address]*precompiled.Precompiled{}
+		for addr, i := range genesis.Alloc {
+			if i.Builtin != nil {
+				j, err := precompiled.CreatePrecompiled(i.Builtin)
+				if err != nil {
+					return err
+				}
+				prec[addr] = j
 			}
-			prec[addr] = j
 		}
-	}
+	*/
 
-	b.SetPrecompiled(prec)
+	// b.SetPrecompiled(prec)
 
 	// The chain is not empty
 	if !b.Empty() {
@@ -697,9 +705,6 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 	// start the gasPool
 	config := b.params.Forks.At(block.Number())
 
-	// gasPool
-	gasPool := NewGasPool(header.GasLimit)
-
 	totalGas := uint64(0)
 
 	receipts := []*types.Receipt{}
@@ -724,8 +729,20 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 		}
 	}
 
+	env := runtime.TxContext{
+		Coinbase:   header.Miner,
+		Timestamp:  int64(header.Timestamp),
+		Number:     int64(header.Number),
+		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		GasLimit:   int64(header.GasLimit),
+	}
+
+	transition := b.executor.NewTransition(txn, hashByNumber, env, config)
+
 	// apply the transactions
 	for indx, tx := range block.Transactions {
+		transition.SetTxn(txn)
+
 		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
 		from, err := signer.Sender(tx)
 		if err != nil {
@@ -735,20 +752,8 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 		msg := tx.Copy()
 		msg.From = from
 
-		gasTable := b.params.GasTable(block.Number())
-
-		env := &runtime.Env{
-			Coinbase:   header.Miner,
-			Timestamp:  header.Timestamp,
-			Number:     header.Number,
-			Difficulty: new(big.Int).SetUint64(header.Difficulty),
-			GasLimit:   big.NewInt(int64(header.GasLimit)),
-			GasPrice:   new(big.Int).SetBytes(tx.GetGasPrice()),
-		}
-
-		executor := state.NewExecutor(txn, env, config, gasTable, hashByNumber)
-
-		gasUsed, failed, err := executor.Apply(txn, msg, env, gasTable, config, hashByNumber, gasPool, false, b.precompiled)
+		gasUsed, failed, err := transition.Apply(msg)
+		txn = transition.Txn()
 
 		totalGas += gasUsed
 
@@ -801,7 +806,6 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 	}
 
 	s2, root := txn.Commit(config.EIP155)
-
 	return s2, root, receipts, totalGas, nil
 }
 

@@ -19,6 +19,14 @@ func DecodeString(str string) ([]byte, error) {
 	return hex.DecodeString(str)
 }
 
+func MustDecodeString(str string) []byte {
+	buf, err := DecodeString(str)
+	if err != nil {
+		panic(fmt.Errorf("could not decode string: %v", err))
+	}
+	return buf
+}
+
 func DecodeHex(str string) ([]byte, error) {
 	if strings.HasPrefix(str, "0x") {
 		str = str[2:]

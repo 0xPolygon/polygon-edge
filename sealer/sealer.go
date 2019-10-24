@@ -9,7 +9,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/derivesha"
@@ -273,16 +272,25 @@ func (s *Sealer) commit() {
 	return
 }
 
+const (
+	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
+	GasLimitBoundDivisor uint64 = 1024
+	// MinGasLimit is the minimum the gas limit may ever be.
+	MinGasLimit uint64 = 5000
+	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
+	MaximumExtraDataSize uint64 = 32
+)
+
 func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {
 	// contrib = (parentGasUsed * 3 / 2) / 1024
-	contrib := (parent.GasUsed + parent.GasUsed/2) / chain.GasLimitBoundDivisor
+	contrib := (parent.GasUsed + parent.GasUsed/2) / GasLimitBoundDivisor
 
 	// decay = parentGasLimit / 1024 -1
-	decay := parent.GasLimit/chain.GasLimitBoundDivisor - 1
+	decay := parent.GasLimit/GasLimitBoundDivisor - 1
 
 	limit := parent.GasLimit - decay + contrib
-	if limit < chain.MinGasLimit {
-		limit = chain.MinGasLimit
+	if limit < MinGasLimit {
+		limit = MinGasLimit
 	}
 	// If we're outside our allowed gas range, we try to hone towards them
 	if limit < gasFloor {

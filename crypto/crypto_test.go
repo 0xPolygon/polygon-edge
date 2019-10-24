@@ -149,7 +149,13 @@ func TestValidateSignatureValues(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		found := ValidateSignatureValues(c.v, c.r, c.s, c.homestead)
+		found := ValidateSignatureValues(c.v, c.r, c.s)
 		assert.Equal(t, found, c.res)
 	}
+}
+
+func TestVV(t *testing.T) {
+
+	ValidateSignatureValues(0, []byte{0x0, 0x1, 0x2, 0x3}, []byte{0x1, 0x2, 0x3})
+
 }

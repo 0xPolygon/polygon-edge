@@ -31,32 +31,6 @@ func getState() (*state, func()) {
 	}
 }
 
-func TestStackPop(t *testing.T) {
-	s, close := getState()
-	defer close()
-
-	assert.Len(t, s.stack, 0)
-	assert.Equal(t, s.stackSize(), 0)
-
-	s.push(one)
-	assert.Len(t, s.stack, 1)
-	assert.Equal(t, s.stackSize(), 1)
-
-	assert.NotNil(t, s.pop())
-	assert.Len(t, s.stack, 1)
-	assert.Equal(t, s.stackSize(), 0)
-
-	s.push(one)
-	s.push(one)
-
-	assert.Len(t, s.stack, 2)
-	assert.Equal(t, s.stackSize(), 2)
-
-	assert.NotNil(t, s.pop())
-	assert.NotNil(t, s.pop())
-	assert.Nil(t, s.pop())
-}
-
 func TestStackTop(t *testing.T) {
 	s, close := getState()
 	defer close()

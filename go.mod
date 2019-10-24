@@ -17,6 +17,7 @@ require (
 	github.com/ferranbt/periodic-dispatcher v0.0.0-20181108165813-15a0c0298473
 	github.com/gobuffalo/packr v1.25.0
 	github.com/golang/snappy v0.0.1
+	github.com/google/gops v0.3.6
 	github.com/hashicorp/consul/api v1.0.1
 	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/go-immutable-radix v1.0.0

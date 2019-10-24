@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/google/gops/agent"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/blockchain/storage"
@@ -74,6 +75,10 @@ func NewAgent(logger *log.Logger, config *Config) *Agent {
 
 // Start starts the agent
 func (a *Agent) Start() error {
+	if err := agent.Listen(agent.Options{}); err != nil {
+		log.Fatal(err)
+	}
+
 	var f func(str string) (*chain.Chain, error)
 	if _, err := os.Stat(a.config.Chain); err == nil {
 		f = chain.ImportFromFile

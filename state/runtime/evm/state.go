@@ -7,6 +7,7 @@ import (
 
 	"sync"
 
+	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/types"
@@ -14,9 +15,17 @@ import (
 
 var statePool = sync.Pool{
 	New: func() interface{} {
-		c := new(state)
-		return c
+		return new(state)
 	},
+}
+
+func acquireState() *state {
+	return statePool.Get().(*state)
+}
+
+func releaseState(s *state) {
+	s.reset()
+	statePool.Put(s)
 }
 
 const stackSize = 1024
@@ -40,6 +49,12 @@ type state struct {
 	code []byte
 	tmp  []byte
 
+	debug bool
+
+	host   runtime.Host
+	msg    *runtime.Contract // change with msg
+	config *chain.ForksInTime
+
 	// memory
 	memory      []byte
 	lastGasCost uint64
@@ -48,61 +63,31 @@ type state struct {
 	stack []*big.Int
 	sp    int
 
-	codeAddress types.Address
-	address     types.Address // address of the contract
-	origin      types.Address // origin is where the storage is taken from
-	caller      types.Address // caller is the one calling the contract
-
 	// remove later
 	evm *EVM
-
-	depth int
 
 	err  error
 	stop bool
 
-	// inputs
-	value *big.Int // value of the tx
-	input []byte   // Input of the tx
-	gas   uint64
+	gas uint64
 
-	// type of contract
-	static bool
-
-	retOffset uint64
-	retSize   uint64
-
-	bitvec bitvec
+	// bitvec bitvec
+	bitmap bitmap
 
 	returnData []byte
-
-	ret []byte
+	ret        []byte
 }
 
 func (c *state) reset() {
 	c.sp = 0
 	c.ip = 0
+	c.gas = 0
 	c.lastGasCost = 0
 	c.stop = false
 	c.err = nil
-	c.stack = c.stack[:0]
 
-	// TODO, some of these resets may not be necessary.
-
-	// reset tmp
-	for i := range c.tmp {
-		c.tmp[i] = 0
-	}
-
-	// reset ret
-	for i := range c.ret {
-		c.ret[i] = 0
-	}
-
-	// reset return data
-	for i := range c.returnData {
-		c.returnData[i] = 0
-	}
+	// reset bitmap
+	c.bitmap.reset()
 
 	// reset memory
 	for i := range c.memory {
@@ -111,20 +96,17 @@ func (c *state) reset() {
 
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]
-	c.returnData = c.returnData[:0]
+	c.code = c.code[:0]
+	// c.returnData = c.returnData[:0]
 	c.memory = c.memory[:0]
 }
 
 func (c *state) validJumpdest(dest *big.Int) bool {
 	udest := dest.Uint64()
-
 	if dest.BitLen() >= 63 || udest >= uint64(len(c.code)) {
 		return false
 	}
-	if OpCode(c.code[udest]) != JUMPDEST {
-		return false
-	}
-	return c.bitvec.codeSegment(udest)
+	return c.bitmap.isSet(uint(udest))
 }
 
 func (c *state) halt() {
@@ -156,6 +138,10 @@ func (c *state) push1() *big.Int {
 
 func (c *state) stackAtLeast(n int) bool {
 	return c.sp >= n
+}
+
+func (c *state) popHash() types.Hash {
+	return types.BytesToHash(c.pop().Bytes())
 }
 
 func (c *state) popAddr() (types.Address, bool) {
@@ -217,6 +203,10 @@ func (c *state) showStack() string {
 	return "Stack: " + strings.Join(str, ",")
 }
 
+func (c *state) resetReturnData() {
+	c.returnData = c.returnData[:0]
+}
+
 // Run executes the virtual machine
 func (c *state) Run() ([]byte, error) {
 	var vmerr error
@@ -230,7 +220,7 @@ func (c *state) Run() ([]byte, error) {
 
 		op := OpCode(c.code[c.ip])
 
-		//fmt.Printf("OP [%d]: %s (%d)\n", c.depth, op.String(), c.gas)
+		//fmt.Printf("OP [%d]: %s (%d)\n", c.msg.Depth, op.String(), c.gas)
 		//fmt.Println(c.showStack())
 
 		inst := dispatchTable[op]
@@ -266,12 +256,8 @@ func (c *state) Run() ([]byte, error) {
 	return c.ret, vmerr
 }
 
-func (c *state) Depth() int {
-	return c.depth
-}
-
 func (c *state) inStaticCall() bool {
-	return c.static
+	return c.msg.Static
 }
 
 func bigToHash(b *big.Int) types.Hash {
@@ -280,14 +266,6 @@ func bigToHash(b *big.Int) types.Hash {
 
 func (c *state) Len() int {
 	return len(c.memory)
-}
-
-// calculates the memory size required for a step
-func calcMemSize(off, l *big.Int) *big.Int {
-	if l.Sign() == 0 {
-		return zero
-	}
-	return new(big.Int).Add(off, l)
 }
 
 func (c *state) checkMemory(offset, size *big.Int) bool {
@@ -329,7 +307,6 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 }
 
 func extendByteSlice(b []byte, needLen int) []byte {
-	// TODO, not sure if the memory is zeroed after each reset
 	b = b[:cap(b)]
 	if n := needLen - cap(b); n > 0 {
 		b = append(b, make([]byte, n)...)
@@ -351,19 +328,6 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 
 	dst = append(dst, c.memory[o:o+l]...)
 	return dst, true
-}
-
-func (c *state) Get(o *big.Int, l *big.Int) []byte {
-	if l.Sign() == 0 {
-		return nil
-	}
-
-	offset := o.Uint64()
-	length := l.Uint64()
-
-	cpy := make([]byte, length)
-	copy(cpy, c.memory[offset:offset+length])
-	return cpy
 }
 
 func (c *state) Show() string {

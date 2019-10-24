@@ -81,7 +81,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatalf("config %s not found", c.Network)
 	}
 
-	builtins := buildBuiltins(t, config)
+	// builtins := buildBuiltins(t, config)
 	s, err := memory.NewMemoryStorage(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		engine.(*ethash.Ethash).SetDAOBlock(5)
 	}
 
-	b.SetPrecompiled(builtins)
+	// b.SetPrecompiled(builtins)
 	if hash := b.Genesis().Hash; hash != c.Genesis.header.Hash {
 		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash, hash.String())
 	}
@@ -199,7 +199,6 @@ func testBlockChainCases(t *testing.T, folder string, skip []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	for _, file := range files {
 		t.Run(file, func(t *testing.T) {
 			data, err := ioutil.ReadFile(file)
