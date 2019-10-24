@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/state/runtime/evm"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
 )
 
 var stateTests = "GeneralStateTests"
@@ -30,30 +31,26 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 		t.Fatalf("config %s not found", fork)
 	}
 
-	builtins := buildBuiltins(t, config)
 	env := c.Env.ToEnv(t)
 
 	msg, err := c.Transaction.At(p.Indexes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	env.GasPrice = new(big.Int).SetBytes(msg.GasPrice)
 
 	s, snap, _ := buildState(t, c.Pre)
-
-	forks := config.At(env.Number)
-	gasTable := config.GasTable(env.Number)
+	forks := config.At(uint64(env.Number))
 
 	var root []byte
 
-	// txn := s.Txn()
 	txn := state.NewTxn(s, snap)
 
-	gasPool := blockchain.NewGasPool(env.GasLimit.Uint64())
+	xxx := state.NewExecutor()
+	xxx.SetRuntime(precompiled.NewPrecompiled())
+	xxx.SetRuntime(evm.NewEVM())
 
-	executor := state.NewExecutor(txn, env, forks, gasTable, vmTestBlockHash)
-
-	_, _, err = executor.Apply(txn, msg, env, gasTable, forks, vmTestBlockHash, gasPool, false, builtins)
+	executor := xxx.NewTransition(txn, vmTestBlockHash, env, forks)
+	_, _, err = executor.Apply(msg)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))

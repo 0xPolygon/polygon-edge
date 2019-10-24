@@ -1,76 +1,143 @@
 package precompiled
 
 import (
-	"fmt"
-
-	"github.com/mitchellh/mapstructure"
+	"encoding/binary"
 
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state/runtime"
+	"github.com/umbracle/minimal/types"
 )
 
-type Runtime struct {
+var _ runtime.Runtime = &Precompiled{}
+
+type contract interface {
+	gas(input []byte) uint64
+	run(input []byte) ([]byte, error)
 }
 
-func (r *Runtime) Run(c *runtime.Contract) ([]byte, uint64, error) {
-	return nil, 0, nil
-}
-
-// Precompiled is a specific precompiled contract
+// Precompiled is the runtime for the precompiled contracts
 type Precompiled struct {
-	ActiveAt uint64
-	Backend  Backend
+	buf       []byte
+	contracts map[types.Address]contract
 }
 
-// Backend is the execution interface for the precompiled contracts
-type Backend interface {
-	Gas(input []byte) uint64
-	Call(input []byte) ([]byte, error)
+// NewPrecompiled creates a new runtime for the precompiled contracts
+func NewPrecompiled() *Precompiled {
+	p := &Precompiled{}
+	p.setupContracts()
+	return p
 }
 
-// CreatePrecompiled creates a precompiled contract from a builtin genesis reference.
-func CreatePrecompiled(b *chain.Builtin) (*Precompiled, error) {
-	p, ok := builtinPrecompiled[b.Name]
-	if !ok {
-		return nil, fmt.Errorf("Precompiled contract '%s' does not exists", b.Name)
+func (p *Precompiled) setupContracts() {
+	p.register("1", &ecrecover{p})
+	p.register("2", &sha256h{})
+	p.register("3", &ripemd160h{p})
+	p.register("4", &identity{})
+
+	// Byzantium fork
+	p.register("5", &modExp{p})
+	p.register("6", &bn256Add{p})
+	p.register("7", &bn256Mul{p})
+	p.register("8", &bn256Pairing{p})
+}
+
+func (p *Precompiled) register(addrStr string, b contract) {
+	if len(p.contracts) == 0 {
+		p.contracts = map[types.Address]contract{}
+	}
+	p.contracts[types.StringToAddress(addrStr)] = b
+}
+
+var (
+	five  = types.StringToAddress("5")
+	six   = types.StringToAddress("6")
+	seven = types.StringToAddress("7")
+	eight = types.StringToAddress("8")
+)
+
+// CanRun implements the runtime interface
+func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
+	if _, ok := p.contracts[c.CodeAddress]; !ok {
+		return false
 	}
 
-	var md mapstructure.Metadata
-	config := &mapstructure.DecoderConfig{
-		Metadata: &md,
-		Result:   &p,
+	// byzantium precompiles
+	switch c.CodeAddress {
+	case five:
+		fallthrough
+	case six:
+		fallthrough
+	case seven:
+		fallthrough
+	case eight:
+		return config.Byzantium
 	}
-	decoder, err := mapstructure.NewDecoder(config)
+
+	return true
+}
+
+// Run runs an execution
+func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
+	contract := p.contracts[c.CodeAddress]
+	gasCost := contract.gas(c.Input)
+	if c.Gas < gasCost {
+		return nil, 0, runtime.ErrGasOverflow
+	}
+
+	c.Gas = c.Gas - gasCost
+	ret, err := contract.run(c.Input)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	if err := decoder.Decode(b.Pricing); err != nil {
-		return nil, err
-	}
-
-	if len(md.Unused) != 0 {
-		return nil, fmt.Errorf("Unused keys in pricing '%s': %v", b.Name, md.Unused)
-	}
-	return &Precompiled{
-		Backend:  p,
-		ActiveAt: b.ActivateAt,
-	}, nil
+	return ret, c.Gas, err
 }
 
-// Exists returns true if the precompiled contract exists
-func Exists(name string) bool {
-	_, ok := builtinPrecompiled[name]
-	return ok
+var zeroPadding = make([]byte, 64)
+
+func (p *Precompiled) leftPad(buf []byte, n int) []byte {
+	// TODO, avoid buffer allocation
+	l := len(buf)
+	if l > n {
+		return buf
+	}
+
+	tmp := make([]byte, n)
+	copy(tmp[n-l:], buf)
+	return tmp
 }
 
-// builtinPrecompiled are the available precompiled contracts
-var builtinPrecompiled = map[string]Backend{
-	"ecrecover":         &ecrecover{},
-	"sha256":            &sha256hash{},
-	"ripemd160":         &ripemd160hash{},
-	"identity":          &dataCopy{},
-	"modexp":            &modExp{},
-	"alt_bn128_add":     &bn256Add{},
-	"alt_bn128_mul":     &bn256ScalarMul{},
-	"alt_bn128_pairing": &bn256Pairing{},
+func (p *Precompiled) get(input []byte, size int) ([]byte, []byte) {
+	p.buf = extendByteSlice(p.buf, size)
+	n := size
+	if len(input) < n {
+		n = len(input)
+	}
+
+	// copy the part from the input
+	copy(p.buf[0:], input[:n])
+
+	// copy empty values
+	if n < size {
+		rest := size - n
+		if rest < 64 {
+			copy(p.buf[n:], zeroPadding[0:size-n])
+		} else {
+			copy(p.buf[n:], make([]byte, rest))
+		}
+	}
+	return p.buf, input[n:]
+}
+
+func (p *Precompiled) getUint64(input []byte) (uint64, []byte) {
+	p.buf, input = p.get(input, 32)
+	num := binary.BigEndian.Uint64(p.buf[24:32])
+	return num, input
+}
+
+func extendByteSlice(b []byte, needLen int) []byte {
+	b = b[:cap(b)]
+	if n := needLen - cap(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+	return b[:needLen]
 }

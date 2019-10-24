@@ -78,30 +78,6 @@ func TestGenesisAlloc(t *testing.T) {
 				},
 			},
 		},
-		{
-			input: `{
-					"0x0000000000000000000000000000000000000000": {
-						"builtin": {
-							"name": "precompiled1",
-							"activate_at": 10,
-							"pricing": {
-								"base": 11
-							}
-						}
-					}
-				}`,
-			output: GenesisAlloc{
-				addr("0"): GenesisAccount{
-					Builtin: &Builtin{
-						Name:       "precompiled1",
-						ActivateAt: 10,
-						Pricing: map[string]uint64{
-							"base": 11,
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, c := range cases {

@@ -40,7 +40,7 @@ func init() {
 	registerRange(PUSH1, PUSH32, opPush, 3)
 	registerRange(DUP1, DUP16, opDup, 3)
 	registerRange(SWAP1, SWAP16, opSwap, 3)
-	registerRange(LOG0, LOG4, opLog, LogGas)
+	registerRange(LOG0, LOG4, opLog, 375)
 
 	register(ADDMOD, handler{opAddMod, 3, 8})
 	register(MULMOD, handler{opMulMod, 3, 8})
@@ -89,7 +89,7 @@ func init() {
 
 	register(POP, handler{opPop, 1, 2})
 
-	register(EXTCODEHASH, handler{opExtCodeHash, 1, 0})
+	register(EXTCODEHASH, handler{opExtCodeHash, 1, 400})
 
 	// context operations
 	register(ADDRESS, handler{opAddress, 0, 2})

@@ -1,45 +1,46 @@
 package evm
 
-// bitmap
+const bitmapSize = uint(8)
 
-type bitvec []byte
-
-func (bits *bitvec) set(pos uint64) {
-	(*bits)[pos/8] |= 0x80 >> (pos % 8)
-}
-func (bits *bitvec) set8(pos uint64) {
-	(*bits)[pos/8] |= 0xFF >> (pos % 8)
-	(*bits)[pos/8+1] |= ^(0xFF >> (pos % 8))
+type bitmap struct {
+	buf []byte
 }
 
-// codeSegment checks if the position is in a code segment.
-func (bits *bitvec) codeSegment(pos uint64) bool {
-	return ((*bits)[pos/8] & (0x80 >> (pos % 8))) == 0
+func (b *bitmap) isSet(i uint) bool {
+	return b.buf[i/bitmapSize]&(1<<(i%bitmapSize)) != 0
 }
 
-// codeBitmap collects data locations in code.
-func codeBitmap(code []byte) bitvec {
-	// The bitmap is 4 bytes longer than necessary, in case the code
-	// ends with a PUSH32, the algorithm will push big.NewInt(0)es onto the
-	// bitvector outside the bounds of the actual code.
-	bits := make(bitvec, len(code)/8+1+4)
-	for pc := uint64(0); pc < uint64(len(code)); {
-		op := OpCode(code[pc])
+func (b *bitmap) set(i uint) {
+	b.buf[i/bitmapSize] |= 1 << (uint(i) % bitmapSize)
+}
 
-		if op >= PUSH1 && op <= PUSH32 {
-			numbits := op - PUSH1 + 1
-			pc++
-			for ; numbits >= 8; numbits -= 8 {
-				bits.set8(pc) // 8
-				pc += 8
-			}
-			for ; numbits > 0; numbits-- {
-				bits.set(pc)
-				pc++
-			}
+func (b *bitmap) reset() {
+	for i := range b.buf {
+		b.buf[i] = 0
+	}
+	b.buf = b.buf[:0]
+}
+
+func (b *bitmap) setCode(code []byte) {
+	codeSize := uint(len(code))
+	b.buf = extendByteSlice(b.buf, int(codeSize/bitmapSize+1))
+
+	for i := uint(0); i < codeSize; {
+		c := code[i]
+
+		if isPushOp(c) {
+			// push op
+			i += uint(c - 0x60 + 2)
 		} else {
-			pc++
+			if c == 0x5B {
+				// jumpdest
+				b.set(i)
+			}
+			i++
 		}
 	}
-	return bits
+}
+
+func isPushOp(i byte) bool {
+	return i>>5 == 3
 }

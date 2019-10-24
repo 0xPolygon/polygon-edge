@@ -19,23 +19,6 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
-// TODO, Add a SpuriousDragon EIP to join both EIP155 and EIP158
-
-func (p *Params) GasTable(number uint64) GasTable {
-	switch {
-	case p.Forks.IsConstantinople(number):
-		return GasTableConstantinople
-	case p.Forks.IsEIP155(number):
-		return GasTableEIP158
-	case p.Forks.IsEIP158(number):
-		return GasTableEIP158
-	case p.Forks.IsEIP150(number):
-		return GasTableEIP150
-	default:
-		return GasTableHomestead
-	}
-}
-
 // Forks specifies when each fork is activated
 type Forks struct {
 	Homestead      *Fork `json:"homestead,omitempty"`
@@ -45,19 +28,6 @@ type Forks struct {
 	EIP150         *Fork `json:"EIP150,omitempty"`
 	EIP158         *Fork `json:"EIP158,omitempty"`
 	EIP155         *Fork `json:"EIP155,omitempty"`
-}
-
-func (f *Forks) GasTable(n uint64) GasTable {
-	switch {
-	case f.IsConstantinople(n):
-		return GasTableConstantinople
-	case f.IsEIP158(n):
-		return GasTableEIP158
-	case f.IsEIP150(n):
-		return GasTableEIP150
-	default:
-		return GasTableHomestead
-	}
 }
 
 func (f *Forks) active(ff *Fork, block uint64) bool {

@@ -20,6 +20,10 @@ type Transaction struct {
 	From Address
 }
 
+func (t *Transaction) IsContractCreation() bool {
+	return t.To == nil
+}
+
 func (t *Transaction) GetGasPrice() []byte {
 	return t.GasPrice
 }

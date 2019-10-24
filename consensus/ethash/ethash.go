@@ -17,6 +17,15 @@ import (
 	"github.com/umbracle/minimal/types"
 )
 
+const (
+	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
+	GasLimitBoundDivisor uint64 = 1024
+	// MinGasLimit is the minimum the gas limit may ever be.
+	MinGasLimit uint64 = 5000
+	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
+	MaximumExtraDataSize uint64 = 32
+)
+
 var (
 	two256 = new(big.Int).Exp(big.NewInt(2), big.NewInt(256), big.NewInt(0))
 )
@@ -69,7 +78,7 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("incorrect timestamp")
 	}
 
-	if uint64(len(header.ExtraData)) > chain.MaximumExtraDataSize {
+	if uint64(len(header.ExtraData)) > MaximumExtraDataSize {
 		return fmt.Errorf("extradata is too long")
 	}
 
@@ -100,8 +109,8 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		gas *= -1
 	}
 
-	limit := parent.GasLimit / chain.GasLimitBoundDivisor
-	if uint64(gas) >= limit || header.GasLimit < chain.MinGasLimit {
+	limit := parent.GasLimit / GasLimitBoundDivisor
+	if uint64(gas) >= limit || header.GasLimit < MinGasLimit {
 		return fmt.Errorf("incorrect gas limit")
 	}
 

@@ -2,14 +2,18 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"hash"
 	"math/big"
+	"strconv"
 
 	"golang.org/x/crypto/sha3"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -36,14 +40,14 @@ type GasPool interface {
 
 // Txn is a reference of the state
 type Txn struct {
-	snapshot   Snapshot
-	state      State
-	snapshots  []*iradix.Tree
-	txn        *iradix.Txn
-	gas        uint64
-	initialGas uint64
-	codeCache  *lru.Cache
-	hash       hashImpl
+	snapshot  Snapshot
+	state     State
+	snapshots []*iradix.Tree
+	txn       *iradix.Txn
+	// gas        uint64
+	// initialGas uint64
+	codeCache *lru.Cache
+	hash      hashImpl
 }
 
 func NewTxn(state State, snapshot Snapshot) *Txn {
@@ -71,11 +75,6 @@ func (txn *Txn) hashit(dst, src []byte) []byte {
 	txn.hash.Write(src)
 	txn.hash.Read(dst)
 	return dst
-}
-
-// gasUsed returns the amount of gas used up by the state transition.
-func (txn *Txn) gasUsed() uint64 {
-	return txn.initialGas - txn.gas
 }
 
 // Snapshot takes a snapshot at this point in time
@@ -127,24 +126,10 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	}
 
 	var err error
-
-	/*
-	var account2 Account
-	if err = rlp.DecodeBytes(data, &account); err != nil {
-		return nil, false
-	}
-	*/
-
 	var account Account
 	if err = account.UnmarshalRlp(data); err != nil {
 		return nil, false
 	}
-
-	/*
-	if reflect.DeepEqual(account, account2) {
-		panic("XXX")
-	}
-	*/
 
 	// Load trie from memory if there is some state
 	if account.Root == emptyStateHash {
@@ -232,6 +217,25 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	return object.Account.Balance
 }
 
+func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
+	log := &types.Log{
+		Address: addr,
+		Topics:  topics,
+	}
+	log.Data = append(log.Data, data...)
+
+	var logs []*types.Log
+	val, exists := txn.txn.Get(logIndex)
+	if !exists {
+		logs = []*types.Log{}
+	} else {
+		logs = val.([]*types.Log)
+	}
+
+	logs = append(logs, log)
+	txn.txn.Insert(logIndex, logs)
+}
+
 // AddLog adds a new log
 func (txn *Txn) AddLog(log *types.Log) {
 	var logs []*types.Log
@@ -256,6 +260,57 @@ func isZeros(b []byte) bool {
 		}
 	}
 	return true
+}
+
+var zeroHash types.Hash
+
+func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, discount bool) (status runtime.StorageStatus) {
+	oldValue := txn.GetState(addr, key)
+	if oldValue == value {
+		return runtime.StorageUnchanged
+	}
+
+	current := oldValue
+	original := txn.GetCommittedState(addr, key)
+
+	txn.SetState(addr, key, value)
+
+	if !discount {
+		status = runtime.StorageModified
+		if oldValue == zeroHash {
+			return runtime.StorageAdded
+		} else if value == zeroHash {
+			txn.AddRefund(15000)
+			return runtime.StorageDeleted
+		}
+		return runtime.StorageModified
+	}
+
+	if original == current {
+		if original == (types.Hash{}) { // create slot (2.1.1)
+			return runtime.StorageAdded
+		}
+		if value == (types.Hash{}) { // delete slot (2.1.2b)
+			txn.AddRefund(15000)
+			return runtime.StorageDeleted
+		}
+		return runtime.StorageModified
+	}
+	if original != (types.Hash{}) {
+		if current == (types.Hash{}) { // recreate slot (2.2.1.1)
+			txn.SubRefund(15000)
+		} else if value == (types.Hash{}) { // delete slot (2.2.1.2)
+			txn.AddRefund(15000)
+		}
+	}
+	if original == value {
+		if original == (types.Hash{}) { // reset to original inexistent slot (2.2.2.1)
+			txn.AddRefund(19800)
+		} else { // reset to original existing slot (2.2.2.2)
+			txn.AddRefund(4800)
+		}
+	}
+	return runtime.StorageModifiedAgain
 }
 
 // SetState change the state of an address
@@ -294,6 +349,13 @@ func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 }
 
 // Nonce
+
+// IncrNonce increases the nonce of the address
+func (txn *Txn) IncrNonce(addr types.Address) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.Nonce++
+	})
+}
 
 // SetNonce reduces the balance
 func (txn *Txn) SetNonce(addr types.Address, nonce uint64) {
@@ -411,6 +473,12 @@ func (txn *Txn) GetCommittedState(addr types.Address, hash types.Hash) types.Has
 	return obj.GetCommitedState(types.BytesToHash(txn.hashit(nil, hash.Bytes())))
 }
 
+func (txn *Txn) TouchAccount(addr types.Address) {
+	txn.upsertAccount(addr, true, func(obj *StateObject) {
+
+	})
+}
+
 // TODO, check panics with this ones
 
 func (txn *Txn) Exist(addr types.Address) bool {
@@ -487,40 +555,41 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
+func (txn *Txn) show(i *iradix.Txn) {
+	fmt.Println("##################################################################################")
+
+	i.Root().Walk(func(k []byte, v interface{}) bool {
+		a, ok := v.(*StateObject)
+		if !ok {
+			// We also have logs, avoid those
+			return false
+		}
+		fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
+		fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
+		fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
+		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
+		fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
+		fmt.Printf("# State root: %s\n", a.Account.Root.String())
+		if a.Txn != nil {
+			a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+				if v == nil {
+					fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
+				} else {
+					fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
+				}
+				return false
+			})
+		}
+		return false
+	})
+	fmt.Println("##################################################################################")
+}
+
 func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 	txn.CleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
-
-	/*
-		fmt.Println("##################################################################################")
-
-		x.Root().Walk(func(k []byte, v interface{}) bool {
-			a, ok := v.(*StateObject)
-			if !ok {
-				// We also have logs, avoid those
-				return false
-			}
-			fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
-			fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
-			fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
-			fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
-			fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
-			fmt.Printf("# State root: %s\n", a.Account.Root.String())
-			if a.Txn != nil {
-				a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-					if v == nil {
-						fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
-					} else {
-						fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
-					}
-					return false
-				})
-			}
-			return false
-		})
-		fmt.Println("##################################################################################")
-	*/
+	// txn.show(x.Txn())
 
 	t, hash := txn.snapshot.Commit(x)
 	return t, hash

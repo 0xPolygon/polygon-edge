@@ -1,67 +1,66 @@
 package evm
 
 import (
-	"math/big"
-
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/types"
 )
 
-// GetHashByNumber returns the hash function of a block number
-type GetHashByNumber = func(i uint64) types.Hash
-
-type CanTransferFunc func(runtime.State, types.Address, *big.Int) bool
-
-type TransferFunc func(state runtime.State, from types.Address, to types.Address, amount *big.Int) error
+var _ runtime.Runtime = &EVM{}
 
 // EVM is the ethereum virtual machine
 type EVM struct {
-	config   chain.ForksInTime
-	gasTable chain.GasTable
-
-	state runtime.State
-	env   *runtime.Env
-
-	getHash     GetHashByNumber
-	CanTransfer CanTransferFunc
-	Transfer    TransferFunc
-
-	executor runtime.Executor
-}
-
-func (e *EVM) Run(c *runtime.Contract) ([]byte, uint64, error) {
-	contract := &state{
-		ip:          0,
-		depth:       c.Depth(),
-		code:        c.Code,
-		evm:         e,
-		caller:      c.Caller,
-		origin:      c.Origin,
-		codeAddress: c.CodeAddress,
-		address:     c.Address,
-		value:       c.Value,
-		stack:       []*big.Int{},
-		sp:          0,
-		gas:         c.Gas,
-		input:       c.Input,
-		bitvec:      codeBitmap(c.Code),
-		static:      c.Static,
-		memory:      []byte{},
-	}
-
-	ret, err := contract.Run()
-	return ret, contract.gas, err
+	vs []state
 }
 
 // NewEVM creates a new EVM
-func NewEVM(executor runtime.Executor, state runtime.State, env *runtime.Env, config chain.ForksInTime, gasTable chain.GasTable, getHash GetHashByNumber) *EVM {
-	return &EVM{
-		config:   config,
-		gasTable: gasTable,
-		executor: executor,
-		state:    state,
-		env:      env,
-		getHash:  getHash,
+func NewEVM() *EVM {
+	return &EVM{}
+}
+
+/*
+// TODO
+func (c *EVM) getValue() *state {
+	if cap(c.vs) > len(c.vs) {
+		c.vs = c.vs[:len(c.vs)+1]
+	} else {
+		c.vs = append(c.vs, state{})
 	}
+	return &c.vs[len(c.vs)-1]
+}
+*/
+
+// CanRun implements the runtime interface
+func (e *EVM) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
+	return true
+}
+
+// Run implements the runtime interface
+func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
+
+	contract := acquireState()
+	contract.resetReturnData()
+
+	contract.msg = c
+	contract.code = c.Code
+	contract.evm = e
+	contract.gas = c.Gas
+	contract.host = host
+	contract.config = config
+
+	contract.bitmap.setCode(c.Code)
+
+	ret, err := contract.Run()
+
+	rett := []byte{}
+	rett = append(rett[:0], ret...)
+
+	gas := contract.gas
+
+	releaseState(contract)
+
+	if err != nil && err != runtime.ErrExecutionReverted {
+		gas = 0
+	}
+
+	return rett, gas, err
 }

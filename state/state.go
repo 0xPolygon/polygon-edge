@@ -33,7 +33,7 @@ type Account struct {
 	Balance  *big.Int
 	Root     types.Hash
 	CodeHash []byte
-	Trie     accountTrie `rlp:"-"`
+	Trie     accountTrie
 }
 
 func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -124,14 +124,6 @@ func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
 	if !ok {
 		return types.Hash{}
 	}
-
-	/*
-		i := rlp.NewIterator(val)
-		content, err := i.Bytes()
-		if err != nil {
-			return types.Hash{}
-		}
-	*/
 
 	p := stateStateParserPool.Get()
 	defer stateStateParserPool.Put(p)

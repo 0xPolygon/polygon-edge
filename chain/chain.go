@@ -13,15 +13,6 @@ import (
 	"github.com/umbracle/minimal/types"
 )
 
-const (
-	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
-	GasLimitBoundDivisor uint64 = 1024
-	// MinGasLimit is the minimum the gas limit may ever be.
-	MinGasLimit uint64 = 5000
-	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
-	MaximumExtraDataSize uint64 = 32
-)
-
 var (
 	// GenesisGasLimit is the default gas limit of the Genesis block.
 	GenesisGasLimit uint64 = 4712388
@@ -242,15 +233,7 @@ type GenesisAccount struct {
 	Storage    map[types.Hash]types.Hash
 	Balance    *big.Int
 	Nonce      uint64
-	Builtin    *Builtin
 	PrivateKey []byte // for tests
-}
-
-// Builtin is a precompiled contract
-type Builtin struct {
-	Name       string            `json:"name"`
-	ActivateAt uint64            `json:"activate_at"`
-	Pricing    map[string]uint64 `json:"pricing"`
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -264,7 +247,6 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 		Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
 		Balance    *string                   `json:"balance"`
 		Nonce      *string                   `json:"nonce,omitempty"`
-		Builtin    *Builtin                  `json:"builtin,omitempty"`
 		PrivateKey *string                   `json:"secretKey,omitempty"`
 	}
 
@@ -298,10 +280,6 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	g.Nonce, subErr = types.ParseUint64orHex(dec.Nonce)
 	if subErr != nil {
 		parseError("nonce", subErr)
-	}
-
-	if dec.Builtin != nil {
-		g.Builtin = dec.Builtin
 	}
 
 	if dec.PrivateKey != nil {

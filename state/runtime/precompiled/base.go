@@ -2,97 +2,87 @@ package precompiled
 
 import (
 	"crypto/sha256"
-	"math/big"
-
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper"
 
 	"golang.org/x/crypto/ripemd160"
+
+	"github.com/umbracle/minimal/crypto"
+	"github.com/umbracle/minimal/helper/keccak"
 )
 
 type ecrecover struct {
-	Base uint64
+	p *Precompiled
 }
 
-func (c *ecrecover) Gas(input []byte) uint64 {
-	return c.Base
+func (e *ecrecover) gas(input []byte) uint64 {
+	return 3000
 }
 
-func (c *ecrecover) Call(input []byte) ([]byte, error) {
-	const ecRecoverInputLength = 128
+func (e *ecrecover) run(input []byte) ([]byte, error) {
+	input, _ = e.p.get(input, 128)
 
-	input = helper.RightPadBytes(input, ecRecoverInputLength)
-	// "input" is (hash, v, r, s), each 32 bytes
-	// but for ecrecover we want (r, s, v)
-
-	r := new(big.Int).SetBytes(input[64:96])
-	s := new(big.Int).SetBytes(input[96:128])
+	// recover the value v. Expect all zeros except the last byte
+	for i := 32; i < 63; i++ {
+		if input[i] != 0 {
+			return nil, nil
+		}
+	}
 	v := input[63] - 27
-
-	// tighter sig s values input homestead only apply to tx sigs
-	if !allZero(input[32:63]) || !crypto.ValidateSignatureValues(v, r.Bytes(), s.Bytes(), false) {
+	if !crypto.ValidateSignatureValues(v, input[64:96], input[96:128]) {
 		return nil, nil
 	}
-	// v needs to be at the end for libsecp256k1
+
 	pubKey, err := crypto.Ecrecover(input[:32], append(input[64:128], v))
-	// make sure the public key is a valid one
 	if err != nil {
 		return nil, nil
 	}
 
-	// the first byte of pubkey is bitcoin heritage
-	return helper.LeftPadBytes(crypto.Keccak256(pubKey[1:])[12:], 32), nil
+	h := keccak.DefaultKeccakPool.Get()
+	h.Write(pubKey[1:])
+	dst := h.Sum(nil)
+	dst = e.p.leftPad(dst[12:], 32)
+	keccak.DefaultKeccakPool.Put(h)
+
+	return dst, nil
 }
 
-func allZero(b []byte) bool {
-	for _, byte := range b {
-		if byte != 0 {
-			return false
-		}
-	}
-	return true
+type identity struct {
 }
 
-type dataCopy struct {
-	Base uint64
-	Word uint64
+func (i *identity) gas(input []byte) uint64 {
+	return baseGasCalc(input, 15, 3)
 }
 
-func (c *dataCopy) Gas(input []byte) uint64 {
-	return uint64(len(input)+31)/32*c.Word + c.Base
-}
-
-func (c *dataCopy) Call(in []byte) ([]byte, error) {
+func (i *identity) run(in []byte) ([]byte, error) {
 	return in, nil
 }
 
-// SHA256 implemented as a native contract.
-type sha256hash struct {
-	Base uint64
-	Word uint64
+type sha256h struct {
 }
 
-func (s *sha256hash) Gas(input []byte) uint64 {
-	return uint64(len(input)+31)/32*s.Word + s.Base
+func (s *sha256h) gas(input []byte) uint64 {
+	return baseGasCalc(input, 60, 12)
 }
 
-func (c *sha256hash) Call(input []byte) ([]byte, error) {
+func (s *sha256h) run(input []byte) ([]byte, error) {
 	h := sha256.Sum256(input)
 	return h[:], nil
 }
 
-// RIPEMD160 implemented as a native contract.
-type ripemd160hash struct {
-	Base uint64
-	Word uint64
+type ripemd160h struct {
+	p *Precompiled
 }
 
-func (c *ripemd160hash) Gas(input []byte) uint64 {
-	return uint64(len(input)+31)/32*c.Word + c.Base
+func (r *ripemd160h) gas(input []byte) uint64 {
+	return baseGasCalc(input, 600, 120)
 }
 
-func (c *ripemd160hash) Call(input []byte) ([]byte, error) {
+func (r *ripemd160h) run(input []byte) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
-	return helper.LeftPadBytes(ripemd.Sum(nil), 32), nil
+	res := ripemd.Sum(nil)
+	return r.p.leftPad(res, 32), nil
+}
+
+func baseGasCalc(input []byte, base, word uint64) uint64 {
+	return base + uint64(len(input)+31)/32*word
 }

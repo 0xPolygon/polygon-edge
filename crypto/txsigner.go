@@ -6,9 +6,9 @@ import (
 
 	"crypto/ecdsa"
 
+	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -151,7 +151,7 @@ func (e *EIP155Signer) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*t
 }
 
 func encodeSignature(R, S []byte, V byte) ([]byte, error) {
-	if !ValidateSignatureValues(V, R, S, false) {
+	if !ValidateSignatureValues(V, R, S) {
 		return nil, fmt.Errorf("invalid signature")
 	}
 
