@@ -2,12 +2,11 @@ package types
 
 import (
 	"database/sql/driver"
-	"hash"
 
 	goHex "encoding/hex"
 
 	"github.com/umbracle/minimal/helper/hex"
-	"golang.org/x/crypto/sha3"
+	"github.com/umbracle/minimal/helper/keccak"
 )
 
 type ReceiptStatus uint64
@@ -72,7 +71,7 @@ func (b *Bloom) Scan(src interface{}) error {
 
 // CreateBloom creates a new bloom filter from a set of receipts
 func CreateBloom(receipts []*Receipt) (b Bloom) {
-	h := sha3.NewLegacyKeccak256()
+	h := keccak.DefaultKeccakPool.Get()
 	for _, receipt := range receipts {
 		for _, log := range receipt.Logs {
 			b.setEncode(h, log.Address[:])
@@ -81,16 +80,17 @@ func CreateBloom(receipts []*Receipt) (b Bloom) {
 			}
 		}
 	}
+	keccak.DefaultKeccakPool.Put(h)
 	return
 }
 
-func (b *Bloom) setEncode(hasher hash.Hash, h []byte) {
+func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 	hasher.Reset()
 	hasher.Write(h[:])
-	h = hasher.Sum(nil)
+	buf := hasher.Read()
 
 	for i := 0; i < 6; i += 2 {
-		bit := (uint(h[i+1]) + (uint(h[i]) << 8)) & 2047
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
 
 		i := 256 - 1 - bit/8
 		j := bit % 8
