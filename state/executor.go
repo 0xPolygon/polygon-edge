@@ -26,6 +26,7 @@ type GetHashByNumber = func(i uint64) types.Hash
 
 type Executor struct {
 	runtimes []runtime.Runtime
+	callback func(t *Transition)
 }
 
 func NewExecutor() *Executor {
@@ -36,6 +37,10 @@ func NewExecutor() *Executor {
 
 func (e *Executor) SetRuntime(r runtime.Runtime) {
 	e.runtimes = append(e.runtimes, r)
+}
+
+func (e *Executor) SetCallback(callback func(t *Transition)) {
+	e.callback = callback
 }
 
 func (e *Executor) NewTransition(txn *Txn, getHash GetHashByNumber, ctx runtime.TxContext, config chain.ForksInTime) *Transition {
@@ -56,6 +61,15 @@ type Transition struct {
 	getHash GetHashByNumber
 	ctx     runtime.TxContext
 	gasPool uint64
+	txnHash types.Hash
+}
+
+func (t *Transition) SetTxnHash(txn types.Hash) {
+	t.txnHash = txn
+}
+
+func (t *Transition) GetTxnHash() types.Hash {
+	return t.txnHash
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
@@ -86,8 +100,19 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 		t.state.RevertToSnapshot(s)
 	}
 
+	if err == nil {
+		// apply other possible changes to the state after the transaction
+		if t.r.callback != nil {
+			t.r.callback(t)
+		}
+	}
+
 	// e.addGasPool(gas)
 	return gas, failed, err
+}
+
+func (t *Transition) Context() runtime.TxContext {
+	return t.ctx
 }
 
 func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {

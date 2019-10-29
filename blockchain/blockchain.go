@@ -61,6 +61,10 @@ type Blockchain struct {
 	daoBlock uint64
 }
 
+var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
+
+var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
+
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
 	b := &Blockchain{
@@ -78,6 +82,18 @@ func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Conse
 	// setup the executor
 	b.executor.SetRuntime(precompiled.NewPrecompiled())
 	b.executor.SetRuntime(evm.NewEVM())
+
+	// TODO, configure this outside the blockchain object
+	b.executor.SetCallback(func(t *state.Transition) {
+		if params.ChainID == 1 && t.Context().Number == 2675119 {
+			if t.GetTxnHash() == ripemdFailedTxn {
+				// create the account
+				t.Txn().TouchAccount(ripemd)
+				// now remove it
+				t.Txn().Suicide(ripemd)
+			}
+		}
+	})
 
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
@@ -537,7 +553,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 			receiptSha := derivesha.CalcReceiptRoot(receipts)
 			if receiptSha != header.ReceiptsRoot {
-				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptsRoot, receiptSha)
+				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptsRoot.String(), receiptSha.String())
 			}
 			rbloom := types.CreateBloom(receipts)
 			if rbloom != header.LogsBloom {
@@ -742,6 +758,7 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 	// apply the transactions
 	for indx, tx := range block.Transactions {
 		transition.SetTxn(txn)
+		transition.SetTxnHash(tx.Hash)
 
 		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
 		from, err := signer.Sender(tx)

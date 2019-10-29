@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/state/runtime/evm"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/types"
 )
 
 var stateTests = "GeneralStateTests"
@@ -24,6 +25,8 @@ type stateCase struct {
 	Post        map[string]postState `json:"post"`
 	Transaction *stTransaction       `json:"transaction"`
 }
+
+var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
 func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
 	config, ok := Forks[fork]
@@ -45,12 +48,21 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 
 	txn := state.NewTxn(s, snap)
 
-	xxx := state.NewExecutor()
-	xxx.SetRuntime(precompiled.NewPrecompiled())
-	xxx.SetRuntime(evm.NewEVM())
+	exec := state.NewExecutor()
+	exec.SetRuntime(precompiled.NewPrecompiled())
+	exec.SetRuntime(evm.NewEVM())
 
-	executor := xxx.NewTransition(txn, vmTestBlockHash, env, forks)
-	_, _, err = executor.Apply(msg)
+	exec.SetCallback(func(t *state.Transition) {
+		if name == "failed_tx_xcf416c53" {
+			// create the account
+			t.Txn().TouchAccount(ripemd)
+			// now remove it
+			t.Txn().Suicide(ripemd)
+		}
+	})
+
+	transition := exec.NewTransition(txn, vmTestBlockHash, env, forks)
+	_, _, err = transition.Apply(msg)
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
@@ -74,14 +86,7 @@ func TestState(t *testing.T) {
 		"stQuadraticComplexityTest",
 	}
 
-	skip := []string{
-		"failed_tx_xcf416c53",
-	}
-
-	// failed_tx_xcf416c53 calls several precompiled contracts (adds the address to the transaction, i.e 'touch')
-	// and then reverts. However, in the case of ripemd (0x0...03), it has to keep the precompiled in the transaction.
-	// https://github.com/ethereum/yellowpaper/pull/288/files#diff-9f702e1491c55da9d76a68d651278764R2259.
-	// This means we have to include some extra functions on the immutable-radix transaction.
+	skip := []string{}
 
 	folders, err := listFolders(stateTests)
 	if err != nil {
