@@ -36,11 +36,8 @@ func (e *ecrecover) run(input []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	h := keccak.DefaultKeccakPool.Get()
-	h.Write(pubKey[1:])
-	dst := h.Sum(nil)
+	dst := keccak.Keccak256(nil, pubKey[1:])
 	dst = e.p.leftPad(dst[12:], 32)
-	keccak.DefaultKeccakPool.Put(h)
 
 	return dst, nil
 }

@@ -42,7 +42,6 @@ var signerPool fastrlp.ArenaPool
 
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
@@ -63,12 +62,10 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		v.Set(a.NewUint(0))
 	}
 
-	buf := hash.WriteRlp(nil, v)
-
+	hash := keccak.Keccak256Rlp(nil, v)
 	signerPool.Put(a)
-	keccak.DefaultKeccakPool.Put(hash)
 
-	return types.BytesToHash(buf)
+	return types.BytesToHash(hash)
 }
 
 func (f *FrontierSigner) Hash(tx *types.Transaction) types.Hash {

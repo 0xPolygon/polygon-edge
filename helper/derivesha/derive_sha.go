@@ -69,18 +69,14 @@ func CalcUncleRoot(uncles []*types.Header) types.Hash {
 		return EmptyUncleHash
 	}
 
-	hash := keccak.DefaultKeccakPool.Get()
 	a := uncleArenaPool.Get()
-
 	v := a.NewArray()
 	for _, i := range uncles {
 		v.Set(i.MarshalWith(a))
 	}
 
-	dst := hash.WriteRlp(nil, v)
-
-	keccak.DefaultKeccakPool.Put(hash)
+	root := keccak.Keccak256Rlp(nil, v)
 	uncleArenaPool.Put(a)
 
-	return types.BytesToHash(dst)
+	return types.BytesToHash(root)
 }

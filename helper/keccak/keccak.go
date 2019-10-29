@@ -37,6 +37,12 @@ func (k *Keccak) Reset() {
 	k.hash.Reset()
 }
 
+// Read hashes the content and returns the intermediate buffer.
+func (k *Keccak) Read() []byte {
+	k.hash.Read(k.tmp)
+	return k.tmp
+}
+
 // Sum implements the hash interface
 func (k *Keccak) Sum(dst []byte) []byte {
 	k.hash.Read(k.tmp)

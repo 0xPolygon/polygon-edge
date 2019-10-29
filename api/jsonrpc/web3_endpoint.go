@@ -21,11 +21,6 @@ func (w *Web3) Sha3(val string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	h := keccak.DefaultKeccakPool.Get()
-	h.Write(v)
-	dst := h.Sum(nil)
-	keccak.DefaultKeccakPool.Put(h)
-
+	dst := keccak.Keccak256(nil, v)
 	return hex.EncodeToHex(dst), nil
 }

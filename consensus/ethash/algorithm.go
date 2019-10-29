@@ -5,8 +5,8 @@ import (
 	"math/big"
 
 	"github.com/umbracle/fastrlp"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/types"
-	"golang.org/x/crypto/sha3"
 )
 
 // REVISION is the spec revision number of Ethash
@@ -48,12 +48,13 @@ func getSeedHashByEpoch(epoch int) []byte {
 	if epoch == 0 {
 		return seed
 	}
-	h := sha3.NewLegacyKeccak256()
+	h := keccak.DefaultKeccakPool.Get()
 	for i := 0; i < epoch; i++ {
 		h.Write(seed)
-		seed = h.Sum(nil)
+		seed = h.Sum(seed[:0])
 		h.Reset()
 	}
+	keccak.DefaultKeccakPool.Put(h)
 	return seed
 }
 

@@ -508,15 +508,12 @@ func opSha3(c *state) {
 		return
 	}
 
-	k := keccak.DefaultKeccakPool.Get()
-	k.Write(c.tmp)
-	c.tmp = k.Sum(c.tmp[:0])
-	keccak.DefaultKeccakPool.Put(k)
-
 	size := length.Uint64()
 	if !c.consumeGas(((size + 31) / 32) * sha3WordGas) {
 		return
 	}
+
+	c.tmp = keccak.Keccak256(c.tmp[:0], c.tmp)
 
 	v := c.push1()
 	v.SetBytes(c.tmp)
