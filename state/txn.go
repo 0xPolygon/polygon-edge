@@ -44,8 +44,6 @@ type Txn struct {
 	state     State
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
-	// gas        uint64
-	// initialGas uint64
 	codeCache *lru.Cache
 	hash      hashImpl
 }

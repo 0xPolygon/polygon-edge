@@ -34,6 +34,8 @@ type Executor struct {
 	daoBlock int64
 	state    State
 	GetHash  GetHashByNumberHelper
+
+	PostHook func(txn *Transition)
 }
 
 // NewExecutor creates a new executor
@@ -330,6 +332,10 @@ func (t *Transition) Txn() *Txn {
 	return t.state
 }
 
+func (t *Transition) GetTxnHash() types.Hash {
+	return t.block.Hash()
+}
+
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	s := t.state.Snapshot()
@@ -338,8 +344,16 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 		t.state.RevertToSnapshot(s)
 	}
 
+	if t.r.PostHook != nil {
+		t.r.PostHook(t)
+	}
+
 	// e.addGasPool(gas)
 	return gas, failed, err
+}
+
+func (t *Transition) Context() runtime.TxContext {
+	return t.ctx
 }
 
 func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {

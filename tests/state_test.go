@@ -26,6 +26,8 @@ type stateCase struct {
 	Transaction *stTransaction       `json:"transaction"`
 }
 
+var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
+
 func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
 	config, ok := Forks[fork]
 	if !ok {
@@ -46,6 +48,14 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 
+	xxx.PostHook = func(t *state.Transition) {
+		if name == "failed_tx_xcf416c53" {
+			// create the account
+			t.Txn().TouchAccount(ripemd)
+			// now remove it
+			t.Txn().Suicide(ripemd)
+		}
+	}
 	xxx.GetHash = func(*types.Header) func(i uint64) types.Hash {
 		return vmTestBlockHash
 	}
@@ -76,14 +86,7 @@ func TestState(t *testing.T) {
 		"stQuadraticComplexityTest",
 	}
 
-	skip := []string{
-		"failed_tx_xcf416c53",
-	}
-
-	// failed_tx_xcf416c53 calls several precompiled contracts (adds the address to the transaction, i.e 'touch')
-	// and then reverts. However, in the case of ripemd (0x0...03), it has to keep the precompiled in the transaction.
-	// https://github.com/ethereum/yellowpaper/pull/288/files#diff-9f702e1491c55da9d76a68d651278764R2259.
-	// This means we have to include some extra functions on the immutable-radix transaction.
+	skip := []string{}
 
 	folders, err := listFolders(stateTests)
 	if err != nil {

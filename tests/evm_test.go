@@ -112,13 +112,10 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 		Logs: logs,
 	}
 
-	h := keccak.DefaultKeccakPool.Get()
-
 	ar := &fastrlp.Arena{}
 	v := r.MarshalLogsWith(ar)
-	h.WriteRlp(res[:0], v)
 
-	keccak.DefaultKeccakPool.Put(h)
+	keccak.Keccak256Rlp(res[:0], v)
 	return
 }
 

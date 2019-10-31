@@ -46,6 +46,10 @@ type Blockchain struct {
 	difficultyCache *lru.Cache
 }
 
+var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
+
+var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
+
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{

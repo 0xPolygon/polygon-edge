@@ -14,6 +14,7 @@ import (
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/state"
+	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/network/discovery"
@@ -30,6 +31,10 @@ import (
 	"github.com/umbracle/minimal/network"
 	"github.com/umbracle/minimal/sealer"
 )
+
+var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
+
+var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
 
 // Minimal is the central manager of the blockchain client
 type Minimal struct {
@@ -184,6 +189,17 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	executor := state.NewExecutor(config.Chain.Params, st)
 	executor.SetRuntime(precompiled.NewPrecompiled())
 	executor.SetRuntime(evm.NewEVM())
+
+	executor.PostHook = func(t *state.Transition) {
+		if config.Chain.Params.ChainID == 1 && t.Context().Number == 2675119 {
+			if t.GetTxnHash() == ripemdFailedTxn {
+				// create the account
+				t.Txn().TouchAccount(ripemd)
+				// now remove it
+				t.Txn().Suicide(ripemd)
+			}
+		}
+	}
 
 	// blockchain object
 	m.Blockchain = blockchain.NewBlockchain(storage, m.consensus, executor)
