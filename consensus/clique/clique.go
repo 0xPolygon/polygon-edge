@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -22,11 +21,6 @@ func (c *Clique) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 	return nil
 }
 
-// Author checks the author of the header
-func (c *Clique) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
 // Seal seals the block
 func (c *Clique) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
 	return nil, nil
@@ -34,13 +28,5 @@ func (c *Clique) Seal(ctx context.Context, block *types.Block) (*types.Block, er
 
 // Close closes the connection
 func (c *Clique) Close() error {
-	return nil
-}
-
-func (c *Clique) Prepare(parent *types.Header, header *types.Header) error {
-	return nil
-}
-
-func (c *Clique) Finalize(txn *state.Txn, block *types.Block) error {
 	return nil
 }

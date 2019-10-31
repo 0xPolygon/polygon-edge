@@ -15,7 +15,7 @@ var peersStoreCmd = &cobra.Command{
 }
 
 func init() {
-	DebugCmd.AddCommand(peersStoreCmd)
+	debugCmd.AddCommand(peersStoreCmd)
 }
 
 func peersInfoRunE(cmd *cobra.Command, args []string) error {

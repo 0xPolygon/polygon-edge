@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 )
 
@@ -32,11 +31,6 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
-	/*
-		if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-			return fmt.Errorf("invalid sequence")
-		}
-	*/
 	if header.Difficulty < p.min {
 		return fmt.Errorf("Difficulty not correct. '%d' <! '%d'", header.Difficulty, p.min)
 	}
@@ -46,12 +40,9 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	return nil
 }
 
-func (p *Pow) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
 func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
 	header := block.Header
+	header.Difficulty = randomInt(p.min, p.max)
 
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -84,16 +75,6 @@ func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error
 		Transactions: block.Transactions,
 	}
 	return block, nil
-}
-
-func (p *Pow) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = randomInt(p.min, p.max)
-	return nil
-}
-
-func (p *Pow) Finalize(txn *state.Txn, block *types.Block) error {
-	txn.AddBalance(block.Header.Miner, big.NewInt(1))
-	return nil
 }
 
 func (p *Pow) Close() error {

@@ -196,9 +196,8 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		},
 	}
 
-	state := itrie.NewState(itrie.NewMemoryStorage())
-
-	b := NewBlockchain(s, state, &fakeConsensus{}, config)
+	st := itrie.NewState(itrie.NewMemoryStorage())
+	b := NewBlockchain(s, &fakeConsensus{}, state.NewExecutor(config, st))
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)

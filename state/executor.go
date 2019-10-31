@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/types"
 
 	"github.com/umbracle/minimal/chain"
@@ -24,52 +25,291 @@ var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
 // GetHashByNumber returns the hash function of a block number
 type GetHashByNumber = func(i uint64) types.Hash
 
+type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
+
+// Executor is the main entity
 type Executor struct {
+	config   *chain.Params
 	runtimes []runtime.Runtime
-	callback func(t *Transition)
+	daoBlock int64
+	state    State
+	GetHash  GetHashByNumberHelper
+
+	PostHook func(txn *Transition)
 }
 
-func NewExecutor() *Executor {
+// NewExecutor creates a new executor
+func NewExecutor(config *chain.Params, s State) *Executor {
 	return &Executor{
+		config:   config,
 		runtimes: []runtime.Runtime{},
+		daoBlock: -1,
+		state:    s,
 	}
 }
 
+func (e *Executor) WriteGenesis(alloc chain.GenesisAlloc) types.Hash {
+	snap := e.state.NewSnapshot()
+	txn := NewTxn(e.state, snap)
+
+	for addr, account := range alloc {
+		if account.Balance != nil {
+			txn.AddBalance(addr, account.Balance)
+		}
+		if account.Nonce != 0 {
+			txn.SetNonce(addr, account.Nonce)
+		}
+		if len(account.Code) != 0 {
+			txn.SetCode(addr, account.Code)
+		}
+		for key, value := range account.Storage {
+			txn.SetState(addr, key, value)
+		}
+	}
+
+	_, root := txn.Commit(false)
+	return types.BytesToHash(root)
+}
+
+// SetDAOHardFork sets the dao hard fork if applicable
+func (e *Executor) SetDAOHardFork(block int64) {
+	e.daoBlock = block
+}
+
+// SetRuntime adds a runtime to the runtime set
 func (e *Executor) SetRuntime(r runtime.Runtime) {
 	e.runtimes = append(e.runtimes, r)
 }
 
-func (e *Executor) SetCallback(callback func(t *Transition)) {
-	e.callback = callback
+// ProcessBlock already does all the handling of the whole process, TODO
+func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*Transition, types.Hash, error) {
+	txn, err := e.BeginTxn(parentRoot, block.Header)
+	if err != nil {
+		return nil, types.Hash{}, err
+	}
+
+	txn.block = block
+	for _, t := range block.Transactions {
+		if err := txn.Write(t); err != nil {
+			return nil, types.Hash{}, err
+		}
+	}
+
+	_, root := txn.Commit()
+	return txn, root, nil
 }
 
-func (e *Executor) NewTransition(txn *Txn, getHash GetHashByNumber, ctx runtime.TxContext, config chain.ForksInTime) *Transition {
-	return &Transition{
-		r:       e,
-		ctx:     ctx,
-		state:   txn,
-		getHash: getHash,
-		config:  &config,
-		gasPool: uint64(ctx.GasLimit),
+func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Transition, error) {
+	config := e.config.Forks.At(header.Number)
+
+	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
+	if err != nil {
+		return nil, err
 	}
+
+	newTxn := NewTxn(e.state, auxSnap2)
+
+	env2 := runtime.TxContext{
+		Coinbase:   header.Miner,
+		Timestamp:  int64(header.Timestamp),
+		Number:     int64(header.Number),
+		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		GasLimit:   int64(header.GasLimit),
+	}
+
+	// Mainnet (TODO: Do this in a preHookFn)
+	if e.config.ChainID == 1 && header.Number == uint64(e.daoBlock) {
+		// Apply the DAO hard fork. Move all the balances from 'drain accounts'
+		// to a single refund contract.
+		for _, i := range dao.DAODrainAccounts {
+			addr := types.StringToAddress(i)
+			newTxn.AddBalance(dao.DAORefundContract, newTxn.GetBalance(addr))
+			newTxn.SetBalance(addr, big.NewInt(0))
+		}
+	}
+
+	txn := &Transition{
+		r:        e,
+		ctx:      env2,
+		state:    newTxn,
+		getHash:  e.GetHash(header),
+		auxState: e.state,
+		config:   config,
+		gasPool:  uint64(env2.GasLimit),
+
+		receipts: []*types.Receipt{},
+		totalGas: 0,
+	}
+	return txn, nil
 }
 
 type Transition struct {
+	// dummy
+	auxState State
+
+	// the current block being processed
+	block *types.Block
+
 	r       *Executor
-	config  *chain.ForksInTime
+	config  chain.ForksInTime
 	state   *Txn
 	getHash GetHashByNumber
 	ctx     runtime.TxContext
 	gasPool uint64
-	txnHash types.Hash
+
+	// result
+	receipts []*types.Receipt
+	totalGas uint64
 }
 
-func (t *Transition) SetTxnHash(txn types.Hash) {
-	t.txnHash = txn
+func (t *Transition) TotalGas() uint64 {
+	return t.totalGas
 }
 
-func (t *Transition) GetTxnHash() types.Hash {
-	return t.txnHash
+func (t *Transition) Receipts() []*types.Receipt {
+	return t.receipts
+}
+
+var emptyFrom = types.Address{}
+
+// Write writes another transaction to the executor
+func (t *Transition) Write(txn *types.Transaction) error {
+	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
+
+	var err error
+	if txn.From == emptyFrom {
+		txn.From, err = signer.Sender(txn)
+		if err != nil {
+			return err
+		}
+	}
+
+	msg := txn.Copy()
+
+	gasUsed, failed, _ := t.Apply(msg)
+
+	t.totalGas += gasUsed
+
+	logs := t.state.Logs()
+
+	var root []byte
+
+	receipt := &types.Receipt{
+		CumulativeGasUsed: t.totalGas,
+		TxHash:            txn.Hash,
+		GasUsed:           gasUsed,
+	}
+
+	if t.config.Byzantium {
+		// The suicided accounts are set as deleted for the next iteration
+		t.state.CleanDeleteObjects(true)
+
+		if failed {
+			receipt.SetStatus(types.ReceiptFailed)
+		} else {
+			receipt.SetStatus(types.ReceiptSuccess)
+		}
+
+	} else {
+		ss, aux := t.state.Commit(t.config.EIP155)
+		t.state = NewTxn(t.auxState, ss)
+		root = aux
+		receipt.Root = types.BytesToHash(root)
+	}
+
+	// if the transaction created a contract, store the creation address in the receipt.
+	if msg.To == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce)
+	}
+
+	// Set the receipt logs and create a bloom for filtering
+	receipt.Logs = buildLogs(logs, txn.Hash, types.Hash{}, uint(len(t.receipts)))
+	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
+	t.receipts = append(t.receipts, receipt)
+
+	return nil
+}
+
+// Commit commits the final result
+func (t *Transition) Commit() (Snapshot, types.Hash) {
+	if t.r.config.ChainID == 1 {
+		t.applyMainnetBlockRewards()
+	}
+
+	s2, root := t.state.Commit(t.config.EIP155)
+	return s2, types.BytesToHash(root)
+}
+
+// Block rewards at different forks
+var (
+	// FrontierBlockReward is the block reward for the Frontier fork
+	FrontierBlockReward = big.NewInt(5e+18)
+
+	// ByzantiumBlockReward is the block reward for the Byzantium fork
+	ByzantiumBlockReward = big.NewInt(3e+18)
+
+	// ConstantinopleBlockReward is the block reward for the Constantinople fork
+	ConstantinopleBlockReward = big.NewInt(2e+18)
+)
+
+var (
+	big8  = big.NewInt(8)
+	big32 = big.NewInt(32)
+)
+
+func (t *Transition) applyMainnetBlockRewards() {
+	number := t.GetTxContext().Number
+	numberBigInt := big.NewInt(int64(number))
+
+	var blockReward *big.Int
+	switch {
+	case t.config.Constantinople:
+		blockReward = ConstantinopleBlockReward
+	case t.config.Byzantium:
+		blockReward = ByzantiumBlockReward
+	default:
+		blockReward = FrontierBlockReward
+	}
+
+	reward := new(big.Int).Set(blockReward)
+
+	r := new(big.Int)
+	for _, uncle := range t.block.Uncles {
+		r.Add(big.NewInt(int64(uncle.Number)), big8)
+		r.Sub(r, numberBigInt)
+		r.Mul(r, blockReward)
+		r.Div(r, big8)
+
+		t.state.AddBalance(uncle.Miner, r)
+
+		r.Div(blockReward, big32)
+		reward.Add(reward, r)
+	}
+
+	t.state.AddBalance(t.block.Header.Miner, reward)
+}
+
+func (t *Transition) postProcess() {
+	if t.r.config.ChainID == 1 {
+		t.applyMainnetBlockRewards()
+	}
+}
+
+func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
+	newLogs := []*types.Log{}
+
+	for indx, log := range logs {
+		newLog := log
+
+		newLog.TxHash = txHash
+		newLog.BlockHash = blockHash
+		newLog.TxIndex = txIndex
+		newLog.LogIndex = uint(indx)
+
+		newLogs = append(newLogs, newLog)
+	}
+
+	return newLogs
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
@@ -92,6 +332,10 @@ func (t *Transition) Txn() *Txn {
 	return t.state
 }
 
+func (t *Transition) GetTxnHash() types.Hash {
+	return t.block.Hash()
+}
+
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	s := t.state.Snapshot()
@@ -100,11 +344,8 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 		t.state.RevertToSnapshot(s)
 	}
 
-	if err == nil {
-		// apply other possible changes to the state after the transaction
-		if t.r.callback != nil {
-			t.r.callback(t)
-		}
+	if t.r.PostHook != nil {
+		t.r.PostHook(t)
 	}
 
 	// e.addGasPool(gas)
@@ -154,8 +395,9 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	upfrontGasCost := new(big.Int).SetBytes(msg.GasPrice)
 	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 	balance := t.state.GetBalance(msg.From)
+
 	if balance.Cmp(upfrontGasCost) < 0 {
-		return 0, ErrInsufficientBalanceForGas
+		return 0, fmt.Errorf("balance %s not enough to pay gas %s", balance, upfrontGasCost)
 	}
 	t.state.SubBalance(msg.From, upfrontGasCost)
 
@@ -242,8 +484,8 @@ func (t *Transition) Call2(caller types.Address, to types.Address, input []byte,
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) ([]byte, uint64, error) {
 	for _, r := range t.r.runtimes {
-		if r.CanRun(contract, host, t.config) {
-			return r.Run(contract, host, t.config)
+		if r.CanRun(contract, host, &t.config) {
+			return r.Run(contract, host, &t.config)
 		}
 	}
 	return nil, 0, fmt.Errorf("not found")

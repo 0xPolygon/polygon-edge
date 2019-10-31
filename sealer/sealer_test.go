@@ -14,6 +14,8 @@ import (
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/umbracle/minimal/state/runtime/evm"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
 
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
@@ -33,21 +35,8 @@ func (h *hookSealer) VerifyHeader(parent *types.Header, header *types.Header, un
 	return nil
 }
 
-func (h *hookSealer) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
 func (h *hookSealer) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
 	return h.hook(ctx, block)
-}
-
-func (h *hookSealer) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = 0
-	return nil
-}
-
-func (h *hookSealer) Finalize(txn *state.Txn, block *types.Block) error {
-	return nil
 }
 
 func (h *hookSealer) Close() error {
@@ -63,11 +52,19 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		Forks: &chain.Forks{
 			EIP155:    chain.NewFork(0),
 			Homestead: chain.NewFork(0),
+			Byzantium: chain.NewFork(0),
 		},
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b := blockchain.NewBlockchain(storage, st, engine, config)
+
+	executor := state.NewExecutor(config, st)
+	executor.SetRuntime(precompiled.NewPrecompiled())
+	executor.SetRuntime(evm.NewEVM())
+
+	b := blockchain.NewBlockchain(storage, engine, executor)
+
+	executor.GetHash = b.GetHashHelper
 
 	advanceChain := func() {
 		header, _ := b.Header()
@@ -77,11 +74,13 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		newHeader := &types.Header{
 			ParentHash: parent.Hash,
 			Number:     num + 1,
-			GasLimit:   calcGasLimit(parent, 8000000, 8000000),
+			GasLimit:   8000000,
 			ExtraData:  []byte{},
 			Difficulty: 10,
+			StateRoot:  types.EmptyRootHash,
 		}
 
+		newHeader.ComputeHash()
 		if err := b.WriteHeader(newHeader); err != nil {
 			t.Fatal(err)
 		}
@@ -108,122 +107,167 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 		Output: ioutil.Discard,
 	})
 
-	sealer := NewSealer(sealerConfig, logger, b, engine)
-	sealer.coinbase = addr2
+	sealerConfig.Coinbase = addr2
+	sealer := NewSealer(sealerConfig, logger, b, engine, executor)
 
 	return sealer, advanceChain
 }
 
-func TestSealerContextCancel(t *testing.T) {
-	t.Skip()
-
-	// If a new block arrives while sealing, the sealing has to stop.
-
-	done := make(chan struct{})
-
-	sealer, _ := testSealer(t, DefaultConfig(), func(ctx context.Context, b *types.Block) (*types.Block, error) {
-		go func() {
-			done <- <-ctx.Done()
-		}()
-		time.Sleep(2 * time.Second)
+func TestCancelSealingFunction(t *testing.T) {
+	seal := make(chan chan struct{})
+	s, _ := testSealer(t, DefaultConfig(), func(ctx context.Context, b *types.Block) (*types.Block, error) {
+		ok := make(chan struct{})
+		seal <- ok
+		<-ok
 		return b, nil
 	})
 
-	go sealer.commit()
-	time.Sleep(1 * time.Second)
-	go sealer.commit()
+	doSeal := func(ctx context.Context, cancel context.CancelFunc) {
+		ch := s.sealAsync(ctx)
 
-	<-done
-	<-sealer.SealedCh
+		ok := <-seal
+		cancel()
+		ok <- struct{}{}
 
-	select {
-	case <-sealer.SealedCh:
-		// Only one value expected
-		t.Fatal("bad")
-	default:
-	}
-}
+		<-ch
 
-func TestSealerNotifyNewBlock(t *testing.T) {
-	t.Skip()
-
-	// If we get a notification of a new block while sealing we stop the process
-
-	done := make(chan struct{})
-	sealer, advance := testSealer(t, DefaultConfig(), func(ctx context.Context, b *types.Block) (*types.Block, error) {
-		go func() {
-			done <- <-ctx.Done()
-		}()
-		time.Sleep(2 * time.Second)
-		return b, nil
-	})
-
-	go sealer.run(context.Background())
-
-	// Notify to start mining (otherwise it will wait until time interval)
-	advance()
-
-	time.Sleep(1 * time.Second)
-
-	// Notify again to cancel current sealing
-	advance()
-
-	<-done
-	<-sealer.SealedCh
-
-	select {
-	case <-sealer.SealedCh:
-		// Only one value expected
-		t.Fatal("bad")
-	default:
-	}
-}
-
-func TestSealerPeriodicSealing(t *testing.T) {
-	t.Skip()
-
-	// it has to seal blocks periodically
-
-	done := make(chan struct{})
-	interval := 1 * time.Second
-
-	sealerConfig := DefaultConfig()
-	sealerConfig.CommitInterval = interval
-
-	sealer, _ := testSealer(t, sealerConfig, func(ctx context.Context, b *types.Block) (*types.Block, error) {
-		go func() {
-			done <- <-ctx.Done()
-		}()
-		// time.Sleep(sealerTime)
-		return b, nil
-	})
-
-	sealer.SetEnabled(true)
-
-	for i := 0; i < 5; i++ {
-		last := time.Now()
-
-		select {
-		case b := <-sealer.SealedCh:
-			if b.Block.Number() != uint64(i+1) {
-				t.Fatal("bad")
-			}
-			if time.Since(last) > 2*time.Second {
-				t.Fatal("bad")
-			}
-		case <-time.After(2 * time.Second):
+		// it should not include any new block
+		if header, _ := s.blockchain.Header(); header.Number != 0 {
 			t.Fatal("bad")
 		}
 	}
 
-	sealer.SetEnabled(false)
-	if sealer.enabled == true {
+	// cancel the seal context
+	ctx, cancel := context.WithCancel(context.Background())
+	doSeal(ctx, cancel)
+
+	// cancel the parent context
+	ctx, cancel = context.WithCancel(context.Background())
+	subCtx, _ := context.WithCancel(ctx)
+	doSeal(subCtx, cancel)
+}
+
+func TestCancelSealingRoutine(t *testing.T) {
+	seal := make(chan chan struct{})
+	s, _ := testSealer(t, DefaultConfig(), func(ctx context.Context, b *types.Block) (*types.Block, error) {
+		ok := make(chan struct{})
+		seal <- ok
+		<-ok
+		return b, nil
+	})
+
+	// start the sealer
+	s.SetEnabled(true)
+	ch := <-seal
+
+	// stop the sealer
+	s.SetEnabled(false)
+	ch <- struct{}{} // finish block sealing
+
+	// wait for the run routine to finish
+	time.Sleep(500 * time.Millisecond)
+
+	// it should not include any new block
+	if header, _ := s.blockchain.Header(); header.Number != 0 {
 		t.Fatal("bad")
 	}
+}
 
+func TestCancelSealingOnAdvanceChain(t *testing.T) {
+	// tests that the async sealing routines get cancelled if there is a new head block
+
+	seal := make(chan chan struct{})
+	s, advance := testSealer(t, DefaultConfig(), func(ctx context.Context, b *types.Block) (*types.Block, error) {
+		ok := make(chan struct{})
+		seal <- ok
+		<-ok
+		return b, nil
+	})
+
+	s.SetEnabled(true)
+
+	// listen for sealing events
+	resCh := make(chan *SealedNotify)
+	go func() {
+		for {
+			resCh <- <-s.SealedCh
+		}
+	}()
+
+	// sealing block 1
+	wait1 := <-seal
+
+	// advance block 1 (the sealer has to discard current block 1 sealing)
+	advance()
+
+	// sealing block 2
+	wait2 := <-seal
+
+	// release both sealers
+	wait1 <- struct{}{}
+	wait2 <- struct{}{}
+
+	// expect only one event (block 2 sealed)
 	select {
-	case <-sealer.SealedCh:
-		t.Fatal("bad")
+	case evnt := <-resCh:
+		if evnt.Block.Number() != 2 {
+			t.Fatal("incorrect sealed block")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("no sealing events")
+	}
+
+	// do not expect more events
+	select {
+	case <-resCh:
+		t.Fatal("more sealing events not expected")
 	default:
+	}
+}
+
+func TestSealBlockAfterTxnInDevMode(t *testing.T) {
+	// tests that the sealer waits for new transactions in dev-mode
+
+	notify := make(chan struct{})
+	s, _ := testSealer(t, &Config{DevMode: true}, func(ctx context.Context, b *types.Block) (*types.Block, error) {
+		notify <- struct{}{}
+		return b, nil
+	})
+
+	s.SetEnabled(true)
+
+	// It should not process txns yet
+	select {
+	case <-notify:
+		t.Fatal("sealing not expected")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if err := s.AddTx(&types.Transaction{From: types.StringToAddress("1"), Gas: 100000000}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-notify:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("sealing expected")
+	}
+	time.Sleep(1 * time.Second)
+}
+
+func noopHookfunc(ctx context.Context, b *types.Block) (*types.Block, error) {
+	return b, nil
+}
+
+func TestAcceptNonSignedTransactionsOnlyInDevMode(t *testing.T) {
+	s, _ := testSealer(t, &Config{DevMode: false}, noopHookfunc)
+
+	txn := &types.Transaction{From: types.StringToAddress("1")}
+	if err := s.AddTx(txn); err == nil {
+		t.Fatal("Sealer in non dev-mode cannot accept non-signed transactions")
+	}
+
+	s, _ = testSealer(t, &Config{DevMode: true}, noopHookfunc)
+	if err := s.AddTx(txn); err != nil {
+		t.Fatal(err)
 	}
 }

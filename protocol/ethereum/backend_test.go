@@ -161,7 +161,7 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 		NetworkID:       1,
 		TD:              big.NewInt(1),
 		CurrentBlock:    h0.Hash,
-		GenesisBlock:    b0.Genesis().Hash,
+		GenesisBlock:    b0.Genesis(),
 	}
 
 	h1, _ := b1.Header()
@@ -170,7 +170,7 @@ func ethPipe(b0, b1 *blockchain.Blockchain) (*Ethereum, *Ethereum) {
 		NetworkID:       1,
 		TD:              big.NewInt(1),
 		CurrentBlock:    h1.Hash,
-		GenesisBlock:    b1.Genesis().Hash,
+		GenesisBlock:    b1.Genesis(),
 	}
 
 	conn0, conn1 := net.Pipe()
@@ -198,7 +198,7 @@ func testEthereum(conn net.Conn, b *blockchain.Blockchain) *Ethereum {
 	h, _ := b.Header()
 	st := &status
 	st.CurrentBlock = h.Hash
-	st.GenesisBlock = b.Genesis().Hash
+	st.GenesisBlock = b.Genesis()
 
 	eth := newTestEthereumProto("", conn, b)
 	if err := eth.Init(st); err != nil {

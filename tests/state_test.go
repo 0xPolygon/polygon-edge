@@ -41,34 +41,34 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 		t.Fatal(err)
 	}
 
-	s, snap, _ := buildState(t, c.Pre)
+	s, _, pastRoot := buildState(t, c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	var root []byte
+	xxx := state.NewExecutor(&chain.Params{Forks: config}, s)
+	xxx.SetRuntime(precompiled.NewPrecompiled())
+	xxx.SetRuntime(evm.NewEVM())
 
-	txn := state.NewTxn(s, snap)
-
-	exec := state.NewExecutor()
-	exec.SetRuntime(precompiled.NewPrecompiled())
-	exec.SetRuntime(evm.NewEVM())
-
-	exec.SetCallback(func(t *state.Transition) {
+	xxx.PostHook = func(t *state.Transition) {
 		if name == "failed_tx_xcf416c53" {
 			// create the account
 			t.Txn().TouchAccount(ripemd)
 			// now remove it
 			t.Txn().Suicide(ripemd)
 		}
-	})
+	}
+	xxx.GetHash = func(*types.Header) func(i uint64) types.Hash {
+		return vmTestBlockHash
+	}
 
-	transition := exec.NewTransition(txn, vmTestBlockHash, env, forks)
-	_, _, err = transition.Apply(msg)
+	executor, _ := xxx.BeginTxn(pastRoot, c.Env.ToHeader(t))
+	_, _, err = executor.Apply(msg)
+
+	txn := executor.Txn()
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
-	_, root = txn.Commit(forks.EIP158)
-
+	_, root := txn.Commit(forks.EIP158)
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hex.EncodeToHex(root))
 	}

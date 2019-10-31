@@ -3,7 +3,6 @@ package sealer
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -12,66 +11,70 @@ import (
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/derivesha"
+	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 )
 
+// Config is the sealer config
+type Config struct {
+	DevMode  bool
+	Coinbase types.Address
+	Extra    []byte
+}
+
+// DefaultConfig is the default sealer config
+func DefaultConfig() *Config {
+	return &Config{
+		DevMode:  false,
+		Coinbase: types.Address{},
+		Extra:    []byte{},
+	}
+}
+
 // Sealer seals blocks
 type Sealer struct {
-	config     *Config
-	logger     hclog.Logger
-	lastHeader *types.Header
+	config *Config
+	logger hclog.Logger
 
 	blockchain *blockchain.Blockchain
-	engine     consensus.Consensus
+	engine     consensus.Consensus // TODO; remove once the executor has more content
 	txPool     *TxPool
 
-	signer   crypto.TxSigner
-	coinbase types.Address
+	signer crypto.TxSigner // TODO; this should move away?
 
-	// sealer
-	stopSealing context.CancelFunc
-	newBlock    chan struct{}
-
-	// commit block every n seconds if no transactions are sent
-	commitInterval *time.Timer
-
+	// sealing process
 	stopFn  context.CancelFunc
 	lock    sync.Mutex
 	enabled bool
 
+	executor *state.Executor
 	SealedCh chan *SealedNotify
+
+	wakeCh chan struct{}
 }
 
+// TODO; this one is tricky
 type SealedNotify struct {
 	Block *types.Block
 }
 
 // NewSealer creates a new sealer for a specific engine
-func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Blockchain, engine consensus.Consensus) *Sealer {
-	if config.CommitInterval < minCommitInterval {
-		config.CommitInterval = minCommitInterval
-	}
-
-	fmt.Println(config.CommitInterval)
-
+func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Blockchain, engine consensus.Consensus, executor *state.Executor) *Sealer {
 	s := &Sealer{
-		blockchain:     blockchain,
-		engine:         engine,
-		config:         config,
-		logger:         logger,
-		txPool:         NewTxPool(blockchain),
-		newBlock:       make(chan struct{}, 1),
-		commitInterval: time.NewTimer(minCommitInterval),
-		signer:         crypto.NewEIP155Signer(1),
-		SealedCh:       make(chan *SealedNotify, 10),
+		blockchain: blockchain,
+		engine:     engine,
+		config:     config,
+		logger:     logger.Named("Sealer"),
+		txPool:     NewTxPool(blockchain),
+		signer:     crypto.NewEIP155Signer(1),
+		SealedCh:   make(chan *SealedNotify, 10),
+		executor:   executor,
+		wakeCh:     make(chan struct{}),
 	}
 	return s
 }
 
-func (s *Sealer) SetCoinbase(coinbase types.Address) {
-	s.coinbase = coinbase
-}
-
+// SetEnabled enables or disables the sealer
 func (s *Sealer) SetEnabled(enabled bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -93,34 +96,77 @@ func (s *Sealer) run(ctx context.Context) {
 	listener := s.blockchain.Subscribe()
 
 	for {
+		if s.config.DevMode {
+			// In dev-mode we wait for new transactions to seal blocks
+			select {
+			case <-s.wakeCh:
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		// start sealing
+		subCtx, cancel := context.WithCancel(ctx)
+		done := s.sealAsync(subCtx)
+
+		// wait for the sealing to be done
 		select {
-		case <-listener:
-			fmt.Println("==> listener")
-			go s.commit()
-
-		case <-s.commitInterval.C:
-			go s.commit()
-
+		case <-done:
+			// the sealing process has finished
 		case <-ctx.Done():
+			// the sealing routine has been canceled
+		case <-listener:
+			// there is a new head
+		}
+
+		// cancel the sealing process context
+		cancel()
+
+		if ctx.Err() != nil {
 			return
 		}
 	}
 }
 
+var emptyFrom = types.StringToAddress("0")
+
 // AddTx adds a new transaction to the transaction pool
-func (s *Sealer) AddTx(tx *types.Transaction) {
-	s.txPool.Add(tx)
+func (s *Sealer) AddTx(tx *types.Transaction) error {
+	if tx.From != emptyFrom {
+		if !s.config.DevMode {
+			return fmt.Errorf("non signed transactions are only valid in dev mode")
+		}
+	}
+
+	if err := s.txPool.Add(tx); err != nil {
+		return err
+	}
+
+	// in dev mode we notify after each transaction
+	if s.config.DevMode {
+		select {
+		case s.wakeCh <- struct{}{}:
+		default:
+		}
+	}
+	return nil
 }
 
-func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Block {
+func generateNewBlock(header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) *types.Block {
 	if len(txs) == 0 {
 		header.TxRoot = types.EmptyRootHash
 	} else {
 		header.TxRoot = derivesha.CalcTxsRoot(txs)
 	}
 
+	if len(receipts) == 0 {
+		header.ReceiptsRoot = types.EmptyRootHash
+	} else {
+		header.ReceiptsRoot = derivesha.CalcReceiptRoot(receipts)
+	}
+
+	// TODO: Compute uncles
 	header.Sha3Uncles = types.EmptyUncleHash
-	header.ReceiptsRoot = types.EmptyRootHash
 
 	return &types.Block{
 		Header:       header,
@@ -128,183 +174,97 @@ func generateNewBlock(header *types.Header, txs []*types.Transaction) *types.Blo
 	}
 }
 
-func (s *Sealer) commit() {
-	fmt.Println("- commit interval -")
+func (s *Sealer) sealAsync(ctx context.Context) chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		if err := s.seal(ctx); err != nil {
+			s.logger.Trace("failed to seal", "err", err)
+		}
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}()
+	return ch
+}
 
-	//fmt.Println("- commit -")
-	s.commitInterval.Reset(s.config.CommitInterval)
-
-	if s.stopSealing != nil {
-		fmt.Println("_ STOP _")
-		s.stopSealing()
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	s.stopSealing = cancel
-
+func (s *Sealer) seal(ctx context.Context) error {
 	parent, ok := s.blockchain.Header()
 	if !ok {
-		return
-	}
-	promoted, err := s.txPool.reset(s.lastHeader, parent)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Sealing block: ", parent.Number+1)
-
-	pricedTxs := newTxPriceHeap()
-	for _, tx := range promoted {
-		from, err := s.signer.Sender(tx)
-		if err != nil {
-			panic("invalid sender")
-		}
-
-		// NOTE, we need to sort with big.Int instead of uint64
-		if err := pricedTxs.Push(from, tx, new(big.Int).SetBytes(tx.GetGasPrice())); err != nil {
-			panic(err)
-		}
-	}
-
-	// not sure about this
-	timestamp := uint64(time.Now().Unix())
-	if parent.Timestamp >= timestamp {
-		timestamp = parent.Timestamp + 1
+		return fmt.Errorf("current header not found")
 	}
 
 	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   calcGasLimit(parent, 8000000, 8000000),
-		ExtraData:  []byte{},
-		Timestamp:  timestamp,
-		Miner:      s.coinbase,
+		GasLimit:   100000000, // placeholder for now
+		Timestamp:  uint64(time.Now().Unix()),
+		Miner:      s.config.Coinbase,
+		ExtraData:  s.config.Extra,
 	}
 
-	if err := s.engine.Prepare(parent, header); err != nil {
-		panic(err)
-	}
-
-	//fmt.Println("- post difficulty -")
-	//fmt.Println(header.Difficulty)
-
-	//fmt.Println("-- parent --")
-	//fmt.Println(parent.StateRoot)
-
-	state, ok := s.blockchain.GetState(parent)
-	if !ok {
-		panic("state not found")
-	}
-
-	/*
-		txIterator := func(err error, gas uint64) (*types.Transaction, bool) {
-			if gas < chain.TxGas {
-				return nil, false
-			}
-			tx := pricedTxs.Pop()
-			if tx == nil {
-				return nil, false
-			}
-			return tx.tx, true
-		}
-	*/
-
-	//fmt.Println(state)
-
-	root, err := s.blockchain.SimpleIteration(state, header)
+	transition, err := s.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	//fmt.Println("-- root --")
-	//fmt.Println(root)
+	/// GET THE TRANSACTIONS
 
-	/*
-		_, root, txns, err := s.blockchain.BlockIterator(state, header, txIterator)
-		header.StateRoot = types.BytesToHash(root)
-	*/
-
-	// TODO, get uncles
-
-	header.StateRoot = types.BytesToHash(root)
-	block := generateNewBlock(header, nil)
-
-	// Seal
-	if _, err := s.engine.Seal(ctx, block); err != nil {
-		panic(err)
+	pricedTxs, err := s.txPool.sortTxns(transition.Txn(), parent)
+	if err != nil {
+		return err
 	}
 
-	// The context was cancelled
-	if ctx.Err() != nil {
-		return
-	}
+	/// PROCESS THE TRANSACTIONS
 
-	/*
-		td, ok := s.blockchain.GetTD(block.ParentHash())
-		if !ok {
-			return
+	txns := []*types.Transaction{}
+	for {
+		val := pricedTxs.Pop()
+		if val == nil {
+			break
 		}
-	*/
 
-	//fmt.Println("-- write block --")
-	//fmt.Println(block.Header.Print())
-	//fmt.Println(block.Header.Hash().Bytes())
+		msg := val.tx
+		txns = append(txns, msg)
+
+		if err := transition.Write(msg); err != nil {
+			break
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+	}
+
+	_, root := transition.Commit()
+
+	header.StateRoot = root
+	header.GasUsed = transition.TotalGas()
+	block := generateNewBlock(header, txns, transition.Receipts())
+
+	// Start the consensus sealing
+	if _, err := s.engine.Seal(ctx, block); err != nil {
+		return err
+	}
+	// Check if the context was cancelled while in the sealing routine
+	if ctx.Err() != nil {
+		return nil
+	}
 
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		s.logger.Error("failed to write sealed block", "err", err)
-		return
+		return fmt.Errorf("failed to write sealed block: %v", err)
 	}
 
 	s.logger.Info("Block sealed", "number", num+1, "hash", header.Hash)
-
-	// Write the new state
-	// s.blockchain.AddState(types.BytesToHash(root), newState)
 
 	// Broadcast the block to the network
 	select {
 	case s.SealedCh <- &SealedNotify{Block: block}:
 	default:
-		fmt.Println("-- failed to notify --")
 	}
 
-	return
-}
-
-const (
-	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
-	GasLimitBoundDivisor uint64 = 1024
-	// MinGasLimit is the minimum the gas limit may ever be.
-	MinGasLimit uint64 = 5000
-	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
-	MaximumExtraDataSize uint64 = 32
-)
-
-func calcGasLimit(parent *types.Header, gasFloor, gasCeil uint64) uint64 {
-	// contrib = (parentGasUsed * 3 / 2) / 1024
-	contrib := (parent.GasUsed + parent.GasUsed/2) / GasLimitBoundDivisor
-
-	// decay = parentGasLimit / 1024 -1
-	decay := parent.GasLimit/GasLimitBoundDivisor - 1
-
-	limit := parent.GasLimit - decay + contrib
-	if limit < MinGasLimit {
-		limit = MinGasLimit
-	}
-	// If we're outside our allowed gas range, we try to hone towards them
-	if limit < gasFloor {
-		limit = parent.GasLimit + decay
-		if limit > gasFloor {
-			limit = gasFloor
-		}
-	} else if limit > gasCeil {
-		limit = parent.GasLimit - decay
-		if limit < gasCeil {
-			limit = gasCeil
-		}
-	}
-	return limit
+	return nil
 }
 
 // TxDifference returns a new set which is the difference between a and b.
@@ -321,6 +281,5 @@ func txDifference(a, b []*types.Transaction) []*types.Transaction {
 			keep = append(keep, tx)
 		}
 	}
-
 	return keep
 }

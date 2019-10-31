@@ -568,7 +568,7 @@ func (b *Backend) GetStatus() (*Status, error) {
 		NetworkID:       b.NetworkID,
 		TD:              td,
 		CurrentBlock:    header.Hash,
-		GenesisBlock:    b.blockchain.Genesis().Hash,
+		GenesisBlock:    b.blockchain.Genesis(),
 	}
 	return status, nil
 }

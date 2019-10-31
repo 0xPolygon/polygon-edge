@@ -19,6 +19,8 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/state"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/umbracle/minimal/state/runtime/evm"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
 )
 
 const blockchainTests = "BlockchainTests"
@@ -105,22 +107,34 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
-	b := blockchain.NewBlockchain(s, st, engine, params)
+	executor := state.NewExecutor(params, st)
+	executor.SetRuntime(precompiled.NewPrecompiled())
+	executor.SetRuntime(evm.NewEVM())
+
+	b := blockchain.NewBlockchain(s, engine, executor)
 	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}
 
+	executor.GetHash = b.GetHashHelper
+
 	// Change the dao block
 	if c.Network == "HomesteadToDaoAt5" {
-		b.SetDAOBlock(5)
+		b.Executor().SetDAOHardFork(5)
+		// b.SetDAOBlock(5)
 		engine.(*ethash.Ethash).SetDAOBlock(5)
 	}
 
+	// Validate the genesis
+	genesisHeader, ok := b.GetHeaderByNumber(0)
+	if !ok {
+		t.Fatal("not found")
+	}
 	// b.SetPrecompiled(builtins)
-	if hash := b.Genesis().Hash; hash != c.Genesis.header.Hash {
+	if hash := genesisHeader.Hash; hash != c.Genesis.header.Hash {
 		t.Fatalf("genesis hash mismatch: expected %s but found %s", c.Genesis.header.Hash, hash.String())
 	}
-	if stateRoot := b.Genesis().StateRoot; stateRoot != c.Genesis.header.StateRoot {
+	if stateRoot := genesisHeader.StateRoot; stateRoot != c.Genesis.header.StateRoot {
 		t.Fatalf("genesis state root mismatch: expected %s but found %s", c.Genesis.header.StateRoot.String(), stateRoot.String())
 	}
 
@@ -156,8 +170,8 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
 	}
 
-	snap, ok := b.GetState(lastBlock)
-	if !ok {
+	snap, err := st.NewSnapshotAt(lastBlock.StateRoot)
+	if err != nil {
 		t.Fatalf("state of last block not found")
 	}
 

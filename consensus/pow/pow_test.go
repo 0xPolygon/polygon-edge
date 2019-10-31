@@ -15,7 +15,7 @@ func TestSeal(t *testing.T) {
 		Number: 10,
 	}
 
-	c.Prepare(nil, h)
+	// c.Prepare(nil, h)
 	b := &types.Block{
 		Header: h,
 	}

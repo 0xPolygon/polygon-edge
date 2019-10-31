@@ -125,6 +125,16 @@ func stringToInt64T(t *testing.T, str string) int64 {
 	return int64(n)
 }
 
+func (e *env) ToHeader(t *testing.T) *types.Header {
+	return &types.Header{
+		Miner:      stringToAddressT(t, e.Coinbase),
+		Difficulty: stringToUint64T(t, e.Difficulty),
+		GasLimit:   stringToUint64T(t, e.GasLimit),
+		Number:     stringToUint64T(t, e.Number),
+		Timestamp:  stringToUint64T(t, e.Timestamp),
+	}
+}
+
 func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
@@ -193,7 +203,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot, []byte) {
+func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Snapshot, types.Hash) {
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
@@ -214,7 +224,7 @@ func buildState(t *testing.T, allocs chain.GenesisAlloc) (state.State, state.Sna
 	}
 
 	snap, root := txn.Commit(false)
-	return s, snap, root
+	return s, snap, types.BytesToHash(root)
 }
 
 type indexes struct {

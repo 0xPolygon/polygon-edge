@@ -13,17 +13,7 @@ import (
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
-)
-
-const (
-	// GasLimitBoundDivisor is the bound divisor of the gas limit, used in update calculations.
-	GasLimitBoundDivisor uint64 = 1024
-	// MinGasLimit is the minimum the gas limit may ever be.
-	MinGasLimit uint64 = 5000
-	// MaximumExtraDataSize is the maximum size extra data may be after Genesis.
-	MaximumExtraDataSize uint64 = 32
 )
 
 var (
@@ -78,7 +68,7 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("incorrect timestamp")
 	}
 
-	if uint64(len(header.ExtraData)) > MaximumExtraDataSize {
+	if uint64(len(header.ExtraData)) > 32 {
 		return fmt.Errorf("extradata is too long")
 	}
 
@@ -109,8 +99,8 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		gas *= -1
 	}
 
-	limit := parent.GasLimit / GasLimitBoundDivisor
-	if uint64(gas) >= limit || header.GasLimit < MinGasLimit {
+	limit := parent.GasLimit / 1024
+	if uint64(gas) >= limit || header.GasLimit < 5000 {
 		return fmt.Errorf("incorrect gas limit")
 	}
 
@@ -206,102 +196,9 @@ func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 	}
 }
 
-// Author checks the author of the header
-func (e *Ethash) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
-const maxUint = ^uint(0)
-const maxInt = int64(maxUint >> 1)
-
-var maxBigUint64 = big.NewInt(maxInt)
-
 // Seal seals the block
 func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
-	/*
-		// initial random value
-		nonceBig, err := crand.Int(crand.Reader, maxBigUint64)
-		if err != nil {
-			panic(err)
-		}
-
-		header := block.Header
-		cache, err := e.getCache(header.Number)
-		if err != nil {
-			return nil, err
-		}
-
-		nonce := nonceBig.Uint64()
-		hash := e.sealHash(header)
-
-		//for {
-		digest, result := cache.hashimoto(hash, nonce)
-
-		fmt.Println(digest)
-		fmt.Println(result)
-		fmt.Println(header.Difficulty)
-
-		nonce++
-		//}
-	*/
 	panic("NOT IMPLEMENTED")
-}
-
-// Prepare runs before processing the head during mining.
-func (e *Ethash) Prepare(parent *types.Header, header *types.Header) error {
-	header.Difficulty = e.CalcDifficulty(int64(header.Timestamp), parent)
-	return nil
-}
-
-var (
-	big8  = big.NewInt(8)
-	big32 = big.NewInt(32)
-)
-
-// Block rewards at different forks
-var (
-	// FrontierBlockReward is the block reward for the Frontier fork
-	FrontierBlockReward = big.NewInt(5e+18)
-
-	// ByzantiumBlockReward is the block reward for the Byzantium fork
-	ByzantiumBlockReward = big.NewInt(3e+18)
-
-	// ConstantinopleBlockReward is the block reward for the Constantinople fork
-	ConstantinopleBlockReward = big.NewInt(2e+18)
-)
-
-// Finalize runs after the block has been processed
-func (e *Ethash) Finalize(txn *state.Txn, block *types.Block) error {
-	number := block.Number()
-	numberBigInt := big.NewInt(int64(number))
-
-	var blockReward *big.Int
-	switch num := number; {
-	case e.config.Forks.IsConstantinople(num):
-		blockReward = ConstantinopleBlockReward
-	case e.config.Forks.IsByzantium(num):
-		blockReward = ByzantiumBlockReward
-	default:
-		blockReward = FrontierBlockReward
-	}
-
-	reward := new(big.Int).Set(blockReward)
-
-	r := new(big.Int)
-	for _, uncle := range block.Uncles {
-		r.Add(big.NewInt(int64(uncle.Number)), big8)
-		r.Sub(r, numberBigInt)
-		r.Mul(r, blockReward)
-		r.Div(r, big8)
-
-		txn.AddBalance(uncle.Miner, r)
-
-		r.Div(blockReward, big32)
-		reward.Add(reward, r)
-	}
-
-	txn.AddBalance(block.Header.Miner, reward)
-	return nil
 }
 
 // Close closes the connection
