@@ -57,6 +57,10 @@ var (
 
 // CanRun implements the runtime interface
 func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
+	//fmt.Println("-- can run --")
+	//fmt.Println(config)
+	//fmt.Println(config.Byzantium)
+
 	if _, ok := p.contracts[c.CodeAddress]; !ok {
 		return false
 	}
@@ -76,10 +80,20 @@ func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *cha
 	return true
 }
 
+// Name implements the runtime interface
+func (p *Precompiled) Name() string {
+	return "precompiled"
+}
+
 // Run runs an execution
 func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input)
+
+	//fmt.Println("-- gas cost --")
+	//fmt.Println(gasCost)
+	//fmt.Println(c.Gas)
+
 	if c.Gas < gasCost {
 		return nil, 0, runtime.ErrGasOverflow
 	}

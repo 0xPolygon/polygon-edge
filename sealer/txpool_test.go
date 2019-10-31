@@ -146,7 +146,7 @@ func (c *dummyChain) add(h *header) error {
 		ExtraData:  []byte{h.hash},
 	}
 
-	c.headers[hash] = generateNewBlock(header, h.txs)
+	c.headers[hash] = generateNewBlock(header, h.txs, nil)
 	return nil
 }
 
@@ -255,7 +255,7 @@ func TestTxPoolReset(t *testing.T) {
 			if err := b.WriteHeader(block.Header); err != nil {
 				t.Fatal(err)
 			}
-			b.WriteAuxBlocks(block)
+			// b.WriteAuxBlocks(block)
 		}
 
 		pool := NewTxPool(b)

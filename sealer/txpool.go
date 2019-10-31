@@ -45,18 +45,22 @@ func (t *TxPool) SetSigner(signer crypto.TxSigner) {
 
 // Add adds a new transaction to the pool
 func (t *TxPool) Add(tx *types.Transaction) error {
-	if err := t.validateTx(tx); err != nil {
+	err := t.validateTx(tx)
+	if err != nil {
 		return err
 	}
-	from, err := t.signer.Sender(tx)
-	if err != nil {
-		return fmt.Errorf("invalid sender")
+
+	if tx.From == emptyFrom {
+		tx.From, err = t.signer.Sender(tx)
+		if err != nil {
+			return fmt.Errorf("invalid sender")
+		}
 	}
 
-	txs, ok := t.queue[from]
+	txs, ok := t.queue[tx.From]
 	if !ok {
 		txs = newTxQueue()
-		t.queue[from] = txs
+		t.queue[tx.From] = txs
 	}
 	txs.Add(tx)
 
@@ -132,13 +136,36 @@ func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, er
 	// Get all the pending transactions and update
 	for from, list := range t.queue {
 		// TODO, filter low txs
-
 		nonce := t.state.GetNonce(from)
 		res := list.Promote(nonce)
 		promoted = append(promoted, res...)
 	}
 
 	return promoted, nil
+}
+
+func (t *TxPool) sortTxns(txn *state.Txn, parent *types.Header) (*txPriceHeap, error) {
+	t.Update(nil, txn)
+	promoted, err := t.reset(nil, parent)
+	if err != nil {
+		return nil, err
+	}
+
+	pricedTxs := newTxPriceHeap()
+	for _, tx := range promoted {
+		if tx.From == emptyFrom {
+			tx.From, err = t.signer.Sender(tx)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// NOTE, we need to sort with big.Int instead of uint64
+		if err := pricedTxs.Push(tx.From, tx, new(big.Int).SetBytes(tx.GetGasPrice())); err != nil {
+			return nil, err
+		}
+	}
+	return pricedTxs, nil
 }
 
 func (t *TxPool) validateTx(tx *types.Transaction) error {

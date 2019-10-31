@@ -43,15 +43,18 @@ func TestChainGenesis(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			genesis, err := chain.ImportFromName(c.Name)
+			genesisConfig, err := chain.ImportFromName(c.Name)
 			assert.NoError(t, err)
 
 			b := NewTestBlockchain(t, nil)
-			assert.NoError(t, b.WriteGenesis(genesis.Genesis))
+			assert.NoError(t, b.WriteGenesis(genesisConfig.Genesis))
 
-			root := b.genesis.StateRoot.String()
+			genesisHeader, ok := b.GetHeaderByNumber(0)
+			assert.True(t, ok)
+
+			root := genesisHeader.StateRoot.String()
 			assert.Equal(t, root, c.Root)
-			assert.Equal(t, b.genesis.Hash.String(), c.Hash)
+			assert.Equal(t, genesisHeader.Hash.String(), c.Hash)
 		})
 	}
 }

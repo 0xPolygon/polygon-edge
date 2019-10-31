@@ -102,6 +102,7 @@ const (
 type Runtime interface {
 	Run(c *Contract, host Host, config *chain.ForksInTime) ([]byte, uint64, error)
 	CanRun(c *Contract, host Host, config *chain.ForksInTime) bool
+	Name() string
 }
 
 // Contract is the instance being called

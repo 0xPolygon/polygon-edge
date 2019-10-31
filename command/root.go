@@ -3,7 +3,6 @@ package command
 import (
 	logger "github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/minimal/command/debug"
 )
 
 // RegisterCmd adds the parsed cmd as a sub-command of the root cmd.
@@ -20,10 +19,6 @@ var rootCmd = &cobra.Command{
 	Long:  "Minimal is ...", // TODO: Add long description (or not)
 	Run:   rootRun,
 	RunE:  rootRunE,
-}
-
-func init() {
-	rootCmd.AddCommand(debug.DebugCmd)
 }
 
 // Run runs the root command which initialises the program.

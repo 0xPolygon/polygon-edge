@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/minimal/api"
 	"github.com/umbracle/minimal/chain"
+	"github.com/umbracle/minimal/state"
 
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/network/discovery"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/umbracle/minimal/protocol"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/umbracle/minimal/state/runtime/evm"
+	"github.com/umbracle/minimal/state/runtime/precompiled"
 
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
@@ -42,6 +45,7 @@ type Minimal struct {
 	chain      *chain.Chain
 	apis       []api.API
 	InmemSink  *metrics.InmemSink
+	devMode    bool
 }
 
 func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
@@ -177,18 +181,21 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 
 	st := itrie.NewState(stateStorage)
 
+	executor := state.NewExecutor(config.Chain.Params, st)
+	executor.SetRuntime(precompiled.NewPrecompiled())
+	executor.SetRuntime(evm.NewEVM())
+
 	// blockchain object
-	m.Blockchain = blockchain.NewBlockchain(storage, st, m.consensus, config.Chain.Params)
+	m.Blockchain = blockchain.NewBlockchain(storage, m.consensus, executor)
 	if err := m.Blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
 		return nil, err
 	}
 
 	sealerConfig := &sealer.Config{
-		CommitInterval: 5 * time.Second,
+		Coinbase: crypto.PubKeyToAddress(&m.Key.PublicKey),
 	}
-	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus)
+	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.Blockchain, m.consensus, executor)
 	m.Sealer.SetEnabled(m.config.Seal)
-	m.Sealer.SetCoinbase(crypto.PubKeyToAddress(&m.Key.PublicKey))
 
 	// Start protocol backends
 	for name, entry := range config.ProtocolEntries {

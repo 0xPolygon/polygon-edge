@@ -2,6 +2,9 @@ package jsonrpc
 
 import (
 	"fmt"
+
+	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/types"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -26,5 +29,34 @@ func (e *Eth) GetBlockByNumber(blockNumber string, full bool) (interface{}, erro
 
 // GetBlockByHash returns information about a block by hash
 func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
+	return nil, nil
+}
+
+// SendTransaction creates new message call transaction or a contract creation, if the data field contains code.
+func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error) {
+	var err error
+
+	txn := &types.Transaction{}
+	txn.From = types.StringToAddress(params["from"].(string))
+
+	to := types.StringToAddress(params["to"].(string))
+	txn.To = &to
+
+	input := hex.MustDecodeHex(params["input"].(string))
+	gasPrice := hex.MustDecodeHex(params["gasPrice"].(string))
+
+	gas := params["gas"].(string)
+
+	txn.Input = input
+	txn.GasPrice = gasPrice
+	txn.Gas, err = types.ParseUint64orHex(&gas)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := e.d.minimal.Sealer.AddTx(txn); err != nil {
+		panic(err)
+	}
+
 	return nil, nil
 }

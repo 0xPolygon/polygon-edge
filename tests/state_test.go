@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/state/runtime/evm"
 	"github.com/umbracle/minimal/state/runtime/precompiled"
+	"github.com/umbracle/minimal/types"
 )
 
 var stateTests = "GeneralStateTests"
@@ -38,25 +39,26 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 		t.Fatal(err)
 	}
 
-	s, snap, _ := buildState(t, c.Pre)
+	s, _, pastRoot := buildState(t, c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	var root []byte
-
-	txn := state.NewTxn(s, snap)
-
-	xxx := state.NewExecutor()
+	xxx := state.NewExecutor(&chain.Params{Forks: config}, s)
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 
-	executor := xxx.NewTransition(txn, vmTestBlockHash, env, forks)
+	xxx.GetHash = func(*types.Header) func(i uint64) types.Hash {
+		return vmTestBlockHash
+	}
+
+	executor, _ := xxx.BeginTxn(pastRoot, c.Env.ToHeader(t))
 	_, _, err = executor.Apply(msg)
+
+	txn := executor.Txn()
 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
-	_, root = txn.Commit(forks.EIP158)
-
+	_, root := txn.Commit(forks.EIP158)
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hex.EncodeToHex(root))
 	}

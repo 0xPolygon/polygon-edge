@@ -49,13 +49,16 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	env.GasPrice = types.BytesToHash(c.Exec.GasPrice.Bytes())
 	env.Origin = c.Exec.Origin
 
-	s, snap, _ := buildState(t, c.Pre)
-	txn := state.NewTxn(s, snap)
+	s, _, root := buildState(t, c.Pre)
 
 	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 
-	executor := state.NewExecutor()
-	e := executor.NewTransition(txn, vmTestBlockHash, env, config)
+	executor := state.NewExecutor(&mainnetChainConfig, s)
+	executor.GetHash = func(*types.Header) func(i uint64) types.Hash {
+		return vmTestBlockHash
+	}
+
+	e, _ := executor.BeginTxn(root, c.Env.ToHeader(t))
 
 	evmR := evm.NewEVM()
 
@@ -81,6 +84,8 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if ret := hex.EncodeToHex(ret); ret != c.Out {
 		t.Fatalf("return mismatch: got %s, want %s", ret, c.Out)
 	}
+
+	txn := e.Txn()
 
 	// check logs
 	if logs := rlpHashLogs(txn.Logs()); logs != types.StringToHash(c.Logs) {
@@ -125,6 +130,8 @@ func TestEVM(t *testing.T) {
 
 	long := []string{
 		"loop-",
+		"gasprice",
+		"origin",
 	}
 
 	for _, folder := range folders {

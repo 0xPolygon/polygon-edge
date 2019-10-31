@@ -34,6 +34,11 @@ func (e *EVM) CanRun(c *runtime.Contract, host runtime.Host, config *chain.Forks
 	return true
 }
 
+// Name implements the runtime interface
+func (e *EVM) Name() string {
+	return "evm"
+}
+
 // Run implements the runtime interface
 func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
 

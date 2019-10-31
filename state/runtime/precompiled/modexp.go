@@ -75,6 +75,8 @@ func multComplexity(x *big.Int) *big.Int {
 }
 
 func (m *modExp) gas(input []byte) uint64 {
+	// fmt.Println("-- calc gas --")
+
 	var val, tail []byte
 
 	val, tail = m.p.get(input, 32)

@@ -5,21 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/umbracle/minimal/helper/dao"
 	"github.com/umbracle/minimal/helper/derivesha"
-	"github.com/umbracle/minimal/helper/hex"
 
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/crypto"
-
 	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/state/runtime/evm"
-	"github.com/umbracle/minimal/state/runtime/precompiled"
-
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
 
 	mapset "github.com/deckarep/golang-set"
@@ -40,49 +31,39 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
-	db          storage.Storage
-	consensus   consensus.Consensus
-	genesis     *types.Header
-	state       state.State
-	triedb      itrie.Storage
-	params      *chain.Params
-	sidechainCh chan *types.Header
+	db        storage.Storage
+	consensus consensus.Consensus
+	executor  *state.Executor
 
-	// listener for advancedhead subscribers
-	listeners []chan *types.Header
+	genesis types.Hash
+
+	// TODO: Unify in a single event
+	sidechainCh chan *types.Header
+	listeners   []chan *types.Header
 
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
-
-	// executor of the transition
-	executor *state.Executor
-
-	daoBlock uint64
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db storage.Storage, st state.State, consensus consensus.Consensus, params *chain.Params) *Blockchain {
+func NewBlockchain(db storage.Storage, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
 		db:          db,
 		consensus:   consensus,
-		genesis:     nil,
-		state:       st,
-		params:      params,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
-		daoBlock:    dao.DAOForkBlock,
-		executor:    state.NewExecutor(),
+		executor:    executor,
 	}
-
-	// setup the executor
-	b.executor.SetRuntime(precompiled.NewPrecompiled())
-	b.executor.SetRuntime(evm.NewEVM())
 
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 	return b
+}
+
+func (b *Blockchain) Executor() *state.Executor {
+	return b.executor
 }
 
 func (b *Blockchain) Subscribe() chan *types.Header {
@@ -97,67 +78,28 @@ func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 }
 
 // Genesis returns the genesis block
-func (b *Blockchain) Genesis() *types.Header {
+func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
 }
 
 // WriteGenesis writes the genesis block if not present
 func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
-	// Build precompiled contracts
-	/*
-		prec := map[types.Address]*precompiled.Precompiled{}
-		for addr, i := range genesis.Alloc {
-			if i.Builtin != nil {
-				j, err := precompiled.CreatePrecompiled(i.Builtin)
-				if err != nil {
-					return err
-				}
-				prec[addr] = j
-			}
-		}
-	*/
-
-	// b.SetPrecompiled(prec)
-
-	// The chain is not empty
-	if !b.Empty() {
-		// load genesis from memory
-		genesisHash, ok := b.db.ReadCanonicalHash(0)
+	_, ok := b.db.ReadHeadHash()
+	if ok {
+		b.genesis, ok = b.db.ReadCanonicalHash(0)
 		if !ok {
-			return fmt.Errorf("genesis hash not found")
-		}
-		b.genesis, ok = b.readHeader(genesisHash)
-		if !ok {
-			return fmt.Errorf("genesis header '%s' not found", genesisHash.String())
+			return fmt.Errorf("failed to load genesis hash")
 		}
 		return nil
 	}
 
-	snap := b.state.NewSnapshot()
-
-	txn := state.NewTxn(b.state, snap)
-	for addr, account := range genesis.Alloc {
-		if account.Balance != nil {
-			txn.AddBalance(addr, account.Balance)
-		}
-		if account.Nonce != 0 {
-			txn.SetNonce(addr, account.Nonce)
-		}
-		if len(account.Code) != 0 {
-			txn.SetCode(addr, account.Code)
-		}
-		for key, value := range account.Storage {
-			txn.SetState(addr, key, value)
-		}
-	}
-
-	_, root := txn.Commit(false)
+	root := b.executor.WriteGenesis(genesis.Alloc)
 
 	header := genesis.ToBlock()
-	header.StateRoot = types.BytesToHash(root)
+	header.StateRoot = root
 	header.ComputeHash()
 
-	b.genesis = header
+	b.genesis = header.Hash
 
 	// add genesis block
 	if err := b.addHeader(header); err != nil {
@@ -176,14 +118,6 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	return nil
 }
 
-func (b *Blockchain) getStateRoot(root types.Hash) (state.Snapshot, bool) {
-	ss, err := b.state.NewSnapshotAt(root)
-	if err != nil {
-		return nil, false
-	}
-	return ss, true
-}
-
 // WriteHeaderGenesis writes the genesis without any state allocation
 // TODO, remove
 func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
@@ -200,7 +134,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 		return err
 	}
 
-	b.genesis = header.Copy()
+	b.genesis = header.Hash
 	if err := b.db.WriteDiff(header.Hash, big.NewInt(1)); err != nil {
 		return err
 	}
@@ -236,15 +170,13 @@ func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
 		return err
 	}
 
-	/*
-		// notify the listeners
-		for _, ch := range b.listeners {
-			select {
-			case ch <- h:
-			default:
-			}
+	// notify the listeners
+	for _, ch := range b.listeners {
+		select {
+		case ch <- h:
+		default:
 		}
-	*/
+	}
 
 	return nil
 }
@@ -461,7 +393,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 	parent, ok := b.readHeader(blocks[0].ParentHash())
 	if !ok {
-		return fmt.Errorf("parent of %s (%d) not found", blocks[0].Hash().String(), blocks[0].Number())
+		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
 
 	// validate chain
@@ -501,50 +433,15 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 		b.bodiesCache.Add(block.Header.Hash, body)
 
-		// verify uncles. It requires to have the bodies in memory. TODO: Part of the consensus? Only required on POW.
+		// Verify uncles. It requires to have the bodies on memory
 		if err := b.VerifyUncles(block); err != nil {
 			return err
 		}
-
-		// Try to write first the state transition
-		parent, ok := b.readHeader(header.ParentHash)
-		if !ok {
-			return fmt.Errorf("unknown ancestor 1")
+		// Process and validate the block
+		if err := b.processBlock(blocks[indx]); err != nil {
+			return err
 		}
-
-		st, ok := b.getStateRoot(parent.StateRoot)
-		if !ok {
-			return fmt.Errorf("unknown state root: %s", parent.StateRoot.String())
-		}
-
-		if parent.StateRoot != (types.Hash{}) {
-			// Done for testing. TODO, remove.
-
-			block := blocks[indx]
-			_, root, receipts, totalGas, err := b.Process(st, block)
-			if err != nil {
-				return err
-			}
-
-			// Validate the result
-
-			if hex.EncodeToHex(root) != header.StateRoot.String() {
-				return fmt.Errorf("invalid merkle root")
-			}
-			if totalGas != header.GasUsed {
-				return fmt.Errorf("gas used is different")
-			}
-
-			receiptSha := derivesha.CalcReceiptRoot(receipts)
-			if receiptSha != header.ReceiptsRoot {
-				return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptsRoot, receiptSha)
-			}
-			rbloom := types.CreateBloom(receipts)
-			if rbloom != header.LogsBloom {
-				return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.LogsBloom, rbloom)
-			}
-		}
-
+		// Write the header to the chain
 		if err := b.WriteHeader(header); err != nil {
 			return err
 		}
@@ -553,164 +450,42 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	return nil
 }
 
-func (b *Blockchain) WriteAuxBlocks(block *types.Block) {
-	b.db.WriteBody(block.Header.Hash, block.Body())
-}
-
-func (b *Blockchain) GetState(header *types.Header) (state.Snapshot, bool) {
-	return b.getStateRoot(header.StateRoot)
-}
-
-func (b *Blockchain) SimpleIteration(s state.Snapshot, header *types.Header) ([]byte, error) {
-	txn := state.NewTxn(b.state, s)
-
-	// without uncles
-	if err := b.consensus.Finalize(txn, &types.Block{Header: header}); err != nil {
-		panic(err)
-	}
-
-	config := b.params.Forks.At(header.Number)
-
-	_, root := txn.Commit(config.EIP155)
-	return root, nil
-}
-
-/*
-func (b *Blockchain) BlockIterator(s state.Snapshot, header *types.Header, getTx func(err error, gas uint64) (*types.Transaction, bool)) (state.Snapshot, []byte, []*types.Transaction, error) {
-
-	// add the rewards
-	// txn := s.Txn()
-	txn := state.NewTxn(b.state, s)
-
-	// start the gasPool
-	config := b.params.Forks.At(header.Number)
-
-	// gasPool
-	gasPool := NewGasPool(header.GasLimit)
-
-	totalGas := uint64(0)
-
-	receipts := []*types.Receipt{}
-
-	var txerr error
-
-	count := 0
-
-	txns := []*types.Transaction{}
-
-	// apply the transactions
-	for {
-		tx, ok := getTx(txerr, gasPool.gas)
-		if !ok {
-			break
-		}
-
-		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
-		from, err := signer.Sender(tx)
-		if err != nil {
-			panic(err)
-		}
-
-		msg := tx.Copy()
-		msg.SetFrom(from)
-
-		gasTable := b.params.GasTable(header.Number)
-
-		env := &runtime.Env{
-			Coinbase:   header.Miner,
-			Timestamp:  header.Timestamp,
-			Number:     header.Number,
-			Difficulty: new(big.Int).SetUint64(header.Difficulty),
-			GasLimit:   big.NewInt(int64(header.GasLimit)),
-			GasPrice:   new(big.Int).SetBytes(tx.GasPrice),
-		}
-
-		executor := state.NewExecutor(txn, env, config, gasTable, b.GetHashByNumber)
-
-		gasUsed, failed, err := executor.Apply(txn, msg, env, gasTable, config, b.GetHashByNumber, gasPool, false, b.precompiled)
-
-		txerr = err
-		totalGas += gasUsed
-
-		logs := txn.Logs()
-
-		ss, root := txn.Commit(config.EIP155)
-		txn = state.NewTxn(b.state, ss)
-
-		if config.Byzantium {
-			root = []byte{}
-		}
-
-		// Create receipt
-
-		receipt := &types.Receipt{
-			Root:              types.BytesToHash(root),
-			CumulativeGasUsed: totalGas,
-			TxHash:            tx.Hash(),
-			GasUsed:           gasUsed,
-		}
-		if failed {
-			receipt.Status = 0
-		} else {
-			receipt.Status = types.ReceiptSuccess
-			// receipt.Root = types.ReceiptSuccessBytes
-		}
-
-		// if the transaction created a contract, store the creation address in the receipt.
-		if msg.To == nil {
-			receipt.ContractAddress = crypto.CreateAddress(msg.From(), tx.Nonce)
-		}
-
-		// Set the receipt logs and create a bloom for filtering
-		receipt.Logs = buildLogs(logs, tx.Hash(), header.Hash(), uint(count))
-		receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
-		receipts = append(receipts, receipt)
-
-		count++
-
-		txns = append(txns, tx)
-
-	}
-
-	// without uncles
-	if err := b.consensus.Finalize(txn, &types.Block{Header: header}); err != nil {
-		panic(err)
-	}
-
-	s2, root := txn.Commit(config.EIP155)
-	return s2, root, txns, nil
-}
-*/
-
-// SetDAOBlock sets the dao block, only to be used during tests
-func (b *Blockchain) SetDAOBlock(n uint64) {
-	b.daoBlock = n
-}
-
-func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapshot, []byte, []*types.Receipt, uint64, error) {
+func (b *Blockchain) processBlock(block *types.Block) error {
 	header := block.Header
-	txn := state.NewTxn(b.state, s)
 
-	// Mainnet
-	if b.params.ChainID == 1 && block.Number() == b.daoBlock {
-		// Apply the DAO hard fork. Move all the balances from 'drain accounts'
-		// to a single refund contract.
-		for _, i := range dao.DAODrainAccounts {
-			addr := types.StringToAddress(i)
-			txn.AddBalance(dao.DAORefundContract, txn.GetBalance(addr))
-			txn.SetBalance(addr, big.NewInt(0))
-		}
+	// process the block
+	parent, ok := b.readHeader(header.ParentHash)
+	if !ok {
+		return fmt.Errorf("unknown ancestor 1")
+	}
+	transition, root, err := b.executor.ProcessBlock(parent.StateRoot, block)
+	if err != nil {
+		return err
 	}
 
-	// start the gasPool
-	config := b.params.Forks.At(block.Number())
+	// validate the fields
+	if root != header.StateRoot {
+		return fmt.Errorf("invalid merkle root")
+	}
+	if transition.TotalGas() != header.GasUsed {
+		return fmt.Errorf("gas used is different")
+	}
+	receiptSha := derivesha.CalcReceiptRoot(transition.Receipts())
+	if receiptSha != header.ReceiptsRoot {
+		return fmt.Errorf("invalid receipts root")
+	}
+	rbloom := types.CreateBloom(transition.Receipts())
+	if rbloom != header.LogsBloom {
+		return fmt.Errorf("invalid receipts bloom")
+	}
+	return nil
+}
 
-	totalGas := uint64(0)
+var emptyFrom = types.Address{}
 
-	receipts := []*types.Receipt{}
-
-	hashByNumber := func(i uint64) (res types.Hash) {
-		num, hash := block.Number()-1, block.ParentHash()
+func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res types.Hash) {
+	return func(i uint64) (res types.Hash) {
+		num, hash := header.Number-1, header.ParentHash
 
 		for {
 			if num == i {
@@ -728,102 +503,6 @@ func (b *Blockchain) Process(s state.Snapshot, block *types.Block) (state.Snapsh
 			num--
 		}
 	}
-
-	env := runtime.TxContext{
-		Coinbase:   header.Miner,
-		Timestamp:  int64(header.Timestamp),
-		Number:     int64(header.Number),
-		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
-		GasLimit:   int64(header.GasLimit),
-	}
-
-	transition := b.executor.NewTransition(txn, hashByNumber, env, config)
-
-	// apply the transactions
-	for indx, tx := range block.Transactions {
-		transition.SetTxn(txn)
-
-		signer := crypto.NewSigner(config, uint64(b.params.ChainID))
-		from, err := signer.Sender(tx)
-		if err != nil {
-			panic(err)
-		}
-
-		msg := tx.Copy()
-		msg.From = from
-
-		gasUsed, failed, err := transition.Apply(msg)
-		txn = transition.Txn()
-
-		totalGas += gasUsed
-
-		logs := txn.Logs()
-
-		// Pre-Byzantium. Compute state root after each transaction. That root is included in the receipt
-		// of the transaction.
-		// Post-Byzantium. Compute one single state root after all the transactions.
-
-		var root []byte
-
-		receipt := &types.Receipt{
-			CumulativeGasUsed: totalGas,
-			TxHash:            tx.Hash,
-			GasUsed:           gasUsed,
-		}
-
-		if config.Byzantium {
-			// The suicided accounts are set as deleted for the next iteration
-			txn.CleanDeleteObjects(true)
-
-			if failed {
-				receipt.SetStatus(types.ReceiptFailed)
-			} else {
-				receipt.SetStatus(types.ReceiptSuccess)
-			}
-
-		} else {
-			ss, aux := txn.Commit(config.EIP155)
-			txn = state.NewTxn(b.state, ss)
-			root = aux
-			receipt.Root = types.BytesToHash(root)
-		}
-
-		// Create receipt
-
-		// if the transaction created a contract, store the creation address in the receipt.
-		if msg.To == nil {
-			receipt.ContractAddress = crypto.CreateAddress(msg.From, tx.Nonce)
-		}
-
-		// Set the receipt logs and create a bloom for filtering
-		receipt.Logs = buildLogs(logs, tx.Hash, block.Hash(), uint(indx))
-		receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
-		receipts = append(receipts, receipt)
-	}
-
-	if err := b.consensus.Finalize(txn, block); err != nil {
-		panic(err)
-	}
-
-	s2, root := txn.Commit(config.EIP155)
-	return s2, root, receipts, totalGas, nil
-}
-
-func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
-	newLogs := []*types.Log{}
-
-	for indx, log := range logs {
-		newLog := log
-
-		newLog.TxHash = txHash
-		newLog.BlockHash = blockHash
-		newLog.TxIndex = txIndex
-		newLog.LogIndex = uint(indx)
-
-		newLogs = append(newLogs, newLog)
-	}
-
-	return newLogs
 }
 
 func (b *Blockchain) GetHashByNumber(i uint64) types.Hash {
