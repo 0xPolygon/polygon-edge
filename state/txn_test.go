@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"testing"
 
-	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
@@ -44,7 +43,7 @@ func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
 	return v, ok
 }
 
-func (m *mockSnapshot) Commit(x *iradix.Tree) (Snapshot, []byte) {
+func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, []byte) {
 	panic("Not implemented in tests")
 }
 

@@ -583,13 +583,74 @@ func (txn *Txn) show(i *iradix.Txn) {
 	fmt.Println("##################################################################################")
 }
 
+func show(objs []*Object) {
+	fmt.Println("##################################################################################")
+
+	for _, obj := range objs {
+		fmt.Printf("# ----------------- %s -------------------\n", obj.Address.String())
+		fmt.Printf("# Deleted: %v\n", obj.Deleted)
+		fmt.Printf("# Balance: %s\n", obj.Balance.String())
+		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(obj.Nonce)))
+		fmt.Printf("# Code hash: %s\n", obj.CodeHash.String())
+		fmt.Printf("# State root: %s\n", obj.Root.String())
+
+		for _, entry := range obj.Storage {
+			if entry.Deleted {
+				fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(entry.Key))
+			} else {
+				fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(entry.Key), hex.EncodeToHex(entry.Val))
+			}
+		}
+	}
+	fmt.Println("##################################################################################")
+}
+
 func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 	txn.CleanDeleteObjects(deleteEmptyObjects)
 
 	x := txn.txn.Commit()
-	// txn.show(x.Txn())
 
-	t, hash := txn.snapshot.Commit(x)
+	// Do a more complex thing for now
+	objs := []*Object{}
+	x.Root().Walk(func(k []byte, v interface{}) bool {
+		a, ok := v.(*StateObject)
+		if !ok {
+			// We also have logs, avoid those
+			return false
+		}
+
+		obj := &Object{
+			Nonce:     a.Account.Nonce,
+			Address:   types.BytesToAddress(k),
+			Balance:   a.Account.Balance,
+			Root:      a.Account.Root,
+			CodeHash:  types.BytesToHash(a.Account.CodeHash),
+			DirtyCode: a.DirtyCode,
+			Code:      a.Code,
+		}
+		if a.Deleted {
+			obj.Deleted = true
+		} else {
+			if a.Txn != nil {
+				a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
+					store := &StorageObject{Key: k}
+					if v == nil {
+						store.Deleted = true
+					} else {
+						store.Val = v.([]byte)
+					}
+					obj.Storage = append(obj.Storage, store)
+					return false
+				})
+			}
+		}
+
+		objs = append(objs, obj)
+		return false
+	})
+	// show(objs)
+
+	t, hash := txn.snapshot.Commit(objs)
 	return t, hash
 }
 
