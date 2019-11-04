@@ -574,7 +574,7 @@ func (e *Ethereum) handleBodies(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 
-	txnsRoot := deriveRoot(p, txns, types.EmptyRootHash)
+	txnsRoot := calculateRoot(p, txns, types.EmptyRootHash)
 
 	var unclesRoot types.Hash
 	hash := keccak.DefaultKeccakPool.Get()
@@ -606,7 +606,7 @@ func (e *Ethereum) handleReceipts(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 
-	beacon := deriveRoot(p, elems, types.EmptyRootHash)
+	beacon := calculateRoot(p, elems, types.EmptyRootHash)
 	if handler := e.getHandler(beacon.String(), receiptsMsg); handler != nil {
 		return handler(p, v)
 	}

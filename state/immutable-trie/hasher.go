@@ -174,9 +174,6 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		h.ReleaseArenas(idx)
 	}
 
-	//fmt.Println("- buf -")
-	//fmt.Println(h.buf)
-
 	tmp := h.Hash(h.buf)
 	hh := node.SetHash(tmp)
 

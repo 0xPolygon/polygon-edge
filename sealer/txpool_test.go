@@ -11,10 +11,10 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
+	"github.com/umbracle/minimal/types/buildroot"
 )
 
 var key1, _ = crypto.GenerateKey()
@@ -142,7 +142,7 @@ func (c *dummyChain) add(h *header) error {
 		ParentHash: parent,
 		Number:     h.number,
 		Difficulty: h.diff,
-		TxRoot:     derivesha.CalcTxsRoot(h.txs),
+		TxRoot:     buildroot.CalculateTransactionsRoot(h.txs),
 		ExtraData:  []byte{h.hash},
 	}
 

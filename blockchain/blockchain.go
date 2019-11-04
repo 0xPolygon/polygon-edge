@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/umbracle/minimal/helper/derivesha"
-
 	"github.com/umbracle/minimal/blockchain/storage"
 	"github.com/umbracle/minimal/chain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
+	"github.com/umbracle/minimal/types/buildroot"
 
 	mapset "github.com/deckarep/golang-set"
 	lru "github.com/hashicorp/golang-lru"
@@ -417,11 +416,11 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		// This is not necessary.
 
 		// verify body data
-		if hash := derivesha.CalcUncleRoot(block.Uncles); hash != blocks[i].Header.Sha3Uncles {
+		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != blocks[i].Header.Sha3Uncles {
 			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, blocks[i].Header.Sha3Uncles)
 		}
 		// TODO, the wrapper around transactions
-		if hash := derivesha.CalcTxsRoot(block.Transactions); hash != blocks[i].Header.TxRoot {
+		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != blocks[i].Header.TxRoot {
 			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, blocks[i].Header.TxRoot)
 		}
 		parent = blocks[i].Header
@@ -474,7 +473,7 @@ func (b *Blockchain) processBlock(block *types.Block) error {
 	if transition.TotalGas() != header.GasUsed {
 		return fmt.Errorf("gas used is different")
 	}
-	receiptSha := derivesha.CalcReceiptRoot(transition.Receipts())
+	receiptSha := buildroot.CalculateReceiptsRoot(transition.Receipts())
 	if receiptSha != header.ReceiptsRoot {
 		return fmt.Errorf("invalid receipts root")
 	}

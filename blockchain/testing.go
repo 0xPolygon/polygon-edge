@@ -7,10 +7,11 @@ import (
 
 	"github.com/umbracle/minimal/blockchain/storage/memory"
 	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
 	itrie "github.com/umbracle/minimal/state/immutable-trie"
+
 	"github.com/umbracle/minimal/types"
+	"github.com/umbracle/minimal/types/buildroot"
 )
 
 type fakeConsensus struct {
@@ -145,8 +146,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 		}
 		localReceipts := []*types.Receipt{r0}
 
-		header.TxRoot = derivesha.CalcTxsRoot(txs)
-		header.ReceiptsRoot = derivesha.CalcReceiptRoot(localReceipts)
+		header.TxRoot = buildroot.CalculateTransactionsRoot(txs)
+		header.ReceiptsRoot = buildroot.CalculateReceiptsRoot(localReceipts)
 		header.LogsBloom = types.CreateBloom(localReceipts)
 		header.Sha3Uncles = types.EmptyUncleHash
 
