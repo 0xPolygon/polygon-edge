@@ -9,8 +9,6 @@ import (
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
-
-	iradix "github.com/hashicorp/go-immutable-radix"
 )
 
 // Node represents a node reference
@@ -125,7 +123,7 @@ var accountArenaPool fastrlp.ArenaPool
 
 var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
 
-func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
+func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	// Create an insertion batch for all the entries
 	batch := t.storage.Batch()
 
@@ -138,63 +136,57 @@ func (t *Trie) Commit(x *iradix.Tree) (state.Snapshot, []byte) {
 	ar1 := stateArenaPool.Get()
 	defer stateArenaPool.Put(ar1)
 
-	x.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*state.StateObject)
-		if !ok {
-			// We also have logs, avoid those
-			return false
-		}
+	for _, obj := range objs {
+		if obj.Deleted {
+			tt.Delete(hashit(obj.Address.Bytes()))
+		} else {
 
-		if a.Deleted {
-			tt.Delete(hashit(k))
-			return false
-		}
+			account := state.Account{
+				Balance:  obj.Balance,
+				Nonce:    obj.Nonce,
+				CodeHash: obj.CodeHash.Bytes(),
+				Root:     obj.Root, // old root
+			}
 
-		// compute first the state changes
-		if a.Txn != nil {
-			localTxn := a.Account.Trie.(*Trie).Txn()
-			localTxn.batch = batch
-
-			// Apply all the changes
-			a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-				if v == nil {
-					localTxn.Delete(k)
-				} else {
-					vv := ar1.NewBytes(bytes.TrimLeft(v.([]byte), "\x00"))
-					localTxn.Insert(k, vv.MarshalTo(nil))
+			if len(obj.Storage) != 0 {
+				localSnapshot, err := t.state.NewSnapshotAt(obj.Root)
+				if err != nil {
+					panic(err)
 				}
-				return false
-			})
 
-			accountStateRoot, _ := localTxn.Hash()
-			accountStateTrie := localTxn.Commit()
+				localTxn := localSnapshot.(*Trie).Txn()
+				localTxn.batch = batch
 
-			// Add this to the cache
-			t.state.AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
+				for _, entry := range obj.Storage {
+					k := hashit(entry.Key)
+					if entry.Deleted {
+						localTxn.Delete(k)
+					} else {
+						vv := ar1.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
+						localTxn.Insert(k, vv.MarshalTo(nil))
+					}
+				}
 
-			a.Account.Root = types.BytesToHash(accountStateRoot)
+				accountStateRoot, _ := localTxn.Hash()
+				accountStateTrie := localTxn.Commit()
+
+				// Add this to the cache
+				t.state.AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
+
+				account.Root = types.BytesToHash(accountStateRoot)
+			}
+
+			if obj.DirtyCode {
+				t.state.SetCode(obj.CodeHash, obj.Code)
+			}
+
+			vv := account.MarshalWith(arena)
+			data := vv.MarshalTo(nil)
+
+			tt.Insert(hashit(obj.Address.Bytes()), data)
+			arena.Reset()
 		}
-
-		if a.DirtyCode {
-			t.state.SetCode(types.BytesToHash(a.Account.CodeHash), a.Code)
-		}
-
-		vv := a.Account.MarshalWith(arena)
-
-		/*
-			vv := arena.NewArray()
-			vv.Set(arena.NewUint(a.Account.Nonce))
-			vv.Set(arena.NewBigInt(a.Account.Balance))
-			vv.Set(arena.NewBytes(a.Account.Root.Bytes()))
-			vv.Set(arena.NewBytes(a.Account.CodeHash))
-		*/
-
-		data := vv.MarshalTo(nil)
-
-		tt.Insert(hashit(k), data)
-		arena.Reset()
-		return false
-	})
+	}
 
 	root, _ := tt.Hash()
 

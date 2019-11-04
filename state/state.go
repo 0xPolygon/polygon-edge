@@ -19,7 +19,7 @@ type State interface {
 
 type Snapshot interface {
 	Get(k []byte) ([]byte, bool)
-	Commit(x *iradix.Tree) (Snapshot, []byte)
+	Commit(objs []*Object) (Snapshot, []byte)
 }
 
 // account trie
@@ -158,4 +158,27 @@ func (s *StateObject) Copy() *StateObject {
 	}
 
 	return ss
+}
+
+// Object is the serialization of the radix object (can be merged to StateObject?).
+type Object struct {
+	Address  types.Address
+	CodeHash types.Hash
+	Balance  *big.Int
+	Root     types.Hash
+	Nonce    uint64
+	Deleted  bool
+
+	// TODO: Move this to executor
+	DirtyCode bool
+	Code      []byte
+
+	Storage []*StorageObject
+}
+
+// StorageObject is an entry in the storage
+type StorageObject struct {
+	Deleted bool
+	Key     []byte
+	Val     []byte
 }
