@@ -10,8 +10,8 @@ import (
 	"github.com/umbracle/fastrlp"
 	"github.com/umbracle/minimal/helper/hex"
 	"github.com/umbracle/minimal/helper/keccak"
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
 	"github.com/umbracle/minimal/types"
+	"github.com/umbracle/minimal/types/buildroot"
 )
 
 const skeletonSize = 190
@@ -345,7 +345,7 @@ func (s *Slot) deliverBodies(req *Request, p *fastrlp.Parser, v *fastrlp.Value) 
 			s.txnsDelta = append(s.txnsDelta, 0)
 		} else {
 			// derive root of the transactions
-			if txRoot := deriveRoot(p, txns, types.EmptyRootHash); txRoot != header.TxRoot {
+			if txRoot := calculateRoot(p, txns, types.EmptyRootHash); txRoot != header.TxRoot {
 				return fmt.Errorf("txroot is different")
 			}
 
@@ -457,7 +457,7 @@ func (s *Slot) deliverReceipts(req *Request, p *fastrlp.Parser, v *fastrlp.Value
 			s.receiptsDelta = append(s.receiptsDelta, 0)
 		} else {
 			// derive receipts root
-			if root := deriveRoot(p, receipts, types.EmptyRootHash); root != header.ReceiptsRoot {
+			if root := calculateRoot(p, receipts, types.EmptyRootHash); root != header.ReceiptsRoot {
 				return fmt.Errorf("bad receipts root")
 			}
 			for _, elem := range receipts {
@@ -953,19 +953,28 @@ func hasReceipts(h types.Header) bool {
 	return h.ReceiptsRoot != types.EmptyRootHash
 }
 
-func deriveRoot(p *fastrlp.Parser, elems []*fastrlp.Value, def types.Hash) types.Hash {
-	if len(elems) == 0 {
+func calculateRoot(p *fastrlp.Parser, elems []*fastrlp.Value, def types.Hash) types.Hash {
+	num := len(elems)
+	if num == 0 {
 		return def
 	}
-	ar := &fastrlp.Arena{}
-	t := itrie.NewTrie()
-	txn := t.Txn()
 
-	for indx, elem := range elems {
-		j := ar.NewUint(uint64(indx))
-		txn.Insert(j.MarshalTo(nil), p.Raw(elem))
-	}
+	return buildroot.CalculateRoot(num, func(i int) []byte {
+		return p.Raw(elems[i])
+	})
 
-	root, _ := txn.Hash()
-	return types.BytesToHash(root)
+	/*
+		ar := &fastrlp.Arena{}
+		t := itrie.NewTrie()
+		txn := t.Txn()
+
+		for indx, elem := range elems {
+			j := ar.NewUint(uint64(indx))
+			txn.Insert(j.MarshalTo(nil), p.Raw(elem))
+		}
+
+		root, _ := txn.Hash()
+		return types.BytesToHash(root)
+	*/
+
 }

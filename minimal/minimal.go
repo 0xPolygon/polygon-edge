@@ -207,6 +207,8 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 		return nil, err
 	}
 
+	executor.GetHash = m.Blockchain.GetHashHelper
+
 	sealerConfig := &sealer.Config{
 		Coinbase: crypto.PubKeyToAddress(&m.Key.PublicKey),
 	}

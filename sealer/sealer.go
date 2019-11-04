@@ -10,9 +10,9 @@ import (
 	"github.com/umbracle/minimal/blockchain"
 	"github.com/umbracle/minimal/consensus"
 	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/derivesha"
 	"github.com/umbracle/minimal/state"
 	"github.com/umbracle/minimal/types"
+	"github.com/umbracle/minimal/types/buildroot"
 )
 
 // Config is the sealer config
@@ -156,13 +156,13 @@ func generateNewBlock(header *types.Header, txs []*types.Transaction, receipts [
 	if len(txs) == 0 {
 		header.TxRoot = types.EmptyRootHash
 	} else {
-		header.TxRoot = derivesha.CalcTxsRoot(txs)
+		header.TxRoot = buildroot.CalculateTransactionsRoot(txs)
 	}
 
 	if len(receipts) == 0 {
 		header.ReceiptsRoot = types.EmptyRootHash
 	} else {
-		header.ReceiptsRoot = derivesha.CalcReceiptRoot(receipts)
+		header.ReceiptsRoot = buildroot.CalculateReceiptsRoot(receipts)
 	}
 
 	// TODO: Compute uncles
