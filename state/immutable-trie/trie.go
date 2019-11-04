@@ -158,11 +158,12 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 				localTxn.batch = batch
 
 				for _, entry := range obj.Storage {
+					k := hashit(entry.Key)
 					if entry.Deleted {
-						localTxn.Delete(entry.Key)
+						localTxn.Delete(k)
 					} else {
 						vv := ar1.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
-						localTxn.Insert(entry.Key, vv.MarshalTo(nil))
+						localTxn.Insert(k, vv.MarshalTo(nil))
 					}
 				}
 

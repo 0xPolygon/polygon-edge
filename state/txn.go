@@ -7,12 +7,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"golang.org/x/crypto/sha3"
-
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/minimal/crypto"
 	"github.com/umbracle/minimal/helper/hex"
+	"github.com/umbracle/minimal/helper/keccak"
 	"github.com/umbracle/minimal/state/runtime"
 	"github.com/umbracle/minimal/types"
 )
@@ -20,8 +19,6 @@ import (
 var (
 	ErrInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
 )
-
-// var emptyCodeHash = crypto.Keccak256(nil)
 
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
@@ -33,11 +30,6 @@ var (
 	refundIndex = types.BytesToHash([]byte{3}).Bytes()
 )
 
-type GasPool interface {
-	SubGas(uint64) error
-	AddGas(uint64)
-}
-
 // Txn is a reference of the state
 type Txn struct {
 	snapshot  Snapshot
@@ -45,7 +37,7 @@ type Txn struct {
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
-	hash      hashImpl
+	hash      *keccak.Keccak
 }
 
 func NewTxn(state State, snapshot Snapshot) *Txn {
@@ -63,16 +55,16 @@ func newTxn(state State, snapshot Snapshot) *Txn {
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
-		hash:      sha3.NewLegacyKeccak256().(hashImpl),
+		hash:      keccak.NewKeccak256(),
 	}
 }
 
-func (txn *Txn) hashit(dst, src []byte) []byte {
-	dst = extendByteSlice(dst, 32)
+func (txn *Txn) hashit(src []byte) []byte {
 	txn.hash.Reset()
 	txn.hash.Write(src)
-	txn.hash.Read(dst)
-	return dst
+	// hashit is used to make queries so we do not need to
+	// make copies of the result
+	return txn.hash.Read()
 }
 
 // Snapshot takes a snapshot at this point in time
@@ -118,7 +110,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 		return obj.Copy(), true
 	}
 
-	data, ok := txn.snapshot.Get(txn.hashit(nil, addr.Bytes()))
+	data, ok := txn.snapshot.Get(txn.hashit(addr.Bytes()))
 	if !ok {
 		return nil, false
 	}
@@ -285,24 +277,24 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 	}
 
 	if original == current {
-		if original == (types.Hash{}) { // create slot (2.1.1)
+		if original == zeroHash { // create slot (2.1.1)
 			return runtime.StorageAdded
 		}
-		if value == (types.Hash{}) { // delete slot (2.1.2b)
+		if value == zeroHash { // delete slot (2.1.2b)
 			txn.AddRefund(15000)
 			return runtime.StorageDeleted
 		}
 		return runtime.StorageModified
 	}
-	if original != (types.Hash{}) {
-		if current == (types.Hash{}) { // recreate slot (2.2.1.1)
+	if original != zeroHash {
+		if current == zeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
-		} else if value == (types.Hash{}) { // delete slot (2.2.1.2)
+		} else if value == zeroHash { // delete slot (2.2.1.2)
 			txn.AddRefund(15000)
 		}
 	}
 	if original == value {
-		if original == (types.Hash{}) { // reset to original inexistent slot (2.2.2.1)
+		if original == zeroHash { // reset to original inexistent slot (2.2.2.1)
 			txn.AddRefund(19800)
 		} else { // reset to original existing slot (2.2.2.2)
 			txn.AddRefund(4800)
@@ -318,10 +310,10 @@ func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
 			object.Txn = iradix.New().Txn()
 		}
 
-		if isZeros(value.Bytes()) {
-			object.Txn.Insert(txn.hashit(nil, key.Bytes()), nil)
+		if value == zeroHash {
+			object.Txn.Insert(key.Bytes(), nil)
 		} else {
-			object.Txn.Insert(txn.hashit(nil, key.Bytes()), value.Bytes())
+			object.Txn.Insert(key.Bytes(), value.Bytes())
 		}
 	})
 }
@@ -333,16 +325,16 @@ func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 		return types.Hash{}
 	}
 
-	k := txn.hashit(nil, hash.Bytes())
-
 	if object.Txn != nil {
-		if val, ok := object.Txn.Get(k); ok {
+		if val, ok := object.Txn.Get(hash.Bytes()); ok {
 			if val == nil {
 				return types.Hash{}
 			}
 			return types.BytesToHash(val.([]byte))
 		}
 	}
+
+	k := txn.hashit(hash.Bytes())
 	return object.GetCommitedState(types.BytesToHash(k))
 }
 
@@ -412,8 +404,6 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	return types.BytesToHash(object.Account.CodeHash)
 }
 
-// Suicide
-
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
@@ -468,7 +458,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, hash types.Hash) types.Has
 	if !ok {
 		return types.Hash{}
 	}
-	return obj.GetCommitedState(types.BytesToHash(txn.hashit(nil, hash.Bytes())))
+	return obj.GetCommitedState(types.BytesToHash(txn.hashit(hash.Bytes())))
 }
 
 func (txn *Txn) TouchAccount(addr types.Address) {
