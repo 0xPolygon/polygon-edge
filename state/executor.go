@@ -94,7 +94,6 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*Tra
 			return nil, types.Hash{}, err
 		}
 	}
-
 	_, root := txn.Commit()
 	return txn, root, nil
 }

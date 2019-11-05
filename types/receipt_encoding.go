@@ -90,7 +90,7 @@ func (r *Receipt) MarshalWith(a *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(a.NewBytes(r.Root[:]))
 	}
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
-	vv.Set(a.NewBytes(r.LogsBloom[:]))
+	vv.Set(a.NewCopyBytes(r.LogsBloom[:]))
 	vv.Set(r.MarshalLogsWith(a))
 	return vv
 }

@@ -413,6 +413,8 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 		} else {
 			suicided = true
 			object.Suicide = true
+		}
+		if object != nil {
 			object.Account.Balance = new(big.Int)
 		}
 	})
@@ -441,6 +443,7 @@ func (txn *Txn) Logs() []*types.Log {
 	if !exists {
 		return nil
 	}
+	txn.txn.Delete(logIndex)
 	return data.([]*types.Log)
 }
 
