@@ -480,10 +480,6 @@ func (b *Backend) listen() {
 				b.packetCh <- packet
 			} else {
 				go func() {
-
-					// fmt.Println("-- packet --")
-					// fmt.Println(packet)
-
 					if err := b.HandlePacket(packet); err != nil {
 						b.logger.Trace("failed to handle packet", "err", err.Error())
 					}
