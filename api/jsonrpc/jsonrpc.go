@@ -79,7 +79,7 @@ func Factory(logger hclog.Logger, m interface{}, config map[string]interface{}) 
 
 var defaultServers = map[serverType]ServerFactory{
 	serverHTTP: startHTTPServer,
-	serverIPC:  startIPCServer,
+	// serverIPC:  startIPCServer,
 }
 
 // ServerConfig is the configuration for each server
