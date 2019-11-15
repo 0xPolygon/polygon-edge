@@ -33,6 +33,14 @@ $ go run main.go agent --config ./config.json --data-dir /tmp/local --port 30304
 
 The values from the CLI have preference over the ones in the configuration file.
 
+### Dev
+
+Start a development chain with instant sealing:
+
+```
+$ go run main.go dev
+```
+
 ### Genesis
 
 Generates a test genesis file:
