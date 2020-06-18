@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain/storage/memory"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state"
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
+	"github.com/0xPolygon/minimal/blockchain/storage/memory"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state"
+	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 
-	"github.com/umbracle/minimal/types"
-	"github.com/umbracle/minimal/types/buildroot"
+	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/minimal/types/buildroot"
 )
 
 type fakeConsensus struct {

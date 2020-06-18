@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/umbracle/minimal/command"
-	"github.com/umbracle/minimal/version"
+	"github.com/0xPolygon/minimal/command"
+	"github.com/0xPolygon/minimal/version"
 )
 
 var versionCmd = &cobra.Command{

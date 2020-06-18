@@ -1,7 +1,7 @@
 package ethash
 
 import (
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 const minDiff = 131072

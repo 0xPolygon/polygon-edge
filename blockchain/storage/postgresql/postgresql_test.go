@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	_ "github.com/lib/pq"
-	"github.com/umbracle/minimal/blockchain/storage"
 
 	"github.com/hashicorp/go-hclog"
 )

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/0xPolygon/minimal/api"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/api"
 	"github.com/valyala/fasthttp"
 )
 

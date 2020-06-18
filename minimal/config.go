@@ -1,13 +1,13 @@
 package minimal
 
 import (
-	"github.com/umbracle/minimal/api"
-	"github.com/umbracle/minimal/blockchain/storage"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/minimal/keystore"
-	"github.com/umbracle/minimal/network/discovery"
-	"github.com/umbracle/minimal/protocol"
+	"github.com/0xPolygon/minimal/api"
+	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/minimal/keystore"
+	"github.com/0xPolygon/minimal/network/discovery"
+	"github.com/0xPolygon/minimal/protocol"
 )
 
 // Config is used to parametrize the minimal client

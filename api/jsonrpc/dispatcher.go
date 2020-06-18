@@ -8,7 +8,7 @@ import (
 
 	"reflect"
 
-	"github.com/umbracle/minimal/minimal"
+	"github.com/0xPolygon/minimal/minimal"
 )
 
 var (

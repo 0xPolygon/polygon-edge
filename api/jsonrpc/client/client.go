@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/json"
 
-	"github.com/umbracle/minimal/api/jsonrpc"
+	"github.com/0xPolygon/minimal/api/jsonrpc"
 	"github.com/valyala/fasthttp"
 )
 

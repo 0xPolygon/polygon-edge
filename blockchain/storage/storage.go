@@ -3,8 +3,8 @@ package storage
 import (
 	"math/big"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/types"
 )
 
 // Storage is a generic blockchain storage

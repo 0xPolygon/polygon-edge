@@ -12,8 +12,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/hex"
 )
 
 func newTestDiscovery(t *testing.T, transport Transport, capturePacket bool) *Backend {

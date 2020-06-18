@@ -1,8 +1,8 @@
 package dao
 
 import (
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // DAOForkExtraData is the dao fork extra data

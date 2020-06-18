@@ -1,8 +1,8 @@
 package debug
 
 import (
+	"github.com/0xPolygon/minimal/command"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/minimal/command"
 )
 
 var debugCmd = &cobra.Command{

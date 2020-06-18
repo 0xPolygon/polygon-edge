@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/types"
 )
 
 // prefix

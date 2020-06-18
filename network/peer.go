@@ -3,7 +3,7 @@ package network
 import (
 	"fmt"
 
-	"github.com/umbracle/minimal/helper/enode"
+	"github.com/0xPolygon/minimal/helper/enode"
 )
 
 type Status int

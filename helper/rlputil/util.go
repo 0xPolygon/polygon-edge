@@ -1,8 +1,8 @@
 package rlputil
 
 import (
+	"github.com/0xPolygon/minimal/types"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/types"
 )
 
 // Handy tools to encode rlp values during tests

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/umbracle/minimal/network"
+	"github.com/0xPolygon/minimal/network"
 )
 
 func BenchmarkHandshake(b *testing.B) {

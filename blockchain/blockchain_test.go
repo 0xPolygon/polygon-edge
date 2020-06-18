@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/chain"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 func TestGenesis(t *testing.T) {

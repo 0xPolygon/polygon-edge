@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	"github.com/0xPolygon/minimal/api"
+	"github.com/0xPolygon/minimal/minimal"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/api"
-	"github.com/umbracle/minimal/minimal"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 )

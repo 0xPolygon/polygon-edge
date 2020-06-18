@@ -11,18 +11,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/sealer"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/minimal"
-	"github.com/umbracle/minimal/sealer"
 
 	"sync"
 
-	"github.com/umbracle/minimal/network"
+	"github.com/0xPolygon/minimal/network"
 
-	"github.com/umbracle/minimal/protocol"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/protocol"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Backend is the ethereum backend

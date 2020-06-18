@@ -6,9 +6,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/0xPolygon/minimal/helper/enode"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/network"
 )
 
 // Rlpx is the RLPx transport protocol

@@ -9,8 +9,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/types"
 )
 
 var (

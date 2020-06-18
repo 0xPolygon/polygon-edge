@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	httpClient "github.com/umbracle/minimal/api/http/client"
-	"github.com/umbracle/minimal/command"
+	httpClient "github.com/0xPolygon/minimal/api/http/client"
+	"github.com/0xPolygon/minimal/command"
 )
 
 var peersAddCmd = &cobra.Command{

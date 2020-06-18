@@ -7,10 +7,10 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
 

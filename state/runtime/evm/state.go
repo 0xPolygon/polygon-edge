@@ -7,10 +7,10 @@ import (
 
 	"sync"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/types"
 )
 
 var statePool = sync.Pool{

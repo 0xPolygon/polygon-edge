@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"github.com/umbracle/minimal/blockchain/storage"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 
 	"fmt"
 

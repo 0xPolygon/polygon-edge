@@ -5,8 +5,8 @@ import (
 	"hash"
 	"sync"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 )
 

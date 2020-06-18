@@ -3,7 +3,7 @@ package itrie
 import (
 	"testing"
 
-	"github.com/umbracle/minimal/state"
+	"github.com/0xPolygon/minimal/state"
 )
 
 func TestState(t *testing.T) {

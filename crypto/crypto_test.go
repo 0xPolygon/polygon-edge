@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 )
 
 func TestKeyEncoding(t *testing.T) {

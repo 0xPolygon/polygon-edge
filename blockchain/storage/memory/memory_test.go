@@ -3,7 +3,7 @@ package memory
 import (
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain/storage"
 )
 
 func TestStorage(t *testing.T) {

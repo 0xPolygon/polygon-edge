@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/minimal/types"
 )
 
 // REVISION is the spec revision number of Ethash

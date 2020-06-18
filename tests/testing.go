@@ -11,15 +11,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/hex"
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
-	"github.com/umbracle/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/hex"
+	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
+	"github.com/0xPolygon/minimal/state/runtime"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // TESTS is the default location of the tests folder

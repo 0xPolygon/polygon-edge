@@ -1,8 +1,8 @@
 package evm
 
 import (
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state/runtime"
 )
 
 var _ runtime.Runtime = &EVM{}

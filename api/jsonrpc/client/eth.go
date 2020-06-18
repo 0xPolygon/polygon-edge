@@ -3,7 +3,7 @@ package client
 import (
 	"fmt"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Eth is used to query the eth service

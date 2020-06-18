@@ -6,10 +6,10 @@ import (
 	"math/bits"
 	"sync"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/minimal/state/runtime"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/types"
 )
 
 type instruction func(c *state)

@@ -5,33 +5,33 @@ import (
 	"log"
 	"os"
 
+	"github.com/0xPolygon/minimal/api"
+	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/minimal/keystore"
+	"github.com/0xPolygon/minimal/network/discovery"
 	"github.com/google/gops/agent"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/api"
-	"github.com/umbracle/minimal/blockchain/storage"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/minimal/keystore"
-	"github.com/umbracle/minimal/network/discovery"
 
-	"github.com/umbracle/minimal/protocol"
+	"github.com/0xPolygon/minimal/protocol"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/minimal"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/minimal"
 
-	consensusClique "github.com/umbracle/minimal/consensus/clique"
-	consensusEthash "github.com/umbracle/minimal/consensus/ethash"
-	consensusPOW "github.com/umbracle/minimal/consensus/pow"
+	consensusClique "github.com/0xPolygon/minimal/consensus/clique"
+	consensusEthash "github.com/0xPolygon/minimal/consensus/ethash"
+	consensusPOW "github.com/0xPolygon/minimal/consensus/pow"
 
-	discoveryConsul "github.com/umbracle/minimal/network/discovery/consul"
-	discoveryDevP2P "github.com/umbracle/minimal/network/discovery/devp2p"
+	discoveryConsul "github.com/0xPolygon/minimal/network/discovery/consul"
+	discoveryDevP2P "github.com/0xPolygon/minimal/network/discovery/devp2p"
 
-	protocolEthereum "github.com/umbracle/minimal/protocol/ethereum"
+	protocolEthereum "github.com/0xPolygon/minimal/protocol/ethereum"
 
-	storageBoltDB "github.com/umbracle/minimal/blockchain/storage/boltdb"
-	storageLevelDB "github.com/umbracle/minimal/blockchain/storage/leveldb"
+	storageBoltDB "github.com/0xPolygon/minimal/blockchain/storage/boltdb"
+	storageLevelDB "github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 
-	apiHTTP "github.com/umbracle/minimal/api/http"
-	apiJsonRPC "github.com/umbracle/minimal/api/jsonrpc"
+	apiHTTP "github.com/0xPolygon/minimal/api/http"
+	apiJsonRPC "github.com/0xPolygon/minimal/api/jsonrpc"
 )
 
 var blockchainBackends = map[string]storage.Factory{

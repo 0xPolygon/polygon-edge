@@ -6,9 +6,9 @@ import (
 
 	"encoding/binary"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/helper/keccak"
 )
 
 // Header represents a block header in the Ethereum blockchain.

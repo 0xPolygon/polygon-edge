@@ -3,7 +3,7 @@ package http
 import (
 	"fmt"
 
-	"github.com/umbracle/minimal/network"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/valyala/fasthttp"
 )
 

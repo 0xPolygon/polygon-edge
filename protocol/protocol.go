@@ -3,8 +3,8 @@ package protocol
 import (
 	"context"
 
+	"github.com/0xPolygon/minimal/network"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/network"
 )
 
 // Backend is a protocol backend

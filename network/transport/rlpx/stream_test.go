@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/umbracle/minimal/network"
+	"github.com/0xPolygon/minimal/network"
 )
 
 func readMsg(t *testing.T, s *Stream) *Message {

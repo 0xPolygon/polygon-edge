@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xPolygon/minimal/network"
 	"github.com/mitchellh/colorstring"
 	"github.com/mitchellh/mapstructure"
 	"github.com/ryanuber/columnize"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/minimal/network"
 	"golang.org/x/crypto/ssh/terminal"
 
-	httpClient "github.com/umbracle/minimal/api/http/client"
-	"github.com/umbracle/minimal/command"
+	httpClient "github.com/0xPolygon/minimal/api/http/client"
+	"github.com/0xPolygon/minimal/command"
 )
 
 var peersInfoCmd = &cobra.Command{

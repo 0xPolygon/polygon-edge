@@ -3,8 +3,8 @@ package jsonrpc
 import (
 	"errors"
 
+	"github.com/0xPolygon/minimal/helper/ipc"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/helper/ipc"
 )
 
 const defaultIPCPath = "/tmp/minimal.ipc"

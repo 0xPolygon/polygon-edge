@@ -14,9 +14,9 @@ import (
 
 	mrand "math/rand"
 
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/enode"
 	"github.com/umbracle/ecies"
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/enode"
 
 	"golang.org/x/crypto/sha3"
 )

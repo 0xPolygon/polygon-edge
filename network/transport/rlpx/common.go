@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/0xPolygon/minimal/helper/enode"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/enode"
 )
 
 const (

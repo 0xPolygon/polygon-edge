@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/umbracle/minimal/network"
+	"github.com/0xPolygon/minimal/network"
 )
 
 // Stream represents a logic stream within a RLPx session

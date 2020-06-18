@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/boltdb/bolt"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 // Factory creates a boltdb storage

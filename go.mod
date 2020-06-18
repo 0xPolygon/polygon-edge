@@ -1,6 +1,6 @@
-module github.com/umbracle/minimal
+module github.com/0xPolygon/minimal
 
-go 1.12
+go 1.14
 
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7 // indirect

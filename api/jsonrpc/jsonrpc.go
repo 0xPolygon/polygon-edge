@@ -3,10 +3,10 @@ package jsonrpc
 import (
 	"fmt"
 
+	"github.com/0xPolygon/minimal/api"
+	"github.com/0xPolygon/minimal/minimal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
-	"github.com/umbracle/minimal/api"
-	"github.com/umbracle/minimal/minimal"
 )
 
 type serverType int

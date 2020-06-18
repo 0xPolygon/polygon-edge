@@ -5,8 +5,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 type ecrecover struct {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 var emptyAddr types.Address

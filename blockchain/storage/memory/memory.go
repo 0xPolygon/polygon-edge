@@ -1,9 +1,9 @@
 package memory
 
 import (
+	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/blockchain/storage"
-	"github.com/umbracle/minimal/helper/hex"
 )
 
 // NewMemoryStorage creates the new storage reference with inmemory

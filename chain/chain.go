@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/gobuffalo/packr"
 	"github.com/hashicorp/go-multierror"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 )
 
 var (

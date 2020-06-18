@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/minimal/crypto"
+	"github.com/0xPolygon/minimal/crypto"
 )
 
 const (

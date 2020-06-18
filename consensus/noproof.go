@@ -3,8 +3,8 @@ package consensus
 import (
 	"context"
 
-	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/types"
 )
 
 /*

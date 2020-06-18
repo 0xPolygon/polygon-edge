@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 )
 
 type MockStorage func(t *testing.T) (Storage, func())

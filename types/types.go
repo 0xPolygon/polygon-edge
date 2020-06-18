@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/umbracle/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/hex"
 )
 
 const (

@@ -3,8 +3,8 @@ package clique
 import (
 	"context"
 
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Clique is a consensus algorithm for the clique protocol

@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/enode"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/enode"
 )
 
 func TestHandshakeP2P(t *testing.T) {

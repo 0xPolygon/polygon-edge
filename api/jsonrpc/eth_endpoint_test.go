@@ -3,8 +3,8 @@ package jsonrpc
 import (
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/minimal"
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/minimal"
 )
 
 func TestEthEndpointGetBlockByNumber(t *testing.T) {

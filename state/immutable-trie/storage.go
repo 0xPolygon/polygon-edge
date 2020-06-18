@@ -3,11 +3,11 @@ package itrie
 import (
 	"fmt"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 )
 
 var parserPool fastrlp.ParserPool

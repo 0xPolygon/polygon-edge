@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/minimal/types/buildroot"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/types"
-	"github.com/umbracle/minimal/types/buildroot"
 )
 
 // Config is the sealer config

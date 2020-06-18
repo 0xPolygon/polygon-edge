@@ -3,8 +3,8 @@ package ethash
 import (
 	"testing"
 
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/helper/hex"
 )
 
 func TestSizes(t *testing.T) {

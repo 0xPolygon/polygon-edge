@@ -14,18 +14,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/enode"
+	"github.com/0xPolygon/minimal/helper/hex"
 	kbucket "github.com/ferranbt/go-kademlia-bucket"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/helper/hex"
 
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/0xPolygon/minimal/network/discovery"
 	"github.com/armon/go-metrics"
-	"github.com/umbracle/minimal/network/discovery"
 
 	crand "crypto/rand"
 )

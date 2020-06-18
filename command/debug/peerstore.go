@@ -3,9 +3,9 @@ package debug
 import (
 	"fmt"
 
+	"github.com/0xPolygon/minimal/network"
 	"github.com/ryanuber/columnize"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/minimal/network"
 )
 
 var peersStoreCmd = &cobra.Command{

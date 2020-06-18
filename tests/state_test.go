@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/state/runtime/evm"
-	"github.com/umbracle/minimal/state/runtime/precompiled"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/state/runtime/evm"
+	"github.com/0xPolygon/minimal/state/runtime/precompiled"
+	"github.com/0xPolygon/minimal/types"
 )
 
 var stateTests = "GeneralStateTests"

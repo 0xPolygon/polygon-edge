@@ -17,7 +17,7 @@ DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 cd "$DIR"
 
 GIT_COMMIT="$(git rev-parse HEAD)"
-GO_LDFLAGS="-X github.com/umbracle/minimal/version.GitCommit=${GIT_COMMIT}"
+GO_LDFLAGS="-X github.com/0xPolygon/minimal/version.GitCommit=${GIT_COMMIT}"
 
 # Determine the arch/os combos we're building for
 XC_ARCH=${XC_ARCH:-"amd64"}

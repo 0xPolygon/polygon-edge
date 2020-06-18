@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // TxContext is the context of the transaction

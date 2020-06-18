@@ -1,8 +1,8 @@
 package jsonrpc
 
 import (
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 // Web3 is the web3 jsonrpc endpoint

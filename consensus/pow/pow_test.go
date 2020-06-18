@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 func TestSeal(t *testing.T) {

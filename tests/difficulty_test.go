@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/consensus"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 
-	"github.com/umbracle/minimal/consensus/ethash"
+	"github.com/0xPolygon/minimal/consensus/ethash"
 )
 
 const difficultyTests = "BasicTests"

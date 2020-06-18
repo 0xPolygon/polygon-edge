@@ -7,12 +7,12 @@ import (
 	"net"
 	"time"
 
+	"github.com/0xPolygon/minimal/helper/enode"
 	"github.com/mitchellh/mapstructure"
-	"github.com/umbracle/minimal/helper/enode"
 
+	"github.com/0xPolygon/minimal/network/discovery"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/network/discovery"
 )
 
 type config struct {

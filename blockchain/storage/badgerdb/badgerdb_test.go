@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/umbracle/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain/storage"
 )
 
 func newStorage(t *testing.T) (storage.Storage, func()) {

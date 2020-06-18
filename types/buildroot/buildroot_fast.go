@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"sync"
 
-	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 func min(i, j int) int {

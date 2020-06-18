@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Request is a jsonrpc request

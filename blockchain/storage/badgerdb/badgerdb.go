@@ -3,9 +3,9 @@ package badgerdb
 import (
 	"fmt"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/dgraph-io/badger"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/blockchain/storage"
 )
 
 // Factory creates a leveldb storage

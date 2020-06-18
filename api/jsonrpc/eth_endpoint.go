@@ -3,8 +3,8 @@ package jsonrpc
 import (
 	"fmt"
 
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Eth is the eth jsonrpc endpoint

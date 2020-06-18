@@ -5,8 +5,8 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 type ReceiptStatus uint64

@@ -13,15 +13,15 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/minimal/network"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/network/transport/rlpx"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/network/transport/rlpx"
-	"github.com/umbracle/minimal/types"
 )
 
 var (

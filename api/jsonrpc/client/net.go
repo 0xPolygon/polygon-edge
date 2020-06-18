@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Net is used to query the net service

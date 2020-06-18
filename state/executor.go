@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/umbracle/minimal/helper/dao"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/helper/dao"
+	"github.com/0xPolygon/minimal/types"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/state/runtime"
 )
 
 const (

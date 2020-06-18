@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/helper/enode"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/snappy"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/helper/enode"
-	"github.com/umbracle/minimal/network"
 )
 
 const (

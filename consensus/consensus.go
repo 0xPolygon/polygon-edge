@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Consensus is the interface for consensus

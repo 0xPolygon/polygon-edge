@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/command"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/command"
 )
 
 const genesisPath = "./genesis.json"

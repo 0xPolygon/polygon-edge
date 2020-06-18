@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/types"
 )
 
 func newTestBackend(t *testing.T, b0 *blockchain.Blockchain) *Backend {

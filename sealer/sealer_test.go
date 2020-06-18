@@ -8,17 +8,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/blockchain/storage/memory"
+	"github.com/0xPolygon/minimal/chain"
+	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
+	"github.com/0xPolygon/minimal/state/runtime/evm"
+	"github.com/0xPolygon/minimal/state/runtime/precompiled"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/blockchain/storage/memory"
-	"github.com/umbracle/minimal/chain"
-	itrie "github.com/umbracle/minimal/state/immutable-trie"
-	"github.com/umbracle/minimal/state/runtime/evm"
-	"github.com/umbracle/minimal/state/runtime/precompiled"
 
-	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/types"
 )
 
 type sealHook func(ctx context.Context, block *types.Block) (*types.Block, error)

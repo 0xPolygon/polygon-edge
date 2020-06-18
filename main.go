@@ -3,13 +3,13 @@ package main
 import (
 	logger "github.com/hashicorp/go-hclog"
 
-	"github.com/umbracle/minimal/command"
-	_ "github.com/umbracle/minimal/command/version"
-	_ "github.com/umbracle/minimal/command/peers"
-	_ "github.com/umbracle/minimal/command/genesis"
-	_ "github.com/umbracle/minimal/command/agent"
-	_ "github.com/umbracle/minimal/command/dev"
-	_ "github.com/umbracle/minimal/command/debug"
+	"github.com/0xPolygon/minimal/command"
+	_ "github.com/0xPolygon/minimal/command/agent"
+	_ "github.com/0xPolygon/minimal/command/debug"
+	_ "github.com/0xPolygon/minimal/command/dev"
+	_ "github.com/0xPolygon/minimal/command/genesis"
+	_ "github.com/0xPolygon/minimal/command/peers"
+	_ "github.com/0xPolygon/minimal/command/version"
 )
 
 func main() {

@@ -9,13 +9,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/network/transport/rlpx"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/network"
-	"github.com/umbracle/minimal/network/transport/rlpx"
-	"github.com/umbracle/minimal/types"
 )
 
 func newTestEthereumProto(peerID string, conn net.Conn, b *blockchain.Blockchain) *Ethereum {

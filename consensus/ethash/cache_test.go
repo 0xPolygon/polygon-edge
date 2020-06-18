@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/minimal/helper/hex"
 )
 
 func TestHashimotoLight(t *testing.T) {

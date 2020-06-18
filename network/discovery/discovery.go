@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"github.com/0xPolygon/minimal/helper/enode"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/minimal/helper/enode"
 )
 
 // TODO, Is is necessary the Schedule call or we can start once the factory

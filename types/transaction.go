@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/umbracle/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 type Transaction struct {

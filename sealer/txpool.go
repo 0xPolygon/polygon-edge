@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/umbracle/minimal/blockchain"
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/state"
-	"github.com/umbracle/minimal/types"
+	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/types"
 )
 
 const (

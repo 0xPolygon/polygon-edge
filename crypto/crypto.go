@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/umbracle/ecies"
-	"github.com/umbracle/minimal/helper/hex"
-	"github.com/umbracle/minimal/types"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/umbracle/fastrlp"

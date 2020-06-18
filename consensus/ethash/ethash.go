@@ -8,12 +8,12 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/helper/dao"
+	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/types"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/umbracle/minimal/chain"
-	"github.com/umbracle/minimal/consensus"
-	"github.com/umbracle/minimal/helper/dao"
-	"github.com/umbracle/minimal/helper/keccak"
-	"github.com/umbracle/minimal/types"
 )
 
 var (

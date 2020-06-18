@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/umbracle/minimal/crypto"
-	"github.com/umbracle/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/hex"
 )
 
 const nodeIDBytes = 512 / 8
