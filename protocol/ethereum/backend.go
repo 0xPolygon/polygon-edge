@@ -8,18 +8,16 @@ import (
 	"math/big"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/sealer"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-
-	"sync"
-
-	"github.com/0xPolygon/minimal/network"
 
 	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/types"

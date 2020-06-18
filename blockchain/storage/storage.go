@@ -31,6 +31,9 @@ type Storage interface {
 	WriteBody(hash types.Hash, body *types.Body) error
 	ReadBody(hash types.Hash) (*types.Body, bool)
 
+	WriteSnapshot(hash types.Hash, blob []byte) error
+	ReadSnapshot(hash types.Hash) ([]byte, bool)
+
 	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
 	ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 

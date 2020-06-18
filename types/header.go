@@ -2,13 +2,14 @@ package types
 
 import (
 	"database/sql/driver"
-	"fmt"
-
 	"encoding/binary"
+	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/fastrlp"
+	"golang.org/x/crypto/sha3"
 )
 
 // Header represents a block header in the Ethereum blockchain.
@@ -247,6 +248,37 @@ func (b *Block) ParentHash() Hash {
 
 func (b *Block) Body() *Body {
 	return &Body{
+		Transactions: b.Transactions,
+		Uncles:       b.Uncles,
+	}
+}
+
+func CalcUncleHash(uncles []*Header) Hash {
+	if len(uncles) == 0 {
+		return EmptyUncleHash
+	}
+	return rlpHash(uncles)
+}
+
+func rlpHash(x interface{}) (h Hash) {
+	hw := sha3.NewLegacyKeccak256()
+	rlp.Encode(hw, x)
+	hw.Sum(h[:0])
+	return h
+}
+
+func (b *Block) String() string {
+	str := fmt.Sprintf(`Block(#%v):`, b.Number())
+	return str
+}
+
+// WithSeal returns a new block with the data from b but the header replaced with
+// the sealed one.
+func (b *Block) WithSeal(header *Header) *Block {
+	cpy := *header
+
+	return &Block{
+		Header:       &cpy,
 		Transactions: b.Transactions,
 		Uncles:       b.Uncles,
 	}

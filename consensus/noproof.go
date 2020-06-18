@@ -16,12 +16,12 @@ type NoProof struct {
 }
 
 // VerifyHeader verifies the header is correct
-func (n *NoProof) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (n *NoProof) VerifyHeader(chain ChainReader, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
 // Seal seals the block
-func (n *NoProof) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (n *NoProof) Seal(chain ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	block.Header.ComputeHash()
 	return block, nil
 }

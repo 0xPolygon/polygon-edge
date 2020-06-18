@@ -19,5 +19,5 @@ func TestSeal(t *testing.T) {
 	b := &types.Block{
 		Header: h,
 	}
-	c.Seal(context.Background(), b)
+	c.Seal(nil, b, context.Background())
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/armon/go-metrics"
@@ -28,7 +29,6 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/sealer"
 )
 
@@ -202,7 +202,7 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	}
 
 	// blockchain object
-	m.Blockchain = blockchain.NewBlockchain(storage, m.consensus, executor)
+	m.Blockchain = blockchain.NewBlockchain(storage, config.Chain.Params, m.consensus, executor)
 	if err := m.Blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
 		return nil, err
 	}

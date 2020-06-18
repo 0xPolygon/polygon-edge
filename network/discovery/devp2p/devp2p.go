@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"net"
@@ -26,8 +27,6 @@ import (
 
 	"github.com/0xPolygon/minimal/network/discovery"
 	"github.com/armon/go-metrics"
-
-	crand "crypto/rand"
 )
 
 var (

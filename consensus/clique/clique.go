@@ -17,12 +17,12 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 }
 
 // VerifyHeader verifies the header is correct
-func (c *Clique) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (c *Clique) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
 // Seal seals the block
-func (c *Clique) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	return nil, nil
 }
 

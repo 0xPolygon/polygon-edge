@@ -98,6 +98,11 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*Tra
 	return txn, root, nil
 }
 
+// StateAt returns snapshot at given root
+func (e *Executor) StateAt(root types.Hash) (Snapshot, error) {
+	return e.state.NewSnapshotAt(root)
+}
+
 func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
 

@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/network"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/blockchain"

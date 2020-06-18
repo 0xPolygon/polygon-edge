@@ -67,3 +67,8 @@ CREATE TABLE canonical (
     hash    char(66) REFERENCES headers(hash),
     number  int UNIQUE
 );
+
+CREATE TABLE snapshot (
+    hash  char(66) REFERENCES headers(hash),
+    blob  bytea
+);

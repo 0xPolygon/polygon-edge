@@ -111,7 +111,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	executor.SetRuntime(precompiled.NewPrecompiled())
 	executor.SetRuntime(evm.NewEVM())
 
-	b := blockchain.NewBlockchain(s, engine, executor)
+	b := blockchain.NewBlockchain(s, params, engine, executor)
 	if err := b.WriteGenesis(genesis); err != nil {
 		t.Fatal(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	hexCore "encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -153,6 +154,17 @@ func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	return append(sig, term)[1:], nil
 }
 
+// SigToPub returns the public key that created the given signature.
+func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
+	s, err := Ecrecover(hash, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	x, y := elliptic.Unmarshal(S256, s)
+	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
+}
+
 // Keccak256 calculates the Keccak256
 func Keccak256(v ...[]byte) []byte {
 	h := sha3.NewLegacyKeccak256()
@@ -166,4 +178,47 @@ func Keccak256(v ...[]byte) []byte {
 func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	buf := Keccak256(MarshallPublicKey(pub)[1:])[12:]
 	return types.BytesToAddress(buf)
+}
+
+// HexToECDSA parses a secp256k1 private key.
+func HexToECDSA(hexkey string) (*ecdsa.PrivateKey, error) {
+	b, err := hex.DecodeString(hexkey)
+	if byteErr, ok := err.(hexCore.InvalidByteError); ok {
+		return nil, fmt.Errorf("invalid hex character %q in private key", byte(byteErr))
+	} else if err != nil {
+		return nil, fmt.Errorf("invalid hex data for private key")
+	}
+	return ToECDSA(b)
+}
+
+// ToECDSA creates a private key with the given D value.
+func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
+	return toECDSA(d, true)
+}
+
+// toECDSA creates a private key with the given D value. The strict parameter
+// controls whether the key's length should be enforced at the curve size or
+// it can also accept legacy encodings (0 prefixes).
+func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
+	priv := new(ecdsa.PrivateKey)
+	priv.PublicKey.Curve = S256
+	if strict && 8*len(d) != priv.Params().BitSize {
+		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
+	}
+	priv.D = new(big.Int).SetBytes(d)
+
+	// The priv.D must < N
+	if priv.D.Cmp(new(big.Int).SetBytes(secp256k1N)) >= 0 {
+		return nil, fmt.Errorf("invalid private key, >=N")
+	}
+	// The priv.D must not be zero or negative.
+	if priv.D.Sign() <= 0 {
+		return nil, fmt.Errorf("invalid private key, zero or negative")
+	}
+
+	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
+	if priv.PublicKey.X == nil {
+		return nil, fmt.Errorf("invalid private key")
+	}
+	return priv, nil
 }

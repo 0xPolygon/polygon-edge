@@ -243,7 +243,7 @@ func (s *Sealer) seal(ctx context.Context) error {
 	block := generateNewBlock(header, txns, transition.Receipts())
 
 	// Start the consensus sealing
-	if _, err := s.engine.Seal(ctx, block); err != nil {
+	if _, err := s.engine.Seal(s.blockchain, block, ctx); err != nil {
 		return err
 	}
 	// Check if the context was cancelled while in the sealing routine

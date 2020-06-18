@@ -27,7 +27,8 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
-func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (p *Pow) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
+	parent, _ := chain.CurrentHeader()
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
@@ -40,7 +41,7 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	return nil
 }
 
-func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (p *Pow) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	header := block.Header
 	header.Difficulty = randomInt(p.min, p.max)
 

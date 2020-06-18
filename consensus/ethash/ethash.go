@@ -57,8 +57,9 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 }
 
 // VerifyHeader verifies the header is correct
-func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
 	headerNum := header.Number
+	parent, _ := chain.CurrentHeader()
 	parentNum := parent.Number
 
 	if headerNum != parentNum+1 {
@@ -197,7 +198,7 @@ func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 }
 
 // Seal seals the block
-func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (e *Ethash) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	panic("NOT IMPLEMENTED")
 }
 
