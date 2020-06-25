@@ -8,6 +8,7 @@ import (
 	_ "github.com/0xPolygon/minimal/command/debug"
 	_ "github.com/0xPolygon/minimal/command/dev"
 	_ "github.com/0xPolygon/minimal/command/genesis"
+	_ "github.com/0xPolygon/minimal/command/ibft"
 	_ "github.com/0xPolygon/minimal/command/peers"
 	_ "github.com/0xPolygon/minimal/command/version"
 )

@@ -20,6 +20,9 @@ type Session interface {
 	// Info returns the information of the network
 	GetInfo() Info
 
+	// Write raw message on connection
+	WriteRawMsg(code uint64, buf []byte) error
+
 	// CloseChan returns a read-only channel which is closed as
 	// soon as the session is closed.
 	CloseChan() <-chan struct{}

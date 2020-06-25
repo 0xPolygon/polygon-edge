@@ -2,6 +2,7 @@ package pow
 
 import (
 	"context"
+	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
 	"math"
@@ -9,6 +10,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/types"
 )
@@ -23,7 +25,7 @@ type Pow struct {
 	max uint64
 }
 
-func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
@@ -38,6 +40,12 @@ func (p *Pow) VerifyHeader(chain consensus.ChainReader, header *types.Header, un
 	if header.Difficulty > p.max {
 		return fmt.Errorf("Difficulty not correct. '%d' >! '%d'", header.Difficulty, p.min)
 	}
+	return nil
+}
+
+// Prepare initializes the consensus fields of a block header according to the
+// rules of a particular engine. The changes are executed inline.
+func (p *Pow) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	return nil
 }
 

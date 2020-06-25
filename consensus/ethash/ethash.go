@@ -3,11 +3,13 @@ package ethash
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/helper/dao"
@@ -35,7 +37,7 @@ type Ethash struct {
 }
 
 // Factory is the factory method to create an Ethash consensus
-func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
 	var pathStr string
 	path, ok := config.Config["path"]
 	if ok {
@@ -195,6 +197,12 @@ func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 	default:
 		return FrontierDifficulty(time, parent)
 	}
+}
+
+// Prepare initializes the consensus fields of a block header according to the
+// rules of a particular engine. The changes are executed inline.
+func (e *Ethash) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
 }
 
 // Seal seals the block

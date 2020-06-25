@@ -177,7 +177,7 @@ func (s *Stream) readData(code uint64, buf []byte) error {
 
 	var h Header
 	h = make([]byte, HeaderSize)
-	h.Encode(uint16(code-uint64(s.offset)), uint32(size))
+	h.Encode(uint16(code-s.offset), uint32(size))
 
 	if _, err := s.recvBuf.Write(h); err != nil {
 		s.recvLock.Unlock()

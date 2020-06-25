@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -23,6 +24,10 @@ const (
 	// fetcherID is the ID indicates the block is from Istanbul engine
 	fetcherID = "istanbul"
 )
+
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
+	return New(ibft.DefaultConfig, privateKey, db), nil
+}
 
 // New creates an Ethereum backend for Istanbul core engine.
 func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) consensus.Istanbul {

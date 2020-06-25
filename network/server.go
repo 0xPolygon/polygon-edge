@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/helper/enode"
@@ -122,6 +125,8 @@ type Server struct {
 	Name   string
 	key    *ecdsa.PrivateKey
 
+	consensus consensus.Consensus
+
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
@@ -184,6 +189,15 @@ func (s *Server) SetPeerStore(p PeerStore) {
 	s.peerStore = p
 }
 
+// SetConsensus sets the consensus
+func (s *Server) SetConsensus(c consensus.Consensus) {
+	s.consensus = c
+
+	if handler, ok := s.consensus.(consensus.Handler); ok {
+		handler.SetBroadcaster(s)
+	}
+}
+
 // GetPeers returns a copy of list of peers
 func (s *Server) GetPeers() []string {
 	s.peersLock.Lock()
@@ -210,6 +224,26 @@ func (s *Server) buildInfo() {
 		info.Capabilities = append(info.Capabilities, cap)
 	}
 	s.info = info
+}
+
+func (s *Server) Enqueue(id string, block *types.Block) {
+	//s.fetcher.Enqueue(id, block)
+}
+
+func (s *Server) FindPeers(targets map[types.Address]bool) map[types.Address]consensus.Peer {
+	m := make(map[types.Address]consensus.Peer)
+	for _, p := range s.peers {
+		pubKey, err := p.Enode.PublicKey()
+		if err != nil {
+			continue
+		}
+
+		addr := crypto.PubKeyToAddress(pubKey)
+		if targets[addr] {
+			m[addr] = p
+		}
+	}
+	return m
 }
 
 // Schedule starts all the tasks once all the protocols have been loaded

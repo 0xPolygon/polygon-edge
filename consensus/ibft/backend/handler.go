@@ -6,7 +6,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/rlp"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -29,7 +29,7 @@ func (sb *backend) Protocol() consensus.Protocol {
 }
 
 // HandleMsg implements consensus.Handler.HandleMsg
-func (sb *backend) HandleMsg(addr types.Address, msg p2p.Msg) (bool, error) {
+func (sb *backend) HandleMsg(addr types.Address, msg consensus.Msg) (bool, error) {
 	sb.coreMu.Lock()
 	defer sb.coreMu.Unlock()
 
@@ -39,8 +39,10 @@ func (sb *backend) HandleMsg(addr types.Address, msg p2p.Msg) (bool, error) {
 		}
 
 		var data []byte
-		if err := msg.Decode(&data); err != nil {
-			return true, errDecodeFailed
+
+		s := rlp.NewStream(msg.Payload, uint64(msg.Size))
+		if err := s.Decode(&data); err != nil {
+			return false, err
 		}
 
 		hash := ibft.RLPHash(data)

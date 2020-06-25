@@ -26,12 +26,12 @@ func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
 	return types.Address{}, nil
 }
 
-func (f *fakeConsensus) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
-	return nil, nil
+func (f *fakeConsensus) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
 }
 
-func (f *fakeConsensus) Prepare(parent *types.Header, header *types.Header) error {
-	return nil
+func (f *fakeConsensus) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
+	return nil, nil
 }
 
 func (f *fakeConsensus) Finalize(txn *state.Txn, block *types.Block) error {

@@ -316,6 +316,11 @@ func (b *Blockchain) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return b.readHeader(hash)
 }
 
+// GetConsensus returns the consensus engine
+func (b *Blockchain) GetConsensus() consensus.Consensus {
+	return b.consensus
+}
+
 func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	h, ok := b.headersCache.Get(hash)
 	if ok {
@@ -810,5 +815,9 @@ func (b *Blockchain) GetBlock(hash types.Hash, number uint64) (*types.Block, boo
 }
 
 func (b *Blockchain) Close() error {
+	if istanbul, ok := b.consensus.(consensus.Istanbul); ok {
+		istanbul.Stop()
+	}
+
 	return b.db.Close()
 }

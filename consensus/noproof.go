@@ -20,6 +20,12 @@ func (n *NoProof) VerifyHeader(chain ChainReader, header *types.Header, uncle, s
 	return nil
 }
 
+// Prepare initializes the consensus fields of a block header according to the
+// rules of a particular engine. The changes are executed inline.
+func (n *NoProof) Prepare(chain ChainReader, header *types.Header) error {
+	return nil
+}
+
 // Seal seals the block
 func (n *NoProof) Seal(chain ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	block.Header.ComputeHash()
@@ -28,10 +34,6 @@ func (n *NoProof) Seal(chain ChainReader, block *types.Block, ctx context.Contex
 
 // Close closes the connection
 func (n *NoProof) Close() error {
-	return nil
-}
-
-func (n *NoProof) Prepare(parent *types.Header, header *types.Header) error {
 	return nil
 }
 

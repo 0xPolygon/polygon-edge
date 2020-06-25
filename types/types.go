@@ -162,7 +162,7 @@ func (h *Hash) MarshalText() ([]byte, error) {
 	return []byte(h.String()), nil
 }
 
-func (a *Address) MarshalText() ([]byte, error) {
+func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 

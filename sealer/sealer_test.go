@@ -36,6 +36,10 @@ func (h *hookSealer) VerifyHeader(chain consensus.ChainReader, header *types.Hea
 	return nil
 }
 
+func (h *hookSealer) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
+}
+
 func (h *hookSealer) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	return h.hook(ctx, block)
 }

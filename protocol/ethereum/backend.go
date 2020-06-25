@@ -513,7 +513,7 @@ func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandle
 	b.peersLock.Unlock()
 
 	// Start the protocol handle
-	if err := proto.Init(status); err != nil {
+	if err := proto.Init(peer, status); err != nil {
 		return nil, err
 	}
 

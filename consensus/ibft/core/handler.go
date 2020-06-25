@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
@@ -152,12 +153,16 @@ func (c *core) handleCheckedMsg(msg *message, src ibft.Validator) error {
 
 	switch msg.Code {
 	case msgPreprepare:
+		fmt.Println("msg preprepare")
 		return testBacklog(c.handlePreprepare(msg, src))
 	case msgPrepare:
+		fmt.Println("msg prepare")
 		return testBacklog(c.handlePrepare(msg, src))
 	case msgCommit:
+		fmt.Println("msg commit")
 		return testBacklog(c.handleCommit(msg, src))
 	case msgRoundChange:
+		fmt.Println("msg round change")
 		return testBacklog(c.handleRoundChange(msg, src))
 	default:
 		logger.Error("Invalid message", "msg", msg)

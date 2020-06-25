@@ -204,6 +204,10 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 // Hash returns the root hash of the trie. It does not write to the
 // database and can be used even if the trie doesn't have one.
 func (t *Trie) Hash() types.Hash {
+	if t.root == nil {
+		return types.EmptyRootHash
+	}
+
 	hash, cached, _ := t.hashRoot()
 	t.root = cached
 	return types.BytesToHash(hash)

@@ -174,10 +174,12 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	}
 	consensusConfig.Config = config.ConsensusEntry.Config
 
-	m.consensus, err = engine(context.Background(), consensusConfig)
+	m.consensus, err = engine(context.Background(), consensusConfig, key, storage)
 	if err != nil {
 		return nil, err
 	}
+
+	m.server.SetConsensus(m.consensus)
 
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
@@ -252,6 +254,10 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 			return nil, err
 		}
 		m.apis = append(m.apis, api)
+	}
+
+	if istanbul, ok := m.consensus.(consensus.Istanbul); ok {
+		istanbul.Start(m.Blockchain, m.Blockchain.CurrentBlock, m.Blockchain.HasBadBlock)
 	}
 
 	if err := m.server.Schedule(); err != nil {
