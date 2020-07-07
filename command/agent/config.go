@@ -15,6 +15,8 @@ type Config struct {
 	DataDir     string     `json:"data_dir"`
 	BindAddr    string     `json:"bind_addr"`
 	BindPort    int        `json:"bind_port"`
+	RPCAddr     string     `json:"rpc_addr"`
+	RPCPort     int        `json:"rpc_port"`
 	Telemetry   *Telemetry `json:"telemetry"`
 	ServiceName string     `json:"service_name"`
 	Seal        bool       `json:"seal"`
@@ -39,6 +41,8 @@ func DefaultConfig() *Config {
 		DataDir:     "./test-chain",
 		BindAddr:    "0.0.0.0",
 		BindPort:    30303,
+		RPCAddr:     "127.0.0.1",
+		RPCPort:     8545,
 		ServiceName: "minimal",
 		Telemetry: &Telemetry{
 			PrometheusPort: 8080,
@@ -62,6 +66,12 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.BindPort != 0 {
 		c.BindPort = c1.BindPort
+	}
+	if c1.RPCAddr != "" {
+		c.RPCAddr = c1.RPCAddr
+	}
+	if c1.RPCPort != 0 {
+		c.RPCPort = c1.RPCPort
 	}
 	if c1.DataDir != "" {
 		c.DataDir = c1.DataDir

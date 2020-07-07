@@ -3,10 +3,9 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
-
-	"reflect"
 
 	"github.com/0xPolygon/minimal/minimal"
 )
@@ -119,7 +118,7 @@ func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
 		return nil, invalidJSONRequest
 	}
 	var params []interface{}
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params, &params); req.Params != nil && err != nil {
 		return nil, invalidJSONRequest
 	}
 

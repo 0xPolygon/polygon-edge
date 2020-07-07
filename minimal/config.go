@@ -33,6 +33,9 @@ type Config struct {
 	BindAddr string
 	BindPort int
 
+	RPCAddr string
+	RPCPort int
+
 	DataDir     string
 	ServiceName string
 	Seal        bool

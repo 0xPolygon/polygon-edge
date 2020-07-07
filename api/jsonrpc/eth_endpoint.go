@@ -32,6 +32,16 @@ func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
 	return nil, nil
 }
 
+// CurrentBlock returns current block number
+func (e *Eth) BlockNumber() (interface{}, error) {
+	h, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error fetching current block")
+	}
+
+	return types.Uint64(h.Number), nil
+}
+
 // SendTransaction creates new message call transaction or a contract creation, if the data field contains code.
 func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error) {
 	var err error

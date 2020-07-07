@@ -146,20 +146,24 @@ func (a *Agent) Start() error {
 			Config: conf,
 		}
 	}
-	/*
-		// jsonrpc api set by default, can be disabled explicitely on the configuration
-		if _, ok := apiEntries["jsonrpc"]; !ok {
-			apiEntries["jsonrpc"] = &minimal.Entry{
-				Config: map[string]interface{}{},
-			}
+
+	// jsonrpc api set by default, can be disabled explicitely on the configuration
+	if _, ok := apiEntries["jsonrpc"]; !ok {
+		apiEntries["jsonrpc"] = &minimal.Entry{
+			Config: map[string]interface{}{
+				"http": map[string]interface{}{
+					"addr": a.config.RPCAddr,
+					"port": a.config.RPCPort,
+				},
+			},
 		}
-		// http set by default
-		if _, ok := apiEntries["http"]; !ok {
-			apiEntries["http"] = &minimal.Entry{
-				Config: map[string]interface{}{},
-			}
-		}
-	*/
+	}
+	//// http set by default
+	//if _, ok := apiEntries["http"]; !ok {
+	//	apiEntries["http"] = &minimal.Entry{
+	//		Config: map[string]interface{}{},
+	//	}
+	//}
 
 	config := &minimal.Config{
 		Keystore:    keystore.NewLocalKeystore(a.config.DataDir),
@@ -167,6 +171,8 @@ func (a *Agent) Start() error {
 		DataDir:     a.config.DataDir,
 		BindAddr:    a.config.BindAddr,
 		BindPort:    a.config.BindPort,
+		RPCAddr:     a.config.RPCAddr,
+		RPCPort:     a.config.RPCPort,
 		ServiceName: a.config.ServiceName,
 		Seal:        a.config.Seal,
 
