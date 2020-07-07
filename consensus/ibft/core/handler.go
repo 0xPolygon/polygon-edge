@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
@@ -120,19 +119,17 @@ func (c *core) sendEvent(ev interface{}) {
 }
 
 func (c *core) handleMsg(payload []byte) error {
-	logger := c.logger.New()
-
 	// Decode message and check its signature
 	msg := new(message)
 	if err := msg.FromPayload(payload, c.validateFn); err != nil {
-		logger.Error("Failed to decode message from payload", "err", err)
+		c.logger.Error("Failed to decode message from payload", "err", err)
 		return err
 	}
 
 	// Only accept message if the address is valid
 	_, src := c.valSet.GetByAddress(msg.Address)
 	if src == nil {
-		logger.Error("Invalid address in message", "msg", msg)
+		c.logger.Error("Invalid address in message", "msg", msg)
 		return ibft.ErrUnauthorizedAddress
 	}
 
@@ -140,7 +137,7 @@ func (c *core) handleMsg(payload []byte) error {
 }
 
 func (c *core) handleCheckedMsg(msg *message, src ibft.Validator) error {
-	logger := c.logger.New("address", c.address, "from", src)
+	logger := c.logger.With("address", c.address, "from", src)
 
 	// Store the message if it's a future message
 	testBacklog := func(err error) error {
@@ -153,16 +150,12 @@ func (c *core) handleCheckedMsg(msg *message, src ibft.Validator) error {
 
 	switch msg.Code {
 	case msgPreprepare:
-		fmt.Println("msg preprepare")
 		return testBacklog(c.handlePreprepare(msg, src))
 	case msgPrepare:
-		fmt.Println("msg prepare")
 		return testBacklog(c.handlePrepare(msg, src))
 	case msgCommit:
-		fmt.Println("msg commit")
 		return testBacklog(c.handleCommit(msg, src))
 	case msgRoundChange:
-		fmt.Println("msg round change")
 		return testBacklog(c.handleRoundChange(msg, src))
 	default:
 		logger.Error("Invalid message", "msg", msg)

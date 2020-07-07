@@ -270,10 +270,12 @@ func (s *Server) Schedule() error {
 	}
 
 	go func() {
-		session, err := s.transport.Accept()
-		if err == nil {
-			if err := s.addSession(session); err != nil {
-				// log
+		for {
+			session, err := s.transport.Accept()
+			if err == nil {
+				if err := s.addSession(session); err != nil {
+					s.logger.Trace("failed adding session", err)
+				}
 			}
 		}
 	}()
@@ -303,14 +305,14 @@ func (s *Server) dialTask(id string, tasks chan string) {
 	for {
 		select {
 		case task := <-tasks:
-			s.logger.Trace("DIAL", "id", id, "task", task)
+			//s.logger.Trace("DIAL", "id", id, "task", task)
 
 			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				s.logger.Trace("Err", "id", id, "err", err)
+				//s.logger.Trace("Err", "id", id, "err", err)
 
 				if err.Error() == "too many peers" {
 					busy = true

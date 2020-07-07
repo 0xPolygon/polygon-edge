@@ -60,7 +60,7 @@ func (c *core) checkMessage(msgCode uint64, view *ibft.View) error {
 }
 
 func (c *core) storeBacklog(msg *message, src ibft.Validator) {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	if src.Address() == c.Address() {
 		logger.Warn("Backlog from self")
@@ -103,7 +103,7 @@ func (c *core) processBacklog() {
 			continue
 		}
 
-		logger := c.logger.New("from", src, "state", c.state)
+		logger := c.logger.With("from", src, "state", c.state)
 		isFuture := false
 
 		// We stop processing if

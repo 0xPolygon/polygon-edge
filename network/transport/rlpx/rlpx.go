@@ -101,7 +101,7 @@ func (r *Rlpx) Setup(priv *ecdsa.PrivateKey, backends []*network.Protocol, info 
 			go func() {
 				session, err := r.accept(conn)
 				if err != nil {
-					// log
+					r.Logger.Trace("session accept error", err)
 				} else {
 					select {
 					case r.sessionCh <- session:

@@ -16,7 +16,7 @@ func (c *core) sendNextRoundChange() {
 
 // sendRoundChange sends the ROUND CHANGE message with the given round
 func (c *core) sendRoundChange(round *big.Int) {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	cv := c.currentView()
 	if cv.Round.Cmp(round) >= 0 {
@@ -50,7 +50,7 @@ func (c *core) sendRoundChange(round *big.Int) {
 }
 
 func (c *core) handleRoundChange(msg *message, src ibft.Validator) error {
-	logger := c.logger.New("state", c.state, "from", src.Address().String())
+	logger := c.logger.With("state", c.state, "from", src.Address().String())
 
 	// Decode ROUND CHANGE message
 	var rc *ibft.Subject

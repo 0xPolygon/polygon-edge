@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -25,7 +26,7 @@ type Pow struct {
 	max uint64
 }
 
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 

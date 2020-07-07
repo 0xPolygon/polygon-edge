@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/minimal/helper/rlputil"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -25,17 +26,18 @@ const (
 	fetcherID = "istanbul"
 )
 
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
-	return New(ibft.DefaultConfig, privateKey, db), nil
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
+	return New(ibft.DefaultConfig, privateKey, db, logger), nil
 }
 
 // New creates an Ethereum backend for Istanbul core engine.
-func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) consensus.Istanbul {
+func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) consensus.Istanbul {
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	recentMessages, _ := lru.NewARC(inmemoryPeers)
 	knownMessages, _ := lru.NewARC(inmemoryMessages)
 	backend := &backend{
+		logger:           logger,
 		config:           config,
 		istanbulEventMux: new(event.TypeMux),
 		privateKey:       privateKey,
@@ -48,7 +50,7 @@ func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) 
 		recentMessages:   recentMessages,
 		knownMessages:    knownMessages,
 	}
-	backend.core = istanbulCore.New(backend, backend.config)
+	backend.core = istanbulCore.New(backend, backend.config, logger)
 	return backend
 }
 
@@ -59,10 +61,11 @@ type backend struct {
 	istanbulEventMux *event.TypeMux
 	privateKey       *ecdsa.PrivateKey
 	address          types.Address
+	logger           hclog.Logger
 	core             istanbulCore.Engine
 	db               storage.Storage
 	chain            consensus.ChainReader
-	currentBlock     func() *types.Block
+	currentBlock     func(full bool) *types.Block
 	hasBadBlock      func(hash types.Hash) bool
 
 	// the channels for istanbul engine notifications
@@ -271,7 +274,7 @@ func (sb *backend) getValidators(number uint64, hash types.Hash) ibft.ValidatorS
 }
 
 func (sb *backend) LastProposal() (ibft.Proposal, types.Address) {
-	block := sb.currentBlock()
+	block := sb.currentBlock(false)
 
 	var proposer types.Address
 	if new(big.Int).SetUint64(block.Number()).Cmp(types.Big0) > 0 {

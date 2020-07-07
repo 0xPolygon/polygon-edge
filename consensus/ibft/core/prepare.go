@@ -7,7 +7,7 @@ import (
 )
 
 func (c *core) sendPrepare() {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	sub := c.current.Subject()
 	encodedSubject, err := Encode(sub)
@@ -55,7 +55,7 @@ func (c *core) handlePrepare(msg *message, src ibft.Validator) error {
 
 // verifyPrepare verifies if the received PREPARE message is equivalent to our subject
 func (c *core) verifyPrepare(prepare *ibft.Subject, src ibft.Validator) error {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	sub := c.current.Subject()
 	if !reflect.DeepEqual(prepare, sub) {
@@ -67,7 +67,7 @@ func (c *core) verifyPrepare(prepare *ibft.Subject, src ibft.Validator) error {
 }
 
 func (c *core) acceptPrepare(msg *message, src ibft.Validator) error {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	// Add the PREPARE message to current round state
 	if err := c.current.Prepares.Add(msg); err != nil {

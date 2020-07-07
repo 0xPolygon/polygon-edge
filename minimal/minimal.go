@@ -174,7 +174,7 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	}
 	consensusConfig.Config = config.ConsensusEntry.Config
 
-	m.consensus, err = engine(context.Background(), consensusConfig, key, storage)
+	m.consensus, err = engine(context.Background(), consensusConfig, key, storage, logger)
 	if err != nil {
 		return nil, err
 	}

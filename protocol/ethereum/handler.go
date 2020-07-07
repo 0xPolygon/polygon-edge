@@ -468,6 +468,9 @@ func (e *Ethereum) fetchBlock(hash types.Hash) (*types.Block, error) {
 }
 
 func (e *Ethereum) handleNewBlockMsg(p *fastrlp.Parser, v *fastrlp.Value) error {
+	if h, ok := e.blockchain.GetConsensus().(consensus.Handler); ok {
+		h.NewChainHead()
+	}
 	return e.backend.announceNewBlock(e, p, v)
 }
 

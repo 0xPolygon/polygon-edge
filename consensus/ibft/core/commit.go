@@ -21,7 +21,7 @@ func (c *core) sendCommitForOldBlock(view *ibft.View, digest types.Hash) {
 }
 
 func (c *core) broadcastCommit(sub *ibft.Subject) {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	encodedSubject, err := Encode(sub)
 	if err != nil {
@@ -67,7 +67,7 @@ func (c *core) handleCommit(msg *message, src ibft.Validator) error {
 
 // verifyCommit verifies if the received COMMIT message is equivalent to our subject
 func (c *core) verifyCommit(commit *ibft.Subject, src ibft.Validator) error {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	sub := c.current.Subject()
 	if !reflect.DeepEqual(commit, sub) {
@@ -79,7 +79,7 @@ func (c *core) verifyCommit(commit *ibft.Subject, src ibft.Validator) error {
 }
 
 func (c *core) acceptCommit(msg *message, src ibft.Validator) error {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	// Add the COMMIT message to current round state
 	if err := c.current.Commits.Add(msg); err != nil {

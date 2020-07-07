@@ -247,22 +247,25 @@ func (s *Sealer) seal(ctx context.Context) error {
 	block := generateNewBlock(header, txns, transition.Receipts())
 
 	// Start the consensus sealing
-	if _, err := s.engine.Seal(s.blockchain, block, ctx); err != nil {
+	block, err = s.engine.Seal(s.blockchain, block, ctx)
+	if err != nil {
 		return err
 	}
+	if block == nil {
+		return nil
+	}
+
 	// Check if the context was cancelled while in the sealing routine
 	if ctx.Err() != nil {
 		return nil
 	}
-
-	fmt.Println("Block sealed", "number", num+1, "hash", header.Hash)
 
 	// Write the new blocks
 	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return fmt.Errorf("failed to write sealed block: %v", err)
 	}
 
-	s.logger.Info("Block sealed", "number", num+1, "hash", header.Hash)
+	s.logger.Info("Block sealed", "number", num+1, "hash", block.Hash())
 
 	// Broadcast the block to the network
 	select {

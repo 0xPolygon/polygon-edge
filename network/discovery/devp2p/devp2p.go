@@ -480,7 +480,7 @@ func (b *Backend) listen() {
 			} else {
 				go func() {
 					if err := b.HandlePacket(packet); err != nil {
-						b.logger.Trace("failed to handle packet", "err", err.Error())
+						//b.logger.Trace("failed to handle packet", "err", err.Error())
 					}
 				}()
 			}

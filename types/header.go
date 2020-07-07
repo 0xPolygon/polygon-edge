@@ -62,8 +62,30 @@ func (n *Nonce) Scan(src interface{}) error {
 
 var marshalArenaPool fastrlp.ArenaPool
 
+func (h *Header) CalculateHash() (hash Hash) {
+	// If the mix digest is equivalent to the predefined Istanbul digest, use Istanbul
+	// specific hash calculation.
+	if h.MixHash == IstanbulDigest {
+		// Seal is reserved in extra-data. To prove block is signed by the proposer.
+		if istanbulHeader := IstanbulFilteredHeader(h, true); istanbulHeader != nil {
+			return rlpHash(istanbulHeader)
+		}
+	}
+	return rlpHash(h)
+}
+
 // ComputeHash computes the hash of the header
 func (h *Header) ComputeHash() *Header {
+	// If the mix digest is equivalent to the predefined Istanbul digest, use Istanbul
+	// specific hash calculation.
+	if h.MixHash == IstanbulDigest {
+		// Seal is reserved in extra-data. To prove block is signed by the proposer.
+		if istanbulHeader := IstanbulFilteredHeader(h, true); istanbulHeader != nil {
+			h.Hash = rlpHash(istanbulHeader)
+			return h
+		}
+	}
+
 	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
 
@@ -158,12 +180,7 @@ type Block struct {
 	Uncles       []*Header
 }
 
-func (b *Block) UnmarshalRLP(buf []byte) error {
-	p := &fastrlp.Parser{}
-	v, err := p.Parse(buf)
-	if err != nil {
-		return err
-	}
+func (b *Block) UnmarshalRLP(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -235,7 +252,7 @@ func (b *Block) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (b *Block) Hash() Hash {
-	return b.Header.Hash
+	return b.Header.CalculateHash()
 }
 
 func (b *Block) Number() uint64 {

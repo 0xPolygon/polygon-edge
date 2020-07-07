@@ -10,19 +10,19 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/hashicorp/go-hclog"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 // New creates an Istanbul consensus core
-func New(backend ibft.Backend, config *ibft.Config) Engine {
+func New(backend ibft.Backend, config *ibft.Config, logger hclog.Logger) Engine {
 	c := &core{
 		config:             config,
 		address:            backend.Address(),
 		state:              StateAcceptRequest,
 		handlerWg:          new(sync.WaitGroup),
-		logger:             log.New("address", backend.Address()),
+		logger:             logger,
 		backend:            backend,
 		backlogs:           make(map[ibft.Validator]*prque.Prque),
 		backlogsMu:         new(sync.Mutex),
@@ -43,7 +43,7 @@ type core struct {
 	config  *ibft.Config
 	address types.Address
 	state   State
-	logger  log.Logger
+	logger  hclog.Logger
 
 	backend               ibft.Backend
 	events                *event.TypeMuxSubscription
@@ -112,7 +112,7 @@ func (c *core) finalizeMessage(msg *message) ([]byte, error) {
 }
 
 func (c *core) broadcast(msg *message) {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	payload, err := c.finalizeMessage(msg)
 	if err != nil {
@@ -163,11 +163,11 @@ func (c *core) commit() {
 
 // startNewRound starts a new round. if round equals to 0, it means to starts a new sequence
 func (c *core) startNewRound(round *big.Int) {
-	var logger log.Logger
+	var logger hclog.Logger
 	if c.current == nil {
-		logger = c.logger.New("old_round", -1, "old_seq", 0)
+		logger = c.logger.With("old_round", -1, "old_seq", 0)
 	} else {
-		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence())
+		logger = c.logger.With("old_round", c.current.Round(), "old_seq", c.current.Sequence())
 	}
 
 	roundChange := false
@@ -213,7 +213,7 @@ func (c *core) startNewRound(round *big.Int) {
 	}
 
 	// Update logger
-	logger = logger.New("old_proposer", c.valSet.GetProposer())
+	logger = logger.With("old_proposer", c.valSet.GetProposer())
 	// Clear invalid ROUND CHANGE messages
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
 	// New snapshot for new round
@@ -240,7 +240,7 @@ func (c *core) startNewRound(round *big.Int) {
 }
 
 func (c *core) catchUpRound(view *ibft.View) {
-	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
+	logger := c.logger.With("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
 
 	if view.Round.Cmp(c.current.Round()) > 0 {
 		c.roundMeter.Mark(new(big.Int).Sub(view.Round, c.current.Round()).Int64())

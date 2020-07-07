@@ -7,7 +7,7 @@ import (
 )
 
 func (c *core) handleRequest(request *ibft.Request) error {
-	logger := c.logger.New("state", c.state, "seq", c.current.sequence)
+	logger := c.logger.With("state", c.state, "seq", c.current.sequence)
 
 	if err := c.checkRequestMsg(request); err != nil {
 		if err == errInvalidMessage {
@@ -46,7 +46,7 @@ func (c *core) checkRequestMsg(request *ibft.Request) error {
 }
 
 func (c *core) storeRequestMsg(request *ibft.Request) {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	logger.Trace("Store future request", "number", request.Proposal.Number(), "hash", request.Proposal.Hash())
 

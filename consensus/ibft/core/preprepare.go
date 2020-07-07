@@ -9,7 +9,7 @@ import (
 )
 
 func (c *core) sendPreprepare(request *ibft.Request) {
-	logger := c.logger.New("state", c.state)
+	logger := c.logger.With("state", c.state)
 
 	// If I'm the proposer and I have the same sequence with the proposal
 	if c.current.Sequence().Cmp(new(big.Int).SetUint64(request.Proposal.Number())) == 0 && c.isProposer() {
@@ -31,7 +31,7 @@ func (c *core) sendPreprepare(request *ibft.Request) {
 }
 
 func (c *core) handlePreprepare(msg *message, src ibft.Validator) error {
-	logger := c.logger.New("from", src, "state", c.state)
+	logger := c.logger.With("from", src, "state", c.state)
 
 	// Decode PRE-PREPARE
 	var preprepare *ibft.Preprepare

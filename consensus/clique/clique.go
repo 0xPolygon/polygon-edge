@@ -7,13 +7,14 @@ import (
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 // Clique is a consensus algorithm for the clique protocol
 type Clique struct {
 }
 
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	c := &Clique{}
 	return c, nil
 }

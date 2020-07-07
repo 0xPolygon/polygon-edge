@@ -167,6 +167,11 @@ func (b *Backend) runWatcher() {
 
 			if block.Number() > num {
 				// future block
+				if block.Number()-1 == num {
+					if err := b.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+						b.logger.Trace("err writing blocks", err)
+					}
+				}
 				continue
 			}
 			if num-maxUncleLen > block.Number() {
@@ -319,30 +324,27 @@ func (b *Backend) runTask(id string) {
 }
 
 func (b *Backend) announceNewBlock(e *Ethereum, p *fastrlp.Parser, v *fastrlp.Value) error {
-	/*
-		elems, err := v.GetElems()
-		if err != nil {
-			return err
-		}
-		if len(elems) != 2 {
-			return fmt.Errorf("bad")
-		}
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) != 2 {
+		return fmt.Errorf("bad")
+	}
 
-		// difficulty in elems.0
-		diff := new(big.Int)
-		if err := elems[0].GetBigInt(diff); err != nil {
-			return err
-		}
+	// difficulty in elems.0
+	diff := new(big.Int)
+	if err := elems[0].GetBigInt(diff); err != nil {
+		return err
+	}
 
-		// block in elems.1
-		subElems, err := elems[1].GetElems()
-		if err != nil {
-			return err
-		}
-		if len(subElems) != 3 {
-			return fmt.Errorf("bad.2")
-		}
-	*/
+	var block types.Block
+	err = block.UnmarshalRLP(p, elems[1])
+	if err != nil {
+		return err
+	}
+
+	b.wqueue <- &block
 	return nil
 }
 
@@ -446,7 +448,7 @@ func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 var defaultArena fastrlp.ArenaPool
 
 func (b *Backend) broadcastBlock(block *types.Block) {
-	fmt.Println("== BROADCAST BLOCK ==")
+	b.logger.Info("== BROADCAST BLOCK ==", block.Number(), block.Header.ComputeHash())
 
 	// total difficulty so far at the parent
 	diff, ok := b.blockchain.GetTD(block.ParentHash())

@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 // ChainReader defines a small collection of methods needed to access the local
@@ -34,7 +35,7 @@ type ChainReader interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// GetBlock retrieves a block from the database by hash and number.
-	GetBlock(hash types.Hash, number uint64) (*types.Block, bool)
+	GetBlock(hash types.Hash, number uint64, full bool) (*types.Block, bool)
 }
 
 // Consensus is the interface for consensus
@@ -84,14 +85,14 @@ type Config struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, *Config, *ecdsa.PrivateKey, storage.Storage) (Consensus, error)
+type Factory func(context.Context, *Config, *ecdsa.PrivateKey, storage.Storage, hclog.Logger) (Consensus, error)
 
 // Istanbul is a consensus engine to avoid byzantine failure
 type Istanbul interface {
 	Consensus
 
 	// Start starts the engine
-	Start(chain ChainReader, currentBlock func() *types.Block, hasBadBlock func(hash types.Hash) bool) error
+	Start(chain ChainReader, currentBlock func(bool) *types.Block, hasBadBlock func(hash types.Hash) bool) error
 
 	// Stop stops the engine
 	Stop() error

@@ -438,6 +438,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	// Write chain
 	for indx, block := range blocks {
 		header := block.Header
+		header.ComputeHash()
 
 		body := block.Body()
 		if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
@@ -603,6 +604,9 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	// Write the data
 	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
+		b.headersCache.Add(header.Hash, header)
+		b.bodiesCache.Add(header.Hash, header)
+
 		return b.writeCanonicalHeader(header)
 	}
 
@@ -623,6 +627,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		return err
 	}
 	b.headersCache.Add(header.Hash, header)
+	b.bodiesCache.Add(header.Hash, header)
 
 	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
 	if incomingDiff.Cmp(headerDiff) > 0 {
@@ -771,9 +776,9 @@ func (b *Blockchain) Config() *chain.Params {
 	return b.config
 }
 
-func (b *Blockchain) CurrentBlock() *types.Block {
+func (b *Blockchain) CurrentBlock(full bool) *types.Block {
 	header, _ := b.CurrentHeader()
-	block, _ := b.GetBlock(header.Hash, header.Number)
+	block, _ := b.GetBlock(header.Hash, header.Number, full)
 
 	return block
 }
@@ -801,8 +806,8 @@ func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, b
 	return h, true
 }
 
-func (b *Blockchain) GetBlock(hash types.Hash, number uint64) (*types.Block, bool) {
-	block, ok := b.GetBlockByHash(hash, true)
+func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types.Block, bool) {
+	block, ok := b.GetBlockByHash(hash, full)
 	if !ok {
 		return nil, false
 	}

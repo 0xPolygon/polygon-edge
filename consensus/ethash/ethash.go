@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/helper/dao"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -37,7 +38,7 @@ type Ethash struct {
 }
 
 // Factory is the factory method to create an Ethash consensus
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	var pathStr string
 	path, ok := config.Config["path"]
 	if ok {
