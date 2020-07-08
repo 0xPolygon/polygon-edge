@@ -243,6 +243,8 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	hcLogger := hclog.New(&hclog.LoggerOptions{
 		Level: hclog.LevelFromString("INFO"),
 	})
+
+	hcLogger.Info("public key", crypto.PubKeyToAddress(&m.Key.PublicKey))
 	// Start api backends
 	for name, entry := range config.APIEntries {
 		backend, ok := config.APIBackends[name]
