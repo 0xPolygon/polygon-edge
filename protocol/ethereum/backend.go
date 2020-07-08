@@ -448,7 +448,7 @@ func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 var defaultArena fastrlp.ArenaPool
 
 func (b *Backend) broadcastBlock(block *types.Block) {
-	b.logger.Info("== BROADCAST BLOCK ==", block.Number(), block.Header.ComputeHash())
+	b.logger.Info("== BROADCAST BLOCK ==", block.Number())
 
 	// total difficulty so far at the parent
 	diff, ok := b.blockchain.GetTD(block.ParentHash())
