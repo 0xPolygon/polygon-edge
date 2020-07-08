@@ -252,7 +252,7 @@ func (c *core) catchUpRound(view *ibft.View) {
 	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
-	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
+	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet.GetProposer().Address())
 }
 
 // updateRoundState updates round state by checking if locking block is necessary
