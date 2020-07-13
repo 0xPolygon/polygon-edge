@@ -460,6 +460,10 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 	}
 
+	if h, ok := b.GetConsensus().(consensus.Handler); ok {
+		h.NewChainHead()
+	}
+
 	return nil
 }
 

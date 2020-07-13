@@ -167,10 +167,8 @@ func (b *Backend) runWatcher() {
 
 			if block.Number() > num {
 				// future block
-				if block.Number()-1 == num {
-					if err := b.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-						b.logger.Trace("err writing blocks", err)
-					}
+				if err := b.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+					b.logger.Trace("err writing blocks", err)
 				}
 				continue
 			}

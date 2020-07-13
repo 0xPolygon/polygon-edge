@@ -129,7 +129,7 @@ func (c *core) handleMsg(payload []byte) error {
 	// Only accept message if the address is valid
 	_, src := c.valSet.GetByAddress(msg.Address)
 	if src == nil {
-		c.logger.Error("Invalid address in message", "msg", msg)
+		c.logger.Error("Invalid address in message", "msg", msg, "address", msg.Address, "valSet", c.valSet)
 		return ibft.ErrUnauthorizedAddress
 	}
 

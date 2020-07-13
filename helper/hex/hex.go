@@ -3,6 +3,7 @@ package hex
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,7 @@ var (
 	ErrEmptyNumber   = &DecError{"hex string \"0x\""}
 	ErrLeadingZero   = &DecError{"hex number with leading zero digits"}
 	ErrUint64Range   = &DecError{"hex number > 64 bits"}
+	ErrBig256Range   = &DecError{"hex number > 256 bits"}
 )
 
 type DecError struct{ msg string }
@@ -74,4 +76,14 @@ func DecodeNibble(in byte) uint64 {
 	default:
 		return BadNibble
 	}
+}
+
+// EncodeBig encodes bigint as a hex string with 0x prefix.
+// The sign of the integer is ignored.
+func EncodeBig(bigint *big.Int) string {
+	nbits := bigint.BitLen()
+	if nbits == 0 {
+		return "0x0"
+	}
+	return fmt.Sprintf("%#x", bigint)
 }

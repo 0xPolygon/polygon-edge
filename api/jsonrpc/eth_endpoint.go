@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -69,4 +70,48 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 	}
 
 	return nil, nil
+}
+
+// CurrentBlock returns current block number
+func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
+	addr := types.StringToAddress(address)
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	s := e.d.minimal.Blockchain.Executor().State()
+	snap, err := s.NewSnapshotAt(header.StateRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
+		return (*types.Big)(acc.Balance), nil
+	}
+
+	receipts := e.d.minimal.Blockchain.GetReceiptsByHash(header.Hash)
+	fmt.Println(receipts)
+	return "0x0", nil
+}
+
+// GetTransactionCount returns account nonce
+func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
+	addr := types.StringToAddress(address)
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	s := e.d.minimal.Blockchain.Executor().State()
+	snap, err := s.NewSnapshotAt(header.StateRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
+		return types.Uint64(acc.Nonce), nil
+	}
+
+	return "0x0", nil
 }

@@ -99,6 +99,11 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*Tra
 }
 
 // StateAt returns snapshot at given root
+func (e *Executor) State() State {
+	return e.state
+}
+
+// StateAt returns snapshot at given root
 func (e *Executor) StateAt(root types.Hash) (Snapshot, error) {
 	return e.state.NewSnapshotAt(root)
 }

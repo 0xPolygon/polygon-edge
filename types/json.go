@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	bigT    = reflect.TypeOf((*Big)(nil))
 	uint64T = reflect.TypeOf(Uint64(0))
 )
 
