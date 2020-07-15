@@ -35,7 +35,7 @@ var (
 	respTimeout        = 10 * time.Second
 	revalidateInterval = 10 * time.Second
 	lookupInterval     = 1 * time.Minute
-	numProbeTasks      = 2
+	numProbeTasks      = 3
 )
 
 const (

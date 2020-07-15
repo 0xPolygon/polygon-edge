@@ -273,9 +273,11 @@ func (s *Server) Schedule() error {
 		for {
 			session, err := s.transport.Accept()
 			if err == nil {
-				if err := s.addSession(session); err != nil {
-					s.logger.Trace("failed adding session", err)
-				}
+				go func() {
+					if err := s.addSession(session); err != nil {
+						s.logger.Trace("failed adding session", err)
+					}
+				}()
 			}
 		}
 	}()
