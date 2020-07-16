@@ -12,7 +12,7 @@ func (r *Receipt) UnmarshalRLP(v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
-	if len(elems) != 4 {
+	if len(elems) != 5 {
 		return fmt.Errorf("expected 4 elements")
 	}
 
@@ -32,17 +32,20 @@ func (r *Receipt) UnmarshalRLP(v *fastrlp.Value) error {
 		return fmt.Errorf("bad root/status size %d", size)
 	}
 
+	if _, err = elems[1].GetBytes(r.TxHash[:0], 32); err != nil {
+		return err
+	}
 	// cumulativeGasUsed
-	if r.CumulativeGasUsed, err = elems[1].GetUint64(); err != nil {
+	if r.CumulativeGasUsed, err = elems[2].GetUint64(); err != nil {
 		return err
 	}
 	// logsBloom
-	if _, err = elems[2].GetBytes(r.LogsBloom[:0], 256); err != nil {
+	if _, err = elems[3].GetBytes(r.LogsBloom[:0], 256); err != nil {
 		return err
 	}
 
 	// logs
-	logsElems, err := v.Get(3).GetElems()
+	logsElems, err := v.Get(4).GetElems()
 	if err != nil {
 		return err
 	}
@@ -89,6 +92,7 @@ func (r *Receipt) MarshalWith(a *fastrlp.Arena) *fastrlp.Value {
 	} else {
 		vv.Set(a.NewBytes(r.Root[:]))
 	}
+	vv.Set(a.NewBytes(r.TxHash.Bytes()))
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
 	vv.Set(a.NewCopyBytes(r.LogsBloom[:]))
 	vv.Set(r.MarshalLogsWith(a))

@@ -37,6 +37,9 @@ type Storage interface {
 	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
 	ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 
+	WriteTxLookup(hash types.Hash, blockHash types.Hash) error
+	ReadTxLookup(hash types.Hash) (types.Hash, bool)
+
 	Close() error
 }
 

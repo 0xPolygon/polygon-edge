@@ -72,3 +72,8 @@ CREATE TABLE snapshot (
     hash  char(66) REFERENCES headers(hash),
     blob  bytea
 );
+
+CREATE TABLE tx_lookup (
+    hash    char(66) REFERENCES headers(hash),
+    number  numeric
+);

@@ -393,6 +393,30 @@ func (b *Backend) ReadSnapshot(hash types.Hash) ([]byte, bool) {
 	return snapshot.blob, true
 }
 
+// WriteTxLookup implements the storage backend
+func (b *Backend) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
+	_, err := b.db.Exec("INSERT INTO tx_lookup (hash, block_hash) VALUES ($1, $2)", hash, blockHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadTxLookup implements the storage backend
+func (b *Backend) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
+	query := "SELECT blob FROM tx_lookup WHERE hash=$1"
+	var txLookup struct {
+		blockHash types.Hash
+	}
+
+	if err := b.db.Select(&txLookup, query, hash); err != nil {
+		return types.Hash{}, false
+	}
+
+	return txLookup.blockHash, true
+}
+
 // WriteCanonicalHeader implements the storage backend
 func (b *Backend) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
 	tx, err := b.db.Begin()

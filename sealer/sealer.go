@@ -265,7 +265,7 @@ func (s *Sealer) seal(ctx context.Context) error {
 		return fmt.Errorf("failed to write sealed block: %v", err)
 	}
 
-	s.logger.Info("Block sealed", "number", num+1, "hash", block.Hash())
+	s.logger.Info("Block sealed", "number", num+1, "hash", block.Header.Hash)
 
 	// Broadcast the block to the network
 	select {

@@ -57,10 +57,12 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 	gasPrice := hex.MustDecodeHex(params["gasPrice"].(string))
 
 	gas := params["gas"].(string)
+	value := hex.MustDecodeHex(params["value"].(string))
 
 	txn.Input = input
 	txn.GasPrice = gasPrice
 	txn.Gas, err = types.ParseUint64orHex(&gas)
+	txn.Value = value
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +71,26 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 		panic(err)
 	}
 
-	return nil, nil
+	txn.ComputeHash()
+	return txn.Hash.String(), nil
+}
+
+// GetTransactionReceipt returns account nonce
+func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
+	blockHash, ok := e.d.minimal.Blockchain.ReadTransactionBlockHash(types.StringToHash(hash))
+	if !ok {
+		return nil, fmt.Errorf("transaction not mined")
+	}
+
+	receipts := e.d.minimal.Blockchain.GetReceiptsByHash(blockHash)
+
+	for _, receipt := range receipts {
+		if receipt.TxHash == types.StringToHash(hash) {
+			return receipt, nil
+		}
+	}
+
+	return nil, fmt.Errorf("transaction not found")
 }
 
 // CurrentBlock returns current block number

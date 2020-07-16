@@ -480,6 +480,10 @@ func (b *Blockchain) processBlock(block *types.Block) error {
 		return err
 	}
 
+	err = b.WriteReceipts(block.Header.Hash, transition.Receipts())
+	if err != nil {
+		return err
+	}
 	// validate the fields
 	if root != header.StateRoot {
 		return fmt.Errorf("invalid merkle root")
@@ -608,9 +612,6 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	// Write the data
 	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
-		b.headersCache.Add(header.Hash, header)
-		b.bodiesCache.Add(header.Hash, header)
-
 		return b.writeCanonicalHeader(header)
 	}
 
@@ -631,7 +632,6 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		return err
 	}
 	b.headersCache.Add(header.Hash, header)
-	b.bodiesCache.Add(header.Hash, header)
 
 	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
 	if incomingDiff.Cmp(headerDiff) > 0 {
@@ -647,6 +647,20 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	}
 
 	return nil
+}
+
+// WriteReceipts writes a block receipts
+func (b *Blockchain) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
+	for _, receipt := range receipts {
+		_ = b.db.WriteTxLookup(receipt.TxHash, hash)
+	}
+
+	return b.db.WriteReceipts(hash, receipts)
+}
+
+// ReadTransactionBlockHash fetches block hash for provided transaction hash
+func (b *Blockchain) ReadTransactionBlockHash(hash types.Hash) (types.Hash, bool) {
+	return b.db.ReadTxLookup(hash)
 }
 
 // SideChainCh returns the channel of headers
