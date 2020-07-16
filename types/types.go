@@ -162,7 +162,7 @@ func (a *Address) UnmarshalText(input []byte) error {
 	return nil
 }
 
-func (h *Hash) MarshalText() ([]byte, error) {
+func (h Hash) MarshalText() ([]byte, error) {
 	return []byte(h.String()), nil
 }
 

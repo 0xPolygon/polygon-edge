@@ -231,11 +231,11 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 
 // GenesisAccount is an account in the state of the genesis block.
 type GenesisAccount struct {
-	Code       []byte
-	Storage    map[types.Hash]types.Hash
-	Balance    *big.Int
-	Nonce      uint64
-	PrivateKey []byte // for tests
+	Code       []byte                    `json:"code,omitempty"`
+	Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
+	Balance    *big.Int                  `json:"balance,omitempty"`
+	Nonce      uint64                    `json:"nonce,omitempty"`
+	PrivateKey []byte                    `json:"secretKey,omitempty"` // for tests
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
