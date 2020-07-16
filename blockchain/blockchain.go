@@ -611,6 +611,8 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 
 	// Write the data
 	if header.ParentHash == head.Hash {
+		b.headersCache.Add(header.Hash, header)
+
 		// Fast path to save the new canonical header
 		return b.writeCanonicalHeader(header)
 	}

@@ -66,7 +66,7 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		config:     config,
 		logger:     logger.Named("Sealer"),
 		txPool:     NewTxPool(blockchain),
-		signer:     crypto.NewEIP155Signer(1),
+		signer:     crypto.NewEIP155Signer(13931),
 		SealedCh:   make(chan *SealedNotify, 10),
 		executor:   executor,
 		wakeCh:     make(chan struct{}),
