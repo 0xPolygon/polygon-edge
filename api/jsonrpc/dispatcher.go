@@ -118,7 +118,7 @@ func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
 		return nil, invalidJSONRequest
 	}
 	var params []interface{}
-	if err := json.Unmarshal(req.Params, &params); req.Params != nil && err != nil {
+	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return nil, invalidJSONRequest
 	}
 

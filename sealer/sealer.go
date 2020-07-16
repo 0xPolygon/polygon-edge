@@ -66,7 +66,7 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		config:     config,
 		logger:     logger.Named("Sealer"),
 		txPool:     NewTxPool(blockchain),
-		signer:     crypto.NewEIP155Signer(13931),
+		signer:     crypto.NewEIP155Signer(1),
 		SealedCh:   make(chan *SealedNotify, 10),
 		executor:   executor,
 		wakeCh:     make(chan struct{}),
@@ -198,7 +198,7 @@ func (s *Sealer) seal(ctx context.Context) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   4700000, // placeholder for now
+		GasLimit:   100000000, // placeholder for now
 		Timestamp:  uint64(time.Now().Unix()),
 		Miner:      s.config.Coinbase,
 		ExtraData:  s.config.Extra,
