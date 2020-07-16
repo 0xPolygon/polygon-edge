@@ -53,16 +53,25 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 	to := types.StringToAddress(params["to"].(string))
 	txn.To = &to
 
-	input := hex.MustDecodeHex(params["input"].(string))
+	input := hex.MustDecodeHex(params["data"].(string))
 	gasPrice := hex.MustDecodeHex(params["gasPrice"].(string))
 
 	gas := params["gas"].(string)
-	value := hex.MustDecodeHex(params["value"].(string))
+	if value, ok := params["value"]; ok {
+		txn.Value = hex.MustDecodeHex(value.(string))
+	}
+
+	if nonce, ok := params["nonce"]; ok {
+		nonceString := nonce.(string)
+		txn.Nonce, err = types.ParseUint64orHex(&nonceString)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	txn.Input = input
 	txn.GasPrice = gasPrice
 	txn.Gas, err = types.ParseUint64orHex(&gas)
-	txn.Value = value
 	if err != nil {
 		panic(err)
 	}
@@ -111,9 +120,7 @@ func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
 		return (*types.Big)(acc.Balance), nil
 	}
 
-	receipts := e.d.minimal.Blockchain.GetReceiptsByHash(header.Hash)
-	fmt.Println(receipts)
-	return "0x0", nil
+	return new(types.Big), nil
 }
 
 // GetTransactionCount returns account nonce
