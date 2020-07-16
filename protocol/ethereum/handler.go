@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -132,6 +134,7 @@ type Blockchain interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 	GetHeaderByNumber(number uint64) (*types.Header, bool)
 	GetBodyByHash(types.Hash) (*types.Body, bool)
+	GetConsensus() consensus.Consensus
 }
 
 // Ethereum is the protocol for etheruem
@@ -316,7 +319,7 @@ func (e *Ethereum) Status() *Status {
 }
 
 // Init starts the protocol
-func (e *Ethereum) Init(status *Status) error {
+func (e *Ethereum) Init(peer *network.Peer, status *Status) error {
 	errr := make(chan error, 2)
 
 	go func() {
@@ -339,7 +342,7 @@ func (e *Ethereum) Init(status *Status) error {
 	}
 
 	// handshake was correct, start to listen for packets
-	go e.listen()
+	go e.listen(peer)
 	return nil
 }
 
@@ -816,7 +819,7 @@ func (e *Ethereum) handleGetHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
 // defPool is the default rlp parser pool to use if no specific parser if found in the msg pools
 var defPool fastrlp.ParserPool
 
-func (e *Ethereum) listen() {
+func (e *Ethereum) listen(peer *network.Peer) {
 	for {
 		// read the message
 		buf, code, err := e.readMsg()
@@ -834,6 +837,23 @@ func (e *Ethereum) listen() {
 
 		// dispatch the message in a go routine
 		go func() {
+			if handler, ok := e.blockchain.GetConsensus().(consensus.Handler); ok {
+				pubKey, err := peer.Enode.PublicKey()
+				if err != nil {
+					return
+				}
+
+				addr := crypto.PubKeyToAddress(pubKey)
+				handled, err := handler.HandleMsg(addr, consensus.Msg{
+					Code:    uint64(code + 16),
+					Size:    uint32(len(buf)),
+					Payload: bytes.NewBuffer(buf),
+				})
+				if handled {
+					return
+				}
+			}
+
 			if err := e.dispatchMsg(code, p, v); err != nil {
 				e.logger.Error("failed to handle msg", err.Error())
 			}

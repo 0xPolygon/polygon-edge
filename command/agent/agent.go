@@ -20,6 +20,7 @@ import (
 
 	consensusClique "github.com/0xPolygon/minimal/consensus/clique"
 	consensusEthash "github.com/0xPolygon/minimal/consensus/ethash"
+	consensusIBFT "github.com/0xPolygon/minimal/consensus/ibft/backend"
 	consensusPOW "github.com/0xPolygon/minimal/consensus/pow"
 
 	discoveryConsul "github.com/0xPolygon/minimal/network/discovery/consul"
@@ -43,6 +44,7 @@ var consensusBackends = map[string]consensus.Factory{
 	"clique": consensusClique.Factory,
 	"ethash": consensusEthash.Factory,
 	"pow":    consensusPOW.Factory,
+	"ibft":   consensusIBFT.Factory,
 }
 
 var discoveryBackends = map[string]discovery.Factory{
@@ -144,20 +146,24 @@ func (a *Agent) Start() error {
 			Config: conf,
 		}
 	}
-	/*
-		// jsonrpc api set by default, can be disabled explicitely on the configuration
-		if _, ok := apiEntries["jsonrpc"]; !ok {
-			apiEntries["jsonrpc"] = &minimal.Entry{
-				Config: map[string]interface{}{},
-			}
+
+	// jsonrpc api set by default, can be disabled explicitely on the configuration
+	if _, ok := apiEntries["jsonrpc"]; !ok {
+		apiEntries["jsonrpc"] = &minimal.Entry{
+			Config: map[string]interface{}{
+				"http": map[string]interface{}{
+					"addr": a.config.RPCAddr,
+					"port": a.config.RPCPort,
+				},
+			},
 		}
-		// http set by default
-		if _, ok := apiEntries["http"]; !ok {
-			apiEntries["http"] = &minimal.Entry{
-				Config: map[string]interface{}{},
-			}
-		}
-	*/
+	}
+	//// http set by default
+	//if _, ok := apiEntries["http"]; !ok {
+	//	apiEntries["http"] = &minimal.Entry{
+	//		Config: map[string]interface{}{},
+	//	}
+	//}
 
 	config := &minimal.Config{
 		Keystore:    keystore.NewLocalKeystore(a.config.DataDir),
@@ -165,6 +171,8 @@ func (a *Agent) Start() error {
 		DataDir:     a.config.DataDir,
 		BindAddr:    a.config.BindAddr,
 		BindPort:    a.config.BindPort,
+		RPCAddr:     a.config.RPCAddr,
+		RPCPort:     a.config.RPCPort,
 		ServiceName: a.config.ServiceName,
 		Seal:        a.config.Seal,
 

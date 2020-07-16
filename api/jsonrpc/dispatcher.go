@@ -3,10 +3,9 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
-
-	"reflect"
 
 	"github.com/0xPolygon/minimal/minimal"
 )

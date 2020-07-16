@@ -88,7 +88,7 @@ func versionRunE(cmd *cobra.Command, args []string) error {
 	executor.SetRuntime(precompiled.NewPrecompiled())
 	executor.SetRuntime(evm.NewEVM())
 
-	bChain := blockchain.NewBlockchain(inmemBlockchainStorage, engine, executor)
+	bChain := blockchain.NewBlockchain(inmemBlockchainStorage, params, engine, executor)
 	if err := bChain.WriteGenesis(genesis); err != nil {
 		panic(err)
 	}

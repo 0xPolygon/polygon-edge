@@ -1,7 +1,11 @@
 package rlputil
 
 import (
+	"bytes"
+
+	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -36,4 +40,20 @@ func EncodeHeaders(h []*types.Header) []byte {
 		v.Set(i.MarshalWith(ar))
 	}
 	return v.MarshalTo(nil)
+}
+
+func GetRlp(t *types.Transaction) []byte {
+	enc, _ := rlp.EncodeToBytes(t)
+	return enc
+}
+
+func DeriveSha(txs []*types.Transaction) types.Hash {
+	keybuf := new(bytes.Buffer)
+	trie := new(itrie.Trie)
+	for i := 0; i < len(txs); i++ {
+		keybuf.Reset()
+		rlp.Encode(keybuf, uint(i))
+		trie.TryUpdate(keybuf.Bytes(), GetRlp(txs[i]))
+	}
+	return trie.Hash()
 }

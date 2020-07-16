@@ -2,6 +2,7 @@ package postgresql
 
 import (
 	"database/sql"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -10,8 +11,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-
-	"fmt"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -368,6 +367,54 @@ func (b *Backend) ReadBody(hash types.Hash) (*types.Body, bool) {
 		Transactions: transactions,
 	}
 	return body, true
+}
+
+// WriteSnapshot implements the storage backend
+func (b *Backend) WriteSnapshot(hash types.Hash, blob []byte) error {
+	_, err := b.db.Exec("INSERT INTO shapshot (hash, blob) VALUES ($1, $2)", hash, blob)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadSnapshot implements the storage backend
+func (b *Backend) ReadSnapshot(hash types.Hash) ([]byte, bool) {
+	query := "SELECT blob FROM shapshot WHERE hash=$1"
+	var snapshot struct {
+		blob []byte
+	}
+
+	if err := b.db.Select(&snapshot, query, hash); err != nil {
+		return nil, false
+	}
+
+	return snapshot.blob, true
+}
+
+// WriteTxLookup implements the storage backend
+func (b *Backend) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
+	_, err := b.db.Exec("INSERT INTO tx_lookup (hash, block_hash) VALUES ($1, $2)", hash, blockHash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ReadTxLookup implements the storage backend
+func (b *Backend) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
+	query := "SELECT blob FROM tx_lookup WHERE hash=$1"
+	var txLookup struct {
+		blockHash types.Hash
+	}
+
+	if err := b.db.Select(&txLookup, query, hash); err != nil {
+		return types.Hash{}, false
+	}
+
+	return txLookup.blockHash, true
 }
 
 // WriteCanonicalHeader implements the storage backend

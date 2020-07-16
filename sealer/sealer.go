@@ -66,7 +66,7 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		config:     config,
 		logger:     logger.Named("Sealer"),
 		txPool:     NewTxPool(blockchain),
-		signer:     crypto.NewEIP155Signer(1),
+		signer:     crypto.NewEIP155Signer(13931),
 		SealedCh:   make(chan *SealedNotify, 10),
 		executor:   executor,
 		wakeCh:     make(chan struct{}),
@@ -204,6 +204,10 @@ func (s *Sealer) seal(ctx context.Context) error {
 		ExtraData:  s.config.Extra,
 	}
 
+	if err := s.engine.Prepare(s.blockchain, header); err != nil {
+		return err
+	}
+
 	transition, err := s.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
 		return err
@@ -243,9 +247,14 @@ func (s *Sealer) seal(ctx context.Context) error {
 	block := generateNewBlock(header, txns, transition.Receipts())
 
 	// Start the consensus sealing
-	if _, err := s.engine.Seal(ctx, block); err != nil {
+	block, err = s.engine.Seal(s.blockchain, block, ctx)
+	if err != nil {
 		return err
 	}
+	if block == nil {
+		return nil
+	}
+
 	// Check if the context was cancelled while in the sealing routine
 	if ctx.Err() != nil {
 		return nil
@@ -256,7 +265,7 @@ func (s *Sealer) seal(ctx context.Context) error {
 		return fmt.Errorf("failed to write sealed block: %v", err)
 	}
 
-	s.logger.Info("Block sealed", "number", num+1, "hash", header.Hash)
+	s.logger.Info("Block sealed", "number", num+1, "hash", block.Header.Hash)
 
 	// Broadcast the block to the network
 	select {

@@ -2,6 +2,7 @@ package pow
 
 import (
 	"context"
+	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
 	"math"
@@ -9,8 +10,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -23,11 +26,12 @@ type Pow struct {
 	max uint64
 }
 
-func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
-func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (p *Pow) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
+	parent, _ := chain.CurrentHeader()
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
@@ -40,7 +44,13 @@ func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, se
 	return nil
 }
 
-func (p *Pow) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+// Prepare initializes the consensus fields of a block header according to the
+// rules of a particular engine. The changes are executed inline.
+func (p *Pow) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
+}
+
+func (p *Pow) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	header := block.Header
 	header.Difficulty = randomInt(p.min, p.max)
 

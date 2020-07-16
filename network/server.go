@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/helper/enode"
@@ -122,6 +125,8 @@ type Server struct {
 	Name   string
 	key    *ecdsa.PrivateKey
 
+	consensus consensus.Consensus
+
 	peersLock sync.Mutex
 	peers     map[string]*Peer
 
@@ -184,6 +189,15 @@ func (s *Server) SetPeerStore(p PeerStore) {
 	s.peerStore = p
 }
 
+// SetConsensus sets the consensus
+func (s *Server) SetConsensus(c consensus.Consensus) {
+	s.consensus = c
+
+	if handler, ok := s.consensus.(consensus.Handler); ok {
+		handler.SetBroadcaster(s)
+	}
+}
+
 // GetPeers returns a copy of list of peers
 func (s *Server) GetPeers() []string {
 	s.peersLock.Lock()
@@ -212,6 +226,26 @@ func (s *Server) buildInfo() {
 	s.info = info
 }
 
+func (s *Server) Enqueue(id string, block *types.Block) {
+	//s.fetcher.Enqueue(id, block)
+}
+
+func (s *Server) FindPeers(targets map[types.Address]bool) map[types.Address]consensus.Peer {
+	m := make(map[types.Address]consensus.Peer)
+	for _, p := range s.peers {
+		pubKey, err := p.Enode.PublicKey()
+		if err != nil {
+			continue
+		}
+
+		addr := crypto.PubKeyToAddress(pubKey)
+		if targets[addr] {
+			m[addr] = p
+		}
+	}
+	return m
+}
+
 // Schedule starts all the tasks once all the protocols have been loaded
 func (s *Server) Schedule() error {
 	// bootstrap peers
@@ -236,10 +270,14 @@ func (s *Server) Schedule() error {
 	}
 
 	go func() {
-		session, err := s.transport.Accept()
-		if err == nil {
-			if err := s.addSession(session); err != nil {
-				// log
+		for {
+			session, err := s.transport.Accept()
+			if err == nil {
+				go func() {
+					if err := s.addSession(session); err != nil {
+						s.logger.Trace("failed adding session", err)
+					}
+				}()
 			}
 		}
 	}()
@@ -269,14 +307,14 @@ func (s *Server) dialTask(id string, tasks chan string) {
 	for {
 		select {
 		case task := <-tasks:
-			s.logger.Trace("DIAL", "id", id, "task", task)
+			//s.logger.Trace("DIAL", "id", id, "task", task)
 
 			err := s.connect(task)
 
 			contains := s.dispatcher.Contains(task)
 			busy := false
 			if err != nil {
-				s.logger.Trace("Err", "id", id, "err", err)
+				//s.logger.Trace("Err", "id", id, "err", err)
 
 				if err.Error() == "too many peers" {
 					busy = true

@@ -32,6 +32,12 @@ var (
 
 	// RECEIPTS is the prefix for receipts
 	RECEIPTS = []byte("r")
+
+	// SNAPSHOTS is the prefix for snapshots
+	SNAPSHOTS = []byte("s")
+
+	// TRANSACTION is the prefix for transactions
+	TX_LOOKUP_PREFIX = []byte("l")
 )
 
 // sub-prefix
@@ -248,6 +254,22 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, bool) {
 	return body2, true
 }
 
+// -- snapshots --
+
+// WriteBody writes the body
+func (s *KeyValueStorage) WriteSnapshot(hash types.Hash, blob []byte) error {
+	return s.set(SNAPSHOTS, hash.Bytes(), blob)
+}
+
+// ReadBody reads the body
+func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
+	data, ok := s.get(SNAPSHOTS, hash.Bytes())
+	if !ok {
+		return []byte{}, false
+	}
+	return data, true
+}
+
 // -- receipts --
 
 // WriteReceipts writes the receipts
@@ -289,6 +311,34 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 	}
 
 	return receipts2, true
+}
+
+// -- tx lookup --
+
+// WriteReceipts writes the receipts
+func (s *KeyValueStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
+	ar := &fastrlp.Arena{}
+
+	vr := ar.NewBytes(blockHash.Bytes())
+
+	return s.write2(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
+}
+
+// ReadReceipts reads the receipts
+func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
+	parser := &fastrlp.Parser{}
+	v := s.read2(TX_LOOKUP_PREFIX, hash.Bytes(), parser)
+	if v == nil {
+		return types.Hash{}, false
+	}
+
+	blockHash := []byte{}
+	blockHash, err := v.GetBytes(blockHash[:0], 32)
+	if err != nil {
+		panic(err)
+	}
+
+	return types.BytesToHash(blockHash), true
 }
 
 // -- write ops --

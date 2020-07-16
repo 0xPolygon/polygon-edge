@@ -30,6 +30,8 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
+	config *chain.Params
+
 	db        storage.Storage
 	consensus consensus.Consensus
 	executor  *state.Executor
@@ -50,8 +52,10 @@ var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db storage.Storage, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
+func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
+		config: config,
+
 		db:          db,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
@@ -312,6 +316,11 @@ func (b *Blockchain) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
 	return b.readHeader(hash)
 }
 
+// GetConsensus returns the consensus engine
+func (b *Blockchain) GetConsensus() consensus.Consensus {
+	return b.consensus
+}
+
 func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	h, ok := b.headersCache.Get(hash)
 	if ok {
@@ -409,7 +418,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if blocks[i].ParentHash() != parent.Hash {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(parent, blocks[i].Header, false, true); err != nil {
+		if err := b.consensus.VerifyHeader(b, blocks[i].Header, false, true); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
@@ -429,6 +438,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	// Write chain
 	for indx, block := range blocks {
 		header := block.Header
+		header.ComputeHash()
 
 		body := block.Body()
 		if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
@@ -450,6 +460,10 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 	}
 
+	if h, ok := b.GetConsensus().(consensus.Handler); ok {
+		h.NewChainHead()
+	}
+
 	return nil
 }
 
@@ -466,6 +480,10 @@ func (b *Blockchain) processBlock(block *types.Block) error {
 		return err
 	}
 
+	err = b.WriteReceipts(block.Header.Hash, transition.Receipts())
+	if err != nil {
+		return err
+	}
 	// validate the fields
 	if root != header.StateRoot {
 		return fmt.Errorf("invalid merkle root")
@@ -559,7 +577,7 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 			return errDanglingUncle
 		}
 
-		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle, true, false); err != nil {
+		if err := b.consensus.VerifyHeader(b, uncle, true, false); err != nil {
 			return err
 		}
 	}
@@ -593,6 +611,8 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 
 	// Write the data
 	if header.ParentHash == head.Hash {
+		b.headersCache.Add(header.Hash, header)
+
 		// Fast path to save the new canonical header
 		return b.writeCanonicalHeader(header)
 	}
@@ -629,6 +649,20 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	}
 
 	return nil
+}
+
+// WriteReceipts writes a block receipts
+func (b *Blockchain) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
+	for _, receipt := range receipts {
+		_ = b.db.WriteTxLookup(receipt.TxHash, hash)
+	}
+
+	return b.db.WriteReceipts(hash, receipts)
+}
+
+// ReadTransactionBlockHash fetches block hash for provided transaction hash
+func (b *Blockchain) ReadTransactionBlockHash(hash types.Hash) (types.Hash, bool) {
+	return b.db.ReadTxLookup(hash)
 }
 
 // SideChainCh returns the channel of headers
@@ -758,6 +792,57 @@ func (b *Blockchain) GetBlockByNumber(n uint64, full bool) (*types.Block, bool) 
 	return b.GetBlockByHash(hash, full)
 }
 
+func (b *Blockchain) Config() *chain.Params {
+	return b.config
+}
+
+func (b *Blockchain) CurrentBlock(full bool) *types.Block {
+	header, _ := b.CurrentHeader()
+	block, _ := b.GetBlock(header.Hash, header.Number, full)
+
+	return block
+}
+
+func (b *Blockchain) HasBadBlock(hash types.Hash) bool {
+	return false
+}
+
+func (b *Blockchain) CurrentHeader() (*types.Header, bool) {
+	return b.Header()
+}
+
+func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
+	hhash, ok := b.db.ReadCanonicalHash(number)
+	if !ok {
+		return nil, false
+	}
+	if hhash != hash {
+		return nil, false
+	}
+	h, ok := b.readHeader(hash)
+	if !ok {
+		return nil, false
+	}
+	return h, true
+}
+
+func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types.Block, bool) {
+	block, ok := b.GetBlockByHash(hash, full)
+	if !ok {
+		return nil, false
+	}
+
+	if block.Number() != number {
+		return nil, false
+	}
+
+	return block, true
+}
+
 func (b *Blockchain) Close() error {
+	if istanbul, ok := b.consensus.(consensus.Istanbul); ok {
+		istanbul.Stop()
+	}
+
 	return b.db.Close()
 }

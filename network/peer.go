@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/enode"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type Status int
@@ -61,6 +62,15 @@ func newPeer(conn Session) *Peer {
 // Session returns the session of the peer
 func (p *Peer) Session() Session {
 	return p.conn
+}
+
+func (p *Peer) Send(msgcode uint64, data interface{}) error {
+	buf, err := rlp.EncodeToBytes(data)
+	if err != nil {
+		return err
+	}
+
+	return p.Session().WriteRawMsg(msgcode, buf)
 }
 
 // GetProtocols returns all the protocols of the peer

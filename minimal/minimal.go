@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/armon/go-metrics"
@@ -28,7 +29,6 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/sealer"
 )
 
@@ -174,10 +174,12 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	}
 	consensusConfig.Config = config.ConsensusEntry.Config
 
-	m.consensus, err = engine(context.Background(), consensusConfig)
+	m.consensus, err = engine(context.Background(), consensusConfig, key, storage, logger)
 	if err != nil {
 		return nil, err
 	}
+
+	m.server.SetConsensus(m.consensus)
 
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
@@ -202,7 +204,7 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	}
 
 	// blockchain object
-	m.Blockchain = blockchain.NewBlockchain(storage, m.consensus, executor)
+	m.Blockchain = blockchain.NewBlockchain(storage, config.Chain.Params, m.consensus, executor)
 	if err := m.Blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
 		return nil, err
 	}
@@ -241,6 +243,8 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 	hcLogger := hclog.New(&hclog.LoggerOptions{
 		Level: hclog.LevelFromString("INFO"),
 	})
+
+	hcLogger.Info("public key", crypto.PubKeyToAddress(&m.Key.PublicKey))
 	// Start api backends
 	for name, entry := range config.APIEntries {
 		backend, ok := config.APIBackends[name]
@@ -252,6 +256,10 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 			return nil, err
 		}
 		m.apis = append(m.apis, api)
+	}
+
+	if istanbul, ok := m.consensus.(consensus.Istanbul); ok {
+		istanbul.Start(m.Blockchain, m.Blockchain.CurrentBlock, m.Blockchain.HasBadBlock)
 	}
 
 	if err := m.server.Schedule(); err != nil {

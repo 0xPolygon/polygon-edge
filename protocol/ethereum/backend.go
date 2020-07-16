@@ -8,18 +8,16 @@ import (
 	"math/big"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/sealer"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-
-	"sync"
-
-	"github.com/0xPolygon/minimal/network"
 
 	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/types"
@@ -169,6 +167,9 @@ func (b *Backend) runWatcher() {
 
 			if block.Number() > num {
 				// future block
+				if err := b.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+					b.logger.Trace("err writing blocks", err)
+				}
 				continue
 			}
 			if num-maxUncleLen > block.Number() {
@@ -321,30 +322,27 @@ func (b *Backend) runTask(id string) {
 }
 
 func (b *Backend) announceNewBlock(e *Ethereum, p *fastrlp.Parser, v *fastrlp.Value) error {
-	/*
-		elems, err := v.GetElems()
-		if err != nil {
-			return err
-		}
-		if len(elems) != 2 {
-			return fmt.Errorf("bad")
-		}
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	if len(elems) != 2 {
+		return fmt.Errorf("bad")
+	}
 
-		// difficulty in elems.0
-		diff := new(big.Int)
-		if err := elems[0].GetBigInt(diff); err != nil {
-			return err
-		}
+	// difficulty in elems.0
+	diff := new(big.Int)
+	if err := elems[0].GetBigInt(diff); err != nil {
+		return err
+	}
 
-		// block in elems.1
-		subElems, err := elems[1].GetElems()
-		if err != nil {
-			return err
-		}
-		if len(subElems) != 3 {
-			return fmt.Errorf("bad.2")
-		}
-	*/
+	var block types.Block
+	err = block.UnmarshalRLP(p, elems[1])
+	if err != nil {
+		return err
+	}
+
+	b.wqueue <- &block
 	return nil
 }
 
@@ -448,7 +446,7 @@ func (b *Backend) WatchMinedBlocks(watch chan *sealer.SealedNotify) {
 var defaultArena fastrlp.ArenaPool
 
 func (b *Backend) broadcastBlock(block *types.Block) {
-	fmt.Println("== BROADCAST BLOCK ==")
+	b.logger.Info("== BROADCAST BLOCK ==", block.Number())
 
 	// total difficulty so far at the parent
 	diff, ok := b.blockchain.GetTD(block.ParentHash())
@@ -515,7 +513,7 @@ func (b *Backend) Add(conn net.Conn, peer *network.Peer) (network.ProtocolHandle
 	b.peersLock.Unlock()
 
 	// Start the protocol handle
-	if err := proto.Init(status); err != nil {
+	if err := proto.Init(peer, status); err != nil {
 		return nil, err
 	}
 

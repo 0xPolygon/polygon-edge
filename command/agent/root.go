@@ -34,6 +34,8 @@ var agentCmd = &cobra.Command{
 func init() {
 	agentCmd.Flags().Int("port", 0, "Port ...")
 	agentCmd.Flags().String("addr", "", "Addr ...")
+	agentCmd.Flags().Int("rpc-port", 0, "RPC Port ...")
+	agentCmd.Flags().String("rpc-addr", "", "RPC Addr ...")
 	agentCmd.Flags().String("data-dir", "", "Data-dir ...")
 	agentCmd.Flags().String("service", "", "Service ...")
 	agentCmd.Flags().Int("prometheus", 0, "Prometheus ...")
@@ -63,6 +65,8 @@ func readConfig(cmd *cobra.Command, args []string) (*Config, error) {
 		cliConfig.Chain = chain
 		cliConfig.BindAddr, _ = cmd.Flags().GetString("addr")
 		cliConfig.BindPort, _ = cmd.Flags().GetInt("port")
+		cliConfig.RPCAddr, _ = cmd.Flags().GetString("rpc-addr")
+		cliConfig.RPCPort, _ = cmd.Flags().GetInt("rpc-port")
 		cliConfig.DataDir, _ = cmd.Flags().GetString("data-dir")
 		cliConfig.ServiceName, _ = cmd.Flags().GetString("service")
 		cliConfig.Telemetry.PrometheusPort, _ = cmd.Flags().GetInt("prometheus")

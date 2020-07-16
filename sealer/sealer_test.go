@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/state/runtime/evm"
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
@@ -31,11 +32,15 @@ func newHookSealer(hook sealHook) *hookSealer {
 	return &hookSealer{hook}
 }
 
-func (h *hookSealer) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (h *hookSealer) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
-func (h *hookSealer) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (h *hookSealer) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
+}
+
+func (h *hookSealer) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	return h.hook(ctx, block)
 }
 
@@ -62,7 +67,7 @@ func testSealer(t *testing.T, sealerConfig *Config, hook sealHook) (*Sealer, fun
 	executor.SetRuntime(precompiled.NewPrecompiled())
 	executor.SetRuntime(evm.NewEVM())
 
-	b := blockchain.NewBlockchain(storage, engine, executor)
+	b := blockchain.NewBlockchain(storage, config, engine, executor)
 
 	executor.GetHash = b.GetHashHelper
 

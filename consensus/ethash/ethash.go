@@ -3,16 +3,19 @@ package ethash
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/helper/dao"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -35,7 +38,7 @@ type Ethash struct {
 }
 
 // Factory is the factory method to create an Ethash consensus
-func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	var pathStr string
 	path, ok := config.Config["path"]
 	if ok {
@@ -57,8 +60,9 @@ func Factory(ctx context.Context, config *consensus.Config) (consensus.Consensus
 }
 
 // VerifyHeader verifies the header is correct
-func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
 	headerNum := header.Number
+	parent, _ := chain.CurrentHeader()
 	parentNum := parent.Number
 
 	if headerNum != parentNum+1 {
@@ -196,8 +200,14 @@ func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 	}
 }
 
+// Prepare initializes the consensus fields of a block header according to the
+// rules of a particular engine. The changes are executed inline.
+func (e *Ethash) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	return nil
+}
+
 // Seal seals the block
-func (e *Ethash) Seal(ctx context.Context, block *types.Block) (*types.Block, error) {
+func (e *Ethash) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
 	panic("NOT IMPLEMENTED")
 }
 

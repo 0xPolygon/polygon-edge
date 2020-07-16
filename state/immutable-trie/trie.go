@@ -201,6 +201,40 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	return nTrie, root
 }
 
+// Hash returns the root hash of the trie. It does not write to the
+// database and can be used even if the trie doesn't have one.
+func (t *Trie) Hash() types.Hash {
+	if t.root == nil {
+		return types.EmptyRootHash
+	}
+
+	hash, cached, _ := t.hashRoot()
+	t.root = cached
+	return types.BytesToHash(hash)
+}
+
+func (t *Trie) TryUpdate(key, value []byte) error {
+	k := keybytesToHex(key)
+	if len(value) != 0 {
+		tt := t.Txn()
+		n := tt.insert(t.root, k, value)
+		t.root = n
+	} else {
+		tt := t.Txn()
+		n, ok := tt.delete(t.root, k)
+		if !ok {
+			return fmt.Errorf("missing node")
+		}
+		t.root = n
+	}
+	return nil
+}
+
+func (t *Trie) hashRoot() ([]byte, Node, error) {
+	hash, _ := t.root.Hash()
+	return hash, t.root, nil
+}
+
 func (t *Trie) Txn() *Txn {
 	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
 }
