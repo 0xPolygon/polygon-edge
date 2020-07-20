@@ -179,3 +179,29 @@ func (e *Eth) GetTransactionCount(address string, number string) (interface{}, e
 
 	return "0x0", nil
 }
+
+// GetCode returns account code at given block number
+func (e *Eth) GetCode(address string, number string) (interface{}, error) {
+	addr := types.StringToAddress(address)
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	s := e.d.minimal.Blockchain.Executor().State()
+	snap, err := s.NewSnapshotAt(header.StateRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
+		code, ok := snap.Get(acc.CodeHash)
+		if !ok {
+			return "0x", nil
+		}
+
+		return types.HexBytes(code), nil
+	}
+
+	return "0x", nil
+}

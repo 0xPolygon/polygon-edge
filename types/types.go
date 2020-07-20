@@ -107,6 +107,10 @@ func (h *HexBytes) Scan(src interface{}) error {
 	return nil
 }
 
+func (h HexBytes) MarshalText() ([]byte, error) {
+	return []byte(h.String()), nil
+}
+
 func StringToHash(str string) Hash {
 	return BytesToHash(stringToBytes(str))
 }
