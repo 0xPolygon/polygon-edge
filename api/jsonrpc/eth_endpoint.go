@@ -2,10 +2,13 @@ package jsonrpc
 
 import (
 	"fmt"
+	"math/big"
 
+	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/umbracle/fastrlp"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -41,6 +44,39 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 	}
 
 	return types.Uint64(h.Number), nil
+}
+
+func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
+	raw := new(types.HexBytes)
+	err := raw.Scan(input)
+	if err != nil {
+		return nil, err
+	}
+	tx := &types.Transaction{}
+	p := &fastrlp.Parser{}
+
+	v, err := p.Parse(raw.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.UnmarshalRLP(p, v)
+	if err != nil {
+		return nil, err
+	}
+
+	signer := crypto.NewEIP155Signer(types.DeriveChainId(new(big.Int).SetBytes([]byte{tx.V})).Uint64())
+	tx.From, err = signer.Sender(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := e.d.minimal.Sealer.AddTx(tx); err != nil {
+		panic(err)
+	}
+
+	tx.ComputeHash()
+	return tx.Hash.String(), nil
 }
 
 // SendTransaction creates new message call transaction or a contract creation, if the data field contains code.

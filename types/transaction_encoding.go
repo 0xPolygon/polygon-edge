@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/umbracle/fastrlp"
@@ -95,4 +96,17 @@ func (t *Transaction) MarshalWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(t.S))
 
 	return vv
+}
+
+// deriveChainId derives the chain id from the given v parameter
+func DeriveChainId(v *big.Int) *big.Int {
+	if v.BitLen() <= 64 {
+		v := v.Uint64()
+		if v == 27 || v == 28 {
+			return new(big.Int)
+		}
+		return new(big.Int).SetUint64((v - 35) / 2)
+	}
+	v = new(big.Int).Sub(v, big.NewInt(35))
+	return v.Div(v, big.NewInt(2))
 }
