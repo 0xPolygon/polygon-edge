@@ -10,44 +10,71 @@ To find out more about Polygon, visit the [official website](https://polygon.tec
 
 WARNING: This is a work in progress so architectural changes may happen in the future. The code has not been audited yet, so please contact [Polygon team](mailto:contact@polygon.technology) if you would like to use it in production.
 
-## Commands
+## Structure
 
-### Agent
+-   api - Server confiuration
+    -   http - HTTP server for peer management and debugging
+    -   jsonrpc - RPC server, endpoints: [](https://eth.wiki/json-rpc/API)[https://eth.wiki/json-rpc/API](https://eth.wiki/json-rpc/API), not fully implemented yet)
+-   blockchain - Chain information (read/write blocks)
+    -   storage - Storage implementations
+-   chain - Chain parameters (active forks, consensus engine, etc.)
+    -   chains - Predefined chain configurations (mainnet, goerli, ibft)
+-   command - CLI commands
+-   consensus - Consensus interface
+    -   Clique - Clique engine (not fully implemented yet)
+    -   Ethash - Ethash engine
+    -   IBFT - IBFT engine
+    -   POW - POW engine
+-   crypto - Crypto utility functions
+-   helper - Helper packages
+    -   dao - Dao utils
+    -   enode - Enode encoding/decoding function
+    -   hex - Hex encoding/decoding functions
+    -   ipc - IPC connection functions
+    -   keccak - Keccak functions
+    -   rlputil - Rlp encoding/decoding helper function
+-   minimal - initialization (legacy name)
+-   network - Start server and updates peer connections
+    -   discovery - Discovers new peers and queues them
+    -   transport - Peer communication transporting
+-   protocol - Blockchain sync
+-   scrips - Build script
+-   sealer - Seals the block
+-   state - State machine (currently implements EVM)
+-   test - Test cases
+-   types - Ethereum protocol types (block, transaction, etc..)
+-   version - codebase version
 
-Starts the Ethereum client for the mainnet:
+## Dev
 
-```
-$ go run main.go agent [--config ./config.json]
-```
+The easiest way to start with Polygon SDK is to "bypass" consensus and networking and start a blockchain locally. This is enabled with **dev** command that starts a local node and mines every transaction in a separate block. 
 
-The configuration file can be specified either in HCL or JSON format:
+go run main.go dev
 
-```
-{
-    "data-dir": "/tmp/data-dir"
-}
-```
+Use curl command to send transaction ([](https://eth.wiki/json-rpc/API)[https://eth.wiki/json-rpc/API](https://eth.wiki/json-rpc/API) - eth_sendTransaction method). Wait for the transaction to get mined, use eth_blockNumber and eth_getBlockByNumber methods.
 
-Some attributes can be also set from the command line:
+In order to better understand each step during the block sealing (sealer.go), we suggest using a debugger.
 
-```
-$ go run main.go agent --config ./config.json --data-dir /tmp/local --port 30304 --log-level TRACE
-```
+## Pluggable Consensus
 
-The values from the CLI have preference over the ones in the configuration file.
+Polygon SDK is designed to offer off-the-shelf pluggable consensus algortihms.
 
-### Dev
+The current list of supported consensus algorithms:
+1. IBFT
+2. Ethereum Nakamoto PoW
+3. Clique PoA (not fully implemented yet)
 
-Start a development chain with instant sealing:
+We plan to add support for more consensus algorithms in the future (HotSuff, Tendermint etc). Contact us if you would like to use a specific, not yet supported algorithm for your project.
 
-```
-$ go run main.go dev
-```
+### IBFT
 
-### Genesis
+Perform the following steps to activate networking and the IBFT consensus engine:
+1. Generate genesis block that will contain a validator list:
 
-Generates a test genesis file:
+go run main.go ibft-genesis [privateKey1, port1 privateKey2, port2 ...]
 
-```
-$ go run main.go genesis
-```
+2. For each validator create data folder and insert privateKey in the file called key.
+
+3. Start each validator:
+
+go run main.go agent ibft --data-dir [folder] --port [port] --addr [address] --rpc-addr [rpcAddress] --rpc-port [rpcPort] --seal --log-level TRACE
