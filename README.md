@@ -49,7 +49,9 @@ WARNING: This is a work in progress so architectural changes may happen in the f
 
 The easiest way to start with Polygon SDK is to "bypass" consensus and networking and start a blockchain locally. This is enabled with **dev** command that starts a local node and mines every transaction in a separate block. 
 
+```
 go run main.go dev
+```
 
 Use curl command to send transaction ([](https://eth.wiki/json-rpc/API)[https://eth.wiki/json-rpc/API](https://eth.wiki/json-rpc/API) - eth_sendTransaction method). Wait for the transaction to get mined, use eth_blockNumber and eth_getBlockByNumber methods.
 
@@ -71,10 +73,15 @@ We plan to add support for more consensus algorithms in the future (HotSuff, Ten
 Perform the following steps to activate networking and the IBFT consensus engine:
 1. Generate genesis block that will contain a validator list:
 
+```
 go run main.go ibft-genesis [privateKey1, port1 privateKey2, port2 ...]
-
-2. For each validator create data folder and insert privateKey in the file called key.
+```
+2. For each validator create data folder and insert privateKey in the file called `key`.
 
 3. Start each validator:
 
+```
 go run main.go agent ibft --data-dir [folder] --port [port] --addr [address] --rpc-addr [rpcAddress] --rpc-port [rpcPort] --seal --log-level TRACE
+```
+
+
