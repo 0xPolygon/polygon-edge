@@ -1,11 +1,14 @@
-# Minimal
 
-[![CircleCI](https://circleci.com/gh/0xPolygon/minimal.svg?style=svg)](https://circleci.com/gh/0xPolygon/minimal)
-[![Join the chat at https://gitter.im/0xPolygon/minimal](https://badges.gitter.im/0xPolygon/minimal.svg)](https://gitter.im/0xPolygon/minimal?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+# Polygon SDK
 
-Modular implementation of different stacks of the Ethereum blockchain.
 
-This is a work in progress so architectural changes are expected in the near future. Besides, there exist intentional panics intended to cover areas where the logic is unfinished or the test coverage is not complete.
+Polygon SDK is a modular and extensible framework for building Ethereum-compatible blockchain networks. 
+
+This repository is the first implementation of Polygon SDK, written in Golang. Other implementations, written in other programming languages might be introduced in the future. If you would like to contribute to this or any future implementation, please reach out to [Polygon team](mailto:contact@polygon.technology).
+
+To find out more about Polygon, visit the [official website](https://polygon.technology/).
+
+WARNING: This is a work in progress so architectural changes may happen in the future. The code has not been audited yet, so please contact [Polygon team](mailto:contact@polygon.technology) if you would like to use it in production.
 
 ## Commands
 
