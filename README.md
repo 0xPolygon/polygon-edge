@@ -53,9 +53,16 @@ The easiest way to start with Polygon SDK is to "bypass" consensus and networkin
 go run main.go dev
 ```
 
-Use curl command to send transaction ([](https://eth.wiki/json-rpc/API)[https://eth.wiki/json-rpc/API](https://eth.wiki/json-rpc/API) - eth_sendTransaction method). Wait for the transaction to get mined, use eth_blockNumber and eth_getBlockByNumber methods.
-
-In order to better understand each step during the block sealing (sealer.go), we suggest using a debugger.
+#### The RPC methods currently implemented are:
+* [eth_blockNumber](https://eth.wiki/json-rpc/API)
+* [eth_getBlockByNumber](https://eth.wiki/json-rpc/API)
+* [eth_sendRawTransaction](https://eth.wiki/json-rpc/API)
+* [eth_sendTransaction](https://eth.wiki/json-rpc/API)
+* [eth_getTransactionReceipt](https://eth.wiki/json-rpc/API)
+* [eth_getBalance](https://eth.wiki/json-rpc/API)
+* [eth_getTransactionCount](https://eth.wiki/json-rpc/API)
+* [eth_getCode](https://eth.wiki/json-rpc/API)
+* [web3_sha](https://eth.wiki/json-rpc/API)
 
 ## Pluggable Consensus
 
