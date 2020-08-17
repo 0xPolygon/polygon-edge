@@ -48,7 +48,7 @@ WARNING: This is a work in progress so architectural changes may happen in the f
 
 ## Dev
 
-The easiest way to start with Polygon SDK is to "bypass" consensus and networking and start a blockchain locally. This is enabled with **dev** command that starts a local node and mines every transaction in a separate block. 
+The easiest way to start with Polygon SDK is to "bypass" consensus and networking and start a blockchain locally. This is enabled with `dev` command that starts a local node and mines every transaction in a separate block. 
 
 ```
 go run main.go dev
