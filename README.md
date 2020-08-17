@@ -63,7 +63,7 @@ Polygon SDK is designed to offer off-the-shelf pluggable consensus algortihms.
 
 The current list of supported consensus algorithms:
 1. IBFT
-2. Ethereum Nakamoto PoW
+2. Ethereum's Nakamoto PoW
 3. Clique PoA (not fully implemented yet)
 
 We plan to add support for more consensus algorithms in the future (HotSuff, Tendermint etc). Contact us if you would like to use a specific, not yet supported algorithm for your project.
@@ -76,7 +76,7 @@ Perform the following steps to activate networking and the IBFT consensus engine
 ```
 go run main.go ibft-genesis [privateKey1, port1 privateKey2, port2 ...]
 ```
-2. For each validator create data folder and insert privateKey in the file called `key`.
+2. For each validator create data folder and insert `privateKey` in the file called `key`.
 
 3. Start each validator:
 
