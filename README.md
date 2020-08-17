@@ -1,4 +1,5 @@
 
+
 # Polygon SDK
 
 
@@ -53,7 +54,7 @@ The easiest way to start with Polygon SDK is to "bypass" consensus and networkin
 go run main.go dev
 ```
 
-#### The RPC methods currently implemented are:
+The current list of implemented RPC methods:
 * [eth_blockNumber](https://eth.wiki/json-rpc/API)
 * [eth_getBlockByNumber](https://eth.wiki/json-rpc/API)
 * [eth_sendRawTransaction](https://eth.wiki/json-rpc/API)
