@@ -396,6 +396,16 @@ var Forks = map[string]*chain.Forks{
 		Byzantium:      chain.NewFork(0),
 		Constantinople: chain.NewFork(0),
 	},
+	"Istanbul": {
+		Homestead:      chain.NewFork(0),
+		EIP150:         chain.NewFork(0),
+		EIP155:         chain.NewFork(0),
+		EIP158:         chain.NewFork(0),
+		Byzantium:      chain.NewFork(0),
+		Constantinople: chain.NewFork(0),
+		Petersburg:     chain.NewFork(0),
+		Istanbul:       chain.NewFork(0),
+	},
 	"FrontierToHomesteadAt5": {
 		Homestead: chain.NewFork(5),
 	},
@@ -541,18 +551,20 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(folder string) ([]string, error) {
-	path := filepath.Join(TESTS, folder)
-
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
+func listFolders(paths ...string) ([]string, error) {
 	folders := []string{}
-	for _, i := range files {
-		if i.IsDir() {
-			folders = append(folders, filepath.Join(path, i.Name()))
+
+	for _, p := range paths {
+		path := filepath.Join(TESTS, p)
+
+		files, err := ioutil.ReadDir(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range files {
+			if i.IsDir() {
+				folders = append(folders, filepath.Join(path, i.Name()))
+			}
 		}
 	}
 	return folders, nil

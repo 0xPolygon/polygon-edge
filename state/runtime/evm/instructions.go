@@ -445,7 +445,10 @@ func opSload(c *state) {
 	loc := c.top()
 
 	var gas uint64
-	if c.config.EIP150 {
+	if c.config.Istanbul {
+		// eip-1884
+		gas = 800
+	} else if c.config.EIP150 {
 		gas = 200
 	} else {
 		gas = 50
@@ -464,31 +467,46 @@ func opSStore(c *state) {
 		return
 	}
 
+	if c.config.Istanbul && c.gas <= 2300 {
+		c.exit(errOutOfGas)
+		return
+	}
+
 	key := c.popHash()
 	val := c.popHash()
 
-	discount := c.config.Constantinople && !c.config.Petersburg
+	legacyGasMetering := !c.config.Istanbul && (c.config.Petersburg || !c.config.Constantinople)
 
-	status := c.host.SetStorage(c.msg.Address, key, val, discount)
+	status := c.host.SetStorage(c.msg.Address, key, val, c.config)
 	cost := uint64(0)
 
 	switch status {
 	case runtime.StorageUnchanged:
-		if !discount {
+		if c.config.Istanbul {
+			// eip-2200
+			cost = 800
+		} else if legacyGasMetering {
 			cost = 5000
 		} else {
 			cost = 200
 		}
+
 	case runtime.StorageModified:
 		cost = 5000
+
 	case runtime.StorageModifiedAgain:
-		if !discount {
+		if c.config.Istanbul {
+			// eip-2200
+			cost = 800
+		} else if legacyGasMetering {
 			cost = 5000
 		} else {
 			cost = 200
 		}
+
 	case runtime.StorageAdded:
 		cost = 20000
+
 	case runtime.StorageDeleted:
 		cost = 5000
 	}
@@ -533,16 +551,38 @@ func opBalance(c *state) {
 	addr, _ := c.popAddr()
 
 	var gas uint64
-	if c.config.EIP150 {
+	if c.config.Istanbul {
+		// eip-1884
+		gas = 700
+	} else if c.config.EIP150 {
 		gas = 400
 	} else {
 		gas = 20
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
 
 	c.push1().Set(c.host.GetBalance(addr))
+}
+
+func opSelfBalance(c *state) {
+	if !c.config.Istanbul {
+		c.exit(errOpCodeNotFound)
+		return
+	}
+
+	c.push1().Set(c.host.GetBalance(c.msg.Address))
+}
+
+func opChainID(c *state) {
+	if !c.config.Istanbul {
+		c.exit(errOpCodeNotFound)
+		return
+	}
+
+	c.push1().SetUint64(uint64(c.host.GetTxContext().ChainID))
 }
 
 func opOrigin(c *state) {
@@ -621,6 +661,16 @@ func opExtCodeHash(c *state) {
 	}
 
 	address, _ := c.popAddr()
+
+	var gas uint64
+	if c.config.Istanbul {
+		gas = 700
+	} else {
+		gas = 400
+	}
+	if !c.consumeGas(gas) {
+		return
+	}
 
 	v := c.push1()
 	if c.host.Empty(address) {

@@ -16,7 +16,10 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-var stateTests = "GeneralStateTests"
+var (
+	stateTests       = "GeneralStateTests"
+	legacyStateTests = "LegacyTests/Constantinople/GeneralStateTests"
+)
 
 type stateCase struct {
 	Info        *info                `json:"_info"`
@@ -44,7 +47,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	s, _, pastRoot := buildState(t, c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	xxx := state.NewExecutor(&chain.Params{Forks: config}, s)
+	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s)
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 
@@ -70,7 +73,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 
 	_, root := txn.Commit(forks.EIP158)
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %s %d): expected %s but found %s", name, fork, index, p.Root.String(), hex.EncodeToHex(root))
+		t.Fatalf("root mismatch (%s %s %s %d): expected %s but found %s", file, name, fork, index, p.Root.String(), hex.EncodeToHex(root))
 	}
 
 	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
@@ -84,11 +87,16 @@ func TestState(t *testing.T) {
 		"static_Return50000",
 		"static_Call1MB",
 		"stQuadraticComplexityTest",
+		"stTimeConsuming",
 	}
 
-	skip := []string{}
+	skip := []string{
+		"RevertPrecompiledTouch",
+	}
 
-	folders, err := listFolders(stateTests)
+	// There are two folders in spec tests, one for the current tests for the Istanbul fork
+	// and one for the legacy tests for the other forks
+	folders, err := listFolders(stateTests, legacyStateTests)
 	if err != nil {
 		t.Fatal(err)
 	}

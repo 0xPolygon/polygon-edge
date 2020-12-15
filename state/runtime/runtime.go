@@ -17,6 +17,7 @@ type TxContext struct {
 	Number     int64
 	Timestamp  int64
 	GasLimit   int64
+	ChainID    int64
 	Difficulty types.Hash
 }
 
@@ -57,7 +58,7 @@ func (s StorageStatus) String() string {
 type Host interface {
 	AccountExists(addr types.Address) bool
 	GetStorage(addr types.Address, key types.Hash) types.Hash
-	SetStorage(addr types.Address, key types.Hash, value types.Hash, discount bool) StorageStatus
+	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash

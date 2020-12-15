@@ -124,6 +124,7 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Trans
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		GasLimit:   int64(header.GasLimit),
+		ChainID:    int64(e.config.ChainID),
 	}
 
 	// Mainnet (TODO: Do this in a preHookFn)
@@ -385,7 +386,12 @@ func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {
 		}
 		nonZeros := len(payload) - zeros
 		cost += uint64(zeros) * 4
-		cost += uint64(nonZeros) * 68
+
+		nonZeroCost := uint64(68)
+		if t.config.Istanbul {
+			nonZeroCost = 16
+		}
+		cost += uint64(nonZeros) * nonZeroCost
 	}
 
 	return uint64(cost)
@@ -610,8 +616,8 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]by
 	return code, gas, nil
 }
 
-func (t *Transition) SetStorage(addr types.Address, key types.Hash, value types.Hash, discount bool) runtime.StorageStatus {
-	return t.state.SetStorage(addr, key, value, discount)
+func (t *Transition) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
+	return t.state.SetStorage(addr, key, value, config)
 }
 
 func (t *Transition) GetTxContext() runtime.TxContext {

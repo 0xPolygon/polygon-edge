@@ -11,7 +11,7 @@ import (
 var _ runtime.Runtime = &Precompiled{}
 
 type contract interface {
-	gas(input []byte) uint64
+	gas(input []byte, config *chain.ForksInTime) uint64
 	run(input []byte) ([]byte, error)
 }
 
@@ -39,6 +39,9 @@ func (p *Precompiled) setupContracts() {
 	p.register("6", &bn256Add{p})
 	p.register("7", &bn256Mul{p})
 	p.register("8", &bn256Pairing{p})
+
+	// Istanbul fork
+	p.register("9", &blake2f{p})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
@@ -53,6 +56,7 @@ var (
 	six   = types.StringToAddress("6")
 	seven = types.StringToAddress("7")
 	eight = types.StringToAddress("8")
+	nine  = types.StringToAddress("9")
 )
 
 // CanRun implements the runtime interface
@@ -77,6 +81,12 @@ func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *cha
 		return config.Byzantium
 	}
 
+	// istanbul precompiles
+	switch c.CodeAddress {
+	case nine:
+		return config.Istanbul
+	}
+
 	return true
 }
 
@@ -88,11 +98,7 @@ func (p *Precompiled) Name() string {
 // Run runs an execution
 func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
 	contract := p.contracts[c.CodeAddress]
-	gasCost := contract.gas(c.Input)
-
-	//fmt.Println("-- gas cost --")
-	//fmt.Println(gasCost)
-	//fmt.Println(c.Gas)
+	gasCost := contract.gas(c.Input, config)
 
 	if c.Gas < gasCost {
 		return nil, 0, runtime.ErrGasOverflow

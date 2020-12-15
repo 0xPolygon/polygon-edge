@@ -25,6 +25,7 @@ type Forks struct {
 	Byzantium      *Fork `json:"byzantium,omitempty"`
 	Constantinople *Fork `json:"constantinople,omitempty"`
 	Petersburg     *Fork `json:"petersburg,omitempty"`
+	Istanbul       *Fork `json:"istanbul,omitempty"`
 	EIP150         *Fork `json:"EIP150,omitempty"`
 	EIP158         *Fork `json:"EIP158,omitempty"`
 	EIP155         *Fork `json:"EIP155,omitempty"`
@@ -71,6 +72,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		Byzantium:      f.active(f.Byzantium, block),
 		Constantinople: f.active(f.Constantinople, block),
 		Petersburg:     f.active(f.Petersburg, block),
+		Istanbul:       f.active(f.Istanbul, block),
 		EIP150:         f.active(f.EIP150, block),
 		EIP158:         f.active(f.EIP158, block),
 		EIP155:         f.active(f.EIP155, block),
@@ -93,5 +95,5 @@ func (f Fork) Int() *big.Int {
 }
 
 type ForksInTime struct {
-	Homestead, Byzantium, Constantinople, Petersburg, EIP150, EIP158, EIP155 bool
+	Homestead, Byzantium, Constantinople, Petersburg, Istanbul, EIP150, EIP158, EIP155 bool
 }

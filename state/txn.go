@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strconv"
 
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
@@ -171,6 +172,7 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
+	//fmt.Printf("ADD BALANCE: %s %s\n", addr.String(), balance.String())
 	/*
 		if balance.Sign() == 0 {
 			return
@@ -183,6 +185,8 @@ func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
 
 // SubBalance reduces the balance
 func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
+	//fmt.Printf("SUB BALANCE: %s %s\n", addr.String(), balance.String())
+
 	if balance.Sign() == 0 {
 		return
 	}
@@ -193,6 +197,7 @@ func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
 
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
+	//fmt.Printf("SET BALANCE: %s %s\n", addr.String(), balance.String())
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
 	})
@@ -254,7 +259,7 @@ func isZeros(b []byte) bool {
 
 var zeroHash types.Hash
 
-func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, discount bool) (status runtime.StorageStatus) {
+func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) (status runtime.StorageStatus) {
 	oldValue := txn.GetState(addr, key)
 	if oldValue == value {
 		return runtime.StorageUnchanged
@@ -265,7 +270,9 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 
 	txn.SetState(addr, key, value)
 
-	if !discount {
+	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
+
+	if legacyGasMetering {
 		status = runtime.StorageModified
 		if oldValue == zeroHash {
 			return runtime.StorageAdded
@@ -295,9 +302,17 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 	}
 	if original == value {
 		if original == zeroHash { // reset to original inexistent slot (2.2.2.1)
-			txn.AddRefund(19800)
+			if config.Istanbul {
+				txn.AddRefund(19200)
+			} else {
+				txn.AddRefund(19800)
+			}
 		} else { // reset to original existing slot (2.2.2.2)
-			txn.AddRefund(4800)
+			if config.Istanbul {
+				txn.AddRefund(4200)
+			} else {
+				txn.AddRefund(4800)
+			}
 		}
 	}
 	return runtime.StorageModifiedAgain
@@ -429,6 +444,8 @@ func (txn *Txn) HasSuicided(addr types.Address) bool {
 
 // Refund
 func (txn *Txn) AddRefund(gas uint64) {
+	// fmt.Printf("=-----------ADD REFUND: %d\n", gas)
+
 	refund := txn.GetRefund() + gas
 	txn.txn.Insert(refundIndex, refund)
 }

@@ -4,6 +4,8 @@ import (
 	"math/big"
 
 	"math"
+
+	"github.com/0xPolygon/minimal/chain"
 )
 
 type modExp struct {
@@ -74,7 +76,7 @@ func multComplexity(x *big.Int) *big.Int {
 	return x
 }
 
-func (m *modExp) gas(input []byte) uint64 {
+func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	// fmt.Println("-- calc gas --")
 
 	var val, tail []byte

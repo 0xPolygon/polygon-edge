@@ -180,7 +180,13 @@ type Block struct {
 	Uncles       []*Header
 }
 
-func (b *Block) UnmarshalRLP(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (b *Block) UnmarshalRLP(buf []byte) error {
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(buf)
+	if err != nil {
+		return err
+	}
+
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
