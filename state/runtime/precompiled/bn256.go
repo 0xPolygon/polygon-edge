@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/chain"
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
@@ -11,7 +12,10 @@ type bn256Add struct {
 	p *Precompiled
 }
 
-func (b *bn256Add) gas(input []byte) uint64 {
+func (b *bn256Add) gas(input []byte, config *chain.ForksInTime) uint64 {
+	if config.Istanbul {
+		return 150
+	}
 	return 500
 }
 
@@ -40,7 +44,10 @@ type bn256Mul struct {
 	p *Precompiled
 }
 
-func (b *bn256Mul) gas(input []byte) uint64 {
+func (b *bn256Mul) gas(input []byte, config *chain.ForksInTime) uint64 {
+	if config.Istanbul {
+		return 6000
+	}
 	return 40000
 }
 
@@ -74,8 +81,12 @@ type bn256Pairing struct {
 	p *Precompiled
 }
 
-func (b *bn256Pairing) gas(input []byte) uint64 {
-	return 100000 + 80000*uint64(len(input)/192)
+func (b *bn256Pairing) gas(input []byte, config *chain.ForksInTime) uint64 {
+	baseGas, pointGas := uint64(100000), uint64(80000)
+	if config.Istanbul {
+		baseGas, pointGas = 45000, 34000
+	}
+	return baseGas + pointGas*uint64(len(input)/192)
 }
 
 func (b *bn256Pairing) run(input []byte) ([]byte, error) {

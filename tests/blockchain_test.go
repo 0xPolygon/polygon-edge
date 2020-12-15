@@ -98,7 +98,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		fakePow = false
 	}
 
-	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: params})
+	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: params}, nil, nil, nil)
 	if fakePow {
 		engine.(*ethash.Ethash).SetFakePow()
 	}
@@ -234,72 +234,12 @@ func testBlockChainCases(t *testing.T, folder string, skip []string) {
 	}
 }
 
-func TestBlockchainBlockGasLimitTest(t *testing.T) {
-	testBlockChainCases(t, "bcBlockGasLimitTest", none)
+func TestBlockchainInvalidBlocks(t *testing.T) {
+	testBlockChainCases(t, "InvalidBlocks", []string{})
 }
 
-func TestBlockchainExploitTest(t *testing.T) {
-	if !testing.Short() {
-		testBlockChainCases(t, "bcExploitTest", none)
-	}
-}
-
-func TestBlockchainForgedTest(t *testing.T) {
-	testBlockChainCases(t, "bcForgedTest", []string{
-		"ForkUncle",
-	})
-}
-
-func TestBlockchainForkStressTest(t *testing.T) {
-	testBlockChainCases(t, "bcForkStressTest", none)
-}
-
-func TestBlockchainGasPricerTest(t *testing.T) {
-	testBlockChainCases(t, "bcGasPricerTest", none)
-}
-
-func TestBlockchainInvalidHeaderTest(t *testing.T) {
-	testBlockChainCases(t, "bcInvalidHeaderTest", none)
-}
-
-func TestBlockchainMultiChainTest(t *testing.T) {
-	testBlockChainCases(t, "bcMultiChainTest", []string{
-		"ChainAtoChainB_blockorder",
-		"CallContractFromNotBestBlock",
-	})
-}
-
-func TestBlockchainRandomBlockhashTest(t *testing.T) {
-	testBlockChainCases(t, "bcRandomBlockhashTest", none)
-}
-
-func TestBlockchainStateTests(t *testing.T) {
-	testBlockChainCases(t, "bcStateTests", none)
-}
-
-func TestBlockchainTotalDifficulty(t *testing.T) {
-	testBlockChainCases(t, "bcTotalDifficultyTest", []string{
-		"lotsOfLeafs",
-		"lotsOfBranches",
-		"sideChainWithMoreTransactions",
-		"uncleBlockAtBlock3afterBlock4", // TODO
-	})
-}
-
-func TestBlockchainUncleHeaderValidity(t *testing.T) {
-	testBlockChainCases(t, "bcUncleHeaderValidity", none)
-}
-
-func TestBlockchainUncleTest(t *testing.T) {
-	testBlockChainCases(t, "bcUncleTest", none)
-}
-
-func TestBlockchainValidBlockTest(t *testing.T) { // x
-	testBlockChainCases(t, "bcValidBlockTest", none)
-}
-
-func TestBlockchainWallet(t *testing.T) { // x
-	testBlockChainCases(t, "bcWalletTest", none)
+func TestBlockchainValidBlocks(t *testing.T) {
+	testBlockChainCases(t, "ValidBlocks", []string{})
 }
 
 func TestBlockchainTransitionTests(t *testing.T) { // x

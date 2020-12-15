@@ -128,7 +128,7 @@ func testDifficultyCase(t *testing.T, file string, config *chain.Forks) {
 		t.Fatal(err)
 	}
 
-	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: &chain.Params{Forks: config}})
+	engine, _ := ethash.Factory(context.Background(), &consensus.Config{Params: &chain.Params{Forks: config}}, nil, nil, nil)
 	engineEthash := engine.(*ethash.Ethash)
 
 	for name, i := range cases {

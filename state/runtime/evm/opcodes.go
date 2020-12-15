@@ -155,6 +155,12 @@ const (
 	// GASLIMIT returns the current block's gas limit
 	GASLIMIT = 0x45
 
+	// CHAINID returns the id of the chain
+	CHAINID = 0x46
+
+	// SELFBALANCE returns the balance of the current account
+	SELFBALANCE = 0x47
+
 	// POP pops a (u)int256 off the stack and discards it
 	POP = 0x50
 
@@ -323,6 +329,8 @@ var opCodeToString = map[OpCode]string{
 	STATICCALL:     "STATICCALL",
 	REVERT:         "REVERT",
 	SELFDESTRUCT:   "SELFDESTRUCT",
+	CHAINID:        "CHAINID",
+	SELFBALANCE:    "SELFBALANCE",
 }
 
 func opCodesToString(from, to OpCode, str string) {

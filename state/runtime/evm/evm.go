@@ -17,18 +17,6 @@ func NewEVM() *EVM {
 	return &EVM{}
 }
 
-/*
-// TODO
-func (c *EVM) getValue() *state {
-	if cap(c.vs) > len(c.vs) {
-		c.vs = c.vs[:len(c.vs)+1]
-	} else {
-		c.vs = append(c.vs, state{})
-	}
-	return &c.vs[len(c.vs)-1]
-}
-*/
-
 // CanRun implements the runtime interface
 func (e *EVM) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
 	return true

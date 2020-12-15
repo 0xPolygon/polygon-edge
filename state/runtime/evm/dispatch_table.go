@@ -89,11 +89,12 @@ func init() {
 
 	register(POP, handler{opPop, 1, 2})
 
-	register(EXTCODEHASH, handler{opExtCodeHash, 1, 400})
+	register(EXTCODEHASH, handler{opExtCodeHash, 1, 0})
 
 	// context operations
 	register(ADDRESS, handler{opAddress, 0, 2})
 	register(BALANCE, handler{opBalance, 1, 0})
+	register(SELFBALANCE, handler{opSelfBalance, 0, 5})
 	register(ORIGIN, handler{opOrigin, 0, 2})
 	register(CALLER, handler{opCaller, 0, 2})
 	register(CALLVALUE, handler{opCallValue, 0, 2})
@@ -103,7 +104,7 @@ func init() {
 	register(EXTCODESIZE, handler{opExtCodeSize, 1, 0})
 	register(GASPRICE, handler{opGasPrice, 0, 2})
 	register(RETURNDATASIZE, handler{opReturnDataSize, 0, 2})
-
+	register(CHAINID, handler{opChainID, 0, 2})
 	register(PC, handler{opPC, 0, 2})
 	register(MSIZE, handler{opMSize, 0, 2})
 	register(GAS, handler{opGas, 0, 2})

@@ -242,6 +242,8 @@ func (c *state) Run() ([]byte, error) {
 		// execute the instruction
 		inst.inst(c)
 
+		// fmt.Printf("[%d] %s %d\n", c.ip, op.String(), c.gas)
+
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
 			c.exit(errStackOverflow)
