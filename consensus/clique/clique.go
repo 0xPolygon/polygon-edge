@@ -20,7 +20,7 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 }
 
 // VerifyHeader verifies the header is correct
-func (c *Clique) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
+func (c *Clique) VerifyHeader(chain consensus.ChainReader, parent *types.Header, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 

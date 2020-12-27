@@ -220,7 +220,7 @@ func (c *state) Run() ([]byte, error) {
 
 		op := OpCode(c.code[c.ip])
 
-		//fmt.Printf("OP [%d]: %s (%d)\n", c.msg.Depth, op.String(), c.gas)
+		//fmt.Printf("%d OP [%d]: %s (%d)\n", c.ip, c.msg.Depth, op.String(), c.gas)
 		//fmt.Println(c.showStack())
 
 		inst := dispatchTable[op]
@@ -241,8 +241,6 @@ func (c *state) Run() ([]byte, error) {
 
 		// execute the instruction
 		inst.inst(c)
-
-		// fmt.Printf("[%d] %s %d\n", c.ip, op.String(), c.gas)
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {

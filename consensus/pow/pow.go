@@ -30,8 +30,7 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
-func (p *Pow) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
-	parent, _ := chain.CurrentHeader()
+func (p *Pow) VerifyHeader(chain consensus.ChainReader, parent *types.Header, header *types.Header, uncle, seal bool) error {
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}

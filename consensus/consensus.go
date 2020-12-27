@@ -41,7 +41,7 @@ type ChainReader interface {
 // Consensus is the interface for consensus
 type Consensus interface {
 	// VerifyHeader verifies the header is correct
-	VerifyHeader(chain ChainReader, header *types.Header, uncle, seal bool) error
+	VerifyHeader(chain ChainReader, parent, header *types.Header, uncle, seal bool) error
 
 	//Prepare initializes the consensus fields of a block header according to the
 	//rules of a particular engine. The changes are executed inline.

@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
-	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
@@ -23,7 +23,10 @@ import (
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
 )
 
-const blockchainTests = "BlockchainTests"
+var (
+	blockchainTests       = "BlockchainTests"
+	blockchainLegacyTests = "LegacyTests/Constantinople/BlockchainTests"
+)
 
 var none = []string{}
 
@@ -151,7 +154,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		}
 
 		blocks := []*types.Block{block}
-		if err := b.WriteBlocks(blocks); err != nil {
+		if err = b.WriteBlocks(blocks); err != nil {
 			if entry.Header == nil {
 				continue
 			} else {
@@ -208,46 +211,48 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 }
 
-func testBlockChainCases(t *testing.T, folder string, skip []string) {
-	files, err := listBlockchainTests(folder)
+func TestBlockchain(t *testing.T) {
+	skip := []string{
+		"ConstantinopleTransition_ByzantiumToConstantinopleFixAt5",
+	}
+
+	folders, err := listFolders(blockchainTests)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, file := range files {
-		t.Run(file, func(t *testing.T) {
-			data, err := ioutil.ReadFile(file)
+
+	for _, folder := range folders {
+		// Do not run the GeneralStateTests which are a copy
+		// of the tests executed by TestState
+		if strings.HasSuffix(folder, "GeneralStateTests") {
+			continue
+		}
+
+		t.Run(folder, func(t *testing.T) {
+			files, err := listFiles(folder)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			var bccases map[string]*BlockchainTest
-			if err := json.Unmarshal(data, &bccases); err != nil {
-				t.Fatal(err)
-			}
+			for _, file := range files {
+				t.Run(file, func(t *testing.T) {
+					data, err := ioutil.ReadFile(file)
+					if err != nil {
+						t.Fatal(err)
+					}
 
-			for name, cc := range bccases {
-				if !contains(skip, name) {
-					testBlockChainCase(t, cc)
-				}
+					var bccases map[string]*BlockchainTest
+					if err := json.Unmarshal(data, &bccases); err != nil {
+						t.Fatal(err)
+					}
+
+					for name, cc := range bccases {
+						if !contains(skip, name) {
+							testBlockChainCase(t, cc)
+						}
+					}
+				})
 			}
 		})
 	}
-}
-
-func TestBlockchainInvalidBlocks(t *testing.T) {
-	testBlockChainCases(t, "InvalidBlocks", []string{})
-}
-
-func TestBlockchainValidBlocks(t *testing.T) {
-	testBlockChainCases(t, "ValidBlocks", []string{})
-}
-
-func TestBlockchainTransitionTests(t *testing.T) { // x
-	testBlockChainCases(t, "TransitionTests", []string{
-		"blockChainFrontier", // TODO
-	})
-}
-
-func listBlockchainTests(folder string) ([]string, error) {
-	return listFiles(filepath.Join(blockchainTests, folder))
 }
