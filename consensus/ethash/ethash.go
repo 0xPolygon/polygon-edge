@@ -60,9 +60,8 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 }
 
 // VerifyHeader verifies the header is correct
-func (e *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(chain consensus.ChainReader, parent *types.Header, header *types.Header, uncle, seal bool) error {
 	headerNum := header.Number
-	parent, _ := chain.CurrentHeader()
 	parentNum := parent.Number
 
 	if headerNum != parentNum+1 {
