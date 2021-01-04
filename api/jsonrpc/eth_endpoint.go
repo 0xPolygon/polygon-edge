@@ -122,19 +122,6 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 
 // GetTransactionReceipt returns account nonce
 func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
-	blockHash, ok := e.d.minimal.Blockchain.ReadTransactionBlockHash(types.StringToHash(hash))
-	if !ok {
-		return nil, fmt.Errorf("transaction not mined")
-	}
-
-	receipts := e.d.minimal.Blockchain.GetReceiptsByHash(blockHash)
-
-	for _, receipt := range receipts {
-		if receipt.TxHash == types.StringToHash(hash) {
-			return receipt, nil
-		}
-	}
-
 	return nil, fmt.Errorf("transaction not found")
 }
 
