@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"container/heap"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,6 +38,8 @@ type FilterManager struct {
 
 	updateCh chan struct{}
 	timer    timeHeapImpl
+
+	maxID int
 }
 
 func (f *FilterManager) Run() {
@@ -86,6 +89,14 @@ func (f *FilterManager) dispatchEvent(evnt blockchain.Event) error {
 }
 
 func (f *FilterManager) removeFilter(id string) error {
+	f.lock.Lock()
+
+	idInt, _ := strconv.Atoi(id)
+	if idInt < f.maxID {
+		f.maxID = idInt
+	}
+
+	f.lock.Unlock()
 	return nil
 }
 
@@ -93,14 +104,12 @@ func (f *FilterManager) nextTimeoutFilter() (*Filter, time.Time) {
 	return nil, time.Time{}
 }
 
-func (f *FilterManager) findNextID() string {
-	return "1"
-}
-
 func (f *FilterManager) AddFilter() (string, error) {
 	f.lock.Lock()
 
-	id := f.findNextID()
+	id := strconv.Itoa(f.maxID)
+	f.maxID++
+
 	filter := &Filter{
 		id: id,
 	}
