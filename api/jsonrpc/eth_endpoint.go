@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/api/jsonrpc/filter"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
@@ -191,4 +192,25 @@ func (e *Eth) GetCode(address string, number string) (interface{}, error) {
 	}
 
 	return "0x", nil
+}
+
+// NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
+func (e *Eth) NewFilter(filter *filter.LogFilter) (interface{}, error) {
+	return e.d.filterManager.NewLogFilter(filter)
+}
+
+// NewBlockFilter creates a filter in the node, to notify when a new block arrives
+func (e *Eth) NewBlockFilter() (interface{}, error) {
+	return e.d.filterManager.NewBlockFilter()
+}
+
+// GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
+func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
+	return nil, nil
+}
+
+// UninstallFilter uninstalls a filter with given ID
+func (e *Eth) UninstallFilter(id string) {
+	// TODO: Not sure about the return field here but it needs one
+	e.d.filterManager.Uninstall(id)
 }

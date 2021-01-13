@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/0xPolygon/minimal/api/jsonrpc/filter"
 	"github.com/0xPolygon/minimal/minimal"
 )
 
@@ -48,6 +49,7 @@ type Dispatcher struct {
 	serviceMap       map[string]*serviceData
 	endpoints        endpoints
 	enabledEndpoints map[serverType]enabledEndpoints
+	filterManager    *filter.FilterManager
 }
 
 func newDispatcher() *Dispatcher {

@@ -34,6 +34,7 @@ type Blockchain struct {
 	consensus consensus.Consensus
 	executor  *state.Executor
 
+	config  *chain.Params
 	genesis types.Hash
 
 	// TODO: Unify in a single event
@@ -52,6 +53,7 @@ var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73a
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
+		config:      config,
 		db:          db,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
@@ -63,6 +65,10 @@ func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 	return b
+}
+
+func (b *Blockchain) Config() *chain.Params {
+	return b.config
 }
 
 func (b *Blockchain) Executor() *state.Executor {
@@ -586,6 +592,8 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) WriteHeader(header *types.Header) error {
+	evnt := &Event{}
+
 	head, ok := b.Header()
 	if !ok {
 		return fmt.Errorf("header not found")
@@ -618,12 +626,12 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
 	if incomingDiff.Cmp(headerDiff) > 0 {
 		// new block has higher difficulty than us, reorg the chain
-		if err := b.handleReorg(head, header); err != nil {
+		if err := b.handleReorg(evnt, head, header); err != nil {
 			return err
 		}
 	} else {
 		// new block has lower difficulty than us, create a new fork
-		if err := b.writeFork(header); err != nil {
+		if err := b.writeFork(evnt, header); err != nil {
 			return err
 		}
 	}
@@ -636,9 +644,10 @@ func (b *Blockchain) SideChainCh() chan *types.Header {
 	return b.sidechainCh
 }
 
-func (b *Blockchain) writeFork(header *types.Header) error {
+func (b *Blockchain) writeFork(evnt *Event, header *types.Header) error {
 	forks := b.db.ReadForks()
 
+	// TODO: We can remove this once subscription is stable
 	select {
 	case b.sidechainCh <- header:
 	default:
@@ -657,7 +666,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	return nil
 }
 
-func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Header) error {
+func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader *types.Header) error {
 	newChainHead := newHeader
 	oldChainHead := oldHeader
 
@@ -695,7 +704,7 @@ func (b *Blockchain) handleReorg(oldHeader *types.Header, newHeader *types.Heade
 		oldChain = append(oldChain, oldHeader)
 	}
 
-	if err := b.writeFork(oldChainHead); err != nil {
+	if err := b.writeFork(evnt, oldChainHead); err != nil {
 		return fmt.Errorf("failed to write the old header as fork: %v", err)
 	}
 

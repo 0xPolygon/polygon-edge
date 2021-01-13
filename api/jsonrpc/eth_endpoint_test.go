@@ -35,3 +35,5 @@ func TestEthEndpointGetBlockByNumber(t *testing.T) {
 	}
 	expectEmptyResult(t, resp)
 }
+
+// TODO: Test filterLog rpc endpoint decoding
