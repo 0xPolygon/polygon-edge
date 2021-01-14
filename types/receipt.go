@@ -35,12 +35,6 @@ type Log struct {
 	Address Address  `json:"address"`
 	Topics  []Hash   `json:"topics"`
 	Data    HexBytes `json:"data"`
-	//BlockNumber uint64   `json:"blockNumber"`
-	//TxHash      Hash     `json:"transactionHash"`
-	//TxIndex     uint     `json:"transactionIndex"`
-	//BlockHash   Hash     `json:"blockHash"`
-	//LogIndex    uint     `json:"logIndex"`
-	//Removed     bool     `json:"removed"`
 }
 
 const BloomByteLength = 256

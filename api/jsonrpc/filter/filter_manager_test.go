@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,199 +11,62 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	addr1 = types.StringToAddress("1")
-	addr2 = types.StringToAddress("2")
-
-	hash1 = types.StringToHash("1")
-	hash2 = types.StringToHash("2")
-	hash3 = types.StringToHash("3")
-	hash4 = types.StringToHash("4")
-)
-
-func TestFilterDecode(t *testing.T) {
-	cases := []struct {
-		str string
-		res *LogFilter
-	}{
-		{
-			`{}`,
-			&LogFilter{},
-		},
-		{
-			`{
-				"address": "1"
-			}`,
-			nil,
-		},
-		{
-			`{
-				"address": "` + addr1.String() + `"
-			}`,
-			&LogFilter{
-				Addresses: []types.Address{
-					addr1,
-				},
-			},
-		},
-		{
-			`{
-				"address": [
-					"` + addr1.String() + `",
-					"` + addr2.String() + `"
-				]
-			}`,
-			&LogFilter{
-				Addresses: []types.Address{
-					addr1,
-					addr2,
-				},
-			},
-		},
-		{
-			`{
-				"topics": [
-					"` + hash1.String() + `",
-					[
-						"` + hash1.String() + `"
-					],
-					[
-						"` + hash1.String() + `",
-						"` + hash2.String() + `"
-					],
-					null,
-					"` + hash1.String() + `"
-				]
-			}`,
-			&LogFilter{
-				Topics: [][]types.Hash{
-					{
-						hash1,
-					},
-					{
-						hash1,
-					},
-					{
-						hash1,
-						hash2,
-					},
-					{},
-					{
-						hash1,
-					},
-				},
-			},
-		},
-	}
-
-	for _, c := range cases {
-		res := &LogFilter{}
-		err := res.UnmarshalJSON([]byte(c.str))
-		if err != nil && c.res != nil {
-			t.Fatal(err)
-		}
-		if err == nil && c.res == nil {
-			t.Fatal("it should fail")
-		}
-		if c.res != nil {
-			if !reflect.DeepEqual(res, c.res) {
-				t.Fatal("bad")
-			}
-		}
-	}
-}
-
-func TestFilterMatch(t *testing.T) {
-	cases := []struct {
-		filter LogFilter
-		log    *types.Log
-		match  bool
-	}{
-		{
-			// correct, exact match
-			LogFilter{
-				Topics: [][]types.Hash{
-					{
-						hash1,
-					},
-				},
-			},
-			&types.Log{
-				Topics: []types.Hash{
-					hash1,
-				},
-			},
-			true,
-		},
-		{
-			// bad, the filter has two hashes
-			LogFilter{
-				Topics: [][]types.Hash{
-					{
-						hash1,
-					},
-					{
-						hash1,
-					},
-				},
-			},
-			&types.Log{
-				Topics: []types.Hash{
-					hash1,
-				},
-			},
-			false,
-		},
-		{
-			// correct, wildcard in one hash
-			LogFilter{
-				Topics: [][]types.Hash{
-					{},
-					{
-						hash2,
-					},
-				},
-			},
-			&types.Log{
-				Topics: []types.Hash{
-					hash1,
-					hash2,
-				},
-			},
-			true,
-		},
-		{
-			// correct, more topics than in filter
-			LogFilter{
-				Topics: [][]types.Hash{
-					{
-						hash1,
-					},
-					{
-						hash2,
-					},
-				},
-			},
-			&types.Log{
-				Topics: []types.Hash{
-					hash1,
-					hash2,
-					hash3,
-				},
-			},
-			true,
-		},
-	}
-
-	for indx, c := range cases {
-		if c.filter.Match(c.log) != c.match {
-			t.Fatalf("bad %d", indx)
-		}
-	}
-}
-
 func TestLogFilter(t *testing.T) {
+	store := &mockStore{
+		header: &types.Header{},
+	}
 
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+	go m.Run()
+
+	id := m.addFilter(&LogFilter{
+		Topics: [][]types.Hash{
+			{hash1},
+		},
+	})
+
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
+			{
+				header: &types.Header{
+					Hash: hash1,
+				},
+				receipts: []*types.Receipt{
+					{
+						Logs: []*types.Log{
+							{
+								Topics: []types.Hash{
+									hash1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		OldChain: []*mockHeader{
+			{
+				header: &types.Header{
+					Hash: hash2,
+				},
+				receipts: []*types.Receipt{
+					{
+						Logs: []*types.Log{
+							{
+								Topics: []types.Hash{
+									hash1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	time.Sleep(500 * time.Millisecond)
+
+	m.GetFilterChanges(id)
 }
 
 func TestBlockFilter(t *testing.T) {
@@ -220,21 +83,27 @@ func TestBlockFilter(t *testing.T) {
 	id := m.addFilter(nil)
 
 	// emit two events
-	store.emitEvent(&blockchain.Event{
-		NewChain: []*types.Header{
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
 			{
-				Hash: types.StringToHash("1"),
+				header: &types.Header{
+					Hash: types.StringToHash("1"),
+				},
 			},
 			{
-				Hash: types.StringToHash("2"),
+				header: &types.Header{
+					Hash: types.StringToHash("2"),
+				},
 			},
 		},
 	})
 
-	store.emitEvent(&blockchain.Event{
-		NewChain: []*types.Header{
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
 			{
-				Hash: types.StringToHash("3"),
+				header: &types.Header{
+					Hash: types.StringToHash("3"),
+				},
 			},
 		},
 	})
@@ -246,10 +115,12 @@ func TestBlockFilter(t *testing.T) {
 
 	// emit one more event, it should not return the
 	// first three hashes
-	store.emitEvent(&blockchain.Event{
-		NewChain: []*types.Header{
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
 			{
-				Hash: types.StringToHash("4"),
+				header: &types.Header{
+					Hash: types.StringToHash("4"),
+				},
 			},
 		},
 	})
@@ -300,10 +171,39 @@ func TestHeadStream(t *testing.T) {
 type mockStore struct {
 	header  *types.Header
 	eventCh chan blockchain.Event
+
+	receiptsLock sync.Mutex
+	receipts     map[types.Hash][]*types.Receipt
 }
 
-func (m *mockStore) emitEvent(evnt *blockchain.Event) {
-	m.eventCh <- *evnt
+type mockHeader struct {
+	header   *types.Header
+	receipts []*types.Receipt
+}
+
+type mockEvent struct {
+	OldChain []*mockHeader
+	NewChain []*mockHeader
+}
+
+func (m *mockStore) emitEvent(evnt *mockEvent) {
+	if m.receipts == nil {
+		m.receipts = map[types.Hash][]*types.Receipt{}
+	}
+
+	bEvnt := blockchain.Event{
+		NewChain: []*types.Header{},
+		OldChain: []*types.Header{},
+	}
+	for _, i := range evnt.NewChain {
+		m.receipts[i.header.Hash] = i.receipts
+		bEvnt.NewChain = append(bEvnt.NewChain, i.header)
+	}
+	for _, i := range evnt.OldChain {
+		m.receipts[i.header.Hash] = i.receipts
+		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
+	}
+	m.eventCh <- bEvnt
 }
 
 func (m *mockStore) Header() *types.Header {
@@ -311,7 +211,11 @@ func (m *mockStore) Header() *types.Header {
 }
 
 func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
-	return nil, nil
+	m.receiptsLock.Lock()
+	defer m.receiptsLock.Unlock()
+
+	receipts := m.receipts[hash]
+	return receipts, nil
 }
 
 // Subscribe subscribes for chain head events
