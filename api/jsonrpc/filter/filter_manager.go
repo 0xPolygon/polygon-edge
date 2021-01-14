@@ -282,6 +282,109 @@ type LogFilter struct {
 	Topics    [][]types.Hash
 }
 
+func (l *LogFilter) addTopicSet(set ...string) error {
+	if l.Topics == nil {
+		l.Topics = [][]types.Hash{}
+	}
+	res := []types.Hash{}
+	for _, i := range set {
+		item := types.Hash{}
+		if err := item.UnmarshalText([]byte(i)); err != nil {
+			return err
+		}
+		res = append(res, item)
+	}
+	l.Topics = append(l.Topics, res)
+	return nil
+}
+
+func (l *LogFilter) addAddress(raw string) error {
+	if l.Addresses == nil {
+		l.Addresses = []types.Address{}
+	}
+	addr := types.Address{}
+	if err := addr.UnmarshalText([]byte(raw)); err != nil {
+		return err
+	}
+	l.Addresses = append(l.Addresses, addr)
+	return nil
+}
+
+func (l *LogFilter) UnmarshalJSON(data []byte) error {
+	var obj struct {
+		Address interface{}   `json:"address"`
+		Topics  []interface{} `json:"topics"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+
+	if obj.Address != nil {
+		// decode address, either "" or [""]
+		switch raw := obj.Address.(type) {
+		case string:
+			// ""
+			if err := l.addAddress(raw); err != nil {
+				return err
+			}
+
+		case []interface{}:
+			// ["", ""]
+			for _, addr := range raw {
+				if item, ok := addr.(string); ok {
+					if err := l.addAddress(item); err != nil {
+						return err
+					}
+				} else {
+					return fmt.Errorf("address expected")
+				}
+			}
+
+		default:
+			return fmt.Errorf("bad")
+		}
+	}
+
+	if obj.Topics != nil {
+		// decode topics, either "" or ["", ""] or null
+		for _, item := range obj.Topics {
+			switch raw := item.(type) {
+			case string:
+				// ""
+				if err := l.addTopicSet(raw); err != nil {
+					return err
+				}
+
+			case []interface{}:
+				// ["", ""]
+				res := []string{}
+				for _, i := range raw {
+					if item, ok := i.(string); ok {
+						res = append(res, item)
+					} else {
+						return fmt.Errorf("hash expected")
+					}
+				}
+				if err := l.addTopicSet(res...); err != nil {
+					return err
+				}
+
+			case nil:
+				// null
+				if err := l.addTopicSet(); err != nil {
+					return err
+				}
+
+			default:
+				return fmt.Errorf("bad")
+			}
+		}
+	}
+
+	// decode topics
+	return nil
+}
+
 // Match returns whether the receipt includes topics for this filter
 func (l *LogFilter) Match(log *types.Log) bool {
 	// check addresses
