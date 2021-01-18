@@ -43,6 +43,8 @@ type Blockchain struct {
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
+
+	config *chain.Params
 }
 
 var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
@@ -53,6 +55,7 @@ var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73a
 func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
 		db:          db,
+		config:      config,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
@@ -63,6 +66,31 @@ func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 	return b
+}
+
+func (b *Blockchain) Config() *chain.Params {
+	return b.config
+}
+
+func (b *Blockchain) CurrentHeader() (*types.Header, bool) {
+	return b.Header()
+}
+
+func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
+	return b.GetHeaderByHash(hash)
+}
+
+func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types.Block, bool) {
+	return b.GetBlockByHash(hash, full)
+}
+
+func (b *Blockchain) ReadTransactionBlockHash(hash types.Hash) (types.Hash, bool) {
+	// TODO
+	return types.Hash{}, false
+}
+
+func (b *Blockchain) GetConsensus() consensus.Consensus {
+	return b.consensus
 }
 
 func (b *Blockchain) Executor() *state.Executor {

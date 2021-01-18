@@ -16,7 +16,7 @@ type NoProof struct {
 }
 
 // VerifyHeader verifies the header is correct
-func (n *NoProof) VerifyHeader(chain ChainReader, header *types.Header, uncle, seal bool) error {
+func (n *NoProof) VerifyHeader(chain ChainReader, parent, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
