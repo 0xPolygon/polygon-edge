@@ -24,7 +24,10 @@ func TestFilterDecode(t *testing.T) {
 	}{
 		{
 			`{}`,
-			&LogFilter{},
+			&LogFilter{
+				fromBlock: latest,
+				toBlock:   latest,
+			},
 		},
 		{
 			`{
@@ -37,6 +40,8 @@ func TestFilterDecode(t *testing.T) {
 				"address": "` + addr1.String() + `"
 			}`,
 			&LogFilter{
+				fromBlock: latest,
+				toBlock:   latest,
 				Addresses: []types.Address{
 					addr1,
 				},
@@ -50,6 +55,8 @@ func TestFilterDecode(t *testing.T) {
 				]
 			}`,
 			&LogFilter{
+				fromBlock: latest,
+				toBlock:   latest,
 				Addresses: []types.Address{
 					addr1,
 					addr2,
@@ -72,6 +79,8 @@ func TestFilterDecode(t *testing.T) {
 				]
 			}`,
 			&LogFilter{
+				fromBlock: latest,
+				toBlock:   latest,
 				Topics: [][]types.Hash{
 					{
 						hash1,
@@ -90,9 +99,19 @@ func TestFilterDecode(t *testing.T) {
 				},
 			},
 		},
+		{
+			`{
+				"fromBlock": "pending",
+				"toBlock": "earliest"
+			}`,
+			&LogFilter{
+				fromBlock: pending,
+				toBlock:   earliest,
+			},
+		},
 	}
 
-	for _, c := range cases {
+	for indx, c := range cases {
 		res := &LogFilter{}
 		err := res.UnmarshalJSON([]byte(c.str))
 		if err != nil && c.res != nil {
@@ -103,7 +122,7 @@ func TestFilterDecode(t *testing.T) {
 		}
 		if c.res != nil {
 			if !reflect.DeepEqual(res, c.res) {
-				t.Fatal("bad")
+				t.Fatalf("bad %d", indx)
 			}
 		}
 	}

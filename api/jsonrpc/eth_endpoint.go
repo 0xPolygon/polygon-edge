@@ -196,12 +196,12 @@ func (e *Eth) GetCode(address string, number string) (interface{}, error) {
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
 func (e *Eth) NewFilter(filter *filter.LogFilter) (interface{}, error) {
-	return e.d.filterManager.NewLogFilter(filter)
+	return e.d.filterManager.NewLogFilter(filter), nil
 }
 
 // NewBlockFilter creates a filter in the node, to notify when a new block arrives
 func (e *Eth) NewBlockFilter() (interface{}, error) {
-	return e.d.filterManager.NewBlockFilter()
+	return e.d.filterManager.NewBlockFilter(), nil
 }
 
 // GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
@@ -214,3 +214,10 @@ func (e *Eth) UninstallFilter(id string) {
 	// TODO: Not sure about the return field here but it needs one
 	e.d.filterManager.Uninstall(id)
 }
+
+/*
+TODO
+func (e *Eth) GetLogs() {
+
+}
+*/

@@ -32,7 +32,6 @@ type Filter struct {
 	block *headElem
 
 	// log cache
-	// TODO: Specify this log object here instead of types
 	logs []*Log
 
 	// log filter
@@ -134,13 +133,13 @@ func (f *FilterManager) Run() {
 		case evnt := <-f.watcher:
 			// new blockchain event
 			if err := f.dispatchEvent(evnt); err != nil {
-				fmt.Println(err)
+				f.logger.Error("failed to dispatch event", "err", err)
 			}
 
 		case <-timeoutCh:
 			// timeout for filter
 			if err := f.Uninstall(filter.id); err != nil {
-				fmt.Println(err)
+				f.logger.Error("failed to uninstall filter", "err", err)
 			}
 
 		case <-f.updateCh:

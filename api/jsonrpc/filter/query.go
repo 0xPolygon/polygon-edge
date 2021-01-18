@@ -7,10 +7,17 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+const (
+	pending  = -3
+	latest   = -2
+	earliest = -1
+)
+
 // LogFilter is a filter for logs
 type LogFilter struct {
-	// TODO: We are going to do only the subscription mechanism
-	// and later on we will extrapolate to pending/latest and range logs.
+	fromBlock int64
+	toBlock   int64
+
 	Addresses []types.Address
 	Topics    [][]types.Hash
 }
@@ -43,14 +50,49 @@ func (l *LogFilter) addAddress(raw string) error {
 	return nil
 }
 
+func parseFilterBlock(i string) (int64, error) {
+	switch i {
+	case "latest":
+		return latest, nil
+	case "pending":
+		return pending, nil
+	case "earliest":
+		return earliest, nil
+	}
+	n, err := types.ParseUint64orHex(&i)
+	if err != nil {
+		return 0, err
+	}
+	return int64(n), nil
+}
+
 // UnmarshalJSON decodes a json object
 func (l *LogFilter) UnmarshalJSON(data []byte) error {
 	var obj struct {
-		Address interface{}   `json:"address"`
-		Topics  []interface{} `json:"topics"`
+		FromBlock string        `json:"fromBlock"`
+		ToBlock   string        `json:"toBlock"`
+		Address   interface{}   `json:"address"`
+		Topics    []interface{} `json:"topics"`
 	}
-	if err := json.Unmarshal(data, &obj); err != nil {
+	err := json.Unmarshal(data, &obj)
+	if err != nil {
 		return err
+	}
+
+	if obj.FromBlock == "" {
+		l.fromBlock = latest
+	} else {
+		if l.fromBlock, err = parseFilterBlock(obj.FromBlock); err != nil {
+			return err
+		}
+	}
+
+	if obj.ToBlock == "" {
+		l.toBlock = latest
+	} else {
+		if l.toBlock, err = parseFilterBlock(obj.ToBlock); err != nil {
+			return err
+		}
 	}
 
 	if obj.Address != nil {
@@ -75,7 +117,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 			}
 
 		default:
-			return fmt.Errorf("bad")
+			return fmt.Errorf("failed to decode address. Expected either '' or ['', '']")
 		}
 	}
 
@@ -110,7 +152,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 				}
 
 			default:
-				return fmt.Errorf("bad")
+				return fmt.Errorf("failed to decode topics. Expected '' or [''] or null")
 			}
 		}
 	}
