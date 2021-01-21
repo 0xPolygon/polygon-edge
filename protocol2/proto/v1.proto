@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/protocol2/proto";
+
+service V1 {
+    rpc WatchBlocks(Empty) returns (stream Component);
+}
+
+message Empty {
+
+}
+
+message Component {
+    
+}
