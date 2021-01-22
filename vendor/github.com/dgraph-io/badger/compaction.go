@@ -64,7 +64,7 @@ func (r keyRange) overlapsWith(dst keyRange) bool {
 	return true
 }
 
-func getKeyRange(tables []*table.Table) keyRange {
+func getKeyRange(tables ...*table.Table) keyRange {
 	if len(tables) == 0 {
 		return keyRange{}
 	}
@@ -78,6 +78,9 @@ func getKeyRange(tables []*table.Table) keyRange {
 			biggest = tables[i].Biggest()
 		}
 	}
+
+	// We pick all the versions of the smallest and the biggest key. Note that version zero would
+	// be the rightmost key, considering versions are default sorted in descending order.
 	return keyRange{
 		left:  y.KeyWithTs(y.ParseKey(smallest), math.MaxUint64),
 		right: y.KeyWithTs(y.ParseKey(biggest), 0),
@@ -131,7 +134,7 @@ func (cs *compactStatus) toLog(tr trace.Trace) {
 
 	tr.LazyPrintf("Compaction status:")
 	for i, l := range cs.levels {
-		if len(l.debug()) == 0 {
+		if l.debug() == "" {
 			continue
 		}
 		tr.LazyPrintf("[%d] %s", i, l.debug())
