@@ -45,8 +45,6 @@ type Blockchain struct {
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
 
-	config *chain.Params
-
 	// event subscriptions
 	stream *eventStream
 }
@@ -56,7 +54,6 @@ func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus
 	b := &Blockchain{
 		config:      config,
 		db:          db,
-		config:      config,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
@@ -688,7 +685,7 @@ func (b *Blockchain) SideChainCh() chan *types.Header {
 	return b.sidechainCh
 }
 
-func (b *Blockchain) writeFork(evnt *Event, header *types.Header) error {
+func (b *Blockchain) writeFork(header *types.Header) error {
 	forks := b.db.ReadForks()
 
 	// TODO: We can remove this once subscription is stable
