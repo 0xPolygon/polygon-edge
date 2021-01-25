@@ -34,6 +34,7 @@ type Blockchain struct {
 	consensus consensus.Consensus
 	executor  *state.Executor
 
+	config  *chain.Params
 	genesis types.Hash
 
 	// TODO: Remove and use eventStream
@@ -44,8 +45,6 @@ type Blockchain struct {
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
 
-	config *chain.Params
-
 	// event subscriptions
 	stream *eventStream
 }
@@ -53,8 +52,8 @@ type Blockchain struct {
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
-		db:          db,
 		config:      config,
+		db:          db,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
@@ -689,6 +688,7 @@ func (b *Blockchain) SideChainCh() chan *types.Header {
 func (b *Blockchain) writeFork(header *types.Header) error {
 	forks := b.db.ReadForks()
 
+	// TODO: We can remove this once subscription is stable
 	select {
 	case b.sidechainCh <- header:
 	default:

@@ -6,13 +6,38 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-type Subscription struct {
+type Subscription interface {
+	GetEvent() *Event
+	Close()
+}
+
+type MockSubscription struct {
+	eventCh chan *Event
+}
+
+func NewMockSubscription() *MockSubscription {
+	return &MockSubscription{eventCh: make(chan *Event)}
+}
+
+func (m *MockSubscription) Push(e *Event) {
+	m.eventCh <- e
+}
+
+func (m *MockSubscription) GetEvent() *Event {
+	evnt := <-m.eventCh
+	return evnt
+}
+
+func (m *MockSubscription) Close() {
+}
+
+type subscription struct {
 	updateCh chan struct{}
 	closeCh  chan struct{}
 	elem     *eventElem
 }
 
-func (s *Subscription) GetEvent() *Event {
+func (s *subscription) GetEvent() *Event {
 	for {
 		if s.elem.next != nil {
 			s.elem = s.elem.next
@@ -30,7 +55,7 @@ func (s *Subscription) GetEvent() *Event {
 	}
 }
 
-func (s *Subscription) Close() {
+func (s *subscription) Close() {
 	close(s.closeCh)
 }
 
@@ -70,7 +95,7 @@ func (e *Event) AddOldHeader(h *types.Header) {
 	e.OldChain = append(e.OldChain, hh)
 }
 
-func (b *Blockchain) SubscribeEvents() *Subscription {
+func (b *Blockchain) SubscribeEvents() Subscription {
 	return b.stream.subscribe()
 }
 
@@ -87,9 +112,9 @@ type eventStream struct {
 	updateCh []chan struct{}
 }
 
-func (e *eventStream) subscribe() *Subscription {
+func (e *eventStream) subscribe() *subscription {
 	head, updateCh := e.Head()
-	s := &Subscription{
+	s := &subscription{
 		elem:     head,
 		updateCh: updateCh,
 	}

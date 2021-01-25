@@ -308,13 +308,13 @@ func (t *Transition) postProcess() {
 func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
 	newLogs := []*types.Log{}
 
-	for indx, log := range logs {
+	for _, log := range logs {
 		newLog := log
 
-		newLog.TxHash = txHash
-		newLog.BlockHash = blockHash
-		newLog.TxIndex = txIndex
-		newLog.LogIndex = uint(indx)
+		//newLog.TxHash = txHash
+		//newLog.BlockHash = blockHash
+		//newLog.TxIndex = txIndex
+		//newLog.LogIndex = uint(indx)
 
 		newLogs = append(newLogs, newLog)
 	}
