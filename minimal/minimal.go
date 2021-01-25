@@ -258,9 +258,12 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 		m.apis = append(m.apis, api)
 	}
 
-	if istanbul, ok := m.consensus.(consensus.Istanbul); ok {
-		istanbul.Start(m.Blockchain, m.Blockchain.CurrentBlock, m.Blockchain.HasBadBlock)
-	}
+	/*
+		// TODO: FIX
+		if istanbul, ok := m.consensus.(consensus.Istanbul); ok {
+			istanbul.Start(m.Blockchain, m.Blockchain.CurrentBlock, m.Blockchain.HasBadBlock)
+		}
+	*/
 
 	if err := m.server.Schedule(); err != nil {
 		return nil, err

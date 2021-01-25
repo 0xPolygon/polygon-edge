@@ -37,28 +37,31 @@ type Blockchain struct {
 	config  *chain.Params
 	genesis types.Hash
 
-	// TODO: Unify in a single event
+	// TODO: Remove and use eventStream
 	sidechainCh chan *types.Header
 	listeners   []chan *types.Header
 
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
+
+	config *chain.Params
+
+	// event subscriptions
+	stream *eventStream
 }
-
-var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
-
-var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
 
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
 	b := &Blockchain{
 		config:      config,
 		db:          db,
+		config:      config,
 		consensus:   consensus,
 		sidechainCh: make(chan *types.Header, 10),
 		listeners:   []chan *types.Header{},
 		executor:    executor,
+		stream:      &eventStream{},
 	}
 
 	b.headersCache, _ = lru.New(100)
@@ -69,6 +72,27 @@ func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus
 
 func (b *Blockchain) Config() *chain.Params {
 	return b.config
+}
+
+func (b *Blockchain) CurrentHeader() (*types.Header, bool) {
+	return b.Header()
+}
+
+func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
+	return b.GetHeaderByHash(hash)
+}
+
+func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types.Block, bool) {
+	return b.GetBlockByHash(hash, full)
+}
+
+func (b *Blockchain) ReadTransactionBlockHash(hash types.Hash) (types.Hash, bool) {
+	// TODO
+	return types.Hash{}, false
+}
+
+func (b *Blockchain) GetConsensus() consensus.Consensus {
+	return b.consensus
 }
 
 func (b *Blockchain) Executor() *state.Executor {
@@ -147,6 +171,12 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	if err := b.db.WriteDiff(header.Hash, big.NewInt(1)); err != nil {
 		return err
 	}
+
+	// write the value to the stream
+	evnt := &Event{}
+	evnt.AddNewHeader(header)
+	b.stream.push(evnt)
+
 	return nil
 }
 
@@ -387,9 +417,11 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	}
 
 	for _, h := range headers {
-		if err := b.WriteHeader(h); err != nil {
+		evnt := &Event{}
+		if err := b.writeHeaderImpl(evnt, h); err != nil {
 			return err
 		}
+		b.dispatchEvent(evnt)
 	}
 	return nil
 }
@@ -450,10 +482,13 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if err := b.processBlock(blocks[indx]); err != nil {
 			return err
 		}
+
 		// Write the header to the chain
-		if err := b.WriteHeader(header); err != nil {
+		evnt := &Event{}
+		if err := b.writeHeaderImpl(evnt, header); err != nil {
 			return err
 		}
+		b.dispatchEvent(evnt)
 	}
 
 	return nil
@@ -587,13 +622,20 @@ func (b *Blockchain) addHeader(header *types.Header) error {
 
 // WriteBlock writes a block of data
 func (b *Blockchain) WriteBlock(block *types.Block) error {
-	return b.WriteHeader(block.Header)
+	evnt := &Event{}
+	if err := b.writeHeaderImpl(evnt, block.Header); err != nil {
+		return err
+	}
+	b.dispatchEvent(evnt)
+	return nil
+}
+
+func (b *Blockchain) dispatchEvent(evnt *Event) {
+	b.stream.push(evnt)
 }
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
-func (b *Blockchain) WriteHeader(header *types.Header) error {
-	evnt := &Event{}
-
+func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	head, ok := b.Header()
 	if !ok {
 		return fmt.Errorf("header not found")
@@ -602,6 +644,7 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 	// Write the data
 	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
+		evnt.AddNewHeader(header)
 		return b.writeCanonicalHeader(header)
 	}
 
@@ -631,7 +674,8 @@ func (b *Blockchain) WriteHeader(header *types.Header) error {
 		}
 	} else {
 		// new block has lower difficulty than us, create a new fork
-		if err := b.writeFork(evnt, header); err != nil {
+		evnt.AddOldHeader(header)
+		if err := b.writeFork(header); err != nil {
 			return err
 		}
 	}
@@ -704,7 +748,17 @@ func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader
 		oldChain = append(oldChain, oldHeader)
 	}
 
-	if err := b.writeFork(evnt, oldChainHead); err != nil {
+	for _, b := range oldChain[:len(oldChain)-1] {
+		evnt.AddOldHeader(b)
+	}
+	evnt.AddOldHeader(oldChainHead)
+
+	evnt.AddNewHeader(newChainHead)
+	for _, b := range newChain {
+		evnt.AddNewHeader(b)
+	}
+
+	if err := b.writeFork(oldChainHead); err != nil {
 		return fmt.Errorf("failed to write the old header as fork: %v", err)
 	}
 
@@ -715,7 +769,7 @@ func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader
 		}
 	}
 
-	// oldChain headers can become now uncles
+	// oldChain headers can become now uncles, REMOVE
 	go func() {
 		for _, i := range oldChain {
 			select {

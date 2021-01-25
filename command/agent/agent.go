@@ -20,7 +20,6 @@ import (
 
 	consensusClique "github.com/0xPolygon/minimal/consensus/clique"
 	consensusEthash "github.com/0xPolygon/minimal/consensus/ethash"
-	consensusIBFT "github.com/0xPolygon/minimal/consensus/ibft/backend"
 	consensusPOW "github.com/0xPolygon/minimal/consensus/pow"
 
 	discoveryConsul "github.com/0xPolygon/minimal/network/discovery/consul"
@@ -44,7 +43,7 @@ var consensusBackends = map[string]consensus.Factory{
 	"clique": consensusClique.Factory,
 	"ethash": consensusEthash.Factory,
 	"pow":    consensusPOW.Factory,
-	"ibft":   consensusIBFT.Factory,
+	// "ibft":   consensusIBFT.Factory,
 }
 
 var discoveryBackends = map[string]discovery.Factory{
