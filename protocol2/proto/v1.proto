@@ -4,6 +4,8 @@ package v1;
 
 option go_package = "/protocol2/proto";
 
+import "google/protobuf/any.proto";
+
 service V1 {
     rpc WatchBlocks(Empty) returns (stream Component);
 }
@@ -13,5 +15,5 @@ message Empty {
 }
 
 message Component {
-    
+    google.protobuf.Any spec = 3;
 }
