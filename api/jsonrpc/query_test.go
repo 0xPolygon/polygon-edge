@@ -1,4 +1,4 @@
-package filter
+package jsonrpc
 
 import (
 	"reflect"

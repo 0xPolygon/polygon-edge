@@ -1,4 +1,4 @@
-package filter
+package jsonrpc
 
 import (
 	"container/heap"
@@ -56,11 +56,6 @@ func (f *Filter) match() bool {
 	return false
 }
 
-type subscription interface {
-	Watch() chan blockchain.Event
-	Close()
-}
-
 // blockchain is the interface with the blockchain required
 // by the filter manager
 type store interface {
@@ -71,7 +66,7 @@ type store interface {
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
 	// Subscribe subscribes for chain head events
-	Subscribe() subscription
+	SubscribeEvents() blockchain.Subscription
 }
 
 var defaultTimeout = 1 * time.Minute
@@ -82,7 +77,7 @@ type FilterManager struct {
 	store   store
 	closeCh chan struct{}
 
-	watcher chan blockchain.Event
+	subscription blockchain.Subscription
 
 	filters map[string]*Filter
 	lock    sync.Mutex
@@ -111,13 +106,24 @@ func NewFilterManager(logger hclog.Logger, store store) *FilterManager {
 	m.blockStream.push(header.Hash)
 
 	// start the head watcher
-	m.watcher = store.Subscribe().Watch()
+	m.subscription = store.SubscribeEvents()
 
 	return m
 }
 
 func (f *FilterManager) Run() {
+
 	// watch for new events in the blockchain
+	watchCh := make(chan *blockchain.Event)
+	go func() {
+		for {
+			evnt := f.subscription.GetEvent()
+			if evnt == nil {
+				return
+			}
+			watchCh <- evnt
+		}
+	}()
 
 	var timeoutCh <-chan time.Time
 	for {
@@ -130,7 +136,7 @@ func (f *FilterManager) Run() {
 		}
 
 		select {
-		case evnt := <-f.watcher:
+		case evnt := <-watchCh:
 			// new blockchain event
 			if err := f.dispatchEvent(evnt); err != nil {
 				f.logger.Error("failed to dispatch event", "err", err)
@@ -165,7 +171,7 @@ func (f *FilterManager) nextTimeoutFilter() *Filter {
 	return item
 }
 
-func (f *FilterManager) dispatchEvent(evnt blockchain.Event) error {
+func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 

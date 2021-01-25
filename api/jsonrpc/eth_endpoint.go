@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/api/jsonrpc/filter"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
@@ -195,7 +194,7 @@ func (e *Eth) GetCode(address string, number string) (interface{}, error) {
 }
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
-func (e *Eth) NewFilter(filter *filter.LogFilter) (interface{}, error) {
+func (e *Eth) NewFilter(filter *LogFilter) (interface{}, error) {
 	return e.d.filterManager.NewLogFilter(filter), nil
 }
 

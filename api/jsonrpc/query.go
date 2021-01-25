@@ -1,4 +1,4 @@
-package filter
+package jsonrpc
 
 import (
 	"encoding/json"
@@ -15,8 +15,8 @@ const (
 
 // LogFilter is a filter for logs
 type LogFilter struct {
-	fromBlock int64
-	toBlock   int64
+	fromBlock BlockNumber
+	toBlock   BlockNumber
 
 	Addresses []types.Address
 	Topics    [][]types.Hash
@@ -50,22 +50,6 @@ func (l *LogFilter) addAddress(raw string) error {
 	return nil
 }
 
-func parseFilterBlock(i string) (int64, error) {
-	switch i {
-	case "latest":
-		return latest, nil
-	case "pending":
-		return pending, nil
-	case "earliest":
-		return earliest, nil
-	}
-	n, err := types.ParseUint64orHex(&i)
-	if err != nil {
-		return 0, err
-	}
-	return int64(n), nil
-}
-
 // UnmarshalJSON decodes a json object
 func (l *LogFilter) UnmarshalJSON(data []byte) error {
 	var obj struct {
@@ -80,17 +64,17 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 	}
 
 	if obj.FromBlock == "" {
-		l.fromBlock = latest
+		l.fromBlock = LatestBlockNumber
 	} else {
-		if l.fromBlock, err = parseFilterBlock(obj.FromBlock); err != nil {
+		if l.fromBlock, err = stringToBlockNumber(obj.FromBlock); err != nil {
 			return err
 		}
 	}
 
 	if obj.ToBlock == "" {
-		l.toBlock = latest
+		l.toBlock = LatestBlockNumber
 	} else {
-		if l.toBlock, err = parseFilterBlock(obj.ToBlock); err != nil {
+		if l.toBlock, err = stringToBlockNumber(obj.ToBlock); err != nil {
 			return err
 		}
 	}

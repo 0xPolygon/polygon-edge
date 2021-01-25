@@ -1,4 +1,4 @@
-package filter
+package jsonrpc
 
 import (
 	"sync"
@@ -12,9 +12,7 @@ import (
 )
 
 func TestLogFilter(t *testing.T) {
-	store := &mockStore{
-		header: &types.Header{},
-	}
+	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
 	go m.Run()
@@ -70,11 +68,7 @@ func TestLogFilter(t *testing.T) {
 }
 
 func TestBlockFilter(t *testing.T) {
-	store := &mockStore{
-		header: &types.Header{
-			Hash: types.StringToHash("0"),
-		},
-	}
+	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
 	go m.Run()
@@ -131,7 +125,7 @@ func TestBlockFilter(t *testing.T) {
 }
 
 func TestTimeout(t *testing.T) {
-	store := &mockStore{}
+	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
 	m.timeout = 2 * time.Second
@@ -142,7 +136,7 @@ func TestTimeout(t *testing.T) {
 	id := m.addFilter(nil)
 
 	assert.True(t, m.Exists(id))
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 	assert.False(t, m.Exists(id))
 }
 
@@ -160,8 +154,8 @@ func TestHeadStream(t *testing.T) {
 	// get the updates, there are two new entries
 	updates, next := cur.getUpdates()
 
-	assert.Equal(t, updates[0], types.StringToHash("3"))
-	assert.Equal(t, updates[1], types.StringToHash("4"))
+	assert.Equal(t, updates[0], types.StringToHash("3").String())
+	assert.Equal(t, updates[1], types.StringToHash("4").String())
 
 	// there are no new entries
 	updates, _ = next.getUpdates()
@@ -169,11 +163,17 @@ func TestHeadStream(t *testing.T) {
 }
 
 type mockStore struct {
-	header  *types.Header
-	eventCh chan blockchain.Event
-
+	header       *types.Header
+	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
+}
+
+func newMockStore() *mockStore {
+	return &mockStore{
+		header:       &types.Header{Number: 0},
+		subscription: blockchain.NewMockSubscription(),
+	}
 }
 
 type mockHeader struct {
@@ -191,7 +191,7 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		m.receipts = map[types.Hash][]*types.Receipt{}
 	}
 
-	bEvnt := blockchain.Event{
+	bEvnt := &blockchain.Event{
 		NewChain: []*types.Header{},
 		OldChain: []*types.Header{},
 	}
@@ -203,7 +203,7 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
-	m.eventCh <- bEvnt
+	m.subscription.Push(bEvnt)
 }
 
 func (m *mockStore) Header() *types.Header {
@@ -219,15 +219,6 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 }
 
 // Subscribe subscribes for chain head events
-func (m *mockStore) Subscribe() subscription {
-	return m
-}
-
-func (m *mockStore) Watch() chan blockchain.Event {
-	m.eventCh = make(chan blockchain.Event)
-	return m.eventCh
-}
-
-func (m *mockStore) Close() {
-
+func (m *mockStore) SubscribeEvents() blockchain.Subscription {
+	return m.subscription
 }
