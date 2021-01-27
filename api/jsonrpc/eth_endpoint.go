@@ -146,6 +146,44 @@ func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
 	return new(types.Big), nil
 }
 
+// GetStorageAt returns the contract storage at the index position
+func (e *Eth) GetStorageAt(address string, index []byte, number string) (interface{}, error) {
+
+	addr := types.StringToAddress(address)
+
+	// Fetch the requested header
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	// Fetch the world state snapshot
+	s := e.d.minimal.Blockchain.Executor().State()
+	snap, err := s.NewSnapshotAt(header.StateRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	acc, ok := state.NewTxn(s, snap).GetAccount(addr)
+	if !ok {
+		return nil, fmt.Errorf("error getting account state")
+	}
+
+	// Fetch the Storage state snapshot
+	snap, err = s.NewSnapshotAt(acc.Root)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the storage for the passed in location
+	result, ok := snap.Get(index)
+	if !ok {
+		return nil, fmt.Errorf("error getting storage snapshot")
+	}
+
+	return result, nil
+}
+
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
