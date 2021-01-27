@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
@@ -47,6 +48,32 @@ type Blockchain struct {
 
 	// event subscriptions
 	stream *eventStream
+
+	// Average gas price (rolling average)
+	averageGasPrice      *big.Int
+	averageGasPriceCount *big.Int
+
+	// Used for making the UpdateGasPriceAvg atomic
+	agpMux sync.Mutex
+}
+
+// UpdateGasPriceAvg Updates the rolling average value of the gas price
+func (b *Blockchain) UpdateGasPriceAvg(newValue *big.Int) {
+	b.agpMux.Lock()
+
+	b.averageGasPriceCount.Add(b.averageGasPriceCount, big.NewInt(1))
+
+	differential := big.NewInt(0)
+	differential.Div(newValue.Sub(newValue, b.averageGasPrice), b.averageGasPriceCount)
+
+	b.averageGasPrice.Add(b.averageGasPrice, differential)
+
+	b.agpMux.Unlock()
+}
+
+// GetAvgGasPrice returns the average gas price
+func (b *Blockchain) GetAvgGasPrice() *big.Int {
+	return b.averageGasPrice
 }
 
 // NewBlockchain creates a new blockchain object
@@ -64,6 +91,10 @@ func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
+
+	b.averageGasPrice = big.NewInt(0)
+	b.averageGasPriceCount = big.NewInt(0)
+
 	return b
 }
 
@@ -486,6 +517,9 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return err
 		}
 		b.dispatchEvent(evnt)
+
+		// Update the average gas price
+		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
 	}
 
 	return nil

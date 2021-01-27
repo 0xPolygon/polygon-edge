@@ -184,6 +184,15 @@ func (e *Eth) GetStorageAt(address string, index []byte, number string) (interfa
 	return result, nil
 }
 
+// GasPrice returns the average gas price based on the last x blocks
+func (e *Eth) GasPrice() (interface{}, error) {
+
+	// Grab the average gas price and convert it to a hex value
+	avgGasPrice := hex.EncodeBig(e.d.minimal.Blockchain.GetAvgGasPrice())
+
+	return avgGasPrice, nil
+}
+
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
