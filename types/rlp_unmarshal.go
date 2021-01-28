@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -131,9 +130,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", num)
 	}
 
-	hash := keccak.DefaultKeccakPool.Get()
-	hash.WriteRlp(h.Hash[:0], v)
-	keccak.DefaultKeccakPool.Put(hash)
+	p.Hash(h.Hash[:0], v)
 
 	// parentHash
 	if err = elems[0].GetHash(h.ParentHash[:]); err != nil {
@@ -302,9 +299,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", num)
 	}
 
-	hash := keccak.DefaultKeccakPool.Get()
-	hash.WriteRlp(t.Hash[:0], v)
-	keccak.DefaultKeccakPool.Put(hash)
+	p.Hash(t.Hash[:0], v)
 
 	// nonce
 	if t.Nonce, err = elems[0].GetUint64(); err != nil {

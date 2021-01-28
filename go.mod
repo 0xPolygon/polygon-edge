@@ -37,7 +37,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
-	github.com/umbracle/fastrlp v0.0.0-20210127203036-adaebacde700
+	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/valyala/fasthttp v1.2.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad

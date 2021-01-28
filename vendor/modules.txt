@@ -238,7 +238,7 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
 ## explicit
 github.com/umbracle/ecies
-# github.com/umbracle/fastrlp v0.0.0-20210127203036-adaebacde700
+# github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b

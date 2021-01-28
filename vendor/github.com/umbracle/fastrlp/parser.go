@@ -31,6 +31,9 @@ func (p *Parser) Raw(v *Value) []byte {
 
 // Hash performs a keccak hash of the rlp value
 func (p *Parser) Hash(dst []byte, v *Value) []byte {
+	if p.k == nil {
+		p.k = NewKeccak256()
+	}
 	p.k.Reset()
 	p.k.Write(p.Raw(v))
 	return p.k.Sum(dst)
