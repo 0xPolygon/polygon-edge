@@ -238,7 +238,7 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
 ## explicit
 github.com/umbracle/ecies
-# github.com/umbracle/fastrlp v0.0.0-20191017143648-86584926e68c
+# github.com/umbracle/fastrlp v0.0.0-20210127203036-adaebacde700
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
@@ -252,7 +252,7 @@ github.com/valyala/fasthttp
 github.com/valyala/fasthttp/fasthttpadaptor
 github.com/valyala/fasthttp/fasthttputil
 github.com/valyala/fasthttp/stackless
-# golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
+# golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 ## explicit
 golang.org/x/crypto/hkdf
 golang.org/x/crypto/ripemd160
@@ -266,8 +266,11 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 # golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
 golang.org/x/sys/cpu
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.0.0-20201117132131-f5c789dd3221
+golang.org/x/term
 # golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap

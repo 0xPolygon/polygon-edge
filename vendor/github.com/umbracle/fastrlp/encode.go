@@ -167,6 +167,17 @@ func (v *Value) GetHash(buf []byte) error {
 	return err
 }
 
+// GetByte returns a byte
+func (v *Value) GetByte() (byte, error) {
+	if v.t != TypeBytes {
+		return 0, errNoBytes()
+	}
+	if len(v.b) != 1 {
+		return 0, fmt.Errorf("bad length, expected 1 but found %d", len(v.b))
+	}
+	return byte(v.b[0]), nil
+}
+
 // GetUint64 returns uint64.
 func (v *Value) GetUint64() (uint64, error) {
 	if v.t != TypeBytes {
