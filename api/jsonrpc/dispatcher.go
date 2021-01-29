@@ -48,6 +48,7 @@ type Dispatcher struct {
 	serviceMap       map[string]*serviceData
 	endpoints        endpoints
 	enabledEndpoints map[serverType]enabledEndpoints
+	filterManager    *FilterManager
 }
 
 func newDispatcher() *Dispatcher {

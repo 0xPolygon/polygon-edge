@@ -113,10 +113,16 @@ github.com/google/gopacket/routing
 github.com/google/gops/agent
 github.com/google/gops/internal
 github.com/google/gops/signal
+<<<<<<< HEAD
 # github.com/google/uuid v1.1.2
 github.com/google/uuid
 # github.com/gorilla/websocket v1.4.2
 github.com/gorilla/websocket
+=======
+# github.com/google/uuid v1.1.4
+## explicit
+github.com/google/uuid
+>>>>>>> develop
 # github.com/hashicorp/consul/api v1.0.1
 ## explicit
 github.com/hashicorp/consul/api

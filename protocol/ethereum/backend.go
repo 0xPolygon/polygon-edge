@@ -337,7 +337,7 @@ func (b *Backend) announceNewBlock(e *Ethereum, p *fastrlp.Parser, v *fastrlp.Va
 	}
 
 	var block types.Block
-	err = block.UnmarshalRLP(p, elems[1])
+	err = block.UnmarshalRLP(p.Raw(elems[1]))
 	if err != nil {
 		return err
 	}

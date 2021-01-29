@@ -35,6 +35,15 @@ const (
 
 var rander = rand.Reader // random function
 
+<<<<<<< HEAD
+=======
+type invalidLengthError struct{ len int }
+
+func (err invalidLengthError) Error() string {
+	return fmt.Sprintf("invalid UUID length: %d", err.len)
+}
+
+>>>>>>> develop
 // Parse decodes s into a UUID or returns an error.  Both the standard UUID
 // forms of xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and
 // urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx are decoded as well as the
@@ -68,7 +77,11 @@ func Parse(s string) (UUID, error) {
 		}
 		return uuid, nil
 	default:
+<<<<<<< HEAD
 		return uuid, fmt.Errorf("invalid UUID length: %d", len(s))
+=======
+		return uuid, invalidLengthError{len(s)}
+>>>>>>> develop
 	}
 	// s is now at least 36 bytes long
 	// it must be of the form  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -112,7 +125,11 @@ func ParseBytes(b []byte) (UUID, error) {
 		}
 		return uuid, nil
 	default:
+<<<<<<< HEAD
 		return uuid, fmt.Errorf("invalid UUID length: %d", len(b))
+=======
+		return uuid, invalidLengthError{len(b)}
+>>>>>>> develop
 	}
 	// s is now at least 36 bytes long
 	// it must be of the form  xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx

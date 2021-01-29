@@ -122,19 +122,6 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 
 // GetTransactionReceipt returns account nonce
 func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
-	blockHash, ok := e.d.minimal.Blockchain.ReadTransactionBlockHash(types.StringToHash(hash))
-	if !ok {
-		return nil, fmt.Errorf("transaction not mined")
-	}
-
-	receipts := e.d.minimal.Blockchain.GetReceiptsByHash(blockHash)
-
-	for _, receipt := range receipts {
-		if receipt.TxHash == types.StringToHash(hash) {
-			return receipt, nil
-		}
-	}
-
 	return nil, fmt.Errorf("transaction not found")
 }
 
@@ -205,3 +192,31 @@ func (e *Eth) GetCode(address string, number string) (interface{}, error) {
 
 	return "0x", nil
 }
+
+// NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
+func (e *Eth) NewFilter(filter *LogFilter) (interface{}, error) {
+	return e.d.filterManager.NewLogFilter(filter), nil
+}
+
+// NewBlockFilter creates a filter in the node, to notify when a new block arrives
+func (e *Eth) NewBlockFilter() (interface{}, error) {
+	return e.d.filterManager.NewBlockFilter(), nil
+}
+
+// GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
+func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
+	return nil, nil
+}
+
+// UninstallFilter uninstalls a filter with given ID
+func (e *Eth) UninstallFilter(id string) {
+	// TODO: Not sure about the return field here but it needs one
+	e.d.filterManager.Uninstall(id)
+}
+
+/*
+TODO
+func (e *Eth) GetLogs() {
+
+}
+*/

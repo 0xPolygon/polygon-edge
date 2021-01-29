@@ -17,6 +17,7 @@ require (
 	github.com/golang/protobuf v1.4.3
 	github.com/golang/snappy v0.0.1
 	github.com/google/gops v0.3.6
+	github.com/google/uuid v1.1.4
 	github.com/hashicorp/consul/api v1.0.1
 	github.com/hashicorp/go-hclog v0.14.1
 	github.com/hashicorp/go-immutable-radix v1.0.0
