@@ -8,7 +8,6 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/buaazp/fasthttprouter v0.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/dgraph-io/badger v1.6.1
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/ferranbt/go-kademlia-bucket v0.2.1-0.20190612080044-d5ef9cf1cf01
@@ -25,8 +24,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
 	github.com/imdario/mergo v0.3.7
-	github.com/jmoiron/sqlx v1.2.0
-	github.com/lib/pq v1.2.0
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/libp2p/go-libp2p v0.8.1
 	github.com/libp2p/go-libp2p-core v0.5.1
 	github.com/libp2p/go-libp2p-net v0.1.0
@@ -45,7 +43,6 @@ require (
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/valyala/fasthttp v1.2.0
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
-	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951

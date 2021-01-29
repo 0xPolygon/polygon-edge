@@ -25,10 +25,8 @@ import (
 	discoveryConsul "github.com/0xPolygon/minimal/network/discovery/consul"
 	discoveryDevP2P "github.com/0xPolygon/minimal/network/discovery/devp2p"
 
-	protocolEthereum "github.com/0xPolygon/minimal/protocol/ethereum"
-
-	storageBoltDB "github.com/0xPolygon/minimal/blockchain/storage/boltdb"
 	storageLevelDB "github.com/0xPolygon/minimal/blockchain/storage/leveldb"
+	protocolEthereum "github.com/0xPolygon/minimal/protocol/ethereum"
 
 	apiHTTP "github.com/0xPolygon/minimal/api/http"
 	apiJsonRPC "github.com/0xPolygon/minimal/api/jsonrpc"
@@ -36,7 +34,6 @@ import (
 
 var blockchainBackends = map[string]storage.Factory{
 	"leveldb": storageLevelDB.Factory,
-	"boltdb":  storageBoltDB.Factory,
 }
 
 var consensusBackends = map[string]consensus.Factory{

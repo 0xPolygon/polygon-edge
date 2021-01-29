@@ -1,5 +1,3 @@
-# github.com/AndreasBriese/bbloom v0.0.0-20190306092124-e2d15f34fcf9
-github.com/AndreasBriese/bbloom
 # github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6
 github.com/StackExchange/wmi
 # github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847
@@ -19,8 +17,6 @@ github.com/btcsuite/btcd/btcec
 # github.com/buaazp/fasthttprouter v0.1.1
 ## explicit
 github.com/buaazp/fasthttprouter
-# github.com/cespare/xxhash v1.1.0
-github.com/cespare/xxhash
 # github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
 # github.com/davecgh/go-spew v1.1.1
@@ -30,19 +26,6 @@ github.com/davidlazar/go-crypto/salsa20
 # github.com/deckarep/golang-set v1.7.1
 ## explicit
 github.com/deckarep/golang-set
-# github.com/dgraph-io/badger v1.6.1
-## explicit
-github.com/dgraph-io/badger
-github.com/dgraph-io/badger/options
-github.com/dgraph-io/badger/pb
-github.com/dgraph-io/badger/skl
-github.com/dgraph-io/badger/table
-github.com/dgraph-io/badger/trie
-github.com/dgraph-io/badger/y
-# github.com/dgraph-io/ristretto v0.0.2
-github.com/dgraph-io/ristretto/z
-# github.com/dustin/go-humanize v1.0.0
-github.com/dustin/go-humanize
 # github.com/edsrzf/mmap-go v1.0.0
 ## explicit
 github.com/edsrzf/mmap-go
@@ -185,10 +168,6 @@ github.com/jbenet/go-temp-err-catcher
 github.com/jbenet/goprocess
 github.com/jbenet/goprocess/context
 github.com/jbenet/goprocess/periodic
-# github.com/jmoiron/sqlx v1.2.0
-## explicit
-github.com/jmoiron/sqlx
-github.com/jmoiron/sqlx/reflectx
 # github.com/joho/godotenv v1.3.0
 github.com/joho/godotenv
 # github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
@@ -201,11 +180,8 @@ github.com/klauspost/compress/zlib
 github.com/klauspost/cpuid
 # github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d
 github.com/koron/go-ssdp
-# github.com/lib/pq v1.2.0
+# github.com/kr/pretty v0.2.0
 ## explicit
-github.com/lib/pq
-github.com/lib/pq/oid
-github.com/lib/pq/scram
 # github.com/libp2p/go-addr-util v0.0.1
 github.com/libp2p/go-addr-util
 # github.com/libp2p/go-buffer-pool v0.0.2
@@ -513,8 +489,6 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# google.golang.org/appengine v1.6.5
-## explicit
 # google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.35.0
