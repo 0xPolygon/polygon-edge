@@ -193,6 +193,29 @@ func (e *Eth) GasPrice() (interface{}, error) {
 	return avgGasPrice, nil
 }
 
+// Call executes a smart contract call using the transaction object data
+func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, error) {
+
+	// Fetch the requested header
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	transition, err := e.d.minimal.Blockchain.Executor().BeginTxn(header.StateRoot, header)
+	if err != nil {
+		return nil, err
+	}
+
+	// The return value of the execution is saved in the transition (returnValue field)
+	_, _, err = transition.Apply(transaction)
+	if err != nil {
+		return nil, err
+	}
+
+	return transition.ReturnValue(), nil
+}
+
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
