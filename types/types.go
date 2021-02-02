@@ -119,6 +119,10 @@ func StringToAddress(str string) Address {
 	return BytesToAddress(stringToBytes(str))
 }
 
+func AddressToString(address Address) string {
+	return string(address[:])
+}
+
 func BytesToAddress(b []byte) Address {
 	var a Address
 

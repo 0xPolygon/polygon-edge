@@ -151,6 +151,8 @@ func (e *Eth) GetStorageAt(address string, index []byte, number string) (interfa
 
 	addr := types.StringToAddress(address)
 
+	// TODO add different fetch cases for the number arg
+
 	// Fetch the requested header
 	header, ok := e.d.minimal.Blockchain.Header()
 	if !ok {
@@ -196,6 +198,8 @@ func (e *Eth) GasPrice() (interface{}, error) {
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, error) {
 
+	// TODO add different fetch cases for the number arg
+
 	// Fetch the requested header
 	header, ok := e.d.minimal.Blockchain.Header()
 	if !ok {
@@ -214,6 +218,150 @@ func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, 
 	}
 
 	return transition.ReturnValue(), nil
+}
+
+// EstimateGasParams - Optional params used for the EstimateGas call
+type EstimateGasParams struct {
+	transaction *types.Transaction
+	number      string
+}
+
+// EstimateGas estimates the gas needed to execute a transaction
+func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
+
+	const standardGas uint64 = 21000
+
+	// TODO add different fetch cases for the number arg
+	// Fetch the requested header
+	header, ok := e.d.minimal.Blockchain.Header()
+	if !ok {
+		return nil, fmt.Errorf("error getting header")
+	}
+
+	transaction := params.transaction
+
+	var (
+		lowEnd  uint64 = standardGas
+		highEnd uint64
+		cap     uint64
+	)
+
+	// If the gas limit was passed in, use it as a ceiling
+	if transaction.Gas != 0 && uint64(transaction.Gas) >= standardGas {
+		highEnd = uint64(transaction.Gas)
+	} else {
+		// If not, use the referenced block number
+		highEnd = header.GasLimit
+	}
+
+	gasPriceInt := hex.DecodeHexToBig(transaction.GasPrice.String())
+	valueInt := hex.DecodeHexToBig(transaction.Value.String())
+
+	// If the sender address is present, recalculate the ceiling to his balance
+	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+
+		// Get the account balance
+		s := e.d.minimal.Blockchain.Executor().State()
+		snap, err := s.NewSnapshotAt(header.StateRoot)
+
+		var accountBalance *big.Int
+
+		if err != nil {
+			return nil, err
+		}
+
+		if acc, ok := state.NewTxn(s, snap).GetAccount(transaction.From); ok {
+			accountBalance = acc.Balance
+		}
+
+		if err != nil {
+			return 0, err
+		}
+
+		available := new(big.Int).Set(accountBalance)
+
+		if transaction.Value != nil {
+			if valueInt.Cmp(available) >= 0 {
+				return 0, fmt.Errorf("insufficient funds for transfer")
+			}
+
+			available.Sub(available, valueInt)
+		}
+
+		allowance := new(big.Int).Div(available, gasPriceInt)
+
+		// If the allowance is larger than maximum uint64, skip checking
+		if allowance.IsUint64() && highEnd > allowance.Uint64() {
+			highEnd = allowance.Uint64()
+		}
+	}
+
+	cap = highEnd
+
+	// Run the transaction with the estimated gas
+	testTransaction := func(gas uint64) (bool, error) {
+
+		transition, err := e.d.minimal.Blockchain.Executor().BeginTxn(header.StateRoot, header)
+		if err != nil {
+			return true, err
+		}
+
+		// Create a dummy transaction with the new gas
+		txn := &types.Transaction{}
+		txn.Nonce = transaction.Nonce
+		txn.GasPrice = transaction.GasPrice
+		txn.Value = transaction.Value
+		txn.Input = transaction.Input
+		txn.V = transaction.V
+		txn.R = transaction.R
+		txn.S = transaction.S
+		txn.Hash = transaction.Hash
+		txn.From = transaction.From
+		txn.To = transaction.To
+
+		txn.Gas = gas
+
+		_, failed, err := transition.Apply(transaction)
+		if err != nil {
+			return failed, err
+		}
+
+		return failed, nil
+	}
+
+	// Start the binary search for the lowest possible gas price
+	for lowEnd <= highEnd {
+		mid := (lowEnd + highEnd) / 2
+
+		failed, err := testTransaction(mid)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if failed {
+			// If the transaction failed => increase the gas
+			lowEnd = mid + 1
+		} else {
+			// If the transaction didn't fail => lower the gas
+			highEnd = mid - 1
+		}
+	}
+
+	// Check the edge case if even the highest cap is not enough to complete the transaction
+	if highEnd == cap {
+		failed, err := testTransaction(cap)
+
+		if err != nil {
+			return 0, err
+		}
+
+		if failed {
+			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+		}
+	}
+
+	return hex.EncodeUint64(highEnd), nil
 }
 
 // GetTransactionCount returns account nonce
