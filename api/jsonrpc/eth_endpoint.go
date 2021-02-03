@@ -36,7 +36,7 @@ func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
 	return nil, nil
 }
 
-// CurrentBlock returns current block number
+// BlockNumber returns current block number
 func (e *Eth) BlockNumber() (interface{}, error) {
 	h, ok := e.d.minimal.Blockchain.Header()
 	if !ok {
@@ -46,6 +46,7 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 	return types.Uint64(h.Number), nil
 }
 
+// SendRawTransaction sends a raw transaction
 func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	raw := new(types.HexBytes)
 	err := raw.Scan(input)
@@ -125,12 +126,13 @@ func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
 	return nil, fmt.Errorf("transaction not found")
 }
 
-// CurrentBlock returns current block number
+// GetBalance returns the account's balance
 func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+
+	header, err := e.GetBlockHeader(number)
+	if err != nil {
+		return nil, err
 	}
 
 	s := e.d.minimal.Blockchain.Executor().State()
@@ -151,12 +153,10 @@ func (e *Eth) GetStorageAt(address string, index []byte, number string) (interfa
 
 	addr := types.StringToAddress(address)
 
-	// TODO add different fetch cases for the number arg
-
 	// Fetch the requested header
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+	header, err := e.GetBlockHeader(number)
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch the world state snapshot
@@ -198,12 +198,10 @@ func (e *Eth) GasPrice() (interface{}, error) {
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, error) {
 
-	// TODO add different fetch cases for the number arg
-
 	// Fetch the requested header
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+	header, err := e.GetBlockHeader(number)
+	if err != nil {
+		return nil, err
 	}
 
 	transition, err := e.d.minimal.Blockchain.Executor().BeginTxn(header.StateRoot, header)
@@ -220,6 +218,36 @@ func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, 
 	return transition.ReturnValue(), nil
 }
 
+// GetBlockHeader returns the specific header of the requested block
+// latest, earliest, pending, or a specific block number
+func (e *Eth) GetBlockHeader(number string) (*types.Header, error) {
+
+	blockchainRef := e.d.minimal.Blockchain
+
+	switch number {
+	case "latest":
+		header, ok := blockchainRef.Header()
+		if !ok {
+			return nil, fmt.Errorf("Error fetching latest header")
+		}
+
+		return header, nil
+	case "earliest":
+		return nil, fmt.Errorf("Fetching the earliest header is not supported")
+	case "pending":
+		return nil, fmt.Errorf("Fetching the pending header is not supported")
+	default:
+		// Convert the block number from hex to uint64
+		blockNumber := hex.DecodeHexToBig(number)
+
+		header, ok := blockchainRef.GetHeaderByNumber(blockNumber.Uint64())
+		if !ok {
+			return nil, fmt.Errorf("Error fetching block number %d header", blockNumber.Uint64())
+		}
+		return header, nil
+	}
+}
+
 // EstimateGasParams - Optional params used for the EstimateGas call
 type EstimateGasParams struct {
 	transaction *types.Transaction
@@ -231,11 +259,10 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 
 	const standardGas uint64 = 21000
 
-	// TODO add different fetch cases for the number arg
 	// Fetch the requested header
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+	header, err := e.GetBlockHeader(params.number)
+	if err != nil {
+		return nil, err
 	}
 
 	transaction := params.transaction
@@ -367,9 +394,10 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+
+	header, err := e.GetBlockHeader(number)
+	if err != nil {
+		return nil, err
 	}
 
 	s := e.d.minimal.Blockchain.Executor().State()
@@ -388,9 +416,10 @@ func (e *Eth) GetTransactionCount(address string, number string) (interface{}, e
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address string, number string) (interface{}, error) {
 	addr := types.StringToAddress(address)
-	header, ok := e.d.minimal.Blockchain.Header()
-	if !ok {
-		return nil, fmt.Errorf("error getting header")
+
+	header, err := e.GetBlockHeader(number)
+	if err != nil {
+		return nil, err
 	}
 
 	s := e.d.minimal.Blockchain.Executor().State()
