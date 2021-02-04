@@ -533,7 +533,7 @@ func (e *Ethereum) handleHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// decode the first header to search the beacon
 	var header types.Header
-	if err := header.UnmarshalRLP(p, elems[0]); err != nil {
+	if err := header.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 
@@ -681,7 +681,7 @@ func (e *Ethereum) handleGetReceipts(p *fastrlp.Parser, v *fastrlp.Value) error 
 
 		vv := ar.NewArray()
 		for _, receipt := range receipts {
-			vv.Set(receipt.MarshalWith(ar))
+			vv.Set(receipt.MarshalRLPWith(ar))
 		}
 		res.Set(vv)
 	}
@@ -715,7 +715,7 @@ func (e *Ethereum) handleGetBodies(p *fastrlp.Parser, v *fastrlp.Value) error {
 	for _, elem := range elems[:amount] {
 		body, ok := e.blockchain.GetBodyByHash(types.BytesToHash(elem.Raw()))
 		if ok {
-			res.Set(body.MarshalWith(ar))
+			res.Set(body.MarshalRLPWith(ar))
 		} else {
 			res.Set(ar.NewNullArray())
 		}
@@ -793,7 +793,7 @@ func (e *Ethereum) handleGetHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	res := ar.NewArray()
-	res.Set(origin.MarshalWith(ar)) // add origin
+	res.Set(origin.MarshalRLPWith(ar)) // add origin
 
 	count := uint64(1)
 	for count < amount {
@@ -808,7 +808,7 @@ func (e *Ethereum) handleGetHeader(p *fastrlp.Parser, v *fastrlp.Value) error {
 			break
 		}
 		count++
-		res.Set(origin.MarshalWith(ar))
+		res.Set(origin.MarshalRLPWith(ar))
 	}
 
 	e.writeRLP(BlockHeadersMsg, res)
@@ -942,7 +942,7 @@ func (e *Ethereum) requestBody(hash types.Hash, beacon types.Hash) (*types.Body,
 		transactions := []*types.Transaction{}
 		for _, i := range txns {
 			txn := new(types.Transaction)
-			if err := txn.UnmarshalRLP(p, i); err != nil {
+			if err := txn.UnmarshalRLPFrom(p, i); err != nil {
 				return err
 			}
 			transactions = append(transactions, txn)
@@ -956,7 +956,7 @@ func (e *Ethereum) requestBody(hash types.Hash, beacon types.Hash) (*types.Body,
 		unclesX := []*types.Header{}
 		for _, i := range uncles {
 			uncle := new(types.Header)
-			if err := uncle.UnmarshalRLP(p, i); err != nil {
+			if err := uncle.UnmarshalRLPFrom(p, i); err != nil {
 				return err
 			}
 			unclesX = append(unclesX, uncle)
@@ -1018,7 +1018,7 @@ func (e *Ethereum) requestHeaderByNumber2(originN uint64, originH *types.Hash, a
 			header := new(types.Header)
 
 			// unmarshal the header
-			if err := header.UnmarshalRLP(p, elems[indx]); err != nil {
+			if err := header.UnmarshalRLPFrom(p, elems[indx]); err != nil {
 				return err
 			}
 			// decode the hash

@@ -33,7 +33,7 @@ func (t *Transaction) ComputeHash() *Transaction {
 	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
 
-	v := t.MarshalWith(ar)
+	v := t.MarshalRLPWith(ar)
 	hash.WriteRlp(t.Hash[:0], v)
 
 	marshalArenaPool.Put(ar)
