@@ -3,55 +3,43 @@ package protocol2
 import (
 	"context"
 	"fmt"
-	"math/big"
+	"math"
 	"sync"
 
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/protocol2/proto"
-	v1 "github.com/0xPolygon/minimal/protocol2/proto"
 	"github.com/0xPolygon/minimal/types"
 	"google.golang.org/grpc"
 )
 
-// Event to be removed later
-type Event struct {
-	OldChain []*types.Header
-	NewChain []*types.Header
-}
-
-type subscription interface {
-	GetEvent() *Event
-	Close()
-}
-
-// blockchain is the interface required by the syncer to connect to the blockchain
-type blockchain interface {
-	SubscribeEvents() subscription
+// Blockchain is the interface required by the syncer to connect to the blockchain
+type Blockchain interface {
+	SubscribeEvents() blockchain.Subscription
+	Header() *types.Header
+	GetReceiptsByHash(types.Hash) []*types.Receipt
+	GetBodyByHash(types.Hash) (*types.Body, bool)
+	GetHeaderByHash(types.Hash) (*types.Header, bool)
+	GetHeaderByNumber(n uint64) (*types.Header, bool)
 }
 
 // Syncer is a sync protocol
 type Syncer struct {
-	headWatcher *headWatcher
+	blockchain Blockchain
 
 	peersLock sync.Mutex
 	peers     map[string]*peer
-
-	// notify a change in the target peer
-	updateCh chan *peer
 
 	stopCh chan struct{}
 }
 
 type peer struct {
-	client     *proto.V1Client
-	difficulty *big.Int
-	updateCh   chan *proto.Component
+	client *proto.V1Client
 }
 
 func NewSyncer() *Syncer {
 	return &Syncer{
-		headWatcher: &headWatcher{},
-		peers:       map[string]*peer{},
-		stopCh:      make(chan struct{}),
+		peers:  map[string]*peer{},
+		stopCh: make(chan struct{}),
 	}
 }
 
@@ -60,83 +48,75 @@ func (s *Syncer) Start() {
 }
 
 func (s *Syncer) handleUser(conn *grpc.ClientConn) {
-	go func() {
-		clt := proto.NewV1Client(conn)
 
-		recv, err := clt.WatchBlocks(context.Background(), &v1.Empty{})
+}
+
+func (s *Syncer) findCommonAncestor(clt proto.V1Client, height *types.Header) (*types.Header, error) {
+	h := s.blockchain.Header()
+
+	min := uint64(0) // genesis
+	max := h.Number
+
+	if heightNumber := height.Number; max > heightNumber {
+		max = heightNumber
+	}
+
+	var header *types.Header
+	for min <= max {
+		m := uint64(math.Floor(float64(min+max) / 2))
+
+		req := &proto.GetHeadersRequest{
+			Number: int64(m),
+		}
+		resp, err := clt.GetHeaders(context.Background(), req)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		for {
-			msg, err := recv.Recv()
-			if err != nil {
-				panic(err)
+
+		if len(resp.Objs) == 0 {
+			// peer does not have the m peer, search in lower bounds
+			max = m - 1
+		} else {
+			if len(resp.Objs) != 1 {
+				return nil, fmt.Errorf("unexpected more than 1 result")
 			}
-			fmt.Println("- msg -")
-			fmt.Println(msg)
+
+			var found *types.Header
+			if found.Number != m {
+				return nil, fmt.Errorf("header response number not correct, asked %d but retrieved %d", m, header.Number)
+			}
+
+			expectedHeader, ok := s.blockchain.GetHeaderByNumber(m)
+			if !ok {
+				return nil, fmt.Errorf("cannot find the header %d in local chain", m)
+			}
+			if expectedHeader.Hash == found.Hash {
+				header = found
+				min = m + 1
+			} else {
+				if m == 0 {
+					return nil, fmt.Errorf("genesis does not match?")
+				}
+				max = m - 1
+			}
 		}
-	}()
+	}
+
+	if min == 0 {
+		return nil, nil
+	}
+	return header, nil
 }
 
 func (s *Syncer) run() {
 	var cancelFn context.CancelFunc
-	var ctx context.Context
 
 	for {
 		select {
-		case target := <-s.updateCh:
-			if cancelFn != nil {
-				cancelFn()
-			}
-			ctx, cancelFn = context.WithCancel(context.Background())
-			go func() {
-				s.syncTarget(ctx, target)
-			}()
-
 		case <-s.stopCh:
 			if cancelFn != nil {
 				cancelFn()
 			}
 		}
 	}
-}
-
-func (s *Syncer) syncTarget(ctx context.Context, target *peer) error {
-	var latestKnownBlock, latestSyncedBlock *types.Header
-	var err error
-
-	// batch sync
-	for {
-		// find common ancenstor
-		latestKnownBlock, latestSyncedBlock, err = s.findAncestor(ctx, nil)
-		if err != nil {
-			return err
-		}
-
-		// check if we are at least n blocks away
-		if latestKnownBlock.Number-20 < latestSyncedBlock.Number {
-			break
-		}
-
-		// sync with ancestor
-		if err := s.batchSyncTo(ctx, nil); err != nil {
-			return err
-		}
-	}
-
-	// tip sync
-	for i := latestSyncedBlock.Number; i < latestKnownBlock.Number; i++ {
-
-	}
-
-	// wait for updates
-	return nil
-}
-
-func (s *Syncer) findAncestor(ctx context.Context, target *proto.V1Client) (*types.Header, *types.Header, error) {
-	return nil, nil, nil
-}
-
-func (s *Syncer) batchSyncTo(ctx context.Context, target *proto.V1Client) error {
-	return nil
 }

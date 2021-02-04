@@ -31,12 +31,18 @@ func DefaultConfig() *Config {
 	}
 }
 
+type Blockchain interface {
+	Header() (*types.Header, bool)
+	WriteBlocks(blocks []*types.Block) error
+	SubscribeEvents() blockchain.Subscription
+}
+
 // Sealer seals blocks
 type Sealer struct {
 	config *Config
 	logger hclog.Logger
 
-	blockchain *blockchain.Blockchain
+	blockchain Blockchain
 	engine     consensus.Consensus // TODO; remove once the executor has more content
 	txPool     *TxPool
 
@@ -48,14 +54,8 @@ type Sealer struct {
 	enabled bool
 
 	executor *state.Executor
-	SealedCh chan *SealedNotify
 
 	wakeCh chan struct{}
-}
-
-// TODO; this one is tricky
-type SealedNotify struct {
-	Block *types.Block
 }
 
 // NewSealer creates a new sealer for a specific engine
@@ -64,10 +64,9 @@ func NewSealer(config *Config, logger hclog.Logger, blockchain *blockchain.Block
 		blockchain: blockchain,
 		engine:     engine,
 		config:     config,
-		logger:     logger.Named("Sealer"),
+		logger:     logger.Named("sealer"),
 		txPool:     NewTxPool(blockchain),
 		signer:     crypto.NewEIP155Signer(13931),
-		SealedCh:   make(chan *SealedNotify, 10),
 		executor:   executor,
 		wakeCh:     make(chan struct{}),
 	}
@@ -85,6 +84,8 @@ func (s *Sealer) SetEnabled(enabled bool) {
 		// stop the sealer
 		s.stopFn()
 	} else if enabled && !wasRunning {
+		s.logger.Info("Start sealing")
+
 		// start the sealer
 		ctx, cancel := context.WithCancel(context.Background())
 		s.stopFn = cancel
@@ -93,7 +94,8 @@ func (s *Sealer) SetEnabled(enabled bool) {
 }
 
 func (s *Sealer) run(ctx context.Context) {
-	listener := s.blockchain.Subscribe()
+	//listener := s.blockchain.SubscribeEvents()
+	//eventCh := listener.GetEventCh()
 
 	for {
 		if s.config.DevMode {
@@ -115,7 +117,7 @@ func (s *Sealer) run(ctx context.Context) {
 			// the sealing process has finished
 		case <-ctx.Done():
 			// the sealing routine has been canceled
-		case <-listener:
+			//case <-eventCh:
 			// there is a new head
 		}
 
@@ -189,10 +191,7 @@ func (s *Sealer) sealAsync(ctx context.Context) chan struct{} {
 }
 
 func (s *Sealer) seal(ctx context.Context) error {
-	parent, ok := s.blockchain.Header()
-	if !ok {
-		return fmt.Errorf("current header not found")
-	}
+	parent, _ := s.blockchain.Header()
 
 	num := parent.Number
 	header := &types.Header{
@@ -204,7 +203,7 @@ func (s *Sealer) seal(ctx context.Context) error {
 		ExtraData:  s.config.Extra,
 	}
 
-	if err := s.engine.Prepare(s.blockchain, header); err != nil {
+	if err := s.engine.Prepare(header); err != nil {
 		return err
 	}
 
@@ -247,7 +246,8 @@ func (s *Sealer) seal(ctx context.Context) error {
 	block := generateNewBlock(header, txns, transition.Receipts())
 
 	// Start the consensus sealing
-	block, err = s.engine.Seal(s.blockchain, block, ctx)
+	s.logger.Debug("seal block", "num", block.Number())
+	block, err = s.engine.Seal(block, ctx)
 	if err != nil {
 		return err
 	}
@@ -266,13 +266,6 @@ func (s *Sealer) seal(ctx context.Context) error {
 	}
 
 	s.logger.Info("Block sealed", "number", num+1, "hash", block.Header.Hash)
-
-	// Broadcast the block to the network
-	select {
-	case s.SealedCh <- &SealedNotify{Block: block}:
-	default:
-	}
-
 	return nil
 }
 

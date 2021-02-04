@@ -10,6 +10,7 @@ import (
 	context "context"
 	proto "github.com/golang/protobuf/proto"
 	any "github.com/golang/protobuf/ptypes/any"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -30,14 +31,19 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
-type Empty struct {
+type GetHeadersRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	Number int64  `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
+	Hash   string `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	Skip   int64  `protobuf:"varint,3,opt,name=skip,proto3" json:"skip,omitempty"`
+	Amount int64  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 }
 
-func (x *Empty) Reset() {
-	*x = Empty{}
+func (x *GetHeadersRequest) Reset() {
+	*x = GetHeadersRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_protocol2_proto_v1_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -45,13 +51,13 @@ func (x *Empty) Reset() {
 	}
 }
 
-func (x *Empty) String() string {
+func (x *GetHeadersRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Empty) ProtoMessage() {}
+func (*GetHeadersRequest) ProtoMessage() {}
 
-func (x *Empty) ProtoReflect() protoreflect.Message {
+func (x *GetHeadersRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol2_proto_v1_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -63,21 +69,49 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Empty.ProtoReflect.Descriptor instead.
-func (*Empty) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetHeadersRequest.ProtoReflect.Descriptor instead.
+func (*GetHeadersRequest) Descriptor() ([]byte, []int) {
 	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{0}
 }
 
-type Component struct {
+func (x *GetHeadersRequest) GetNumber() int64 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *GetHeadersRequest) GetHash() string {
+	if x != nil {
+		return x.Hash
+	}
+	return ""
+}
+
+func (x *GetHeadersRequest) GetSkip() int64 {
+	if x != nil {
+		return x.Skip
+	}
+	return 0
+}
+
+func (x *GetHeadersRequest) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+type HashRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Spec *any.Any `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+	Hash []string `protobuf:"bytes,1,rep,name=hash,proto3" json:"hash,omitempty"`
 }
 
-func (x *Component) Reset() {
-	*x = Component{}
+func (x *HashRequest) Reset() {
+	*x = HashRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_protocol2_proto_v1_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -85,13 +119,13 @@ func (x *Component) Reset() {
 	}
 }
 
-func (x *Component) String() string {
+func (x *HashRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Component) ProtoMessage() {}
+func (*HashRequest) ProtoMessage() {}
 
-func (x *Component) ProtoReflect() protoreflect.Message {
+func (x *HashRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol2_proto_v1_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -103,12 +137,216 @@ func (x *Component) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Component.ProtoReflect.Descriptor instead.
-func (*Component) Descriptor() ([]byte, []int) {
+// Deprecated: Use HashRequest.ProtoReflect.Descriptor instead.
+func (*HashRequest) Descriptor() ([]byte, []int) {
 	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Component) GetSpec() *any.Any {
+func (x *HashRequest) GetHash() []string {
+	if x != nil {
+		return x.Hash
+	}
+	return nil
+}
+
+type NumberRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Number []int64 `protobuf:"varint,1,rep,packed,name=number,proto3" json:"number,omitempty"`
+}
+
+func (x *NumberRequest) Reset() {
+	*x = NumberRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protocol2_proto_v1_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *NumberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NumberRequest) ProtoMessage() {}
+
+func (x *NumberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol2_proto_v1_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NumberRequest.ProtoReflect.Descriptor instead.
+func (*NumberRequest) Descriptor() ([]byte, []int) {
+	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *NumberRequest) GetNumber() []int64 {
+	if x != nil {
+		return x.Number
+	}
+	return nil
+}
+
+type Response struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Objs []*Response_Component `protobuf:"bytes,1,rep,name=objs,proto3" json:"objs,omitempty"`
+}
+
+func (x *Response) Reset() {
+	*x = Response{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protocol2_proto_v1_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Response) ProtoMessage() {}
+
+func (x *Response) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol2_proto_v1_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Response.ProtoReflect.Descriptor instead.
+func (*Response) Descriptor() ([]byte, []int) {
+	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Response) GetObjs() []*Response_Component {
+	if x != nil {
+		return x.Objs
+	}
+	return nil
+}
+
+type Status struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Difficulty string `protobuf:"bytes,1,opt,name=difficulty,proto3" json:"difficulty,omitempty"`
+	Hash       string `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	Number     int64  `protobuf:"varint,3,opt,name=number,proto3" json:"number,omitempty"`
+}
+
+func (x *Status) Reset() {
+	*x = Status{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protocol2_proto_v1_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Status) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Status) ProtoMessage() {}
+
+func (x *Status) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol2_proto_v1_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Status.ProtoReflect.Descriptor instead.
+func (*Status) Descriptor() ([]byte, []int) {
+	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Status) GetDifficulty() string {
+	if x != nil {
+		return x.Difficulty
+	}
+	return ""
+}
+
+func (x *Status) GetHash() string {
+	if x != nil {
+		return x.Hash
+	}
+	return ""
+}
+
+func (x *Status) GetNumber() int64 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+type Response_Component struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Spec *any.Any `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
+}
+
+func (x *Response_Component) Reset() {
+	*x = Response_Component{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protocol2_proto_v1_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Response_Component) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Response_Component) ProtoMessage() {}
+
+func (x *Response_Component) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol2_proto_v1_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Response_Component.ProtoReflect.Descriptor instead.
+func (*Response_Component) Descriptor() ([]byte, []int) {
+	return file_protocol2_proto_v1_proto_rawDescGZIP(), []int{3, 0}
+}
+
+func (x *Response_Component) GetSpec() *any.Any {
 	if x != nil {
 		return x.Spec
 	}
@@ -119,18 +357,49 @@ var File_protocol2_proto_v1_proto protoreflect.FileDescriptor
 
 var file_protocol2_proto_v1_proto_rawDesc = []byte{
 	0x0a, 0x18, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x32, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x2f, 0x76, 0x31, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x02, 0x76, 0x31, 0x1a, 0x19,
+	0x6f, 0x2f, 0x76, 0x31, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x02, 0x76, 0x31, 0x1a, 0x1b,
 	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f,
-	0x61, 0x6e, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x07, 0x0a, 0x05, 0x45, 0x6d, 0x70,
-	0x74, 0x79, 0x22, 0x35, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x12,
-	0x28, 0x0a, 0x04, 0x73, 0x70, 0x65, 0x63, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e,
+	0x65, 0x6d, 0x70, 0x74, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x19, 0x67, 0x6f, 0x6f,
+	0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x61, 0x6e, 0x79,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x6b, 0x0a, 0x11, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61,
+	0x64, 0x65, 0x72, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x6e,
+	0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x6e, 0x75, 0x6d,
+	0x62, 0x65, 0x72, 0x12, 0x12, 0x0a, 0x04, 0x68, 0x61, 0x73, 0x68, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x68, 0x61, 0x73, 0x68, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x6b, 0x69, 0x70, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x6b, 0x69, 0x70, 0x12, 0x16, 0x0a, 0x06, 0x61,
+	0x6d, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x61, 0x6d, 0x6f,
+	0x75, 0x6e, 0x74, 0x22, 0x21, 0x0a, 0x0b, 0x48, 0x61, 0x73, 0x68, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x68, 0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x04, 0x68, 0x61, 0x73, 0x68, 0x22, 0x27, 0x0a, 0x0d, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x6e, 0x75, 0x6d, 0x62, 0x65,
+	0x72, 0x18, 0x01, 0x20, 0x03, 0x28, 0x03, 0x52, 0x06, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x22,
+	0x6d, 0x0a, 0x08, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2a, 0x0a, 0x04, 0x6f,
+	0x62, 0x6a, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x76, 0x31, 0x2e, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e,
+	0x74, 0x52, 0x04, 0x6f, 0x62, 0x6a, 0x73, 0x1a, 0x35, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x6f,
+	0x6e, 0x65, 0x6e, 0x74, 0x12, 0x28, 0x0a, 0x04, 0x73, 0x70, 0x65, 0x63, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x04, 0x73, 0x70, 0x65, 0x63, 0x22, 0x54,
+	0x0a, 0x06, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x1e, 0x0a, 0x0a, 0x64, 0x69, 0x66, 0x66,
+	0x69, 0x63, 0x75, 0x6c, 0x74, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x64, 0x69,
+	0x66, 0x66, 0x69, 0x63, 0x75, 0x6c, 0x74, 0x79, 0x12, 0x12, 0x0a, 0x04, 0x68, 0x61, 0x73, 0x68,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x68, 0x61, 0x73, 0x68, 0x12, 0x16, 0x0a, 0x06,
+	0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x6e, 0x75,
+	0x6d, 0x62, 0x65, 0x72, 0x32, 0xcc, 0x01, 0x0a, 0x02, 0x56, 0x31, 0x12, 0x32, 0x0a, 0x11, 0x47,
+	0x65, 0x74, 0x52, 0x65, 0x63, 0x65, 0x69, 0x70, 0x74, 0x73, 0x42, 0x79, 0x48, 0x61, 0x73, 0x68,
+	0x12, 0x0f, 0x2e, 0x76, 0x31, 0x2e, 0x48, 0x61, 0x73, 0x68, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x1a, 0x0c, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x30, 0x0a, 0x0f, 0x47, 0x65, 0x74, 0x42, 0x6f, 0x64, 0x69, 0x65, 0x73, 0x42, 0x79, 0x48, 0x61,
+	0x73, 0x68, 0x12, 0x0f, 0x2e, 0x76, 0x31, 0x2e, 0x48, 0x61, 0x73, 0x68, 0x52, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x1a, 0x0c, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x31, 0x0a, 0x0a, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x73, 0x12,
+	0x15, 0x2e, 0x76, 0x31, 0x2e, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x73, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0c, 0x2e, 0x76, 0x31, 0x2e, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2d, 0x0a, 0x05, 0x57, 0x61, 0x74, 0x63, 0x68, 0x12, 0x16, 0x2e,
 	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e,
-	0x41, 0x6e, 0x79, 0x52, 0x04, 0x73, 0x70, 0x65, 0x63, 0x32, 0x2f, 0x0a, 0x02, 0x56, 0x31, 0x12,
-	0x29, 0x0a, 0x0b, 0x57, 0x61, 0x74, 0x63, 0x68, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x12, 0x09,
-	0x2e, 0x76, 0x31, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x0d, 0x2e, 0x76, 0x31, 0x2e, 0x43,
-	0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x30, 0x01, 0x42, 0x12, 0x5a, 0x10, 0x2f, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x32, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x0a, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x74, 0x61, 0x74, 0x75,
+	0x73, 0x30, 0x01, 0x42, 0x12, 0x5a, 0x10, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c,
+	0x32, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -145,21 +414,33 @@ func file_protocol2_proto_v1_proto_rawDescGZIP() []byte {
 	return file_protocol2_proto_v1_proto_rawDescData
 }
 
-var file_protocol2_proto_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_protocol2_proto_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_protocol2_proto_v1_proto_goTypes = []interface{}{
-	(*Empty)(nil),     // 0: v1.Empty
-	(*Component)(nil), // 1: v1.Component
-	(*any.Any)(nil),   // 2: google.protobuf.Any
+	(*GetHeadersRequest)(nil),  // 0: v1.GetHeadersRequest
+	(*HashRequest)(nil),        // 1: v1.HashRequest
+	(*NumberRequest)(nil),      // 2: v1.NumberRequest
+	(*Response)(nil),           // 3: v1.Response
+	(*Status)(nil),             // 4: v1.Status
+	(*Response_Component)(nil), // 5: v1.Response.Component
+	(*any.Any)(nil),            // 6: google.protobuf.Any
+	(*empty.Empty)(nil),        // 7: google.protobuf.Empty
 }
 var file_protocol2_proto_v1_proto_depIdxs = []int32{
-	2, // 0: v1.Component.spec:type_name -> google.protobuf.Any
-	0, // 1: v1.V1.WatchBlocks:input_type -> v1.Empty
-	1, // 2: v1.V1.WatchBlocks:output_type -> v1.Component
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: v1.Response.objs:type_name -> v1.Response.Component
+	6, // 1: v1.Response.Component.spec:type_name -> google.protobuf.Any
+	1, // 2: v1.V1.GetReceiptsByHash:input_type -> v1.HashRequest
+	1, // 3: v1.V1.GetBodiesByHash:input_type -> v1.HashRequest
+	0, // 4: v1.V1.GetHeaders:input_type -> v1.GetHeadersRequest
+	7, // 5: v1.V1.Watch:input_type -> google.protobuf.Empty
+	3, // 6: v1.V1.GetReceiptsByHash:output_type -> v1.Response
+	3, // 7: v1.V1.GetBodiesByHash:output_type -> v1.Response
+	3, // 8: v1.V1.GetHeaders:output_type -> v1.Response
+	4, // 9: v1.V1.Watch:output_type -> v1.Status
+	6, // [6:10] is the sub-list for method output_type
+	2, // [2:6] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_protocol2_proto_v1_proto_init() }
@@ -169,7 +450,7 @@ func file_protocol2_proto_v1_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_protocol2_proto_v1_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Empty); i {
+			switch v := v.(*GetHeadersRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -181,7 +462,55 @@ func file_protocol2_proto_v1_proto_init() {
 			}
 		}
 		file_protocol2_proto_v1_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Component); i {
+			switch v := v.(*HashRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protocol2_proto_v1_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*NumberRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protocol2_proto_v1_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Response); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protocol2_proto_v1_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Status); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protocol2_proto_v1_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Response_Component); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -199,7 +528,7 @@ func file_protocol2_proto_v1_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_protocol2_proto_v1_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -225,7 +554,10 @@ const _ = grpc.SupportPackageIsVersion6
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type V1Client interface {
-	WatchBlocks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (V1_WatchBlocksClient, error)
+	GetReceiptsByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error)
+	GetBodiesByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error)
+	GetHeaders(ctx context.Context, in *GetHeadersRequest, opts ...grpc.CallOption) (*Response, error)
+	Watch(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (V1_WatchClient, error)
 }
 
 type v1Client struct {
@@ -236,12 +568,39 @@ func NewV1Client(cc grpc.ClientConnInterface) V1Client {
 	return &v1Client{cc}
 }
 
-func (c *v1Client) WatchBlocks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (V1_WatchBlocksClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_V1_serviceDesc.Streams[0], "/v1.V1/WatchBlocks", opts...)
+func (c *v1Client) GetReceiptsByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/v1.V1/GetReceiptsByHash", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &v1WatchBlocksClient{stream}
+	return out, nil
+}
+
+func (c *v1Client) GetBodiesByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/v1.V1/GetBodiesByHash", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v1Client) GetHeaders(ctx context.Context, in *GetHeadersRequest, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/v1.V1/GetHeaders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v1Client) Watch(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (V1_WatchClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_V1_serviceDesc.Streams[0], "/v1.V1/Watch", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &v1WatchClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -251,17 +610,17 @@ func (c *v1Client) WatchBlocks(ctx context.Context, in *Empty, opts ...grpc.Call
 	return x, nil
 }
 
-type V1_WatchBlocksClient interface {
-	Recv() (*Component, error)
+type V1_WatchClient interface {
+	Recv() (*Status, error)
 	grpc.ClientStream
 }
 
-type v1WatchBlocksClient struct {
+type v1WatchClient struct {
 	grpc.ClientStream
 }
 
-func (x *v1WatchBlocksClient) Recv() (*Component, error) {
-	m := new(Component)
+func (x *v1WatchClient) Recv() (*Status, error) {
+	m := new(Status)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -270,50 +629,129 @@ func (x *v1WatchBlocksClient) Recv() (*Component, error) {
 
 // V1Server is the server API for V1 service.
 type V1Server interface {
-	WatchBlocks(*Empty, V1_WatchBlocksServer) error
+	GetReceiptsByHash(context.Context, *HashRequest) (*Response, error)
+	GetBodiesByHash(context.Context, *HashRequest) (*Response, error)
+	GetHeaders(context.Context, *GetHeadersRequest) (*Response, error)
+	Watch(*empty.Empty, V1_WatchServer) error
 }
 
 // UnimplementedV1Server can be embedded to have forward compatible implementations.
 type UnimplementedV1Server struct {
 }
 
-func (*UnimplementedV1Server) WatchBlocks(*Empty, V1_WatchBlocksServer) error {
-	return status.Errorf(codes.Unimplemented, "method WatchBlocks not implemented")
+func (*UnimplementedV1Server) GetReceiptsByHash(context.Context, *HashRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReceiptsByHash not implemented")
+}
+func (*UnimplementedV1Server) GetBodiesByHash(context.Context, *HashRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBodiesByHash not implemented")
+}
+func (*UnimplementedV1Server) GetHeaders(context.Context, *GetHeadersRequest) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHeaders not implemented")
+}
+func (*UnimplementedV1Server) Watch(*empty.Empty, V1_WatchServer) error {
+	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
 }
 
 func RegisterV1Server(s *grpc.Server, srv V1Server) {
 	s.RegisterService(&_V1_serviceDesc, srv)
 }
 
-func _V1_WatchBlocks_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Empty)
+func _V1_GetReceiptsByHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HashRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V1Server).GetReceiptsByHash(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.V1/GetReceiptsByHash",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V1Server).GetReceiptsByHash(ctx, req.(*HashRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V1_GetBodiesByHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HashRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V1Server).GetBodiesByHash(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.V1/GetBodiesByHash",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V1Server).GetBodiesByHash(ctx, req.(*HashRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V1_GetHeaders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHeadersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V1Server).GetHeaders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.V1/GetHeaders",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V1Server).GetHeaders(ctx, req.(*GetHeadersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V1_Watch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(empty.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(V1Server).WatchBlocks(m, &v1WatchBlocksServer{stream})
+	return srv.(V1Server).Watch(m, &v1WatchServer{stream})
 }
 
-type V1_WatchBlocksServer interface {
-	Send(*Component) error
+type V1_WatchServer interface {
+	Send(*Status) error
 	grpc.ServerStream
 }
 
-type v1WatchBlocksServer struct {
+type v1WatchServer struct {
 	grpc.ServerStream
 }
 
-func (x *v1WatchBlocksServer) Send(m *Component) error {
+func (x *v1WatchServer) Send(m *Status) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 var _V1_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.V1",
 	HandlerType: (*V1Server)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetReceiptsByHash",
+			Handler:    _V1_GetReceiptsByHash_Handler,
+		},
+		{
+			MethodName: "GetBodiesByHash",
+			Handler:    _V1_GetBodiesByHash_Handler,
+		},
+		{
+			MethodName: "GetHeaders",
+			Handler:    _V1_GetHeaders_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "WatchBlocks",
-			Handler:       _V1_WatchBlocks_Handler,
+			StreamName:    "Watch",
+			Handler:       _V1_Watch_Handler,
 			ServerStreams: true,
 		},
 	},

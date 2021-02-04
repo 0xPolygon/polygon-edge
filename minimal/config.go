@@ -1,44 +1,42 @@
 package minimal
 
 import (
-	"github.com/0xPolygon/minimal/api"
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"net"
+
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/minimal/keystore"
-	"github.com/0xPolygon/minimal/network/discovery"
-	"github.com/0xPolygon/minimal/protocol"
 )
 
 // Config is used to parametrize the minimal client
 type Config struct {
-	DiscoveryBackends map[string]discovery.Factory
-	DiscoveryEntries  map[string]*Entry
+	//DiscoveryBackends map[string]discovery.Factory
+	//DiscoveryEntries  map[string]*Entry
 
-	ProtocolBackends map[string]protocol.Factory
-	ProtocolEntries  map[string]*Entry
+	//ProtocolBackends map[string]protocol.Factory
+	//ProtocolEntries  map[string]*Entry
 
-	BlockchainBackends map[string]storage.Factory
-	BlockchainEntries  map[string]*Entry
+	//BlockchainBackends map[string]storage.Factory
+	//BlockchainEntries  map[string]*Entry
 
-	ConsensusBackends map[string]consensus.Factory
-	ConsensusEntry    *Entry
+	// ConsensusBackends map[string]consensus.Factory
+	ConsensusConfig map[string]interface{}
 
-	APIBackends map[string]api.Factory
-	APIEntries  map[string]*Entry
+	//APIBackends map[string]api.Factory
+	//APIEntries  map[string]*Entry
 
-	Keystore keystore.Keystore
-	Chain    *chain.Chain
+	// Keystore keystore.Keystore
+	Chain *chain.Chain
 
-	BindAddr string
-	BindPort int
+	GRPCAddr   *net.TCPAddr
+	LibP2PAddr *net.TCPAddr
 
-	RPCAddr string
-	RPCPort int
+	DataDir string
+	Seal    bool
+}
 
-	DataDir     string
-	ServiceName string
-	Seal        bool
-
-	StateStorage string
+func DefaultConfig() *Config {
+	return &Config{
+		GRPCAddr:        &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9632},
+		LibP2PAddr:      &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1478},
+		ConsensusConfig: map[string]interface{}{},
+	}
 }

@@ -7,6 +7,7 @@ import (
 )
 
 type Subscription interface {
+	GetEventCh() chan *Event
 	GetEvent() *Event
 	Close()
 }
@@ -35,6 +36,15 @@ type subscription struct {
 	updateCh chan struct{}
 	closeCh  chan struct{}
 	elem     *eventElem
+}
+
+func (s *subscription) GetEventCh() chan *Event {
+	eventCh := make(chan *Event)
+	go func() {
+		evnt := s.GetEvent()
+		eventCh <- evnt
+	}()
+	return eventCh
 }
 
 func (s *subscription) GetEvent() *Event {
@@ -117,6 +127,7 @@ func (e *eventStream) subscribe() *subscription {
 	s := &subscription{
 		elem:     head,
 		updateCh: updateCh,
+		closeCh:  make(chan struct{}),
 	}
 	return s
 }

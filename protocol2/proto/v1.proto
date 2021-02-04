@@ -4,16 +4,41 @@ package v1;
 
 option go_package = "/protocol2/proto";
 
+import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 
 service V1 {
-    rpc WatchBlocks(Empty) returns (stream Component);
+    rpc GetReceiptsByHash(HashRequest) returns (Response);
+    rpc GetBodiesByHash(HashRequest) returns (Response);
+    rpc GetHeaders(GetHeadersRequest) returns (Response);
+    rpc Watch(google.protobuf.Empty) returns (stream Status);
 }
 
-message Empty {
-
+message GetHeadersRequest {
+    int64 number = 1;
+    string hash = 2;
+    int64 skip = 3;
+    int64 amount = 4;
 }
 
-message Component {
-    google.protobuf.Any spec = 3;
+message HashRequest  {
+    repeated string hash = 1;
+}
+
+message NumberRequest {
+    repeated int64 number = 1;
+}
+
+message Response {
+    repeated Component objs = 1;
+
+    message Component {
+        google.protobuf.Any spec = 1;
+    }
+}
+
+message Status {
+    string difficulty = 1;
+    string hash = 2;
+    int64 number = 3;
 }

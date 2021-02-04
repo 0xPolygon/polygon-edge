@@ -12,7 +12,6 @@ require (
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/ferranbt/go-kademlia-bucket v0.2.1-0.20190612080044-d5ef9cf1cf01
 	github.com/ferranbt/periodic-dispatcher v0.0.0-20181108165813-15a0c0298473
-	github.com/gobuffalo/packr v1.25.0
 	github.com/golang/protobuf v1.4.3
 	github.com/golang/snappy v0.0.1
 	github.com/google/gops v0.3.6
@@ -29,6 +28,7 @@ require (
 	github.com/libp2p/go-libp2p-core v0.5.1
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-noise v0.1.1
+	github.com/mitchellh/cli v1.0.0
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/multiformats/go-multiaddr v0.2.1

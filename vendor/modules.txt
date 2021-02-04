@@ -6,8 +6,12 @@ github.com/aristanetworks/goarista/monotime
 ## explicit
 github.com/armon/go-metrics
 github.com/armon/go-metrics/prometheus
+# github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
+github.com/armon/go-radix
 # github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
 github.com/beorn7/perks/quantile
+# github.com/bgentry/speakeasy v0.1.0
+github.com/bgentry/speakeasy
 # github.com/boltdb/bolt v1.3.1
 ## explicit
 github.com/boltdb/bolt
@@ -67,15 +71,6 @@ github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
-# github.com/gobuffalo/envy v1.7.0
-github.com/gobuffalo/envy
-# github.com/gobuffalo/packd v0.0.0-20190315124812-a385830c7fc0
-github.com/gobuffalo/packd
-# github.com/gobuffalo/packr v1.25.0
-## explicit
-github.com/gobuffalo/packr
-# github.com/gobuffalo/syncx v0.0.0-20190224160051-33c29581e754
-github.com/gobuffalo/syncx
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
@@ -85,6 +80,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/golang/snappy v0.0.1
 ## explicit
@@ -168,8 +164,6 @@ github.com/jbenet/go-temp-err-catcher
 github.com/jbenet/goprocess
 github.com/jbenet/goprocess/context
 github.com/jbenet/goprocess/periodic
-# github.com/joho/godotenv v1.3.0
-github.com/joho/godotenv
 # github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 github.com/kardianos/osext
 # github.com/klauspost/compress v1.4.0
@@ -304,6 +298,9 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v0.1.1
 github.com/minio/sha256-simd
+# github.com/mitchellh/cli v1.0.0
+## explicit
+github.com/mitchellh/cli
 # github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 ## explicit
 github.com/mitchellh/colorstring
@@ -342,6 +339,11 @@ github.com/opentracing/opentracing-go/log
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
+# github.com/posener/complete v1.1.1
+github.com/posener/complete
+github.com/posener/complete/cmd
+github.com/posener/complete/cmd/install
+github.com/posener/complete/match
 # github.com/prometheus/client_golang v0.9.2
 ## explicit
 github.com/prometheus/client_golang/prometheus
@@ -358,10 +360,6 @@ github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/util
 github.com/prometheus/procfs/nfs
 github.com/prometheus/procfs/xfs
-# github.com/rogpeppe/go-internal v1.3.0
-github.com/rogpeppe/go-internal/modfile
-github.com/rogpeppe/go-internal/module
-github.com/rogpeppe/go-internal/semver
 # github.com/ryanuber/columnize v2.1.0+incompatible
 ## explicit
 github.com/ryanuber/columnize
@@ -567,6 +565,7 @@ google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
+google.golang.org/protobuf/types/known/emptypb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951
 ## explicit

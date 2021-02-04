@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal"
 
-	consensusClique "github.com/0xPolygon/minimal/consensus/clique"
 	consensusEthash "github.com/0xPolygon/minimal/consensus/ethash"
 	consensusPOW "github.com/0xPolygon/minimal/consensus/pow"
 
@@ -37,7 +36,6 @@ var blockchainBackends = map[string]storage.Factory{
 }
 
 var consensusBackends = map[string]consensus.Factory{
-	"clique": consensusClique.Factory,
 	"ethash": consensusEthash.Factory,
 	"pow":    consensusPOW.Factory,
 	// "ibft":   consensusIBFT.Factory,

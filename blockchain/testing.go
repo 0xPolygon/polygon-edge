@@ -7,7 +7,6 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/state"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 
@@ -18,7 +17,7 @@ import (
 type fakeConsensus struct {
 }
 
-func (f *fakeConsensus) VerifyHeader(chain consensus.ChainReader, parent, header *types.Header, uncle, seal bool) error {
+func (f *fakeConsensus) VerifyHeader(parent, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
@@ -26,11 +25,11 @@ func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
 	return types.Address{}, nil
 }
 
-func (f *fakeConsensus) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (f *fakeConsensus) Prepare(header *types.Header) error {
 	return nil
 }
 
-func (f *fakeConsensus) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
+func (f *fakeConsensus) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	return nil, nil
 }
 

@@ -193,9 +193,11 @@ func (s *Server) SetPeerStore(p PeerStore) {
 func (s *Server) SetConsensus(c consensus.Consensus) {
 	s.consensus = c
 
-	if handler, ok := s.consensus.(consensus.Handler); ok {
-		handler.SetBroadcaster(s)
-	}
+	/*
+		if handler, ok := s.consensus.(consensus.Handler); ok {
+			handler.SetBroadcaster(s)
+		}
+	*/
 }
 
 // GetPeers returns a copy of list of peers

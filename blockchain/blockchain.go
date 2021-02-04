@@ -444,7 +444,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if blocks[i].ParentHash() != parent.Hash {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(nil, parent, blocks[i].Header, false, true); err != nil {
+		if err := b.consensus.VerifyHeader(parent, blocks[i].Header, false, true); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
@@ -597,7 +597,7 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 			return errDanglingUncle
 		}
 
-		if err := b.consensus.VerifyHeader(nil, ancestors[uncle.ParentHash], uncle, true, false); err != nil {
+		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle, true, false); err != nil {
 			return err
 		}
 	}
