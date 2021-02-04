@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -224,7 +225,13 @@ func (e *Eth) GetBlockHeader(number string) (*types.Header, error) {
 
 	blockchainRef := e.d.minimal.Blockchain
 
-	switch number {
+	blockRef := "latest" // default value
+
+	if number != "" {
+		blockRef = number
+	}
+
+	switch blockRef {
 	case "latest":
 		header, ok := blockchainRef.Header()
 		if !ok {
@@ -323,6 +330,11 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 		}
 	}
 
+	if highEnd > types.GasCap.Uint64() {
+		// The high end is greater than the environment gas cap
+		highEnd = types.GasCap.Uint64()
+	}
+
 	cap = highEnd
 
 	// Run the transaction with the estimated gas
@@ -389,6 +401,53 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 	}
 
 	return hex.EncodeUint64(highEnd), nil
+}
+
+// GetLogs returns an array of logs matching the filter options
+func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
+
+	var referenceFrom uint64
+	var referenceTo uint64
+
+	// Fetch the requested from header
+	header, err := e.GetBlockHeader(strconv.FormatUint((uint64)(filterOptions.fromBlock), 10))
+	if err != nil {
+		return nil, err
+	}
+
+	referenceFrom = header.Number
+
+	// Fetch the requested to header
+	header, err = e.GetBlockHeader(strconv.FormatUint((uint64)(filterOptions.toBlock), 10))
+	if err != nil {
+		return nil, err
+	}
+
+	referenceTo = header.Number
+
+	var result []*types.Log
+
+	// TODO Refactor this to use blooms
+
+	for i := referenceFrom; i < referenceTo; i++ {
+
+		body, err := e.d.minimal.Blockchain.GetHeaderByNumber(i)
+		if err {
+			return nil, fmt.Errorf("Error fetching header for block %d", i)
+		}
+
+		receipts := e.d.minimal.Blockchain.GetReceiptsByHash(body.ReceiptsRoot)
+
+		for _, receipt := range receipts {
+			for _, log := range receipt.Logs {
+				if filterOptions.Match(log) {
+					result = append(result, log)
+				}
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // GetTransactionCount returns account nonce
@@ -460,10 +519,3 @@ func (e *Eth) UninstallFilter(id string) {
 	// TODO: Not sure about the return field here but it needs one
 	e.d.filterManager.Uninstall(id)
 }
-
-/*
-TODO
-func (e *Eth) GetLogs() {
-
-}
-*/

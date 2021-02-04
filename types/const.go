@@ -10,4 +10,6 @@ var (
 	Big32  = big.NewInt(32)
 	Big256 = big.NewInt(256)
 	Big257 = big.NewInt(257)
+
+	GasCap = big.NewInt(5000000)
 )
