@@ -98,9 +98,12 @@ func readConfig(args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	var configFile string
-	flags.StringVar(&cliConfig.LogLevel, "log-level", "INFO", "")
+	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
-	flags.StringVar(&configFile, "", "", "")
+	flags.StringVar(&configFile, "config", "", "")
+	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
+	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
+	flags.StringVar(&cliConfig.LibP2PAddr, "libp2p", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

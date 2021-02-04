@@ -20,6 +20,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
+		P2PAddr: AddrInfoToString(s.s.AddrInfo()),
 	}
 	return status, nil
 }

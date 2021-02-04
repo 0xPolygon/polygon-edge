@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"strings"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -51,6 +52,21 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf.Chain = chain
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
+
+	if c.LibP2PAddr != "" {
+		addr, err := net.ResolveTCPAddr("tcp", c.LibP2PAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse libP2P addr '%s': %v", c.LibP2PAddr, err)
+		}
+		conf.LibP2PAddr = addr
+	}
+	if c.GRPCAddr != "" {
+		addr, err := net.ResolveTCPAddr("tcp", c.GRPCAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse grpc addr '%s': %v", c.GRPCAddr, err)
+		}
+		conf.GRPCAddr = addr
+	}
 	return conf, nil
 }
 
@@ -71,6 +87,12 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.LogLevel != "" {
 		c.LogLevel = c1.LogLevel
+	}
+	if c1.GRPCAddr != "" {
+		c.GRPCAddr = c1.GRPCAddr
+	}
+	if c1.LibP2PAddr != "" {
+		c.LibP2PAddr = c1.LibP2PAddr
 	}
 	if err := mergo.Merge(&c.Consensus, c1.Consensus, mergo.WithOverride); err != nil {
 		return err

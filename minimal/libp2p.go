@@ -43,8 +43,16 @@ func (s *Server) setupLibP2P() error {
 	s.libp2pServer = libp2pgrpc.NewGRPCProtocol(context.Background(), host)
 	s.host = host
 
-	s.logger.Info("LibP2P server running", "addr", addr.String())
+	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 	return nil
+}
+
+// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
+func AddrInfoToString(addr *peer.AddrInfo) string {
+	if len(addr.Addrs) != 1 {
+		panic("Not supported")
+	}
+	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
 }
 
 func readLibp2pKey(path string) (crypto.PrivKey, error) {
