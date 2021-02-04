@@ -146,7 +146,7 @@ func (s *Slot) deliverHeaders(q *Queue3, req *Request, p *fastrlp.Parser, v *fas
 	}
 
 	// decode the first header to check if it matches with the beacon
-	if err := s.headers[0].UnmarshalRLP(p, elems[0]); err != nil {
+	if err := s.headers[0].UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 	// validate the beacon hash
@@ -161,7 +161,7 @@ func (s *Slot) deliverHeaders(q *Queue3, req *Request, p *fastrlp.Parser, v *fas
 	// Unmarshal the rest of the headers
 	parent := s.headers[0]
 	for i := 1; i < num; i++ {
-		if err := s.headers[i].UnmarshalRLP(p, elems[i]); err != nil {
+		if err := s.headers[i].UnmarshalRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
 		// validate the sequential numbers
@@ -351,7 +351,7 @@ func (s *Slot) deliverBodies(req *Request, p *fastrlp.Parser, v *fastrlp.Value) 
 
 			for _, elem := range txns {
 				txn := s.getTxn()
-				if err := txn.UnmarshalRLP(p, elem); err != nil {
+				if err := txn.UnmarshalRLPFrom(p, elem); err != nil {
 					return err
 				}
 			}
@@ -385,7 +385,7 @@ func (s *Slot) deliverBodies(req *Request, p *fastrlp.Parser, v *fastrlp.Value) 
 
 			for _, elem := range uncles {
 				uncle := s.getUncle()
-				if err := uncle.UnmarshalRLP(p, elem); err != nil {
+				if err := uncle.UnmarshalRLPFrom(p, elem); err != nil {
 					return err
 				}
 			}
@@ -462,7 +462,7 @@ func (s *Slot) deliverReceipts(req *Request, p *fastrlp.Parser, v *fastrlp.Value
 			}
 			for _, elem := range receipts {
 				receipt := s.getReceipt()
-				if err := receipt.UnmarshalRLP(elem); err != nil {
+				if err := receipt.UnmarshalRLPFrom(p, elem); err != nil {
 					return err
 				}
 			}

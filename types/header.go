@@ -67,7 +67,7 @@ func (h *Header) ComputeHash() *Header {
 	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
 
-	v := h.MarshalWith(ar)
+	v := h.MarshalRLPWith(ar)
 	hash.WriteRlp(h.Hash[:0], v)
 
 	marshalArenaPool.Put(ar)
@@ -89,150 +89,10 @@ type Body struct {
 	Uncles       []*Header
 }
 
-func (b *Body) UnmarshalRLP(p *fastrlp.Parser, v *fastrlp.Value) error {
-	tuple, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-	if len(tuple) != 2 {
-		return fmt.Errorf("Two elements expected")
-	}
-
-	// transactions
-	txns, err := tuple[0].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, txn := range txns {
-		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalRLP(p, txn); err != nil {
-			return err
-		}
-		b.Transactions = append(b.Transactions, bTxn)
-	}
-
-	// uncles
-	uncles, err := tuple[1].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, uncle := range uncles {
-		bUncle := &Header{}
-		if err := bUncle.UnmarshalRLP(p, uncle); err != nil {
-			return err
-		}
-		b.Uncles = append(b.Uncles, bUncle)
-	}
-
-	return nil
-}
-
-func (b *Body) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
-	vv := ar.NewArray()
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalWith(ar))
-		}
-		vv.Set(v0)
-	}
-
-	if len(b.Uncles) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v1 := ar.NewArray()
-		for _, uncle := range b.Uncles {
-			v1.Set(uncle.MarshalWith(ar))
-		}
-		vv.Set(v1)
-	}
-
-	return vv
-}
-
 type Block struct {
 	Header       *Header
 	Transactions []*Transaction
 	Uncles       []*Header
-}
-
-func (b *Block) UnmarshalRLP(buf []byte) error {
-	p := &fastrlp.Parser{}
-	v, err := p.Parse(buf)
-	if err != nil {
-		return err
-	}
-
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-
-	// header
-	b.Header = &Header{}
-	if err := b.Header.UnmarshalRLP(p, elems[0]); err != nil {
-		return err
-	}
-
-	// transactions
-	txns, err := elems[1].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, txn := range txns {
-		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalRLP(p, txn); err != nil {
-			return err
-		}
-		b.Transactions = append(b.Transactions, bTxn)
-	}
-
-	// uncles
-	uncles, err := elems[2].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, uncle := range uncles {
-		bUncle := &Header{}
-		if err := bUncle.UnmarshalRLP(p, uncle); err != nil {
-			return err
-		}
-		b.Uncles = append(b.Uncles, bUncle)
-	}
-
-	return nil
-}
-
-func (b *Block) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
-	// merge with the other
-
-	vv := ar.NewArray()
-	vv.Set(b.Header.MarshalWith(ar))
-
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalWith(ar))
-		}
-		vv.Set(v0)
-	}
-
-	if len(b.Uncles) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v1 := ar.NewArray()
-		for _, uncle := range b.Uncles {
-			v1.Set(uncle.MarshalWith(ar))
-		}
-		vv.Set(v1)
-	}
-
-	return vv
-
 }
 
 func (b *Block) Hash() Hash {

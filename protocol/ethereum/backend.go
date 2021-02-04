@@ -463,7 +463,7 @@ func (b *Backend) broadcastBlock(block *types.Block) {
 	// send block
 	v0 := ar.NewArray()
 	v0.Set(ar.NewBigInt(blockDiff))
-	v0.Set(block.MarshalWith(ar))
+	v0.Set(block.MarshalRLPWith(ar))
 
 	for _, i := range b.peers {
 		if err := i.writeRLP(NewBlockMsg, v0); err != nil {

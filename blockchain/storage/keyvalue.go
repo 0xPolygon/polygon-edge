@@ -187,7 +187,7 @@ func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
 // WriteHeader writes the header
 func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
 	ar := &fastrlp.Arena{}
-	v := h.MarshalWith(ar)
+	v := h.MarshalRLPWith(ar)
 
 	return s.write2(HEADER, h.Hash.Bytes(), v)
 }
@@ -201,7 +201,7 @@ func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, bool) {
 	}
 
 	header2 := &types.Header{}
-	if err := header2.UnmarshalRLP(p, v); err != nil {
+	if err := header2.UnmarshalRLPFrom(p, v); err != nil {
 		panic(err)
 	}
 
@@ -233,7 +233,7 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 // WriteBody writes the body
 func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
 	ar := &fastrlp.Arena{}
-	v := body.MarshalWith(ar)
+	v := body.MarshalRLPWith(ar)
 
 	return s.write2(BODY, hash.Bytes(), v)
 }
@@ -247,7 +247,7 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, bool) {
 	if v == nil {
 		return nil, false
 	}
-	if err := body2.UnmarshalRLP(parser, v); err != nil {
+	if err := body2.UnmarshalRLPFrom(parser, v); err != nil {
 		panic(err)
 	}
 
@@ -282,7 +282,7 @@ func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Recei
 	} else {
 		vr = ar.NewArray()
 		for _, receipt := range receipts {
-			vr.Set(receipt.MarshalWith(ar))
+			vr.Set(receipt.MarshalRLPWith(ar))
 		}
 	}
 
@@ -304,7 +304,7 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 	}
 	for _, elem := range elems {
 		receipt := &types.Receipt{}
-		if err := receipt.UnmarshalRLP(elem); err != nil {
+		if err := receipt.UnmarshalRLPFrom(parser, elem); err != nil {
 			panic(err)
 		}
 		receipts2 = append(receipts2, receipt)

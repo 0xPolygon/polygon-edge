@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/umbracle/fastrlp"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -54,16 +53,9 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	tx := &types.Transaction{}
-	p := &fastrlp.Parser{}
-
-	v, err := p.Parse(raw.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	err = tx.UnmarshalRLP(p, v)
-	if err != nil {
+	if err := tx.UnmarshalRLP(raw.Bytes()); err != nil {
 		return nil, err
 	}
 

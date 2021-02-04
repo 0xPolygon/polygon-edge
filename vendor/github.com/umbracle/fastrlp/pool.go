@@ -4,6 +4,9 @@ import (
 	"sync"
 )
 
+// DefaultParserPool is a default ParserPool
+var DefaultParserPool ParserPool
+
 // ParserPool may be used for pooling Parsers for similarly typed RLPs.
 type ParserPool struct {
 	pool sync.Pool
@@ -22,6 +25,9 @@ func (pp *ParserPool) Get() *Parser {
 func (pp *ParserPool) Put(p *Parser) {
 	pp.pool.Put(p)
 }
+
+// DefaultArenaPool is a default ArenaPool
+var DefaultArenaPool ArenaPool
 
 // ArenaPool may be used for pooling Arenas for similarly typed RLPs.
 type ArenaPool struct {
