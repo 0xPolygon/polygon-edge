@@ -269,7 +269,7 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 	var (
 		lowEnd  uint64 = standardGas
 		highEnd uint64
-		cap     uint64
+		gasCap  uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
@@ -296,13 +296,12 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 			return nil, err
 		}
 
-		if acc, ok := state.NewTxn(s, snap).GetAccount(transaction.From); ok {
-			accountBalance = acc.Balance
-		}
-
-		if err != nil {
+		acc, ok := state.NewTxn(s, snap).GetAccount(transaction.From)
+		if !ok {
 			return 0, err
 		}
+
+		accountBalance = acc.Balance
 
 		available := new(big.Int).Set(accountBalance)
 
@@ -327,7 +326,7 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 		highEnd = types.GasCap.Uint64()
 	}
 
-	cap = highEnd
+	gasCap = highEnd
 
 	// Run the transaction with the estimated gas
 	testTransaction := func(gas uint64) (bool, error) {
@@ -380,15 +379,15 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 	}
 
 	// Check the edge case if even the highest cap is not enough to complete the transaction
-	if highEnd == cap {
-		failed, err := testTransaction(cap)
+	if highEnd == gasCap {
+		failed, err := testTransaction(gasCap)
 
 		if err != nil {
 			return 0, err
 		}
 
 		if failed {
-			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
+			return 0, fmt.Errorf("gas required exceeds allowance (%d)", gasCap)
 		}
 	}
 
@@ -435,6 +434,12 @@ func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
 				if filterOptions.Match(log) {
 					result = append(result, log)
 				}
+				// Experimental solution
+				// if receipt.LogsBloom.IsLogInBloom(log) {
+				// 	if filterOptions.Match(log) {
+				// 		result = append(result, log)
+				// 	}
+				// }
 			}
 		}
 	}
