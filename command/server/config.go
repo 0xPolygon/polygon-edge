@@ -22,6 +22,7 @@ type Config struct {
 	Seal       bool                   `json:"seal"`
 	LogLevel   string                 `json:"log_level"`
 	Consensus  map[string]interface{} `json:"consensus"`
+	Join       string
 }
 
 type Telemetry struct {
@@ -58,6 +59,9 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse libP2P addr '%s': %v", c.LibP2PAddr, err)
 		}
+		if addr.IP == nil {
+			addr.IP = net.ParseIP("127.0.0.1")
+		}
 		conf.LibP2PAddr = addr
 	}
 	if c.GRPCAddr != "" {
@@ -93,6 +97,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.LibP2PAddr != "" {
 		c.LibP2PAddr = c1.LibP2PAddr
+	}
+	if c1.Join != "" {
+		c.Join = c1.Join
 	}
 	if err := mergo.Merge(&c.Consensus, c1.Consensus, mergo.WithOverride); err != nil {
 		return err

@@ -11,12 +11,12 @@ type systemService struct {
 	s *Server
 }
 
-func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto.Status, error) {
+func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto.ServerStatus, error) {
 	header, _ := s.s.blockchain.Header()
 
-	status := &proto.Status{
+	status := &proto.ServerStatus{
 		Network: int64(s.s.chain.Params.ChainID),
-		Current: &proto.Status_Block{
+		Current: &proto.ServerStatus_Block{
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
@@ -48,4 +48,20 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 
 	sub.Close()
 	return nil
+}
+
+func (s *systemService) PeersAdd(ctx context.Context, req *proto.PeersAddRequest) (*empty.Empty, error) {
+	err := s.s.Join(req.Id)
+	return &empty.Empty{}, err
+}
+
+func (s *systemService) PeersList(ctx context.Context, req *empty.Empty) (*proto.PeersListResponse, error) {
+	resp := &proto.PeersListResponse{
+		Peers: []*proto.Peer{},
+	}
+	ids := s.s.host.Peerstore().Peers()
+	for _, id := range ids {
+		resp.Peers = append(resp.Peers, &proto.Peer{Id: id.String()})
+	}
+	return resp, nil
 }

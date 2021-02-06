@@ -15,9 +15,11 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/protocol2"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/host"
 	ma "github.com/multiformats/go-multiaddr"
@@ -35,12 +37,6 @@ import (
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/sealer"
 )
-
-/*
-var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
-
-var ripemdFailedTxn = types.StringToHash("0xcf416c536ec1a19ed1fb89e4ec7ffb3cf73aa413b3aa9b77d60e4fd81a4296ba")
-*/
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
@@ -68,6 +64,9 @@ type Server struct {
 	host         host.Host
 	libp2pServer *libp2pgrpc.GRPCProtocol
 	addrs        []ma.Multiaddr
+
+	// syncer protocol
+	syncer *protocol2.Syncer
 }
 
 var dirPaths = []string{
@@ -94,31 +93,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
-	/*
-		// Only one blockchain backend is allowed
-		if len(config.BlockchainEntries) > 1 {
-			return nil, fmt.Errorf("Only one blockchain backend allowed")
-		}
-		// Only one discovery backend is allowed (for now)
-		if len(config.DiscoveryEntries) > 1 {
-			return nil, fmt.Errorf("Only one discovery mechanism is allowed")
-		}
-	*/
-
-	/*
-		// Build necessary paths
-		paths := []string{}
-		paths = addPath(paths, "blockchain", nil)
-		paths = addPath(paths, "consensus", nil)
-		paths = addPath(paths, "network", nil)
-		paths = addPath(paths, "trie", nil)
-
-		// Create paths
-		if err := setupDataDir(config.DataDir, paths); err != nil {
-			return nil, fmt.Errorf("failed to create data directories: %v", err)
-		}
-	*/
-
 	// Get the private key for the node
 	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
 	key, err := keystore.Get()
@@ -126,13 +100,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to read private key: %v", err)
 	}
 	m.key = key
-
-	/*
-		// setup telemetry
-		if err := m.startTelemetry(); err != nil {
-			return nil, err
-		}
-	*/
 
 	storage, err := leveldb.NewLevelDBStorage(filepath.Join(config.DataDir, "blockchain"), logger)
 	if err != nil {
@@ -144,76 +111,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err := m.setupConsensus(); err != nil {
 		return nil, err
 	}
-
-	/*
-		// Build storage backend
-		var storage storage.Storage
-		for name, entry := range config.BlockchainEntries {
-			storageFunc, ok := config.BlockchainBackends[name]
-			if !ok {
-				return nil, fmt.Errorf("storage '%s' not found", name)
-			}
-
-			entry.addPath(filepath.Join(config.DataDir, "blockchain"))
-			storage, err = storageFunc(entry.Config, logger)
-			if err != nil {
-				return nil, err
-			}
-		}
-	*/
-
-	/*
-		// Start server
-		serverConfig := network.DefaultConfig()
-		serverConfig.BindAddress = config.BindAddr
-		serverConfig.BindPort = config.BindPort
-		serverConfig.Bootnodes = config.Chain.Bootnodes
-		serverConfig.DataDir = filepath.Join(config.DataDir, "network")
-
-		transport := &rlpx.Rlpx{
-			Logger: logger.Named("Rlpx"),
-		}
-
-		m.server = network.NewServer("minimal", m.Key, serverConfig, logger.Named("server"), transport)
-
-		// set the peerstore
-		// peerstore := network.NewJSONPeerStore(serverConfig.DataDir)
-		peerstore, err := network.NewBoltDBPeerStore(serverConfig.DataDir)
-		if err != nil {
-			return nil, err
-		}
-
-		m.server.SetPeerStore(peerstore)
-	*/
-
-	/*
-		// Build discovery backend
-		for name, entry := range config.DiscoveryEntries {
-			backend, ok := config.DiscoveryBackends[name]
-			if !ok {
-				return nil, fmt.Errorf("discovery '%s' not found", name)
-			}
-
-			conf := entry.Config
-			conf["bootnodes"] = config.Chain.Bootnodes
-
-			// setup discovery factories
-			discoveryConfig := &discovery.BackendConfig{
-				Logger: logger.Named(name),
-				Key:    key,
-				Enode:  m.server.Enode,
-				Config: conf,
-			}
-
-			discovery, err := backend(context.Background(), discoveryConfig)
-			if err != nil {
-				return nil, err
-			}
-			m.server.Discovery = discovery
-		}
-	*/
-
-	// m.server.SetConsensus(m.consensus)
 
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
@@ -241,43 +138,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
 	m.Sealer.SetEnabled(m.config.Seal)
 
-	/*
-		// Start protocol backends
-		for name, entry := range config.ProtocolEntries {
-			backend, ok := config.ProtocolBackends[name]
-			if !ok {
-				return nil, fmt.Errorf("protocol '%s' not found", name)
-			}
-
-			proto, err := backend(context.Background(), logger.Named(name), m, entry.Config)
-			if err != nil {
-				return nil, err
-			}
-			proto.Run()
-			m.backends = append(m.backends, proto)
-		}
-
-		// Register backends
-		for _, i := range m.backends {
-			if err := m.server.RegisterProtocol(i.Protocols()); err != nil {
-				return nil, err
-			}
-		}
-
-		// Start api backends
-		for name, entry := range config.APIEntries {
-			backend, ok := config.APIBackends[name]
-			if !ok {
-				return nil, fmt.Errorf("api '%s' not found", name)
-			}
-			api, err := backend(hcLogger, m, entry.Config)
-			if err != nil {
-				return nil, err
-			}
-			m.apis = append(m.apis, api)
-		}
-	*/
-
 	// setup libp2p server
 	if err := m.setupLibP2P(); err != nil {
 		return nil, err
@@ -288,6 +148,15 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup syncer protocol
+	m.syncer = protocol2.NewSyncer()
+	m.syncer.Register(m.libp2pServer.GetGRPCServer())
+	m.syncer.Start()
+
+	// register the libp2p GRPC endpoints
+	proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{})
+
+	m.libp2pServer.Serve()
 	return m, nil
 }
 
@@ -337,21 +206,36 @@ func (s *Server) Chain() *chain.Chain {
 	return s.chain
 }
 
-func (s *Server) Close() {
+func (s *Server) Join(addr0 string) error {
+	s.logger.Info("[INFO]: Join peer", "addr", addr0)
 
+	// add peer to the libp2p peerstore
+	peerID, err := s.AddPeerFromMultiAddrString(addr0)
+	if err != nil {
+		return err
+	}
+
+	// perform handshake protocol
+	conn, err := s.dial(peerID)
+	if err != nil {
+		return err
+	}
+	clt := proto.NewHandshakeClient(conn)
+	if _, err := clt.Hello(context.Background(), &empty.Empty{}); err != nil {
+		return err
+	}
+
+	// send the connection to the syncer
+	go s.syncer.HandleUser(conn)
+
+	return nil
+}
+
+func (s *Server) Close() {
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
-
 	s.host.Close()
-	// TODO, close the backends
-
-	/*
-		// close the apis
-		for _, i := range s.apis {
-			i.Close()
-		}
-	*/
 }
 
 // Entry is a backend configuration entry

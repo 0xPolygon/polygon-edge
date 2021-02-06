@@ -11,7 +11,7 @@ import (
 )
 
 // Protocol is the GRPC-over-libp2p protocol.
-const xxx protocol.ID = "/grpc/0.0.1"
+const grpcProtocolID protocol.ID = "/grpc/0.0.1"
 
 // GRPCProtocol is the GRPC-transported protocol handler.
 type GRPCProtocol struct {
@@ -31,7 +31,7 @@ func NewGRPCProtocol(ctx context.Context, host host.Host) *GRPCProtocol {
 		grpcServer: grpcServer,
 		streamCh:   make(chan inet.Stream),
 	}
-	host.SetStreamHandler(xxx, grpcProtocol.HandleStream)
+	host.SetStreamHandler(grpcProtocolID, grpcProtocol.HandleStream)
 	// Serve will not return until Accept fails, when the ctx is canceled.
 	// go grpcServer.Serve(newGrpcListener(grpcProtocol))
 	return grpcProtocol

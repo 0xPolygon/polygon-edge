@@ -8,19 +8,19 @@ import "google/protobuf/empty.proto";
 
 service System {
     // GetInfo returns info about the client
-    rpc GetStatus(google.protobuf.Empty) returns (Status);
+    rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);
 
-    /*
     // PeersAdd adds a new peer
     rpc PeersAdd(PeersAddRequest) returns (google.protobuf.Empty);
 
     // PeersList returns the list of peers
     rpc PeersList(google.protobuf.Empty) returns (PeersListResponse);
 
+    /*
     // PeersInfo returns the info of a peer
     rpc PeersInfo(PeersInfoRequest) returns (PeersInfoResponse);
     */
-    
+
     // Subscribe subscribes to blockchain events
     rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
 }
@@ -28,14 +28,14 @@ service System {
 message BlockchainEvent {
     repeated Header added = 1;
     repeated Header removed = 2;
-    
+
     message Header {
         int64 number = 1;
         string hash = 2;
     }
 }
 
-message Status {
+message ServerStatus {
     int64 network = 1;
     
     string genesis = 2;
@@ -51,7 +51,7 @@ message Status {
 }
 
 message Peer {
-
+    string id = 1;
 }
 
 message PeersAddRequest {

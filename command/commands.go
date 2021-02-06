@@ -26,6 +26,16 @@ func Commands() map[string]cli.CommandFactory {
 				UI: ui,
 			}, nil
 		},
+		"dev": func() (cli.Command, error) {
+			return &DevCommand{
+				UI: ui,
+			}, nil
+		},
+		"genesis": func() (cli.Command, error) {
+			return &GenesisCommand{
+				UI: ui,
+			}, nil
+		},
 		"peers add": func() (cli.Command, error) {
 			return &PeersAdd{
 				Meta: meta,

@@ -8,10 +8,9 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 
 service V1 {
-    rpc GetReceiptsByHash(HashRequest) returns (Response);
-    rpc GetBodiesByHash(HashRequest) returns (Response);
+    rpc GetObjectsByHash(HashRequest) returns (Response);
     rpc GetHeaders(GetHeadersRequest) returns (Response);
-    rpc Watch(google.protobuf.Empty) returns (stream Status);
+    rpc Watch(google.protobuf.Empty) returns (stream V1Status);
 }
 
 message GetHeadersRequest {
@@ -23,6 +22,13 @@ message GetHeadersRequest {
 
 message HashRequest  {
     repeated string hash = 1;
+    Type type = 2;
+
+    enum Type {
+        UNKNOWN = 0;
+        BODIES = 1;
+        RECEIPTS = 2;
+    }
 }
 
 message NumberRequest {
@@ -37,7 +43,7 @@ message Response {
     }
 }
 
-message Status {
+message V1Status {
     string difficulty = 1;
     string hash = 2;
     int64 number = 3;

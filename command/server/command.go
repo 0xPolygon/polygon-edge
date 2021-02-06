@@ -54,6 +54,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if conf.Join != "" {
+		server.Join(conf.Join)
+	}
 	return c.handleSignals(server.Close)
 }
 
@@ -104,6 +107,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
 	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
 	flags.StringVar(&cliConfig.LibP2PAddr, "libp2p", "", "")
+	flags.StringVar(&cliConfig.Join, "join", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

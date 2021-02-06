@@ -135,7 +135,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	if err := b.addHeader(header); err != nil {
 		return err
 	}
-	if err := b.advanceHead(header); err != nil {
+	if _, err := b.advanceHead(header); err != nil {
 		return err
 	}
 
@@ -160,7 +160,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	if err := b.addHeader(header); err != nil {
 		return err
 	}
-	if err := b.advanceHead(header); err != nil {
+	if _, err := b.advanceHead(header); err != nil {
 		return err
 	}
 
@@ -195,7 +195,7 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return b.readDiff(hash)
 }
 
-func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
+func (b *Blockchain) writeCanonicalHeader(evnt *Event, h *types.Header) error {
 	td, ok := b.readDiff(h.ParentHash)
 	if !ok {
 		return fmt.Errorf("parent difficulty not found 2")
@@ -206,48 +206,48 @@ func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
 		return err
 	}
 
-	// notify the listeners
-	for _, ch := range b.listeners {
-		select {
-		case ch <- h:
-		default:
-		}
-	}
+	evnt.Type = EventHead
+	evnt.AddNewHeader(h)
+	evnt.SetDifficulty(diff)
 
 	return nil
 }
 
-func (b *Blockchain) advanceHead(h *types.Header) error {
+func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 	if err := b.db.WriteHeadHash(h.Hash); err != nil {
-		return err
+		return nil, err
 	}
 	if err := b.db.WriteHeadNumber(h.Number); err != nil {
-		return err
+		return nil, err
 	}
 	if err := b.db.WriteCanonicalHash(h.Number, h.Hash); err != nil {
-		return err
+		return nil, err
 	}
 
-	if h.ParentHash != types.StringToHash("") {
+	if h.ParentHash == types.StringToHash("") {
 		// Dont write difficulty for genesis
-		td, ok := b.readDiff(h.ParentHash)
-		if !ok {
-			return fmt.Errorf("parent difficulty not found 1")
-		}
-
-		if err := b.db.WriteDiff(h.Hash, big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))); err != nil {
-			return err
-		}
+		return nil, nil
 	}
 
-	for _, ch := range b.listeners {
-		select {
-		case ch <- h:
-		default:
-		}
+	td, ok := b.readDiff(h.ParentHash)
+	if !ok {
+		return nil, fmt.Errorf("parent difficulty not found 1")
 	}
 
-	return nil
+	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteDiff(h.Hash, diff); err != nil {
+		return nil, err
+	}
+	return diff, nil
+
+	/*
+		for _, ch := range b.listeners {
+			select {
+			case ch <- h:
+			default:
+			}
+		}
+	*/
 }
 
 // Header returns the header of the blockchain
@@ -641,8 +641,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	// Write the data
 	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
-		evnt.AddNewHeader(header)
-		return b.writeCanonicalHeader(header)
+		return b.writeCanonicalHeader(evnt, header)
 	}
 
 	if err := b.db.WriteHeader(header); err != nil {
@@ -672,6 +671,8 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	} else {
 		// new block has lower difficulty than us, create a new fork
 		evnt.AddOldHeader(header)
+		evnt.Type = EventFork
+
 		if err := b.writeFork(header); err != nil {
 			return err
 		}
@@ -689,10 +690,12 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	forks := b.db.ReadForks()
 
 	// TODO: We can remove this once subscription is stable
-	select {
-	case b.sidechainCh <- header:
-	default:
-	}
+	/*
+		select {
+		case b.sidechainCh <- header:
+		default:
+		}
+	*/
 
 	newForks := []types.Hash{}
 	for _, fork := range forks {
@@ -766,17 +769,26 @@ func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader
 		}
 	}
 
-	// oldChain headers can become now uncles, REMOVE
-	go func() {
-		for _, i := range oldChain {
-			select {
-			case b.sidechainCh <- i:
-			default:
+	/*
+		// oldChain headers can become now uncles, REMOVE
+		go func() {
+			for _, i := range oldChain {
+				select {
+				case b.sidechainCh <- i:
+				default:
+				}
 			}
-		}
-	}()
+		}()
+	*/
 
-	return b.advanceHead(newChainHead)
+	diff, err := b.advanceHead(newChainHead)
+	if err != nil {
+		return err
+	}
+
+	evnt.Type = EventReorg
+	evnt.SetDifficulty(diff)
+	return nil
 }
 
 // GetForks returns the forks

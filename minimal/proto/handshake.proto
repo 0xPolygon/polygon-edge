@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/minimal/proto";
+
+import "google/protobuf/empty.proto";
+
+service Handshake {
+    rpc Hello(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

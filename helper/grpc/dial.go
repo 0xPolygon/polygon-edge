@@ -27,7 +27,7 @@ func (p *GRPCProtocol) GetDialOption(ctx context.Context) grpc.DialOption {
 			return nil, err
 		}
 
-		stream, err := p.host.NewStream(ctx, id, xxx)
+		stream, err := p.host.NewStream(ctx, id, grpcProtocolID)
 		if err != nil {
 			return nil, err
 		}

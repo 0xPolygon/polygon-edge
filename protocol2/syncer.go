@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/protocol2/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 )
 
@@ -43,12 +44,32 @@ func NewSyncer() *Syncer {
 	}
 }
 
+func (s *Syncer) Register(server *grpc.Server) {
+	proto.RegisterV1Server(server, &serviceV1{})
+}
+
 func (s *Syncer) Start() {
 	go s.run()
 }
 
-func (s *Syncer) handleUser(conn *grpc.ClientConn) {
+func (s *Syncer) HandleUser(conn *grpc.ClientConn) {
+	fmt.Println("- new user -")
 
+	// watch for changes of the other node first
+	clt := proto.NewV1Client(conn)
+
+	stream, err := clt.Watch(context.Background(), &empty.Empty{})
+	if err != nil {
+		panic(err)
+	}
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("-- msg --")
+		fmt.Println(msg)
+	}
 }
 
 func (s *Syncer) findCommonAncestor(clt proto.V1Client, height *types.Header) (*types.Header, error) {

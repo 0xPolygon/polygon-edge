@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"testing"
 
@@ -125,6 +126,7 @@ func TestInsertHeaders(t *testing.T) {
 	type evnt struct {
 		NewChain []*header
 		OldChain []*header
+		Diff     *big.Int
 	}
 	type headerEvnt struct {
 		header *header
@@ -164,6 +166,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -172,6 +175,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 			},
@@ -195,6 +199,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -203,6 +208,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3).Parent(0x1).Diff(5),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -236,6 +242,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -244,6 +251,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -252,6 +260,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -267,6 +276,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x2),
 							mock(0x3),
 						},
+						Diff: big.NewInt(12),
 					},
 				},
 				{
@@ -275,6 +285,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x5).Parent(0x4).Diff(11).Number(3),
 						},
+						Diff: big.NewInt(23),
 					},
 				},
 				{
@@ -309,6 +320,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -317,6 +329,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -325,6 +338,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -337,6 +351,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(15),
 					},
 				},
 				{
@@ -380,6 +395,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -388,6 +404,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -401,6 +418,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x1),
 							mock(0x2),
 						},
+						Diff: big.NewInt(6),
 					},
 				},
 				{
@@ -415,6 +433,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3).Parent(0x0).Diff(5),
 						},
+						Diff: big.NewInt(14),
 					},
 				},
 			},
@@ -475,6 +494,12 @@ func TestInsertHeaders(t *testing.T) {
 				evnt := sub.GetEvent()
 				checkEvents(cc.History[i].event.NewChain, evnt.NewChain)
 				checkEvents(cc.History[i].event.OldChain, evnt.OldChain)
+
+				if evnt.Difficulty != nil {
+					if evnt.Difficulty.Cmp(cc.History[i].event.Diff) != 0 {
+						t.Fatal("bad diff in event")
+					}
+				}
 			}
 
 			head, _ := b.Header()

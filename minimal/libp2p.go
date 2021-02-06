@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	noise "github.com/libp2p/go-libp2p-noise"
 	ma "github.com/multiformats/go-multiaddr"
+	"google.golang.org/grpc"
 )
 
 func (s *Server) setupLibP2P() error {
@@ -105,23 +106,28 @@ func (s *Server) AddPeerFromAddrInfo(peer *peer.AddrInfo) {
 }
 
 // AddPeerFromMultiAddr adds a peer with the multiaddr format
-func (s *Server) AddPeerFromMultiAddr(addr ma.Multiaddr) error {
+func (s *Server) AddPeerFromMultiAddr(addr ma.Multiaddr) (peer.ID, error) {
 	p, err := peer.AddrInfoFromP2pAddr(addr)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.AddPeerFromAddrInfo(p)
-	return nil
+	return p.ID, nil
 }
 
 // AddPeerFromMultiAddrString adds a peer in string
-func (s *Server) AddPeerFromMultiAddrString(str string) error {
+func (s *Server) AddPeerFromMultiAddrString(str string) (peer.ID, error) {
 	addr, err := ma.NewMultiaddr(str)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := s.AddPeerFromMultiAddr(addr); err != nil {
-		return err
+	peerID, err := s.AddPeerFromMultiAddr(addr)
+	if err != nil {
+		return "", err
 	}
-	return nil
+	return peerID, nil
+}
+
+func (s *Server) dial(p peer.ID) (*grpc.ClientConn, error) {
+	return s.libp2pServer.Dial(context.Background(), p, grpc.WithInsecure())
 }
