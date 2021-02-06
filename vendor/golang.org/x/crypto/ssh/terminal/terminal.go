@@ -2,105 +2,32 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Package terminal provides support functions for dealing with terminals, as
+// commonly found on UNIX systems.
+//
+// Deprecated: this package moved to golang.org/x/term.
 package terminal
 
 import (
-	"bytes"
 	"io"
-	"runtime"
-	"strconv"
-	"sync"
-	"unicode/utf8"
+
+	"golang.org/x/term"
 )
 
 // EscapeCodes contains escape sequences that can be written to the terminal in
 // order to achieve different styles of text.
-type EscapeCodes struct {
-	// Foreground colors
-	Black, Red, Green, Yellow, Blue, Magenta, Cyan, White []byte
-
-	// Reset all attributes
-	Reset []byte
-}
-
-var vt100EscapeCodes = EscapeCodes{
-	Black:   []byte{keyEscape, '[', '3', '0', 'm'},
-	Red:     []byte{keyEscape, '[', '3', '1', 'm'},
-	Green:   []byte{keyEscape, '[', '3', '2', 'm'},
-	Yellow:  []byte{keyEscape, '[', '3', '3', 'm'},
-	Blue:    []byte{keyEscape, '[', '3', '4', 'm'},
-	Magenta: []byte{keyEscape, '[', '3', '5', 'm'},
-	Cyan:    []byte{keyEscape, '[', '3', '6', 'm'},
-	White:   []byte{keyEscape, '[', '3', '7', 'm'},
-
-	Reset: []byte{keyEscape, '[', '0', 'm'},
-}
+type EscapeCodes = term.EscapeCodes
 
 // Terminal contains the state for running a VT100 terminal that is capable of
 // reading lines of input.
-type Terminal struct {
-	// AutoCompleteCallback, if non-null, is called for each keypress with
-	// the full input line and the current position of the cursor (in
-	// bytes, as an index into |line|). If it returns ok=false, the key
-	// press is processed normally. Otherwise it returns a replacement line
-	// and the new cursor position.
-	AutoCompleteCallback func(line string, pos int, key rune) (newLine string, newPos int, ok bool)
-
-	// Escape contains a pointer to the escape codes for this terminal.
-	// It's always a valid pointer, although the escape codes themselves
-	// may be empty if the terminal doesn't support them.
-	Escape *EscapeCodes
-
-	// lock protects the terminal and the state in this object from
-	// concurrent processing of a key press and a Write() call.
-	lock sync.Mutex
-
-	c      io.ReadWriter
-	prompt []rune
-
-	// line is the current line being entered.
-	line []rune
-	// pos is the logical position of the cursor in line
-	pos int
-	// echo is true if local echo is enabled
-	echo bool
-	// pasteActive is true iff there is a bracketed paste operation in
-	// progress.
-	pasteActive bool
-
-	// cursorX contains the current X value of the cursor where the left
-	// edge is 0. cursorY contains the row number where the first row of
-	// the current line is 0.
-	cursorX, cursorY int
-	// maxLine is the greatest value of cursorY so far.
-	maxLine int
-
-	termWidth, termHeight int
-
-	// outBuf contains the terminal data to be sent.
-	outBuf []byte
-	// remainder contains the remainder of any partial key sequences after
-	// a read. It aliases into inBuf.
-	remainder []byte
-	inBuf     [256]byte
-
-	// history contains previously entered commands so that they can be
-	// accessed with the up and down keys.
-	history stRingBuffer
-	// historyIndex stores the currently accessed history entry, where zero
-	// means the immediately previous entry.
-	historyIndex int
-	// When navigating up and down the history it's possible to return to
-	// the incomplete, initial line. That value is stored in
-	// historyPending.
-	historyPending string
-}
+type Terminal = term.Terminal
 
 // NewTerminal runs a VT100 terminal on the given ReadWriter. If the ReadWriter is
 // a local terminal, that terminal must first have been put into raw mode.
 // prompt is a string that is written at the start of each input line (i.e.
 // "> ").
 func NewTerminal(c io.ReadWriter, prompt string) *Terminal {
+<<<<<<< HEAD
 	return &Terminal{
 		Escape:       &vt100EscapeCodes,
 		c:            c,
@@ -884,104 +811,52 @@ type pasteIndicatorError struct{}
 
 func (pasteIndicatorError) Error() string {
 	return "terminal: ErrPasteIndicator not correctly handled"
+=======
+	return term.NewTerminal(c, prompt)
+>>>>>>> develop
 }
 
 // ErrPasteIndicator may be returned from ReadLine as the error, in addition
 // to valid line data. It indicates that bracketed paste mode is enabled and
 // that the returned line consists only of pasted data. Programs may wish to
 // interpret pasted data more literally than typed data.
-var ErrPasteIndicator = pasteIndicatorError{}
+var ErrPasteIndicator = term.ErrPasteIndicator
 
-// SetBracketedPasteMode requests that the terminal bracket paste operations
-// with markers. Not all terminals support this but, if it is supported, then
-// enabling this mode will stop any autocomplete callback from running due to
-// pastes. Additionally, any lines that are completely pasted will be returned
-// from ReadLine with the error set to ErrPasteIndicator.
-func (t *Terminal) SetBracketedPasteMode(on bool) {
-	if on {
-		io.WriteString(t.c, "\x1b[?2004h")
-	} else {
-		io.WriteString(t.c, "\x1b[?2004l")
-	}
+// State contains the state of a terminal.
+type State = term.State
+
+// IsTerminal returns whether the given file descriptor is a terminal.
+func IsTerminal(fd int) bool {
+	return term.IsTerminal(fd)
 }
 
-// stRingBuffer is a ring buffer of strings.
-type stRingBuffer struct {
-	// entries contains max elements.
-	entries []string
-	max     int
-	// head contains the index of the element most recently added to the ring.
-	head int
-	// size contains the number of elements in the ring.
-	size int
+// ReadPassword reads a line of input from a terminal without local echo.  This
+// is commonly used for inputting passwords and other sensitive data. The slice
+// returned does not include the \n.
+func ReadPassword(fd int) ([]byte, error) {
+	return term.ReadPassword(fd)
 }
 
-func (s *stRingBuffer) Add(a string) {
-	if s.entries == nil {
-		const defaultNumEntries = 100
-		s.entries = make([]string, defaultNumEntries)
-		s.max = defaultNumEntries
-	}
-
-	s.head = (s.head + 1) % s.max
-	s.entries[s.head] = a
-	if s.size < s.max {
-		s.size++
-	}
+// MakeRaw puts the terminal connected to the given file descriptor into raw
+// mode and returns the previous state of the terminal so that it can be
+// restored.
+func MakeRaw(fd int) (*State, error) {
+	return term.MakeRaw(fd)
 }
 
-// NthPreviousEntry returns the value passed to the nth previous call to Add.
-// If n is zero then the immediately prior value is returned, if one, then the
-// next most recent, and so on. If such an element doesn't exist then ok is
-// false.
-func (s *stRingBuffer) NthPreviousEntry(n int) (value string, ok bool) {
-	if n >= s.size {
-		return "", false
-	}
-	index := s.head - n
-	if index < 0 {
-		index += s.max
-	}
-	return s.entries[index], true
+// Restore restores the terminal connected to the given file descriptor to a
+// previous state.
+func Restore(fd int, oldState *State) error {
+	return term.Restore(fd, oldState)
 }
 
-// readPasswordLine reads from reader until it finds \n or io.EOF.
-// The slice returned does not include the \n.
-// readPasswordLine also ignores any \r it finds.
-// Windows uses \r as end of line. So, on Windows, readPasswordLine
-// reads until it finds \r and ignores any \n it finds during processing.
-func readPasswordLine(reader io.Reader) ([]byte, error) {
-	var buf [1]byte
-	var ret []byte
+// GetState returns the current state of a terminal which may be useful to
+// restore the terminal after a signal.
+func GetState(fd int) (*State, error) {
+	return term.GetState(fd)
+}
 
-	for {
-		n, err := reader.Read(buf[:])
-		if n > 0 {
-			switch buf[0] {
-			case '\b':
-				if len(ret) > 0 {
-					ret = ret[:len(ret)-1]
-				}
-			case '\n':
-				if runtime.GOOS != "windows" {
-					return ret, nil
-				}
-				// otherwise ignore \n
-			case '\r':
-				if runtime.GOOS == "windows" {
-					return ret, nil
-				}
-				// otherwise ignore \r
-			default:
-				ret = append(ret, buf[0])
-			}
-			continue
-		}
-		if err != nil {
-			if err == io.EOF && len(ret) > 0 {
-				return ret, nil
-			}
-			return ret, err
-		}
-	}
+// GetSize returns the dimensions of the given terminal.
+func GetSize(fd int) (width, height int, err error) {
+	return term.GetSize(fd)
 }

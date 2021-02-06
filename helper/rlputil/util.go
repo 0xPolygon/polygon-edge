@@ -15,7 +15,7 @@ func EncodeBodies(b []*types.Body) []byte {
 	ar := &fastrlp.Arena{}
 	v := ar.NewArray()
 	for _, i := range b {
-		v.Set(i.MarshalWith(ar))
+		v.Set(i.MarshalRLPWith(ar))
 	}
 	return v.MarshalTo(nil)
 }
@@ -26,7 +26,7 @@ func EncodeReceipts(r [][]*types.Receipt) []byte {
 	for _, i := range r {
 		vv := ar.NewArray()
 		for _, j := range i {
-			vv.Set(j.MarshalWith(ar))
+			vv.Set(j.MarshalRLPWith(ar))
 		}
 		v.Set(vv)
 	}
@@ -37,7 +37,7 @@ func EncodeHeaders(h []*types.Header) []byte {
 	ar := &fastrlp.Arena{}
 	v := ar.NewArray()
 	for _, i := range h {
-		v.Set(i.MarshalWith(ar))
+		v.Set(i.MarshalRLPWith(ar))
 	}
 	return v.MarshalTo(nil)
 }

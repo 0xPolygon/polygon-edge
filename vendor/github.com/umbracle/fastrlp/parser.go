@@ -9,6 +9,7 @@ import (
 type Parser struct {
 	buf []byte
 	c   cache
+	k   *Keccak
 }
 
 // Parse parses a complete rlp encoding
@@ -26,6 +27,16 @@ func (p *Parser) Parse(b []byte) (*Value, error) {
 // Raw returns the raw bytes of the value
 func (p *Parser) Raw(v *Value) []byte {
 	return p.buf[v.i : v.i+v.fullLen()]
+}
+
+// Hash performs a keccak hash of the rlp value
+func (p *Parser) Hash(dst []byte, v *Value) []byte {
+	if p.k == nil {
+		p.k = NewKeccak256()
+	}
+	p.k.Reset()
+	p.k.Write(p.Raw(v))
+	return p.k.Sum(dst)
 }
 
 func parseValue(b []byte, c *cache) (*Value, []byte, error) {

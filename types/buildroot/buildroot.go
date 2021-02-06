@@ -15,7 +15,7 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 
 	res := calculateRootWithRlp(len(receipts), func(i int) *fastrlp.Value {
 		ar.Reset()
-		return receipts[i].MarshalWith(ar)
+		return receipts[i].MarshalRLPWith(ar)
 	})
 
 	arenaPool.Put(ar)
@@ -28,7 +28,7 @@ func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 
 	res := calculateRootWithRlp(len(transactions), func(i int) *fastrlp.Value {
 		ar.Reset()
-		return transactions[i].MarshalWith(ar)
+		return transactions[i].MarshalRLPWith(ar)
 	})
 
 	arenaPool.Put(ar)
@@ -44,7 +44,7 @@ func CalculateUncleRoot(uncles []*types.Header) types.Hash {
 	a := arenaPool.Get()
 	v := a.NewArray()
 	for _, i := range uncles {
-		v.Set(i.MarshalWith(a))
+		v.Set(i.MarshalRLPWith(a))
 	}
 
 	root := keccak.Keccak256Rlp(nil, v)
