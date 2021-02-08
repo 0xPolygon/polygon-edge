@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"fmt"
 	"math/big"
-	"strconv"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -119,8 +118,8 @@ func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
 	return nil, fmt.Errorf("transaction not found")
 }
 
-// GetBalance returns the account's balance
-func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
+// GetBalance returns the account's balance at the referenced block
+func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error) {
 	addr := types.StringToAddress(address)
 
 	header, err := e.GetBlockHeader(number)
@@ -142,7 +141,7 @@ func (e *Eth) GetBalance(address string, number string) (interface{}, error) {
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address string, index []byte, number string) (interface{}, error) {
+func (e *Eth) GetStorageAt(address string, index types.Hash , number BlockNumber) (interface{}, error) {
 
 	addr := types.StringToAddress(address)
 
@@ -171,7 +170,7 @@ func (e *Eth) GetStorageAt(address string, index []byte, number string) (interfa
 	}
 
 	// Get the storage for the passed in location
-	result, ok := snap.Get(index)
+	result, ok := snap.Get(index.Bytes())
 	if !ok {
 		return nil, fmt.Errorf("error getting storage snapshot")
 	}
@@ -189,7 +188,7 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, error) {
+func (e *Eth) Call(transaction *types.Transaction, number BlockNumber) (interface{}, error) {
 
 	// Fetch the requested header
 	header, err := e.GetBlockHeader(number)
@@ -213,35 +212,28 @@ func (e *Eth) Call(transaction *types.Transaction, number string) (interface{}, 
 
 // GetBlockHeader returns the specific header of the requested block
 // latest, earliest, pending, or a specific block number
-func (e *Eth) GetBlockHeader(number string) (*types.Header, error) {
+// See query.go for specific default values
+func (e *Eth) GetBlockHeader(number BlockNumber) (*types.Header, error) {
 
 	blockchainRef := e.d.minimal.Blockchain
 
-	blockRef := "latest" // default value
-
-	if number != "" {
-		blockRef = number
-	}
-
-	switch blockRef {
-	case "latest":
+	switch number {
+	case latest:
 		header, ok := blockchainRef.Header()
 		if !ok {
 			return nil, fmt.Errorf("Error fetching latest header")
 		}
 
 		return header, nil
-	case "earliest":
+	case earliest:
 		return nil, fmt.Errorf("Fetching the earliest header is not supported")
-	case "pending":
+	case pending:
 		return nil, fmt.Errorf("Fetching the pending header is not supported")
 	default:
 		// Convert the block number from hex to uint64
-		blockNumber := hex.DecodeHexToBig(number)
-
-		header, ok := blockchainRef.GetHeaderByNumber(blockNumber.Uint64())
+		header, ok := blockchainRef.GetHeaderByNumber(uint64(number))
 		if !ok {
-			return nil, fmt.Errorf("Error fetching block number %d header", blockNumber.Uint64())
+			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
 		}
 		return header, nil
 	}
@@ -250,7 +242,7 @@ func (e *Eth) GetBlockHeader(number string) (*types.Header, error) {
 // EstimateGasParams - Optional params used for the EstimateGas call
 type EstimateGasParams struct {
 	transaction *types.Transaction
-	number      string
+	number      BlockNumber
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
@@ -395,13 +387,13 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 }
 
 // GetLogs returns an array of logs matching the filter options
-func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
+func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 
 	var referenceFrom uint64
 	var referenceTo uint64
 
 	// Fetch the requested from header
-	header, err := e.GetBlockHeader(strconv.FormatUint((uint64)(filterOptions.fromBlock), 10))
+	header, err := e.GetBlockHeader(filterOptions.fromBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +401,7 @@ func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
 	referenceFrom = header.Number
 
 	// Fetch the requested to header
-	header, err = e.GetBlockHeader(strconv.FormatUint((uint64)(filterOptions.toBlock), 10))
+	header, err = e.GetBlockHeader(filterOptions.toBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -417,8 +409,6 @@ func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
 	referenceTo = header.Number
 
 	var result []*types.Log
-
-	// TODO Refactor this to use blooms
 
 	for i := referenceFrom; i < referenceTo; i++ {
 
@@ -448,7 +438,7 @@ func (e *Eth) GetLogs(filterOptions LogFilter) ([]*types.Log, error) {
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(address string, number string) (interface{}, error) {
+func (e *Eth) GetTransactionCount(address string, number BlockNumber) (interface{}, error) {
 	addr := types.StringToAddress(address)
 
 	header, err := e.GetBlockHeader(number)
@@ -470,7 +460,7 @@ func (e *Eth) GetTransactionCount(address string, number string) (interface{}, e
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address string, number string) (interface{}, error) {
+func (e *Eth) GetCode(address string, number BlockNumber) (interface{}, error) {
 	addr := types.StringToAddress(address)
 
 	header, err := e.GetBlockHeader(number)
