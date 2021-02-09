@@ -7,12 +7,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-const (
-	pending  = -3
-	latest   = -2
-	earliest = -1
-)
-
 // LogFilter is a filter for logs
 type LogFilter struct {
 	fromBlock BlockNumber

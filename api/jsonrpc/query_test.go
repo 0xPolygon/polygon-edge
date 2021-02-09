@@ -25,8 +25,8 @@ func TestFilterDecode(t *testing.T) {
 		{
 			`{}`,
 			&LogFilter{
-				fromBlock: latest,
-				toBlock:   latest,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
 			},
 		},
 		{
@@ -40,8 +40,8 @@ func TestFilterDecode(t *testing.T) {
 				"address": "` + addr1.String() + `"
 			}`,
 			&LogFilter{
-				fromBlock: latest,
-				toBlock:   latest,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
 				Addresses: []types.Address{
 					addr1,
 				},
@@ -55,8 +55,8 @@ func TestFilterDecode(t *testing.T) {
 				]
 			}`,
 			&LogFilter{
-				fromBlock: latest,
-				toBlock:   latest,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
 				Addresses: []types.Address{
 					addr1,
 					addr2,
@@ -79,8 +79,8 @@ func TestFilterDecode(t *testing.T) {
 				]
 			}`,
 			&LogFilter{
-				fromBlock: latest,
-				toBlock:   latest,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
 				Topics: [][]types.Hash{
 					{
 						hash1,
@@ -105,8 +105,8 @@ func TestFilterDecode(t *testing.T) {
 				"toBlock": "earliest"
 			}`,
 			&LogFilter{
-				fromBlock: pending,
-				toBlock:   earliest,
+				fromBlock: PendingBlockNumber,
+				toBlock:   EarliestBlockNumber,
 			},
 		},
 	}

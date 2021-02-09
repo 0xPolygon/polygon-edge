@@ -212,22 +212,22 @@ func (e *Eth) Call(transaction *types.Transaction, number BlockNumber) (interfac
 
 // GetBlockHeader returns the specific header of the requested block
 // latest, earliest, pending, or a specific block number
-// See query.go for specific default values
+// See codec.go for specific default values
 func (e *Eth) GetBlockHeader(number BlockNumber) (*types.Header, error) {
 
 	blockchainRef := e.d.minimal.Blockchain
 
 	switch number {
-	case latest:
+	case LatestBlockNumber:
 		header, ok := blockchainRef.Header()
 		if !ok {
 			return nil, fmt.Errorf("Error fetching latest header")
 		}
 
 		return header, nil
-	case earliest:
+	case EarliestBlockNumber:
 		return nil, fmt.Errorf("Fetching the earliest header is not supported")
-	case pending:
+	case PendingBlockNumber:
 		return nil, fmt.Errorf("Fetching the pending header is not supported")
 	default:
 		// Convert the block number from hex to uint64
@@ -239,24 +239,29 @@ func (e *Eth) GetBlockHeader(number BlockNumber) (*types.Header, error) {
 	}
 }
 
-// EstimateGasParams - Optional params used for the EstimateGas call
-type EstimateGasParams struct {
-	transaction *types.Transaction
-	number      BlockNumber
+// Checks if the default value for the block number should be used (latest)
+func resolveBlockNumber(number *BlockNumber) BlockNumber {
+	currentNumber := LatestBlockNumber
+
+	if number != nil {
+		currentNumber = *number
+	}
+
+	return currentNumber
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
-func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
+func (e *Eth) EstimateGas(transaction *types.Transaction, number *BlockNumber) (interface{}, error) {
 
 	const standardGas uint64 = 21000
 
+	currentNumber := resolveBlockNumber(number);
+
 	// Fetch the requested header
-	header, err := e.GetBlockHeader(params.number)
+	header, err := e.GetBlockHeader(currentNumber)
 	if err != nil {
 		return nil, err
 	}
-
-	transaction := params.transaction
 
 	var (
 		lowEnd  uint64 = standardGas
@@ -329,18 +334,7 @@ func (e *Eth) EstimateGas(params EstimateGasParams) (interface{}, error) {
 		}
 
 		// Create a dummy transaction with the new gas
-		txn := &types.Transaction{}
-		txn.Nonce = transaction.Nonce
-		txn.GasPrice = transaction.GasPrice
-		txn.Value = transaction.Value
-		txn.Input = transaction.Input
-		txn.V = transaction.V
-		txn.R = transaction.R
-		txn.S = transaction.S
-		txn.Hash = transaction.Hash
-		txn.From = transaction.From
-		txn.To = transaction.To
-
+		txn := transaction.Copy()
 		txn.Gas = gas
 
 		_, failed, err := transition.Apply(transaction)
