@@ -170,6 +170,13 @@ type Transition struct {
 	// result
 	receipts []*types.Receipt
 	totalGas uint64
+
+	// The return value for the contract execution
+	returnValue []byte
+}
+
+func (t* Transition) ReturnValue() []byte {
+	return t.returnValue
 }
 
 func (t *Transition) TotalGas() uint64 {
@@ -349,7 +356,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	s := t.state.Snapshot()
-	gas, failed, err := t.apply(msg)
+	returnValue, gas, failed, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -357,6 +364,8 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	if t.r.PostHook != nil {
 		t.r.PostHook(t)
 	}
+
+	t.returnValue = returnValue
 
 	// e.addGasPool(gas)
 	return gas, failed, err
@@ -423,10 +432,10 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	return gasAvailable, nil
 }
 
-func (t *Transition) apply(msg *types.Transaction) (uint64, bool, error) {
+func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error) {
 	// check if there is enough gas in the pool
 	if err := t.subGasPool(msg.Gas); err != nil {
-		return 0, false, err
+		return nil, 0, false, err
 	}
 
 	txn := t.state
@@ -434,10 +443,10 @@ func (t *Transition) apply(msg *types.Transaction) (uint64, bool, error) {
 
 	gas, err := t.preCheck(msg)
 	if err != nil {
-		return 0, false, err
+		return nil, 0, false, err
 	}
 	if gas > msg.Gas {
-		return 0, false, errorVMOutOfGas
+		return nil, 0, false, errorVMOutOfGas
 	}
 
 	gasPrice := new(big.Int).SetBytes(msg.GetGasPrice())
@@ -449,17 +458,18 @@ func (t *Transition) apply(msg *types.Transaction) (uint64, bool, error) {
 
 	var subErr error
 	var gasLeft uint64
+	var returnValue []byte
 
 	if msg.IsContractCreation() {
 		_, gasLeft, subErr = t.Create2(msg.From, msg.Input, value, gas)
 	} else {
 		txn.IncrNonce(msg.From)
-		_, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, gas)
+		returnValue, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, gas)
 	}
 	if subErr != nil {
 		if subErr == runtime.ErrNotEnoughFunds {
 			txn.RevertToSnapshot(s)
-			return 0, false, subErr
+			return nil, 0, false, subErr
 		}
 	}
 
@@ -483,7 +493,7 @@ func (t *Transition) apply(msg *types.Transaction) (uint64, bool, error) {
 	// return gas to the pool
 	t.addGasPool(gasLeft)
 
-	return gasUsed, subErr != nil, nil
+	return returnValue, gasUsed, subErr != nil, nil
 }
 
 func (t *Transition) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {

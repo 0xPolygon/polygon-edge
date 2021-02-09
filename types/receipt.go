@@ -84,10 +84,62 @@ func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 	buf := hasher.Read()
 
 	for i := 0; i < 6; i += 2 {
+		// Find the global bit location
 		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
 
-		i := 256 - 1 - bit/8
-		j := bit % 8
-		b[i] = b[i] | (1 << j)
+		// Find where the bit maps in the [0..255] byte array
+		byteLocation := 256 - 1 - bit/8
+		bitLocation := bit % 8
+		b[byteLocation] = b[byteLocation] | (1 << bitLocation)
 	}
+}
+
+// IsLogInBloom checks if the log has a possible presence in the bloom filter
+func (b *Bloom) IsLogInBloom(log *Log) bool {
+	hasher := keccak.DefaultKeccakPool.Get()
+
+	// Check if the log address is present
+	addressPresent := b.isByteArrPresent(hasher, log.Address.Bytes())
+	if !addressPresent {
+		return false
+	}
+
+	// Check if all the topics are present
+	for _, topic := range log.Topics {
+		topicsPresent := b.isByteArrPresent(hasher, topic.Bytes())
+
+		if !topicsPresent {
+			return false
+		}
+	}
+	
+	keccak.DefaultKeccakPool.Put(hasher)
+
+	return true
+}
+
+// isByteArrPresent checks if the byte array is possibly present in the Bloom filter
+func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
+	hasher.Reset()
+	hasher.Write(data[:])
+	buf := hasher.Read()
+
+	for i := 0; i < 6; i += 2 {
+		// Find the global bit location
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
+
+		// Find where the bit maps in the [0..255] byte array
+		byteLocation := 256 - 1 - bit/8
+		bitLocation := bit % 8
+
+		referenceByte := b[byteLocation]
+		
+		isSet := int(referenceByte & (1 << (bitLocation - 1)))
+
+		if isSet == 0 {
+			return false
+		}
+	}
+
+	return true
 }

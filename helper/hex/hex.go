@@ -87,3 +87,11 @@ func EncodeBig(bigint *big.Int) string {
 	}
 	return fmt.Sprintf("%#x", bigint)
 }
+
+// DecodeHexToBig converts a hex number to a big.Int value
+func DecodeHexToBig(hexNum string) *big.Int {
+	createdNum := new(big.Int)
+	createdNum.SetString(hexNum, 16)
+
+	return createdNum
+}
