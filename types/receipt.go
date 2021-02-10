@@ -16,6 +16,8 @@ const (
 	ReceiptSuccess
 )
 
+type Receipts []*Receipt
+
 type Receipt struct {
 	Root              Hash           `json:"root" db:"root"`
 	CumulativeGasUsed uint64         `json:"cumulativeGasUsed" db:"cumulative_gas_used"`

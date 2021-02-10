@@ -32,7 +32,7 @@ func DefaultConfig() *Config {
 }
 
 type Blockchain interface {
-	Header() (*types.Header, bool)
+	Header() *types.Header
 	WriteBlocks(blocks []*types.Block) error
 	SubscribeEvents() blockchain.Subscription
 }
@@ -191,7 +191,7 @@ func (s *Sealer) sealAsync(ctx context.Context) chan struct{} {
 }
 
 func (s *Sealer) seal(ctx context.Context) error {
-	parent, _ := s.blockchain.Header()
+	parent := s.blockchain.Header()
 
 	num := parent.Number
 	header := &types.Header{

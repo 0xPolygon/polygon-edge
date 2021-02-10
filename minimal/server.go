@@ -25,8 +25,6 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
-	"github.com/0xPolygon/minimal/protocol"
-
 	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/state/runtime/evm"
@@ -44,7 +42,7 @@ type Server struct {
 	config *Config
 	Sealer *sealer.Sealer
 
-	backends  []protocol.Backend
+	// backends  []protocol.Backend
 	consensus consensus.Consensus
 
 	// blockchain stack
@@ -78,9 +76,9 @@ var dirPaths = []string{
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger:     logger,
-		config:     config,
-		backends:   []protocol.Backend{},
+		logger: logger,
+		config: config,
+		// backends:   []protocol.Backend{},
 		apis:       []api.API{},
 		chain:      config.Chain,
 		grpcServer: grpc.NewServer(),
@@ -124,8 +122,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	executor.SetRuntime(evm.NewEVM())
 
 	// blockchain object
-	m.blockchain = blockchain.NewBlockchain(storage, config.Chain.Params, m.consensus, executor)
-	if err := m.blockchain.WriteGenesis(config.Chain.Genesis); err != nil {
+	m.blockchain, err = blockchain.NewBlockchain(logger, storage, config.Chain, m.consensus, executor)
+	if err != nil {
 		return nil, err
 	}
 
@@ -149,7 +147,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	// setup syncer protocol
-	m.syncer = protocol2.NewSyncer()
+	m.syncer = protocol2.NewSyncer(m.blockchain)
 	m.syncer.Register(m.libp2pServer.GetGRPCServer())
 	m.syncer.Start()
 

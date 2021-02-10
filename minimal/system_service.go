@@ -12,7 +12,7 @@ type systemService struct {
 }
 
 func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto.ServerStatus, error) {
-	header, _ := s.s.blockchain.Header()
+	header := s.s.blockchain.Header()
 
 	status := &proto.ServerStatus{
 		Network: int64(s.s.chain.Params.ChainID),

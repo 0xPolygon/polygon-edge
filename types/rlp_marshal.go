@@ -50,6 +50,10 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
+func (b *Body) MarshalRLPTo(dst []byte) []byte {
+	return marshalRLPTo(b, dst)
+}
+
 func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	if len(b.Transactions) == 0 {
@@ -105,6 +109,18 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
 
+	return vv
+}
+
+func (r Receipts) MarshalRLPTo(dst []byte) []byte {
+	return marshalRLPTo(&r, dst)
+}
+
+func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+	for _, rr := range *r {
+		vv.Set(rr.MarshalRLPWith(a))
+	}
 	return vv
 }
 

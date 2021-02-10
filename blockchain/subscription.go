@@ -46,8 +46,10 @@ type subscription struct {
 func (s *subscription) GetEventCh() chan *Event {
 	eventCh := make(chan *Event)
 	go func() {
-		evnt := s.GetEvent()
-		eventCh <- evnt
+		for {
+			evnt := s.GetEvent()
+			eventCh <- evnt
+		}
 	}()
 	return eventCh
 }

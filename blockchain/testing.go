@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
@@ -190,15 +191,20 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
-	config := &chain.Params{
-		Forks: &chain.Forks{
-			EIP155:    chain.NewFork(0),
-			Homestead: chain.NewFork(0),
+	config := &chain.Chain{
+		Params: &chain.Params{
+			Forks: &chain.Forks{
+				EIP155:    chain.NewFork(0),
+				Homestead: chain.NewFork(0),
+			},
 		},
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b := NewBlockchain(s, config, &fakeConsensus{}, state.NewExecutor(config, st))
+	b, err := NewBlockchain(hclog.NewNullLogger(), s, config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)

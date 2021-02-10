@@ -3,10 +3,12 @@ package protocol2
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/protocol2/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 )
@@ -22,9 +24,26 @@ type serviceV1 struct {
 
 	addCh  chan chan *proto.V1Status
 	stopCh chan struct{}
+
+	status     *proto.V1Status
+	statusLock sync.Mutex
 }
 
 func (s *serviceV1) start() {
+	// get the current status of the syncer
+	currentHeader := s.store.Header()
+
+	diff, ok := s.store.GetTD(currentHeader.Hash)
+	if !ok {
+		panic("Failed to read difficulty")
+	}
+
+	s.status = &proto.V1Status{
+		Hash:       currentHeader.Hash.String(),
+		Number:     int64(currentHeader.Number),
+		Difficulty: diff.String(),
+	}
+
 	eventCh := s.subs.GetEventCh()
 
 	s.addCh = make(chan chan *proto.V1Status, 10)
@@ -54,6 +73,10 @@ func (s *serviceV1) start() {
 				Number:     int64(evnt.NewChain[0].Number),
 			}
 
+			s.statusLock.Lock()
+			s.status = status
+			s.statusLock.Unlock()
+
 			// send notifications
 			for _, ch := range channels {
 				ch <- status
@@ -62,6 +85,19 @@ func (s *serviceV1) start() {
 			return
 		}
 	}
+}
+
+type rlpObject interface {
+	MarshalRLPTo(dst []byte) []byte
+	UnmarshalRLP(input []byte) error
+}
+
+// GetCurrent implements the V1Server interface
+func (s *serviceV1) GetCurrent(ctx context.Context, in *empty.Empty) (*proto.V1Status, error) {
+	s.statusLock.Lock()
+	status := s.status
+	s.statusLock.Unlock()
+	return status, nil
 }
 
 // GetObjectsByHash implements the V1Server interface
@@ -74,22 +110,29 @@ func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest
 		Objs: []*proto.Response_Component{},
 	}
 	for _, hash := range hashes {
-
-		//var data []byte
-		//var err error
+		var obj rlpObject
+		var found bool
 
 		if req.Type == proto.HashRequest_BODIES {
-
+			obj, found = s.store.GetBodyByHash(hash)
 		} else if req.Type == proto.HashRequest_RECEIPTS {
-
+			var raw []*types.Receipt
+			raw, found = s.store.GetReceiptsByHash(hash)
+			obj = types.Receipts(raw)
 		}
 
-		body, ok := s.store.GetBodyByHash(hash)
-		if ok {
-
+		var data []byte
+		if found {
+			data = obj.MarshalRLPTo(nil)
 		} else {
-			fmt.Println(body)
+			data = []byte{}
 		}
+
+		resp.Objs = append(resp.Objs, &proto.Response_Component{
+			Spec: &any.Any{
+				Value: data,
+			},
+		})
 	}
 	return resp, nil
 }
@@ -168,4 +211,49 @@ func (s *serviceV1) Watch(req *empty.Empty, stream proto.V1_WatchServer) error {
 			return nil
 		}
 	}
+}
+
+// Helper functions to decode responses from the grpc layer
+func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Body, error) {
+	input := []string{}
+	for _, h := range hashes {
+		input = append(input, h.String())
+	}
+	resp, err := clt.GetObjectsByHash(ctx, &proto.HashRequest{Hash: input, Type: proto.HashRequest_BODIES})
+	if err != nil {
+		return nil, err
+	}
+	res := []*types.Body{}
+	for _, obj := range resp.Objs {
+		var body types.Body
+		if obj.Spec.Value != nil {
+			if err := body.UnmarshalRLP(obj.Spec.Value); err != nil {
+				return nil, err
+			}
+		}
+		res = append(res, &body)
+	}
+	return res, nil
+}
+
+func getReceipts(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Receipts, error) {
+	input := []string{}
+	for _, h := range hashes {
+		input = append(input, h.String())
+	}
+	resp, err := clt.GetObjectsByHash(ctx, &proto.HashRequest{Hash: input, Type: proto.HashRequest_RECEIPTS})
+	if err != nil {
+		return nil, err
+	}
+	res := []*types.Receipts{}
+	for _, obj := range resp.Objs {
+		var receipts types.Receipts
+		if obj.Spec.Value != nil {
+			if err := receipts.UnmarshalRLP(obj.Spec.Value); err != nil {
+				return nil, err
+			}
+		}
+		res = append(res, &receipts)
+	}
+	return res, nil
 }

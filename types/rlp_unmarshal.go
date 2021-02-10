@@ -197,6 +197,25 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return err
 }
 
+func (r Receipts) UnmarshalRLP(input []byte) error {
+	return unmarshalRlp(&r, input)
+}
+
+func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+	for _, elem := range elems {
+		rr := &Receipt{}
+		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
+			return err
+		}
+		(*r) = append(*r, rr)
+	}
+	return nil
+}
+
 func (r *Receipt) UnmarshalRLP(input []byte) error {
 	return unmarshalRlp(r, input)
 }

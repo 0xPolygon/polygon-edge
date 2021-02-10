@@ -4,23 +4,32 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/big"
 	"sync"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/protocol2/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Blockchain is the interface required by the syncer to connect to the blockchain
 type Blockchain interface {
 	SubscribeEvents() blockchain.Subscription
 	Header() *types.Header
-	GetReceiptsByHash(types.Hash) []*types.Receipt
+	GetTD(hash types.Hash) (*big.Int, bool)
+	GetReceiptsByHash(types.Hash) ([]*types.Receipt, bool)
 	GetBodyByHash(types.Hash) (*types.Body, bool)
 	GetHeaderByHash(types.Hash) (*types.Header, bool)
 	GetHeaderByNumber(n uint64) (*types.Header, bool)
+}
+
+type peer struct {
+	id     string
+	client *proto.V1Client
 }
 
 // Syncer is a sync protocol
@@ -30,25 +39,25 @@ type Syncer struct {
 	peersLock sync.Mutex
 	peers     map[string]*peer
 
-	stopCh chan struct{}
+	serviceV1 *serviceV1
+	stopCh    chan struct{}
 }
 
-type peer struct {
-	client *proto.V1Client
-}
-
-func NewSyncer() *Syncer {
+func NewSyncer(blockchain Blockchain) *Syncer {
 	return &Syncer{
-		peers:  map[string]*peer{},
-		stopCh: make(chan struct{}),
+		peers:      map[string]*peer{},
+		stopCh:     make(chan struct{}),
+		blockchain: blockchain,
 	}
 }
 
 func (s *Syncer) Register(server *grpc.Server) {
-	proto.RegisterV1Server(server, &serviceV1{})
+	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
+	proto.RegisterV1Server(server, s.serviceV1)
 }
 
 func (s *Syncer) Start() {
+	go s.serviceV1.start()
 	go s.run()
 }
 
@@ -62,29 +71,58 @@ func (s *Syncer) HandleUser(conn *grpc.ClientConn) {
 	if err != nil {
 		panic(err)
 	}
+	go s.watchImpl("", stream)
+
+	currentState, err := clt.GetCurrent(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		panic(err)
+	}
+
+	header, err := s.findCommonAncestor(clt, uint64(currentState.Number))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("- ancestor header -")
+	fmt.Println(header)
+}
+
+func (s *Syncer) watchImpl(id string, stream proto.V1_WatchClient) {
 	for {
-		msg, err := stream.Recv()
+		recv, err := stream.Recv()
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("-- msg --")
-		fmt.Println(msg)
+		fmt.Println(recv)
 	}
 }
 
-func (s *Syncer) findCommonAncestor(clt proto.V1Client, height *types.Header) (*types.Header, error) {
+func (s *Syncer) findCommonAncestor(clt proto.V1Client, targetHeight uint64) (*types.Header, error) {
 	h := s.blockchain.Header()
 
 	min := uint64(0) // genesis
 	max := h.Number
 
-	if heightNumber := height.Number; max > heightNumber {
+	if heightNumber := targetHeight; max > heightNumber {
 		max = heightNumber
 	}
 
 	var header *types.Header
 	for min <= max {
 		m := uint64(math.Floor(float64(min+max) / 2))
+
+		if m == 0 {
+			// our common ancestor is the genesis
+			genesis, ok := s.blockchain.GetHeaderByNumber(0)
+			if !ok {
+				return nil, fmt.Errorf("failed to read local genesis")
+			}
+			return genesis, nil
+		}
+
+		// fmt.Println("- req -")
+		// fmt.Println(min, max, m)
+		// time.Sleep(1 * time.Second)
 
 		req := &proto.GetHeadersRequest{
 			Number: int64(m),
