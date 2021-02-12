@@ -25,6 +25,10 @@ type Log struct {
 	Removed     bool       `json:"removed"`
 }
 
+type wsConn interface {
+	WriteMessage(b []byte) error
+}
+
 type Filter struct {
 	id string
 
@@ -42,6 +46,72 @@ type Filter struct {
 
 	// next time to timeout
 	timestamp time.Time
+
+	// websocket connection
+	ws wsConn
+}
+
+func (f *Filter) getUpdates() (string, error) {
+	if f.isBlockFilter() {
+		// block filter
+		updates, newHead := f.block.getUpdates()
+		f.block = newHead
+
+		return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
+	}
+	// log filter
+	res, err := json.Marshal(f.logs)
+	if err != nil {
+		return "", err
+	}
+	f.logs = []*Log{}
+	return string(res), nil
+}
+
+func (f *Filter) isWS() bool {
+	return f.ws != nil
+}
+
+var ethSubscriptionTemplate = `{
+	"jsonrpc": "2.0",
+	"method": "eth_subscription",
+	"params": {
+		"subscription":"%s",
+		"result": %s
+	}
+}`
+
+func (f *Filter) sendMessage(msg string) error {
+	res := fmt.Sprintf(ethSubscriptionTemplate, f.id, msg)
+	if err := f.ws.WriteMessage([]byte(res)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *Filter) flush() error {
+	if f.isBlockFilter() {
+		// send each block independently
+		updates, newHead := f.block.getUpdates()
+		f.block = newHead
+
+		for _, block := range updates {
+			if err := f.sendMessage(block); err != nil {
+				return err
+			}
+		}
+	} else {
+		// log filter
+		res, err := json.Marshal(f.logs)
+		if err != nil {
+			return err
+		}
+		if err := f.sendMessage(string(res)); err != nil {
+			return err
+		}
+		f.logs = []*Log{}
+	}
+	return nil
 }
 
 func (f *Filter) isLogFilter() bool {
@@ -144,8 +214,8 @@ func (f *FilterManager) Run() {
 
 		case <-timeoutCh:
 			// timeout for filter
-			if err := f.Uninstall(filter.id); err != nil {
-				f.logger.Error("failed to uninstall filter", "err", err)
+			if !f.Uninstall(filter.id) {
+				f.logger.Error("failed to uninstall filter", "id", filter.id)
 			}
 
 		case <-f.updateCh:
@@ -219,6 +289,12 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 		processBlock(i, false)
 	}
 
+	// flush all the websocket values
+	for _, f := range f.filters {
+		if f.isWS() {
+			f.flush()
+		}
+	}
 	return nil
 }
 
@@ -239,52 +315,47 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	if !ok {
 		return "", errFilterDoesNotExists
 	}
-
-	if !item.isBlockFilter() {
-		// log filter
-		res, err := json.Marshal(item.logs)
-		if err != nil {
-			return "", err
-		}
-		return string(res), nil
+	if item.isWS() {
+		// we cannot get updates from a ws filter with getFilterChanges
+		return "", errFilterDoesNotExists
 	}
 
-	updates, newHead := item.block.getUpdates()
-	item.block = newHead
-
-	res := fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\""))
-
+	res, err := item.getUpdates()
+	if err != nil {
+		return "", err
+	}
 	return res, nil
 }
 
-func (f *FilterManager) Uninstall(id string) error {
+func (f *FilterManager) Uninstall(id string) bool {
 	f.lock.Lock()
 
 	item, ok := f.filters[id]
 	if !ok {
-		return errFilterDoesNotExists
+		return false
 	}
 
 	delete(f.filters, id)
 	heap.Remove(&f.timer, item.index)
 
 	f.lock.Unlock()
-	return nil
+	return true
 }
 
-func (f *FilterManager) NewBlockFilter() string {
-	return f.addFilter(nil)
+func (f *FilterManager) NewBlockFilter(ws wsConn) string {
+	return f.addFilter(nil, ws)
 }
 
-func (f *FilterManager) NewLogFilter(logFilter *LogFilter) string {
-	return f.addFilter(logFilter)
+func (f *FilterManager) NewLogFilter(logFilter *LogFilter, ws wsConn) string {
+	return f.addFilter(logFilter, ws)
 }
 
-func (f *FilterManager) addFilter(logFilter *LogFilter) string {
+func (f *FilterManager) addFilter(logFilter *LogFilter, ws wsConn) string {
 	f.lock.Lock()
 
 	filter := &Filter{
 		id: uuid.New().String(),
+		ws: ws,
 	}
 
 	if logFilter == nil {

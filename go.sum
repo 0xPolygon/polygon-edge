@@ -329,10 +329,6 @@ github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d/go.mod h1:9OrXJ
 github.com/tyler-smith/go-bip39 v1.0.1-0.20181017060643-dbb3b84ba2ef/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2K9Zr6cf67kNs=
 github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50 h1:x4PE3nuIwRylLUGumEXvpSuEzQeiJUL1a3RGSPpmTlc=
 github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50/go.mod h1:Kr+nyw5nWGn6d7EH+yyfway8bj0jgS2ZGMLDkIgiGfI=
-github.com/umbracle/fastrlp v0.0.0-20191017143648-86584926e68c h1:KCbyOp0afQzDTGARP+qj9HpZVk79WQaQtAO+4kMy/E4=
-github.com/umbracle/fastrlp v0.0.0-20191017143648-86584926e68c/go.mod h1:TBFAIaLMusGh1X7Pd3trJTjLsOmNErpPV9/J7BY9lSA=
-github.com/umbracle/fastrlp v0.0.0-20210127203036-adaebacde700 h1:qS+6jiLojG3YlyGtZJWjS4JrSPvfM1Yejw9KkQngSco=
-github.com/umbracle/fastrlp v0.0.0-20210127203036-adaebacde700/go.mod h1:z0AyVhz/7VbuYSaCB+tFgypZKD1DJL76ATih6XqFlig=
 github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8 h1:lWWKP+Oi7FSORlB3Y8rLz1Q7OOxtD8vecmtYOSNkIpo=
 github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8/go.mod h1:z0AyVhz/7VbuYSaCB+tFgypZKD1DJL76ATih6XqFlig=
 github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b h1:t3nz9xXkLZJz+ZlTGFT3ixsCGO5AHx1Yift2EAfjnnc=

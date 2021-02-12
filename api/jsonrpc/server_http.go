@@ -1,13 +1,16 @@
 package jsonrpc
 
 import (
-	"fmt"
+	"io/ioutil"
 	"net"
+	"net/http"
 
 	"github.com/0xPolygon/minimal/api"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
-	"github.com/valyala/fasthttp"
 )
+
+var upgrader = websocket.Upgrader{}
 
 const (
 	defaultHTTAddr  = "127.0.0.1"
@@ -18,7 +21,6 @@ const (
 type HTTPServer struct {
 	logger hclog.Logger
 	d      *Dispatcher
-	http   *fasthttp.Server
 }
 
 func startHTTPServer(d *Dispatcher, logger hclog.Logger, config ServerConfig) (Server, error) {
@@ -38,40 +40,69 @@ func startHTTPServer(d *Dispatcher, logger hclog.Logger, config ServerConfig) (S
 		logger: httpLogger,
 		d:      d,
 	}
-	h.serve(lis)
+	go h.serve(lis)
 	return h, nil
 }
 
-func (h *HTTPServer) serve(lis net.Listener) {
-	h.http = &fasthttp.Server{
-		Handler: h.handler,
+func (h *HTTPServer) handleWs(w http.ResponseWriter, req *http.Request) {
+	c, err := upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		return
 	}
+	defer c.Close()
 
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			break
+		}
+		go h.d.handleWs(message, c)
+	}
+}
+
+func (h *HTTPServer) handle(w http.ResponseWriter, req *http.Request) {
+	handleErr := func(err error) {
+		w.Write([]byte(err.Error()))
+		return
+	}
+	if req.Method == "GET" {
+		w.Write([]byte("Minimal JSON-RPC"))
+		return
+	}
+	if req.Method != "POST" {
+		w.Write([]byte("method " + req.Method + " not allowed"))
+		return
+	}
+	data, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		handleErr(err)
+		return
+	}
+	resp, err := h.d.handle(serverHTTP, data)
+	if err != nil {
+		handleErr(err)
+		return
+	}
+	w.Write(resp)
+}
+
+func (h *HTTPServer) serve(lis net.Listener) {
+	mux := http.DefaultServeMux
+	mux.HandleFunc("/", h.handle)
+	mux.HandleFunc("/ws", h.handleWs)
+
+	srv := http.Server{
+		Handler: mux,
+	}
 	go func() {
-		if err := h.http.Serve(lis); err != nil {
-			h.logger.Info("Jsonrpc http closed: %v", err)
+		if err := srv.Serve(lis); err != nil {
+			panic(err)
 		}
 	}()
 }
 
-func (h *HTTPServer) handler(ctx *fasthttp.RequestCtx) {
-	if ctx.IsGet() {
-		fmt.Fprintf(ctx, "Minimal JSON-RPC")
-		return
-	}
-	if !ctx.IsPost() {
-		fmt.Fprintf(ctx, "method %s not allowed", ctx.Method())
-		return
-	}
-	resp, err := h.d.handle(serverHTTP, ctx.PostBody())
-	if err != nil {
-		fmt.Fprintf(ctx, err.Error())
-		return
-	}
-	fmt.Fprintf(ctx, string(resp))
-}
-
 // Close implements the transport interface
 func (h *HTTPServer) Close() error {
-	return h.http.Shutdown()
+	// return h.http.Shutdown()
+	return nil
 }

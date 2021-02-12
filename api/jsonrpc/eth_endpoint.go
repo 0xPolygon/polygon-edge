@@ -141,7 +141,7 @@ func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address string, index types.Hash , number BlockNumber) (interface{}, error) {
+func (e *Eth) GetStorageAt(address string, index types.Hash, number BlockNumber) (interface{}, error) {
 
 	addr := types.StringToAddress(address)
 
@@ -255,7 +255,7 @@ func (e *Eth) EstimateGas(transaction *types.Transaction, number *BlockNumber) (
 
 	const standardGas uint64 = 21000
 
-	currentNumber := resolveBlockNumber(number);
+	currentNumber := resolveBlockNumber(number)
 
 	// Fetch the requested header
 	header, err := e.GetBlockHeader(currentNumber)
@@ -482,12 +482,12 @@ func (e *Eth) GetCode(address string, number BlockNumber) (interface{}, error) {
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
 func (e *Eth) NewFilter(filter *LogFilter) (interface{}, error) {
-	return e.d.filterManager.NewLogFilter(filter), nil
+	return e.d.filterManager.NewLogFilter(filter, nil), nil
 }
 
 // NewBlockFilter creates a filter in the node, to notify when a new block arrives
 func (e *Eth) NewBlockFilter() (interface{}, error) {
-	return e.d.filterManager.NewBlockFilter(), nil
+	return e.d.filterManager.NewBlockFilter(nil), nil
 }
 
 // GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
@@ -496,7 +496,13 @@ func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
 }
 
 // UninstallFilter uninstalls a filter with given ID
-func (e *Eth) UninstallFilter(id string) {
-	// TODO: Not sure about the return field here but it needs one
-	e.d.filterManager.Uninstall(id)
+func (e *Eth) UninstallFilter(id string) (bool, error) {
+	ok := e.d.filterManager.Uninstall(id)
+	return ok, nil
+}
+
+// Unsubscribe uninstalls a filter in a websocket
+func (e *Eth) Unsubscribe(id string) (bool, error) {
+	ok := e.d.filterManager.Uninstall(id)
+	return ok, nil
 }

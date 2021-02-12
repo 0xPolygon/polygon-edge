@@ -21,7 +21,7 @@ func TestLogFilter(t *testing.T) {
 		Topics: [][]types.Hash{
 			{hash1},
 		},
-	})
+	}, nil)
 
 	store.emitEvent(&mockEvent{
 		NewChain: []*mockHeader{
@@ -74,7 +74,7 @@ func TestBlockFilter(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil)
+	id := m.addFilter(nil, nil)
 
 	// emit two events
 	store.emitEvent(&mockEvent{
@@ -133,7 +133,7 @@ func TestTimeout(t *testing.T) {
 	go m.Run()
 
 	// add block filter
-	id := m.addFilter(nil)
+	id := m.addFilter(nil, nil)
 
 	assert.True(t, m.Exists(id))
 	time.Sleep(3 * time.Second)
