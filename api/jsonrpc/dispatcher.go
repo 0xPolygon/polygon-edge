@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -113,11 +114,35 @@ func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*ser
 	return service, fd, nil
 }
 
+func (d *Dispatcher) handleWs(reqBody []byte, conn *websocket.Conn) ([]byte, error) {
+	var req Request
+	if err := json.Unmarshal(reqBody, &req); err != nil {
+		return nil, invalidJSONRequest
+	}
+
+	// if the request method is eth_subscribe we need to create a
+	// new filter with ws connection
+	if req.Method == "eth_subscribe" {
+
+	}
+
+	// its a normal query that we handle with the dispatcher
+	resp, err := d.handleReq(serverWS, req)
+	if err != nil {
+		panic(err)
+	}
+	return resp, nil
+}
+
 func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
 	}
+	return d.handleReq(typ, req)
+}
+
+func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return nil, invalidJSONRequest
