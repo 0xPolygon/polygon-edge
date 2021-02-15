@@ -44,6 +44,19 @@ func (l *LogFilter) addAddress(raw string) error {
 	return nil
 }
 
+func decodeLogFilterFromInterface(i interface{}) (*LogFilter, error) {
+	// once the log filter is decoded as map[string]interface we cannot use unmarshaljson
+	raw, err := json.Marshal(i)
+	if err != nil {
+		return nil, err
+	}
+	filter := &LogFilter{}
+	if err := json.Unmarshal(raw, &filter); err != nil {
+		return nil, err
+	}
+	return filter, nil
+}
+
 // UnmarshalJSON decodes a json object
 func (l *LogFilter) UnmarshalJSON(data []byte) error {
 	var obj struct {

@@ -1,7 +1,6 @@
 package minimal
 
 import (
-	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/consensus"
@@ -23,9 +22,6 @@ type Config struct {
 
 	ConsensusBackends map[string]consensus.Factory
 	ConsensusEntry    *Entry
-
-	APIBackends map[string]api.Factory
-	APIEntries  map[string]*Entry
 
 	Keystore keystore.Keystore
 	Chain    *chain.Chain

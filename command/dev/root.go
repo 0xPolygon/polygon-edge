@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/minimal/api/jsonrpc"
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
@@ -107,18 +106,10 @@ func versionRunE(cmd *cobra.Command, args []string) error {
 	m.Blockchain = bChain
 	m.Sealer = sealer
 
-	a, err := jsonrpc.Factory(logger, m, map[string]interface{}{})
-	if err != nil {
-		panic(err)
-	}
-
 	// start the sealer once all the process are active
 	sealer.SetEnabled(true)
 
 	// wait
-	closeFn := func() {
-		a.Close()
-	}
 	handleClose(closeFn)
 	return nil
 }

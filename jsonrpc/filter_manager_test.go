@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLogFilter(t *testing.T) {
+func TestFilterLog(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -67,7 +67,7 @@ func TestLogFilter(t *testing.T) {
 	m.GetFilterChanges(id)
 }
 
-func TestBlockFilter(t *testing.T) {
+func TestFilterBlock(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -124,7 +124,7 @@ func TestBlockFilter(t *testing.T) {
 	m.GetFilterChanges(id)
 }
 
-func TestTimeout(t *testing.T) {
+func TestFilterTimeout(t *testing.T) {
 	store := newMockStore()
 
 	m := NewFilterManager(hclog.NewNullLogger(), store)
@@ -140,22 +140,65 @@ func TestTimeout(t *testing.T) {
 	assert.False(t, m.Exists(id))
 }
 
+func TestFilterWebsocket(t *testing.T) {
+	store := newMockStore()
+
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
+	}
+
+	m := NewFilterManager(hclog.NewNullLogger(), store)
+	go m.Run()
+
+	id := m.NewBlockFilter(mock)
+
+	// we cannot call get filter changes for a websocket filter
+	_, err := m.GetFilterChanges(id)
+	assert.Equal(t, err, errFilterDoesNotExists)
+
+	// emit two events
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
+			{
+				header: &types.Header{
+					Hash: types.StringToHash("1"),
+				},
+			},
+		},
+	})
+
+	select {
+	case <-mock.msgCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("bad")
+	}
+}
+
+type mockWsConn struct {
+	msgCh chan []byte
+}
+
+func (m *mockWsConn) WriteMessage(b []byte) error {
+	m.msgCh <- b
+	return nil
+}
+
 func TestHeadStream(t *testing.T) {
 	b := &blockStream{}
 
-	b.push(types.StringToHash("1"))
-	b.push(types.StringToHash("2"))
+	b.push(&types.Header{Hash: types.StringToHash("1")})
+	b.push(&types.Header{Hash: types.StringToHash("2")})
 
 	cur := b.Head()
 
-	b.push(types.StringToHash("3"))
-	b.push(types.StringToHash("4"))
+	b.push(&types.Header{Hash: types.StringToHash("3")})
+	b.push(&types.Header{Hash: types.StringToHash("4")})
 
 	// get the updates, there are two new entries
 	updates, next := cur.getUpdates()
 
-	assert.Equal(t, updates[0], types.StringToHash("3").String())
-	assert.Equal(t, updates[1], types.StringToHash("4").String())
+	assert.Equal(t, updates[0].Hash.String(), types.StringToHash("3").String())
+	assert.Equal(t, updates[1].Hash.String(), types.StringToHash("4").String())
 
 	// there are no new entries
 	updates, _ = next.getUpdates()
@@ -163,6 +206,8 @@ func TestHeadStream(t *testing.T) {
 }
 
 type mockStore struct {
+	nullBlockchainInterface
+
 	header       *types.Header
 	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
