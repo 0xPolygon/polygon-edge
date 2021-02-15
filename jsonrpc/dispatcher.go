@@ -7,8 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/gorilla/websocket"
+	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -45,36 +44,21 @@ type enabledEndpoints map[string]struct{}
 
 // Dispatcher handles jsonrpc requests
 type Dispatcher struct {
-	minimal          *minimal.Minimal
-	serviceMap       map[string]*serviceData
-	endpoints        endpoints
-	enabledEndpoints map[serverType]enabledEndpoints
-	filterManager    *FilterManager
+	logger        hclog.Logger
+	store         blockchainInterface
+	serviceMap    map[string]*serviceData
+	endpoints     endpoints
+	filterManager *FilterManager
 }
 
-func newDispatcher() *Dispatcher {
+func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
 	d := &Dispatcher{
-		enabledEndpoints: map[serverType]enabledEndpoints{},
+		logger:        logger.Named("dispatcher"),
+		filterManager: NewFilterManager(logger, store),
 	}
-
-	d.enabledEndpoints[serverIPC] = enabledEndpoints{}
-	d.enabledEndpoints[serverHTTP] = enabledEndpoints{}
-	d.enabledEndpoints[serverWS] = enabledEndpoints{}
-
 	d.registerEndpoints()
+	go d.filterManager.Run()
 	return d
-}
-
-func (d *Dispatcher) disableEndpoints(typ serverType, endpoints []string) {
-	for _, i := range endpoints {
-		delete(d.enabledEndpoints[typ], i)
-	}
-}
-
-func (d *Dispatcher) enableEndpoints(typ serverType, endpoints []string) {
-	for _, i := range endpoints {
-		d.enabledEndpoints[typ][i] = struct{}{}
-	}
 }
 
 func (d *Dispatcher) registerEndpoints() {
@@ -95,11 +79,6 @@ func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*ser
 
 	serviceName, funcName := callName[0], callName[1]
 
-	// check that the serviceName is enabled for this source
-	if _, ok := d.enabledEndpoints[typ][serviceName]; !ok {
-		return nil, nil, invalidMethod(req.Method)
-	}
-
 	service, ok := d.serviceMap[serviceName]
 	if !ok {
 		return nil, nil, invalidMethod(req.Method)
@@ -114,7 +93,60 @@ func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*ser
 	return service, fd, nil
 }
 
-func (d *Dispatcher) handleWs(reqBody []byte, conn *websocket.Conn) ([]byte, error) {
+type wsConn interface {
+	WriteMessage(b []byte) error
+}
+
+func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {
+	var params []interface{}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return "", invalidJSONRequest
+	}
+	if len(params) == 0 {
+		return "", invalidJSONRequest
+	}
+
+	subscribeMethod, ok := params[0].(string)
+	if !ok {
+		return "", fmt.Errorf("subscribe method '%s' not found", params[0])
+	}
+
+	var filterID string
+	if subscribeMethod == "newHeads" {
+		filterID = d.filterManager.NewBlockFilter(conn)
+
+	} else if subscribeMethod == "logs" {
+		logFilter, err := decodeLogFilterFromInterface(params[1])
+		if err != nil {
+			return "", err
+		}
+		filterID = d.filterManager.NewLogFilter(logFilter, conn)
+
+	} else {
+		return "", fmt.Errorf("subscribe method %s not found", subscribeMethod)
+	}
+
+	return filterID, nil
+}
+
+func (d *Dispatcher) handleUnsubscribe(req Request) (bool, error) {
+	var params []interface{}
+	if err := json.Unmarshal(req.Params, &params); err != nil {
+		return false, invalidJSONRequest
+	}
+	if len(params) != 1 {
+		return false, invalidJSONRequest
+	}
+
+	filterID, ok := params[0].(string)
+	if !ok {
+		return false, fmt.Errorf("unsubscribe filter not found")
+	}
+
+	return d.filterManager.Uninstall(filterID), nil
+}
+
+func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
@@ -123,18 +155,38 @@ func (d *Dispatcher) handleWs(reqBody []byte, conn *websocket.Conn) ([]byte, err
 	// if the request method is eth_subscribe we need to create a
 	// new filter with ws connection
 	if req.Method == "eth_subscribe" {
+		filterID, err := d.handleSubscribe(req, conn)
+		if err != nil {
+			return nil, err
+		}
 
+		resp := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, req.ID, filterID)
+		return []byte(resp), nil
+	}
+
+	if req.Method == "eth_unsubscribe" {
+		ok, err := d.handleUnsubscribe(req)
+		if err != nil {
+			return nil, err
+		}
+
+		res := "false"
+		if ok {
+			res = "true"
+		}
+		resp := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, req.ID, res)
+		return []byte(resp), nil
 	}
 
 	// its a normal query that we handle with the dispatcher
 	resp, err := d.handleReq(serverWS, req)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return resp, nil
 }
 
-func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
+func (d *Dispatcher) Handle(typ serverType, reqBody []byte) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
@@ -143,6 +195,8 @@ func (d *Dispatcher) handle(typ serverType, reqBody []byte) ([]byte, error) {
 }
 
 func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
+	d.logger.Debug("request", "method", req.Method, "id", req.ID, "typ", typ)
+
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return nil, invalidJSONRequest
@@ -180,6 +234,7 @@ func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
 	}
 
 	resp := Response{
+		ID:     req.ID,
 		Result: data,
 	}
 	respBytes, err := json.Marshal(resp)

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
@@ -48,7 +47,6 @@ type Minimal struct {
 	Blockchain *blockchain.Blockchain
 	Key        *ecdsa.PrivateKey
 	chain      *chain.Chain
-	apis       []api.API
 	InmemSink  *metrics.InmemSink
 	devMode    bool
 }
@@ -59,7 +57,6 @@ func NewMinimal(logger hclog.Logger, config *Config) (*Minimal, error) {
 		config:    config,
 		sealingCh: make(chan bool, 1),
 		backends:  []protocol.Backend{},
-		apis:      []api.API{},
 		chain:     config.Chain,
 	}
 

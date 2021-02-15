@@ -25,10 +25,6 @@ type Log struct {
 	Removed     bool       `json:"removed"`
 }
 
-type wsConn interface {
-	WriteMessage(b []byte) error
-}
-
 type Filter struct {
 	id string
 
@@ -51,12 +47,16 @@ type Filter struct {
 	ws wsConn
 }
 
-func (f *Filter) getUpdates() (string, error) {
+func (f *Filter) getFilterUpdates() (string, error) {
 	if f.isBlockFilter() {
 		// block filter
-		updates, newHead := f.block.getUpdates()
+		headers, newHead := f.block.getUpdates()
 		f.block = newHead
 
+		updates := []string{}
+		for _, header := range headers {
+			updates = append(updates, header.Hash.String())
+		}
 		return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
 	}
 	// log filter
@@ -96,18 +96,24 @@ func (f *Filter) flush() error {
 		f.block = newHead
 
 		for _, block := range updates {
-			if err := f.sendMessage(block); err != nil {
+			raw, err := json.Marshal(block)
+			if err != nil {
+				return err
+			}
+			if err := f.sendMessage(string(raw)); err != nil {
 				return err
 			}
 		}
 	} else {
 		// log filter
-		res, err := json.Marshal(f.logs)
-		if err != nil {
-			return err
-		}
-		if err := f.sendMessage(string(res)); err != nil {
-			return err
+		for _, log := range f.logs {
+			res, err := json.Marshal(log)
+			if err != nil {
+				return err
+			}
+			if err := f.sendMessage(string(res)); err != nil {
+				return err
+			}
 		}
 		f.logs = []*Log{}
 	}
@@ -126,25 +132,12 @@ func (f *Filter) match() bool {
 	return false
 }
 
-// blockchain is the interface with the blockchain required
-// by the filter manager
-type store interface {
-	// Header returns the current header of the chain (genesis if empty)
-	Header() *types.Header
-
-	// GetReceiptsByHash returns the receipts for a hash
-	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
-
-	// Subscribe subscribes for chain head events
-	SubscribeEvents() blockchain.Subscription
-}
-
 var defaultTimeout = 1 * time.Minute
 
 type FilterManager struct {
 	logger hclog.Logger
 
-	store   store
+	store   blockchainInterface
 	closeCh chan struct{}
 
 	subscription blockchain.Subscription
@@ -159,7 +152,7 @@ type FilterManager struct {
 	blockStream *blockStream
 }
 
-func NewFilterManager(logger hclog.Logger, store store) *FilterManager {
+func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterManager {
 	m := &FilterManager{
 		logger:      logger.Named("filter"),
 		store:       store,
@@ -173,7 +166,7 @@ func NewFilterManager(logger hclog.Logger, store store) *FilterManager {
 
 	// start blockstream with the current header
 	header := store.Header()
-	m.blockStream.push(header.Hash)
+	m.blockStream.push(header)
 
 	// start the head watcher
 	m.subscription = store.SubscribeEvents()
@@ -247,7 +240,7 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 
 	// first include all the new headers in the blockstream for the block filters
 	for _, header := range evnt.NewChain {
-		f.blockStream.push(header.Hash)
+		f.blockStream.push(header)
 	}
 
 	processBlock := func(h *types.Header, removed bool) error {
@@ -320,7 +313,7 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 		return "", errFilterDoesNotExists
 	}
 
-	res, err := item.getUpdates()
+	res, err := item.getFilterUpdates()
 	if err != nil {
 		return "", err
 	}
@@ -430,10 +423,10 @@ func (b *blockStream) Head() *headElem {
 	return head
 }
 
-func (b *blockStream) push(newBlock types.Hash) {
+func (b *blockStream) push(header *types.Header) {
 	b.lock.Lock()
 	newHead := &headElem{
-		hash: newBlock.String(),
+		header: header.Copy(),
 	}
 	if b.head != nil {
 		b.head.next = newHead
@@ -443,12 +436,12 @@ func (b *blockStream) push(newBlock types.Hash) {
 }
 
 type headElem struct {
-	hash string
-	next *headElem
+	header *types.Header
+	next   *headElem
 }
 
-func (h *headElem) getUpdates() ([]string, *headElem) {
-	res := []string{}
+func (h *headElem) getUpdates() ([]*types.Header, *headElem) {
+	res := []*types.Header{}
 
 	cur := h
 	for {
@@ -456,7 +449,7 @@ func (h *headElem) getUpdates() ([]string, *headElem) {
 			break
 		}
 		cur = cur.next
-		res = append(res, cur.hash)
+		res = append(res, cur.header)
 	}
 	return res, cur
 }

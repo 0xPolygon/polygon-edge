@@ -3,13 +3,15 @@ package jsonrpc
 import (
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	s := newTestDispatcher("web3")
+	s := newDispatcher(hclog.NewNullLogger(), nil)
+	s.registerEndpoints()
 
-	resp, err := s.handle(serverHTTP, []byte(`{
+	resp, err := s.Handle(serverHTTP, []byte(`{
 		"method": "web3_sha3",
 		"params": ["0x68656c6c6f20776f726c64"]
 	}`))

@@ -3,16 +3,11 @@ package jsonrpc
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
-
-func newTestDispatcher(endpoints ...string) *Dispatcher {
-	s := newDispatcher()
-	s.registerEndpoints()
-	s.enableEndpoints(serverHTTP, endpoints)
-	return s
-}
 
 func expectEmptyResult(t *testing.T, data []byte) {
 	var i interface{}
@@ -48,31 +43,37 @@ func expectJSONResult(data []byte, v interface{}) error {
 	return nil
 }
 
-func TestServerEnableEndpoints(t *testing.T) {
-	s := newDispatcher()
+func TestDispatcherWebsocket(t *testing.T) {
+	store := newMockStore()
+
+	s := newDispatcher(hclog.NewNullLogger(), store)
 	s.registerEndpoints()
 
-	req := []byte(`{
-		"method": "web3_sha3",
-		"params": ["0x68656c6c6f20776f726c64"]
-	}`)
-
-	validate := func(typ serverType) {
-		_, err := s.handle(typ, req)
-		assert.Error(t, err)
-
-		s.enableEndpoints(typ, []string{"web3"})
-
-		_, err = s.handle(typ, req)
-		assert.NoError(t, err)
-
-		s.disableEndpoints(typ, []string{"web3"})
-
-		_, err = s.handle(typ, req)
-		assert.Error(t, err)
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
 	}
 
-	validate(serverHTTP)
-	validate(serverIPC)
-	validate(serverWS)
+	req := []byte(`{
+		"method": "eth_subscribe",
+		"params": ["newHeads"]
+	}`)
+	if _, err := s.HandleWs(req, mock); err != nil {
+		t.Fatal(err)
+	}
+
+	store.emitEvent(&mockEvent{
+		NewChain: []*mockHeader{
+			{
+				header: &types.Header{
+					Hash: types.StringToHash("1"),
+				},
+			},
+		},
+	})
+
+	select {
+	case <-mock.msgCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("bad")
+	}
 }

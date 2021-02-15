@@ -51,17 +51,14 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 		return 0, fmt.Errorf("value is empty")
 	}
 
-	if strings.HasPrefix(str, "\"") && strings.HasSuffix(str, "\"") {
-		switch str := str[1 : len(str)-1]; str {
-		case "pending":
-			return PendingBlockNumber, nil
-		case "latest":
-			return LatestBlockNumber, nil
-		case "earliest":
-			return EarliestBlockNumber, nil
-		default:
-			return 0, fmt.Errorf("blocknumber not found: %s", str)
-		}
+	str = strings.Trim(str, "\"")
+	switch str {
+	case "pending":
+		return PendingBlockNumber, nil
+	case "latest":
+		return LatestBlockNumber, nil
+	case "earliest":
+		return EarliestBlockNumber, nil
 	}
 
 	n, err := types.ParseUint64orHex(&str)
@@ -78,6 +75,5 @@ func (b BlockNumber) UnmarshalJSON(buffer []byte) error {
 		return err
 	}
 	b = num
-
 	return nil
 }
