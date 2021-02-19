@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type systemService struct {
@@ -55,13 +56,47 @@ func (s *systemService) PeersAdd(ctx context.Context, req *proto.PeersAddRequest
 	return &empty.Empty{}, err
 }
 
+func (s *systemService) PeersStatus(ctx context.Context, req *proto.PeersStatusRequest) (*proto.Peer, error) {
+	peerID, err := peer.Decode(req.Id)
+	if err != nil {
+		return nil, err
+	}
+	peer, err := s.getPeer(peerID)
+	if err != nil {
+		return nil, err
+	}
+	return peer, nil
+}
+
+func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
+	protocols, err := s.s.host.Peerstore().GetProtocols(id)
+	if err != nil {
+		return nil, err
+	}
+	info := s.s.host.Peerstore().PeerInfo(id)
+	addrs := []string{}
+	for _, addr := range info.Addrs {
+		addrs = append(addrs, addr.String())
+	}
+	peer := &proto.Peer{
+		Id:        id.String(),
+		Protocols: protocols,
+		Addrs:     addrs,
+	}
+	return peer, nil
+}
+
 func (s *systemService) PeersList(ctx context.Context, req *empty.Empty) (*proto.PeersListResponse, error) {
 	resp := &proto.PeersListResponse{
 		Peers: []*proto.Peer{},
 	}
 	ids := s.s.host.Peerstore().Peers()
 	for _, id := range ids {
-		resp.Peers = append(resp.Peers, &proto.Peer{Id: id.String()})
+		peer, err := s.getPeer(id)
+		if err != nil {
+			return nil, err
+		}
+		resp.Peers = append(resp.Peers, peer)
 	}
 	return resp, nil
 }

@@ -16,10 +16,8 @@ service System {
     // PeersList returns the list of peers
     rpc PeersList(google.protobuf.Empty) returns (PeersListResponse);
 
-    /*
     // PeersInfo returns the info of a peer
-    rpc PeersInfo(PeersInfoRequest) returns (PeersInfoResponse);
-    */
+    rpc PeersStatus(PeersStatusRequest) returns (Peer);
 
     // Subscribe subscribes to blockchain events
     rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
@@ -52,18 +50,16 @@ message ServerStatus {
 
 message Peer {
     string id = 1;
+    repeated string protocols = 2;
+    repeated string addrs = 3;
 }
 
 message PeersAddRequest {
     string id = 1;
 }
 
-message PeersInfoRequest {
+message PeersStatusRequest {
     string id = 1;
-}
-
-message PeersInfoResponse {
-    Peer peer = 1;
 }
 
 message PeersListResponse {

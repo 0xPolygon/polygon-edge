@@ -129,5 +129,9 @@ func (s *Server) AddPeerFromMultiAddrString(str string) (peer.ID, error) {
 }
 
 func (s *Server) dial(p peer.ID) (*grpc.ClientConn, error) {
+
+	fmt.Println("-- p --")
+	fmt.Println(p.String())
+
 	return s.libp2pServer.Dial(context.Background(), p, grpc.WithInsecure())
 }

@@ -1,4 +1,4 @@
-package protocol2
+package protocol
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/protocol2/proto"
+	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -19,7 +19,7 @@ var _ proto.V1Server = &serviceV1{}
 type serviceV1 struct {
 	logger hclog.Logger
 
-	store Blockchain
+	store blockchainShim
 	subs  blockchain.Subscription
 
 	addCh  chan chan *proto.V1Status
@@ -171,8 +171,16 @@ func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest
 	resp := &proto.Response{
 		Objs: []*proto.Response_Component{},
 	}
+	addData := func(h *types.Header) {
+		resp.Objs = append(resp.Objs, &proto.Response_Component{
+			Spec: &any.Any{
+				Value: h.MarshalRLPTo(nil),
+			},
+		})
+	}
 
 	// resp
+	addData(origin)
 
 	count := int64(1)
 	for count < req.Amount {
@@ -186,7 +194,9 @@ func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest
 			break
 		}
 		count++
+
 		// resp
+		addData(origin)
 	}
 
 	return resp, nil

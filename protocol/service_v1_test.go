@@ -1,8 +1,7 @@
-package protocol2
+package protocol
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -11,10 +10,11 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/protocol2/proto"
+	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )
 
@@ -24,6 +24,7 @@ func TestServiceV1Watch(t *testing.T) {
 	s := &serviceV1{
 		logger: hclog.NewNullLogger(),
 		subs:   mockSub,
+		store:  &mockBlockchain{},
 	}
 	go s.start()
 
@@ -74,6 +75,6 @@ func TestServiceV1Watch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println("- recv -")
-	fmt.Println(recv)
+	assert.Equal(t, recv.Number, int64(100))
+	assert.Equal(t, recv.Difficulty, "100")
 }

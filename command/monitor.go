@@ -11,32 +11,32 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-// Watch is the command to watch to the blockchain events
-type Watch struct {
+// MonitorCommand is the command to Monitor to the blockchain events
+type MonitorCommand struct {
 	Meta
 }
 
 // Help implements the cli.Command interface
-func (w *Watch) Help() string {
+func (m *MonitorCommand) Help() string {
 	return ""
 }
 
 // Synopsis implements the cli.Command interface
-func (w *Watch) Synopsis() string {
+func (m *MonitorCommand) Synopsis() string {
 	return ""
 }
 
 // Run implements the cli.Command interface
-func (w *Watch) Run(args []string) int {
-	flags := w.FlagSet("watch")
+func (m *MonitorCommand) Run(args []string) int {
+	flags := m.FlagSet("monitor")
 	if err := flags.Parse(args); err != nil {
-		w.UI.Error(err.Error())
+		m.UI.Error(err.Error())
 		return 1
 	}
 
-	conn, err := w.Conn()
+	conn, err := m.Conn()
 	if err != nil {
-		w.UI.Error(err.Error())
+		m.UI.Error(err.Error())
 		return 1
 	}
 
@@ -45,7 +45,7 @@ func (w *Watch) Run(args []string) int {
 
 	stream, err := clt.Subscribe(ctx, &empty.Empty{})
 	if err != nil {
-		w.UI.Error(err.Error())
+		m.UI.Error(err.Error())
 		cancelFn()
 		return 1
 	}
@@ -55,11 +55,16 @@ func (w *Watch) Run(args []string) int {
 		for {
 			evnt, err := stream.Recv()
 			if err != nil {
-				w.UI.Error(fmt.Sprintf("failed to read event: %v", err))
+				m.UI.Error(fmt.Sprintf("failed to read event: %v", err))
 				break
 			}
-			fmt.Println("-- evnt --")
-			fmt.Println(evnt)
+			fmt.Println("-- event --")
+			for _, add := range evnt.Added {
+				fmt.Printf("Add block: Num %d Hash %s\n", add.Number, add.Hash)
+			}
+			for _, del := range evnt.Removed {
+				fmt.Printf("Delete block: Num %d Hash %s\n", del.Number, del.Hash)
+			}
 		}
 		doneCh <- struct{}{}
 	}()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/mitchellh/cli"
+	"github.com/ryanuber/columnize"
 	"google.golang.org/grpc"
 )
 
@@ -41,8 +42,8 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
-		"peers info": func() (cli.Command, error) {
-			return &PeersInfo{
+		"peers status": func() (cli.Command, error) {
+			return &PeersStatus{
 				Meta: meta,
 			}, nil
 		},
@@ -56,8 +57,8 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
-		"watch": func() (cli.Command, error) {
-			return &Watch{
+		"monitor": func() (cli.Command, error) {
+			return &MonitorCommand{
 				Meta: meta,
 			}, nil
 		},
@@ -89,4 +90,17 @@ func (m *Meta) Conn() (*grpc.ClientConn, error) {
 		return nil, fmt.Errorf("failed to connect to server: %v", err)
 	}
 	return conn, nil
+}
+
+func formatList(in []string) string {
+	columnConf := columnize.DefaultConfig()
+	columnConf.Empty = "<none>"
+	return columnize.Format(in, columnConf)
+}
+
+func formatKV(in []string) string {
+	columnConf := columnize.DefaultConfig()
+	columnConf.Empty = "<none>"
+	columnConf.Glue = " = "
+	return columnize.Format(in, columnConf)
 }

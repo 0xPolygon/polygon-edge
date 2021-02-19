@@ -7,5 +7,9 @@ option go_package = "/minimal/proto";
 import "google/protobuf/empty.proto";
 
 service Handshake {
-    rpc Hello(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc Hello(HelloReq) returns (google.protobuf.Empty);
+}
+
+message HelloReq {
+    string id = 1;
 }

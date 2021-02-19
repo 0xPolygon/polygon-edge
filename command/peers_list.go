@@ -44,12 +44,19 @@ func (p *PeersList) Run(args []string) int {
 		return 1
 	}
 
-	if len(resp.Peers) == 0 {
-		p.UI.Info("No peers")
-	} else {
-		for _, peer := range resp.Peers {
-			fmt.Println(peer.Id)
-		}
-	}
+	p.UI.Output(formatPeers(resp.Peers))
 	return 0
+}
+
+func formatPeers(peers []*proto.Peer) string {
+	if len(peers) == 0 {
+		return "No deployments found"
+	}
+
+	rows := make([]string, len(peers)+1)
+	rows[0] = "ID"
+	for i, d := range peers {
+		rows[i+1] = fmt.Sprintf("%s", d.Id)
+	}
+	return formatList(rows)
 }

@@ -161,7 +161,9 @@ type Peer struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id        string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Protocols []string `protobuf:"bytes,2,rep,name=protocols,proto3" json:"protocols,omitempty"`
+	Addrs     []string `protobuf:"bytes,3,rep,name=addrs,proto3" json:"addrs,omitempty"`
 }
 
 func (x *Peer) Reset() {
@@ -201,6 +203,20 @@ func (x *Peer) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *Peer) GetProtocols() []string {
+	if x != nil {
+		return x.Protocols
+	}
+	return nil
+}
+
+func (x *Peer) GetAddrs() []string {
+	if x != nil {
+		return x.Addrs
+	}
+	return nil
 }
 
 type PeersAddRequest struct {
@@ -250,7 +266,7 @@ func (x *PeersAddRequest) GetId() string {
 	return ""
 }
 
-type PeersInfoRequest struct {
+type PeersStatusRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -258,8 +274,8 @@ type PeersInfoRequest struct {
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 }
 
-func (x *PeersInfoRequest) Reset() {
-	*x = PeersInfoRequest{}
+func (x *PeersStatusRequest) Reset() {
+	*x = PeersStatusRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_minimal_proto_system_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -267,13 +283,13 @@ func (x *PeersInfoRequest) Reset() {
 	}
 }
 
-func (x *PeersInfoRequest) String() string {
+func (x *PeersStatusRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PeersInfoRequest) ProtoMessage() {}
+func (*PeersStatusRequest) ProtoMessage() {}
 
-func (x *PeersInfoRequest) ProtoReflect() protoreflect.Message {
+func (x *PeersStatusRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_minimal_proto_system_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -285,63 +301,16 @@ func (x *PeersInfoRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PeersInfoRequest.ProtoReflect.Descriptor instead.
-func (*PeersInfoRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use PeersStatusRequest.ProtoReflect.Descriptor instead.
+func (*PeersStatusRequest) Descriptor() ([]byte, []int) {
 	return file_minimal_proto_system_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *PeersInfoRequest) GetId() string {
+func (x *PeersStatusRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
-}
-
-type PeersInfoResponse struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Peer *Peer `protobuf:"bytes,1,opt,name=peer,proto3" json:"peer,omitempty"`
-}
-
-func (x *PeersInfoResponse) Reset() {
-	*x = PeersInfoResponse{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_minimal_proto_system_proto_msgTypes[5]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *PeersInfoResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PeersInfoResponse) ProtoMessage() {}
-
-func (x *PeersInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minimal_proto_system_proto_msgTypes[5]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PeersInfoResponse.ProtoReflect.Descriptor instead.
-func (*PeersInfoResponse) Descriptor() ([]byte, []int) {
-	return file_minimal_proto_system_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *PeersInfoResponse) GetPeer() *Peer {
-	if x != nil {
-		return x.Peer
-	}
-	return nil
 }
 
 type PeersListResponse struct {
@@ -355,7 +324,7 @@ type PeersListResponse struct {
 func (x *PeersListResponse) Reset() {
 	*x = PeersListResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_minimal_proto_system_proto_msgTypes[6]
+		mi := &file_minimal_proto_system_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -368,7 +337,7 @@ func (x *PeersListResponse) String() string {
 func (*PeersListResponse) ProtoMessage() {}
 
 func (x *PeersListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_minimal_proto_system_proto_msgTypes[6]
+	mi := &file_minimal_proto_system_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -381,7 +350,7 @@ func (x *PeersListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PeersListResponse.ProtoReflect.Descriptor instead.
 func (*PeersListResponse) Descriptor() ([]byte, []int) {
-	return file_minimal_proto_system_proto_rawDescGZIP(), []int{6}
+	return file_minimal_proto_system_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PeersListResponse) GetPeers() []*Peer {
@@ -403,7 +372,7 @@ type BlockchainEvent_Header struct {
 func (x *BlockchainEvent_Header) Reset() {
 	*x = BlockchainEvent_Header{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_minimal_proto_system_proto_msgTypes[7]
+		mi := &file_minimal_proto_system_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -416,7 +385,7 @@ func (x *BlockchainEvent_Header) String() string {
 func (*BlockchainEvent_Header) ProtoMessage() {}
 
 func (x *BlockchainEvent_Header) ProtoReflect() protoreflect.Message {
-	mi := &file_minimal_proto_system_proto_msgTypes[7]
+	mi := &file_minimal_proto_system_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +427,7 @@ type ServerStatus_Block struct {
 func (x *ServerStatus_Block) Reset() {
 	*x = ServerStatus_Block{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_minimal_proto_system_proto_msgTypes[8]
+		mi := &file_minimal_proto_system_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -471,7 +440,7 @@ func (x *ServerStatus_Block) String() string {
 func (*ServerStatus_Block) ProtoMessage() {}
 
 func (x *ServerStatus_Block) ProtoReflect() protoreflect.Message {
-	mi := &file_minimal_proto_system_proto_msgTypes[8]
+	mi := &file_minimal_proto_system_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -531,36 +500,39 @@ var file_minimal_proto_system_proto_rawDesc = []byte{
 	0x1a, 0x33, 0x0a, 0x05, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x16, 0x0a, 0x06, 0x6e, 0x75, 0x6d,
 	0x62, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x6e, 0x75, 0x6d, 0x62, 0x65,
 	0x72, 0x12, 0x12, 0x0a, 0x04, 0x68, 0x61, 0x73, 0x68, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x04, 0x68, 0x61, 0x73, 0x68, 0x22, 0x16, 0x0a, 0x04, 0x50, 0x65, 0x65, 0x72, 0x12, 0x0e, 0x0a,
-	0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x22, 0x21, 0x0a,
-	0x0f, 0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64,
-	0x22, 0x22, 0x0a, 0x10, 0x50, 0x65, 0x65, 0x72, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x71,
+	0x04, 0x68, 0x61, 0x73, 0x68, 0x22, 0x4a, 0x0a, 0x04, 0x50, 0x65, 0x65, 0x72, 0x12, 0x0e, 0x0a,
+	0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1c, 0x0a,
+	0x09, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x09, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x73, 0x12, 0x14, 0x0a, 0x05, 0x61,
+	0x64, 0x64, 0x72, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x61, 0x64, 0x64, 0x72,
+	0x73, 0x22, 0x21, 0x0a, 0x0f, 0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x52, 0x65, 0x71,
 	0x75, 0x65, 0x73, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x02, 0x69, 0x64, 0x22, 0x31, 0x0a, 0x11, 0x50, 0x65, 0x65, 0x72, 0x73, 0x49, 0x6e, 0x66,
-	0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1c, 0x0a, 0x04, 0x70, 0x65, 0x65,
-	0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65,
-	0x72, 0x52, 0x04, 0x70, 0x65, 0x65, 0x72, 0x22, 0x33, 0x0a, 0x11, 0x50, 0x65, 0x65, 0x72, 0x73,
-	0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1e, 0x0a, 0x05,
-	0x70, 0x65, 0x65, 0x72, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x08, 0x2e, 0x76, 0x31,
-	0x2e, 0x50, 0x65, 0x65, 0x72, 0x52, 0x05, 0x70, 0x65, 0x65, 0x72, 0x73, 0x32, 0xf0, 0x01, 0x0a,
-	0x06, 0x53, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x12, 0x35, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x53, 0x74,
-	0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x10, 0x2e, 0x76,
-	0x31, 0x2e, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x37,
-	0x0a, 0x08, 0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x12, 0x13, 0x2e, 0x76, 0x31, 0x2e,
-	0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x12, 0x3a, 0x0a, 0x09, 0x50, 0x65, 0x65, 0x72, 0x73,
-	0x4c, 0x69, 0x73, 0x74, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x15, 0x2e, 0x76,
-	0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x73, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f,
-	0x6e, 0x73, 0x65, 0x12, 0x3a, 0x0a, 0x09, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65,
-	0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
-	0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x13, 0x2e, 0x76, 0x31, 0x2e, 0x42, 0x6c,
-	0x6f, 0x63, 0x6b, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x30, 0x01, 0x42,
-	0x10, 0x5a, 0x0e, 0x2f, 0x6d, 0x69, 0x6e, 0x69, 0x6d, 0x61, 0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x02, 0x69, 0x64, 0x22, 0x24, 0x0a, 0x12, 0x50, 0x65, 0x65, 0x72, 0x73, 0x53, 0x74, 0x61,
+	0x74, 0x75, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x22, 0x33, 0x0a, 0x11, 0x50, 0x65,
+	0x65, 0x72, 0x73, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x1e, 0x0a, 0x05, 0x70, 0x65, 0x65, 0x72, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x08,
+	0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x52, 0x05, 0x70, 0x65, 0x65, 0x72, 0x73, 0x32,
+	0xa1, 0x02, 0x0a, 0x06, 0x53, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x12, 0x35, 0x0a, 0x09, 0x47, 0x65,
+	0x74, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a,
+	0x10, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x53, 0x74, 0x61, 0x74, 0x75,
+	0x73, 0x12, 0x37, 0x0a, 0x08, 0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x12, 0x13, 0x2e,
+	0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x73, 0x41, 0x64, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x12, 0x3a, 0x0a, 0x09, 0x50, 0x65,
+	0x65, 0x72, 0x73, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a,
+	0x15, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x73, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2f, 0x0a, 0x0b, 0x50, 0x65, 0x65, 0x72, 0x73, 0x53,
+	0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x2e, 0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x73,
+	0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x08, 0x2e,
+	0x76, 0x31, 0x2e, 0x50, 0x65, 0x65, 0x72, 0x12, 0x3a, 0x0a, 0x09, 0x53, 0x75, 0x62, 0x73, 0x63,
+	0x72, 0x69, 0x62, 0x65, 0x12, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x13, 0x2e, 0x76,
+	0x31, 0x2e, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x45, 0x76, 0x65, 0x6e,
+	0x74, 0x30, 0x01, 0x42, 0x10, 0x5a, 0x0e, 0x2f, 0x6d, 0x69, 0x6e, 0x69, 0x6d, 0x61, 0x6c, 0x2f,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -575,38 +547,38 @@ func file_minimal_proto_system_proto_rawDescGZIP() []byte {
 	return file_minimal_proto_system_proto_rawDescData
 }
 
-var file_minimal_proto_system_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_minimal_proto_system_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_minimal_proto_system_proto_goTypes = []interface{}{
 	(*BlockchainEvent)(nil),        // 0: v1.BlockchainEvent
 	(*ServerStatus)(nil),           // 1: v1.ServerStatus
 	(*Peer)(nil),                   // 2: v1.Peer
 	(*PeersAddRequest)(nil),        // 3: v1.PeersAddRequest
-	(*PeersInfoRequest)(nil),       // 4: v1.PeersInfoRequest
-	(*PeersInfoResponse)(nil),      // 5: v1.PeersInfoResponse
-	(*PeersListResponse)(nil),      // 6: v1.PeersListResponse
-	(*BlockchainEvent_Header)(nil), // 7: v1.BlockchainEvent.Header
-	(*ServerStatus_Block)(nil),     // 8: v1.ServerStatus.Block
-	(*empty.Empty)(nil),            // 9: google.protobuf.Empty
+	(*PeersStatusRequest)(nil),     // 4: v1.PeersStatusRequest
+	(*PeersListResponse)(nil),      // 5: v1.PeersListResponse
+	(*BlockchainEvent_Header)(nil), // 6: v1.BlockchainEvent.Header
+	(*ServerStatus_Block)(nil),     // 7: v1.ServerStatus.Block
+	(*empty.Empty)(nil),            // 8: google.protobuf.Empty
 }
 var file_minimal_proto_system_proto_depIdxs = []int32{
-	7, // 0: v1.BlockchainEvent.added:type_name -> v1.BlockchainEvent.Header
-	7, // 1: v1.BlockchainEvent.removed:type_name -> v1.BlockchainEvent.Header
-	8, // 2: v1.ServerStatus.current:type_name -> v1.ServerStatus.Block
-	2, // 3: v1.PeersInfoResponse.peer:type_name -> v1.Peer
-	2, // 4: v1.PeersListResponse.peers:type_name -> v1.Peer
-	9, // 5: v1.System.GetStatus:input_type -> google.protobuf.Empty
-	3, // 6: v1.System.PeersAdd:input_type -> v1.PeersAddRequest
-	9, // 7: v1.System.PeersList:input_type -> google.protobuf.Empty
-	9, // 8: v1.System.Subscribe:input_type -> google.protobuf.Empty
+	6, // 0: v1.BlockchainEvent.added:type_name -> v1.BlockchainEvent.Header
+	6, // 1: v1.BlockchainEvent.removed:type_name -> v1.BlockchainEvent.Header
+	7, // 2: v1.ServerStatus.current:type_name -> v1.ServerStatus.Block
+	2, // 3: v1.PeersListResponse.peers:type_name -> v1.Peer
+	8, // 4: v1.System.GetStatus:input_type -> google.protobuf.Empty
+	3, // 5: v1.System.PeersAdd:input_type -> v1.PeersAddRequest
+	8, // 6: v1.System.PeersList:input_type -> google.protobuf.Empty
+	4, // 7: v1.System.PeersStatus:input_type -> v1.PeersStatusRequest
+	8, // 8: v1.System.Subscribe:input_type -> google.protobuf.Empty
 	1, // 9: v1.System.GetStatus:output_type -> v1.ServerStatus
-	9, // 10: v1.System.PeersAdd:output_type -> google.protobuf.Empty
-	6, // 11: v1.System.PeersList:output_type -> v1.PeersListResponse
-	0, // 12: v1.System.Subscribe:output_type -> v1.BlockchainEvent
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 10: v1.System.PeersAdd:output_type -> google.protobuf.Empty
+	5, // 11: v1.System.PeersList:output_type -> v1.PeersListResponse
+	2, // 12: v1.System.PeersStatus:output_type -> v1.Peer
+	0, // 13: v1.System.Subscribe:output_type -> v1.BlockchainEvent
+	9, // [9:14] is the sub-list for method output_type
+	4, // [4:9] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_minimal_proto_system_proto_init() }
@@ -664,7 +636,7 @@ func file_minimal_proto_system_proto_init() {
 			}
 		}
 		file_minimal_proto_system_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PeersInfoRequest); i {
+			switch v := v.(*PeersStatusRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -676,18 +648,6 @@ func file_minimal_proto_system_proto_init() {
 			}
 		}
 		file_minimal_proto_system_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*PeersInfoResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_minimal_proto_system_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*PeersListResponse); i {
 			case 0:
 				return &v.state
@@ -699,7 +659,7 @@ func file_minimal_proto_system_proto_init() {
 				return nil
 			}
 		}
-		file_minimal_proto_system_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_minimal_proto_system_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BlockchainEvent_Header); i {
 			case 0:
 				return &v.state
@@ -711,7 +671,7 @@ func file_minimal_proto_system_proto_init() {
 				return nil
 			}
 		}
-		file_minimal_proto_system_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_minimal_proto_system_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ServerStatus_Block); i {
 			case 0:
 				return &v.state
@@ -730,7 +690,7 @@ func file_minimal_proto_system_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_minimal_proto_system_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -762,6 +722,8 @@ type SystemClient interface {
 	PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	// PeersList returns the list of peers
 	PeersList(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*PeersListResponse, error)
+	// PeersInfo returns the info of a peer
+	PeersStatus(ctx context.Context, in *PeersStatusRequest, opts ...grpc.CallOption) (*Peer, error)
 	// Subscribe subscribes to blockchain events
 	Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error)
 }
@@ -795,6 +757,15 @@ func (c *systemClient) PeersAdd(ctx context.Context, in *PeersAddRequest, opts .
 func (c *systemClient) PeersList(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*PeersListResponse, error) {
 	out := new(PeersListResponse)
 	err := c.cc.Invoke(ctx, "/v1.System/PeersList", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *systemClient) PeersStatus(ctx context.Context, in *PeersStatusRequest, opts ...grpc.CallOption) (*Peer, error) {
+	out := new(Peer)
+	err := c.cc.Invoke(ctx, "/v1.System/PeersStatus", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -841,6 +812,8 @@ type SystemServer interface {
 	PeersAdd(context.Context, *PeersAddRequest) (*empty.Empty, error)
 	// PeersList returns the list of peers
 	PeersList(context.Context, *empty.Empty) (*PeersListResponse, error)
+	// PeersInfo returns the info of a peer
+	PeersStatus(context.Context, *PeersStatusRequest) (*Peer, error)
 	// Subscribe subscribes to blockchain events
 	Subscribe(*empty.Empty, System_SubscribeServer) error
 }
@@ -857,6 +830,9 @@ func (*UnimplementedSystemServer) PeersAdd(context.Context, *PeersAddRequest) (*
 }
 func (*UnimplementedSystemServer) PeersList(context.Context, *empty.Empty) (*PeersListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PeersList not implemented")
+}
+func (*UnimplementedSystemServer) PeersStatus(context.Context, *PeersStatusRequest) (*Peer, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PeersStatus not implemented")
 }
 func (*UnimplementedSystemServer) Subscribe(*empty.Empty, System_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
@@ -920,6 +896,24 @@ func _System_PeersList_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _System_PeersStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PeersStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SystemServer).PeersStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.System/PeersStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SystemServer).PeersStatus(ctx, req.(*PeersStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _System_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(empty.Empty)
 	if err := stream.RecvMsg(m); err != nil {
@@ -956,6 +950,10 @@ var _System_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PeersList",
 			Handler:    _System_PeersList_Handler,
+		},
+		{
+			MethodName: "PeersStatus",
+			Handler:    _System_PeersStatus_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

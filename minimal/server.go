@@ -15,13 +15,13 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/protocol2"
+	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
@@ -64,7 +64,7 @@ type Server struct {
 	addrs        []ma.Multiaddr
 
 	// syncer protocol
-	syncer *protocol2.Syncer
+	syncer *protocol.Syncer
 }
 
 var dirPaths = []string{
@@ -147,12 +147,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	// setup syncer protocol
-	m.syncer = protocol2.NewSyncer(m.blockchain)
+	m.syncer = protocol.NewSyncer(logger, m.blockchain)
 	m.syncer.Register(m.libp2pServer.GetGRPCServer())
 	m.syncer.Start()
 
 	// register the libp2p GRPC endpoints
-	proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{})
+	proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{s: m})
 
 	m.libp2pServer.Serve()
 	return m, nil
@@ -219,14 +219,36 @@ func (s *Server) Join(addr0 string) error {
 		return err
 	}
 	clt := proto.NewHandshakeClient(conn)
-	if _, err := clt.Hello(context.Background(), &empty.Empty{}); err != nil {
+
+	req := &proto.HelloReq{
+		Id: s.host.ID().String(),
+	}
+	if _, err := clt.Hello(context.Background(), req); err != nil {
 		return err
 	}
 
 	// send the connection to the syncer
-	go s.syncer.HandleUser(conn)
+	go s.syncer.HandleUser(peerID, conn)
 
 	return nil
+}
+
+func (s *Server) handleConnUser(addr string) {
+	// we are already connected with libp2p
+	fmt.Println("-- addr --")
+	fmt.Println(addr)
+
+	peerID, err := peer.Decode(addr)
+	if err != nil {
+		panic(err)
+	}
+
+	// perform handshake protocol
+	conn, err := s.dial(peerID)
+	if err != nil {
+		panic(err)
+	}
+	go s.syncer.HandleUser(peerID, conn)
 }
 
 func (s *Server) Close() {

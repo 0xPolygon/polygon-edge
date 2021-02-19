@@ -31,7 +31,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-type Blockchain interface {
+type blockchainShim interface {
 	Header() *types.Header
 	WriteBlocks(blocks []*types.Block) error
 	SubscribeEvents() blockchain.Subscription
@@ -42,7 +42,7 @@ type Sealer struct {
 	config *Config
 	logger hclog.Logger
 
-	blockchain Blockchain
+	blockchain blockchainShim
 	engine     consensus.Consensus // TODO; remove once the executor has more content
 	txPool     *TxPool
 
@@ -94,8 +94,8 @@ func (s *Sealer) SetEnabled(enabled bool) {
 }
 
 func (s *Sealer) run(ctx context.Context) {
-	//listener := s.blockchain.SubscribeEvents()
-	//eventCh := listener.GetEventCh()
+	sub := s.blockchain.SubscribeEvents()
+	eventCh := sub.GetEventCh()
 
 	for {
 		if s.config.DevMode {
@@ -117,8 +117,8 @@ func (s *Sealer) run(ctx context.Context) {
 			// the sealing process has finished
 		case <-ctx.Done():
 			// the sealing routine has been canceled
-			//case <-eventCh:
-			// there is a new head
+		case <-eventCh:
+			// there is a new head, reset sealer
 		}
 
 		// cancel the sealing process context

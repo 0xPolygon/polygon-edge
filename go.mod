@@ -27,6 +27,7 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.1.4
 	github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c // indirect
 	github.com/prometheus/client_golang v0.9.2 // indirect
+	github.com/ryanuber/columnize v2.1.2+incompatible
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
