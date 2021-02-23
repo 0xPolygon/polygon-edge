@@ -10,6 +10,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/golang/protobuf v1.4.3
 	github.com/google/uuid v1.1.4
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-hclog v0.14.1
 	github.com/hashicorp/go-immutable-radix v1.0.0
 	github.com/hashicorp/go-multierror v1.0.0
@@ -33,7 +34,6 @@ require (
 	github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
 	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
-	github.com/valyala/fasthttp v1.2.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0

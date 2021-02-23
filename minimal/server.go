@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
@@ -51,7 +50,6 @@ type Server struct {
 
 	key       *ecdsa.PrivateKey
 	chain     *chain.Chain
-	apis      []api.API
 	InmemSink *metrics.InmemSink
 	devMode   bool
 
@@ -79,7 +77,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		logger: logger,
 		config: config,
 		// backends:   []protocol.Backend{},
-		apis:       []api.API{},
 		chain:      config.Chain,
 		grpcServer: grpc.NewServer(),
 	}
