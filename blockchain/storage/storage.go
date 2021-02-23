@@ -3,8 +3,9 @@ package storage
 import (
 	"math/big"
 
-	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/minimal/types"
 )
 
 // Storage is a generic blockchain storage
@@ -39,6 +40,14 @@ type Storage interface {
 
 	WriteTxLookup(hash types.Hash, blockHash types.Hash) error
 	ReadTxLookup(hash types.Hash) (types.Hash, bool)
+
+	// Chain indexer //
+	ReadIndexSectionHead(section uint64) types.Hash
+	WriteIndexSectionHead(section uint64, hash types.Hash) error
+	RemoveSectionHead(section uint64) error
+	WriteValidSectionsNum(sections uint64) error
+	ReadValidSectionsNum() (uint64, error)
+	WriteBloomBits(bitNum uint, currentSection uint64, bHead types.Hash, bits []byte)
 
 	Close() error
 }

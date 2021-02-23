@@ -38,6 +38,7 @@ type Log struct {
 }
 
 const BloomByteLength = 256
+const BloomBitLength = 256 * 8
 
 type Bloom [BloomByteLength]byte
 

@@ -1,12 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
+
+	"github.com/0xPolygon/minimal/types"
 )
 
 // prefix
@@ -38,6 +40,10 @@ var (
 
 	// TRANSACTION is the prefix for transactions
 	TX_LOOKUP_PREFIX = []byte("l")
+
+	// CHAIN_INDEXER is the prefix for the chain indexer
+	CHAIN_INDEXER_HEAD = []byte("chainIndexerSectionsHead")
+	CHAIN_INDEXER      = []byte("chainIndexer")
 )
 
 // sub-prefix
@@ -46,6 +52,8 @@ var (
 	HASH   = []byte("hash")
 	NUMBER = []byte("number")
 	EMPTY  = []byte("empty")
+
+	CHAIN_SECTIONS = []byte("sectionsValid")
 )
 
 // KV is a key value storage interface
@@ -362,18 +370,82 @@ func (s *KeyValueStorage) write2(p, k []byte, v *fastrlp.Value) error {
 	return s.set(p, k, dst)
 }
 
-func (s *KeyValueStorage) set(p []byte, k []byte, v []byte) error {
-	p = append(p, k...)
-	return s.db.Set(p, v)
+// Prefix, Key, Value
+func (s *KeyValueStorage) set(prefix []byte, key []byte, value []byte) error {
+	prefix = append(prefix, key...)
+	return s.db.Set(prefix, value)
 }
 
-func (s *KeyValueStorage) get(p []byte, k []byte) ([]byte, bool) {
-	p = append(p, k...)
-	data, ok, err := s.db.Get(p)
+func (s *KeyValueStorage) get(prefix []byte, key []byte) ([]byte, bool) {
+	prefix = append(prefix, key...)
+	data, ok, err := s.db.Get(prefix)
 	if err != nil {
 		return nil, false
 	}
 	return data, ok
+}
+
+// Chain indexer //
+
+func (s *KeyValueStorage) ReadIndexSectionHead(section uint64) types.Hash {
+	var sectionBinary []byte
+	binary.BigEndian.PutUint64(sectionBinary[:], section)
+
+	data, _ := s.get(CHAIN_INDEXER, sectionBinary)
+
+	return types.BytesToHash(data)
+}
+
+func (s *KeyValueStorage) WriteIndexSectionHead(section uint64, hash types.Hash) error {
+	var sectionBinary []byte
+	binary.BigEndian.PutUint64(sectionBinary[:], section)
+
+	err := s.set(CHAIN_INDEXER_HEAD, sectionBinary, hash.Bytes())
+
+	return err
+}
+
+func (s *KeyValueStorage) RemoveSectionHead(section uint64) error {
+
+	// TODO swap with remove
+	var sectionBinary []byte
+	binary.BigEndian.PutUint64(sectionBinary[:], section)
+
+	err := s.set(CHAIN_INDEXER_HEAD, sectionBinary, nil)
+
+	return err
+}
+
+func (s *KeyValueStorage) WriteValidSectionsNum(sections uint64) error {
+	var sectionsBinary []byte
+	binary.BigEndian.PutUint64(sectionsBinary[:], sections)
+
+	err := s.set(CHAIN_INDEXER, CHAIN_SECTIONS, sectionsBinary)
+
+	return err
+}
+
+func (s *KeyValueStorage) ReadValidSectionsNum() (uint64, error) {
+	var ret uint64
+
+	data, _ := s.get(CHAIN_INDEXER, CHAIN_SECTIONS)
+
+	buf := bytes.NewBuffer(data)
+	_ = binary.Read(buf, binary.BigEndian, &ret)
+
+	return ret, nil
+}
+
+func (s *KeyValueStorage) WriteBloomBits(bitNum uint, currentSection uint64, bHead types.Hash, bits []byte) {
+	var bitNumBinary []byte
+	binary.BigEndian.PutUint64(bitNumBinary[:], uint64(bitNum))
+
+	var currentSectionBinary []byte
+	binary.BigEndian.PutUint64(currentSectionBinary[:], uint64(currentSection))
+
+	generatedKey := append(bitNumBinary, currentSectionBinary...)
+
+	_ = s.set(CHAIN_INDEXER, append(generatedKey, bHead.Bytes()...), bits)
 }
 
 // Close closes the connection with the db
