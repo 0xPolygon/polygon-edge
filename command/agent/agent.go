@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/0xPolygon/minimal/api"
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/minimal/keystore"
@@ -29,9 +28,6 @@ import (
 
 	storageBoltDB "github.com/0xPolygon/minimal/blockchain/storage/boltdb"
 	storageLevelDB "github.com/0xPolygon/minimal/blockchain/storage/leveldb"
-
-	apiHTTP "github.com/0xPolygon/minimal/api/http"
-	apiJsonRPC "github.com/0xPolygon/minimal/api/jsonrpc"
 )
 
 var blockchainBackends = map[string]storage.Factory{
@@ -53,11 +49,6 @@ var discoveryBackends = map[string]discovery.Factory{
 
 var protocolBackends = map[string]protocol.Factory{
 	"ethereum": protocolEthereum.Factory,
-}
-
-var apiBackends = map[string]api.Factory{
-	"jsonrpc": apiJsonRPC.Factory,
-	"http":    apiHTTP.Factory,
 }
 
 // Agent is a long running daemon that is used to run
