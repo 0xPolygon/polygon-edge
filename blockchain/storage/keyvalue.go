@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/types"
@@ -290,12 +291,12 @@ func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Recei
 }
 
 // ReadReceipts reads the receipts
-func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool) {
+func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error) {
 	receipts2 := []*types.Receipt{}
 	parser := &fastrlp.Parser{}
 	v := s.read2(RECEIPTS, hash.Bytes(), parser)
 	if v == nil {
-		return nil, false
+		return nil, fmt.Errorf("empty")
 	}
 
 	elems, err := v.GetElems()
@@ -310,7 +311,7 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 		receipts2 = append(receipts2, receipt)
 	}
 
-	return receipts2, true
+	return receipts2, nil
 }
 
 // -- tx lookup --

@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/protocol"
@@ -41,7 +42,6 @@ type Server struct {
 	config *Config
 	Sealer *sealer.Sealer
 
-	// backends  []protocol.Backend
 	consensus consensus.Consensus
 
 	// blockchain stack
@@ -52,6 +52,9 @@ type Server struct {
 	chain     *chain.Chain
 	InmemSink *metrics.InmemSink
 	devMode   bool
+
+	// jsonrpc stack
+	jsonrpcServer *jsonrpc.JSONRPC
 
 	// system grpc server
 	grpcServer *grpc.Server
@@ -143,6 +146,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup jsonrpc
+	if err := m.setupJSONRPC(); err != nil {
+		return nil, err
+	}
+
 	// setup syncer protocol
 	m.syncer = protocol.NewSyncer(logger, m.blockchain)
 	m.syncer.Register(m.libp2pServer.GetGRPCServer())
@@ -173,6 +181,30 @@ func (s *Server) setupConsensus() error {
 		return err
 	}
 	s.consensus = consensus
+	return nil
+}
+
+type jsonRPCHub struct {
+	*blockchain.Blockchain
+	*sealer.Sealer
+	*state.Executor
+}
+
+func (s *Server) setupJSONRPC() error {
+	hub := &jsonRPCHub{
+		Blockchain: s.blockchain,
+		Sealer:     s.Sealer,
+		Executor:   s.blockchain.Executor(),
+	}
+	conf := &jsonrpc.Config{
+		Store: hub,
+		Addr:  s.config.JSONRPCAddr,
+	}
+	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
+	if err != nil {
+		return err
+	}
+	s.jsonrpcServer = srv
 	return nil
 }
 

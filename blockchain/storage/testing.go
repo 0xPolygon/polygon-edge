@@ -348,9 +348,9 @@ func testReceipts(t *testing.T, m MockStorage) {
 	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
-	r, ok := s.ReadReceipts(h.Hash)
-	if !ok {
-		t.Fatal("not found")
+	r, err := s.ReadReceipts(h.Hash)
+	if err != nil {
+		t.Fatal(err)
 	}
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the receipt
 	if len(r) != len(receipts) {

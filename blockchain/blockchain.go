@@ -357,7 +357,7 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 }
 
 // GetReceiptsByHash returns the receipts by their hash
-func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, bool) {
+func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
 	return b.db.ReadReceipts(hash)
 }
 

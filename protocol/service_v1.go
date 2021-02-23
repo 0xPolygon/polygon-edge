@@ -117,7 +117,11 @@ func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest
 			obj, found = s.store.GetBodyByHash(hash)
 		} else if req.Type == proto.HashRequest_RECEIPTS {
 			var raw []*types.Receipt
-			raw, found = s.store.GetReceiptsByHash(hash)
+			raw, err = s.store.GetReceiptsByHash(hash)
+			if err != nil {
+				return nil, err
+			}
+			found = true
 			obj = types.Receipts(raw)
 		}
 

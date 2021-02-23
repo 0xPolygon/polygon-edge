@@ -14,7 +14,7 @@ type blockchainShim interface {
 	CurrentTD() *big.Int
 
 	GetTD(hash types.Hash) (*big.Int, bool)
-	GetReceiptsByHash(types.Hash) ([]*types.Receipt, bool)
+	GetReceiptsByHash(types.Hash) ([]*types.Receipt, error)
 	GetBodyByHash(types.Hash) (*types.Body, bool)
 	GetHeaderByHash(types.Hash) (*types.Header, bool)
 	GetHeaderByNumber(n uint64) (*types.Header, bool)
@@ -38,8 +38,8 @@ func (b *mockBlockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return big.NewInt(0), true
 }
 
-func (b *mockBlockchain) GetReceiptsByHash(types.Hash) ([]*types.Receipt, bool) {
-	return nil, false
+func (b *mockBlockchain) GetReceiptsByHash(types.Hash) ([]*types.Receipt, error) {
+	return nil, nil
 }
 
 func (b *mockBlockchain) GetBodyByHash(types.Hash) (*types.Body, bool) {
