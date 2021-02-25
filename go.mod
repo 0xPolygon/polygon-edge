@@ -31,7 +31,6 @@ require (
 	github.com/ryanuber/columnize v2.1.2+incompatible
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/umbracle/ecies v0.0.0-20190516151710-4bface869a50
 	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad

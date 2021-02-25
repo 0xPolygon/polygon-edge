@@ -122,7 +122,9 @@ func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest
 				return nil, err
 			}
 			found = true
-			obj = types.Receipts(raw)
+
+			receipts := types.Receipts(raw)
+			obj = &receipts
 		}
 
 		var data []byte

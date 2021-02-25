@@ -15,16 +15,11 @@ import (
 func TestGenesis(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
-	// no genesis block yet
-	if _, ok := b.Header(); ok {
-		t.Fatal("it should be empty")
-	}
-
 	// add genesis block
 	genesis := &types.Header{Difficulty: 1, Number: 0}
 	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
-	header, _ := b.Header()
+	header := b.Header()
 	assert.Equal(t, header.Hash, genesis.Hash)
 }
 
@@ -502,7 +497,7 @@ func TestInsertHeaders(t *testing.T) {
 				}
 			}
 
-			head, _ := b.Header()
+			head := b.Header()
 
 			expected, ok := chain.headers[cc.Head.hash]
 			assert.True(t, ok)
@@ -510,7 +505,9 @@ func TestInsertHeaders(t *testing.T) {
 			// check that we got the right hash
 			assert.Equal(t, head.Hash, expected.Hash)
 
-			forks := b.GetForks()
+			forks, err := b.GetForks()
+			assert.NoError(t, err)
+
 			expectedForks := []types.Hash{}
 
 			for _, i := range cc.Forks {
@@ -573,10 +570,8 @@ func TestCommitChain(t *testing.T) {
 		block := blocks[i]
 
 		// check blocks
-		i, ok := b.db.ReadBody(block.Hash())
-		if !ok {
-			t.Fatal("it should exists")
-		}
+		i, err := b.db.ReadBody(block.Hash())
+		assert.NoError(t, err)
 
 		assert.Len(t, i.Transactions, 1)
 		assert.Equal(t, i.Transactions[0].Nonce, block.Number())

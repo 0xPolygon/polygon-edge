@@ -376,8 +376,8 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	if ok {
 		return h.(*types.Header), true
 	}
-	hh, ok := b.db.ReadHeader(hash)
-	if !ok {
+	hh, err := b.db.ReadHeader(hash)
+	if err != nil {
 		return nil, false
 	}
 	b.headersCache.Add(hash, hh)
@@ -389,8 +389,8 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	if ok {
 		return body.(*types.Body), true
 	}
-	bb, ok := b.db.ReadBody(hash)
-	if !ok {
+	bb, err := b.db.ReadBody(hash)
+	if err != nil {
 		return nil, false
 	}
 	b.bodiesCache.Add(hash, bb)
@@ -708,8 +708,10 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 }
 
 func (b *Blockchain) writeFork(header *types.Header) error {
-	forks := b.db.ReadForks()
-
+	forks, err := b.db.ReadForks()
+	if err != nil {
+		return err
+	}
 	newForks := []types.Hash{}
 	for _, fork := range forks {
 		if fork != header.ParentHash {
@@ -793,7 +795,7 @@ func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader
 }
 
 // GetForks returns the forks
-func (b *Blockchain) GetForks() []types.Hash {
+func (b *Blockchain) GetForks() ([]types.Hash, error) {
 	return b.db.ReadForks()
 }
 

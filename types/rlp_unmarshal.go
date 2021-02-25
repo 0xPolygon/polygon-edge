@@ -6,11 +6,17 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-type rawRLPUnmarshaler interface {
+type RLPUnmarshaler interface {
+	RawRLPUnmarshaler
+
+	UnmarshalRLP(input []byte) error
+}
+
+type RawRLPUnmarshaler interface {
 	UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
 }
 
-func unmarshalRlp(obj rawRLPUnmarshaler, input []byte) error {
+func UnmarshalRlp(obj RawRLPUnmarshaler, input []byte) error {
 	pr := fastrlp.DefaultParserPool.Get()
 
 	v, err := pr.Parse(input)
@@ -28,7 +34,7 @@ func unmarshalRlp(obj rawRLPUnmarshaler, input []byte) error {
 }
 
 func (b *Block) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(b, input)
+	return UnmarshalRlp(b, input)
 }
 
 func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -76,7 +82,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (b *Body) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(b, input)
+	return UnmarshalRlp(b, input)
 }
 
 func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -118,7 +124,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (h *Header) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(h, input)
+	return UnmarshalRlp(h, input)
 }
 
 func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -197,8 +203,8 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return err
 }
 
-func (r Receipts) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(&r, input)
+func (r *Receipts) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(r, input)
 }
 
 func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -217,7 +223,7 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (r *Receipt) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(r, input)
+	return UnmarshalRlp(r, input)
 }
 
 // UnmarshalRLP unmarshals a Receipt in RLP format
@@ -226,7 +232,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
-	if len(elems) != 5 {
+	if len(elems) != 4 {
 		return fmt.Errorf("expected 4 elements")
 	}
 
@@ -246,20 +252,17 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return fmt.Errorf("bad root/status size %d", size)
 	}
 
-	if _, err = elems[1].GetBytes(r.TxHash[:0], 32); err != nil {
-		return err
-	}
 	// cumulativeGasUsed
-	if r.CumulativeGasUsed, err = elems[2].GetUint64(); err != nil {
+	if r.CumulativeGasUsed, err = elems[1].GetUint64(); err != nil {
 		return err
 	}
 	// logsBloom
-	if _, err = elems[3].GetBytes(r.LogsBloom[:0], 256); err != nil {
+	if _, err = elems[2].GetBytes(r.LogsBloom[:0], 256); err != nil {
 		return err
 	}
 
 	// logs
-	logsElems, err := v.Get(4).GetElems()
+	logsElems, err := v.Get(3).GetElems()
 	if err != nil {
 		return err
 	}
@@ -305,7 +308,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	return unmarshalRlp(t, input)
+	return UnmarshalRlp(t, input)
 }
 
 // UnmarshalRLP unmarshals a Transaction in RLP format

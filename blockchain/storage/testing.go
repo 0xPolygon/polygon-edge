@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/stretchr/testify/assert"
 )
 
 type MockStorage func(t *testing.T) (Storage, func())
@@ -44,10 +45,10 @@ func TestStorage(t *testing.T, m MockStorage) {
 		testBody(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testReceipts(t, m)
+		testWriteCanonicalHeader(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testWriteCanonicalHeader(t, m)
+		testReceipts(t, m)
 	})
 }
 
@@ -195,7 +196,9 @@ func testForks(t *testing.T, m MockStorage) {
 			t.Fatal(err)
 		}
 
-		forks := s.ReadForks()
+		forks, err := s.ReadForks()
+		assert.NoError(t, err)
+
 		if !reflect.DeepEqual(cc.Forks, forks) {
 			t.Fatal("bad")
 		}
@@ -218,10 +221,8 @@ func testHeader(t *testing.T, m MockStorage) {
 	if err := s.WriteHeader(header); err != nil {
 		t.Fatal(err)
 	}
-	header1, ok := s.ReadHeader(header.Hash)
-	if !ok {
-		t.Fatal("not found")
-	}
+	header1, err := s.ReadHeader(header.Hash)
+	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(header, header1) {
 		t.Fatal("bad")
@@ -240,7 +241,7 @@ func testBody(t *testing.T, m MockStorage) {
 		ExtraData:  []byte{}, // if not set it will fail
 	}
 	if err := s.WriteHeader(header); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
 	addr1 := types.StringToAddress("11")
@@ -274,13 +275,11 @@ func testBody(t *testing.T, m MockStorage) {
 
 	body0 := block.Body()
 	if err := s.WriteBody(header.Hash, body0); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
-	body1, ok := s.ReadBody(header.Hash)
-	if !ok {
-		t.Fatal("not found")
-	}
+	body1, err := s.ReadBody(header.Hash)
+	assert.NoError(t, err)
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
 	tx0, tx1 := body0.Transactions, body1.Transactions
@@ -324,13 +323,14 @@ func testReceipts(t *testing.T, m MockStorage) {
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
 		TxHash:            txn.Hash,
+		LogsBloom:         types.Bloom{0x1},
 		Logs: []*types.Log{
-			&types.Log{
+			{
 				Address: addr1,
 				Topics:  []types.Hash{hash1, hash2},
 				Data:    []byte{0x1, 0x2},
 			},
-			&types.Log{
+			{
 				Address: addr2,
 				Topics:  []types.Hash{hash1},
 			},
@@ -340,7 +340,13 @@ func testReceipts(t *testing.T, m MockStorage) {
 		Root:              types.StringToHash("1"),
 		CumulativeGasUsed: 10,
 		TxHash:            txn.Hash,
-		Logs:              []*types.Log{},
+		LogsBloom:         types.Bloom{0x1},
+		Logs: []*types.Log{
+			{
+				Address: addr2,
+				Topics:  []types.Hash{hash1},
+			},
+		},
 	}
 
 	receipts := []*types.Receipt{r0, r1}
@@ -379,10 +385,8 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 		t.Fatal(err)
 	}
 
-	hh, ok := s.ReadHeader(h.Hash)
-	if !ok {
-		t.Fatal("not found header")
-	}
+	hh, err := s.ReadHeader(h.Hash)
+	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(h, hh) {
 

@@ -18,18 +18,18 @@ type Storage interface {
 	WriteHeadNumber(uint64) error
 
 	WriteForks(forks []types.Hash) error
-	ReadForks() []types.Hash
+	ReadForks() ([]types.Hash, error)
 
 	WriteDiff(hash types.Hash, diff *big.Int) error
 	ReadDiff(hash types.Hash) (*big.Int, bool)
 
 	WriteHeader(h *types.Header) error
-	ReadHeader(hash types.Hash) (*types.Header, bool)
+	ReadHeader(hash types.Hash) (*types.Header, error)
 
 	WriteCanonicalHeader(h *types.Header, diff *big.Int) error
 
 	WriteBody(hash types.Hash, body *types.Body) error
-	ReadBody(hash types.Hash) (*types.Body, bool)
+	ReadBody(hash types.Hash) (*types.Body, error)
 
 	WriteSnapshot(hash types.Hash, blob []byte) error
 	ReadSnapshot(hash types.Hash) ([]byte, bool)
