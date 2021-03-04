@@ -45,13 +45,13 @@ type enabledEndpoints map[string]struct{}
 // Dispatcher handles jsonrpc requests
 type Dispatcher struct {
 	logger        hclog.Logger
-	store         blockchainInterface
+	store         BlockchainInterface
 	serviceMap    map[string]*serviceData
 	endpoints     endpoints
 	filterManager *FilterManager
 }
 
-func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store BlockchainInterface) *Dispatcher {
 	d := &Dispatcher{
 		logger:        logger.Named("dispatcher"),
 		filterManager: NewFilterManager(logger, store),

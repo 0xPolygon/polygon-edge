@@ -137,7 +137,7 @@ var defaultTimeout = 1 * time.Minute
 type FilterManager struct {
 	logger hclog.Logger
 
-	store   blockchainInterface
+	store   BlockchainInterface
 	closeCh chan struct{}
 
 	subscription blockchain.Subscription
@@ -152,7 +152,7 @@ type FilterManager struct {
 	blockStream *blockStream
 }
 
-func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterManager {
+func NewFilterManager(logger hclog.Logger, store BlockchainInterface) *FilterManager {
 	m := &FilterManager{
 		logger:      logger.Named("filter"),
 		store:       store,

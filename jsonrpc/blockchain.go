@@ -10,7 +10,7 @@ import (
 
 // blockchain is the interface with the blockchain required
 // by the filter manager
-type blockchainInterface interface {
+type BlockchainInterface interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
 

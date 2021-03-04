@@ -12,7 +12,7 @@ import (
 
 const (
 	// bloomThrottling is the time to wait between processing two consecutive index sections
-	// It's useful during chain upgrades to prevent disk overload.
+	// It's useful during chain upgrades to prevent disk overload
 	bloomThrottling = 100 * time.Millisecond
 )
 
@@ -26,13 +26,13 @@ type BloomIndexer struct {
 }
 
 // NewBloomIndexer returns a chain indexer that generates bloom bits data for the main chain for fast logs filtering
-func NewBloomIndexer(db storage.Storage, size, confirms uint64, logger hclog.Logger) *ChainIndexer {
+func NewBloomIndexer(db storage.Storage, size uint64, logger hclog.Logger) *ChainIndexer {
 	backend := &BloomIndexer{
 		db:   db,
 		size: size,
 	}
 
-	return NewChainIndexer(db, backend, size, confirms, bloomThrottling, logger)
+	return NewChainIndexer(db, backend, size, bloomThrottling, logger)
 }
 
 // Reset implements the ChainIndexerBackend interface
@@ -47,7 +47,7 @@ func (b *BloomIndexer) Reset(ctx context.Context, sectionStart uint64, lastHead 
 	return err
 }
 
-// Process implements ChainIndexerBackend interface
+// Process implements the ChainIndexerBackend interface
 // Adds a new bloom into the index
 func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error {
 
@@ -57,11 +57,10 @@ func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error 
 	return err
 }
 
-// Commit implements ChainIndexerBackend interface
+// Commit implements the ChainIndexerBackend interface
 // Finalizes the bloom section, and writes it to the DB
-func (b *BloomIndexer) Commit(blockNr uint64) error {
+func (b *BloomIndexer) Commit() error {
 
-	// TODO add transactions
 	for i := 0; i < types.BloomBitLength; i++ {
 
 		bits, err := b.generator.Bitset(uint(i))

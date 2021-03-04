@@ -50,7 +50,7 @@ type dispatcherImpl interface {
 }
 
 type Config struct {
-	Store blockchainInterface
+	Store BlockchainInterface
 	Addr  *net.TCPAddr
 }
 
