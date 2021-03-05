@@ -21,18 +21,25 @@ func (e *Eth) GetBlockByNumber(blockNumber string, full bool) (interface{}, erro
 	if err != nil {
 		return nil, err
 	}
-	if block < 0 {
-		return nil, fmt.Errorf("this data cannot be provided yet")
-	}
 
-	// TODO, show full blocks
-	header, _ := e.d.store.GetHeaderByNumber(uint64(block))
-	return header, nil
+	header, err := e.GetBlockHeader(block)
+	return header, err
 }
 
 // GetBlockByHash returns information about a block by hash
 func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
-	return nil, nil
+
+	hashedString := types.Hash{}
+	if err := hashedString.UnmarshalText([]byte(hashStr)); err != nil {
+		return nil, err
+	}
+
+	block, ok := e.d.store.GetBlockByHash(hashedString, full)
+	if !ok {
+		return nil, fmt.Errorf("unable to get block by hash %v", hashStr)
+	}
+
+	return block, nil
 }
 
 // BlockNumber returns current block number
@@ -111,7 +118,26 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 
 // GetTransactionReceipt returns account nonce
 func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
-	return nil, fmt.Errorf("transaction not found")
+	hashedString := types.Hash{}
+	if err := hashedString.UnmarshalText([]byte(hash)); err != nil {
+		return nil, err
+	}
+
+	header, err := e.GetBlockHeader(LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := e.d.store.GetReceiptsByHash(header.ReceiptsRoot)
+
+	// TODO find a more optimal solution
+	for _, receipt := range receipts {
+		if receipt.TxHash == hashedString {
+			return receipt, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // GetStorageAt returns the contract storage at the index position

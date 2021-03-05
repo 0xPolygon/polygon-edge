@@ -34,6 +34,9 @@ type blockchainInterface interface {
 
 	// BeginTxn starts a transition object
 	BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error)
+
+	// GetBlockByHash gets a block using the provided hash
+	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 }
 
 type nullBlockchainInterface struct {
@@ -69,4 +72,8 @@ func (b *nullBlockchainInterface) State() state.State {
 
 func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error) {
 	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	return nil, false
 }
