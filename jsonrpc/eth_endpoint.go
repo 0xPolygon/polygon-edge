@@ -45,6 +45,11 @@ func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
 // BlockNumber returns current block number
 func (e *Eth) BlockNumber() (interface{}, error) {
 	h := e.d.store.Header()
+
+	if h == nil {
+		return nil, fmt.Errorf("header has a nil value")
+	}
+
 	return types.Uint64(h.Number), nil
 }
 

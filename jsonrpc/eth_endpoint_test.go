@@ -1,17 +1,48 @@
 package jsonrpc
 
 import (
+	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
+
+// HELPER FUNCTIONS //
+
+// AssertEqual checks if values are equal
+func AssertEqual(t *testing.T, a interface{}, b interface{}, fatal bool) {
+	if a == b {
+		return
+	}
+
+	if fatal {
+		t.Fatalf("Received %v (type %v), expected %v (type %v)", a, reflect.TypeOf(a), b, reflect.TypeOf(b))
+	} else {
+		t.Errorf("Received %v (type %v), expected %v (type %v)", a, reflect.TypeOf(a), b, reflect.TypeOf(b))
+	}
+
+}
+
+// AssertType checks if a is the type of b
+func AssertType(t *testing.T, a interface{}, b reflect.Type, fatal bool) {
+	if reflect.TypeOf(a) != b {
+		if fatal {
+			t.Fatalf("Received %v (type %v), expected type %v", a, reflect.TypeOf(a), b)
+		} else {
+			t.Errorf("Received %v (type %v), expected type %v", a, reflect.TypeOf(a), b)
+		}
+	}
+}
 
 // TEST SETUP //
 
 // The idea is to overwrite the methods used by the actual endpoint,
-// so we can finely control what gets returned
+// so we can finely control what gets returned to the test
+// Callback functions are functions that should be defined (overwritten) in the test itself
 
 type mockBlockStore struct {
 	nullBlockchainInterface
@@ -29,10 +60,83 @@ func (m *mockBlockStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, b
 	return m.getHeaderByNumberCallback(blockNumber)
 }
 
+func (m *mockBlockStore) State() state.State {
+	return &mockState{}
+}
+
 func newMockBlockStore() *mockBlockStore {
 	return &mockBlockStore{
 		header: &types.Header{Number: 0},
 	}
+}
+
+// STATE / SNAPSHOT / ACCOUNTS MOCKS //
+
+type nullStateInterface struct {
+}
+
+func (b *nullStateInterface) NewSnapshotAt(types.Hash) (state.Snapshot, error) {
+	return nil, nil
+}
+
+func (b *nullStateInterface) NewSnapshot() state.Snapshot {
+	return nil
+}
+
+func (b *nullStateInterface) GetCode(hash types.Hash) ([]byte, bool) {
+	return nil, false
+}
+
+type mockAccount struct {
+	Acct    *state.Account
+	Storage map[types.Hash]types.Hash
+}
+
+type mockState struct {
+	nullStateInterface
+
+	newSnapshotAtCallback func(types.Hash) (state.Snapshot, error)
+	newSnapshotCallback   func() state.Snapshot
+	getCodeCallback       func(hash types.Hash) ([]byte, bool)
+}
+
+type mockTxn struct {
+	accounts map[types.Address]*mockAccount
+}
+
+func (m *mockTxn) GetAccount(addr types.Address) (*state.Account, bool) {
+	if val, ok := m.accounts[addr]; ok {
+		return val.Acct, true
+	}
+
+	return nil, false
+}
+
+type mockSnapshot struct {
+}
+
+func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
+	return nil, false
+}
+
+func (m *mockSnapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+	return nil, nil
+}
+
+func (m *mockState) NewSnapshotAt(hash types.Hash) (state.Snapshot, error) {
+	return &mockSnapshot{}, nil
+}
+
+func (m *mockState) NewSnapshot() state.Snapshot {
+	return &mockSnapshot{}
+}
+
+func (m *mockState) GetCode(hash types.Hash) ([]byte, bool) {
+	return m.getCodeCallback(hash)
+}
+
+func NewTxn(state state.State, snapshot state.Snapshot) *mockTxn {
+	return &mockTxn{}
 }
 
 // TESTS //
@@ -48,7 +152,7 @@ func TestGetBlockByNumber(t *testing.T) {
 		{"Invalid block number", "-50", true},
 		{"Empty block number", "", true},
 		{"Valid block number", "2", false},
-		{"Block number out of scope", "5", false},
+		{"Block number out of scope", "6", true},
 	}
 
 	store := newMockBlockStore()
@@ -65,17 +169,13 @@ func TestGetBlockByNumber(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			block, error := dispatcher.endpoints.Eth.GetBlockByNumber(testCase.blockNumber, false)
+			block, blockError := dispatcher.endpoints.Eth.GetBlockByNumber(testCase.blockNumber, false)
 
-			if error != nil && !testCase.shouldFail {
+			if blockError != nil && !testCase.shouldFail {
 				// If there is an error, and the test shouldn't fail
-				t.Fatalf("Error: %v", error)
+				t.Fatalf("Error: %v", blockError)
 			} else if !testCase.shouldFail {
-				foundType, ok := block.(*types.Header)
-
-				if !ok {
-					t.Fatalf("Invalid return value for %v. Expected *types.Header, got %v", testCase.name, foundType)
-				}
+				AssertType(t, block, reflect.TypeOf(&types.Header{}), true)
 			}
 		})
 	}
@@ -83,38 +183,92 @@ func TestGetBlockByNumber(t *testing.T) {
 
 func TestBlockNumber(t *testing.T) {
 	testTable := []struct {
-		name         string
-		blockNumbers []uint64
-		shouldFail   bool
+		name        string
+		blockNumber uint64
+		shouldFail  bool
 	}{
-		{"Gets the final block number", []uint64{0, 1, 2, 3}, false},
-		{"No blocks added", []uint64{}, true},
+		{"Gets the final block number", 0, false},
+		{"No blocks added", 0, true},
 	}
 
-	store := newMockStore()
+	store := newMockBlockStore()
 
-	dispatcher := newDispatcher(hclog.NewNullLogger(), store)
-	dispatcher.registerEndpoints()
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	for _, testCase := range testTable {
+	for index, testCase := range testTable {
+		if index == 1 {
+			store.header = nil
+		}
+
 		t.Run(testCase.name, func(t *testing.T) {
-			block, error := dispatcher.endpoints.Eth.BlockNumber()
+			block, blockError := dispatcher.endpoints.Eth.BlockNumber()
 
-			if error != nil && !testCase.shouldFail {
-				t.Errorf(testCase.name)
-			}
-
-			foundType, ok := block.(uint64)
-			if !ok && !testCase.shouldFail {
-				t.Errorf("Invalid return value for %v. Expected *types.Header, got %v", testCase.name, foundType)
-			}
-
-			if len(testCase.blockNumbers) > 1 && block != testCase.blockNumbers[len(testCase.blockNumbers)-1] {
-				t.Errorf("Invalid final block number. Expected %v, got %v", testCase.blockNumbers[len(testCase.blockNumbers)-1], block)
+			if blockError != nil && !testCase.shouldFail {
+				// If there is an error, and the test shouldn't fail
+				t.Fatalf("Error: %v", blockError)
+			} else if !testCase.shouldFail {
+				AssertEqual(t, block, types.Uint64(0), true)
 			}
 		})
 	}
 }
+
+func TestGetBalance(t *testing.T) {
+	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
+
+	testTable := []struct {
+		name       string
+		address    string
+		balance    *big.Int
+		shouldFail bool
+	}{
+		{"Balances match for account 1", "1", balances[0], false},
+		{"Balances match for account 2", "2", balances[1], true},
+		{"Invalid account address", "3", nil, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+	storeState := store.State()
+	snap, _ := storeState.NewSnapshotAt(store.header.StateRoot)
+
+	txn := NewTxn(storeState, snap)
+	txn.accounts = map[types.Address]*mockAccount{}
+	txn.accounts[types.StringToAddress("1")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(123),
+			Balance: balances[0],
+		},
+		Storage: nil,
+	}
+	txn.accounts[types.StringToAddress("2")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(456),
+			Balance: balances[1],
+		},
+		Storage: nil,
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+
+		t.Run(testCase.name, func(t *testing.T) {
+			balance, balanceError := dispatcher.endpoints.Eth.GetBalance(testCase.address, LatestBlockNumber)
+
+			if balanceError != nil && !testCase.shouldFail {
+				// If there is an error, and the test shouldn't fail
+				t.Fatalf("Error: %v", balanceError)
+			} else if !testCase.shouldFail {
+				AssertEqual(t, balance, testCase.balance, true)
+			}
+		})
+	}
+}
+
+// TODO
+// GetBlockByHash
+// GetTransactionReceipt
 
 // Remaining test methods:
 // TODO SendRawTransaction
@@ -175,13 +329,6 @@ func TestBlockNumber(t *testing.T) {
 // Test cases:
 // I. Regular case
 // II. No logs found
-
-// TODO GetBalance
-// 1. Create a couple of dummy accounts with balances
-// 2. Check if the balances match
-// Test cases:
-// I. Regular matching
-// II. Invalid address
 
 // TODO GetTransactionCount
 // 1. Create two accounts
