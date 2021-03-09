@@ -249,6 +249,8 @@ func TestGetBalance(t *testing.T) {
 		Storage: nil,
 	}
 
+	// TODO Refactor the main funcs to be testable (remove the global state.NewTxn call)
+
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	for _, testCase := range testTable {
@@ -271,6 +273,17 @@ func TestGetBalance(t *testing.T) {
 // GetTransactionReceipt
 
 // Remaining test methods:
+
+// TODO GetBlockHeader
+// 1. Call with block string / number
+// 2. Check if the response matches
+// Test cases:
+// I. Latest
+// II. Earliest
+// III. Pending
+// IV. Specific block number
+// V. Block number out of bounds
+
 // TODO SendRawTransaction
 // 1. Create a transaction
 // 2. Sign it with a dummy key
@@ -287,14 +300,6 @@ func TestGetBalance(t *testing.T) {
 // I. Normal transaction
 // II. Missing fields
 
-// TODO GetStorageAt
-// 1. Create a dummy contract with 1 field
-// 2. Check if the storage matches
-// Test cases:
-// I. Normal creation
-// II. Invalid header
-// III. Invalid index
-
 // TODO GasPrice
 // 1. Create a couple of blocks with a gas price
 // 2. Get the average and check if it matches
@@ -310,18 +315,6 @@ func TestGetBalance(t *testing.T) {
 // I. Regular call
 // II. Call for non existing block num
 
-// TODO GetBlockHeader
-// 1. Call with block string / number
-// 2. Check if the response matches
-// Test cases:
-// I. Latest
-// II. Earliest
-// III. Pending
-// IV. Specific block number
-// V. Block number out of bounds
-
-// TODO EstimateGas
-
 // TODO GetLogs
 // 1. Create dummy blocks with receipts / logs
 // 2. Create a dummy filter that matches a subset
@@ -330,7 +323,17 @@ func TestGetBalance(t *testing.T) {
 // I. Regular case
 // II. No logs found
 
-// TODO GetTransactionCount
+// TODO GetStorageAt (uses state)
+// 1. Create a dummy contract with 1 field
+// 2. Check if the storage matches
+// Test cases:
+// I. Normal creation
+// II. Invalid header
+// III. Invalid index
+
+// TODO EstimateGas (uses state)
+
+// TODO GetTransactionCount (uses state)
 // 1. Create two accounts
 // 2. Send a couple of transactions from 1 account to the other
 // 3. Check the nonce
@@ -339,7 +342,7 @@ func TestGetBalance(t *testing.T) {
 // II. Invalid block
 // III. Invalid address
 
-// TODO GetCode
+// TODO GetCode (uses state)
 // 1. Create a dummy contract
 // 2. Fetch the code
 // Test cases:
