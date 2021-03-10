@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - 1.6.2
+  - 1.13.4
   - tip
 
 allowed_failures:

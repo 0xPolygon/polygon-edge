@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
@@ -14,14 +15,9 @@ import (
 	"github.com/0xPolygon/minimal/types/buildroot"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 )
-
-// TODO, fix testing with genesis
-// TODO, cleanup block transition function
-// TODO, add cache to uncles computing
-// TODO, after header chain we can figure out a better semantic relation
-// about how the blocks are processed.
 
 var (
 	errDuplicateUncle  = errors.New("duplicate uncle")
@@ -31,20 +27,22 @@ var (
 
 // Blockchain is a blockchain reference
 type Blockchain struct {
+	logger hclog.Logger
+
 	db        storage.Storage
 	consensus consensus.Consensus
 	executor  *state.Executor
 
-	config  *chain.Params
+	config  *chain.Chain
 	genesis types.Hash
-
-	// TODO: Remove and use eventStream
-	sidechainCh chan *types.Header
-	listeners   []chan *types.Header
 
 	headersCache    *lru.Cache
 	bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
+
+	// the current last header + difficulty
+	currentHeader     atomic.Value
+	currentDifficulty atomic.Value
 
 	// event subscriptions
 	stream *eventStream
@@ -77,33 +75,75 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(db storage.Storage, config *chain.Params, consensus consensus.Consensus, executor *state.Executor) *Blockchain {
+func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus consensus.Consensus, executor *state.Executor) (*Blockchain, error) {
 	b := &Blockchain{
-		config:      config,
-		db:          db,
-		consensus:   consensus,
-		sidechainCh: make(chan *types.Header, 10),
-		listeners:   []chan *types.Header{},
-		executor:    executor,
-		stream:      &eventStream{},
+		logger:    logger.Named("blockchain"),
+		config:    config,
+		db:        db,
+		consensus: consensus,
+		executor:  executor,
+		stream:    &eventStream{},
 	}
 
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 
+	// push the first event to the stream
+	b.stream.push(&Event{})
+
+	// try to write the genesis block
+	head, ok := b.db.ReadHeadHash()
+	if ok {
+		// initialized storage
+		b.genesis, ok = b.db.ReadCanonicalHash(0)
+		if !ok {
+			return nil, fmt.Errorf("failed to load genesis hash")
+		}
+		header, ok := b.GetHeaderByHash(head)
+		if !ok {
+			return nil, fmt.Errorf("failed to get header with hash %s", head.String())
+		}
+		diff, ok := b.GetTD(head)
+		if !ok {
+			return nil, fmt.Errorf("failed to read difficulty")
+		}
+
+		b.logger.Info("Current header", "hash", header.Hash.String(), "number", header.Number)
+		b.setCurrentHeader(header, diff)
+	} else {
+		// empty storage, write the genesis
+		if err := b.writeGenesis(config.Genesis); err != nil {
+			return nil, err
+		}
+	}
+
 	b.averageGasPrice = big.NewInt(0)
 	b.averageGasPriceCount = big.NewInt(0)
 
-	return b
+	return b, nil
+}
+
+func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
+	hh := h.Copy()
+	b.currentHeader.Store(hh)
+
+	dd := new(big.Int).Set(diff)
+	b.currentDifficulty.Store(dd)
+}
+
+// Header returns the current header
+func (b *Blockchain) Header() *types.Header {
+	return b.currentHeader.Load().(*types.Header)
+}
+
+// CurrentTD returns the current total difficulty
+func (b *Blockchain) CurrentTD() *big.Int {
+	return b.currentDifficulty.Load().(*big.Int)
 }
 
 func (b *Blockchain) Config() *chain.Params {
-	return b.config
-}
-
-func (b *Blockchain) CurrentHeader() (*types.Header, bool) {
-	return b.Header()
+	return b.config.Params
 }
 
 func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
@@ -114,23 +154,12 @@ func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types
 	return b.GetBlockByHash(hash, full)
 }
 
-func (b *Blockchain) ReadTransactionBlockHash(hash types.Hash) (types.Hash, bool) {
-	// TODO
-	return types.Hash{}, false
-}
-
 func (b *Blockchain) GetConsensus() consensus.Consensus {
 	return b.consensus
 }
 
 func (b *Blockchain) Executor() *state.Executor {
 	return b.executor
-}
-
-func (b *Blockchain) Subscribe() chan *types.Header {
-	ch := make(chan *types.Header, 5)
-	b.listeners = append(b.listeners, ch)
-	return ch
 }
 
 // GetParent return the parent
@@ -143,17 +172,7 @@ func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
 }
 
-// WriteGenesis writes the genesis block if not present
-func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
-	_, ok := b.db.ReadHeadHash()
-	if ok {
-		b.genesis, ok = b.db.ReadCanonicalHash(0)
-		if !ok {
-			return fmt.Errorf("failed to load genesis hash")
-		}
-		return nil
-	}
-
+func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 	root := b.executor.WriteGenesis(genesis.Alloc)
 
 	header := genesis.ToBlock()
@@ -166,7 +185,7 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 	if err := b.addHeader(header); err != nil {
 		return err
 	}
-	if err := b.advanceHead(header); err != nil {
+	if _, err := b.advanceHead(header); err != nil {
 		return err
 	}
 
@@ -175,7 +194,9 @@ func (b *Blockchain) WriteGenesis(genesis *chain.Genesis) error {
 		return err
 	}
 	b.difficultyCache.Add(header.Hash, diff)
+	b.setCurrentHeader(header, diff)
 
+	b.logger.Info("Empty storage, write genesis", "hash", b.genesis.String())
 	return nil
 }
 
@@ -191,7 +212,7 @@ func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
 	if err := b.addHeader(header); err != nil {
 		return err
 	}
-	if err := b.advanceHead(header); err != nil {
+	if _, err := b.advanceHead(header); err != nil {
 		return err
 	}
 
@@ -215,10 +236,7 @@ func (b *Blockchain) Empty() bool {
 }
 
 func (b *Blockchain) GetChainTD() (*big.Int, bool) {
-	header, ok := b.Header()
-	if !ok {
-		return nil, false
-	}
+	header := b.Header()
 	return b.GetTD(header.Hash)
 }
 
@@ -226,7 +244,7 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return b.readDiff(hash)
 }
 
-func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
+func (b *Blockchain) writeCanonicalHeader(evnt *Event, h *types.Header) error {
 	td, ok := b.readDiff(h.ParentHash)
 	if !ok {
 		return fmt.Errorf("parent difficulty not found 2")
@@ -237,64 +255,42 @@ func (b *Blockchain) writeCanonicalHeader(h *types.Header) error {
 		return err
 	}
 
-	// notify the listeners
-	for _, ch := range b.listeners {
-		select {
-		case ch <- h:
-		default:
-		}
-	}
+	evnt.Type = EventHead
+	evnt.AddNewHeader(h)
+	evnt.SetDifficulty(diff)
 
+	b.setCurrentHeader(h, diff)
 	return nil
 }
 
-func (b *Blockchain) advanceHead(h *types.Header) error {
+func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 	if err := b.db.WriteHeadHash(h.Hash); err != nil {
-		return err
+		return nil, err
 	}
 	if err := b.db.WriteHeadNumber(h.Number); err != nil {
-		return err
+		return nil, err
 	}
 	if err := b.db.WriteCanonicalHash(h.Number, h.Hash); err != nil {
-		return err
+		return nil, err
 	}
 
-	if h.ParentHash != types.StringToHash("") {
+	if h.ParentHash == types.StringToHash("") {
 		// Dont write difficulty for genesis
-		td, ok := b.readDiff(h.ParentHash)
-		if !ok {
-			return fmt.Errorf("parent difficulty not found 1")
-		}
-
-		if err := b.db.WriteDiff(h.Hash, big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))); err != nil {
-			return err
-		}
+		return nil, nil
 	}
 
-	for _, ch := range b.listeners {
-		select {
-		case ch <- h:
-		default:
-		}
-	}
-
-	return nil
-}
-
-// Header returns the header of the blockchain
-func (b *Blockchain) Header() (*types.Header, bool) {
-	// TODO, We may get better insight about the error if we know in which specific
-	// step it failed. Not sure yet if this expression will be a storage interface in itself
-	// in the future.
-	hash, ok := b.db.ReadHeadHash()
+	td, ok := b.readDiff(h.ParentHash)
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("parent difficulty not found 1")
 	}
-	header, ok := b.readHeader(hash)
-	if !ok {
-		return nil, false
+
+	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteDiff(h.Hash, diff); err != nil {
+		return nil, err
 	}
-	return header, true
+
+	b.setCurrentHeader(h, diff)
+	return diff, nil
 }
 
 // CommitBodies writes the bodies
@@ -361,9 +357,8 @@ func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Rece
 }
 
 // GetReceiptsByHash returns the receipts by their hash
-func (b *Blockchain) GetReceiptsByHash(hash types.Hash) []*types.Receipt {
-	r, _ := b.db.ReadReceipts(hash)
-	return r
+func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	return b.db.ReadReceipts(hash)
 }
 
 // GetBodyByHash returns the body by their hash
@@ -381,8 +376,8 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	if ok {
 		return h.(*types.Header), true
 	}
-	hh, ok := b.db.ReadHeader(hash)
-	if !ok {
+	hh, err := b.db.ReadHeader(hash)
+	if err != nil {
 		return nil, false
 	}
 	b.headersCache.Add(hash, hh)
@@ -394,8 +389,8 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	if ok {
 		return body.(*types.Body), true
 	}
-	bb, ok := b.db.ReadBody(hash)
-	if !ok {
+	bb, err := b.db.ReadBody(hash)
+	if err != nil {
 		return nil, false
 	}
 	b.bodiesCache.Add(hash, bb)
@@ -475,7 +470,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if blocks[i].ParentHash() != parent.Hash {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(nil, parent, blocks[i].Header, false, true); err != nil {
+		if err := b.consensus.VerifyHeader(parent, blocks[i].Header, false, true); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
@@ -631,7 +626,7 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 			return errDanglingUncle
 		}
 
-		if err := b.consensus.VerifyHeader(nil, ancestors[uncle.ParentHash], uncle, true, false); err != nil {
+		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle, true, false); err != nil {
 			return err
 		}
 	}
@@ -667,16 +662,12 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
-	head, ok := b.Header()
-	if !ok {
-		return fmt.Errorf("header not found")
-	}
+	head := b.Header()
 
 	// Write the data
 	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
-		evnt.AddNewHeader(header)
-		return b.writeCanonicalHeader(header)
+		return b.writeCanonicalHeader(evnt, header)
 	}
 
 	if err := b.db.WriteHeader(header); err != nil {
@@ -706,6 +697,8 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	} else {
 		// new block has lower difficulty than us, create a new fork
 		evnt.AddOldHeader(header)
+		evnt.Type = EventFork
+
 		if err := b.writeFork(header); err != nil {
 			return err
 		}
@@ -714,20 +707,11 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	return nil
 }
 
-// SideChainCh returns the channel of headers
-func (b *Blockchain) SideChainCh() chan *types.Header {
-	return b.sidechainCh
-}
-
 func (b *Blockchain) writeFork(header *types.Header) error {
-	forks := b.db.ReadForks()
-
-	// TODO: We can remove this once subscription is stable
-	select {
-	case b.sidechainCh <- header:
-	default:
+	forks, err := b.db.ReadForks()
+	if err != nil {
+		return err
 	}
-
 	newForks := []types.Hash{}
 	for _, fork := range forks {
 		if fork != header.ParentHash {
@@ -800,21 +784,18 @@ func (b *Blockchain) handleReorg(evnt *Event, oldHeader *types.Header, newHeader
 		}
 	}
 
-	// oldChain headers can become now uncles, REMOVE
-	go func() {
-		for _, i := range oldChain {
-			select {
-			case b.sidechainCh <- i:
-			default:
-			}
-		}
-	}()
+	diff, err := b.advanceHead(newChainHead)
+	if err != nil {
+		return err
+	}
 
-	return b.advanceHead(newChainHead)
+	evnt.Type = EventReorg
+	evnt.SetDifficulty(diff)
+	return nil
 }
 
 // GetForks returns the forks
-func (b *Blockchain) GetForks() []types.Hash {
+func (b *Blockchain) GetForks() ([]types.Hash, error) {
 	return b.db.ReadForks()
 }
 
@@ -839,8 +820,6 @@ func (b *Blockchain) GetBlockByHash(hash types.Hash, full bool) (*types.Block, b
 	block.Transactions = body.Transactions
 	block.Uncles = body.Uncles
 	return block, true
-
-	// return block.WithBody(body.Transactions, body.Uncles), true
 }
 
 // GetBlockByNumber returns the block by their number

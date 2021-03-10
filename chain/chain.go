@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/gobuffalo/packr"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -18,10 +17,6 @@ var (
 	GenesisGasLimit uint64 = 4712388
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty = big.NewInt(131072)
-)
-
-var (
-	box = packr.NewBox("./chains")
 )
 
 type Chain struct {
@@ -296,7 +291,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 
 // ImportFromName imports a chain from the precompiled json chains (i.e. foundation)
 func ImportFromName(chain string) (*Chain, error) {
-	data, err := box.Find(chain + ".json")
+	data, err := Asset("chain/chains/" + chain + ".json")
 	if err != nil {
 		return nil, err
 	}

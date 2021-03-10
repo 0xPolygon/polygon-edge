@@ -29,7 +29,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error
 	}
 
 	kv := &levelDBKV{db}
-	return storage.NewKeyValueStorage(logger, kv), nil
+	return storage.NewKeyValueStorage(logger.Named("leveldb"), kv), nil
 }
 
 // levelDBKV is the leveldb implementation of the kv storage

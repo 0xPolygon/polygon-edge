@@ -1,12 +1,14 @@
 package blockchain
 
 import (
+	"math/big"
 	"sync"
 
 	"github.com/0xPolygon/minimal/types"
 )
 
 type Subscription interface {
+	GetEventCh() chan *Event
 	GetEvent() *Event
 	Close()
 }
@@ -23,6 +25,10 @@ func (m *MockSubscription) Push(e *Event) {
 	m.eventCh <- e
 }
 
+func (m *MockSubscription) GetEventCh() chan *Event {
+	return m.eventCh
+}
+
 func (m *MockSubscription) GetEvent() *Event {
 	evnt := <-m.eventCh
 	return evnt
@@ -35,6 +41,17 @@ type subscription struct {
 	updateCh chan struct{}
 	closeCh  chan struct{}
 	elem     *eventElem
+}
+
+func (s *subscription) GetEventCh() chan *Event {
+	eventCh := make(chan *Event)
+	go func() {
+		for {
+			evnt := s.GetEvent()
+			eventCh <- evnt
+		}
+	}()
+	return eventCh
 }
 
 func (s *subscription) GetEvent() *Event {
@@ -59,17 +76,13 @@ func (s *subscription) Close() {
 	close(s.closeCh)
 }
 
-/*
-TODO:
-Different types for the event:
-- Sealer
-- Batch Sync
-- Sync
-- Manual?
-Subscribe for specific event types. For example, the sealer might want
-to get notified for head chain Sync events and the sync protocol (whichever it is)
-wants to know about Sealer block events that it has to send to the network.
-*/
+type EventType int
+
+const (
+	EventHead EventType = iota
+	EventReorg
+	EventFork
+)
 
 type Event struct {
 	// Old chain removed if there was a reorg
@@ -77,6 +90,20 @@ type Event struct {
 
 	// New part of the chain (or a fork)
 	NewChain []*types.Header
+
+	// Difficulty is the new difficulty created with this event
+	Difficulty *big.Int
+
+	// Type is the type of event
+	Type EventType
+
+	// Source is the source that generated the blocks for the event
+	// right now it can be either the Sealer or the Syncer. TODO
+	Source string
+}
+
+func (e *Event) SetDifficulty(b *big.Int) {
+	e.Difficulty = new(big.Int).Set(b)
 }
 
 func (e *Event) AddNewHeader(h *types.Header) {
@@ -117,6 +144,7 @@ func (e *eventStream) subscribe() *subscription {
 	s := &subscription{
 		elem:     head,
 		updateCh: updateCh,
+		closeCh:  make(chan struct{}),
 	}
 	return s
 }

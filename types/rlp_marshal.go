@@ -4,11 +4,17 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-type rawRLPMarshaler interface {
+type RLPMarshaler interface {
+	MarshalRLPTo(dst []byte) []byte
+
+	RawRLPMarshaler
+}
+
+type RawRLPMarshaler interface {
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 }
 
-func marshalRLPTo(obj rawRLPMarshaler, dst []byte) []byte {
+func MarshalRLPTo(obj RawRLPMarshaler, dst []byte) []byte {
 	ar := fastrlp.DefaultArenaPool.Get()
 	dst = obj.MarshalRLPWith(ar).MarshalTo(dst)
 	fastrlp.DefaultArenaPool.Put(ar)
@@ -20,7 +26,7 @@ func (b *Block) MarshalRLP() []byte {
 }
 
 func (b *Block) MarshalRLPTo(dst []byte) []byte {
-	return marshalRLPTo(b, dst)
+	return MarshalRLPTo(b, dst)
 }
 
 func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -48,6 +54,10 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	return vv
+}
+
+func (b *Body) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(b, dst)
 }
 
 func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -80,7 +90,7 @@ func (h *Header) MarshalRLP() []byte {
 }
 
 func (h *Header) MarshalRLPTo(dst []byte) []byte {
-	return marshalRLPTo(h, dst)
+	return MarshalRLPTo(h, dst)
 }
 
 // MarshalRLPWith marshals the header to RLP with a specific fastrlp.Arena
@@ -108,12 +118,24 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
+func (r Receipts) MarshalRLPTo(dst []byte) []byte {
+	return MarshalRLPTo(&r, dst)
+}
+
+func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	vv := a.NewArray()
+	for _, rr := range *r {
+		vv.Set(rr.MarshalRLPWith(a))
+	}
+	return vv
+}
+
 func (r *Receipt) MarshalRLP() []byte {
 	return r.MarshalRLPTo(nil)
 }
 
 func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
-	return marshalRLPTo(r, dst)
+	return MarshalRLPTo(r, dst)
 }
 
 // MarshalRLPWith marshals a receipt with a specific fastrlp.Arena
@@ -161,7 +183,7 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
-	return marshalRLPTo(t, dst)
+	return MarshalRLPTo(t, dst)
 }
 
 // MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena

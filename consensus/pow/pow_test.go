@@ -2,7 +2,9 @@ package pow
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/types"
 )
@@ -10,7 +12,7 @@ import (
 func TestSeal(t *testing.T) {
 	// t.Skip()
 
-	c, _ := Factory(context.Background(), nil)
+	c := &Pow{min: 1000000, max: 1500000}
 	h := &types.Header{
 		Number: 10,
 	}
@@ -19,5 +21,8 @@ func TestSeal(t *testing.T) {
 	b := &types.Block{
 		Header: h,
 	}
-	c.Seal(nil, b, context.Background())
+
+	now := time.Now()
+	c.Seal(b, context.Background())
+	fmt.Println(time.Since(now))
 }

@@ -30,6 +30,14 @@ ifeq (1,${PACKR})
 endif
 	@packr clean
 
+.PHONY: bindata
+bindata:
+	go-bindata -pkg chain -o ./chain/chain_bindata.go ./chain/chains
+
+.PHONY: protoc
+protoc:
+	protoc --go_out=plugins=grpc:. ./minimal/proto/*.proto
+
 .PHONY: clean-ibft-dir
 clean-ibft-dir:
 	rm -rf ./.ibft1/blockchain ./.ibft1/consensus ./.ibft1/network ./.ibft1/trie

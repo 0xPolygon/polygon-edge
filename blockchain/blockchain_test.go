@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"testing"
 
@@ -14,16 +15,11 @@ import (
 func TestGenesis(t *testing.T) {
 	b := NewTestBlockchain(t, nil)
 
-	// no genesis block yet
-	if _, ok := b.Header(); ok {
-		t.Fatal("it should be empty")
-	}
-
 	// add genesis block
 	genesis := &types.Header{Difficulty: 1, Number: 0}
 	assert.NoError(t, b.WriteHeaderGenesis(genesis))
 
-	header, _ := b.Header()
+	header := b.Header()
 	assert.Equal(t, header.Hash, genesis.Hash)
 }
 
@@ -125,6 +121,7 @@ func TestInsertHeaders(t *testing.T) {
 	type evnt struct {
 		NewChain []*header
 		OldChain []*header
+		Diff     *big.Int
 	}
 	type headerEvnt struct {
 		header *header
@@ -164,6 +161,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -172,6 +170,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 			},
@@ -195,6 +194,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -203,6 +203,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3).Parent(0x1).Diff(5),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -236,6 +237,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -244,6 +246,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -252,6 +255,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -267,6 +271,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x2),
 							mock(0x3),
 						},
+						Diff: big.NewInt(12),
 					},
 				},
 				{
@@ -275,6 +280,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x5).Parent(0x4).Diff(11).Number(3),
 						},
+						Diff: big.NewInt(23),
 					},
 				},
 				{
@@ -309,6 +315,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -317,6 +324,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -325,6 +333,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(7),
 					},
 				},
 				{
@@ -337,6 +346,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3),
 						},
+						Diff: big.NewInt(15),
 					},
 				},
 				{
@@ -380,6 +390,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -388,6 +399,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
+						Diff: big.NewInt(4),
 					},
 				},
 				{
@@ -401,6 +413,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x1),
 							mock(0x2),
 						},
+						Diff: big.NewInt(6),
 					},
 				},
 				{
@@ -415,6 +428,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3).Parent(0x0).Diff(5),
 						},
+						Diff: big.NewInt(14),
 					},
 				},
 			},
@@ -475,9 +489,15 @@ func TestInsertHeaders(t *testing.T) {
 				evnt := sub.GetEvent()
 				checkEvents(cc.History[i].event.NewChain, evnt.NewChain)
 				checkEvents(cc.History[i].event.OldChain, evnt.OldChain)
+
+				if evnt.Difficulty != nil {
+					if evnt.Difficulty.Cmp(cc.History[i].event.Diff) != 0 {
+						t.Fatal("bad diff in event")
+					}
+				}
 			}
 
-			head, _ := b.Header()
+			head := b.Header()
 
 			expected, ok := chain.headers[cc.Head.hash]
 			assert.True(t, ok)
@@ -485,7 +505,9 @@ func TestInsertHeaders(t *testing.T) {
 			// check that we got the right hash
 			assert.Equal(t, head.Hash, expected.Hash)
 
-			forks := b.GetForks()
+			forks, err := b.GetForks()
+			assert.NoError(t, err)
+
 			expectedForks := []types.Hash{}
 
 			for _, i := range cc.Forks {
@@ -548,10 +570,8 @@ func TestCommitChain(t *testing.T) {
 		block := blocks[i]
 
 		// check blocks
-		i, ok := b.db.ReadBody(block.Hash())
-		if !ok {
-			t.Fatal("it should exists")
-		}
+		i, err := b.db.ReadBody(block.Hash())
+		assert.NoError(t, err)
 
 		assert.Len(t, i.Transactions, 1)
 		assert.Equal(t, i.Transactions[0].Nonce, block.Number())
