@@ -7,14 +7,15 @@ import (
 	"math/big"
 	"strconv"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
-	iradix "github.com/hashicorp/go-immutable-radix"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -39,6 +40,17 @@ type Txn struct {
 	txn       *iradix.Txn
 	codeCache *lru.Cache
 	hash      *keccak.Keccak
+}
+
+type StateHelperInterface interface {
+	NewTxn(state State, snapshot Snapshot) *Txn
+}
+
+type StateHelper struct {
+}
+
+func (sh *StateHelper) NewTxn(state State, snapshot Snapshot) *Txn {
+	return newTxn(state, snapshot)
 }
 
 func NewTxn(state State, snapshot Snapshot) *Txn {

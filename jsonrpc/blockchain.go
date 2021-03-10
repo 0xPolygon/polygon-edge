@@ -32,6 +32,9 @@ type blockchainInterface interface {
 	// State returns a reference to the state
 	State() state.State
 
+	//// GetStateHelper returns a helper for state related functions
+	//GetStateHelper() *state.StateHelper
+
 	// BeginTxn starts a transition object
 	BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error)
 
@@ -69,6 +72,10 @@ func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 func (b *nullBlockchainInterface) State() state.State {
 	return nil
 }
+
+//func (b *nullBlockchainInterface) GetStateHelper() *state.StateHelperInterface {
+//	return nil
+//}
 
 func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error) {
 	return nil, nil

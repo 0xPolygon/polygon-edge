@@ -1,12 +1,15 @@
 package jsonrpc
 
 import (
-	"math/big"
+	"crypto/ecdsa"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
@@ -50,6 +53,7 @@ type mockBlockStore struct {
 	header *types.Header
 
 	getHeaderByNumberCallback func(blockNumber uint64) (*types.Header, bool)
+	addTxCallback             func(tx *types.Transaction) error
 }
 
 func (m *mockBlockStore) Header() *types.Header {
@@ -63,6 +67,21 @@ func (m *mockBlockStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, b
 func (m *mockBlockStore) State() state.State {
 	return &mockState{}
 }
+
+func (m *mockBlockStore) AddTx(tx *types.Transaction) error {
+	return m.addTxCallback(tx)
+}
+
+type mockStateHelper struct {
+}
+
+func (sh *mockStateHelper) NewTxn(state state.State, snapshot state.Snapshot) *state.Txn {
+	return nil
+}
+
+//func (m *mockBlockStore) GetStateHelper() *state.StateHelperInterface {
+//	return &mockStateHelper{}
+//}
 
 func newMockBlockStore() *mockBlockStore {
 	return &mockBlockStore{
@@ -135,9 +154,11 @@ func (m *mockState) GetCode(hash types.Hash) ([]byte, bool) {
 	return m.getCodeCallback(hash)
 }
 
-func NewTxn(state state.State, snapshot state.Snapshot) *mockTxn {
-	return &mockTxn{}
-}
+//func NewTxn(state state.State, snapshot state.Snapshot) *mockTxn {
+//	return &mockTxn{}
+//}
+
+var signer = &crypto.FrontierSigner{}
 
 // TESTS //
 
@@ -213,85 +234,144 @@ func TestBlockNumber(t *testing.T) {
 	}
 }
 
-func TestGetBalance(t *testing.T) {
-	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
+func TestSendRawTransaction(t *testing.T) {
+	keys := []*ecdsa.PrivateKey{}
+	addresses := []types.Address{}
+
+	// Generate dummy keys and addresses
+	for i := 0; i < 3; i++ {
+		var key, _ = crypto.GenerateKey()
+		var address = crypto.PubKeyToAddress(&key.PublicKey)
+
+		keys = append(keys, key)
+		addresses = append(addresses, address)
+	}
 
 	testTable := []struct {
-		name       string
-		address    string
-		balance    *big.Int
-		shouldFail bool
+		name        string
+		transaction *types.Transaction
+		key         *ecdsa.PrivateKey
+		shouldFail  bool
 	}{
-		{"Balances match for account 1", "1", balances[0], false},
-		{"Balances match for account 2", "2", balances[1], true},
-		{"Invalid account address", "3", nil, true},
+		{"Valid raw transaction", &types.Transaction{
+			Nonce:    1,
+			To:       &addresses[0],
+			Value:    []byte{0x1},
+			Gas:      10,
+			GasPrice: []byte{0x1},
+			Input:    []byte{},
+		}, keys[0], false},
+		{"Invalid from param", &types.Transaction{
+			Nonce:    2,
+			To:       nil,
+			Value:    []byte{0x1},
+			Gas:      10,
+			GasPrice: []byte{0x1},
+			Input:    []byte{},
+		}, keys[1], true},
+		{"Error when adding to the tx pool", &types.Transaction{
+			Nonce:    3,
+			To:       &addresses[2],
+			Value:    []byte{0x1},
+			Gas:      10,
+			GasPrice: []byte{0x1},
+			Input:    []byte{},
+		}, keys[2], true},
 	}
 
-	// Setup //
 	store := newMockBlockStore()
-	storeState := store.State()
-	snap, _ := storeState.NewSnapshotAt(store.header.StateRoot)
 
-	txn := NewTxn(storeState, snap)
-	txn.accounts = map[types.Address]*mockAccount{}
-	txn.accounts[types.StringToAddress("1")] = &mockAccount{
-		Acct: &state.Account{
-			Nonce:   uint64(123),
-			Balance: balances[0],
-		},
-		Storage: nil,
+	store.addTxCallback = func(tx *types.Transaction) error {
+		return nil
 	}
-	txn.accounts[types.StringToAddress("2")] = &mockAccount{
-		Acct: &state.Account{
-			Nonce:   uint64(456),
-			Balance: balances[1],
-		},
-		Storage: nil,
-	}
-
-	// TODO Refactor the main funcs to be testable (remove the global state.NewTxn call)
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	for _, testCase := range testTable {
+	for index, testCase := range testTable {
+		if index == len(testTable)-1 {
+			store.addTxCallback = func(tx *types.Transaction) error {
+				return fmt.Errorf("sample error")
+			}
+		}
+
+		tx, err := signer.SignTx(testCase.transaction, testCase.key)
+		if err != nil {
+			t.Fatalf("Error: Unable to sign transaction %v", testCase.transaction)
+		}
 
 		t.Run(testCase.name, func(t *testing.T) {
-			balance, balanceError := dispatcher.endpoints.Eth.GetBalance(testCase.address, LatestBlockNumber)
+			txHash, txHashError := dispatcher.endpoints.Eth.SendRawTransaction(hex.EncodeToHex(tx.MarshalRLP()))
 
-			if balanceError != nil && !testCase.shouldFail {
+			if txHashError != nil && !testCase.shouldFail {
 				// If there is an error, and the test shouldn't fail
-				t.Fatalf("Error: %v", balanceError)
+				t.Fatalf("Error: %v", txHashError)
 			} else if !testCase.shouldFail {
-				AssertEqual(t, balance, testCase.balance, true)
+				AssertType(t, txHash, reflect.TypeOf(""), true)
 			}
 		})
 	}
 }
+
+//func TestGetBalance(t *testing.T) {
+//	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
+//
+//	testTable := []struct {
+//		name       string
+//		address    string
+//		balance    *big.Int
+//		shouldFail bool
+//	}{
+//		{"Balances match for account 1", "1", balances[0], false},
+//		{"Balances match for account 2", "2", balances[1], true},
+//		{"Invalid account address", "3", nil, true},
+//	}
+//
+//	// Setup //
+//	store := newMockBlockStore()
+//	storeState := store.State()
+//	snap, _ := storeState.NewSnapshotAt(store.header.StateRoot)
+//
+//	stateHelper := store.GetStateHelper()
+//
+//	txn := stateHelper.NewTxn(storeState, snap)
+//	txn.accounts = map[types.Address]*mockAccount{}
+//	txn.accounts[types.StringToAddress("1")] = &mockAccount{
+//		Acct: &state.Account{
+//			Nonce:   uint64(123),
+//			Balance: balances[0],
+//		},
+//		Storage: nil,
+//	}
+//	txn.accounts[types.StringToAddress("2")] = &mockAccount{
+//		Acct: &state.Account{
+//			Nonce:   uint64(456),
+//			Balance: balances[1],
+//		},
+//		Storage: nil,
+//	}
+//
+//	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+//
+//	for _, testCase := range testTable {
+//
+//		t.Run(testCase.name, func(t *testing.T) {
+//			balance, balanceError := dispatcher.endpoints.Eth.GetBalance(testCase.address, LatestBlockNumber)
+//
+//			if balanceError != nil && !testCase.shouldFail {
+//				// If there is an error, and the test shouldn't fail
+//				t.Fatalf("Error: %v", balanceError)
+//			} else if !testCase.shouldFail {
+//				AssertEqual(t, balance, testCase.balance, true)
+//			}
+//		})
+//	}
+//}
 
 // TODO
 // GetBlockByHash
 // GetTransactionReceipt
 
 // Remaining test methods:
-
-// TODO GetBlockHeader
-// 1. Call with block string / number
-// 2. Check if the response matches
-// Test cases:
-// I. Latest
-// II. Earliest
-// III. Pending
-// IV. Specific block number
-// V. Block number out of bounds
-
-// TODO SendRawTransaction
-// 1. Create a transaction
-// 2. Sign it with a dummy key
-// 3. Check if it returns a hash
-// Test cases:
-// I. Normal raw transaction
-// II. Empty input
-// III. Missing from / Signature
 
 // TODO SendTransaction
 // 1. Create transaction with params

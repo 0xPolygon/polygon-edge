@@ -73,7 +73,7 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	}
 
 	if err := e.d.store.AddTx(tx); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	tx.ComputeHash()
@@ -471,9 +471,11 @@ func (e *Eth) GetTransactionCount(address string, number BlockNumber) (interface
 		return nil, err
 	}
 
+	//stateHelper := e.d.store.GetStateHelper()
 	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
 		return types.Uint64(acc.Nonce), nil
 	}
+
 	return "0x0", nil
 }
 
