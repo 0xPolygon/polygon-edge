@@ -329,9 +329,12 @@ github.com/shirou/gopsutil/internal/common
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
 github.com/spaolacci/murmur3
-# github.com/stretchr/testify v1.6.1
+# github.com/stretchr/objx v0.1.1
+github.com/stretchr/objx
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/mock
 # github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 ## explicit
 github.com/syndtr/goleveldb/leveldb

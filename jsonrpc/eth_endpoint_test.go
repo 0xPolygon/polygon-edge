@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
@@ -27,6 +28,7 @@ type mockBlockStore struct {
 
 	getHeaderByNumberCallback func(blockNumber uint64) (*types.Header, bool)
 	addTxCallback             func(tx *types.Transaction) error
+	getAvgGasPriceCallback    func() *big.Int
 }
 
 func (m *mockBlockStore) Header() *types.Header {
@@ -35,6 +37,10 @@ func (m *mockBlockStore) Header() *types.Header {
 
 func (m *mockBlockStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
 	return m.getHeaderByNumberCallback(blockNumber)
+}
+
+func (m *mockBlockStore) GetAvgGasPrice() *big.Int {
+	return m.getAvgGasPriceCallback()
 }
 
 func (m *mockBlockStore) State() state.State {
@@ -355,6 +361,45 @@ func TestSendTransaction(t *testing.T) {
 	}
 }
 
+func TestGasPrice(t *testing.T) {
+	testTable := []struct {
+		name       string
+		gasPrice   *big.Int
+		shouldFail bool
+	}{
+		{
+			"Valid gas price",
+			big.NewInt(5),
+			false,
+		},
+	}
+
+	store := newMockBlockStore()
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for index, testCase := range testTable {
+
+		store.getAvgGasPriceCallback = func() *big.Int {
+			return testTable[index].gasPrice
+		}
+
+		t.Run(testCase.name, func(t *testing.T) {
+			gasPrice, gasPriceError := dispatcher.endpoints.Eth.GasPrice()
+
+			if testCase.shouldFail {
+				assert.NotNilf(t, gasPriceError, "Invalid fail case")
+			} else {
+				assert.IsTypef(t, "", gasPrice, "Invalid return type")
+
+				assert.Equalf(t, gasPrice, hex.EncodeBig(testCase.gasPrice), "Return value doesn't match")
+			}
+		})
+	}
+}
+
+// TODO add before each to the test suite
+
 //func TestGetBalance(t *testing.T) {
 //	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
 //
@@ -415,13 +460,6 @@ func TestSendTransaction(t *testing.T) {
 // GetTransactionReceipt
 
 // Remaining test methods:
-
-// TODO SendTransaction
-// 1. Create transaction with params
-// 2. Check if it returns a hash
-// Test cases:
-// I. Normal transaction
-// II. Missing fields
 
 // TODO GasPrice
 // 1. Create a couple of blocks with a gas price
