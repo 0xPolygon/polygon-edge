@@ -179,45 +179,19 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 	header.StateRoot = root
 	header.ComputeHash()
 
-	b.genesis = header.Hash
-
-	// add genesis block
-	if err := b.addHeader(header); err != nil {
+	if err := b.writeGenesisImpl(header); err != nil {
 		return err
 	}
-	if _, err := b.advanceHead(header); err != nil {
-		return err
-	}
-
-	diff := new(big.Int).SetUint64(header.Difficulty)
-	if err := b.db.WriteDiff(header.Hash, diff); err != nil {
-		return err
-	}
-	b.difficultyCache.Add(header.Hash, diff)
-	b.setCurrentHeader(header, diff)
-
-	b.logger.Info("Empty storage, write genesis", "hash", b.genesis.String())
 	return nil
 }
 
-// WriteHeaderGenesis writes the genesis without any state allocation
-// TODO, remove
-func (b *Blockchain) WriteHeaderGenesis(header *types.Header) error {
-	// The chain is not empty
-	if !b.Empty() {
-		return nil
-	}
+func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
+	b.genesis = header.Hash
 
-	// add genesis block
-	if err := b.addHeader(header); err != nil {
+	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
 	if _, err := b.advanceHead(header); err != nil {
-		return err
-	}
-
-	b.genesis = header.Hash
-	if err := b.db.WriteDiff(header.Hash, big.NewInt(1)); err != nil {
 		return err
 	}
 
@@ -274,17 +248,16 @@ func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 		return nil, err
 	}
 
-	if h.ParentHash == types.StringToHash("") {
-		// Dont write difficulty for genesis
-		return nil, nil
+	currentDiff := big.NewInt(0)
+	if h.ParentHash != types.StringToHash("") {
+		td, ok := b.readDiff(h.ParentHash)
+		if !ok {
+			return nil, fmt.Errorf("parent difficulty not found 1")
+		}
+		currentDiff = td
 	}
 
-	td, ok := b.readDiff(h.ParentHash)
-	if !ok {
-		return nil, fmt.Errorf("parent difficulty not found 1")
-	}
-
-	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
+	diff := big.NewInt(1).Add(currentDiff, new(big.Int).SetUint64(h.Difficulty))
 	if err := b.db.WriteDiff(h.Hash, diff); err != nil {
 		return nil, err
 	}

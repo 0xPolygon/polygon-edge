@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/minimal/chain"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -17,7 +17,10 @@ func TestGenesis(t *testing.T) {
 
 	// add genesis block
 	genesis := &types.Header{Difficulty: 1, Number: 0}
-	assert.NoError(t, b.WriteHeaderGenesis(genesis))
+	genesis.ComputeHash()
+
+	_, err := b.advanceHead(genesis)
+	assert.NoError(t, err)
 
 	header := b.Header()
 	assert.Equal(t, header.Hash, genesis.Hash)
@@ -43,7 +46,7 @@ func TestChainGenesis(t *testing.T) {
 			assert.NoError(t, err)
 
 			b := NewTestBlockchain(t, nil)
-			assert.NoError(t, b.WriteGenesis(genesisConfig.Genesis))
+			assert.NoError(t, b.writeGenesis(genesisConfig.Genesis))
 
 			genesisHeader, ok := b.GetHeaderByNumber(0)
 			assert.True(t, ok)
@@ -147,7 +150,7 @@ func TestInsertHeaders(t *testing.T) {
 			Chain: []*header{
 				mock(0x0),
 			},
-			TD: 1,
+			TD: 0,
 		},
 		{
 			Name: "Linear",
@@ -161,7 +164,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
-						Diff: big.NewInt(2),
+						Diff: big.NewInt(1),
 					},
 				},
 				{
@@ -170,7 +173,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(4),
+						Diff: big.NewInt(3),
 					},
 				},
 			},
@@ -180,7 +183,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x1),
 				mock(0x2),
 			},
-			TD: 1 + 1 + 2,
+			TD: 0 + 1 + 2,
 		},
 		{
 			Name: "Keep block with higher difficulty",
@@ -194,7 +197,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
-						Diff: big.NewInt(2),
+						Diff: big.NewInt(1),
 					},
 				},
 				{
@@ -203,7 +206,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3).Parent(0x1).Diff(5),
 						},
-						Diff: big.NewInt(7),
+						Diff: big.NewInt(6),
 					},
 				},
 				{
@@ -223,7 +226,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x1),
 				mock(0x3).Parent(0x1).Diff(5),
 			},
-			TD: 1 + 1 + 5,
+			TD: 0 + 1 + 5,
 		},
 		{
 			Name: "Reorg",
@@ -237,7 +240,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
-						Diff: big.NewInt(2),
+						Diff: big.NewInt(1),
 					},
 				},
 				{
@@ -246,7 +249,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(4),
+						Diff: big.NewInt(1 + 2),
 					},
 				},
 				{
@@ -255,7 +258,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(7),
+						Diff: big.NewInt(1 + 2 + 3),
 					},
 				},
 				{
@@ -271,7 +274,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x2),
 							mock(0x3),
 						},
-						Diff: big.NewInt(12),
+						Diff: big.NewInt(1 + 10),
 					},
 				},
 				{
@@ -280,7 +283,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x5).Parent(0x4).Diff(11).Number(3),
 						},
-						Diff: big.NewInt(23),
+						Diff: big.NewInt(1 + 10 + 11),
 					},
 				},
 				{
@@ -301,7 +304,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x4).Parent(0x1).Diff(10).Number(2),
 				mock(0x5).Parent(0x4).Diff(11).Number(3),
 			},
-			TD: 1 + 1 + 10 + 11,
+			TD: 0 + 1 + 10 + 11,
 		},
 		{
 			Name: "Forks in reorgs",
@@ -315,7 +318,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
-						Diff: big.NewInt(2),
+						Diff: big.NewInt(1),
 					},
 				},
 				{
@@ -324,7 +327,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(4),
+						Diff: big.NewInt(1 + 2),
 					},
 				},
 				{
@@ -333,7 +336,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(7),
+						Diff: big.NewInt(1 + 2 + 3),
 					},
 				},
 				{
@@ -346,7 +349,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(15),
+						Diff: big.NewInt(1 + 2 + 11),
 					},
 				},
 				{
@@ -376,7 +379,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x2),
 				mock(0x4).Parent(0x2).Diff(11),
 			},
-			TD: 1 + 1 + 2 + 11,
+			TD: 0 + 1 + 2 + 11,
 		},
 		{
 			Name: "Head from old long fork",
@@ -390,7 +393,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x1),
 						},
-						Diff: big.NewInt(2),
+						Diff: big.NewInt(1),
 					},
 				},
 				{
@@ -399,7 +402,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(4),
+						Diff: big.NewInt(1 + 2),
 					},
 				},
 				{
@@ -413,7 +416,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x1),
 							mock(0x2),
 						},
-						Diff: big.NewInt(6),
+						Diff: big.NewInt(0 + 5),
 					},
 				},
 				{
@@ -428,7 +431,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3).Parent(0x0).Diff(5),
 						},
-						Diff: big.NewInt(14),
+						Diff: big.NewInt(1 + 2 + 10),
 					},
 				},
 			},
@@ -443,7 +446,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x2),
 				mock(0x4).Parent(0x2).Diff(10),
 			},
-			TD: 1 + 1 + 2 + 10,
+			TD: 0 + 1 + 2 + 10,
 		},
 	}
 
@@ -472,7 +475,7 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			// genesis is 0x0
-			if err := b.WriteHeaderGenesis(chain.headers[0x0]); err != nil {
+			if err := b.writeGenesisImpl(chain.headers[0x0]); err != nil {
 				t.Fatal(err)
 			}
 
@@ -535,6 +538,8 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			if td, _ := b.GetChainTD(); cc.TD != td.Uint64() {
+				fmt.Println(td)
+				fmt.Println(cc.TD)
 				t.Fatal("bad")
 			}
 		})
@@ -548,7 +553,8 @@ func TestForkUnkwonParents(t *testing.T) {
 	h1 := NewTestHeaderFromChain(h0[:5], 10)
 
 	// Write genesis
-	assert.NoError(t, b.WriteHeaderGenesis(h0[0]))
+	_, err := b.advanceHead(h0[0])
+	assert.NoError(t, err)
 
 	// Write 10 headers
 	assert.NoError(t, b.WriteHeaders(h0[1:]))
