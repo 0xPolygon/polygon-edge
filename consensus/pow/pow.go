@@ -30,7 +30,7 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
-func (p *Pow) VerifyHeader(chain consensus.ChainReader, parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}
@@ -45,11 +45,11 @@ func (p *Pow) VerifyHeader(chain consensus.ChainReader, parent *types.Header, he
 
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
-func (p *Pow) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (p *Pow) Prepare(header *types.Header) error {
 	return nil
 }
 
-func (p *Pow) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
+func (p *Pow) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	header := block.Header
 	header.Difficulty = randomInt(p.min, p.max)
 

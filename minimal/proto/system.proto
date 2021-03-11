@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/minimal/proto";
+
+import "google/protobuf/empty.proto";
+
+service System {
+    // GetInfo returns info about the client
+    rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);
+
+    // PeersAdd adds a new peer
+    rpc PeersAdd(PeersAddRequest) returns (google.protobuf.Empty);
+
+    // PeersList returns the list of peers
+    rpc PeersList(google.protobuf.Empty) returns (PeersListResponse);
+
+    // PeersInfo returns the info of a peer
+    rpc PeersStatus(PeersStatusRequest) returns (Peer);
+
+    // Subscribe subscribes to blockchain events
+    rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
+}
+
+message BlockchainEvent {
+    repeated Header added = 1;
+    repeated Header removed = 2;
+
+    message Header {
+        int64 number = 1;
+        string hash = 2;
+    }
+}
+
+message ServerStatus {
+    int64 network = 1;
+    
+    string genesis = 2;
+
+    Block current = 3;
+
+    string p2pAddr = 4;
+    
+    message Block {
+        int64 number = 1;
+        string hash = 2;
+    }
+}
+
+message Peer {
+    string id = 1;
+    repeated string protocols = 2;
+    repeated string addrs = 3;
+}
+
+message PeersAddRequest {
+    string id = 1;
+}
+
+message PeersStatusRequest {
+    string id = 1;
+}
+
+message PeersListResponse {
+    repeated Peer peers = 1;
+}

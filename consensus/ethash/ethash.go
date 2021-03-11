@@ -60,7 +60,7 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 }
 
 // VerifyHeader verifies the header is correct
-func (e *Ethash) VerifyHeader(chain consensus.ChainReader, parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
 	headerNum := header.Number
 	parentNum := parent.Number
 
@@ -201,12 +201,12 @@ func (e *Ethash) CalcDifficulty(time int64, parent *types.Header) uint64 {
 
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
-func (e *Ethash) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (e *Ethash) Prepare(header *types.Header) error {
 	return nil
 }
 
 // Seal seals the block
-func (e *Ethash) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
+func (e *Ethash) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	panic("NOT IMPLEMENTED")
 }
 

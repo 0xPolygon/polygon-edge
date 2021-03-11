@@ -290,6 +290,10 @@ func (t *Transition) applyMainnetBlockRewards() {
 
 	reward := new(big.Int).Set(blockReward)
 
+	fmt.Println("- tt --")
+	fmt.Println(t)
+	fmt.Println(t.block)
+
 	r := new(big.Int)
 	for _, uncle := range t.block.Uncles {
 		r.Add(big.NewInt(int64(uncle.Number)), big8)
