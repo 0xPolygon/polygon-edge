@@ -425,17 +425,13 @@ func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
+
 	if err != nil {
-		return nil, err
+		return new(types.Big), fmt.Errorf("unable to fetch account")
 	}
 
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		return (*types.Big)(acc.Balance), nil
-	}
-
-	return new(types.Big), nil
+	return (*types.Big)(acc.Balance), nil
 }
 
 // GetTransactionCount returns account nonce
@@ -447,18 +443,12 @@ func (e *Eth) GetTransactionCount(address string, number BlockNumber) (interface
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
 	if err != nil {
-		return nil, err
+		return "0x0", nil
 	}
 
-	//stateHelper := e.d.store.GetStateHelper()
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		return types.Uint64(acc.Nonce), nil
-	}
-
-	return "0x0", nil
+	return types.Uint64(acc.Nonce), nil
 }
 
 // GetCode returns account code at given block number
@@ -470,20 +460,17 @@ func (e *Eth) GetCode(address string, number BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		code, ok := snap.Get(acc.CodeHash)
-		if !ok {
-			return "0x", nil
-		}
-		return types.HexBytes(code), nil
+	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
+	if err != nil {
+		return "0x", fmt.Errorf("unable to fetch account code")
 	}
-	return "0x", nil
+
+	return types.HexBytes(code), nil
 }
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).

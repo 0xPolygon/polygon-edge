@@ -24,7 +24,8 @@ import (
 type mockBlockStore struct {
 	nullBlockchainInterface
 
-	header *types.Header
+	header       *types.Header
+	mockAccounts map[types.Address]*mockAccount
 
 	getHeaderByNumberCallback func(blockNumber uint64) (*types.Header, bool)
 	addTxCallback             func(tx *types.Transaction) error
@@ -67,13 +68,6 @@ func (m *mockBlockStore) AddTx(tx *types.Transaction) error {
 	return m.addTxCallback(tx)
 }
 
-type mockStateHelper struct {
-}
-
-func (sh *mockStateHelper) NewTxn(state state.State, snapshot state.Snapshot) *state.Txn {
-	return nil
-}
-
 func newMockBlockStore() *mockBlockStore {
 	return &mockBlockStore{
 		header: &types.Header{Number: 0},
@@ -109,45 +103,6 @@ type mockState struct {
 	newSnapshotCallback   func() state.Snapshot
 	getCodeCallback       func(hash types.Hash) ([]byte, bool)
 }
-
-type mockTxn struct {
-	accounts map[types.Address]*mockAccount
-}
-
-func (m *mockTxn) GetAccount(addr types.Address) (*state.Account, bool) {
-	if val, ok := m.accounts[addr]; ok {
-		return val.Acct, true
-	}
-
-	return nil, false
-}
-
-type mockSnapshot struct {
-}
-
-func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
-	return nil, false
-}
-
-func (m *mockSnapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
-	return nil, nil
-}
-
-func (m *mockState) NewSnapshotAt(hash types.Hash) (state.Snapshot, error) {
-	return &mockSnapshot{}, nil
-}
-
-func (m *mockState) NewSnapshot() state.Snapshot {
-	return &mockSnapshot{}
-}
-
-func (m *mockState) GetCode(hash types.Hash) ([]byte, bool) {
-	return m.getCodeCallback(hash)
-}
-
-//func NewTxn(state state.State, snapshot state.Snapshot) *mockTxn {
-//	return &mockTxn{}
-//}
 
 var signer = &crypto.FrontierSigner{}
 
@@ -410,62 +365,208 @@ func TestGasPrice(t *testing.T) {
 	}
 }
 
-// TODO add before each to the test suite
+func TestGetBalance(t *testing.T) {
+	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
 
-//func TestGetBalance(t *testing.T) {
-//	balances := []*big.Int{big.NewInt(10), big.NewInt(15)}
-//
-//	testTable := []struct {
-//		name       string
-//		address    string
-//		balance    *big.Int
-//		shouldFail bool
-//	}{
-//		{"Balances match for account 1", "1", balances[0], false},
-//		{"Balances match for account 2", "2", balances[1], true},
-//		{"Invalid account address", "3", nil, true},
-//	}
-//
-//	// Setup //
-//	store := newMockBlockStore()
-//	storeState := store.State()
-//	snap, _ := storeState.NewSnapshotAt(store.header.StateRoot)
-//
-//	stateHelper := store.GetStateHelper()
-//
-//	txn := stateHelper.NewTxn(storeState, snap)
-//	txn.accounts = map[types.Address]*mockAccount{}
-//	txn.accounts[types.StringToAddress("1")] = &mockAccount{
-//		Acct: &state.Account{
-//			Nonce:   uint64(123),
-//			Balance: balances[0],
-//		},
-//		Storage: nil,
-//	}
-//	txn.accounts[types.StringToAddress("2")] = &mockAccount{
-//		Acct: &state.Account{
-//			Nonce:   uint64(456),
-//			Balance: balances[1],
-//		},
-//		Storage: nil,
-//	}
-//
-//	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-//
-//	for _, testCase := range testTable {
-//
-//		t.Run(testCase.name, func(t *testing.T) {
-//			balance, balanceError := dispatcher.endpoints.Eth.GetBalance(testCase.address, LatestBlockNumber)
-//
-//			if balanceError != nil && !testCase.shouldFail {
-//				// If there is an error, and the test shouldn't fail
-//				t.Fatalf("Error: %v", balanceError)
-//			} else if !testCase.shouldFail {
-//				AssertEqual(t, balance, testCase.balance, true)
-//			}
-//		})
-//	}
-//}
+	testTable := []struct {
+		name       string
+		address    string
+		balance    *big.Int
+		shouldFail bool
+	}{
+		{"Balances match for account 1", "1", balances[0], false},
+		{"Balances match for account 2", "2", balances[1], true},
+		{"Invalid account address", "3", nil, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	store.mockAccounts = map[types.Address]*mockAccount{}
+	store.mockAccounts[types.StringToAddress("1")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(123),
+			Balance: balances[0],
+		},
+		Storage: nil,
+	}
+
+	store.mockAccounts[types.StringToAddress("2")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(456),
+			Balance: balances[1],
+		},
+		Storage: nil,
+	}
+
+	store.getAccountCallback = func(root types.Hash, addr types.Address) (*state.Account, error) {
+		if val, ok := store.mockAccounts[addr]; ok {
+			return val.Acct, nil
+		}
+
+		return nil, fmt.Errorf("no account found")
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+
+		t.Run(testCase.name, func(t *testing.T) {
+			balance, balanceError := dispatcher.endpoints.Eth.GetBalance(testCase.address, LatestBlockNumber)
+
+			if balanceError != nil && !testCase.shouldFail {
+				// If there is an error, and the test shouldn't fail
+				t.Fatalf("Error: %v", balanceError)
+			} else if !testCase.shouldFail {
+				assert.Equalf(t, (*types.Big)(testCase.balance), balance, "Balances don't match")
+			}
+		})
+	}
+}
+
+func TestGetTransactionCount(t *testing.T) {
+	testTable := []struct {
+		name        string
+		address     string
+		nonce       uint64
+		blockNumber BlockNumber
+		shouldPanic bool
+		shouldFail  bool
+	}{
+		{"Valid address nonce", "1", uint64(123), LatestBlockNumber, false, false},
+		{"Invalid address", "5", 0, LatestBlockNumber, false, true},
+		{"Invalid block number", "2", 0, -50, true, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	store.mockAccounts = map[types.Address]*mockAccount{}
+	store.mockAccounts[types.StringToAddress("1")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(123),
+			Balance: nil,
+		},
+		Storage: nil,
+	}
+
+	store.mockAccounts[types.StringToAddress("2")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:   uint64(456),
+			Balance: nil,
+		},
+		Storage: nil,
+	}
+
+	store.getAccountCallback = func(root types.Hash, addr types.Address) (*state.Account, error) {
+		if val, ok := store.mockAccounts[addr]; ok {
+			return val.Acct, nil
+		}
+
+		return nil, fmt.Errorf("no account found")
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.shouldPanic {
+				assert.Panicsf(t, func() {
+					_, _ = dispatcher.endpoints.Eth.GetTransactionCount(testCase.address, testCase.blockNumber)
+				}, "No panic detected")
+			} else {
+				nonce, nonceError := dispatcher.endpoints.Eth.GetTransactionCount(testCase.address, testCase.blockNumber)
+
+				if nonceError != nil && !testCase.shouldFail {
+					// If there is an error, and the test shouldn't fail
+					t.Fatalf("Error: %v", nonceError)
+				} else if !testCase.shouldFail {
+					assert.Equalf(t, (types.Uint64)(testCase.nonce), nonce, "Nonces don't match")
+				}
+			}
+		})
+	}
+}
+
+func TestGetCode(t *testing.T) {
+	testTable := []struct {
+		name        string
+		address     string
+		shouldPanic bool
+		shouldFail  bool
+	}{
+		{"Valid address code", "1", false, false},
+		{"Invalid code", "2", false, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	store.mockAccounts = map[types.Address]*mockAccount{}
+	store.mockAccounts[types.StringToAddress("1")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:    uint64(123),
+			Balance:  nil,
+			CodeHash: types.StringToAddress("123").Bytes(),
+		},
+		Storage: nil,
+	}
+
+	store.mockAccounts[types.StringToAddress("2")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:    uint64(456),
+			Balance:  nil,
+			CodeHash: nil,
+		},
+		Storage: nil,
+	}
+
+	store.getAccountCallback = func(root types.Hash, addr types.Address) (*state.Account, error) {
+		if val, ok := store.mockAccounts[addr]; ok {
+			return val.Acct, nil
+		}
+
+		return nil, fmt.Errorf("no account found")
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for index, testCase := range testTable {
+
+		if index == 1 {
+			store.getCodeCallback = func(hash types.Hash) ([]byte, error) {
+				return nil, fmt.Errorf("invalid hash")
+			}
+		} else {
+			store.getCodeCallback = func(hash types.Hash) ([]byte, error) {
+				return []byte{}, nil
+			}
+		}
+
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.shouldPanic {
+				assert.Panicsf(t, func() {
+					_, _ = dispatcher.endpoints.Eth.GetCode(testCase.address, LatestBlockNumber)
+				}, "No panic detected")
+			} else {
+				code, codeError := dispatcher.endpoints.Eth.GetCode(testCase.address, LatestBlockNumber)
+
+				if codeError != nil && !testCase.shouldFail {
+					// If there is an error, and the test shouldn't fail
+					t.Fatalf("Error: %v", codeError)
+				} else if !testCase.shouldFail {
+					assert.IsTypef(t,
+						types.HexBytes{},
+						code,
+						"Code hashes don't match")
+				}
+			}
+		})
+	}
+}
+
+// TODO add before each to the test suite
 
 // TODO
 // GetBlockByHash
@@ -497,21 +598,3 @@ func TestGasPrice(t *testing.T) {
 // III. Invalid index
 
 // TODO EstimateGas (uses state)
-
-// TODO GetTransactionCount (uses state)
-// 1. Create two accounts
-// 2. Send a couple of transactions from 1 account to the other
-// 3. Check the nonce
-// Test cases:
-// I. Regular case
-// II. Invalid block
-// III. Invalid address
-
-// TODO GetCode (uses state)
-// 1. Create a dummy contract
-// 2. Fetch the code
-// Test cases:
-// I. User account
-// II. Contract account
-// III. Invalid address
-// IV. Invalid block number
