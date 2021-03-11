@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -18,5 +17,4 @@ func TestHTTPServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println(srv)
-	time.Sleep(1 * time.Minute)
 }

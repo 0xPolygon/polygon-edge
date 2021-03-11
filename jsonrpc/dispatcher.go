@@ -53,11 +53,13 @@ type Dispatcher struct {
 
 func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
 	d := &Dispatcher{
-		logger:        logger.Named("dispatcher"),
-		filterManager: NewFilterManager(logger, store),
+		logger: logger.Named("dispatcher"),
 	}
 	d.registerEndpoints()
-	go d.filterManager.Run()
+	if store != nil {
+		d.filterManager = NewFilterManager(logger, store)
+		go d.filterManager.Run()
+	}
 	return d
 }
 
