@@ -42,17 +42,6 @@ type Txn struct {
 	hash      *keccak.Keccak
 }
 
-type StateHelperInterface interface {
-	NewTxn(state State, snapshot Snapshot) *Txn
-}
-
-type StateHelper struct {
-}
-
-func (sh *StateHelper) NewTxn(state State, snapshot Snapshot) *Txn {
-	return newTxn(state, snapshot)
-}
-
 func NewTxn(state State, snapshot Snapshot) *Txn {
 	return newTxn(state, snapshot)
 }

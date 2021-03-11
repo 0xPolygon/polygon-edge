@@ -156,27 +156,9 @@ func (e *Eth) GetStorageAt(address string, index types.Hash, number BlockNumber)
 		return nil, err
 	}
 
-	// Fetch the world state snapshot
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	acc, ok := state.NewTxn(s, snap).GetAccount(addr)
-	if !ok {
-		return nil, fmt.Errorf("error getting account state")
-	}
-
-	// Fetch the Storage state snapshot
-	snap, err = s.NewSnapshotAt(acc.Root)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get the storage for the passed in location
-	result, ok := snap.Get(index.Bytes())
-	if !ok {
+	result, err := e.d.store.GetStorage(header.StateRoot, addr, index)
+	if err != nil {
 		return nil, fmt.Errorf("error getting storage snapshot")
 	}
 

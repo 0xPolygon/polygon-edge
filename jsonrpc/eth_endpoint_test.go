@@ -29,6 +29,22 @@ type mockBlockStore struct {
 	getHeaderByNumberCallback func(blockNumber uint64) (*types.Header, bool)
 	addTxCallback             func(tx *types.Transaction) error
 	getAvgGasPriceCallback    func() *big.Int
+
+	getAccountCallback func(root types.Hash, addr types.Address) (*state.Account, error)
+	getStorageCallback func(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
+	getCodeCallback    func(hash types.Hash) ([]byte, error)
+}
+
+func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	return m.getAccountCallback(root, addr)
+}
+
+func (m *mockBlockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	return m.getStorageCallback(root, addr, slot)
+}
+
+func (m *mockBlockStore) GetCode(hash types.Hash) ([]byte, error) {
+	return m.getCodeCallback(hash)
 }
 
 func (m *mockBlockStore) Header() *types.Header {
@@ -57,10 +73,6 @@ type mockStateHelper struct {
 func (sh *mockStateHelper) NewTxn(state state.State, snapshot state.Snapshot) *state.Txn {
 	return nil
 }
-
-//func (m *mockBlockStore) GetStateHelper() *state.StateHelperInterface {
-//	return &mockStateHelper{}
-//}
 
 func newMockBlockStore() *mockBlockStore {
 	return &mockBlockStore{
@@ -460,14 +472,6 @@ func TestGasPrice(t *testing.T) {
 // GetTransactionReceipt
 
 // Remaining test methods:
-
-// TODO GasPrice
-// 1. Create a couple of blocks with a gas price
-// 2. Get the average and check if it matches
-// Test cases:
-// I. Regular average (multiple blocks)
-// II. Single block
-// III. No blocks
 
 // TODO Call
 // 1. Deploy a dummy contract with 1 method
