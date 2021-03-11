@@ -3,43 +3,16 @@ package jsonrpc
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
-
-// HELPER FUNCTIONS //
-
-// AssertEqual checks if values are equal
-func AssertEqual(t *testing.T, a interface{}, b interface{}, fatal bool) {
-	if a == b {
-		return
-	}
-
-	if fatal {
-		t.Fatalf("Received %v (type %v), expected %v (type %v)", a, reflect.TypeOf(a), b, reflect.TypeOf(b))
-	} else {
-		t.Errorf("Received %v (type %v), expected %v (type %v)", a, reflect.TypeOf(a), b, reflect.TypeOf(b))
-	}
-
-}
-
-// AssertType checks if a is the type of b
-func AssertType(t *testing.T, a interface{}, b reflect.Type, fatal bool) {
-	if reflect.TypeOf(a) != b {
-		if fatal {
-			t.Fatalf("Received %v (type %v), expected type %v", a, reflect.TypeOf(a), b)
-		} else {
-			t.Errorf("Received %v (type %v), expected type %v", a, reflect.TypeOf(a), b)
-		}
-	}
-}
 
 // TEST SETUP //
 
@@ -196,7 +169,7 @@ func TestGetBlockByNumber(t *testing.T) {
 				// If there is an error, and the test shouldn't fail
 				t.Fatalf("Error: %v", blockError)
 			} else if !testCase.shouldFail {
-				AssertType(t, block, reflect.TypeOf(&types.Header{}), true)
+				assert.IsTypef(t, &types.Header{}, block, "Invalid return type")
 			}
 		})
 	}
@@ -228,7 +201,7 @@ func TestBlockNumber(t *testing.T) {
 				// If there is an error, and the test shouldn't fail
 				t.Fatalf("Error: %v", blockError)
 			} else if !testCase.shouldFail {
-				AssertEqual(t, block, types.Uint64(0), true)
+				assert.Equalf(t, types.Uint64(0), block, "Output not equal")
 			}
 		})
 	}
@@ -306,7 +279,77 @@ func TestSendRawTransaction(t *testing.T) {
 				// If there is an error, and the test shouldn't fail
 				t.Fatalf("Error: %v", txHashError)
 			} else if !testCase.shouldFail {
-				AssertType(t, txHash, reflect.TypeOf(""), true)
+				assert.IsTypef(t, "", txHash, "Return type mismatch")
+			}
+		})
+	}
+}
+
+func TestSendTransaction(t *testing.T) {
+	keys := []*ecdsa.PrivateKey{}
+	addresses := []types.Address{}
+
+	// Generate dummy keys and addresses
+	for i := 0; i < 3; i++ {
+		var key, _ = crypto.GenerateKey()
+		var address = crypto.PubKeyToAddress(&key.PublicKey)
+
+		keys = append(keys, key)
+		addresses = append(addresses, address)
+	}
+
+	testTable := []struct {
+		name           string
+		transactionMap map[string]interface{}
+		shouldFail     bool
+	}{
+		{"Valid transaction object", map[string]interface{}{
+			"nonce":    "1",
+			"from":     (&addresses[0]).String(),
+			"to":       (&addresses[1]).String(),
+			"data":     "",
+			"gasPrice": "0x0001",
+			"gas":      "0x01",
+		}, false},
+		{"Invalid nonce", map[string]interface{}{
+			"nonce":    "",
+			"from":     (&addresses[0]).String(),
+			"to":       (&addresses[1]).String(),
+			"data":     "",
+			"gasPrice": "0x0001",
+			"gas":      "0x01",
+		}, true},
+		{"Invalid gas", map[string]interface{}{
+			"nonce":    "3",
+			"from":     (&addresses[0]).String(),
+			"to":       (&addresses[1]).String(),
+			"data":     "",
+			"gasPrice": "0x0001",
+			"gas":      "",
+		}, true},
+	}
+
+	store := newMockBlockStore()
+
+	store.addTxCallback = func(tx *types.Transaction) error {
+		return nil
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+
+			if testCase.shouldFail {
+				assert.Panicsf(t, func() {
+					_, _ = dispatcher.endpoints.Eth.SendTransaction(testCase.transactionMap)
+				}, "No panic detected")
+			} else {
+				assert.NotPanicsf(t, func() {
+					txHash, _ := dispatcher.endpoints.Eth.SendTransaction(testCase.transactionMap)
+
+					assert.IsTypef(t, "", txHash, "Return type mismatch")
+				}, "Invalid panic detected")
 			}
 		})
 	}

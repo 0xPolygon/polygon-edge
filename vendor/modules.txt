@@ -221,7 +221,7 @@ github.com/shirou/gopsutil/internal/common
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.4.0
+# github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
 # github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
