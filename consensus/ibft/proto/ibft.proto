@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/consensus/ibft/proto";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+
+service Ibft {
+    rpc Prepare(Subject) returns (google.protobuf.Empty);
+    rpc PrePrepare(Preprepare) returns (google.protobuf.Empty);
+    rpc Commit(Subject) returns (google.protobuf.Empty);
+    rpc RoundChange(Subject) returns (google.protobuf.Empty);
+}
+
+message Preprepare {
+    View view = 1;
+    Proposal proposal = 2;
+}
+
+message Subject {
+    View view = 1;
+    string digest = 2;
+}
+
+message View {
+    string string = 1;
+    string sequence = 2;
+}
+
+message Proposal {
+    google.protobuf.Any block = 1;
+}
