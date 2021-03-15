@@ -566,6 +566,84 @@ func TestGetCode(t *testing.T) {
 	}
 }
 
+func TestGetStorageAt(t *testing.T) {
+	testTable := []struct {
+		name        string
+		address     string
+		index       types.Hash
+		shouldPanic bool
+		shouldFail  bool
+	}{
+		{"Valid address", "1", types.StringToHash("1"), false, false},
+		{"Invalid address", "2", types.StringToHash("1"), false, true},
+		{"Invalid index", "1", types.StringToHash("2"), false, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	store.mockAccounts = map[types.Address]*mockAccount{}
+	store.mockAccounts[types.StringToAddress("1")] = &mockAccount{
+		Acct: &state.Account{
+			Nonce:    uint64(123),
+			Balance:  nil,
+			CodeHash: types.StringToAddress("123").Bytes(),
+		},
+		Storage: map[types.Hash]types.Hash{
+			types.StringToHash("1"): types.StringToHash("Slot 1 ACC 1"),
+		},
+	}
+
+	store.getStorageCallback = func(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+
+		if addr != types.StringToAddress("1") {
+			// Simulate a failed account fetch
+			return nil, fmt.Errorf("invalid address")
+		}
+
+		if slot != types.StringToHash("1") {
+			// Simulate invalid slot access
+			return nil, fmt.Errorf("")
+		}
+
+		return store.mockAccounts[addr].Storage[slot].Bytes(), nil
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.shouldPanic {
+				assert.Panicsf(t, func() {
+					_, _ = dispatcher.endpoints.Eth.GetStorageAt(
+						testCase.address,
+						testCase.index,
+						LatestBlockNumber,
+					)
+				}, "No panic detected")
+			} else {
+				slot, slotError := dispatcher.endpoints.Eth.GetStorageAt(
+					testCase.address,
+					testCase.index,
+					LatestBlockNumber,
+				)
+
+				if slotError != nil && !testCase.shouldFail {
+					// If there is an error, and the test shouldn't fail
+					t.Fatalf("Error: %v", slotError)
+				} else if !testCase.shouldFail {
+					assert.Equalf(
+						t,
+						types.StringToHash("Slot 1 ACC 1").Bytes(),
+						slot,
+						"Slot doesn't match",
+					)
+				}
+			}
+		})
+	}
+}
+
 // TODO add before each to the test suite
 
 // TODO
@@ -588,13 +666,5 @@ func TestGetCode(t *testing.T) {
 // Test cases:
 // I. Regular case
 // II. No logs found
-
-// TODO GetStorageAt (uses state)
-// 1. Create a dummy contract with 1 field
-// 2. Check if the storage matches
-// Test cases:
-// I. Normal creation
-// II. Invalid header
-// III. Invalid index
 
 // TODO EstimateGas (uses state)
