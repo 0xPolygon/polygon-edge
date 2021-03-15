@@ -106,6 +106,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
 	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
 	flags.StringVar(&cliConfig.LibP2PAddr, "libp2p", "", "")
+	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 
 	if err := flags.Parse(args); err != nil {
