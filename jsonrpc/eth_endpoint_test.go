@@ -34,6 +34,7 @@ type mockBlockStore struct {
 	getAccountCallback func(root types.Hash, addr types.Address) (*state.Account, error)
 	getStorageCallback func(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	getCodeCallback    func(hash types.Hash) ([]byte, error)
+	applyTxnCallback   func(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
 }
 
 func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
@@ -42,6 +43,10 @@ func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*state
 
 func (m *mockBlockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	return m.getStorageCallback(root, addr, slot)
+}
+
+func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	return m.applyTxnCallback(header, txn)
 }
 
 func (m *mockBlockStore) GetCode(hash types.Hash) ([]byte, error) {
@@ -644,20 +649,91 @@ func TestGetStorageAt(t *testing.T) {
 	}
 }
 
+func TestCall(t *testing.T) {
+	var key, _ = crypto.GenerateKey()
+	var address = crypto.PubKeyToAddress(&key.PublicKey)
+
+	dummyTransaction := &types.Transaction{
+		Nonce:    1,
+		To:       &address,
+		Value:    []byte{0x1},
+		Gas:      10,
+		GasPrice: []byte{0x1},
+		Input:    []byte{},
+	}
+
+	testTable := []struct {
+		name        string
+		transaction *types.Transaction
+		shouldPanic bool
+		shouldFail  bool
+	}{
+		{"Valid return value", dummyTransaction, false, false},
+		{"Failed transaction", dummyTransaction, false, true},
+		{"Invalid transaction", dummyTransaction, false, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	// Used for return value comparison
+	referenceReturnValue := types.Hex2Bytes("0x0005")
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	for index, testCase := range testTable {
+
+		switch index {
+		case 0:
+			store.applyTxnCallback = func(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+				return referenceReturnValue, false, nil
+			}
+		case 1:
+			store.applyTxnCallback = func(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+				return nil, true, nil
+			}
+		case 2:
+			store.applyTxnCallback = func(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+				return nil, false, fmt.Errorf("Unable to apply transaction")
+			}
+		}
+
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.shouldPanic {
+				assert.Panicsf(t, func() {
+					_, _ = dispatcher.endpoints.Eth.Call(
+						testCase.transaction,
+						LatestBlockNumber,
+					)
+				}, "No panic detected")
+			} else {
+				returnValue, callError := dispatcher.endpoints.Eth.Call(
+					testCase.transaction,
+					LatestBlockNumber,
+				)
+
+				if callError != nil && !testCase.shouldFail {
+					// If there is an error, and the test shouldn't fail
+					t.Fatalf("Error: %v", callError)
+				} else if !testCase.shouldFail {
+					assert.Equalf(
+						t,
+						referenceReturnValue,
+						returnValue,
+						"Return values don't match",
+					)
+				}
+			}
+		})
+	}
+}
+
 // TODO add before each to the test suite
 
-// TODO
-// GetBlockByHash
-// GetTransactionReceipt
+// NOTES //
+// GetBlockByHash - Should be tested as part of blockchain.go
 
 // Remaining test methods:
-
-// TODO Call
-// 1. Deploy a dummy contract with 1 method
-// 2. Call the contract method and check result
-// Test cases:
-// I. Regular call
-// II. Call for non existing block num
 
 // TODO GetLogs
 // 1. Create dummy blocks with receipts / logs

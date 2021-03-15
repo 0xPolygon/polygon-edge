@@ -183,18 +183,18 @@ func (e *Eth) Call(transaction *types.Transaction, number BlockNumber) (interfac
 		return nil, err
 	}
 
-	transition, err := e.d.store.BeginTxn(header.StateRoot, header)
-	if err != nil {
-		return nil, err
-	}
-
 	// The return value of the execution is saved in the transition (returnValue field)
-	_, _, err = transition.Apply(transaction)
+	returnValue, failed, err := e.d.store.ApplyTxn(header, transaction)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return transition.ReturnValue(), nil
+	if failed {
+		return nil, fmt.Errorf("unable to execute call")
+	}
+
+	return returnValue, nil
 }
 
 // GetBlockHeader returns the specific header of the requested block

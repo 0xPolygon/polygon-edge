@@ -246,6 +246,22 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
+func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	transition, err := j.BeginTxn(header.StateRoot, header)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	_, failed, err := transition.Apply(txn)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return transition.ReturnValue(), failed, nil
+}
+
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
 		state:      s.state,

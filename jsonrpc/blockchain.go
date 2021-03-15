@@ -46,6 +46,9 @@ type blockchainInterface interface {
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 
+	// ApplyTxn applies a transaction object to the blockchain
+	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+
 	stateHelperInterface
 }
 

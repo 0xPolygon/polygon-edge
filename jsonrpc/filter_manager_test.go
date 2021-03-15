@@ -215,6 +215,10 @@ type mockStore struct {
 	receipts     map[types.Hash][]*types.Receipt
 }
 
+func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	panic("implement me")
+}
+
 func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
 	panic("implement me")
 }
