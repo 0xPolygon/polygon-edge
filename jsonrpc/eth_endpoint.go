@@ -368,6 +368,10 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 	var referenceFrom uint64
 	var referenceTo uint64
 
+	if filterOptions.fromBlock > filterOptions.toBlock {
+		return nil, fmt.Errorf("invalid block search range")
+	}
+
 	// Fetch the requested from header
 	header, err := e.GetBlockHeader(filterOptions.fromBlock)
 	if err != nil {
@@ -403,12 +407,6 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 				if filterOptions.Match(log) {
 					result = append(result, log)
 				}
-				// Experimental solution
-				// if receipt.LogsBloom.IsLogInBloom(log) {
-				// 	if filterOptions.Match(log) {
-				// 		result = append(result, log)
-				// 	}
-				// }
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
@@ -31,14 +32,19 @@ type mockBlockStore struct {
 	addTxCallback             func(tx *types.Transaction) error
 	getAvgGasPriceCallback    func() *big.Int
 
-	getAccountCallback func(root types.Hash, addr types.Address) (*state.Account, error)
-	getStorageCallback func(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
-	getCodeCallback    func(hash types.Hash) ([]byte, error)
-	applyTxnCallback   func(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+	getAccountCallback        func(root types.Hash, addr types.Address) (*state.Account, error)
+	getStorageCallback        func(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
+	getCodeCallback           func(hash types.Hash) ([]byte, error)
+	applyTxnCallback          func(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+	getReceiptsByHashCallback func(hash types.Hash) ([]*types.Receipt, error)
 }
 
 func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
 	return m.getAccountCallback(root, addr)
+}
+
+func (m *mockBlockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	return m.getReceiptsByHashCallback(hash)
 }
 
 func (m *mockBlockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
@@ -77,6 +83,50 @@ func newMockBlockStore() *mockBlockStore {
 	return &mockBlockStore{
 		header: &types.Header{Number: 0},
 	}
+}
+
+// DUMMY DATA GENERATION //
+
+func (m *mockBlockStore) generateTopics(numTopics int) []types.Hash {
+	var topics = []types.Hash{}
+
+	for i := 0; i < numTopics; i++ {
+		topics = append(topics, types.StringToHash(fmt.Sprintf("topic %d", i)))
+	}
+
+	return topics
+}
+
+func (m *mockBlockStore) generateLogs(numLogs int, numTopics int) []*types.Log {
+
+	var logs = []*types.Log{}
+
+	for i := 0; i < numLogs; i++ {
+		logs = append(logs, &types.Log{
+			Topics: m.generateTopics(numTopics),
+		})
+	}
+
+	return logs
+}
+
+type generateReceiptsParams struct {
+	numReceipts int
+	numLogs     int
+	numTopics   int
+}
+
+func (m *mockBlockStore) generateReceipts(params generateReceiptsParams) []*types.Receipt {
+
+	var receipts = []*types.Receipt{}
+
+	for i := 0; i < params.numReceipts; i++ {
+		receipts = append(receipts, &types.Receipt{
+			Logs: m.generateLogs(params.numLogs, params.numTopics),
+		})
+	}
+
+	return receipts
 }
 
 // STATE / SNAPSHOT / ACCOUNTS MOCKS //
@@ -728,19 +778,108 @@ func TestCall(t *testing.T) {
 	}
 }
 
+func TestGetLogs(t *testing.T) {
+
+	// Topics we're searching for
+	var topics = [][]types.Hash{
+		{types.StringToHash("topic 4")},
+		{types.StringToHash("topic 5")},
+		{types.StringToHash("topic 6")},
+	}
+
+	testTable := []struct {
+		name          string
+		filterOptions *LogFilter
+		shouldFail    bool
+	}{
+		{"Found matching logs",
+			&LogFilter{
+				fromBlock: 1,
+				toBlock:   4,
+				Topics:    topics,
+			},
+			false},
+		{"Invalid block range", &LogFilter{
+			fromBlock: 10,
+			toBlock:   5,
+			Topics:    topics,
+		}, true},
+		{"Reference blocks not found", &LogFilter{
+			fromBlock: 10,
+			toBlock:   20,
+			Topics:    topics,
+		}, true},
+	}
+
+	// Setup //
+	store := newMockBlockStore()
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	store.getHeaderByNumberCallback = func(blockNumber uint64) (*types.Header, bool) {
+		return &types.Header{
+			Number:       blockNumber,
+			ReceiptsRoot: types.StringToHash(strconv.FormatUint(blockNumber, 10)),
+		}, true
+	}
+
+	store.getReceiptsByHashCallback = func(hash types.Hash) ([]*types.Receipt, error) {
+
+		switch hash {
+		case types.StringToHash(strconv.FormatUint(1, 10)):
+			return store.generateReceipts(
+				generateReceiptsParams{
+					numReceipts: 1,
+					numTopics:   1,
+					numLogs:     2,
+				},
+			), nil
+		case types.StringToHash(strconv.FormatUint(2, 10)):
+			return store.generateReceipts(
+				generateReceiptsParams{
+					numReceipts: 2,
+					numTopics:   5,
+					numLogs:     1,
+				},
+			), nil
+		case types.StringToHash(strconv.FormatUint(3, 10)):
+			return store.generateReceipts(
+				generateReceiptsParams{
+					numReceipts: 3,
+					numTopics:   10,
+					numLogs:     5,
+				},
+			), nil
+		}
+
+		return nil, nil
+	}
+
+	for index, testCase := range testTable {
+
+		if index == 2 {
+			store.getHeaderByNumberCallback = func(blockNumber uint64) (*types.Header, bool) {
+				return nil, false
+			}
+		}
+
+		t.Run(testCase.name, func(t *testing.T) {
+			foundLogs, logError := dispatcher.endpoints.Eth.GetLogs(
+				testCase.filterOptions,
+			)
+
+			if logError != nil && !testCase.shouldFail {
+				// If there is an error, and the test shouldn't fail
+				t.Fatalf("Error: %v", logError)
+			} else if !testCase.shouldFail {
+				assert.Lenf(t, foundLogs, 17, "Invalid number of logs found")
+			}
+		})
+	}
+}
+
 // TODO add before each to the test suite
 
-// NOTES //
-// GetBlockByHash - Should be tested as part of blockchain.go
-
 // Remaining test methods:
-
-// TODO GetLogs
-// 1. Create dummy blocks with receipts / logs
-// 2. Create a dummy filter that matches a subset
-// 3. Check if it returns the matched logs
-// Test cases:
-// I. Regular case
-// II. No logs found
 
 // TODO EstimateGas (uses state)
