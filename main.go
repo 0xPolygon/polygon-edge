@@ -1,6 +1,38 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/0xPolygon/minimal/command"
+	"github.com/mitchellh/cli"
+)
+
+func main() {
+	os.Exit(Run(os.Args[1:]))
+}
+
+// Run starts the cli
+func Run(args []string) int {
+	commands := command.Commands()
+
+	cli := &cli.CLI{
+		Name:     "polygon",
+		Args:     args,
+		Commands: commands,
+	}
+
+	exitCode, err := cli.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error executing CLI: %s\n", err.Error())
+		return 1
+	}
+
+	return exitCode
+}
+
+/*
+import (
 	logger "github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/command"
@@ -19,3 +51,4 @@ func main() {
 		logger.Default().Error(err.Error())
 	}
 }
+*/

@@ -137,41 +137,15 @@ func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
 
 // WriteForks writes the current forks
 func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
-	ar := &fastrlp.Arena{}
-
-	var vr *fastrlp.Value
-	if len(forks) == 0 {
-		vr = ar.NewNullArray()
-	} else {
-		vr = ar.NewArray()
-		for _, fork := range forks {
-			vr.Set(ar.NewCopyBytes(fork[:]))
-		}
-	}
-
-	return s.write2(FORK, EMPTY, vr)
+	ff := Forks(forks)
+	return s.writeRLP(FORK, EMPTY, &ff)
 }
 
 // ReadForks read the current forks
-func (s *KeyValueStorage) ReadForks() []types.Hash {
-	parser := &fastrlp.Parser{}
-	v := s.read2(FORK, EMPTY, parser)
-	if v == nil {
-		return nil
-	}
-
-	elems, err := v.GetElems()
-	if err != nil {
-		panic(err)
-	}
-	forks := make([]types.Hash, len(elems))
-	for indx, elem := range elems {
-		if err := elem.GetHash(forks[indx][:]); err != nil {
-			panic(err)
-		}
-	}
-
-	return forks
+func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
+	forks := &Forks{}
+	err := s.readRLP(FORK, EMPTY, forks)
+	return *forks, err
 }
 
 // -- difficulty --
@@ -194,26 +168,14 @@ func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
 
 // WriteHeader writes the header
 func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
-	ar := &fastrlp.Arena{}
-	v := h.MarshalRLPWith(ar)
-
-	return s.write2(HEADER, h.Hash.Bytes(), v)
+	return s.writeRLP(HEADER, h.Hash.Bytes(), h)
 }
 
 // ReadHeader reads the header
-func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, bool) {
-	p := &fastrlp.Parser{}
-	v := s.read2(HEADER, hash.Bytes(), p)
-	if v == nil {
-		return nil, false
-	}
-
-	header2 := &types.Header{}
-	if err := header2.UnmarshalRLPFrom(p, v); err != nil {
-		panic(err)
-	}
-
-	return header2, true
+func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
+	header := &types.Header{}
+	err := s.readRLP(HEADER, hash.Bytes(), header)
+	return header, err
 }
 
 // WriteCanonicalHeader implements the storage interface
@@ -240,26 +202,14 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 
 // WriteBody writes the body
 func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
-	ar := &fastrlp.Arena{}
-	v := body.MarshalRLPWith(ar)
-
-	return s.write2(BODY, hash.Bytes(), v)
+	return s.writeRLP(BODY, hash.Bytes(), body)
 }
 
 // ReadBody reads the body
-func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, bool) {
-	body2 := &types.Body{}
-	parser := &fastrlp.Parser{}
-
-	v := s.read2(BODY, hash.Bytes(), parser)
-	if v == nil {
-		return nil, false
-	}
-	if err := body2.UnmarshalRLPFrom(parser, v); err != nil {
-		panic(err)
-	}
-
-	return body2, true
+func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
+	body := &types.Body{}
+	err := s.readRLP(BODY, hash.Bytes(), body)
+	return body, err
 }
 
 // -- snapshots --
@@ -282,43 +232,15 @@ func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
 
 // WriteReceipts writes the receipts
 func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
-	ar := &fastrlp.Arena{}
-
-	var vr *fastrlp.Value
-	if len(receipts) == 0 {
-		vr = ar.NewNullArray()
-	} else {
-		vr = ar.NewArray()
-		for _, receipt := range receipts {
-			vr.Set(receipt.MarshalRLPWith(ar))
-		}
-	}
-
-	return s.write2(RECEIPTS, hash.Bytes(), vr)
+	rr := types.Receipts(receipts)
+	return s.writeRLP(RECEIPTS, hash.Bytes(), &rr)
 }
 
 // ReadReceipts reads the receipts
-func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool) {
-	receipts2 := []*types.Receipt{}
-	parser := &fastrlp.Parser{}
-	v := s.read2(RECEIPTS, hash.Bytes(), parser)
-	if v == nil {
-		return nil, false
-	}
-
-	elems, err := v.GetElems()
-	if err != nil {
-		panic(err)
-	}
-	for _, elem := range elems {
-		receipt := &types.Receipt{}
-		if err := receipt.UnmarshalRLPFrom(parser, elem); err != nil {
-			panic(err)
-		}
-		receipts2 = append(receipts2, receipt)
-	}
-
-	return receipts2, true
+func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error) {
+	receipts := &types.Receipts{}
+	err := s.readRLP(RECEIPTS, hash.Bytes(), receipts)
+	return *receipts, err
 }
 
 // -- tx lookup --
@@ -326,9 +248,7 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
 // WriteReceipts writes the receipts
 func (s *KeyValueStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
 	ar := &fastrlp.Arena{}
-
 	vr := ar.NewBytes(blockHash.Bytes())
-
 	return s.write2(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
 }
 
@@ -350,6 +270,25 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 }
 
 // -- write ops --
+
+func (s *KeyValueStorage) writeRLP(p, k []byte, obj types.RLPMarshaler) error {
+	return s.set(p, k, obj.MarshalRLPTo(nil))
+}
+
+func (s *KeyValueStorage) readRLP(p, k []byte, obj types.RLPUnmarshaler) error {
+	p = append(p, k...)
+	data, ok, err := s.db.Get(p)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	if err := obj.UnmarshalRLP(data); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (s *KeyValueStorage) read2(p, k []byte, parser *fastrlp.Parser) *fastrlp.Value {
 	data, ok := s.get(p, k)

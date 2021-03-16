@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"github.com/0xPolygon/minimal/api/jsonrpc"
 	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/types"
 )
 

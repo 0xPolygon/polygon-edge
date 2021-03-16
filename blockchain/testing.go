@@ -7,9 +7,9 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/state"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
@@ -18,7 +18,7 @@ import (
 type fakeConsensus struct {
 }
 
-func (f *fakeConsensus) VerifyHeader(chain consensus.ChainReader, parent, header *types.Header, uncle, seal bool) error {
+func (f *fakeConsensus) VerifyHeader(parent, header *types.Header, uncle, seal bool) error {
 	return nil
 }
 
@@ -26,11 +26,11 @@ func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
 	return types.Address{}, nil
 }
 
-func (f *fakeConsensus) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (f *fakeConsensus) Prepare(header *types.Header) error {
 	return nil
 }
 
-func (f *fakeConsensus) Seal(chain consensus.ChainReader, block *types.Block, ctx context.Context) (*types.Block, error) {
+func (f *fakeConsensus) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	return nil, nil
 }
 
@@ -191,15 +191,20 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
-	config := &chain.Params{
-		Forks: &chain.Forks{
-			EIP155:    chain.NewFork(0),
-			Homestead: chain.NewFork(0),
+	config := &chain.Chain{
+		Params: &chain.Params{
+			Forks: &chain.Forks{
+				EIP155:    chain.NewFork(0),
+				Homestead: chain.NewFork(0),
+			},
 		},
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b := NewBlockchain(s, config, &fakeConsensus{}, state.NewExecutor(config, st))
+	b, err := NewBlockchain(hclog.NewNullLogger(), s, config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if headers != nil {
 		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
 			t.Fatal(err)

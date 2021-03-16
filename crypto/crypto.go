@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/umbracle/ecies"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/umbracle/fastrlp"
@@ -21,10 +20,6 @@ import (
 var (
 	big1 = big.NewInt(1)
 )
-
-func init() {
-	ecies.AddParamsForCurve(S256, ecies.ECIES_AES128_SHA256)
-}
 
 // S256 is the secp256k1 elliptic curve
 var S256 = btcec.S256()

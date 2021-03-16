@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/hashicorp/go-hclog"
 )
 
 func newStorage(t *testing.T) (storage.Storage, func()) {
@@ -13,7 +14,7 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewLevelDBStorage(path, nil)
+	s, err := NewLevelDBStorage(path, hclog.NewNullLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,24 +19,24 @@ type Storage interface {
 	WriteHeadNumber(uint64) error
 
 	WriteForks(forks []types.Hash) error
-	ReadForks() []types.Hash
+	ReadForks() ([]types.Hash, error)
 
 	WriteDiff(hash types.Hash, diff *big.Int) error
 	ReadDiff(hash types.Hash) (*big.Int, bool)
 
 	WriteHeader(h *types.Header) error
-	ReadHeader(hash types.Hash) (*types.Header, bool)
+	ReadHeader(hash types.Hash) (*types.Header, error)
 
 	WriteCanonicalHeader(h *types.Header, diff *big.Int) error
 
 	WriteBody(hash types.Hash, body *types.Body) error
-	ReadBody(hash types.Hash) (*types.Body, bool)
+	ReadBody(hash types.Hash) (*types.Body, error)
 
 	WriteSnapshot(hash types.Hash, blob []byte) error
 	ReadSnapshot(hash types.Hash) ([]byte, bool)
 
 	WriteReceipts(hash types.Hash, receipts []*types.Receipt) error
-	ReadReceipts(hash types.Hash) ([]*types.Receipt, bool)
+	ReadReceipts(hash types.Hash) ([]*types.Receipt, error)
 
 	WriteTxLookup(hash types.Hash, blockHash types.Hash) error
 	ReadTxLookup(hash types.Hash) (types.Hash, bool)
