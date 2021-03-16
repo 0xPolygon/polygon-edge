@@ -877,9 +877,3 @@ func TestGetLogs(t *testing.T) {
 		})
 	}
 }
-
-// TODO add before each to the test suite
-
-// Remaining test methods:
-
-// TODO EstimateGas (uses state)
