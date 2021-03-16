@@ -275,9 +275,9 @@ func (c *ChainIndexer) processSection(section uint64, lastHead types.Hash) (type
 			return types.Hash{}, fmt.Errorf("Bloom indexer: canonical block #%d unknown", blockNum)
 		}
 
-		header, ok := c.storage.ReadHeader(hash)
+		header, err := c.storage.ReadHeader(hash)
 
-		if !ok {
+		if err != nil {
 			return types.Hash{}, fmt.Errorf("unable to read header for hash %s", hash)
 		}
 
