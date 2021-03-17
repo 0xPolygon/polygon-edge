@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// TODO: Already done by grpc
+
 // Proposal supports retrieving height and serialized block to be used during Istanbul consensus.
 type Proposal interface {
 	// Number retrieves the sequence number of this proposal.

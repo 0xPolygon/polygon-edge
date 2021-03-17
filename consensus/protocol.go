@@ -1,9 +1,7 @@
 package consensus
 
-import (
-	"github.com/0xPolygon/minimal/types"
-)
-
+/*
+// TODO: Remove
 // Constants to match up protocol versions and messages
 const (
 	Eth62 = 62
@@ -41,3 +39,4 @@ type Peer interface {
 	// Send sends the message to this peer
 	Send(msgcode uint64, data interface{}) error
 }
+*/

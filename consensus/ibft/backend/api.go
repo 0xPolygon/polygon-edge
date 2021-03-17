@@ -1,11 +1,7 @@
 package backend
 
-import (
-	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/types"
-)
-
+/*
+// TODO: Remove
 // API is a user facing RPC API to dump Istanbul state
 type API struct {
 	chain    consensus.ChainReader
@@ -99,3 +95,4 @@ func (api *API) Discard(address types.Address) {
 
 	delete(api.istanbul.candidates, address)
 }
+*/

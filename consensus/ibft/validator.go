@@ -6,6 +6,8 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+// Consolidate with the validator package
+
 type Validator interface {
 	// Address returns address
 	Address() types.Address

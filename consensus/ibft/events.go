@@ -1,5 +1,7 @@
 package ibft
 
+// TODO: Remove, already done by grpc
+
 // RequestEvent is posted to propose a proposal
 type RequestEvent struct {
 	Proposal Proposal

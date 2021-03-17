@@ -2,13 +2,16 @@ package backend
 
 import (
 	"errors"
+	"io"
 
-	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	lru "github.com/hashicorp/golang-lru"
 )
+
+// TODO: Remove
+// This is done in libp2p
 
 const (
 	istanbulMsg = 0x11
@@ -19,6 +22,7 @@ var (
 	errDecodeFailed = errors.New("fail to decode istanbul message")
 )
 
+/*
 // Protocol implements consensus.Engine.Protocol
 func (sb *backend) Protocol() consensus.Protocol {
 	return consensus.Protocol{
@@ -27,9 +31,16 @@ func (sb *backend) Protocol() consensus.Protocol {
 		Lengths:  []uint64{18},
 	}
 }
+*/
+
+type Msg struct {
+	Code    uint64
+	Payload io.Reader
+	Size    uint64
+}
 
 // HandleMsg implements consensus.Handler.HandleMsg
-func (sb *backend) HandleMsg(addr types.Address, msg consensus.Msg) (bool, error) {
+func (sb *backend) HandleMsg(addr types.Address, msg Msg) (bool, error) {
 	sb.coreMu.Lock()
 	defer sb.coreMu.Unlock()
 
@@ -73,10 +84,12 @@ func (sb *backend) HandleMsg(addr types.Address, msg consensus.Msg) (bool, error
 	return false, nil
 }
 
+/*
 // SetBroadcaster implements consensus.Handler.SetBroadcaster
 func (sb *backend) SetBroadcaster(broadcaster consensus.Broadcaster) {
 	sb.broadcaster = broadcaster
 }
+*/
 
 func (sb *backend) NewChainHead() error {
 	sb.coreMu.RLock()

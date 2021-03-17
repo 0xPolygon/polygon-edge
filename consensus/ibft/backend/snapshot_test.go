@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/minimal/state/runtime/evm"
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 type testerVote struct {
@@ -331,7 +332,8 @@ func TestVoting(t *testing.T) {
 		if tt.epoch != 0 {
 			config.Epoch = tt.epoch
 		}
-		engine := New(config, accounts.accounts[tt.validators[0]], db).(*backend)
+		logger := hclog.NewNullLogger()
+		engine := New(config, accounts.accounts[tt.validators[0]], db, logger)
 
 		chainConfig := &chain.Params{
 			Forks: &chain.Forks{
@@ -349,7 +351,16 @@ func TestVoting(t *testing.T) {
 		executor := state.NewExecutor(chainConfig, st)
 		executor.SetRuntime(precompiled.NewPrecompiled())
 		executor.SetRuntime(evm.NewEVM())
-		chain := blockchain.NewBlockchain(db, chainConfig, engine, executor)
+
+		chain := &chain.Chain{
+			Params: chainConfig,
+		}
+		blockchain, err := blockchain.NewBlockchain(logger, db, chain, engine, executor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		engine.blockchain = blockchain // this is an interesitng problem
+		// blockchain depends on the engine and consensus depends on blockchain
 
 		// Assemble a chain of headers from the cast votes
 		headers := make([]*types.Header, len(tt.votes))
@@ -375,7 +386,7 @@ func TestVoting(t *testing.T) {
 		// Pass all the headers through clique and ensure tallying succeeds
 		head := headers[len(headers)-1]
 
-		snap, err := engine.snapshot(chain, head.Number, head.Hash, headers)
+		snap, err := engine.snapshot(head.Number, head.Hash, headers)
 		if err != nil {
 			t.Errorf("test %d: failed to create voting snapshot: %v", i, err)
 			continue

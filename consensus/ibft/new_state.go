@@ -6,6 +6,8 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 )
 
+// represetns core/roundstate.go
+
 type state struct {
 	round    *big.Int
 	sequence *big.Int

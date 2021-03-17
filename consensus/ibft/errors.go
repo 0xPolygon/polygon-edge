@@ -2,6 +2,8 @@ package ibft
 
 import "errors"
 
+// TODO: Remove, they do not seem that important
+
 var (
 	// ErrUnauthorizedAddress is returned when given address cannot be found in
 	// current validator set.

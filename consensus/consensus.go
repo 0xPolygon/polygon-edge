@@ -41,14 +41,3 @@ type Config struct {
 
 // Factory is the factory function to create a discovery backend
 type Factory func(context.Context, *Config, *ecdsa.PrivateKey, storage.Storage, hclog.Logger) (Consensus, error)
-
-// Istanbul is a consensus engine to avoid byzantine failure
-type Istanbul interface {
-	Consensus
-
-	// Start starts the engine
-	Start(currentBlock func(bool) *types.Block, hasBadBlock func(hash types.Hash) bool) error
-
-	// Stop stops the engine
-	Stop() error
-}

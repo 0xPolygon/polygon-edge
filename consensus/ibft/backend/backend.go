@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/consensus/ibft"
@@ -26,12 +27,45 @@ const (
 	fetcherID = "istanbul"
 )
 
+type backend struct {
+	config           *ibft.Config
+	istanbulEventMux *event.TypeMux
+	privateKey       *ecdsa.PrivateKey
+	address          types.Address
+	logger           hclog.Logger
+	core             istanbulCore.Engine
+	db               storage.Storage
+	// currentBlock     func(full bool) *types.Block
+	// hasBadBlock      func(hash types.Hash) bool
+	blockchain *blockchain.Blockchain
+
+	// the channels for istanbul engine notifications
+	commitCh          chan *types.Block
+	proposedBlockHash types.Hash
+	sealMu            sync.Mutex
+	coreStarted       bool
+	coreMu            sync.RWMutex
+
+	// Current list of candidates we are pushing
+	candidates map[types.Address]bool
+	// Protects the signer fields
+	candidatesLock sync.RWMutex
+	// Snapshots for recent block to speed up reorgs
+	recents *lru.ARCCache
+
+	// event subscription for ChainHeadEvent event
+	// broadcaster consensus.Broadcaster TODO: Replace
+
+	recentMessages *lru.ARCCache // the cache of peer's messages
+	knownMessages  *lru.ARCCache // the cache of self messages
+}
+
 func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
 	return New(ibft.DefaultConfig, privateKey, db, logger), nil
 }
 
 // New creates an Ethereum backend for Istanbul core engine.
-func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) consensus.Istanbul {
+func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) *backend {
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	recentMessages, _ := lru.NewARC(inmemoryPeers)
@@ -54,39 +88,6 @@ func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, 
 }
 
 // ----------------------------------------------------------------------------
-
-type backend struct {
-	config           *ibft.Config
-	istanbulEventMux *event.TypeMux
-	privateKey       *ecdsa.PrivateKey
-	address          types.Address
-	logger           hclog.Logger
-	core             istanbulCore.Engine
-	db               storage.Storage
-	chain            consensus.ChainReader
-	currentBlock     func(full bool) *types.Block
-	hasBadBlock      func(hash types.Hash) bool
-
-	// the channels for istanbul engine notifications
-	commitCh          chan *types.Block
-	proposedBlockHash types.Hash
-	sealMu            sync.Mutex
-	coreStarted       bool
-	coreMu            sync.RWMutex
-
-	// Current list of candidates we are pushing
-	candidates map[types.Address]bool
-	// Protects the signer fields
-	candidatesLock sync.RWMutex
-	// Snapshots for recent block to speed up reorgs
-	recents *lru.ARCCache
-
-	// event subscription for ChainHeadEvent event
-	broadcaster consensus.Broadcaster
-
-	recentMessages *lru.ARCCache // the cache of peer's messages
-	knownMessages  *lru.ARCCache // the cache of self messages
-}
 
 // Address implements istanbul.Backend.Address
 func (sb *backend) Address() types.Address {
@@ -112,37 +113,41 @@ func (sb *backend) Broadcast(valSet ibft.ValidatorSet, payload []byte) error {
 
 // Broadcast implements istanbul.Backend.Gossip
 func (sb *backend) Gossip(valSet ibft.ValidatorSet, payload []byte) error {
-	hash := ibft.RLPHash(payload)
-	sb.knownMessages.Add(hash, true)
+	// TODO
+	// sb.network.Gossip()
+	/*
+		hash := ibft.RLPHash(payload)
+		sb.knownMessages.Add(hash, true)
 
-	targets := make(map[types.Address]bool)
-	for _, val := range valSet.List() {
-		if val.Address() != sb.Address() {
-			targets[val.Address()] = true
-		}
-	}
-
-	if sb.broadcaster != nil && len(targets) > 0 {
-		ps := sb.broadcaster.FindPeers(targets)
-		for addr, p := range ps {
-			ms, ok := sb.recentMessages.Get(addr)
-			var m *lru.ARCCache
-			if ok {
-				m, _ = ms.(*lru.ARCCache)
-				if _, k := m.Get(hash); k {
-					// This peer had this event, skip it
-					continue
-				}
-			} else {
-				m, _ = lru.NewARC(inmemoryMessages)
+		targets := make(map[types.Address]bool)
+		for _, val := range valSet.List() {
+			if val.Address() != sb.Address() {
+				targets[val.Address()] = true
 			}
-
-			m.Add(hash, true)
-			sb.recentMessages.Add(addr, m)
-
-			go p.Send(istanbulMsg, payload)
 		}
-	}
+
+		if sb.broadcaster != nil && len(targets) > 0 {
+			ps := sb.broadcaster.FindPeers(targets)
+			for addr, p := range ps {
+				ms, ok := sb.recentMessages.Get(addr)
+				var m *lru.ARCCache
+				if ok {
+					m, _ = ms.(*lru.ARCCache)
+					if _, k := m.Get(hash); k {
+						// This peer had this event, skip it
+						continue
+					}
+				} else {
+					m, _ = lru.NewARC(inmemoryMessages)
+				}
+
+				m.Add(hash, true)
+				sb.recentMessages.Add(addr, m)
+
+				go p.Send(istanbulMsg, payload)
+			}
+		}
+	*/
 	return nil
 }
 
@@ -176,9 +181,12 @@ func (sb *backend) Commit(proposal ibft.Proposal, seals [][]byte) error {
 		return nil
 	}
 
-	if sb.broadcaster != nil {
-		sb.broadcaster.Enqueue(fetcherID, block)
-	}
+	/*
+		TODO: network.Enqueue()
+		if sb.broadcaster != nil {
+			sb.broadcaster.Enqueue(fetcherID, block)
+		}
+	*/
 	return nil
 }
 
@@ -212,7 +220,7 @@ func (sb *backend) Verify(proposal ibft.Proposal) (time.Duration, error) {
 	}
 
 	// verify the header of proposed block
-	err := sb.VerifyHeader(sb.chain, block.Header, false, false)
+	err := sb.VerifyHeader(nil, block.Header, false, false)
 	// ignore errEmptyCommittedSeals error because we don't have the committed seals yet
 	if err == nil || err == errEmptyCommittedSeals {
 		return 0, nil
@@ -243,13 +251,13 @@ func (sb *backend) CheckSignature(data []byte, address types.Address, sig []byte
 
 // HasPropsal implements istanbul.Backend.HashBlock
 func (sb *backend) HasPropsal(hash types.Hash, number *big.Int) bool {
-	_, ok := sb.chain.GetHeader(hash, number.Uint64())
+	_, ok := sb.blockchain.GetHeaderByHash(hash)
 	return ok
 }
 
 // GetProposer implements istanbul.Backend.GetProposer
 func (sb *backend) GetProposer(number uint64) types.Address {
-	if h, _ := sb.chain.GetHeaderByNumber(number); h != nil {
+	if h, _ := sb.blockchain.GetHeaderByNumber(number); h != nil {
 		a, _ := sb.Author(h)
 		return a
 	}
@@ -265,7 +273,7 @@ func (sb *backend) ParentValidators(proposal ibft.Proposal) ibft.ValidatorSet {
 }
 
 func (sb *backend) getValidators(number uint64, hash types.Hash) ibft.ValidatorSet {
-	snap, err := sb.snapshot(sb.chain, number, hash, nil)
+	snap, err := sb.snapshot(number, hash, nil)
 	if err != nil {
 		return validator.NewSet(nil, sb.config.ProposerPolicy)
 	}
@@ -273,7 +281,12 @@ func (sb *backend) getValidators(number uint64, hash types.Hash) ibft.ValidatorS
 }
 
 func (sb *backend) LastProposal() (ibft.Proposal, types.Address) {
-	block := sb.currentBlock(false)
+	// block := sb.currentBlock(false)
+
+	block, ok := sb.blockchain.GetBlockByHash(sb.blockchain.Header().Hash, true)
+	if !ok {
+		panic("TODO")
+	}
 
 	var proposer types.Address
 	if new(big.Int).SetUint64(block.Number()).Cmp(types.Big0) > 0 {
@@ -289,8 +302,12 @@ func (sb *backend) LastProposal() (ibft.Proposal, types.Address) {
 }
 
 func (sb *backend) HasBadProposal(hash types.Hash) bool {
-	if sb.hasBadBlock == nil {
-		return false
-	}
-	return sb.hasBadBlock(hash)
+	return false
+
+	/*
+		if sb.hasBadBlock == nil {
+			return false
+		}
+		return sb.hasBadBlock(hash)
+	*/
 }

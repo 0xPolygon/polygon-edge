@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/validator"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/hashicorp/go-hclog"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -151,7 +151,7 @@ func TestCheckMessage(t *testing.T) {
 
 func TestStoreBacklog(t *testing.T) {
 	c := &core{
-		logger:     log.New("backend", "test", "id", 0),
+		logger:     hclog.NewNullLogger(),
 		backlogs:   make(map[ibft.Validator]*prque.Prque),
 		backlogsMu: new(sync.Mutex),
 	}
@@ -221,7 +221,7 @@ func TestProcessFutureBacklog(t *testing.T) {
 		events: new(event.TypeMux),
 	}
 	c := &core{
-		logger:     log.New("backend", "test", "id", 0),
+		logger:     hclog.NewNullLogger(),
 		backlogs:   make(map[ibft.Validator]*prque.Prque),
 		backlogsMu: new(sync.Mutex),
 		backend:    backend,
@@ -312,7 +312,7 @@ func testProcessBacklog(t *testing.T, msg *message) {
 		peers:  vset,
 	}
 	c := &core{
-		logger:     log.New("backend", "test", "id", 0),
+		logger:     hclog.NewNullLogger(),
 		backlogs:   make(map[ibft.Validator]*prque.Prque),
 		backlogsMu: new(sync.Mutex),
 		backend:    backend,

@@ -19,10 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IbftClient interface {
-	Prepare(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error)
-	PrePrepare(ctx context.Context, in *Preprepare, opts ...grpc.CallOption) (*empty.Empty, error)
-	Commit(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error)
-	RoundChange(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error)
+	Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
 type ibftClient struct {
@@ -33,36 +30,9 @@ func NewIbftClient(cc grpc.ClientConnInterface) IbftClient {
 	return &ibftClient{cc}
 }
 
-func (c *ibftClient) Prepare(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ibftClient) Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Ibft/Prepare", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *ibftClient) PrePrepare(ctx context.Context, in *Preprepare, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Ibft/PrePrepare", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *ibftClient) Commit(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Ibft/Commit", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *ibftClient) RoundChange(ctx context.Context, in *Subject, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Ibft/RoundChange", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1.Ibft/Message", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,10 +43,7 @@ func (c *ibftClient) RoundChange(ctx context.Context, in *Subject, opts ...grpc.
 // All implementations must embed UnimplementedIbftServer
 // for forward compatibility
 type IbftServer interface {
-	Prepare(context.Context, *Subject) (*empty.Empty, error)
-	PrePrepare(context.Context, *Preprepare) (*empty.Empty, error)
-	Commit(context.Context, *Subject) (*empty.Empty, error)
-	RoundChange(context.Context, *Subject) (*empty.Empty, error)
+	Message(context.Context, *MessageReq) (*empty.Empty, error)
 	mustEmbedUnimplementedIbftServer()
 }
 
@@ -84,17 +51,8 @@ type IbftServer interface {
 type UnimplementedIbftServer struct {
 }
 
-func (UnimplementedIbftServer) Prepare(context.Context, *Subject) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Prepare not implemented")
-}
-func (UnimplementedIbftServer) PrePrepare(context.Context, *Preprepare) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PrePrepare not implemented")
-}
-func (UnimplementedIbftServer) Commit(context.Context, *Subject) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
-}
-func (UnimplementedIbftServer) RoundChange(context.Context, *Subject) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RoundChange not implemented")
+func (UnimplementedIbftServer) Message(context.Context, *MessageReq) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Message not implemented")
 }
 func (UnimplementedIbftServer) mustEmbedUnimplementedIbftServer() {}
 
@@ -109,74 +67,20 @@ func RegisterIbftServer(s grpc.ServiceRegistrar, srv IbftServer) {
 	s.RegisterService(&Ibft_ServiceDesc, srv)
 }
 
-func _Ibft_Prepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Subject)
+func _Ibft_Message_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MessageReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IbftServer).Prepare(ctx, in)
+		return srv.(IbftServer).Message(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1.Ibft/Prepare",
+		FullMethod: "/v1.Ibft/Message",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IbftServer).Prepare(ctx, req.(*Subject))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Ibft_PrePrepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Preprepare)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IbftServer).PrePrepare(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.Ibft/PrePrepare",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IbftServer).PrePrepare(ctx, req.(*Preprepare))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Ibft_Commit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Subject)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IbftServer).Commit(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.Ibft/Commit",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IbftServer).Commit(ctx, req.(*Subject))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Ibft_RoundChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Subject)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IbftServer).RoundChange(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.Ibft/RoundChange",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IbftServer).RoundChange(ctx, req.(*Subject))
+		return srv.(IbftServer).Message(ctx, req.(*MessageReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -189,20 +93,8 @@ var Ibft_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*IbftServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Prepare",
-			Handler:    _Ibft_Prepare_Handler,
-		},
-		{
-			MethodName: "PrePrepare",
-			Handler:    _Ibft_PrePrepare_Handler,
-		},
-		{
-			MethodName: "Commit",
-			Handler:    _Ibft_Commit_Handler,
-		},
-		{
-			MethodName: "RoundChange",
-			Handler:    _Ibft_RoundChange_Handler,
+			MethodName: "Message",
+			Handler:    _Ibft_Message_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

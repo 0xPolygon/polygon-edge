@@ -8,10 +8,16 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 
 service Ibft {
-    rpc Prepare(Subject) returns (google.protobuf.Empty);
-    rpc PrePrepare(Preprepare) returns (google.protobuf.Empty);
-    rpc Commit(Subject) returns (google.protobuf.Empty);
-    rpc RoundChange(Subject) returns (google.protobuf.Empty);
+    rpc Message(MessageReq) returns (google.protobuf.Empty);
+}
+
+message MessageReq {
+    oneof message {
+        Preprepare preprepare = 1;
+        Subject prepare = 2;
+        Subject commit = 3;
+        Subject roundChange = 4;
+    }
 }
 
 message Preprepare {

@@ -8,6 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+// TODO: Remove, we are going to consolidate all the packages in a single one
+// so we do not need to "mock" this as an interface
+
 // Backend provides application specific functions for Istanbul core
 type Backend interface {
 	// Address returns the owner's address

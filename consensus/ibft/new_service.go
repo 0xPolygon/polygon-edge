@@ -13,18 +13,7 @@ type service struct {
 	b *Backend2
 }
 
-func (s *service) Prepare(ctx context.Context, req *proto.Subject) (*empty.Empty, error) {
-	return nil, nil
-}
-
-func (s *service) PrePrepare(ctx context.Context, req *proto.Preprepare) (*empty.Empty, error) {
-	return nil, nil
-}
-
-func (s *service) Commit(ctx context.Context, req *proto.Subject) (*empty.Empty, error) {
-	return nil, nil
-}
-
-func (s *service) RoundChange(ctx context.Context, req *proto.Subject) (*empty.Empty, error) {
+func (s *service) Message(ctx context.Context, req *proto.MessageReq) (*empty.Empty, error) {
+	// read the message and send it to a queue
 	return nil, nil
 }

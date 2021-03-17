@@ -9,9 +9,9 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/validator"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	elog "github.com/ethereum/go-ethereum/log"
+	"github.com/hashicorp/go-hclog"
 )
 
 var testLogger = elog.New()
@@ -28,7 +28,7 @@ type testSystemBackend struct {
 	sentMsgs      [][]byte // store the message when Send is called by core
 
 	address types.Address
-	db      ethdb.Database
+	// db      ethdb.Database
 }
 
 type testCommittedMsgs struct {
@@ -176,8 +176,6 @@ func newTestValidatorSet(n int) ibft.ValidatorSet {
 
 // FIXME: int64 is needed for N and F
 func NewTestSystemWithBackend(n, f uint64) *testSystem {
-	testLogger.SetHandler(elog.StdoutHandler)
-
 	addrs := generateValidators(int(n))
 	sys := newTestSystem(n)
 	config := ibft.DefaultConfig
@@ -188,7 +186,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 		backend.peers = vset
 		backend.address = vset.GetByIndex(i).Address()
 
-		core := New(backend, config).(*core)
+		core := New(backend, config, hclog.NewNullLogger()).(*core)
 		core.state = StateAcceptRequest
 		core.current = newRoundState(&ibft.View{
 			Round:    big.NewInt(0),
@@ -197,7 +195,7 @@ func NewTestSystemWithBackend(n, f uint64) *testSystem {
 			return false
 		})
 		core.valSet = vset
-		core.logger = testLogger
+		core.logger = hclog.NewNullLogger()
 		core.validateFn = backend.CheckValidatorSignature
 
 		backend.engine = core
@@ -249,12 +247,12 @@ func (t *testSystem) stop(core bool) {
 
 func (t *testSystem) NewBackend(id uint64) *testSystemBackend {
 	// assume always success
-	ethDB, _ := ethdb.NewMemDatabase()
+	//ethDB, _ := ethdb.NewMemDatabase()
 	backend := &testSystemBackend{
 		id:     id,
 		sys:    t,
 		events: new(event.TypeMux),
-		db:     ethDB,
+		//db:     ethDB,
 	}
 
 	t.backends[id] = backend

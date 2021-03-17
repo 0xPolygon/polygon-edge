@@ -8,6 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// TODO: Remove, this is already done in minimal...
+
 // S256 is the secp256k1 elliptic curve
 var S256 = btcec.S256()
 

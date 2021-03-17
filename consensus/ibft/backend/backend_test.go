@@ -15,7 +15,7 @@ import (
 )
 
 func TestSign(t *testing.T) {
-	b := newBackend()
+	b := newBackend(t)
 	data := []byte("Here is a string....")
 	sig, err := b.Sign(data)
 	if err != nil {
@@ -36,7 +36,7 @@ func TestCheckSignature(t *testing.T) {
 	data := []byte("Here is a string....")
 	hashData := crypto.Keccak256([]byte(data))
 	sig, _ := crypto.Sign(key, hashData)
-	b := newBackend()
+	b := newBackend(t)
 	a := getAddress()
 	err := b.CheckSignature(data, a, sig)
 	if err != nil {
@@ -95,7 +95,7 @@ func TestCheckValidatorSignature(t *testing.T) {
 }
 
 func TestCommit(t *testing.T) {
-	backend := newBackend()
+	backend := newBackend(t)
 
 	commitCh := make(chan *types.Block)
 	// Case: it's a proposer, so the backend.commit will receive channel result from backend.Commit function
@@ -109,10 +109,10 @@ func TestCommit(t *testing.T) {
 			nil,
 			[][]byte{append([]byte{1}, bytes.Repeat([]byte{0x00}, types.IstanbulExtraSeal-1)...)},
 			func() *types.Block {
-				chain, engine := newBlockChain(1)
+				chain, engine := newBlockChain(t, 1)
 				genesis, _ := chain.GetBlockByHash(chain.Genesis(), true)
-				block := makeBlockWithoutSeal(chain, engine, genesis)
-				header, _ := engine.chain.GetHeader(block.ParentHash(), block.Number()-1)
+				block := makeBlockWithoutSeal(engine, genesis)
+				header, _ := engine.blockchain.GetHeaderByHash(block.ParentHash())
 				expectedBlock, _ := engine.updateBlock(header, block)
 				return expectedBlock
 			},
@@ -122,10 +122,10 @@ func TestCommit(t *testing.T) {
 			errInvalidCommittedSeals,
 			nil,
 			func() *types.Block {
-				chain, engine := newBlockChain(1)
+				chain, engine := newBlockChain(t, 1)
 				genesis, _ := chain.GetBlockByHash(chain.Genesis(), true)
-				block := makeBlockWithoutSeal(chain, engine, genesis)
-				header, _ := engine.chain.GetHeader(block.ParentHash(), block.Number()-1)
+				block := makeBlockWithoutSeal(engine, genesis)
+				header, _ := engine.blockchain.GetHeaderByHash(block.ParentHash())
 				expectedBlock, _ := engine.updateBlock(header, block)
 				return expectedBlock
 			},
@@ -161,9 +161,9 @@ func TestCommit(t *testing.T) {
 }
 
 func TestGetProposer(t *testing.T) {
-	chain, engine := newBlockChain(1)
+	chain, engine := newBlockChain(t, 1)
 	genesis, _ := chain.GetBlockByHash(chain.Genesis(), true)
-	block := makeBlock(chain, engine, genesis)
+	block := makeBlock(engine, genesis)
 	chain.WriteBlocks([]*types.Block{block})
 	expected := engine.GetProposer(1)
 	actual := engine.Address()
@@ -219,8 +219,8 @@ func (slice Keys) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func newBackend() (b *backend) {
-	_, b = newBlockChain(4)
+func newBackend(t *testing.T) (b *backend) {
+	_, b = newBlockChain(t, 4)
 	key, _ := generatePrivateKey()
 	b.privateKey = key
 	return

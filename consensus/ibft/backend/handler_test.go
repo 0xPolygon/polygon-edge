@@ -5,13 +5,12 @@ import (
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	lru "github.com/hashicorp/golang-lru"
 )
 
 func TestIstanbulMessage(t *testing.T) {
-	_, backend := newBlockChain(1)
+	_, backend := newBlockChain(t, 1)
 
 	// generate one msg
 	data := []byte("data1")
@@ -50,7 +49,7 @@ func TestIstanbulMessage(t *testing.T) {
 	}
 }
 
-func makeMsg(msgcode uint64, data interface{}) p2p.Msg {
+func makeMsg(msgcode uint64, data interface{}) Msg {
 	size, r, _ := rlp.EncodeToReader(data)
-	return p2p.Msg{Code: msgcode, Size: uint32(size), Payload: r}
+	return Msg{Code: msgcode, Size: uint64(size), Payload: r}
 }

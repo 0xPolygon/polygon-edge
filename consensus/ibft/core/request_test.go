@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/hashicorp/go-hclog"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -69,7 +69,7 @@ func TestStoreRequestMsg(t *testing.T) {
 		events: new(event.TypeMux),
 	}
 	c := &core{
-		logger:  log.New("backend", "test", "id", 0),
+		logger:  hclog.NewNullLogger(),
 		backend: backend,
 		state:   StateAcceptRequest,
 		current: newRoundState(&ibft.View{
