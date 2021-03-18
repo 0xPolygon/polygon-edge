@@ -36,8 +36,12 @@ func (s *Server) setupLibP2P() error {
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrs(s.addrs...),
 		libp2p.Identity(key),
+		libp2p.NATPortMap(),
 	)
 	if err != nil {
+		return fmt.Errorf("failed to create libp2p stack: %v", err)
+	}
+	if err = s.setupDHT(context.Background(), host); err != nil {
 		return fmt.Errorf("failed to create libp2p stack: %v", err)
 	}
 
