@@ -19,6 +19,10 @@ type Conn interface {
 	ConnSecurity
 	ConnMultiaddrs
 
+	// ID returns an identifier that uniquely identifies this Conn within this
+	// host, during this run. Connection IDs may repeat across restarts.
+	ID() string
+
 	// NewStream constructs a new Stream over this conn.
 	NewStream() (Stream, error)
 

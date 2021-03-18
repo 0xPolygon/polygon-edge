@@ -5,7 +5,9 @@ import (
 	"reflect"
 	"runtime"
 
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
+
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 )
 
@@ -76,7 +78,7 @@ func callConstructor(c reflect.Value, args []reflect.Value) (interface{}, error)
 	return val, err
 }
 
-type constructor func(h host.Host, u *tptu.Upgrader) interface{}
+type constructor func(h host.Host, u *tptu.Upgrader, cg connmgr.ConnectionGater) interface{}
 
 func makeArgumentConstructors(fnType reflect.Type, argTypes map[reflect.Type]constructor) ([]constructor, error) {
 	out := make([]constructor, fnType.NumIn())
@@ -96,7 +98,7 @@ func makeConstructor(
 	tpt interface{},
 	tptType reflect.Type,
 	argTypes map[reflect.Type]constructor,
-) (func(host.Host, *tptu.Upgrader) (interface{}, error), error) {
+) (func(host.Host, *tptu.Upgrader, connmgr.ConnectionGater) (interface{}, error), error) {
 	v := reflect.ValueOf(tpt)
 	// avoid panicing on nil/zero value.
 	if v == (reflect.Value{}) {
@@ -116,10 +118,17 @@ func makeConstructor(
 		return nil, err
 	}
 
-	return func(h host.Host, u *tptu.Upgrader) (interface{}, error) {
+	return func(h host.Host, u *tptu.Upgrader, cg connmgr.ConnectionGater) (interface{}, error) {
 		arguments := make([]reflect.Value, len(argConstructors))
 		for i, makeArg := range argConstructors {
-			arguments[i] = reflect.ValueOf(makeArg(h, u))
+			if arg := makeArg(h, u, cg); arg != nil {
+				arguments[i] = reflect.ValueOf(arg)
+			} else {
+				// ValueOf an un-typed nil yields a zero reflect
+				// value. However, we _want_ the zero value of
+				// the _type_.
+				arguments[i] = reflect.Zero(t.In(i))
+			}
 		}
 		return callConstructor(v, arguments)
 	}, nil

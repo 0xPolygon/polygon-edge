@@ -45,9 +45,9 @@ type Session struct {
 	reader io.Reader
 
 	// pings is used to track inflight pings
-	pings    map[uint32]chan struct{}
-	pingID   uint32
-	pingLock sync.Mutex
+	pingLock   sync.Mutex
+	pingID     uint32
+	activePing *ping
 
 	// streams maps a stream id to a stream, and inflight has an entry
 	// for any outgoing stream that has not yet been established. Both are
@@ -66,6 +66,8 @@ type Session struct {
 
 	// sendCh is used to send messages
 	sendCh chan []byte
+	// pingCh is used to send pongs (responses to pings)
+	pongCh chan uint32
 
 	// recvDoneCh is closed when recv() exits to avoid a race
 	// between stream registration and stream shutdown
@@ -104,12 +106,12 @@ func newSession(config *Config, conn net.Conn, client bool, readBuf int) *Sessio
 		logger:     log.New(config.LogOutput, "", log.LstdFlags),
 		conn:       conn,
 		reader:     reader,
-		pings:      make(map[uint32]chan struct{}),
 		streams:    make(map[uint32]*Stream),
 		inflight:   make(map[uint32]struct{}),
 		synCh:      make(chan struct{}, config.AcceptBacklog),
 		acceptCh:   make(chan *Stream, config.AcceptBacklog),
 		sendCh:     make(chan []byte, 64),
+		pongCh:     make(chan uint32, config.PingBacklog),
 		recvDoneCh: make(chan struct{}),
 		sendDoneCh: make(chan struct{}),
 		shutdownCh: make(chan struct{}),
@@ -218,14 +220,18 @@ func (s *Session) Accept() (net.Conn, error) {
 // AcceptStream is used to block until the next available stream
 // is ready to be accepted.
 func (s *Session) AcceptStream() (*Stream, error) {
-	select {
-	case stream := <-s.acceptCh:
-		if err := stream.sendWindowUpdate(); err != nil {
-			return nil, err
+	for {
+		select {
+		case stream := <-s.acceptCh:
+			if err := stream.sendWindowUpdate(); err != nil {
+				// don't return accept errors.
+				s.logger.Printf("[WARN] error sending window update before accepting: %s", err)
+				continue
+			}
+			return stream, nil
+		case <-s.shutdownCh:
+			return nil, s.shutdownErr
 		}
-		return stream, nil
-	case <-s.shutdownCh:
-		return nil, s.shutdownErr
 	}
 }
 
@@ -281,19 +287,33 @@ func (s *Session) goAway(reason uint32) header {
 }
 
 // Ping is used to measure the RTT response time
-func (s *Session) Ping() (time.Duration, error) {
-	// Get a channel for the ping
-	ch := make(chan struct{})
-
-	// Get a new ping id, mark as pending
+func (s *Session) Ping() (dur time.Duration, err error) {
+	// Prepare a ping.
 	s.pingLock.Lock()
-	id := s.pingID
+	// If there's an active ping, jump on the bandwagon.
+	if activePing := s.activePing; activePing != nil {
+		s.pingLock.Unlock()
+		return activePing.wait()
+	}
+
+	// Ok, our job to send the ping.
+	activePing := newPing(s.pingID)
 	s.pingID++
-	s.pings[id] = ch
+	s.activePing = activePing
 	s.pingLock.Unlock()
 
+	defer func() {
+		// complete ping promise
+		activePing.finish(dur, err)
+
+		// Unset it.
+		s.pingLock.Lock()
+		s.activePing = nil
+		s.pingLock.Unlock()
+	}()
+
 	// Send the ping request
-	hdr := encode(typePing, flagSYN, 0, id)
+	hdr := encode(typePing, flagSYN, 0, activePing.id)
 	if err := s.sendMsg(hdr, nil, nil); err != nil {
 		return 0, err
 	}
@@ -303,11 +323,8 @@ func (s *Session) Ping() (time.Duration, error) {
 	timer := time.NewTimer(s.config.ConnectionWriteTimeout)
 	defer timer.Stop()
 	select {
-	case <-ch:
+	case <-activePing.pingResponse:
 	case <-timer.C:
-		s.pingLock.Lock()
-		delete(s.pings, id) // Ignore it if a response comes later.
-		s.pingLock.Unlock()
 		return 0, ErrTimeout
 	case <-s.shutdownCh:
 		return 0, s.shutdownErr
@@ -456,6 +473,10 @@ func (s *Session) sendLoop() error {
 		var buf []byte
 		select {
 		case buf = <-s.sendCh:
+		case pingID := <-s.pongCh:
+			buf = pool.Get(headerSize)
+			hdr := encode(typePing, flagACK, 0, pingID)
+			copy(buf, hdr[:])
 		case <-s.shutdownCh:
 			return nil
 			//default:
@@ -605,7 +626,7 @@ func (s *Session) handleStreamMessage(hdr header) error {
 	return nil
 }
 
-// handlePing is invokde for a typePing frame
+// handlePing is invoked for a typePing frame
 func (s *Session) handlePing(hdr header) error {
 	flags := hdr.Flags()
 	pingID := hdr.Length()
@@ -613,21 +634,25 @@ func (s *Session) handlePing(hdr header) error {
 	// Check if this is a query, respond back in a separate context so we
 	// don't interfere with the receiving thread blocking for the write.
 	if flags&flagSYN == flagSYN {
-		go func() {
-			hdr := encode(typePing, flagACK, 0, pingID)
-			if err := s.sendMsg(hdr, nil, nil); err != nil {
-				s.logger.Printf("[WARN] yamux: failed to send ping reply: %v", err)
-			}
-		}()
+		select {
+		case s.pongCh <- pingID:
+		default:
+			s.logger.Printf("[WARN] yamux: dropped ping reply")
+		}
 		return nil
 	}
 
 	// Handle a response
 	s.pingLock.Lock()
-	ch := s.pings[pingID]
-	if ch != nil {
-		delete(s.pings, pingID)
-		close(ch)
+	// If we have an active ping, and this is a response to that active
+	// ping, complete the ping.
+	if s.activePing != nil && s.activePing.id == pingID {
+		// Don't assume that the peer won't send multiple responses for
+		// the same ping.
+		select {
+		case s.activePing.pingResponse <- struct{}{}:
+		default:
+		}
 	}
 	s.pingLock.Unlock()
 	return nil
@@ -706,6 +731,7 @@ func (s *Session) closeStream(id uint32) {
 		default:
 			s.logger.Printf("[ERR] yamux: SYN tracking out of sync")
 		}
+		delete(s.inflight, id)
 	}
 	delete(s.streams, id)
 	s.streamLock.Unlock()

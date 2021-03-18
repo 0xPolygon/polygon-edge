@@ -32,6 +32,11 @@ func (d *pipeDeadline) set(t time.Time) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// deadline closed
+	if d.cancel == nil {
+		return
+	}
+
 	if d.timer != nil && !d.timer.Stop() {
 		<-d.cancel // Wait for the timer callback to finish and close cancel
 	}
@@ -68,6 +73,18 @@ func (d *pipeDeadline) wait() chan struct{} {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.cancel
+}
+
+// close closes, the deadline. Any future calls to `set` will do nothing.
+func (d *pipeDeadline) close() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.timer != nil && !d.timer.Stop() {
+		<-d.cancel // Wait for the timer callback to finish and close cancel
+	}
+	d.timer = nil
+	d.cancel = nil
 }
 
 func isClosedChan(c <-chan struct{}) bool {

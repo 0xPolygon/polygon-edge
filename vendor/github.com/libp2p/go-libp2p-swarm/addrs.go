@@ -1,12 +1,12 @@
 package swarm
 
 import (
-	mafilter "github.com/libp2p/go-maddr-filter"
+	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
 
 // http://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
-var lowTimeoutFilters = mafilter.NewFilters()
+var lowTimeoutFilters = ma.NewFilters()
 
 func init() {
 	for _, p := range []string{

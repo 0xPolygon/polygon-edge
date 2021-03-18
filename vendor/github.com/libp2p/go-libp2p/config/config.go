@@ -19,20 +19,18 @@ import (
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	relay "github.com/libp2p/go-libp2p/p2p/host/relay"
+	"github.com/libp2p/go-libp2p/p2p/host/relay"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
 
 	autonat "github.com/libp2p/go-libp2p-autonat"
+	blankhost "github.com/libp2p/go-libp2p-blankhost"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	logging "github.com/ipfs/go-log"
-	filter "github.com/libp2p/go-maddr-filter"
 	ma "github.com/multiformats/go-multiaddr"
-
-	blankhost "github.com/libp2p/go-libp2p-blankhost"
 )
 
 var log = logging.Logger("p2p-config")
@@ -46,7 +44,7 @@ type NATManagerC func(network.Network) bhost.NATManager
 
 type RoutingC func(host.Host) (routing.PeerRouting, error)
 
-// autoNATConfig defines the AutoNAT behavior for the libp2p host.
+// AutoNATConfig defines the AutoNAT behavior for the libp2p host.
 type AutoNATConfig struct {
 	ForceReachability   *network.Reachability
 	EnableService       bool
@@ -78,9 +76,9 @@ type Config struct {
 	Relay       bool
 	RelayOpts   []circuit.RelayOpt
 
-	ListenAddrs  []ma.Multiaddr
-	AddrsFactory bhost.AddrsFactory
-	Filters      *filter.Filters
+	ListenAddrs     []ma.Multiaddr
+	AddrsFactory    bhost.AddrsFactory
+	ConnectionGater connmgr.ConnectionGater
 
 	ConnManager connmgr.ConnManager
 	NATManager  NATManagerC
@@ -129,10 +127,7 @@ func (cfg *Config) makeSwarm(ctx context.Context) (*swarm.Swarm, error) {
 	}
 
 	// TODO: Make the swarm implementation configurable.
-	swrm := swarm.NewSwarm(ctx, pid, cfg.Peerstore, cfg.Reporter)
-	if cfg.Filters != nil {
-		swrm.Filters = cfg.Filters
-	}
+	swrm := swarm.NewSwarm(ctx, pid, cfg.Peerstore, cfg.Reporter, cfg.ConnectionGater)
 	return swrm, nil
 }
 
@@ -144,7 +139,7 @@ func (cfg *Config) addTransports(ctx context.Context, h host.Host) (err error) {
 	}
 	upgrader := new(tptu.Upgrader)
 	upgrader.PSK = cfg.PSK
-	upgrader.Filters = cfg.Filters
+	upgrader.ConnGater = cfg.ConnectionGater
 	if cfg.Insecure {
 		upgrader.Secure = makeInsecureTransport(h.ID(), cfg.PeerKey)
 	} else {
@@ -159,7 +154,7 @@ func (cfg *Config) addTransports(ctx context.Context, h host.Host) (err error) {
 		return err
 	}
 
-	tpts, err := makeTransports(h, upgrader, cfg.Transports)
+	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.Transports)
 	if err != nil {
 		return err
 	}
@@ -312,7 +307,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 			SecurityTransports: cfg.SecurityTransports,
 			Insecure:           cfg.Insecure,
 			PSK:                cfg.PSK,
-			Filters:            cfg.Filters,
+			ConnectionGater:    cfg.ConnectionGater,
 			Reporter:           cfg.Reporter,
 			PeerKey:            autonatPrivKey,
 
@@ -340,7 +335,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		autonatOpts = append(autonatOpts, autonat.WithReachability(*cfg.AutoNATConfig.ForceReachability))
 	}
 
-	if _, err = autonat.New(ctx, h, autonatOpts...); err != nil {
+	if h.AutoNat, err = autonat.New(ctx, h, autonatOpts...); err != nil {
 		h.Close()
 		return nil, fmt.Errorf("cannot enable autorelay; autonat failed to start: %v", err)
 	}

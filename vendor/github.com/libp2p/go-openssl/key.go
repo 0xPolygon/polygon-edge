@@ -183,11 +183,15 @@ func (key *pKey) VerifyPKCS1v15(method Method, data, sig []byte) error {
 	ctx := C.X_EVP_MD_CTX_new()
 	defer C.X_EVP_MD_CTX_free(ctx)
 
+	if len(sig) == 0 {
+		return errors.New("verifypkcs1v15: 0-length sig")
+	}
+
 	if key.KeyType() == KeyTypeED25519 {
 		// do ED specific one-shot sign
 
-		if method != nil || len(data) == 0 || len(sig) == 0 {
-			return errors.New("verifypkcs1v15: 0-length data or sig or non-null digest")
+		if method != nil || len(data) == 0 {
+			return errors.New("verifypkcs1v15: 0-length data or non-null digest")
 		}
 
 		if 1 != C.X_EVP_DigestVerifyInit(ctx, nil, nil, nil, key.key) {

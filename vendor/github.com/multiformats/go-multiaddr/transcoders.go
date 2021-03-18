@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -292,13 +293,29 @@ func garlic32Validate(b []byte) error {
 
 var TranscoderP2P = NewTranscoderFromFunctions(p2pStB, p2pBtS, p2pVal)
 
+// The encoded peer ID can either be a CID of a key or a raw multihash (identity
+// or sha256-256).
 func p2pStB(s string) ([]byte, error) {
-	// the address is a varint prefixed multihash string representation
-	m, err := mh.FromB58String(s)
+	// check if the address is a base58 encoded sha256 or identity multihash
+	if strings.HasPrefix(s, "Qm") || strings.HasPrefix(s, "1") {
+		m, err := mh.FromB58String(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse p2p addr: %s %s", s, err)
+		}
+		return m, nil
+	}
+
+	// check if the address is a CID
+	c, err := cid.Decode(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse p2p addr: %s %s", s, err)
 	}
-	return m, nil
+
+	if ty := c.Type(); ty == cid.Libp2pKey {
+		return c.Hash(), nil
+	} else {
+		return nil, fmt.Errorf("failed to parse p2p addr: %s has the invalid codec %d", s, ty)
+	}
 }
 
 func p2pVal(b []byte) error {

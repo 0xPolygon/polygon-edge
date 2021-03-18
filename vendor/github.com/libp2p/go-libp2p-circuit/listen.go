@@ -6,7 +6,7 @@ import (
 	pb "github.com/libp2p/go-libp2p-circuit/pb"
 
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 var _ manet.Listener = (*RelayListener)(nil)
@@ -23,22 +23,24 @@ func (r *Relay) Listener() *RelayListener {
 }
 
 func (l *RelayListener) Accept() (manet.Conn, error) {
-	select {
-	case c := <-l.incoming:
-		err := l.Relay().writeResponse(c.stream, pb.CircuitRelay_SUCCESS)
-		if err != nil {
-			log.Debugf("error writing relay response: %s", err.Error())
-			c.stream.Reset()
-			return nil, err
+	for {
+		select {
+		case c := <-l.incoming:
+			err := l.Relay().writeResponse(c.stream, pb.CircuitRelay_SUCCESS)
+			if err != nil {
+				log.Debugf("error writing relay response: %s", err.Error())
+				c.stream.Reset()
+				continue
+			}
+
+			// TODO: Pretty print.
+			log.Infof("accepted relay connection: %q", c)
+
+			c.tagHop()
+			return c, nil
+		case <-l.ctx.Done():
+			return nil, l.ctx.Err()
 		}
-
-		// TODO: Pretty print.
-		log.Infof("accepted relay connection: %q", c)
-
-		c.tagHop()
-		return c, nil
-	case <-l.ctx.Done():
-		return nil, l.ctx.Err()
 	}
 }
 

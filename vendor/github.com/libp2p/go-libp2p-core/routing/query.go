@@ -102,3 +102,10 @@ func PublishQueryEvent(ctx context.Context, ev *QueryEvent) {
 	ech := ich.(*eventChannel)
 	ech.send(ctx, ev)
 }
+
+// SubscribesToQueryEvents returns true if the context subscribes to query
+// events. If this function returns falls, calling `PublishQueryEvent` on the
+// context will be a no-op.
+func SubscribesToQueryEvents(ctx context.Context) bool {
+	return ctx.Value(routingQueryKey{}) != nil
+}

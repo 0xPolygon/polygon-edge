@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/libp2p/go-libp2p-autonat/pb"
-	"github.com/libp2p/go-libp2p-core/helpers"
-
-	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+
+	pb "github.com/libp2p/go-libp2p-autonat/pb"
+
+	protoio "github.com/libp2p/go-msgio/protoio"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-// AutoNATError is the class of errors signalled by AutoNAT services
-type AutoNATError struct {
+// Error wraps errors signalled by AutoNAT services
+type Error struct {
 	Status pb.Message_ResponseStatus
 	Text   string
 }
@@ -41,10 +41,10 @@ func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) 
 	}
 	// Might as well just reset the stream. Once we get to this point, we
 	// don't care about being nice.
-	defer helpers.FullClose(s)
+	defer s.Close()
 
-	r := ggio.NewDelimitedReader(s, network.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
+	r := protoio.NewDelimitedReader(s, network.MessageSizeMax)
+	w := protoio.NewDelimitedWriter(s)
 
 	req := newDialMessage(peer.AddrInfo{ID: c.h.ID(), Addrs: c.addrFunc()})
 	err = w.WriteMsg(req)
@@ -71,30 +71,32 @@ func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) 
 		return ma.NewMultiaddrBytes(addr)
 
 	default:
-		return nil, AutoNATError{Status: status, Text: res.GetDialResponse().GetStatusText()}
+		return nil, Error{Status: status, Text: res.GetDialResponse().GetStatusText()}
 	}
 }
 
-func (e AutoNATError) Error() string {
+func (e Error) Error() string {
 	return fmt.Sprintf("AutoNAT error: %s (%s)", e.Text, e.Status.String())
 }
 
-func (e AutoNATError) IsDialError() bool {
+// IsDialError returns true if the error was due to a dial back failure
+func (e Error) IsDialError() bool {
 	return e.Status == pb.Message_E_DIAL_ERROR
 }
 
-func (e AutoNATError) IsDialRefused() bool {
+// IsDialRefused returns true if the error was due to a refusal to dial back
+func (e Error) IsDialRefused() bool {
 	return e.Status == pb.Message_E_DIAL_REFUSED
 }
 
 // IsDialError returns true if the AutoNAT peer signalled an error dialing back
 func IsDialError(e error) bool {
-	ae, ok := e.(AutoNATError)
+	ae, ok := e.(Error)
 	return ok && ae.IsDialError()
 }
 
 // IsDialRefused returns true if the AutoNAT peer signalled refusal to dial back
 func IsDialRefused(e error) bool {
-	ae, ok := e.(AutoNATError)
+	ae, ok := e.(Error)
 	return ok && ae.IsDialRefused()
 }

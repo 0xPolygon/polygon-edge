@@ -78,5 +78,5 @@ type EvtLocalAddressesUpdated struct {
 
 	// SignedPeerRecord contains our own updated peer.PeerRecord, listing the addresses enumerated in Current.
 	// wrapped in a record.Envelope and signed by the Host's private key.
-	SignedPeerRecord record.Envelope
+	SignedPeerRecord *record.Envelope
 }

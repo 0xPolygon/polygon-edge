@@ -20,4 +20,5 @@ func (_ NullConnMgr) TrimOpenConns(ctx context.Context)        {}
 func (_ NullConnMgr) Notifee() network.Notifiee                { return network.GlobalNoopNotifiee }
 func (_ NullConnMgr) Protect(peer.ID, string)                  {}
 func (_ NullConnMgr) Unprotect(peer.ID, string) bool           { return false }
+func (_ NullConnMgr) IsProtected(peer.ID, string) bool         { return false }
 func (_ NullConnMgr) Close() error                             { return nil }

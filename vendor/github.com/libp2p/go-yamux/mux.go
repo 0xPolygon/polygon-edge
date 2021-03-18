@@ -14,6 +14,9 @@ type Config struct {
 	// waiting an accept.
 	AcceptBacklog int
 
+	// PingBacklog is used to limit how many ping acks we can queue.
+	PingBacklog int
+
 	// EnableKeepalive is used to do a period keep alive
 	// messages using a ping.
 	EnableKeepAlive bool
@@ -53,6 +56,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		AcceptBacklog:          256,
+		PingBacklog:            32,
 		EnableKeepAlive:        true,
 		KeepAliveInterval:      30 * time.Second,
 		ConnectionWriteTimeout: 10 * time.Second,
@@ -80,6 +84,9 @@ func VerifyConfig(config *Config) error {
 	}
 	if config.WriteCoalesceDelay < 0 {
 		return fmt.Errorf("WriteCoalesceDelay must be >= 0")
+	}
+	if config.PingBacklog < 1 {
+		return fmt.Errorf("PingBacklog must be > 0")
 	}
 	return nil
 }
