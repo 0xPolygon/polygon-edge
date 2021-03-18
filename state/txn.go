@@ -7,14 +7,15 @@ import (
 	"math/big"
 	"strconv"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
-	iradix "github.com/hashicorp/go-immutable-radix"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 var (

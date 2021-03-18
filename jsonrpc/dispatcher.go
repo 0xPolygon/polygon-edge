@@ -51,6 +51,18 @@ type Dispatcher struct {
 	filterManager *FilterManager
 }
 
+// newTestDispatcher returns a dispatcher without the filter manager, used for testing
+func newTestDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
+	d := &Dispatcher{
+		logger: logger.Named("dispatcher"),
+		store:  store,
+	}
+
+	d.registerEndpoints()
+
+	return d
+}
+
 func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
 	d := &Dispatcher{
 		logger:        logger.Named("dispatcher"),

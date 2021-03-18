@@ -21,23 +21,35 @@ func (e *Eth) GetBlockByNumber(blockNumber string, full bool) (interface{}, erro
 	if err != nil {
 		return nil, err
 	}
-	if block < 0 {
-		return nil, fmt.Errorf("this data cannot be provided yet")
-	}
 
-	// TODO, show full blocks
-	header, _ := e.d.store.GetHeaderByNumber(uint64(block))
-	return header, nil
+	header, err := e.GetBlockHeader(block)
+	return header, err
 }
 
 // GetBlockByHash returns information about a block by hash
 func (e *Eth) GetBlockByHash(hashStr string, full bool) (interface{}, error) {
-	return nil, nil
+
+	hashedString := types.Hash{}
+	if err := hashedString.UnmarshalText([]byte(hashStr)); err != nil {
+		return nil, err
+	}
+
+	block, ok := e.d.store.GetBlockByHash(hashedString, full)
+	if !ok {
+		return nil, fmt.Errorf("unable to get block by hash %v", hashStr)
+	}
+
+	return block, nil
 }
 
 // BlockNumber returns current block number
 func (e *Eth) BlockNumber() (interface{}, error) {
 	h := e.d.store.Header()
+
+	if h == nil {
+		return nil, fmt.Errorf("header has a nil value")
+	}
+
 	return types.Uint64(h.Number), nil
 }
 
@@ -61,7 +73,7 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	}
 
 	if err := e.d.store.AddTx(tx); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	tx.ComputeHash()
@@ -111,7 +123,26 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 
 // GetTransactionReceipt returns account nonce
 func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
-	return nil, fmt.Errorf("transaction not found")
+	hashedString := types.Hash{}
+	if err := hashedString.UnmarshalText([]byte(hash)); err != nil {
+		return nil, err
+	}
+
+	header, err := e.GetBlockHeader(LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := e.d.store.GetReceiptsByHash(header.ReceiptsRoot)
+
+	// TODO find a more optimal solution
+	for _, receipt := range receipts {
+		if receipt.TxHash == hashedString {
+			return receipt, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // GetStorageAt returns the contract storage at the index position
@@ -125,27 +156,9 @@ func (e *Eth) GetStorageAt(address string, index types.Hash, number BlockNumber)
 		return nil, err
 	}
 
-	// Fetch the world state snapshot
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	acc, ok := state.NewTxn(s, snap).GetAccount(addr)
-	if !ok {
-		return nil, fmt.Errorf("error getting account state")
-	}
-
-	// Fetch the Storage state snapshot
-	snap, err = s.NewSnapshotAt(acc.Root)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get the storage for the passed in location
-	result, ok := snap.Get(index.Bytes())
-	if !ok {
+	result, err := e.d.store.GetStorage(header.StateRoot, addr, index)
+	if err != nil {
 		return nil, fmt.Errorf("error getting storage snapshot")
 	}
 
@@ -170,18 +183,18 @@ func (e *Eth) Call(transaction *types.Transaction, number BlockNumber) (interfac
 		return nil, err
 	}
 
-	transition, err := e.d.store.BeginTxn(header.StateRoot, header)
-	if err != nil {
-		return nil, err
-	}
-
 	// The return value of the execution is saved in the transition (returnValue field)
-	_, _, err = transition.Apply(transaction)
+	returnValue, failed, err := e.d.store.ApplyTxn(header, transaction)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return transition.ReturnValue(), nil
+	if failed {
+		return nil, fmt.Errorf("unable to execute call")
+	}
+
+	return returnValue, nil
 }
 
 // GetBlockHeader returns the specific header of the requested block
@@ -355,6 +368,10 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 	var referenceFrom uint64
 	var referenceTo uint64
 
+	if filterOptions.fromBlock > filterOptions.toBlock {
+		return nil, fmt.Errorf("invalid block search range")
+	}
+
 	// Fetch the requested from header
 	header, err := e.GetBlockHeader(filterOptions.fromBlock)
 	if err != nil {
@@ -390,12 +407,6 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 				if filterOptions.Match(log) {
 					result = append(result, log)
 				}
-				// Experimental solution
-				// if receipt.LogsBloom.IsLogInBloom(log) {
-				// 	if filterOptions.Match(log) {
-				// 		result = append(result, log)
-				// 	}
-				// }
 			}
 		}
 	}
@@ -412,17 +423,13 @@ func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
+
 	if err != nil {
-		return nil, err
+		return new(types.Big), fmt.Errorf("unable to fetch account")
 	}
 
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		return (*types.Big)(acc.Balance), nil
-	}
-
-	return new(types.Big), nil
+	return (*types.Big)(acc.Balance), nil
 }
 
 // GetTransactionCount returns account nonce
@@ -434,16 +441,12 @@ func (e *Eth) GetTransactionCount(address string, number BlockNumber) (interface
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
 	if err != nil {
-		return nil, err
+		return "0x0", nil
 	}
 
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		return types.Uint64(acc.Nonce), nil
-	}
-	return "0x0", nil
+	return types.Uint64(acc.Nonce), nil
 }
 
 // GetCode returns account code at given block number
@@ -455,20 +458,17 @@ func (e *Eth) GetCode(address string, number BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 
-	s := e.d.store.State()
-	snap, err := s.NewSnapshotAt(header.StateRoot)
+	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	if acc, ok := state.NewTxn(s, snap).GetAccount(addr); ok {
-		code, ok := snap.Get(acc.CodeHash)
-		if !ok {
-			return "0x", nil
-		}
-		return types.HexBytes(code), nil
+	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
+	if err != nil {
+		return "0x", fmt.Errorf("unable to fetch account code")
 	}
-	return "0x", nil
+
+	return types.HexBytes(code), nil
 }
 
 // NewFilter creates a filter object, based on filter options, to notify when the state changes (logs).
