@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -123,15 +124,7 @@ func (sb *backend) verifyHeader(header *types.Header, parents []*types.Header) e
 		return errInvalidDifficulty
 	}
 
-	return sb.verifyCascadingFields(header, parents)
-}
-
-// verifyCascadingFields verifies all the header fields that are not standalone,
-// rather depend on a batch of previous headers. The caller may optionally pass
-// in a batch of parents (ascending order) to avoid looking those up from the
-// database. This is useful for concurrently verifying a batch of new headers.
-func (sb *backend) verifyCascadingFields(header *types.Header, parents []*types.Header) error {
-	// The genesis block is the always valid dead-end
+	// verfiy cascading fields
 	number := header.Number
 	if number == 0 {
 		return nil
@@ -165,6 +158,7 @@ func (sb *backend) verifyCascadingFields(header *types.Header, parents []*types.
 	return sb.verifyCommittedSeals(header, parents)
 }
 
+/*
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications (the order is that of
@@ -185,7 +179,9 @@ func (sb *backend) VerifyHeaders(headers []*types.Header, seals []bool) (chan<- 
 	}()
 	return abort, results
 }
+*/
 
+/*
 // VerifyUncles verifies that the given block's uncles conform to the consensus
 // rules of a given engine.
 func (sb *backend) VerifyUncles(block *types.Block) error {
@@ -194,6 +190,7 @@ func (sb *backend) VerifyUncles(block *types.Block) error {
 	}
 	return nil
 }
+*/
 
 // verifySigner checks whether the signer is in parent's validator set
 func (sb *backend) verifySigner(header *types.Header, parents []*types.Header) error {
@@ -273,6 +270,7 @@ func (sb *backend) verifyCommittedSeals(header *types.Header, parents []*types.H
 	return nil
 }
 
+/*
 // VerifySeal checks whether the crypto seal on a header is valid according to
 // the consensus rules of the given engine.
 func (sb *backend) VerifySeal(header *types.Header) error {
@@ -288,6 +286,7 @@ func (sb *backend) VerifySeal(header *types.Header) error {
 	}
 	return sb.verifySigner(header, nil)
 }
+*/
 
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
@@ -530,6 +529,8 @@ func (sb *backend) snapshot(number uint64, hash types.Hash, parents []*types.Hea
 		headers []*types.Header
 		snap    *Snapshot
 	)
+	fmt.Println("- num -")
+	fmt.Println(number)
 	for snap == nil {
 		// If an in-memory snapshot was found, use that
 		if s, ok := sb.recents.Get(hash); ok {
@@ -538,7 +539,7 @@ func (sb *backend) snapshot(number uint64, hash types.Hash, parents []*types.Hea
 		}
 		// If an on-disk checkpoint snapshot can be found, use that
 		if number%checkpointInterval == 0 {
-			if s, err := loadSnapshot(sb.config.Epoch, sb.db, hash); err == nil {
+			if s, err := sb.LoadSnapshot(sb.config.Epoch, hash); err == nil {
 				snap = s
 				break
 			}
@@ -554,7 +555,7 @@ func (sb *backend) snapshot(number uint64, hash types.Hash, parents []*types.Hea
 				return nil, err
 			}
 			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash, validator.NewSet(istanbulExtra.Validators, sb.config.ProposerPolicy))
-			if err := snap.store(sb.db); err != nil {
+			if err := sb.WriteSnapshot(snap); err != nil {
 				return nil, err
 			}
 			break
@@ -582,6 +583,10 @@ func (sb *backend) snapshot(number uint64, hash types.Hash, parents []*types.Hea
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
+	fmt.Println("-- headers --")
+	fmt.Println(headers)
+	fmt.Println(snap)
+
 	snap, err := snap.apply(headers)
 	if err != nil {
 		return nil, err
@@ -590,7 +595,7 @@ func (sb *backend) snapshot(number uint64, hash types.Hash, parents []*types.Hea
 
 	// If we've generated a new checkpoint snapshot, save to disk
 	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
-		if err = snap.store(sb.db); err != nil {
+		if err = sb.WriteSnapshot(snap); err != nil {
 			return nil, err
 		}
 	}

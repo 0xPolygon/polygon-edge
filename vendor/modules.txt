@@ -29,26 +29,11 @@ github.com/deckarep/golang-set
 github.com/edsrzf/mmap-go
 # github.com/ethereum/go-ethereum v1.9.15
 ## explicit
-github.com/ethereum/go-ethereum/common
-github.com/ethereum/go-ethereum/common/bitutil
 github.com/ethereum/go-ethereum/common/hexutil
-github.com/ethereum/go-ethereum/common/math
 github.com/ethereum/go-ethereum/common/mclock
-github.com/ethereum/go-ethereum/crypto
-github.com/ethereum/go-ethereum/crypto/ecies
-github.com/ethereum/go-ethereum/crypto/secp256k1
-github.com/ethereum/go-ethereum/ethdb
 github.com/ethereum/go-ethereum/event
 github.com/ethereum/go-ethereum/log
 github.com/ethereum/go-ethereum/metrics
-github.com/ethereum/go-ethereum/p2p
-github.com/ethereum/go-ethereum/p2p/discover
-github.com/ethereum/go-ethereum/p2p/discover/v4wire
-github.com/ethereum/go-ethereum/p2p/discv5
-github.com/ethereum/go-ethereum/p2p/enode
-github.com/ethereum/go-ethereum/p2p/enr
-github.com/ethereum/go-ethereum/p2p/nat
-github.com/ethereum/go-ethereum/p2p/netutil
 github.com/ethereum/go-ethereum/rlp
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
@@ -85,9 +70,12 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-hclog v0.14.1
 ## explicit
 github.com/hashicorp/go-hclog
-# github.com/hashicorp/go-immutable-radix v1.0.0
+# github.com/hashicorp/go-immutable-radix v1.3.0
 ## explicit
 github.com/hashicorp/go-immutable-radix
+# github.com/hashicorp/go-memdb v1.3.2
+## explicit
+github.com/hashicorp/go-memdb
 # github.com/hashicorp/go-multierror v1.0.0
 ## explicit
 github.com/hashicorp/go-multierror
@@ -383,7 +371,6 @@ golang.org/x/crypto/blake2s
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
-golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160

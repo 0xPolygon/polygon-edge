@@ -147,8 +147,8 @@ func (c *core) commit() {
 
 	proposal := c.current.Proposal()
 	if proposal != nil {
-		committedSeals := make([][]byte, c.current.Commits.Size())
-		for i, v := range c.current.Commits.Values() {
+		committedSeals := make([][]byte, c.current.commits.Size())
+		for i, v := range c.current.commits.Values() {
 			committedSeals[i] = make([]byte, types.IstanbulExtraSeal)
 			copy(committedSeals[i][:], v.CommittedSeal[:])
 		}
@@ -260,7 +260,7 @@ func (c *core) updateRoundState(view *ibft.View, validatorSet ibft.ValidatorSet,
 	// Lock only if both roundChange is true and it is locked
 	if roundChange && c.current != nil {
 		if c.current.IsHashLocked() {
-			c.current = newRoundState(view, validatorSet, c.current.GetLockedHash(), c.current.Preprepare, c.current.pendingRequest, c.backend.HasBadProposal)
+			c.current = newRoundState(view, validatorSet, c.current.GetLockedHash(), c.current.preprepare, c.current.pendingRequest, c.backend.HasBadProposal)
 		} else {
 			c.current = newRoundState(view, validatorSet, types.Hash{}, nil, c.current.pendingRequest, c.backend.HasBadProposal)
 		}

@@ -1,5 +1,6 @@
 package validator
 
+/*
 import (
 	"reflect"
 	"strings"
@@ -190,3 +191,4 @@ func testStickyProposer(t *testing.T) {
 		t.Errorf("proposer mismatch: have %v, want %v", val, val2)
 	}
 }
+*/

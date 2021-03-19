@@ -13,9 +13,9 @@ func newTestRoundState(view *ibft.View, validatorSet ibft.ValidatorSet) *roundSt
 	return &roundState{
 		round:      view.Round,
 		sequence:   view.Sequence,
-		Preprepare: newTestPreprepare(view),
-		Prepares:   newMessageSet(validatorSet),
-		Commits:    newMessageSet(validatorSet),
+		preprepare: newTestPreprepare(view),
+		prepares:   newMessageSet(validatorSet),
+		commits:    newMessageSet(validatorSet),
 		mu:         new(sync.RWMutex),
 		hasBadProposal: func(hash types.Hash) bool {
 			return false

@@ -8,8 +8,12 @@ import (
 
 // NewMemoryStorage creates the new storage reference with inmemory
 func NewMemoryStorage(logger hclog.Logger) (storage.Storage, error) {
+	return storage.NewKeyValueStorage(logger, NewMemoryRaw()), nil
+}
+
+func NewMemoryRaw() storage.KV {
 	db := &memoryKV{map[string][]byte{}}
-	return storage.NewKeyValueStorage(logger, db), nil
+	return db
 }
 
 // memoryKV is an in memory implementation of the kv storage

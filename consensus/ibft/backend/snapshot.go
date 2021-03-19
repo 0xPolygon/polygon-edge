@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/consensus/ibft/validator"
 	"github.com/0xPolygon/minimal/types"
@@ -56,6 +55,7 @@ func newSnapshot(epoch uint64, number uint64, hash types.Hash, valSet ibft.Valid
 	return snap
 }
 
+/*
 // loadSnapshot loads an existing snapshot from the database.
 func loadSnapshot(epoch uint64, db storage.Storage, hash types.Hash) (*Snapshot, error) {
 	blob, ok := db.ReadSnapshot(hash)
@@ -79,6 +79,7 @@ func (s *Snapshot) store(db storage.Storage) error {
 	}
 	return db.WriteSnapshot(s.Hash, blob)
 }
+*/
 
 // copy creates a deep copy of the snapshot, though not the individual votes.
 func (s *Snapshot) copy() *Snapshot {
@@ -155,6 +156,11 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			return nil, errInvalidVotingChain
 		}
 	}
+	fmt.Println("-- headedrs --")
+	fmt.Println(headers)
+	fmt.Println("--s--")
+	fmt.Println(s)
+
 	if headers[0].Number != s.Number+1 {
 		return nil, errInvalidVotingChain
 	}
@@ -173,6 +179,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println(">>>>> header <<<<<<")
+		fmt.Println(validator)
+		fmt.Println(header.Hash.String())
+		fmt.Println(snap.ValSet)
+
 		if _, v := snap.ValSet.GetByAddress(validator); v == nil {
 			return nil, errUnauthorized
 		}

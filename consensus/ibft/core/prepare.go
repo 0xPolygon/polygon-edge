@@ -70,7 +70,7 @@ func (c *core) acceptPrepare(msg *message, src ibft.Validator) error {
 	logger := c.logger.With("from", src, "state", c.state)
 
 	// Add the PREPARE message to current round state
-	if err := c.current.Prepares.Add(msg); err != nil {
+	if err := c.current.prepares.Add(msg); err != nil {
 		logger.Error("Failed to add PREPARE message to round state", "msg", msg, "err", err)
 		return err
 	}

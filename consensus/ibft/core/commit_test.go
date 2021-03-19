@@ -175,7 +175,7 @@ OUTER:
 			if r0.state != StatePrepared {
 				t.Errorf("state mismatch: have %v, want %v", r0.state, StatePrepared)
 			}
-			if r0.current.Commits.Size() > 2*r0.valSet.F() {
+			if r0.current.commits.Size() > 2*r0.valSet.F() {
 				t.Errorf("the size of commit messages should be less than %v", 2*r0.valSet.F()+1)
 			}
 			if r0.current.IsHashLocked() {
@@ -185,8 +185,8 @@ OUTER:
 		}
 
 		// core should have 2F+1 prepare messages
-		if r0.current.Commits.Size() <= 2*r0.valSet.F() {
-			t.Errorf("the size of commit messages should be larger than 2F+1: size %v", r0.current.Commits.Size())
+		if r0.current.commits.Size() <= 2*r0.valSet.F() {
+			t.Errorf("the size of commit messages should be larger than 2F+1: size %v", r0.current.commits.Size())
 		}
 
 		// check signatures large than 2F+1

@@ -121,6 +121,9 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 // RecoverPubkey verifies the compact signature "signature" of "hash" for the
 // secp256k1 curve.
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
+	if len(signature) == 0 {
+		return nil, fmt.Errorf("signature empty")
+	}
 	size := len(signature)
 	term := byte(27)
 	if signature[size-1] == 1 {

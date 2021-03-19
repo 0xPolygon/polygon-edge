@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -158,4 +159,30 @@ func TestVV(t *testing.T) {
 
 	ValidateSignatureValues(0, []byte{0x0, 0x1, 0x2, 0x3}, []byte{0x1, 0x2, 0x3})
 
+}
+
+func TestRecover(t *testing.T) {
+	hash := Keccak256([]byte("a"))
+
+	priv, _ := GenerateKey()
+	sig, err := Sign(priv, hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println("--")
+	fmt.Println(sig)
+	fmt.Println(hash)
+
+	pub, err := RecoverPubkey(sig, hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signedAddr := PubKeyToAddress(&priv.PublicKey)
+	recoveredAddr := PubKeyToAddress(pub)
+
+	if signedAddr != recoveredAddr {
+		t.Fatal("bad")
+	}
 }

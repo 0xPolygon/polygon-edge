@@ -3,15 +3,16 @@ package backend
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/0xPolygon/minimal/consensus/ibft/aux"
 	istanbulCore "github.com/0xPolygon/minimal/consensus/ibft/core"
 	"github.com/0xPolygon/minimal/consensus/ibft/validator"
 	"github.com/0xPolygon/minimal/crypto"
@@ -34,10 +35,12 @@ type backend struct {
 	address          types.Address
 	logger           hclog.Logger
 	core             istanbulCore.Engine
-	db               storage.Storage
+
 	// currentBlock     func(full bool) *types.Block
 	// hasBadBlock      func(hash types.Hash) bool
-	blockchain *blockchain.Blockchain
+
+	blockchain aux.BlockchainInterface
+	db         storage.KV
 
 	// the channels for istanbul engine notifications
 	commitCh          chan *types.Block
@@ -60,12 +63,12 @@ type backend struct {
 	knownMessages  *lru.ARCCache // the cache of self messages
 }
 
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.KV, logger hclog.Logger) (consensus.Consensus, error) {
 	return New(ibft.DefaultConfig, privateKey, db, logger), nil
 }
 
 // New creates an Ethereum backend for Istanbul core engine.
-func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) *backend {
+func New(config *ibft.Config, privateKey *ecdsa.PrivateKey, db storage.KV, logger hclog.Logger) *backend {
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
 	recentMessages, _ := lru.NewARC(inmemoryPeers)
@@ -283,22 +286,29 @@ func (sb *backend) getValidators(number uint64, hash types.Hash) ibft.ValidatorS
 func (sb *backend) LastProposal() (ibft.Proposal, types.Address) {
 	// block := sb.currentBlock(false)
 
-	block, ok := sb.blockchain.GetBlockByHash(sb.blockchain.Header().Hash, true)
+	header, ok := sb.blockchain.GetHeaderByHash(sb.blockchain.Header().Hash)
 	if !ok {
 		panic("TODO")
 	}
+	/*
+		block, ok := sb.blockchain.GetBlockByHash(sb.blockchain.Header().Hash, true)
+		if !ok {
+			panic("TODO")
+		}
+	*/
 
 	var proposer types.Address
-	if new(big.Int).SetUint64(block.Number()).Cmp(types.Big0) > 0 {
+	if new(big.Int).SetUint64(header.Number).Cmp(types.Big0) > 0 {
 		var err error
-		proposer, err = sb.Author(block.Header)
+		proposer, err = sb.Author(header)
 		if err != nil {
 			return nil, types.Address{}
 		}
 	}
 
 	// Return header only block here since we don't need block body
-	return block, proposer
+	bb := &types.Block{Header: header}
+	return bb, proposer
 }
 
 func (sb *backend) HasBadProposal(hash types.Hash) bool {
@@ -310,4 +320,38 @@ func (sb *backend) HasBadProposal(hash types.Hash) bool {
 		}
 		return sb.hasBadBlock(hash)
 	*/
+}
+
+// store stuff (we can do better later on)
+
+var (
+	// SNAPSHOTS is the prefix for snapshots
+	SNAPSHOTS = []byte("s")
+)
+
+func (sb *backend) WriteSnapshot(s *Snapshot) error {
+	blob, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	if err := sb.db.Set(append(SNAPSHOTS, s.Hash.Bytes()...), blob); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (sb *backend) LoadSnapshot(epoch uint64, hash types.Hash) (*Snapshot, error) {
+	blob, ok, err := sb.db.Get(append(SNAPSHOTS, hash.Bytes()...))
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+	snap := new(Snapshot)
+	if err := json.Unmarshal(blob, snap); err != nil {
+		return nil, err
+	}
+	snap.Epoch = epoch
+	return snap, nil
 }

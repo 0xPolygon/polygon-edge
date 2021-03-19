@@ -173,6 +173,9 @@ func (b *Blockchain) Genesis() types.Hash {
 }
 
 func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
+	if genesis == nil {
+		genesis = &chain.Genesis{}
+	}
 	root := b.executor.WriteGenesis(genesis.Alloc)
 
 	header := genesis.ToBlock()

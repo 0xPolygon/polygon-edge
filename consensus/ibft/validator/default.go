@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"sort"
@@ -78,6 +79,10 @@ func (valSet *defaultSet) GetByIndex(i uint64) ibft.Validator {
 }
 
 func (valSet *defaultSet) GetByAddress(addr types.Address) (int, ibft.Validator) {
+	for _, val := range valSet.List() {
+		fmt.Println("-- addr --")
+		fmt.Println(val.Address().String())
+	}
 	for i, val := range valSet.List() {
 		if addr == val.Address() {
 			return i, val

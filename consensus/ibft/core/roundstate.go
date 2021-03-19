@@ -17,9 +17,9 @@ func newRoundState(view *ibft.View, validatorSet ibft.ValidatorSet, lockedHash t
 	return &roundState{
 		round:          view.Round,
 		sequence:       view.Sequence,
-		Preprepare:     preprepare,
-		Prepares:       newMessageSet(validatorSet),
-		Commits:        newMessageSet(validatorSet),
+		preprepare:     preprepare,
+		prepares:       newMessageSet(validatorSet),
+		commits:        newMessageSet(validatorSet),
 		lockedHash:     lockedHash,
 		mu:             new(sync.RWMutex),
 		pendingRequest: pendingRequest,
@@ -29,13 +29,13 @@ func newRoundState(view *ibft.View, validatorSet ibft.ValidatorSet, lockedHash t
 
 // roundState stores the consensus state
 type roundState struct {
-	round          *big.Int
-	sequence       *big.Int
-	Preprepare     *ibft.Preprepare
-	Prepares       *messageSet
-	Commits        *messageSet
+	round          *big.Int         // uint64
+	sequence       *big.Int         // uint64
+	preprepare     *ibft.Preprepare // or maybe the proposal is here... not in pending
+	prepares       *messageSet
+	commits        *messageSet
 	lockedHash     types.Hash
-	pendingRequest *ibft.Request
+	pendingRequest *ibft.Request // the proposal of the round maybe?
 
 	mu             *sync.RWMutex
 	hasBadProposal func(hash types.Hash) bool
@@ -45,11 +45,11 @@ func (s *roundState) GetPrepareOrCommitSize() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := s.Prepares.Size() + s.Commits.Size()
+	result := s.prepares.Size() + s.commits.Size()
 
 	// find duplicate one
-	for _, m := range s.Prepares.Values() {
-		if s.Commits.Get(m.Address) != nil {
+	for _, m := range s.prepares.Values() {
+		if s.commits.Get(m.Address) != nil {
 			result--
 		}
 	}
@@ -60,7 +60,7 @@ func (s *roundState) Subject() *ibft.Subject {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.Preprepare == nil {
+	if s.preprepare == nil {
 		return nil
 	}
 
@@ -69,7 +69,7 @@ func (s *roundState) Subject() *ibft.Subject {
 			Round:    new(big.Int).Set(s.round),
 			Sequence: new(big.Int).Set(s.sequence),
 		},
-		Digest: s.Preprepare.Proposal.Hash(),
+		Digest: s.preprepare.Proposal.Hash(),
 	}
 }
 
@@ -77,15 +77,15 @@ func (s *roundState) SetPreprepare(preprepare *ibft.Preprepare) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.Preprepare = preprepare
+	s.preprepare = preprepare
 }
 
 func (s *roundState) Proposal() ibft.Proposal {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.Preprepare != nil {
-		return s.Preprepare.Proposal
+	if s.preprepare != nil {
+		return s.preprepare.Proposal
 	}
 
 	return nil
@@ -123,8 +123,8 @@ func (s *roundState) LockHash() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.Preprepare != nil {
-		s.lockedHash = s.Preprepare.Proposal.Hash()
+	if s.preprepare != nil {
+		s.lockedHash = s.preprepare.Proposal.Hash()
 	}
 }
 
@@ -171,9 +171,9 @@ func (s *roundState) DecodeRLP(stream *rlp.Stream) error {
 	}
 	s.round = ss.Round
 	s.sequence = ss.Sequence
-	s.Preprepare = ss.Preprepare
-	s.Prepares = ss.Prepares
-	s.Commits = ss.Commits
+	s.preprepare = ss.Preprepare
+	s.prepares = ss.Prepares
+	s.commits = ss.Commits
 	s.lockedHash = ss.lockedHash
 	s.pendingRequest = ss.pendingRequest
 	s.mu = new(sync.RWMutex)
@@ -196,9 +196,9 @@ func (s *roundState) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{
 		s.round,
 		s.sequence,
-		s.Preprepare,
-		s.Prepares,
-		s.Commits,
+		s.preprepare,
+		s.prepares,
+		s.commits,
 		s.lockedHash,
 		s.pendingRequest,
 	})

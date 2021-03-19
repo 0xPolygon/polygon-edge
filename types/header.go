@@ -54,6 +54,13 @@ func (n Nonce) Value() (driver.Value, error) {
 	return n.String(), nil
 }
 
+func (n Nonce) Set(buf []byte) {
+	if len(buf) != 8 {
+		panic("BUG: Nonce expects buf of len 8")
+	}
+	copy(n[:], buf)
+}
+
 func (n *Nonce) Scan(src interface{}) error {
 	nn := hex.MustDecodeHex(string(src.([]byte)))
 	copy(n[:], nn[:])
