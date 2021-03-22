@@ -2,15 +2,12 @@ package minimal
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
+	"github.com/0xPolygon/minimal/helper/keystore"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	noise "github.com/libp2p/go-libp2p-noise"
@@ -19,8 +16,7 @@ import (
 )
 
 func (s *Server) setupLibP2P() error {
-	// read libp2p key
-	key, err := readLibp2pKey(filepath.Join(s.config.DataDir, "keystore", "libp2p"))
+	libp2pkey, err := keystore.ReadLibp2pKey(filepath.Join(s.config.DataDir, "keystore", "libp2p"))
 	if err != nil {
 		return err
 	}
@@ -35,7 +31,7 @@ func (s *Server) setupLibP2P() error {
 		// Use noise as the encryption protocol
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrs(s.addrs...),
-		libp2p.Identity(key),
+		libp2p.Identity(libp2pkey),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2p stack: %v", err)
@@ -54,42 +50,6 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 		panic("Not supported")
 	}
 	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
-}
-
-func readLibp2pKey(path string) (crypto.PrivKey, error) {
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("Failed to stat (%s): %v", path, err)
-	}
-	if os.IsNotExist(err) {
-		priv, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
-		if err != nil {
-			return nil, err
-		}
-		buf, err := crypto.MarshalPrivateKey(priv)
-		if err != nil {
-			return nil, err
-		}
-		if err := ioutil.WriteFile(path, []byte(hex.EncodeToString(buf)), 0600); err != nil {
-			return nil, err
-		}
-		return priv, nil
-	}
-
-	// exists
-	raw, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	buf, err := hex.DecodeString(string(raw))
-	if err != nil {
-		return nil, err
-	}
-	key, err := crypto.UnmarshalPrivateKey(buf)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
 }
 
 // AddrInfo returns the addr info of the server

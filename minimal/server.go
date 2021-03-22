@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+
 	"path/filepath"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
@@ -22,10 +22,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+
 	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
 	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
+	"github.com/0xPolygon/minimal/helper/keystore"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/state/runtime/evm"
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
@@ -75,6 +77,12 @@ var dirPaths = []string{
 	"trie",
 }
 
+func NewServerWithConfig(config *Config) *Server {
+	return &Server{
+		config: config,
+	}
+}
+
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
 		logger: logger,
@@ -87,17 +95,16 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := setupDataDir(config.DataDir, dirPaths); err != nil {
+	err := SetupDataDir(m.config.DataDir, dirPaths)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
-	// Get the private key for the node
-	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
-	key, err := keystore.Get()
+	// Init sealing private key
+	m.key, err = keystore.ReadPrivKey(filepath.Join(m.config.DataDir, "keystore", "key"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
+		return nil, err
 	}
-	m.key = key
 
 	storage, err := leveldb.NewLevelDBStorage(filepath.Join(config.DataDir, "blockchain"), logger)
 	if err != nil {
@@ -284,31 +291,7 @@ func (s *Server) Close() {
 	s.host.Close()
 }
 
-// Entry is a backend configuration entry
-type Entry struct {
-	Enabled bool
-	Config  map[string]interface{}
-}
-
-func (e *Entry) addPath(path string) {
-	if len(e.Config) == 0 {
-		e.Config = map[string]interface{}{}
-	}
-	if _, ok := e.Config["path"]; !ok {
-		e.Config["path"] = path
-	}
-}
-
-func addPath(paths []string, path string, entries map[string]*Entry) []string {
-	newpath := paths[0:]
-	newpath = append(newpath, path)
-	for name := range entries {
-		newpath = append(newpath, filepath.Join(path, name))
-	}
-	return newpath
-}
-
-func setupDataDir(dataDir string, paths []string) error {
+func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
 	}
@@ -333,13 +316,6 @@ func createDir(path string) error {
 		}
 	}
 	return nil
-}
-
-func getSingleKey(i map[string]*Entry) string {
-	for k := range i {
-		return k
-	}
-	panic("internal. key not found")
 }
 
 func (s *Server) startTelemetry() error {

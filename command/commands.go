@@ -32,6 +32,11 @@ func Commands() map[string]cli.CommandFactory {
 				UI: ui,
 			}, nil
 		},
+		"init": func() (cli.Command, error) {
+			return &InitCommand{
+				UI: ui,
+			}, nil
+		},
 		"genesis": func() (cli.Command, error) {
 			return &GenesisCommand{
 				UI: ui,
