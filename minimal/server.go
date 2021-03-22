@@ -18,6 +18,8 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/types"
+
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
@@ -43,6 +45,7 @@ type Server struct {
 	logger hclog.Logger
 	config *Config
 	Sealer *sealer.Sealer
+	state  state.State
 
 	consensus consensus.Consensus
 
@@ -127,6 +130,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	st := itrie.NewState(stateStorage)
+	m.state = st
 
 	executor := state.NewExecutor(config.Chain.Params, st)
 	executor.SetRuntime(precompiled.NewPrecompiled())
@@ -196,21 +200,92 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
+	state state.State
+
 	*blockchain.Blockchain
 	*sealer.Sealer
 	*state.Executor
 }
 
+func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
+	snap, err := j.state.NewSnapshotAt(root)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := snap.Get(slot)
+	if !ok {
+		return nil, fmt.Errorf("error getting storage snapshot")
+	}
+	return result, nil
+}
+
+func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	obj, err := j.getState(root, addr.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	var account state.Account
+	if err := account.UnmarshalRlp(obj); err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
+func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	account, err := j.GetAccount(root, addr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := j.getState(account.Root, slot.Bytes())
+
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
+	res, ok := j.state.GetCode(hash)
+
+	if !ok {
+		return nil, fmt.Errorf("unable to fetch code")
+	}
+
+	return res, nil
+}
+
+func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	transition, err := j.BeginTxn(header.StateRoot, header)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	_, failed, err := transition.Apply(txn)
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return transition.ReturnValue(), failed, nil
+}
+
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
+		state:      s.state,
 		Blockchain: s.blockchain,
 		Sealer:     s.Sealer,
 		Executor:   s.blockchain.Executor(),
 	}
+
 	conf := &jsonrpc.Config{
 		Store: hub,
 		Addr:  s.config.JSONRPCAddr,
 	}
+
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
 	if err != nil {
 		return err

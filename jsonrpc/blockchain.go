@@ -8,6 +8,14 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+// stateHelperInterface Wrapper for these state functions
+// They are implemented by the jsonRPCHub in server.go
+type stateHelperInterface interface {
+	GetAccount(root types.Hash, addr types.Address) (*state.Account, error)
+	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
+	GetCode(hash types.Hash) ([]byte, error)
+}
+
 // blockchain is the interface with the blockchain required
 // by the filter manager
 type blockchainInterface interface {
@@ -34,6 +42,14 @@ type blockchainInterface interface {
 
 	// BeginTxn starts a transition object
 	BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error)
+
+	// GetBlockByHash gets a block using the provided hash
+	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
+
+	// ApplyTxn applies a transaction object to the blockchain
+	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+
+	stateHelperInterface
 }
 
 type nullBlockchainInterface struct {
@@ -69,4 +85,8 @@ func (b *nullBlockchainInterface) State() state.State {
 
 func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error) {
 	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	return nil, false
 }

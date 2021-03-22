@@ -3,9 +3,10 @@ package itrie
 import (
 	"fmt"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 type State struct {

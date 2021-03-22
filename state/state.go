@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/types"
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/fastrlp"
+
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/types"
 )
 
 type State interface {

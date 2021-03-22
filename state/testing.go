@@ -4,8 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/minimal/types"
 )
 
 var addr1 = types.StringToAddress("1")

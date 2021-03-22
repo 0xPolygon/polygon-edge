@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -212,6 +213,22 @@ type mockStore struct {
 	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
+}
+
+func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	panic("implement me")
+}
+
+func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	panic("implement me")
+}
+
+func (m *mockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	panic("implement me")
+}
+
+func (m *mockStore) GetCode(hash types.Hash) ([]byte, error) {
+	panic("implement me")
 }
 
 func newMockStore() *mockStore {
