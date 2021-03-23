@@ -9,6 +9,8 @@ import (
 )
 
 type handshakeService struct {
+	proto.UnimplementedHandshakeServer
+
 	s *Server
 }
 

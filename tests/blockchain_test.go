@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ethash"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/state"
@@ -114,8 +115,12 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	executor.SetRuntime(precompiled.NewPrecompiled())
 	executor.SetRuntime(evm.NewEVM())
 
-	b := blockchain.NewBlockchain(s, params, engine, executor)
-	if err := b.WriteGenesis(genesis); err != nil {
+	chain := &chain.Chain{
+		Genesis: genesis,
+		Params:  params,
+	}
+	b, err := blockchain.NewBlockchain(hclog.NewNullLogger(), s, chain, engine, executor)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,7 +172,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 		validBlocks[block.Hash()] = block
 	}
 
-	lastBlock, _ := b.Header()
+	lastBlock := b.Header()
 	// Validate last block
 	if hash := lastBlock.Hash.String(); hash != c.LastBlockHash {
 		t.Fatalf("header mismatch: found %s but expected %s", hash, c.LastBlockHash)
@@ -199,7 +204,7 @@ func testBlockChainCase(t *testing.T, c *BlockchainTest) {
 	}
 
 	// Validate imported headers
-	header, _ := b.Header()
+	header := b.Header()
 	for current := header; current != nil && current.Number != 0; current, _ = b.GetHeaderByHash(current.ParentHash) {
 		valid, ok := validBlocks[current.Hash]
 		if !ok {
