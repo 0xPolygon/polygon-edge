@@ -108,6 +108,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.LibP2PAddr, "libp2p", "", "")
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
+	flags.StringVar(&cliConfig.Chain, "chain", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

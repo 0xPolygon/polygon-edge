@@ -7,13 +7,17 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-type service struct {
+type grpcTransport struct {
 	proto.UnimplementedIbftServer
 
 	b *Backend2
 }
 
-func (s *service) Message(ctx context.Context, req *proto.MessageReq) (*empty.Empty, error) {
+func (g *grpcTransport) broadcast(msg *proto.MessageReq) {
+
+}
+
+func (g *grpcTransport) Message(ctx context.Context, req *proto.MessageReq) (*empty.Empty, error) {
 	// read the message and send it to a queue
 	return nil, nil
 }

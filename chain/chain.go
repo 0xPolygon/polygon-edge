@@ -289,6 +289,18 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+func Import(chain string) (*Chain, error) {
+	c, err := ImportFromName(chain)
+	if err == nil {
+		return c, nil
+	}
+	if chain == "" {
+		// use the default genesis.json name
+		chain = "./genesis.json"
+	}
+	return ImportFromFile(chain)
+}
+
 // ImportFromName imports a chain from the precompiled json chains (i.e. foundation)
 func ImportFromName(chain string) (*Chain, error) {
 	data, err := Asset("chain/chains/" + chain + ".json")

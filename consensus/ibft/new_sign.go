@@ -51,7 +51,7 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 		return nil, err
 	}
 	extra.Seal = seal
-	if err := putIbftExtra(h, extra); err != nil {
+	if err := PutIbftExtra(h, extra); err != nil {
 		return nil, err
 	}
 	return h, nil

@@ -18,20 +18,20 @@ import (
 // New creates an Istanbul consensus core
 func New(backend ibft.Backend, config *ibft.Config, logger hclog.Logger) Engine {
 	c := &core{
-		config:             config,
-		address:            backend.Address(),
-		state:              StateAcceptRequest,
-		handlerWg:          new(sync.WaitGroup),
-		logger:             logger,
-		backend:            backend,
-		backlogs:           make(map[ibft.Validator]*prque.Prque),
-		backlogsMu:         new(sync.Mutex),
-		pendingRequests:    prque.New(),
-		pendingRequestsMu:  new(sync.Mutex),
-		consensusTimestamp: time.Time{},
-		roundMeter:         metrics.NewRegisteredMeter("consensus/ibft/core/round", nil),
-		sequenceMeter:      metrics.NewRegisteredMeter("consensus/ibft/core/sequence", nil),
-		consensusTimer:     metrics.NewRegisteredTimer("consensus/ibft/core/consensus", nil),
+		config:            config,
+		address:           backend.Address(),
+		state:             StateAcceptRequest,
+		handlerWg:         new(sync.WaitGroup),
+		logger:            logger,
+		backend:           backend,
+		backlogs:          make(map[ibft.Validator]*prque.Prque),
+		backlogsMu:        new(sync.Mutex),
+		pendingRequests:   prque.New(),
+		pendingRequestsMu: new(sync.Mutex),
+		//consensusTimestamp: time.Time{},
+		roundMeter:    metrics.NewRegisteredMeter("consensus/ibft/core/round", nil),
+		sequenceMeter: metrics.NewRegisteredMeter("consensus/ibft/core/sequence", nil),
+		//consensusTimer:     metrics.NewRegisteredTimer("consensus/ibft/core/consensus", nil),
 	}
 	c.validateFn = c.checkValidatorSignature
 	return c
@@ -67,13 +67,13 @@ type core struct {
 	pendingRequests   *prque.Prque
 	pendingRequestsMu *sync.Mutex
 
-	consensusTimestamp time.Time
+	// consensusTimestamp time.Time
 	// the meter to record the round change rate
 	roundMeter metrics.Meter
 	// the meter to record the sequence update rate
 	sequenceMeter metrics.Meter
 	// the timer to record consensus duration (from accepting a preprepare to final committed stage)
-	consensusTimer metrics.Timer
+	//consensusTimer metrics.Timer
 }
 
 func (c *core) finalizeMessage(msg *message) ([]byte, error) {
@@ -176,13 +176,13 @@ func (c *core) startNewRound(round *big.Int) {
 	if c.current == nil {
 		logger.Trace("Start to the initial round")
 	} else if new(big.Int).SetUint64(lastProposal.Number()).Cmp(c.current.Sequence()) >= 0 {
-		diff := new(big.Int).Sub(new(big.Int).SetUint64(lastProposal.Number()), c.current.Sequence())
-		c.sequenceMeter.Mark(new(big.Int).Add(diff, types.Big1).Int64())
+		// diff := new(big.Int).Sub(new(big.Int).SetUint64(lastProposal.Number()), c.current.Sequence())
+		// c.sequenceMeter.Mark(new(big.Int).Add(diff, types.Big1).Int64())
 
-		if !c.consensusTimestamp.IsZero() {
-			c.consensusTimer.UpdateSince(c.consensusTimestamp)
-			c.consensusTimestamp = time.Time{}
-		}
+		//if !c.consensusTimestamp.IsZero() {
+		//c.consensusTimer.UpdateSince(c.consensusTimestamp)
+		//c.consensusTimestamp = time.Time{}
+		//}
 		logger.Trace("Catch up latest proposal", "number", lastProposal.Number(), "hash", lastProposal.Hash())
 	} else if new(big.Int).SetUint64(lastProposal.Number()).Cmp(big.NewInt(c.current.Sequence().Int64()-1)) == 0 {
 		if round.Cmp(types.Big0) == 0 {

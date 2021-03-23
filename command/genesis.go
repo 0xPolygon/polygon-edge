@@ -87,7 +87,9 @@ func (c *GenesisCommand) Run(args []string) int {
 			Seal:          []byte{},
 			CommittedSeal: [][]byte{},
 		}
-		extraData = ibftExtra.MarshalRLPTo(nil)
+
+		extraData = make([]byte, types.IstanbulExtraVanity)
+		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
 	cc := &chain.Chain{

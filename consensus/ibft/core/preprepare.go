@@ -110,6 +110,6 @@ func (c *core) handlePreprepare(msg *message, src ibft.Validator) error {
 }
 
 func (c *core) acceptPreprepare(preprepare *ibft.Preprepare) {
-	c.consensusTimestamp = time.Now()
+	// c.consensusTimestamp = time.Now()
 	c.current.SetPreprepare(preprepare)
 }

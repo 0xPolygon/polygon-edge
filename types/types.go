@@ -10,6 +10,8 @@ import (
 	"github.com/0xPolygon/minimal/helper/hex"
 )
 
+var ZeroAddress = Address{}
+
 const (
 	HashLength    = 32
 	AddressLength = 20

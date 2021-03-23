@@ -31,8 +31,8 @@ message Subject {
 }
 
 message View {
-    string string = 1;
-    string sequence = 2;
+    uint64 round = 1;
+    uint64 sequence = 2;
 }
 
 message Proposal {

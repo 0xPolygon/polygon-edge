@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/helper/dao"
@@ -38,7 +38,7 @@ type Ethash struct {
 }
 
 // Factory is the factory method to create an Ethash consensus
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, blockchain *blockchain.Blockchain, config *consensus.Config, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
 	var pathStr string
 	path, ok := config.Config["path"]
 	if ok {

@@ -34,7 +34,6 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/sealer"
 )
 
@@ -112,11 +111,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 	m.storage = storage
 
-	// Setup consensus
-	if err := m.setupConsensus(); err != nil {
-		return nil, err
-	}
-
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
 		return nil, err
@@ -136,12 +130,19 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	executor.GetHash = m.blockchain.GetHashHelper
 
-	// Setup sealer
-	sealerConfig := &sealer.Config{
-		Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
+	/*
+		// Setup sealer
+		sealerConfig := &sealer.Config{
+			Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
+		}
+		m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
+		m.Sealer.SetEnabled(m.config.Seal)
+	*/
+
+	// Setup consensus
+	if err := m.setupConsensus(); err != nil {
+		return nil, err
 	}
-	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
-	m.Sealer.SetEnabled(m.config.Seal)
 
 	// setup libp2p server
 	if err := m.setupLibP2P(); err != nil {
@@ -183,11 +184,15 @@ func (s *Server) setupConsensus() error {
 	}
 	config.Config["path"] = filepath.Join(s.config.DataDir, "consensus")
 
-	consensus, err := engine(context.Background(), config, s.key, s.storage, s.logger)
+	consensus, err := engine(context.Background(), s.blockchain, config, s.key, s.logger)
 	if err != nil {
 		return err
 	}
 	s.consensus = consensus
+
+	// set now the consensus in blockchain
+	s.blockchain.SetConsensus(consensus)
+
 	return nil
 }
 

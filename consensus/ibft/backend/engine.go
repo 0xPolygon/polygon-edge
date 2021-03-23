@@ -417,6 +417,7 @@ func (sb *backend) VerifyHeader(parent, header *types.Header, uncle, seal bool) 
 	return sb.verifyHeader(header, nil)
 }
 
+// REMOVE when we remove the Sealer
 // Seal generates a new block for the given input block with the local miner's
 // seal place on top.
 func (sb *backend) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {

@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"log"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
@@ -40,4 +40,4 @@ type Config struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, *Config, *ecdsa.PrivateKey, storage.Storage, hclog.Logger) (Consensus, error)
+type Factory func(context.Context, *blockchain.Blockchain, *Config, *ecdsa.PrivateKey, hclog.Logger) (Consensus, error)

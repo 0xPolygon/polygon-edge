@@ -151,3 +151,26 @@ func TestSnapshotVoting(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotNextValidator(t *testing.T) {
+	var (
+		addr1 = types.StringToAddress("1")
+		addr2 = types.StringToAddress("2")
+		addr3 = types.StringToAddress("3")
+		addr4 = types.StringToAddress("4")
+	)
+
+	snapshot := &Snapshot2{
+		Set: ValidatorSet2{
+			addr1,
+			addr2,
+			addr3,
+		},
+	}
+
+	assert.Equal(t, snapshot.NextValidator(addr1), addr2)
+	assert.Equal(t, snapshot.NextValidator(addr2), addr3)
+	assert.Equal(t, snapshot.NextValidator(addr3), addr1)
+	assert.Equal(t, snapshot.NextValidator(types.ZeroAddress), addr1)
+	assert.Equal(t, snapshot.NextValidator(addr4), addr1)
+}

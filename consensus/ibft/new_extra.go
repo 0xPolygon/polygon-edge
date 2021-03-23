@@ -27,7 +27,7 @@ func putIbftExtraValidators(h *types.Header, validators []types.Address) {
 	h.ExtraData = extra
 }
 
-func putIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
+func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	// pad zeros to the right up to istambul vanity
 	extra := h.ExtraData
 	if len(extra) < types.IstanbulExtraVanity {

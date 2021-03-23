@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
@@ -25,12 +24,16 @@ var (
 	errDanglingUncle   = errors.New("uncle's parent is not ancestor")
 )
 
+type Consensus interface {
+	VerifyHeader(parent, header *types.Header, uncle, seal bool) error
+}
+
 // Blockchain is a blockchain reference
 type Blockchain struct {
 	logger hclog.Logger
 
 	db        storage.Storage
-	consensus consensus.Consensus
+	consensus Consensus
 	executor  *state.Executor
 
 	config  *chain.Chain
@@ -75,7 +78,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus consensus.Consensus, executor *state.Executor) (*Blockchain, error) {
+func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus Consensus, executor *state.Executor) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -124,6 +127,10 @@ func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain,
 	return b, nil
 }
 
+func (b *Blockchain) SetConsensus(c Consensus) {
+	b.consensus = c
+}
+
 func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
 	hh := h.Copy()
 	b.currentHeader.Store(hh)
@@ -154,10 +161,6 @@ func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types
 	return b.GetBlockByHash(hash, full)
 }
 
-func (b *Blockchain) GetConsensus() consensus.Consensus {
-	return b.consensus
-}
-
 func (b *Blockchain) Executor() *state.Executor {
 	return b.executor
 }
@@ -181,6 +184,10 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 	header := genesis.ToBlock()
 	header.StateRoot = root
 	header.ComputeHash()
+
+	fmt.Println("- write header extra -")
+	fmt.Println(genesis.ExtraData)
+	fmt.Println(header.ExtraData)
 
 	if err := b.writeGenesisImpl(header); err != nil {
 		return err

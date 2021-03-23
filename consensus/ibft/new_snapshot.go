@@ -20,6 +20,7 @@ var (
 
 type snapshotState struct {
 	store   aux.BlockchainInterface
+	config  *Config
 	readyCh chan struct{}
 	db      *memdb.MemDB
 }
@@ -37,10 +38,14 @@ func (s *snapshotState) setup() error {
 		return fmt.Errorf("failed to get genesis")
 	}
 
+	fmt.Println("- extra -")
+	fmt.Println(genesis.ExtraData)
+
 	extra, err := getIbftExtra(genesis)
 	if err != nil {
 		return err
 	}
+	fmt.Println(extra.Validators)
 	genesisSnap := &Snapshot2{
 		Number: 0,
 		Hash:   genesis.Hash.String(),
@@ -99,6 +104,8 @@ func (s *snapshotState) verifyHeader(header *types.Header) error {
 	if len(found) <= 2*snap.Set.MinFaultyNodes() {
 		return fmt.Errorf("not enough healthy nodes")
 	}
+
+	// TODO: if the header is valid, update the snapshot
 	return nil
 }
 
@@ -143,10 +150,18 @@ func (s *snapshotState) processHeaders(headers []*types.Header) error {
 	currentSnapshot := snapshot.Copy()
 	fmt.Println(currentSnapshot)
 
-	for _, h := range headers {
-		validator, err := ecrecover(h)
+	for _, header := range headers {
+		number := header.Number
+		if number%s.config.Epoch == 0 {
+			currentSnapshot.Votes = nil
+		}
+
+		validator, err := ecrecover(header)
 		if err != nil {
 			return err
+		}
+		if !currentSnapshot.Set.Includes(validator) {
+			return fmt.Errorf("bad")
 		}
 
 		fmt.Println("-- validator --")
@@ -261,6 +276,29 @@ type Snapshot2 struct {
 
 	// current set of validators
 	Set ValidatorSet2
+}
+
+func (s *Snapshot2) NextValidator(last types.Address) types.Address {
+	if last == types.ZeroAddress {
+		// pick the first one
+		return s.Set[0]
+	}
+	// find the address of the last validator and pick the next one
+	addrIndx := -1
+	for indx, addr := range s.Set {
+		if addr == last {
+			addrIndx = indx
+		}
+	}
+	if addrIndx == -1 {
+		// if nothing found, return the first one
+		return s.Set[0]
+	}
+	if addrIndx == len(s.Set)-1 {
+		// if the address is the last one, pick the first one
+		return s.Set[0]
+	}
+	return s.Set[addrIndx+1]
 }
 
 func (s *Snapshot2) Copy() *Snapshot2 {
