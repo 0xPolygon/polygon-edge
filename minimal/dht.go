@@ -26,7 +26,7 @@ func (s *Server) setupDHT(ctx context.Context, host host.Host) error {
 	s.dht.RoutingTable().PeerAdded = s.peerAdded
 	s.dht.RoutingTable().PeerRemoved = s.peerRemoved
 
-	go s.handlePeerChanged()
+	go s.handlePeerChanged(ctx)
 
 	return nil
 }
@@ -41,26 +41,39 @@ func (s *Server) peerAdded(p peer.ID) {
 
 func (s *Server) peerRemoved(p peer.ID) {
 	s.logger.Info("Peer removed", "peer", p.String())
+
+	peerInfo := s.host.Peerstore().PeerInfo(p)
+	addr0 := AddrInfoToString(&peerInfo)
+
+	s.peerJoinedMutex.Lock()
+	defer s.peerJoinedMutex.Unlock()
+	s.peerJoined[addr0] = false
+
 	select {
 	case s.peerRemovedCh <- struct{}{}:
 	default:
 	}
 }
 
-func (s *Server) handlePeerChanged() {
+func (s *Server) handlePeerChanged(ctx context.Context) {
 	for {
 		select {
 		case <-s.peerAddedCh:
 		case <-s.peerRemovedCh:
+		case <-ctx.Done():
+			return
 		}
+		s.addClosestPeers()
+	}
+}
 
-		pc, err := s.dht.GetClosestPeers(context.Background(), string(s.host.ID()))
-		if err == nil {
-			for peer := range pc {
-				peerInfo := s.host.Peerstore().PeerInfo(peer)
-				addr0 := AddrInfoToString(&peerInfo)
-				s.Join(addr0)
-			}
+func (s *Server) addClosestPeers() {
+	pc, err := s.dht.GetClosestPeers(context.Background(), string(s.host.ID()))
+	if err == nil {
+		for peer := range pc {
+			peerInfo := s.host.Peerstore().PeerInfo(peer)
+			addr0 := AddrInfoToString(&peerInfo)
+			s.Join(addr0)
 		}
 	}
 }

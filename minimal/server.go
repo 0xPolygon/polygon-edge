@@ -65,14 +65,14 @@ type Server struct {
 	grpcServer *grpc.Server
 
 	// libp2p stack
-	host               host.Host
-	libp2pServer       *libp2pgrpc.GRPCProtocol
-	addrs              []ma.Multiaddr
-	dht                *dht.IpfsDHT
-	peerAddedCh        chan struct{}
-	peerRemovedCh      chan struct{}
-	peerConnected      map[string]bool
-	peerConnectedMutex *sync.RWMutex
+	host            host.Host
+	libp2pServer    *libp2pgrpc.GRPCProtocol
+	addrs           []ma.Multiaddr
+	dht             *dht.IpfsDHT
+	peerAddedCh     chan struct{}
+	peerRemovedCh   chan struct{}
+	peerJoined      map[string]bool
+	peerJoinedMutex *sync.RWMutex
 
 	// syncer protocol
 	syncer *protocol.Syncer
@@ -90,12 +90,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		logger: logger,
 		config: config,
 		// backends:   []protocol.Backend{},
-		chain:              config.Chain,
-		grpcServer:         grpc.NewServer(),
-		peerAddedCh:        make(chan struct{}),
-		peerRemovedCh:      make(chan struct{}),
-		peerConnected:      make(map[string]bool),
-		peerConnectedMutex: new(sync.RWMutex),
+		chain:           config.Chain,
+		grpcServer:      grpc.NewServer(),
+		peerAddedCh:     make(chan struct{}),
+		peerRemovedCh:   make(chan struct{}),
+		peerJoined:      make(map[string]bool),
+		peerJoinedMutex: new(sync.RWMutex),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -321,21 +321,23 @@ func (s *Server) Chain() *chain.Chain {
 
 func (s *Server) Join(addr0 string) error {
 	s.logger.Info("[INFO]: Join peer", "addr", addr0)
-	if s.getPeerConnected(addr0) {
+
+	s.peerJoinedMutex.Lock()
+	defer s.peerJoinedMutex.Unlock()
+
+	if s.peerJoined[addr0] {
 		return nil
 	}
 
 	// add peer to the libp2p peerstore
 	peerID, err := s.AddPeerFromMultiAddrString(addr0)
 	if err != nil {
-		s.setPeerConnected(addr0, false)
 		return err
 	}
 
 	// perform handshake protocol
 	conn, err := s.dial(peerID)
 	if err != nil {
-		s.setPeerConnected(addr0, false)
 		return err
 	}
 	clt := proto.NewHandshakeClient(conn)
@@ -344,11 +346,10 @@ func (s *Server) Join(addr0 string) error {
 		Id: s.host.ID().String(),
 	}
 	if _, err := clt.Hello(context.Background(), req); err != nil {
-		s.setPeerConnected(addr0, false)
 		return err
 	}
 
-	s.setPeerConnected(addr0, true)
+	s.peerJoined[addr0] = true
 	// send the connection to the syncer
 	go s.syncer.HandleUser(peerID, conn)
 
@@ -366,8 +367,12 @@ func (s *Server) handleConnUser(addr string) {
 	}
 
 	peerInfo := s.host.Peerstore().PeerInfo(peerID)
+
+	s.peerJoinedMutex.Lock()
+	defer s.peerJoinedMutex.Unlock()
+
 	addr0 := AddrInfoToString(&peerInfo)
-	if s.getPeerConnected(addr0) {
+	if s.peerJoined[addr0] {
 		return
 	}
 
@@ -377,7 +382,7 @@ func (s *Server) handleConnUser(addr string) {
 		panic(err)
 	}
 
-	s.setPeerConnected(addr0, true)
+	s.peerJoined[addr0] = true
 	go s.syncer.HandleUser(peerID, conn)
 }
 
@@ -466,16 +471,4 @@ func (s *Server) startTelemetry() error {
 
 	metrics.NewGlobal(metricsConf, sinks)
 	return nil
-}
-
-func (s *Server) getPeerConnected(addr0 string) bool {
-	s.peerConnectedMutex.RLock()
-	defer s.peerConnectedMutex.RUnlock()
-	return s.peerConnected[addr0]
-}
-
-func (s *Server) setPeerConnected(addr0 string, isConnected bool) {
-	s.peerConnectedMutex.Lock()
-	defer s.peerConnectedMutex.Unlock()
-	s.peerConnected[addr0] = isConnected
 }

@@ -42,7 +42,7 @@ func (s *Server) setupLibP2P() error {
 		return fmt.Errorf("failed to create libp2p stack: %v", err)
 	}
 	if err = s.setupDHT(context.Background(), host); err != nil {
-		return fmt.Errorf("failed to create libp2p stack: %v", err)
+		return fmt.Errorf("failed to create DHT: %v", err)
 	}
 
 	s.libp2pServer = libp2pgrpc.NewGRPCProtocol(context.Background(), host)
