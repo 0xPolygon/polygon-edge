@@ -62,23 +62,35 @@ func (s *Server) handlePeerChanged(ctx context.Context) {
 }
 
 func (s *Server) addBestPeer() {
-	pc, err := s.dht.GetClosestPeers(context.Background(), string(s.host.ID()))
-	if err == nil {
-		peers := []peer.ID{}
-		for p := range pc {
-			peers = append(peers, p)
-		}
-		s.sortPeersByLatency(peers)
+	addr0, err := s.getBestPeerAddr()
+	if err != nil {
+		s.logger.Error("Failed to get best peer", "error", err.Error())
+	}
+	if addr0 != nil {
+		s.Join(*addr0)
+	}
+}
 
-		for _, peer := range peers {
-			peerInfo := s.host.Peerstore().PeerInfo(peer)
-			addr0 := AddrInfoToString(&peerInfo)
-			if !s.getPeerJoined(addr0) {
-				s.Join(addr0)
-				return
-			}
+func (s *Server) getBestPeerAddr() (*string, error) {
+	pc, err := s.dht.GetClosestPeers(context.Background(), string(s.host.ID()))
+	if err != nil {
+		return nil, err
+	}
+
+	peers := []peer.ID{}
+	for p := range pc {
+		peers = append(peers, p)
+	}
+	s.sortPeersByLatency(peers)
+
+	for _, peer := range peers {
+		peerInfo := s.host.Peerstore().PeerInfo(peer)
+		addr0 := AddrInfoToString(&peerInfo)
+		if !s.getPeerJoined(addr0) {
+			return &addr0, nil
 		}
 	}
+	return nil, nil
 }
 
 func (s *Server) sortPeersByLatency(peers []peer.ID) {
