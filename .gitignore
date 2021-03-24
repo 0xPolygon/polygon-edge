@@ -6,7 +6,7 @@ config*.json
 bin/
 pkg/
 
-test-chain
+test-chain-1
 test-chain-2
 .idea
 

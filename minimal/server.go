@@ -299,7 +299,7 @@ func (s *Server) setupJSONRPC() error {
 func (s *Server) setupGRPC() error {
 	s.grpcServer = grpc.NewServer()
 
-	proto.RegisterSystemServer(s.grpcServer, &systemService{s})
+	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
 	if err != nil {
@@ -355,9 +355,6 @@ func (s *Server) Join(addr0 string) error {
 
 func (s *Server) handleConnUser(addr string) {
 	// we are already connected with libp2p
-	fmt.Println("-- addr --")
-	fmt.Println(addr)
-
 	peerID, err := peer.Decode(addr)
 	if err != nil {
 		panic(err)

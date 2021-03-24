@@ -13,10 +13,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-var _ proto.V1Server = &serviceV1{}
-
 // serviceV1 is the GRPC server implementation for the v1 protocol
 type serviceV1 struct {
+	proto.UnimplementedV1Server
+
 	logger hclog.Logger
 
 	store blockchainShim

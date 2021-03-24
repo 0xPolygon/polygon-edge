@@ -9,6 +9,8 @@ import (
 )
 
 type systemService struct {
+	proto.UnimplementedSystemServer
+
 	s *Server
 }
 

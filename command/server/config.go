@@ -14,15 +14,16 @@ import (
 )
 
 type Config struct {
-	Chain      string                 `json:"chain"`
-	DataDir    string                 `json:"data_dir"`
-	LibP2PAddr string                 `json:"bind_addr"`
-	GRPCAddr   string                 `json:"rpc_addr"`
-	Telemetry  *Telemetry             `json:"telemetry"`
-	Seal       bool                   `json:"seal"`
-	LogLevel   string                 `json:"log_level"`
-	Consensus  map[string]interface{} `json:"consensus"`
-	Join       string
+	Chain       string                 `json:"chain"`
+	DataDir     string                 `json:"data_dir"`
+	LibP2PAddr  string                 `json:"bind_addr"`
+	GRPCAddr    string                 `json:"rpc_addr"`
+	JSONRPCAddr string                 `json:"jsonrpc_addr"`
+	Telemetry   *Telemetry             `json:"telemetry"`
+	Seal        bool                   `json:"seal"`
+	LogLevel    string                 `json:"log_level"`
+	Consensus   map[string]interface{} `json:"consensus"`
+	Join        string
 }
 
 type Telemetry struct {
@@ -71,6 +72,13 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		}
 		conf.GRPCAddr = addr
 	}
+	if c.JSONRPCAddr != "" {
+		addr, err := net.ResolveTCPAddr("tcp", c.JSONRPCAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse jsonrc addr '%s': %v", c.JSONRPCAddr, err)
+		}
+		conf.JSONRPCAddr = addr
+	}
 	return conf, nil
 }
 
@@ -97,6 +105,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.LibP2PAddr != "" {
 		c.LibP2PAddr = c1.LibP2PAddr
+	}
+	if c1.JSONRPCAddr != "" {
+		c.JSONRPCAddr = c1.JSONRPCAddr
 	}
 	if c1.Join != "" {
 		c.Join = c1.Join

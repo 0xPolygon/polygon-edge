@@ -1,7 +1,5 @@
 
-
 # Polygon SDK
-
 
 Polygon SDK is a modular and extensible framework for building Ethereum-compatible blockchain networks. 
 
@@ -76,20 +74,32 @@ The current list of supported consensus algorithms:
 
 We plan to add support for more consensus algorithms in the future (HotSuff, Tendermint etc). Contact us if you would like to use a specific, not yet supported algorithm for your project.
 
-### IBFT
+## Contributing
 
-Perform the following steps to activate networking and the IBFT consensus engine:
-1. Generate genesis block that will contain a validator list:
+### Protobuf
 
-```
-go run main.go ibft-genesis [privateKey1, port1 privateKey2, port2 ...]
-```
-2. For each validator create data folder and insert `privateKey` in the file called `key`.
+We use version 3.12.0 of protobuf and version 1.1.0 of protoc-gen-go-grpc.
 
-3. Start each validator:
+## Example
+
+Start one node:
 
 ```
-go run main.go agent ibft --data-dir [folder] --port [port] --addr [address] --rpc-addr [rpcAddress] --rpc-port [rpcPort] --seal --log-level TRACE
+$ go run main.go server --data-dir ./test-chain-1 --grpc :10000 --libp2p :10001 --jsonrpc :10002 --seal
 ```
 
+By default, the client uses an empty genesis file with a ~5s PoW.
 
+In the logs of the running client you will see the LibP2P address required to connect to this node.
+
+Start a second node that connects to the first:
+
+```
+$ go run main.go server --data-dir ./test-chain-2 --grpc :20000 --libp2p :20001 --jsonrpc :20002 --seal --join <node-1-libp2p-addr>
+```
+
+Monitor the blockchain events (i.e forks, reorgs...) in node 2.
+
+```
+$ go run main.go monitor --address localhost:20000
+```

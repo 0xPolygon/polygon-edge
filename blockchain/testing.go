@@ -110,6 +110,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 			GasLimit: uint64(0),
 		},
 	}
+	genesis.Header.ComputeHash()
 
 	blocks := []*types.Block{genesis}
 	receipts := [][]*types.Receipt{nil} // genesis does not have tx
@@ -191,7 +192,12 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
+	genesis := &chain.Genesis{
+		Number:   0,
+		GasLimit: 0,
+	}
 	config := &chain.Chain{
+		Genesis: genesis,
 		Params: &chain.Params{
 			Forks: &chain.Forks{
 				EIP155:    chain.NewFork(0),
@@ -206,7 +212,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 	if headers != nil {
-		if err := b.WriteHeaderGenesis(headers[0]); err != nil {
+		if _, err := b.advanceHead(headers[0]); err != nil {
 			t.Fatal(err)
 		}
 		if err := b.WriteHeaders(headers[1:]); err != nil {
