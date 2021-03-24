@@ -24,6 +24,7 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/host"
+	libp2pmetrics "github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	ma "github.com/multiformats/go-multiaddr"
@@ -69,6 +70,7 @@ type Server struct {
 	libp2pServer    *libp2pgrpc.GRPCProtocol
 	addrs           []ma.Multiaddr
 	dht             *dht.IpfsDHT
+	bwc             libp2pmetrics.Reporter
 	peerAddedCh     chan struct{}
 	peerRemovedCh   chan struct{}
 	peerJoined      map[string]bool
@@ -322,13 +324,6 @@ func (s *Server) Chain() *chain.Chain {
 func (s *Server) Join(addr0 string) error {
 	s.logger.Info("[INFO]: Join peer", "addr", addr0)
 
-	s.peerJoinedMutex.Lock()
-	defer s.peerJoinedMutex.Unlock()
-
-	if s.peerJoined[addr0] {
-		return nil
-	}
-
 	// add peer to the libp2p peerstore
 	peerID, err := s.AddPeerFromMultiAddrString(addr0)
 	if err != nil {
@@ -349,8 +344,10 @@ func (s *Server) Join(addr0 string) error {
 		return err
 	}
 
-	s.peerJoined[addr0] = true
-	// send the connection to the syncer
+	if s.getPeerJoined(addr0) {
+		return nil
+	}
+	s.setPeerJoined(addr0, true)
 	go s.syncer.HandleUser(peerID, conn)
 
 	return nil
@@ -367,12 +364,8 @@ func (s *Server) handleConnUser(addr string) {
 	}
 
 	peerInfo := s.host.Peerstore().PeerInfo(peerID)
-
-	s.peerJoinedMutex.Lock()
-	defer s.peerJoinedMutex.Unlock()
-
 	addr0 := AddrInfoToString(&peerInfo)
-	if s.peerJoined[addr0] {
+	if s.getPeerJoined(addr0) {
 		return
 	}
 
@@ -382,7 +375,7 @@ func (s *Server) handleConnUser(addr string) {
 		panic(err)
 	}
 
-	s.peerJoined[addr0] = true
+	s.setPeerJoined(addr0, true)
 	go s.syncer.HandleUser(peerID, conn)
 }
 
@@ -471,4 +464,16 @@ func (s *Server) startTelemetry() error {
 
 	metrics.NewGlobal(metricsConf, sinks)
 	return nil
+}
+
+func (s *Server) getPeerJoined(addr0 string) bool {
+	s.peerJoinedMutex.RLock()
+	defer s.peerJoinedMutex.RUnlock()
+	return s.peerJoined[addr0]
+}
+
+func (s *Server) setPeerJoined(addr0 string, joined bool) {
+	s.peerJoinedMutex.Lock()
+	defer s.peerJoinedMutex.Unlock()
+	s.peerJoined[addr0] = joined
 }

@@ -2,6 +2,7 @@ package minimal
 
 import (
 	"context"
+	"sort"
 
 	"github.com/ipfs/go-ipns"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -42,13 +43,6 @@ func (s *Server) peerAdded(p peer.ID) {
 func (s *Server) peerRemoved(p peer.ID) {
 	s.logger.Info("Peer removed", "peer", p.String())
 
-	peerInfo := s.host.Peerstore().PeerInfo(p)
-	addr0 := AddrInfoToString(&peerInfo)
-
-	s.peerJoinedMutex.Lock()
-	defer s.peerJoinedMutex.Unlock()
-	s.peerJoined[addr0] = false
-
 	select {
 	case s.peerRemovedCh <- struct{}{}:
 	default:
@@ -63,17 +57,44 @@ func (s *Server) handlePeerChanged(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
-		s.addClosestPeers()
+		s.addBestPeer()
 	}
 }
 
-func (s *Server) addClosestPeers() {
+func (s *Server) addBestPeer() {
 	pc, err := s.dht.GetClosestPeers(context.Background(), string(s.host.ID()))
 	if err == nil {
-		for peer := range pc {
+		peers := []peer.ID{}
+		for p := range pc {
+			peers = append(peers, p)
+		}
+		s.sortPeersByLatency(peers)
+
+		for _, peer := range peers {
 			peerInfo := s.host.Peerstore().PeerInfo(peer)
 			addr0 := AddrInfoToString(&peerInfo)
-			s.Join(addr0)
+			if !s.getPeerJoined(addr0) {
+				s.Join(addr0)
+				return
+			}
 		}
 	}
+}
+
+func (s *Server) sortPeersByLatency(peers []peer.ID) {
+	peerToBw := s.bwc.GetBandwidthByPeer()
+	sort.SliceStable(peers, func(i, j int) bool {
+		p1, p2 := peers[i], peers[j]
+		bw1, bw2 := peerToBw[p1], peerToBw[p2]
+		if bw1.TotalIn == 0 && bw2.TotalIn == 0 {
+			return i < j
+		}
+		if bw1.TotalIn == 0 {
+			return false
+		}
+		if bw2.TotalIn == 0 {
+			return true
+		}
+		return bw1.RateIn > bw2.RateIn
+	})
 }
