@@ -65,6 +65,11 @@ func (b *Bloom) Scan(src interface{}) error {
 	return nil
 }
 
+// MarshalText implements encoding.TextMarshaler
+func (b Bloom) MarshalText() ([]byte, error) {
+	return []byte(b.String()), nil
+}
+
 // CreateBloom creates a new bloom filter from a set of receipts
 func CreateBloom(receipts []*Receipt) (b Bloom) {
 	h := keccak.DefaultKeccakPool.Get()
@@ -114,7 +119,7 @@ func (b *Bloom) IsLogInBloom(log *Log) bool {
 			return false
 		}
 	}
-	
+
 	keccak.DefaultKeccakPool.Put(hasher)
 
 	return true
@@ -135,7 +140,7 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 		bitLocation := bit % 8
 
 		referenceByte := b[byteLocation]
-		
+
 		isSet := int(referenceByte & (1 << (bitLocation - 1)))
 
 		if isSet == 0 {
