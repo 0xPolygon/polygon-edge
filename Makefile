@@ -16,6 +16,7 @@ bindata:
 protoc:
 	protoc --go_out=. --go-grpc_out=. ./minimal/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
+	protoc --go_out=. --go-grpc_out=. ./network/grpc/test/*.proto
 	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/proto/*.proto
 
 .PHONY: clean-ibft-dir
