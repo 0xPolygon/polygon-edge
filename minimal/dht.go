@@ -2,7 +2,6 @@ package minimal
 
 import (
 	"context"
-	"sort"
 
 	"github.com/ipfs/go-ipns"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -81,7 +80,6 @@ func (s *Server) getBestPeerAddr() (*string, error) {
 	for p := range pc {
 		peers = append(peers, p)
 	}
-	s.sortPeersByLatency(peers)
 
 	for _, peer := range peers {
 		peerInfo := s.host.Peerstore().PeerInfo(peer)
@@ -91,22 +89,4 @@ func (s *Server) getBestPeerAddr() (*string, error) {
 		}
 	}
 	return nil, nil
-}
-
-func (s *Server) sortPeersByLatency(peers []peer.ID) {
-	peerToBw := s.bwc.GetBandwidthByPeer()
-	sort.SliceStable(peers, func(i, j int) bool {
-		p1, p2 := peers[i], peers[j]
-		bw1, bw2 := peerToBw[p1], peerToBw[p2]
-		if bw1.TotalIn == 0 && bw2.TotalIn == 0 {
-			return i < j
-		}
-		if bw1.TotalIn == 0 {
-			return false
-		}
-		if bw2.TotalIn == 0 {
-			return true
-		}
-		return bw1.RateIn > bw2.RateIn
-	})
 }

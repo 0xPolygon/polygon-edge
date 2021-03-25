@@ -24,7 +24,6 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/host"
-	libp2pmetrics "github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	ma "github.com/multiformats/go-multiaddr"
@@ -70,7 +69,6 @@ type Server struct {
 	libp2pServer    *libp2pgrpc.GRPCProtocol
 	addrs           []ma.Multiaddr
 	dht             *dht.IpfsDHT
-	bwc             libp2pmetrics.Reporter
 	peerAddedCh     chan struct{}
 	peerRemovedCh   chan struct{}
 	peerJoined      map[string]bool

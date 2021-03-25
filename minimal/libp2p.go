@@ -11,7 +11,6 @@ import (
 	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	noise "github.com/libp2p/go-libp2p-noise"
@@ -31,7 +30,6 @@ func (s *Server) setupLibP2P() error {
 	}
 	s.addrs = []ma.Multiaddr{addr}
 
-	bwc := metrics.NewBandwidthCounter()
 	host, err := libp2p.New(
 		context.Background(),
 		// Use noise as the encryption protocol
@@ -39,7 +37,6 @@ func (s *Server) setupLibP2P() error {
 		libp2p.ListenAddrs(s.addrs...),
 		libp2p.Identity(key),
 		libp2p.NATPortMap(),
-		libp2p.BandwidthReporter(bwc),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2p stack: %v", err)
@@ -50,7 +47,6 @@ func (s *Server) setupLibP2P() error {
 
 	s.libp2pServer = libp2pgrpc.NewGRPCProtocol(context.Background(), host)
 	s.host = host
-	s.bwc = bwc
 
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 	return nil

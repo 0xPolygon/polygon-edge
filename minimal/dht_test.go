@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	swarmt "github.com/libp2p/go-libp2p-swarm/testing"
@@ -112,34 +110,7 @@ func connect(t *testing.T, ctx context.Context, a, b *dht.IpfsDHT) {
 	wait(t, ctx, b, a)
 }
 
-type MockBandWidthCounter struct {
-	bandwidthByPeer map[peer.ID]metrics.Stats
-}
-
-func (bwc *MockBandWidthCounter) LogSentMessage(int64)                             {}
-func (bwc *MockBandWidthCounter) LogRecvMessage(int64)                             {}
-func (bwc *MockBandWidthCounter) LogSentMessageStream(int64, protocol.ID, peer.ID) {}
-func (bwc *MockBandWidthCounter) LogRecvMessageStream(int64, protocol.ID, peer.ID) {}
-func (bwc *MockBandWidthCounter) GetBandwidthForPeer(peer.ID) metrics.Stats {
-	return metrics.Stats{}
-}
-func (bwc *MockBandWidthCounter) GetBandwidthForProtocol(protocol.ID) metrics.Stats {
-	return metrics.Stats{}
-}
-func (bwc *MockBandWidthCounter) GetBandwidthTotals() metrics.Stats {
-	return metrics.Stats{}
-}
-func (bwc *MockBandWidthCounter) GetBandwidthByPeer() map[peer.ID]metrics.Stats {
-	return bwc.bandwidthByPeer
-}
-func (bwc *MockBandWidthCounter) GetBandwidthByProtocol() map[protocol.ID]metrics.Stats {
-	return make(map[protocol.ID]metrics.Stats)
-}
-
-// Check type
-var _ metrics.Reporter = &MockBandWidthCounter{}
-
-func createTestServer(dht *dht.IpfsDHT, bwc metrics.Reporter) *Server {
+func createTestServer(dht *dht.IpfsDHT) *Server {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:  "test",
 		Level: hclog.LevelFromString("debug"),
@@ -148,7 +119,6 @@ func createTestServer(dht *dht.IpfsDHT, bwc metrics.Reporter) *Server {
 	return &Server{
 		logger:          logger,
 		dht:             dht,
-		bwc:             bwc,
 		host:            dht.Host(),
 		peerAddedCh:     make(chan struct{}),
 		peerRemovedCh:   make(chan struct{}),
@@ -198,7 +168,7 @@ func TestPeerAdded(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dht := createTestDHT(context.Background(), t, true)
-			s := createTestServer(dht, nil)
+			s := createTestServer(dht)
 			defer func() {
 				dht.Close()
 				dht.Host().Close()
@@ -268,7 +238,7 @@ func TestPeerRemoved(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dht := createTestDHT(context.Background(), t, true)
-			s := createTestServer(dht, nil)
+			s := createTestServer(dht)
 			defer func() {
 				dht.Close()
 				dht.Host().Close()
@@ -312,18 +282,12 @@ func TestGetBestPeerAddr(t *testing.T) {
 	for i := 0; i < nDHTs; i++ {
 		connect(t, ctx, dhts[i], dhts[(i+1)%len(dhts)])
 	}
-	bwc := &MockBandWidthCounter{bandwidthByPeer: make(map[peer.ID]metrics.Stats)}
-	s := createTestServer(dhts[0], bwc)
+	s := createTestServer(dhts[0])
 
-	for i, d := range dhts[1:] {
-		pid := d.Host().ID()
-		bwc.bandwidthByPeer[pid] = metrics.Stats{
-			TotalIn: int64(i * 100),
-			RateIn:  float64(i * 1000),
-		}
-	}
+	closestPeersChan, err := dhts[0].GetClosestPeers(context.Background(), string(s.host.ID()))
+	closestPeer := <-closestPeersChan
 
-	expectedPeerInfo := s.host.Peerstore().PeerInfo(dhts[len(dhts)-1].Host().ID())
+	expectedPeerInfo := s.host.Peerstore().PeerInfo(closestPeer)
 	expectedPeerAddr := AddrInfoToString(&expectedPeerInfo)
 
 	addr0, err := s.getBestPeerAddr()
