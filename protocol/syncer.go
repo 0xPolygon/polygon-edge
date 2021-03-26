@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -39,16 +40,18 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peersLock sync.Mutex
-	peers     map[peer.ID]*syncPeer
+	peersLock sync.Mutex            // TODO: Remove
+	peers     map[peer.ID]*syncPeer // TODO: Remove
+	newPeerCh chan struct{}         // TODO: Remove
 
 	// status of the syncing process
 	status status
 
-	newPeerCh chan struct{}
-
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
+
+	// TODO: We use the new network.Server
+	server *network.Server
 
 	// id of the current target
 	target string

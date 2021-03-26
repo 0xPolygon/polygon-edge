@@ -28,10 +28,15 @@ type Server struct {
 
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
+
+	updateCh chan peer.ID
+
+	identity *identity
 }
 
 type Peer struct {
-	Info peer.AddrInfo
+	Info    peer.AddrInfo
+	readyCh chan struct{}
 }
 
 func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
@@ -56,10 +61,15 @@ func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
 	}
 
 	srv := &Server{
-		host:  host,
-		addrs: []multiaddr.Multiaddr{addr},
-		peers: map[peer.ID]*Peer{},
+		host:     host,
+		addrs:    []multiaddr.Multiaddr{addr},
+		peers:    map[peer.ID]*Peer{},
+		updateCh: make(chan peer.ID),
 	}
+
+	// start identity
+	srv.identity = &identity{srv: srv}
+	srv.identity.setup()
 
 	// notify for peer connection updates
 	host.Network().Notify(srv)
@@ -67,20 +77,43 @@ func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
 	return srv, nil
 }
 
-func (s *Server) Connect(addr peer.AddrInfo) (*Peer, error) {
+func (s *Server) Connect(addr peer.AddrInfo) error {
 	if err := s.host.Connect(context.Background(), addr); err != nil {
-		return nil, err
+		return err
 	}
-	return nil, nil
+	return nil
+}
+
+func (s *Server) addPeer(id peer.ID) {
+	// TODO: add to custom peer store
+	select {
+	case s.updateCh <- id:
+	default:
+	}
+}
+
+func (s *Server) StartStream(proto string, id peer.ID) network.Stream {
+	stream, err := s.host.NewStream(context.Background(), id, protocol.ID(proto))
+	if err != nil {
+		panic(err)
+	}
+	return stream
 }
 
 type Protocol interface {
-	GetID() string
 	Handler() func(network.Stream)
 }
 
-func (s *Server) Register(p Protocol) {
-	s.host.SetStreamHandler(protocol.ID(p.GetID()), p.Handler())
+func (s *Server) Register(id string, p Protocol) {
+	s.wrapStream(id, p.Handler())
+}
+
+func (s *Server) wrapStream(id string, handle func(network.Stream)) {
+	s.host.SetStreamHandler(protocol.ID(id), func(stream network.Stream) {
+		// TODO: Auth peer id, for non-identity protocols, the peer
+		// must be authenticated before we can call the handle
+		handle(stream)
+	})
 }
 
 func readLibp2pKey(dataDir string) (crypto.PrivKey, error) {
@@ -145,7 +178,7 @@ func (s *Server) ListenClose(network.Network, multiaddr.Multiaddr) {
 }
 
 // Connected implements the network.Notifiee interface
-func (s *Server) Connected(network.Network, network.Conn) {
+func (s *Server) Connected(net network.Network, conn network.Conn) {
 	fmt.Println("-c")
 }
 
@@ -162,3 +195,10 @@ func (s *Server) OpenedStream(network.Network, network.Stream) {
 // ClosedStream implements the network.Notifiee interface
 func (s *Server) ClosedStream(network.Network, network.Stream) {
 }
+
+// TODO: Gossip.
+// TODO: Dial pool (min, max nodes).
+// TODO: Dht.
+// TODO: Fixed nodes (validator set) that are never replaced.
+//      - Node priorities (libp2p?)
+// TODO: wrap security.

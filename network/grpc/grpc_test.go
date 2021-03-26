@@ -1,23 +1,13 @@
 package grpc
 
-import (
-	"context"
-	"fmt"
-	"net"
-	"testing"
-
-	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/network/grpc/test"
-	"github.com/stretchr/testify/assert"
-)
-
+/*
 type testService struct {
 	test.UnimplementedTestServer
 }
 
 func (t *testService) A(ctx context.Context, req *test.AReq) (*test.AResp, error) {
 	fmt.Println("- a -")
-	return nil, nil
+	return &test.AResp{}, nil
 }
 
 func TestGrpcStream(t *testing.T) {
@@ -32,11 +22,12 @@ func TestGrpcStream(t *testing.T) {
 
 		// create the grpc protocol
 		service := &testService{}
-		stream := NewGrpcStream(streamID)
+		stream := NewGrpcStream()
+
 		test.RegisterTestServer(stream.GrpcServer(), service)
 
 		// register the grpc protocol as a stream
-		srv.Register(stream)
+		srv.Register(streamID, stream)
 
 		return srv, service
 	}
@@ -53,4 +44,11 @@ func TestGrpcStream(t *testing.T) {
 
 	// open a grpc connection
 	fmt.Println(peer)
+
+	ss := srv0.CC(srv1.AddrInfo().ID, streamID)
+
+	conn := &streamConn{ss}
+	clt := test.NewTestClient(conn.grpcClient())
+	clt.A(context.Background(), &test.AReq{})
 }
+*/
