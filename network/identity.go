@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/network/proto"
@@ -51,6 +52,8 @@ func (i *identity) handleConnected(conn network.Conn) {
 }
 
 func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status, error) {
+	fmt.Println(ctx.(*grpc.Context).PeerID)
+
 	resp := &proto.Status{
 		Metadata: map[string]string{
 			"a": "b",

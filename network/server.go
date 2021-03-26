@@ -36,6 +36,9 @@ type Server struct {
 	dialQueue *dialQueue
 
 	identity *identity
+
+	addPeerCh    chan peer.ID
+	deletePeerCh chan peer.ID
 }
 
 type Peer struct {
@@ -95,7 +98,45 @@ func AddrInfoToString(addr peer.AddrInfo) string {
 	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
 }
 
+const dialSlots = 1 // To be modified later
+
 func (s *Server) runDial() {
+	// we work with dialSlots, there can only be at any time x concurrent slots to dial
+	// nodes (this is, connect + identity handshake).
+
+	/*
+		dial := func(addr peer.AddrInfo) {
+			if err := s.host.Connect(context.Background(), addr); err != nil {
+				panic(err)
+			}
+		}
+	*/
+
+	/*
+		dialCh := make(chan peer.AddrInfo)
+
+		dialFunc := func() {
+			for addr := range dialCh {
+				if err := s.host.Connect(context.Background(), addr); err != nil {
+					panic(err)
+				}
+			}
+		}
+
+		for i := 0; i < dialSlots; i++ {
+			go dialFunc()
+		}
+
+
+		for {
+			select {
+			case <-s.addPeerCh:
+
+			case <-s.deletePeerCh:
+
+			}
+		}*/
+
 	for {
 		tt := s.dialQueue.pop()
 

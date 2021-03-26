@@ -2,13 +2,16 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 
 	manet "github.com/multiformats/go-multiaddr-net"
 
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
+	grpcPeer "google.golang.org/grpc/peer"
 )
 
 type GrpcStream struct {
@@ -22,10 +25,32 @@ func NewGrpcStream() *GrpcStream {
 	g := &GrpcStream{
 		ctx:        context.Background(),
 		streamCh:   make(chan network.Stream),
-		grpcServer: grpc.NewServer(),
+		grpcServer: grpc.NewServer(grpc.UnaryInterceptor(interceptor)),
 	}
 	g.Serve()
 	return g
+}
+
+type Context struct {
+	context.Context
+	PeerID peer.ID
+}
+
+func interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	peer, ok := grpcPeer.FromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("peer expected")
+	}
+
+	// we expect our libp2p wrapper
+	addr := peer.Addr.(*wrapLibp2pAddr)
+
+	ctx2 := &Context{
+		Context: ctx,
+		PeerID:  addr.id,
+	}
+	h, err := handler(ctx2, req)
+	return h, err
 }
 
 func (g *GrpcStream) Serve() {
@@ -89,13 +114,18 @@ type streamConn struct {
 	network.Stream
 }
 
+type wrapLibp2pAddr struct {
+	id peer.ID
+	net.Addr
+}
+
 // LocalAddr returns the local address.
 func (c *streamConn) LocalAddr() net.Addr {
 	addr, err := manet.ToNetAddr(c.Stream.Conn().LocalMultiaddr())
 	if err != nil {
-		return fakeLocalAddr()
+		return fakeRemoteAddr()
 	}
-	return addr
+	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().LocalPeer()}
 }
 
 // RemoteAddr returns the remote address.
@@ -104,7 +134,7 @@ func (c *streamConn) RemoteAddr() net.Addr {
 	if err != nil {
 		return fakeRemoteAddr()
 	}
-	return addr
+	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().RemotePeer()}
 }
 
 var _ net.Conn = &streamConn{}

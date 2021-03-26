@@ -10,4 +10,11 @@ service Identity {
 
 message Status {
     map<string, string> metadata = 1;
+    
+    repeated Key keys = 2;
+
+    message Key {
+        string signature = 1;
+        string message = 2;
+    }
 }
