@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
@@ -22,12 +23,8 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
-	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/state/runtime/evm"
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
@@ -63,9 +60,10 @@ type Server struct {
 	grpcServer *grpc.Server
 
 	// libp2p stack
-	host         host.Host
-	libp2pServer *libp2pgrpc.GRPCProtocol
-	addrs        []ma.Multiaddr
+	//host         host.Host
+	//libp2pServer *libp2pgrpc.GRPCProtocol
+	//addrs        []ma.Multiaddr
+	network *network.Server
 
 	// syncer protocol
 	syncer *protocol.Syncer
@@ -76,6 +74,7 @@ var dirPaths = []string{
 	"consensus",
 	"keystore",
 	"trie",
+	"libp2p",
 }
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
@@ -140,10 +139,18 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
 	m.Sealer.SetEnabled(m.config.Seal)
 
-	// setup libp2p server
-	if err := m.setupLibP2P(); err != nil {
+	// start libp2p
+	m.network, err = network.NewServer(logger, filepath.Join(m.config.DataDir, "libp2p"), config.LibP2PAddr)
+	if err != nil {
 		return nil, err
 	}
+
+	/*
+		// setup libp2p server
+		if err := m.setupLibP2P(); err != nil {
+			return nil, err
+		}
+	*/
 
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
@@ -156,14 +163,14 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	// setup syncer protocol
-	m.syncer = protocol.NewSyncer(logger, m.blockchain)
-	m.syncer.Register(m.libp2pServer.GetGRPCServer())
+	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
+	// m.syncer.Register(m.libp2pServer.GetGRPCServer())
 	m.syncer.Start()
 
 	// register the libp2p GRPC endpoints
-	proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{s: m})
+	//proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{s: m})
 
-	m.libp2pServer.Serve()
+	//m.libp2pServer.Serve()
 	return m, nil
 }
 
@@ -309,34 +316,43 @@ func (s *Server) Chain() *chain.Chain {
 }
 
 func (s *Server) Join(addr0 string) error {
-	s.logger.Info("[INFO]: Join peer", "addr", addr0)
+	s.logger.Info("Join peer", "addr", addr0)
 
-	// add peer to the libp2p peerstore
-	peerID, err := s.AddPeerFromMultiAddrString(addr0)
-	if err != nil {
+	if err := s.network.ConnectAddr(addr0); err != nil {
+		panic(err)
 		return err
 	}
+	return nil
 
-	// perform handshake protocol
-	conn, err := s.dial(peerID)
-	if err != nil {
-		return err
-	}
-	clt := proto.NewHandshakeClient(conn)
+	/*
+		// add peer to the libp2p peerstore
+		peerID, err := s.AddPeerFromMultiAddrString(addr0)
+		if err != nil {
+			return err
+		}
 
-	req := &proto.HelloReq{
-		Id: s.host.ID().String(),
-	}
-	if _, err := clt.Hello(context.Background(), req); err != nil {
-		return err
-	}
+		// perform handshake protocol
+		conn, err := s.dial(peerID)
+		if err != nil {
+			return err
+		}
+		clt := proto.NewHandshakeClient(conn)
 
-	// send the connection to the syncer
-	go s.syncer.HandleUser(peerID, conn)
+		req := &proto.HelloReq{
+			Id: s.host.ID().String(),
+		}
+		if _, err := clt.Hello(context.Background(), req); err != nil {
+			return err
+		}
+
+		// send the connection to the syncer
+		go s.syncer.HandleUser(peerID, conn)
+	*/
 
 	return nil
 }
 
+/*
 func (s *Server) handleConnUser(addr string) {
 	// we are already connected with libp2p
 	peerID, err := peer.Decode(addr)
@@ -351,12 +367,13 @@ func (s *Server) handleConnUser(addr string) {
 	}
 	go s.syncer.HandleUser(peerID, conn)
 }
+*/
 
 func (s *Server) Close() {
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
-	s.host.Close()
+	s.network.Close()
 }
 
 // Entry is a backend configuration entry

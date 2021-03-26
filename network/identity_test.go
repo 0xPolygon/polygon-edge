@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +14,7 @@ func TestGrpcStream(t *testing.T) {
 
 	createServer := func() *Server {
 		// create the server
-		srv, err := NewServer("", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+		srv, err := NewServer(hclog.NewNullLogger(), "", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 		assert.NoError(t, err)
 		port++
 

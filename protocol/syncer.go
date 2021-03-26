@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/network"
+	libp2pGrpc "github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -57,23 +58,45 @@ type Syncer struct {
 	target string
 }
 
-func NewSyncer(logger hclog.Logger, blockchain blockchainShim) *Syncer {
-	return &Syncer{
+func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
+	s := &Syncer{
 		logger:     logger.Named("syncer"),
 		peers:      map[peer.ID]*syncPeer{},
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		newPeerCh:  make(chan struct{}),
 		status:     statusSync,
+		server:     server,
 	}
+	return s
 }
 
+/*
 func (s *Syncer) Register(server *grpc.Server) {
 	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
 	proto.RegisterV1Server(server, s.serviceV1)
 }
+*/
+
+const syncerV1 = "/syncer/0.1"
 
 func (s *Syncer) Start() {
+	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
+
+	// register the grpc protocol for syncer
+	grpc := libp2pGrpc.NewGrpcStream()
+	proto.RegisterV1Server(grpc.GrpcServer(), s.serviceV1)
+
+	s.server.Register(syncerV1, grpc)
+
+	go func() {
+		for {
+			peerID := <-s.server.UpdateCh()
+
+			stream := s.server.StartStream(syncerV1, peerID)
+			go s.HandleUser(peerID, libp2pGrpc.WrapClient(stream))
+		}
+	}()
 	go s.serviceV1.start()
 	go s.syncPeerImpl()
 }

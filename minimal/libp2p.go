@@ -1,5 +1,6 @@
 package minimal
 
+/*
 import (
 	"context"
 	"encoding/hex"
@@ -135,3 +136,4 @@ func (s *Server) dial(p peer.ID) (*grpc.ClientConn, error) {
 
 	return s.libp2pServer.Dial(context.Background(), p, grpc.WithInsecure())
 }
+*/

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -23,23 +24,27 @@ import (
 var _ network.Notifiee = &Server{}
 
 type Server struct {
+	logger hclog.Logger
+
 	host  host.Host
 	addrs []multiaddr.Multiaddr
 
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
 
-	updateCh chan peer.ID
+	updateCh  chan peer.ID
+	dialQueue *dialQueue
 
 	identity *identity
 }
 
 type Peer struct {
-	Info    peer.AddrInfo
-	readyCh chan struct{}
+	Info peer.AddrInfo
 }
 
-func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
+func NewServer(logger hclog.Logger, dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
+	logger = logger.Named("network")
+
 	key, err := readLibp2pKey(dataDir)
 	if err != nil {
 		return nil, err
@@ -61,10 +66,12 @@ func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
 	}
 
 	srv := &Server{
-		host:     host,
-		addrs:    []multiaddr.Multiaddr{addr},
-		peers:    map[peer.ID]*Peer{},
-		updateCh: make(chan peer.ID),
+		logger:    logger,
+		host:      host,
+		addrs:     []multiaddr.Multiaddr{addr},
+		peers:     map[peer.ID]*Peer{},
+		updateCh:  make(chan peer.ID),
+		dialQueue: newDialQueue(),
 	}
 
 	// start identity
@@ -73,15 +80,59 @@ func NewServer(dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
 
 	// notify for peer connection updates
 	host.Network().Notify(srv)
+	go srv.runDial()
+
+	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	return srv, nil
 }
 
-func (s *Server) Connect(addr peer.AddrInfo) error {
-	if err := s.host.Connect(context.Background(), addr); err != nil {
+// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
+func AddrInfoToString(addr peer.AddrInfo) string {
+	if len(addr.Addrs) != 1 {
+		panic("Not supported")
+	}
+	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+}
+
+func (s *Server) runDial() {
+	for {
+		tt := s.dialQueue.pop()
+
+		s.logger.Debug("dial", "addr", tt.addr.String())
+
+		// dial the task
+		if err := s.host.Connect(context.Background(), tt.addr); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (s *Server) ConnectAddr(addr string) error {
+	addr0, err := multiaddr.NewMultiaddr(addr)
+	if err != nil {
 		return err
 	}
+	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
+	if err != nil {
+		return err
+	}
+	s.Connect(*addr1)
 	return nil
+}
+
+func (s *Server) Connect(addr peer.AddrInfo) error {
+	s.dialQueue.add(addr, 1)
+	return nil
+}
+
+func (s *Server) Close() {
+	s.host.Close()
+	s.dialQueue.Close()
+}
+
+func (s *Server) UpdateCh() chan peer.ID {
+	return s.updateCh
 }
 
 func (s *Server) addPeer(id peer.ID) {
@@ -202,3 +253,6 @@ func (s *Server) ClosedStream(network.Network, network.Stream) {
 // TODO: Fixed nodes (validator set) that are never replaced.
 //      - Node priorities (libp2p?)
 // TODO: wrap security.
+// TODO: Utils to drop peers (call it from identity or syncer)
+// TODO: Peers metadata
+// TODO: Identity shares possible private keys and its included as metadata
