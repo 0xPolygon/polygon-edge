@@ -2,7 +2,6 @@ package addrutil
 
 import (
 	ma "github.com/multiformats/go-multiaddr"
-	mafmt "github.com/whyrusleeping/mafmt"
 )
 
 // SubtractFilter returns a filter func that filters all of the given addresses
@@ -20,7 +19,16 @@ func SubtractFilter(addrs ...ma.Multiaddr) func(ma.Multiaddr) bool {
 // IsFDCostlyTransport returns true for transports that require a new file
 // descriptor per connection created
 func IsFDCostlyTransport(a ma.Multiaddr) bool {
-	return mafmt.TCP.Matches(a)
+	res := false
+
+	ma.ForEach(a, func(c ma.Component) bool {
+		if c.Protocol().Code == ma.P_TCP {
+			res = true
+			return false
+		}
+		return true
+	})
+	return res
 }
 
 // FilterNeg returns a negated version of the passed in filter

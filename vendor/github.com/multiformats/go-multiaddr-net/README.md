@@ -1,3 +1,8 @@
+# DEPRECATION NOTICE
+
+This package has moved into go-multiaddr as a sub-package,
+`github.com/multiformats/go-multiaddr/net`.
+
 # go-multiaddr-net
 
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](https://protocol.ai)

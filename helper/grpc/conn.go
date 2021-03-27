@@ -3,13 +3,13 @@ package grpc
 import (
 	"net"
 
-	inet "github.com/libp2p/go-libp2p-net"
+	"github.com/libp2p/go-libp2p-core/network"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
 // streamConn represents a net.Conn wrapped to be compatible with net.conn
 type streamConn struct {
-	inet.Stream
+	network.Stream
 }
 
 // LocalAddr returns the local address.

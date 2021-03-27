@@ -108,6 +108,23 @@ func PeerRecordFromAddrInfo(info AddrInfo) *PeerRecord {
 	return rec
 }
 
+// PeerRecordFromProtobuf creates a PeerRecord from a protobuf PeerRecord
+// struct.
+func PeerRecordFromProtobuf(msg *pb.PeerRecord) (*PeerRecord, error) {
+	record := &PeerRecord{}
+
+	var id ID
+	if err := id.UnmarshalBinary(msg.PeerId); err != nil {
+		return nil, err
+	}
+
+	record.PeerID = id
+	record.Addrs = addrsFromProtobuf(msg.Addresses)
+	record.Seq = msg.Seq
+
+	return record, nil
+}
+
 // TimestampSeq is a helper to generate a timestamp-based sequence number for a PeerRecord.
 func TimestampSeq() uint64 {
 	return uint64(time.Now().UnixNano())
@@ -138,14 +155,13 @@ func (r *PeerRecord) UnmarshalRecord(bytes []byte) error {
 	if err != nil {
 		return err
 	}
-	var id ID
-	err = id.UnmarshalBinary(msg.PeerId)
+
+	rPtr, err := PeerRecordFromProtobuf(&msg)
 	if err != nil {
 		return err
 	}
-	r.PeerID = id
-	r.Addrs = addrsFromProtobuf(msg.Addresses)
-	r.Seq = msg.Seq
+	*r = *rPtr
+
 	return nil
 }
 
@@ -153,16 +169,11 @@ func (r *PeerRecord) UnmarshalRecord(bytes []byte) error {
 // This method is called automatically when constructing a routing.Envelope
 // using Seal or PeerRecord.Sign.
 func (r *PeerRecord) MarshalRecord() ([]byte, error) {
-	idBytes, err := r.PeerID.MarshalBinary()
+	msg, err := r.ToProtobuf()
 	if err != nil {
 		return nil, err
 	}
-	msg := pb.PeerRecord{
-		PeerId:    idBytes,
-		Addresses: addrsToProtobuf(r.Addrs),
-		Seq:       r.Seq,
-	}
-	return proto.Marshal(&msg)
+	return proto.Marshal(msg)
 }
 
 // Equal returns true if the other PeerRecord is identical to this one.
@@ -185,6 +196,19 @@ func (r *PeerRecord) Equal(other *PeerRecord) bool {
 		}
 	}
 	return true
+}
+
+// ToProtobuf returns the equivalent Protocol Buffer struct object of a PeerRecord.
+func (r *PeerRecord) ToProtobuf() (*pb.PeerRecord, error) {
+	idBytes, err := r.PeerID.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	return &pb.PeerRecord{
+		PeerId:    idBytes,
+		Addresses: addrsToProtobuf(r.Addrs),
+		Seq:       r.Seq,
+	}, nil
 }
 
 func addrsFromProtobuf(addrs []*pb.PeerRecord_AddressInfo) []ma.Multiaddr {

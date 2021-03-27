@@ -35,6 +35,9 @@ func NewPeerMetadata() *memoryPeerMetadata {
 }
 
 func (ps *memoryPeerMetadata) Put(p peer.ID, key string, val interface{}) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
 	ps.dslock.Lock()
 	defer ps.dslock.Unlock()
 	if vals, ok := val.(string); ok && internKeys[key] {
@@ -49,6 +52,9 @@ func (ps *memoryPeerMetadata) Put(p peer.ID, key string, val interface{}) error 
 }
 
 func (ps *memoryPeerMetadata) Get(p peer.ID, key string) (interface{}, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
 	ps.dslock.RLock()
 	defer ps.dslock.RUnlock()
 	i, ok := ps.ds[metakey{p, key}]

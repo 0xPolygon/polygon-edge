@@ -1,6 +1,5 @@
-// Package log is the logging library used by IPFS
-// (https://github.com/ipfs/go-ipfs). It uses a modified version of
-// https://godoc.org/github.com/whyrusleeping/go-logging .
+// Package log is the logging library used by IPFS & libp2p
+// (https://github.com/ipfs/go-ipfs).
 package log
 
 import (
@@ -41,14 +40,33 @@ func Logger(system string) *ZapEventLogger {
 	}
 
 	logger := getLogger(system)
+	skipLogger := logger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
 
-	return &ZapEventLogger{system: system, SugaredLogger: *logger}
+	return &ZapEventLogger{
+		system:        system,
+		SugaredLogger: *logger,
+		skipLogger:    *skipLogger,
+	}
 }
 
 // ZapEventLogger implements the EventLogger and wraps a go-logging Logger
 type ZapEventLogger struct {
 	zap.SugaredLogger
-	system string
+	// used to fix the caller location when calling Warning and Warningf.
+	skipLogger zap.SugaredLogger
+	system     string
+}
+
+// Warning is for compatibility
+// Deprecated: use Warn(args ...interface{}) instead
+func (logger *ZapEventLogger) Warning(args ...interface{}) {
+	logger.skipLogger.Warn(args...)
+}
+
+// Warningf is for compatibility
+// Deprecated: use Warnf(format string, args ...interface{}) instead
+func (logger *ZapEventLogger) Warningf(format string, args ...interface{}) {
+	logger.skipLogger.Warnf(format, args...)
 }
 
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.

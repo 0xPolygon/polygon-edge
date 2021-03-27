@@ -10,13 +10,17 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
+
+// HopTagWeight is the connection manager weight for connections carrying relay hop streams
+var HopTagWeight = 5
 
 type Conn struct {
 	stream network.Stream
 	remote peer.AddrInfo
 	host   host.Host
+	relay  *Relay
 }
 
 type NetAddr struct {
@@ -69,13 +73,28 @@ func (c *Conn) RemoteAddr() net.Addr {
 // by the connection manager, taking with them all the relayed connections (that may themselves
 // be protected).
 func (c *Conn) tagHop() {
-	c.host.ConnManager().UpsertTag(c.stream.Conn().RemotePeer(), "relay-hop-stream", incrementTag)
+	c.relay.mx.Lock()
+	defer c.relay.mx.Unlock()
+
+	p := c.stream.Conn().RemotePeer()
+	c.relay.hopCount[p]++
+	if c.relay.hopCount[p] == 1 {
+		c.host.ConnManager().TagPeer(p, "relay-hop-stream", HopTagWeight)
+	}
 }
 
 // Decrement the underlying relay connection tag by 1; this is performed when we close the
 // relayed connection.
 func (c *Conn) untagHop() {
-	c.host.ConnManager().UpsertTag(c.stream.Conn().RemotePeer(), "relay-hop-stream", decrementTag)
+	c.relay.mx.Lock()
+	defer c.relay.mx.Unlock()
+
+	p := c.stream.Conn().RemotePeer()
+	c.relay.hopCount[p]--
+	if c.relay.hopCount[p] == 0 {
+		c.host.ConnManager().UntagPeer(p, "relay-hop-stream")
+		delete(c.relay.hopCount, p)
+	}
 }
 
 // TODO: is it okay to cast c.Conn().RemotePeer() into a multiaddr? might be "user input"

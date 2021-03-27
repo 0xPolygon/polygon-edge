@@ -1,5 +1,7 @@
 package minimal
 
+import "github.com/libp2p/go-libp2p-core/peer"
+
 /*
 import (
 	"context"
@@ -37,9 +39,13 @@ func (s *Server) setupLibP2P() error {
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrs(s.addrs...),
 		libp2p.Identity(key),
+		libp2p.NATPortMap(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2p stack: %v", err)
+	}
+	if err = s.setupDHT(context.Background(), host); err != nil {
+		return fmt.Errorf("failed to create DHT: %v", err)
 	}
 
 	s.libp2pServer = libp2pgrpc.NewGRPCProtocol(context.Background(), host)
@@ -47,14 +53,6 @@ func (s *Server) setupLibP2P() error {
 
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 	return nil
-}
-
-// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
-func AddrInfoToString(addr *peer.AddrInfo) string {
-	if len(addr.Addrs) != 1 {
-		panic("Not supported")
-	}
-	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
 }
 
 func readLibp2pKey(path string) (crypto.PrivKey, error) {
@@ -137,3 +135,11 @@ func (s *Server) dial(p peer.ID) (*grpc.ClientConn, error) {
 	return s.libp2pServer.Dial(context.Background(), p, grpc.WithInsecure())
 }
 */
+
+// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
+func AddrInfoToString(addr *peer.AddrInfo) string {
+	if len(addr.Addrs) != 1 {
+		panic("Not supported")
+	}
+	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+}

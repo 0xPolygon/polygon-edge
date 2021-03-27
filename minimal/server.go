@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
@@ -23,6 +24,9 @@ import (
 	"github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
@@ -60,6 +64,14 @@ type Server struct {
 	grpcServer *grpc.Server
 
 	// libp2p stack
+	host host.Host
+	// libp2pServer    *libp2pgrpc.GRPCProtocol
+	addrs           []ma.Multiaddr
+	dht             *dht.IpfsDHT
+	peerAddedCh     chan struct{}
+	peerRemovedCh   chan struct{}
+	peerJoined      map[string]bool
+	peerJoinedMutex *sync.RWMutex
 	//host         host.Host
 	//libp2pServer *libp2pgrpc.GRPCProtocol
 	//addrs        []ma.Multiaddr
@@ -82,8 +94,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		logger: logger,
 		config: config,
 		// backends:   []protocol.Backend{},
-		chain:      config.Chain,
-		grpcServer: grpc.NewServer(),
+		chain:           config.Chain,
+		grpcServer:      grpc.NewServer(),
+		peerAddedCh:     make(chan struct{}),
+		peerRemovedCh:   make(chan struct{}),
+		peerJoined:      make(map[string]bool),
+		peerJoinedMutex: new(sync.RWMutex),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -328,28 +344,33 @@ func (s *Server) Join(addr0 string) error {
 	return nil
 
 	/*
-		// add peer to the libp2p peerstore
-		peerID, err := s.AddPeerFromMultiAddrString(addr0)
-		if err != nil {
-			return err
-		}
+			// add peer to the libp2p peerstore
+			peerID, err := s.AddPeerFromMultiAddrString(addr0)
+			if err != nil {
+				return err
+			}
 
-		// perform handshake protocol
-		conn, err := s.dial(peerID)
-		if err != nil {
-			return err
-		}
-		clt := proto.NewHandshakeClient(conn)
+			// perform handshake protocol
+			conn, err := s.dial(peerID)
+			if err != nil {
+				return err
+			}
+			clt := proto.NewHandshakeClient(conn)
 
-		req := &proto.HelloReq{
-			Id: s.host.ID().String(),
+		if s.getPeerJoined(addr0) {
+			return nil
 		}
-		if _, err := clt.Hello(context.Background(), req); err != nil {
-			return err
-		}
-
-		// send the connection to the syncer
+		s.setPeerJoined(addr0, true)
 		go s.syncer.HandleUser(peerID, conn)
+			req := &proto.HelloReq{
+				Id: s.host.ID().String(),
+			}
+			if _, err := clt.Hello(context.Background(), req); err != nil {
+				return err
+			}
+
+			// send the connection to the syncer
+			go s.syncer.HandleUser(peerID, conn)
 	*/
 
 	return nil
@@ -363,11 +384,19 @@ func (s *Server) handleConnUser(addr string) {
 		panic(err)
 	}
 
+	peerInfo := s.host.Peerstore().PeerInfo(peerID)
+	addr0 := AddrInfoToString(&peerInfo)
+	if s.getPeerJoined(addr0) {
+		return
+	}
+
 	// perform handshake protocol
 	conn, err := s.dial(peerID)
 	if err != nil {
 		panic(err)
 	}
+
+	s.setPeerJoined(addr0, true)
 	go s.syncer.HandleUser(peerID, conn)
 }
 */
@@ -457,4 +486,16 @@ func (s *Server) startTelemetry() error {
 
 	metrics.NewGlobal(metricsConf, sinks)
 	return nil
+}
+
+func (s *Server) getPeerJoined(addr0 string) bool {
+	s.peerJoinedMutex.RLock()
+	defer s.peerJoinedMutex.RUnlock()
+	return s.peerJoined[addr0]
+}
+
+func (s *Server) setPeerJoined(addr0 string, joined bool) {
+	s.peerJoinedMutex.Lock()
+	defer s.peerJoinedMutex.Unlock()
+	s.peerJoined[addr0] = joined
 }

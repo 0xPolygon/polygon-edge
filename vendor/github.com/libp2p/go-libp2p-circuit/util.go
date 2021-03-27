@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"encoding/binary"
 	"errors"
 	"io"
 
@@ -9,10 +8,12 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 
-	ggio "github.com/gogo/protobuf/io"
-	proto "github.com/gogo/protobuf/proto"
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/libp2p/go-msgio/protoio"
+
+	"github.com/gogo/protobuf/proto"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-varint"
 )
 
 func peerToPeerInfo(p *pb.CircuitRelay_Peer) (peer.AddrInfo, error) {
@@ -94,7 +95,7 @@ func (d *delimitedReader) ReadByte() (byte, error) {
 }
 
 func (d *delimitedReader) ReadMsg(msg proto.Message) error {
-	mlen, err := binary.ReadUvarint(d)
+	mlen, err := varint.ReadUvarint(d)
 	if err != nil {
 		return err
 	}
@@ -112,6 +113,6 @@ func (d *delimitedReader) ReadMsg(msg proto.Message) error {
 	return proto.Unmarshal(buf, msg)
 }
 
-func newDelimitedWriter(w io.Writer) ggio.WriteCloser {
-	return ggio.NewDelimitedWriter(w)
+func newDelimitedWriter(w io.Writer) protoio.WriteCloser {
+	return protoio.NewDelimitedWriter(w)
 }

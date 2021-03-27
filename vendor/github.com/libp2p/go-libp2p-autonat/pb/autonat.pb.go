@@ -1217,9 +1217,6 @@ func skipAutonat(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthAutonat
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthAutonat
-			}
 		case 3:
 			depth++
 		case 4:
@@ -1231,6 +1228,9 @@ func skipAutonat(dAtA []byte) (n int, err error) {
 			iNdEx += 4
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
+		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthAutonat
 		}
 		if depth == 0 {
 			return iNdEx, nil

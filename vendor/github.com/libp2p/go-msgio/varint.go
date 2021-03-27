@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/multiformats/go-varint"
 )
 
 // varintWriter is the underlying type that implements the Writer interface.
@@ -115,7 +116,7 @@ func (s *varintReader) NextMsgLen() (int, error) {
 
 func (s *varintReader) nextMsgLen() (int, error) {
 	if s.next == -1 {
-		length, err := binary.ReadUvarint(s.br)
+		length, err := varint.ReadUvarint(s.br)
 		if err != nil {
 			return 0, err
 		}

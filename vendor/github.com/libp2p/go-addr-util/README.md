@@ -6,6 +6,8 @@ go-addr-util
 [![](https://img.shields.io/badge/freenode-%23libp2p-yellow.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23libp2p)
 [![codecov](https://codecov.io/gh/libp2p/go-addr-util/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-addr-util)
 [![Travis CI](https://travis-ci.org/libp2p/go-addr-util.svg?branch=master)](https://travis-ci.org/libp2p/go-addr-util)
+[![Discourse posts](https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg)](https://discuss.libp2p.io)
+
 
 > Address utilities for libp2p swarm.
 
@@ -32,3 +34,7 @@ Small note: If editing the Readme, please conform to the [standard-readme](https
 ## License
 
 [MIT](LICENSE) © Jeromy Johnson
+
+---
+
+The last gx published version of this module was: 2.0.11: QmZomXpA4HrYKRV2ftnE5odWMT2JNnhAXTvEyQrzXrnyEX

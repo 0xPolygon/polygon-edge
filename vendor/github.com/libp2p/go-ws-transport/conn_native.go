@@ -17,9 +17,14 @@ type Conn struct {
 	DefaultMessageType int
 	reader             io.Reader
 	closeOnce          sync.Once
+
+	readLock, writeLock sync.Mutex
 }
 
 func (c *Conn) Read(b []byte) (int, error) {
+	c.readLock.Lock()
+	defer c.readLock.Unlock()
+
 	if c.reader == nil {
 		if err := c.prepNextReader(); err != nil {
 			return 0, err
@@ -67,6 +72,9 @@ func (c *Conn) prepNextReader() error {
 }
 
 func (c *Conn) Write(b []byte) (n int, err error) {
+	c.writeLock.Lock()
+	defer c.writeLock.Unlock()
+
 	if err := c.Conn.WriteMessage(c.DefaultMessageType, b); err != nil {
 		return 0, err
 	}
@@ -113,10 +121,18 @@ func (c *Conn) SetDeadline(t time.Time) error {
 }
 
 func (c *Conn) SetReadDeadline(t time.Time) error {
+	// Don't lock when setting the read deadline. That would prevent us from
+	// interrupting an in-progress read.
 	return c.Conn.SetReadDeadline(t)
 }
 
 func (c *Conn) SetWriteDeadline(t time.Time) error {
+	// Unlike the read deadline, we need to lock when setting the write
+	// deadline.
+
+	c.writeLock.Lock()
+	defer c.writeLock.Unlock()
+
 	return c.Conn.SetWriteDeadline(t)
 }
 

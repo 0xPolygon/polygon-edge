@@ -85,6 +85,17 @@ func (l *listener) handleIncoming() {
 			return
 		}
 
+		// gate the connection if applicable
+		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+			log.Debugf("gater blocked incoming connection on local addr %s from %s",
+				maconn.LocalMultiaddr(), maconn.RemoteMultiaddr())
+
+			if err := maconn.Close(); err != nil {
+				log.Warnf("failed to incoming connection rejected by gater; err: %s", err)
+			}
+			continue
+		}
+
 		// The go routine below calls Release when the context is
 		// canceled so there's no need to wait on it here.
 		l.threshold.Wait()

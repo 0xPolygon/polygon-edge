@@ -18,24 +18,6 @@
 go get github.com/multiformats/go-multibase
 ```
 
-Note that `go-multibase` is packaged with Gx, so it is recommended to use Gx to install and use it (see Usage section).
-
-## Usage
-
-This module is packaged with [Gx](https://github.com/whyrusleeping/gx). In order to use it in your own project it is recommended that you:
-
-```sh
-go get -u github.com/whyrusleeping/gx
-go get -u github.com/whyrusleeping/gx-go
-cd <your-project-repository>
-gx init
-gx import github.com/multiformats/go-multibase
-gx install --global
-gx-go --rewrite
-```
-
-Please check [Gx](https://github.com/whyrusleeping/gx) and [Gx-go](https://github.com/whyrusleeping/gx-go) documentation for more information.
-
 ## Contribute
 
 Contributions welcome. Please check out [the issues](https://github.com/multiformats/go-multibase/issues).

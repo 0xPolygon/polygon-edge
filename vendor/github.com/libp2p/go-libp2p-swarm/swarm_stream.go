@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"fmt"
-	"io"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,35 +11,29 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
-type streamState int
-
-const (
-	streamOpen streamState = iota
-	streamCloseRead
-	streamCloseWrite
-	streamCloseBoth
-	streamReset
-)
-
 // Validate Stream conforms to the go-libp2p-net Stream interface
 var _ network.Stream = &Stream{}
 
 // Stream is the stream type used by swarm. In general, you won't use this type
 // directly.
 type Stream struct {
+	id uint32
+
 	stream mux.MuxedStream
 	conn   *Conn
 
-	state struct {
-		sync.Mutex
-		v streamState
-	}
+	closeOnce sync.Once
 
 	notifyLk sync.Mutex
 
 	protocol atomic.Value
 
 	stat network.Stat
+}
+
+func (s *Stream) ID() string {
+	// format: <first 10 chars of peer id>-<global conn ordinal>-<global stream ordinal>
+	return fmt.Sprintf("%s-%d", s.conn.ID(), s.id)
 }
 
 func (s *Stream) String() string {
@@ -67,19 +60,6 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.conn.swarm.bwc.LogRecvMessage(int64(n))
 		s.conn.swarm.bwc.LogRecvMessageStream(int64(n), s.Protocol(), s.Conn().RemotePeer())
 	}
-	// If we observe an EOF, this stream is now closed for reading.
-	// If we're already closed for writing, this stream is now fully closed.
-	if err == io.EOF {
-		s.state.Lock()
-		switch s.state.v {
-		case streamCloseWrite:
-			s.state.v = streamCloseBoth
-			s.remove()
-		case streamOpen:
-			s.state.v = streamCloseRead
-		}
-		s.state.Unlock()
-	}
 	return n, err
 }
 
@@ -94,34 +74,33 @@ func (s *Stream) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// Close closes the stream, indicating this side is finished
-// with the stream.
+// Close closes the stream, closing both ends and freeing all associated
+// resources.
 func (s *Stream) Close() error {
 	err := s.stream.Close()
-
-	s.state.Lock()
-	switch s.state.v {
-	case streamCloseRead:
-		s.state.v = streamCloseBoth
-		s.remove()
-	case streamOpen:
-		s.state.v = streamCloseWrite
-	}
-	s.state.Unlock()
+	s.closeOnce.Do(s.remove)
 	return err
 }
 
-// Reset resets the stream, closing both ends.
+// Reset resets the stream, signaling an error on both ends and freeing all
+// associated resources.
 func (s *Stream) Reset() error {
 	err := s.stream.Reset()
-	s.state.Lock()
-	switch s.state.v {
-	case streamOpen, streamCloseRead, streamCloseWrite:
-		s.state.v = streamReset
-		s.remove()
-	}
-	s.state.Unlock()
+	s.closeOnce.Do(s.remove)
 	return err
+}
+
+// Close closes the stream for writing, flushing all data and sending an EOF.
+// This function does not free resources, call Close or Reset when done with the
+// stream.
+func (s *Stream) CloseWrite() error {
+	return s.stream.CloseWrite()
+}
+
+// Close closes the stream for reading. This function does not free resources,
+// call Close or Reset when done with the stream.
+func (s *Stream) CloseRead() error {
+	return s.stream.CloseRead()
 }
 
 func (s *Stream) remove() {
