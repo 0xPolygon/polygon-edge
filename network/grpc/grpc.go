@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 
@@ -37,10 +36,7 @@ type Context struct {
 }
 
 func interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	peer, ok := grpcPeer.FromContext(ctx)
-	if !ok {
-		return nil, fmt.Errorf("peer expected")
-	}
+	peer, _ := grpcPeer.FromContext(ctx)
 
 	// we expect our libp2p wrapper
 	addr := peer.Addr.(*wrapLibp2pAddr)
