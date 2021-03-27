@@ -62,8 +62,8 @@ type BlockchainTest struct {
 	Genesis    *header `json:"genesisBlockHeader"`
 	GenesisRlp string  `json:"genesisRLP"`
 
-	Post chain.GenesisAlloc `json:"postState"`
-	Pre  chain.GenesisAlloc `json:"pre"`
+	Post map[types.Address]*chain.GenesisAccount `json:"postState"`
+	Pre  map[types.Address]*chain.GenesisAccount `json:"pre"`
 }
 
 func (b *BlockchainTest) buildGenesis() *chain.Genesis {

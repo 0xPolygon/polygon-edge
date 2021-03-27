@@ -24,7 +24,7 @@ func hash(str string) types.Hash {
 func TestGenesisAlloc(t *testing.T) {
 	cases := []struct {
 		input  string
-		output GenesisAlloc
+		output map[types.Address]GenesisAccount
 	}{
 		{
 			input: `{
@@ -32,7 +32,7 @@ func TestGenesisAlloc(t *testing.T) {
 					"balance": "0x11"
 				}
 			}`,
-			output: GenesisAlloc{
+			output: map[types.Address]GenesisAccount{
 				emptyAddr: GenesisAccount{
 					Balance: big.NewInt(17),
 				},
@@ -49,7 +49,7 @@ func TestGenesisAlloc(t *testing.T) {
 					}
 				}
 			}`,
-			output: GenesisAlloc{
+			output: map[types.Address]GenesisAccount{
 				emptyAddr: GenesisAccount{
 					Balance: big.NewInt(17),
 					Nonce:   256,
@@ -69,7 +69,7 @@ func TestGenesisAlloc(t *testing.T) {
 					"balance": "0x12"
 				}
 			}`,
-			output: GenesisAlloc{
+			output: map[types.Address]GenesisAccount{
 				addr("0"): GenesisAccount{
 					Balance: big.NewInt(17),
 				},
@@ -82,7 +82,7 @@ func TestGenesisAlloc(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
-			var dec GenesisAlloc
+			var dec map[types.Address]GenesisAccount
 			if err := json.Unmarshal([]byte(c.input), &dec); err != nil {
 				if c.output != nil {
 					t.Fatal(err)
@@ -94,7 +94,7 @@ func TestGenesisAlloc(t *testing.T) {
 	}
 }
 
-func TestGenesis(t *testing.T) {
+func TestGenesisX(t *testing.T) {
 	cases := []struct {
 		input  string
 		output *Genesis
@@ -115,11 +115,11 @@ func TestGenesis(t *testing.T) {
 			output: &Genesis{
 				Difficulty: 18,
 				GasLimit:   17,
-				Alloc: GenesisAlloc{
-					emptyAddr: GenesisAccount{
+				Alloc: map[types.Address]*GenesisAccount{
+					emptyAddr: {
 						Balance: big.NewInt(17),
 					},
-					addr("1"): GenesisAccount{
+					addr("1"): {
 						Balance: big.NewInt(18),
 					},
 				},

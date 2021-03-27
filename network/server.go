@@ -23,8 +23,24 @@ import (
 
 var _ network.Notifiee = &Server{}
 
+type Config struct {
+	NoDiscover bool
+	Addr       *net.TCPAddr
+	DataDir    string
+	MaxPeers   uint64
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		NoDiscover: false,
+		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1478},
+		MaxPeers:   10,
+	}
+}
+
 type Server struct {
 	logger hclog.Logger
+	config *Config
 
 	host  host.Host
 	addrs []multiaddr.Multiaddr
@@ -45,14 +61,14 @@ type Peer struct {
 	Info peer.AddrInfo
 }
 
-func NewServer(logger hclog.Logger, dataDir string, libp2pAddr *net.TCPAddr) (*Server, error) {
+func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
-	key, err := readLibp2pKey(dataDir)
+	key, err := readLibp2pKey(config.DataDir)
 	if err != nil {
 		return nil, err
 	}
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", libp2pAddr.IP.String(), libp2pAddr.Port))
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", config.Addr.IP.String(), config.Addr.Port))
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +86,7 @@ func NewServer(logger hclog.Logger, dataDir string, libp2pAddr *net.TCPAddr) (*S
 
 	srv := &Server{
 		logger:    logger,
+		config:    config,
 		host:      host,
 		addrs:     []multiaddr.Multiaddr{addr},
 		peers:     map[peer.ID]*Peer{},
@@ -86,6 +103,9 @@ func NewServer(logger hclog.Logger, dataDir string, libp2pAddr *net.TCPAddr) (*S
 	go srv.runDial()
 
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
+
+	fmt.Println(config.MaxPeers)
+	fmt.Println(config.NoDiscover)
 
 	return srv, nil
 }

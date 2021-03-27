@@ -156,7 +156,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.Sealer.SetEnabled(m.config.Seal)
 
 	// start libp2p
-	m.network, err = network.NewServer(logger, filepath.Join(m.config.DataDir, "libp2p"), config.LibP2PAddr)
+	netConfig := config.Network
+	netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
+
+	m.network, err = network.NewServer(logger, netConfig)
 	if err != nil {
 		return nil, err
 	}

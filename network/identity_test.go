@@ -1,7 +1,6 @@
 package network
 
 import (
-	"net"
 	"testing"
 	"time"
 
@@ -14,7 +13,9 @@ func TestGrpcStream(t *testing.T) {
 
 	createServer := func() *Server {
 		// create the server
-		srv, err := NewServer(hclog.NewNullLogger(), "", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+		cfg := DefaultConfig()
+		cfg.Addr.Port = port
+		srv, err := NewServer(hclog.NewNullLogger(), cfg)
 		assert.NoError(t, err)
 		port++
 

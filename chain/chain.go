@@ -32,14 +32,14 @@ type Bootnodes []string
 type Genesis struct {
 	Config *Params `json:"config"`
 
-	Nonce      [8]byte       `json:"nonce"`
-	Timestamp  uint64        `json:"timestamp"`
-	ExtraData  []byte        `json:"extraData,omitempty"`
-	GasLimit   uint64        `json:"gasLimit"`
-	Difficulty uint64        `json:"difficulty"`
-	Mixhash    types.Hash    `json:"mixHash"`
-	Coinbase   types.Address `json:"coinbase"`
-	Alloc      GenesisAlloc  `json:"alloc,omitempty"`
+	Nonce      [8]byte                           `json:"nonce"`
+	Timestamp  uint64                            `json:"timestamp"`
+	ExtraData  []byte                            `json:"extraData,omitempty"`
+	GasLimit   uint64                            `json:"gasLimit"`
+	Difficulty uint64                            `json:"difficulty"`
+	Mixhash    types.Hash                        `json:"mixHash"`
+	Coinbase   types.Address                     `json:"coinbase"`
+	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 
 	// Only for testing
 	Number     uint64     `json:"number"`
@@ -98,17 +98,17 @@ func encodeBytes(b []byte) *string {
 // MarshalJSON implements the json interface
 func (g *Genesis) MarshalJSON() ([]byte, error) {
 	type Genesis struct {
-		Nonce      string                     `json:"nonce"`
-		Timestamp  *string                    `json:"timestamp,omitempty"`
-		ExtraData  *string                    `json:"extraData,omitempty"`
-		GasLimit   *string                    `json:"gasLimit,omitempty"`
-		Difficulty *string                    `json:"difficulty,omitempty"`
-		Mixhash    types.Hash                 `json:"mixHash"`
-		Coinbase   types.Address              `json:"coinbase"`
-		Alloc      *map[string]GenesisAccount `json:"alloc,omitempty"`
-		Number     *string                    `json:"number,omitempty"`
-		GasUsed    *string                    `json:"gasUsed,omitempty"`
-		ParentHash types.Hash                 `json:"parentHash"`
+		Nonce      string                      `json:"nonce"`
+		Timestamp  *string                     `json:"timestamp,omitempty"`
+		ExtraData  *string                     `json:"extraData,omitempty"`
+		GasLimit   *string                     `json:"gasLimit,omitempty"`
+		Difficulty *string                     `json:"difficulty,omitempty"`
+		Mixhash    types.Hash                  `json:"mixHash"`
+		Coinbase   types.Address               `json:"coinbase"`
+		Alloc      *map[string]*GenesisAccount `json:"alloc,omitempty"`
+		Number     *string                     `json:"number,omitempty"`
+		GasUsed    *string                     `json:"gasUsed,omitempty"`
+		ParentHash types.Hash                  `json:"parentHash"`
 	}
 
 	var enc Genesis
@@ -124,9 +124,9 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	enc.Coinbase = g.Coinbase
 
 	if g.Alloc != nil {
-		alloc := make(map[string]GenesisAccount, len(g.Alloc))
+		alloc := make(map[string]*GenesisAccount, len(g.Alloc))
 		for k, v := range g.Alloc {
-			alloc[hex.EncodeToString(k[:])] = v
+			alloc[k.String()] = v
 		}
 		enc.Alloc = &alloc
 	}
@@ -141,17 +141,17 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements the json interface
 func (g *Genesis) UnmarshalJSON(data []byte) error {
 	type Genesis struct {
-		Nonce      *string                   `json:"nonce"`
-		Timestamp  *string                   `json:"timestamp"`
-		ExtraData  *string                   `json:"extraData"`
-		GasLimit   *string                   `json:"gasLimit"`
-		Difficulty *string                   `json:"difficulty"`
-		Mixhash    *types.Hash               `json:"mixHash"`
-		Coinbase   *types.Address            `json:"coinbase"`
-		Alloc      map[string]GenesisAccount `json:"alloc"`
-		Number     *string                   `json:"number"`
-		GasUsed    *string                   `json:"gasUsed"`
-		ParentHash *types.Hash               `json:"parentHash"`
+		Nonce      *string                    `json:"nonce"`
+		Timestamp  *string                    `json:"timestamp"`
+		ExtraData  *string                    `json:"extraData"`
+		GasLimit   *string                    `json:"gasLimit"`
+		Difficulty *string                    `json:"difficulty"`
+		Mixhash    *types.Hash                `json:"mixHash"`
+		Coinbase   *types.Address             `json:"coinbase"`
+		Alloc      map[string]*GenesisAccount `json:"alloc"`
+		Number     *string                    `json:"number"`
+		GasUsed    *string                    `json:"gasUsed"`
+		ParentHash *types.Hash                `json:"parentHash"`
 	}
 
 	var dec Genesis
@@ -201,7 +201,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		g.Coinbase = *dec.Coinbase
 	}
 	if dec.Alloc != nil {
-		g.Alloc = make(GenesisAlloc, len(dec.Alloc))
+		g.Alloc = make(map[types.Address]*GenesisAccount, len(dec.Alloc))
 		for k, v := range dec.Alloc {
 			g.Alloc[types.StringToAddress(k)] = v
 		}
@@ -233,8 +233,35 @@ type GenesisAccount struct {
 	PrivateKey []byte                    `json:"secretKey,omitempty"` // for tests
 }
 
-// GenesisAlloc specifies the initial state that is part of the genesis block.
-type GenesisAlloc map[types.Address]GenesisAccount
+type genesisAccountEncoder struct {
+	Code       *string                   `json:"code,omitempty"`
+	Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
+	Balance    *string                   `json:"balance"`
+	Nonce      *string                   `json:"nonce,omitempty"`
+	PrivateKey *string                   `json:"secretKey,omitempty"`
+}
+
+// Encoding
+
+func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
+	obj := &genesisAccountEncoder{}
+	if g.Code != nil {
+		obj.Code = types.EncodeBytes(g.Code)
+	}
+	if len(g.Storage) != 0 {
+		obj.Storage = g.Storage
+	}
+	if g.Balance != nil {
+		obj.Balance = types.EncodeBigInt(g.Balance)
+	}
+	if g.Nonce != 0 {
+		obj.Nonce = types.EncodeUint64(g.Nonce)
+	}
+	if g.PrivateKey != nil {
+		obj.PrivateKey = types.EncodeBytes(g.PrivateKey)
+	}
+	return json.Marshal(obj)
+}
 
 // Decoding
 
@@ -287,6 +314,14 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	}
 
 	return err
+}
+
+func Import(chain string) (*Chain, error) {
+	c, err := ImportFromName(chain)
+	if err == nil {
+		return c, nil
+	}
+	return ImportFromFile(chain)
 }
 
 // ImportFromName imports a chain from the precompiled json chains (i.e. foundation)

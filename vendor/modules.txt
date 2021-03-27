@@ -146,6 +146,12 @@ github.com/jbenet/go-temp-err-catcher
 github.com/jbenet/goprocess
 github.com/jbenet/goprocess/context
 github.com/jbenet/goprocess/periodic
+# github.com/klauspost/compress v1.4.1
+github.com/klauspost/compress/flate
+github.com/klauspost/compress/gzip
+github.com/klauspost/compress/zlib
+# github.com/klauspost/cpuid v1.2.0
+github.com/klauspost/cpuid
 # github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d
 github.com/koron/go-ssdp
 # github.com/libp2p/go-addr-util v0.0.2
@@ -384,6 +390,21 @@ github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
+# github.com/umbracle/go-web3 v0.0.0-20210317180544-e0d0d379acf6
+## explicit
+github.com/umbracle/go-web3
+github.com/umbracle/go-web3/jsonrpc
+github.com/umbracle/go-web3/jsonrpc/codec
+github.com/umbracle/go-web3/jsonrpc/transport
+# github.com/valyala/bytebufferpool v1.0.0
+github.com/valyala/bytebufferpool
+# github.com/valyala/fasthttp v1.4.0
+github.com/valyala/fasthttp
+github.com/valyala/fasthttp/fasthttputil
+github.com/valyala/fasthttp/stackless
+# github.com/valyala/fastjson v1.4.1
+github.com/valyala/fastjson
+github.com/valyala/fastjson/fastfloat
 # github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1
 github.com/whyrusleeping/go-keyspace
 # github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7

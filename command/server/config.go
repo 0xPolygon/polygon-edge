@@ -16,14 +16,20 @@ import (
 type Config struct {
 	Chain       string                 `json:"chain"`
 	DataDir     string                 `json:"data_dir"`
-	LibP2PAddr  string                 `json:"bind_addr"`
 	GRPCAddr    string                 `json:"rpc_addr"`
 	JSONRPCAddr string                 `json:"jsonrpc_addr"`
+	Network     *Network               `json:"network"`
 	Telemetry   *Telemetry             `json:"telemetry"`
 	Seal        bool                   `json:"seal"`
 	LogLevel    string                 `json:"log_level"`
 	Consensus   map[string]interface{} `json:"consensus"`
 	Join        string
+}
+
+type Network struct {
+	NoDiscover bool   `json:"no_discover"`
+	Addr       string `json:"addr"`
+	MaxPeers   uint64 `json:"max_peers"`
 }
 
 type Telemetry struct {
@@ -37,6 +43,10 @@ func defaultConfig() *Config {
 		Telemetry: &Telemetry{
 			PrometheusPort: 8080,
 		},
+		Network: &Network{
+			NoDiscover: false,
+			MaxPeers:   20,
+		},
 		Seal:      false,
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
@@ -47,7 +57,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf := minimal.DefaultConfig()
 
 	// decode chain
-	chain, err := chain.ImportFromName(c.Chain)
+	chain, err := chain.Import(c.Chain)
 	if err != nil {
 		return nil, err
 	}
@@ -55,31 +65,36 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
 
-	if c.LibP2PAddr != "" {
-		addr, err := net.ResolveTCPAddr("tcp", c.LibP2PAddr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse libP2P addr '%s': %v", c.LibP2PAddr, err)
-		}
-		if addr.IP == nil {
-			addr.IP = net.ParseIP("127.0.0.1")
-		}
-		conf.LibP2PAddr = addr
-	}
 	if c.GRPCAddr != "" {
-		addr, err := net.ResolveTCPAddr("tcp", c.GRPCAddr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse grpc addr '%s': %v", c.GRPCAddr, err)
+		if conf.GRPCAddr, err = resolveAddr(c.GRPCAddr); err != nil {
+			return nil, err
 		}
-		conf.GRPCAddr = addr
 	}
 	if c.JSONRPCAddr != "" {
-		addr, err := net.ResolveTCPAddr("tcp", c.JSONRPCAddr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse jsonrc addr '%s': %v", c.JSONRPCAddr, err)
+		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
+			return nil, err
 		}
-		conf.JSONRPCAddr = addr
+	}
+	// network
+	{
+		if conf.Network.Addr, err = resolveAddr(c.Network.Addr); err != nil {
+			return nil, err
+		}
+		conf.Network.NoDiscover = c.Network.NoDiscover
+		conf.Network.MaxPeers = c.Network.MaxPeers
 	}
 	return conf, nil
+}
+
+func resolveAddr(raw string) (*net.TCPAddr, error) {
+	addr, err := net.ResolveTCPAddr("tcp", raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse addr '%s': %v", raw, err)
+	}
+	if addr.IP == nil {
+		addr.IP = net.ParseIP("127.0.0.1")
+	}
+	return addr, nil
 }
 
 func (c *Config) merge(c1 *Config) error {
@@ -103,14 +118,23 @@ func (c *Config) merge(c1 *Config) error {
 	if c1.GRPCAddr != "" {
 		c.GRPCAddr = c1.GRPCAddr
 	}
-	if c1.LibP2PAddr != "" {
-		c.LibP2PAddr = c1.LibP2PAddr
-	}
 	if c1.JSONRPCAddr != "" {
 		c.JSONRPCAddr = c1.JSONRPCAddr
 	}
 	if c1.Join != "" {
 		c.Join = c1.Join
+	}
+	{
+		// network
+		if c1.Network.Addr != "" {
+			c.Network.Addr = c1.Network.Addr
+		}
+		if c1.Network.MaxPeers != 0 {
+			c.Network.MaxPeers = c1.Network.MaxPeers
+		}
+		if c1.Network.NoDiscover {
+			c.Network.NoDiscover = true
+		}
 	}
 	if err := mergo.Merge(&c.Consensus, c1.Consensus, mergo.WithOverride); err != nil {
 		return err
