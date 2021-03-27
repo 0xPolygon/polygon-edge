@@ -47,7 +47,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf := minimal.DefaultConfig()
 
 	// decode chain
-	chain, err := chain.ImportFromName(c.Chain)
+	chain, err := chain.Import(c.Chain)
 	if err != nil {
 		return nil, err
 	}

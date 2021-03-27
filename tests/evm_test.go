@@ -40,8 +40,8 @@ type VMCase struct {
 	Logs string `json:"logs"`
 	Out  string `json:"out"`
 
-	Post chain.GenesisAlloc `json:"post"`
-	Pre  chain.GenesisAlloc `json:"pre"`
+	Post map[types.Address]*chain.GenesisAccount `json:"post"`
+	Pre  map[types.Address]*chain.GenesisAccount `json:"pre"`
 }
 
 func testVMCase(t *testing.T, name string, c *VMCase) {

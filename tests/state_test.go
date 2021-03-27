@@ -22,11 +22,11 @@ var (
 )
 
 type stateCase struct {
-	Info        *info                `json:"_info"`
-	Env         *env                 `json:"env"`
-	Pre         chain.GenesisAlloc   `json:"pre"`
-	Post        map[string]postState `json:"post"`
-	Transaction *stTransaction       `json:"transaction"`
+	Info        *info                                   `json:"_info"`
+	Env         *env                                    `json:"env"`
+	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
+	Post        map[string]postState                    `json:"post"`
+	Transaction *stTransaction                          `json:"transaction"`
 }
 
 var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
