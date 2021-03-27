@@ -1,5 +1,6 @@
 package minimal
 
+/*
 import (
 	"context"
 
@@ -18,3 +19,4 @@ func (h *handshakeService) Hello(ctx context.Context, req *proto.HelloReq) (*emp
 	h.s.handleConnUser(req.Id)
 	return &emptypb.Empty{}, nil
 }
+*/

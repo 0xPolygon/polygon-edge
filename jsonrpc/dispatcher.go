@@ -66,6 +66,7 @@ func newTestDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatch
 func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
 	d := &Dispatcher{
 		logger: logger.Named("dispatcher"),
+		store:  store,
 	}
 	d.registerEndpoints()
 	if store != nil {

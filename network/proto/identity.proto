@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/network/proto";
+
+service Identity {
+    rpc Hello(Status) returns (Status);
+}
+
+message Status {
+    map<string, string> metadata = 1;
+    
+    repeated Key keys = 2;
+
+    message Key {
+        string signature = 1;
+        string message = 2;
+    }
+}

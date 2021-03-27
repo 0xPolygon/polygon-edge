@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/network"
+	libp2pGrpc "github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -39,38 +41,62 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peersLock sync.Mutex
-	peers     map[peer.ID]*syncPeer
+	peersLock sync.Mutex            // TODO: Remove
+	peers     map[peer.ID]*syncPeer // TODO: Remove
+	newPeerCh chan struct{}         // TODO: Remove
 
 	// status of the syncing process
 	status status
 
-	newPeerCh chan struct{}
-
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
+
+	// TODO: We use the new network.Server
+	server *network.Server
 
 	// id of the current target
 	target string
 }
 
-func NewSyncer(logger hclog.Logger, blockchain blockchainShim) *Syncer {
-	return &Syncer{
+func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
+	s := &Syncer{
 		logger:     logger.Named("syncer"),
 		peers:      map[peer.ID]*syncPeer{},
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		newPeerCh:  make(chan struct{}),
 		status:     statusSync,
+		server:     server,
 	}
+	return s
 }
 
+/*
 func (s *Syncer) Register(server *grpc.Server) {
 	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
 	proto.RegisterV1Server(server, s.serviceV1)
 }
+*/
+
+const syncerV1 = "/syncer/0.1"
 
 func (s *Syncer) Start() {
+	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
+
+	// register the grpc protocol for syncer
+	grpc := libp2pGrpc.NewGrpcStream()
+	proto.RegisterV1Server(grpc.GrpcServer(), s.serviceV1)
+
+	s.server.Register(syncerV1, grpc)
+
+	go func() {
+		for {
+			peerID := <-s.server.UpdateCh()
+
+			stream := s.server.StartStream(syncerV1, peerID)
+			go s.HandleUser(peerID, libp2pGrpc.WrapClient(stream))
+		}
+	}()
 	go s.serviceV1.start()
 	go s.syncPeerImpl()
 }

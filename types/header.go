@@ -60,6 +60,11 @@ func (n *Nonce) Scan(src interface{}) error {
 	return nil
 }
 
+// MarshalText implements encoding.TextMarshaler
+func (n Nonce) MarshalText() ([]byte, error) {
+	return []byte(n.String()), nil
+}
+
 var marshalArenaPool fastrlp.ArenaPool
 
 // ComputeHash computes the hash of the header
