@@ -70,7 +70,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		Genesis: &chain.Genesis{
 			GasLimit:   5000,
 			Difficulty: 1,
-			Alloc:      chain.GenesisAlloc{},
+			Alloc:      map[types.Address]*chain.GenesisAccount{},
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
@@ -92,7 +92,7 @@ func (c *GenesisCommand) Run(args []string) int {
 				c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
 				return 1
 			}
-			cc.Genesis.Alloc[addr] = chain.GenesisAccount{
+			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
 				Balance: amount,
 			}
 		}

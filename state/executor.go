@@ -48,7 +48,7 @@ func NewExecutor(config *chain.Params, s State) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(alloc chain.GenesisAlloc) types.Hash {
+func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
 
@@ -175,7 +175,7 @@ type Transition struct {
 	returnValue []byte
 }
 
-func (t* Transition) ReturnValue() []byte {
+func (t *Transition) ReturnValue() []byte {
 	return t.returnValue
 }
 
