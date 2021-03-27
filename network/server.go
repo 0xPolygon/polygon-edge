@@ -11,13 +11,16 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/ipfs/go-ipns"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	noise "github.com/libp2p/go-libp2p-noise"
+	record "github.com/libp2p/go-libp2p-record"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -53,8 +56,8 @@ type Server struct {
 
 	identity *identity
 
-	addPeerCh    chan peer.ID
-	deletePeerCh chan peer.ID
+	// dht config
+	dht *dht.IpfsDHT
 }
 
 type Peer struct {
@@ -104,10 +107,39 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
-	fmt.Println(config.MaxPeers)
-	fmt.Println(config.NoDiscover)
+	//fmt.Println(config.MaxPeers)
+	//fmt.Println(config.NoDiscover)
 
+	if !config.NoDiscover {
+		if err := srv.setupDHT(context.Background()); err != nil {
+			return nil, err
+		}
+	}
 	return srv, nil
+}
+
+func (s *Server) setupDHT(ctx context.Context) error {
+	s.logger.Info("start dht discovery")
+
+	nsValidator := record.NamespacedValidator{}
+	nsValidator["ipns"] = ipns.Validator{}
+	nsValidator["pk"] = record.PublicKeyValidator{}
+
+	d, err := dht.New(ctx, s.host, dht.Mode(dht.ModeServer), dht.Validator(nsValidator), dht.BootstrapPeers())
+	if err != nil {
+		return err
+	}
+	if err = d.Bootstrap(ctx); err != nil {
+		return err
+	}
+
+	s.dht = d
+	s.dht.RoutingTable().PeerAdded = func(p peer.ID) {
+		info := s.host.Peerstore().PeerInfo(p)
+		s.dialQueue.add(info, 1)
+	}
+
+	return nil
 }
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
