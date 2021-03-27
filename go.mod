@@ -33,9 +33,9 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
+	github.com/umbracle/go-web3 v0.0.0-20210317180544-e0d0d379acf6
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/grpc v1.35.0
-	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
