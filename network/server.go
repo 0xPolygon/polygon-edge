@@ -56,6 +56,9 @@ type Server struct {
 
 	identity *identity
 
+	// map of peers that we are connecting
+	pending sync.Map
+
 	// dht config
 	dht *dht.IpfsDHT
 }
@@ -118,6 +121,15 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	return srv, nil
 }
 
+func (s *Server) setPending(id peer.ID) {
+	s.pending.Store(id, true)
+}
+
+func (s *Server) isPending(id peer.ID) bool {
+	_, ok := s.pending.Load(id)
+	return ok
+}
+
 func (s *Server) setupDHT(ctx context.Context) error {
 	s.logger.Info("start dht discovery")
 
@@ -135,6 +147,7 @@ func (s *Server) setupDHT(ctx context.Context) error {
 
 	s.dht = d
 	s.dht.RoutingTable().PeerAdded = func(p peer.ID) {
+		// TODO: Add priority
 		info := s.host.Peerstore().PeerInfo(p)
 		s.dialQueue.add(info, 1)
 	}
@@ -153,42 +166,10 @@ func AddrInfoToString(addr peer.AddrInfo) string {
 const dialSlots = 1 // To be modified later
 
 func (s *Server) runDial() {
-	// we work with dialSlots, there can only be at any time x concurrent slots to dial
-	// nodes (this is, connect + identity handshake).
 
 	/*
-		dial := func(addr peer.AddrInfo) {
-			if err := s.host.Connect(context.Background(), addr); err != nil {
-				panic(err)
-			}
-		}
-	*/
 
-	/*
-		dialCh := make(chan peer.AddrInfo)
-
-		dialFunc := func() {
-			for addr := range dialCh {
-				if err := s.host.Connect(context.Background(), addr); err != nil {
-					panic(err)
-				}
-			}
-		}
-
-		for i := 0; i < dialSlots; i++ {
-			go dialFunc()
-		}
-
-
-		for {
-			select {
-			case <-s.addPeerCh:
-
-			case <-s.deletePeerCh:
-
-			}
-		}*/
-
+	 */
 	for {
 		tt := s.dialQueue.pop()
 
@@ -228,18 +209,10 @@ func (s *Server) UpdateCh() chan peer.ID {
 	return s.updateCh
 }
 
-func (s *Server) addPeer(id peer.ID) {
-	// TODO: add to custom peer store
-	select {
-	case s.updateCh <- id:
-	default:
-	}
-}
-
 func (s *Server) StartStream(proto string, id peer.ID) network.Stream {
 	stream, err := s.host.NewStream(context.Background(), id, protocol.ID(proto))
 	if err != nil {
-		panic(err)
+		panic(err) // TODO
 	}
 	return stream
 }
@@ -254,10 +227,42 @@ func (s *Server) Register(id string, p Protocol) {
 
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {
 	s.host.SetStreamHandler(protocol.ID(id), func(stream network.Stream) {
-		// TODO: Auth peer id, for non-identity protocols, the peer
-		// must be authenticated before we can call the handle
-		handle(stream)
+		peerID := stream.Conn().RemotePeer()
+		s.logger.Trace("open stream", "protocol", id, "peer", peerID)
+
+		if s.isPending(peerID) {
+			s.Disconnect(peerID, "")
+		} else {
+			handle(stream)
+		}
 	})
+}
+
+func (s *Server) addPeer(id peer.ID) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	s.peers[id] = &Peer{}
+
+	// TODO: add to custom peer store
+	select {
+	case s.updateCh <- id:
+	default:
+	}
+}
+
+func (s *Server) Disconnect(peer peer.ID, reason string) {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	if s.host.Network().Connectedness(peer) == network.Connected {
+		// send some close message
+		if reason != "" {
+			s.identity.disconnect(peer, reason)
+		}
+		s.host.Network().ClosePeer(peer)
+	}
+	delete(s.peers, peer)
 }
 
 func readLibp2pKey(dataDir string) (crypto.PrivKey, error) {
