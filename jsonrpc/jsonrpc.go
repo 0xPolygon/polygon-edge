@@ -46,7 +46,7 @@ type JSONRPC struct {
 
 type dispatcherImpl interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
-	Handle(serverType, []byte) ([]byte, error)
+	Handle([]byte) ([]byte, error)
 }
 
 type Config struct {
@@ -145,7 +145,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		handleErr(err)
 		return
 	}
-	resp, err := j.dispatcher.Handle(serverHTTP, data)
+	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
 		handleErr(err)
 		return
