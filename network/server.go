@@ -53,8 +53,12 @@ type Server struct {
 
 	identity *identity
 
-	addPeerCh    chan peer.ID
-	deletePeerCh chan peer.ID
+	addPeerCh    chan Peer // Notifies of new peers being added
+	deletePeerCh chan Peer // Notifies of peers being deleted
+
+	dialSlots  int              // The maximum number of peers that can be connected
+	dialCancel chan interface{} // Dial manager cancel signal
+	serverMux  sync.Mutex       // Mutex for controlling variable access in the server object
 }
 
 type Peer struct {
@@ -92,6 +96,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		peers:     map[peer.ID]*Peer{},
 		updateCh:  make(chan peer.ID),
 		dialQueue: newDialQueue(),
+		dialSlots: 1, // TODO: Think about what his value should initially be
 	}
 
 	// start identity
@@ -118,55 +123,71 @@ func AddrInfoToString(addr peer.AddrInfo) string {
 	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
 }
 
-const dialSlots = 1 // To be modified later
+// dialFromQueue is a helper function to dial an address from the dial queue
+func (s *Server) dialFromQueue() error {
+	// Guaranteed non blocking if called within specific conditions
+	tt := s.dialQueue.pop()
 
-func (s *Server) runDial() {
-	// we work with dialSlots, there can only be at any time x concurrent slots to dial
-	// nodes (this is, connect + identity handshake).
+	s.logger.Debug("dial", "addr", tt.addr.String())
 
-	/*
-		dial := func(addr peer.AddrInfo) {
-			if err := s.host.Connect(context.Background(), addr); err != nil {
-				panic(err)
-			}
-		}
-	*/
+	// Dial the task
+	if err := s.host.Connect(context.Background(), tt.addr); err != nil {
+		return fmt.Errorf("unable to dial address %v", tt.addr.ID.String())
+	}
 
-	/*
-		dialCh := make(chan peer.AddrInfo)
+	return nil
+}
 
-		dialFunc := func() {
-			for addr := range dialCh {
-				if err := s.host.Connect(context.Background(), addr); err != nil {
-					panic(err)
-				}
-			}
-		}
+// SetDialSlots updates the max number of dials for the server
+func (s *Server) SetDialSlots(newDialMax int) {
+	if newDialMax < 1 {
+		return
+	}
 
-		for i := 0; i < dialSlots; i++ {
-			go dialFunc()
-		}
+	s.serverMux.Lock()
+	defer s.serverMux.Unlock()
 
+	s.dialSlots = newDialMax
+}
 
-		for {
-			select {
-			case <-s.addPeerCh:
-
-			case <-s.deletePeerCh:
-
-			}
-		}*/
-
-	for {
-		tt := s.dialQueue.pop()
-
-		s.logger.Debug("dial", "addr", tt.addr.String())
-
-		// dial the task
-		if err := s.host.Connect(context.Background(), tt.addr); err != nil {
+// dialHelper is a helper function that attempts to add peers from the dial queue, as long as it's possible
+func (s *Server) dialHelper() {
+	for s.getPeersListSize() < s.dialSlots && s.dialQueue.size() > 1 {
+		// There are empty slots and they can be filled up
+		if err := s.dialFromQueue(); err != nil {
 			panic(err)
 		}
 	}
+}
+
+// runDial is a go routine that balances the number of connected peers,
+// so it never exceeds the limit
+func (s *Server) runDial() {
+
+	// Initial dial queue empty attempt
+	s.dialHelper()
+
+	for {
+		select {
+		case <-s.addPeerCh:
+			// A new peer has been added, dial if there is an open slot
+			s.dialHelper()
+		case <-s.deletePeerCh:
+			// A peer has been deleted, try to fill the slot
+			s.dialHelper()
+		case <-s.dialCancel:
+			// Cancel signal detected, exit gracefully
+			return
+		}
+	}
+}
+
+// getPeersListSize returns the size of the current peers list (Threadsafe)
+func (s *Server) getPeersListSize() int {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	return len(s.peers)
 }
 
 func (s *Server) ConnectAddr(addr string) error {
@@ -174,22 +195,35 @@ func (s *Server) ConnectAddr(addr string) error {
 	if err != nil {
 		return err
 	}
+
 	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
 	if err != nil {
 		return err
 	}
-	s.Connect(*addr1)
+
+	if err = s.Connect(*addr1); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *Server) Connect(addr peer.AddrInfo) error {
 	s.dialQueue.add(addr, 1)
+
+	// Alert the dial of a connection
+	s.addPeerCh <- Peer{
+		Info: addr,
+	}
+
 	return nil
 }
 
 func (s *Server) Close() {
-	s.host.Close()
+	_ = s.host.Close()
 	s.dialQueue.Close()
+
+	s.dialCancel <- "cancel" // arbitrary message
 }
 
 func (s *Server) UpdateCh() chan peer.ID {
