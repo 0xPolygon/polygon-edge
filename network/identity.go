@@ -55,15 +55,6 @@ func (i *identity) isPending(id peer.ID) bool {
 	return ok
 }
 
-type PeerConnectedEvent struct {
-	Peer peer.ID
-	Err  error
-}
-
-type PeerDisconnectedEvent struct {
-	Peer peer.ID
-}
-
 func (i *identity) setup() {
 	// register the protobuf protocol
 	grpc := grpc.NewGrpcStream()

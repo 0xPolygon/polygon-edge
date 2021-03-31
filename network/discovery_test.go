@@ -1,11 +1,18 @@
 package network
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func discoveryConfig(c *Config) {
+	// we limit maxPeers=1 to limit the number of connections
+	// since we only want to test discovery
+	c.MaxPeers = 1
+}
 
 func TestDiscoveryConnectedPopulatesRoutingTable(t *testing.T) {
 	// when two nodes connect, they populate their kademlia routing tables
@@ -31,12 +38,9 @@ func TestDiscoveryProtocolFindPeers(t *testing.T) {
 }
 
 func TestDiscoveryPeerAdded(t *testing.T) {
-	cfg := func(c *Config) {
-		c.MaxPeers = 1
-	}
-	srv0 := createServer(t, cfg)
-	srv1 := createServer(t, cfg)
-	srv2 := createServer(t, cfg)
+	srv0 := createServer(t, discoveryConfig)
+	srv1 := createServer(t, discoveryConfig)
+	srv2 := createServer(t, discoveryConfig)
 
 	// serial join, srv0 -> srv1 -> srv2
 	multiJoin(t,
@@ -55,4 +59,31 @@ func TestDiscoveryPeerAdded(t *testing.T) {
 	// mix data and we only test how the peers are being populated
 	// In theory, even if they are connected only to one peer, all of them
 	// should end up with the same idea of the network.
+}
+
+func TestDiscoveryFullNetwork(t *testing.T) {
+	// create a network of serially connected nodes
+	// eventually, they have to find each other
+
+	nodes := 20
+	servers := []*Server{}
+	for i := 0; i < nodes; i++ {
+		srv := createServer(t, discoveryConfig)
+		servers = append(servers, srv)
+	}
+
+	// link nodes in serial
+	multiJoinSerial(t, servers)
+
+	// force the discover of other nodes several times
+	for i := 0; i < 50; i++ {
+		for _, srv := range servers {
+			srv.discovery.handleDiscovery()
+		}
+	}
+
+	for _, srv := range servers {
+		fmt.Println("-- peerstore --")
+		fmt.Println(srv.host.Peerstore().Peers().Len())
+	}
 }

@@ -39,6 +39,15 @@ func createServer(t *testing.T, callback func(c *Config)) *Server {
 	return srv
 }
 
+func multiJoinSerial(t *testing.T, srvs []*Server) {
+	dials := []*Server{}
+	for i := 0; i < len(srvs)-1; i++ {
+		srv, dst := srvs[i], srvs[i+1]
+		dials = append(dials, srv, dst)
+	}
+	multiJoin(t, dials...)
+}
+
 func multiJoin(t *testing.T, srvs ...*Server) {
 	if len(srvs)%2 != 0 {
 		t.Fatal("not an even number")
@@ -85,6 +94,31 @@ func TestDialLifecycle(t *testing.T) {
 	assert.Equal(t, srv0.numPeers(), int64(1))
 	assert.Equal(t, srv1.numPeers(), int64(2))
 	assert.Equal(t, srv2.numPeers(), int64(1))
+}
+
+func TestPeerEmitAndSubscribe(t *testing.T) {
+	srv0 := createServer(t, nil)
+
+	sub, err := srv0.subscribePeerEvents()
+	assert.NoError(t, err)
+
+	count := 10
+
+	done := make(chan *PeerEvent)
+	go func() {
+		for i := 0; i < count; i++ {
+			done <- sub.Get()
+		}
+	}()
+
+	for i := 0; i < count; i++ {
+		srv0.emitEvent(&PeerEvent{})
+	}
+
+	// wait to receive all the events
+	for i := 0; i < count; i++ {
+		<-done
+	}
 }
 
 // TODO: Test to get peer notifications.

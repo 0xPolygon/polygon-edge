@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -29,9 +30,17 @@ type discovery struct {
 
 	peers     []peer.ID
 	peersLock sync.Mutex
+
+	notifyCh chan struct{}
+	closeCh  chan struct{}
+}
+
+func (d *discovery) notify() {
+	d.notifyCh <- struct{}{}
 }
 
 func (d *discovery) setup() error {
+	d.notifyCh = make(chan struct{}, 5)
 	d.peers = []peer.ID{}
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
@@ -90,6 +99,9 @@ func (d *discovery) call(peerID peer.ID) error {
 	// we have to add them to the peerstore so that they are
 	// available to all the libp2p services
 	for _, node := range nodes {
+		fmt.Println("-- node --")
+		fmt.Println(node)
+
 		d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
 		if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
 			return err
@@ -122,13 +134,20 @@ func (d *discovery) run() {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			// take a random peer and find peers
-			if len(d.peers) > 0 {
-				target := d.peers[rand.Intn(len(d.peers))]
-				if err := d.call(target); err != nil {
-					panic(err)
-				}
-			}
+		case <-d.notifyCh:
+		case <-d.closeCh:
+			return
+		}
+		d.handleDiscovery()
+	}
+}
+
+func (d *discovery) handleDiscovery() {
+	// take a random peer and find peers
+	if len(d.peers) > 0 {
+		target := d.peers[rand.Intn(len(d.peers))]
+		if err := d.call(target); err != nil {
+			panic(err)
 		}
 	}
 }

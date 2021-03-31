@@ -66,6 +66,8 @@ type Server struct {
 	ps *pubsub.PubSub
 
 	watcher *peerWatcher
+
+	emitterPeerEvent event.Emitter
 }
 
 type Peer struct {
@@ -97,15 +99,21 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create libp2p stack: %v", err)
 	}
 
+	emitter, err := host.EventBus().Emitter(new(PeerEvent))
+	if err != nil {
+		return nil, err
+	}
+
 	srv := &Server{
-		logger:    logger,
-		config:    config,
-		host:      host,
-		addrs:     []multiaddr.Multiaddr{addr},
-		peers:     map[peer.ID]*Peer{},
-		updateCh:  make(chan peer.ID),
-		dialQueue: newDialQueue(),
-		closeCh:   make(chan struct{}),
+		logger:           logger,
+		config:           config,
+		host:             host,
+		addrs:            []multiaddr.Multiaddr{addr},
+		peers:            map[peer.ID]*Peer{},
+		updateCh:         make(chan peer.ID),
+		dialQueue:        newDialQueue(),
+		closeCh:          make(chan struct{}),
+		emitterPeerEvent: emitter,
 	}
 
 	// start identity
@@ -378,6 +386,38 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 	}
 }
 
+func (s *Server) emitEvent(evnt *PeerEvent) {
+	if err := s.emitterPeerEvent.Emit(*evnt); err != nil {
+		s.logger.Error("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
+	}
+}
+
+type Subscription struct {
+	sub event.Subscription
+}
+
+func (s *Subscription) Get() *PeerEvent {
+	evnt := <-s.sub.Out()
+	obj := evnt.(PeerEvent)
+	return &obj
+}
+
+func (s *Subscription) Close() {
+	s.sub.Close()
+}
+
+func (s *Server) subscribePeerEvents() (*Subscription, error) {
+	raw, err := s.host.EventBus().Subscribe(new(PeerEvent))
+	if err != nil {
+		return nil, err
+	}
+
+	sub := &Subscription{
+		sub: raw,
+	}
+	return sub, nil
+}
+
 func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 	addr0, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
@@ -396,4 +436,32 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 		panic("Not supported")
 	}
 	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+}
+
+type PeerConnectedEvent struct {
+	Peer peer.ID
+	Err  error
+}
+
+type PeerDisconnectedEvent struct {
+	Peer peer.ID
+}
+
+const (
+	PeerEventConnected       = "PeerConnected"
+	PeerEventConnectedFailed = "PeerConnectedFailed"
+	PeerEventDisconnected    = "PeerDisconnected"
+)
+
+type PeerEvent struct {
+	// PeerID is the id of the peer that triggered
+	// the event
+	PeerID peer.ID
+
+	// Type is the type of the event
+	Type string
+
+	// Desc is used to include more contextual
+	// information for the event
+	Desc string
 }
