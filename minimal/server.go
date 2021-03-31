@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
@@ -23,12 +22,7 @@ import (
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 
-	"github.com/armon/go-metrics"
-	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
@@ -54,10 +48,8 @@ type Server struct {
 	blockchain *blockchain.Blockchain
 	storage    storage.Storage
 
-	key       *ecdsa.PrivateKey
-	chain     *chain.Chain
-	InmemSink *metrics.InmemSink
-	devMode   bool
+	key   *ecdsa.PrivateKey // TODO: Remove
+	chain *chain.Chain
 
 	// jsonrpc stack
 	jsonrpcServer *jsonrpc.JSONRPC
@@ -65,18 +57,7 @@ type Server struct {
 	// system grpc server
 	grpcServer *grpc.Server
 
-	// libp2p stack
-	host host.Host
-	// libp2pServer    *libp2pgrpc.GRPCProtocol
-	addrs           []ma.Multiaddr
-	dht             *dht.IpfsDHT
-	peerAddedCh     chan struct{}
-	peerRemovedCh   chan struct{}
-	peerJoined      map[string]bool
-	peerJoinedMutex *sync.RWMutex
-	//host         host.Host
-	//libp2pServer *libp2pgrpc.GRPCProtocol
-	//addrs        []ma.Multiaddr
+	// libp2p network
 	network *network.Server
 
 	// transaction pool
@@ -96,14 +77,10 @@ var dirPaths = []string{
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger:          logger,
-		config:          config,
-		chain:           config.Chain,
-		grpcServer:      grpc.NewServer(),
-		peerAddedCh:     make(chan struct{}),
-		peerRemovedCh:   make(chan struct{}),
-		peerJoined:      make(map[string]bool),
-		peerJoinedMutex: new(sync.RWMutex),
+		logger:     logger,
+		config:     config,
+		chain:      config.Chain,
+		grpcServer: grpc.NewServer(),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -195,7 +172,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
 	m.syncer.Start()
 
-	//m.libp2pServer.Serve()
 	return m, nil
 }
 
@@ -335,72 +311,9 @@ func (s *Server) Chain() *chain.Chain {
 	return s.chain
 }
 
-func (s *Server) Join(addr0 string) error {
-	s.logger.Info("Join peer", "addr", addr0)
-
-	if err := s.network.ConnectAddr(addr0); err != nil {
-		panic(err)
-		return err
-	}
-	return nil
-
-	/*
-			// add peer to the libp2p peerstore
-			peerID, err := s.AddPeerFromMultiAddrString(addr0)
-			if err != nil {
-				return err
-			}
-
-			// perform handshake protocol
-			conn, err := s.dial(peerID)
-			if err != nil {
-				return err
-			}
-			clt := proto.NewHandshakeClient(conn)
-
-		if s.getPeerJoined(addr0) {
-			return nil
-		}
-		s.setPeerJoined(addr0, true)
-		go s.syncer.HandleUser(peerID, conn)
-			req := &proto.HelloReq{
-				Id: s.host.ID().String(),
-			}
-			if _, err := clt.Hello(context.Background(), req); err != nil {
-				return err
-			}
-
-			// send the connection to the syncer
-			go s.syncer.HandleUser(peerID, conn)
-	*/
-
-	return nil
+func (s *Server) Join(addr0 string, dur time.Duration) error {
+	return s.network.JoinAddr(addr0, dur)
 }
-
-/*
-func (s *Server) handleConnUser(addr string) {
-	// we are already connected with libp2p
-	peerID, err := peer.Decode(addr)
-	if err != nil {
-		panic(err)
-	}
-
-	peerInfo := s.host.Peerstore().PeerInfo(peerID)
-	addr0 := AddrInfoToString(&peerInfo)
-	if s.getPeerJoined(addr0) {
-		return
-	}
-
-	// perform handshake protocol
-	conn, err := s.dial(peerID)
-	if err != nil {
-		panic(err)
-	}
-
-	s.setPeerJoined(addr0, true)
-	go s.syncer.HandleUser(peerID, conn)
-}
-*/
 
 func (s *Server) Close() {
 	if err := s.blockchain.Close(); err != nil {
@@ -465,38 +378,4 @@ func getSingleKey(i map[string]*Entry) string {
 		return k
 	}
 	panic("internal. key not found")
-}
-
-func (s *Server) startTelemetry() error {
-	s.InmemSink = metrics.NewInmemSink(10*time.Second, time.Minute)
-	metrics.DefaultInmemSignal(s.InmemSink)
-
-	metricsConf := metrics.DefaultConfig("minimal")
-	metricsConf.EnableHostnameLabel = false
-	metricsConf.HostName = ""
-
-	var sinks metrics.FanoutSink
-
-	prom, err := prometheus.NewPrometheusSink()
-	if err != nil {
-		return err
-	}
-
-	sinks = append(sinks, prom)
-	sinks = append(sinks, s.InmemSink)
-
-	metrics.NewGlobal(metricsConf, sinks)
-	return nil
-}
-
-func (s *Server) getPeerJoined(addr0 string) bool {
-	s.peerJoinedMutex.RLock()
-	defer s.peerJoinedMutex.RUnlock()
-	return s.peerJoined[addr0]
-}
-
-func (s *Server) setPeerJoined(addr0 string, joined bool) {
-	s.peerJoinedMutex.Lock()
-	defer s.peerJoinedMutex.Unlock()
-	s.peerJoined[addr0] = joined
 }

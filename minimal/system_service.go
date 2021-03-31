@@ -2,8 +2,10 @@ package minimal
 
 import (
 	"context"
+	"time"
 
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -54,7 +56,11 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 }
 
 func (s *systemService) PeersAdd(ctx context.Context, req *proto.PeersAddRequest) (*empty.Empty, error) {
-	err := s.s.Join(req.Id)
+	dur := time.Duration(0)
+	if req.Blocked {
+		dur = network.DefaultJoinTimeout
+	}
+	err := s.s.Join(req.Id, dur)
 	return &empty.Empty{}, err
 }
 

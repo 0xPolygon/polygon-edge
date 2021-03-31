@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	rawGrpc "google.golang.org/grpc"
+
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/network/proto"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -50,14 +52,6 @@ func (i *identity) setup() {
 
 	i.srv.Register(identityProtoV1, grpc)
 
-	/*
-		emitterPeer, err := i.srv.host.EventBus().Emitter(new(PeerConnectedEvent))
-		if err != nil {
-			panic(err)
-		}
-		//i.emitterPeer = emitterPeer
-	*/
-
 	// register callback messages to notify from new peers
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
@@ -75,12 +69,6 @@ func (i *identity) setup() {
 				}
 			}()
 		},
-		DisconnectedF: func(net network.Network, conn network.Conn) {
-			// remove from peers
-			go func() {
-				i.srv.delPeer(conn.RemotePeer())
-			}()
-		},
 	})
 }
 
@@ -92,8 +80,11 @@ func (i *identity) getStatus() *proto.Status {
 
 func (i *identity) handleConnected(peerID peer.ID) error {
 	// we initiated the connection, now we perform the handshake
-	connxx := grpc.WrapClient(i.srv.StartStream(identityProtoV1, peerID))
-	clt := proto.NewIdentityClient(connxx)
+	conn, err := i.srv.NewProtoStream(identityProtoV1, peerID)
+	if err != nil {
+		return err
+	}
+	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
 	status := i.getStatus()
 	resp, err := clt.Hello(context.Background(), status)
@@ -107,7 +98,6 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	}
 
 	i.srv.addPeer(peerID)
-	// i.emitterPeer.Emit(PeerConnectedEvent{Peer: peerID})
 
 	i.srv.emitEvent(&PeerEvent{
 		PeerID: peerID,

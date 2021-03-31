@@ -121,13 +121,6 @@ func TestPeerEmitAndSubscribe(t *testing.T) {
 	})
 }
 
-// TODO: Test to get peer notifications.
-// It can be used in several places. We should abstract
-// as much as possible libp2p events.
-// - discovery.
-// - peer watch.
-// - dial notifications a peer is updated.
-
 func TestEncodingPeerAddr(t *testing.T) {
 	_, pub, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 	assert.NoError(t, err)

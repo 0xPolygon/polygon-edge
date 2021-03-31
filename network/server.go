@@ -20,8 +20,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-// var _ network.Notifiee = &Server{}
-
 type Config struct {
 	NoDiscover bool
 	Addr       *net.TCPAddr
@@ -55,11 +53,8 @@ type Server struct {
 	identity  *identity
 	discovery *discovery
 
-	// map of peers that we are connecting
-	//pending sync.Map
-
-	// dht config
-	// dht *dht.IpfsDHT
+	protocols     map[string]Protocol
+	protocolsLock sync.Mutex
 
 	// pubsub
 	ps *pubsub.PubSub
@@ -113,6 +108,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
+		protocols:        map[string]Protocol{},
 	}
 
 	// start identity
@@ -123,18 +119,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
-	//fmt.Println(config.MaxPeers)
-	//fmt.Println(config.NoDiscover)
-
 	if !config.NoDiscover {
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
-		/*
-			if err := srv.setupDHT(context.Background()); err != nil {
-				return nil, err
-			}
-		*/
 	}
 
 	// start gossip protocol
@@ -146,45 +134,17 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	go srv.runJoinWatcher()
 
+	// watch for disconnected peers
+	host.Network().Notify(&network.NotifyBundle{
+		DisconnectedF: func(net network.Network, conn network.Conn) {
+			go func() {
+				srv.delPeer(conn.RemotePeer())
+			}()
+		},
+	})
+
 	return srv, nil
 }
-
-/*
-func (s *Server) setPending(id peer.ID) {
-	s.pending.Store(id, true)
-}
-
-func (s *Server) isPending(id peer.ID) bool {
-	_, ok := s.pending.Load(id)
-	return ok
-}
-*/
-
-/*
-func (s *Server) setupDHT(ctx context.Context) error {
-	s.logger.Info("start dht discovery")
-
-	nsValidator := record.NamespacedValidator{}
-	nsValidator["ipns"] = ipns.Validator{}
-	nsValidator["pk"] = record.PublicKeyValidator{}
-
-	d, err := dht.New(ctx, s.host, dht.Mode(dht.ModeServer), dht.Validator(nsValidator), dht.BootstrapPeers())
-	if err != nil {
-		return err
-	}
-	if err = d.Bootstrap(ctx); err != nil {
-		return err
-	}
-
-	s.dht = d
-	s.dht.RoutingTable().PeerAdded = func(p peer.ID) {
-	}
-
-	return nil
-}
-*/
-
-const dialSlots = 1 // To be modified later
 
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
@@ -208,34 +168,41 @@ func (s *Server) runDial() {
 			slots = 0
 		}
 
-		fmt.Println("-- slots --")
-		fmt.Println(s.config.MaxPeers, s.numPeers(), s.identity.numPending())
-		fmt.Println(slots)
+		/*
+			fmt.Println("-- slots --")
+			fmt.Println(s.config.MaxPeers, s.numPeers(), s.identity.numPending())
+			fmt.Println(slots)
+		*/
 
+		// TODO: Right now the dial task are done sequentially because Connect
+		// is a blocking request. In the future we should try to make up to
+		// maxDials requests concurrently.
 		for i := int64(0); i < slots; i++ {
 			tt := s.dialQueue.pop()
 			if tt == nil {
 				// dial closed
 				return
 			}
-
-			// dial the task
 			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
-			// check if its already connected
 
 			if s.isConnected(tt.addr.ID) {
+				// the node is already connected, send an event to wake up
+				// any join watchers
 				s.emitEvent(&PeerEvent{
 					PeerID: tt.addr.ID,
 					Type:   PeerEventDialConnectedNode,
 				})
 			} else {
+				// the connection process is async because it involves connection (here) +
+				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
 					s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
 
-		// wait until there is a notify
+		// wait until there is a change in the state of a peer that
+		// might involve a new dial slot available
 		select {
 		case <-notifyCh:
 		case <-s.closeCh:
@@ -349,20 +316,35 @@ func (s *Server) Close() {
 	close(s.closeCh)
 }
 
-func (s *Server) StartStream(proto string, id peer.ID) network.Stream {
-	stream, err := s.host.NewStream(context.Background(), id, protocol.ID(proto))
-	if err != nil {
-		panic(err) // TODO
+func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
+	s.protocolsLock.Lock()
+	defer s.protocolsLock.Unlock()
+
+	p, ok := s.protocols[proto]
+	if !ok {
+		return nil, fmt.Errorf("protocol not found: %s", proto)
 	}
-	return stream
+	stream, err := s.NewStream(proto, id)
+	if err != nil {
+		return nil, err
+	}
+	return p.Client(stream), nil
+}
+
+func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
+	return s.host.NewStream(context.Background(), id, protocol.ID(proto))
 }
 
 type Protocol interface {
+	Client(network.Stream) interface{}
 	Handler() func(network.Stream)
 }
 
 func (s *Server) Register(id string, p Protocol) {
+	s.protocolsLock.Lock()
+	s.protocols[id] = p
 	s.wrapStream(id, p.Handler())
+	s.protocolsLock.Unlock()
 }
 
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {
@@ -449,6 +431,15 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 		}
 	}()
 	return nil
+}
+
+// SubscribeCh returns an event of of subscription events
+func (s *Server) SubscribeCh() (chan *PeerEvent, error) {
+	ch := make(chan *PeerEvent)
+	err := s.SubscribeFn(func(evnt *PeerEvent) {
+		ch <- evnt
+	})
+	return ch, err
 }
 
 func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {

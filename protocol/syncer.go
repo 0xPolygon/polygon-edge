@@ -89,12 +89,23 @@ func (s *Syncer) Start() {
 
 	s.server.Register(syncerV1, grpc)
 
+	updateCh, err := s.server.SubscribeCh()
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
 		for {
-			peerID := <-s.server.UpdateCh()
+			evnt := <-updateCh
+			if evnt.Type != network.PeerEventConnected {
+				continue
+			}
 
-			stream := s.server.StartStream(syncerV1, peerID)
-			go s.HandleUser(peerID, libp2pGrpc.WrapClient(stream))
+			stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
+			if err != nil {
+				panic(err)
+			}
+			go s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream))
 		}
 	}()
 	go s.serviceV1.start()

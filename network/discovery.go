@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/network/proto"
+	rawGrpc "google.golang.org/grpc"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	kb "github.com/libp2p/go-libp2p-kbucket"
@@ -111,8 +112,11 @@ func (d *discovery) call(peerID peer.ID) error {
 }
 
 func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
-	conn := grpc.WrapClient(d.srv.StartStream(discProto, peerID))
-	clt := proto.NewDiscoveryClient(conn)
+	conn, err := d.srv.NewProtoStream(discProto, peerID)
+	if err != nil {
+		return nil, err
+	}
+	clt := proto.NewDiscoveryClient(conn.(*rawGrpc.ClientConn))
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
 	if err != nil {

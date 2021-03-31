@@ -49,6 +49,10 @@ func interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInf
 	return h, err
 }
 
+func (g *GrpcStream) Client(stream network.Stream) interface{} {
+	return WrapClient(stream)
+}
+
 func (g *GrpcStream) Serve() {
 	go g.grpcServer.Serve(g)
 }
