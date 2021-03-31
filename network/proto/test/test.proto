@@ -9,9 +9,9 @@ service Test {
 }
 
 message AReq {
-
+    string msg = 1;
 }
 
 message AResp {
-    
+    string msg = 1;
 }

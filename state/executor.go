@@ -68,6 +68,10 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	_, root := txn.Commit(false)
+
+	fmt.Println("- write root -")
+	fmt.Println(root)
+
 	return types.BytesToHash(root)
 }
 

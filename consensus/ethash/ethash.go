@@ -9,11 +9,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/helper/dao"
 	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
@@ -38,7 +40,7 @@ type Ethash struct {
 }
 
 // Factory is the factory method to create an Ethash consensus
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, blockchain *blockchain.Blockchain, executor *state.Executor, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
 	var pathStr string
 	path, ok := config.Config["path"]
 	if ok {
@@ -60,7 +62,7 @@ func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.Pr
 }
 
 // VerifyHeader verifies the header is correct
-func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header) error {
 	headerNum := header.Number
 	parentNum := parent.Number
 
@@ -75,12 +77,8 @@ func (e *Ethash) VerifyHeader(parent *types.Header, header *types.Header, uncle,
 		return fmt.Errorf("extradata is too long")
 	}
 
-	if uncle {
-		// TODO
-	} else {
-		if int64(header.Timestamp) > time.Now().Add(15*time.Second).Unix() {
-			return fmt.Errorf("future block")
-		}
+	if int64(header.Timestamp) > time.Now().Add(15*time.Second).Unix() {
+		return fmt.Errorf("future block")
 	}
 
 	diff := e.CalcDifficulty(int64(header.Timestamp), parent)

@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	genesisFileName = "./genesis.json"
-	defaultChainID  = 100
+	genesisFileName       = "./genesis.json"
+	defaultChainID        = 100
+	defaultPremineBalance = "0x100000000000000000000000000"
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -84,8 +85,16 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	if len(premine) != 0 {
 		for _, prem := range premine {
-			spl := strings.Split(prem, ":")
-			addr, val := types.StringToAddress(spl[0]), spl[1]
+
+			var addr types.Address
+			val := defaultPremineBalance
+			if indx := strings.Index(prem, ":"); indx != -1 {
+				// <addr>:<balance>
+				addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
+			} else {
+				// <addr>
+				addr = types.StringToAddress(prem)
+			}
 
 			amount, err := types.ParseUint256orHex(&val)
 			if err != nil {

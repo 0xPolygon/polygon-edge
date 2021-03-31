@@ -112,6 +112,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

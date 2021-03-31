@@ -11,12 +11,12 @@ import (
 func TestDialQueue(t *testing.T) {
 	q := newDialQueue()
 
-	info0 := peer.AddrInfo{
+	info0 := &peer.AddrInfo{
 		ID: peer.ID("a"),
 	}
 	q.add(info0, 1)
 
-	info1 := peer.AddrInfo{
+	info1 := &peer.AddrInfo{
 		ID: peer.ID("b"),
 	}
 	q.add(info1, 1)

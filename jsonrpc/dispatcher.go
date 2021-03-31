@@ -236,7 +236,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	output := fd.fv.Call(inArgs)
 	err = getError(output[1])
 	if err != nil {
-		return nil, internalError
+		return nil, d.internalError(req.Method, err)
 	}
 
 	var data []byte
@@ -244,7 +244,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
-			return nil, internalError
+			return nil, d.internalError(req.Method, err)
 		}
 	}
 
@@ -254,9 +254,14 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	}
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
-		return nil, internalError
+		return nil, d.internalError(req.Method, err)
 	}
 	return respBytes, nil
+}
+
+func (d *Dispatcher) internalError(method string, err error) error {
+	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	return internalError
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) {

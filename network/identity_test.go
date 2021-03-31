@@ -3,20 +3,18 @@ package network
 import (
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGrpcStream(t *testing.T) {
 	srv0 := createServer(t, nil)
-	srv1 := createServer(t, nil)
+	srv1 := createServer(t, func(c *Config) {
+		// c.Chain.Params.ChainID = 10
+	})
 
 	// connect with 0 -> 1
-	err := srv0.Connect(srv1.AddrInfo())
-	assert.NoError(t, err)
+	multiJoin(t, srv0, srv1)
 
-	select {
-	case <-srv0.updateCh:
-	case <-time.After(2 * time.Second):
-	}
+	time.Sleep(5 * time.Second)
 }
+
+// Test: Connect maxPeers
