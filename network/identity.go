@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/network/proto"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -24,16 +22,6 @@ type identity struct {
 	pendingSize int64
 
 	srv *Server
-
-	emitterPeer event.Emitter
-	notifyCh    chan struct{}
-}
-
-func (i *identity) notify() {
-	select {
-	case i.notifyCh <- struct{}{}:
-	default:
-	}
 }
 
 func (i *identity) numPending() int64 {
@@ -62,35 +50,35 @@ func (i *identity) setup() {
 
 	i.srv.Register(identityProtoV1, grpc)
 
-	emitterPeer, err := i.srv.host.EventBus().Emitter(new(PeerConnectedEvent))
-	if err != nil {
-		panic(err)
-	}
-	i.emitterPeer = emitterPeer
+	/*
+		emitterPeer, err := i.srv.host.EventBus().Emitter(new(PeerConnectedEvent))
+		if err != nil {
+			panic(err)
+		}
+		//i.emitterPeer = emitterPeer
+	*/
 
 	// register callback messages to notify from new peers
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
-			// fmt.Printf("Conn: %s %s %d\n", conn.LocalPeer(), conn.RemotePeer(), conn.Stat().Direction)
-			// pending of handshake
 			peerID := conn.RemotePeer()
+			i.srv.logger.Trace("Conn", "peer", peerID, "direction", conn.Stat().Direction)
+
+			// pending of handshake
 			i.setPending(peerID)
 
 			go func() {
-				time.Sleep(1 * time.Second)
+				defer i.delPending(peerID)
+
 				if err := i.handleConnected(peerID); err != nil {
 					i.srv.Disconnect(peerID, err.Error())
 				}
-				// handshake is done
-				i.delPending(peerID)
-				i.notify()
 			}()
 		},
 		DisconnectedF: func(net network.Network, conn network.Conn) {
 			// remove from peers
 			go func() {
 				i.srv.delPeer(conn.RemotePeer())
-				i.notify()
 			}()
 		},
 	})
@@ -119,7 +107,12 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	}
 
 	i.srv.addPeer(peerID)
-	i.emitterPeer.Emit(PeerConnectedEvent{Peer: peerID})
+	// i.emitterPeer.Emit(PeerConnectedEvent{Peer: peerID})
+
+	i.srv.emitEvent(&PeerEvent{
+		PeerID: peerID,
+		Type:   PeerEventConnected,
+	})
 	return nil
 }
 

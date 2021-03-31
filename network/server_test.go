@@ -99,26 +99,26 @@ func TestDialLifecycle(t *testing.T) {
 func TestPeerEmitAndSubscribe(t *testing.T) {
 	srv0 := createServer(t, nil)
 
-	sub, err := srv0.subscribePeerEvents()
+	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
 
-	done := make(chan *PeerEvent)
-	go func() {
+	t.Run("serial", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			done <- sub.Get()
+			srv0.emitEvent(&PeerEvent{})
+			sub.Get()
 		}
-	}()
+	})
 
-	for i := 0; i < count; i++ {
-		srv0.emitEvent(&PeerEvent{})
-	}
-
-	// wait to receive all the events
-	for i := 0; i < count; i++ {
-		<-done
-	}
+	t.Run("parallel", func(t *testing.T) {
+		for i := 0; i < count; i++ {
+			srv0.emitEvent(&PeerEvent{})
+		}
+		for i := 0; i < count; i++ {
+			sub.Get()
+		}
+	})
 }
 
 // TODO: Test to get peer notifications.
@@ -147,4 +147,14 @@ func TestEncodingPeerAddr(t *testing.T) {
 	info2, err := StringToAddrInfo(str)
 	assert.NoError(t, err)
 	assert.Equal(t, info, info2)
+}
+
+func TestJoinWhenAlreadyConnected(t *testing.T) {
+	// if we try to join an already connected node, the watcher
+	// should finish as well
+	srv0 := createServer(t, nil)
+	srv1 := createServer(t, nil)
+
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
 }

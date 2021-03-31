@@ -50,7 +50,6 @@ type Server struct {
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
 
-	updateCh  chan peer.ID
 	dialQueue *dialQueue
 
 	identity  *identity
@@ -65,7 +64,8 @@ type Server struct {
 	// pubsub
 	ps *pubsub.PubSub
 
-	watcher *peerWatcher
+	joinWatchers     map[peer.ID]chan error
+	joinWatchersLock sync.Mutex
 
 	emitterPeerEvent event.Emitter
 }
@@ -110,7 +110,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		host:             host,
 		addrs:            []multiaddr.Multiaddr{addr},
 		peers:            map[peer.ID]*Peer{},
-		updateCh:         make(chan peer.ID),
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -145,13 +144,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 	srv.ps = ps
 
-	// create peer watcher
-	sub, err := srv.SubscribePeerEvents()
-	if err != nil {
-		return nil, err
-	}
-	srv.watcher = &peerWatcher{sub: sub}
-	go srv.watcher.run()
+	go srv.runJoinWatcher()
 
 	return srv, nil
 }
@@ -194,8 +187,17 @@ func (s *Server) setupDHT(ctx context.Context) error {
 const dialSlots = 1 // To be modified later
 
 func (s *Server) runDial() {
+	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
-	s.identity.notifyCh = notifyCh
+	s.SubscribeFn(func(evnt *PeerEvent) {
+		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDisconnected {
+			return
+		}
+		select {
+		case notifyCh <- struct{}{}:
+		default:
+		}
+	})
 
 	for {
 		slots := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
@@ -216,8 +218,17 @@ func (s *Server) runDial() {
 
 			// dial the task
 			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
-			if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-				s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
+			// check if its already connected
+
+			if s.isConnected(tt.addr.ID) {
+				s.emitEvent(&PeerEvent{
+					PeerID: tt.addr.ID,
+					Type:   PeerEventDialConnectedNode,
+				})
+			} else {
+				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
+					s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
+				}
 			}
 		}
 
@@ -230,8 +241,13 @@ func (s *Server) runDial() {
 	}
 }
 
+// PeerEventDialConnectedNode
 func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
+}
+
+func (s *Server) isConnected(peerID peer.ID) bool {
+	return s.host.Network().Connectedness(peerID) == network.Connected
 }
 
 func (s *Server) addPeer(id peer.ID) {
@@ -274,72 +290,76 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 }
 
 func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
+	s.logger.Info("Join request", "addr", addr.String())
 	s.dialQueue.add(addr, 1)
 
 	if timeout == 0 {
 		return nil
 	}
-	err := s.watcher.watch(addr.ID, timeout)
+	err := s.watch(addr.ID, timeout)
 	return err
 }
 
-type peerWatcher struct {
-	sub event.Subscription
-
-	lock     sync.Mutex
-	watchers map[peer.ID]chan error
-}
-
-func (p *peerWatcher) watch(peerID peer.ID, dur time.Duration) error {
+func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 	ch := make(chan error)
 
-	p.lock.Lock()
-	if p.watchers == nil {
-		p.watchers = map[peer.ID]chan error{}
+	s.joinWatchersLock.Lock()
+	if s.joinWatchers == nil {
+		s.joinWatchers = map[peer.ID]chan error{}
 	}
-	p.watchers[peerID] = ch
-	p.lock.Unlock()
+	s.joinWatchers[peerID] = ch
+	s.joinWatchersLock.Unlock()
 
 	select {
 	case <-time.After(dur):
-		p.lock.Lock()
-		delete(p.watchers, peerID)
-		p.lock.Unlock()
+		s.joinWatchersLock.Lock()
+		delete(s.joinWatchers, peerID)
+		s.joinWatchersLock.Unlock()
 
-		return fmt.Errorf("timeout")
+		return fmt.Errorf("timeout %s %s", s.host.ID(), peerID)
 	case err := <-ch:
 		return err
 	}
 }
 
-func (p *peerWatcher) notify(peerID peer.ID, err error) {
-	p.lock.Lock()
-	ch, ok := p.watchers[peerID]
-	if ok {
-		ch <- err
-		close(ch)
+func (s *Server) runJoinWatcher() error {
+	sub, err := s.Subscribe()
+	if err != nil {
+		return err
 	}
-	p.lock.Unlock()
-}
 
-func (p *peerWatcher) run() {
-	for {
-		evnt := <-p.sub.Out()
-		switch obj := evnt.(type) {
-		case PeerConnectedEvent:
-			p.notify(obj.Peer, obj.Err)
+	go func() {
+		for {
+			select {
+			case evnt := <-sub.GetCh():
+				// only concerned about 'PeerEventConnected' and 'PeerEventConnectedFailed'
+				if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDialConnectedNode {
+					break
+				}
+
+				// try to find a watcher for this peer
+				s.joinWatchersLock.Lock()
+				errCh, ok := s.joinWatchers[evnt.PeerID]
+				if ok {
+					errCh <- nil
+					delete(s.joinWatchers, evnt.PeerID)
+				}
+				s.joinWatchersLock.Unlock()
+
+			case <-s.closeCh:
+				sub.Close()
+				return
+			}
 		}
-	}
+	}()
+
+	return nil
 }
 
 func (s *Server) Close() {
 	s.host.Close()
 	s.dialQueue.Close()
 	close(s.closeCh)
-}
-
-func (s *Server) UpdateCh() chan peer.ID {
-	return s.updateCh
 }
 
 func (s *Server) StartStream(proto string, id peer.ID) network.Stream {
@@ -367,18 +387,6 @@ func (s *Server) wrapStream(id string, handle func(network.Stream)) {
 	})
 }
 
-func (s *Server) SubscribePeerEvents() (event.Subscription, error) {
-	events := []interface{}{
-		&PeerConnectedEvent{},
-		&PeerDisconnectedEvent{},
-	}
-	sub, err := s.host.EventBus().Subscribe(events)
-	if err != nil {
-		return nil, err
-	}
-	return sub, nil
-}
-
 func (s *Server) AddrInfo() *peer.AddrInfo {
 	return &peer.AddrInfo{
 		ID:    s.host.ID(),
@@ -388,25 +396,39 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 
 func (s *Server) emitEvent(evnt *PeerEvent) {
 	if err := s.emitterPeerEvent.Emit(*evnt); err != nil {
-		s.logger.Error("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
+		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
 	}
 }
 
 type Subscription struct {
 	sub event.Subscription
+	ch  chan *PeerEvent
+}
+
+func (s *Subscription) run() {
+	// convert interface{} to *PeerEvent channels
+	for {
+		evnt := <-s.sub.Out()
+		obj := evnt.(PeerEvent)
+		s.ch <- &obj
+	}
+}
+
+func (s *Subscription) GetCh() chan *PeerEvent {
+	return s.ch
 }
 
 func (s *Subscription) Get() *PeerEvent {
-	evnt := <-s.sub.Out()
-	obj := evnt.(PeerEvent)
-	return &obj
+	obj := <-s.ch
+	return obj
 }
 
 func (s *Subscription) Close() {
 	s.sub.Close()
 }
 
-func (s *Server) subscribePeerEvents() (*Subscription, error) {
+// Subscribe starts a PeerEvent subscription
+func (s *Server) Subscribe() (*Subscription, error) {
 	raw, err := s.host.EventBus().Subscribe(new(PeerEvent))
 	if err != nil {
 		return nil, err
@@ -414,8 +436,32 @@ func (s *Server) subscribePeerEvents() (*Subscription, error) {
 
 	sub := &Subscription{
 		sub: raw,
+		ch:  make(chan *PeerEvent),
 	}
+	go sub.run()
 	return sub, nil
+}
+
+// SubscribeFn is a helper method to run subscription of PeerEvents
+func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
+	sub, err := s.Subscribe()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			select {
+			case evnt := <-sub.GetCh():
+				handler(evnt)
+
+			case <-s.closeCh:
+				sub.Close()
+				return
+			}
+		}
+	}()
+	return nil
 }
 
 func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
@@ -448,9 +494,10 @@ type PeerDisconnectedEvent struct {
 }
 
 const (
-	PeerEventConnected       = "PeerConnected"
-	PeerEventConnectedFailed = "PeerConnectedFailed"
-	PeerEventDisconnected    = "PeerDisconnected"
+	PeerEventConnected         = "PeerConnected"
+	PeerEventConnectedFailed   = "PeerConnectedFailed"
+	PeerEventDisconnected      = "PeerDisconnected"
+	PeerEventDialConnectedNode = "PeerDialConnectedNode"
 )
 
 type PeerEvent struct {
