@@ -25,7 +25,7 @@ type blockchainInterface interface {
 	// GetReceiptsByHash returns the receipts for a hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
-	// Subscribe subscribes for chain head events
+	// SubscribeEvents subscribes for chain head events
 	SubscribeEvents() blockchain.Subscription
 
 	// GetHeaderByNumber returns the header by number
@@ -36,12 +36,6 @@ type blockchainInterface interface {
 
 	// AddTx adds a new transaction to the tx pool
 	AddTx(tx *types.Transaction) error
-
-	// State returns a reference to the state
-	State() state.State
-
-	// BeginTxn starts a transition object
-	BeginTxn(parentRoot types.Hash, header *types.Header) (*state.Transition, error)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)

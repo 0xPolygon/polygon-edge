@@ -6,7 +6,6 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -246,7 +245,7 @@ func (e *Eth) EstimateGas(transaction *types.Transaction, number *BlockNumber) (
 	}
 
 	var (
-		lowEnd  uint64 = standardGas
+		lowEnd  = standardGas
 		highEnd uint64
 		gasCap  uint64
 	)
@@ -266,20 +265,12 @@ func (e *Eth) EstimateGas(transaction *types.Transaction, number *BlockNumber) (
 	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 
 		// Get the account balance
-		s := e.d.store.State()
-		snap, err := s.NewSnapshotAt(header.StateRoot)
-
-		var accountBalance *big.Int
-
+		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
 		if err != nil {
 			return nil, err
 		}
 
-		acc, ok := state.NewTxn(s, snap).GetAccount(transaction.From)
-		if !ok {
-			return 0, err
-		}
-
+		var accountBalance *big.Int
 		accountBalance = acc.Balance
 
 		available := new(big.Int).Set(accountBalance)
@@ -309,17 +300,11 @@ func (e *Eth) EstimateGas(transaction *types.Transaction, number *BlockNumber) (
 
 	// Run the transaction with the estimated gas
 	testTransaction := func(gas uint64) (bool, error) {
-
-		transition, err := e.d.store.BeginTxn(header.StateRoot, header)
-		if err != nil {
-			return true, err
-		}
-
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		_, failed, err := transition.Apply(transaction)
+		_, failed, err := e.d.store.ApplyTxn(header, txn)
 		if err != nil {
 			return failed, err
 		}
