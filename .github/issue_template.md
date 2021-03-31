@@ -11,10 +11,13 @@ Describe your issue in as much detail as possible here
 ### Steps to reproduce
 * Tell us how to reproduce this issue <br />
 * Where the issue is, if you know <br />
-* Which commands triggered the issue
+* Which commands triggered the issue, if any
 
 ### Expected behaviour
 Tell us what should happen
 
 ### Actual behaviour
 Tell us what happens instead
+
+### Logs
+Please paste any logs here that demonstrate the issue, if they exist
