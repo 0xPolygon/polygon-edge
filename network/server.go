@@ -189,7 +189,7 @@ const dialSlots = 1 // To be modified later
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
-	s.SubscribeFn(func(evnt *PeerEvent) {
+	err := s.SubscribeFn(func(evnt *PeerEvent) {
 		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDisconnected {
 			return
 		}
@@ -198,6 +198,9 @@ func (s *Server) runDial() {
 		default:
 		}
 	})
+	if err != nil {
+		s.logger.Error("dial manager failed to subscribe", "err", err)
+	}
 
 	for {
 		slots := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
@@ -323,37 +326,21 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 }
 
 func (s *Server) runJoinWatcher() error {
-	sub, err := s.Subscribe()
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			select {
-			case evnt := <-sub.GetCh():
-				// only concerned about 'PeerEventConnected' and 'PeerEventConnectedFailed'
-				if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDialConnectedNode {
-					break
-				}
-
-				// try to find a watcher for this peer
-				s.joinWatchersLock.Lock()
-				errCh, ok := s.joinWatchers[evnt.PeerID]
-				if ok {
-					errCh <- nil
-					delete(s.joinWatchers, evnt.PeerID)
-				}
-				s.joinWatchersLock.Unlock()
-
-			case <-s.closeCh:
-				sub.Close()
-				return
-			}
+	return s.SubscribeFn(func(evnt *PeerEvent) {
+		// only concerned about 'PeerEventConnected' and 'PeerEventConnectedFailed'
+		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDialConnectedNode {
+			return
 		}
-	}()
 
-	return nil
+		// try to find a watcher for this peer
+		s.joinWatchersLock.Lock()
+		errCh, ok := s.joinWatchers[evnt.PeerID]
+		if ok {
+			errCh <- nil
+			delete(s.joinWatchers, evnt.PeerID)
+		}
+		s.joinWatchersLock.Unlock()
+	})
 }
 
 func (s *Server) Close() {

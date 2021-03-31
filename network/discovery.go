@@ -65,44 +65,27 @@ func (d *discovery) setup() error {
 	d.srv.Register(discProto, grpc)
 
 	// send all the nodes we connect to the routing table
-	if err := d.syncConnectedPeers(); err != nil {
-		return err
-	}
+	err = d.srv.SubscribeFn(func(evnt *PeerEvent) {
+		if evnt.Type != PeerEventConnected {
+			return
+		}
+		peerID := evnt.PeerID
 
-	go d.run()
-	return nil
-}
+		// add peer to the routing table and to our local peer
+		_, err := d.routingTable.TryAddPeer(peerID, false, false)
+		if err != nil {
+			panic(err)
+		}
 
-func (d *discovery) syncConnectedPeers() error {
-	sub, err := d.srv.Subscribe()
+		d.peersLock.Lock()
+		d.peers = append(d.peers, peerID)
+		d.peersLock.Unlock()
+	})
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		for {
-			select {
-			case evnt := <-sub.GetCh():
-				// only for Connected events
-				peerID := evnt.PeerID
-
-				// add peer to the routing table and to our local peer
-				_, err := d.routingTable.TryAddPeer(peerID, false, false)
-				if err != nil {
-					panic(err)
-				}
-
-				d.peersLock.Lock()
-				d.peers = append(d.peers, peerID)
-				d.peersLock.Unlock()
-
-			case <-d.closeCh:
-				sub.Close()
-				return
-			}
-		}
-	}()
-
+	go d.run()
 	return nil
 }
 
