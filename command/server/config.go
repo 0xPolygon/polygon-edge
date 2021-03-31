@@ -23,6 +23,7 @@ type Config struct {
 	Seal        bool                   `json:"seal"`
 	LogLevel    string                 `json:"log_level"`
 	Consensus   map[string]interface{} `json:"consensus"`
+	Dev         bool
 	Join        string
 }
 
@@ -82,7 +83,19 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		}
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
+		conf.Chain = chain
 	}
+
+	// if we are in dev mode, change the consensus protocol with 'dev'
+	// and disable discovery of other nodes
+	// TODO: Disable networking altogheter.
+	if c.Dev {
+		conf.Network.NoDiscover = true
+		conf.Chain.Params.Engine = map[string]interface{}{
+			"dev": nil,
+		}
+	}
+
 	return conf, nil
 }
 
@@ -103,6 +116,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.Chain != "" {
 		c.Chain = c1.Chain
+	}
+	if c1.Dev {
+		c.Dev = true
 	}
 	if c1.Telemetry != nil {
 		if c1.Telemetry.PrometheusPort != 0 {

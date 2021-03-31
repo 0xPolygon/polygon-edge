@@ -69,11 +69,11 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 }
 
 // UnmarshalJSON automatically decodes the user input for the block number, when a JSON RPC method is called
-func (b BlockNumber) UnmarshalJSON(buffer []byte) error {
+func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 	num, err := stringToBlockNumber(string(buffer))
 	if err != nil {
 		return err
 	}
-	b = num
+	*b = num
 	return nil
 }

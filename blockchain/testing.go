@@ -18,7 +18,7 @@ import (
 type fakeConsensus struct {
 }
 
-func (f *fakeConsensus) VerifyHeader(parent, header *types.Header, uncle, seal bool) error {
+func (f *fakeConsensus) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 

@@ -10,8 +10,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -26,11 +28,11 @@ type Pow struct {
 	max uint64
 }
 
-func Factory(ctx context.Context, config *consensus.Config, privateKey *ecdsa.PrivateKey, db storage.Storage, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, blockchain *blockchain.Blockchain, executor *state.Executor, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
 	return &Pow{min: 1000000, max: 1500000}, nil
 }
 
-func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header, uncle, seal bool) error {
+func (p *Pow) VerifyHeader(parent *types.Header, header *types.Header) error {
 	if header.Timestamp <= parent.Timestamp {
 		return fmt.Errorf("timestamp lower or equal than parent")
 	}

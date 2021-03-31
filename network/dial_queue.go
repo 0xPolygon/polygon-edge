@@ -62,7 +62,18 @@ func (d *dialQueue) popImpl() *dialTask {
 	return nil
 }
 
-func (d *dialQueue) add(addr peer.AddrInfo, priority uint64) {
+func (d *dialQueue) del(peer peer.ID) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	item, ok := d.items[peer]
+	if ok {
+		heap.Remove(&d.heap, item.index)
+		delete(d.items, peer)
+	}
+}
+
+func (d *dialQueue) add(addr *peer.AddrInfo, priority uint64) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -91,7 +102,7 @@ type dialTask struct {
 	index int
 
 	// info of the task
-	addr peer.AddrInfo
+	addr *peer.AddrInfo
 
 	// priority of the task (the higher the better)
 	priority uint64
