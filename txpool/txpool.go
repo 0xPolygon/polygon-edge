@@ -71,7 +71,6 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 }
 
 func (t *TxPool) EnableDev() {
-	fmt.Println("_ EEEE")
 	t.dev = true
 }
 

@@ -437,40 +437,45 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 
 // WriteBlocks writes a batch of blocks
 func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
-	if len(blocks) == 0 {
+	size := len(blocks)
+	if size == 0 {
 		return fmt.Errorf("no headers found to insert")
 	}
 
+	if size == 1 {
+		b.logger.Info("write block", "num", blocks[0].Number())
+	} else {
+		b.logger.Info("write blocks", "num", size, "from", blocks[0].Number(), "to", blocks[size-1].Number())
+	}
 	parent, ok := b.readHeader(blocks[0].ParentHash())
 	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
 
 	// validate chain
-	for i := 0; i < len(blocks); i++ {
+	for i := 0; i < size; i++ {
 		block := blocks[i]
-
-		if blocks[i].Number()-1 != parent.Number {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number(), parent.Number)
+		if block.Number()-1 != parent.Number {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, block.Number(), parent.Number)
 		}
-		if blocks[i].ParentHash() != parent.Hash {
+		if block.ParentHash() != parent.Hash {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(parent, blocks[i].Header); err != nil {
+		if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
 		// This is not necessary.
 
 		// verify body data
-		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != blocks[i].Header.Sha3Uncles {
-			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, blocks[i].Header.Sha3Uncles)
+		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
 		}
 		// TODO, the wrapper around transactions
-		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != blocks[i].Header.TxRoot {
-			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, blocks[i].Header.TxRoot)
+		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
 		}
-		parent = blocks[i].Header
+		parent = block.Header
 	}
 
 	// Write chain

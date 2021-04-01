@@ -20,6 +20,7 @@ func BuildBlock(header *types.Header, txs []*types.Transaction, receipts []*type
 
 	// TODO: Compute uncles
 	header.Sha3Uncles = types.EmptyUncleHash
+	header.ComputeHash()
 
 	return &types.Block{
 		Header:       header,

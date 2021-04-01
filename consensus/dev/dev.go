@@ -3,7 +3,6 @@ package dev
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -36,6 +35,7 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		closeCh:    make(chan struct{}),
 		blockchain: blockchain,
 		executor:   executor,
+		txpool:     txpool,
 	}
 
 	// enable dev mode so that we can accept non-signed txns
@@ -53,14 +53,12 @@ func (d *Dev) run() {
 		// wait until there is a new txn
 		select {
 		case <-d.notifyCh:
+		case <-time.After(1 * time.Second):
 		case <-d.closeCh:
 			return
 		}
 
 		// pick txn from the pool and seal them
-		fmt.Println("-- pending --")
-		fmt.Println(d.txpool.Pending())
-
 		header := d.blockchain.Header()
 		d.do(header)
 	}
@@ -80,31 +78,38 @@ func (d *Dev) do(parent *types.Header) error {
 		return err
 	}
 
-	pricedTxs, err := d.txpool.SortTxns(transition.Txn(), parent)
-	if err != nil {
-		return err
-	}
-	txns := []*types.Transaction{}
-	for {
-		val := pricedTxs.Pop()
-		if val == nil {
-			break
+	/*
+		pricedTxs, err := d.txpool.SortTxns(transition.Txn(), parent)
+		if err != nil {
+			return err
 		}
+		txns := []*types.Transaction{}
+		for {
+			val := pricedTxs.Pop()
+			if val == nil {
+				break
+			}
 
-		msg := val.tx
-		txns = append(txns, msg)
+			msg := val.tx
+			txns = append(txns, msg)
 
-		if err := transition.Write(msg); err != nil {
-			break
+			if err := transition.Write(msg); err != nil {
+				break
+			}
 		}
-	}
+	*/
 
 	_, root := transition.Commit()
 
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
-	block := consensus.BuildBlock(header, txns, transition.Receipts())
-	fmt.Println(block)
+
+	// header hash is computed inside buildBlock
+	block := consensus.BuildBlock(header, nil, transition.Receipts())
+
+	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+		panic(err)
+	}
 
 	return nil
 }

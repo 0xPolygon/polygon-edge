@@ -54,7 +54,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if conf.Join != "" {
-		server.Join(conf.Join)
+		// make a non-blocking join request
+		server.Join(conf.Join, 0)
 	}
 	return c.handleSignals(server.Close)
 }
