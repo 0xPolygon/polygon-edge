@@ -18,12 +18,13 @@ type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
 
-	//Prepare initializes the consensus fields of a block header according to the
-	//rules of a particular engine. The changes are executed inline.
+	// TODO REMOVE
 	Prepare(header *types.Header) error
 
-	// Seal seals the block
+	// TODO REMOVE
 	Seal(block *types.Block, ctx context.Context) (*types.Block, error)
+
+	StartSeal()
 
 	// Close closes the connection
 	Close() error

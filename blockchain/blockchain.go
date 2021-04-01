@@ -447,6 +447,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	} else {
 		b.logger.Info("write blocks", "num", size, "from", blocks[0].Number(), "to", blocks[size-1].Number())
 	}
+
 	parent, ok := b.readHeader(blocks[0].ParentHash())
 	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())

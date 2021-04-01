@@ -31,7 +31,6 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/sealer"
 )
 
@@ -101,6 +100,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	// start libp2p
 	{
 		netConfig := config.Network
+		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 
 		m.network, err = network.NewServer(logger, netConfig)
@@ -151,12 +151,19 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
-	// Setup sealer
-	sealerConfig := &sealer.Config{
-		Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
+	/*
+		// Setup sealer
+		sealerConfig := &sealer.Config{
+			Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
+		}
+		m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
+		m.Sealer.SetEnabled(m.config.Seal)
+	*/
+
+	if m.config.Seal {
+		m.logger.Info("sealing enabled")
+		m.consensus.StartSeal()
 	}
-	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
-	m.Sealer.SetEnabled(m.config.Seal)
 
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {

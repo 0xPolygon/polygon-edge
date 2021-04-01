@@ -42,8 +42,11 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	txpool.EnableDev()
 	txpool.NotifyCh = d.notifyCh
 
-	go d.run()
 	return d, nil
+}
+
+func (d *Dev) StartSeal() {
+	go d.run()
 }
 
 func (d *Dev) run() {

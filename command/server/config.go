@@ -90,6 +90,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	// and disable discovery of other nodes
 	// TODO: Disable networking altogheter.
 	if c.Dev {
+		conf.Seal = true
 		conf.Network.NoDiscover = true
 		conf.Chain.Params.Engine = map[string]interface{}{
 			"dev": nil,

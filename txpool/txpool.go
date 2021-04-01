@@ -74,13 +74,6 @@ func (t *TxPool) EnableDev() {
 	t.dev = true
 }
 
-/*
-// SetSigner changes the signer
-func (t *TxPool) SetSigner(signer crypto.TxSigner) {
-	t.signer = signer
-}
-*/
-
 // AddTx adds a new transaction to the pool
 func (t *TxPool) AddTx(tx *types.Transaction) error {
 	err := t.validateTx(tx)
