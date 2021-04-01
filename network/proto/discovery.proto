@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/network/proto";
+
+service Discovery {
+    rpc FindPeers(FindPeersReq) returns (FindPeersResp);
+}
+
+message FindPeersReq {
+    string key = 1;
+    int64 count = 2;
+}
+
+message FindPeersResp {
+    repeated string nodes = 1; 
+}

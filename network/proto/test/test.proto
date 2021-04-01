@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/network/proto/test";
+
+service Test {
+    rpc A(AReq) returns (AResp);
+}
+
+message AReq {
+    string msg = 1;
+}
+
+message AResp {
+    string msg = 1;
+}

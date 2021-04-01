@@ -56,6 +56,7 @@ message Peer {
 
 message PeersAddRequest {
     string id = 1;
+    bool blocked = 2;
 }
 
 message PeersStatusRequest {

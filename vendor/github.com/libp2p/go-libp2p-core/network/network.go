@@ -8,6 +8,7 @@ package network
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/jbenet/goprocess"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -34,6 +35,14 @@ const (
 	DirOutbound
 )
 
+func (d Direction) String() string {
+	str := [...]string{"Unknown", "Inbound", "Outbound"}
+	if d < 0 || int(d) >= len(str) {
+		return "(unrecognized)"
+	}
+	return str[d]
+}
+
 // Connectedness signals the capacity for a connection with a given node.
 // It is used to signal to services and other peers whether a node is reachable.
 type Connectedness int
@@ -53,13 +62,21 @@ const (
 	CannotConnect
 )
 
+func (c Connectedness) String() string {
+	str := [...]string{"NotConnected", "Connected", "CanConnect", "CannotConnect"}
+	if c < 0 || int(c) >= len(str) {
+		return "(unrecognized)"
+	}
+	return str[c]
+}
+
 // Reachability indicates how reachable a node is.
 type Reachability int
 
 const (
 	// ReachabilityUnknown indicates that the reachability status of the
 	// node is unknown.
-	ReachabilityUnknown = iota
+	ReachabilityUnknown Reachability = iota
 
 	// ReachabilityPublic indicates that the node is reachable from the
 	// public internet.
@@ -72,10 +89,22 @@ const (
 	ReachabilityPrivate
 )
 
+func (r Reachability) String() string {
+	str := [...]string{"Unknown", "Public", "Private"}
+	if r < 0 || int(r) >= len(str) {
+		return "(unrecognized)"
+	}
+	return str[r]
+}
+
 // Stat stores metadata pertaining to a given Stream/Conn.
 type Stat struct {
+	// Direction specifies whether this is an inbound or an outbound connection.
 	Direction Direction
-	Extra     map[interface{}]interface{}
+	// Opened is the timestamp when this connection was opened.
+	Opened time.Time
+	// Extra stores additional metadata about this connection.
+	Extra map[interface{}]interface{}
 }
 
 // StreamHandler is the type of function used to listen for

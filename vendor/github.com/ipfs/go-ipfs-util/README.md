@@ -8,6 +8,10 @@
 
 > Common utilities used by go-ipfs and other related go packages
 
+## Lead Maintainer
+
+[Steven Allen](https://github.com/Stebalien)
+
 ## Install
 
 This is a Go module which can be installed with `go get github.com/ipfs/go-ipfs-util`. `go-ipfs-util` is however packaged with Gx, so it is recommended to use Gx to install it (see Usage section).

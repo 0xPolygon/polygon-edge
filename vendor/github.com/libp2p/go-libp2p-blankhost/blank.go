@@ -2,6 +2,8 @@ package blankhost
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
@@ -11,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/record"
 
 	"github.com/libp2p/go-eventbus"
 
@@ -33,13 +36,35 @@ type BlankHost struct {
 	}
 }
 
-func NewBlankHost(n network.Network) *BlankHost {
+type config struct {
+	cmgr connmgr.ConnManager
+}
+
+type Option = func(cfg *config)
+
+func WithConnectionManager(cmgr connmgr.ConnManager) Option {
+	return func(cfg *config) {
+		cfg.cmgr = cmgr
+	}
+}
+
+func NewBlankHost(n network.Network, options ...Option) *BlankHost {
+	cfg := config{
+		cmgr: &connmgr.NullConnMgr{},
+	}
+	for _, opt := range options {
+		opt(&cfg)
+	}
+
 	bh := &BlankHost{
 		n:        n,
-		cmgr:     &connmgr.NullConnMgr{},
+		cmgr:     cfg.cmgr,
 		mux:      mstream.NewMultistreamMuxer(),
 		eventbus: eventbus.NewBus(),
 	}
+
+	// subscribe the connection manager to network notifications (has no effect with NullConnMgr)
+	n.Notify(bh.cmgr.Notifee())
 
 	var err error
 	if bh.emitters.evtLocalProtocolsUpdated, err = bh.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}); err != nil {
@@ -47,7 +72,34 @@ func NewBlankHost(n network.Network) *BlankHost {
 	}
 
 	n.SetStreamHandler(bh.newStreamHandler)
+
+	// persist a signed peer record for self to the peerstore.
+	if err := bh.initSignedRecord(); err != nil {
+		log.Errorf("error creating blank host, err=%s", err)
+		return nil
+	}
+
 	return bh
+}
+
+func (bh *BlankHost) initSignedRecord() error {
+	cab, ok := peerstore.GetCertifiedAddrBook(bh.n.Peerstore())
+	if !ok {
+		log.Error("peerstore does not support signed records")
+		return errors.New("peerstore does not support signed records")
+	}
+	rec := peer.PeerRecordFromAddrInfo(peer.AddrInfo{bh.ID(), bh.Addrs()})
+	ev, err := record.Seal(rec, bh.Peerstore().PrivKey(bh.ID()))
+	if err != nil {
+		log.Errorf("failed to create signed record for self, err=%s", err)
+		return fmt.Errorf("failed to create signed record for self, err=%s", err)
+	}
+	_, err = cab.ConsumePeerRecord(ev, peerstore.PermanentAddrTTL)
+	if err != nil {
+		log.Errorf("failed to persist signed record to peerstore,err=%s", err)
+		return fmt.Errorf("failed to persist signed record for self, err=%s", err)
+	}
+	return err
 }
 
 var _ host.Host = (*BlankHost)(nil)
@@ -100,7 +152,7 @@ func (bh *BlankHost) NewStream(ctx context.Context, p peer.ID, protos ...protoco
 
 	selected, err := mstream.SelectOneOf(protoStrs, s)
 	if err != nil {
-		s.Close()
+		s.Reset()
 		return nil, err
 	}
 
@@ -146,8 +198,8 @@ func (bh *BlankHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool,
 func (bh *BlankHost) newStreamHandler(s network.Stream) {
 	protoID, handle, err := bh.Mux().Negotiate(s)
 	if err != nil {
-		log.Warning("protocol mux failed: %s", err)
-		s.Close()
+		log.Infow("protocol negotiation failed", "error", err)
+		s.Reset()
 		return
 	}
 

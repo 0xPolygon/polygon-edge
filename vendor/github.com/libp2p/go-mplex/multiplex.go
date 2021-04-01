@@ -13,6 +13,7 @@ import (
 
 	logging "github.com/ipfs/go-log"
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/multiformats/go-varint"
 )
 
 var log = logging.Logger("mplex")
@@ -110,16 +111,15 @@ func NewMultiplex(con net.Conn, initiator bool) *Multiplex {
 
 func (mp *Multiplex) newStream(id streamID, name string) (s *Stream) {
 	s = &Stream{
-		id:        id,
-		name:      name,
-		dataIn:    make(chan []byte, 8),
-		reset:     make(chan struct{}),
-		rDeadline: makePipeDeadline(),
-		wDeadline: makePipeDeadline(),
-		mp:        mp,
+		id:          id,
+		name:        name,
+		dataIn:      make(chan []byte, 8),
+		rDeadline:   makePipeDeadline(),
+		wDeadline:   makePipeDeadline(),
+		mp:          mp,
+		writeCancel: make(chan struct{}),
+		readCancel:  make(chan struct{}),
 	}
-
-	s.closedLocal, s.doCloseLocal = context.WithCancel(context.Background())
 	return
 }
 
@@ -167,7 +167,7 @@ func (mp *Multiplex) IsClosed() bool {
 	}
 }
 
-func (mp *Multiplex) sendMsg(done <-chan struct{}, header uint64, data []byte) error {
+func (mp *Multiplex) sendMsg(timeout, cancel <-chan struct{}, header uint64, data []byte) error {
 	buf := pool.Get(len(data) + 20)
 
 	n := 0
@@ -180,8 +180,10 @@ func (mp *Multiplex) sendMsg(done <-chan struct{}, header uint64, data []byte) e
 		return nil
 	case <-mp.shutdown:
 		return ErrShutdown
-	case <-done:
+	case <-timeout:
 		return errTimeout
+	case <-cancel:
+		return ErrStreamClosed
 	}
 }
 
@@ -320,7 +322,7 @@ func (mp *Multiplex) NewNamedStream(name string) (*Stream, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), NewStreamTimeout)
 	defer cancel()
 
-	err := mp.sendMsg(ctx.Done(), header, []byte(name))
+	err := mp.sendMsg(ctx.Done(), nil, header, []byte(name))
 	if err != nil {
 		return nil, err
 	}
@@ -330,23 +332,20 @@ func (mp *Multiplex) NewNamedStream(name string) (*Stream, error) {
 
 func (mp *Multiplex) cleanup() {
 	mp.closeNoWait()
-	mp.chLock.Lock()
-	defer mp.chLock.Unlock()
-	for _, msch := range mp.channels {
-		msch.clLock.Lock()
-		if !msch.closedRemote {
-			msch.closedRemote = true
-			// Cancel readers
-			close(msch.reset)
-		}
 
-		msch.doCloseLocal()
-		msch.clLock.Unlock()
-	}
-	// Don't remove this nil assignment. We check if this is nil to check if
-	// the connection is closed when we already have the lock (faster than
-	// checking if the stream is closed).
+	// Take the channels.
+	mp.chLock.Lock()
+	channels := mp.channels
 	mp.channels = nil
+	mp.chLock.Unlock()
+
+	// Cancel any reads/writes
+	for _, msch := range channels {
+		msch.cancelRead(ErrStreamReset)
+		msch.cancelWrite(ErrStreamReset)
+	}
+
+	// And... shutdown!
 	if mp.shutdownErr == nil {
 		mp.shutdownErr = ErrShutdown
 	}
@@ -420,81 +419,43 @@ func (mp *Multiplex) handleIncoming() {
 				// This is *ok*. We forget the stream on reset.
 				continue
 			}
-			msch.clLock.Lock()
 
-			isClosed := msch.isClosed()
-
-			if !msch.closedRemote {
-				close(msch.reset)
-				msch.closedRemote = true
+			// Cancel any ongoing reads/writes.
+			msch.cancelRead(ErrStreamReset)
+			msch.cancelWrite(ErrStreamReset)
+		case closeTag:
+			if !ok {
+				// may have canceled our reads already.
+				continue
 			}
 
-			if !isClosed {
-				msch.doCloseLocal()
-			}
-
-			msch.clLock.Unlock()
-
-			msch.cancelDeadlines()
-
+			// unregister and throw away future data.
 			mp.chLock.Lock()
 			delete(mp.channels, ch)
 			mp.chLock.Unlock()
-		case closeTag:
-			if !ok {
-				continue
-			}
 
-			msch.clLock.Lock()
-
-			if msch.closedRemote {
-				msch.clLock.Unlock()
-				// Technically a bug on the other side. We
-				// should consider killing the connection.
-				continue
-			}
-
+			// close data channel, there will be no more data.
 			close(msch.dataIn)
-			msch.closedRemote = true
 
-			cleanup := msch.isClosed()
-
-			msch.clLock.Unlock()
-
-			if cleanup {
-				msch.cancelDeadlines()
-				mp.chLock.Lock()
-				delete(mp.channels, ch)
-				mp.chLock.Unlock()
-			}
+			// We intentionally don't cancel any deadlines, cancel reads, cancel
+			// writes, etc. We just deliver the EOF by closing the
+			// data channel, and unregister the channel so we don't
+			// receive any more data. The user still needs to call
+			// `Close()` or `Reset()`.
 		case messageTag:
 			if !ok {
-				// reset stream, return b
+				// We're not accepting data on this stream, for
+				// some reason. It's likely that we reset it, or
+				// simply canceled reads (e.g., called Close).
 				pool.Put(b)
-
-				// This is a perfectly valid case when we reset
-				// and forget about the stream.
-				log.Debugf("message for non-existant stream, dropping data: %d", ch)
-				// go mp.sendResetMsg(ch.header(resetTag), false)
-				continue
-			}
-
-			msch.clLock.Lock()
-			remoteClosed := msch.closedRemote
-			msch.clLock.Unlock()
-			if remoteClosed {
-				// closed stream, return b
-				pool.Put(b)
-
-				log.Warnf("Received data from remote after stream was closed by them. (len = %d)", len(b))
-				// go mp.sendResetMsg(msch.id.header(resetTag), false)
 				continue
 			}
 
 			recvTimeout.Reset(ReceiveTimeout)
 			select {
 			case msch.dataIn <- b:
-			case <-msch.reset:
+			case <-msch.readCancel:
+				// the user has canceled reading. walk away.
 				pool.Put(b)
 			case <-recvTimeout.C:
 				pool.Put(b)
@@ -533,7 +494,7 @@ func (mp *Multiplex) sendResetMsg(header uint64, hard bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), ResetStreamTimeout)
 	defer cancel()
 
-	err := mp.sendMsg(ctx.Done(), header, nil)
+	err := mp.sendMsg(ctx.Done(), nil, header, nil)
 	if err != nil && !mp.isShutdown() {
 		if hard {
 			log.Warnf("error sending reset message: %s; killing connection", err.Error())
@@ -545,7 +506,7 @@ func (mp *Multiplex) sendResetMsg(header uint64, hard bool) {
 }
 
 func (mp *Multiplex) readNextHeader() (uint64, uint64, error) {
-	h, err := binary.ReadUvarint(mp.buf)
+	h, err := varint.ReadUvarint(mp.buf)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -560,7 +521,7 @@ func (mp *Multiplex) readNextHeader() (uint64, uint64, error) {
 
 func (mp *Multiplex) readNext() ([]byte, error) {
 	// get length
-	l, err := binary.ReadUvarint(mp.buf)
+	l, err := varint.ReadUvarint(mp.buf)
 	if err != nil {
 		return nil, err
 	}

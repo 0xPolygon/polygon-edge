@@ -54,7 +54,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if conf.Join != "" {
-		server.Join(conf.Join)
+		// make a non-blocking join request
+		server.Join(conf.Join, 0)
 	}
 	return c.handleSignals(server.Close)
 }
@@ -94,6 +95,7 @@ func readConfig(args []string) (*Config, error) {
 
 	cliConfig := &Config{
 		Telemetry: &Telemetry{},
+		Network:   &Network{},
 	}
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
@@ -106,9 +108,12 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Chain, "chain", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
 	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
-	flags.StringVar(&cliConfig.LibP2PAddr, "libp2p", "", "")
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
+	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
+	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
+	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

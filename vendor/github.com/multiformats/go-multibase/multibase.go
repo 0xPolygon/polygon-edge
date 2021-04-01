@@ -7,6 +7,7 @@ import (
 
 	b58 "github.com/mr-tron/base58/base58"
 	b32 "github.com/multiformats/go-base32"
+	b36 "github.com/multiformats/go-base36"
 )
 
 // Encoding identifies the type of base-encoding that a multibase is carrying.
@@ -16,7 +17,6 @@ type Encoding int
 // supported yet
 const (
 	Identity          = 0x00
-	Base1             = '1'
 	Base2             = '0'
 	Base8             = '7'
 	Base10            = '9'
@@ -30,37 +30,18 @@ const (
 	Base32hexUpper    = 'V'
 	Base32hexPad      = 't'
 	Base32hexPadUpper = 'T'
-	Base58Flickr      = 'Z'
+	Base36            = 'k'
+	Base36Upper       = 'K'
 	Base58BTC         = 'z'
+	Base58Flickr      = 'Z'
 	Base64            = 'm'
 	Base64url         = 'u'
 	Base64pad         = 'M'
 	Base64urlPad      = 'U'
 )
 
-// Encodings is a map of the supported encoding, unsupported encoding
+// EncodingToStr is a map of the supported encoding, unsupported encoding
 // specified in standard are left out
-var Encodings = map[string]Encoding{
-	"identity":          0x00,
-	"base2":             '0',
-	"base16":            'f',
-	"base16upper":       'F',
-	"base32":            'b',
-	"base32upper":       'B',
-	"base32pad":         'c',
-	"base32padupper":    'C',
-	"base32hex":         'v',
-	"base32hexupper":    'V',
-	"base32hexpad":      't',
-	"base32hexpadupper": 'T',
-	"base58flickr":      'Z',
-	"base58btc":         'z',
-	"base64":            'm',
-	"base64url":         'u',
-	"base64pad":         'M',
-	"base64urlpad":      'U',
-}
-
 var EncodingToStr = map[Encoding]string{
 	0x00: "identity",
 	'0':  "base2",
@@ -74,12 +55,22 @@ var EncodingToStr = map[Encoding]string{
 	'V':  "base32hexupper",
 	't':  "base32hexpad",
 	'T':  "base32hexpadupper",
-	'Z':  "base58flickr",
+	'k':  "base36",
+	'K':  "base36upper",
 	'z':  "base58btc",
+	'Z':  "base58flickr",
 	'm':  "base64",
 	'u':  "base64url",
 	'M':  "base64pad",
 	'U':  "base64urlpad",
+}
+
+var Encodings = map[string]Encoding{}
+
+func init() {
+	for e, n := range EncodingToStr {
+		Encodings[n] = e
+	}
 }
 
 // ErrUnsupportedEncoding is returned when the selected encoding is not known or
@@ -116,6 +107,10 @@ func Encode(base Encoding, data []byte) (string, error) {
 		return string(Base32hexPad) + base32HexLowerPad.EncodeToString(data), nil
 	case Base32hexPadUpper:
 		return string(Base32hexPadUpper) + base32HexUpperPad.EncodeToString(data), nil
+	case Base36:
+		return string(Base36) + b36.EncodeToStringLc(data), nil
+	case Base36Upper:
+		return string(Base36Upper) + b36.EncodeToStringUc(data), nil
 	case Base58BTC:
 		return string(Base58BTC) + b58.EncodeAlphabet(data, b58.BTCAlphabet), nil
 	case Base58Flickr:
@@ -162,6 +157,9 @@ func Decode(data string) (Encoding, []byte, error) {
 		return enc, bytes, err
 	case Base32hexPad, Base32hexPadUpper:
 		bytes, err := b32.HexEncoding.DecodeString(data[1:])
+		return enc, bytes, err
+	case Base36, Base36Upper:
+		bytes, err := b36.DecodeString(data[1:])
 		return enc, bytes, err
 	case Base58BTC:
 		bytes, err := b58.DecodeAlphabet(data[1:], b58.BTCAlphabet)

@@ -19,9 +19,29 @@ type MuxedStream interface {
 	io.Reader
 	io.Writer
 
-	// Close closes the stream for writing. Reading will still work (that
-	// is, the remote side can still write).
+	// Close closes the stream.
+	//
+	// * Any buffered data for writing will be flushed.
+	// * Future reads will fail.
+	// * Any in-progress reads/writes will be interrupted.
+	//
+	// Close may be asynchronous and _does not_ guarantee receipt of the
+	// data.
 	io.Closer
+
+	// CloseWrite closes the stream for writing but leaves it open for
+	// reading.
+	//
+	// CloseWrite does not free the stream, users must still call Close or
+	// Reset.
+	CloseWrite() error
+
+	// CloseRead closes the stream for writing but leaves it open for
+	// reading.
+	//
+	// CloseRead does not free the stream, users must still call Close or
+	// Reset.
+	CloseRead() error
 
 	// Reset closes both ends of the stream. Use this to tell the remote
 	// side to hang up and go away.

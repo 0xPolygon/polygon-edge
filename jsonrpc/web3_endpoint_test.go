@@ -11,7 +11,7 @@ func TestWeb3EndpointSha3(t *testing.T) {
 	s := newDispatcher(hclog.NewNullLogger(), newMockStore())
 	s.registerEndpoints()
 
-	resp, err := s.Handle(serverHTTP, []byte(`{
+	resp, err := s.Handle([]byte(`{
 		"method": "web3_sha3",
 		"params": ["0x68656c6c6f20776f726c64"]
 	}`))

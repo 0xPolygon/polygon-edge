@@ -233,5 +233,13 @@ type ProtoBook interface {
 	AddProtocols(peer.ID, ...string) error
 	SetProtocols(peer.ID, ...string) error
 	RemoveProtocols(peer.ID, ...string) error
+
+	// SupportsProtocols returns the set of protocols the peer supports from among the given protocols.
+	// If the returned error is not nil, the result is indeterminate.
 	SupportsProtocols(peer.ID, ...string) ([]string, error)
+
+	// FirstSupportedProtocol returns the first protocol that the peer supports among the given protocols.
+	// If the peer does not support any of the given protocols, this function will return an empty string and a nil error.
+	// If the returned error is not nil, the result is indeterminate.
+	FirstSupportedProtocol(peer.ID, ...string) (string, error)
 }

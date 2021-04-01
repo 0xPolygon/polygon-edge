@@ -10,12 +10,13 @@
 
 This package provides a multistream multiplexed [security transport](https://github.com/libp2p/go-conn-security). It:
 
-1. Selects a security security transport using multistream-select.
+1. Selects a security transport using multistream-select.
 2. Secures the stream using the selected transport.
 
 Known libp2p security transports include:
 
 * [go-libp2p-secio](https://github.com/libp2p/go-libp2p-secio)
+* [go-libp2p-tls](https://github.com/libp2p/go-libp2p-tls)
 
 ## Install
 
@@ -38,11 +39,11 @@ For more information about how `go-conn-security-multistream` is used in the lib
 
 Feel free to join in. All welcome. Open an [issue](https://github.com/libp2p/go-conn-security-multistream/issues)!
 
-This repository falls under the IPFS [Code of Conduct](https://github.com/libp2p/community/blob/master/code-of-conduct.md).
+This repository falls under the libp2p [Code of Conduct](https://github.com/libp2p/community/blob/master/code-of-conduct.md).
 
-### Want to hack on IPFS?
+### Want to hack on libp2p?
 
-[![](https://cdn.rawgit.com/jbenet/contribute-ipfs-gif/master/img/contribute.gif)](https://github.com/ipfs/community/blob/master/contributing.md)
+[![](https://cdn.rawgit.com/libp2p/community/master/img/contribute.gif)](https://github.com/libp2p/community/blob/master/CONTRIBUTE.md)
 
 ## License
 

@@ -8,6 +8,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
+// AutoNATProto identifies the autonat service protocol
 const AutoNATProto = "/libp2p/autonat/1.0.0"
 
 func newDialMessage(pi peer.AddrInfo) *pb.Message {

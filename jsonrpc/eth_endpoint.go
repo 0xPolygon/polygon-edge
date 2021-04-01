@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
@@ -65,18 +64,11 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	if err := tx.UnmarshalRLP(raw.Bytes()); err != nil {
 		return nil, err
 	}
-
-	signer := crypto.NewEIP155Signer(types.DeriveChainId(new(big.Int).SetBytes([]byte{tx.V})).Uint64())
-	tx.From, err = signer.Sender(tx)
-	if err != nil {
-		return nil, err
-	}
+	tx.ComputeHash()
 
 	if err := e.d.store.AddTx(tx); err != nil {
 		return nil, err
 	}
-
-	tx.ComputeHash()
 	return tx.Hash.String(), nil
 }
 
@@ -84,17 +76,23 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error) {
 	var err error
 
+	fmt.Println("-- params --")
+	fmt.Println(params)
+
 	txn := &types.Transaction{}
 	txn.From = types.StringToAddress(params["from"].(string))
 
 	to := types.StringToAddress(params["to"].(string))
 	txn.To = &to
 
-	input := hex.MustDecodeHex(params["data"].(string))
+	//input := hex.MustDecodeHex(params["data"].(string))
 	gasPrice := hex.MustDecodeHex(params["gasPrice"].(string))
 
 	gas := params["gas"].(string)
 	if value, ok := params["value"]; ok {
+		fmt.Println("-- value --")
+		fmt.Println(value)
+
 		txn.Value = hex.MustDecodeHex(value.(string))
 	}
 
@@ -106,18 +104,17 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 		}
 	}
 
-	txn.Input = input
+	// txn.Input = input
 	txn.GasPrice = gasPrice
 	txn.Gas, err = types.ParseUint64orHex(&gas)
 	if err != nil {
 		panic(err)
 	}
+	txn.ComputeHash()
 
 	if err := e.d.store.AddTx(txn); err != nil {
-		panic(err)
+		return nil, err
 	}
-
-	txn.ComputeHash()
 	return txn.Hash.String(), nil
 }
 
@@ -159,9 +156,8 @@ func (e *Eth) GetStorageAt(address string, index types.Hash, number BlockNumber)
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, addr, index)
 	if err != nil {
-		return nil, fmt.Errorf("error getting storage snapshot")
+		return nil, err
 	}
-
 	return result, nil
 }
 
@@ -206,10 +202,10 @@ func (e *Eth) GetBlockHeader(number BlockNumber) (*types.Header, error) {
 		return e.d.store.Header(), nil
 
 	case EarliestBlockNumber:
-		return nil, fmt.Errorf("Fetching the earliest header is not supported")
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
 
 	case PendingBlockNumber:
-		return nil, fmt.Errorf("Fetching the pending header is not supported")
+		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		// Convert the block number from hex to uint64
@@ -228,7 +224,6 @@ func resolveBlockNumber(number *BlockNumber) BlockNumber {
 	if number != nil {
 		currentNumber = *number
 	}
-
 	return currentNumber
 }
 
@@ -424,11 +419,9 @@ func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, addr)
-
 	if err != nil {
-		return new(types.Big), fmt.Errorf("unable to fetch account")
+		return nil, err
 	}
-
 	return (*types.Big)(acc.Balance), nil
 }
 
@@ -465,7 +458,7 @@ func (e *Eth) GetCode(address string, number BlockNumber) (interface{}, error) {
 
 	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
 	if err != nil {
-		return "0x", fmt.Errorf("unable to fetch account code")
+		return "0x", fmt.Errorf("unable to fetch account code: %v", err)
 	}
 
 	return types.HexBytes(code), nil

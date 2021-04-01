@@ -19,10 +19,11 @@ type config struct {
 	reachability      network.Reachability
 
 	// client
-	bootDelay       time.Duration
-	retryInterval   time.Duration
-	refreshInterval time.Duration
-	requestTimeout  time.Duration
+	bootDelay          time.Duration
+	retryInterval      time.Duration
+	refreshInterval    time.Duration
+	requestTimeout     time.Duration
+	throttlePeerPeriod time.Duration
 
 	// server
 	dialTimeout         time.Duration
@@ -38,6 +39,7 @@ var defaults = func(c *config) error {
 	c.retryInterval = 90 * time.Second
 	c.refreshInterval = 15 * time.Minute
 	c.requestTimeout = 30 * time.Second
+	c.throttlePeerPeriod = 90 * time.Second
 
 	c.dialTimeout = 15 * time.Second
 	c.maxPeerAddresses = 16

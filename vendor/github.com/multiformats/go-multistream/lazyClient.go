@@ -6,16 +6,9 @@ import (
 	"sync"
 )
 
-// Multistream represents in essense a ReadWriteCloser, or a single
-// communication wire which supports multiple streams on it. Each
-// stream is identified by a protocol tag.
-type Multistream interface {
-	io.ReadWriteCloser
-}
-
 // NewMSSelect returns a new Multistream which is able to perform
 // protocol selection with a MultistreamMuxer.
-func NewMSSelect(c io.ReadWriteCloser, proto string) Multistream {
+func NewMSSelect(c io.ReadWriteCloser, proto string) LazyConn {
 	return &lazyClientConn{
 		protos: []string{ProtocolID, proto},
 		con:    c,
@@ -25,7 +18,7 @@ func NewMSSelect(c io.ReadWriteCloser, proto string) Multistream {
 // NewMultistream returns a multistream for the given protocol. This will not
 // perform any protocol selection. If you are using a MultistreamMuxer, use
 // NewMSSelect.
-func NewMultistream(c io.ReadWriteCloser, proto string) Multistream {
+func NewMultistream(c io.ReadWriteCloser, proto string) LazyConn {
 	return &lazyClientConn{
 		protos: []string{proto},
 		con:    c,
@@ -138,6 +131,26 @@ func (l *lazyClientConn) Write(b []byte) (int, error) {
 }
 
 // Close closes the underlying io.ReadWriteCloser
+//
+// This does not flush anything.
 func (l *lazyClientConn) Close() error {
+	// As the client, we flush the handshake on close to cover an
+	// interesting edge-case where the server only speaks a single protocol
+	// and responds eagerly with that protocol before waiting for out
+	// handshake.
+	//
+	// Again, we must not read the error because the other end may have
+	// closed the stream for reading. I mean, we're the initiator so that's
+	// strange... but it's still allowed
+	_ = l.Flush()
 	return l.con.Close()
+}
+
+// Flush sends the handshake.
+func (l *lazyClientConn) Flush() error {
+	l.whandshakeOnce.Do(func() {
+		go l.rhandshakeOnce.Do(l.doReadHandshake)
+		l.doWriteHandshake()
+	})
+	return l.werr
 }

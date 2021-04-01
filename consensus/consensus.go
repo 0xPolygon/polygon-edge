@@ -5,8 +5,10 @@ import (
 	"crypto/ecdsa"
 	"log"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -14,14 +16,15 @@ import (
 // Consensus is the interface for consensus
 type Consensus interface {
 	// VerifyHeader verifies the header is correct
-	VerifyHeader(parent, header *types.Header, uncle, seal bool) error
+	VerifyHeader(parent, header *types.Header) error
 
-	//Prepare initializes the consensus fields of a block header according to the
-	//rules of a particular engine. The changes are executed inline.
+	// TODO REMOVE
 	Prepare(header *types.Header) error
 
-	// Seal seals the block
+	// TODO REMOVE
 	Seal(block *types.Block, ctx context.Context) (*types.Block, error)
+
+	StartSeal()
 
 	// Close closes the connection
 	Close() error
@@ -40,7 +43,7 @@ type Config struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, *Config, *ecdsa.PrivateKey, storage.Storage, hclog.Logger) (Consensus, error)
+type Factory func(context.Context, *Config, *txpool.TxPool, *blockchain.Blockchain, *state.Executor, *ecdsa.PrivateKey, hclog.Logger) (Consensus, error)
 
 // Istanbul is a consensus engine to avoid byzantine failure
 type Istanbul interface {

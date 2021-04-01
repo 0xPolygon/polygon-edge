@@ -5,7 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 type dialPolicy struct {
@@ -52,10 +52,9 @@ func (d *dialPolicy) skipDial(addr ma.Multiaddr) bool {
 }
 
 // skipPeer indicates that the collection of multiaddresses representing a peer
-// isn't worth attempted dialing. Addresses are dialed individually, and while
-// individual addresses for a peer may be worth considering, there are some
-// factors, like the presence of the same public address as the local host,
-// that may make the peer undesirable to dial as a whole.
+// isn't worth attempted dialing. If one of the addresses matches an address
+// we believe is ours, we exclude the peer, even if there are other valid
+// public addresses in the list.
 func (d *dialPolicy) skipPeer(addrs []ma.Multiaddr) bool {
 	localAddrs := d.host.Addrs()
 	localHosts := make([]net.IP, 0)

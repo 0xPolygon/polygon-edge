@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"google.golang.org/grpc"
-
-	inet "github.com/libp2p/go-libp2p-net"
 )
 
 // Protocol is the GRPC-over-libp2p protocol.
@@ -19,7 +18,7 @@ type GRPCProtocol struct {
 	stopCh     chan struct{}
 	host       host.Host
 	grpcServer *grpc.Server
-	streamCh   chan inet.Stream
+	streamCh   chan network.Stream
 }
 
 // NewGRPCProtocol attaches the GRPC protocol to a host.
@@ -29,7 +28,7 @@ func NewGRPCProtocol(ctx context.Context, host host.Host) *GRPCProtocol {
 		ctx:        ctx,
 		host:       host,
 		grpcServer: grpcServer,
-		streamCh:   make(chan inet.Stream),
+		streamCh:   make(chan network.Stream),
 	}
 	host.SetStreamHandler(grpcProtocolID, grpcProtocol.HandleStream)
 	return grpcProtocol
@@ -45,7 +44,7 @@ func (p *GRPCProtocol) GetGRPCServer() *grpc.Server {
 }
 
 // HandleStream handles an incoming stream.
-func (p *GRPCProtocol) HandleStream(stream inet.Stream) {
+func (p *GRPCProtocol) HandleStream(stream network.Stream) {
 	select {
 	case <-p.ctx.Done():
 		return

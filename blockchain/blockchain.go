@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
@@ -30,7 +29,7 @@ type Blockchain struct {
 	logger hclog.Logger
 
 	db        storage.Storage
-	consensus consensus.Consensus
+	consensus Verifier
 	executor  *state.Executor
 
 	config  *chain.Chain
@@ -55,6 +54,10 @@ type Blockchain struct {
 	agpMux sync.Mutex
 }
 
+type Verifier interface {
+	VerifyHeader(parent, header *types.Header) error
+}
+
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
 func (b *Blockchain) UpdateGasPriceAvg(newValue *big.Int) {
 	b.agpMux.Lock()
@@ -75,7 +78,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus consensus.Consensus, executor *state.Executor) (*Blockchain, error) {
+func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus Verifier, executor *state.Executor) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -100,6 +103,10 @@ func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain,
 		if !ok {
 			return nil, fmt.Errorf("failed to load genesis hash")
 		}
+		// validate that the genesis file in storage matches the chain.Genesis
+		if b.genesis != b.computeGenesisHeader(config.Genesis).Hash {
+			return nil, fmt.Errorf("genesis file does not match current genesis")
+		}
 		header, ok := b.GetHeaderByHash(head)
 		if !ok {
 			return nil, fmt.Errorf("failed to get header with hash %s", head.String())
@@ -122,6 +129,10 @@ func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain,
 	b.averageGasPriceCount = big.NewInt(0)
 
 	return b, nil
+}
+
+func (b *Blockchain) SetConsensus(c Verifier) {
+	b.consensus = c
 }
 
 func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
@@ -154,10 +165,6 @@ func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types
 	return b.GetBlockByHash(hash, full)
 }
 
-func (b *Blockchain) GetConsensus() consensus.Consensus {
-	return b.consensus
-}
-
 func (b *Blockchain) Executor() *state.Executor {
 	return b.executor
 }
@@ -172,12 +179,18 @@ func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
 }
 
-func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
+func (b *Blockchain) computeGenesisHeader(genesis *chain.Genesis) *types.Header {
 	root := b.executor.WriteGenesis(genesis.Alloc)
 
 	header := genesis.ToBlock()
 	header.StateRoot = root
 	header.ComputeHash()
+
+	return header
+}
+
+func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
+	header := b.computeGenesisHeader(genesis)
 
 	if err := b.writeGenesisImpl(header); err != nil {
 		return err
@@ -424,8 +437,15 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 
 // WriteBlocks writes a batch of blocks
 func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
-	if len(blocks) == 0 {
+	size := len(blocks)
+	if size == 0 {
 		return fmt.Errorf("no headers found to insert")
+	}
+
+	if size == 1 {
+		b.logger.Info("write block", "num", blocks[0].Number())
+	} else {
+		b.logger.Info("write blocks", "num", size, "from", blocks[0].Number(), "to", blocks[size-1].Number())
 	}
 
 	parent, ok := b.readHeader(blocks[0].ParentHash())
@@ -434,30 +454,29 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	// validate chain
-	for i := 0; i < len(blocks); i++ {
+	for i := 0; i < size; i++ {
 		block := blocks[i]
-
-		if blocks[i].Number()-1 != parent.Number {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number(), parent.Number)
+		if block.Number()-1 != parent.Number {
+			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, block.Number(), parent.Number)
 		}
-		if blocks[i].ParentHash() != parent.Hash {
+		if block.ParentHash() != parent.Hash {
 			return fmt.Errorf("parent hash not correct")
 		}
-		if err := b.consensus.VerifyHeader(parent, blocks[i].Header, false, true); err != nil {
+		if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
 		// This is not necessary.
 
 		// verify body data
-		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != blocks[i].Header.Sha3Uncles {
-			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, blocks[i].Header.Sha3Uncles)
+		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
 		}
 		// TODO, the wrapper around transactions
-		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != blocks[i].Header.TxRoot {
-			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, blocks[i].Header.TxRoot)
+		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
 		}
-		parent = blocks[i].Header
+		parent = block.Header
 	}
 
 	// Write chain
@@ -599,7 +618,7 @@ func (b *Blockchain) VerifyUncles(block *types.Block) error {
 			return errDanglingUncle
 		}
 
-		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle, true, false); err != nil {
+		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle); err != nil {
 			return err
 		}
 	}

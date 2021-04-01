@@ -32,6 +32,10 @@ type Header struct {
 	Hash         Hash
 }
 
+func (h *Header) Equal(hh *Header) bool {
+	return h.Hash == hh.Hash
+}
+
 func (h *Header) HasBody() bool {
 	return h.TxRoot != EmptyRootHash || h.Sha3Uncles != EmptyUncleHash
 }

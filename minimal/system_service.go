@@ -2,8 +2,10 @@ package minimal
 
 import (
 	"context"
+	"time"
 
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -23,7 +25,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
-		P2PAddr: AddrInfoToString(s.s.AddrInfo()),
+		// P2PAddr: AddrInfoToString(s.s.AddrInfo()),
 	}
 	return status, nil
 }
@@ -54,7 +56,11 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 }
 
 func (s *systemService) PeersAdd(ctx context.Context, req *proto.PeersAddRequest) (*empty.Empty, error) {
-	err := s.s.Join(req.Id)
+	dur := time.Duration(0)
+	if req.Blocked {
+		dur = network.DefaultJoinTimeout
+	}
+	err := s.s.Join(req.Id, dur)
 	return &empty.Empty{}, err
 }
 
@@ -71,34 +77,38 @@ func (s *systemService) PeersStatus(ctx context.Context, req *proto.PeersStatusR
 }
 
 func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
-	protocols, err := s.s.host.Peerstore().GetProtocols(id)
-	if err != nil {
-		return nil, err
-	}
-	info := s.s.host.Peerstore().PeerInfo(id)
-	addrs := []string{}
-	for _, addr := range info.Addrs {
-		addrs = append(addrs, addr.String())
-	}
-	peer := &proto.Peer{
-		Id:        id.String(),
-		Protocols: protocols,
-		Addrs:     addrs,
-	}
-	return peer, nil
+	/*
+		protocols, err := s.s.host.Peerstore().GetProtocols(id)
+		if err != nil {
+			return nil, err
+		}
+		info := s.s.host.Peerstore().PeerInfo(id)
+		addrs := []string{}
+		for _, addr := range info.Addrs {
+			addrs = append(addrs, addr.String())
+		}
+		peer := &proto.Peer{
+			Id:        id.String(),
+			Protocols: protocols,
+			Addrs:     addrs,
+		}
+	*/
+	return nil, nil
 }
 
 func (s *systemService) PeersList(ctx context.Context, req *empty.Empty) (*proto.PeersListResponse, error) {
 	resp := &proto.PeersListResponse{
 		Peers: []*proto.Peer{},
 	}
-	ids := s.s.host.Peerstore().Peers()
-	for _, id := range ids {
-		peer, err := s.getPeer(id)
-		if err != nil {
-			return nil, err
+	/*
+		ids := s.s.host.Peerstore().Peers()
+		for _, id := range ids {
+			peer, err := s.getPeer(id)
+			if err != nil {
+				return nil, err
+			}
+			resp.Peers = append(resp.Peers, peer)
 		}
-		resp.Peers = append(resp.Peers, peer)
-	}
+	*/
 	return resp, nil
 }

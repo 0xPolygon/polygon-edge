@@ -67,6 +67,10 @@ func (pb *memoryProtoBook) internProtocol(proto string) string {
 }
 
 func (pb *memoryProtoBook) SetProtocols(p peer.ID, protos ...string) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+
 	s := pb.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -82,6 +86,10 @@ func (pb *memoryProtoBook) SetProtocols(p peer.ID, protos ...string) error {
 }
 
 func (pb *memoryProtoBook) AddProtocols(p peer.ID, protos ...string) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+
 	s := pb.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -100,6 +108,10 @@ func (pb *memoryProtoBook) AddProtocols(p peer.ID, protos ...string) error {
 }
 
 func (pb *memoryProtoBook) GetProtocols(p peer.ID) ([]string, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
+
 	s := pb.segments.get(p)
 	s.RLock()
 	defer s.RUnlock()
@@ -113,6 +125,10 @@ func (pb *memoryProtoBook) GetProtocols(p peer.ID) ([]string, error) {
 }
 
 func (pb *memoryProtoBook) RemoveProtocols(p peer.ID, protos ...string) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+
 	s := pb.segments.get(p)
 	s.Lock()
 	defer s.Unlock()
@@ -130,6 +146,10 @@ func (pb *memoryProtoBook) RemoveProtocols(p peer.ID, protos ...string) error {
 }
 
 func (pb *memoryProtoBook) SupportsProtocols(p peer.ID, protos ...string) ([]string, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
+
 	s := pb.segments.get(p)
 	s.RLock()
 	defer s.RUnlock()
@@ -142,4 +162,21 @@ func (pb *memoryProtoBook) SupportsProtocols(p peer.ID, protos ...string) ([]str
 	}
 
 	return out, nil
+}
+
+func (pb *memoryProtoBook) FirstSupportedProtocol(p peer.ID, protos ...string) (string, error) {
+	if err := p.Validate(); err != nil {
+		return "", err
+	}
+
+	s := pb.segments.get(p)
+	s.RLock()
+	defer s.RUnlock()
+
+	for _, proto := range protos {
+		if _, ok := s.protocols[p][proto]; ok {
+			return proto, nil
+		}
+	}
+	return "", nil
 }

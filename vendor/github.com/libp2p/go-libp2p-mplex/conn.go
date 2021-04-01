@@ -17,12 +17,20 @@ func (c *conn) IsClosed() bool {
 
 // OpenStream creates a new stream.
 func (c *conn) OpenStream() (mux.MuxedStream, error) {
-	return c.mplex().NewStream()
+	s, err := c.mplex().NewStream()
+	if err != nil {
+		return nil, err
+	}
+	return (*stream)(s), nil
 }
 
 // AcceptStream accepts a stream opened by the other side.
 func (c *conn) AcceptStream() (mux.MuxedStream, error) {
-	return c.mplex().Accept()
+	s, err := c.mplex().Accept()
+	if err != nil {
+		return nil, err
+	}
+	return (*stream)(s), nil
 }
 
 func (c *conn) mplex() *mp.Multiplex {
