@@ -40,6 +40,9 @@ type Config struct {
 
 	// Specific configuration parameters for the backend
 	Config map[string]interface{}
+
+	// Path for the consensus protocol tos tore information
+	Path string
 }
 
 // Factory is the factory function to create a discovery backend
