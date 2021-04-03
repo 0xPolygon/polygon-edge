@@ -41,10 +41,21 @@ type Genesis struct {
 	Coinbase   types.Address                     `json:"coinbase"`
 	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 
+	// Computed field
+	Hash types.Hash `json:"-"`
+
 	// Only for testing
 	Number     uint64     `json:"number"`
 	GasUsed    uint64     `json:"gasUsed"`
 	ParentHash types.Hash `json:"parentHash"`
+}
+
+func (g *Genesis) ComputeHash(stateRoot types.Hash) {
+	// we need to get the header to get the hash
+	header := g.ToBlock()
+	header.StateRoot = stateRoot
+	header.ComputeHash()
+	g.Hash = header.Hash
 }
 
 func (g *Genesis) ToBlock() *types.Header {

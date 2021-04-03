@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/network/grpc"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -21,6 +23,14 @@ func grpcTransportFactory(ibft *Ibft2) (transport, error) {
 
 	ibft.network.Register(ibftProto, grpc)
 
+	// perform handshake after each node Connected
+	err := ibft.network.SubscribeFn(func(evnt *network.PeerEvent) {
+		panic("TODO")
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return &grpcTransport{ibft: ibft}, nil
 }
 
@@ -34,7 +44,7 @@ func (g *grpcTransport) Message(ctx context.Context, req *proto.MessageReq) (*em
 	return nil, nil
 }
 
-func (g *grpcTransport) Gossip(msg *proto.MessageReq) error {
+func (g *grpcTransport) Gossip(target []types.Address, msg *proto.MessageReq) error {
 	return nil
 }
 

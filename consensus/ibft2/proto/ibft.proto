@@ -8,7 +8,12 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
 
 service Ibft {
+    rpc Handshake(google.protobuf.Empty) returns (HandshakeResp);
     rpc Message(MessageReq) returns (google.protobuf.Empty);
+}
+
+message HandshakeResp {
+    string key = 1;
 }
 
 message MessageReq {
@@ -18,6 +23,7 @@ message MessageReq {
         Subject commit = 3;
         Subject roundChange = 4;
     }
+    string from = 10;
 }
 
 message Preprepare {

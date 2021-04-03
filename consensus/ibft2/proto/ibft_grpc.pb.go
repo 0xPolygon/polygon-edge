@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IbftClient interface {
+	Handshake(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*HandshakeResp, error)
 	Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
@@ -28,6 +29,15 @@ type ibftClient struct {
 
 func NewIbftClient(cc grpc.ClientConnInterface) IbftClient {
 	return &ibftClient{cc}
+}
+
+func (c *ibftClient) Handshake(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*HandshakeResp, error) {
+	out := new(HandshakeResp)
+	err := c.cc.Invoke(ctx, "/v1.Ibft/Handshake", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *ibftClient) Message(ctx context.Context, in *MessageReq, opts ...grpc.CallOption) (*empty.Empty, error) {
@@ -43,6 +53,7 @@ func (c *ibftClient) Message(ctx context.Context, in *MessageReq, opts ...grpc.C
 // All implementations must embed UnimplementedIbftServer
 // for forward compatibility
 type IbftServer interface {
+	Handshake(context.Context, *empty.Empty) (*HandshakeResp, error)
 	Message(context.Context, *MessageReq) (*empty.Empty, error)
 	mustEmbedUnimplementedIbftServer()
 }
@@ -51,6 +62,9 @@ type IbftServer interface {
 type UnimplementedIbftServer struct {
 }
 
+func (UnimplementedIbftServer) Handshake(context.Context, *empty.Empty) (*HandshakeResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Handshake not implemented")
+}
 func (UnimplementedIbftServer) Message(context.Context, *MessageReq) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Message not implemented")
 }
@@ -65,6 +79,24 @@ type UnsafeIbftServer interface {
 
 func RegisterIbftServer(s grpc.ServiceRegistrar, srv IbftServer) {
 	s.RegisterService(&Ibft_ServiceDesc, srv)
+}
+
+func _Ibft_Handshake_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(empty.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IbftServer).Handshake(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.Ibft/Handshake",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IbftServer).Handshake(ctx, req.(*empty.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Ibft_Message_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -92,6 +124,10 @@ var Ibft_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.Ibft",
 	HandlerType: (*IbftServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Handshake",
+			Handler:    _Ibft_Handshake_Handler,
+		},
 		{
 			MethodName: "Message",
 			Handler:    _Ibft_Message_Handler,

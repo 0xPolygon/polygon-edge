@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
-	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
@@ -49,6 +48,9 @@ type Server struct {
 
 	key   *ecdsa.PrivateKey // TODO: Remove
 	chain *chain.Chain
+
+	// state executor
+	executor *state.Executor
 
 	// jsonrpc stack
 	jsonrpcServer *jsonrpc.JSONRPC
@@ -89,7 +91,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
-	// Get the private key for the node
+	// Get the private key for the node (REMOVE)
 	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
 	key, err := keystore.Get()
 	if err != nil {
@@ -109,12 +111,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		}
 	}
 
-	storage, err := leveldb.NewLevelDBStorage(filepath.Join(config.DataDir, "blockchain"), logger)
-	if err != nil {
-		return nil, err
-	}
-	m.storage = storage
-
 	// start blockchain object
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
@@ -124,17 +120,21 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	executor := state.NewExecutor(config.Chain.Params, st)
-	executor.SetRuntime(precompiled.NewPrecompiled())
-	executor.SetRuntime(evm.NewEVM())
+	m.executor = state.NewExecutor(config.Chain.Params, st)
+	m.executor.SetRuntime(precompiled.NewPrecompiled())
+	m.executor.SetRuntime(evm.NewEVM())
+
+	// compute the genesis root state
+	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	config.Chain.Genesis.ComputeHash(genesisRoot)
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, storage, config.Chain, m.consensus, executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, m.consensus, m.executor)
 	if err != nil {
 		return nil, err
 	}
 
-	executor.GetHash = m.blockchain.GetHashHelper
+	m.executor.GetHash = m.blockchain.GetHashHelper
 
 	{
 		// start transaction pool
@@ -195,7 +195,7 @@ func (s *Server) setupConsensus() error {
 	}
 	config.Config["path"] = filepath.Join(s.config.DataDir, "consensus")
 
-	consensus, err := engine(context.Background(), config, s.txpool, s.blockchain, s.blockchain.Executor(), s.key, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), config, s.txpool, s.blockchain, s.executor, s.key, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -277,7 +277,7 @@ func (s *Server) setupJSONRPC() error {
 		state:      s.state,
 		Blockchain: s.blockchain,
 		TxPool:     s.txpool,
-		Executor:   s.blockchain.Executor(),
+		Executor:   s.executor,
 	}
 
 	conf := &jsonrpc.Config{

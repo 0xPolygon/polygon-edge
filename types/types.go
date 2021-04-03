@@ -11,6 +11,7 @@ import (
 )
 
 var ZeroAddress = Address{}
+var ZeroHash = Hash{}
 
 const (
 	HashLength    = 32
