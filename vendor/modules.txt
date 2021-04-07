@@ -77,9 +77,12 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-hclog v0.14.1
 ## explicit
 github.com/hashicorp/go-hclog
-# github.com/hashicorp/go-immutable-radix v1.0.0
+# github.com/hashicorp/go-immutable-radix v1.3.0
 ## explicit
 github.com/hashicorp/go-immutable-radix
+# github.com/hashicorp/go-memdb v1.3.2
+## explicit
+github.com/hashicorp/go-memdb
 # github.com/hashicorp/go-multierror v1.1.0
 ## explicit
 github.com/hashicorp/go-multierror

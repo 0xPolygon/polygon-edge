@@ -126,7 +126,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
-	config.Chain.Genesis.ComputeHash(genesisRoot)
+	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
 	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, m.consensus, m.executor)
