@@ -3,11 +3,16 @@ package ibft2
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"path/filepath"
 
+	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-memdb"
 )
+
+var snapshotID = "snapshot-id"
 
 var (
 	// Magic nonce number to vote on adding a new validator
@@ -25,7 +30,12 @@ func (i *Ibft2) setupSnapshot() error {
 	i.store = store
 
 	header := i.blockchain.Header()
-	if header.Number == 0 {
+	meta, err := i.getSnapshotMetadata()
+	if err != nil {
+		return err
+	}
+
+	if header.Number == 0 || meta.LastBlock == 0 {
 		extra, err := getIbftExtra(header)
 		if err != nil {
 			return err
@@ -41,6 +51,21 @@ func (i *Ibft2) setupSnapshot() error {
 			return err
 		}
 	}
+
+	// some of the data might get lost due to ungrateful disconnections
+	if header.Number > meta.LastBlock {
+		i.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
+
+		for num := meta.LastBlock + 1; num <= header.Number; num++ {
+			header, ok := i.blockchain.GetHeaderByNumber(num)
+			if !ok {
+				return fmt.Errorf("header %d not found", num)
+			}
+			if err := i.processHeaders([]*types.Header{header}); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -53,8 +78,6 @@ func (i *Ibft2) closeSnapshot() error {
 		return err
 	}
 
-	// TODO: In the future we do not need to store all the snapshots
-	// but we can skip those before the last checkpoint
 	snaps := []*Snapshot{}
 	for obj := it.Next(); obj != nil; obj = it.Next() {
 		snaps = append(snaps, obj.(*Snapshot))
@@ -64,10 +87,14 @@ func (i *Ibft2) closeSnapshot() error {
 		return err
 	}
 
-	// TODO (Store and load)
-	// TODO Do not process genesis if already processed here
-	fmt.Println(string(data))
+	if err := ioutil.WriteFile(i.snapshotsFilePath(), data, 0755); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (i *Ibft2) snapshotsFilePath() string {
+	return filepath.Join(i.config.Path, "snapshots")
 }
 
 func (i *Ibft2) processHeaders(headers []*types.Header) error {
@@ -100,7 +127,7 @@ func (i *Ibft2) processHeaders(headers []*types.Header) error {
 	for _, h := range headers {
 		number := h.Number
 
-		validator, err := ecrecover(h)
+		validator, err := ecrecoverFromHeader(h)
 		if err != nil {
 			return err
 		}
@@ -191,7 +218,38 @@ func (i *Ibft2) processHeaders(headers []*types.Header) error {
 			return nil
 		}
 	}
+
+	// update the metadata
+	if err := i.updateSnapshotMetadata(headers[len(headers)-1].Number); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (i *Ibft2) updateSnapshotMetadata(num uint64) error {
+	txn := i.store.Txn(true)
+	meta := &snapshotMetadata{
+		LastBlock: num,
+	}
+	if err := txn.Insert("meta", meta); err != nil {
+		return err
+	}
+	txn.Commit()
+	return nil
+}
+
+func (i *Ibft2) getSnapshotMetadata() (*snapshotMetadata, error) {
+	txn := i.store.Txn(false)
+	meta, err := txn.First("meta", "id")
+	if err != nil {
+		return nil, err
+	}
+	if meta == nil {
+		meta = &snapshotMetadata{
+			LastBlock: 0,
+		}
+	}
+	return meta.(*snapshotMetadata), nil
 }
 
 func (i *Ibft2) putSnapshot(snap *Snapshot) error {
@@ -316,6 +374,10 @@ type Snapshot struct {
 	Set ValidatorSet
 }
 
+type snapshotMetadata struct {
+	LastBlock uint64
+}
+
 func (s *Snapshot) Equal(ss *Snapshot) bool {
 	// we only check if Votes and Set are equal since Number and Hash
 	// are only meant to be used for indexing
@@ -364,6 +426,32 @@ func (s *Snapshot) Copy() *Snapshot {
 	return ss
 }
 
+func (s *Snapshot) ToProto() *proto.Snapshot {
+	resp := &proto.Snapshot{
+		Validators: []*proto.Snapshot_Validator{},
+		Votes:      []*proto.Snapshot_Vote{},
+		Number:     uint64(s.Number),
+		Hash:       s.Hash,
+	}
+
+	// add votes
+	for _, vote := range s.Votes {
+		resp.Votes = append(resp.Votes, &proto.Snapshot_Vote{
+			Validator: vote.Validator.String(),
+			Proposed:  vote.Address.String(),
+			Auth:      vote.Authorize,
+		})
+	}
+
+	// add addresses
+	for _, val := range s.Set {
+		resp.Validators = append(resp.Validators, &proto.Snapshot_Validator{
+			Address: val.String(),
+		})
+	}
+	return resp
+}
+
 // schema for the state
 var schema *memdb.DBSchema
 
@@ -385,6 +473,21 @@ func init() {
 					},
 				},
 			},
+			"meta": {
+				Name: "meta",
+				Indexes: map[string]*memdb.IndexSchema{
+					"id": {
+						Name:         "id",
+						AllowMissing: false,
+						Unique:       true,
+						Indexer:      singletonRecord, // we store only 1 metadata record
+					},
+				},
+			},
 		},
 	}
+}
+
+var singletonRecord = &memdb.ConditionalIndex{
+	Conditional: func(interface{}) (bool, error) { return true, nil },
 }

@@ -3,11 +3,13 @@ package ibft2
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"testing"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -463,6 +465,14 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				}
 			}
 
+			// check the metadata
+			meta, err := ibft.getSnapshotMetadata()
+			assert.NoError(t, err)
+
+			if meta.LastBlock != headers[len(headers)-1].Number {
+				t.Fatal("incorrect meta")
+			}
+
 			// Process headers all at the same time should have the same result
 			ibft1 := &Ibft2{
 				epochSize:  epoch,
@@ -490,7 +500,9 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 }
 
 func TestSnapshot_Store(t *testing.T) {
-	// TODO
+	//
+	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
+	assert.NoError(t, err)
 
 	pool := newTesterAccountPool()
 	pool.add("a")
@@ -499,6 +511,9 @@ func TestSnapshot_Store(t *testing.T) {
 	ibft1 := &Ibft2{
 		epochSize:  1000,
 		blockchain: blockchain.TestBlockchain(t, genesis),
+		config: &consensus.Config{
+			Path: tmpDir,
+		},
 	}
 	assert.NoError(t, ibft1.setupSnapshot())
 
@@ -525,13 +540,25 @@ func TestSnapshot_Store(t *testing.T) {
 		headers = append(headers, h)
 	}
 
-	err := ibft1.processHeaders(headers)
+	err = ibft1.processHeaders(headers)
 	assert.NoError(t, err)
 
-	ibft1.closeSnapshot()
-
+	assert.NoError(t, ibft1.closeSnapshot())
 }
 
 func TestCalcProposer(t *testing.T) {
 	// TODO TEST
+}
+
+func TestSnapshot_Metadata(t *testing.T) {
+	pool := newTesterAccountPool()
+	pool.add("a")
+
+	genesis := pool.genesis()
+	ibft := &Ibft2{
+		epochSize:  1000,
+		blockchain: blockchain.TestBlockchain(t, genesis),
+	}
+	assert.NoError(t, ibft.setupSnapshot())
+
 }

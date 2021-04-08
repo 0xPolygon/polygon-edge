@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func makeServers(t *testing.T, num int) []*Ibft2 {
@@ -177,35 +178,61 @@ func (m *mockTranport2) Listen() chan *proto.MessageReq {
 	return m.ch
 }
 
-func mockIbft(addr types.Address, pool *testerAccountPool, t *testing.T, msgs []*proto.MessageReq) *Ibft2 {
+type transitionMock struct {
+	*Ibft2
+
+	Transport *mockTranport2
+}
+
+func (t *transitionMock) emitMsg(msg *proto.MessageReq) {
+	t.Transport.ch <- msg
+}
+
+func mockIbft(addr *testerAccount, pool *testerAccountPool, t *testing.T, msgs []*proto.MessageReq) *transitionMock {
 	i := &Ibft2{
 		logger:           hclog.NewNullLogger(),
 		blockchain:       blockchain.TestBlockchain(t, pool.genesis()),
-		validatorKeyAddr: addr,
+		validatorKey:     addr.priv,
+		validatorKeyAddr: addr.Address(),
 		closeCh:          make(chan struct{}),
 		updateCh:         make(chan struct{}),
 		maxTimeoutRange:  1 * time.Second,
+		state2: &currentState{
+			view: &proto.View{},
+		},
 	}
 	assert.NoError(t, i.setupSnapshot())
-	ch := make(chan *proto.MessageReq)
-	go func() {
-		for _, msg := range msgs {
-			ch <- msg
-		}
-		// stop the client when there are no more messages
-		i.Close()
-	}()
-	i.transport = &mockTranport2{
-		ch: ch,
+	assert.NoError(t, i.createKey())
+
+	/*
+		ch := make(chan *proto.MessageReq)
+		go func() {
+			for _, msg := range msgs {
+				ch <- msg
+			}
+			// stop the client when there are no more messages
+			// i.Close()
+		}()
+	*/
+
+	transport := &mockTranport2{
+		ch: make(chan *proto.MessageReq),
 	}
+	i.transport = transport
 	go i.readMessages()
-	return i
+
+	mock := &transitionMock{
+		Ibft2:     i,
+		Transport: transport,
+	}
+	return mock
 }
 
 func TestTransition_AcceptState_ProposeBlock(t *testing.T) {
 	pool := newTesterAccountPool(5)
 
-	i := mockIbft(pool.indx(0).Address(), pool, t, nil)
+	i := mockIbft(pool.indx(0), pool, t, nil)
+	i.state2.view.Sequence = 1
 	i.runAcceptState()
 
 	// transition to AcceptState
@@ -217,29 +244,10 @@ func TestTransition_AcceptState_ProposeLockedBlock(t *testing.T) {
 
 }
 
-func TestTransition_AcceptState_Validator_WrongProposer(t *testing.T) {
-	pool := newTesterAccountPool(5)
-
-	msgs := []*proto.MessageReq{
-		proto.PreprepareMsg(pool.indx(2).Address(), &proto.Preprepare{
-			View: &proto.View{
-				Round:    0,
-				Sequence: 1,
-			},
-			Proposal: &proto.Proposal{},
-		}),
-	}
-	i := mockIbft(pool.indx(1).Address(), pool, t, msgs)
-	i.runAcceptState()
-
-	// the proposal was made from the wrong proposer
-	assert.True(t, i.isState(RoundChangeState))
-}
-
 func TestTransition_ValidateState_Timeout(t *testing.T) {
 	pool := newTesterAccountPool(5)
 
-	i := mockIbft(pool.indx(1).Address(), pool, t, nil)
+	i := mockIbft(pool.indx(1), pool, t, nil)
 	i.setState(ValidateState)
 	i.runValidateState()
 
@@ -264,7 +272,7 @@ func TestTransition_ValidateState_ReceivePrepare(t *testing.T) {
 			View: proto.ViewMsg(1, 0),
 		}),
 	}
-	i := mockIbft(pool.indx(0).Address(), pool, t, msgs)
+	i := mockIbft(pool.indx(0), pool, t, msgs)
 	i.state2 = &currentState{
 		view:       proto.ViewMsg(1, 0),
 		validators: pool.ValidatorSet(),
@@ -303,7 +311,7 @@ func TestTransition_ValidateState_CommitFastTrack(t *testing.T) {
 			View: proto.ViewMsg(1, 0),
 		}),
 	}
-	i := mockIbft(pool.indx(0).Address(), pool, t, msgs)
+	i := mockIbft(pool.indx(0), pool, t, msgs)
 	i.state2 = &currentState{
 		view:       proto.ViewMsg(1, 0),
 		validators: pool.ValidatorSet(),
@@ -327,6 +335,84 @@ func TestTransition_RoundChangeState_X(t *testing.T) {
 
 }
 
-func TestTransition_FailedCommit(t *testing.T) {
+func TestTransition_AcceptState_Proposer_Lock(t *testing.T) {
+	// If we are the proposer and there is a lock value we need to propose it
+}
+
+func TestTransition_AcceptState_Validator_VerifyFails(t *testing.T) {
+	// We are a validator waiting for Preprepare.
+	// We fail to verify the incomming header
+}
+
+func TestTransition_AcceptState_Validator_ProposerInvalid(t *testing.T) {
+	// We are a validator waiting for Preprepare but we receive messages
+	// from an invalid proposer
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C")
+
+	block := &types.Block{
+		Header: &types.Header{
+			ParentHash: pool.genesis().ToBlock().Hash,
+			Number:     1,
+		},
+	}
+
+	data := block.MarshalRLP()
+
+	i := mockIbft(pool.get("B"), pool, t, nil)
+	i.state2 = &currentState{
+		view: proto.ViewMsg(1, 0),
+	}
+	i.setState(AcceptState)
+
+	// wrong proposer
+	i.emitMsg(proto.PreprepareMsg(pool.get("C").Address(), &proto.Preprepare{
+		View: proto.ViewMsg(1, 0),
+		Proposal: &proto.Proposal{
+			Block: &anypb.Any{
+				Value: data,
+			},
+		},
+	}))
+	i.runCycle()
+
+	assert.True(t, i.isState(RoundChangeState))
+}
+
+func TestTransition_AcceptState_Validator_LockWrong(t *testing.T) {
+	// we are in locked state and we expect the prepare value to be
+	// the same as our locked value
+
+	pool := newTesterAccountPool()
+	pool.add("A", "B", "C")
+
+	i := mockIbft(pool.get("B"), pool, t, nil)
+
+	lockedBlock := &types.Block{
+		Header: &types.Header{
+			Number:     1,
+			ParentHash: i.blockchain.Header().Hash,
+			Timestamp:  100,
+		},
+	}
+	wrongBlock := &types.Block{
+		Header: &types.Header{
+			Number:     1,
+			ParentHash: i.blockchain.Header().Hash,
+			Timestamp:  200,
+		},
+	}
+	fmt.Println(wrongBlock)
+
+	i.state2 = &currentState{
+		view:   proto.ViewMsg(1, 0),
+		block:  lockedBlock,
+		locked: true,
+	}
+	i.setState(AcceptState)
+
+}
+
+func TestTransition_AcceptState_Validator_LockCorrect(t *testing.T) {
 
 }

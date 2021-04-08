@@ -10,7 +10,10 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/consensus/ibft2"
+	"github.com/0xPolygon/minimal/crypto"
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/mitchellh/cli"
 )
@@ -38,17 +41,26 @@ func (c *GenesisCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *GenesisCommand) Run(args []string) int {
-
 	flags := flag.NewFlagSet("genesis", flag.ContinueOnError)
 	flags.Usage = func() {}
 
 	var dataDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
+	var name string
+
+	// ibft flags
+	var ibft bool
+	var ibftValidators helperFlags.ArrayFlags
+	var ibftValidatorsPrefixPath string
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
+	flags.StringVar(&name, "name", "example", "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", 100, "")
+	flags.BoolVar(&ibft, "ibft", false, "")
+	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
+	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -66,21 +78,60 @@ func (c *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
+	var bootnodes chain.Bootnodes
+	var extraData []byte
+
+	// determine engine
+	consensus := "pow"
+	if ibft {
+		// extradata
+		consensus = "ibft"
+
+		// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
+		var validators []types.Address
+		if len(ibftValidators) != 0 {
+			for _, val := range ibftValidators {
+				validators = append(validators, types.StringToAddress(val))
+			}
+		} else if ibftValidatorsPrefixPath != "" {
+			// read all folders with the ibftValidatorsPrefixPath and search for
+			// istambul addresses and also include the bootnodes if possible
+			if validators, bootnodes, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
+				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
+				return 1
+			}
+
+		} else {
+			c.UI.Error("cannot load validators for ibft")
+			return 1
+		}
+
+		// create the initial extra data with the validators
+		ibftExtra := &ibft2.IstanbulExtra{
+			Validators:    validators,
+			Seal:          []byte{},
+			CommittedSeal: [][]byte{},
+		}
+		extraData = make([]byte, types.IstanbulExtraVanity)
+		extraData = ibftExtra.MarshalRLPTo(extraData)
+	}
+
 	cc := &chain.Chain{
-		Name: "example",
+		Name: name,
 		Genesis: &chain.Genesis{
 			GasLimit:   5000,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
+			ExtraData:  extraData,
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
 			Forks:   &chain.Forks{},
 			Engine: map[string]interface{}{
-				"pow": map[string]interface{}{},
+				consensus: map[string]interface{}{},
 			},
 		},
-		Bootnodes: chain.Bootnodes{},
+		Bootnodes: bootnodes,
 	}
 
 	if len(premine) != 0 {
@@ -119,4 +170,58 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	c.UI.Info(fmt.Sprintf("Genesis written to %s", genesisPath))
 	return 0
+}
+
+func readValidatorsByRegexp(prefix string) ([]types.Address, []string, error) {
+	validators := []types.Address{}
+	bootnodes := []string{}
+
+	files, err := ioutil.ReadDir(".")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bootnodePort := 10001
+	for _, file := range files {
+		path := file.Name()
+		if !file.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(path, prefix) {
+			continue
+		}
+
+		// try to read key from the filepath/consensus/<key> path
+		possibleConsensusPath := filepath.Join(path, "consensus", ibft2.IbftKeyName)
+
+		// check if path exists
+		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {
+			continue
+		}
+
+		priv, err := crypto.ReadPrivKey(possibleConsensusPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
+
+		// check if the libp2p path exists too
+		if _, err := os.Stat(filepath.Join(path, "libp2p", network.Libp2pKeyName)); os.IsNotExist(err) {
+			continue
+		}
+		libp2pKey, err := network.ReadLibp2pKey(filepath.Join(path, "libp2p"))
+		if err != nil {
+			return nil, nil, err
+		}
+		peerID, err := network.IDFromPriv(libp2pKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		addr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePort, peerID.String())
+		bootnodes = append(bootnodes, addr)
+
+		bootnodePort += 10000
+	}
+
+	return validators, bootnodes, nil
 }

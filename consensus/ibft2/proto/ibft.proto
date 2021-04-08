@@ -24,6 +24,12 @@ message MessageReq {
         Subject roundChange = 4;
     }
     string from = 10;
+
+    // commited seal if its a commit message
+    string seal = 11;
+
+    // signed signature
+    string signature = 12;
 }
 
 message Preprepare {

@@ -458,8 +458,8 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
 
-	fmt.Println("-- parent --")
-	fmt.Println(parent.Number, parent.Hash)
+	//fmt.Println("-- parent --")
+	//fmt.Println(parent.Number, parent.Hash)
 
 	// validate chain
 	for i := 0; i < size; i++ {
@@ -663,12 +663,20 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 }
 
 func (b *Blockchain) dispatchEvent(evnt *Event) {
+
+	fmt.Println("__ DISPATCH EVENT __")
+	fmt.Println(evnt.Type)
+
 	b.stream.push(evnt)
 }
 
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	head := b.Header()
+
+	fmt.Println("XXXXXXXXXX")
+	fmt.Println(header.ParentHash)
+	fmt.Println(head.Hash)
 
 	// Write the data
 	if header.ParentHash == head.Hash {

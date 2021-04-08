@@ -103,3 +103,36 @@ Monitor the blockchain events (i.e forks, reorgs...) in node 2.
 ```
 $ go run main.go monitor --address localhost:20000
 ```
+
+## Ibft
+
+Init some data folders for ibft
+
+```
+$ go run main.go ibft init --data-dir test-chain-1
+$ Done!
+$ go run main.go ibft init --data-dir test-chain-2
+$ Done!
+$ go run main.go ibft init --data-dir test-chain-3
+$ Done!
+```
+
+Generate an ibft genesis file with the previous accounts as validators
+
+```
+$ go run main.go genesis --ibft --ibft-validators-prefix-path test-chain-
+```
+
+Run all the clients.
+
+```
+$ go run main.go server --data-dir ./test-chain-1 --chain genesis.json --grpc :10000 --libp2p :10001 --jsonrpc :10002 --seal
+```
+
+```
+$ go run main.go server --data-dir ./test-chain-2 --chain genesis.json --grpc :20000 --libp2p :20001 --jsonrpc :20002 --seal
+```
+
+```
+$ go run main.go server --data-dir ./test-chain-3 --chain genesis.json --grpc :30000 --libp2p :30001 --jsonrpc :30002 --seal
+```

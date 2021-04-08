@@ -1,13 +1,12 @@
 package ibft2
 
 import (
-	"context"
+	"fmt"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/empty"
 )
 
 var ibftProto = "/ibft/0.1"
@@ -40,11 +39,9 @@ type grpcTransport struct {
 	ibft *Ibft2
 }
 
-func (g *grpcTransport) Message(ctx context.Context, req *proto.MessageReq) (*empty.Empty, error) {
-	return nil, nil
-}
-
 func (g *grpcTransport) Gossip(target []types.Address, msg *proto.MessageReq) error {
+	fmt.Println("__ GOSSIP __")
+
 	return nil
 }
 

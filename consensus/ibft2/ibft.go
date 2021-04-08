@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
@@ -22,10 +23,12 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-memdb"
+	"google.golang.org/grpc"
 )
 
 type blockchainInterface interface {
 	Header() *types.Header
+	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlocks(blocks []*types.Block) error
 }
 
@@ -52,9 +55,6 @@ type Ibft2 struct {
 	msgQueue     msgQueueImpl
 	updateCh     chan struct{}
 
-	// TODOOOO: We take this info from the blockchain
-	// validators []types.Address
-
 	network *network.Server
 
 	transportFactory transportFactory
@@ -63,7 +63,11 @@ type Ibft2 struct {
 	maxTimeoutRange time.Duration
 }
 
-func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, blockchain *blockchain.Blockchain, executor *state.Executor, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
+var (
+	maxDefaultTimeoutRange = 100 * time.Second
+)
+
+func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
 	p := &Ibft2{
 		logger:           logger.Named("ibft2"),
 		config:           config,
@@ -72,30 +76,36 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		closeCh:          make(chan struct{}),
 		transportFactory: grpcTransportFactory,
 		state2:           &currentState{},
-		//preprepareCh:     make(chan *proto.MessageReq, 10),
-		//commitCh:         make(chan *proto.MessageReq, 10),
-		//prepareCh:        make(chan *proto.MessageReq, 10),
+		network:          network,
+		maxTimeoutRange:  maxDefaultTimeoutRange,
+		epochSize:        100000,
 	}
-	p.createKey()
-	return p, nil
-}
 
-func (i *Ibft2) setup() error {
-	db, err := memdb.NewMemDB(schema)
-	if err != nil {
-		return err
+	// register the grpc operator
+	proto.RegisterOperatorServer(srv, &operator{i: p})
+
+	if err := p.createKey(); err != nil {
+		return nil, err
 	}
-	i.store = db
-	return nil
+
+	p.logger.Info("validator key", "addr", p.validatorKeyAddr.String())
+
+	// start the snapshot
+	if err := p.setupSnapshot(); err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 func (i *Ibft2) createKey() error {
 	i.msgQueue = msgQueueImpl{}
+	i.closeCh = make(chan struct{})
 	i.updateCh = make(chan struct{})
 
 	if i.validatorKey == nil {
 		// generate a validator private key
-		validatorKey, err := crypto.ReadPrivKey(filepath.Join(i.config.Path, "validator.key"))
+		validatorKey, err := crypto.ReadPrivKey(filepath.Join(i.config.Path, IbftKeyName))
 		if err != nil {
 			return err
 		}
@@ -104,6 +114,8 @@ func (i *Ibft2) createKey() error {
 	}
 	return nil
 }
+
+const IbftKeyName = "validator.key"
 
 type IbftState uint32
 
@@ -145,16 +157,24 @@ func (i IbftState) String() string {
 func (i *Ibft2) readMessages() {
 	ch := i.transport.Listen()
 
+	fmt.Println("-- ch ..")
+	fmt.Println(ch)
+
 	for {
 		msg := <-ch
-		fmt.Println("-- read msg --")
-		fmt.Println(msg)
 		i.pushMessage(msg)
 	}
 }
 
 func (i *Ibft2) start() {
+	fmt.Println("START")
 	go i.readMessages()
+
+	// initialize the round (DUMMY)
+	i.state2.view = &proto.View{
+		Round:    0,
+		Sequence: 1,
+	}
 
 	for {
 		select {
@@ -163,20 +183,23 @@ func (i *Ibft2) start() {
 		default:
 		}
 
-		switch i.getState() {
-		case AcceptState:
-			i.runAcceptState()
+		i.runCycle()
+	}
+}
 
-		case ValidateState:
-			i.runValidateState()
+func (i *Ibft2) runCycle() {
+	switch i.getState() {
+	case AcceptState:
+		i.runAcceptState()
 
-		case RoundChangeState:
-			i.runRoundChangeState()
+	case ValidateState:
+		i.runValidateState()
 
-		case CommitState:
-			fmt.Println("_ OUT _")
-			return
-		}
+	case RoundChangeState:
+		i.runRoundChangeState()
+
+	case CommitState:
+		return
 	}
 }
 
@@ -206,6 +229,12 @@ type currentState struct {
 	locked bool
 }
 
+func (c *currentState) resetRoundMsgs() {
+	c.prepared = map[types.Address]*proto.MessageReq{}
+	c.committed = map[types.Address]*proto.MessageReq{}
+	c.roundMessages = map[uint64]map[types.Address]*proto.MessageReq{}
+}
+
 func (c *currentState) CalcProposer() {
 	c.proposer = c.validators.CalcProposer(c.view.Round, types.ZeroAddress)
 }
@@ -218,9 +247,9 @@ func (c *currentState) isLocked() bool {
 	return c.locked
 }
 
-func (c *currentState) resetProposal() {
+func (c *currentState) unlock() {
 	c.block = nil
-	// messages...
+	c.locked = false
 }
 
 func (c *currentState) cleanRound(round uint64) {
@@ -311,14 +340,42 @@ func (c *currentState) Subject() *proto.Subject {
 	}
 }
 
-func (i *Ibft2) buildBlock(parent *types.Header) *types.Block {
+var defaultBlockPeriod = 1
+
+func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
+	fmt.Println("-- parent hash --")
+	fmt.Println(parent.Hash)
+
+	header := &types.Header{
+		ParentHash: parent.Hash,
+		Number:     parent.Number + 1,
+		Miner:      types.Address{},
+		Nonce:      types.Nonce{},
+		MixHash:    types.IstanbulDigest,
+		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
+		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
+		Sha3Uncles: types.EmptyUncleHash,
+	}
+
+	// set timestamp
+	header.Timestamp = parent.Timestamp + uint64(defaultBlockPeriod)
+	if int64(header.Timestamp) < time.Now().Unix() {
+		header.Timestamp = uint64(time.Now().Unix())
+	}
+
+	// we need to include in the extra field the current set of validators
+	putIbftExtraValidators(header, snap.Set)
+
+	// write the seal of the block
+	var err error
+	header, err = writeSeal(i.validatorKey, header)
+	if err != nil {
+		panic(err)
+	}
+
 	// TODO: Gather transactions
 	block := &types.Block{
-		Header: &types.Header{
-			ParentHash: parent.Hash,
-			Number:     parent.Number + 1,
-			Miner:      i.validatorKeyAddr,
-		},
+		Header: header,
 	}
 
 	// compute the hash
@@ -333,44 +390,55 @@ func (i *Ibft2) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 
+	fmt.Println("-- parent --")
+	fmt.Println(parent)
+	fmt.Println(parent.Hash)
+
 	// TODO: get validators
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		panic(err)
 	}
 
-	// define the current state
-	i.state2 = &currentState{
-		validators: snap.Set,
-		view: &proto.View{
-			Round:    0,
-			Sequence: number,
-		},
-	}
+	fmt.Println("-- snap --")
+	fmt.Println(snap.Set)
+
+	i.state2.validators = snap.Set
+
+	fmt.Println("-- validators --")
+	fmt.Println(i.state2.validators)
+
+	// reset round messages
+	i.state2.resetRoundMsgs()
 
 	// select the proposer of the block
 	i.state2.CalcProposer()
-	i.logger.Info("proposer calculated", "proposer", i.state2.proposer, "block", number)
-
-	// TODO: Reset roundchange state
 
 	if i.state2.proposer == i.validatorKeyAddr {
+		i.logger.Info("we are the proposer", "block", number)
+
 		if !i.state2.locked {
 			// since the state is not locked, we need to build a new block
-			i.state2.block = i.buildBlock(parent)
+			i.state2.block = i.buildBlock(snap, parent)
 		}
 
+		fmt.Println("Xxx")
+		fmt.Println(i.state2.block.Number())
+
 		// send the preprepare message as an RLP encoded block
-		i.sendPreprepare()
+		i.sendPreprepareMsg()
 
 		// send the prepare message since we are ready to move the state
-		i.sendPrepare()
+		i.sendPrepareMsg()
 
 		// move to validation state for new prepare messages
 		i.setState(ValidateState)
 		return
 	}
 
+	i.logger.Info("proposer calculated", "proposer", i.state2.proposer, "block", number)
+
+	fmt.Println("_ WRA RR")
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
@@ -382,6 +450,10 @@ func (i *Ibft2) runAcceptState() { // start new round
 
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(closeCh)
+
+		fmt.Println("-- msg --")
+		fmt.Println(msg, ok)
+
 		if !ok {
 			return
 		}
@@ -406,23 +478,28 @@ func (i *Ibft2) runAcceptState() { // start new round
 			// the state is locked, we need to receive the same block
 			if block.Hash() == i.state2.block.Hash() {
 				// fast-track and send a commit message and wait for validations
-				i.sendCommit()
+				i.sendCommitMsg()
 				i.setState(ValidateState)
 			} else {
 				i.sendNextRoundChange()
 			}
 		} else {
-			i.state2.block = block
+			// since its a new block, we have to verify it first
+			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+				i.sendNextRoundChange()
+			} else {
+				i.state2.block = block
 
-			// send prepare message and wait for validations
-			i.sendPrepare()
-			i.setState(ValidateState)
+				// send prepare message and wait for validations
+				i.sendPrepareMsg()
+				i.setState(ValidateState)
+			}
 		}
 	}
 }
 
 func (i *Ibft2) runValidateState() {
-	timer := i.randomTimeout(10 * time.Second)
+	timer := i.randomTimeout()
 
 	hasCommited := false
 	sendCommit := func() {
@@ -432,7 +509,7 @@ func (i *Ibft2) runValidateState() {
 
 		if !hasCommited {
 			// send the commit message
-			i.sendCommit()
+			i.sendCommitMsg()
 			hasCommited = true
 		}
 	}
@@ -470,9 +547,9 @@ func (i *Ibft2) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Message)))
 		}
 
-		fmt.Println("-- min faulty nodes --")
-		fmt.Println(i.state2.MinFaultyNodes())
-		fmt.Println(i.state2.numCommited())
+		//fmt.Println("-- min faulty nodes --")
+		//fmt.Println(i.state2.MinFaultyNodes())
+		//fmt.Println(i.state2.numCommited())
 
 		if i.state2.numPrepared() > 2*i.state2.MinFaultyNodes() {
 			// we have received enough pre-prepare messages
@@ -490,18 +567,43 @@ func (i *Ibft2) runValidateState() {
 
 	if i.getState() == CommitState {
 		// write the block!!
-		/**
+
+		// gather all the seals from commit messages
+		committedSeals := [][]byte{}
+		for _, commit := range i.state2.committed {
+			committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal)) // TODO: Validate
+		}
+
+		var err error
+
+		block := i.state2.block
+		block.Header, err = writeCommittedSeals(block.Header, committedSeals)
+		if err != nil {
+			panic(err)
+		}
+
+		// we need to recompute the hash since we have change extra-data
+		block.Header.ComputeHash()
+
 		fmt.Println("-- write block --")
-		if err := i.blockchain.WriteBlocks([]*types.Block{i.state2.block}); err != nil {
+		if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 			panic(err)
 		}
 		fmt.Println("-- correct --")
-		*/
+
+		// unlock everything
+		i.state2.unlock()
+
+		//if block.Header.Number == 2 {
+		//	panic("X")
+		//}
 		i.setState(AcceptState)
 	}
 }
 
 func (i *Ibft2) runRoundChangeState() {
+	panic("BAD")
+
 	/*
 		if !c.waitingForRoundChange {
 			maxRound := c.roundChangeSet.MaxRound(c.valSet.F() + 1)
@@ -570,18 +672,21 @@ func (i *Ibft2) sendRoundChange(round uint64) {
 	// clean the round
 	i.state2.cleanRound(round)
 
-	// Gossip
-	i.transport.Gossip(i.state2.validators, &proto.MessageReq{
-		Message: &proto.MessageReq_RoundChange{},
-	})
+	i.sendRoundChangeMsg()
 }
 
 // --- com wrappers ---
 
-func (i *Ibft2) sendPreprepare() {
+func (i *Ibft2) sendRoundChangeMsg() {
+	i.gossip(i.state2.validators, &proto.MessageReq{
+		Message: &proto.MessageReq_RoundChange{},
+	})
+}
+
+func (i *Ibft2) sendPreprepareMsg() {
 	blockRlp := i.state2.block.MarshalRLP()
 
-	i.transport.Gossip(i.state2.validators, &proto.MessageReq{
+	i.gossip(i.state2.validators, &proto.MessageReq{
 		Message: &proto.MessageReq_Preprepare{
 			Preprepare: &proto.Preprepare{
 				View: i.state2.view,
@@ -595,20 +700,53 @@ func (i *Ibft2) sendPreprepare() {
 	})
 }
 
-func (i *Ibft2) sendPrepare() {
-	i.transport.Gossip(i.state2.validators, &proto.MessageReq{
+func (i *Ibft2) sendPrepareMsg() {
+	i.gossip(i.state2.validators, &proto.MessageReq{
 		Message: &proto.MessageReq_Prepare{
 			Prepare: i.state2.Subject(),
 		},
 	})
 }
 
-func (i *Ibft2) sendCommit() {
-	i.transport.Gossip(i.state2.validators, &proto.MessageReq{
+func (i *Ibft2) sendCommitMsg() {
+	i.gossip(i.state2.validators, &proto.MessageReq{
 		Message: &proto.MessageReq_Commit{
 			Commit: i.state2.Subject(),
 		},
 	})
+}
+
+func (i *Ibft2) gossip(target []types.Address, msg *proto.MessageReq) {
+	// Add the sender of the message
+	msg.From = i.validatorKeyAddr.String()
+
+	// if the message is commit, we need to add the committed seal
+	if _, ok := msg.Message.(*proto.MessageReq_Commit); ok {
+		seal, err := writeCommittedSeal(i.validatorKey, i.state2.block.Header)
+		if err != nil {
+			panic(err)
+		}
+		msg.Seal = hex.EncodeToHex(seal)
+	}
+
+	if _, ok := msg.Message.(*proto.MessageReq_Preprepare); !ok {
+		// copy msg
+		msg2 := msg.Copy()
+		i.pushMessage(msg2)
+	}
+
+	// sign the message
+	signMsg, err := msg.PayloadNoSig()
+	if err != nil {
+		panic(err)
+	}
+	sig, err := crypto.Sign(i.validatorKey, crypto.Keccak256(signMsg))
+	if err != nil {
+		panic(err)
+	}
+	msg.Signature = hex.EncodeToHex(sig)
+
+	i.transport.Gossip(target, msg)
 }
 
 func (i *Ibft2) getState() IbftState {
@@ -627,12 +765,11 @@ func (i *Ibft2) setState(s IbftState) {
 	atomic.StoreUint64(stateAddr, uint64(s))
 }
 
-func (i *Ibft2) randomTimeout(minVal time.Duration) <-chan time.Time {
+func (i *Ibft2) randomTimeout() <-chan time.Time {
 	return time.After(i.maxTimeoutRange)
 }
 
 func (i *Ibft2) StartSeal() {
-
 	// start the transport protocol
 	transport, err := i.transportFactory(i)
 	if err != nil {
@@ -647,23 +784,54 @@ func (i *Ibft2) run() {
 	i.start()
 }
 
+func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
+	// ensure the extra data is correctly formatted
+	if _, err := getIbftExtra(header); err != nil {
+		return err
+	}
+	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
+		return fmt.Errorf("invalid nonce")
+	}
+	if header.MixHash != types.IstanbulDigest {
+		return fmt.Errorf("invalid mixhash")
+	}
+	if header.Sha3Uncles != types.EmptyUncleHash {
+		return fmt.Errorf("invalid sha3 uncles")
+	}
+
+	// verify the sealer
+	if err := verifySigner(snap, header); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (i *Ibft2) VerifyHeader(parent, header *types.Header) error {
+	fmt.Println("__ VERIFY HEADER __")
+
+	snap, err := i.getSnapshot(parent.Number)
+	if err != nil {
+		return err
+	}
+	// verify all the header fields + seal
+	if err := i.verifyHeaderImpl(snap, parent, header); err != nil {
+		return err
+	}
+	// verify the commited seals
+	if err := verifyCommitedFields(snap, header); err != nil {
+		return err
+	}
+
+	// process the new block in order to update the snapshot
+	if err := i.processHeaders([]*types.Header{header}); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (i *Ibft2) Close() error {
 	close(i.closeCh)
 	return nil
-}
-
-// TODO REMOVE
-func (i *Ibft2) Prepare(header *types.Header) error {
-	return nil
-}
-
-// TODO REMOVE
-func (i *Ibft2) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
-	return nil, nil
 }
 
 type Validators []types.Address
@@ -713,9 +881,9 @@ func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 	}
 	for {
 		msg := i.popMessage()
-		fmt.Println("--sssss")
-		fmt.Println(msg)
 		if msg != nil {
+			i.logger.Debug("process message")
+			fmt.Println(msg)
 			return msg, true
 		}
 
@@ -761,9 +929,7 @@ func (i *Ibft2) pushMessage(msg *proto.MessageReq) {
 		msg:  msgType,
 		obj:  msg,
 	}
-	fmt.Println("- -push -")
 	heap.Push(&i.msgQueue, task)
-	fmt.Println(i.msgQueue)
 	i.msgQueueLock.Unlock()
 
 	select {

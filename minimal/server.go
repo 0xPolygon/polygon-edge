@@ -2,7 +2,6 @@ package minimal
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol"
@@ -46,7 +44,7 @@ type Server struct {
 	blockchain *blockchain.Blockchain
 	storage    storage.Storage
 
-	key   *ecdsa.PrivateKey // TODO: Remove
+	// key   *ecdsa.PrivateKey // TODO: Remove
 	chain *chain.Chain
 
 	// state executor
@@ -87,17 +85,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := setupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
-
-	// Get the private key for the node (REMOVE)
-	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
-	key, err := keystore.Get()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
-	}
-	m.key = key
 
 	// start libp2p
 	{
@@ -105,10 +95,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 
-		m.network, err = network.NewServer(logger, netConfig)
+		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
 			return nil, err
 		}
+		m.network = network
 	}
 
 	// start blockchain object
@@ -160,11 +151,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.Sealer.SetEnabled(m.config.Seal)
 	*/
 
-	if m.config.Seal {
-		m.logger.Info("sealing enabled")
-		m.consensus.StartSeal()
-	}
-
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
@@ -179,6 +165,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
 	m.syncer.Start()
 
+	if m.config.Seal {
+		m.logger.Info("sealing enabled")
+		m.consensus.StartSeal()
+	}
+
 	return m, nil
 }
 
@@ -192,10 +183,9 @@ func (s *Server) setupConsensus() error {
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: s.config.ConsensusConfig,
+		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	config.Config["path"] = filepath.Join(s.config.DataDir, "consensus")
-
-	consensus, err := engine(context.Background(), config, s.txpool, s.blockchain, s.executor, s.key, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -353,7 +343,7 @@ func addPath(paths []string, path string, entries map[string]*Entry) []string {
 	return newpath
 }
 
-func setupDataDir(dataDir string, paths []string) error {
+func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
 	}

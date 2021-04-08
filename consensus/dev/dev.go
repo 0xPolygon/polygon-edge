@@ -2,15 +2,16 @@ package dev
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc"
 )
 
 // Dev consensus protocol seals any new transaction inmediatly
@@ -26,7 +27,7 @@ type Dev struct {
 	executor   *state.Executor
 }
 
-func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, blockchain *blockchain.Blockchain, executor *state.Executor, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
 	logger = logger.Named("dev")
 
 	d := &Dev{

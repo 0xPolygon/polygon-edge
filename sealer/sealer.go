@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
@@ -191,81 +190,83 @@ func (s *Sealer) sealAsync(ctx context.Context) chan struct{} {
 }
 
 func (s *Sealer) seal(ctx context.Context) error {
-	parent := s.blockchain.Header()
+	/*
+		parent := s.blockchain.Header()
 
-	num := parent.Number
-	header := &types.Header{
-		ParentHash: parent.Hash,
-		Number:     num + 1,
-		GasLimit:   100000000, // placeholder for now
-		Timestamp:  uint64(time.Now().Unix()),
-		Miner:      s.config.Coinbase,
-		ExtraData:  s.config.Extra,
-	}
-
-	if err := s.engine.Prepare(header); err != nil {
-		return err
-	}
-
-	transition, err := s.executor.BeginTxn(parent.StateRoot, header)
-	if err != nil {
-		return err
-	}
-
-	/// GET THE TRANSACTIONS
-
-	pricedTxs, err := s.txPool.sortTxns(transition.Txn(), parent)
-	if err != nil {
-		return err
-	}
-
-	/// PROCESS THE TRANSACTIONS
-
-	txns := []*types.Transaction{}
-	for {
-		val := pricedTxs.Pop()
-		if val == nil {
-			break
+		num := parent.Number
+		header := &types.Header{
+			ParentHash: parent.Hash,
+			Number:     num + 1,
+			GasLimit:   100000000, // placeholder for now
+			Timestamp:  uint64(time.Now().Unix()),
+			Miner:      s.config.Coinbase,
+			ExtraData:  s.config.Extra,
 		}
 
-		msg := val.tx
-		txns = append(txns, msg)
-
-		if err := transition.Write(msg); err != nil {
-			break
+		if err := s.engine.Prepare(header); err != nil {
+			return err
 		}
+
+		transition, err := s.executor.BeginTxn(parent.StateRoot, header)
+		if err != nil {
+			return err
+		}
+
+		/// GET THE TRANSACTIONS
+
+		pricedTxs, err := s.txPool.sortTxns(transition.Txn(), parent)
+		if err != nil {
+			return err
+		}
+
+		/// PROCESS THE TRANSACTIONS
+
+		txns := []*types.Transaction{}
+		for {
+			val := pricedTxs.Pop()
+			if val == nil {
+				break
+			}
+
+			msg := val.tx
+			txns = append(txns, msg)
+
+			if err := transition.Write(msg); err != nil {
+				break
+			}
+			if ctx.Err() != nil {
+				return nil
+			}
+		}
+
+		_, root := transition.Commit()
+
+		header.StateRoot = root
+		header.GasUsed = transition.TotalGas()
+		block := generateNewBlock(header, txns, transition.Receipts())
+
+		// Start the consensus sealing
+		s.logger.Debug("seal block", "num", block.Number())
+		block, err = s.engine.Seal(block, ctx)
+		if err != nil {
+			return err
+		}
+		if block == nil {
+			return nil
+		}
+
+		// Check if the context was cancelled while in the sealing routine
 		if ctx.Err() != nil {
 			return nil
 		}
-	}
 
-	_, root := transition.Commit()
+		// Write the new blocks
+		if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+			return fmt.Errorf("failed to write sealed block: %v", err)
+		}
 
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-	block := generateNewBlock(header, txns, transition.Receipts())
-
-	// Start the consensus sealing
-	s.logger.Debug("seal block", "num", block.Number())
-	block, err = s.engine.Seal(block, ctx)
-	if err != nil {
-		return err
-	}
-	if block == nil {
-		return nil
-	}
-
-	// Check if the context was cancelled while in the sealing routine
-	if ctx.Err() != nil {
-		return nil
-	}
-
-	// Write the new blocks
-	if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		return fmt.Errorf("failed to write sealed block: %v", err)
-	}
-
-	s.logger.Info("Block sealed", "number", num+1, "hash", block.Header.Hash)
+		s.logger.Info("Block sealed", "number", num+1, "hash", block.Header.Hash)
+	*/
 	return nil
 }
 
