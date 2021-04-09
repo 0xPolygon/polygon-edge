@@ -60,6 +60,7 @@ type Ibft2 struct {
 	transportFactory transportFactory
 	transport        transport
 
+	operator        *operator
 	maxTimeoutRange time.Duration
 }
 
@@ -82,7 +83,8 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	}
 
 	// register the grpc operator
-	proto.RegisterOperatorServer(srv, &operator{i: p})
+	p.operator = &operator{i: p}
+	proto.RegisterOperatorServer(srv, p.operator)
 
 	if err := p.createKey(); err != nil {
 		return nil, err
@@ -235,8 +237,8 @@ func (c *currentState) resetRoundMsgs() {
 	c.roundMessages = map[uint64]map[types.Address]*proto.MessageReq{}
 }
 
-func (c *currentState) CalcProposer() {
-	c.proposer = c.validators.CalcProposer(c.view.Round, types.ZeroAddress)
+func (c *currentState) CalcProposer(lastProposer types.Address) {
+	c.proposer = c.validators.CalcProposer(c.view.Round, lastProposer)
 }
 
 func (c *currentState) lock() {
@@ -340,7 +342,7 @@ func (c *currentState) Subject() *proto.Subject {
 	}
 }
 
-var defaultBlockPeriod = 1
+var defaultBlockPeriod = 1 * time.Second
 
 func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	fmt.Println("-- parent hash --")
@@ -357,11 +359,23 @@ func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 		Sha3Uncles: types.EmptyUncleHash,
 	}
 
-	// set timestamp
-	header.Timestamp = parent.Timestamp + uint64(defaultBlockPeriod)
-	if int64(header.Timestamp) < time.Now().Unix() {
-		header.Timestamp = uint64(time.Now().Unix())
+	// try to pick a candidate
+	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
+		header.Miner = types.StringToAddress(candidate.Address)
+		if candidate.Auth {
+			header.Nonce = nonceAuthVote
+		} else {
+			header.Nonce = nonceDropVote
+		}
 	}
+
+	// set the timestamp
+	parentTime := time.Unix(int64(parent.Timestamp), 0)
+	headerTime := parentTime.Add(defaultBlockPeriod)
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
+	}
+	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -412,7 +426,13 @@ func (i *Ibft2) runAcceptState() { // start new round
 	i.state2.resetRoundMsgs()
 
 	// select the proposer of the block
-	i.state2.CalcProposer()
+	var lastProposer types.Address
+	if parent.Number != 0 {
+		lastProposer, _ = ecrecoverFromHeader(parent)
+	}
+	fmt.Println("-- last proposer --")
+	fmt.Println(lastProposer)
+	i.state2.CalcProposer(lastProposer)
 
 	if i.state2.proposer == i.validatorKeyAddr {
 		i.logger.Info("we are the proposer", "block", number)
@@ -420,10 +440,15 @@ func (i *Ibft2) runAcceptState() { // start new round
 		if !i.state2.locked {
 			// since the state is not locked, we need to build a new block
 			i.state2.block = i.buildBlock(snap, parent)
-		}
 
-		fmt.Println("Xxx")
-		fmt.Println(i.state2.block.Number())
+			// calculate how much time do we have to wait to mine the block
+			delay := time.Since(time.Unix(int64(i.state2.block.Header.Timestamp), 0))
+			fmt.Println("-- delay --")
+			fmt.Println(delay)
+
+			// TODO: Close if process is closed
+			time.Sleep(1 * time.Second)
+		}
 
 		// send the preprepare message as an RLP encoded block
 		i.sendPreprepareMsg()
@@ -797,6 +822,10 @@ func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) e
 	}
 	if header.Sha3Uncles != types.EmptyUncleHash {
 		return fmt.Errorf("invalid sha3 uncles")
+	}
+	// difficulty has to match number
+	if header.Difficulty != header.Number {
+		return fmt.Errorf("wrong difficulty")
 	}
 
 	// verify the sealer

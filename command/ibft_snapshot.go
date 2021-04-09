@@ -3,7 +3,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
@@ -27,20 +26,12 @@ func (p *IbftSnapshot) Synopsis() string {
 // Run implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Run(args []string) int {
 	flags := p.FlagSet("ibft snapshot")
+
+	// query a specific snapshot
+	number := flags.Uint64("number", 0, "")
+
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
-		return 1
-	}
-
-	args = flags.Args()
-	if len(args) != 1 {
-		p.UI.Error("number expected")
-		return 1
-	}
-
-	num, err := strconv.Atoi(args[0])
-	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to parse snapshot number: %v", err))
 		return 1
 	}
 
@@ -50,8 +41,15 @@ func (p *IbftSnapshot) Run(args []string) int {
 		return 1
 	}
 
+	req := &proto.SnapshotReq{
+		Latest: number == nil,
+	}
+	if number != nil {
+		req.Number = *number
+	}
+
 	clt := ibftOp.NewOperatorClient(conn)
-	resp, err := clt.GetSnapshot(context.Background(), &proto.SnapshotReq{Number: uint64(num)})
+	resp, err := clt.GetSnapshot(context.Background(), req)
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

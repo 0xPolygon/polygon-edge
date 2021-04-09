@@ -663,10 +663,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 }
 
 func (b *Blockchain) dispatchEvent(evnt *Event) {
-
-	fmt.Println("__ DISPATCH EVENT __")
-	fmt.Println(evnt.Type)
-
 	b.stream.push(evnt)
 }
 

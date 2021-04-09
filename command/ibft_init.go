@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2"
@@ -45,7 +46,8 @@ func (p *IbftInit) Run(args []string) int {
 	}
 
 	// try to write the ibft private key
-	if _, err := crypto.ReadPrivKey(filepath.Join(pathName, "consensus", ibft2.IbftKeyName)); err != nil {
+	key, err := crypto.ReadPrivKey(filepath.Join(pathName, "consensus", ibft2.IbftKeyName))
+	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
@@ -56,6 +58,7 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
+	p.UI.Output(fmt.Sprintf("Public key: %s", crypto.PubKeyToAddress(&key.PublicKey)))
 	p.UI.Output("Done!")
 	return 0
 }

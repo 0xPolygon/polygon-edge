@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -37,7 +38,19 @@ func (p *IbftCandidates) Run(args []string) int {
 	}
 
 	clt := ibftOp.NewOperatorClient(conn)
-	clt.Candidates(context.Background(), &empty.Empty{})
+	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
+	if err != nil {
+		p.UI.Error(err.Error())
+		return 1
+	}
 
+	if len(resp.Candidates) == 0 {
+		p.UI.Output("No candidates")
+		return 0
+	}
+
+	for _, c := range resp.Candidates {
+		p.UI.Output(fmt.Sprintf("%s %v", c.Address, c.Auth))
+	}
 	return 0
 }

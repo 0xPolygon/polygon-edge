@@ -13,7 +13,8 @@ service Operator {
 }
 
 message SnapshotReq {
-    uint64 number = 1;
+    bool latest = 1;
+    uint64 number = 2;
 }
 
 message Snapshot {

@@ -142,15 +142,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
-	/*
-		// Setup sealer
-		sealerConfig := &sealer.Config{
-			Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
-		}
-		m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
-		m.Sealer.SetEnabled(m.config.Seal)
-	*/
-
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
@@ -284,8 +275,6 @@ func (s *Server) setupJSONRPC() error {
 }
 
 func (s *Server) setupGRPC() error {
-	s.grpcServer = grpc.NewServer()
-
 	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())

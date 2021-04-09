@@ -4,15 +4,11 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/types"
 )
 
 var ibftProto = "/ibft/0.1"
-
-// TODO: As soon as you connect with them you have to exchange the keys
-// and include it on the metadata
 
 func grpcTransportFactory(ibft *Ibft2) (transport, error) {
 	srv := &grpcTransport{ibft: ibft}
@@ -21,15 +17,6 @@ func grpcTransportFactory(ibft *Ibft2) (transport, error) {
 	proto.RegisterIbftServer(grpc.GrpcServer(), srv)
 
 	ibft.network.Register(ibftProto, grpc)
-
-	// perform handshake after each node Connected
-	err := ibft.network.SubscribeFn(func(evnt *network.PeerEvent) {
-		panic("TODO")
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	return &grpcTransport{ibft: ibft}, nil
 }
 

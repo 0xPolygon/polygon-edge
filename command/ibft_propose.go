@@ -1,8 +1,11 @@
 package command
 
 import (
-	"fmt"
-	"strconv"
+	"context"
+
+	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // IbftPropose is the command to query the snapshot
@@ -23,8 +26,19 @@ func (p *IbftPropose) Synopsis() string {
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
 	flags := p.FlagSet("ibft propose")
+
+	var add, del bool
+	flags.BoolVar(&add, "add", false, "add")
+	flags.BoolVar(&del, "del", false, "del")
+
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
+		return 1
+	}
+
+	if add == del {
+		// either (add=true, del=true) or (add=false, del=false)
+		p.UI.Error("only one of add and del needs to be set")
 		return 1
 	}
 
@@ -34,9 +48,9 @@ func (p *IbftPropose) Run(args []string) int {
 		return 1
 	}
 
-	num, err := strconv.Atoi(args[0])
-	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to parse snapshot number: %v", err))
+	var addr types.Address
+	if err := addr.UnmarshalText([]byte(args[0])); err != nil {
+		p.UI.Error("failed to decode addr")
 		return 1
 	}
 
@@ -45,8 +59,16 @@ func (p *IbftPropose) Run(args []string) int {
 		p.UI.Error(err.Error())
 		return 1
 	}
-	fmt.Println(conn)
-	fmt.Println(num)
 
+	clt := ibftOp.NewOperatorClient(conn)
+	req := &proto.Candidate{
+		Address: addr.String(),
+		Auth:    add,
+	}
+	_, err = clt.Propose(context.Background(), req)
+	if err != nil {
+		p.UI.Error(err.Error())
+		return 1
+	}
 	return 0
 }

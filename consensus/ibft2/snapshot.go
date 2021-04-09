@@ -12,8 +12,6 @@ import (
 	"github.com/hashicorp/go-memdb"
 )
 
-var snapshotID = "snapshot-id"
-
 var (
 	// Magic nonce number to vote on adding a new validator
 	nonceAuthVote = types.Nonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
@@ -67,6 +65,18 @@ func (i *Ibft2) setupSnapshot() error {
 		}
 	}
 	return nil
+}
+
+func (i *Ibft2) getLatestSnapshot() (*Snapshot, error) {
+	meta, err := i.getSnapshotMetadata()
+	if err != nil {
+		return nil, err
+	}
+	snap, err := i.getSnapshot(meta.LastBlock)
+	if err != nil {
+		return nil, err
+	}
+	return snap, nil
 }
 
 func (i *Ibft2) closeSnapshot() error {
