@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/golang/protobuf/ptypes/empty"
+
+	"github.com/0xPolygon/minimal/e2e/framework"
 )
 
 func TestPOW(t *testing.T) {
@@ -24,7 +25,7 @@ func TestPOW(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Current.Number != 0 {
+	if status.Current.Number == 0 {
 		t.Fatal("it has not advanced")
 	}
 }

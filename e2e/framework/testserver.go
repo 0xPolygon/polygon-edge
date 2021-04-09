@@ -13,22 +13,27 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
+
+	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/types"
 )
 
+// Configuration for the test server
 type TestServerConfig struct {
-	JsonRPCPort  int64
-	GRPCPort     int64
-	LibP2PPort   int64
-	Seal         bool
-	DataDir      string
-	PremineAccts map[types.Address]*big.Int
+	JsonRPCPort  int64                      // The JSON RPC endpoint port
+	GRPCPort     int64                      // The GRPC endpoint port
+	LibP2PPort   int64                      // The Libp2p endpoint port
+	Seal         bool                       // Flag indicating if blocks should be sealed
+	DataDir      string                     // The directory for the data files
+	PremineAccts map[types.Address]*big.Int // Accounts with existing balances (genesis accounts)
 }
 
+// CALLBACKS //
+
+// Premine callback specifies an account with a balance (in WEI)
 func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
 		t.PremineAccts = map[types.Address]*big.Int{}
@@ -88,12 +93,14 @@ func (t *TestServer) Stop() {
 func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer {
 	path := "polygon-sdk"
 
+	// Sets the services to start on open ports
 	config := &TestServerConfig{
 		JsonRPCPort: getOpenPort(),
 		GRPCPort:    getOpenPort(),
 		LibP2PPort:  getOpenPort(),
 	}
 
+	// Sets the data directory
 	dataDir, err := ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
 	if err != nil {
 		t.Fatal(err)
