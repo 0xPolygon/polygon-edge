@@ -25,6 +25,8 @@ func TestDiscovery(t *testing.T) {
 		}
 	}()
 
+	time.Sleep(5 * time.Second)
+
 	p2pAddrs := make([]string, NumOfNodes)
 	for i, s := range srvs {
 		status, err := s.Operator().GetStatus(context.Background(), &empty.Empty{})
