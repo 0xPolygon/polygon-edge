@@ -25,7 +25,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
-		// P2PAddr: AddrInfoToString(s.s.AddrInfo()),
+		P2PAddr: network.AddrInfoToString(s.s.network.AddrInfo()),
 	}
 	return status, nil
 }
@@ -77,38 +77,34 @@ func (s *systemService) PeersStatus(ctx context.Context, req *proto.PeersStatusR
 }
 
 func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
-	/*
-		protocols, err := s.s.host.Peerstore().GetProtocols(id)
-		if err != nil {
-			return nil, err
-		}
-		info := s.s.host.Peerstore().PeerInfo(id)
-		addrs := []string{}
-		for _, addr := range info.Addrs {
-			addrs = append(addrs, addr.String())
-		}
-		peer := &proto.Peer{
-			Id:        id.String(),
-			Protocols: protocols,
-			Addrs:     addrs,
-		}
-	*/
-	return nil, nil
+	protocols, err := s.s.network.GetProtocols(id)
+	if err != nil {
+		return nil, err
+	}
+	info := s.s.network.GetPeerInfo(id)
+	addrs := []string{}
+	for _, addr := range info.Addrs {
+		addrs = append(addrs, addr.String())
+	}
+	peer := &proto.Peer{
+		Id:        id.String(),
+		Protocols: protocols,
+		Addrs:     addrs,
+	}
+	return peer, nil
 }
 
 func (s *systemService) PeersList(ctx context.Context, req *empty.Empty) (*proto.PeersListResponse, error) {
 	resp := &proto.PeersListResponse{
 		Peers: []*proto.Peer{},
 	}
-	/*
-		ids := s.s.host.Peerstore().Peers()
-		for _, id := range ids {
-			peer, err := s.getPeer(id)
-			if err != nil {
-				return nil, err
-			}
-			resp.Peers = append(resp.Peers, peer)
+	peers := s.s.network.Peers()
+	for _, p := range peers {
+		peer, err := s.getPeer(p.Info.ID)
+		if err != nil {
+			return nil, err
 		}
-	*/
+		resp.Peers = append(resp.Peers, peer)
+	}
 	return resp, nil
 }
