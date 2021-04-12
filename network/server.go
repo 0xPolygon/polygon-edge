@@ -217,8 +217,27 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 
+func (s *Server) Peers() []*Peer {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	peers := make([]*Peer, 0, len(s.peers))
+	for _, p := range s.peers {
+		peers = append(peers, p)
+	}
+	return peers
+}
+
 func (s *Server) isConnected(peerID peer.ID) bool {
 	return s.host.Network().Connectedness(peerID) == network.Connected
+}
+
+func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
+	return s.host.Peerstore().GetProtocols(peerID)
+}
+
+func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
+	return s.host.Peerstore().PeerInfo(peerID)
 }
 
 func (s *Server) addPeer(id peer.ID) {
