@@ -29,6 +29,7 @@ type TestServerConfig struct {
 	Seal         bool                       // Flag indicating if blocks should be sealed
 	DataDir      string                     // The directory for the data files
 	PremineAccts map[types.Address]*big.Int // Accounts with existing balances (genesis accounts)
+	DevMode      bool                       // Toggles the dev mode
 }
 
 // CALLBACKS //
@@ -39,6 +40,16 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 		t.PremineAccts = map[types.Address]*big.Int{}
 	}
 	t.PremineAccts[addr] = amount
+}
+
+// SetDev callback toggles the dev mode
+func (t *TestServerConfig) SetDev(state bool) {
+	t.DevMode = state
+}
+
+// SetSeal callback toggles the seal mode
+func (t *TestServerConfig) SetSeal(state bool) {
+	t.Seal = state
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -148,6 +159,10 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 
 	if config.Seal {
 		args = append(args, "--seal")
+	}
+
+	if config.DevMode {
+		args = append(args, "--dev")
 	}
 
 	stdout := io.Writer(os.Stdout)

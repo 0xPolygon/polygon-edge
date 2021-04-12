@@ -11,3 +11,7 @@ test-chain*
 
 # Exclude the build .exe file from version control
 main.exe
+main
+
+# MacOS Leftovers
+.DS_Store
