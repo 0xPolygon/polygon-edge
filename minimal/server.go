@@ -2,7 +2,6 @@ package minimal
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"os"
@@ -10,11 +9,9 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
-	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol"
@@ -47,8 +44,11 @@ type Server struct {
 	blockchain *blockchain.Blockchain
 	storage    storage.Storage
 
-	key   *ecdsa.PrivateKey // TODO: Remove
+	// key   *ecdsa.PrivateKey // TODO: Remove
 	chain *chain.Chain
+
+	// state executor
+	executor *state.Executor
 
 	// jsonrpc stack
 	jsonrpcServer *jsonrpc.JSONRPC
@@ -85,17 +85,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := setupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
-
-	// Get the private key for the node
-	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
-	key, err := keystore.Get()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
-	}
-	m.key = key
 
 	// start libp2p
 	{
@@ -103,17 +95,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 
-		m.network, err = network.NewServer(logger, netConfig)
+		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
 			return nil, err
 		}
+		m.network = network
 	}
-
-	storage, err := leveldb.NewLevelDBStorage(filepath.Join(config.DataDir, "blockchain"), logger)
-	if err != nil {
-		return nil, err
-	}
-	m.storage = storage
 
 	// start blockchain object
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
@@ -124,17 +111,21 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	executor := state.NewExecutor(config.Chain.Params, st)
-	executor.SetRuntime(precompiled.NewPrecompiled())
-	executor.SetRuntime(evm.NewEVM())
+	m.executor = state.NewExecutor(config.Chain.Params, st)
+	m.executor.SetRuntime(precompiled.NewPrecompiled())
+	m.executor.SetRuntime(evm.NewEVM())
+
+	// compute the genesis root state
+	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, storage, config.Chain, m.consensus, executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, m.consensus, m.executor)
 	if err != nil {
 		return nil, err
 	}
 
-	executor.GetHash = m.blockchain.GetHashHelper
+	m.executor.GetHash = m.blockchain.GetHashHelper
 
 	{
 		// start transaction pool
@@ -151,20 +142,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
-	/*
-		// Setup sealer
-		sealerConfig := &sealer.Config{
-			Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
-		}
-		m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
-		m.Sealer.SetEnabled(m.config.Seal)
-	*/
-
-	if m.config.Seal {
-		m.logger.Info("sealing enabled")
-		m.consensus.StartSeal()
-	}
-
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
@@ -179,6 +156,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
 	m.syncer.Start()
 
+	if m.config.Seal {
+		m.logger.Info("sealing enabled")
+		m.consensus.StartSeal()
+	}
+
 	return m, nil
 }
 
@@ -192,10 +174,9 @@ func (s *Server) setupConsensus() error {
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: s.config.ConsensusConfig,
+		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	config.Config["path"] = filepath.Join(s.config.DataDir, "consensus")
-
-	consensus, err := engine(context.Background(), config, s.txpool, s.blockchain, s.blockchain.Executor(), s.key, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -277,7 +258,7 @@ func (s *Server) setupJSONRPC() error {
 		state:      s.state,
 		Blockchain: s.blockchain,
 		TxPool:     s.txpool,
-		Executor:   s.blockchain.Executor(),
+		Executor:   s.executor,
 	}
 
 	conf := &jsonrpc.Config{
@@ -294,8 +275,6 @@ func (s *Server) setupJSONRPC() error {
 }
 
 func (s *Server) setupGRPC() error {
-	s.grpcServer = grpc.NewServer()
-
 	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
@@ -353,7 +332,7 @@ func addPath(paths []string, path string, entries map[string]*Entry) []string {
 	return newpath
 }
 
-func setupDataDir(dataDir string, paths []string) error {
+func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
 	}

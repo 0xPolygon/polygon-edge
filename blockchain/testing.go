@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
@@ -187,11 +186,6 @@ func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [
 
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
-	s, err := memory.NewMemoryStorage(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	genesis := &chain.Genesis{
 		Number:   0,
 		GasLimit: 0,
@@ -207,7 +201,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b, err := NewBlockchain(hclog.NewNullLogger(), s, config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,4 +232,32 @@ func createGenesis(header *types.Header) *chain.Genesis {
 		Timestamp:  header.Timestamp,
 	}
 	return genesis
+}
+
+type mockVerifier struct {
+}
+
+func (m *mockVerifier) VerifyHeader(parent, header *types.Header) error {
+	return nil
+}
+
+type mockExecutor struct {
+}
+
+func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*state.BlockResult, error) {
+	return &state.BlockResult{}, nil
+}
+
+func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
+	if genesis == nil {
+		genesis = &chain.Genesis{}
+	}
+	config := &chain.Chain{
+		Genesis: genesis,
+	}
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &mockVerifier{}, &mockExecutor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

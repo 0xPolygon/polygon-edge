@@ -4,14 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
+	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/0xPolygon/minimal/types/buildroot"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
@@ -30,7 +32,7 @@ type Blockchain struct {
 
 	db        storage.Storage
 	consensus Verifier
-	executor  *state.Executor
+	executor  Executor
 
 	config  *chain.Chain
 	genesis types.Hash
@@ -58,6 +60,10 @@ type Verifier interface {
 	VerifyHeader(parent, header *types.Header) error
 }
 
+type Executor interface {
+	ProcessBlock(parentRoot types.Hash, block *types.Block) (*state.BlockResult, error)
+}
+
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
 func (b *Blockchain) UpdateGasPriceAvg(newValue *big.Int) {
 	b.agpMux.Lock()
@@ -78,15 +84,27 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 }
 
 // NewBlockchain creates a new blockchain object
-func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain, consensus Verifier, executor *state.Executor) (*Blockchain, error) {
+func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, consensus Verifier, executor Executor) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
-		db:        db,
 		consensus: consensus,
 		executor:  executor,
 		stream:    &eventStream{},
 	}
+
+	var storage storage.Storage
+	var err error
+	if dataDir == "" {
+		if storage, err = memory.NewMemoryStorage(nil); err != nil {
+			return nil, err
+		}
+	} else {
+		if storage, err = leveldb.NewLevelDBStorage(filepath.Join(dataDir, "blockchain"), logger); err != nil {
+			return nil, err
+		}
+	}
+	b.db = storage
 
 	b.headersCache, _ = lru.New(100)
 	b.bodiesCache, _ = lru.New(100)
@@ -104,7 +122,7 @@ func NewBlockchain(logger hclog.Logger, db storage.Storage, config *chain.Chain,
 			return nil, fmt.Errorf("failed to load genesis hash")
 		}
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.computeGenesisHeader(config.Genesis).Hash {
+		if b.genesis != config.Genesis.Hash() {
 			return nil, fmt.Errorf("genesis file does not match current genesis")
 		}
 		header, ok := b.GetHeaderByHash(head)
@@ -165,10 +183,6 @@ func (b *Blockchain) GetBlock(hash types.Hash, number uint64, full bool) (*types
 	return b.GetBlockByHash(hash, full)
 }
 
-func (b *Blockchain) Executor() *state.Executor {
-	return b.executor
-}
-
 // GetParent return the parent
 func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 	return b.readHeader(header.ParentHash)
@@ -179,18 +193,9 @@ func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
 }
 
-func (b *Blockchain) computeGenesisHeader(genesis *chain.Genesis) *types.Header {
-	root := b.executor.WriteGenesis(genesis.Alloc)
-
-	header := genesis.ToBlock()
-	header.StateRoot = root
-	header.ComputeHash()
-
-	return header
-}
-
 func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
-	header := b.computeGenesisHeader(genesis)
+	header := genesis.ToBlock()
+	header.ComputeHash()
 
 	if err := b.writeGenesisImpl(header); err != nil {
 		return err
@@ -453,6 +458,9 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
 
+	//fmt.Println("-- parent --")
+	//fmt.Println(parent.Number, parent.Hash)
+
 	// validate chain
 	for i := 0; i < size; i++ {
 		block := blocks[i]
@@ -468,14 +476,16 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 		// This is not necessary.
 
-		// verify body data
-		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
-		}
-		// TODO, the wrapper around transactions
-		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
-			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
-		}
+		/*
+			// verify body data
+			if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+				return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
+			}
+			// TODO, the wrapper around transactions
+			if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+				return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
+			}
+		*/
 		parent = block.Header
 	}
 
@@ -520,26 +530,30 @@ func (b *Blockchain) processBlock(block *types.Block) error {
 	if !ok {
 		return fmt.Errorf("unknown ancestor 1")
 	}
-	transition, root, err := b.executor.ProcessBlock(parent.StateRoot, block)
+	_, err := b.executor.ProcessBlock(parent.StateRoot, block)
 	if err != nil {
 		return err
 	}
 
-	// validate the fields
-	if root != header.StateRoot {
-		return fmt.Errorf("invalid merkle root")
-	}
-	if transition.TotalGas() != header.GasUsed {
-		return fmt.Errorf("gas used is different")
-	}
-	receiptSha := buildroot.CalculateReceiptsRoot(transition.Receipts())
-	if receiptSha != header.ReceiptsRoot {
-		return fmt.Errorf("invalid receipts root")
-	}
-	rbloom := types.CreateBloom(transition.Receipts())
-	if rbloom != header.LogsBloom {
-		return fmt.Errorf("invalid receipts bloom")
-	}
+	/*
+		// TODO: Add again
+		// validate the fields
+		if result.Root != header.StateRoot {
+			return fmt.Errorf("invalid merkle root")
+		}
+		if result.TotalGas != header.GasUsed {
+			return fmt.Errorf("gas used is different")
+		}
+		receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
+		if receiptSha != header.ReceiptsRoot {
+			return fmt.Errorf("invalid receipts root")
+		}
+		rbloom := types.CreateBloom(result.Receipts)
+		if rbloom != header.LogsBloom {
+			return fmt.Errorf("invalid receipts bloom")
+		}
+	*/
+
 	return nil
 }
 
@@ -655,6 +669,10 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	head := b.Header()
+
+	fmt.Println("XXXXXXXXXX")
+	fmt.Println(header.ParentHash)
+	fmt.Println(head.Hash)
 
 	// Write the data
 	if header.ParentHash == head.Hash {

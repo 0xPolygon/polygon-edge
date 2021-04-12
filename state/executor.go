@@ -81,21 +81,33 @@ func (e *Executor) SetRuntime(r runtime.Runtime) {
 	e.runtimes = append(e.runtimes, r)
 }
 
+type BlockResult struct {
+	Root     types.Hash
+	Receipts []*types.Receipt
+	TotalGas uint64
+}
+
 // ProcessBlock already does all the handling of the whole process, TODO
-func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*Transition, types.Hash, error) {
+func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*BlockResult, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header)
 	if err != nil {
-		return nil, types.Hash{}, err
+		return nil, err
 	}
 
 	txn.block = block
 	for _, t := range block.Transactions {
 		if err := txn.Write(t); err != nil {
-			return nil, types.Hash{}, err
+			return nil, err
 		}
 	}
 	_, root := txn.Commit()
-	return txn, root, nil
+
+	res := &BlockResult{
+		Root:     root,
+		Receipts: txn.Receipts(),
+		TotalGas: txn.TotalGas(),
+	}
+	return res, nil
 }
 
 // StateAt returns snapshot at given root

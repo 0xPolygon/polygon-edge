@@ -101,16 +101,16 @@ func (valSet *defaultSet) CalcProposer(lastProposer types.Address, round uint64)
 	valSet.proposer = valSet.selector(valSet, lastProposer, round)
 }
 
+func emptyAddress(addr types.Address) bool {
+	return addr == types.Address{}
+}
+
 func calcSeed(valSet ibft.ValidatorSet, proposer types.Address, round uint64) uint64 {
 	offset := 0
 	if idx, val := valSet.GetByAddress(proposer); val != nil {
 		offset = idx
 	}
 	return uint64(offset) + round
-}
-
-func emptyAddress(addr types.Address) bool {
-	return addr == types.Address{}
 }
 
 func roundRobinProposer(valSet ibft.ValidatorSet, proposer types.Address, round uint64) ibft.Validator {

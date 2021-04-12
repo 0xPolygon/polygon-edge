@@ -41,6 +41,9 @@ type Genesis struct {
 	Coinbase   types.Address                     `json:"coinbase"`
 	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 
+	// Override
+	StateRoot types.Hash
+
 	// Only for testing
 	Number     uint64     `json:"number"`
 	GasUsed    uint64     `json:"gasUsed"`
@@ -48,6 +51,10 @@ type Genesis struct {
 }
 
 func (g *Genesis) ToBlock() *types.Header {
+	stateRoot := types.EmptyRootHash
+	if g.StateRoot != types.ZeroHash {
+		stateRoot = g.StateRoot
+	}
 	head := &types.Header{
 		Number:       g.Number,
 		Nonce:        g.Nonce,
@@ -59,6 +66,7 @@ func (g *Genesis) ToBlock() *types.Header {
 		Difficulty:   g.Difficulty,
 		MixHash:      g.Mixhash,
 		Miner:        g.Coinbase,
+		StateRoot:    stateRoot,
 		Sha3Uncles:   types.EmptyUncleHash,
 		ReceiptsRoot: types.EmptyRootHash,
 		TxRoot:       types.EmptyRootHash,
@@ -70,6 +78,12 @@ func (g *Genesis) ToBlock() *types.Header {
 		head.Difficulty = GenesisDifficulty.Uint64()
 	}
 	return head
+}
+
+func (g *Genesis) Hash() types.Hash {
+	header := g.ToBlock()
+	header.ComputeHash()
+	return header.Hash
 }
 
 // Decoding

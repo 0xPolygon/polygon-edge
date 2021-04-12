@@ -19,6 +19,7 @@ protoc:
 	protoc --go_out=. --go-grpc_out=. ./network/proto/test/*.proto
 	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
+	protoc --go_out=. --go-grpc_out=. ./consensus/ibft2/proto/*.proto
 
 .PHONY: clean-ibft-dir
 clean-ibft-dir:

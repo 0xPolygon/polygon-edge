@@ -2,7 +2,6 @@ package pow
 
 import (
 	"context"
-	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
 	"math"
@@ -12,10 +11,12 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -32,7 +33,7 @@ type Pow struct {
 	closeCh    chan struct{}
 }
 
-func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, blockchain *blockchain.Blockchain, executor *state.Executor, privateKey *ecdsa.PrivateKey, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
 	p := &Pow{
 		logger:     logger.Named("pow"),
 		blockchain: blockchain,

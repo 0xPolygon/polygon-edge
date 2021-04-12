@@ -42,6 +42,10 @@ func (s *skeleton) build(clt proto.V1Client, ancestor types.Hash) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("- skeleton headers -")
+	fmt.Println(headers)
+
 	s.addSkeleton(headers)
 	return nil
 }

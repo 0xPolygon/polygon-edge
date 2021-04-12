@@ -10,6 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 )
 
+var Libp2pKeyName = "libp2p.key"
+
 func ReadLibp2pKey(dataDir string) (crypto.PrivKey, error) {
 	if dataDir == "" {
 		// use an in-memory key
@@ -20,7 +22,7 @@ func ReadLibp2pKey(dataDir string) (crypto.PrivKey, error) {
 		return priv, nil
 	}
 
-	path := filepath.Join(dataDir, "libp2p")
+	path := filepath.Join(dataDir, Libp2pKeyName)
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("failed to stat (%s): %v", path, err)
