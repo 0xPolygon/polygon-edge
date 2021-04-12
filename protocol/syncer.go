@@ -316,11 +316,9 @@ func (s *Syncer) syncWithPeer(p *syncPeer) {
 
 		// sync the data
 		for _, slot := range sk.slots {
-			/*
-				for _, b := range slot.blocks {
-					fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
-				}
-			*/
+			for _, b := range slot.blocks {
+				fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
+			}
 			if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
 				panic(err)
 			}
@@ -328,7 +326,12 @@ func (s *Syncer) syncWithPeer(p *syncPeer) {
 
 		// try to get the next block
 		startBlock = sk.LastHeader()
-		if startBlock.Number == uint64(target.Number) {
+
+		fmt.Println("- start block -")
+		fmt.Println(startBlock.Number)
+		fmt.Println(target.Number)
+
+		if startBlock.Number >= uint64(target.Number) {
 			break
 		}
 	}
