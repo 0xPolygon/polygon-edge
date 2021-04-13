@@ -284,7 +284,7 @@ func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 	return diff, nil
 }
 
-// CommitBodies writes the bodies
+// CommitBodies writes the bodies (TODO: Remove)
 func (b *Blockchain) CommitBodies(headers []types.Hash, bodies []*types.Body) error {
 	if len(headers) != len(bodies) {
 		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(bodies))
@@ -298,7 +298,7 @@ func (b *Blockchain) CommitBodies(headers []types.Hash, bodies []*types.Body) er
 	return nil
 }
 
-// CommitReceipts writes the receipts
+// CommitReceipts writes the receipts (TODO: Remove)
 func (b *Blockchain) CommitReceipts(headers []types.Hash, receipts [][]*types.Receipt) error {
 	if len(headers) != len(receipts) {
 		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(receipts))
@@ -312,7 +312,7 @@ func (b *Blockchain) CommitReceipts(headers []types.Hash, receipts [][]*types.Re
 }
 
 // CommitChain writes all the other data related to the chain (body and receipts).
-// TODO: I think this function is not used anymore.
+// TODO: I think this function is not used anymore. (TODO: Remove)
 func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Receipt) error {
 	if len(blocks) != len(receipts) {
 		return fmt.Errorf("length dont match. %d and %d", len(blocks), len(receipts))
@@ -493,18 +493,21 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	for indx, block := range blocks {
 		header := block.Header
 
-		body := block.Body()
-		if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
+		if err := b.writeBody(block); err != nil {
 			return err
 		}
-		b.bodiesCache.Add(block.Header.Hash, body)
 
 		// Verify uncles. It requires to have the bodies on memory
 		if err := b.VerifyUncles(block); err != nil {
 			return err
 		}
 		// Process and validate the block
-		if err := b.processBlock(blocks[indx]); err != nil {
+		res, err := b.processBlock(blocks[indx])
+		if err != nil {
+			return err
+		}
+		// write the receipts
+		if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
 			return err
 		}
 
@@ -522,39 +525,67 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	return nil
 }
 
-func (b *Blockchain) processBlock(block *types.Block) error {
+func (b *Blockchain) writeBody(block *types.Block) error {
+	body := block.Body()
+
+	// write the full body (txns + receipts)
+	if err := b.db.WriteBody(block.Header.Hash, body); err != nil {
+		return err
+	}
+
+	// write txn lookups (txhash -> block)
+	for _, txn := range block.Transactions {
+		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
+			return err
+		}
+	}
+
+	b.bodiesCache.Add(block.Header.Hash, body)
+	return nil
+}
+
+func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
+	return b.db.ReadTxLookup(hash)
+}
+
+func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error) {
 	header := block.Header
 
 	// process the block
 	parent, ok := b.readHeader(header.ParentHash)
 	if !ok {
-		return fmt.Errorf("unknown ancestor 1")
+		return nil, fmt.Errorf("unknown ancestor 1")
 	}
-	_, err := b.executor.ProcessBlock(parent.StateRoot, block)
+	result, err := b.executor.ProcessBlock(parent.StateRoot, block)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	receipts := result.Receipts
+	if len(receipts) != len(block.Transactions) {
+		return nil, fmt.Errorf("bad size of receipts and transactions")
 	}
 
 	/*
-		// TODO: Add again
+		ADD AGAIN LATER
 		// validate the fields
 		if result.Root != header.StateRoot {
-			return fmt.Errorf("invalid merkle root")
+			return nil, fmt.Errorf("invalid merkle root")
 		}
 		if result.TotalGas != header.GasUsed {
-			return fmt.Errorf("gas used is different")
+			return nil, fmt.Errorf("gas used is different")
 		}
 		receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
 		if receiptSha != header.ReceiptsRoot {
-			return fmt.Errorf("invalid receipts root")
+			return nil, fmt.Errorf("invalid receipts root")
 		}
 		rbloom := types.CreateBloom(result.Receipts)
 		if rbloom != header.LogsBloom {
-			return fmt.Errorf("invalid receipts bloom")
+			return nil, fmt.Errorf("invalid receipts bloom")
 		}
 	*/
 
-	return nil
+	return result, nil
 }
 
 var emptyFrom = types.Address{}
@@ -669,10 +700,6 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 // WriteHeader writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	head := b.Header()
-
-	fmt.Println("XXXXXXXXXX")
-	fmt.Println(header.ParentHash)
-	fmt.Println(head.Hash)
 
 	// Write the data
 	if header.ParentHash == head.Hash {

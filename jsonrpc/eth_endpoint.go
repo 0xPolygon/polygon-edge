@@ -117,28 +117,63 @@ func (e *Eth) SendTransaction(params map[string]interface{}) (interface{}, error
 	return txn.Hash.String(), nil
 }
 
-// GetTransactionReceipt returns account nonce
-func (e *Eth) GetTransactionReceipt(hash string) (interface{}, error) {
-	hashedString := types.Hash{}
-	if err := hashedString.UnmarshalText([]byte(hash)); err != nil {
-		return nil, err
+// GetTransactionByHash returns a transaction by his hash
+func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
+	blockHash, ok := e.d.store.ReadTxLookup(hash)
+	if !ok {
+		// txn not found
+		return nil, nil
 	}
-
-	header, err := e.GetBlockHeader(LatestBlockNumber)
-	if err != nil {
-		return nil, err
+	block, ok := e.d.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		// block receipts not found
+		return nil, nil
 	}
-
-	receipts, err := e.d.store.GetReceiptsByHash(header.ReceiptsRoot)
-
-	// TODO find a more optimal solution
-	for _, receipt := range receipts {
-		if receipt.TxHash == hashedString {
-			return receipt, nil
+	for _, txn := range block.Transactions {
+		if txn.Hash == hash {
+			return txn, nil
 		}
 	}
-
+	// txn not found (this should not happen)
 	return nil, nil
+}
+
+// GetTransactionReceipt returns a transaction receipt by his hash
+func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
+	blockHash, ok := e.d.store.ReadTxLookup(hash)
+	if !ok {
+		// txn not found
+		return nil, nil
+	}
+
+	block, ok := e.d.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		// block not found
+		return nil, nil
+	}
+	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
+	if err != nil {
+		// block receipts not found
+		return nil, nil
+	}
+
+	// find the transaction in the body
+	indx := -1
+	for i, txn := range block.Transactions {
+		if txn.Hash == hash {
+			indx = i
+			break
+		}
+	}
+	if indx == -1 {
+		// txn not found
+		return nil, nil
+	}
+
+	txn := block.Transactions[indx]
+	receipt := receipts[indx]
+	receipt.TxHash = txn.Hash
+	return receipt, nil
 }
 
 // GetStorageAt returns the contract storage at the index position
