@@ -5,19 +5,19 @@ import (
 )
 
 type Transaction struct {
-	Nonce    uint64   `json:"nonce" db:"nonce"`
-	GasPrice HexBytes `json:"gasPrice" db:"gas_price"`
-	Gas      uint64   `json:"gas" db:"gas"`
-	To       *Address `json:"to" db:"dst"`
-	Value    HexBytes `json:"value" db:"value"`
-	Input    HexBytes `json:"input" db:"input"`
+	Nonce    uint64   `json:"nonce"`
+	GasPrice HexBytes `json:"gasPrice"`
+	Gas      uint64   `json:"gas"`
+	To       *Address `json:"to"`
+	Value    HexBytes `json:"value"`
+	Input    HexBytes `json:"input"`
 
-	V byte     `json:"v" db:"v"`
-	R HexBytes `json:"r" db:"r"`
-	S HexBytes `json:"s" db:"s"`
+	V byte     `json:"v"`
+	R HexBytes `json:"r"`
+	S HexBytes `json:"s"`
 
-	Hash Hash
-	From Address
+	Hash Hash    `json:"hash"`
+	From Address `json:"from"`
 }
 
 func (t *Transaction) IsContractCreation() bool {

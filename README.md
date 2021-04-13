@@ -136,3 +136,30 @@ $ go run main.go server --data-dir ./test-chain-2 --chain genesis.json --grpc :2
 ```
 $ go run main.go server --data-dir ./test-chain-3 --chain genesis.json --grpc :30000 --libp2p :30001 --jsonrpc :30002 --seal
 ```
+
+## Send a transaction using the CLI
+
+Create a genesis file with a premined account
+
+```
+$ go run main.go genesis --premine 0x1010101010101010101010101010101010101010
+```
+
+Start polygon-sdk in dev mode:
+
+```
+$ go run main.go server --chain genesis.json --dev --log-level debug
+```
+
+We can query the balance of the premined account:
+
+```
+$ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params":["0x1010101010101010101010101010101010101010", "latest"],"id":1}' localhost:8545
+{"id":1,"result":"0x100000000000000000000000000"}
+```
+
+Send a transfer transaction:
+
+```
+$ go run main.go txpool add --nonce 0 --from 0x1010101010101010101010101010101010101010 --to 0x0000000000000000000000000000000000000010 --value 0x100
+```

@@ -215,7 +215,10 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	msg := txn.Copy()
 
-	gasUsed, failed, _ := t.Apply(msg)
+	gasUsed, failed, err := t.Apply(msg)
+	if err != nil {
+		fmt.Printf("Apply err: %v", err)
+	}
 
 	t.totalGas += gasUsed
 

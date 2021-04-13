@@ -16,10 +16,10 @@ func discoveryConfig(c *Config) {
 
 func TestDiscoveryConnectedPopulatesRoutingTable(t *testing.T) {
 	// when two nodes connect, they populate their kademlia routing tables
-	srv0 := createServer(t, nil)
-	srv1 := createServer(t, nil)
+	srv0 := CreateServer(t, nil)
+	srv1 := CreateServer(t, nil)
 
-	multiJoin(t, srv0, srv1)
+	MultiJoin(t, srv0, srv1)
 	time.Sleep(1 * time.Second)
 
 	assert.Equal(t, srv0.discovery.routingTable.Size(), 1)
@@ -27,10 +27,10 @@ func TestDiscoveryConnectedPopulatesRoutingTable(t *testing.T) {
 }
 
 func TestDiscoveryProtocolFindPeers(t *testing.T) {
-	srv0 := createServer(t, nil)
-	srv1 := createServer(t, nil)
+	srv0 := CreateServer(t, nil)
+	srv1 := CreateServer(t, nil)
 
-	multiJoin(t, srv0, srv1)
+	MultiJoin(t, srv0, srv1)
 	time.Sleep(1 * time.Second)
 
 	// find peers should not include our identity
@@ -40,12 +40,12 @@ func TestDiscoveryProtocolFindPeers(t *testing.T) {
 }
 
 func TestDiscoveryPeerAdded(t *testing.T) {
-	srv0 := createServer(t, discoveryConfig)
-	srv1 := createServer(t, discoveryConfig)
-	srv2 := createServer(t, discoveryConfig)
+	srv0 := CreateServer(t, discoveryConfig)
+	srv1 := CreateServer(t, discoveryConfig)
+	srv2 := CreateServer(t, discoveryConfig)
 
 	// serial join, srv0 -> srv1 -> srv2
-	multiJoin(t,
+	MultiJoin(t,
 		srv0, srv1,
 		srv1, srv2,
 	)
@@ -72,12 +72,12 @@ func TestDiscoveryFullNetwork(t *testing.T) {
 	nodes := 20
 	servers := []*Server{}
 	for i := 0; i < nodes; i++ {
-		srv := createServer(t, discoveryConfig)
+		srv := CreateServer(t, discoveryConfig)
 		servers = append(servers, srv)
 	}
 
 	// link nodes in serial
-	multiJoinSerial(t, servers)
+	MultiJoinSerial(t, servers)
 
 	// force the discover of other nodes several times
 	for i := 0; i < 50; i++ {
