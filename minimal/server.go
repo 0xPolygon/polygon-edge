@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/proto"
@@ -128,10 +129,18 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.executor.GetHash = m.blockchain.GetHashHelper
 
 	{
+		hub := &txpoolHub{
+			state:      m.state,
+			Blockchain: m.blockchain,
+		}
 		// start transaction pool
-		if m.txpool, err = txpool.NewTxPool(m.blockchain, m.config.Chain, m.network); err != nil {
+		if m.txpool, err = txpool.NewTxPool(logger, hub, m.grpcServer, m.network); err != nil {
 			return nil, err
 		}
+
+		// use the eip155 signer
+		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+		m.txpool.AddSigner(signer)
 	}
 
 	{
@@ -162,6 +171,27 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	return m, nil
+}
+
+type txpoolHub struct {
+	state state.State
+	*blockchain.Blockchain
+}
+
+func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
+	snap, err := t.state.NewSnapshotAt(root)
+	if err != nil {
+		return 0
+	}
+	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
+	if !ok {
+		return 0
+	}
+	var account state.Account
+	if err := account.UnmarshalRlp(result); err != nil {
+		return 0
+	}
+	return account.Nonce
 }
 
 func (s *Server) setupConsensus() error {

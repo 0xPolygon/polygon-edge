@@ -74,6 +74,17 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
+		// ---- txpool ----
+		"txpool add": func() (cli.Command, error) {
+			return &TxPoolAdd{
+				Meta: meta,
+			}, nil
+		},
+		"txpool status": func() (cli.Command, error) {
+			return &TxPoolStatus{
+				Meta: meta,
+			}, nil
+		},
 		// ---- blockchain commands ----
 		"status": func() (cli.Command, error) {
 			return &StatusCommand{

@@ -9,10 +9,10 @@ import (
 )
 
 func TestGossip(t *testing.T) {
-	srv0 := createServer(t, nil)
-	srv1 := createServer(t, nil)
+	srv0 := CreateServer(t, nil)
+	srv1 := CreateServer(t, nil)
 
-	multiJoin(t, srv0, srv1)
+	MultiJoin(t, srv0, srv1)
 
 	topicName := "topic/0.1"
 
