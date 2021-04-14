@@ -2,6 +2,7 @@ package dev
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -57,7 +58,6 @@ func (d *Dev) run() {
 		// wait until there is a new txn
 		select {
 		case <-d.notifyCh:
-		case <-time.After(1 * time.Second):
 		case <-d.closeCh:
 			return
 		}
@@ -82,26 +82,19 @@ func (d *Dev) do(parent *types.Header) error {
 		return err
 	}
 
-	/*
-		pricedTxs, err := d.txpool.SortTxns(transition.Txn(), parent)
-		if err != nil {
-			return err
+	for {
+		txn, retFn := d.txpool.Pop()
+		if txn == nil {
+			break
 		}
-		txns := []*types.Transaction{}
-		for {
-			val := pricedTxs.Pop()
-			if val == nil {
-				break
-			}
+		if err := transition.Write(txn); err != nil {
+			fmt.Println("-- err --")
+			fmt.Println(err)
 
-			msg := val.tx
-			txns = append(txns, msg)
-
-			if err := transition.Write(msg); err != nil {
-				break
-			}
+			retFn()
+			break
 		}
-	*/
+	}
 
 	_, root := transition.Commit()
 

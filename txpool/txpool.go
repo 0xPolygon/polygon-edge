@@ -4,70 +4,103 @@ import (
 	"container/heap"
 	"fmt"
 	"math/big"
+	"sort"
+	"sync"
 	"time"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc"
 )
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
 )
 
-type blockchainImpl interface {
+type store interface {
+	Header() *types.Header
+	GetNonce(root types.Hash, addr types.Address) uint64
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
+}
+
+type signer interface {
+	Sender(tx *types.Transaction) (types.Address, error)
 }
 
 // TxPool is a pool of transactions
 type TxPool struct {
-	chain *chain.Chain
+	logger hclog.Logger
+	signer signer
 
-	signer     crypto.TxSigner
-	state      *state.Txn
-	blockchain blockchainImpl
+	store      store
 	idlePeriod time.Duration
 
-	pending []*types.Transaction
-	queue   map[types.Address]*txQueue
+	// unsorted list of transactions per account
+	queue map[types.Address]*txQueue
 
+	// sorted list of current valid transactions
+	sorted *txPriceHeap
+
+	// network stack
 	network *network.Server
 	topic   *network.Topic
 
 	dev      bool
 	NotifyCh chan struct{}
+
+	proto.UnimplementedTxnPoolOperatorServer
 }
 
 // NewTxPool creates a new pool of transactios
-func NewTxPool(blockchain blockchainImpl, chain *chain.Chain, network *network.Server) (*TxPool, error) {
+func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, network *network.Server) (*TxPool, error) {
 	txPool := &TxPool{
-		chain:      chain,
-		signer:     crypto.NewEIP155Signer(uint64(chain.Params.ChainID)),
-		blockchain: blockchain,
+		logger:     logger.Named("txpool"),
+		store:      store,
 		idlePeriod: defaultIdlePeriod,
 		queue:      make(map[types.Address]*txQueue, 0),
 		network:    network,
+		sorted:     newTxPriceHeap(),
 	}
 
-	// subscribe to the gossip protocol
-	topic, err := network.NewTopic(topicNameV1, &proto.Txn{})
-	if err != nil {
-		return nil, err
+	if network != nil {
+		// subscribe to the gossip protocol
+		topic, err := network.NewTopic(topicNameV1, &proto.Txn{})
+		if err != nil {
+			return nil, err
+		}
+		topic.Subscribe(txPool.handleGossipTxn)
+		txPool.topic = topic
 	}
-	topic.Subscribe(txPool.handleGossipTxn)
-	txPool.topic = topic
 
+	if grpcServer != nil {
+		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
+	}
 	return txPool, nil
+}
+
+func (t *TxPool) AddSigner(s signer) {
+	// TODO: We can add more types of signers here
+	t.signer = s
 }
 
 var topicNameV1 = "txpool/0.1"
 
 func (t *TxPool) handleGossipTxn(obj interface{}) {
-	txn := obj.(*proto.Txn)
-	fmt.Println(txn)
+	raw := obj.(*proto.Txn)
+
+	// TODO: Do not include our own transactions
+	txn := new(types.Transaction)
+	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
+		t.logger.Error("failed to decode broadcasted txn", "err", err)
+	} else {
+		if err := t.addImpl("gossip", txn); err != nil {
+			t.logger.Error("failed to add broadcasted txn", "err", err)
+		}
+	}
 }
 
 func (t *TxPool) EnableDev() {
@@ -76,33 +109,22 @@ func (t *TxPool) EnableDev() {
 
 // AddTx adds a new transaction to the pool
 func (t *TxPool) AddTx(tx *types.Transaction) error {
-	err := t.validateTx(tx)
-	if err != nil {
+	if err := t.addImpl("addTxn", tx); err != nil {
 		return err
 	}
 
-	if tx.From == types.ZeroAddress {
-		tx.From, err = t.signer.Sender(tx)
-		if err != nil {
-			return fmt.Errorf("invalid sender")
+	// broadcast the transaction only if network is enabled
+	// and we are not in dev mode
+	if t.topic != nil && !t.dev {
+		txn := &proto.Txn{
+			Raw: &any.Any{
+				Value: tx.MarshalRLP(),
+			},
 		}
-	} else {
-		// only if we are in dev mode we can accept
-		// a transaction without validation
-		fmt.Println("-- dev --")
-		fmt.Println(t.dev)
-
-		if !t.dev {
-			return fmt.Errorf("cannot accept non-encrypted txn")
+		if err := t.topic.Publish(txn); err != nil {
+			t.logger.Error("failed to topic txn", "err", err)
 		}
 	}
-
-	txs, ok := t.queue[tx.From]
-	if !ok {
-		txs = newTxQueue()
-		t.queue[tx.From] = txs
-	}
-	txs.Add(tx)
 
 	if t.NotifyCh != nil {
 		select {
@@ -113,105 +135,112 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (t *TxPool) Pending() []*types.Transaction {
-	return t.pending
-}
+func (t *TxPool) addImpl(ctx string, txns ...*types.Transaction) error {
+	if len(txns) == 0 {
+		return nil
+	}
 
-func (t *TxPool) Update(b *types.Block, state *state.Txn) error {
-	t.state = state
+	from := txns[0].From
+	for _, txn := range txns {
+		// Since this is a single point of inclusion for new transactions both
+		// to the promoted queue and pending queue we use this point to calculate the hash
+		txn.ComputeHash()
+
+		err := t.validateTx(txn)
+		if err != nil {
+			return err
+		}
+
+		if txn.From == types.ZeroAddress {
+			txn.From, err = t.signer.Sender(txn)
+			if err != nil {
+				return fmt.Errorf("invalid sender")
+			}
+			from = txn.From
+		} else {
+			// only if we are in dev mode we can accept
+			// a transaction without validation
+			if !t.dev {
+				return fmt.Errorf("cannot accept non-encrypted txn")
+			}
+		}
+
+		t.logger.Debug("add txn", "ctx", ctx, "hash", txn.Hash, "from", from)
+	}
+
+	txnsQueue, ok := t.queue[from]
+	if !ok {
+		txnsQueue = newTxQueue()
+		t.queue[from] = txnsQueue
+	}
+	for _, txn := range txns {
+		txnsQueue.Add(txn)
+	}
+
+	// try to promote transactions if possible
+	stateRoot := t.store.Header().StateRoot
+	nonce := t.store.GetNonce(stateRoot, from)
+
+	for _, promoted := range txnsQueue.Promote(nonce) {
+		t.sorted.Push(promoted)
+	}
 	return nil
 }
 
-func (t *TxPool) reset(oldHead, newHead *types.Header) ([]*types.Transaction, error) {
-	var reinject []*types.Transaction
-
-	if oldHead != nil && oldHead.Hash != newHead.ParentHash {
-		var discarded, included []*types.Transaction
-
-		oldHeader, ok := t.blockchain.GetBlockByHash(oldHead.Hash, true)
-		if !ok {
-			return nil, fmt.Errorf("block by hash '%s' not found", oldHead.Hash.String())
-		}
-		newHeader, ok := t.blockchain.GetBlockByHash(newHead.Hash, true)
-		if !ok {
-			return nil, fmt.Errorf("block by hash '%s' not found", newHead.Hash.String())
-		}
-
-		for oldHeader.Number() > newHeader.Number() {
-			discarded = append(discarded, oldHeader.Transactions...)
-			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
-			if !ok {
-				return nil, fmt.Errorf("block by hash '%s' not found", oldHeader.ParentHash().String())
-			}
-		}
-
-		for newHeader.Number() > oldHeader.Number() {
-			included = append(included, newHeader.Transactions...)
-			newHeader, ok = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
-			if !ok {
-				return nil, fmt.Errorf("block by hash '%s' not found", newHeader.ParentHash().String())
-			}
-		}
-
-		for oldHeader.Hash() != newHeader.Hash() {
-			discarded = append(discarded, oldHeader.Transactions...)
-			included = append(included, newHeader.Transactions...)
-
-			oldHeader, ok = t.blockchain.GetBlockByHash(oldHeader.ParentHash(), true)
-			if !ok {
-				return nil, fmt.Errorf("block by hash '%s' not found", oldHeader.ParentHash().String())
-			}
-			newHeader, ok = t.blockchain.GetBlockByHash(newHeader.ParentHash(), true)
-			if !ok {
-				return nil, fmt.Errorf("block by hash '%s' not found", newHeader.ParentHash().String())
-			}
-		}
-
-		reinject = txDifference(discarded, included)
-	}
-
-	// reinject all the transactions into the blocks
-	for _, tx := range reinject {
-		if err := t.AddTx(tx); err != nil {
-			return nil, err
-		}
-	}
-
-	promoted := []*types.Transaction{}
-
-	// Get all the pending transactions and update
-	for from, list := range t.queue {
-		// TODO, filter low txs
-		nonce := t.state.GetNonce(from)
-		res := list.Promote(nonce)
-		promoted = append(promoted, res...)
-	}
-
-	return promoted, nil
+func (t *TxPool) Length() uint64 {
+	return t.sorted.Length()
 }
 
-func (t *TxPool) SortTxns(txn *state.Txn, parent *types.Header) (*txPriceHeap, error) {
-	t.Update(nil, txn)
-	promoted, err := t.reset(nil, parent)
-	if err != nil {
-		return nil, err
+func (t *TxPool) Pop() (*types.Transaction, func()) {
+	txn := t.sorted.Pop()
+	if txn == nil {
+		return nil, nil
 	}
+	ret := func() {
+		t.sorted.Push(txn.tx)
+	}
+	return txn.tx, ret
+}
 
-	pricedTxs := newTxPriceHeap()
-	for _, tx := range promoted {
-		if tx.From == types.ZeroAddress {
-			tx.From, err = t.signer.Sender(tx)
-			if err != nil {
-				return nil, err
+// ProcessEvent processes the blockchain event and resets the txpool accordingly
+func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
+	addTxns := map[types.Hash]*types.Transaction{}
+	for _, evnt := range evnt.OldChain {
+		// reinject these transactions on the pool
+		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
+		if !ok {
+			t.logger.Error("block not found on txn add", "hash", block.Hash())
+		} else {
+			for _, txn := range block.Transactions {
+				addTxns[txn.Hash] = txn
 			}
 		}
+	}
 
-		// NOTE, we need to sort with big.Int instead of uint64
-		if err := pricedTxs.Push(tx.From, tx, new(big.Int).SetBytes(tx.GetGasPrice())); err != nil {
-			return nil, err
+	delTxns := map[types.Hash]*types.Transaction{}
+	for _, evnt := range evnt.NewChain {
+		// remove these transactions from the pool
+		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
+		if !ok {
+			t.logger.Error("block not found on txn del", "hash", block.Hash())
+		} else {
+			for _, txn := range block.Transactions {
+				delete(addTxns, txn.Hash)
+			}
 		}
 	}
-	return pricedTxs, nil
+
+	// try to include again the transactions in the sorted list
+	for _, txn := range addTxns {
+		if err := t.addImpl("reorg", txn); err != nil {
+			t.logger.Error("failed to add txn", "err", err)
+		}
+	}
+
+	// remove the mined transactions from the sorted list
+	for _, txn := range delTxns {
+		t.sorted.Delete(txn)
+	}
 }
 
 func (t *TxPool) validateTx(tx *types.Transaction) error {
@@ -219,8 +248,6 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		if tx.Size() > 32*1024 {
 			return fmt.Errorf("oversize data")
 		}
-	*/
-	/*
 		if tx.Value.Sign() < 0 {
 			return fmt.Errorf("negative value")
 		}
@@ -253,7 +280,6 @@ func (t *txQueue) Add(tx *types.Transaction) {
 
 // Promote promotes all the new valid transactions
 func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
-
 	// Remove elements lower than nonce
 	for {
 		tx := t.Peek()
@@ -288,6 +314,15 @@ func (t *txQueue) Peek() *types.Transaction {
 }
 
 func (t *txQueue) Push(tx *types.Transaction) {
+	// try to find the txn in the set
+	i := sort.Search(len(t.txs), func(i int) bool {
+		return t.txs[0].Nonce >= tx.Nonce
+	})
+	if i < len(t.txs) && t.txs[i].Nonce == tx.Nonce {
+		// txns with the same nonce is on the list
+		return
+	}
+
 	heap.Push(&t.txs, tx)
 }
 
@@ -345,6 +380,7 @@ type pricedTx struct {
 }
 
 type txPriceHeap struct {
+	lock  sync.Mutex
 	index map[types.Hash]*pricedTx
 	heap  txPriceHeapImpl
 }
@@ -356,14 +392,36 @@ func newTxPriceHeap() *txPriceHeap {
 	}
 }
 
-func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price *big.Int) error {
+func (t *txPriceHeap) Length() uint64 {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return uint64(len(t.index))
+}
+
+func (t *txPriceHeap) Delete(tx *types.Transaction) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if item, ok := t.index[tx.Hash]; ok {
+		heap.Remove(&t.heap, item.index)
+		delete(t.index, tx.Hash)
+	}
+}
+
+func (t *txPriceHeap) Push(tx *types.Transaction) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	price := new(big.Int).SetBytes(tx.GetGasPrice())
+
 	if _, ok := t.index[tx.Hash]; ok {
 		return fmt.Errorf("tx %s already exists", tx.Hash)
 	}
 
 	pTx := &pricedTx{
 		tx:    tx,
-		from:  from,
+		from:  tx.From,
 		price: price,
 	}
 	t.index[tx.Hash] = pTx
@@ -372,6 +430,9 @@ func (t *txPriceHeap) Push(from types.Address, tx *types.Transaction, price *big
 }
 
 func (t *txPriceHeap) Pop() *pricedTx {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
 	if len(t.index) == 0 {
 		return nil
 	}
@@ -416,21 +477,4 @@ func (t *txPriceHeapImpl) Pop() interface{} {
 	job.index = -1
 	*t = old[0 : n-1]
 	return job
-}
-
-// TxDifference returns a new set which is the difference between a and b.
-func txDifference(a, b []*types.Transaction) []*types.Transaction {
-	keep := make([]*types.Transaction, 0, len(a))
-
-	remove := make(map[types.Hash]struct{})
-	for _, tx := range b {
-		remove[tx.Hash] = struct{}{}
-	}
-
-	for _, tx := range a {
-		if _, ok := remove[tx.Hash]; !ok {
-			keep = append(keep, tx)
-		}
-	}
-	return keep
 }
