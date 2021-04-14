@@ -20,31 +20,24 @@ func TestDialLifecycle(t *testing.T) {
 		to        uint
 		isSuccess bool
 	}
-	type Expected struct {
-		numPeers int64
+	defConfig := func(c *Config) {
+		c.MaxPeers = 1
+		c.NoDiscover = true
 	}
 
 	tests := []struct {
 		name     string
 		cfgs     []func(*Config)
 		requests []Request
-		expected []Expected
+		// Number of connecting peers after all requests are processed
+		numPeers []int64
 	}{
 		{
 			name: "server 1 should reject incoming connection request from server 3 due to limit",
 			cfgs: []func(*Config){
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
+				defConfig,
+				defConfig,
+				defConfig,
 			},
 			requests: []Request{
 				{
@@ -58,33 +51,16 @@ func TestDialLifecycle(t *testing.T) {
 					isSuccess: false,
 				},
 			},
-			expected: []Expected{
-				{
-					numPeers: 1,
-				},
-				{
-					numPeers: 1,
-				},
-				{
-					numPeers: 0,
-				},
+			numPeers: []int64{
+				1, 1, 0,
 			},
 		},
 		{
 			name: "server 1 should not connect to server 3 due to limit",
 			cfgs: []func(*Config){
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
+				defConfig,
+				defConfig,
+				defConfig,
 			},
 			requests: []Request{
 				{
@@ -98,33 +74,19 @@ func TestDialLifecycle(t *testing.T) {
 					isSuccess: false,
 				},
 			},
-			expected: []Expected{
-				{
-					numPeers: 1,
-				},
-				{
-					numPeers: 1,
-				},
-				{
-					numPeers: 0,
-				},
+			numPeers: []int64{
+				1, 1, 0,
 			},
 		},
 		{
 			name: "should be success",
 			cfgs: []func(*Config){
 				func(c *Config) {
+					defConfig(c)
 					c.MaxPeers = 2
-					c.NoDiscover = true
 				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
-				func(c *Config) {
-					c.MaxPeers = 1
-					c.NoDiscover = true
-				},
+				defConfig,
+				defConfig,
 			},
 			requests: []Request{
 				{
@@ -138,16 +100,8 @@ func TestDialLifecycle(t *testing.T) {
 					isSuccess: true,
 				},
 			},
-			expected: []Expected{
-				{
-					numPeers: 2,
-				},
-				{
-					numPeers: 1,
-				},
-				{
-					numPeers: 1,
-				},
+			numPeers: []int64{
+				2, 1, 1,
 			},
 		},
 	}
@@ -178,8 +132,8 @@ func TestDialLifecycle(t *testing.T) {
 			}
 
 			// Test result
-			for i, ex := range tt.expected {
-				assert.Equal(t, srvs[i].numPeers(), ex.numPeers)
+			for i, n := range tt.numPeers {
+				assert.Equal(t, srvs[i].numPeers(), n)
 			}
 		})
 	}
