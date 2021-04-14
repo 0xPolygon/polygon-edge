@@ -164,10 +164,7 @@ func (s *Server) runDial() {
 	}
 
 	for {
-		slots := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
-		if slots < 0 {
-			slots = 0
-		}
+		slots := s.numOpenSlots()
 
 		/*
 			fmt.Println("-- slots --")
@@ -226,6 +223,14 @@ func (s *Server) Peers() []*Peer {
 		peers = append(peers, p)
 	}
 	return peers
+}
+
+func (s *Server) numOpenSlots() int64 {
+	n := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
+	if n < 0 {
+		n = 0
+	}
+	return n
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
@@ -398,8 +403,9 @@ func (s *Subscription) run() {
 	// convert interface{} to *PeerEvent channels
 	for {
 		evnt := <-s.sub.Out()
-		obj := evnt.(PeerEvent)
-		s.ch <- &obj
+		if obj, ok := evnt.(PeerEvent); ok {
+			s.ch <- &obj
+		}
 	}
 }
 

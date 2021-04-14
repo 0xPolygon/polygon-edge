@@ -74,26 +74,174 @@ func TestDialLifecycle(t *testing.T) {
 	// we should remove discovery protocol and just pipe values to the dialqueue to see how
 	// it behaves
 
-	cfg := func(c *Config) {
-		c.MaxPeers = 1
-		// c.NoDiscover = true
+	type Request struct {
+		from      uint
+		to        uint
+		isSuccess bool
+	}
+	type Expected struct {
+		numPeers int64
 	}
 
-	srv0 := createServer(t, cfg)
-	srv1 := createServer(t, cfg)
-	srv2 := createServer(t, cfg)
+	tests := []struct {
+		name     string
+		cfgs     []func(*Config)
+		requests []Request
+		expected []Expected
+	}{
+		{
+			name: "server 1 should reject incoming connection request from server 3 due to limit",
+			cfgs: []func(*Config){
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+			},
+			requests: []Request{
+				{
+					from:      0,
+					to:        1,
+					isSuccess: true,
+				},
+				{
+					from:      2,
+					to:        0,
+					isSuccess: false,
+				},
+			},
+			expected: []Expected{
+				{
+					numPeers: 1,
+				},
+				{
+					numPeers: 1,
+				},
+				{
+					numPeers: 0,
+				},
+			},
+		},
+		{
+			name: "server 1 should not connect to server 3 due to limit",
+			cfgs: []func(*Config){
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+			},
+			requests: []Request{
+				{
+					from:      0,
+					to:        1,
+					isSuccess: true,
+				},
+				{
+					from:      0,
+					to:        2,
+					isSuccess: false,
+				},
+			},
+			expected: []Expected{
+				{
+					numPeers: 1,
+				},
+				{
+					numPeers: 1,
+				},
+				{
+					numPeers: 0,
+				},
+			},
+		},
+		{
+			name: "should be success",
+			cfgs: []func(*Config){
+				func(c *Config) {
+					c.MaxPeers = 2
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+				func(c *Config) {
+					c.MaxPeers = 1
+					c.NoDiscover = true
+				},
+			},
+			requests: []Request{
+				{
+					from:      0,
+					to:        1,
+					isSuccess: true,
+				},
+				{
+					from:      0,
+					to:        2,
+					isSuccess: true,
+				},
+			},
+			expected: []Expected{
+				{
+					numPeers: 2,
+				},
+				{
+					numPeers: 1,
+				},
+				{
+					numPeers: 1,
+				},
+			},
+		},
+	}
 
-	// serial join, srv0 -> srv1 -> srv2
-	multiJoin(t,
-		srv0, srv1,
-		srv1, srv2,
-	)
+	const timeout = time.Second * 10
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvs := make([]*Server, len(tt.cfgs))
+			for i, cfg := range tt.cfgs {
+				srvs[i] = createServer(t, cfg)
+			}
+			defer func() {
+				for _, s := range srvs {
+					s.Close()
+				}
+			}()
 
-	// since maxPeers=1, the nodes should NOT
-	// try to connect to anyone else in the mesh
-	assert.Equal(t, srv0.numPeers(), int64(1))
-	assert.Equal(t, srv1.numPeers(), int64(2))
-	assert.Equal(t, srv2.numPeers(), int64(1))
+			// Test join
+			for _, req := range tt.requests {
+				src, dst := srvs[req.from], srvs[req.to]
+				err := src.Join(dst.AddrInfo(), timeout)
+
+				if req.isSuccess {
+					assert.NoError(t, err)
+				} else {
+					assert.Error(t, err)
+				}
+			}
+
+			// Test result
+			for i, ex := range tt.expected {
+				assert.Equal(t, srvs[i].numPeers(), ex.numPeers)
+			}
+		})
+	}
 }
 
 func TestPeerEmitAndSubscribe(t *testing.T) {
