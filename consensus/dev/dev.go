@@ -82,6 +82,7 @@ func (d *Dev) do(parent *types.Header) error {
 		return err
 	}
 
+	txns := []*types.Transaction{}
 	for {
 		txn, retFn := d.txpool.Pop()
 		if txn == nil {
@@ -94,6 +95,7 @@ func (d *Dev) do(parent *types.Header) error {
 			retFn()
 			break
 		}
+		txns = append(txns, txn)
 	}
 
 	_, root := transition.Commit()
@@ -102,7 +104,7 @@ func (d *Dev) do(parent *types.Header) error {
 	header.GasUsed = transition.TotalGas()
 
 	// header hash is computed inside buildBlock
-	block := consensus.BuildBlock(header, nil, transition.Receipts())
+	block := consensus.BuildBlock(header, txns, transition.Receipts())
 
 	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		panic(err)

@@ -22,8 +22,11 @@ type blockchainInterface interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
 
-	// GetReceiptsByHash returns the receipts for a hash
+	// GetReceiptsByHash returns the receipts for a block hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+
+	// ReadTxLookup returns a block hash in which a given txn was mined
+	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
 
 	// SubscribeEvents subscribes for chain head events
 	SubscribeEvents() blockchain.Subscription
@@ -51,6 +54,10 @@ type nullBlockchainInterface struct {
 
 func (b *nullBlockchainInterface) Header() *types.Header {
 	return nil
+}
+
+func (b *nullBlockchainInterface) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
+	return types.Hash{}, false
 }
 
 func (b *nullBlockchainInterface) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
