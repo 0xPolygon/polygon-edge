@@ -22,6 +22,7 @@ type V1Client interface {
 	GetCurrent(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*V1Status, error)
 	GetObjectsByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error)
 	GetHeaders(ctx context.Context, in *GetHeadersRequest, opts ...grpc.CallOption) (*Response, error)
+	Notify(ctx context.Context, in *NotifyReq, opts ...grpc.CallOption) (*empty.Empty, error)
 	Watch(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (V1_WatchClient, error)
 }
 
@@ -54,6 +55,15 @@ func (c *v1Client) GetObjectsByHash(ctx context.Context, in *HashRequest, opts .
 func (c *v1Client) GetHeaders(ctx context.Context, in *GetHeadersRequest, opts ...grpc.CallOption) (*Response, error) {
 	out := new(Response)
 	err := c.cc.Invoke(ctx, "/v1.V1/GetHeaders", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v1Client) Notify(ctx context.Context, in *NotifyReq, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/v1.V1/Notify", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +109,7 @@ type V1Server interface {
 	GetCurrent(context.Context, *empty.Empty) (*V1Status, error)
 	GetObjectsByHash(context.Context, *HashRequest) (*Response, error)
 	GetHeaders(context.Context, *GetHeadersRequest) (*Response, error)
+	Notify(context.Context, *NotifyReq) (*empty.Empty, error)
 	Watch(*empty.Empty, V1_WatchServer) error
 	mustEmbedUnimplementedV1Server()
 }
@@ -115,6 +126,9 @@ func (UnimplementedV1Server) GetObjectsByHash(context.Context, *HashRequest) (*R
 }
 func (UnimplementedV1Server) GetHeaders(context.Context, *GetHeadersRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeaders not implemented")
+}
+func (UnimplementedV1Server) Notify(context.Context, *NotifyReq) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
 }
 func (UnimplementedV1Server) Watch(*empty.Empty, V1_WatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
@@ -186,6 +200,24 @@ func _V1_GetHeaders_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V1_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V1Server).Notify(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.V1/Notify",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V1Server).Notify(ctx, req.(*NotifyReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V1_Watch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(empty.Empty)
 	if err := stream.RecvMsg(m); err != nil {
@@ -225,6 +257,10 @@ var V1_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHeaders",
 			Handler:    _V1_GetHeaders_Handler,
+		},
+		{
+			MethodName: "Notify",
+			Handler:    _V1_Notify_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

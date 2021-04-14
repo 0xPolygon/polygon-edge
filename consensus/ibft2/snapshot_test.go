@@ -67,7 +67,7 @@ func (ap *testerAccountPool) add(accounts ...string) {
 
 func (ap *testerAccountPool) genesis() *chain.Genesis {
 	genesis := &types.Header{
-		MixHash: types.IstanbulDigest,
+		MixHash: IstanbulDigest,
 	}
 	putIbftExtraValidators(genesis, ap.ValidatorSet())
 	genesis.ComputeHash()
@@ -397,7 +397,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					Number:     uint64(num + 1),
 					ParentHash: parentHash,
 					Miner:      types.ZeroAddress,
-					MixHash:    types.IstanbulDigest,
+					MixHash:    IstanbulDigest,
 					ExtraData:  genesis.ExtraData,
 				}
 				if v.voted != "" {
@@ -525,7 +525,7 @@ func TestSnapshot_Store(t *testing.T) {
 			Number:     uint64(num) + 1,
 			ParentHash: ibft1.blockchain.Header().Hash,
 			Miner:      types.ZeroAddress,
-			MixHash:    types.IstanbulDigest,
+			MixHash:    IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
 		if action != "" {

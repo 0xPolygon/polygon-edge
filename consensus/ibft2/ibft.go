@@ -1,12 +1,14 @@
 package ibft2
 
 import (
+	"bytes"
 	"container/heap"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -55,6 +58,12 @@ type Ibft2 struct {
 	msgQueue     msgQueueImpl
 	updateCh     chan struct{}
 
+	// sync protocol
+	syncer       *protocol.Syncer
+	syncNotifyCh chan bool
+
+	sealing bool
+
 	network *network.Server
 
 	transportFactory transportFactory
@@ -76,11 +85,17 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		network:          network,
 		maxTimeoutRange:  defaultBlockPeriod,
 		epochSize:        100000,
+		syncNotifyCh:     make(chan bool),
+		sealing:          false,
 	}
+
+	p.syncer = protocol.NewSyncer(logger, network, blockchain)
+	p.syncer.SyncNotifyCh = p.syncNotifyCh
+	p.syncer.Start()
 
 	// register the grpc operator
 	p.operator = &operator{i: p}
-	proto.RegisterOperatorServer(srv, p.operator)
+	proto.RegisterIbftOperatorServer(srv, p.operator)
 
 	if err := p.createKey(); err != nil {
 		return nil, err
@@ -92,6 +107,18 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	if err := p.setupSnapshot(); err != nil {
 		return nil, err
 	}
+
+	transport, err := p.transportFactory(p)
+	if err != nil {
+		panic(err)
+	}
+	p.transport = transport
+
+	// always have this active
+	go p.readMessages()
+
+	// do the start right now but it will only seal blocks if its in sealing mode
+	go p.start()
 
 	return p, nil
 }
@@ -127,6 +154,8 @@ const (
 	// Combine
 	PrepareState
 	CommitState
+
+	SyncState
 )
 
 func (i IbftState) String() string {
@@ -148,18 +177,21 @@ func (i IbftState) String() string {
 
 	case CommitState:
 		return "CommitState"
+
+	case SyncState:
+		return "SyncState"
 	}
 	panic(fmt.Sprintf("BUG: Ibft state not found %d", i))
 }
 
 func (i *Ibft2) readMessages() {
-	fmt.Println("XXX")
-	fmt.Println(i.transport)
+	//fmt.Println("XXX")
+	//fmt.Println(i.transport)
 
 	ch := i.transport.Listen()
 
-	fmt.Println("-- ch ..")
-	fmt.Println(ch)
+	//fmt.Println("-- ch ..")
+	//fmt.Println(ch)
 
 	for {
 		msg := <-ch
@@ -172,16 +204,12 @@ func (i *Ibft2) waitForGenesis() {
 }
 
 func (i *Ibft2) start() {
-	go i.readMessages()
+	// consensus always starts in SyncState mode in case it needs
+	// to sync with other nodes.
+	i.setState(SyncState)
 
 	header := i.blockchain.Header()
 	i.logger.Debug("current sequence", "sequence", header.Number+1)
-
-	// initialize the round and sequence
-	i.state2.view = &proto.View{
-		Round:    0,
-		Sequence: header.Number + 1,
-	}
 
 	// Wait for us to be a validator?
 
@@ -197,6 +225,10 @@ func (i *Ibft2) start() {
 }
 
 func (i *Ibft2) runCycle() {
+	if i.state2.view != nil {
+		i.logger.Debug("cycle", "state", i.getState(), "sequence", i.state2.view.Sequence, "round", i.state2.view.Round)
+	}
+
 	switch i.getState() {
 	case AcceptState:
 		i.runAcceptState()
@@ -207,8 +239,97 @@ func (i *Ibft2) runCycle() {
 	case RoundChangeState:
 		i.runRoundChangeState()
 
+	case SyncState:
+		i.runSyncState()
+
 	case CommitState:
 		return
+	}
+}
+
+func (i *Ibft2) isValidSnapshot() bool {
+
+	fmt.Println("-- check if snapshot is valid --")
+	fmt.Println(i.isSealing())
+
+	if !i.isSealing() {
+		return false
+	}
+
+	// check if we are a validator and enabled
+	header := i.blockchain.Header()
+	snap, err := i.getSnapshot(header.Number)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(snap.Set)
+	if snap.Set.Includes(i.validatorKeyAddr) {
+		fmt.Println("INSIDE")
+
+		i.state2.view = &proto.View{
+			Sequence: header.Number + 1,
+			Round:    0,
+		}
+		return true
+	}
+	return false
+}
+
+func (i *Ibft2) runSyncState() {
+	for i.isState(SyncState) {
+		// try to sync with some target peer
+		p := i.syncer.BestPeer()
+		if p == nil {
+			// if we do not have any peers and we have been a validator
+			// we can start now. In case we start on another fork this will be
+			// reverted later
+			if i.isValidSnapshot() {
+				// initialize the round and sequence
+				header := i.blockchain.Header()
+				i.state2.view = &proto.View{
+					Round:    0,
+					Sequence: header.Number + 1,
+				}
+				i.setState(AcceptState)
+			} else {
+				time.Sleep(1 * time.Second)
+			}
+			continue
+		}
+
+		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
+			i.logger.Error("failed to bulk sync", "err", err)
+			continue
+		}
+
+		// if we are a validator we do not even want to wait here
+		// we can just move ahead
+		if i.isValidSnapshot() {
+			fmt.Println("_ IS VALID SNAPSHOT, STOP NOW _")
+			i.setState(AcceptState)
+			continue
+		}
+
+		// start watch mode
+		var isValidator bool
+		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
+			fmt.Println("_X_X_X_")
+
+			isValidator = i.isValidSnapshot()
+			if isValidator {
+				return false // stop the handler
+			}
+
+			return true
+		})
+
+		if isValidator {
+			// at this point, we are in sync with the latest chain we know of
+			// and we are a validator of that chain so we need to change to AcceptState
+			// so that we can start to do some stuff there
+			i.setState(AcceptState)
+		}
 	}
 }
 
@@ -241,6 +362,17 @@ type currentState struct {
 	err error
 }
 
+func (c *currentState) NumValid() int {
+	/*
+		// ceil(2N/3)
+		num := float64(len(c.validators))
+		return int(math.Ceil(2 * num / 3))
+	*/
+
+	// represents the number of required messages
+	return 2 * c.validators.MinFaultyNodes()
+}
+
 // getErr returns the current error if any and consumes it
 func (c *currentState) getErr() error {
 	err := c.err
@@ -249,7 +381,7 @@ func (c *currentState) getErr() error {
 }
 
 func (c *currentState) maxRound() (maxRound uint64, found bool) {
-	num := c.MinFaultyNodes() + 1
+	num := c.validators.MinFaultyNodes() + 1
 
 	for k, round := range c.roundMessages {
 		if len(round) < num {
@@ -321,10 +453,6 @@ func (c *currentState) AddRoundMessage(msg *proto.MessageReq) int {
 	return len(c.roundMessages[view.Round])
 }
 
-func (c *currentState) MinFaultyNodes() int {
-	return c.validators.MinFaultyNodes()
-}
-
 func (c *currentState) addPrepared(msg *proto.MessageReq) {
 	if c.prepared == nil {
 		c.prepared = map[types.Address]*proto.MessageReq{}
@@ -372,7 +500,7 @@ func (c *currentState) Subject() *proto.Subject {
 	}
 }
 
-var defaultBlockPeriod = 1 * time.Second
+var defaultBlockPeriod = 10 * time.Second
 
 func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	header := &types.Header{
@@ -380,11 +508,14 @@ func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 		Number:     parent.Number + 1,
 		Miner:      types.Address{},
 		Nonce:      types.Nonce{},
-		MixHash:    types.IstanbulDigest,
+		MixHash:    IstanbulDigest,
 		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
 	}
+
+	fmt.Println("## ==> BUILD BLOCK (PARENT INFO) <== ##")
+	fmt.Println(parent.Hash, parent.Number)
 
 	// try to pick a candidate
 	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
@@ -396,18 +527,11 @@ func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 		}
 	}
 
-	fmt.Println(defaultBlockPeriod)
-
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(defaultBlockPeriod)
 
-	fmt.Println(parentTime)
-	fmt.Println(headerTime)
-	fmt.Println(time.Now())
-
 	if headerTime.Before(time.Now()) {
-		fmt.Println("YIKES")
 		headerTime = time.Now()
 	}
 	header.Timestamp = uint64(headerTime.Unix())
@@ -447,6 +571,10 @@ func (i *Ibft2) runAcceptState() { // start new round
 		panic(err)
 	}
 
+	fmt.Println("-- snapshot --")
+	fmt.Println(snap.Set)
+	fmt.Println(snap.Votes)
+
 	i.state2.validators = snap.Set
 
 	// reset round messages
@@ -470,12 +598,19 @@ func (i *Ibft2) runAcceptState() { // start new round
 			// calculate how much time do we have to wait to mine the block
 			delay := time.Until(time.Unix(int64(i.state2.block.Header.Timestamp), 0))
 
+			delay = 2 * time.Second
+			fmt.Println("--")
+			fmt.Println(delay)
+
 			select {
 			case <-time.After(delay):
 			case <-i.closeCh:
 				return
 			}
 		}
+
+		fmt.Println("___ HASH WE SEND __")
+		fmt.Println(i.state2.block.Hash())
 
 		// send the preprepare message as an RLP encoded block
 		i.sendPreprepareMsg()
@@ -515,6 +650,9 @@ func (i *Ibft2) runAcceptState() { // start new round
 		if err := block.UnmarshalRLP(preprepare.Preprepare.Proposal.Block.Value); err != nil {
 			panic(err)
 		}
+
+		fmt.Println("___ HASH WE RECEIVE __")
+		fmt.Println(block.Hash())
 
 		if i.state2.locked {
 			// the state is locked, we need to receive the same block
@@ -582,12 +720,15 @@ func (i *Ibft2) runValidateState() {
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Message)))
 		}
 
-		if i.state2.numPrepared() > 2*i.state2.MinFaultyNodes() {
+		fmt.Println("- min num valid nodes -")
+		fmt.Println(i.state2.NumValid())
+
+		if i.state2.numPrepared() > i.state2.NumValid() {
 			// we have received enough pre-prepare messages
 			sendCommit()
 		}
 
-		if i.state2.numCommited() > 2*i.state2.MinFaultyNodes() {
+		if i.state2.numCommited() > i.state2.NumValid() {
 			// we have received enough commit messages
 			sendCommit()
 
@@ -613,11 +754,29 @@ func (i *Ibft2) runValidateState() {
 	}
 }
 
+type sortedBytesSlice [][]byte
+
+func (s sortedBytesSlice) Len() int {
+	return len(s)
+}
+
+func (s sortedBytesSlice) Less(i, j int) bool {
+	return bytes.Compare(s[i], s[j]) < 0
+}
+
+func (s sortedBytesSlice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 func (i *Ibft2) insertBlock(block *types.Block) error {
-	committedSeals := [][]byte{}
+	committedSeals := sortedBytesSlice{}
 	for _, commit := range i.state2.committed {
 		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal)) // TODO: Validate
 	}
+
+	// we need to sort the committed seals so that each chain generates
+	// the same hash
+	sort.Sort(committedSeals)
 
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
@@ -628,6 +787,9 @@ func (i *Ibft2) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash()
 
+	fmt.Println("_LAST BLOCK HASH_")
+	fmt.Println(block.Header.Hash)
+
 	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
@@ -637,6 +799,9 @@ func (i *Ibft2) insertBlock(block *types.Block) error {
 		Sequence: header.Number + 1,
 		Round:    0,
 	}
+
+	// broadcast the new block
+	i.syncer.Broadcast(block)
 	return nil
 }
 
@@ -680,11 +845,22 @@ func (i *Ibft2) runRoundChangeState() {
 		}
 	}
 
+	bestPeer := i.syncer.BestPeer()
+	if bestPeer != nil {
+		// for now just call the sync protocol
+		i.setState(SyncState)
+		return
+	}
+
 	// if the round was triggered due to an error, we send our own
 	// next round change
 	if err := i.state2.getErr(); err != nil {
 		i.logger.Debug("round change handle err", "err", err)
 		sendNextRoundChange()
+
+		// As for now we are not introducing yet these errors here
+		panic("STOP")
+
 	} else {
 		// otherwise, it is due to a timeout in any stage
 		// First, we try to sync up with any max round already available
@@ -719,11 +895,11 @@ func (i *Ibft2) runRoundChangeState() {
 		view := raw.View()
 		num := i.state2.AddRoundMessage(raw)
 
-		if num == 2*i.state2.MinFaultyNodes()+1 {
+		if num == i.state2.NumValid() {
 			// start a new round inmediatly
 			i.state2.view.Round = view.Round
 			i.setState(AcceptState)
-		} else if num == i.state2.MinFaultyNodes()+1 {
+		} else if num == i.state2.validators.MinFaultyNodes()+1 {
 			// weak certificate, try to catch up if our round number is smaller
 			if i.state2.view.Round < view.Round {
 				// update timer
@@ -835,19 +1011,19 @@ func (i *Ibft2) randomTimeout() chan struct{} {
 	return doneCh
 }
 
+func (i *Ibft2) isSealing() bool {
+	return i.sealing
+}
+
 func (i *Ibft2) StartSeal() {
 	// start the transport protocol
-	transport, err := i.transportFactory(i)
-	if err != nil {
-		panic(err)
-	}
-	i.transport = transport
 
-	go i.run()
+	// go i.run()
+	i.sealing = true
 }
 
 func (i *Ibft2) run() {
-	i.start()
+
 }
 
 func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
@@ -858,7 +1034,7 @@ func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) e
 	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
 		return fmt.Errorf("invalid nonce")
 	}
-	if header.MixHash != types.IstanbulDigest {
+	if header.MixHash != IstanbulDigest {
 		return fmt.Errorf("invalid mixhash")
 	}
 	if header.Sha3Uncles != types.EmptyUncleHash {
@@ -877,7 +1053,7 @@ func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) e
 }
 
 func (i *Ibft2) VerifyHeader(parent, header *types.Header) error {
-	fmt.Println("__ VERIFY HEADER __")
+	// fmt.Println("__ VERIFY HEADER __")
 
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
@@ -924,8 +1100,16 @@ START:
 		}
 	}
 
+	// we only accept???
+	if i.isState(RoundChangeState) {
+		if nextMsg.msg != msgRoundChange {
+			heap.Pop(&i.msgQueue)
+			goto START
+		}
+	}
+
 	fmt.Println("-- msg --")
-	fmt.Println(nextMsg)
+	fmt.Println("====>", nextMsg.msg.String(), nextMsg.view.Sequence, nextMsg.view.Round)
 
 	// TODO: If message is roundChange do some check first
 	// TODO: If we are in round change we only accept stateChange messages
@@ -937,6 +1121,7 @@ START:
 	}
 
 	if cmpView(nextMsg.view, i.state2.view) < 0 {
+		fmt.Printf("old value %d %d\n", nextMsg.view.Sequence, nextMsg.view.Round)
 		// nextMsg is old. Pop the value from the queue and try again
 		heap.Pop(&i.msgQueue)
 		goto START
@@ -1019,6 +1204,21 @@ const (
 	msgCommit      MsgType = 2
 	msgPrepare     MsgType = 3
 )
+
+func (m MsgType) String() string {
+	switch m {
+	case msgRoundChange:
+		return "RoundChange"
+	case msgPrepare:
+		return "Prepare"
+	case msgPreprepare:
+		return "Preprepare"
+	case msgCommit:
+		return "Commit"
+	default:
+		panic("BUG")
+	}
+}
 
 type msgTask struct {
 	// priority

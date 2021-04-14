@@ -48,7 +48,7 @@ func (p *IbftSnapshot) Run(args []string) int {
 		req.Number = *number
 	}
 
-	clt := ibftOp.NewOperatorClient(conn)
+	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.GetSnapshot(context.Background(), req)
 	if err != nil {
 		p.UI.Error(err.Error())

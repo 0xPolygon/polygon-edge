@@ -1,6 +1,8 @@
 package ibft2
 
 import (
+	"fmt"
+
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/types"
@@ -24,6 +26,9 @@ func grpcTransportFactory(ibft *Ibft2) (transport, error) {
 			return
 		}
 
+		fmt.Println("__ MSG __")
+		// fmt.Println(msg)
+
 		ibft.pushMessage(msg)
 	})
 	if err != nil {
@@ -40,6 +45,7 @@ type grpcTransport struct {
 }
 
 func (g *grpcTransport) Gossip(target []types.Address, msg *proto.MessageReq) error {
+	fmt.Println("__ GOSSIP __")
 	return g.topic.Publish(msg)
 }
 

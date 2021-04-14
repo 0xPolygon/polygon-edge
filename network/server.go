@@ -95,6 +95,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create libp2p stack: %v", err)
 	}
 
+	fmt.Println("-- bootnodes --")
+	fmt.Println(config.Chain.Bootnodes)
+
 	emitter, err := host.EventBus().Emitter(new(PeerEvent))
 	if err != nil {
 		return nil, err

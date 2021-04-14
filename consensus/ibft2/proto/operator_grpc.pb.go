@@ -15,158 +15,194 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// OperatorClient is the client API for Operator service.
+// IbftOperatorClient is the client API for IbftOperator service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type OperatorClient interface {
+type IbftOperatorClient interface {
 	GetSnapshot(ctx context.Context, in *SnapshotReq, opts ...grpc.CallOption) (*Snapshot, error)
 	Propose(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*empty.Empty, error)
 	Candidates(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CandidatesResp, error)
+	Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*IbftStatusResp, error)
 }
 
-type operatorClient struct {
+type ibftOperatorClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewOperatorClient(cc grpc.ClientConnInterface) OperatorClient {
-	return &operatorClient{cc}
+func NewIbftOperatorClient(cc grpc.ClientConnInterface) IbftOperatorClient {
+	return &ibftOperatorClient{cc}
 }
 
-func (c *operatorClient) GetSnapshot(ctx context.Context, in *SnapshotReq, opts ...grpc.CallOption) (*Snapshot, error) {
+func (c *ibftOperatorClient) GetSnapshot(ctx context.Context, in *SnapshotReq, opts ...grpc.CallOption) (*Snapshot, error) {
 	out := new(Snapshot)
-	err := c.cc.Invoke(ctx, "/v1.Operator/GetSnapshot", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1.IbftOperator/GetSnapshot", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *operatorClient) Propose(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ibftOperatorClient) Propose(ctx context.Context, in *Candidate, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/v1.Operator/Propose", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1.IbftOperator/Propose", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *operatorClient) Candidates(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CandidatesResp, error) {
+func (c *ibftOperatorClient) Candidates(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*CandidatesResp, error) {
 	out := new(CandidatesResp)
-	err := c.cc.Invoke(ctx, "/v1.Operator/Candidates", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1.IbftOperator/Candidates", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// OperatorServer is the server API for Operator service.
-// All implementations must embed UnimplementedOperatorServer
+func (c *ibftOperatorClient) Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*IbftStatusResp, error) {
+	out := new(IbftStatusResp)
+	err := c.cc.Invoke(ctx, "/v1.IbftOperator/Status", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// IbftOperatorServer is the server API for IbftOperator service.
+// All implementations must embed UnimplementedIbftOperatorServer
 // for forward compatibility
-type OperatorServer interface {
+type IbftOperatorServer interface {
 	GetSnapshot(context.Context, *SnapshotReq) (*Snapshot, error)
 	Propose(context.Context, *Candidate) (*empty.Empty, error)
 	Candidates(context.Context, *empty.Empty) (*CandidatesResp, error)
-	mustEmbedUnimplementedOperatorServer()
+	Status(context.Context, *empty.Empty) (*IbftStatusResp, error)
+	mustEmbedUnimplementedIbftOperatorServer()
 }
 
-// UnimplementedOperatorServer must be embedded to have forward compatible implementations.
-type UnimplementedOperatorServer struct {
+// UnimplementedIbftOperatorServer must be embedded to have forward compatible implementations.
+type UnimplementedIbftOperatorServer struct {
 }
 
-func (UnimplementedOperatorServer) GetSnapshot(context.Context, *SnapshotReq) (*Snapshot, error) {
+func (UnimplementedIbftOperatorServer) GetSnapshot(context.Context, *SnapshotReq) (*Snapshot, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSnapshot not implemented")
 }
-func (UnimplementedOperatorServer) Propose(context.Context, *Candidate) (*empty.Empty, error) {
+func (UnimplementedIbftOperatorServer) Propose(context.Context, *Candidate) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Propose not implemented")
 }
-func (UnimplementedOperatorServer) Candidates(context.Context, *empty.Empty) (*CandidatesResp, error) {
+func (UnimplementedIbftOperatorServer) Candidates(context.Context, *empty.Empty) (*CandidatesResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Candidates not implemented")
 }
-func (UnimplementedOperatorServer) mustEmbedUnimplementedOperatorServer() {}
+func (UnimplementedIbftOperatorServer) Status(context.Context, *empty.Empty) (*IbftStatusResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
+}
+func (UnimplementedIbftOperatorServer) mustEmbedUnimplementedIbftOperatorServer() {}
 
-// UnsafeOperatorServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to OperatorServer will
+// UnsafeIbftOperatorServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to IbftOperatorServer will
 // result in compilation errors.
-type UnsafeOperatorServer interface {
-	mustEmbedUnimplementedOperatorServer()
+type UnsafeIbftOperatorServer interface {
+	mustEmbedUnimplementedIbftOperatorServer()
 }
 
-func RegisterOperatorServer(s grpc.ServiceRegistrar, srv OperatorServer) {
-	s.RegisterService(&Operator_ServiceDesc, srv)
+func RegisterIbftOperatorServer(s grpc.ServiceRegistrar, srv IbftOperatorServer) {
+	s.RegisterService(&IbftOperator_ServiceDesc, srv)
 }
 
-func _Operator_GetSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _IbftOperator_GetSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SnapshotReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(OperatorServer).GetSnapshot(ctx, in)
+		return srv.(IbftOperatorServer).GetSnapshot(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1.Operator/GetSnapshot",
+		FullMethod: "/v1.IbftOperator/GetSnapshot",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OperatorServer).GetSnapshot(ctx, req.(*SnapshotReq))
+		return srv.(IbftOperatorServer).GetSnapshot(ctx, req.(*SnapshotReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Operator_Propose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _IbftOperator_Propose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Candidate)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(OperatorServer).Propose(ctx, in)
+		return srv.(IbftOperatorServer).Propose(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1.Operator/Propose",
+		FullMethod: "/v1.IbftOperator/Propose",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OperatorServer).Propose(ctx, req.(*Candidate))
+		return srv.(IbftOperatorServer).Propose(ctx, req.(*Candidate))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Operator_Candidates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _IbftOperator_Candidates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(OperatorServer).Candidates(ctx, in)
+		return srv.(IbftOperatorServer).Candidates(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1.Operator/Candidates",
+		FullMethod: "/v1.IbftOperator/Candidates",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OperatorServer).Candidates(ctx, req.(*empty.Empty))
+		return srv.(IbftOperatorServer).Candidates(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Operator_ServiceDesc is the grpc.ServiceDesc for Operator service.
+func _IbftOperator_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(empty.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IbftOperatorServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.IbftOperator/Status",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IbftOperatorServer).Status(ctx, req.(*empty.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// IbftOperator_ServiceDesc is the grpc.ServiceDesc for IbftOperator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Operator_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "v1.Operator",
-	HandlerType: (*OperatorServer)(nil),
+var IbftOperator_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "v1.IbftOperator",
+	HandlerType: (*IbftOperatorServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetSnapshot",
-			Handler:    _Operator_GetSnapshot_Handler,
+			Handler:    _IbftOperator_GetSnapshot_Handler,
 		},
 		{
 			MethodName: "Propose",
-			Handler:    _Operator_Propose_Handler,
+			Handler:    _IbftOperator_Propose_Handler,
 		},
 		{
 			MethodName: "Candidates",
-			Handler:    _Operator_Candidates_Handler,
+			Handler:    _IbftOperator_Candidates_Handler,
+		},
+		{
+			MethodName: "Status",
+			Handler:    _IbftOperator_Status_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

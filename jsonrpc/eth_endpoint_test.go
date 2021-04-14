@@ -473,7 +473,8 @@ func TestGetBalance(t *testing.T) {
 				// If there is an error, and the test shouldn't fail
 				t.Fatalf("Error: %v", balanceError)
 			} else if !testCase.shouldFail {
-				assert.Equalf(t, (*types.Big)(testCase.balance), balance, "Balances don't match")
+				res := types.EncodeBigInt(testCase.balance)
+				assert.Equalf(t, &res, balance, "Balances don't match")
 			}
 		})
 	}

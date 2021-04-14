@@ -74,6 +74,11 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
+		"ibft status": func() (cli.Command, error) {
+			return &IbftStatus{
+				Meta: meta,
+			}, nil
+		},
 		// ---- txpool ----
 		"txpool add": func() (cli.Command, error) {
 			return &TxPoolAdd{

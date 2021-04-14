@@ -37,7 +37,7 @@ func (p *IbftCandidates) Run(args []string) int {
 		return 1
 	}
 
-	clt := ibftOp.NewOperatorClient(conn)
+	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
 	if err != nil {
 		p.UI.Error(err.Error())

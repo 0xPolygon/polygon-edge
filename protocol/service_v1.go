@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -17,6 +18,7 @@ import (
 type serviceV1 struct {
 	proto.UnimplementedV1Server
 
+	syncer *Syncer
 	logger hclog.Logger
 
 	store blockchainShim
@@ -90,6 +92,17 @@ func (s *serviceV1) start() {
 type rlpObject interface {
 	MarshalRLPTo(dst []byte) []byte
 	UnmarshalRLP(input []byte) error
+}
+
+func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Empty, error) {
+	id := ctx.(*grpc.Context).PeerID
+
+	b := new(types.Block)
+	if err := b.UnmarshalRLP(req.Raw.Value); err != nil {
+		return nil, err
+	}
+	s.syncer.enqueueBlock(id, b)
+	return &empty.Empty{}, nil
 }
 
 // GetCurrent implements the V1Server interface

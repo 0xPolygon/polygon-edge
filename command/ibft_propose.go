@@ -60,7 +60,7 @@ func (p *IbftPropose) Run(args []string) int {
 		return 1
 	}
 
-	clt := ibftOp.NewOperatorClient(conn)
+	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
 		Auth:    add,

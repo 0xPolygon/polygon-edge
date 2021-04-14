@@ -407,7 +407,8 @@ func (e *Eth) GetBalance(address string, number BlockNumber) (interface{}, error
 	if err != nil {
 		return nil, err
 	}
-	return (*types.Big)(acc.Balance), nil
+	res := types.EncodeBigInt(acc.Balance)
+	return &res, nil
 }
 
 // GetTransactionCount returns account nonce

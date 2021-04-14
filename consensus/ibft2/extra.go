@@ -7,15 +7,27 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+var (
+	// IstanbulDigest represents a hash of "Istanbul practical byzantine fault tolerance"
+	// to identify whether the block is from Istanbul consensus engine
+	IstanbulDigest = types.StringToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365")
+
+	// Fixed number of extra-data bytes reserved for validator vanity
+	IstanbulExtraVanity = 32
+
+	// Fixed number of extra-data bytes reserved for validator seal
+	IstanbulExtraSeal = 65
+)
+
 var zeroBytes = make([]byte, 32)
 
 func putIbftExtraValidators(h *types.Header, validators []types.Address) {
 	// pad zeros to the right up to istambul vanity
 	extra := h.ExtraData
-	if len(extra) < types.IstanbulExtraVanity {
-		extra = append(extra, zeroBytes[:types.IstanbulExtraVanity-len(extra)]...)
+	if len(extra) < IstanbulExtraVanity {
+		extra = append(extra, zeroBytes[:IstanbulExtraVanity-len(extra)]...)
 	} else {
-		extra = extra[:types.IstanbulExtraVanity]
+		extra = extra[:IstanbulExtraVanity]
 	}
 
 	ibftExtra := &IstanbulExtra{
@@ -30,10 +42,10 @@ func putIbftExtraValidators(h *types.Header, validators []types.Address) {
 func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 	// pad zeros to the right up to istambul vanity
 	extra := h.ExtraData
-	if len(extra) < types.IstanbulExtraVanity {
-		extra = append(extra, zeroBytes[:types.IstanbulExtraVanity-len(extra)]...)
+	if len(extra) < IstanbulExtraVanity {
+		extra = append(extra, zeroBytes[:IstanbulExtraVanity-len(extra)]...)
 	} else {
-		extra = extra[:types.IstanbulExtraVanity]
+		extra = extra[:IstanbulExtraVanity]
 	}
 
 	xx := istanbulExtra.MarshalRLPTo(nil)
@@ -44,11 +56,11 @@ func PutIbftExtra(h *types.Header, istanbulExtra *IstanbulExtra) error {
 }
 
 func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
-	if len(h.ExtraData) < types.IstanbulExtraVanity {
+	if len(h.ExtraData) < IstanbulExtraVanity {
 		return nil, fmt.Errorf("wrong extra size: %d", len(h.ExtraData))
 	}
 
-	data := h.ExtraData[types.IstanbulExtraVanity:]
+	data := h.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{}
 	if err := extra.UnmarshalRLP(data); err != nil {
 		return nil, err

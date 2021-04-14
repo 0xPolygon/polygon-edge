@@ -16,7 +16,14 @@ type operator struct {
 	candidatesLock sync.Mutex
 	candidates     []*proto.Candidate
 
-	proto.UnimplementedOperatorServer
+	proto.UnimplementedIbftOperatorServer
+}
+
+func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
+	resp := &proto.IbftStatusResp{
+		Key: o.i.validatorKeyAddr.String(),
+	}
+	return resp, nil
 }
 
 func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
@@ -86,8 +93,16 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 	if err != nil {
 		return nil, err
 	}
-	if snap.Set.Includes(addr) {
-		return nil, fmt.Errorf("is already a validator")
+	// safe checks
+	if req.Auth {
+		if snap.Set.Includes(addr) {
+			return nil, fmt.Errorf("is already a validator")
+		}
+	}
+	if !req.Auth {
+		if !snap.Set.Includes(addr) {
+			return nil, fmt.Errorf("cannot remove a validator if not in snapshot")
+		}
 	}
 
 	// check if we have already vote for this candidate

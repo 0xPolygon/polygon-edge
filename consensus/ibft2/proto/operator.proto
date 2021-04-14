@@ -6,10 +6,15 @@ option go_package = "/consensus/ibft2/proto";
 
 import "google/protobuf/empty.proto";
 
-service Operator {
+service IbftOperator {
     rpc GetSnapshot(SnapshotReq) returns (Snapshot);
     rpc Propose(Candidate) returns (google.protobuf.Empty);
     rpc Candidates(google.protobuf.Empty) returns (CandidatesResp);
+    rpc Status(google.protobuf.Empty) returns (IbftStatusResp);
+}
+
+message IbftStatusResp {
+    string key = 1;
 }
 
 message SnapshotReq {

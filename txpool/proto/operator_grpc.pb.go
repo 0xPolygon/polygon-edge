@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TxnPoolOperatorClient interface {
 	// Status returns the current status of the pool
-	Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*StatusResp, error)
+	Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error)
 	// AddTxn adds a local transaction to the pool
 	AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*empty.Empty, error)
 	// Subscribe subscribes for new events in the txpool
@@ -35,8 +35,8 @@ func NewTxnPoolOperatorClient(cc grpc.ClientConnInterface) TxnPoolOperatorClient
 	return &txnPoolOperatorClient{cc}
 }
 
-func (c *txnPoolOperatorClient) Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*StatusResp, error) {
-	out := new(StatusResp)
+func (c *txnPoolOperatorClient) Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error) {
+	out := new(TxnPoolStatusResp)
 	err := c.cc.Invoke(ctx, "/v1.TxnPoolOperator/Status", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (x *txnPoolOperatorSubscribeClient) Recv() (*TxPoolEvent, error) {
 // for forward compatibility
 type TxnPoolOperatorServer interface {
 	// Status returns the current status of the pool
-	Status(context.Context, *empty.Empty) (*StatusResp, error)
+	Status(context.Context, *empty.Empty) (*TxnPoolStatusResp, error)
 	// AddTxn adds a local transaction to the pool
 	AddTxn(context.Context, *AddTxnReq) (*empty.Empty, error)
 	// Subscribe subscribes for new events in the txpool
@@ -102,7 +102,7 @@ type TxnPoolOperatorServer interface {
 type UnimplementedTxnPoolOperatorServer struct {
 }
 
-func (UnimplementedTxnPoolOperatorServer) Status(context.Context, *empty.Empty) (*StatusResp, error) {
+func (UnimplementedTxnPoolOperatorServer) Status(context.Context, *empty.Empty) (*TxnPoolStatusResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 func (UnimplementedTxnPoolOperatorServer) AddTxn(context.Context, *AddTxnReq) (*empty.Empty, error) {

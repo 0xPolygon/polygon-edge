@@ -91,7 +91,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 	if len(tuple) != 2 {
-		return fmt.Errorf("Two elements expected")
+		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", len(tuple))
 	}
 
 	// transactions

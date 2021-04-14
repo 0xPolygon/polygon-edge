@@ -12,16 +12,77 @@ import (
 	libp2pGrpc "github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
 )
 
+const maxEnqueueSize = 50
+
 type syncPeer struct {
 	peer   peer.ID
 	client proto.V1Client
 	status *proto.V1Status
+
+	// current status
+	number uint64
+	hash   types.Hash
+
+	enqueueLock sync.Mutex
+	enqueue     []*types.Block
+	enqueueCh   chan struct{}
+}
+
+func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
+	s.enqueueLock.Lock()
+	defer s.enqueueLock.Unlock()
+
+	indx := -1
+	for i, b := range s.enqueue {
+		if b.Hash() == lastSeen {
+			indx = i
+		}
+	}
+	if indx != -1 {
+		s.enqueue = s.enqueue[indx:]
+	}
+}
+
+func (s *syncPeer) popBlock() (b *types.Block) {
+	for {
+		s.enqueueLock.Lock()
+		if len(s.enqueue) != 0 {
+			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+			s.enqueueLock.Unlock()
+			return
+		}
+
+		s.enqueueLock.Unlock()
+		<-s.enqueueCh
+	}
+}
+
+func (s *syncPeer) appendBlock(b *types.Block) {
+	s.enqueueLock.Lock()
+	defer s.enqueueLock.Unlock()
+
+	if len(s.enqueue) == maxEnqueueSize {
+		// pop first element
+		s.enqueue = s.enqueue[1:]
+	}
+	// append to the end
+	s.enqueue = append(s.enqueue, b)
+
+	// update the number (TODO LOCK THIS)
+	s.number = b.Number()
+	s.hash = b.Hash()
+
+	select {
+	case s.enqueueCh <- struct{}{}:
+	default:
+	}
 }
 
 type headUpdate struct {
@@ -54,6 +115,8 @@ type Syncer struct {
 	// TODO: We use the new network.Server
 	server *network.Server
 
+	SyncNotifyCh chan bool
+
 	// id of the current target
 	target string
 }
@@ -71,17 +134,41 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 	return s
 }
 
-/*
-func (s *Syncer) Register(server *grpc.Server) {
-	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
-	proto.RegisterV1Server(server, s.serviceV1)
+func (s *Syncer) notifySync(synced bool) {
+	if s.SyncNotifyCh != nil {
+		s.SyncNotifyCh <- synced
+	}
 }
-*/
 
 const syncerV1 = "/syncer/0.1"
 
+func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
+	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
+
+	p, ok := s.peers[peerID]
+	if ok {
+		p.appendBlock(b)
+	}
+}
+
+func (s *Syncer) Broadcast(b *types.Block) {
+	// broadcast the new block to all the peers
+	req := &proto.NotifyReq{
+		Hash:   b.Hash().String(),
+		Number: int64(b.Number()),
+		Raw: &any.Any{
+			Value: b.MarshalRLP(),
+		},
+	}
+	for _, p := range s.peers {
+		if _, err := p.client.Notify(context.Background(), req); err != nil {
+			s.logger.Error("failed to notify", "err", err)
+		}
+	}
+}
+
 func (s *Syncer) Start() {
-	s.serviceV1 = &serviceV1{logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
+	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
 
 	// register the grpc protocol for syncer
 	grpc := libp2pGrpc.NewGrpcStream()
@@ -105,14 +192,14 @@ func (s *Syncer) Start() {
 			if err != nil {
 				panic(err)
 			}
-			go s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream))
+			s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream))
 		}
 	}()
 	go s.serviceV1.start()
-	go s.syncPeerImpl()
+	//go s.syncPeerImpl()
 }
 
-func (s *Syncer) bestPeer() (*syncPeer, *big.Int) {
+func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
 
@@ -125,7 +212,14 @@ func (s *Syncer) bestPeer() (*syncPeer, *big.Int) {
 			bestPeer, bestTd = p, diff
 		}
 	}
-	return bestPeer, bestTd
+	if bestPeer == nil {
+		return nil
+	}
+	curDiff := s.blockchain.CurrentTD()
+	if bestTd.Cmp(curDiff) <= 0 {
+		return nil
+	}
+	return bestPeer
 }
 
 func (s *Syncer) syncPeerImpl() {
@@ -138,24 +232,12 @@ func (s *Syncer) syncPeerImpl() {
 		}
 
 		// check who is the best peer
-		best, bestTd := s.bestPeer()
+		best := s.BestPeer()
 		if best == nil {
 			continue
 		}
 
-		/*
-			fmt.Println("- handlel new peer -")
-			fmt.Println("best")
-			fmt.Println(best)
-			fmt.Println(bestTd)
-		*/
-
-		curDiff := s.blockchain.CurrentTD()
-		if bestTd.Cmp(curDiff) <= 0 {
-			return
-		}
-
-		s.syncWithPeer(best)
+		// s.syncWithPeer(best)
 	}
 }
 
@@ -171,9 +253,10 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) {
 	}
 
 	peer := &syncPeer{
-		peer:   peerID,
-		client: clt,
-		status: status,
+		peer:      peerID,
+		client:    clt,
+		status:    status,
+		enqueueCh: make(chan struct{}),
 	}
 	s.peers[peerID] = peer
 
@@ -182,36 +265,38 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) {
 	default:
 	}
 
-	stream, err := clt.Watch(context.Background(), &empty.Empty{})
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		for {
-			status, err := stream.Recv()
-			if err != nil {
-				panic(err)
-			}
-
-			fmt.Println("-- status --")
-			fmt.Println(status)
-
-			// retrieve the block
-
-			hash := types.StringToHash(status.Hash)
-			header, err := getHeader(clt, nil, &hash)
-			if err != nil {
-				panic(err)
-			}
-			block := &types.Block{
-				Header: header,
-			}
-			if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-				s.logger.Error("failed to write block", "err", err)
-			}
+	/*
+		stream, err := clt.Watch(context.Background(), &empty.Empty{})
+		if err != nil {
+			panic(err)
 		}
-	}()
+
+		go func() {
+			for {
+				status, err := stream.Recv()
+				if err != nil {
+					panic(err)
+				}
+
+				fmt.Println("-- status --")
+				fmt.Println(status)
+
+				// retrieve the block
+
+				hash := types.StringToHash(status.Hash)
+				header, err := getHeader(clt, nil, &hash)
+				if err != nil {
+					panic(err)
+				}
+				block := &types.Block{
+					Header: header,
+				}
+				if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+					s.logger.Error("failed to write block", "err", err)
+				}
+			}
+		}()
+	*/
 }
 
 func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *proto.V1Status) (*types.Header, *types.Header, error) {
@@ -282,13 +367,32 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *proto.V1Status) 
 	return header, fork, nil
 }
 
-func (s *Syncer) syncWithPeer(p *syncPeer) {
-	target := p.status
+func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) bool) {
+	// purge from the cache of broadcasted blocks all the ones we have written so far
+	header := s.blockchain.Header()
+	p.purgeBlocks(header.Hash)
 
+	// listen and enqueue the messages
+	for {
+		b := p.popBlock()
+
+		fmt.Println("--- bb ---")
+		fmt.Println(b)
+
+		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
+			panic(err)
+		}
+		if !handler(b) {
+			break
+		}
+	}
+}
+
+func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// find in batches
@@ -296,45 +400,71 @@ func (s *Syncer) syncWithPeer(p *syncPeer) {
 
 	startBlock := fork
 
+	var lastTarget int64
+
 	// sync up to the current known header for the
 	for {
-		s.logger.Debug("sync up to block", "block", startBlock.Number)
-
-		// start to syncronize with it
-		sk := &skeleton{
-			span: 10,
-			num:  5,
-		}
-		if err := sk.build(p.client, startBlock.Hash); err != nil {
-			panic(err)
-		}
-
-		// fill skeleton
-		for indx := range sk.slots {
-			sk.fillSlot(uint64(indx), p.client)
-		}
-
-		// sync the data
-		for _, slot := range sk.slots {
-			for _, b := range slot.blocks {
-				fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
-			}
-			if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
-				panic(err)
-			}
-		}
-
-		// try to get the next block
-		startBlock = sk.LastHeader()
-
-		fmt.Println("- start block -")
-		fmt.Println(startBlock.Number)
-		fmt.Println(target.Number)
-
-		if startBlock.Number >= uint64(target.Number) {
+		// update target
+		target := p.status.Number
+		if target == lastTarget {
+			// there are no more changes to pull for now
 			break
 		}
+
+		for {
+			s.logger.Debug("sync up to block", "from", startBlock.Number, "to", target)
+
+			// start to syncronize with it
+			sk := &skeleton{
+				span: 10,
+				num:  5,
+			}
+			if err := sk.build(p.client, startBlock.Hash); err != nil {
+				panic(err)
+			}
+
+			// fill skeleton
+			for indx := range sk.slots {
+				sk.fillSlot(uint64(indx), p.client)
+			}
+
+			// sync the data
+			for _, slot := range sk.slots {
+				for _, b := range slot.blocks {
+					fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
+				}
+				if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
+					panic(err)
+				}
+			}
+
+			// try to get the next block
+			startBlock = sk.LastHeader()
+
+			/*
+				// validate that we have written to the correct place
+				lastWrittenHeader := s.blockchain.Header()
+				if startBlock.Hash != lastWrittenHeader.Hash {
+					// this might mean we are writting to a fork??
+					panic("bad")
+				}
+
+				fmt.Println("- start block -")
+				fmt.Println(startBlock.Number)
+				fmt.Println(target)
+			*/
+
+			if startBlock.Number >= uint64(target) {
+				break
+			}
+		}
+
+		lastTarget = target
 	}
+
+	fmt.Println("___ BATCH SYNC DONE ___")
+
+	return nil
 }
 
 func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header, error) {

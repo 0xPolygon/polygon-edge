@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/keccak"
@@ -43,7 +42,7 @@ type Server struct {
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
-	storage    storage.Storage
+	// storage    storage.Storage
 
 	// key   *ecdsa.PrivateKey // TODO: Remove
 	chain *chain.Chain
@@ -161,9 +160,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup syncer protocol
-	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
-	m.syncer.Start()
+	/*
+		// setup syncer protocol
+		m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
+		m.syncer.Start()
+	*/
 
 	if m.config.Seal {
 		m.logger.Info("sealing enabled")

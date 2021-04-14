@@ -45,7 +45,7 @@ func makeServers(t *testing.T, num int) []*Ibft2 {
 	return servers
 }
 
-func TestStates(t *testing.T) {
+func TestStatxs(t *testing.T) {
 	makeServers(t, 3)
 
 	time.Sleep(5 * time.Second)
@@ -202,7 +202,7 @@ func TestTransition_ValidateState(t *testing.T) {
 		// even when we do not have yet the preprepare messages
 		i := newMockIbft2(t, []string{"A", "B", "C", "D"}, "A")
 
-		seal := make([]byte, types.IstanbulExtraSeal)
+		seal := make([]byte, IstanbulExtraSeal)
 
 		i.setState(ValidateState)
 		i.state2.view = proto.ViewMsg(1, 0)
@@ -545,7 +545,7 @@ func (m *mockIbft2) DummyBlock() *types.Block {
 	block := &types.Block{
 		Header: &types.Header{
 			ExtraData:  parent.ExtraData,
-			MixHash:    types.IstanbulDigest,
+			MixHash:    IstanbulDigest,
 			Sha3Uncles: types.EmptyUncleHash,
 		},
 	}
@@ -687,5 +687,26 @@ func (m *mockIbft2) expect(res expectResult) {
 	}
 	if m.state2.err != res.err {
 		m.t.Fatalf("incorrect error %v %v", m.state2.err, res.err)
+	}
+}
+
+func TestFaultyNodes(t *testing.T) {
+	cases := []struct {
+		Network, Faulty uint64
+	}{
+		{1, 0},
+		{2, 0},
+		{3, 0},
+		{4, 1},
+		{5, 1},
+		{6, 1},
+		{7, 2},
+		{8, 2},
+		{9, 2},
+	}
+	for _, c := range cases {
+		pool := newTesterAccountPool(int(c.Network))
+		vals := pool.ValidatorSet()
+		assert.Equal(t, vals.MinFaultyNodes(), int(c.Faulty))
 	}
 }

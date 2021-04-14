@@ -458,8 +458,15 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
 
-	//fmt.Println("-- parent --")
-	//fmt.Println(parent.Number, parent.Hash)
+	fmt.Println("-- write --")
+	fmt.Println(blocks[0].ParentHash())
+	fmt.Println(blocks[0].Hash())
+
+	if parent.Hash == types.ZeroHash {
+		return fmt.Errorf("parent not found")
+	}
+
+	fmt.Println(parent.Number, parent.Hash)
 
 	// validate chain
 	for i := 0; i < size; i++ {
@@ -670,12 +677,14 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	head := b.Header()
 
-	fmt.Println("XXXXXXXXXX")
-	fmt.Println(header.ParentHash)
-	fmt.Println(head.Hash)
-
 	// Write the data
 	if header.ParentHash == head.Hash {
+
+		fmt.Println("-- written --")
+		fmt.Println(header.ParentHash)
+		fmt.Println(header.Hash)
+		fmt.Println(header.Number)
+
 		// Fast path to save the new canonical header
 		return b.writeCanonicalHeader(evnt, header)
 	}

@@ -112,7 +112,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			Seal:          []byte{},
 			CommittedSeal: [][]byte{},
 		}
-		extraData = make([]byte, types.IstanbulExtraVanity)
+		extraData = make([]byte, ibft2.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 

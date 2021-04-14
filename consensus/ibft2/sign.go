@@ -83,7 +83,7 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	}
 
 	for _, seal := range seals {
-		if len(seal) != types.IstanbulExtraSeal {
+		if len(seal) != IstanbulExtraSeal {
 			return nil, fmt.Errorf("bad")
 		}
 	}
@@ -158,6 +158,9 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 		return err
 	}
 	signMsg = commitMsg(signMsg)
+
+	fmt.Println("--- verify ---")
+	fmt.Println(snap.Set)
 
 	visited := map[types.Address]struct{}{}
 	for _, seal := range extra.CommittedSeal {

@@ -19,14 +19,14 @@ const (
 type Receipts []*Receipt
 
 type Receipt struct {
-	Root              Hash           `json:"root" db:"root"`
-	CumulativeGasUsed uint64         `json:"cumulativeGasUsed" db:"cumulative_gas_used"`
-	LogsBloom         Bloom          `json:"logsBloom" db:"bloom"`
+	Root              Hash           `json:"root"`
+	CumulativeGasUsed uint64         `json:"cumulativeGasUsed"`
+	LogsBloom         Bloom          `json:"logsBloom"`
 	Logs              []*Log         `json:"logs"`
 	Status            *ReceiptStatus `json:"status"`
-	TxHash            Hash           `json:"transactionHash" db:"txhash"`
-	ContractAddress   Address        `json:"contractAddress" db:"contract_address"`
-	GasUsed           uint64         `json:"gasUsed" db:"gas_used"`
+	TxHash            Hash           `json:"transactionHash"`
+	ContractAddress   Address        `json:"contractAddress"`
+	GasUsed           uint64         `json:"gasUsed"`
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {

@@ -38,6 +38,10 @@ func (i *Ibft2) setupSnapshot() error {
 		if err != nil {
 			return err
 		}
+
+		fmt.Println("---xx")
+		fmt.Println(extra.Validators)
+
 		// create the first snapshot from the genesis
 		snap := &Snapshot{
 			Hash:   header.Hash.String(),
@@ -72,10 +76,13 @@ func (i *Ibft2) getLatestSnapshot() (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("- meta -")
+	fmt.Println(meta.LastBlock)
 	snap, err := i.getSnapshot(meta.LastBlock)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(snap.Set)
 	return snap, nil
 }
 
