@@ -2,7 +2,6 @@ package txpool
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
@@ -29,11 +28,6 @@ func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*empty.Empty
 		}
 		txn.From = from
 	}
-
-	fmt.Println("XXX")
-	fmt.Println(txn.From)
-	fmt.Println(txn.To)
-
 	if err := t.AddTx(txn); err != nil {
 		return nil, err
 	}
