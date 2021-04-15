@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -95,9 +96,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create libp2p stack: %v", err)
 	}
 
-	fmt.Println("-- bootnodes --")
-	fmt.Println(config.Chain.Bootnodes)
-
 	emitter, err := host.EventBus().Emitter(new(PeerEvent))
 	if err != nil {
 		return nil, err
@@ -127,6 +125,20 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
+
+		// try to decode the bootnodes
+		bootnodes := []*peer.AddrInfo{}
+		for _, raw := range config.Chain.Bootnodes {
+			node, err := StringToAddrInfo(raw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+			}
+			// add the bootnode to the peerstore
+			srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
+			bootnodes = append(bootnodes, node)
+		}
+
+		srv.discovery.setBootnodes(bootnodes)
 	}
 
 	// start gossip protocol
@@ -197,7 +209,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
+					// s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
@@ -257,6 +269,8 @@ func (s *Server) addPeer(id peer.ID) {
 		Info: s.host.Peerstore().PeerInfo(id),
 	}
 	s.peers[id] = p
+
+	s.logger.Info("Peer connected", "id", id.String())
 }
 
 func (s *Server) delPeer(id peer.ID) {

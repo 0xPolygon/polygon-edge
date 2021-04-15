@@ -159,9 +159,6 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	}
 	signMsg = commitMsg(signMsg)
 
-	fmt.Println("--- verify ---")
-	fmt.Println(snap.Set)
-
 	visited := map[types.Address]struct{}{}
 	for _, seal := range extra.CommittedSeal {
 		addr, err := ecrecoverImpl(seal, signMsg)

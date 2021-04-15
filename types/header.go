@@ -6,9 +6,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -67,21 +65,6 @@ func (n *Nonce) Scan(src interface{}) error {
 // MarshalText implements encoding.TextMarshaler
 func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
-}
-
-var marshalArenaPool fastrlp.ArenaPool
-
-// ComputeHash computes the hash of the header
-func (h *Header) ComputeHash() *Header {
-	ar := marshalArenaPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
-
-	v := h.MarshalRLPWith(ar)
-	hash.WriteRlp(h.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
-	return h
 }
 
 func (h *Header) Copy() *Header {

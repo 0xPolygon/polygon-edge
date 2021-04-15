@@ -35,6 +35,10 @@ type syncPeer struct {
 	enqueueCh   chan struct{}
 }
 
+func (s *syncPeer) Number() uint64 {
+	return s.number
+}
+
 func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()

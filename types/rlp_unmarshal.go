@@ -136,8 +136,6 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", num)
 	}
 
-	p.Hash(h.Hash[:0], v)
-
 	// parentHash
 	if err = elems[0].GetHash(h.ParentHash[:]); err != nil {
 		return err
@@ -200,6 +198,9 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 	h.SetNonce(nonce)
+
+	// compute the hash after the decoding
+	h.ComputeHash()
 	return err
 }
 

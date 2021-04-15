@@ -1,15 +1,12 @@
 package ibft2
 
 import (
-	"bytes"
-	"container/heap"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
-	"sort"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -54,9 +51,11 @@ type Ibft2 struct {
 	epochSize uint64
 
 	// We use a message queue to process messages in order
-	msgQueueLock sync.Mutex
-	msgQueue     msgQueueImpl
-	updateCh     chan struct{}
+	//msgQueueLock sync.Mutex
+	//msgQueue     msgQueueImpl
+
+	msgQueue *msgQueue
+	updateCh chan struct{}
 
 	// sync protocol
 	syncer       *protocol.Syncer
@@ -124,7 +123,8 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 }
 
 func (i *Ibft2) createKey() error {
-	i.msgQueue = msgQueueImpl{}
+	// i.msgQueue = msgQueueImpl{}
+	i.msgQueue = newMsgQueue()
 	i.closeCh = make(chan struct{})
 	i.updateCh = make(chan struct{})
 
@@ -558,7 +558,8 @@ func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 }
 
 func (i *Ibft2) runAcceptState() { // start new round
-	i.logger.Info("Accept state", "sequence", i.state2.view.Sequence)
+	logger := i.logger.Named("acceptState")
+	logger.Info("Accept state", "sequence", i.state2.view.Sequence)
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
@@ -589,7 +590,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 	i.state2.CalcProposer(lastProposer)
 
 	if i.state2.proposer == i.validatorKeyAddr {
-		i.logger.Info("we are the proposer", "block", number)
+		logger.Info("we are the proposer", "block", number)
 
 		if !i.state2.locked {
 			// since the state is not locked, we need to build a new block
@@ -598,7 +599,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 			// calculate how much time do we have to wait to mine the block
 			delay := time.Until(time.Unix(int64(i.state2.block.Header.Timestamp), 0))
 
-			delay = 2 * time.Second
+			delay = 1 * time.Second
 			fmt.Println("--")
 			fmt.Println(delay)
 
@@ -635,6 +636,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 			return
 		}
 		if msg == nil {
+			logger.Debug("timeout")
 			i.setState(RoundChangeState)
 			continue
 		}
@@ -664,6 +666,8 @@ func (i *Ibft2) runAcceptState() { // start new round
 				i.handleStateErr(errIncorrectBlockLocked)
 			}
 		} else {
+			fmt.Println("- extra -")
+			fmt.Println(block.Header.ExtraData.Bytes())
 			// since its a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.handleStateErr(errBlockVerificationFailed)
@@ -716,6 +720,10 @@ func (i *Ibft2) runValidateState() {
 			// we send all the messages to ourselves too
 			continue
 
+		case *proto.MessageReq_RoundChange:
+			// add the message but dont do anything else
+			i.state2.AddRoundMessage(msg)
+
 		default:
 			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Message)))
 		}
@@ -754,29 +762,11 @@ func (i *Ibft2) runValidateState() {
 	}
 }
 
-type sortedBytesSlice [][]byte
-
-func (s sortedBytesSlice) Len() int {
-	return len(s)
-}
-
-func (s sortedBytesSlice) Less(i, j int) bool {
-	return bytes.Compare(s[i], s[j]) < 0
-}
-
-func (s sortedBytesSlice) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
 func (i *Ibft2) insertBlock(block *types.Block) error {
-	committedSeals := sortedBytesSlice{}
+	committedSeals := [][]byte{}
 	for _, commit := range i.state2.committed {
 		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal)) // TODO: Validate
 	}
-
-	// we need to sort the committed seals so that each chain generates
-	// the same hash
-	sort.Sort(committedSeals)
 
 	header, err := writeCommittedSeals(block.Header, committedSeals)
 	if err != nil {
@@ -831,25 +821,23 @@ func (i *Ibft2) runRoundChangeState() {
 	}
 
 	checkTimeout := func() {
-		lastProposal := i.blockchain.Header()
-		if lastProposal.Number >= i.state2.view.Sequence {
-			i.logger.Debug("round change catch up", "current", lastProposal.Number, "sequence", i.state2.view.Sequence)
-			// we need to catch up with the last sequence
-			i.state2.view = &proto.View{
-				Sequence: lastProposal.Number + 1,
+		// check if there is any peer that is really advanced and we might need to sync with it first
+		if i.syncer != nil {
+			bestPeer := i.syncer.BestPeer()
+			if bestPeer != nil {
+				lastProposal := i.blockchain.Header()
+				if bestPeer.Number() > lastProposal.Number {
+					i.logger.Debug("it has found a better peer to connect", "local", lastProposal.Number, "remote", bestPeer.Number())
+					// we need to catch up with the last sequence
+					i.setState(SyncState)
+					return
+				}
 			}
-			i.setState(AcceptState)
-		} else {
-			// start a new round
-			sendNextRoundChange()
 		}
-	}
 
-	bestPeer := i.syncer.BestPeer()
-	if bestPeer != nil {
-		// for now just call the sync protocol
-		i.setState(SyncState)
-		return
+		// otherwise, it seems that we are in sync
+		// and we should start a new round
+		sendNextRoundChange()
 	}
 
 	// if the round was triggered due to an error, we send our own
@@ -879,11 +867,12 @@ func (i *Ibft2) runRoundChangeState() {
 	for i.getState() == RoundChangeState {
 		raw, ok := i.getNextMessage(timerCh)
 		if !ok {
+			fmt.Println("- close -")
 			// closing
 			return
 		}
 		if raw == nil {
-			i.logger.Debug("timeout")
+			i.logger.Debug("round change timeout")
 			checkTimeout()
 			continue
 		}
@@ -1003,9 +992,25 @@ func (i *Ibft2) setState(s IbftState) {
 }
 
 func (i *Ibft2) randomTimeout() chan struct{} {
+
+	/*
+		doneCh := make(chan struct{})
+		go func() {
+			<-time.After(i.maxTimeoutRange)
+			doneCh <- struct{}{}
+		}()
+		return doneCh
+	*/
+
 	doneCh := make(chan struct{})
 	go func() {
-		<-time.After(i.maxTimeoutRange)
+		// set timeout based on the round number
+		timeout := time.Duration(10000) * time.Millisecond
+		round := i.state2.view.Round
+		if round > 0 {
+			timeout += time.Duration(math.Pow(2, float64(round))) * time.Second
+		}
+		time.Sleep(timeout)
 		doneCh <- struct{}{}
 	}()
 	return doneCh
@@ -1082,66 +1087,89 @@ func (i *Ibft2) Close() error {
 
 type Validators []types.Address
 
+/*
 func (i *Ibft2) popMessage() *proto.MessageReq {
-	i.msgQueueLock.Lock()
-	defer i.msgQueueLock.Unlock()
+			i.msgQueueLock.Lock()
+			defer i.msgQueueLock.Unlock()
 
-START:
-	if i.msgQueue.Len() == 0 {
-		return nil
-	}
-	nextMsg := i.msgQueue[0]
+			fmt.Println("-- pop --")
+			fmt.Println(i.msgQueue)
 
-	// If we are in preprepare we only accept prepreare messages
-	if i.isState(AcceptState) {
-		if nextMsg.msg != msgPreprepare {
+		START:
+			if i.msgQueue.Len() == 0 {
+				return nil
+			}
+			nextMsg := i.msgQueue[0]
+
+			// If we are in preprepare we only accept prepreare messages
+			if i.isState(AcceptState) {
+				if nextMsg.msg != msgPreprepare {
+					heap.Pop(&i.msgQueue)
+					goto START
+				}
+			}
+
+			fmt.Println("-- msg --")
+			fmt.Println("====>", nextMsg.obj.From, nextMsg.msg.String(), nextMsg.view.Sequence, nextMsg.view.Round)
+
+			// we only accept???
+			if i.isState(RoundChangeState) {
+				if nextMsg.msg != msgRoundChange {
+					heap.Pop(&i.msgQueue)
+					goto START
+				}
+
+				/// compare is different here
+				if nextMsg.view.Sequence > i.state2.view.Sequence {
+					fmt.Println("_C_A_")
+					// future message
+					return nil
+				} else if cmpView(nextMsg.view, i.state2.view) < 0 {
+					fmt.Println("_C_B_")
+					// old message
+					heap.Pop(&i.msgQueue)
+					goto START
+				}
+
+				// pop the value
+				heap.Pop(&i.msgQueue)
+				return nextMsg.obj
+			}
+
+			// TODO: If message is roundChange do some check first
+			// TODO: If we are in round change we only accept stateChange messages
+
+			if cmpView(nextMsg.view, i.state2.view) > 0 {
+				fmt.Println("==> Future proposal", i.state2.view)
+				// nextMsg is higher in either round (state change) or sequence
+				// (future proposal). We need to wait for a newer message
+				return nil
+			}
+
+			if cmpView(nextMsg.view, i.state2.view) < 0 {
+				fmt.Printf("old value %d %d\n", nextMsg.view.Sequence, nextMsg.view.Round)
+				// nextMsg is old. Pop the value from the queue and try again
+				heap.Pop(&i.msgQueue)
+				goto START
+			}
+
+			// TODO: If in state accepted state we only accept pre-prepare messages
 			heap.Pop(&i.msgQueue)
-			goto START
-		}
-	}
-
-	// we only accept???
-	if i.isState(RoundChangeState) {
-		if nextMsg.msg != msgRoundChange {
-			heap.Pop(&i.msgQueue)
-			goto START
-		}
-	}
-
-	fmt.Println("-- msg --")
-	fmt.Println("====>", nextMsg.msg.String(), nextMsg.view.Sequence, nextMsg.view.Round)
-
-	// TODO: If message is roundChange do some check first
-	// TODO: If we are in round change we only accept stateChange messages
-
-	if cmpView(nextMsg.view, i.state2.view) > 0 {
-		// nextMsg is higher in either round (state change) or sequence
-		// (future proposal). We need to wait for a newer message
-		return nil
-	}
-
-	if cmpView(nextMsg.view, i.state2.view) < 0 {
-		fmt.Printf("old value %d %d\n", nextMsg.view.Sequence, nextMsg.view.Round)
-		// nextMsg is old. Pop the value from the queue and try again
-		heap.Pop(&i.msgQueue)
-		goto START
-	}
-
-	// TODO: If in state accepted state we only accept pre-prepare messages
-	heap.Pop(&i.msgQueue)
-	return nextMsg.obj
+			return nextMsg.obj
 }
+*/
 
 func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 	if stopCh == nil {
 		stopCh = make(chan struct{})
 	}
 	for {
-		msg := i.popMessage()
+		msg := i.msgQueue.readMessage(i.getState(), i.state2.view)
+		// msg := i.popMessage()
 		if msg != nil {
 			i.logger.Debug("process message")
 			// fmt.Println(msg)
-			return msg, true
+			return msg.obj, true
 		}
 
 		// wait until there is a new message or
@@ -1157,7 +1185,8 @@ func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 }
 
 func (i *Ibft2) pushMessage(msg *proto.MessageReq) {
-	i.msgQueueLock.Lock()
+
+	// imsgQueueLock.Lock()
 
 	// TODO: We can do better
 	var view *proto.View
@@ -1186,104 +1215,13 @@ func (i *Ibft2) pushMessage(msg *proto.MessageReq) {
 		msg:  msgType,
 		obj:  msg,
 	}
-	heap.Push(&i.msgQueue, task)
-	i.msgQueueLock.Unlock()
+	i.msgQueue.pushMessage(task)
+
+	//heap.Push(&i.msgQueue, task)
+	//i.msgQueueLock.Unlock()
 
 	select {
 	case i.updateCh <- struct{}{}:
 	default:
 	}
-}
-
-type MsgType uint64
-
-const (
-	// priority order for the messages
-	msgRoundChange MsgType = 0
-	msgPreprepare  MsgType = 1
-	msgCommit      MsgType = 2
-	msgPrepare     MsgType = 3
-)
-
-func (m MsgType) String() string {
-	switch m {
-	case msgRoundChange:
-		return "RoundChange"
-	case msgPrepare:
-		return "Prepare"
-	case msgPreprepare:
-		return "Preprepare"
-	case msgCommit:
-		return "Commit"
-	default:
-		panic("BUG")
-	}
-}
-
-type msgTask struct {
-	// priority
-	view *proto.View
-	msg  MsgType
-
-	obj *proto.MessageReq
-}
-
-type msgQueueImpl []*msgTask
-
-// Len returns the length of the queue
-func (m msgQueueImpl) Len() int {
-	return len(m)
-}
-
-// Less compares the priorities of two items at the passed in indexes (A < B)
-func (m msgQueueImpl) Less(i, j int) bool {
-	ti, tj := m[i], m[j]
-	// sort by sequence
-	if ti.view.Sequence != tj.view.Sequence {
-		return ti.view.Sequence < tj.view.Sequence
-	}
-	// sort by round
-	if ti.view.Round != tj.view.Round {
-		return ti.view.Round < tj.view.Round
-	}
-	// sort by message
-	return ti.msg < tj.msg
-}
-
-// Swap swaps the places of the items at the passed-in indexes
-func (m msgQueueImpl) Swap(i, j int) {
-	m[i], m[j] = m[j], m[i]
-}
-
-// Push adds a new item to the queue
-func (m *msgQueueImpl) Push(x interface{}) {
-	*m = append(*m, x.(*msgTask))
-}
-
-// Pop removes an item from the queue
-func (m *msgQueueImpl) Pop() interface{} {
-	old := *m
-	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil
-	*m = old[0 : n-1]
-	return item
-}
-
-func cmpView(v, y *proto.View) int {
-	if v.Sequence != y.Sequence {
-		if v.Sequence < y.Sequence {
-			return -1
-		} else {
-			return 1
-		}
-	}
-	if v.Round != y.Round {
-		if v.Round < y.Round {
-			return -1
-		} else {
-			return 1
-		}
-	}
-	return 0
 }
