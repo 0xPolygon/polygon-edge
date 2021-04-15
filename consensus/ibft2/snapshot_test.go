@@ -79,10 +79,6 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 	return c
 }
 
-func (ap *testerAccountPool) indx(account uint64) *testerAccount {
-	return ap.accounts[account]
-}
-
 func (ap *testerAccountPool) get(name string) *testerAccount {
 	for _, i := range ap.accounts {
 		if i.alias == name {
@@ -425,6 +421,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			ibft := &Ibft2{
 				epochSize:  epoch,
 				blockchain: blockchain.TestBlockchain(t, genesis),
+				config:     &consensus.Config{},
 			}
 			assert.NoError(t, ibft.setupSnapshot())
 			for indx, header := range headers {
@@ -477,6 +474,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			ibft1 := &Ibft2{
 				epochSize:  epoch,
 				blockchain: blockchain.TestBlockchain(t, genesis),
+				config:     &consensus.Config{},
 			}
 			assert.NoError(t, ibft1.setupSnapshot())
 			if err := ibft1.processHeaders(headers); err != nil {
@@ -500,7 +498,6 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 }
 
 func TestSnapshot_Store(t *testing.T) {
-	//
 	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
 	assert.NoError(t, err)
 
@@ -543,22 +540,73 @@ func TestSnapshot_Store(t *testing.T) {
 	err = ibft1.processHeaders(headers)
 	assert.NoError(t, err)
 
-	assert.NoError(t, ibft1.closeSnapshot())
+	meta, err := ibft1.getSnapshotMetadata()
+	assert.NoError(t, err)
+	assert.Equal(t, meta.LastBlock, uint64(4))
+	assert.NoError(t, ibft1.saveSnapDataToFile())
+
+	// load snapshot data
+	ibft2 := &Ibft2{
+		blockchain: blockchain.TestBlockchain(t, genesis),
+		config: &consensus.Config{
+			Path: tmpDir,
+		},
+	}
+	assert.NoError(t, ibft2.setupSnapshot())
+	meta, err = ibft2.getSnapshotMetadata()
+	assert.NoError(t, err)
+	assert.Equal(t, meta.LastBlock, uint64(4))
+
+	snap, err := ibft2.getLatestSnapshot()
+	assert.NoError(t, err)
+	assert.Equal(t, snap.Number, 4)
 }
 
-func TestCalcProposer(t *testing.T) {
-	// TODO TEST
-}
-
-func TestSnapshot_Metadata(t *testing.T) {
+func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool := newTesterAccountPool()
-	pool.add("a")
+	pool.add("a", "b", "c")
 
 	genesis := pool.genesis()
-	ibft := &Ibft2{
-		epochSize:  1000,
+	ibft1 := &Ibft2{
+		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
+		config:     &consensus.Config{},
 	}
-	assert.NoError(t, ibft.setupSnapshot())
+	assert.NoError(t, ibft1.setupSnapshot())
 
+	// write a header that creates a snapshot
+	headers := []*types.Header{}
+	for i := 1; i < 51; i++ {
+		id := strconv.Itoa(i)
+		pool.add(id)
+
+		h := &types.Header{
+			Number:     uint64(i),
+			ParentHash: ibft1.blockchain.Header().Hash,
+			Miner:      types.ZeroAddress,
+			MixHash:    IstanbulDigest,
+			ExtraData:  genesis.ExtraData,
+		}
+
+		h.Miner = pool.get(id).Address()
+		h.Nonce = nonceAuthVote
+
+		h = pool.get("a").sign(h)
+		h.ComputeHash()
+		headers = append(headers, h)
+	}
+
+	err := ibft1.processHeaders(headers)
+	assert.NoError(t, err)
+
+	txn := ibft1.store.Txn(false)
+	it, err := txn.ReverseLowerBound("snapshot", "number", 50)
+	assert.NoError(t, err)
+
+	// 21 -> 50
+	count := 0
+	for obj := it.Next(); obj != nil; obj = it.Next() {
+		count++
+	}
+	assert.Equal(t, count, 20)
 }

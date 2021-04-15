@@ -100,6 +100,9 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 }
 
 func signHash(h *types.Header) ([]byte, error) {
+	//hash := istambulHeaderHash(h)
+	//return hash.Bytes(), nil
+
 	h = h.Copy() // make a copy since we update the extra field
 
 	arena := fastrlp.DefaultArenaPool.Get()

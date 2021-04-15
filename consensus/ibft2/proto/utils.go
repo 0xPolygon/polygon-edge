@@ -17,6 +17,11 @@ func (m *MessageReq) PayloadNoSig() ([]byte, error) {
 	return data, nil
 }
 
+func (m *MessageReq) FromAddr() types.Address {
+	return types.StringToAddress(m.From)
+}
+
+/*
 func (m *MessageReq) View() *View {
 	var view *View
 	switch obj := m.Message.(type) {
@@ -34,7 +39,9 @@ func (m *MessageReq) View() *View {
 	}
 	return view
 }
+*/
 
+/*
 func PreprepareMsg(from types.Address, preprepare *Preprepare) *MessageReq {
 	return &MessageReq{
 		Message: &MessageReq_Preprepare{
@@ -70,6 +77,7 @@ func RoundChange(from types.Address, subject *Subject) *MessageReq {
 		From: from.String(),
 	}
 }
+*/
 
 func ViewMsg(sequence, round uint64) *View {
 	return &View{
@@ -84,4 +92,8 @@ func (m *MessageReq) Copy() *MessageReq {
 
 func (c *Candidate) Copy() *Candidate {
 	return proto.Clone(c).(*Candidate)
+}
+
+func (v *View) Copy() *View {
+	return proto.Clone(v).(*View)
 }

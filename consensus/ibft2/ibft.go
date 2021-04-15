@@ -7,7 +7,6 @@ import (
 	"math"
 	"path/filepath"
 	"reflect"
-	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -35,8 +34,6 @@ type blockchainInterface interface {
 type Ibft2 struct {
 	logger hclog.Logger
 	config *consensus.Config
-
-	state  uint64
 	state2 *currentState
 
 	blockchain blockchainInterface
@@ -50,10 +47,6 @@ type Ibft2 struct {
 	store     *memdb.MemDB
 	epochSize uint64
 
-	// We use a message queue to process messages in order
-	//msgQueueLock sync.Mutex
-	//msgQueue     msgQueueImpl
-
 	msgQueue *msgQueue
 	updateCh chan struct{}
 
@@ -62,7 +55,6 @@ type Ibft2 struct {
 	syncNotifyCh chan bool
 
 	sealing bool
-
 	network *network.Server
 
 	transportFactory transportFactory
@@ -113,9 +105,6 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	}
 	p.transport = transport
 
-	// always have this active
-	go p.readMessages()
-
 	// do the start right now but it will only seal blocks if its in sealing mode
 	go p.start()
 
@@ -142,67 +131,6 @@ func (i *Ibft2) createKey() error {
 
 const IbftKeyName = "validator.key"
 
-type IbftState uint32
-
-const (
-	AcceptState IbftState = iota
-	RoundChangeState
-	PreprepareState // TODO: REMOVE
-
-	ValidateState
-
-	// Combine
-	PrepareState
-	CommitState
-
-	SyncState
-)
-
-func (i IbftState) String() string {
-	switch i {
-	case AcceptState:
-		return "AcceptState"
-
-	case RoundChangeState:
-		return "RoundChangeState"
-
-	case PreprepareState:
-		return "PreprepareState"
-
-	case ValidateState:
-		return "ValidateState"
-
-	case PrepareState:
-		return "PrepareState"
-
-	case CommitState:
-		return "CommitState"
-
-	case SyncState:
-		return "SyncState"
-	}
-	panic(fmt.Sprintf("BUG: Ibft state not found %d", i))
-}
-
-func (i *Ibft2) readMessages() {
-	//fmt.Println("XXX")
-	//fmt.Println(i.transport)
-
-	ch := i.transport.Listen()
-
-	//fmt.Println("-- ch ..")
-	//fmt.Println(ch)
-
-	for {
-		msg := <-ch
-		i.pushMessage(msg)
-	}
-}
-
-func (i *Ibft2) waitForGenesis() {
-	// TODO
-}
-
 func (i *Ibft2) start() {
 	// consensus always starts in SyncState mode in case it needs
 	// to sync with other nodes.
@@ -210,8 +138,6 @@ func (i *Ibft2) start() {
 
 	header := i.blockchain.Header()
 	i.logger.Debug("current sequence", "sequence", header.Number+1)
-
-	// Wait for us to be a validator?
 
 	for {
 		select {
@@ -241,9 +167,6 @@ func (i *Ibft2) runCycle() {
 
 	case SyncState:
 		i.runSyncState()
-
-	case CommitState:
-		return
 	}
 }
 
@@ -314,8 +237,6 @@ func (i *Ibft2) runSyncState() {
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
-			fmt.Println("_X_X_X_")
-
 			isValidator = i.isValidSnapshot()
 			if isValidator {
 				return false // stop the handler
@@ -330,173 +251,6 @@ func (i *Ibft2) runSyncState() {
 			// so that we can start to do some stuff there
 			i.setState(AcceptState)
 		}
-	}
-}
-
-type currentState struct {
-	// the snapshot being currently used
-	validators ValidatorSet
-
-	// the proposed block
-	block *types.Block
-
-	// the selected proposer
-	proposer types.Address
-
-	// current view
-	view *proto.View
-
-	// list of prepared messages
-	prepared map[types.Address]*proto.MessageReq
-
-	// list of commited messages
-	committed map[types.Address]*proto.MessageReq
-
-	// list of round change messages
-	roundMessages map[uint64]map[types.Address]*proto.MessageReq
-
-	// locked signals whether the proposal is locked
-	locked bool
-
-	// describes whether there has been an error during the computation
-	err error
-}
-
-func (c *currentState) NumValid() int {
-	/*
-		// ceil(2N/3)
-		num := float64(len(c.validators))
-		return int(math.Ceil(2 * num / 3))
-	*/
-
-	// represents the number of required messages
-	return 2 * c.validators.MinFaultyNodes()
-}
-
-// getErr returns the current error if any and consumes it
-func (c *currentState) getErr() error {
-	err := c.err
-	c.err = nil
-	return err
-}
-
-func (c *currentState) maxRound() (maxRound uint64, found bool) {
-	num := c.validators.MinFaultyNodes() + 1
-
-	for k, round := range c.roundMessages {
-		if len(round) < num {
-			continue
-		}
-		if maxRound < k {
-			maxRound = k
-			found = true
-		}
-	}
-	return
-}
-
-func (c *currentState) resetRoundMsgs() {
-	c.prepared = map[types.Address]*proto.MessageReq{}
-	c.committed = map[types.Address]*proto.MessageReq{}
-	c.roundMessages = map[uint64]map[types.Address]*proto.MessageReq{}
-}
-
-func (c *currentState) CalcProposer(lastProposer types.Address) {
-	c.proposer = c.validators.CalcProposer(c.view.Round, lastProposer)
-}
-
-func (c *currentState) lock() {
-	c.locked = true
-}
-
-func (c *currentState) isLocked() bool {
-	return c.locked
-}
-
-func (c *currentState) unlock() {
-	c.block = nil
-	c.locked = false
-}
-
-func (c *currentState) cleanRound(round uint64) {
-	delete(c.roundMessages, round)
-}
-
-func (c *currentState) numRounds(round uint64) int {
-	if c.roundMessages == nil {
-		return 0
-	}
-	obj, ok := c.roundMessages[round]
-	if !ok {
-		return 0
-	}
-	return len(obj)
-}
-
-func (c *currentState) AddRoundMessage(msg *proto.MessageReq) int {
-	if c.roundMessages == nil {
-		c.roundMessages = map[uint64]map[types.Address]*proto.MessageReq{}
-	}
-	// validate round change message
-	obj, ok := msg.Message.(*proto.MessageReq_RoundChange)
-	if !ok {
-		panic("BUG: Msg different from state change found")
-	}
-	addr := types.StringToAddress(msg.From)
-	view := obj.RoundChange.View
-	if _, ok := c.roundMessages[view.Round]; !ok {
-		c.roundMessages[view.Round] = map[types.Address]*proto.MessageReq{}
-	}
-	if c.validators.Includes(addr) {
-		c.roundMessages[view.Round][addr] = msg
-	}
-	return len(c.roundMessages[view.Round])
-}
-
-func (c *currentState) addPrepared(msg *proto.MessageReq) {
-	if c.prepared == nil {
-		c.prepared = map[types.Address]*proto.MessageReq{}
-	}
-	// validate prepared message
-	if _, ok := msg.Message.(*proto.MessageReq_Prepare); !ok {
-		return
-	}
-	// validate address
-	addr := types.StringToAddress(msg.From)
-	if c.validators.Includes(addr) {
-		c.prepared[addr] = msg
-	}
-}
-
-func (c *currentState) addCommited(msg *proto.MessageReq) {
-	if c.committed == nil {
-		c.committed = map[types.Address]*proto.MessageReq{}
-	}
-	// validate prepared message
-	if _, ok := msg.Message.(*proto.MessageReq_Commit); !ok {
-		return
-	}
-	// validate address
-	addr := types.StringToAddress(msg.From)
-	if c.validators.Includes(addr) {
-		c.committed[addr] = msg
-	}
-}
-
-func (c *currentState) numPrepared() int {
-	return len(c.prepared)
-}
-
-func (c *currentState) numCommited() int {
-	return len(c.committed)
-}
-
-func (c *currentState) Subject() *proto.Subject {
-	return &proto.Subject{
-		View: &proto.View{
-			Round:    c.view.Round,
-			Sequence: c.view.Sequence,
-		},
 	}
 }
 
@@ -641,7 +395,6 @@ func (i *Ibft2) runAcceptState() { // start new round
 			continue
 		}
 
-		preprepare, _ := msg.Message.(*proto.MessageReq_Preprepare)
 		if msg.From != i.state2.proposer.String() {
 			i.logger.Error("msg received from wrong proposer")
 			continue
@@ -649,7 +402,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 
 		// retrieve the block proposal
 		block := &types.Block{}
-		if err := block.UnmarshalRLP(preprepare.Preprepare.Proposal.Block.Value); err != nil {
+		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
 			panic(err)
 		}
 
@@ -708,24 +461,15 @@ func (i *Ibft2) runValidateState() {
 			continue
 		}
 
-		switch msg.Message.(type) {
-		case *proto.MessageReq_Prepare:
+		switch msg.Type {
+		case proto.MessageReq_Prepare:
 			i.state2.addPrepared(msg)
 
-		case *proto.MessageReq_Commit:
+		case proto.MessageReq_Commit:
 			i.state2.addCommited(msg)
 
-		case *proto.MessageReq_Preprepare:
-			// TODO: We might receive this here if we are the proposer since
-			// we send all the messages to ourselves too
-			continue
-
-		case *proto.MessageReq_RoundChange:
-			// add the message but dont do anything else
-			i.state2.AddRoundMessage(msg)
-
 		default:
-			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Message)))
+			panic(fmt.Sprintf("BUG: %s", reflect.TypeOf(msg.Type)))
 		}
 
 		fmt.Println("- min num valid nodes -")
@@ -881,7 +625,7 @@ func (i *Ibft2) runRoundChangeState() {
 		fmt.Println(raw)
 
 		// we only expect RoundChange messages right now
-		view := raw.View()
+		view := raw.View
 		num := i.state2.AddRoundMessage(raw)
 
 		if num == i.state2.NumValid() {
@@ -902,52 +646,41 @@ func (i *Ibft2) runRoundChangeState() {
 // --- com wrappers ---
 
 func (i *Ibft2) sendRoundChange() {
-	i.gossip(i.state2.validators, &proto.MessageReq{
-		Message: &proto.MessageReq_RoundChange{
-			RoundChange: i.state2.Subject(),
-		},
-	})
+	i.gossip(proto.MessageReq_RoundChange)
 }
 
 func (i *Ibft2) sendPreprepareMsg() {
-	blockRlp := i.state2.block.MarshalRLP()
-
-	i.gossip(i.state2.validators, &proto.MessageReq{
-		Message: &proto.MessageReq_Preprepare{
-			Preprepare: &proto.Preprepare{
-				View: i.state2.view,
-				Proposal: &proto.Proposal{
-					Block: &any.Any{
-						Value: blockRlp,
-					},
-				},
-			},
-		},
-	})
+	i.gossip(proto.MessageReq_Preprepare)
 }
 
 func (i *Ibft2) sendPrepareMsg() {
-	i.gossip(i.state2.validators, &proto.MessageReq{
-		Message: &proto.MessageReq_Prepare{
-			Prepare: i.state2.Subject(),
-		},
-	})
+	i.gossip(proto.MessageReq_Prepare)
 }
 
 func (i *Ibft2) sendCommitMsg() {
-	i.gossip(i.state2.validators, &proto.MessageReq{
-		Message: &proto.MessageReq_Commit{
-			Commit: i.state2.Subject(),
-		},
-	})
+	i.gossip(proto.MessageReq_Commit)
 }
 
-func (i *Ibft2) gossip(target []types.Address, msg *proto.MessageReq) {
-	// Add the sender of the message
+func (i *Ibft2) gossip(typ proto.MessageReq_Type) {
+	msg := &proto.MessageReq{
+		Type: typ,
+	}
+
+	// add View
+	msg.View = i.state2.view.Copy()
+
+	// add the sender of the message
 	msg.From = i.validatorKeyAddr.String()
 
+	// if we are sending a preprepare message we need to include the proposed block
+	if msg.Type == proto.MessageReq_Preprepare {
+		msg.Proposal = &any.Any{
+			Value: i.state2.block.MarshalRLP(),
+		}
+	}
+
 	// if the message is commit, we need to add the committed seal
-	if _, ok := msg.Message.(*proto.MessageReq_Commit); ok {
+	if msg.Type == proto.MessageReq_Commit {
 		seal, err := writeCommittedSeal(i.validatorKey, i.state2.block.Header)
 		if err != nil {
 			panic(err)
@@ -955,10 +688,9 @@ func (i *Ibft2) gossip(target []types.Address, msg *proto.MessageReq) {
 		msg.Seal = hex.EncodeToHex(seal)
 	}
 
-	if _, ok := msg.Message.(*proto.MessageReq_Preprepare); !ok {
-		// copy msg
-		msg2 := msg.Copy()
-		i.pushMessage(msg2)
+	if msg.Type != proto.MessageReq_Preprepare {
+		// send a copy to ourselves except for our own preprepare message
+		i.pushMessage(msg.Copy())
 	}
 
 	// sign the message
@@ -972,23 +704,20 @@ func (i *Ibft2) gossip(target []types.Address, msg *proto.MessageReq) {
 	}
 	msg.Signature = hex.EncodeToHex(sig)
 
-	i.transport.Gossip(target, msg)
+	i.transport.Gossip(msg)
 }
 
 func (i *Ibft2) getState() IbftState {
-	stateAddr := (*uint64)(&i.state)
-	return IbftState(atomic.LoadUint64(stateAddr))
+	return i.state2.getState()
 }
 
 func (i *Ibft2) isState(s IbftState) bool {
-	return i.getState() == s
+	return i.state2.getState() == s
 }
 
 func (i *Ibft2) setState(s IbftState) {
 	i.logger.Debug("state change", "new", s)
-
-	stateAddr := (*uint64)(&i.state)
-	atomic.StoreUint64(stateAddr, uint64(s))
+	i.state2.setState(s)
 }
 
 func (i *Ibft2) randomTimeout() chan struct{} {
@@ -1058,8 +787,6 @@ func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) e
 }
 
 func (i *Ibft2) VerifyHeader(parent, header *types.Header) error {
-	// fmt.Println("__ VERIFY HEADER __")
-
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
@@ -1085,90 +812,14 @@ func (i *Ibft2) Close() error {
 	return nil
 }
 
-type Validators []types.Address
-
-/*
-func (i *Ibft2) popMessage() *proto.MessageReq {
-			i.msgQueueLock.Lock()
-			defer i.msgQueueLock.Unlock()
-
-			fmt.Println("-- pop --")
-			fmt.Println(i.msgQueue)
-
-		START:
-			if i.msgQueue.Len() == 0 {
-				return nil
-			}
-			nextMsg := i.msgQueue[0]
-
-			// If we are in preprepare we only accept prepreare messages
-			if i.isState(AcceptState) {
-				if nextMsg.msg != msgPreprepare {
-					heap.Pop(&i.msgQueue)
-					goto START
-				}
-			}
-
-			fmt.Println("-- msg --")
-			fmt.Println("====>", nextMsg.obj.From, nextMsg.msg.String(), nextMsg.view.Sequence, nextMsg.view.Round)
-
-			// we only accept???
-			if i.isState(RoundChangeState) {
-				if nextMsg.msg != msgRoundChange {
-					heap.Pop(&i.msgQueue)
-					goto START
-				}
-
-				/// compare is different here
-				if nextMsg.view.Sequence > i.state2.view.Sequence {
-					fmt.Println("_C_A_")
-					// future message
-					return nil
-				} else if cmpView(nextMsg.view, i.state2.view) < 0 {
-					fmt.Println("_C_B_")
-					// old message
-					heap.Pop(&i.msgQueue)
-					goto START
-				}
-
-				// pop the value
-				heap.Pop(&i.msgQueue)
-				return nextMsg.obj
-			}
-
-			// TODO: If message is roundChange do some check first
-			// TODO: If we are in round change we only accept stateChange messages
-
-			if cmpView(nextMsg.view, i.state2.view) > 0 {
-				fmt.Println("==> Future proposal", i.state2.view)
-				// nextMsg is higher in either round (state change) or sequence
-				// (future proposal). We need to wait for a newer message
-				return nil
-			}
-
-			if cmpView(nextMsg.view, i.state2.view) < 0 {
-				fmt.Printf("old value %d %d\n", nextMsg.view.Sequence, nextMsg.view.Round)
-				// nextMsg is old. Pop the value from the queue and try again
-				heap.Pop(&i.msgQueue)
-				goto START
-			}
-
-			// TODO: If in state accepted state we only accept pre-prepare messages
-			heap.Pop(&i.msgQueue)
-			return nextMsg.obj
-}
-*/
-
 func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 	if stopCh == nil {
 		stopCh = make(chan struct{})
 	}
 	for {
 		msg := i.msgQueue.readMessage(i.getState(), i.state2.view)
-		// msg := i.popMessage()
 		if msg != nil {
 			i.logger.Debug("process message")
-			// fmt.Println(msg)
 			return msg.obj, true
 		}
 
@@ -1185,40 +836,12 @@ func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 }
 
 func (i *Ibft2) pushMessage(msg *proto.MessageReq) {
-
-	// imsgQueueLock.Lock()
-
-	// TODO: We can do better
-	var view *proto.View
-	var msgType MsgType
-
-	switch obj := msg.Message.(type) {
-	case *proto.MessageReq_Preprepare:
-		view = obj.Preprepare.View
-		msgType = msgPreprepare
-
-	case *proto.MessageReq_Prepare:
-		view = obj.Prepare.View
-		msgType = msgPrepare
-
-	case *proto.MessageReq_Commit:
-		view = obj.Commit.View
-		msgType = msgCommit
-
-	case *proto.MessageReq_RoundChange:
-		view = obj.RoundChange.View
-		msgType = msgRoundChange
-	}
-
 	task := &msgTask{
-		view: view,
-		msg:  msgType,
+		view: msg.View,
+		msg:  protoTypeToMsg(msg.Type),
 		obj:  msg,
 	}
 	i.msgQueue.pushMessage(task)
-
-	//heap.Push(&i.msgQueue, task)
-	//i.msgQueueLock.Unlock()
 
 	select {
 	case i.updateCh <- struct{}{}:

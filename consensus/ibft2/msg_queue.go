@@ -23,6 +23,9 @@ func (m *msgQueue) pushMessage(task *msgTask) {
 }
 
 func (m *msgQueue) readMessage(state IbftState, current *proto.View) *msgTask {
+	m.queueLock.Lock()
+	defer m.queueLock.Unlock()
+
 	queue := m.getQueue(state)
 
 	for {
@@ -80,6 +83,17 @@ func newMsgQueue() *msgQueue {
 		acceptStateQueue:      msgQueueImpl{},
 		validateStateQueue:    msgQueueImpl{},
 	}
+}
+
+func protoTypeToMsg(typ proto.MessageReq_Type) MsgType {
+	if typ == proto.MessageReq_Preprepare {
+		return msgPreprepare
+	} else if typ == proto.MessageReq_Prepare {
+		return msgPrepare
+	} else if typ == proto.MessageReq_Commit {
+		return msgCommit
+	}
+	return msgRoundChange
 }
 
 func msgToState(msg MsgType) IbftState {

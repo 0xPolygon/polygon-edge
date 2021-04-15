@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math"
+	"os"
 	"path/filepath"
 
 	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
@@ -27,6 +27,11 @@ func (i *Ibft2) setupSnapshot() error {
 	}
 	i.store = store
 
+	// read from storage
+	if err := i.loadSnapDataFromFile(); err != nil {
+		return err
+	}
+
 	header := i.blockchain.Header()
 	meta, err := i.getSnapshotMetadata()
 	if err != nil {
@@ -38,9 +43,6 @@ func (i *Ibft2) setupSnapshot() error {
 		if err != nil {
 			return err
 		}
-
-		fmt.Println("---xx")
-		fmt.Println(extra.Validators)
 
 		// create the first snapshot from the genesis
 		snap := &Snapshot{
@@ -76,17 +78,52 @@ func (i *Ibft2) getLatestSnapshot() (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("- meta -")
-	fmt.Println(meta.LastBlock)
 	snap, err := i.getSnapshot(meta.LastBlock)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(snap.Set)
 	return snap, nil
 }
 
-func (i *Ibft2) closeSnapshot() error {
+func (i *Ibft2) loadSnapDataFromFile() error {
+	if i.config.Path == "" {
+		return nil
+	}
+
+	// load metadata
+	var meta *snapshotMetadata
+	if err := i.readDataStore("metadata", &meta); err != nil {
+		return err
+	}
+	if meta != nil {
+		if err := i.updateSnapshotMetadata(meta.LastBlock); err != nil {
+			return err
+		}
+	}
+
+	// load snapshots
+	snaps := []*Snapshot{}
+	if err := i.readDataStore("snapshots", &snaps); err != nil {
+		return err
+	}
+	for _, s := range snaps {
+		if err := i.putSnapshot(s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Ibft2) saveSnapDataToFile() error {
+	if i.config.Path == "" {
+		return nil
+	}
+
+	meta, err := i.getSnapshotMetadata()
+	if err != nil {
+		return err
+	}
+
 	txn := i.store.Txn(false)
 
 	// List all the snapshots
@@ -99,19 +136,41 @@ func (i *Ibft2) closeSnapshot() error {
 	for obj := it.Next(); obj != nil; obj = it.Next() {
 		snaps = append(snaps, obj.(*Snapshot))
 	}
-	data, err := json.Marshal(snaps)
-	if err != nil {
+	if err := i.writeDataStore("snapshots", snaps); err != nil {
 		return err
 	}
 
-	if err := ioutil.WriteFile(i.snapshotsFilePath(), data, 0755); err != nil {
+	// write metadata
+	if err := i.writeDataStore("metadata", meta); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (i *Ibft2) snapshotsFilePath() string {
-	return filepath.Join(i.config.Path, "snapshots")
+func (i *Ibft2) readDataStore(file string, obj interface{}) error {
+	path := filepath.Join(i.config.Path, file)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *Ibft2) writeDataStore(file string, obj interface{}) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(filepath.Join(i.config.Path, file), data, 0755); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (i *Ibft2) processHeaders(headers []*types.Header) error {
@@ -158,6 +217,15 @@ func (i *Ibft2) processHeaders(headers []*types.Header) error {
 			snap.Votes = nil
 			if err := saveSnap(h); err != nil {
 				return err
+			}
+
+			// remove in-memory snaphots from two epochs before this one
+			epoch := int(number/i.epochSize) - 2
+			if epoch > 0 {
+				purgeBlock := uint64(epoch) * i.epochSize
+				if err := i.removeSnapshotsLowerThan(purgeBlock); err != nil {
+					return err
+				}
 			}
 			continue
 		}
@@ -243,6 +311,23 @@ func (i *Ibft2) processHeaders(headers []*types.Header) error {
 	return nil
 }
 
+func (i *Ibft2) removeSnapshotsLowerThan(num uint64) error {
+	txn := i.store.Txn(true)
+
+	it, err := txn.ReverseLowerBound("snapshot", "number", int(num))
+	if err != nil {
+		return err
+	}
+
+	for obj := it.Next(); obj != nil; obj = it.Next() {
+		if err := txn.Delete("snapshot", obj); err != nil {
+			return err
+		}
+	}
+	txn.Commit()
+	return nil
+}
+
 func (i *Ibft2) updateSnapshotMetadata(num uint64) error {
 	txn := i.store.Txn(true)
 	meta := &snapshotMetadata{
@@ -287,68 +372,6 @@ func (i *Ibft2) getSnapshot(num uint64) (*Snapshot, error) {
 		return nil, err
 	}
 	return it.Next().(*Snapshot), nil
-}
-
-type ValidatorSet []types.Address
-
-func (v *ValidatorSet) CalcProposer(round uint64, lastProposer types.Address) types.Address {
-	seed := uint64(0)
-	if lastProposer == types.ZeroAddress {
-		seed = round
-	} else {
-		offset := 0
-		if indx := v.Index(lastProposer); indx != -1 {
-			offset = indx
-		}
-		seed = uint64(offset) + round + 1
-	}
-	pick := seed % uint64(v.Len())
-	return (*v)[pick]
-}
-
-func (v *ValidatorSet) Add(addr types.Address) {
-	*v = append(*v, addr)
-}
-
-func (v *ValidatorSet) Del(addr types.Address) {
-	for indx, i := range *v {
-		if i == addr {
-			*v = append((*v)[:indx], (*v)[indx+1:]...)
-		}
-	}
-}
-
-func (v *ValidatorSet) Len() int {
-	return len(*v)
-}
-
-func (v *ValidatorSet) Equal(vv *ValidatorSet) bool {
-	if len(*v) != len(*vv) {
-		return false
-	}
-	for indx := range *v {
-		if (*v)[indx] != (*vv)[indx] {
-			return false
-		}
-	}
-	return true
-}
-
-func (v *ValidatorSet) Index(addr types.Address) int {
-	for indx, i := range *v {
-		if i == addr {
-			return indx
-		}
-	}
-	return -1
-}
-
-func (v *ValidatorSet) Includes(addr types.Address) bool {
-	return v.Index(addr) != -1
-}
-
-func (v *ValidatorSet) MinFaultyNodes() int {
-	return int(math.Ceil(float64(len(*v))/3)) - 1
 }
 
 type Vote struct {
