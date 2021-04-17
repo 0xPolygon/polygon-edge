@@ -263,11 +263,17 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 
 // -- write ops --
 
-func (s *KeyValueStorage) writeRLP(p, k []byte, obj types.RLPMarshaler) error {
-	return s.set(p, k, obj.MarshalRLPTo(nil))
+func (s *KeyValueStorage) writeRLP(p, k []byte, raw types.RLPMarshaler) error {
+	var data []byte
+	if obj, ok := raw.(types.RLPStoreMarshaler); ok {
+		data = obj.MarshalStoreRLPTo(nil)
+	} else {
+		data = raw.MarshalRLPTo(nil)
+	}
+	return s.set(p, k, data)
 }
 
-func (s *KeyValueStorage) readRLP(p, k []byte, obj types.RLPUnmarshaler) error {
+func (s *KeyValueStorage) readRLP(p, k []byte, raw types.RLPUnmarshaler) error {
 	p = append(p, k...)
 	data, ok, err := s.db.Get(p)
 	if err != nil {
@@ -276,8 +282,16 @@ func (s *KeyValueStorage) readRLP(p, k []byte, obj types.RLPUnmarshaler) error {
 	if !ok {
 		return nil
 	}
-	if err := obj.UnmarshalRLP(data); err != nil {
-		return err
+	if obj, ok := raw.(types.RLPStoreUnmarshaler); ok {
+		// decode in the store format
+		if err := obj.UnmarshalStoreRLP(data); err != nil {
+			return err
+		}
+	} else {
+		// normal rlp decoding
+		if err := raw.UnmarshalRLP(data); err != nil {
+			return err
+		}
 	}
 	return nil
 }

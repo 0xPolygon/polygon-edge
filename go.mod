@@ -33,7 +33,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
-	github.com/umbracle/go-web3 v0.0.0-20210317180544-e0d0d379acf6
+	github.com/umbracle/go-web3 v0.0.0-20210417095447-b7216f1f52d7
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/grpc v1.35.0

@@ -75,7 +75,7 @@ type IstanbulExtra struct {
 }
 
 func (i *IstanbulExtra) MarshalRLPTo(dst []byte) []byte {
-	return types.MarshalRLPTo(i, dst)
+	return types.MarshalRLPTo(i.MarshalRLPWith, dst)
 }
 
 func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -114,7 +114,7 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (i *IstanbulExtra) UnmarshalRLP(input []byte) error {
-	return types.UnmarshalRlp(i, input)
+	return types.UnmarshalRlp(i.UnmarshalRLPFrom, input)
 }
 
 func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {

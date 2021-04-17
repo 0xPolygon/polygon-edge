@@ -46,10 +46,17 @@ type blockchainInterface interface {
 	// ApplyTxn applies a transaction object to the blockchain
 	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
 
+	// GetNonce returns the next nonce for this address
+	GetNonce(addr types.Address) (uint64, error)
+
 	stateHelperInterface
 }
 
 type nullBlockchainInterface struct {
+}
+
+func (b *nullBlockchainInterface) GetNonce(addr types.Address) (uint64, error) {
+	return 0, nil
 }
 
 func (b *nullBlockchainInterface) Header() *types.Header {
@@ -90,4 +97,20 @@ func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.
 
 func (b *nullBlockchainInterface) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
 	return nil, false
+}
+
+func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	return nil, false, nil
+}
+
+func (b *nullBlockchainInterface) GetCode(hash types.Hash) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	return nil, nil
 }

@@ -113,3 +113,24 @@ func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
 func (m *mockStore) Header() *types.Header {
 	return &types.Header{}
 }
+
+func TestTxnQueue_Promotion(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+
+	addr1 := types.Address{0x1}
+
+	pool.addImpl("", &types.Transaction{
+		From: addr1,
+	})
+
+	// though txn0 is not being processed yet and the current nonce is 0
+	// we need to consider that txn0 is on the sorted pool so this one is promoted too
+	pool.addImpl("", &types.Transaction{
+		From:  addr1,
+		Nonce: 1,
+	})
+
+	assert.Equal(t, pool.Length(), uint64(2))
+}

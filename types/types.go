@@ -98,7 +98,11 @@ func (h HexBytes) Value() (driver.Value, error) {
 func (h *HexBytes) Scan(src interface{}) error {
 	str, ok := src.(string)
 	if !ok {
-		str = string(src.([]byte))
+		raw, ok := src.([]byte)
+		if !ok {
+			return fmt.Errorf("bad")
+		}
+		str = string(raw)
 	}
 	hh := hex.MustDecodeHex(str)
 	aux := make([]byte, len(hh))

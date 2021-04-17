@@ -170,18 +170,18 @@ func (t *TxPool) addImpl(ctx string, txns ...*types.Transaction) error {
 
 	txnsQueue, ok := t.queue[from]
 	if !ok {
+		stateRoot := t.store.Header().StateRoot
+
+		// initialize the txn queue for the account
 		txnsQueue = newTxQueue()
+		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, from)
 		t.queue[from] = txnsQueue
 	}
 	for _, txn := range txns {
 		txnsQueue.Add(txn)
 	}
 
-	// try to promote transactions if possible
-	stateRoot := t.store.Header().StateRoot
-	nonce := t.store.GetNonce(stateRoot, from)
-
-	for _, promoted := range txnsQueue.Promote(nonce) {
+	for _, promoted := range txnsQueue.Promote() {
 		t.sorted.Push(promoted)
 	}
 	return nil
@@ -256,34 +256,38 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 }
 
 type txQueue struct {
-	txs  txHeap
-	last time.Time
+	txs       txHeap
+	nextNonce uint64
 }
 
 func newTxQueue() *txQueue {
 	return &txQueue{
-		txs:  txHeap{},
-		last: time.Now(),
+		txs: txHeap{},
 	}
 }
 
-// LastTime returns the last time queried
-func (t *txQueue) LastTime() time.Time {
-	return t.last
+func (t *txQueue) Reset(txns ...*types.Transaction) {
+	lowestNonce := t.nextNonce
+	for _, txn := range txns {
+		if txn.Nonce < lowestNonce {
+			lowestNonce = txn.Nonce
+		}
+		t.Push(txn)
+	}
+	t.nextNonce = lowestNonce
 }
 
 // Add adds a new tx into the queue
 func (t *txQueue) Add(tx *types.Transaction) {
-	t.last = time.Now()
 	t.Push(tx)
 }
 
 // Promote promotes all the new valid transactions
-func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
+func (t *txQueue) Promote() []*types.Transaction {
 	// Remove elements lower than nonce
 	for {
 		tx := t.Peek()
-		if tx == nil || tx.Nonce >= nextNonce {
+		if tx == nil || tx.Nonce >= t.nextNonce {
 			break
 		}
 		t.Pop()
@@ -291,7 +295,7 @@ func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
 
 	// Promote elements
 	tx := t.Peek()
-	if tx == nil || tx.Nonce != nextNonce {
+	if tx == nil || tx.Nonce != t.nextNonce {
 		return nil
 	}
 
@@ -306,6 +310,13 @@ func (t *txQueue) Promote(nextNonce uint64) []*types.Transaction {
 		}
 		tx = tx2
 	}
+	if len(promote) == 0 {
+		return nil
+	}
+
+	lastTxn := promote[len(promote)-1]
+	t.nextNonce = lastTxn.Nonce + 1
+
 	return promote
 }
 

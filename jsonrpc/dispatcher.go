@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -366,4 +367,48 @@ func lowerCaseFirst(str string) string {
 		return string(unicode.ToLower(v)) + str[i+1:]
 	}
 	return ""
+}
+
+func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
+	// set default values
+	if arg.From == nil {
+		return nil, fmt.Errorf("from is empty")
+	}
+	if arg.Nonce == nil {
+		// get nonce from the pool
+		arg.Nonce = argUintPtr(0)
+	}
+	if arg.Value == nil {
+		arg.Value = argBytesPtr([]byte{})
+	}
+	if arg.GasPrice == nil {
+		// use the suggested gas price
+		arg.GasPrice = argBytesPtr([]byte{})
+		// arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+	}
+	if arg.To == nil {
+		if arg.Input == nil {
+			return nil, fmt.Errorf("contract creation without data provided")
+		}
+	}
+	if arg.Input == nil {
+		arg.Input = argBytesPtr([]byte{})
+	}
+	if arg.Gas == nil {
+		arg.Gas = argUintPtr(0)
+	}
+
+	txn := &types.Transaction{
+		From:     *arg.From,
+		Gas:      uint64(*arg.Gas),
+		GasPrice: types.HexBytes(*arg.GasPrice),
+		Value:    types.HexBytes(*arg.Value),
+		Input:    types.HexBytes(*arg.Input),
+		Nonce:    uint64(*arg.Nonce),
+	}
+	if arg.To != nil {
+		txn.To = arg.To
+	}
+	txn.ComputeHash()
+	return txn, nil
 }

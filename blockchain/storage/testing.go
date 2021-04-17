@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -341,6 +340,8 @@ func testReceipts(t *testing.T, m MockStorage) {
 		CumulativeGasUsed: 10,
 		TxHash:            txn.Hash,
 		LogsBloom:         types.Bloom{0x1},
+		GasUsed:           10,
+		ContractAddress:   types.Address{0x1},
 		Logs: []*types.Log{
 			{
 				Address: addr2,
@@ -354,19 +355,11 @@ func testReceipts(t *testing.T, m MockStorage) {
 	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
-	r, err := s.ReadReceipts(h.Hash)
+	found, err := s.ReadReceipts(h.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the receipt
-	if len(r) != len(receipts) {
-		t.Fatal("lengths are different")
-	}
-	for indx, i := range receipts {
-		if !bytes.Equal(i.Root[:], r[indx].Root[:]) {
-			t.Fatal("receipt txhash is not correct")
-		}
-	}
+	assert.True(t, reflect.DeepEqual(receipts, found))
 }
 
 func testWriteCanonicalHeader(t *testing.T, m MockStorage) {

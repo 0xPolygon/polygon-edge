@@ -6,17 +6,13 @@ import (
 
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
-
-	RawRLPMarshaler
 }
 
-type RawRLPMarshaler interface {
-	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
-}
+type marshalRLPFunc func(ar *fastrlp.Arena) *fastrlp.Value
 
-func MarshalRLPTo(obj RawRLPMarshaler, dst []byte) []byte {
+func MarshalRLPTo(obj marshalRLPFunc, dst []byte) []byte {
 	ar := fastrlp.DefaultArenaPool.Get()
-	dst = obj.MarshalRLPWith(ar).MarshalTo(dst)
+	dst = obj(ar).MarshalTo(dst)
 	fastrlp.DefaultArenaPool.Put(ar)
 	return dst
 }
@@ -26,7 +22,7 @@ func (b *Block) MarshalRLP() []byte {
 }
 
 func (b *Block) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b, dst)
+	return MarshalRLPTo(b.MarshalRLPWith, dst)
 }
 
 func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -57,7 +53,7 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (b *Body) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b, dst)
+	return MarshalRLPTo(b.MarshalRLPWith, dst)
 }
 
 func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -90,7 +86,7 @@ func (h *Header) MarshalRLP() []byte {
 }
 
 func (h *Header) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(h, dst)
+	return MarshalRLPTo(h.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals the header to RLP with a specific fastrlp.Arena
@@ -119,7 +115,7 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (r Receipts) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(&r, dst)
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
 func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
@@ -135,7 +131,7 @@ func (r *Receipt) MarshalRLP() []byte {
 }
 
 func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(r, dst)
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals a receipt with a specific fastrlp.Arena
@@ -183,7 +179,7 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(t, dst)
+	return MarshalRLPTo(t.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena

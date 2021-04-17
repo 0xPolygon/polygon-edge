@@ -22,7 +22,8 @@ type Dev struct {
 	notifyCh chan struct{}
 	closeCh  chan struct{}
 
-	txpool *txpool.TxPool
+	interval uint64
+	txpool   *txpool.TxPool
 
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
@@ -40,6 +41,15 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		txpool:     txpool,
 	}
 
+	rawInterval, ok := config.Config["interval"]
+	if ok {
+		interval, ok := rawInterval.(uint64)
+		if !ok {
+			return nil, fmt.Errorf("interval expected int")
+		}
+		d.interval = interval
+	}
+
 	// enable dev mode so that we can accept non-signed txns
 	txpool.EnableDev()
 	txpool.NotifyCh = d.notifyCh
@@ -51,13 +61,25 @@ func (d *Dev) StartSeal() {
 	go d.run()
 }
 
+func (d *Dev) nextNotify() chan struct{} {
+	if d.interval != 0 {
+		ch := make(chan struct{})
+		go func() {
+			<-time.After(time.Duration(d.interval) * time.Second)
+			ch <- struct{}{}
+		}()
+		return ch
+	}
+	return d.notifyCh
+}
+
 func (d *Dev) run() {
 	d.logger.Info("started")
 
 	for {
 		// wait until there is a new txn
 		select {
-		case <-d.notifyCh:
+		case <-d.nextNotify():
 		case <-d.closeCh:
 			return
 		}
@@ -88,6 +110,7 @@ func (d *Dev) do(parent *types.Header) error {
 		if txn == nil {
 			break
 		}
+
 		if err := transition.Write(txn); err != nil {
 			fmt.Println("-- err --")
 			fmt.Println(err)

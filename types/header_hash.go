@@ -14,7 +14,6 @@ func init() {
 var marshalArenaPool fastrlp.ArenaPool
 
 func defHeaderHash(h *Header) (hash Hash) {
-	panic("X")
 	// default header hashing
 	ar := marshalArenaPool.Get()
 	hasher := keccak.DefaultKeccakPool.Get()

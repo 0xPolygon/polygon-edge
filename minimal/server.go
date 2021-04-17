@@ -202,9 +202,13 @@ func (s *Server) setupConsensus() error {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
 
+	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
+	if !ok {
+		engineConfig = map[string]interface{}{}
+	}
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
-		Config: s.config.ConsensusConfig,
+		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
 	consensus, err := engine(context.Background(), config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))

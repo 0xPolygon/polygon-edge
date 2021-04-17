@@ -7,16 +7,12 @@ import (
 )
 
 type RLPUnmarshaler interface {
-	RawRLPUnmarshaler
-
 	UnmarshalRLP(input []byte) error
 }
 
-type RawRLPUnmarshaler interface {
-	UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
-}
+type unmarshalRLPFunc func(p *fastrlp.Parser, v *fastrlp.Value) error
 
-func UnmarshalRlp(obj RawRLPUnmarshaler, input []byte) error {
+func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	pr := fastrlp.DefaultParserPool.Get()
 
 	v, err := pr.Parse(input)
@@ -24,7 +20,7 @@ func UnmarshalRlp(obj RawRLPUnmarshaler, input []byte) error {
 		fastrlp.DefaultParserPool.Put(pr)
 		return err
 	}
-	if err := obj.UnmarshalRLPFrom(pr, v); err != nil {
+	if err := obj(pr, v); err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
 		return err
 	}
@@ -34,7 +30,7 @@ func UnmarshalRlp(obj RawRLPUnmarshaler, input []byte) error {
 }
 
 func (b *Block) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(b, input)
+	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
 }
 
 func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -82,7 +78,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (b *Body) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(b, input)
+	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
 }
 
 func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -124,7 +120,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (h *Header) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(h, input)
+	return UnmarshalRlp(h.UnmarshalRLPFrom, input)
 }
 
 func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -205,7 +201,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (r *Receipts) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(r, input)
+	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
 }
 
 func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -224,7 +220,7 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (r *Receipt) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(r, input)
+	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
 }
 
 // UnmarshalRLP unmarshals a Receipt in RLP format
@@ -309,7 +305,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(t, input)
+	return UnmarshalRlp(t.UnmarshalRLPFrom, input)
 }
 
 // UnmarshalRLP unmarshals a Transaction in RLP format
