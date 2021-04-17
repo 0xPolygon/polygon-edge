@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/umbracle/fastrlp"
 )
@@ -63,48 +64,6 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// uncles
 	uncles, err := elems[2].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, uncle := range uncles {
-		bUncle := &Header{}
-		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
-			return err
-		}
-		b.Uncles = append(b.Uncles, bUncle)
-	}
-
-	return nil
-}
-
-func (b *Body) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
-}
-
-func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
-	tuple, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-	if len(tuple) != 2 {
-		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", len(tuple))
-	}
-
-	// transactions
-	txns, err := tuple[0].GetElems()
-	if err != nil {
-		return err
-	}
-	for _, txn := range txns {
-		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalRLPFrom(p, txn); err != nil {
-			return err
-		}
-		b.Transactions = append(b.Transactions, bTxn)
-	}
-
-	// uncles
-	uncles, err := tuple[1].GetElems()
 	if err != nil {
 		return err
 	}
@@ -325,7 +284,8 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 	// gasPrice
-	if t.GasPrice, err = elems[1].GetBytes(t.GasPrice[:0]); err != nil {
+	t.GasPrice = new(big.Int)
+	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
 	// gas
@@ -343,7 +303,8 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		t.To = nil
 	}
 	// value
-	if t.Value, err = elems[4].GetBytes(t.Value[:0]); err != nil {
+	t.Value = new(big.Int)
+	if err := elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
 	// input
@@ -356,9 +317,10 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 	if len(vv) != 1 {
-		return fmt.Errorf("only one byte expected")
+		t.V = 0x0
+	} else {
+		t.V = byte(vv[0])
 	}
-	t.V = byte(vv[0])
 	// R
 	if t.R, err = elems[7].GetBytes(t.R[:0]); err != nil {
 		return err

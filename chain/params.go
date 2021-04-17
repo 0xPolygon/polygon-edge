@@ -97,3 +97,14 @@ func (f Fork) Int() *big.Int {
 type ForksInTime struct {
 	Homestead, Byzantium, Constantinople, Petersburg, Istanbul, EIP150, EIP158, EIP155 bool
 }
+
+var AllForksEnabled = &Forks{
+	Homestead:      NewFork(0),
+	EIP150:         NewFork(0),
+	EIP155:         NewFork(0),
+	EIP158:         NewFork(0),
+	Byzantium:      NewFork(0),
+	Constantinople: NewFork(0),
+	Petersburg:     NewFork(0),
+	Istanbul:       NewFork(0),
+}

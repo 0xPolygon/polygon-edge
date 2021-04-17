@@ -45,14 +45,14 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewCopyBytes(tx.GetGasPrice()))
+	v.Set(a.NewBigInt(tx.GasPrice))
 	v.Set(a.NewUint(tx.Gas))
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
 	}
-	v.Set(a.NewCopyBytes(tx.Value))
+	v.Set(a.NewBigInt(tx.Value))
 	v.Set(a.NewCopyBytes(tx.Input))
 
 	// EIP155

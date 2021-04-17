@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/go-web3/testutil"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
@@ -37,6 +38,39 @@ func TestTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		fmt.Println(root)
 	}
+}
+
+var (
+	addr0 = types.Address{}
+	addr1 = types.Address{0x1}
+)
+
+func TestTransaction_Logs_X(t *testing.T) {
+	fr := &framework.TestServer{
+		Config: &framework.TestServerConfig{
+			PremineAccts: []*framework.SrvAccount{
+				{
+					Addr: types.StringToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
+				},
+			},
+			JsonRPCPort: 8545,
+		},
+	}
+
+	cc := &testutil.Contract{}
+	cc.AddEvent(testutil.NewEvent("A").
+		Add("address", true).
+		Add("address", true))
+
+	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
+	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
+
+	_, addr := fr.DeployContract(cc)
+	receipt := fr.TxnTo(addr, "setA1")
+
+	fmt.Println(receipt)
+	fmt.Println(receipt.Logs)
+	fmt.Println(receipt.TransactionHash)
 }
 
 func TestPreminedBalance(t *testing.T) {

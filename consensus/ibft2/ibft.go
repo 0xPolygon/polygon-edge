@@ -420,7 +420,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 			}
 		} else {
 			fmt.Println("- extra -")
-			fmt.Println(block.Header.ExtraData.Bytes())
+			fmt.Println(block.Header.ExtraData)
 			// since its a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.handleStateErr(errBlockVerificationFailed)

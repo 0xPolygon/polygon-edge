@@ -14,9 +14,26 @@ type Eth struct {
 }
 
 // GetBlockByNumber returns information about a block by block number
-func (e *Eth) GetBlockByNumber(block BlockNumber, full bool) (interface{}, error) {
-	header, err := e.getBlockHeaderImpl(block)
-	return header, err
+func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, error) {
+	var num uint64
+	switch number {
+	case LatestBlockNumber:
+		num = e.d.store.Header().Number
+
+	case EarliestBlockNumber:
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
+
+	case PendingBlockNumber:
+		return nil, fmt.Errorf("fetching the pending header is not supported")
+
+	default:
+		num = uint64(number)
+	}
+	block, ok := e.d.store.GetBlockByNumber(num, full)
+	if !ok {
+		return nil, fmt.Errorf("unable to get block by num %v", num)
+	}
+	return toBlock(block), nil
 }
 
 // GetBlockByHash returns information about a block by hash
@@ -25,7 +42,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, full bool) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("unable to get block by hash %v", hash)
 	}
-	return block, nil
+	return toBlock(block), nil
 }
 
 // BlockNumber returns current block number
@@ -79,7 +96,7 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	}
 	for _, txn := range block.Transactions {
 		if txn.Hash == hash {
-			return txn, nil
+			return toTransaction(txn), nil
 		}
 	}
 	// txn not found (this should not happen)
@@ -99,6 +116,11 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		// block not found
 		return nil, nil
 	}
+
+	fmt.Println("-- receipt --")
+	fmt.Println(hash)
+	fmt.Println(blockHash)
+
 	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
 	if err != nil {
 		// block receipts not found
@@ -119,15 +141,44 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	}
 
 	txn := block.Transactions[indx]
-	receipt := receipts[indx]
-	receipt.TxHash = txn.Hash
-	return receipt, nil
+	raw := receipts[indx]
+
+	logs := make([]*Log, len(raw.Logs))
+	for indx, elem := range raw.Logs {
+		logs[indx] = &Log{
+			Address:     elem.Address,
+			Topics:      elem.Topics,
+			Data:        argBytes(elem.Data),
+			BlockHash:   block.Hash(),
+			BlockNumber: argUint64(block.Number()),
+			TxHash:      txn.Hash,
+			TxIndex:     argUint64(indx),
+			LogIndex:    argUint64(indx),
+			Removed:     false,
+		}
+	}
+	res := &receipt{
+		Root:              raw.Root,
+		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
+		LogsBloom:         raw.LogsBloom,
+		Status:            raw.Status,
+		TxHash:            txn.Hash,
+		TxIndex:           argUint64(indx),
+		BlockHash:         block.Hash(),
+		BlockNumber:       argUint64(block.Number()),
+		GasUsed:           argUint64(raw.GasUsed),
+		ContractAddress:   raw.ContractAddress,
+		FromAddr:          txn.From,
+		ToAddr:            txn.To,
+		Logs:              logs,
+	}
+	return res, nil
 }
 
 // GetStorageAt returns the contract storage at the index position
 func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number BlockNumber) (interface{}, error) {
 	// Fetch the requested header
-	header, err := e.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +207,7 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 	// Fetch the requested header
-	header, err := e.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
 	}
@@ -171,27 +222,6 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 		return nil, fmt.Errorf("unable to execute call")
 	}
 	return returnValue, nil
-}
-
-func (e *Eth) getBlockHeaderImpl(number BlockNumber) (*types.Header, error) {
-	switch number {
-	case LatestBlockNumber:
-		return e.d.store.Header(), nil
-
-	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		// Convert the block number from hex to uint64
-		header, ok := e.d.store.GetHeaderByNumber(uint64(number))
-		if !ok {
-			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
-		}
-		return header, nil
-	}
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
@@ -209,7 +239,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Fetch the requested header
-	header, err := e.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
 	}
@@ -228,8 +258,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := hex.DecodeHexToBig(transaction.GasPrice.String())
-	valueInt := hex.DecodeHexToBig(transaction.Value.String())
+	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
+	valueInt := new(big.Int).Set(transaction.Value)
 
 	// If the sender address is present, recalculate the ceiling to his balance
 	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
@@ -318,7 +348,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 }
 
 // GetLogs returns an array of logs matching the filter options
-func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
+func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	var referenceFrom uint64
 	var referenceTo uint64
 
@@ -327,7 +357,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 	}
 
 	// Fetch the requested from header
-	header, err := e.getBlockHeaderImpl(filterOptions.fromBlock)
+	header, err := e.d.getBlockHeaderImpl(filterOptions.fromBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -335,29 +365,38 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 	referenceFrom = header.Number
 
 	// Fetch the requested to header
-	header, err = e.getBlockHeaderImpl(filterOptions.toBlock)
+	header, err = e.d.getBlockHeaderImpl(filterOptions.toBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	referenceTo = header.Number
 
-	var result []*types.Log
+	var result []*Log
 	for i := referenceFrom; i < referenceTo; i++ {
-		body, ok := e.d.store.GetHeaderByNumber(i)
+		header, ok := e.d.store.GetHeaderByNumber(i)
 		if !ok {
 			return nil, fmt.Errorf("Error fetching header for block %d", i)
 		}
 
-		receipts, err := e.d.store.GetReceiptsByHash(body.ReceiptsRoot)
+		receipts, err := e.d.store.GetReceiptsByHash(header.Hash)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, receipt := range receipts {
-			for _, log := range receipt.Logs {
+		for indx, receipt := range receipts {
+			for logIndx, log := range receipt.Logs {
 				if filterOptions.Match(log) {
-					result = append(result, log)
+					result = append(result, &Log{
+						Address:     log.Address,
+						Topics:      log.Topics,
+						Data:        argBytes(log.Data),
+						BlockNumber: argUint64(header.Number),
+						BlockHash:   header.Hash,
+						TxHash:      receipt.TxHash,
+						TxIndex:     argUint64(indx),
+						LogIndex:    argUint64(logIndx),
+					})
 				}
 			}
 		}
@@ -367,7 +406,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) ([]*types.Log, error) {
 
 // GetBalance returns the account's balance at the referenced block
 func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
 	}
@@ -380,30 +419,16 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (interface{}, error) {
-	var nonce uint64
-	if number == PendingBlockNumber {
-		res, err := e.d.store.GetNonce(address)
-		if err != nil {
-			return nil, err
-		}
-		nonce = res
-	} else {
-		header, err := e.getBlockHeaderImpl(number)
-		if err != nil {
-			return nil, err
-		}
-		acc, err := e.d.store.GetAccount(header.StateRoot, address)
-		if err != nil {
-			return nil, err
-		}
-		nonce = acc.Nonce
+	nonce, err := e.d.getNextNonce(address, number)
+	if err != nil {
+		return nil, err
 	}
 	return argUintPtr(nonce), nil
 }
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
 	}

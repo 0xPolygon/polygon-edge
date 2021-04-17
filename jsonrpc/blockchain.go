@@ -43,11 +43,14 @@ type blockchainInterface interface {
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 
+	// GetBlockByNumber returns a block using the provided number
+	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
+
 	// ApplyTxn applies a transaction object to the blockchain
 	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
 
 	// GetNonce returns the next nonce for this address
-	GetNonce(addr types.Address) (uint64, error)
+	GetNonce(addr types.Address) (uint64, bool)
 
 	stateHelperInterface
 }
@@ -55,8 +58,8 @@ type blockchainInterface interface {
 type nullBlockchainInterface struct {
 }
 
-func (b *nullBlockchainInterface) GetNonce(addr types.Address) (uint64, error) {
-	return 0, nil
+func (b *nullBlockchainInterface) GetNonce(addr types.Address) (uint64, bool) {
+	return 0, false
 }
 
 func (b *nullBlockchainInterface) Header() *types.Header {
@@ -96,6 +99,10 @@ func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.
 }
 
 func (b *nullBlockchainInterface) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (b *nullBlockchainInterface) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
 	return nil, false
 }
 

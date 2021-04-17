@@ -59,11 +59,11 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf := minimal.DefaultConfig()
 
 	// decode chain
-	chain, err := chain.Import(c.Chain)
+	cc, err := chain.Import(c.Chain)
 	if err != nil {
 		return nil, err
 	}
-	conf.Chain = chain
+	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
 
@@ -84,7 +84,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		}
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
-		conf.Chain = chain
+		conf.Chain = cc
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -98,6 +98,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		if c.DevInterval != 0 {
 			engineConfig["interval"] = c.DevInterval
 		}
+		conf.Chain.Params.Forks = chain.AllForksEnabled
 		conf.Chain.Params.Engine = map[string]interface{}{
 			"dev": engineConfig,
 		}

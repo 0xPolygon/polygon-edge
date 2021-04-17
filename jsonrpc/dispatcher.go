@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"unicode"
@@ -205,6 +206,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
+
+	fmt.Println("-- req --")
+	fmt.Println(string(reqBody))
+
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
@@ -369,6 +374,45 @@ func lowerCaseFirst(str string) string {
 	return ""
 }
 
+func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, error) {
+	switch number {
+	case LatestBlockNumber:
+		return d.store.Header(), nil
+
+	case EarliestBlockNumber:
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
+
+	case PendingBlockNumber:
+		return nil, fmt.Errorf("fetching the pending header is not supported")
+
+	default:
+		// Convert the block number from hex to uint64
+		header, ok := d.store.GetHeaderByNumber(uint64(number))
+		if !ok {
+			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
+		}
+		return header, nil
+	}
+}
+
+func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
+	if number == PendingBlockNumber {
+		res, ok := d.store.GetNonce(address)
+		if ok {
+			return res, nil
+		}
+	}
+	header, err := d.getBlockHeaderImpl(number)
+	if err != nil {
+		return 0, err
+	}
+	acc, err := d.store.GetAccount(header.StateRoot, address)
+	if err != nil {
+		return 0, err
+	}
+	return acc.Nonce, nil
+}
+
 func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
@@ -376,15 +420,18 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	}
 	if arg.Nonce == nil {
 		// get nonce from the pool
-		arg.Nonce = argUintPtr(0)
+		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		arg.Nonce = argUintPtr(nonce)
 	}
 	if arg.Value == nil {
 		arg.Value = argBytesPtr([]byte{})
 	}
 	if arg.GasPrice == nil {
 		// use the suggested gas price
-		arg.GasPrice = argBytesPtr([]byte{})
-		// arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
 	}
 	if arg.To == nil {
 		if arg.Input == nil {
@@ -395,15 +442,16 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		arg.Input = argBytesPtr([]byte{})
 	}
 	if arg.Gas == nil {
-		arg.Gas = argUintPtr(0)
+		// TODO
+		arg.Gas = argUintPtr(1000000)
 	}
 
 	txn := &types.Transaction{
 		From:     *arg.From,
 		Gas:      uint64(*arg.Gas),
-		GasPrice: types.HexBytes(*arg.GasPrice),
-		Value:    types.HexBytes(*arg.Value),
-		Input:    types.HexBytes(*arg.Input),
+		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
+		Value:    new(big.Int).SetBytes(*arg.Value),
+		Input:    *arg.Input,
 		Nonce:    uint64(*arg.Nonce),
 	}
 	if arg.To != nil {

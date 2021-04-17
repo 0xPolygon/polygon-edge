@@ -129,9 +129,9 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 		t0 := &types.Transaction{
 			Nonce:    uint64(i),
 			To:       &addr0,
-			Value:    big.NewInt(0).Bytes(),
+			Value:    big.NewInt(0),
 			Gas:      0,
-			GasPrice: big.NewInt(0).Bytes(),
+			GasPrice: big.NewInt(0),
 			Input:    header.Hash.Bytes(),
 			V:        0x27,
 		}
@@ -141,8 +141,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 		// -- receipts --
 		r0 := &types.Receipt{
-			GasUsed:           uint64(i),
-			TxHash:            t0.Hash,
+			GasUsed: uint64(i),
+			//TxHash:            t0.Hash,
 			CumulativeGasUsed: uint64(i), // this value changes the rlpHash
 		}
 		localReceipts := []*types.Receipt{r0}
@@ -167,21 +167,6 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 	}
 
 	return headers, blocks, receipts
-}
-
-// NewTestBlockchainWithBlocks creates a dummy blockchain with headers, bodies and receipts
-func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) *Blockchain {
-	headers := []*types.Header{}
-	for _, block := range blocks {
-		headers = append(headers, block.Header)
-	}
-
-	b := NewTestBlockchain(t, headers)
-	if err := b.CommitChain(blocks, receipts); err != nil {
-		t.Fatal(err)
-	}
-
-	return b
 }
 
 // NewTestBlockchain creates a new dummy blockchain for testing

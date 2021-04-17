@@ -3,7 +3,6 @@ package types
 import (
 	"database/sql/driver"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -81,40 +80,6 @@ func (a *Address) Scan(src interface{}) error {
 	return nil
 }
 
-type HexBytes []byte
-
-func (h HexBytes) String() string {
-	return hex.EncodeToHex(h)
-}
-
-func (h HexBytes) Bytes() []byte {
-	return h[:]
-}
-
-func (h HexBytes) Value() (driver.Value, error) {
-	return h.String(), nil
-}
-
-func (h *HexBytes) Scan(src interface{}) error {
-	str, ok := src.(string)
-	if !ok {
-		raw, ok := src.([]byte)
-		if !ok {
-			return fmt.Errorf("bad")
-		}
-		str = string(raw)
-	}
-	hh := hex.MustDecodeHex(str)
-	aux := make([]byte, len(hh))
-	copy(aux[:], hh[:])
-	*h = aux
-	return nil
-}
-
-func (h HexBytes) MarshalText() ([]byte, error) {
-	return []byte(h.String()), nil
-}
-
 func StringToHash(str string) Hash {
 	return BytesToHash(stringToBytes(str))
 }
@@ -187,50 +152,3 @@ var (
 	// EmptyUncleHash is the root when there are no uncles
 	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
 )
-
-// Uint64 marshals/unmarshals as a JSON string with 0x prefix.
-// The zero value marshals as "0x0".
-type Uint64 uint64
-
-// MarshalText implements encoding.TextMarshaler.
-func (b Uint64) MarshalText() ([]byte, error) {
-	buf := make([]byte, 2, 10)
-	copy(buf, `0x`)
-	buf = strconv.AppendUint(buf, uint64(b), 16)
-	return buf, nil
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (b *Uint64) UnmarshalJSON(input []byte) error {
-	if !isString(input) {
-		return errNonString(uint64T)
-	}
-	return wrapTypeError(b.UnmarshalText(input[1:len(input)-1]), uint64T)
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler
-func (b *Uint64) UnmarshalText(input []byte) error {
-	raw, err := checkNumberText(input)
-	if err != nil {
-		return err
-	}
-	if len(raw) > 16 {
-		return hex.ErrUint64Range
-	}
-	var dec uint64
-	for _, byte := range raw {
-		nib := hex.DecodeNibble(byte)
-		if nib == hex.BadNibble {
-			return hex.ErrSyntax
-		}
-		dec *= 16
-		dec += nib
-	}
-	*b = Uint64(dec)
-	return nil
-}
-
-// String returns the hex encoding of b.
-func (b Uint64) String() string {
-	return hex.EncodeUint64(uint64(b))
-}

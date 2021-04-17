@@ -114,6 +114,9 @@ func (c *state) halt() {
 }
 
 func (c *state) exit(err error) {
+	fmt.Println("- err message -")
+	fmt.Println(err)
+
 	if err == nil {
 		panic("cannot stop with none")
 	}

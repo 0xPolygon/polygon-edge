@@ -1,31 +1,27 @@
 package types
 
 import (
+	"math/big"
+
 	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 type Transaction struct {
-	Nonce    uint64   `json:"nonce"`
-	GasPrice HexBytes `json:"gasPrice"`
-	Gas      uint64   `json:"gas"`
-	To       *Address `json:"to"`
-	Value    HexBytes `json:"value"`
-	Input    HexBytes `json:"input"`
-
-	V byte     `json:"v"`
-	R HexBytes `json:"r"`
-	S HexBytes `json:"s"`
-
-	Hash Hash    `json:"hash"`
-	From Address `json:"from"`
+	Nonce    uint64
+	GasPrice *big.Int
+	Gas      uint64
+	To       *Address
+	Value    *big.Int
+	Input    []byte
+	V        byte
+	R        []byte
+	S        []byte
+	Hash     Hash
+	From     Address
 }
 
 func (t *Transaction) IsContractCreation() bool {
 	return t.To == nil
-}
-
-func (t *Transaction) GetGasPrice() []byte {
-	return t.GasPrice
 }
 
 // ComputeHash computes the hash of the transaction
@@ -45,11 +41,11 @@ func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
 	*tt = *t
 
-	tt.GasPrice = make([]byte, len(t.GasPrice))
-	copy(tt.GasPrice[:], t.GasPrice[:])
+	tt.GasPrice = new(big.Int)
+	tt.GasPrice.Set(t.GasPrice)
 
-	tt.Value = make([]byte, len(t.Value))
-	copy(tt.Value[:], t.Value[:])
+	tt.Value = new(big.Int)
+	tt.Value.Set(t.Value)
 
 	tt.R = make([]byte, len(t.R))
 	copy(tt.R[:], t.R[:])

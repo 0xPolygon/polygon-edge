@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -28,24 +27,19 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/sealer"
 )
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
 	logger hclog.Logger
 	config *Config
-	Sealer *sealer.Sealer
 	state  state.State
 
 	consensus consensus.Consensus
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
-	// storage    storage.Storage
-
-	// key   *ecdsa.PrivateKey // TODO: Remove
-	chain *chain.Chain
+	chain      *chain.Chain
 
 	// state executor
 	executor *state.Executor
@@ -61,9 +55,6 @@ type Server struct {
 
 	// transaction pool
 	txpool *txpool.TxPool
-
-	// syncer protocol
-	syncer *protocol.Syncer
 }
 
 var dirPaths = []string{

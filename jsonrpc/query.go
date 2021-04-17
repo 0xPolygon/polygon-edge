@@ -166,6 +166,9 @@ func (l *LogFilter) Match(log *types.Log) bool {
 			return false
 		}
 	}
+	fmt.Println("- topics -")
+	fmt.Println(l.Topics, log.Topics)
+
 	// check topics
 	if len(l.Topics) > len(log.Topics) {
 		return false

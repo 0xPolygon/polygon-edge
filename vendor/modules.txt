@@ -348,9 +348,11 @@ github.com/umbracle/go-eth-bn256
 # github.com/umbracle/go-web3 v0.0.0-20210417095447-b7216f1f52d7
 ## explicit
 github.com/umbracle/go-web3
+github.com/umbracle/go-web3/compiler
 github.com/umbracle/go-web3/jsonrpc
 github.com/umbracle/go-web3/jsonrpc/codec
 github.com/umbracle/go-web3/jsonrpc/transport
+github.com/umbracle/go-web3/testutil
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasthttp v1.4.0

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/types"
 )
@@ -563,27 +564,30 @@ func TestForkUnkwonParents(t *testing.T) {
 	assert.Error(t, b.WriteHeadersWithBodies([]*types.Header{h1[12]}))
 }
 
-func TestCommitChain(t *testing.T) {
-	// test if the data written in commitchain is retrieved correctly
+func TestBlockchainWriteBody(t *testing.T) {
+	storage, err := memory.NewMemoryStorage(nil)
+	assert.NoError(t, err)
 
-	headers, blocks, receipts := NewTestBodyChain(2)
-	b := NewTestBlockchain(t, headers)
-
-	// commit values to the chain, skip first block (genesis)
-	assert.NoError(t, b.CommitChain(blocks, receipts))
-
-	for i := 1; i < len(blocks); i++ {
-		block := blocks[i]
-
-		// check blocks
-		i, err := b.db.ReadBody(block.Hash())
-		assert.NoError(t, err)
-
-		assert.Len(t, i.Transactions, 1)
-		assert.Equal(t, i.Transactions[0].Nonce, block.Number())
-
-		// check receipts
-		r, _ := b.db.ReadReceipts(block.Hash())
-		assert.Len(t, r, 1)
+	b := &Blockchain{
+		db: storage,
 	}
+
+	block := &types.Block{
+		Header: &types.Header{},
+		Transactions: []*types.Transaction{
+			{
+				Value: big.NewInt(10),
+				V:     1,
+			},
+		},
+	}
+	block.Header.ComputeHash()
+
+	if err := b.writeBody(block); err != nil {
+		t.Fatal(err)
+	}
+
+	body, ok := b.readBody(block.Hash())
+	fmt.Println(body)
+	fmt.Println(ok)
 }

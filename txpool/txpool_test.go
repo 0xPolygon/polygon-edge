@@ -125,6 +125,9 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		From: addr1,
 	})
 
+	nonce, _ := pool.GetNonce(addr1)
+	assert.Equal(t, nonce, uint64(1))
+
 	// though txn0 is not being processed yet and the current nonce is 0
 	// we need to consider that txn0 is on the sorted pool so this one is promoted too
 	pool.addImpl("", &types.Transaction{
@@ -132,5 +135,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Nonce: 1,
 	})
 
+	nonce, _ = pool.GetNonce(addr1)
+	assert.Equal(t, nonce, uint64(2))
 	assert.Equal(t, pool.Length(), uint64(2))
 }

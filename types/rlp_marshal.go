@@ -52,35 +52,6 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-func (b *Body) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b.MarshalRLPWith, dst)
-}
-
-func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
-	vv := ar.NewArray()
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalRLPWith(ar))
-		}
-		vv.Set(v0)
-	}
-
-	if len(b.Uncles) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v1 := ar.NewArray()
-		for _, uncle := range b.Uncles {
-			v1.Set(uncle.MarshalRLPWith(ar))
-		}
-		vv.Set(v1)
-	}
-
-	return vv
-}
-
 func (h *Header) MarshalRLP() []byte {
 	return h.MarshalRLPTo(nil)
 }
@@ -187,7 +158,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	vv.Set(arena.NewUint(t.Nonce))
-	vv.Set(arena.NewCopyBytes(t.GasPrice))
+	vv.Set(arena.NewBigInt(t.GasPrice))
 	vv.Set(arena.NewUint(t.Gas))
 
 	// Address may be empty
@@ -197,7 +168,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(arena.NewNull())
 	}
 
-	vv.Set(arena.NewCopyBytes(t.Value))
+	vv.Set(arena.NewBigInt(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
 
 	// signature values

@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 
-	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 )
@@ -37,8 +36,8 @@ type Blockchain struct {
 	config  *chain.Chain
 	genesis types.Hash
 
-	headersCache    *lru.Cache
-	bodiesCache     *lru.Cache
+	headersCache *lru.Cache
+	//bodiesCache     *lru.Cache
 	difficultyCache *lru.Cache
 
 	// the current last header + difficulty
@@ -107,7 +106,7 @@ func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, con
 	b.db = storage
 
 	b.headersCache, _ = lru.New(100)
-	b.bodiesCache, _ = lru.New(100)
+	//b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 
 	// push the first event to the stream
@@ -284,69 +283,6 @@ func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 	return diff, nil
 }
 
-// CommitBodies writes the bodies (TODO: Remove)
-func (b *Blockchain) CommitBodies(headers []types.Hash, bodies []*types.Body) error {
-	if len(headers) != len(bodies) {
-		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(bodies))
-	}
-
-	for indx, hash := range headers {
-		if err := b.db.WriteBody(hash, bodies[indx]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CommitReceipts writes the receipts (TODO: Remove)
-func (b *Blockchain) CommitReceipts(headers []types.Hash, receipts [][]*types.Receipt) error {
-	if len(headers) != len(receipts) {
-		return fmt.Errorf("lengths dont match %d and %d", len(headers), len(receipts))
-	}
-	for indx, hash := range headers {
-		if err := b.db.WriteReceipts(hash, receipts[indx]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CommitChain writes all the other data related to the chain (body and receipts).
-// TODO: I think this function is not used anymore. (TODO: Remove)
-func (b *Blockchain) CommitChain(blocks []*types.Block, receipts [][]*types.Receipt) error {
-	if len(blocks) != len(receipts) {
-		return fmt.Errorf("length dont match. %d and %d", len(blocks), len(receipts))
-	}
-
-	for i := 1; i < len(blocks); i++ {
-		if blocks[i].Number()-1 != blocks[i-1].Number() {
-			return fmt.Errorf("number sequence not correct at %d, %d and %d", i, blocks[i].Number(), blocks[i-1].Number())
-		}
-		if blocks[i].ParentHash() != blocks[i-1].Hash() {
-			return fmt.Errorf("parent hash not correct")
-		}
-	}
-
-	for indx, block := range blocks {
-		r := receipts[indx]
-
-		hash := block.Hash()
-
-		body := &types.Body{
-			Transactions: block.Transactions,
-			Uncles:       block.Uncles,
-		}
-		if err := b.db.WriteBody(hash, body); err != nil {
-			return err
-		}
-		if err := b.db.WriteReceipts(hash, r); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // GetReceiptsByHash returns the receipts by their hash
 func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
 	return b.db.ReadReceipts(hash)
@@ -376,15 +312,21 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 }
 
 func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
-	body, ok := b.bodiesCache.Get(hash)
-	if ok {
-		return body.(*types.Body), true
-	}
+	fmt.Println("-- read body --")
+	fmt.Println(hash)
+
+	//body, ok := b.bodiesCache.Get(hash)
+	//if ok {
+	//	fmt.Println("_ FOUND _")
+	//	return body.(*types.Body), true
+	//}
 	bb, err := b.db.ReadBody(hash)
 	if err != nil {
+		b.logger.Error("failed to read body", "err", err)
 		return nil, false
 	}
-	b.bodiesCache.Add(hash, bb)
+
+	//b.bodiesCache.Add(hash, bb)
 	return bb, true
 }
 
@@ -457,16 +399,9 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	if !ok {
 		return fmt.Errorf("parent of %s (%d) not found: %s", blocks[0].Hash().String(), blocks[0].Number(), blocks[0].ParentHash())
 	}
-
-	fmt.Println("-- write --")
-	fmt.Println(blocks[0].ParentHash())
-	fmt.Println(blocks[0].Hash())
-
 	if parent.Hash == types.ZeroHash {
 		return fmt.Errorf("parent not found")
 	}
-
-	fmt.Println(parent.Number, parent.Hash)
 
 	// validate chain
 	for i := 0; i < size; i++ {
@@ -504,10 +439,12 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return err
 		}
 
-		// Verify uncles. It requires to have the bodies on memory
-		if err := b.VerifyUncles(block); err != nil {
-			return err
-		}
+		/*
+			// Verify uncles. It requires to have the bodies on memory
+			if err := b.VerifyUncles(block); err != nil {
+				return err
+			}
+		*/
 		// Process and validate the block
 		res, err := b.processBlock(blocks[indx])
 		if err != nil {
@@ -529,11 +466,14 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
 	}
 
+	b.logger.Info("new head", "hash", b.Header().Hash, "number", b.Header().Number)
 	return nil
 }
 
 func (b *Blockchain) writeBody(block *types.Block) error {
 	body := block.Body()
+
+	// b.logger.Info("write body", "hash", block.Header.Hash, "txns", len(body.Transactions))
 
 	// write the full body (txns + receipts)
 	if err := b.db.WriteBody(block.Header.Hash, body); err != nil {
@@ -542,17 +482,21 @@ func (b *Blockchain) writeBody(block *types.Block) error {
 
 	// write txn lookups (txhash -> block)
 	for _, txn := range block.Transactions {
+		//b.logger.Info("write txn lookup", "hash", txn.Hash, "block", block.Hash())
 		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
 			return err
 		}
 	}
 
-	b.bodiesCache.Add(block.Header.Hash, body)
+	//b.bodiesCache.Add(block.Header.Hash, body)
 	return nil
 }
 
 func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
-	return b.db.ReadTxLookup(hash)
+	v, ok := b.db.ReadTxLookup(hash)
+
+	fmt.Println("LOOKUP: ", hash, v)
+	return v, ok
 }
 
 func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error) {
@@ -627,57 +571,6 @@ func (b *Blockchain) GetHashByNumber(i uint64) types.Hash {
 	return block.Hash()
 }
 
-func (b *Blockchain) VerifyUncles(block *types.Block) error {
-	if len(block.Uncles) == 0 {
-		return nil
-	}
-	if len(block.Uncles) > 2 {
-		return fmt.Errorf("too many uncles")
-	}
-
-	// Gather the set of past uncles and ancestors
-	uncles, ancestors := mapset.NewSet(), make(map[types.Hash]*types.Header)
-
-	number, parent := block.Number()-1, block.ParentHash()
-	for i := 0; i < 7; i++ {
-		ancestor, ok := b.GetBlockByHash(parent, true)
-		if !ok {
-			break
-		}
-		ancestors[ancestor.Hash()] = ancestor.Header
-		for _, uncle := range ancestor.Uncles {
-			uncles.Add(uncle.Hash)
-		}
-		parent, number = ancestor.ParentHash(), number-1
-	}
-	ancestors[block.Hash()] = block.Header
-	uncles.Add(block.Hash())
-
-	// Verify each of the uncles that it's recent, but not an ancestor
-	for _, uncle := range block.Uncles {
-		// Make sure every uncle is rewarded only once
-		hash := uncle.Hash
-		if uncles.Contains(hash) {
-			return errDuplicateUncle
-		}
-		uncles.Add(hash)
-
-		// Make sure the uncle has a valid ancestry
-		if ancestors[hash] != nil {
-			return errUncleIsAncestor
-		}
-		if ancestors[uncle.ParentHash] == nil || uncle.ParentHash == block.ParentHash() {
-			return errDanglingUncle
-		}
-
-		if err := b.consensus.VerifyHeader(ancestors[uncle.ParentHash], uncle); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (b *Blockchain) addHeader(header *types.Header) error {
 	b.headersCache.Add(header.Hash, header)
 
@@ -710,12 +603,6 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 
 	// Write the data
 	if header.ParentHash == head.Hash {
-
-		fmt.Println("-- written --")
-		fmt.Println(header.ParentHash)
-		fmt.Println(header.Hash)
-		fmt.Println(header.Number)
-
 		// Fast path to save the new canonical header
 		return b.writeCanonicalHeader(evnt, header)
 	}

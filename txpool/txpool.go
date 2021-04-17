@@ -82,6 +82,14 @@ func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, networ
 	return txPool, nil
 }
 
+func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
+	q, ok := t.queue[addr]
+	if !ok {
+		return 0, false
+	}
+	return q.nextNonce, true
+}
+
 func (t *TxPool) AddSigner(s signer) {
 	// TODO: We can add more types of signers here
 	t.signer = s
@@ -424,7 +432,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	price := new(big.Int).SetBytes(tx.GetGasPrice())
+	price := new(big.Int).Set(tx.GasPrice)
 
 	if _, ok := t.index[tx.Hash]; ok {
 		return fmt.Errorf("tx %s already exists", tx.Hash)

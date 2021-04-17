@@ -13,22 +13,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDecode_Types(t *testing.T) {
+func TestBasicTypes_Encode(t *testing.T) {
 	// decode basic types
 	cases := []struct {
 		obj interface{}
+		dec interface{}
 		res string
 	}{
 		{
-			argBigPtr(big.NewInt(10)),
+			argBig(*big.NewInt(10)),
+			&argBig{},
 			"0xa",
 		},
 		{
 			argUint64(10),
+			argUintPtr(0),
 			"0xa",
 		},
 		{
-			argBytesPtr([]byte{0x1, 0x2}),
+			argBytes([]byte{0x1, 0x2}),
+			&argBytes{},
 			"0x0102",
 		},
 	}
@@ -37,6 +41,7 @@ func TestDecode_Types(t *testing.T) {
 		res, err := json.Marshal(c.obj)
 		assert.NoError(t, err)
 		assert.Equal(t, strings.Trim(string(res), "\""), c.res)
+		assert.NoError(t, json.Unmarshal(res, c.dec))
 	}
 }
 

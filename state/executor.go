@@ -220,6 +220,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		fmt.Printf("Apply err: %v", err)
 	}
 
+	fmt.Println("__ FAILED __")
+	fmt.Println(failed)
+
 	t.totalGas += gasUsed
 
 	logs := t.state.Logs()
@@ -253,6 +256,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	if msg.To == nil {
 		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce)
 	}
+
+	fmt.Println("===> WRITE DONE <===")
+	fmt.Println(logs)
 
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = buildLogs(logs, txn.Hash, types.Hash{}, uint(len(t.receipts)))
@@ -435,7 +441,7 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	}
 
 	// deduct the upfront max gas cost
-	upfrontGasCost := new(big.Int).SetBytes(msg.GasPrice)
+	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 	balance := t.state.GetBalance(msg.From)
 
@@ -468,11 +474,11 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 		return nil, 0, false, errorVMOutOfGas
 	}
 
-	gasPrice := new(big.Int).SetBytes(msg.GetGasPrice())
-	value := new(big.Int).SetBytes(msg.Value)
+	gasPrice := new(big.Int).Set(msg.GasPrice)
+	value := new(big.Int).Set(msg.Value)
 
 	// Set the specific transaction fields in the context
-	t.ctx.GasPrice = types.BytesToHash(msg.GetGasPrice())
+	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
 	var subErr error
