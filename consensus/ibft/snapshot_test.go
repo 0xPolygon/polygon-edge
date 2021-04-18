@@ -418,7 +418,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 
 			// process the headers independently
-			ibft := &Ibft2{
+			ibft := &Ibft{
 				epochSize:  epoch,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -471,7 +471,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 
 			// Process headers all at the same time should have the same result
-			ibft1 := &Ibft2{
+			ibft1 := &Ibft{
 				epochSize:  epoch,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
@@ -505,7 +505,7 @@ func TestSnapshot_Store(t *testing.T) {
 	pool.add("a")
 
 	genesis := pool.genesis()
-	ibft1 := &Ibft2{
+	ibft1 := &Ibft{
 		epochSize:  1000,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config: &consensus.Config{
@@ -546,7 +546,7 @@ func TestSnapshot_Store(t *testing.T) {
 	assert.NoError(t, ibft1.saveSnapDataToFile())
 
 	// load snapshot data
-	ibft2 := &Ibft2{
+	ibft2 := &Ibft{
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config: &consensus.Config{
 			Path: tmpDir,
@@ -567,7 +567,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool.add("a", "b", "c")
 
 	genesis := pool.genesis()
-	ibft1 := &Ibft2{
+	ibft1 := &Ibft{
 		epochSize:  10,
 		blockchain: blockchain.TestBlockchain(t, genesis),
 		config:     &consensus.Config{},

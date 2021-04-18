@@ -11,7 +11,7 @@ import (
 )
 
 type operator struct {
-	i *Ibft2
+	i *Ibft
 
 	candidatesLock sync.Mutex
 	candidates     []*proto.Candidate

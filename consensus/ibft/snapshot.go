@@ -20,7 +20,7 @@ var (
 	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 )
 
-func (i *Ibft2) setupSnapshot() error {
+func (i *Ibft) setupSnapshot() error {
 	store, err := memdb.NewMemDB(schema)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (i *Ibft2) setupSnapshot() error {
 	return nil
 }
 
-func (i *Ibft2) getLatestSnapshot() (*Snapshot, error) {
+func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 	meta, err := i.getSnapshotMetadata()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (i *Ibft2) getLatestSnapshot() (*Snapshot, error) {
 	return snap, nil
 }
 
-func (i *Ibft2) loadSnapDataFromFile() error {
+func (i *Ibft) loadSnapDataFromFile() error {
 	if i.config.Path == "" {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (i *Ibft2) loadSnapDataFromFile() error {
 	return nil
 }
 
-func (i *Ibft2) saveSnapDataToFile() error {
+func (i *Ibft) saveSnapDataToFile() error {
 	if i.config.Path == "" {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (i *Ibft2) saveSnapDataToFile() error {
 	return nil
 }
 
-func (i *Ibft2) readDataStore(file string, obj interface{}) error {
+func (i *Ibft) readDataStore(file string, obj interface{}) error {
 	path := filepath.Join(i.config.Path, file)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
@@ -162,7 +162,7 @@ func (i *Ibft2) readDataStore(file string, obj interface{}) error {
 	return nil
 }
 
-func (i *Ibft2) writeDataStore(file string, obj interface{}) error {
+func (i *Ibft) writeDataStore(file string, obj interface{}) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (i *Ibft2) writeDataStore(file string, obj interface{}) error {
 	return nil
 }
 
-func (i *Ibft2) processHeaders(headers []*types.Header) error {
+func (i *Ibft) processHeaders(headers []*types.Header) error {
 	if len(headers) == 0 {
 		return nil
 	}
@@ -311,7 +311,7 @@ func (i *Ibft2) processHeaders(headers []*types.Header) error {
 	return nil
 }
 
-func (i *Ibft2) removeSnapshotsLowerThan(num uint64) error {
+func (i *Ibft) removeSnapshotsLowerThan(num uint64) error {
 	txn := i.store.Txn(true)
 
 	it, err := txn.ReverseLowerBound("snapshot", "number", int(num))
@@ -328,7 +328,7 @@ func (i *Ibft2) removeSnapshotsLowerThan(num uint64) error {
 	return nil
 }
 
-func (i *Ibft2) updateSnapshotMetadata(num uint64) error {
+func (i *Ibft) updateSnapshotMetadata(num uint64) error {
 	txn := i.store.Txn(true)
 	meta := &snapshotMetadata{
 		LastBlock: num,
@@ -340,7 +340,7 @@ func (i *Ibft2) updateSnapshotMetadata(num uint64) error {
 	return nil
 }
 
-func (i *Ibft2) getSnapshotMetadata() (*snapshotMetadata, error) {
+func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
 	txn := i.store.Txn(false)
 	meta, err := txn.First("meta", "id")
 	if err != nil {
@@ -354,7 +354,7 @@ func (i *Ibft2) getSnapshotMetadata() (*snapshotMetadata, error) {
 	return meta.(*snapshotMetadata), nil
 }
 
-func (i *Ibft2) putSnapshot(snap *Snapshot) error {
+func (i *Ibft) putSnapshot(snap *Snapshot) error {
 	txn := i.store.Txn(true)
 	if err := txn.Insert("snapshot", snap); err != nil {
 		return err
@@ -363,7 +363,7 @@ func (i *Ibft2) putSnapshot(snap *Snapshot) error {
 	return nil
 }
 
-func (i *Ibft2) getSnapshot(num uint64) (*Snapshot, error) {
+func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
 	txn := i.store.Txn(false)
 	defer txn.Abort()
 

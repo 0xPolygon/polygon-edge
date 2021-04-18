@@ -454,7 +454,7 @@ func TestTransition_RoundChangeState_MaxRound(t *testing.T) {
 
 type mockIbft struct {
 	t *testing.T
-	*Ibft2
+	*Ibft
 
 	blockchain *blockchain.Blockchain
 	pool       *testerAccountPool
@@ -490,7 +490,7 @@ func (m *mockIbft) emitMsg(msg *proto.MessageReq) {
 	from := m.pool.get(msg.From).Address()
 	msg.From = from.String()
 
-	m.Ibft2.pushMessage(msg)
+	m.Ibft.pushMessage(msg)
 }
 
 func (m *mockIbft) addMessage(msg *proto.MessageReq) {
@@ -518,7 +518,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	}
 
 	addr := pool.get(account)
-	ibft := &Ibft2{
+	ibft := &Ibft{
 		logger:           hclog.NewNullLogger(),
 		config:           &consensus.Config{},
 		blockchain:       m,
@@ -533,7 +533,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
 
-	m.Ibft2 = ibft
+	m.Ibft = ibft
 
 	assert.NoError(t, ibft.setupSnapshot())
 	assert.NoError(t, ibft.createKey())
@@ -541,7 +541,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	// set the initial validators frrom the snapshot
 	ibft.state.validators = pool.ValidatorSet()
 
-	m.Ibft2.transport = m
+	m.Ibft.transport = m
 	return m
 }
 

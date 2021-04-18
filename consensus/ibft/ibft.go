@@ -32,7 +32,7 @@ type blockchainInterface interface {
 	WriteBlocks(blocks []*types.Block) error
 }
 
-type Ibft2 struct {
+type Ibft struct {
 	sealing uint64
 
 	logger hclog.Logger
@@ -68,8 +68,8 @@ type Ibft2 struct {
 }
 
 func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
-	p := &Ibft2{
-		logger:       logger.Named("ibft2"),
+	p := &Ibft{
+		logger:       logger.Named("ibft"),
 		config:       config,
 		blockchain:   blockchain,
 		executor:     executor,
@@ -125,7 +125,7 @@ func (g *gossipTransport) Gossip(msg *proto.MessageReq) error {
 	return g.topic.Publish(msg)
 }
 
-func (i *Ibft2) setupTransport() error {
+func (i *Ibft) setupTransport() error {
 	// use a gossip protocol
 	topic, err := i.network.NewTopic(ibftProto, &proto.MessageReq{})
 	if err != nil {
@@ -162,7 +162,7 @@ func (i *Ibft2) setupTransport() error {
 	return nil
 }
 
-func (i *Ibft2) createKey() error {
+func (i *Ibft) createKey() error {
 	// i.msgQueue = msgQueueImpl{}
 	i.msgQueue = newMsgQueue()
 	i.closeCh = make(chan struct{})
@@ -182,7 +182,7 @@ func (i *Ibft2) createKey() error {
 
 const IbftKeyName = "validator.key"
 
-func (i *Ibft2) start() {
+func (i *Ibft) start() {
 	// consensus always starts in SyncState mode in case it needs
 	// to sync with other nodes.
 	i.setState(SyncState)
@@ -201,7 +201,7 @@ func (i *Ibft2) start() {
 	}
 }
 
-func (i *Ibft2) runCycle() {
+func (i *Ibft) runCycle() {
 	if i.state.view != nil {
 		i.logger.Debug("cycle", "state", i.getState(), "sequence", i.state.view.Sequence, "round", i.state.view.Round)
 	}
@@ -221,7 +221,7 @@ func (i *Ibft2) runCycle() {
 	}
 }
 
-func (i *Ibft2) isValidSnapshot() bool {
+func (i *Ibft) isValidSnapshot() bool {
 	if !i.isSealing() {
 		return false
 	}
@@ -243,7 +243,7 @@ func (i *Ibft2) isValidSnapshot() bool {
 	return false
 }
 
-func (i *Ibft2) runSyncState() {
+func (i *Ibft) runSyncState() {
 	for i.isState(SyncState) {
 		// try to sync with some target peer
 		p := i.syncer.BestPeer()
@@ -299,7 +299,7 @@ func (i *Ibft2) runSyncState() {
 
 var defaultBlockPeriod = 10 * time.Second
 
-func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
+func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -351,7 +351,7 @@ func (i *Ibft2) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	return block
 }
 
-func (i *Ibft2) runAcceptState() { // start new round
+func (i *Ibft) runAcceptState() { // start new round
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence)
 
@@ -457,7 +457,7 @@ func (i *Ibft2) runAcceptState() { // start new round
 	}
 }
 
-func (i *Ibft2) runValidateState() {
+func (i *Ibft) runValidateState() {
 	hasCommited := false
 	sendCommit := func() {
 		// at this point either we have enough prepare messages
@@ -525,7 +525,7 @@ func (i *Ibft2) runValidateState() {
 	}
 }
 
-func (i *Ibft2) insertBlock(block *types.Block) error {
+func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
 		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal)) // TODO: Validate
@@ -561,12 +561,12 @@ var (
 	errFailedToInsertBlock     = fmt.Errorf("failed to insert block")
 )
 
-func (i *Ibft2) handleStateErr(err error) {
+func (i *Ibft) handleStateErr(err error) {
 	i.state.err = err
 	i.setState(RoundChangeState)
 }
 
-func (i *Ibft2) runRoundChangeState() {
+func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round)
 		// set the new round
@@ -652,23 +652,23 @@ func (i *Ibft2) runRoundChangeState() {
 
 // --- com wrappers ---
 
-func (i *Ibft2) sendRoundChange() {
+func (i *Ibft) sendRoundChange() {
 	i.gossip(proto.MessageReq_RoundChange)
 }
 
-func (i *Ibft2) sendPreprepareMsg() {
+func (i *Ibft) sendPreprepareMsg() {
 	i.gossip(proto.MessageReq_Preprepare)
 }
 
-func (i *Ibft2) sendPrepareMsg() {
+func (i *Ibft) sendPrepareMsg() {
 	i.gossip(proto.MessageReq_Prepare)
 }
 
-func (i *Ibft2) sendCommitMsg() {
+func (i *Ibft) sendCommitMsg() {
 	i.gossip(proto.MessageReq_Commit)
 }
 
-func (i *Ibft2) gossip(typ proto.MessageReq_Type) {
+func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 	msg := &proto.MessageReq{
 		Type: typ,
 	}
@@ -708,24 +708,24 @@ func (i *Ibft2) gossip(typ proto.MessageReq_Type) {
 	}
 }
 
-func (i *Ibft2) getState() IbftState {
+func (i *Ibft) getState() IbftState {
 	return i.state.getState()
 }
 
-func (i *Ibft2) isState(s IbftState) bool {
+func (i *Ibft) isState(s IbftState) bool {
 	return i.state.getState() == s
 }
 
-func (i *Ibft2) setState(s IbftState) {
+func (i *Ibft) setState(s IbftState) {
 	i.logger.Debug("state change", "new", s)
 	i.state.setState(s)
 }
 
-func (i *Ibft2) forceTimeout() {
+func (i *Ibft) forceTimeout() {
 	i.forceTimeoutCh = true
 }
 
-func (i *Ibft2) randomTimeout() chan struct{} {
+func (i *Ibft) randomTimeout() chan struct{} {
 	// calculate the timeout duration depending on the current round
 	timeout := time.Duration(10000) * time.Millisecond
 	round := i.state.view.Round
@@ -741,22 +741,22 @@ func (i *Ibft2) randomTimeout() chan struct{} {
 	return doneCh
 }
 
-func (i *Ibft2) isSealing() bool {
+func (i *Ibft) isSealing() bool {
 	return atomic.LoadUint64(&i.sealing) != 0
 }
 
-func (i *Ibft2) StartSeal() {
+func (i *Ibft) StartSeal() {
 	// start the transport protocol
 
 	// go i.run()
 	atomic.StoreUint64(&i.sealing, 1)
 }
 
-func (i *Ibft2) run() {
+func (i *Ibft) run() {
 
 }
 
-func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
+func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
 	if _, err := getIbftExtra(header); err != nil {
 		return err
@@ -782,7 +782,7 @@ func (i *Ibft2) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) e
 	return nil
 }
 
-func (i *Ibft2) VerifyHeader(parent, header *types.Header) error {
+func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
@@ -803,12 +803,12 @@ func (i *Ibft2) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
-func (i *Ibft2) Close() error {
+func (i *Ibft) Close() error {
 	close(i.closeCh)
 	return nil
 }
 
-func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
+func (i *Ibft) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 	if stopCh == nil {
 		stopCh = make(chan struct{})
 	}
@@ -835,7 +835,7 @@ func (i *Ibft2) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 	}
 }
 
-func (i *Ibft2) pushMessage(msg *proto.MessageReq) {
+func (i *Ibft) pushMessage(msg *proto.MessageReq) {
 	task := &msgTask{
 		view: msg.View,
 		msg:  protoTypeToMsg(msg.Type),
