@@ -9,6 +9,8 @@ import (
 
 // LogFilter is a filter for logs
 type LogFilter struct {
+	BlockHash *types.Hash
+
 	fromBlock BlockNumber
 	toBlock   BlockNumber
 
@@ -60,6 +62,7 @@ func decodeLogFilterFromInterface(i interface{}) (*LogFilter, error) {
 // UnmarshalJSON decodes a json object
 func (l *LogFilter) UnmarshalJSON(data []byte) error {
 	var obj struct {
+		BlockHash *types.Hash   `json:"blockHash"`
 		FromBlock string        `json:"fromBlock"`
 		ToBlock   string        `json:"toBlock"`
 		Address   interface{}   `json:"address"`
@@ -166,9 +169,6 @@ func (l *LogFilter) Match(log *types.Log) bool {
 			return false
 		}
 	}
-	fmt.Println("- topics -")
-	fmt.Println(l.Topics, log.Topics)
-
 	// check topics
 	if len(l.Topics) > len(log.Topics) {
 		return false

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/0xPolygon/minimal/consensus/ibft2"
+	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/minimal"
 	"github.com/0xPolygon/minimal/network"
@@ -46,7 +46,7 @@ func (p *IbftInit) Run(args []string) int {
 	}
 
 	// try to write the ibft private key
-	key, err := crypto.ReadPrivKey(filepath.Join(pathName, "consensus", ibft2.IbftKeyName))
+	key, err := crypto.ReadPrivKey(filepath.Join(pathName, "consensus", ibft.IbftKeyName))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

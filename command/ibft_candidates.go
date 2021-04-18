@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 

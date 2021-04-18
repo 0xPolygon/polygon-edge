@@ -246,8 +246,6 @@ func (s *Syncer) syncPeerImpl() {
 }
 
 func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) {
-	fmt.Println("- new user -")
-
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 

@@ -2,7 +2,7 @@ package minimal
 
 import (
 	consensusDev "github.com/0xPolygon/minimal/consensus/dev"
-	consensusIBFT "github.com/0xPolygon/minimal/consensus/ibft2"
+	consensusIBFT "github.com/0xPolygon/minimal/consensus/ibft"
 	consensusPOW "github.com/0xPolygon/minimal/consensus/pow"
 
 	"github.com/0xPolygon/minimal/consensus"

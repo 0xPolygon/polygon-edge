@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	"github.com/0xPolygon/minimal/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 )
 
 // IbftSnapshot is the command to query the snapshot

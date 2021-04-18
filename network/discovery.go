@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -153,7 +152,6 @@ func (d *discovery) run() {
 }
 
 func (d *discovery) handleDiscovery() {
-	fmt.Println("_ HANDLE DISCOVERY _")
 	if d.routingTable.Size() == 0 {
 		// if there are no peers on the table try to include the bootnodes
 		for _, node := range d.bootnodes {

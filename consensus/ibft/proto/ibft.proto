@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/consensus/ibft/proto";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+
+service Ibft {
+    rpc Handshake(google.protobuf.Empty) returns (HandshakeResp);
+    rpc Message(MessageReq) returns (google.protobuf.Empty);
+}
+
+message HandshakeResp {
+    string key = 1;
+}
+
+message MessageReq {
+    // type is the type of the message
+    Type type = 1;
+
+    // from is the address of the sender
+    string from = 2;
+
+    // seal is the committed seal if message is commit
+    string seal = 3;
+
+    // signature is the crypto signature of the message
+    string signature = 4;
+
+    // view is the view assigned to the message
+    View view = 5;
+
+    // hash of the locked block
+    string digest = 6;
+
+    // proposal is the rlp encoded block in preprepare messages
+    google.protobuf.Any proposal = 7;
+
+    enum Type {
+        Preprepare = 0;
+        Prepare = 1;
+        Commit = 2;
+        RoundChange = 3;
+    }
+}
+
+message View {
+    uint64 round = 1;
+    uint64 sequence = 2;
+}
+
+/*
+message MessageReq {
+    oneof message {
+        Preprepare preprepare = 1;
+        Subject prepare = 2;
+        Subject commit = 3;
+        Subject roundChange = 4;
+    }
+    string from = 10;
+
+    // commited seal if its a commit message
+    string seal = 11;
+
+    // signed signature
+    string signature = 12;
+}
+
+message Preprepare {
+    View view = 1;
+    Proposal proposal = 2;
+}
+
+message Subject {
+    View view = 1;
+    string digest = 2;
+}
+*/
+
+/*
+message Proposal {
+    google.protobuf.Any block = 1;
+}
+*/
