@@ -129,7 +129,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	{
 		vals, err := elems[0].GetElems()
 		if err != nil {
-			panic("a")
+			return fmt.Errorf("list expected for validators")
 		}
 		i.Validators = make([]types.Address, len(vals))
 		for indx, val := range vals {
@@ -150,7 +150,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	{
 		vals, err := elems[2].GetElems()
 		if err != nil {
-			panic("b")
+			return fmt.Errorf("list expected for committed")
 		}
 		i.CommittedSeal = make([][]byte, len(vals))
 		for indx, val := range vals {

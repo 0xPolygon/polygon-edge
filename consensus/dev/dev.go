@@ -29,7 +29,7 @@ type Dev struct {
 	executor   *state.Executor
 }
 
-func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
 	logger = logger.Named("dev")
 
 	d := &Dev{
@@ -57,8 +57,9 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	return d, nil
 }
 
-func (d *Dev) StartSeal() {
+func (d *Dev) Start() error {
 	go d.run()
+	return nil
 }
 
 func (d *Dev) nextNotify() chan struct{} {
@@ -86,7 +87,9 @@ func (d *Dev) run() {
 
 		// pick txn from the pool and seal them
 		header := d.blockchain.Header()
-		d.do(header)
+		if err := d.do(header); err != nil {
+			d.logger.Error("failed to mine block", "err", err)
+		}
 	}
 }
 
@@ -110,11 +113,7 @@ func (d *Dev) do(parent *types.Header) error {
 		if txn == nil {
 			break
 		}
-
 		if err := transition.Write(txn); err != nil {
-			fmt.Println("-- err --")
-			fmt.Println(err)
-
 			retFn()
 			break
 		}
@@ -130,9 +129,8 @@ func (d *Dev) do(parent *types.Header) error {
 	block := consensus.BuildBlock(header, txns, transition.Receipts())
 
 	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-		panic(err)
+		return err
 	}
-
 	return nil
 }
 

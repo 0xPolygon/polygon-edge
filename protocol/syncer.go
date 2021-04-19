@@ -6,8 +6,8 @@ import (
 	"math"
 	"math/big"
 	"sync"
-	"time"
 
+	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
 	libp2pGrpc "github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
@@ -24,7 +24,7 @@ const maxEnqueueSize = 50
 type syncPeer struct {
 	peer   peer.ID
 	client proto.V1Client
-	status *proto.V1Status
+	status *Status
 
 	// current status
 	number uint64
@@ -89,17 +89,42 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	}
 }
 
-type headUpdate struct {
-	peer   string
-	status *proto.V1Status
+type Status struct {
+	Difficulty *big.Int
+	Hash       types.Hash
+	Number     uint64
 }
 
-type status int
+func (s *Status) Copy() *Status {
+	ss := new(Status)
+	ss.Hash = s.Hash
+	ss.Number = s.Number
+	ss.Difficulty = new(big.Int).Set(s.Difficulty)
+	return ss
+}
 
-const (
-	statusSync status = iota
-	statusWatch
-)
+func (s *Status) toProto() *proto.V1Status {
+	return &proto.V1Status{
+		Number:     s.Number,
+		Hash:       s.Hash.String(),
+		Difficulty: s.Difficulty.String(),
+	}
+}
+
+func statusFromProto(p *proto.V1Status) (*Status, error) {
+	s := new(Status)
+	if err := s.Hash.UnmarshalText([]byte(p.Hash)); err != nil {
+		return nil, err
+	}
+	s.Number = p.Number
+
+	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode difficulty")
+	}
+	s.Difficulty = diff
+	return s, nil
+}
 
 // Syncer is a sync protocol
 type Syncer struct {
@@ -110,19 +135,13 @@ type Syncer struct {
 	peers     map[peer.ID]*syncPeer // TODO: Remove
 	newPeerCh chan struct{}         // TODO: Remove
 
-	// status of the syncing process
-	status status
-
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
 
-	// TODO: We use the new network.Server
+	status     *Status
+	statusLock sync.Mutex
+
 	server *network.Server
-
-	SyncNotifyCh chan bool
-
-	// id of the current target
-	target string
 }
 
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
@@ -132,16 +151,54 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		newPeerCh:  make(chan struct{}),
-		status:     statusSync,
 		server:     server,
 	}
 	return s
 }
 
-func (s *Syncer) notifySync(synced bool) {
-	if s.SyncNotifyCh != nil {
-		s.SyncNotifyCh <- synced
+func (s *Syncer) syncCurrentStatus() {
+	// get the current status of the syncer
+	currentHeader := s.blockchain.Header()
+	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
+
+	s.status = &Status{
+		Hash:       currentHeader.Hash,
+		Number:     currentHeader.Number,
+		Difficulty: diff,
 	}
+
+	sub := s.blockchain.SubscribeEvents()
+	eventCh := sub.GetEventCh()
+
+	// watch the subscription and notify
+	for {
+		select {
+		case evnt := <-eventCh:
+			if evnt.Type == blockchain.EventFork {
+				// we do not want to notify forks
+				continue
+			}
+			if len(evnt.NewChain) == 0 {
+				// this should not happen
+				continue
+			}
+
+			status := &Status{
+				Difficulty: evnt.Difficulty,
+				Hash:       evnt.NewChain[0].Hash,
+				Number:     evnt.NewChain[0].Number,
+			}
+
+			s.statusLock.Lock()
+			s.status = status
+			s.statusLock.Unlock()
+
+		case <-s.stopCh:
+			sub.Close()
+			return
+		}
+	}
+
 }
 
 const syncerV1 = "/syncer/0.1"
@@ -156,10 +213,16 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 }
 
 func (s *Syncer) Broadcast(b *types.Block) {
+	// diff is number in ibft
+	diff := new(big.Int).SetUint64(b.Number())
+
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
-		Hash:   b.Hash().String(),
-		Number: int64(b.Number()),
+		Status: &proto.V1Status{
+			Hash:       b.Hash().String(),
+			Number:     b.Number(),
+			Difficulty: diff.String(),
+		},
 		Raw: &any.Any{
 			Value: b.MarshalRLP(),
 		},
@@ -171,8 +234,17 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 }
 
+func (s *Syncer) getStatus() *Status {
+	s.statusLock.Lock()
+	status := s.status.Copy()
+	s.statusLock.Unlock()
+	return status
+}
+
 func (s *Syncer) Start() {
-	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain, subs: s.blockchain.SubscribeEvents()}
+	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
+
+	go s.syncCurrentStatus()
 
 	// register the grpc protocol for syncer
 	grpc := libp2pGrpc.NewGrpcStream()
@@ -180,10 +252,7 @@ func (s *Syncer) Start() {
 
 	s.server.Register(syncerV1, grpc)
 
-	updateCh, err := s.server.SubscribeCh()
-	if err != nil {
-		panic(err)
-	}
+	updateCh, _ := s.server.SubscribeCh()
 
 	go func() {
 		for {
@@ -192,18 +261,16 @@ func (s *Syncer) Start() {
 				continue
 			}
 
-			fmt.Println("- peer connected --")
-			fmt.Println(evnt)
-
 			stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
 			if err != nil {
-				panic(err)
+				s.logger.Error("failed to open a stream", "err", err)
+				continue
 			}
-			s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream))
+			if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
+				s.logger.Error("failed to handle user", "err", err)
+			}
 		}
 	}()
-	go s.serviceV1.start()
-	//go s.syncPeerImpl()
 }
 
 func (s *Syncer) BestPeer() *syncPeer {
@@ -211,12 +278,9 @@ func (s *Syncer) BestPeer() *syncPeer {
 	var bestTd *big.Int
 
 	for _, p := range s.peers {
-		diff, err := types.ParseUint256orHex(&p.status.Difficulty)
-		if err != nil {
-			panic(err)
-		}
-		if bestPeer == nil || diff.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = p, diff
+		status := p.status
+		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
+			bestPeer, bestTd = p, status.Difficulty
 		}
 	}
 	if bestPeer == nil {
@@ -229,34 +293,18 @@ func (s *Syncer) BestPeer() *syncPeer {
 	return bestPeer
 }
 
-func (s *Syncer) syncPeerImpl() {
-	for {
-		select {
-		case <-s.newPeerCh:
-		case <-time.After(10 * time.Second):
-		case <-s.stopCh:
-			return
-		}
-
-		// check who is the best peer
-		best := s.BestPeer()
-		if best == nil {
-			continue
-		}
-
-		// s.syncWithPeer(best)
-	}
-}
-
-func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) {
+func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
-	status, err := clt.GetCurrent(context.Background(), &empty.Empty{})
+	rawStatus, err := clt.GetCurrent(context.Background(), &empty.Empty{})
 	if err != nil {
-		panic(err)
+		return err
 	}
-
+	status, err := statusFromProto(rawStatus)
+	if err != nil {
+		return err
+	}
 	peer := &syncPeer{
 		peer:      peerID,
 		client:    clt,
@@ -264,47 +312,10 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) {
 		enqueueCh: make(chan struct{}),
 	}
 	s.peers[peerID] = peer
-
-	select {
-	case s.newPeerCh <- struct{}{}:
-	default:
-	}
-
-	/*
-		stream, err := clt.Watch(context.Background(), &empty.Empty{})
-		if err != nil {
-			panic(err)
-		}
-
-		go func() {
-			for {
-				status, err := stream.Recv()
-				if err != nil {
-					panic(err)
-				}
-
-				fmt.Println("-- status --")
-				fmt.Println(status)
-
-				// retrieve the block
-
-				hash := types.StringToHash(status.Hash)
-				header, err := getHeader(clt, nil, &hash)
-				if err != nil {
-					panic(err)
-				}
-				block := &types.Block{
-					Header: header,
-				}
-				if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
-					s.logger.Error("failed to write block", "err", err)
-				}
-			}
-		}()
-	*/
+	return nil
 }
 
-func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *proto.V1Status) (*types.Header, *types.Header, error) {
+func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.Header, *types.Header, error) {
 	h := s.blockchain.Header()
 
 	min := uint64(0) // genesis
@@ -367,7 +378,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *proto.V1Status) 
 		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
 	}
 	if fork == nil {
-		panic("fork not found")
+		return nil, nil, fmt.Errorf("fork not found")
 	}
 	return header, fork, nil
 }
@@ -381,11 +392,9 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 	for {
 		b := p.popBlock()
 
-		fmt.Println("--- bb ---")
-		fmt.Println(b)
-
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
-			panic(err)
+			s.logger.Error("failed to write block", "err", err)
+			break
 		}
 		if !handler(b) {
 			break
@@ -405,7 +414,7 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 	startBlock := fork
 
-	var lastTarget int64
+	var lastTarget uint64
 
 	// sync up to the current known header for the
 	for {
@@ -425,7 +434,7 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 				num:  5,
 			}
 			if err := sk.build(p.client, startBlock.Hash); err != nil {
-				panic(err)
+				return fmt.Errorf("failed to build skeleton: %v", err)
 			}
 
 			// fill skeleton
@@ -435,29 +444,18 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 			// sync the data
 			for _, slot := range sk.slots {
-				for _, b := range slot.blocks {
-					fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
-				}
+				/*
+					for _, b := range slot.blocks {
+						fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
+					}
+				*/
 				if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
-					panic(err)
+					return fmt.Errorf("failed to write bulk sync blocks: %v", err)
 				}
 			}
 
 			// try to get the next block
 			startBlock = sk.LastHeader()
-
-			/*
-				// validate that we have written to the correct place
-				lastWrittenHeader := s.blockchain.Header()
-				if startBlock.Hash != lastWrittenHeader.Hash {
-					// this might mean we are writting to a fork??
-					panic("bad")
-				}
-
-				fmt.Println("- start block -")
-				fmt.Println(startBlock.Number)
-				fmt.Println(target)
-			*/
 
 			if startBlock.Number >= uint64(target) {
 				break
@@ -466,9 +464,6 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 		lastTarget = target
 	}
-
-	fmt.Println("___ BATCH SYNC DONE ___")
-
 	return nil
 }
 

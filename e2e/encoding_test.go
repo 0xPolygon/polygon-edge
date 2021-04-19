@@ -1,46 +1,36 @@
 package e2e
 
 import (
-	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/testutil"
 )
 
 func TestEncoding(t *testing.T) {
-	fr := &framework.TestServer{
-		Config: &framework.TestServerConfig{
-			PremineAccts: []*framework.SrvAccount{
-				{
-					Addr: types.StringToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
-				},
-			},
-			JsonRPCPort: 8545,
-		},
-	}
+	fr := framework.NewTestServerFromGenesis(t)
 
-	client := fr.JSONRPC()
-	block0, err := client.Eth().GetBlockByNumber(0, false)
+	// deploy a contract
+	cc := &testutil.Contract{}
+	cc.AddEvent(testutil.NewEvent("A").
+		Add("address", true).
+		Add("address", true))
+
+	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
+	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
+
+	_, addr := fr.DeployContract(cc)
+
+	// send a transaction
+	receipt := fr.TxnTo(addr, "setA1")
+
+	// try to get the transaction
+	client := fr.JSONRPC().Eth()
+
+	_, err := client.GetTransactionByHash(receipt.TransactionHash)
 	assert.NoError(t, err)
 
-	block1, err := client.Eth().GetBlockByHash(block0.Hash, false)
+	_, err = client.GetBlockByHash(receipt.BlockHash, true)
 	assert.NoError(t, err)
-
-	assert.Equal(t, block0, block1)
-
-	// send a transfer
-	receipt, err := fr.SendTxn(&web3.Transaction{
-		From:  web3.Address(fr.Config.PremineAccts[0].Addr),
-		To:    &web3.Address{0x1},
-		Value: big.NewInt(1),
-	})
-	assert.NoError(t, err)
-
-	fmt.Println("-- receipt --")
-	fmt.Println(receipt)
-	fmt.Println(receipt.TransactionHash)
 }

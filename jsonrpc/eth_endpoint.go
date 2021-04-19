@@ -29,6 +29,7 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, erro
 	default:
 		num = uint64(number)
 	}
+
 	block, ok := e.d.store.GetBlockByNumber(num, full)
 	if !ok {
 		return nil, fmt.Errorf("unable to get block by num %v", num)
@@ -113,17 +114,20 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 	block, ok := e.d.store.GetBlockByHash(blockHash, true)
 	if !ok {
+		fmt.Println("CCCC")
 		// block not found
 		return nil, nil
 	}
 
 	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
 	if err != nil {
+		fmt.Println("AAAA", err)
 		// block receipts not found
 		return nil, nil
 	}
 	if len(receipts) == 0 {
 		// receitps not written yet on the db
+		fmt.Println("BBBB")
 		return nil, nil
 	}
 	// find the transaction in the body

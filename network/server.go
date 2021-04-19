@@ -206,7 +206,6 @@ func (s *Server) runDial() {
 					Type:   PeerEventDialConnectedNode,
 				})
 			} else {
-				fmt.Printf("Dial: %s %s\n", s.host.ID(), tt.addr.ID)
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
@@ -302,10 +301,7 @@ func (s *Server) Disconnect(peer peer.ID, reason string) {
 
 func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEvent) bool) bool {
 	// TODO: Try to replace joinwatcher with this
-	sub, err := s.Subscribe()
-	if err != nil {
-		panic(err)
-	}
+	sub, _ := s.Subscribe()
 
 	doneCh := make(chan struct{})
 	closed := false

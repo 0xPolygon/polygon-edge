@@ -80,7 +80,8 @@ func (d *discovery) setup() error {
 		// add peer to the routing table and to our local peer
 		_, err := d.routingTable.TryAddPeer(peerID, false, false)
 		if err != nil {
-			panic(err)
+			d.srv.logger.Error("failed to add peer to routing table", "err", err)
+			return
 		}
 
 		d.peersLock.Lock()

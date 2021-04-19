@@ -1,113 +1,21 @@
 package e2e
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
-	"github.com/umbracle/go-web3/testutil"
 
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
 )
-
-func TestTransaction_Transfer(t *testing.T) {
-
-	var privKeyRaw = "0x4b2216c76f1b4c60c44d41986863e7337bc1a317d6a9366adfd8966fe2ac05f6"
-	key, _ := crypto.ParsePrivateKey(hex.MustDecodeHex(privKeyRaw))
-
-	// 0xdf7fd4830f4cc1440b469615e9996e9fde92608f
-	addr := crypto.PubKeyToAddress(&key.PublicKey)
-
-	clt, err := jsonrpc.NewClient("http://127.0.0.1:10002") /* http://127.0.0.1:8545 */
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eth := clt.Eth()
-	fmt.Println(eth.BlockNumber())
-
-	signer := crypto.NewEIP155Signer(100)
-	target := types.StringToAddress("0x1010101010101010101010101010101010101010")
-
-	for i := 0; i < 3; i++ {
-		/*
-			root, err := eth.SendTransaction(&web3.Transaction{
-				From:     web3.HexToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
-				To:       &target,
-				GasPrice: 10000,
-				Gas:      1000000,
-				Value:    big.NewInt(10000),
-				Nonce:    uint64(i),
-			})
-			assert.NoError(t, err)
-			fmt.Println(root)
-		*/
-		txn := &types.Transaction{
-			From:     addr,
-			To:       &target,
-			GasPrice: big.NewInt(10000),
-			Gas:      1000000,
-			Value:    big.NewInt(10000),
-			Nonce:    uint64(i),
-		}
-		txn, err = signer.SignTx(txn, key)
-		if err != nil {
-			panic(err)
-		}
-		data := txn.MarshalRLP()
-		fmt.Println(data)
-
-		//from, err := signer.Sender(txn)
-		//assert.NoError(t, err)
-
-		// fmt.Println(from, addr)
-
-		hash, err := eth.SendRawTransaction(data)
-		assert.NoError(t, err)
-		fmt.Println(hash)
-
-	}
-}
 
 var (
 	addr0 = types.Address{}
 	addr1 = types.Address{0x1}
 )
-
-func TestTransaction_Logs_X(t *testing.T) {
-	fr := &framework.TestServer{
-		Config: &framework.TestServerConfig{
-			PremineAccts: []*framework.SrvAccount{
-				{
-					Addr: types.StringToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
-				},
-			},
-			JsonRPCPort: 8545,
-		},
-	}
-
-	cc := &testutil.Contract{}
-	cc.AddEvent(testutil.NewEvent("A").
-		Add("address", true).
-		Add("address", true))
-
-	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
-	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
-
-	_, addr := fr.DeployContract(cc)
-	receipt := fr.TxnTo(addr, "setA1")
-
-	fmt.Println(receipt)
-	fmt.Println(receipt.Logs)
-	fmt.Println(receipt.TransactionHash)
-}
 
 func TestPreminedBalance(t *testing.T) {
 	validAccounts := []struct {

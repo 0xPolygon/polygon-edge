@@ -2,8 +2,9 @@ package state
 
 import (
 	"fmt"
-	"github.com/0xPolygon/minimal/types"
 	"math/big"
+
+	"github.com/0xPolygon/minimal/types"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
@@ -199,10 +200,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	if err != nil {
 		fmt.Printf("Apply err: %v", err)
 	}
-
-	fmt.Println("__ FAILED __")
-	fmt.Println(failed)
-
 	t.totalGas += gasUsed
 
 	logs := t.state.Logs()
@@ -237,9 +234,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce)
 	}
 
-	fmt.Println("===> WRITE DONE <===")
-	fmt.Println(logs)
-
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = buildLogs(logs, txn.Hash, types.Hash{}, uint(len(t.receipts)))
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
@@ -250,10 +244,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
-	if t.r.config.ChainID == 1 {
-		t.applyMainnetBlockRewards()
-	}
-
 	s2, root := t.state.Commit(t.config.EIP155)
 	return s2, types.BytesToHash(root)
 }
@@ -275,59 +265,11 @@ var (
 	big32 = big.NewInt(32)
 )
 
-func (t *Transition) applyMainnetBlockRewards() {
-	number := t.GetTxContext().Number
-	numberBigInt := big.NewInt(int64(number))
-
-	var blockReward *big.Int
-	switch {
-	case t.config.Constantinople:
-		blockReward = ConstantinopleBlockReward
-	case t.config.Byzantium:
-		blockReward = ByzantiumBlockReward
-	default:
-		blockReward = FrontierBlockReward
-	}
-
-	reward := new(big.Int).Set(blockReward)
-
-	fmt.Println("- tt --")
-	fmt.Println(t)
-	fmt.Println(t.block)
-
-	r := new(big.Int)
-	for _, uncle := range t.block.Uncles {
-		r.Add(big.NewInt(int64(uncle.Number)), big8)
-		r.Sub(r, numberBigInt)
-		r.Mul(r, blockReward)
-		r.Div(r, big8)
-
-		t.state.AddBalance(uncle.Miner, r)
-
-		r.Div(blockReward, big32)
-		reward.Add(reward, r)
-	}
-
-	t.state.AddBalance(t.block.Header.Miner, reward)
-}
-
-func (t *Transition) postProcess() {
-	if t.r.config.ChainID == 1 {
-		t.applyMainnetBlockRewards()
-	}
-}
-
 func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
 	newLogs := []*types.Log{}
 
 	for _, log := range logs {
 		newLog := log
-
-		//newLog.TxHash = txHash
-		//newLog.BlockHash = blockHash
-		//newLog.TxIndex = txIndex
-		//newLog.LogIndex = uint(indx)
-
 		newLogs = append(newLogs, newLog)
 	}
 
@@ -371,8 +313,6 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	}
 
 	t.returnValue = returnValue
-
-	// e.addGasPool(gas)
 	return gas, failed, err
 }
 

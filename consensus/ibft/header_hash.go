@@ -6,11 +6,6 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-func init() {
-	// we need to find a way to lock this
-	// types.HeaderHash = istambulHeaderHash
-}
-
 func istambulHeaderHash(h *types.Header) types.Hash {
 	// this function replaces extra so we need to make a copy
 	h = h.Copy() // Remove later
@@ -22,7 +17,7 @@ func istambulHeaderHash(h *types.Header) types.Hash {
 	// the extra field the seal and commitedseal items
 	extra, err := getIbftExtra(h)
 	if err != nil {
-		panic(err)
+		return types.Hash{}
 	}
 	putIbftExtraValidators(h, extra.Validators)
 

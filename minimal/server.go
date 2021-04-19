@@ -111,7 +111,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, m.consensus, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		if m.txpool, err = txpool.NewTxPool(logger, hub, m.grpcServer, m.network); err != nil {
+		if m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, hub, m.grpcServer, m.network); err != nil {
 			return nil, err
 		}
 
@@ -141,6 +141,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
+	// after consensus is done, we can mine the genesis block in blockchain
+	// This is done because consensus might use a custom Hash function so we need
+	// to wait for consensus because we do any block hashing like genesis
+	if err := m.blockchain.ComputeGenesis(); err != nil {
+		return nil, err
+	}
+
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
@@ -151,10 +158,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if m.config.Seal {
-		m.logger.Info("sealing enabled")
-		m.txpool.StartSeal()
-		m.consensus.StartSeal()
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
 	}
 
 	return m, nil
@@ -197,7 +202,7 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(context.Background(), config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/minimal/types/buildroot"
 
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
@@ -36,8 +37,7 @@ type Blockchain struct {
 	config  *chain.Chain
 	genesis types.Hash
 
-	headersCache *lru.Cache
-	//bodiesCache     *lru.Cache
+	headersCache    *lru.Cache
 	difficultyCache *lru.Cache
 
 	// the current last header + difficulty
@@ -84,9 +84,6 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, consensus Verifier, executor Executor) (*Blockchain, error) {
-	if consensus == nil {
-		consensus = &MockVerifier{}
-	}
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -109,38 +106,15 @@ func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, con
 	b.db = storage
 
 	b.headersCache, _ = lru.New(100)
-	//b.bodiesCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 
 	// push the first event to the stream
 	b.stream.push(&Event{})
 
-	// try to write the genesis block
-	head, ok := b.db.ReadHeadHash()
-	if ok {
-		// initialized storage
-		b.genesis, ok = b.db.ReadCanonicalHash(0)
-		if !ok {
-			return nil, fmt.Errorf("failed to load genesis hash")
-		}
-		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != config.Genesis.Hash() {
-			return nil, fmt.Errorf("genesis file does not match current genesis")
-		}
-		header, ok := b.GetHeaderByHash(head)
-		if !ok {
-			return nil, fmt.Errorf("failed to get header with hash %s", head.String())
-		}
-		diff, ok := b.GetTD(head)
-		if !ok {
-			return nil, fmt.Errorf("failed to read difficulty")
-		}
-
-		b.logger.Info("Current header", "hash", header.Hash.String(), "number", header.Number)
-		b.setCurrentHeader(header, diff)
-	} else {
-		// empty storage, write the genesis
-		if err := b.writeGenesis(config.Genesis); err != nil {
+	if _, ok := consensus.(*MockVerifier); ok {
+		// if we are using mock consensus we can compute right away the genesis since
+		// this consensus does not change the header hash
+		if err := b.ComputeGenesis(); err != nil {
 			return nil, err
 		}
 	}
@@ -148,8 +122,41 @@ func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, con
 	b.averageGasPrice = big.NewInt(0)
 	b.averageGasPriceCount = big.NewInt(0)
 
-	b.logger.Info("genesis", "hash", config.Genesis.Hash())
 	return b, nil
+}
+
+func (b *Blockchain) ComputeGenesis() error {
+	// try to write the genesis block
+	head, ok := b.db.ReadHeadHash()
+	if ok {
+		// initialized storage
+		b.genesis, ok = b.db.ReadCanonicalHash(0)
+		if !ok {
+			return fmt.Errorf("failed to load genesis hash")
+		}
+		// validate that the genesis file in storage matches the chain.Genesis
+		if b.genesis != b.config.Genesis.Hash() {
+			return fmt.Errorf("genesis file does not match current genesis")
+		}
+		header, ok := b.GetHeaderByHash(head)
+		if !ok {
+			return fmt.Errorf("failed to get header with hash %s", head.String())
+		}
+		diff, ok := b.GetTD(head)
+		if !ok {
+			return fmt.Errorf("failed to read difficulty")
+		}
+
+		b.logger.Info("Current header", "hash", header.Hash.String(), "number", header.Number)
+		b.setCurrentHeader(header, diff)
+	} else {
+		// empty storage, write the genesis
+		if err := b.writeGenesis(b.config.Genesis); err != nil {
+			return err
+		}
+	}
+	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
+	return nil
 }
 
 func (b *Blockchain) SetConsensus(c Verifier) {
@@ -317,21 +324,11 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 }
 
 func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
-	fmt.Println("-- read body --")
-	fmt.Println(hash)
-
-	//body, ok := b.bodiesCache.Get(hash)
-	//if ok {
-	//	fmt.Println("_ FOUND _")
-	//	return body.(*types.Body), true
-	//}
 	bb, err := b.db.ReadBody(hash)
 	if err != nil {
 		b.logger.Error("failed to read body", "err", err)
 		return nil, false
 	}
-
-	//b.bodiesCache.Add(hash, bb)
 	return bb, true
 }
 
@@ -421,18 +418,14 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return fmt.Errorf("failed to verify the header: %v", err)
 		}
 
-		// This is not necessary.
-
-		/*
-			// verify body data
-			if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-				return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
-			}
-			// TODO, the wrapper around transactions
-			if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
-				return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
-			}
-		*/
+		// verify body data
+		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+			return fmt.Errorf("uncle root hash mismatch: have %s, want %s", hash, block.Header.Sha3Uncles)
+		}
+		// TODO, the wrapper around transactions
+		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+			return fmt.Errorf("transaction root hash mismatch: have %s, want %s", hash, block.Header.TxRoot)
+		}
 		parent = block.Header
 	}
 
@@ -443,13 +436,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if err := b.writeBody(block); err != nil {
 			return err
 		}
-
-		/*
-			// Verify uncles. It requires to have the bodies on memory
-			if err := b.VerifyUncles(block); err != nil {
-				return err
-			}
-		*/
 		// Process and validate the block
 		res, err := b.processBlock(blocks[indx])
 		if err != nil {
@@ -481,8 +467,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 func (b *Blockchain) writeBody(block *types.Block) error {
 	body := block.Body()
 
-	// b.logger.Info("write body", "hash", block.Header.Hash, "txns", len(body.Transactions))
-
 	// write the full body (txns + receipts)
 	if err := b.db.WriteBody(block.Header.Hash, body); err != nil {
 		return err
@@ -490,20 +474,15 @@ func (b *Blockchain) writeBody(block *types.Block) error {
 
 	// write txn lookups (txhash -> block)
 	for _, txn := range block.Transactions {
-		//b.logger.Info("write txn lookup", "hash", txn.Hash, "block", block.Hash())
 		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
 			return err
 		}
 	}
-
-	//b.bodiesCache.Add(block.Header.Hash, body)
 	return nil
 }
 
 func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	v, ok := b.db.ReadTxLookup(hash)
-
-	fmt.Println("LOOKUP: ", hash, v)
 	return v, ok
 }
 
@@ -525,25 +504,17 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("bad size of receipts and transactions")
 	}
 
-	/*
-		ADD AGAIN LATER
-		// validate the fields
-		if result.Root != header.StateRoot {
-			return nil, fmt.Errorf("invalid merkle root")
-		}
-		if result.TotalGas != header.GasUsed {
-			return nil, fmt.Errorf("gas used is different")
-		}
-		receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
-		if receiptSha != header.ReceiptsRoot {
-			return nil, fmt.Errorf("invalid receipts root")
-		}
-		rbloom := types.CreateBloom(result.Receipts)
-		if rbloom != header.LogsBloom {
-			return nil, fmt.Errorf("invalid receipts bloom")
-		}
-	*/
-
+	// validate the fields
+	if result.Root != header.StateRoot {
+		return nil, fmt.Errorf("invalid merkle root")
+	}
+	if result.TotalGas != header.GasUsed {
+		return nil, fmt.Errorf("gas used is different")
+	}
+	receiptSha := buildroot.CalculateReceiptsRoot(result.Receipts)
+	if receiptSha != header.ReceiptsRoot {
+		return nil, fmt.Errorf("invalid receipts root")
+	}
 	return result, nil
 }
 
@@ -603,9 +574,6 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		return b.writeCanonicalHeader(evnt, header)
 	}
 
-	fmt.Println("-- write header --")
-	fmt.Println(header)
-
 	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
@@ -623,7 +591,6 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		return err
 	}
 
-	fmt.Println("ADD TO CACHE", header.Hash, header)
 	b.headersCache.Add(header.Hash, header)
 
 	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
@@ -648,7 +615,11 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 func (b *Blockchain) writeFork(header *types.Header) error {
 	forks, err := b.db.ReadForks()
 	if err != nil {
-		return err
+		if err == storage.ErrNotFound {
+			forks = []types.Hash{}
+		} else {
+			return err
+		}
 	}
 	newForks := []types.Hash{}
 	for _, fork := range forks {

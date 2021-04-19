@@ -9,10 +9,6 @@ github.com/btcsuite/btcd/btcec
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
 github.com/davidlazar/go-crypto/salsa20
-# github.com/deckarep/golang-set v1.7.1
-## explicit
-# github.com/edsrzf/mmap-go v1.0.0
-## explicit
 # github.com/ethereum/go-ethereum v1.9.15
 ## explicit
 github.com/ethereum/go-ethereum/common/hexutil
@@ -50,8 +46,6 @@ github.com/hashicorp/go-hclog
 # github.com/hashicorp/go-immutable-radix v1.3.0
 ## explicit
 github.com/hashicorp/go-immutable-radix
-# github.com/hashicorp/go-memdb v1.3.2
-## explicit
 # github.com/hashicorp/go-multierror v1.1.0
 ## explicit
 github.com/hashicorp/go-multierror
@@ -311,7 +305,7 @@ github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20210419124620-84ffc6e4e4f8
+# github.com/umbracle/go-web3 v0.0.0-20210419160836-7945683fe6a4
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/compiler
@@ -485,8 +479,6 @@ google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/emptypb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/karalabe/cookiejar.v2 v2.0.0-20150724131613-8dcd6a7f4951
-## explicit
 # gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 ## explicit
 gopkg.in/natefinch/npipe.v2

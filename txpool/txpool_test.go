@@ -3,7 +3,6 @@ package txpool
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/network"
@@ -12,32 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTxPool(t *testing.T) {
-
-}
-
-func TestNotifyCh(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), &mockStore{}, nil, nil)
-	assert.NoError(t, err)
-
-	pool.EnableDev()
-	pool.NotifyCh = make(chan struct{}, 1)
-
-	txn := &types.Transaction{
-		From: types.Address{0x1},
-	}
-	assert.NoError(t, pool.AddTx(txn))
-
-	select {
-	case <-time.After(1 * time.Second):
-		t.Fatal("bad")
-	case <-pool.NotifyCh:
-	}
-}
-
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -65,9 +41,6 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestBroadcast(t *testing.T) {
-	// TODO
-	t.Skip()
-
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it
 	key0, _ := crypto.GenerateKey()
@@ -79,7 +52,7 @@ func TestBroadcast(t *testing.T) {
 	signer := &crypto.FrontierSigner{}
 
 	createPool := func() *TxPool {
-		pool, err := NewTxPool(hclog.NewNullLogger(), &mockStore{}, nil, network.CreateServer(t, nil))
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, network.CreateServer(t, nil))
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 		return pool
@@ -115,7 +88,7 @@ func (m *mockStore) Header() *types.Header {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 

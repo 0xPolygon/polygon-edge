@@ -7,7 +7,6 @@ import (
 	"math"
 	"path/filepath"
 	"reflect"
-	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -32,7 +31,7 @@ type blockchainInterface interface {
 }
 
 type Ibft struct {
-	sealing uint64
+	sealing bool
 
 	logger hclog.Logger
 	config *consensus.Config
@@ -69,7 +68,7 @@ type Ibft struct {
 	forceTimeoutCh bool
 }
 
-func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
 	p := &Ibft{
 		logger:       logger.Named("ibft"),
 		config:       config,
@@ -81,12 +80,13 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		network:      network,
 		epochSize:    100000,
 		syncNotifyCh: make(chan bool),
-		sealing:      0,
+		sealing:      sealing,
 	}
 
+	// Important. We change the hash function for the headers
+	types.HeaderHash = istambulHeaderHash
+
 	p.syncer = protocol.NewSyncer(logger, network, blockchain)
-	p.syncer.SyncNotifyCh = p.syncNotifyCh
-	p.syncer.Start()
 
 	// register the grpc operator
 	p.operator = &operator{ibft: p}
@@ -98,20 +98,23 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 
 	p.logger.Info("validator key", "addr", p.validatorKeyAddr.String())
 
-	// start the snapshot
-	if err := p.setupSnapshot(); err != nil {
-		return nil, err
-	}
-
 	// start the transport protocol
 	if err := p.setupTransport(); err != nil {
 		return nil, err
 	}
-
-	// do the start right now but it will only seal blocks if its in sealing mode
-	go p.start()
-
 	return p, nil
+}
+
+func (i *Ibft) Start() error {
+	// start the snapshot
+	if err := i.setupSnapshot(); err != nil {
+		return err
+	}
+
+	i.syncer.Start()
+	go i.start()
+
+	return nil
 }
 
 type transport interface {
@@ -233,7 +236,7 @@ func (i *Ibft) isValidSnapshot() bool {
 	header := i.blockchain.Header()
 	snap, err := i.getSnapshot(header.Number)
 	if err != nil {
-		panic(err)
+		return false
 	}
 
 	if snap.Set.Includes(i.validatorKeyAddr) {
@@ -302,7 +305,7 @@ func (i *Ibft) runSyncState() {
 
 var defaultBlockPeriod = 2 * time.Second
 
-func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
+func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     parent.Number + 1,
@@ -339,7 +342,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	txns := []*types.Transaction{}
 	for {
@@ -347,18 +350,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 		if txn == nil {
 			break
 		}
-
 		if err := transition.Write(txn); err != nil {
-			fmt.Println("-- err --")
-			fmt.Println(err)
-
 			retFn()
 			break
 		}
 		txns = append(txns, txn)
-
-		// do only one txn
-		break
 	}
 
 	_, root := transition.Commit()
@@ -371,7 +367,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	// write the seal of the block after all the fields are completed
 	header, err = writeSeal(i.validatorKey, block.Header)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	block.Header = header
 
@@ -380,7 +376,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	block.Header.ComputeHash()
 
 	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
-	return block
+	return block, nil
 }
 
 func (i *Ibft) runAcceptState() { // start new round
@@ -391,15 +387,20 @@ func (i *Ibft) runAcceptState() { // start new round
 	parent := i.blockchain.Header()
 	number := parent.Number + 1
 	if number != i.state.view.Sequence {
-		panic("TODO")
+		i.logger.Error("sequence not correct", "parent", parent.Number, "sequence", i.state.view.Sequence)
+		i.setState(SyncState)
+		return
 	}
 	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
-		panic(err)
+		i.logger.Error("cannot find snapshot", "num", parent.Number)
+		i.setState(SyncState)
+		return
 	}
 
 	if !snap.Set.Includes(i.validatorKeyAddr) {
 		// we are not a validator anymore, move back to sync state
+		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
 		return
 	}
@@ -424,15 +425,15 @@ func (i *Ibft) runAcceptState() { // start new round
 
 		if !i.state.locked {
 			// since the state is not locked, we need to build a new block
-			i.state.block = i.buildBlock(snap, parent)
+			i.state.block, err = i.buildBlock(snap, parent)
+			if err != nil {
+				i.logger.Error("failed to build block", "err", err)
+				i.setState(RoundChangeState)
+				return
+			}
 
 			// calculate how much time do we have to wait to mine the block
 			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
-
-			fmt.Println("- delay -")
-			fmt.Println(delay)
-			fmt.Println(parent.Timestamp)
-			fmt.Println(i.state.block.Header.Timestamp)
 
 			select {
 			case <-time.After(delay):
@@ -476,7 +477,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		// retrieve the block proposal
 		block := &types.Block{}
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
-			panic(err)
+			i.logger.Error("failed to unmarshal block", "err", err)
+			i.setState(RoundChangeState)
+			return
 		}
 		if i.state.locked {
 			// the state is locked, we need to receive the same block
@@ -560,8 +563,6 @@ func (i *Ibft) runValidateState() {
 		i.state.unlock()
 
 		if err := i.insertBlock(block); err != nil {
-			panic(err)
-
 			// start a new round with the state unlocked since we need to
 			// be able to propose/validate a different block
 			i.logger.Error("failed to insert block", "err", err)
@@ -795,18 +796,7 @@ func (i *Ibft) randomTimeout() chan struct{} {
 }
 
 func (i *Ibft) isSealing() bool {
-	return atomic.LoadUint64(&i.sealing) != 0
-}
-
-func (i *Ibft) StartSeal() {
-	// start the transport protocol
-
-	// go i.run()
-	atomic.StoreUint64(&i.sealing, 1)
-}
-
-func (i *Ibft) run() {
-
+	return i.sealing
 }
 
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {

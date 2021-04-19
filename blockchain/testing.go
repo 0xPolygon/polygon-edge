@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -13,33 +12,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
 )
-
-type fakeConsensus struct {
-}
-
-func (f *fakeConsensus) VerifyHeader(parent, header *types.Header) error {
-	return nil
-}
-
-func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
-func (f *fakeConsensus) Prepare(header *types.Header) error {
-	return nil
-}
-
-func (f *fakeConsensus) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
-	return nil, nil
-}
-
-func (f *fakeConsensus) Finalize(txn *state.Txn, block *types.Block) error {
-	return nil
-}
-
-func (f *fakeConsensus) Close() error {
-	return nil
-}
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
 func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
@@ -186,7 +158,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, state.NewExecutor(config.Params, st))
 	if err != nil {
 		t.Fatal(err)
 	}

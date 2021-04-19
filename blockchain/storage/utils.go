@@ -31,12 +31,12 @@ func (f *Forks) UnmarshalRLP(input []byte) error {
 func (f *Forks) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	forks := make([]types.Hash, len(elems))
 	for indx, elem := range elems {
 		if err := elem.GetHash(forks[indx][:]); err != nil {
-			panic(err)
+			return err
 		}
 	}
 	*f = forks

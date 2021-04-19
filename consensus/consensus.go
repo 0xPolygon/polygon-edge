@@ -19,8 +19,8 @@ type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
 
-	// StartSeal enables sealing in the consensus
-	StartSeal()
+	// Start starts the consensus
+	Start() error
 
 	// Close closes the connection
 	Close() error
@@ -42,4 +42,4 @@ type Config struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, *Config, *txpool.TxPool, *network.Server, *blockchain.Blockchain, *state.Executor, *grpc.Server, hclog.Logger) (Consensus, error)
+type Factory func(context.Context, bool, *Config, *txpool.TxPool, *network.Server, *blockchain.Blockchain, *state.Executor, *grpc.Server, hclog.Logger) (Consensus, error)

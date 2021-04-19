@@ -69,6 +69,13 @@ func (e *Eth) GetFilterChanges(id string) ([]*web3.Log, error) {
 	return res, nil
 }
 
+// GetTransactionByHash returns a transaction by his hash
+func (e *Eth) GetTransactionByHash(hash web3.Hash) (*web3.Transaction, error) {
+	var txn *web3.Transaction
+	err := e.c.Call("eth_getTransactionByHash", &txn, hash)
+	return txn, err
+}
+
 // GetFilterChangesBlock returns the filter changes for block filters
 func (e *Eth) GetFilterChangesBlock(id string) ([]web3.Hash, error) {
 	var raw string

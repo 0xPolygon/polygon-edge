@@ -109,9 +109,17 @@ func (m *mockBlockStore2) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, 
 }
 
 func (m *mockBlockStore2) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
+	b, ok := m.GetBlockByNumber(blockNumber, false)
+	if !ok {
+		return nil, false
+	}
+	return b.Header, true
+}
+
+func (m *mockBlockStore2) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
 	for _, b := range m.blocks {
 		if b.Number() == blockNumber {
-			return b.Header, true
+			return b, true
 		}
 	}
 	return nil, false
@@ -378,6 +386,10 @@ func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
+func (m *mockStoreTxn) GetNonce(addr types.Address) (uint64, bool) {
+	return 1, false
+}
+
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
@@ -404,8 +416,10 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	arg := &txnArgs{
-		From: argAddrPtr(addr0),
-		To:   argAddrPtr(addr0),
+		From:     argAddrPtr(addr0),
+		To:       argAddrPtr(addr0),
+		Nonce:    argUintPtr(0),
+		GasPrice: argBytesPtr([]byte{0x1}),
 	}
 	_, err := dispatcher.endpoints.Eth.SendTransaction(arg)
 	assert.NoError(t, err)

@@ -206,10 +206,6 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
-
-	fmt.Println("-- req --")
-	fmt.Println(string(reqBody))
-
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest

@@ -33,7 +33,7 @@ func (s serverType) String() string {
 	case serverWS:
 		return "ws"
 	default:
-		panic("TODO")
+		panic("BUG: Not expected")
 	}
 }
 
@@ -89,7 +89,7 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 	go func() {
 		if err := srv.Serve(lis); err != nil {
-			panic(err)
+			j.logger.Error("closed http connection", "err", err)
 		}
 	}()
 	return nil

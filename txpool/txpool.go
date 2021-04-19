@@ -57,7 +57,7 @@ type TxPool struct {
 }
 
 // NewTxPool creates a new pool of transactios
-func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, network *network.Server) (*TxPool, error) {
+func NewTxPool(logger hclog.Logger, sealing bool, store store, grpcServer *grpc.Server, network *network.Server) (*TxPool, error) {
 	txPool := &TxPool{
 		logger:     logger.Named("txpool"),
 		store:      store,
@@ -65,6 +65,7 @@ func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, networ
 		queue:      make(map[types.Address]*txQueue, 0),
 		network:    network,
 		sorted:     newTxPriceHeap(),
+		sealing:    sealing,
 	}
 
 	if network != nil {
@@ -81,10 +82,6 @@ func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, networ
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
 	return txPool, nil
-}
-
-func (t *TxPool) StartSeal() {
-	t.sealing = true
 }
 
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {

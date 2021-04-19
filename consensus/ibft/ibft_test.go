@@ -120,20 +120,6 @@ func TestTransition_AcceptState_ToSync(t *testing.T) {
 	})
 }
 
-func TestTransition_AcceptState_Proposer_ValidProposer(t *testing.T) {
-	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
-	i.setState(AcceptState)
-
-	// we are the proposer and we need to build a block
-	i.runCycle()
-
-	i.expect(expectResult{
-		sequence: 1,
-		state:    ValidateState,
-		outgoing: 2, // preprepare and prepare
-	})
-}
-
 func TestTransition_AcceptState_Proposer_Locked(t *testing.T) {
 	// If we are the proposer and there is a lock value we need to propose it
 	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")

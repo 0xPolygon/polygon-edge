@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/compiler"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -23,6 +24,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/types"
 )
@@ -91,9 +93,6 @@ func (t *TestServer) JsonRPCAddr() string {
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	fmt.Println("////")
-	fmt.Println(t.JsonRPCAddr())
-
 	clt, err := jsonrpc.NewClient(t.JsonRPCAddr())
 	if err != nil {
 		t.t.Fatal(err)
@@ -113,6 +112,25 @@ func (t *TestServer) Stop() {
 	if err := t.cmd.Process.Kill(); err != nil {
 		t.t.Error(err)
 	}
+}
+
+func NewTestServerFromGenesis(t *testing.T) *TestServer {
+	c, err := chain.ImportFromFile("../genesis.json")
+	assert.NoError(t, err)
+
+	config := &TestServerConfig{
+		PremineAccts: []*SrvAccount{},
+		JsonRPCPort:  8545,
+	}
+
+	for addr := range c.Genesis.Alloc {
+		config.PremineAccts = append(config.PremineAccts, &SrvAccount{Addr: addr})
+	}
+
+	srv := &TestServer{
+		Config: config,
+	}
+	return srv
 }
 
 func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer {
@@ -247,10 +265,6 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("-- txn hash --")
-	fmt.Println(hash)
-
 	var receipt *web3.Receipt
 	var count uint64
 	for {
@@ -261,13 +275,12 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 			}
 		}
 		if receipt != nil {
-			fmt.Println("POP")
 			break
 		}
-		if count > 100 {
+		if count > 5 {
 			return nil, fmt.Errorf("timeout")
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 		count++
 	}
 	return receipt, nil
