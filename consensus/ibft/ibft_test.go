@@ -104,6 +104,22 @@ func TestTransition_ValidateState_CommitFastTrack(t *testing.T) {
 	})
 }
 
+func TestTransition_AcceptState_ToSync(t *testing.T) {
+	// we are in AcceptState and we are not in the validators list
+	// means that we have been removed as validator, move to sync state
+	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "")
+	i.setState(AcceptState)
+	i.Close()
+
+	// we are the proposer and we need to build a block
+	i.runCycle()
+
+	i.expect(expectResult{
+		sequence: 1,
+		state:    SyncState,
+	})
+}
+
 func TestTransition_AcceptState_Proposer_ValidProposer(t *testing.T) {
 	i := newMockIbft(t, []string{"A", "B", "C", "D"}, "A")
 	i.setState(AcceptState)
@@ -517,7 +533,15 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		respMsg:    []*proto.MessageReq{},
 	}
 
-	addr := pool.get(account)
+	var addr *testerAccount
+	if account == "" {
+		// account not in validator set, create a new one that is not part
+		// of the genesis
+		pool.add("xx")
+		addr = pool.get("xx")
+	} else {
+		addr = pool.get(account)
+	}
 	ibft := &Ibft{
 		logger:           hclog.NewNullLogger(),
 		config:           &consensus.Config{},

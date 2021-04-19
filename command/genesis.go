@@ -126,7 +126,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
-			Forks:   &chain.Forks{},
+			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				consensus: map[string]interface{}{},
 			},

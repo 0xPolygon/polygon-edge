@@ -28,7 +28,8 @@ func (p *IbftSnapshot) Run(args []string) int {
 	flags := p.FlagSet("ibft snapshot")
 
 	// query a specific snapshot
-	number := flags.Uint64("number", 0, "")
+	var number int64
+	flags.Int64Var(&number, "number", -1, "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
@@ -41,11 +42,11 @@ func (p *IbftSnapshot) Run(args []string) int {
 		return 1
 	}
 
-	req := &proto.SnapshotReq{
-		Latest: number == nil,
-	}
-	if number != nil {
-		req.Number = *number
+	req := &proto.SnapshotReq{}
+	if number >= 0 {
+		req.Number = uint64(number)
+	} else {
+		req.Latest = true
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)

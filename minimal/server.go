@@ -151,14 +151,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	/*
-		// setup syncer protocol
-		m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
-		m.syncer.Start()
-	*/
-
 	if m.config.Seal {
 		m.logger.Info("sealing enabled")
+		m.txpool.StartSeal()
 		m.consensus.StartSeal()
 	}
 
@@ -332,6 +327,7 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
 	s.network.Close()
+	s.consensus.Close()
 }
 
 // Entry is a backend configuration entry

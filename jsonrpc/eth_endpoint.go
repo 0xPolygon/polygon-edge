@@ -117,16 +117,15 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		return nil, nil
 	}
 
-	fmt.Println("-- receipt --")
-	fmt.Println(hash)
-	fmt.Println(blockHash)
-
 	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
 	if err != nil {
 		// block receipts not found
 		return nil, nil
 	}
-
+	if len(receipts) == 0 {
+		// receitps not written yet on the db
+		return nil, nil
+	}
 	// find the transaction in the body
 	indx := -1
 	for i, txn := range block.Transactions {
@@ -349,39 +348,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
-	var referenceFrom uint64
-	var referenceTo uint64
-
-	if filterOptions.fromBlock > filterOptions.toBlock {
-		return nil, fmt.Errorf("invalid block search range")
-	}
-
-	// Fetch the requested from header
-	header, err := e.d.getBlockHeaderImpl(filterOptions.fromBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	referenceFrom = header.Number
-
-	// Fetch the requested to header
-	header, err = e.d.getBlockHeaderImpl(filterOptions.toBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	referenceTo = header.Number
-
 	var result []*Log
-	for i := referenceFrom; i < referenceTo; i++ {
-		header, ok := e.d.store.GetHeaderByNumber(i)
-		if !ok {
-			return nil, fmt.Errorf("Error fetching header for block %d", i)
-		}
-
+	parseReceipts := func(header *types.Header) error {
 		receipts, err := e.d.store.GetReceiptsByHash(header.Hash)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		for indx, receipt := range receipts {
@@ -399,6 +370,50 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 					})
 				}
 			}
+		}
+		return nil
+	}
+
+	if filterOptions.BlockHash != nil {
+		block, ok := e.d.store.GetBlockByHash(*filterOptions.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("not found")
+		}
+		if err := parseReceipts(block.Header); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	head := e.d.store.Header().Number
+
+	resolveNum := func(num BlockNumber) uint64 {
+		if num == PendingBlockNumber || num == EarliestBlockNumber {
+			num = LatestBlockNumber
+		}
+		if num == LatestBlockNumber {
+			return head
+		}
+		return uint64(num)
+	}
+
+	from := resolveNum(filterOptions.fromBlock)
+	to := resolveNum(filterOptions.toBlock)
+
+	if to < from {
+		return nil, fmt.Errorf("incorrect range")
+	}
+	for i := from; i < to; i++ {
+		header, ok := e.d.store.GetHeaderByNumber(i)
+		if !ok {
+			break
+		}
+		if header.Number == 0 {
+			// do not check logs in genesis
+			continue
+		}
+		if err := parseReceipts(header); err != nil {
+			return nil, err
 		}
 	}
 	return result, nil
@@ -457,7 +472,7 @@ func (e *Eth) NewBlockFilter() (interface{}, error) {
 
 // GetFilterChanges is a polling method for a filter, which returns an array of logs which occurred since last poll.
 func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
-	return nil, nil
+	return e.d.filterManager.GetFilterChanges(id)
 }
 
 // UninstallFilter uninstalls a filter with given ID

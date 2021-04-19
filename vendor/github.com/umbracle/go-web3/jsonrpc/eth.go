@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -52,6 +53,58 @@ func (e *Eth) GetBlockByHash(hash web3.Hash, full bool) (*web3.Block, error) {
 		return nil, err
 	}
 	return b, nil
+}
+
+func (e *Eth) GetFilterChanges(id string) ([]*web3.Log, error) {
+	var raw string
+	err := e.c.Call("eth_getFilterChanges", &raw, id)
+	if err != nil {
+		return nil, err
+	}
+	var res []*web3.Log
+	if err := json.Unmarshal([]byte(raw), &res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (e *Eth) GetFilterChangesBlock(id string) ([]web3.Hash, error) {
+	var raw string
+	err := e.c.Call("eth_getFilterChanges", &raw, id)
+	if err != nil {
+		return nil, err
+	}
+	var res []web3.Hash
+	if err := json.Unmarshal([]byte(raw), &res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (e *Eth) NewFilter(filter *web3.LogFilter) (string, error) {
+	var id string
+	err := e.c.Call("eth_newFilter", &id, filter)
+	return id, err
+}
+
+func (e *Eth) NewBlockFilter() (string, error) {
+	var id string
+	err := e.c.Call("eth_newBlockFilter", &id, nil)
+	return id, err
+}
+
+func (e *Eth) UninstallFilter(id string) (bool, error) {
+	var res bool
+	err := e.c.Call("eth_uninstallFilter", &res, id)
+	return res, err
+}
+
+// SendRawTransaction sends a signed transaction in rlp format.
+func (e *Eth) SendRawTransaction(data []byte) (web3.Hash, error) {
+	var hash web3.Hash
+	hexData := "0x" + hex.EncodeToString(data)
+	err := e.c.Call("eth_sendRawTransaction", &hash, hexData)
+	return hash, err
 }
 
 // SendTransaction creates new message call transaction or a contract creation.

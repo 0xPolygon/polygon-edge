@@ -73,6 +73,8 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	l.BlockHash = obj.BlockHash
+
 	if obj.FromBlock == "" {
 		l.fromBlock = LatestBlockNumber
 	} else {

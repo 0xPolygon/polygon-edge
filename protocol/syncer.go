@@ -192,6 +192,9 @@ func (s *Syncer) Start() {
 				continue
 			}
 
+			fmt.Println("- peer connected --")
+			fmt.Println(evnt)
+
 			stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
 			if err != nil {
 				panic(err)

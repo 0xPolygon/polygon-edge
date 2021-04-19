@@ -11,12 +11,21 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 	"github.com/umbracle/go-web3/testutil"
 
+	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
 )
 
-func TestTransaction(t *testing.T) {
-	clt, err := jsonrpc.NewClient("http://127.0.0.1:8545")
+func TestTransaction_Transfer(t *testing.T) {
+
+	var privKeyRaw = "0x4b2216c76f1b4c60c44d41986863e7337bc1a317d6a9366adfd8966fe2ac05f6"
+	key, _ := crypto.ParsePrivateKey(hex.MustDecodeHex(privKeyRaw))
+
+	// 0xdf7fd4830f4cc1440b469615e9996e9fde92608f
+	addr := crypto.PubKeyToAddress(&key.PublicKey)
+
+	clt, err := jsonrpc.NewClient("http://127.0.0.1:10002") /* http://127.0.0.1:8545 */
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,19 +33,46 @@ func TestTransaction(t *testing.T) {
 	eth := clt.Eth()
 	fmt.Println(eth.BlockNumber())
 
-	target := web3.HexToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0a")
+	signer := crypto.NewEIP155Signer(100)
+	target := types.StringToAddress("0x1010101010101010101010101010101010101010")
 
 	for i := 0; i < 3; i++ {
-		root, err := eth.SendTransaction(&web3.Transaction{
-			From:     web3.HexToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
+		/*
+			root, err := eth.SendTransaction(&web3.Transaction{
+				From:     web3.HexToAddress("0x9bd03347a977e4deb0a0ad685f8385f264524b0b"),
+				To:       &target,
+				GasPrice: 10000,
+				Gas:      1000000,
+				Value:    big.NewInt(10000),
+				Nonce:    uint64(i),
+			})
+			assert.NoError(t, err)
+			fmt.Println(root)
+		*/
+		txn := &types.Transaction{
+			From:     addr,
 			To:       &target,
-			GasPrice: 10000,
+			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(i),
-		})
+		}
+		txn, err = signer.SignTx(txn, key)
+		if err != nil {
+			panic(err)
+		}
+		data := txn.MarshalRLP()
+		fmt.Println(data)
+
+		//from, err := signer.Sender(txn)
+		//assert.NoError(t, err)
+
+		// fmt.Println(from, addr)
+
+		hash, err := eth.SendRawTransaction(data)
 		assert.NoError(t, err)
-		fmt.Println(root)
+		fmt.Println(hash)
+
 	}
 }
 

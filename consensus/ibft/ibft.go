@@ -22,7 +22,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-memdb"
 	"google.golang.org/grpc"
 )
 
@@ -46,8 +45,11 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey
 	validatorKeyAddr types.Address
 
+	txpool *txpool.TxPool
+
 	// snapshot state
-	store     *memdb.MemDB
+	// store     *memdb.MemDB
+	store     *snapshotStore
 	epochSize uint64
 
 	// queue of messages
@@ -74,6 +76,7 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 		blockchain:   blockchain,
 		executor:     executor,
 		closeCh:      make(chan struct{}),
+		txpool:       txpool,
 		state:        &currentState{},
 		network:      network,
 		epochSize:    100000,
@@ -86,7 +89,7 @@ func Factory(ctx context.Context, config *consensus.Config, txpool *txpool.TxPoo
 	p.syncer.Start()
 
 	// register the grpc operator
-	p.operator = &operator{i: p}
+	p.operator = &operator{ibft: p}
 	proto.RegisterIbftOperatorServer(srv, p.operator)
 
 	if err := p.createKey(); err != nil {
@@ -297,7 +300,7 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-var defaultBlockPeriod = 10 * time.Second
+var defaultBlockPeriod = 2 * time.Second
 
 func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	header := &types.Header{
@@ -309,6 +312,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
+		GasLimit:   100000000, // placeholder for now
 	}
 
 	// try to pick a candidate
@@ -333,21 +337,49 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) *types.Block {
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
 
-	// write the seal of the block
-	var err error
-	header, err = writeSeal(i.validatorKey, header)
+	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
 		panic(err)
 	}
+	txns := []*types.Transaction{}
+	for {
+		txn, retFn := i.txpool.Pop()
+		if txn == nil {
+			break
+		}
 
-	// TODO: Gather transactions
-	block := &types.Block{
-		Header: header,
+		if err := transition.Write(txn); err != nil {
+			fmt.Println("-- err --")
+			fmt.Println(err)
+
+			retFn()
+			break
+		}
+		txns = append(txns, txn)
+
+		// do only one txn
+		break
 	}
+
+	_, root := transition.Commit()
+	header.StateRoot = root
+	header.GasUsed = transition.TotalGas()
+
+	// build the block
+	block := consensus.BuildBlock(header, txns, transition.Receipts())
+
+	// write the seal of the block after all the fields are completed
+	header, err = writeSeal(i.validatorKey, block.Header)
+	if err != nil {
+		panic(err)
+	}
+	block.Header = header
 
 	// compute the hash, this is only a provisional hash since the final one
 	// is sealed after all the committed seals
 	block.Header.ComputeHash()
+
+	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
 	return block
 }
 
@@ -365,6 +397,14 @@ func (i *Ibft) runAcceptState() { // start new round
 	if err != nil {
 		panic(err)
 	}
+
+	if !snap.Set.Includes(i.validatorKeyAddr) {
+		// we are not a validator anymore, move back to sync state
+		i.setState(SyncState)
+		return
+	}
+
+	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
 	i.state.validators = snap.Set
 
@@ -388,6 +428,11 @@ func (i *Ibft) runAcceptState() { // start new round
 
 			// calculate how much time do we have to wait to mine the block
 			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
+
+			fmt.Println("- delay -")
+			fmt.Println(delay)
+			fmt.Println(parent.Timestamp)
+			fmt.Println(i.state.block.Header.Timestamp)
 
 			select {
 			case <-time.After(delay):
@@ -445,6 +490,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		} else {
 			// since its a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
+				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 			} else {
 				i.state.block = block
@@ -514,6 +560,8 @@ func (i *Ibft) runValidateState() {
 		i.state.unlock()
 
 		if err := i.insertBlock(block); err != nil {
+			panic(err)
+
 			// start a new round with the state unlocked since we need to
 			// be able to propose/validate a different block
 			i.logger.Error("failed to insert block", "err", err)
@@ -552,6 +600,11 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// broadcast the new block
 	i.syncer.Broadcast(block)
+
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	i.txpool.ResetWithHeader(block.Header)
+
 	return nil
 }
 
@@ -805,6 +858,10 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 
 func (i *Ibft) Close() error {
 	close(i.closeCh)
+
+	if i.config.Path != "" {
+		i.store.saveToPath(i.config.Path)
+	}
 	return nil
 }
 

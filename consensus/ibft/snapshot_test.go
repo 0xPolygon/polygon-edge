@@ -497,71 +497,6 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 	}
 }
 
-func TestSnapshot_Store(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
-	assert.NoError(t, err)
-
-	pool := newTesterAccountPool()
-	pool.add("a")
-
-	genesis := pool.genesis()
-	ibft1 := &Ibft{
-		epochSize:  1000,
-		blockchain: blockchain.TestBlockchain(t, genesis),
-		config: &consensus.Config{
-			Path: tmpDir,
-		},
-	}
-	assert.NoError(t, ibft1.setupSnapshot())
-
-	// write a header that creates a snapshot
-	headers := []*types.Header{}
-	actions := []string{"b", "", "", "c"}
-	for num, action := range actions {
-		h := &types.Header{
-			Number:     uint64(num) + 1,
-			ParentHash: ibft1.blockchain.Header().Hash,
-			Miner:      types.ZeroAddress,
-			MixHash:    IstanbulDigest,
-			ExtraData:  genesis.ExtraData,
-		}
-		if action != "" {
-			// create a new address in the pool with this alias
-			pool.add(action)
-			h.Miner = pool.get(action).Address()
-			h.Nonce = nonceAuthVote
-		}
-
-		h = pool.get("a").sign(h)
-		h.ComputeHash()
-		headers = append(headers, h)
-	}
-
-	err = ibft1.processHeaders(headers)
-	assert.NoError(t, err)
-
-	meta, err := ibft1.getSnapshotMetadata()
-	assert.NoError(t, err)
-	assert.Equal(t, meta.LastBlock, uint64(4))
-	assert.NoError(t, ibft1.saveSnapDataToFile())
-
-	// load snapshot data
-	ibft2 := &Ibft{
-		blockchain: blockchain.TestBlockchain(t, genesis),
-		config: &consensus.Config{
-			Path: tmpDir,
-		},
-	}
-	assert.NoError(t, ibft2.setupSnapshot())
-	meta, err = ibft2.getSnapshotMetadata()
-	assert.NoError(t, err)
-	assert.Equal(t, meta.LastBlock, uint64(4))
-
-	snap, err := ibft2.getLatestSnapshot()
-	assert.NoError(t, err)
-	assert.Equal(t, snap.Number, 4)
-}
-
 func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	pool := newTesterAccountPool()
 	pool.add("a", "b", "c")
@@ -599,14 +534,45 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 	err := ibft1.processHeaders(headers)
 	assert.NoError(t, err)
 
-	txn := ibft1.store.Txn(false)
-	it, err := txn.ReverseLowerBound("snapshot", "number", 50)
+	assert.Equal(t, len(ibft1.store.list), 21)
+}
+
+func TestSnapshot_Store_SaveLoad(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
 	assert.NoError(t, err)
 
-	// 21 -> 50
-	count := 0
-	for obj := it.Next(); obj != nil; obj = it.Next() {
-		count++
+	store0 := newSnapshotStore()
+	for i := 0; i < 10; i++ {
+		store0.add(&Snapshot{
+			Number: uint64(i),
+		})
 	}
-	assert.Equal(t, count, 20)
+	assert.NoError(t, store0.saveToPath(tmpDir))
+
+	store1 := newSnapshotStore()
+	assert.NoError(t, store1.loadFromPath(tmpDir))
+
+	assert.Equal(t, store0, store1)
+}
+
+func TestSnapshot_Store_Find(t *testing.T) {
+	store := newSnapshotStore()
+
+	for i := 0; i <= 100; i++ {
+		if i%10 == 0 {
+			store.add(&Snapshot{
+				Number: uint64(i),
+			})
+		}
+	}
+
+	check := func(num, expected uint64) {
+		assert.Equal(t, store.find(num).Number, expected)
+	}
+
+	check(0, 0)
+	check(19, 10)
+	check(20, 20)
+	check(21, 20)
+	check(1000, 100)
 }

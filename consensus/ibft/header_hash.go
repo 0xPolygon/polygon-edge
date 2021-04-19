@@ -8,7 +8,7 @@ import (
 
 func init() {
 	// we need to find a way to lock this
-	types.HeaderHash = istambulHeaderHash
+	// types.HeaderHash = istambulHeaderHash
 }
 
 func istambulHeaderHash(h *types.Header) types.Hash {

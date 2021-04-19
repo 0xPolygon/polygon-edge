@@ -11,7 +11,7 @@ import (
 )
 
 type operator struct {
-	i *Ibft
+	ibft *Ibft
 
 	candidatesLock sync.Mutex
 	candidates     []*proto.Candidate
@@ -21,13 +21,12 @@ type operator struct {
 
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
 	resp := &proto.IbftStatusResp{
-		Key: o.i.validatorKeyAddr.String(),
+		Key: o.ibft.validatorKeyAddr.String(),
 	}
 	return resp, nil
 }
 
 func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
-	// TODO: Test (we do not vote twice and items are removed after being promoted)
 	o.candidatesLock.Lock()
 	defer o.candidatesLock.Unlock()
 
@@ -35,23 +34,35 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 	// selected as validators
 	for i := 0; i < len(o.candidates); i++ {
 		addr := types.StringToAddress(o.candidates[i].Address)
-		if snap.Set.Includes(addr) {
+
+		delete := func() {
 			o.candidates = append(o.candidates[:i], o.candidates[i+1:]...)
 			i--
+		}
+
+		if o.candidates[i].Auth && snap.Set.Includes(addr) {
+			// if add and its already in, we can remove it
+			delete()
+			continue
+		}
+		if !o.candidates[i].Auth && !snap.Set.Includes(addr) {
+			// if remove and already out of the validators we can remove it
+			delete()
 		}
 	}
 
 	var candidate *proto.Candidate
 
-	// now pick the first candidate that we have not voted yet
+	// now pick the first candidate that has not received a vote yet
 	for _, c := range o.candidates {
 		addr := types.StringToAddress(c.Address)
 
 		count := snap.Count(func(v *Vote) bool {
-			return v.Address == addr && v.Validator == o.i.validatorKeyAddr
+			return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
 		})
 		if count == 0 {
 			candidate = c
+			break
 		}
 	}
 	return candidate
@@ -62,9 +73,9 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 	var err error
 
 	if req.Latest {
-		snap, err = o.i.getLatestSnapshot()
+		snap, err = o.ibft.getLatestSnapshot()
 	} else {
-		snap, err = o.i.getSnapshot(req.Number)
+		snap, err = o.ibft.getSnapshot(req.Number)
 	}
 	if err != nil {
 		return nil, err
@@ -89,7 +100,7 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 		}
 	}
 
-	snap, err := o.i.getLatestSnapshot()
+	snap, err := o.ibft.getLatestSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +118,7 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 
 	// check if we have already vote for this candidate
 	count := snap.Count(func(v *Vote) bool {
-		return v.Address == addr && v.Validator == o.i.validatorKeyAddr
+		return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
 	})
 	if count == 1 {
 		return nil, fmt.Errorf("we already voted for this address")

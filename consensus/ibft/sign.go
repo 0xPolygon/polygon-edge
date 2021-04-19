@@ -142,6 +142,11 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("-- signer --")
+	fmt.Println(signer)
+	fmt.Println(snap.Set)
+
 	if !snap.Set.Includes(signer) {
 		return fmt.Errorf("not found signer")
 	}

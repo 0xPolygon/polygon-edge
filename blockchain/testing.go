@@ -219,10 +219,10 @@ func createGenesis(header *types.Header) *chain.Genesis {
 	return genesis
 }
 
-type mockVerifier struct {
+type MockVerifier struct {
 }
 
-func (m *mockVerifier) VerifyHeader(parent, header *types.Header) error {
+func (m *MockVerifier) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
@@ -240,7 +240,7 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	config := &chain.Chain{
 		Genesis: genesis,
 	}
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &mockVerifier{}, &mockExecutor{})
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, &mockExecutor{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -111,6 +111,16 @@ func TestFilterDecode(t *testing.T) {
 				toBlock:   EarliestBlockNumber,
 			},
 		},
+		{
+			`{
+				"blockHash": "` + hash1.String() + `"
+			}`,
+			&LogFilter{
+				BlockHash: &hash1,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
+			},
+		},
 	}
 
 	for indx, c := range cases {

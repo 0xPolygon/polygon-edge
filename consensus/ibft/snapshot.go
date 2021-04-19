@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"sync"
+	"sync/atomic"
 
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/hashicorp/go-memdb"
 )
 
 var (
@@ -21,15 +23,13 @@ var (
 )
 
 func (i *Ibft) setupSnapshot() error {
-	store, err := memdb.NewMemDB(schema)
-	if err != nil {
-		return err
-	}
-	i.store = store
+	i.store = newSnapshotStore()
 
 	// read from storage
-	if err := i.loadSnapDataFromFile(); err != nil {
-		return err
+	if i.config.Path != "" {
+		if err := i.store.loadFromPath(i.config.Path); err != nil {
+			return err
+		}
 	}
 
 	header := i.blockchain.Header()
@@ -38,20 +38,9 @@ func (i *Ibft) setupSnapshot() error {
 		return err
 	}
 
-	if header.Number == 0 || meta.LastBlock == 0 {
-		extra, err := getIbftExtra(header)
-		if err != nil {
-			return err
-		}
-
-		// create the first snapshot from the genesis
-		snap := &Snapshot{
-			Hash:   header.Hash.String(),
-			Number: 0,
-			Votes:  []*Vote{},
-			Set:    extra.Validators,
-		}
-		if err := i.putSnapshot(snap); err != nil {
+	if header.Number == 0 {
+		// add genesis
+		if err := i.addHeaderSnap(header); err != nil {
 			return err
 		}
 	}
@@ -61,6 +50,9 @@ func (i *Ibft) setupSnapshot() error {
 		i.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
 
 		for num := meta.LastBlock + 1; num <= header.Number; num++ {
+			if num == 0 {
+				continue
+			}
 			header, ok := i.blockchain.GetHeaderByNumber(num)
 			if !ok {
 				return fmt.Errorf("header %d not found", num)
@@ -70,6 +62,25 @@ func (i *Ibft) setupSnapshot() error {
 			}
 		}
 	}
+	return nil
+}
+
+func (i *Ibft) addHeaderSnap(header *types.Header) error {
+	// genesis header needs to be set by hand, all the other
+	// snapshots are set as part of processHeaders
+	extra, err := getIbftExtra(header)
+	if err != nil {
+		return err
+	}
+
+	// create the first snapshot from the genesis
+	snap := &Snapshot{
+		Hash:   header.Hash.String(),
+		Number: header.Number,
+		Votes:  []*Vote{},
+		Set:    extra.Validators,
+	}
+	i.store.add(snap)
 	return nil
 }
 
@@ -85,92 +96,11 @@ func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 	return snap, nil
 }
 
-func (i *Ibft) loadSnapDataFromFile() error {
-	if i.config.Path == "" {
-		return nil
-	}
-
-	// load metadata
-	var meta *snapshotMetadata
-	if err := i.readDataStore("metadata", &meta); err != nil {
-		return err
-	}
-	if meta != nil {
-		if err := i.updateSnapshotMetadata(meta.LastBlock); err != nil {
-			return err
-		}
-	}
-
-	// load snapshots
-	snaps := []*Snapshot{}
-	if err := i.readDataStore("snapshots", &snaps); err != nil {
-		return err
-	}
-	for _, s := range snaps {
-		if err := i.putSnapshot(s); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (i *Ibft) saveSnapDataToFile() error {
 	if i.config.Path == "" {
 		return nil
 	}
-
-	meta, err := i.getSnapshotMetadata()
-	if err != nil {
-		return err
-	}
-
-	txn := i.store.Txn(false)
-
-	// List all the snapshots
-	it, err := txn.Get("snapshot", "number")
-	if err != nil {
-		return err
-	}
-
-	snaps := []*Snapshot{}
-	for obj := it.Next(); obj != nil; obj = it.Next() {
-		snaps = append(snaps, obj.(*Snapshot))
-	}
-	if err := i.writeDataStore("snapshots", snaps); err != nil {
-		return err
-	}
-
-	// write metadata
-	if err := i.writeDataStore("metadata", meta); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (i *Ibft) readDataStore(file string, obj interface{}) error {
-	path := filepath.Join(i.config.Path, file)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
-	}
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, obj); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (i *Ibft) writeDataStore(file string, obj interface{}) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(filepath.Join(i.config.Path, file), data, 0755); err != nil {
-		return err
-	}
-	return nil
+	return i.store.saveToPath(i.config.Path)
 }
 
 func (i *Ibft) processHeaders(headers []*types.Header) error {
@@ -189,11 +119,10 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return nil
 		}
 
-		snap.Number = int(h.Number)
+		snap.Number = h.Number
 		snap.Hash = h.Hash.String()
-		if err := i.putSnapshot(snap); err != nil {
-			return err
-		}
+
+		i.store.add(snap)
 
 		parentSnap = snap
 		snap = parentSnap.Copy()
@@ -223,9 +152,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			epoch := int(number/i.epochSize) - 2
 			if epoch > 0 {
 				purgeBlock := uint64(epoch) * i.epochSize
-				if err := i.removeSnapshotsLowerThan(purgeBlock); err != nil {
-					return err
-				}
+				i.store.deleteLower(purgeBlock)
 			}
 			continue
 		}
@@ -305,73 +232,20 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 
 	// update the metadata
-	if err := i.updateSnapshotMetadata(headers[len(headers)-1].Number); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (i *Ibft) removeSnapshotsLowerThan(num uint64) error {
-	txn := i.store.Txn(true)
-
-	it, err := txn.ReverseLowerBound("snapshot", "number", int(num))
-	if err != nil {
-		return err
-	}
-
-	for obj := it.Next(); obj != nil; obj = it.Next() {
-		if err := txn.Delete("snapshot", obj); err != nil {
-			return err
-		}
-	}
-	txn.Commit()
-	return nil
-}
-
-func (i *Ibft) updateSnapshotMetadata(num uint64) error {
-	txn := i.store.Txn(true)
-	meta := &snapshotMetadata{
-		LastBlock: num,
-	}
-	if err := txn.Insert("meta", meta); err != nil {
-		return err
-	}
-	txn.Commit()
+	i.store.updateLastBlock(headers[len(headers)-1].Number)
 	return nil
 }
 
 func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
-	txn := i.store.Txn(false)
-	meta, err := txn.First("meta", "id")
-	if err != nil {
-		return nil, err
+	meta := &snapshotMetadata{
+		LastBlock: i.store.getLastBlock(),
 	}
-	if meta == nil {
-		meta = &snapshotMetadata{
-			LastBlock: 0,
-		}
-	}
-	return meta.(*snapshotMetadata), nil
-}
-
-func (i *Ibft) putSnapshot(snap *Snapshot) error {
-	txn := i.store.Txn(true)
-	if err := txn.Insert("snapshot", snap); err != nil {
-		return err
-	}
-	txn.Commit()
-	return nil
+	return meta, nil
 }
 
 func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
-	txn := i.store.Txn(false)
-	defer txn.Abort()
-
-	it, err := txn.ReverseLowerBound("snapshot", "number", int(num))
-	if err != nil {
-		return nil, err
-	}
-	return it.Next().(*Snapshot), nil
+	snap := i.store.find(num)
+	return snap, nil
 }
 
 type Vote struct {
@@ -402,7 +276,7 @@ func (v *Vote) Copy() *Vote {
 // Snapshot is the current state at a given point in time for validators and votes
 type Snapshot struct {
 	// block number when the snapshot was created
-	Number int
+	Number uint64
 
 	// block hash when the snapshot was created
 	Hash string
@@ -492,42 +366,145 @@ func (s *Snapshot) ToProto() *proto.Snapshot {
 	return resp
 }
 
-// schema for the state
-var schema *memdb.DBSchema
+type snapshotStore struct {
+	lastNumber uint64
+	lock       sync.Mutex
+	list       snapshotSortedList
+}
 
-func init() {
-	schema = &memdb.DBSchema{
-		Tables: map[string]*memdb.TableSchema{
-			"snapshot": {
-				Name: "snapshot",
-				Indexes: map[string]*memdb.IndexSchema{
-					"id": {
-						Name:    "id",
-						Unique:  true,
-						Indexer: &memdb.StringFieldIndex{Field: "Hash"},
-					},
-					"number": {
-						Name:    "number",
-						Unique:  true,
-						Indexer: &memdb.IntFieldIndex{Field: "Number"},
-					},
-				},
-			},
-			"meta": {
-				Name: "meta",
-				Indexes: map[string]*memdb.IndexSchema{
-					"id": {
-						Name:         "id",
-						AllowMissing: false,
-						Unique:       true,
-						Indexer:      singletonRecord, // we store only 1 metadata record
-					},
-				},
-			},
-		},
+func newSnapshotStore() *snapshotStore {
+	return &snapshotStore{
+		list: snapshotSortedList{},
 	}
 }
 
-var singletonRecord = &memdb.ConditionalIndex{
-	Conditional: func(interface{}) (bool, error) { return true, nil },
+func (s *snapshotStore) loadFromPath(path string) error {
+	// load metadata
+	var meta *snapshotMetadata
+	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
+		return err
+	}
+	if meta != nil {
+		s.lastNumber = meta.LastBlock
+	}
+
+	// load snapshots
+	snaps := []*Snapshot{}
+	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
+		return err
+	}
+	for _, snap := range snaps {
+		s.add(snap)
+	}
+	return nil
+}
+
+func (s *snapshotStore) saveToPath(path string) error {
+	// write snapshots
+	if err := writeDataStore(filepath.Join(path, "snapshots"), s.list); err != nil {
+		return err
+	}
+
+	// write metadata
+	meta := &snapshotMetadata{
+		LastBlock: s.lastNumber,
+	}
+	if err := writeDataStore(filepath.Join(path, "metadata"), meta); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *snapshotStore) getLastBlock() uint64 {
+	return atomic.LoadUint64(&s.lastNumber)
+}
+
+func (s *snapshotStore) updateLastBlock(num uint64) {
+	atomic.StoreUint64(&s.lastNumber, num)
+}
+
+func (s *snapshotStore) deleteLower(num uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	i := sort.Search(len(s.list), func(i int) bool {
+		return s.list[i].Number >= num
+	})
+	s.list = s.list[i:]
+}
+
+func (s *snapshotStore) find(num uint64) *Snapshot {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if len(s.list) == 0 {
+		return nil
+	}
+
+	// fast track, check the last item
+	if last := s.list[len(s.list)-1]; last.Number < num {
+		return last
+	}
+
+	i := sort.Search(len(s.list), func(i int) bool {
+		return s.list[i].Number >= num
+	})
+	if i < len(s.list) {
+		if i == 0 {
+			return s.list[0]
+		}
+		if s.list[i].Number == num {
+			return s.list[i]
+		}
+		return s.list[i-1]
+	}
+	return nil
+}
+
+func (s *snapshotStore) add(snap *Snapshot) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// append and sort the list
+	s.list = append(s.list, snap)
+	sort.Sort(&s.list)
+}
+
+type snapshotSortedList []*Snapshot
+
+func (s snapshotSortedList) Len() int {
+	return len(s)
+}
+
+func (s snapshotSortedList) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s snapshotSortedList) Less(i, j int) bool {
+	return s[i].Number < s[j].Number
+}
+
+func readDataStore(path string, obj interface{}) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, obj); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeDataStore(path string, obj interface{}) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(path, data, 0755); err != nil {
+		return err
+	}
+	return nil
 }

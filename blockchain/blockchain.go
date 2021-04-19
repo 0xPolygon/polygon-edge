@@ -84,6 +84,9 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, consensus Verifier, executor Executor) (*Blockchain, error) {
+	if consensus == nil {
+		consensus = &MockVerifier{}
+	}
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -145,6 +148,7 @@ func NewBlockchain(logger hclog.Logger, dataDir string, config *chain.Chain, con
 	b.averageGasPrice = big.NewInt(0)
 	b.averageGasPriceCount = big.NewInt(0)
 
+	b.logger.Info("genesis", "hash", config.Genesis.Hash())
 	return b, nil
 }
 
@@ -307,6 +311,7 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	if err != nil {
 		return nil, false
 	}
+	hh.ComputeHash()
 	b.headersCache.Add(hash, hh)
 	return hh, true
 }
@@ -390,9 +395,9 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	if size == 1 {
-		b.logger.Info("write block", "num", blocks[0].Number())
+		b.logger.Info("write block", "num", blocks[0].Number(), "parent", blocks[0].ParentHash())
 	} else {
-		b.logger.Info("write blocks", "num", size, "from", blocks[0].Number(), "to", blocks[size-1].Number())
+		b.logger.Info("write blocks", "num", size, "from", blocks[0].Number(), "to", blocks[size-1].Number(), "parent", blocks[0].ParentHash())
 	}
 
 	parent, ok := b.readHeader(blocks[0].ParentHash())
@@ -450,10 +455,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if err != nil {
 			return err
 		}
-		// write the receipts
-		if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
-			return err
-		}
 
 		// Write the header to the chain
 		evnt := &Event{}
@@ -461,6 +462,13 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 			return err
 		}
 		b.dispatchEvent(evnt)
+
+		// write the receipts, do it only after the header has been written.
+		// Otherwise, a client might ask for a header once the receipt is valid
+		// but before it is written into the storage
+		if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
+			return err
+		}
 
 		// Update the average gas price
 		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
@@ -571,18 +579,6 @@ func (b *Blockchain) GetHashByNumber(i uint64) types.Hash {
 	return block.Hash()
 }
 
-func (b *Blockchain) addHeader(header *types.Header) error {
-	b.headersCache.Add(header.Hash, header)
-
-	if err := b.db.WriteHeader(header); err != nil {
-		return err
-	}
-	if err := b.db.WriteCanonicalHash(header.Number, header.Hash); err != nil {
-		return err
-	}
-	return nil
-}
-
 // WriteBlock writes a block of data
 func (b *Blockchain) WriteBlock(block *types.Block) error {
 	evnt := &Event{}
@@ -607,6 +603,9 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		return b.writeCanonicalHeader(evnt, header)
 	}
 
+	fmt.Println("-- write header --")
+	fmt.Println(header)
+
 	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
@@ -623,6 +622,8 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	if err := b.db.WriteDiff(header.Hash, big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))); err != nil {
 		return err
 	}
+
+	fmt.Println("ADD TO CACHE", header.Hash, header)
 	b.headersCache.Add(header.Hash, header)
 
 	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))

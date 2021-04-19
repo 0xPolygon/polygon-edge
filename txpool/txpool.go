@@ -49,6 +49,7 @@ type TxPool struct {
 	network *network.Server
 	topic   *network.Topic
 
+	sealing  bool
 	dev      bool
 	NotifyCh chan struct{}
 
@@ -82,6 +83,10 @@ func NewTxPool(logger hclog.Logger, store store, grpcServer *grpc.Server, networ
 	return txPool, nil
 }
 
+func (t *TxPool) StartSeal() {
+	t.sealing = true
+}
+
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 	q, ok := t.queue[addr]
 	if !ok {
@@ -98,9 +103,11 @@ func (t *TxPool) AddSigner(s signer) {
 var topicNameV1 = "txpool/0.1"
 
 func (t *TxPool) handleGossipTxn(obj interface{}) {
-	raw := obj.(*proto.Txn)
+	if !t.sealing {
+		return
+	}
 
-	// TODO: Do not include our own transactions
+	raw := obj.(*proto.Txn)
 	txn := new(types.Transaction)
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
@@ -210,6 +217,13 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	return txn.tx, ret
 }
 
+func (t *TxPool) ResetWithHeader(h *types.Header) {
+	evnt := &blockchain.Event{
+		NewChain: []*types.Header{h},
+	}
+	t.ProcessEvent(evnt)
+}
+
 // ProcessEvent processes the blockchain event and resets the txpool accordingly
 func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	addTxns := map[types.Hash]*types.Transaction{}
@@ -234,6 +248,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		} else {
 			for _, txn := range block.Transactions {
 				delete(addTxns, txn.Hash)
+				delTxns[txn.Hash] = txn
 			}
 		}
 	}
