@@ -2,10 +2,8 @@ package state
 
 import (
 	"fmt"
-	"math/big"
-
-	"github.com/0xPolygon/minimal/helper/dao"
 	"github.com/0xPolygon/minimal/types"
+	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
@@ -31,7 +29,6 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 type Executor struct {
 	config   *chain.Params
 	runtimes []runtime.Runtime
-	daoBlock int64
 	state    State
 	GetHash  GetHashByNumberHelper
 
@@ -43,7 +40,6 @@ func NewExecutor(config *chain.Params, s State) *Executor {
 	return &Executor{
 		config:   config,
 		runtimes: []runtime.Runtime{},
-		daoBlock: -1,
 		state:    s,
 	}
 }
@@ -69,11 +65,6 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 
 	_, root := txn.Commit(false)
 	return types.BytesToHash(root)
-}
-
-// SetDAOHardFork sets the dao hard fork if applicable
-func (e *Executor) SetDAOHardFork(block int64) {
-	e.daoBlock = block
 }
 
 // SetRuntime adds a runtime to the runtime set
@@ -137,17 +128,6 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Trans
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		GasLimit:   int64(header.GasLimit),
 		ChainID:    int64(e.config.ChainID),
-	}
-
-	// Mainnet (TODO: Do this in a preHookFn)
-	if e.config.ChainID == 1 && header.Number == uint64(e.daoBlock) {
-		// Apply the DAO hard fork. Move all the balances from 'drain accounts'
-		// to a single refund contract.
-		for _, i := range dao.DAODrainAccounts {
-			addr := types.StringToAddress(i)
-			newTxn.AddBalance(dao.DAORefundContract, newTxn.GetBalance(addr))
-			newTxn.SetBalance(addr, big.NewInt(0))
-		}
 	}
 
 	txn := &Transition{

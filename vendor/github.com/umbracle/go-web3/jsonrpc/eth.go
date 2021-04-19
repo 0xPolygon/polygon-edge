@@ -55,6 +55,7 @@ func (e *Eth) GetBlockByHash(hash web3.Hash, full bool) (*web3.Block, error) {
 	return b, nil
 }
 
+// GetFilterChanges returns the filter changes for log filters
 func (e *Eth) GetFilterChanges(id string) ([]*web3.Log, error) {
 	var raw string
 	err := e.c.Call("eth_getFilterChanges", &raw, id)
@@ -68,6 +69,7 @@ func (e *Eth) GetFilterChanges(id string) ([]*web3.Log, error) {
 	return res, nil
 }
 
+// GetFilterChangesBlock returns the filter changes for block filters
 func (e *Eth) GetFilterChangesBlock(id string) ([]web3.Hash, error) {
 	var raw string
 	err := e.c.Call("eth_getFilterChanges", &raw, id)
@@ -81,18 +83,21 @@ func (e *Eth) GetFilterChangesBlock(id string) ([]web3.Hash, error) {
 	return res, nil
 }
 
+// NewFilter creates a new log filter
 func (e *Eth) NewFilter(filter *web3.LogFilter) (string, error) {
 	var id string
 	err := e.c.Call("eth_newFilter", &id, filter)
 	return id, err
 }
 
+// NewBlockFilter creates a new block filter
 func (e *Eth) NewBlockFilter() (string, error) {
 	var id string
 	err := e.c.Call("eth_newBlockFilter", &id, nil)
 	return id, err
 }
 
+// UninstallFilter uninstalls a filter
 func (e *Eth) UninstallFilter(id string) (bool, error) {
 	var res bool
 	err := e.c.Call("eth_uninstallFilter", &res, id)
