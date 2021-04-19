@@ -10,136 +10,86 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDialLifecycle(t *testing.T) {
-	// TODO: Lets change this test, instead of testing this with the discovery protocol
-	// we should remove discovery protocol and just pipe values to the dialqueue to see how
-	// it behaves
-
-	type Request struct {
-		from      uint
-		to        uint
-		isSuccess bool
-	}
-	defConfig := func(c *Config) {
+func TestConnLimit_Inbound(t *testing.T) {
+	// we should not receive more inbound connections if we are already connected to max peers
+	conf := func(c *Config) {
 		c.MaxPeers = 1
 		c.NoDiscover = true
 	}
 
-	tests := []struct {
-		name     string
-		cfgs     []func(*Config)
-		requests []Request
-		// Number of connecting peers after all requests are processed
-		numPeers []int64
-	}{
-		{
-			name: "server 1 should reject incoming connection request from server 3 due to limit",
-			cfgs: []func(*Config){
-				defConfig,
-				defConfig,
-				defConfig,
-			},
-			requests: []Request{
-				{
-					from:      0,
-					to:        1,
-					isSuccess: true,
-				},
-				{
-					from:      2,
-					to:        0,
-					isSuccess: false,
-				},
-			},
-			numPeers: []int64{
-				1, 1, 0,
-			},
-		},
-		{
-			name: "server 1 should not connect to server 3 due to limit",
-			cfgs: []func(*Config){
-				defConfig,
-				defConfig,
-				defConfig,
-			},
-			requests: []Request{
-				{
-					from:      0,
-					to:        1,
-					isSuccess: true,
-				},
-				{
-					from:      0,
-					to:        2,
-					isSuccess: false,
-				},
-			},
-			numPeers: []int64{
-				1, 1, 0,
-			},
-		},
-		{
-			name: "should be success",
-			cfgs: []func(*Config){
-				func(c *Config) {
-					defConfig(c)
-					c.MaxPeers = 2
-				},
-				defConfig,
-				defConfig,
-			},
-			requests: []Request{
-				{
-					from:      0,
-					to:        1,
-					isSuccess: true,
-				},
-				{
-					from:      0,
-					to:        2,
-					isSuccess: true,
-				},
-			},
-			numPeers: []int64{
-				2, 1, 1,
-			},
-		},
+	srv0 := CreateServer(t, conf)
+	srv1 := CreateServer(t, conf)
+	srv2 := CreateServer(t, conf)
+
+	// One slot left, it can connect 0->1
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 1*time.Second))
+
+	// srv2 tries to connect to srv0 but srv0 is already connected
+	// to max peers
+	assert.Error(t, srv2.Join(srv1.AddrInfo(), 1*time.Second))
+
+	srv0.Disconnect(srv1.host.ID(), "bye")
+
+	// try to connect again
+	assert.NoError(t, srv2.Join(srv1.AddrInfo(), 1*time.Second))
+}
+
+func TestConnLimit_Outbound(t *testing.T) {
+	// we should not try to make connections if we are already connected to max peers
+	conf := func(c *Config) {
+		c.MaxPeers = 1
+		c.NoDiscover = true
 	}
 
-	const timeout = time.Second * 10
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*Server, len(tt.cfgs))
-			for i, cfg := range tt.cfgs {
-				srvs[i] = CreateServer(t, cfg)
-			}
-			defer func() {
-				for _, s := range srvs {
-					s.Close()
-				}
-			}()
+	srv0 := CreateServer(t, conf)
+	srv1 := CreateServer(t, conf)
+	srv2 := CreateServer(t, conf)
 
-			// Test join
-			for _, req := range tt.requests {
-				src, dst := srvs[req.from], srvs[req.to]
-				err := src.Join(dst.AddrInfo(), timeout)
+	// One slot left, it can connect 0->1
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 1*time.Second))
 
-				if req.isSuccess {
-					assert.NoError(t, err)
-				} else {
-					assert.Error(t, err)
-				}
-			}
+	// No slots left (timeout)
+	err := srv0.Join(srv2.AddrInfo(), 1*time.Second)
+	assert.Error(t, err)
 
-			// Test result
-			for i, n := range tt.numPeers {
-				assert.Equal(t, srvs[i].numPeers(), n)
-			}
-		})
+	// Disconnect 0 and 1 (sync)
+	srv0.Disconnect(srv1.host.ID(), "bye")
+
+	// Now srv0 is trying to connect to srv2 since there are slots left
+	connected := srv0.waitForEvent(2*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
+	assert.True(t, connected)
+}
+
+func TestPeersLifecycle(t *testing.T) {
+	srv0 := CreateServer(t, nil)
+	srv1 := CreateServer(t, nil)
+
+	// 0 -> 1 (connect)
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 0))
+
+	// 1 should receive the connected event as well
+	assert.True(t, srv1.waitForEvent(5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID)))
+
+	// 1 -> 0 (disconnect)
+	srv1.Disconnect(srv0.AddrInfo().ID, "bye")
+
+	// both 0 and 1 should receive a disconnect event
+	assert.True(t, srv0.waitForEvent(5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID)))
+}
+
+func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
+	return func(evnt *PeerEvent) bool {
+		return evnt.Type == PeerEventDisconnected && evnt.PeerID == p
 	}
 }
 
-func TestPeerEmitAndSubscribe(t *testing.T) {
+func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
+	return func(evnt *PeerEvent) bool {
+		return evnt.Type == PeerEventConnected && evnt.PeerID == p
+	}
+}
+
+func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	srv0 := CreateServer(t, nil)
 
 	sub, err := srv0.Subscribe()

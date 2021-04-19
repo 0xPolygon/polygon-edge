@@ -206,10 +206,11 @@ func (s *Server) runDial() {
 					Type:   PeerEventDialConnectedNode,
 				})
 			} else {
+				fmt.Printf("Dial: %s %s\n", s.host.ID(), tt.addr.ID)
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					// s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
@@ -261,6 +262,8 @@ func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
 }
 
 func (s *Server) addPeer(id peer.ID) {
+	s.logger.Info("Peer connected", "id", id.String())
+
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
@@ -270,20 +273,68 @@ func (s *Server) addPeer(id peer.ID) {
 	}
 	s.peers[id] = p
 
-	s.logger.Info("Peer connected", "id", id.String())
+	s.emitEvent(&PeerEvent{
+		PeerID: id,
+		Type:   PeerEventConnected,
+	})
 }
 
 func (s *Server) delPeer(id peer.ID) {
+	s.logger.Info("Peer disconnected", "id", id.String())
+
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
+
+	s.emitEvent(&PeerEvent{
+		PeerID: id,
+		Type:   PeerEventDisconnected,
+	})
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		// send some close message
 		s.host.Network().ClosePeer(peer)
+	}
+}
+
+func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEvent) bool) bool {
+	// TODO: Try to replace joinwatcher with this
+	sub, err := s.Subscribe()
+	if err != nil {
+		panic(err)
+	}
+
+	doneCh := make(chan struct{})
+	closed := false
+	go func() {
+		loop := true
+		for loop {
+			select {
+			case evnt := <-sub.GetCh():
+				if handler(evnt) {
+					loop = false
+				}
+
+			case <-s.closeCh:
+				closed = true
+				loop = false
+			}
+		}
+		sub.Close()
+		doneCh <- struct{}{}
+	}()
+	if closed {
+		return false
+	}
+
+	select {
+	case <-doneCh:
+		return true
+	case <-time.After(timeout):
+		return false
 	}
 }
 

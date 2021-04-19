@@ -14,7 +14,7 @@ func discoveryConfig(c *Config) {
 	c.MaxPeers = 2
 }
 
-func TestDiscoveryConnectedPopulatesRoutingTable(t *testing.T) {
+func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	// when two nodes connect, they populate their kademlia routing tables
 	srv0 := CreateServer(t, nil)
 	srv1 := CreateServer(t, nil)
@@ -26,7 +26,7 @@ func TestDiscoveryConnectedPopulatesRoutingTable(t *testing.T) {
 	assert.Equal(t, srv1.discovery.routingTable.Size(), 1)
 }
 
-func TestDiscoveryProtocolFindPeers(t *testing.T) {
+func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 	srv0 := CreateServer(t, nil)
 	srv1 := CreateServer(t, nil)
 
@@ -39,7 +39,7 @@ func TestDiscoveryProtocolFindPeers(t *testing.T) {
 	assert.Empty(t, resp)
 }
 
-func TestDiscoveryPeerAdded(t *testing.T) {
+func TestDiscovery_PeerAdded(t *testing.T) {
 	srv0 := CreateServer(t, discoveryConfig)
 	srv1 := CreateServer(t, discoveryConfig)
 	srv2 := CreateServer(t, discoveryConfig)
@@ -63,7 +63,7 @@ func TestDiscoveryPeerAdded(t *testing.T) {
 	// should end up with the same idea of the network.
 }
 
-func TestDiscoveryFullNetwork(t *testing.T) {
+func TestDiscovery_FullNetwork(t *testing.T) {
 	t.Skip()
 
 	// create a network of serially connected nodes

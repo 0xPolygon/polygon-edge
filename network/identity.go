@@ -40,11 +40,6 @@ func (i *identity) setPending(id peer.ID) {
 	atomic.AddInt64(&i.pendingSize, 1)
 }
 
-func (i *identity) isPending(id peer.ID) bool {
-	_, ok := i.pending.Load(id)
-	return ok
-}
-
 func (i *identity) setup() {
 	// register the protobuf protocol
 	grpc := grpc.NewGrpcStream()
@@ -107,11 +102,6 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	}
 
 	i.srv.addPeer(peerID)
-
-	i.srv.emitEvent(&PeerEvent{
-		PeerID: peerID,
-		Type:   PeerEventConnected,
-	})
 	return nil
 }
 
