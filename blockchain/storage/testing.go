@@ -25,34 +25,30 @@ var (
 func TestStorage(t *testing.T, m MockStorage) {
 	t.Helper()
 
-	/*
-		t.Run("", func(t *testing.T) {
-			testCanonicalChain(t, m)
-		})
-		t.Run("", func(t *testing.T) {
-			testDifficulty(t, m)
-		})
-		t.Run("", func(t *testing.T) {
-			testHead(t, m)
-		})
-		t.Run("", func(t *testing.T) {
-			testForks(t, m)
-		})
-		t.Run("", func(t *testing.T) {
-			testHeader(t, m)
-		})
-	*/
+	t.Run("", func(t *testing.T) {
+		testCanonicalChain(t, m)
+	})
+	t.Run("", func(t *testing.T) {
+		testDifficulty(t, m)
+	})
+	t.Run("", func(t *testing.T) {
+		testHead(t, m)
+	})
+	t.Run("", func(t *testing.T) {
+		testForks(t, m)
+	})
+	t.Run("", func(t *testing.T) {
+		testHeader(t, m)
+	})
 	t.Run("", func(t *testing.T) {
 		testBody(t, m)
 	})
-	/*
-		t.Run("", func(t *testing.T) {
-			testWriteCanonicalHeader(t, m)
-		})
-		t.Run("", func(t *testing.T) {
-			testReceipts(t, m)
-		})
-	*/
+	t.Run("", func(t *testing.T) {
+		testWriteCanonicalHeader(t, m)
+	})
+	t.Run("", func(t *testing.T) {
+		testReceipts(t, m)
+	})
 }
 
 func testCanonicalChain(t *testing.T, m MockStorage) {
