@@ -3,9 +3,8 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"sync"
 
-	"github.com/0xPolygon/minimal/blockchain"
+	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -17,74 +16,10 @@ import (
 type serviceV1 struct {
 	proto.UnimplementedV1Server
 
+	syncer *Syncer
 	logger hclog.Logger
 
 	store blockchainShim
-	subs  blockchain.Subscription
-
-	addCh  chan chan *proto.V1Status
-	stopCh chan struct{}
-
-	status     *proto.V1Status
-	statusLock sync.Mutex
-}
-
-func (s *serviceV1) start() {
-	// get the current status of the syncer
-	currentHeader := s.store.Header()
-
-	diff, ok := s.store.GetTD(currentHeader.Hash)
-	if !ok {
-		panic("Failed to read difficulty")
-	}
-
-	s.status = &proto.V1Status{
-		Hash:       currentHeader.Hash.String(),
-		Number:     int64(currentHeader.Number),
-		Difficulty: diff.String(),
-	}
-
-	eventCh := s.subs.GetEventCh()
-
-	s.addCh = make(chan chan *proto.V1Status, 10)
-	s.stopCh = make(chan struct{})
-
-	channels := make([]chan *proto.V1Status, 0)
-
-	// watch the subscription and notify
-	for {
-		select {
-		case add := <-s.addCh:
-			channels = append(channels, add)
-
-		case evnt := <-eventCh:
-			if evnt.Type == blockchain.EventFork {
-				// we do not want to notify forks
-				continue
-			}
-			if len(evnt.NewChain) == 0 {
-				// this should not happen
-				continue
-			}
-
-			status := &proto.V1Status{
-				Difficulty: evnt.Difficulty.String(),
-				Hash:       evnt.NewChain[0].Hash.String(),
-				Number:     int64(evnt.NewChain[0].Number),
-			}
-
-			s.statusLock.Lock()
-			s.status = status
-			s.statusLock.Unlock()
-
-			// send notifications
-			for _, ch := range channels {
-				ch <- status
-			}
-		case <-s.stopCh:
-			return
-		}
-	}
 }
 
 type rlpObject interface {
@@ -92,11 +27,20 @@ type rlpObject interface {
 	UnmarshalRLP(input []byte) error
 }
 
+func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Empty, error) {
+	id := ctx.(*grpc.Context).PeerID
+
+	b := new(types.Block)
+	if err := b.UnmarshalRLP(req.Raw.Value); err != nil {
+		return nil, err
+	}
+	s.syncer.enqueueBlock(id, b)
+	return &empty.Empty{}, nil
+}
+
 // GetCurrent implements the V1Server interface
 func (s *serviceV1) GetCurrent(ctx context.Context, in *empty.Empty) (*proto.V1Status, error) {
-	s.statusLock.Lock()
-	status := s.status
-	s.statusLock.Unlock()
+	status := s.syncer.status.toProto()
 	return status, nil
 }
 
@@ -208,27 +152,6 @@ func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest
 	return resp, nil
 }
 
-// Watch implements the V1Server interface
-func (s *serviceV1) Watch(req *empty.Empty, stream proto.V1_WatchServer) error {
-	watchCh := make(chan *proto.V1Status)
-	s.addCh <- watchCh
-
-	for {
-		select {
-		case status := <-watchCh:
-			if err := stream.Send(status); err != nil {
-				s.logger.Error("[ERROR]: failed to send watch status", "err", err)
-				close(watchCh)
-				return nil
-			}
-
-		case <-stream.Context().Done():
-			close(watchCh)
-			return nil
-		}
-	}
-}
-
 // Helper functions to decode responses from the grpc layer
 func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Body, error) {
 	input := []string{}
@@ -249,27 +172,8 @@ func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]
 		}
 		res = append(res, &body)
 	}
-	return res, nil
-}
-
-func getReceipts(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Receipts, error) {
-	input := []string{}
-	for _, h := range hashes {
-		input = append(input, h.String())
-	}
-	resp, err := clt.GetObjectsByHash(ctx, &proto.HashRequest{Hash: input, Type: proto.HashRequest_RECEIPTS})
-	if err != nil {
-		return nil, err
-	}
-	res := []*types.Receipts{}
-	for _, obj := range resp.Objs {
-		var receipts types.Receipts
-		if obj.Spec.Value != nil {
-			if err := receipts.UnmarshalRLP(obj.Spec.Value); err != nil {
-				return nil, err
-			}
-		}
-		res = append(res, &receipts)
+	if len(res) != len(input) {
+		return nil, fmt.Errorf("not correct size")
 	}
 	return res, nil
 }

@@ -14,17 +14,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-type Log struct {
-	types.Log
-
-	BlockNumber uint64     `json:"blockNumber"`
-	TxHash      types.Hash `json:"transactionHash"`
-	TxIndex     uint       `json:"transactionIndex"`
-	BlockHash   types.Hash `json:"blockHash"`
-	LogIndex    uint       `json:"logIndex"`
-	Removed     bool       `json:"removed"`
-}
-
 type Filter struct {
 	id string
 
@@ -257,11 +246,13 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 					if f.isLogFilter() {
 						if f.logFilter.Match(log) {
 							nn := &Log{
-								Log:         *log,
-								BlockNumber: h.Number,
+								Address:     log.Address,
+								Topics:      log.Topics,
+								Data:        argBytes(log.Data),
+								BlockNumber: argUint64(h.Number),
 								BlockHash:   h.Hash,
 								TxHash:      receipt.TxHash,
-								TxIndex:     uint(indx),
+								TxIndex:     argUint64(indx),
 								Removed:     removed,
 							}
 							f.logs = append(f.logs, nn)

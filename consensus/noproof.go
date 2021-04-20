@@ -7,10 +7,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-/*
-var err = fmt.Errorf("NoProof consensus only meant to be used to verify headers only")
-*/
-
 // NoProof is a consensus algorithm that validates everything
 type NoProof struct {
 }

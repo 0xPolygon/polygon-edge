@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/consensus/ibft2"
+	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
 	"github.com/0xPolygon/minimal/network"
@@ -50,7 +50,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var name string
 
 	// ibft flags
-	var ibft bool
+	var ibftConsensus bool
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
 
@@ -58,7 +58,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&name, "name", "example", "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", 100, "")
-	flags.BoolVar(&ibft, "ibft", false, "")
+	flags.BoolVar(&ibftConsensus, "ibft", false, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
@@ -83,7 +83,7 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	// determine engine
 	consensus := "pow"
-	if ibft {
+	if ibftConsensus {
 		// extradata
 		consensus = "ibft"
 
@@ -107,12 +107,12 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 
 		// create the initial extra data with the validators
-		ibftExtra := &ibft2.IstanbulExtra{
+		ibftExtra := &ibft.IstanbulExtra{
 			Validators:    validators,
 			Seal:          []byte{},
 			CommittedSeal: [][]byte{},
 		}
-		extraData = make([]byte, types.IstanbulExtraVanity)
+		extraData = make([]byte, ibft.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
@@ -126,7 +126,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
-			Forks:   &chain.Forks{},
+			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				consensus: map[string]interface{}{},
 			},
@@ -192,7 +192,7 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, []string, error) {
 		}
 
 		// try to read key from the filepath/consensus/<key> path
-		possibleConsensusPath := filepath.Join(path, "consensus", ibft2.IbftKeyName)
+		possibleConsensusPath := filepath.Join(path, "consensus", ibft.IbftKeyName)
 
 		// check if path exists
 		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {

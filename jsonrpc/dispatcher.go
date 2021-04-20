@@ -3,10 +3,12 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"unicode"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -366,4 +368,91 @@ func lowerCaseFirst(str string) string {
 		return string(unicode.ToLower(v)) + str[i+1:]
 	}
 	return ""
+}
+
+func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, error) {
+	switch number {
+	case LatestBlockNumber:
+		return d.store.Header(), nil
+
+	case EarliestBlockNumber:
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
+
+	case PendingBlockNumber:
+		return nil, fmt.Errorf("fetching the pending header is not supported")
+
+	default:
+		// Convert the block number from hex to uint64
+		header, ok := d.store.GetHeaderByNumber(uint64(number))
+		if !ok {
+			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
+		}
+		return header, nil
+	}
+}
+
+func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
+	if number == PendingBlockNumber {
+		res, ok := d.store.GetNonce(address)
+		if ok {
+			return res, nil
+		}
+	}
+	header, err := d.getBlockHeaderImpl(number)
+	if err != nil {
+		return 0, err
+	}
+	acc, err := d.store.GetAccount(header.StateRoot, address)
+	if err != nil {
+		return 0, err
+	}
+	return acc.Nonce, nil
+}
+
+func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
+	// set default values
+	if arg.From == nil {
+		return nil, fmt.Errorf("from is empty")
+	}
+	if arg.Nonce == nil {
+		// get nonce from the pool
+		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		arg.Nonce = argUintPtr(nonce)
+	}
+	if arg.Value == nil {
+		arg.Value = argBytesPtr([]byte{})
+	}
+	if arg.GasPrice == nil {
+		// use the suggested gas price
+		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+	}
+	if arg.To == nil {
+		if arg.Input == nil {
+			return nil, fmt.Errorf("contract creation without data provided")
+		}
+	}
+	if arg.Input == nil {
+		arg.Input = argBytesPtr([]byte{})
+	}
+	if arg.Gas == nil {
+		// TODO
+		arg.Gas = argUintPtr(1000000)
+	}
+
+	txn := &types.Transaction{
+		From:     *arg.From,
+		Gas:      uint64(*arg.Gas),
+		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
+		Value:    new(big.Int).SetBytes(*arg.Value),
+		Input:    *arg.Input,
+		Nonce:    uint64(*arg.Nonce),
+	}
+	if arg.To != nil {
+		txn.To = arg.To
+	}
+	txn.ComputeHash()
+	return txn, nil
 }

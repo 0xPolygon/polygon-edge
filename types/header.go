@@ -6,30 +6,28 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 )
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash     `json:"parentHash"`
-	Sha3Uncles   Hash     `json:"sha3Uncles"`
-	Miner        Address  `json:"miner"`
-	StateRoot    Hash     `json:"stateRoot"`
-	TxRoot       Hash     `json:"transactionsRoot"`
-	ReceiptsRoot Hash     `json:"receiptsRoot"`
-	LogsBloom    Bloom    `json:"logsBloom"`
-	Difficulty   uint64   `json:"difficulty"`
-	Number       uint64   `json:"number"`
-	GasLimit     uint64   `json:"gasLimit"`
-	GasUsed      uint64   `json:"gasUsed"`
-	Timestamp    uint64   `json:"timestamp"`
-	ExtraData    HexBytes `json:"extraData"`
-	MixHash      Hash     `json:"mixHash"`
-	Nonce        Nonce    `json:"nonce"`
-	Hash         Hash     `json:"hash"`
+	ParentHash   Hash
+	Sha3Uncles   Hash
+	Miner        Address
+	StateRoot    Hash
+	TxRoot       Hash
+	ReceiptsRoot Hash
+	LogsBloom    Bloom
+	Difficulty   uint64
+	Number       uint64
+	GasLimit     uint64
+	GasUsed      uint64
+	Timestamp    uint64
+	ExtraData    []byte
+	MixHash      Hash
+	Nonce        Nonce
+	Hash         Hash
 }
 
 func (h *Header) Equal(hh *Header) bool {
@@ -67,21 +65,6 @@ func (n *Nonce) Scan(src interface{}) error {
 // MarshalText implements encoding.TextMarshaler
 func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
-}
-
-var marshalArenaPool fastrlp.ArenaPool
-
-// ComputeHash computes the hash of the header
-func (h *Header) ComputeHash() *Header {
-	ar := marshalArenaPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
-
-	v := h.MarshalRLPWith(ar)
-	hash.WriteRlp(h.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
-	return h
 }
 
 func (h *Header) Copy() *Header {

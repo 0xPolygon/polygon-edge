@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -124,6 +125,20 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
+
+		// try to decode the bootnodes
+		bootnodes := []*peer.AddrInfo{}
+		for _, raw := range config.Chain.Bootnodes {
+			node, err := StringToAddrInfo(raw)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+			}
+			// add the bootnode to the peerstore
+			srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
+			bootnodes = append(bootnodes, node)
+		}
+
+		srv.discovery.setBootnodes(bootnodes)
 	}
 
 	// start gossip protocol
@@ -194,7 +209,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Error("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
@@ -246,6 +261,8 @@ func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
 }
 
 func (s *Server) addPeer(id peer.ID) {
+	s.logger.Info("Peer connected", "id", id.String())
+
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
@@ -254,19 +271,66 @@ func (s *Server) addPeer(id peer.ID) {
 		Info: s.host.Peerstore().PeerInfo(id),
 	}
 	s.peers[id] = p
+
+	s.emitEvent(&PeerEvent{
+		PeerID: id,
+		Type:   PeerEventConnected,
+	})
 }
 
 func (s *Server) delPeer(id peer.ID) {
+	s.logger.Info("Peer disconnected", "id", id.String())
+
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
+
+	s.emitEvent(&PeerEvent{
+		PeerID: id,
+		Type:   PeerEventDisconnected,
+	})
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		// send some close message
 		s.host.Network().ClosePeer(peer)
+	}
+}
+
+func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEvent) bool) bool {
+	// TODO: Try to replace joinwatcher with this
+	sub, _ := s.Subscribe()
+
+	doneCh := make(chan struct{})
+	closed := false
+	go func() {
+		loop := true
+		for loop {
+			select {
+			case evnt := <-sub.GetCh():
+				if handler(evnt) {
+					loop = false
+				}
+
+			case <-s.closeCh:
+				closed = true
+				loop = false
+			}
+		}
+		sub.Close()
+		doneCh <- struct{}{}
+	}()
+	if closed {
+		return false
+	}
+
+	select {
+	case <-doneCh:
+		return true
+	case <-time.After(timeout):
+		return false
 	}
 }
 

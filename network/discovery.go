@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -34,6 +33,12 @@ type discovery struct {
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
+
+	bootnodes []*peer.AddrInfo
+}
+
+func (d *discovery) setBootnodes(bootnodes []*peer.AddrInfo) {
+	d.bootnodes = bootnodes
 }
 
 func (d *discovery) notify() {
@@ -75,7 +80,8 @@ func (d *discovery) setup() error {
 		// add peer to the routing table and to our local peer
 		_, err := d.routingTable.TryAddPeer(peerID, false, false)
 		if err != nil {
-			panic(err)
+			d.srv.logger.Error("failed to add peer to routing table", "err", err)
+			return
 		}
 
 		d.peersLock.Lock()
@@ -100,8 +106,8 @@ func (d *discovery) call(peerID peer.ID) error {
 	// we have to add them to the peerstore so that they are
 	// available to all the libp2p services
 	for _, node := range nodes {
-		fmt.Println("-- node --")
-		fmt.Println(node)
+		//fmt.Println("-- node --")
+		//fmt.Println(node)
 
 		d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
 		if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
@@ -147,11 +153,20 @@ func (d *discovery) run() {
 }
 
 func (d *discovery) handleDiscovery() {
-	// take a random peer and find peers
-	if len(d.peers) > 0 {
-		target := d.peers[rand.Intn(len(d.peers))]
-		if err := d.call(target); err != nil {
-			panic(err)
+	if d.routingTable.Size() == 0 {
+		// if there are no peers on the table try to include the bootnodes
+		for _, node := range d.bootnodes {
+			if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
+				d.srv.logger.Error("failed to add bootnode", "err", err)
+			}
+		}
+	} else {
+		// take a random peer and find peers
+		if len(d.peers) > 0 {
+			target := d.peers[rand.Intn(len(d.peers))]
+			if err := d.call(target); err != nil {
+				// d.srv.logger.Error("failed to dial bootnode", "err", err)
+			}
 		}
 	}
 }

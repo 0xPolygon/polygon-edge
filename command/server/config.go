@@ -24,6 +24,7 @@ type Config struct {
 	LogLevel    string                 `json:"log_level"`
 	Consensus   map[string]interface{} `json:"consensus"`
 	Dev         bool
+	DevInterval uint64
 	Join        string
 }
 
@@ -58,11 +59,11 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	conf := minimal.DefaultConfig()
 
 	// decode chain
-	chain, err := chain.Import(c.Chain)
+	cc, err := chain.Import(c.Chain)
 	if err != nil {
 		return nil, err
 	}
-	conf.Chain = chain
+	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
 
@@ -83,7 +84,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 		}
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
-		conf.Chain = chain
+		conf.Chain = cc
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -92,8 +93,14 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	if c.Dev {
 		conf.Seal = true
 		conf.Network.NoDiscover = true
+
+		engineConfig := map[string]interface{}{}
+		if c.DevInterval != 0 {
+			engineConfig["interval"] = c.DevInterval
+		}
+		conf.Chain.Params.Forks = chain.AllForksEnabled
 		conf.Chain.Params.Engine = map[string]interface{}{
-			"dev": nil,
+			"dev": engineConfig,
 		}
 	}
 
@@ -120,6 +127,9 @@ func (c *Config) merge(c1 *Config) error {
 	}
 	if c1.Dev {
 		c.Dev = true
+	}
+	if c1.DevInterval != 0 {
+		c.DevInterval = c1.DevInterval
 	}
 	if c1.Telemetry != nil {
 		if c1.Telemetry.PrometheusPort != 0 {
