@@ -11,9 +11,9 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-const NumOfNodes = 3
-
 func TestDiscovery(t *testing.T) {
+	const NumOfNodes = 3
+
 	srvs := make([]*framework.TestServer, NumOfNodes)
 	for i := range srvs {
 		srvs[i] = framework.NewTestServer(t, func(config *framework.TestServerConfig) {
