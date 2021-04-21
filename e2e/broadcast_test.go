@@ -43,9 +43,9 @@ func TestBroadcast(t *testing.T) {
 		Nonce:    0,
 		From:     senderAddr,
 		To:       &receiverAddr,
-		Value:    ethToWei(1).Bytes(),
+		Value:    ethToWei(1),
 		Gas:      1000,
-		GasPrice: big.NewInt(0x1000).Bytes(),
+		GasPrice: big.NewInt(0x1000),
 		Input:    []byte{},
 	}
 	tx, err := signer.SignTx(tx, senderKey)
