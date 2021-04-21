@@ -114,6 +114,14 @@ func (h HexBytes) MarshalText() ([]byte, error) {
 	return []byte(h.String()), nil
 }
 
+func (h *HexBytes) UnmarshalJSON(input []byte) error {
+	if !isString(input) {
+		return errNonString(hexBytesT)
+	}
+	*h = HexBytes(stringToBytes(string(input[1 : len(input)-1])))
+	return nil
+}
+
 func StringToHash(str string) Hash {
 	return BytesToHash(stringToBytes(str))
 }

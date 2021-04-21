@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	bigT    = reflect.TypeOf((*Big)(nil))
-	uint64T = reflect.TypeOf(Uint64(0))
+	bigT      = reflect.TypeOf((*Big)(nil))
+	uint64T   = reflect.TypeOf(Uint64(0))
+	hexBytesT = reflect.TypeOf(HexBytes([]byte{}))
 )
 
 func isString(input []byte) bool {
