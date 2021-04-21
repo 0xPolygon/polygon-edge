@@ -133,6 +133,9 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 	if t.Value, err = decodeBigInt(t.Value, v, "value"); err != nil {
 		return err
 	}
+	if t.Nonce, err = decodeUint(v, "nonce"); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -19,15 +19,8 @@ type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
 
-	/*
-		// TODO REMOVE
-		Prepare(header *types.Header) error
-
-		// TODO REMOVE
-		Seal(block *types.Block, ctx context.Context) (*types.Block, error)
-	*/
-
-	StartSeal()
+	// Start starts the consensus
+	Start() error
 
 	// Close closes the connection
 	Close() error
@@ -49,17 +42,4 @@ type Config struct {
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, *Config, *txpool.TxPool, *network.Server, *blockchain.Blockchain, *state.Executor, *grpc.Server, hclog.Logger) (Consensus, error)
-
-/*
-// Istanbul is a consensus engine to avoid byzantine failure
-type Istanbul interface {
-	Consensus
-
-	// Start starts the engine
-	Start(currentBlock func(bool) *types.Block, hasBadBlock func(hash types.Hash) bool) error
-
-	// Stop stops the engine
-	Stop() error
-}
-*/
+type Factory func(context.Context, bool, *Config, *txpool.TxPool, *network.Server, *blockchain.Blockchain, *state.Executor, *grpc.Server, hclog.Logger) (Consensus, error)

@@ -6,17 +6,13 @@ import (
 
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
-
-	RawRLPMarshaler
 }
 
-type RawRLPMarshaler interface {
-	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
-}
+type marshalRLPFunc func(ar *fastrlp.Arena) *fastrlp.Value
 
-func MarshalRLPTo(obj RawRLPMarshaler, dst []byte) []byte {
+func MarshalRLPTo(obj marshalRLPFunc, dst []byte) []byte {
 	ar := fastrlp.DefaultArenaPool.Get()
-	dst = obj.MarshalRLPWith(ar).MarshalTo(dst)
+	dst = obj(ar).MarshalTo(dst)
 	fastrlp.DefaultArenaPool.Put(ar)
 	return dst
 }
@@ -26,7 +22,7 @@ func (b *Block) MarshalRLP() []byte {
 }
 
 func (b *Block) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b, dst)
+	return MarshalRLPTo(b.MarshalRLPWith, dst)
 }
 
 func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -56,41 +52,12 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return vv
 }
 
-func (b *Body) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b, dst)
-}
-
-func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
-	vv := ar.NewArray()
-	if len(b.Transactions) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v0 := ar.NewArray()
-		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalRLPWith(ar))
-		}
-		vv.Set(v0)
-	}
-
-	if len(b.Uncles) == 0 {
-		vv.Set(ar.NewNullArray())
-	} else {
-		v1 := ar.NewArray()
-		for _, uncle := range b.Uncles {
-			v1.Set(uncle.MarshalRLPWith(ar))
-		}
-		vv.Set(v1)
-	}
-
-	return vv
-}
-
 func (h *Header) MarshalRLP() []byte {
 	return h.MarshalRLPTo(nil)
 }
 
 func (h *Header) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(h, dst)
+	return MarshalRLPTo(h.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals the header to RLP with a specific fastrlp.Arena
@@ -119,7 +86,7 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (r Receipts) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(&r, dst)
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
 func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
@@ -135,7 +102,7 @@ func (r *Receipt) MarshalRLP() []byte {
 }
 
 func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(r, dst)
+	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals a receipt with a specific fastrlp.Arena
@@ -183,7 +150,7 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(t, dst)
+	return MarshalRLPTo(t.MarshalRLPWith, dst)
 }
 
 // MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena
@@ -191,7 +158,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	vv.Set(arena.NewUint(t.Nonce))
-	vv.Set(arena.NewCopyBytes(t.GasPrice))
+	vv.Set(arena.NewBigInt(t.GasPrice))
 	vv.Set(arena.NewUint(t.Gas))
 
 	// Address may be empty
@@ -201,7 +168,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(arena.NewNull())
 	}
 
-	vv.Set(arena.NewCopyBytes(t.Value))
+	vv.Set(arena.NewBigInt(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
 
 	// signature values

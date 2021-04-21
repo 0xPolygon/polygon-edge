@@ -8,14 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/protocol"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -29,24 +27,19 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/sealer"
 )
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
 	logger hclog.Logger
 	config *Config
-	Sealer *sealer.Sealer
 	state  state.State
 
 	consensus consensus.Consensus
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
-	storage    storage.Storage
-
-	// key   *ecdsa.PrivateKey // TODO: Remove
-	chain *chain.Chain
+	chain      *chain.Chain
 
 	// state executor
 	executor *state.Executor
@@ -62,9 +55,6 @@ type Server struct {
 
 	// transaction pool
 	txpool *txpool.TxPool
-
-	// syncer protocol
-	syncer *protocol.Syncer
 }
 
 var dirPaths = []string{
@@ -121,7 +111,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, m.consensus, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +124,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		if m.txpool, err = txpool.NewTxPool(logger, hub, m.grpcServer, m.network); err != nil {
+		if m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, hub, m.grpcServer, m.network); err != nil {
 			return nil, err
 		}
 
@@ -151,6 +141,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
+	// after consensus is done, we can mine the genesis block in blockchain
+	// This is done because consensus might use a custom Hash function so we need
+	// to wait for consensus because we do any block hashing like genesis
+	if err := m.blockchain.ComputeGenesis(); err != nil {
+		return nil, err
+	}
+
 	// setup grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
@@ -161,13 +158,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup syncer protocol
-	m.syncer = protocol.NewSyncer(logger, m.network, m.blockchain)
-	m.syncer.Start()
-
-	if m.config.Seal {
-		m.logger.Info("sealing enabled")
-		m.consensus.StartSeal()
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
 	}
 
 	return m, nil
@@ -201,12 +193,16 @@ func (s *Server) setupConsensus() error {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
 
+	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
+	if !ok {
+		engineConfig = map[string]interface{}{}
+	}
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
-		Config: s.config.ConsensusConfig,
+		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(context.Background(), config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -336,6 +332,7 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
 	s.network.Close()
+	s.consensus.Close()
 }
 
 // Entry is a backend configuration entry

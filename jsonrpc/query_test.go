@@ -10,6 +10,8 @@ import (
 var (
 	addr1 = types.StringToAddress("1")
 	addr2 = types.StringToAddress("2")
+	addr3 = types.StringToAddress("3")
+	addr5 = types.StringToAddress("5")
 
 	hash1 = types.StringToHash("1")
 	hash2 = types.StringToHash("2")
@@ -107,6 +109,16 @@ func TestFilterDecode(t *testing.T) {
 			&LogFilter{
 				fromBlock: PendingBlockNumber,
 				toBlock:   EarliestBlockNumber,
+			},
+		},
+		{
+			`{
+				"blockHash": "` + hash1.String() + `"
+			}`,
+			&LogFilter{
+				BlockHash: &hash1,
+				fromBlock: LatestBlockNumber,
+				toBlock:   LatestBlockNumber,
 			},
 		},
 	}

@@ -22,7 +22,7 @@ type V1Client interface {
 	GetCurrent(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*V1Status, error)
 	GetObjectsByHash(ctx context.Context, in *HashRequest, opts ...grpc.CallOption) (*Response, error)
 	GetHeaders(ctx context.Context, in *GetHeadersRequest, opts ...grpc.CallOption) (*Response, error)
-	Watch(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (V1_WatchClient, error)
+	Notify(ctx context.Context, in *NotifyReq, opts ...grpc.CallOption) (*empty.Empty, error)
 }
 
 type v1Client struct {
@@ -60,36 +60,13 @@ func (c *v1Client) GetHeaders(ctx context.Context, in *GetHeadersRequest, opts .
 	return out, nil
 }
 
-func (c *v1Client) Watch(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (V1_WatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &V1_ServiceDesc.Streams[0], "/v1.V1/Watch", opts...)
+func (c *v1Client) Notify(ctx context.Context, in *NotifyReq, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/v1.V1/Notify", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &v1WatchClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type V1_WatchClient interface {
-	Recv() (*V1Status, error)
-	grpc.ClientStream
-}
-
-type v1WatchClient struct {
-	grpc.ClientStream
-}
-
-func (x *v1WatchClient) Recv() (*V1Status, error) {
-	m := new(V1Status)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 // V1Server is the server API for V1 service.
@@ -99,7 +76,7 @@ type V1Server interface {
 	GetCurrent(context.Context, *empty.Empty) (*V1Status, error)
 	GetObjectsByHash(context.Context, *HashRequest) (*Response, error)
 	GetHeaders(context.Context, *GetHeadersRequest) (*Response, error)
-	Watch(*empty.Empty, V1_WatchServer) error
+	Notify(context.Context, *NotifyReq) (*empty.Empty, error)
 	mustEmbedUnimplementedV1Server()
 }
 
@@ -116,8 +93,8 @@ func (UnimplementedV1Server) GetObjectsByHash(context.Context, *HashRequest) (*R
 func (UnimplementedV1Server) GetHeaders(context.Context, *GetHeadersRequest) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeaders not implemented")
 }
-func (UnimplementedV1Server) Watch(*empty.Empty, V1_WatchServer) error {
-	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
+func (UnimplementedV1Server) Notify(context.Context, *NotifyReq) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
 }
 func (UnimplementedV1Server) mustEmbedUnimplementedV1Server() {}
 
@@ -186,25 +163,22 @@ func _V1_GetHeaders_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
-func _V1_Watch_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(empty.Empty)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _V1_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyReq)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(V1Server).Watch(m, &v1WatchServer{stream})
-}
-
-type V1_WatchServer interface {
-	Send(*V1Status) error
-	grpc.ServerStream
-}
-
-type v1WatchServer struct {
-	grpc.ServerStream
-}
-
-func (x *v1WatchServer) Send(m *V1Status) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(V1Server).Notify(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.V1/Notify",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V1Server).Notify(ctx, req.(*NotifyReq))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // V1_ServiceDesc is the grpc.ServiceDesc for V1 service.
@@ -226,13 +200,11 @@ var V1_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetHeaders",
 			Handler:    _V1_GetHeaders_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Watch",
-			Handler:       _V1_Watch_Handler,
-			ServerStreams: true,
+			MethodName: "Notify",
+			Handler:    _V1_Notify_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "protocol/proto/v1.proto",
 }

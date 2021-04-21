@@ -5,10 +5,13 @@ import (
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/hashicorp/go-hclog"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 type Topic struct {
+	logger hclog.Logger
+
 	topic   *pubsub.Topic
 	typ     reflect.Type
 	closeCh chan struct{}
@@ -46,12 +49,14 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 	for {
 		msg, err := sub.Next(ctx)
 		if err != nil {
-			panic(err)
+			t.logger.Error("failed to get topic", "err", err)
+			continue
 		}
 
 		obj := t.createObj()
 		if err := proto.Unmarshal(msg.Data, obj); err != nil {
-			panic(err)
+			t.logger.Error("failed to unmarshal topic", "err", err)
+			continue
 		}
 		handler(obj)
 	}
@@ -63,8 +68,9 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		return nil, err
 	}
 	tt := &Topic{
-		topic: topic,
-		typ:   reflect.TypeOf(obj).Elem(),
+		logger: s.logger.Named(protoID),
+		topic:  topic,
+		typ:    reflect.TypeOf(obj).Elem(),
 	}
 	return tt, nil
 }

@@ -11,7 +11,7 @@ service V1 {
     rpc GetCurrent(google.protobuf.Empty) returns (V1Status);
     rpc GetObjectsByHash(HashRequest) returns (Response);
     rpc GetHeaders(GetHeadersRequest) returns (Response);
-    rpc Watch(google.protobuf.Empty) returns (stream V1Status);
+    rpc Notify(NotifyReq) returns (google.protobuf.Empty);
 }
 
 message GetCurrentResponse {
@@ -51,5 +51,10 @@ message Response {
 message V1Status {
     string difficulty = 1;
     string hash = 2;
-    int64 number = 3;
+    uint64 number = 3;
+}
+
+message NotifyReq {
+    V1Status status = 1;
+    google.protobuf.Any raw = 2;
 }

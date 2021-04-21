@@ -82,8 +82,8 @@ func (p *TxPoolAdd) Run(args []string) int {
 	txn := &types.Transaction{
 		To:       &to,
 		Gas:      gasLimit,
-		Value:    value.Bytes(),
-		GasPrice: gasPrice.Bytes(),
+		Value:    value,
+		GasPrice: gasPrice,
 		Nonce:    nonce,
 		V:        1, // it is necessary to encode in rlp
 	}

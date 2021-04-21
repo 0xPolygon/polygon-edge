@@ -8,8 +8,8 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.StatusResp, error) {
-	resp := &proto.StatusResp{
+func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
+	resp := &proto.TxnPoolStatusResp{
 		Length: t.sorted.Length(),
 	}
 	return resp, nil

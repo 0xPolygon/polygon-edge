@@ -57,6 +57,15 @@ func (t *Block) MarshalJSON() ([]byte, error) {
 	o.Set("difficulty", a.NewString(fmt.Sprintf("0x%x", t.Difficulty)))
 	o.Set("extraData", a.NewString("0x"+hex.EncodeToString(t.ExtraData)))
 
+	// uncles
+	if len(t.Uncles) != 0 {
+		uncles := a.NewArray()
+		for indx, uncle := range t.Uncles {
+			uncles.SetArrayItem(indx, a.NewString(uncle.String()))
+		}
+		o.Set("uncles", uncles)
+	}
+
 	res := o.MarshalTo(nil)
 	defaultArena.Put(a)
 	return res, nil
@@ -67,17 +76,22 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 	a := defaultArena.Get()
 
 	o := a.NewObject()
+	o.Set("hash", a.NewString(t.Hash.String()))
 	o.Set("from", a.NewString(t.From.String()))
-	if t.To != "" {
-		o.Set("to", a.NewString(t.To))
+	if t.To != nil {
+		o.Set("to", a.NewString(t.To.String()))
 	}
 	if len(t.Input) != 0 {
 		o.Set("input", a.NewString("0x"+hex.EncodeToString(t.Input)))
 	}
-	o.Set("gasPrice", a.NewString(fmt.Sprintf("0x%x", t.GasPrice)))
-	o.Set("gas", a.NewString(fmt.Sprintf("0x%x", t.Gas)))
 	if t.Value != nil {
 		o.Set("value", a.NewString(fmt.Sprintf("0x%x", t.Value)))
+	}
+	o.Set("gasPrice", a.NewString(fmt.Sprintf("0x%x", t.GasPrice)))
+	o.Set("gas", a.NewString(fmt.Sprintf("0x%x", t.Gas)))
+	if t.Nonce != 0 {
+		// we can remove this once we include support for custom nonces
+		o.Set("nonce", a.NewString(fmt.Sprintf("0x%x", t.Nonce)))
 	}
 
 	res := o.MarshalTo(nil)

@@ -3,8 +3,8 @@ package command
 import (
 	"context"
 
-	"github.com/0xPolygon/minimal/consensus/ibft2/proto"
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft2/proto"
+	"github.com/0xPolygon/minimal/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -60,7 +60,7 @@ func (p *IbftPropose) Run(args []string) int {
 		return 1
 	}
 
-	clt := ibftOp.NewOperatorClient(conn)
+	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
 		Auth:    add,

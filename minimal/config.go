@@ -9,8 +9,6 @@ import (
 
 // Config is used to parametrize the minimal client
 type Config struct {
-	ConsensusConfig map[string]interface{}
-
 	Chain *chain.Chain
 
 	JSONRPCAddr *net.TCPAddr
@@ -24,9 +22,8 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		JSONRPCAddr:     &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545},
-		GRPCAddr:        &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9632},
-		Network:         network.DefaultConfig(),
-		ConsensusConfig: map[string]interface{}{},
+		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545},
+		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9632},
+		Network:     network.DefaultConfig(),
 	}
 }
