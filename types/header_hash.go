@@ -29,5 +29,6 @@ func defHeaderHash(h *Header) (hash Hash) {
 // ComputeHash computes the hash of the header
 func (h *Header) ComputeHash() *Header {
 	h.Hash = HeaderHash(h)
+
 	return h
 }

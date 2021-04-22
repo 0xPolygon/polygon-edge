@@ -5,7 +5,14 @@ import (
 
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/testutil"
+)
+
+// TODO Fix undefined addresses below
+var (
+	addr0 web3.Address
+	addr1 web3.Address
 )
 
 func TestEncoding(t *testing.T) {
