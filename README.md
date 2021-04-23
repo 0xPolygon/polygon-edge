@@ -120,7 +120,7 @@ $ Done!
 Generate an ibft genesis file with the previous accounts as validators
 
 ```
-$ go run main.go genesis --ibft --ibft-validators-prefix-path test-chain-
+$ go run main.go genesis --consensus ibft --ibft-validators-prefix-path test-chain-
 ```
 
 Run all the clients.
