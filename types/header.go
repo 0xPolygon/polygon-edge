@@ -6,30 +6,32 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 )
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash   Hash     `json:"parentHash" db:"parent_hash"`
-	Sha3Uncles   Hash     `json:"sha3Uncles" db:"sha3_uncles"`
-	Miner        Address  `json:"miner" db:"miner"`
-	StateRoot    Hash     `json:"stateRoot" db:"state_root"`
-	TxRoot       Hash     `json:"transactionsRoot" db:"transactions_root"`
-	ReceiptsRoot Hash     `json:"receiptsRoot" db:"receipts_root"`
-	LogsBloom    Bloom    `json:"logsBloom" db:"logs_bloom"`
-	Difficulty   uint64   `json:"difficulty" db:"difficulty"`
-	Number       uint64   `json:"number" db:"number"`
-	GasLimit     uint64   `json:"gasLimit" db:"gas_limit"`
-	GasUsed      uint64   `json:"gasUsed" db:"gas_used"`
-	Timestamp    uint64   `json:"timestamp" db:"timestamp"`
-	ExtraData    HexBytes `json:"extraData" db:"extradata"`
-	MixHash      Hash     `json:"mixHash" db:"mixhash"`
-	Nonce        Nonce    `json:"nonce" db:"nonce"`
+	ParentHash   Hash
+	Sha3Uncles   Hash
+	Miner        Address
+	StateRoot    Hash
+	TxRoot       Hash
+	ReceiptsRoot Hash
+	LogsBloom    Bloom
+	Difficulty   uint64
+	Number       uint64
+	GasLimit     uint64
+	GasUsed      uint64
+	Timestamp    uint64
+	ExtraData    []byte
+	MixHash      Hash
+	Nonce        Nonce
 	Hash         Hash
+}
+
+func (h *Header) Equal(hh *Header) bool {
+	return h.Hash == hh.Hash
 }
 
 func (h *Header) HasBody() bool {
@@ -63,21 +65,6 @@ func (n *Nonce) Scan(src interface{}) error {
 // MarshalText implements encoding.TextMarshaler
 func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
-}
-
-var marshalArenaPool fastrlp.ArenaPool
-
-// ComputeHash computes the hash of the header
-func (h *Header) ComputeHash() *Header {
-	ar := marshalArenaPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
-
-	v := h.MarshalRLPWith(ar)
-	hash.WriteRlp(h.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
-	return h
 }
 
 func (h *Header) Copy() *Header {

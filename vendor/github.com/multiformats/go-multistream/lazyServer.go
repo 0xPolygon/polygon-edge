@@ -33,5 +33,19 @@ func (l *lazyServerConn) Read(b []byte) (int, error) {
 }
 
 func (l *lazyServerConn) Close() error {
+	// As the server, we MUST flush the handshake on close. Otherwise, if
+	// the other side is actually waiting for our close (i.e., reading until
+	// EOF), they may get an error even though we received the request.
+	//
+	// However, we MUST NOT return any errors from Flush. The initiator may
+	// have already closed their side for reading. Basically, _we_ don't
+	// care about the outcome of this flush, only the other side does.
+	_ = l.Flush()
 	return l.con.Close()
+}
+
+// Flush sends the handshake.
+func (l *lazyServerConn) Flush() error {
+	l.waitForHandshake.Do(func() { panic("didn't initiate handshake") })
+	return l.werr
 }

@@ -2,59 +2,47 @@ package minimal
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
-	"github.com/0xPolygon/minimal/blockchain/storage/leveldb"
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/minimal/keystore"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/protocol"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 
-	"github.com/armon/go-metrics"
-	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	ma "github.com/multiformats/go-multiaddr"
 	"google.golang.org/grpc"
 
-	libp2pgrpc "github.com/0xPolygon/minimal/helper/grpc"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
 	"github.com/0xPolygon/minimal/state/runtime/evm"
 	"github.com/0xPolygon/minimal/state/runtime/precompiled"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/sealer"
 )
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
 	logger hclog.Logger
 	config *Config
-	Sealer *sealer.Sealer
 	state  state.State
 
 	consensus consensus.Consensus
 
 	// blockchain stack
 	blockchain *blockchain.Blockchain
-	storage    storage.Storage
+	chain      *chain.Chain
 
-	key       *ecdsa.PrivateKey
-	chain     *chain.Chain
-	InmemSink *metrics.InmemSink
-	devMode   bool
+	// state executor
+	executor *state.Executor
 
 	// jsonrpc stack
 	jsonrpcServer *jsonrpc.JSONRPC
@@ -62,13 +50,11 @@ type Server struct {
 	// system grpc server
 	grpcServer *grpc.Server
 
-	// libp2p stack
-	host         host.Host
-	libp2pServer *libp2pgrpc.GRPCProtocol
-	addrs        []ma.Multiaddr
+	// libp2p network
+	network *network.Server
 
-	// syncer protocol
-	syncer *protocol.Syncer
+	// transaction pool
+	txpool *txpool.TxPool
 }
 
 var dirPaths = []string{
@@ -76,13 +62,13 @@ var dirPaths = []string{
 	"consensus",
 	"keystore",
 	"trie",
+	"libp2p",
 }
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger: logger,
-		config: config,
-		// backends:   []protocol.Backend{},
+		logger:     logger,
+		config:     config,
 		chain:      config.Chain,
 		grpcServer: grpc.NewServer(),
 	}
@@ -90,29 +76,24 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := setupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
-	// Get the private key for the node
-	keystore := keystore.NewLocalKeystore(filepath.Join(config.DataDir, "keystore"))
-	key, err := keystore.Get()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %v", err)
-	}
-	m.key = key
+	// start libp2p
+	{
+		netConfig := config.Network
+		netConfig.Chain = m.config.Chain
+		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 
-	storage, err := leveldb.NewLevelDBStorage(filepath.Join(config.DataDir, "blockchain"), logger)
-	if err != nil {
-		return nil, err
-	}
-	m.storage = storage
-
-	// Setup consensus
-	if err := m.setupConsensus(); err != nil {
-		return nil, err
+		network, err := network.NewServer(logger, netConfig)
+		if err != nil {
+			return nil, err
+		}
+		m.network = network
 	}
 
+	// start blockchain object
 	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(m.config.DataDir, "trie"), logger)
 	if err != nil {
 		return nil, err
@@ -121,27 +102,49 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	executor := state.NewExecutor(config.Chain.Params, st)
-	executor.SetRuntime(precompiled.NewPrecompiled())
-	executor.SetRuntime(evm.NewEVM())
+	m.executor = state.NewExecutor(config.Chain.Params, st)
+	m.executor.SetRuntime(precompiled.NewPrecompiled())
+	m.executor.SetRuntime(evm.NewEVM())
+
+	// compute the genesis root state
+	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, storage, config.Chain, m.consensus, executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
 	if err != nil {
 		return nil, err
 	}
 
-	executor.GetHash = m.blockchain.GetHashHelper
+	m.executor.GetHash = m.blockchain.GetHashHelper
 
-	// Setup sealer
-	sealerConfig := &sealer.Config{
-		Coinbase: crypto.PubKeyToAddress(&m.key.PublicKey),
+	{
+		hub := &txpoolHub{
+			state:      m.state,
+			Blockchain: m.blockchain,
+		}
+		// start transaction pool
+		if m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, hub, m.grpcServer, m.network); err != nil {
+			return nil, err
+		}
+
+		// use the eip155 signer
+		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+		m.txpool.AddSigner(signer)
 	}
-	m.Sealer = sealer.NewSealer(sealerConfig, logger, m.blockchain, m.consensus, executor)
-	m.Sealer.SetEnabled(m.config.Seal)
 
-	// setup libp2p server
-	if err := m.setupLibP2P(); err != nil {
+	{
+		// Setup consensus
+		if err := m.setupConsensus(); err != nil {
+			return nil, err
+		}
+		m.blockchain.SetConsensus(m.consensus)
+	}
+
+	// after consensus is done, we can mine the genesis block in blockchain
+	// This is done because consensus might use a custom Hash function so we need
+	// to wait for consensus because we do any block hashing like genesis
+	if err := m.blockchain.ComputeGenesis(); err != nil {
 		return nil, err
 	}
 
@@ -155,16 +158,32 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup syncer protocol
-	m.syncer = protocol.NewSyncer(logger, m.blockchain)
-	m.syncer.Register(m.libp2pServer.GetGRPCServer())
-	m.syncer.Start()
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
 
-	// register the libp2p GRPC endpoints
-	proto.RegisterHandshakeServer(m.libp2pServer.GetGRPCServer(), &handshakeService{s: m})
-
-	m.libp2pServer.Serve()
 	return m, nil
+}
+
+type txpoolHub struct {
+	state state.State
+	*blockchain.Blockchain
+}
+
+func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
+	snap, err := t.state.NewSnapshotAt(root)
+	if err != nil {
+		return 0
+	}
+	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
+	if !ok {
+		return 0
+	}
+	var account state.Account
+	if err := account.UnmarshalRlp(result); err != nil {
+		return 0
+	}
+	return account.Nonce
 }
 
 func (s *Server) setupConsensus() error {
@@ -174,13 +193,16 @@ func (s *Server) setupConsensus() error {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
 
+	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
+	if !ok {
+		engineConfig = map[string]interface{}{}
+	}
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
-		Config: s.config.ConsensusConfig,
+		Config: engineConfig,
+		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	config.Config["path"] = filepath.Join(s.config.DataDir, "consensus")
-
-	consensus, err := engine(context.Background(), config, s.key, s.storage, s.logger)
+	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -192,16 +214,19 @@ type jsonRPCHub struct {
 	state state.State
 
 	*blockchain.Blockchain
-	*sealer.Sealer
+	*txpool.TxPool
 	*state.Executor
 }
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
+	// the values in the trie are the hashed objects of the keys
+	key := keccak.Keccak256(nil, slot)
+
 	snap, err := j.state.NewSnapshotAt(root)
 	if err != nil {
 		return nil, err
 	}
-	result, ok := snap.Get(slot)
+	result, ok := snap.Get(key)
 	if !ok {
 		return nil, fmt.Errorf("error getting storage snapshot")
 	}
@@ -222,43 +247,35 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	account, err := j.GetAccount(root, addr)
-
 	if err != nil {
 		return nil, err
 	}
 
 	obj, err := j.getState(account.Root, slot.Bytes())
-
 	if err != nil {
 		return nil, err
 	}
-
 	return obj, nil
 }
 
 func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	res, ok := j.state.GetCode(hash)
-
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")
 	}
-
 	return res, nil
 }
 
 func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
 	transition, err := j.BeginTxn(header.StateRoot, header)
-
 	if err != nil {
 		return nil, false, err
 	}
 
 	_, failed, err := transition.Apply(txn)
-
 	if err != nil {
 		return nil, false, err
 	}
-
 	return transition.ReturnValue(), failed, nil
 }
 
@@ -266,8 +283,8 @@ func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
 		state:      s.state,
 		Blockchain: s.blockchain,
-		Sealer:     s.Sealer,
-		Executor:   s.blockchain.Executor(),
+		TxPool:     s.txpool,
+		Executor:   s.executor,
 	}
 
 	conf := &jsonrpc.Config{
@@ -284,8 +301,6 @@ func (s *Server) setupJSONRPC() error {
 }
 
 func (s *Server) setupGRPC() error {
-	s.grpcServer = grpc.NewServer()
-
 	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
@@ -308,55 +323,16 @@ func (s *Server) Chain() *chain.Chain {
 	return s.chain
 }
 
-func (s *Server) Join(addr0 string) error {
-	s.logger.Info("[INFO]: Join peer", "addr", addr0)
-
-	// add peer to the libp2p peerstore
-	peerID, err := s.AddPeerFromMultiAddrString(addr0)
-	if err != nil {
-		return err
-	}
-
-	// perform handshake protocol
-	conn, err := s.dial(peerID)
-	if err != nil {
-		return err
-	}
-	clt := proto.NewHandshakeClient(conn)
-
-	req := &proto.HelloReq{
-		Id: s.host.ID().String(),
-	}
-	if _, err := clt.Hello(context.Background(), req); err != nil {
-		return err
-	}
-
-	// send the connection to the syncer
-	go s.syncer.HandleUser(peerID, conn)
-
-	return nil
-}
-
-func (s *Server) handleConnUser(addr string) {
-	// we are already connected with libp2p
-	peerID, err := peer.Decode(addr)
-	if err != nil {
-		panic(err)
-	}
-
-	// perform handshake protocol
-	conn, err := s.dial(peerID)
-	if err != nil {
-		panic(err)
-	}
-	go s.syncer.HandleUser(peerID, conn)
+func (s *Server) Join(addr0 string, dur time.Duration) error {
+	return s.network.JoinAddr(addr0, dur)
 }
 
 func (s *Server) Close() {
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
-	s.host.Close()
+	s.network.Close()
+	s.consensus.Close()
 }
 
 // Entry is a backend configuration entry
@@ -383,7 +359,7 @@ func addPath(paths []string, path string, entries map[string]*Entry) []string {
 	return newpath
 }
 
-func setupDataDir(dataDir string, paths []string) error {
+func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
 	}
@@ -415,26 +391,4 @@ func getSingleKey(i map[string]*Entry) string {
 		return k
 	}
 	panic("internal. key not found")
-}
-
-func (s *Server) startTelemetry() error {
-	s.InmemSink = metrics.NewInmemSink(10*time.Second, time.Minute)
-	metrics.DefaultInmemSignal(s.InmemSink)
-
-	metricsConf := metrics.DefaultConfig("minimal")
-	metricsConf.EnableHostnameLabel = false
-	metricsConf.HostName = ""
-
-	var sinks metrics.FanoutSink
-
-	prom, err := prometheus.NewPrometheusSink()
-	if err != nil {
-		return err
-	}
-
-	sinks = append(sinks, prom)
-	sinks = append(sinks, s.InmemSink)
-
-	metrics.NewGlobal(metricsConf, sinks)
-	return nil
 }

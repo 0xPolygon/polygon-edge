@@ -22,8 +22,11 @@ type blockchainInterface interface {
 	// Header returns the current header of the chain (genesis if empty)
 	Header() *types.Header
 
-	// GetReceiptsByHash returns the receipts for a hash
+	// GetReceiptsByHash returns the receipts for a block hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+
+	// ReadTxLookup returns a block hash in which a given txn was mined
+	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
 
 	// SubscribeEvents subscribes for chain head events
 	SubscribeEvents() blockchain.Subscription
@@ -40,8 +43,14 @@ type blockchainInterface interface {
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 
+	// GetBlockByNumber returns a block using the provided number
+	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
+
 	// ApplyTxn applies a transaction object to the blockchain
 	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+
+	// GetNonce returns the next nonce for this address
+	GetNonce(addr types.Address) (uint64, bool)
 
 	stateHelperInterface
 }
@@ -49,8 +58,16 @@ type blockchainInterface interface {
 type nullBlockchainInterface struct {
 }
 
+func (b *nullBlockchainInterface) GetNonce(addr types.Address) (uint64, bool) {
+	return 0, false
+}
+
 func (b *nullBlockchainInterface) Header() *types.Header {
 	return nil
+}
+
+func (b *nullBlockchainInterface) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
+	return types.Hash{}, false
 }
 
 func (b *nullBlockchainInterface) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
@@ -83,4 +100,24 @@ func (b *nullBlockchainInterface) BeginTxn(parentRoot types.Hash, header *types.
 
 func (b *nullBlockchainInterface) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
 	return nil, false
+}
+
+func (b *nullBlockchainInterface) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+	return nil, false, nil
+}
+
+func (b *nullBlockchainInterface) GetCode(hash types.Hash) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *nullBlockchainInterface) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	return nil, nil
 }

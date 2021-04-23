@@ -1,11 +1,9 @@
 package blockchain
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/state"
 	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
@@ -14,33 +12,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/0xPolygon/minimal/types/buildroot"
 )
-
-type fakeConsensus struct {
-}
-
-func (f *fakeConsensus) VerifyHeader(parent, header *types.Header, uncle, seal bool) error {
-	return nil
-}
-
-func (f *fakeConsensus) Author(header *types.Header) (types.Address, error) {
-	return types.Address{}, nil
-}
-
-func (f *fakeConsensus) Prepare(header *types.Header) error {
-	return nil
-}
-
-func (f *fakeConsensus) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
-	return nil, nil
-}
-
-func (f *fakeConsensus) Finalize(txn *state.Txn, block *types.Block) error {
-	return nil
-}
-
-func (f *fakeConsensus) Close() error {
-	return nil
-}
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
 func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
@@ -130,9 +101,9 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 		t0 := &types.Transaction{
 			Nonce:    uint64(i),
 			To:       &addr0,
-			Value:    big.NewInt(0).Bytes(),
+			Value:    big.NewInt(0),
 			Gas:      0,
-			GasPrice: big.NewInt(0).Bytes(),
+			GasPrice: big.NewInt(0),
 			Input:    header.Hash.Bytes(),
 			V:        0x27,
 		}
@@ -142,8 +113,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 		// -- receipts --
 		r0 := &types.Receipt{
-			GasUsed:           uint64(i),
-			TxHash:            t0.Hash,
+			GasUsed: uint64(i),
+			//TxHash:            t0.Hash,
 			CumulativeGasUsed: uint64(i), // this value changes the rlpHash
 		}
 		localReceipts := []*types.Receipt{r0}
@@ -170,28 +141,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 	return headers, blocks, receipts
 }
 
-// NewTestBlockchainWithBlocks creates a dummy blockchain with headers, bodies and receipts
-func NewTestBlockchainWithBlocks(t *testing.T, blocks []*types.Block, receipts [][]*types.Receipt) *Blockchain {
-	headers := []*types.Header{}
-	for _, block := range blocks {
-		headers = append(headers, block.Header)
-	}
-
-	b := NewTestBlockchain(t, headers)
-	if err := b.CommitChain(blocks, receipts); err != nil {
-		t.Fatal(err)
-	}
-
-	return b
-}
-
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
-	s, err := memory.NewMemoryStorage(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	genesis := &chain.Genesis{
 		Number:   0,
 		GasLimit: 0,
@@ -207,7 +158,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b, err := NewBlockchain(hclog.NewNullLogger(), s, config, &fakeConsensus{}, state.NewExecutor(config.Params, st))
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, state.NewExecutor(config.Params, st))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,4 +189,32 @@ func createGenesis(header *types.Header) *chain.Genesis {
 		Timestamp:  header.Timestamp,
 	}
 	return genesis
+}
+
+type MockVerifier struct {
+}
+
+func (m *MockVerifier) VerifyHeader(parent, header *types.Header) error {
+	return nil
+}
+
+type mockExecutor struct {
+}
+
+func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*state.BlockResult, error) {
+	return &state.BlockResult{}, nil
+}
+
+func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
+	if genesis == nil {
+		genesis = &chain.Genesis{}
+	}
+	config := &chain.Chain{
+		Genesis: genesis,
+	}
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, &mockExecutor{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

@@ -37,6 +37,7 @@ func Commands() map[string]cli.CommandFactory {
 				UI: ui,
 			}, nil
 		},
+		// ---- peers commands ----
 		"peers add": func() (cli.Command, error) {
 			return &PeersAdd{
 				Meta: meta,
@@ -52,6 +53,44 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
+		// ---- ibft commands ----
+		"ibft init": func() (cli.Command, error) {
+			return &IbftInit{
+				Meta: meta,
+			}, nil
+		},
+		"ibft snapshot": func() (cli.Command, error) {
+			return &IbftSnapshot{
+				Meta: meta,
+			}, nil
+		},
+		"ibft candidates": func() (cli.Command, error) {
+			return &IbftCandidates{
+				Meta: meta,
+			}, nil
+		},
+		"ibft propose": func() (cli.Command, error) {
+			return &IbftPropose{
+				Meta: meta,
+			}, nil
+		},
+		"ibft status": func() (cli.Command, error) {
+			return &IbftStatus{
+				Meta: meta,
+			}, nil
+		},
+		// ---- txpool ----
+		"txpool add": func() (cli.Command, error) {
+			return &TxPoolAdd{
+				Meta: meta,
+			}, nil
+		},
+		"txpool status": func() (cli.Command, error) {
+			return &TxPoolStatus{
+				Meta: meta,
+			}, nil
+		},
+		// ---- blockchain commands ----
 		"status": func() (cli.Command, error) {
 			return &StatusCommand{
 				Meta: meta,

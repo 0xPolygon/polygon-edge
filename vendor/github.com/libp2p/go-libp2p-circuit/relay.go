@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-circuit/pb"
 
-	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -52,6 +52,10 @@ type Relay struct {
 	// atomic counters
 	streamCount  int32
 	liveHopCount int32
+
+	// per peer hop counters
+	mx       sync.Mutex
+	hopCount map[peer.ID]int
 }
 
 // RelayOpts are options for configuring the relay transport.
@@ -94,6 +98,7 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 		ctx:      ctx,
 		self:     h.ID(),
 		incoming: make(chan *Conn),
+		hopCount: make(map[peer.ID]int),
 	}
 
 	for _, opt := range opts {
@@ -186,7 +191,7 @@ func (r *Relay) DialPeer(ctx context.Context, relay peer.AddrInfo, dest peer.Add
 		return nil, RelayError{msg.GetCode()}
 	}
 
-	return &Conn{stream: s, remote: dest, host: r.host}, nil
+	return &Conn{stream: s, remote: dest, host: r.host, relay: r}, nil
 }
 
 func (r *Relay) Matches(addr ma.Multiaddr) bool {
@@ -201,6 +206,7 @@ func CanHop(ctx context.Context, host host.Host, id peer.ID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer s.Close()
 
 	rd := newDelimitedReader(s, maxMessageSize)
 	wr := newDelimitedWriter(s)
@@ -219,9 +225,6 @@ func CanHop(ctx context.Context, host host.Host, id peer.ID) (bool, error) {
 
 	if err := rd.ReadMsg(&msg); err != nil {
 		s.Reset()
-		return false, err
-	}
-	if err := helpers.FullClose(s); err != nil {
 		return false, err
 	}
 
@@ -258,7 +261,7 @@ func (r *Relay) handleNewStream(s network.Stream) {
 	case pb.CircuitRelay_CAN_HOP:
 		r.handleCanHop(s, &msg)
 	default:
-		log.Warningf("unexpected relay handshake: %d", msg.GetType())
+		log.Warnf("unexpected relay handshake: %d", msg.GetType())
 		r.handleError(s, pb.CircuitRelay_MALFORMED_MESSAGE)
 	}
 }
@@ -274,7 +277,7 @@ func (r *Relay) handleHopStream(s network.Stream, msg *pb.CircuitRelay) {
 	defer atomic.AddInt32(&r.streamCount, -1)
 
 	if (streamCount + liveHopCount) > int32(HopStreamLimit) {
-		log.Warning("hop stream limit exceeded; resetting stream")
+		log.Warn("hop stream limit exceeded; resetting stream")
 		s.Reset()
 		return
 	}
@@ -384,6 +387,8 @@ func (r *Relay) handleHopStream(s network.Stream, msg *pb.CircuitRelay) {
 	*goroutines = 2
 	done := func() {
 		if atomic.AddInt32(goroutines, -1) == 0 {
+			s.Close()
+			bs.Close()
 			r.rmLiveHop(src.ID, dst.ID)
 		}
 	}
@@ -404,7 +409,7 @@ func (r *Relay) handleHopStream(s network.Stream, msg *pb.CircuitRelay) {
 			bs.Reset()
 		} else {
 			// propagate the close
-			s.Close()
+			s.CloseWrite()
 		}
 		log.Debugf("relayed %d bytes from %s to %s", count, dst.ID.Pretty(), src.ID.Pretty())
 	}()
@@ -423,7 +428,7 @@ func (r *Relay) handleHopStream(s network.Stream, msg *pb.CircuitRelay) {
 			s.Reset()
 		} else {
 			// propagate the close
-			bs.Close()
+			bs.CloseWrite()
 		}
 		log.Debugf("relayed %d bytes from %s to %s", count, src.ID.Pretty(), dst.ID.Pretty())
 	}()
@@ -449,7 +454,7 @@ func (r *Relay) handleStopStream(s network.Stream, msg *pb.CircuitRelay) {
 	}
 
 	select {
-	case r.incoming <- &Conn{stream: s, remote: src, host: r.host}:
+	case r.incoming <- &Conn{stream: s, remote: src, host: r.host, relay: r}:
 	case <-time.After(RelayAcceptTimeout):
 		r.handleError(s, pb.CircuitRelay_STOP_RELAY_REFUSED)
 	}
@@ -468,18 +473,18 @@ func (r *Relay) handleCanHop(s network.Stream, msg *pb.CircuitRelay) {
 		s.Reset()
 		log.Debugf("error writing relay response: %s", err.Error())
 	} else {
-		helpers.FullClose(s)
+		s.Close()
 	}
 }
 
 func (r *Relay) handleError(s network.Stream, code pb.CircuitRelay_Status) {
-	log.Warningf("relay error: %s (%d)", pb.CircuitRelay_Status_name[int32(code)], code)
+	log.Warnf("relay error: %s (%d)", pb.CircuitRelay_Status_name[int32(code)], code)
 	err := r.writeResponse(s, code)
 	if err != nil {
 		s.Reset()
 		log.Debugf("error writing relay response: %s", err.Error())
 	} else {
-		helpers.FullClose(s)
+		s.Close()
 	}
 }
 

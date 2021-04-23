@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/txpool/proto";
+
+import "google/protobuf/any.proto";
+
+message Txn {
+    google.protobuf.Any raw = 1;
+}

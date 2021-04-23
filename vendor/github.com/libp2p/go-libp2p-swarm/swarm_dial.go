@@ -10,11 +10,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/transport"
+
+	addrutil "github.com/libp2p/go-addr-util"
 	lgbl "github.com/libp2p/go-libp2p-loggables"
 
 	logging "github.com/ipfs/go-log"
-	addrutil "github.com/libp2p/go-addr-util"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // Diagram of dial sync:
@@ -50,6 +52,10 @@ var (
 	// ErrNoGoodAddresses is returned when we find addresses for a peer but
 	// can't use any of them.
 	ErrNoGoodAddresses = errors.New("no good addresses")
+
+	// ErrGaterDisallowedConnection is returned when the gater prevents us from
+	// forming a connection with a peer.
+	ErrGaterDisallowedConnection = errors.New("gater disallows connection to peer")
 )
 
 // DialAttempts governs how many times a goroutine will try to dial a given peer.
@@ -218,6 +224,11 @@ func (db *DialBackoff) cleanup() {
 // This allows us to use various transport protocols, do NAT traversal/relay,
 // etc. to achieve connection.
 func (s *Swarm) DialPeer(ctx context.Context, p peer.ID) (network.Conn, error) {
+	if s.gater != nil && !s.gater.InterceptPeerDial(p) {
+		log.Debugf("gater disallowed outbound connection to peer %s", p.Pretty())
+		return nil, &DialError{Peer: p, Cause: ErrGaterDisallowedConnection}
+	}
+
 	return s.dialPeer(ctx, p)
 }
 
@@ -328,38 +339,68 @@ func (s *Swarm) dial(ctx context.Context, p peer.ID) (*Conn, error) {
 	}
 
 	//////
-	/*
-		This slice-to-chan code is temporary, the peerstore can currently provide
-		a channel as an interface for receiving addresses, but more thought
-		needs to be put into the execution. For now, this allows us to use
-		the improved rate limiter, while maintaining the outward behaviour
-		that we previously had (halting a dial when we run out of addrs)
-	*/
 	peerAddrs := s.peers.Addrs(p)
 	if len(peerAddrs) == 0 {
 		return nil, &DialError{Peer: p, Cause: ErrNoAddresses}
 	}
-	goodAddrs := s.filterKnownUndialables(peerAddrs)
+	goodAddrs := s.filterKnownUndialables(p, peerAddrs)
 	if len(goodAddrs) == 0 {
 		return nil, &DialError{Peer: p, Cause: ErrNoGoodAddresses}
 	}
-	goodAddrsChan := make(chan ma.Multiaddr, len(goodAddrs))
-	nonBackoff := false
+
+	/////// Check backoff andnRank addresses
+	var nonBackoff bool
 	for _, a := range goodAddrs {
 		// skip addresses in back-off
 		if !s.backf.Backoff(p, a) {
 			nonBackoff = true
-			goodAddrsChan <- a
 		}
 	}
-	close(goodAddrsChan)
 	if !nonBackoff {
 		return nil, ErrDialBackoff
 	}
-	/////////
 
-	// try to get a connection to any addr
-	connC, dialErr := s.dialAddrs(ctx, p, goodAddrsChan)
+	// ranks addresses in descending order of preference for dialing
+	// Private UDP > Public UDP > Private TCP > Public TCP > UDP Relay server > TCP Relay server
+	rankAddrsFnc := func(addrs []ma.Multiaddr) []ma.Multiaddr {
+		var localUdpAddrs []ma.Multiaddr // private udp
+		var relayUdpAddrs []ma.Multiaddr // relay udp
+		var othersUdp []ma.Multiaddr     // public udp
+
+		var localFdAddrs []ma.Multiaddr // private fd consuming
+		var relayFdAddrs []ma.Multiaddr //  relay fd consuming
+		var othersFd []ma.Multiaddr     // public fd consuming
+
+		for _, a := range addrs {
+			if _, err := a.ValueForProtocol(ma.P_CIRCUIT); err == nil {
+				if s.IsFdConsumingAddr(a) {
+					relayFdAddrs = append(relayFdAddrs, a)
+					continue
+				}
+				relayUdpAddrs = append(relayUdpAddrs, a)
+			} else if manet.IsPrivateAddr(a) {
+				if s.IsFdConsumingAddr(a) {
+					localFdAddrs = append(localFdAddrs, a)
+					continue
+				}
+				localUdpAddrs = append(localUdpAddrs, a)
+			} else {
+				if s.IsFdConsumingAddr(a) {
+					othersFd = append(othersFd, a)
+					continue
+				}
+				othersUdp = append(othersUdp, a)
+			}
+		}
+
+		relays := append(relayUdpAddrs, relayFdAddrs...)
+		fds := append(localFdAddrs, othersFd...)
+
+		return append(append(append(localUdpAddrs, othersUdp...), fds...), relays...)
+	}
+
+	connC, dialErr := s.dialAddrs(ctx, p, rankAddrsFnc(goodAddrs))
+
 	if dialErr != nil {
 		logdial["error"] = dialErr.Cause.Error()
 		switch dialErr.Cause {
@@ -393,7 +434,7 @@ func (s *Swarm) dial(ctx context.Context, p peer.ID) (*Conn, error) {
 // IPv6 link-local addresses, addresses without a dial-capable transport,
 // and addresses that we know to be our own.
 // This is an optimization to avoid wasting time on dials that we know are going to fail.
-func (s *Swarm) filterKnownUndialables(addrs []ma.Multiaddr) []ma.Multiaddr {
+func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Multiaddr {
 	lisAddrs, _ := s.InterfaceListenAddresses()
 	var ourAddrs []ma.Multiaddr
 	for _, addr := range lisAddrs {
@@ -409,11 +450,29 @@ func (s *Swarm) filterKnownUndialables(addrs []ma.Multiaddr) []ma.Multiaddr {
 		s.canDial,
 		// TODO: Consider allowing link-local addresses
 		addrutil.AddrOverNonLocalIP,
-		addrutil.FilterNeg(s.Filters.AddrBlocked),
+		func(addr ma.Multiaddr) bool {
+			return s.gater == nil || s.gater.InterceptAddrDial(p, addr)
+		},
 	)
 }
 
-func (s *Swarm) dialAddrs(ctx context.Context, p peer.ID, remoteAddrs <-chan ma.Multiaddr) (transport.CapableConn, *DialError) {
+func (s *Swarm) dialAddrs(ctx context.Context, p peer.ID, remoteAddrs []ma.Multiaddr) (transport.CapableConn, *DialError) {
+	/*
+		This slice-to-chan code is temporary, the peerstore can currently provide
+		a channel as an interface for receiving addresses, but more thought
+		needs to be put into the execution. For now, this allows us to use
+		the improved rate limiter, while maintaining the outward behaviour
+		that we previously had (halting a dial when we run out of addrs)
+	*/
+	var remoteAddrChan chan ma.Multiaddr
+	if len(remoteAddrs) > 0 {
+		remoteAddrChan = make(chan ma.Multiaddr, len(remoteAddrs))
+		for i := range remoteAddrs {
+			remoteAddrChan <- remoteAddrs[i]
+		}
+		close(remoteAddrChan)
+	}
+
 	log.Debugf("%s swarm dialing %s", s.local, p)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -427,7 +486,7 @@ func (s *Swarm) dialAddrs(ctx context.Context, p peer.ID, remoteAddrs <-chan ma.
 
 	var active int
 dialLoop:
-	for remoteAddrs != nil || active > 0 {
+	for remoteAddrChan != nil || active > 0 {
 		// Check for context cancellations and/or responses first.
 		select {
 		case <-ctx.Done():
@@ -453,9 +512,9 @@ dialLoop:
 
 		// Now, attempt to dial.
 		select {
-		case addr, ok := <-remoteAddrs:
+		case addr, ok := <-remoteAddrChan:
 			if !ok {
-				remoteAddrs = nil
+				remoteAddrChan = nil
 				continue
 			}
 
@@ -528,4 +587,25 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 
 	// success! we got one!
 	return connC, nil
+}
+
+// TODO We should have a `IsFdConsuming() bool` method on the `Transport` interface in go-libp2p-core/transport.
+// This function checks if any of the transport protocols in the address requires a file descriptor.
+// For now:
+// A Non-circuit address which has the TCP/UNIX protocol is deemed FD consuming.
+// For a circuit-relay address, we look at the address of the relay server/proxy
+// and use the same logic as above to decide.
+func (s *Swarm) IsFdConsumingAddr(addr ma.Multiaddr) bool {
+	first, _ := ma.SplitFunc(addr, func(c ma.Component) bool {
+		return c.Protocol().Code == ma.P_CIRCUIT
+	})
+
+	// for safety
+	if first == nil {
+		return true
+	}
+
+	_, err1 := first.ValueForProtocol(ma.P_TCP)
+	_, err2 := first.ValueForProtocol(ma.P_UNIX)
+	return err1 == nil || err2 == nil
 }

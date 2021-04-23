@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -9,31 +10,62 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/compiler"
+	"github.com/umbracle/go-web3/jsonrpc"
+	"github.com/umbracle/go-web3/testutil"
+	"golang.org/x/crypto/sha3"
+
+	"google.golang.org/grpc"
+
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/umbracle/go-web3/jsonrpc"
-	"google.golang.org/grpc"
 )
 
-type TestServerConfig struct {
-	JsonRPCPort  int64
-	GRPCPort     int64
-	LibP2PPort   int64
-	Seal         bool
-	DataDir      string
-	PremineAccts map[types.Address]*big.Int
+type SrvAccount struct {
+	Addr    types.Address
+	Balance *big.Int
 }
 
+// Configuration for the test server
+type TestServerConfig struct {
+	JsonRPCPort  int64         // The JSON RPC endpoint port
+	GRPCPort     int64         // The GRPC endpoint port
+	LibP2PPort   int64         // The Libp2p endpoint port
+	Seal         bool          // Flag indicating if blocks should be sealed
+	DataDir      string        // The directory for the data files
+	PremineAccts []*SrvAccount // Accounts with existing balances (genesis accounts)
+	DevMode      bool          // Toggles the dev mode
+}
+
+// CALLBACKS //
+
+// Premine callback specifies an account with a balance (in WEI)
 func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
-		t.PremineAccts = map[types.Address]*big.Int{}
+		t.PremineAccts = []*SrvAccount{}
 	}
-	t.PremineAccts[addr] = amount
+	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
+		Addr:    addr,
+		Balance: amount,
+	})
+}
+
+// SetDev callback toggles the dev mode
+func (t *TestServerConfig) SetDev(state bool) {
+	t.DevMode = state
+}
+
+// SetSeal callback toggles the seal mode
+func (t *TestServerConfig) SetSeal(state bool) {
+	t.Seal = state
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -48,22 +80,19 @@ func getOpenPort() int64 {
 type TestServer struct {
 	t *testing.T
 
-	config *TestServerConfig
+	Config *TestServerConfig
 	cmd    *exec.Cmd
 }
 
 func (t *TestServer) GrpcAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.config.GRPCPort)
+	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.GRPCPort)
 }
 
 func (t *TestServer) JsonRPCAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.config.JsonRPCPort)
+	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JsonRPCPort)
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	fmt.Println("////")
-	fmt.Println(t.JsonRPCAddr())
-
 	clt, err := jsonrpc.NewClient(t.JsonRPCAddr())
 	if err != nil {
 		t.t.Fatal(err)
@@ -72,7 +101,7 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 }
 
 func (t *TestServer) Operator() proto.SystemClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -85,15 +114,36 @@ func (t *TestServer) Stop() {
 	}
 }
 
+func NewTestServerFromGenesis(t *testing.T) *TestServer {
+	c, err := chain.ImportFromFile("../genesis.json")
+	assert.NoError(t, err)
+
+	config := &TestServerConfig{
+		PremineAccts: []*SrvAccount{},
+		JsonRPCPort:  8545,
+	}
+
+	for addr := range c.Genesis.Alloc {
+		config.PremineAccts = append(config.PremineAccts, &SrvAccount{Addr: addr})
+	}
+
+	srv := &TestServer{
+		Config: config,
+	}
+	return srv
+}
+
 func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer {
 	path := "polygon-sdk"
 
+	// Sets the services to start on open ports
 	config := &TestServerConfig{
 		JsonRPCPort: getOpenPort(),
 		GRPCPort:    getOpenPort(),
 		LibP2PPort:  getOpenPort(),
 	}
 
+	// Sets the data directory
 	dataDir, err := ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
 	if err != nil {
 		t.Fatal(err)
@@ -112,8 +162,8 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 			"--data-dir", dataDir,
 		}
 		// add premines
-		for addr, amount := range config.PremineAccts {
-			args = append(args, "--premine", addr.String()+":0x"+amount.Text(16))
+		for _, acct := range config.PremineAccts {
+			args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 		}
 
 		vcmd := exec.Command(path, args...)
@@ -143,10 +193,12 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 		args = append(args, "--seal")
 	}
 
+	if config.DevMode {
+		args = append(args, "--dev")
+	}
+
 	stdout := io.Writer(os.Stdout)
 	stderr := io.Writer(os.Stdout)
-
-	fmt.Println(strings.Join(args, " "))
 
 	// Start the server
 	cmd := exec.Command(path, args...)
@@ -158,7 +210,7 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 
 	srv := &TestServer{
 		t:      t,
-		config: config,
+		Config: config,
 		cmd:    cmd,
 	}
 
@@ -169,4 +221,87 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 		}
 	}
 	return srv
+}
+
+// DeployContract deploys a contract with account 0 and returns the address
+func (t *TestServer) DeployContract(c *testutil.Contract) (*compiler.Artifact, web3.Address) {
+	solcContract, err := c.Compile()
+	if err != nil {
+		panic(err)
+	}
+	buf, err := hex.DecodeString(solcContract.Bin)
+	if err != nil {
+		panic(err)
+	}
+	receipt, err := t.SendTxn(&web3.Transaction{
+		Input: buf,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return solcContract, receipt.ContractAddress
+}
+
+const (
+	DefaultGasPrice = 1879048192 // 0x70000000
+	DefaultGasLimit = 5242880    // 0x500000
+)
+
+var emptyAddr web3.Address
+
+func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
+	client := t.JSONRPC()
+
+	if txn.From == emptyAddr {
+		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
+	}
+	if txn.GasPrice == 0 {
+		txn.GasPrice = DefaultGasPrice
+	}
+	if txn.Gas == 0 {
+		txn.Gas = DefaultGasLimit
+	}
+	hash, err := client.Eth().SendTransaction(txn)
+	if err != nil {
+		return nil, err
+	}
+	var receipt *web3.Receipt
+	var count uint64
+	for {
+		receipt, err = client.Eth().GetTransactionReceipt(hash)
+		if err != nil {
+			if err.Error() != "not found" {
+				return nil, err
+			}
+		}
+		if receipt != nil {
+			break
+		}
+		if count > 5 {
+			return nil, fmt.Errorf("timeout")
+		}
+		time.Sleep(1 * time.Second)
+		count++
+	}
+	return receipt, nil
+}
+
+func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
+	sig := MethodSig(method)
+	receipt, err := t.SendTxn(&web3.Transaction{
+		To:    &address,
+		Input: sig,
+	})
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return receipt
+}
+
+// MethodSig returns the signature of a non-parametrized function
+func MethodSig(name string) []byte {
+	h := sha3.NewLegacyKeccak256()
+	h.Write([]byte(name + "()"))
+	b := h.Sum(nil)
+	return b[:4]
 }

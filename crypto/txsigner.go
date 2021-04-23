@@ -45,14 +45,14 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewCopyBytes(tx.GetGasPrice()))
+	v.Set(a.NewBigInt(tx.GasPrice))
 	v.Set(a.NewUint(tx.Gas))
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
 	}
-	v.Set(a.NewCopyBytes(tx.Value))
+	v.Set(a.NewBigInt(tx.Value))
 	v.Set(a.NewCopyBytes(tx.Input))
 
 	// EIP155
@@ -144,12 +144,25 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 }
 
 func (e *EIP155Signer) SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*types.Transaction, error) {
-	return nil, fmt.Errorf("not implemented")
+	tx = tx.Copy()
+
+	h := e.Hash(tx)
+
+	sig, err := Sign(priv, h[:])
+	if err != nil {
+		return nil, err
+	}
+
+	tx.R = sig[:32]
+	tx.S = sig[32:64]
+	tx.V = byte(sig[64]+35) + (byte(e.chainID) * 2)
+
+	return tx, nil
 }
 
 func encodeSignature(R, S []byte, V byte) ([]byte, error) {
 	if !ValidateSignatureValues(V, R, S) {
-		return nil, fmt.Errorf("invalid signature")
+		return nil, fmt.Errorf("invalid txn signature")
 	}
 
 	sig := make([]byte, 65)

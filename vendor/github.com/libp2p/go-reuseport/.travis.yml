@@ -4,13 +4,12 @@ os:
 language: go
 
 go:
-  - 1.11.x
+  - 1.13.x
 
 env:
   global:
     - GOTFLAGS="-race"
   matrix:
-    - BUILD_DEPTYPE=gx
     - BUILD_DEPTYPE=gomod
 
 
@@ -24,7 +23,6 @@ script:
 
 cache:
   directories:
-    - $GOPATH/src/gx
     - $GOPATH/pkg/mod
     - $HOME/.cache/go-build
 

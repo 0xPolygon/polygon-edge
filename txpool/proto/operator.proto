@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/txpool/proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+
+service TxnPoolOperator {
+    // Status returns the current status of the pool
+    rpc Status(google.protobuf.Empty) returns (TxnPoolStatusResp);
+
+    // AddTxn adds a local transaction to the pool
+    rpc AddTxn(AddTxnReq) returns (google.protobuf.Empty);
+
+    // Subscribe subscribes for new events in the txpool
+    rpc Subscribe(google.protobuf.Empty) returns (stream TxPoolEvent);
+}
+
+message AddTxnReq {
+    google.protobuf.Any raw = 1;
+    string from = 2;
+}
+
+message TxnPoolStatusResp {
+    uint64 length = 1;
+}
+
+message TxPoolEvent {
+
+}

@@ -8,7 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/minimal/blockchain/storage/memory"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -24,38 +25,6 @@ func TestGenesis(t *testing.T) {
 
 	header := b.Header()
 	assert.Equal(t, header.Hash, genesis.Hash)
-}
-
-func TestChainGenesis(t *testing.T) {
-	// Test chain genesis from json files
-	cases := []struct {
-		Name string
-		Root string
-		Hash string
-	}{
-		{
-			Name: "foundation",
-			Root: "0xd7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544",
-			Hash: "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.Name, func(t *testing.T) {
-			genesisConfig, err := chain.ImportFromName(c.Name)
-			assert.NoError(t, err)
-
-			b := NewTestBlockchain(t, nil)
-			assert.NoError(t, b.writeGenesis(genesisConfig.Genesis))
-
-			genesisHeader, ok := b.GetHeaderByNumber(0)
-			assert.True(t, ok)
-
-			root := genesisHeader.StateRoot.String()
-			assert.Equal(t, root, c.Root)
-			assert.Equal(t, genesisHeader.Hash.String(), c.Hash)
-		})
-	}
 }
 
 type dummyChain struct {
@@ -509,7 +478,9 @@ func TestInsertHeaders(t *testing.T) {
 			assert.Equal(t, head.Hash, expected.Hash)
 
 			forks, err := b.GetForks()
-			assert.NoError(t, err)
+			if err != nil && err != storage.ErrNotFound {
+				t.Fatal(err)
+			}
 
 			expectedForks := []types.Hash{}
 
@@ -563,27 +534,30 @@ func TestForkUnkwonParents(t *testing.T) {
 	assert.Error(t, b.WriteHeadersWithBodies([]*types.Header{h1[12]}))
 }
 
-func TestCommitChain(t *testing.T) {
-	// test if the data written in commitchain is retrieved correctly
+func TestBlockchainWriteBody(t *testing.T) {
+	storage, err := memory.NewMemoryStorage(nil)
+	assert.NoError(t, err)
 
-	headers, blocks, receipts := NewTestBodyChain(2)
-	b := NewTestBlockchain(t, headers)
-
-	// commit values to the chain, skip first block (genesis)
-	assert.NoError(t, b.CommitChain(blocks, receipts))
-
-	for i := 1; i < len(blocks); i++ {
-		block := blocks[i]
-
-		// check blocks
-		i, err := b.db.ReadBody(block.Hash())
-		assert.NoError(t, err)
-
-		assert.Len(t, i.Transactions, 1)
-		assert.Equal(t, i.Transactions[0].Nonce, block.Number())
-
-		// check receipts
-		r, _ := b.db.ReadReceipts(block.Hash())
-		assert.Len(t, r, 1)
+	b := &Blockchain{
+		db: storage,
 	}
+
+	block := &types.Block{
+		Header: &types.Header{},
+		Transactions: []*types.Transaction{
+			{
+				Value: big.NewInt(10),
+				V:     1,
+			},
+		},
+	}
+	block.Header.ComputeHash()
+
+	if err := b.writeBody(block); err != nil {
+		t.Fatal(err)
+	}
+
+	body, ok := b.readBody(block.Hash())
+	fmt.Println(body)
+	fmt.Println(ok)
 }

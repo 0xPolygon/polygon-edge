@@ -29,6 +29,7 @@
 #include <openssl/x509v3.h>
 #include <openssl/ec.h>
 
+
 #ifndef SSL_MODE_RELEASE_BUFFERS
 #define SSL_MODE_RELEASE_BUFFERS 0
 #endif
@@ -89,6 +90,8 @@ extern int X_SSL_CTX_set_tlsext_ticket_key_cb(SSL_CTX *sslctx,
 extern int X_SSL_CTX_ticket_key_cb(SSL *s, unsigned char key_name[16],
         unsigned char iv[EVP_MAX_IV_LENGTH],
         EVP_CIPHER_CTX *cctx, HMAC_CTX *hctx, int enc);
+extern int SSL_CTX_set_alpn_protos(SSL_CTX *ctx, const unsigned char *protos,
+                             unsigned int protos_len);
 
 /* BIO methods */
 extern int X_BIO_get_flags(BIO *b);
@@ -170,3 +173,10 @@ extern int X_X509_set_version(X509 *x, long version);
 
 /* PEM methods */
 extern int X_PEM_write_bio_PrivateKey_traditional(BIO *bio, EVP_PKEY *key, const EVP_CIPHER *enc, unsigned char *kstr, int klen, pem_password_cb *cb, void *u);
+
+/* Object methods */
+extern int OBJ_create(const char *oid,const char *sn,const char *ln);
+
+/* Extension helper method */
+extern const unsigned char * get_extention(X509 *x, int NID, int *data_len);
+extern int add_custom_ext(X509 *cert, int nid, char *value, int len);

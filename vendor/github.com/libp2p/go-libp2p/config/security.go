@@ -42,7 +42,7 @@ func SecurityConstructor(security interface{}) (SecC, error) {
 		return nil, err
 	}
 	return func(h host.Host) (sec.SecureTransport, error) {
-		t, err := ctor(h, nil)
+		t, err := ctor(h, nil, nil)
 		if err != nil {
 			return nil, err
 		}

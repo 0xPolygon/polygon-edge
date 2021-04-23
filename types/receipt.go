@@ -19,14 +19,17 @@ const (
 type Receipts []*Receipt
 
 type Receipt struct {
-	Root              Hash           `json:"root" db:"root"`
-	CumulativeGasUsed uint64         `json:"cumulativeGasUsed" db:"cumulative_gas_used"`
-	LogsBloom         Bloom          `json:"logsBloom" db:"bloom"`
-	Logs              []*Log         `json:"logs"`
-	Status            *ReceiptStatus `json:"status"`
-	TxHash            Hash           `json:"transactionHash" db:"txhash"`
-	ContractAddress   Address        `json:"contractAddress" db:"contract_address"`
-	GasUsed           uint64         `json:"gasUsed" db:"gas_used"`
+	// consensus fields
+	Root              Hash
+	CumulativeGasUsed uint64
+	LogsBloom         Bloom
+	Logs              []*Log
+	Status            *ReceiptStatus
+
+	// context fields
+	GasUsed         uint64
+	ContractAddress Address
+	TxHash          Hash
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {
@@ -34,9 +37,9 @@ func (r *Receipt) SetStatus(s ReceiptStatus) {
 }
 
 type Log struct {
-	Address Address  `json:"address"`
-	Topics  []Hash   `json:"topics"`
-	Data    HexBytes `json:"data"`
+	Address Address
+	Topics  []Hash
+	Data    []byte
 }
 
 const BloomByteLength = 256

@@ -8,16 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 
 	pb "github.com/libp2p/go-libp2p-autonat/pb"
 
-	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-msgio/protoio"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // AutoNATService provides NAT autodetection services to other peers
@@ -51,13 +50,13 @@ func newAutoNATService(ctx context.Context, c *config) (*autoNATService, error) 
 }
 
 func (as *autoNATService) handleStream(s network.Stream) {
-	defer helpers.FullClose(s)
+	defer s.Close()
 
 	pid := s.Conn().RemotePeer()
 	log.Debugf("New stream from %s", pid.Pretty())
 
-	r := ggio.NewDelimitedReader(s, network.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
+	r := protoio.NewDelimitedReader(s, network.MessageSizeMax)
+	w := protoio.NewDelimitedWriter(s)
 
 	var req pb.Message
 	var res pb.Message

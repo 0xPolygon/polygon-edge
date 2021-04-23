@@ -1,10 +1,11 @@
 # go-reuseport
 
 [![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](https://protocol.ai)
-[![](https://img.shields.io/badge/project-libp2p-blue.svg?style=flat-square)](https://libp2p.io/)
-[![](https://img.shields.io/badge/freenode-%23libp2p-blue.svg?style=flat-square)](https://webchat.freenode.net/?channels=%23libp2p)
+[![](https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square)](https://libp2p.io/)
+[![](https://img.shields.io/badge/freenode-%23libp2p-yellow.svg?style=flat-square)](https://webchat.freenode.net/?channels=%23libp2p)
 [![codecov](https://codecov.io/gh/libp2p/go-reuseport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-reuseport)
 [![Travis CI](https://travis-ci.org/libp2p/go-reuseport.svg?branch=master)](https://travis-ci.org/libp2p/go-reuseport)
+[![Discourse posts](https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg)](https://discuss.libp2p.io)
 
 **NOTE:** This package REQUIRES go >= 1.11.
 
@@ -44,3 +45,7 @@ c, _ := reuse.Dial("tcp", "127.0.0.1:1234", "127.0.0.1:1235")
 ## Tested
 
 Tested on `darwin`, `linux`, and `windows`.
+
+---
+
+The last gx published version of this module was: 0.2.2: Qme8kdM7thoCqLqd7GYCRqipoZJS64rhJo5MBcTpyWfsL9

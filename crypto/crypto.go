@@ -7,9 +7,11 @@ import (
 	"crypto/rand"
 	hexCore "encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keystore"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/btcsuite/btcd/btcec"
 	"golang.org/x/crypto/sha3"
@@ -216,4 +218,34 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 		return nil, fmt.Errorf("invalid private key")
 	}
 	return priv, nil
+}
+
+func ReadPrivKey(path string) (*ecdsa.PrivateKey, error) {
+	createFn := func() ([]byte, error) {
+		key, err := GenerateKey()
+		if err != nil {
+			return nil, err
+		}
+		buf, err := MarshallPrivateKey(key)
+		if err != nil {
+			return nil, err
+		}
+		return buf, nil
+	}
+	readFn := func(b []byte) (interface{}, error) {
+		buf, err := ioutil.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		key, err := ParsePrivateKey(buf)
+		if err != nil {
+			return nil, err
+		}
+		return key, nil
+	}
+	obj, err := keystore.CreateIfNotExists(path, createFn, readFn)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*ecdsa.PrivateKey), nil
 }

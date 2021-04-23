@@ -6,9 +6,12 @@ config*.json
 bin/
 pkg/
 
-test-chain-1
-test-chain-2
+test-chain*
 .idea
 
 # Exclude the build .exe file from version control
 main.exe
+main
+
+# MacOS Leftovers
+.DS_Store

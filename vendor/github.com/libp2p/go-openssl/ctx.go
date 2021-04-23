@@ -522,6 +522,29 @@ func (c *Ctx) SetCipherList(list string) error {
 	return nil
 }
 
+// SetNextProtos sets Negotiation protocol to the ctx.
+func (c *Ctx) SetNextProtos(protos []string) error {
+	if len(protos) == 0 {
+		return nil
+	}
+	vector := make([]byte, 0)
+	for _, proto := range protos {
+		if len(proto) > 255 {
+			return fmt.Errorf(
+				"Proto length can't be more than 255. But got a proto %s with length %d",
+				proto, len(proto))
+		}
+		vector = append(vector, byte(uint8(len(proto))))
+		vector = append(vector, []byte(proto)...)
+	}
+	ret := int(C.SSL_CTX_set_alpn_protos(c.ctx, (*C.uchar)(unsafe.Pointer(&vector[0])),
+		C.uint(len(vector))))
+	if ret != 0 {
+		return errors.New("Error while setting protos to ctx")
+	}
+	return nil
+}
+
 type SessionCacheModes int
 
 const (

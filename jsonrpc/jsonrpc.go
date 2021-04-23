@@ -33,7 +33,7 @@ func (s serverType) String() string {
 	case serverWS:
 		return "ws"
 	default:
-		panic("TODO")
+		panic("BUG: Not expected")
 	}
 }
 
@@ -46,7 +46,7 @@ type JSONRPC struct {
 
 type dispatcherImpl interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
-	Handle(serverType, []byte) ([]byte, error)
+	Handle([]byte) ([]byte, error)
 }
 
 type Config struct {
@@ -89,7 +89,7 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 	go func() {
 		if err := srv.Serve(lis); err != nil {
-			panic(err)
+			j.logger.Error("closed http connection", "err", err)
 		}
 	}()
 	return nil
@@ -145,7 +145,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		handleErr(err)
 		return
 	}
-	resp, err := j.dispatcher.Handle(serverHTTP, data)
+	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
 		handleErr(err)
 		return

@@ -56,7 +56,7 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("not found")
+		return nil, fmt.Errorf("state not found at hash %s", root)
 	}
 	t := &Trie{
 		root:    n,

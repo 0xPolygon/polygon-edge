@@ -284,9 +284,9 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	msg := &types.Transaction{
 		To:       t.To,
 		Nonce:    t.Nonce,
-		Value:    t.Value[i.Value].Bytes(),
+		Value:    new(big.Int).Set(t.Value[i.Value]),
 		Gas:      t.GasLimit[i.Gas],
-		GasPrice: t.GasPrice.Bytes(),
+		GasPrice: new(big.Int).Set(t.GasPrice),
 		Input:    hex.MustDecodeHex(t.Data[i.Data]),
 	}
 

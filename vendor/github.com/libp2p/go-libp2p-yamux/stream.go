@@ -36,6 +36,14 @@ func (s *stream) Reset() error {
 	return s.yamux().Reset()
 }
 
+func (s *stream) CloseRead() error {
+	return s.yamux().CloseRead()
+}
+
+func (s *stream) CloseWrite() error {
+	return s.yamux().CloseWrite()
+}
+
 func (s *stream) SetDeadline(t time.Time) error {
 	return s.yamux().SetDeadline(t)
 }

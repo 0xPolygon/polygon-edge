@@ -102,6 +102,10 @@ type Event struct {
 	Source string
 }
 
+func (e *Event) Header() *types.Header {
+	return e.NewChain[len(e.NewChain)-1]
+}
+
 func (e *Event) SetDifficulty(b *big.Int) {
 	e.Difficulty = new(big.Int).Set(b)
 }

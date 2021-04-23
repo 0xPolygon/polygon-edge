@@ -3,10 +3,12 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"unicode"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -32,6 +34,11 @@ type funcData struct {
 	inNum int
 	reqt  []reflect.Type
 	fv    reflect.Value
+	isDyn bool
+}
+
+func (f *funcData) numParams() int {
+	return f.inNum - 1
 }
 
 type endpoints struct {
@@ -86,7 +93,7 @@ func (d *Dispatcher) registerEndpoints() {
 	d.registerService("web3", d.endpoints.Web3)
 }
 
-func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*serviceData, *funcData, error) {
+func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) {
 	callName := strings.SplitN(req.Method, "_", 2)
 	if len(callName) != 2 {
 		return nil, nil, invalidMethod(req.Method)
@@ -101,9 +108,6 @@ func (d *Dispatcher) getFnHandler(typ serverType, req Request, params int) (*ser
 	fd, ok := service.funcMap[funcName]
 	if !ok {
 		return nil, nil, invalidMethod(req.Method)
-	}
-	if params != fd.inNum-1 {
-		return nil, nil, invalidArguments(req.Method)
 	}
 	return service, fd, nil
 }
@@ -194,30 +198,25 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	}
 
 	// its a normal query that we handle with the dispatcher
-	resp, err := d.handleReq(serverWS, req)
+	resp, err := d.handleReq(req)
 	if err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
-func (d *Dispatcher) Handle(typ serverType, reqBody []byte) ([]byte, error) {
+func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return nil, invalidJSONRequest
 	}
-	return d.handleReq(typ, req)
+	return d.handleReq(req)
 }
 
-func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
-	d.logger.Debug("request", "method", req.Method, "id", req.ID, "typ", typ)
+func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
+	d.logger.Debug("request", "method", req.Method, "id", req.ID)
 
-	var params []interface{}
-	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return nil, invalidJSONRequest
-	}
-
-	service, fd, err := d.getFnHandler(typ, req, len(params))
+	service, fd, err := d.getFnHandler(req)
 	if err != nil {
 		return nil, err
 	}
@@ -225,18 +224,21 @@ func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
 	inArgs := make([]reflect.Value, fd.inNum)
 	inArgs[0] = service.sv
 
+	inputs := make([]interface{}, fd.numParams())
 	for i := 0; i < fd.inNum-1; i++ {
-		elem := reflect.ValueOf(params[i])
-		if elem.Type() != fd.reqt[i+1] {
-			return nil, invalidArguments(req.Method)
-		}
-		inArgs[i+1] = elem
+		val := reflect.New(fd.reqt[i+1])
+		inputs[i] = val.Interface()
+		inArgs[i+1] = val.Elem()
+	}
+
+	if err := json.Unmarshal(req.Params, &inputs); err != nil {
+		return nil, invalidJSONRequest
 	}
 
 	output := fd.fv.Call(inArgs)
 	err = getError(output[1])
 	if err != nil {
-		return nil, internalError
+		return nil, d.internalError(req.Method, err)
 	}
 
 	var data []byte
@@ -244,7 +246,7 @@ func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
-			return nil, internalError
+			return nil, d.internalError(req.Method, err)
 		}
 	}
 
@@ -254,9 +256,14 @@ func (d *Dispatcher) handleReq(typ serverType, req Request) ([]byte, error) {
 	}
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
-		return nil, internalError
+		return nil, d.internalError(req.Method, err)
 	}
 	return respBytes, nil
+}
+
+func (d *Dispatcher) internalError(method string, err error) error {
+	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	return internalError
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) {
@@ -288,6 +295,13 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		var err error
 		if fd.inNum, fd.reqt, err = validateFunc(funcName, fd.fv, true); err != nil {
 			panic(fmt.Sprintf("jsonrpc: %s", err))
+		}
+		// check if last item is a pointer
+		if fd.numParams() != 0 {
+			last := fd.reqt[fd.numParams()]
+			if last.Kind() == reflect.Ptr {
+				fd.isDyn = true
+			}
 		}
 		funcMap[name] = fd
 	}
@@ -342,10 +356,6 @@ func isErrorType(t reflect.Type) bool {
 	return t.Implements(errt)
 }
 
-func (d *Dispatcher) funcExample(b string) (interface{}, error) {
-	return nil, nil
-}
-
 func getError(v reflect.Value) error {
 	if v.IsNil() {
 		return nil
@@ -358,4 +368,91 @@ func lowerCaseFirst(str string) string {
 		return string(unicode.ToLower(v)) + str[i+1:]
 	}
 	return ""
+}
+
+func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, error) {
+	switch number {
+	case LatestBlockNumber:
+		return d.store.Header(), nil
+
+	case EarliestBlockNumber:
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
+
+	case PendingBlockNumber:
+		return nil, fmt.Errorf("fetching the pending header is not supported")
+
+	default:
+		// Convert the block number from hex to uint64
+		header, ok := d.store.GetHeaderByNumber(uint64(number))
+		if !ok {
+			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
+		}
+		return header, nil
+	}
+}
+
+func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
+	if number == PendingBlockNumber {
+		res, ok := d.store.GetNonce(address)
+		if ok {
+			return res, nil
+		}
+	}
+	header, err := d.getBlockHeaderImpl(number)
+	if err != nil {
+		return 0, err
+	}
+	acc, err := d.store.GetAccount(header.StateRoot, address)
+	if err != nil {
+		return 0, err
+	}
+	return acc.Nonce, nil
+}
+
+func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
+	// set default values
+	if arg.From == nil {
+		return nil, fmt.Errorf("from is empty")
+	}
+	if arg.Nonce == nil {
+		// get nonce from the pool
+		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		arg.Nonce = argUintPtr(nonce)
+	}
+	if arg.Value == nil {
+		arg.Value = argBytesPtr([]byte{})
+	}
+	if arg.GasPrice == nil {
+		// use the suggested gas price
+		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+	}
+	if arg.To == nil {
+		if arg.Input == nil {
+			return nil, fmt.Errorf("contract creation without data provided")
+		}
+	}
+	if arg.Input == nil {
+		arg.Input = argBytesPtr([]byte{})
+	}
+	if arg.Gas == nil {
+		// TODO
+		arg.Gas = argUintPtr(1000000)
+	}
+
+	txn := &types.Transaction{
+		From:     *arg.From,
+		Gas:      uint64(*arg.Gas),
+		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
+		Value:    new(big.Int).SetBytes(*arg.Value),
+		Input:    *arg.Input,
+		Nonce:    uint64(*arg.Nonce),
+	}
+	if arg.To != nil {
+		txn.To = arg.To
+	}
+	txn.ComputeHash()
+	return txn, nil
 }

@@ -30,6 +30,9 @@ type ContentRouting interface {
 	Provide(context.Context, cid.Cid, bool) error
 
 	// Search for peers who are able to provide a given key
+	//
+	// When count is 0, this method will return an unbounded number of
+	// results.
 	FindProvidersAsync(context.Context, cid.Cid, int) <-chan peer.AddrInfo
 }
 
@@ -37,7 +40,6 @@ type ContentRouting interface {
 // This can be implemented by a simple lookup table, a tracking server,
 // or even a DHT.
 type PeerRouting interface {
-	// Find specific Peer
 	// FindPeer searches for a peer with given ID, returns a peer.AddrInfo
 	// with relevant addresses.
 	FindPeer(context.Context, peer.ID) (peer.AddrInfo, error)

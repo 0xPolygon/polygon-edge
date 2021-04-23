@@ -32,6 +32,14 @@ func (s *stream) Close() error {
 	return s.mplex().Close()
 }
 
+func (s *stream) CloseWrite() error {
+	return s.mplex().CloseWrite()
+}
+
+func (s *stream) CloseRead() error {
+	return s.mplex().CloseRead()
+}
+
 func (s *stream) Reset() error {
 	return s.mplex().Reset()
 }

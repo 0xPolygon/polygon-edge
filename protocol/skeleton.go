@@ -62,6 +62,28 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 			Header: h,
 		})
 	}
+
+	// for each header with body we request it
+	bodyHashes := []types.Hash{}
+	bodyIndex := []int{}
+
+	for indx, h := range resp {
+		if h.TxRoot != types.EmptyRootHash {
+			bodyHashes = append(bodyHashes, h.Hash)
+			bodyIndex = append(bodyIndex, indx)
+		}
+	}
+	if len(bodyHashes) == 0 {
+		return nil
+	}
+
+	bodies, err := getBodies(context.Background(), clt, bodyHashes)
+	if err != nil {
+		return err
+	}
+	for indx, body := range bodies {
+		slot.blocks[bodyIndex[indx]].Transactions = body.Transactions
+	}
 	return nil
 }
 

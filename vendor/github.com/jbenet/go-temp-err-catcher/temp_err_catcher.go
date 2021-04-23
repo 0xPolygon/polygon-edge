@@ -3,6 +3,7 @@
 package temperrcatcher
 
 import (
+	"errors"
 	"time"
 )
 
@@ -23,7 +24,8 @@ type Temporary interface {
 // ErrIsTemporary returns whether an error is Temporary(),
 // iff it implements the Temporary interface.
 func ErrIsTemporary(e error) bool {
-	te, ok := e.(Temporary)
+	var te Temporary
+	ok := errors.As(e, &te)
 	return ok && te.Temporary()
 }
 
