@@ -48,23 +48,19 @@ func (c *GenesisCommand) Run(args []string) int {
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
 	var name string
+	var consensus string
 
 	// ibft flags
-	var ibftConsensus bool
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
-
-	// dummy flag
-	var dummyConsensus bool
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
 	flags.StringVar(&name, "name", "example", "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", 100, "")
-	flags.BoolVar(&ibftConsensus, "ibft", false, "")
+	flags.StringVar(&consensus, "consensus", "pow", "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
-	flags.BoolVar(&dummyConsensus, "dummy", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -85,17 +81,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var bootnodes chain.Bootnodes
 	var extraData []byte
 
-	// determine engine
-	consensus := "pow"
-	// todo: clean conditional branch
-	if ibftConsensus && dummyConsensus {
-		c.UI.Error("Cannot enable both ibft and dummy consensus")
-		return 1
-	}
-	if ibftConsensus {
-		// extradata
-		consensus = "ibft"
-
+	if consensus == "ibft" {
 		// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
 		var validators []types.Address
 		if len(ibftValidators) != 0 {
@@ -123,9 +109,6 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 		extraData = make([]byte, ibft.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
-	}
-	if dummyConsensus {
-		consensus = "dummy"
 	}
 
 	cc := &chain.Chain{

@@ -181,8 +181,10 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 
 		// add consensus flags
 		switch config.Consensus {
+		case ConsensusIBFT:
+			args = append(args, "--consensus", "ibft")
 		case ConsensusDummy:
-			args = append(args, "--dummy")
+			args = append(args, "--consensus", "dummy")
 		}
 
 		vcmd := exec.Command(path, args...)
