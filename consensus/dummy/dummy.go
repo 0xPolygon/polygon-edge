@@ -64,6 +64,10 @@ func (d *Dummy) run() {
 		// wait until there is a new txn
 		select {
 		case <-d.notifyCh:
+		case <-time.After(time.Second):
+			if d.txpool.Length() == 0 {
+				continue
+			}
 		case <-d.closeCh:
 			return
 		}
