@@ -17,6 +17,7 @@ func TestDiscovery(t *testing.T) {
 	srvs := make([]*framework.TestServer, NumOfNodes)
 	for i := range srvs {
 		srvs[i] = framework.NewTestServer(t, func(config *framework.TestServerConfig) {
+			config.SetConsensus(framework.ConsensusDummy)
 		})
 	}
 	defer func() {
@@ -24,8 +25,6 @@ func TestDiscovery(t *testing.T) {
 			s.Stop()
 		}
 	}()
-
-	time.Sleep(5 * time.Second)
 
 	p2pAddrs := make([]string, NumOfNodes)
 	for i, s := range srvs {
@@ -46,7 +45,7 @@ func TestDiscovery(t *testing.T) {
 		}
 	}
 
-	time.Sleep(time.Second * 60)
+	time.Sleep(30 * time.Second)
 
 	for i, s := range srvs {
 		res, err := s.Operator().PeersList(context.Background(), &empty.Empty{})

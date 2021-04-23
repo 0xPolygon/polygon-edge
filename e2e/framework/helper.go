@@ -57,10 +57,15 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		}(srvs[i], srvs[i+1], errCh)
 	}
 
+	errCount := 0
 	for i := 0; i < len(srvs)/2; i++ {
 		err := <-errCh
 		if err != nil {
-			t.Fatalf("failed to connect from %d to %d, err=%+v ", 2*i, 2*i+1, err)
+			errCount++
+			t.Errorf("failed to connect from %d to %d, err=%+v ", 2*i, 2*i+1, err)
 		}
+	}
+	if errCount > 0 {
+		t.Fail()
 	}
 }
