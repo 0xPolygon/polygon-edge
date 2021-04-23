@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -18,12 +17,6 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
-)
-
-var (
-	errDuplicateUncle  = errors.New("duplicate uncle")
-	errUncleIsAncestor = errors.New("uncle is ancestor")
-	errDanglingUncle   = errors.New("uncle's parent is not ancestor")
 )
 
 // Blockchain is a blockchain reference
@@ -308,24 +301,27 @@ func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
 	return nil
 }
 
-// advanceHead Advances the difficulty
-func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
-	if err := b.db.WriteHeadHash(h.Hash); err != nil {
+// advanceHead Sets the passed in header as the new head of the chain
+func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
+	// Write the current head hash into storage
+	if err := b.db.WriteHeadHash(newHeader.Hash); err != nil {
 		return nil, err
 	}
 
-	if err := b.db.WriteHeadNumber(h.Number); err != nil {
+	// Write the current head number into storage
+	if err := b.db.WriteHeadNumber(newHeader.Number); err != nil {
 		return nil, err
 	}
 
-	if err := b.db.WriteCanonicalHash(h.Number, h.Hash); err != nil {
+	// Matches the current head number with the current hash
+	if err := b.db.WriteCanonicalHash(newHeader.Number, newHeader.Hash); err != nil {
 		return nil, err
 	}
 
 	// Check if there was a parent difficulty
 	currentDiff := big.NewInt(0)
-	if h.ParentHash != types.StringToHash("") {
-		td, ok := b.readDiff(h.ParentHash)
+	if newHeader.ParentHash != types.StringToHash("") {
+		td, ok := b.readDiff(newHeader.ParentHash)
 		if !ok {
 			return nil, fmt.Errorf("parent difficulty not found")
 		}
@@ -333,13 +329,13 @@ func (b *Blockchain) advanceHead(h *types.Header) (*big.Int, error) {
 	}
 
 	// Calculate the new difficulty
-	diff := big.NewInt(1).Add(currentDiff, new(big.Int).SetUint64(h.Difficulty))
-	if err := b.db.WriteDiff(h.Hash, diff); err != nil {
+	diff := big.NewInt(1).Add(currentDiff, new(big.Int).SetUint64(newHeader.Difficulty))
+	if err := b.db.WriteDiff(newHeader.Hash, diff); err != nil {
 		return nil, err
 	}
 
 	// Update the blockchain reference
-	b.setCurrentHeader(h, diff)
+	b.setCurrentHeader(newHeader, diff)
 
 	return diff, nil
 }
@@ -394,24 +390,24 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 }
 
 // readDiff reads the latest difficulty using the hash
-func (b *Blockchain) readDiff(hash types.Hash) (*big.Int, bool) {
+func (b *Blockchain) readDiff(headerHash types.Hash) (*big.Int, bool) {
 	// Try to find the difficulty in the cache
-	d, ok := b.difficultyCache.Get(hash)
+	foundDifficulty, ok := b.difficultyCache.Get(headerHash)
 	if ok {
 		// Hit, return the difficulty
-		return d.(*big.Int), true
+		return foundDifficulty.(*big.Int), true
 	}
 
 	// Miss, read the difficulty from the DB
-	dd, ok := b.db.ReadDiff(hash)
+	dbDifficulty, ok := b.db.ReadDiff(headerHash)
 	if !ok {
 		return nil, false
 	}
 
 	// Update the difficulty cache
-	b.difficultyCache.Add(hash, dd)
+	b.difficultyCache.Add(headerHash, dbDifficulty)
 
-	return dd, true
+	return dbDifficulty, true
 }
 
 // GetHeaderByNumber returns the header using the block number
@@ -667,9 +663,7 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 	return result, nil
 }
 
-var emptyFrom = types.Address{}
-
-// GetHashHelper returns the callback method TODO
+// GetHashHelper is used by the EVM, so that the SC can get the hash of the header number
 func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res types.Hash) {
 	return func(i uint64) (res types.Hash) {
 		num, hash := header.Number-1, header.ParentHash
