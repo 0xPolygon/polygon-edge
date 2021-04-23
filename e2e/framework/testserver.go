@@ -29,6 +29,13 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+type ConsensusType int
+
+const (
+	ConsensusIBFT ConsensusType = iota
+	ConsensusDummy
+)
+
 type SrvAccount struct {
 	Addr    types.Address
 	Balance *big.Int
@@ -43,6 +50,7 @@ type TestServerConfig struct {
 	DataDir      string        // The directory for the data files
 	PremineAccts []*SrvAccount // Accounts with existing balances (genesis accounts)
 	DevMode      bool          // Toggles the dev mode
+	Consensus    ConsensusType // Consensus Type
 }
 
 // CALLBACKS //
@@ -61,6 +69,11 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 // SetDev callback toggles the dev mode
 func (t *TestServerConfig) SetDev(state bool) {
 	t.DevMode = state
+}
+
+// SetDev callback toggles the dev mode
+func (t *TestServerConfig) SetConsensus(c ConsensusType) {
+	t.Consensus = c
 }
 
 // SetSeal callback toggles the seal mode
@@ -164,6 +177,12 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 		// add premines
 		for _, acct := range config.PremineAccts {
 			args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
+		}
+
+		// add consensus flags
+		switch config.Consensus {
+		case ConsensusDummy:
+			args = append(args, "--dummy")
 		}
 
 		vcmd := exec.Command(path, args...)
