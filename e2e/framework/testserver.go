@@ -26,6 +26,7 @@ import (
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -119,6 +120,14 @@ func (t *TestServer) Operator() proto.SystemClient {
 		t.t.Fatal(err)
 	}
 	return proto.NewSystemClient(conn)
+}
+
+func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
 func (t *TestServer) Stop() {
