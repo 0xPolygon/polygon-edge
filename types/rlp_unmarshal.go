@@ -160,10 +160,6 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (r *Receipts) UnmarshalRLP(input []byte) error {
-
-	fmt.Println("-ccccc")
-	fmt.Println(input)
-
 	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
 }
 
