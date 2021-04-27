@@ -26,7 +26,15 @@ import (
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
+)
+
+type ConsensusType int
+
+const (
+	ConsensusIBFT ConsensusType = iota
+	ConsensusDummy
 )
 
 type SrvAccount struct {
@@ -43,6 +51,7 @@ type TestServerConfig struct {
 	DataDir      string        // The directory for the data files
 	PremineAccts []*SrvAccount // Accounts with existing balances (genesis accounts)
 	DevMode      bool          // Toggles the dev mode
+	Consensus    ConsensusType // Consensus Type
 }
 
 // CALLBACKS //
@@ -61,6 +70,11 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 // SetDev callback toggles the dev mode
 func (t *TestServerConfig) SetDev(state bool) {
 	t.DevMode = state
+}
+
+// SetDev callback toggles the dev mode
+func (t *TestServerConfig) SetConsensus(c ConsensusType) {
+	t.Consensus = c
 }
 
 // SetSeal callback toggles the seal mode
@@ -106,6 +120,14 @@ func (t *TestServer) Operator() proto.SystemClient {
 		t.t.Fatal(err)
 	}
 	return proto.NewSystemClient(conn)
+}
+
+func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
 func (t *TestServer) Stop() {
@@ -164,6 +186,14 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 		// add premines
 		for _, acct := range config.PremineAccts {
 			args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
+		}
+
+		// add consensus flags
+		switch config.Consensus {
+		case ConsensusIBFT:
+			args = append(args, "--consensus", "ibft")
+		case ConsensusDummy:
+			args = append(args, "--consensus", "dummy")
 		}
 
 		vcmd := exec.Command(path, args...)
