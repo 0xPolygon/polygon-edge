@@ -120,6 +120,33 @@ func main() {
 }
 ```
 
+## Wallet
+
+As for now the library only provides primitive abstractions to send signed abstractions. The intended goal is to abstract the next steps inside the contract package.
+
+```
+// Generate a random wallet
+key, _ := wallet.GenerateKey()
+
+to := web3.Address{0x1}
+transferVal := big.NewInt(1000)
+
+// Create the transaction
+txn := &web3.Transaction{
+	To:    &to,
+	Value: transferVal,
+	Gas:   100000,
+}
+
+// Create the signer object and sign
+signer := wallet.NewEIP155Signer(chainID)
+txn, _ = signer.SignTx(txn, key)
+
+// Send the signed transaction
+data := txn.MarshalRLP()
+hash, _ := c.Eth().SendRawTransaction(data)
+```
+
 ## ENS
 
 Resolve names on the Ethereum Name Service registrar.

@@ -2,9 +2,17 @@
 github.com/armon/go-radix
 # github.com/bgentry/speakeasy v0.1.0
 github.com/bgentry/speakeasy
-# github.com/btcsuite/btcd v0.20.1-beta
+# github.com/btcsuite/btcd v0.21.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
+github.com/btcsuite/btcd/chaincfg
+github.com/btcsuite/btcd/chaincfg/chainhash
+github.com/btcsuite/btcd/wire
+# github.com/btcsuite/btcutil v1.0.2
+github.com/btcsuite/btcutil
+github.com/btcsuite/btcutil/base58
+github.com/btcsuite/btcutil/bech32
+github.com/btcsuite/btcutil/hdkeychain
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
@@ -299,13 +307,16 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
+# github.com/tyler-smith/go-bip39 v1.1.0
+github.com/tyler-smith/go-bip39
+github.com/tyler-smith/go-bip39/wordlists
 # github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20210419160836-7945683fe6a4
+# github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/compiler
@@ -313,6 +324,7 @@ github.com/umbracle/go-web3/jsonrpc
 github.com/umbracle/go-web3/jsonrpc/codec
 github.com/umbracle/go-web3/jsonrpc/transport
 github.com/umbracle/go-web3/testutil
+github.com/umbracle/go-web3/wallet
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasthttp v1.4.0
@@ -355,6 +367,7 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa

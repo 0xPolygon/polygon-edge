@@ -50,8 +50,9 @@ type dispatcherImpl interface {
 }
 
 type Config struct {
-	Store blockchainInterface
-	Addr  *net.TCPAddr
+	Store   blockchainInterface
+	Addr    *net.TCPAddr
+	ChainID uint64
 }
 
 // NewJSONRPC returns the JsonRPC http server
@@ -62,7 +63,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
-		dispatcher: newDispatcher(logger, config.Store),
+		dispatcher: newDispatcher(logger, config.Store, config.ChainID),
 	}
 
 	// start http server

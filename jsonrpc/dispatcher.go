@@ -56,6 +56,7 @@ type Dispatcher struct {
 	serviceMap    map[string]*serviceData
 	endpoints     endpoints
 	filterManager *FilterManager
+	chainID       uint64
 }
 
 // newTestDispatcher returns a dispatcher without the filter manager, used for testing
@@ -70,10 +71,11 @@ func newTestDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatch
 	return d
 }
 
-func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store blockchainInterface, chainID uint64) *Dispatcher {
 	d := &Dispatcher{
-		logger: logger.Named("dispatcher"),
-		store:  store,
+		logger:  logger.Named("dispatcher"),
+		store:   store,
+		chainID: chainID,
 	}
 	d.registerEndpoints()
 	if store != nil {

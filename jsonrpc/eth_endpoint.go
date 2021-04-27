@@ -13,6 +13,11 @@ type Eth struct {
 	d *Dispatcher
 }
 
+// ChainId returns the chain id of the client
+func (e *Eth) ChainId() (interface{}, error) {
+	return argUintPtr(e.d.chainID), nil
+}
+
 // GetBlockByNumber returns information about a block by block number
 func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, error) {
 	var num uint64

@@ -48,7 +48,7 @@ func expectJSONResult(data []byte, v interface{}) error {
 func TestDispatcherWebsocket(t *testing.T) {
 	store := newMockStore()
 
-	s := newDispatcher(hclog.NewNullLogger(), store)
+	s := newDispatcher(hclog.NewNullLogger(), store, 0)
 	s.registerEndpoints()
 
 	mock := &mockWsConn{
@@ -111,7 +111,7 @@ func (m *mockService) Filter(f LogFilter) (interface{}, error) {
 func TestDispatcherFuncDecode(t *testing.T) {
 	srv := &mockService{msgCh: make(chan interface{}, 10)}
 
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore())
+	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 	s.registerService("mock", srv)
 
 	handleReq := func(typ string, msg string) interface{} {
