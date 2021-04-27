@@ -228,7 +228,7 @@ func (b *Blockchain) Genesis() types.Hash {
 
 // writeGenesis wrapper for the genesis write function
 func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
-	header := genesis.ToBlock()
+	header := genesis.GenesisHeader()
 	header.ComputeHash()
 
 	if err := b.writeGenesisImpl(header); err != nil {

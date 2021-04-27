@@ -83,6 +83,7 @@ type Fork uint64
 
 func NewFork(n uint64) *Fork {
 	f := Fork(n)
+
 	return &f
 }
 

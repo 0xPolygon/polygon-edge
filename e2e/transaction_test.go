@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -185,11 +184,14 @@ func TestEthTransfer(t *testing.T) {
 			preSendData.previousReceiverBalance = balanceReceiver
 
 			toAddress := web3.Address(testCase.recipient)
+
+			gasPrice := uint64(1048576)
+
 			// Create the transaction
 			txnObject := &web3.Transaction{
 				From:     web3.Address(testCase.sender),
 				To:       &toAddress,
-				GasPrice: 1048576,
+				GasPrice: gasPrice,
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
@@ -227,10 +229,8 @@ func TestEthTransfer(t *testing.T) {
 
 			expandedGasUsed := new(big.Int).Mul(
 				big.NewInt(int64(receipt.GasUsed)),
-				big.NewInt(1000000),
+				big.NewInt(int64(gasPrice)),
 			)
-
-			fmt.Printf("Gas used is %v", receipt.GasUsed)
 
 			if !testCase.shouldFail {
 				spentAmount := new(big.Int).Add(testCase.amount, expandedGasUsed)

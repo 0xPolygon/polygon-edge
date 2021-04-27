@@ -13,6 +13,7 @@ import (
 	"github.com/imdario/mergo"
 )
 
+// Config defines the server configuration params
 type Config struct {
 	Chain       string                 `json:"chain"`
 	DataDir     string                 `json:"data_dir"`
@@ -28,6 +29,7 @@ type Config struct {
 	Join        string
 }
 
+// Network defines the network configuration params
 type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
@@ -63,6 +65,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
@@ -89,7 +92,7 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
 	// and disable discovery of other nodes
-	// TODO: Disable networking altogheter.
+	// TODO: Disable networking altogether.
 	if c.Dev {
 		conf.Seal = true
 		conf.Network.NoDiscover = true
