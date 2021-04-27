@@ -412,6 +412,8 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 		returnValue, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, gas)
 	}
 	if subErr != nil {
+		// fmt.Printf("suberr: %s\n", subErr.Error())
+
 		if subErr == runtime.ErrNotEnoughFunds {
 			txn.RevertToSnapshot(s)
 			return nil, 0, false, subErr

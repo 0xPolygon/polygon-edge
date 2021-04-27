@@ -229,7 +229,7 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 	if failed {
 		return nil, fmt.Errorf("unable to execute call")
 	}
-	return returnValue, nil
+	return argBytesPtr(returnValue), nil
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
@@ -325,7 +325,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		mid := (lowEnd + highEnd) / 2
 
 		failed, err := testTransaction(mid)
-
 		if err != nil {
 			return 0, err
 		}
@@ -338,6 +337,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			highEnd = mid - 1
 		}
 	}
+
+	// we stopped the binary search at the last gas limit
+	// at which the txn could not be executed
+	highEnd += 1
 
 	// Check the edge case if even the highest cap is not enough to complete the transaction
 	if highEnd == gasCap {

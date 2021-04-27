@@ -205,7 +205,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		// status
 		r.SetStatus(ReceiptStatus(buf[0]))
 	default:
-		return fmt.Errorf("bad root/status size %d", size)
+		r.SetStatus(0)
 	}
 
 	// cumulativeGasUsed
