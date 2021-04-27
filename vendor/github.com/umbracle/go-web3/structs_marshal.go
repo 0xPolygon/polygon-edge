@@ -94,6 +94,14 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		o.Set("nonce", a.NewString(fmt.Sprintf("0x%x", t.Nonce)))
 	}
 
+	o.Set("v", a.NewString("0x"+hex.EncodeToString(t.V)))
+	o.Set("r", a.NewString("0x"+hex.EncodeToString(t.R)))
+	o.Set("s", a.NewString("0x"+hex.EncodeToString(t.R)))
+
+	o.Set("blockHash", a.NewString(t.BlockHash.String()))
+	o.Set("blockNumber", a.NewString(fmt.Sprintf("0x%x", t.BlockNumber)))
+	o.Set("transactionIndex", a.NewString(fmt.Sprintf("0x%x", t.TxnIndex)))
+
 	res := o.MarshalTo(nil)
 	defaultArena.Put(a)
 	return res, nil

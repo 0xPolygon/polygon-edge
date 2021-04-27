@@ -8,7 +8,7 @@ import (
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore())
+	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 	s.registerEndpoints()
 
 	resp, err := s.Handle([]byte(`{

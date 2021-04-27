@@ -143,6 +143,7 @@ func NewTestServer(t *testing.T, cb ServerConfigCallback) *TestServer {
 		if server.testHTTPEndpoint() {
 			break
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	server.client = &ethClient{server.HTTPAddr()}
@@ -201,6 +202,18 @@ func (t *TestServer) Call(msg *web3.CallMsg) (string, error) {
 	return resp, nil
 }
 
+func (t *TestServer) Transfer(address web3.Address, value *big.Int) *web3.Receipt {
+	receipt, err := t.SendTxn(&web3.Transaction{
+		From:  t.accounts[0],
+		To:    &address,
+		Value: value,
+	})
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return receipt
+}
+
 // TxnTo sends a transaction to a given method without any arguments
 func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
 	sig := MethodSig(method)
@@ -226,11 +239,16 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 		txn.Gas = DefaultGasLimit
 	}
 
-	var hash string
+	var hash web3.Hash
 	if err := t.client.call("eth_sendTransaction", &hash, txn); err != nil {
 		return nil, err
 	}
 
+	return t.WaitForReceipt(hash)
+}
+
+// WaitForReceipt waits for the receipt
+func (t *TestServer) WaitForReceipt(hash web3.Hash) (*web3.Receipt, error) {
 	var receipt *web3.Receipt
 	var count uint64
 	for {

@@ -295,8 +295,16 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 	if err != nil {
 		return nil, err
 	}
+	return t.WaitForReceipt(hash)
+}
+
+func (t *TestServer) WaitForReceipt(hash web3.Hash) (*web3.Receipt, error) {
+	client := t.JSONRPC()
+
 	var receipt *web3.Receipt
 	var count uint64
+	var err error
+
 	for {
 		receipt, err = client.Eth().GetTransactionReceipt(hash)
 		if err != nil {

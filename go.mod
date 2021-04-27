@@ -3,7 +3,7 @@ module github.com/0xPolygon/minimal
 go 1.14
 
 require (
-	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/ethereum/go-ethereum v1.9.15
 	github.com/golang/protobuf v1.4.3
 	github.com/google/gopacket v1.1.18 // indirect
@@ -30,7 +30,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
-	github.com/umbracle/go-web3 v0.0.0-20210419160836-7945683fe6a4
+	github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	google.golang.org/grpc v1.35.0
