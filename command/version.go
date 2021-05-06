@@ -12,7 +12,7 @@ type VersionCommand struct {
 
 // Help implements the cli.Command interface
 func (c *VersionCommand) Help() string {
-	return ""
+	return "Returns the current Polygon SDK version"
 }
 
 // Synopsis implements the cli.Command interface
@@ -23,5 +23,6 @@ func (c *VersionCommand) Synopsis() string {
 // Run implements the cli.Command interface
 func (c *VersionCommand) Run(args []string) int {
 	c.UI.Output(version.GetVersion())
+
 	return 0
 }

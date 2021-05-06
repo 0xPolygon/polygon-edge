@@ -11,17 +11,22 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Commands returns the cli commands
+// Commands returns a mapping of all available commands
 func Commands() map[string]cli.CommandFactory {
 	ui := &cli.BasicUi{
 		Reader:      os.Stdin,
 		Writer:      os.Stdout,
 		ErrorWriter: os.Stderr,
 	}
+
 	meta := Meta{
 		UI: ui,
 	}
+
 	return map[string]cli.CommandFactory{
+
+		// GENERIC SDK COMMANDS //
+
 		"server": func() (cli.Command, error) {
 			return &server.Command{
 				UI: ui,
@@ -37,7 +42,9 @@ func Commands() map[string]cli.CommandFactory {
 				UI: ui,
 			}, nil
 		},
-		// ---- peers commands ----
+
+		// PEER COMMANDS //
+
 		"peers add": func() (cli.Command, error) {
 			return &PeersAdd{
 				Meta: meta,
@@ -53,7 +60,9 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
-		// ---- ibft commands ----
+
+		// IBFT COMMANDS //
+
 		"ibft init": func() (cli.Command, error) {
 			return &IbftInit{
 				Meta: meta,
@@ -79,7 +88,9 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
-		// ---- txpool ----
+
+		// TXPOOL COMMANDS //
+
 		"txpool add": func() (cli.Command, error) {
 			return &TxPoolAdd{
 				Meta: meta,
@@ -90,7 +101,9 @@ func Commands() map[string]cli.CommandFactory {
 				Meta: meta,
 			}, nil
 		},
-		// ---- blockchain commands ----
+
+		// BLOCKCHAIN COMMANDS //
+
 		"status": func() (cli.Command, error) {
 			return &StatusCommand{
 				Meta: meta,
@@ -109,16 +122,74 @@ func Commands() map[string]cli.CommandFactory {
 	}
 }
 
+// FlagDescriptor contains the description elements for a command flag
+type FlagDescriptor struct {
+	description       string   // Flag description
+	arguments         []string // Arguments list
+	argumentsOptional bool     // Flag indicating if flag arguments are optional
+}
+
+type HelpGenerator interface {
+	DefineFlags()
+}
+
 // Meta is a helper utility for the commands
 type Meta struct {
+	HelpGenerator
+
 	UI   cli.Ui
 	addr string
+
+	flagMap map[string]FlagDescriptor
+}
+
+// GenerateHelp is a utility function called by every command's Help() method
+func (m *Meta) GenerateHelp(synopsys string) string {
+	helpOutput := ""
+	for flagEl, descriptor := range m.flagMap {
+		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n"
+	}
+
+	return fmt.Sprintf("Description:\n\n%s\nFlags:\n\n%s", synopsys, helpOutput)
+}
+
+// GenerateFlagDesc generates the flag descriptions in a readable format
+func (m *Meta) GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string {
+	// Generate the top row (with various flags)
+	topRow := fmt.Sprintf("--%s", flagEl)
+
+	argLength := len(descriptor.arguments)
+
+	if argLength > 0 {
+		topRow += " "
+		if descriptor.argumentsOptional {
+			topRow += "["
+		}
+
+		for argIndx, argument := range descriptor.arguments {
+			topRow += argument
+
+			if argIndx < argLength-1 && argLength > 1 {
+				topRow += " "
+			}
+		}
+
+		if descriptor.argumentsOptional {
+			topRow += "]"
+		}
+	}
+
+	// Generate the bottom description
+	bottomRow := fmt.Sprintf("\t%s", descriptor.description)
+
+	return fmt.Sprintf("%s\n%s", topRow, bottomRow)
 }
 
 // FlagSet adds some default commands to handle grpc connections with the server
 func (m *Meta) FlagSet(n string) *flag.FlagSet {
 	f := flag.NewFlagSet(n, flag.ContinueOnError)
 	f.StringVar(&m.addr, "address", "127.0.0.1:9632", "Address of the http api")
+
 	return f
 }
 
@@ -128,18 +199,29 @@ func (m *Meta) Conn() (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to server: %v", err)
 	}
+
 	return conn, nil
 }
 
+// OUTPUT FORMATTING //
+
+// formatList formats a list, using a specific blank value replacement
 func formatList(in []string) string {
 	columnConf := columnize.DefaultConfig()
 	columnConf.Empty = "<none>"
+
 	return columnize.Format(in, columnConf)
 }
 
+// formatKV formats key value pairs:
+//
+// Key = Value
+//
+// Key = <none>
 func formatKV(in []string) string {
 	columnConf := columnize.DefaultConfig()
 	columnConf.Empty = "<none>"
 	columnConf.Glue = " = "
+
 	return columnize.Format(in, columnConf)
 }

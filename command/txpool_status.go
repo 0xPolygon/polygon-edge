@@ -15,12 +15,12 @@ type TxPoolStatus struct {
 
 // Help implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Help() string {
-	return ""
+	return "Returns the number of transactions in the pool"
 }
 
 // Synopsis implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Synopsis() string {
-	return ""
+	return "txpool status"
 }
 
 // Run implements the cli.TxPoolStatus interface
@@ -29,12 +29,14 @@ func (p *TxPoolStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
+
 		return 1
 	}
 
 	conn, err := p.Conn()
 	if err != nil {
 		p.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -47,6 +49,11 @@ func (p *TxPoolStatus) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(fmt.Sprintf("%d", resp.Length))
+	commandOutput := formatKV([]string{
+		fmt.Sprintf("Number of txns in pool:|%d", resp.Length),
+	})
+
+	p.UI.Output(commandOutput)
+
 	return 0
 }

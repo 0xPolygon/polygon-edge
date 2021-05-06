@@ -12,7 +12,7 @@ type Params struct {
 }
 
 func (p *Params) GetEngine() string {
-	// We now there is already one
+	// We know there is already one
 	for k := range p.Engine {
 		return k
 	}
@@ -96,7 +96,14 @@ func (f Fork) Int() *big.Int {
 }
 
 type ForksInTime struct {
-	Homestead, Byzantium, Constantinople, Petersburg, Istanbul, EIP150, EIP158, EIP155 bool
+	Homestead,
+	Byzantium,
+	Constantinople,
+	Petersburg,
+	Istanbul,
+	EIP150,
+	EIP158,
+	EIP155 bool
 }
 
 var AllForksEnabled = &Forks{

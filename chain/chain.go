@@ -55,9 +55,11 @@ type Genesis struct {
 // GenesisHeader converts the initially defined genesis struct to a header
 func (g *Genesis) GenesisHeader() *types.Header {
 	stateRoot := types.EmptyRootHash
+
 	if g.StateRoot != types.ZeroHash {
 		stateRoot = g.StateRoot
 	}
+
 	head := &types.Header{
 		Number:       g.Number,
 		Nonce:        g.Nonce,
@@ -74,12 +76,16 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		ReceiptsRoot: types.EmptyRootHash,
 		TxRoot:       types.EmptyRootHash,
 	}
+
+	// Set default values if none are passed in
 	if g.GasLimit == 0 {
 		head.GasLimit = GenesisGasLimit
 	}
+
 	if g.Difficulty == 0 {
 		head.Difficulty = GenesisDifficulty.Uint64()
 	}
+
 	return head
 }
 
@@ -239,7 +245,7 @@ type genesisAccountEncoder struct {
 	PrivateKey *string                   `json:"secretKey,omitempty"`
 }
 
-// Encoding
+// ENCODING //
 
 func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	obj := &genesisAccountEncoder{}
@@ -261,7 +267,7 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	return json.Marshal(obj)
 }
 
-// Decoding
+// DECODING //
 
 func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
@@ -319,6 +325,7 @@ func Import(chain string) (*Chain, error) {
 	if err == nil {
 		return c, nil
 	}
+
 	return ImportFromFile(chain)
 }
 
@@ -328,6 +335,7 @@ func ImportFromName(chain string) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return importChain(data)
 }
 
@@ -337,6 +345,7 @@ func ImportFromFile(filename string) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return importChain(data)
 }
 
@@ -348,5 +357,6 @@ func importChain(content []byte) (*Chain, error) {
 	if engines := chain.Params.Engine; len(engines) != 1 {
 		return nil, fmt.Errorf("Expected one consensus engine but found %d", len(engines))
 	}
+
 	return chain, nil
 }

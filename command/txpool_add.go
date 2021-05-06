@@ -15,34 +15,60 @@ type TxPoolAdd struct {
 	Meta
 }
 
+// DefineFlags defines the command flags
+func (p *TxPoolAdd) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	if len(p.flagMap) > 0 {
+		// No need to redefine the flags again
+		return
+	}
+
+	p.flagMap["from"] = FlagDescriptor{
+		description: "Really helpful description",
+		arguments: []string{
+			"ARG",
+		},
+		argumentsOptional: false,
+	}
+}
+
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
-	return ""
+	p.DefineFlags()
+
+	return p.GenerateHelp(p.Synopsis())
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Synopsis() string {
-	return ""
+	return "Adds a new transaction to the transaction pool\n"
 }
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
 	flags := p.FlagSet("txpool add")
 
-	// address types
+	// Address types
 	var fromRaw, toRaw string
 
-	// big int types
+	// BigInt types
 	var valueRaw, gasPriceRaw string
 
 	var nonce, gasLimit uint64
 
+	// Define the flags
 	flags.StringVar(&fromRaw, "from", "", "")
 	flags.StringVar(&toRaw, "to", "", "")
 	flags.StringVar(&valueRaw, "value", "", "")
 	flags.StringVar(&gasPriceRaw, "gasPrice", "0x100000", "")
 	flags.Uint64Var(&gasLimit, "gasLimit", 1000000, "")
 	flags.Uint64Var(&nonce, "nonce", 0, "")
+
+	// Save the flags for the help method
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
