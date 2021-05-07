@@ -10,14 +10,14 @@ import (
 
 // Request is a jsonrpc request
 type Request struct {
-	ID     int             `json:"id"`
+	ID     interface{}     `json:"id"`
 	Method string          `json:"method"`
 	Params json.RawMessage `json:"params"`
 }
 
 // Response is a jsonrpc response
 type Response struct {
-	ID     int             `json:"id"`
+	ID     interface{}     `json:"id"`
 	Result json.RawMessage `json:"result"`
 	Error  *ErrorObject    `json:"error,omitempty"`
 }
