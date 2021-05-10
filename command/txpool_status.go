@@ -20,7 +20,7 @@ func (p *TxPoolStatus) Help() string {
 
 // Synopsis implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Synopsis() string {
-	return "txpool status"
+	return p.Help()
 }
 
 // Run implements the cli.TxPoolStatus interface

@@ -28,11 +28,51 @@ func (p *TxPoolAdd) DefineFlags() {
 	}
 
 	p.flagMap["from"] = FlagDescriptor{
-		description: "Really helpful description",
+		description: "The sender address",
 		arguments: []string{
-			"ARG",
+			"ADDRESS",
 		},
 		argumentsOptional: false,
+	}
+
+	p.flagMap["to"] = FlagDescriptor{
+		description: "The receiver address",
+		arguments: []string{
+			"ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["value"] = FlagDescriptor{
+		description: "The value of the transaction",
+		arguments: []string{
+			"VALUE",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["gasPrice"] = FlagDescriptor{
+		description: "The gas price",
+		arguments: []string{
+			"GASPRICE",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["gasLimit"] = FlagDescriptor{
+		description: "The specified gas limit",
+		arguments: []string{
+			"LIMIT",
+		},
+		argumentsOptional: true,
+	}
+
+	p.flagMap["nonce"] = FlagDescriptor{
+		description: "The nonce of the transaction",
+		arguments: []string{
+			"NONCE",
+		},
+		argumentsOptional: true,
 	}
 }
 
@@ -45,7 +85,10 @@ func (p *TxPoolAdd) Help() string {
 
 // Synopsis implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Synopsis() string {
-	return "Adds a new transaction to the transaction pool\n"
+
+	usage := "txpool add --from ADDRESS --to ADDRESS --value VALUE\n\t--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]"
+
+	return fmt.Sprintf("Adds a new transaction to the transaction pool\n\nUsage:\n\n\t%s\n", usage)
 }
 
 // Run implements the cli.TxPoolAdd interface

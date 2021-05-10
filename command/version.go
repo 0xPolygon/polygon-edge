@@ -17,7 +17,7 @@ func (c *VersionCommand) Help() string {
 
 // Synopsis implements the cli.Command interface
 func (c *VersionCommand) Synopsis() string {
-	return ""
+	return c.Help()
 }
 
 // Run implements the cli.Command interface

@@ -147,7 +147,7 @@ type Meta struct {
 func (m *Meta) GenerateHelp(synopsys string) string {
 	helpOutput := ""
 	for flagEl, descriptor := range m.flagMap {
-		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n"
+		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n\n"
 	}
 
 	return fmt.Sprintf("Description:\n\n%s\nFlags:\n\n%s", synopsys, helpOutput)
