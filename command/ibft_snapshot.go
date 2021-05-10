@@ -13,14 +13,43 @@ type IbftSnapshot struct {
 	Meta
 }
 
+// DefineFlags defines the command flags
+func (p *IbftSnapshot) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	if len(p.flagMap) > 0 {
+		// No need to redefine the flags again
+		return
+	}
+
+	p.flagMap["number"] = FlagDescriptor{
+		description: "The block height (number) for the snapshot",
+		arguments: []string{
+			"BLOCK_NUMBER",
+		},
+		argumentsOptional: false,
+	}
+}
+
+// GetHelperText returns a simple description of the command
+func (p *IbftSnapshot) GetHelperText() string {
+	return "Returns the IBFT snapshot at the latest block number, unless a block number is specified"
+}
+
 // Help implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Help() string {
-	return ""
+	p.DefineFlags()
+	usage := "ibft snapshot [--number BLOCK_NUMBER]"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.IbftSnapshot interface

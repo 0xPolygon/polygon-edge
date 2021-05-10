@@ -13,14 +13,21 @@ type StatusCommand struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (c *StatusCommand) GetHelperText() string {
+	return "Returns the status of the Polygon SDK client"
+}
+
 // Help implements the cli.Command interface
 func (c *StatusCommand) Help() string {
-	return ""
+	usage := "status"
+
+	return c.GenerateHelp(c.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.Command interface
 func (c *StatusCommand) Synopsis() string {
-	return ""
+	return c.GetHelperText()
 }
 
 // Run implements the cli.Command interface

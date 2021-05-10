@@ -64,7 +64,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		arguments: []string{
 			"LIMIT",
 		},
-		argumentsOptional: true,
+		argumentsOptional: false,
 	}
 
 	p.flagMap["nonce"] = FlagDescriptor{
@@ -72,23 +72,26 @@ func (p *TxPoolAdd) DefineFlags() {
 		arguments: []string{
 			"NONCE",
 		},
-		argumentsOptional: true,
+		argumentsOptional: false,
 	}
+}
+
+// GetHelperText returns a simple description of the command
+func (p *TxPoolAdd) GetHelperText() string {
+	return "Adds a new transaction to the transaction pool"
 }
 
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
 	p.DefineFlags()
+	usage := "txpool add --from ADDRESS --to ADDRESS --value VALUE\n\t--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]"
 
-	return p.GenerateHelp(p.Synopsis())
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Synopsis() string {
-
-	usage := "txpool add --from ADDRESS --to ADDRESS --value VALUE\n\t--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]"
-
-	return fmt.Sprintf("Adds a new transaction to the transaction pool\n\nUsage:\n\n\t%s\n", usage)
+	return p.GetHelperText()
 }
 
 // Run implements the cli.TxPoolAdd interface

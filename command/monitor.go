@@ -16,14 +16,21 @@ type MonitorCommand struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (m *MonitorCommand) GetHelperText() string {
+	return "Starts logging client activity"
+}
+
 // Help implements the cli.Command interface
 func (m *MonitorCommand) Help() string {
-	return ""
+	usage := "monitor"
+
+	return m.GenerateHelp(m.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.Command interface
 func (m *MonitorCommand) Synopsis() string {
-	return ""
+	return m.GetHelperText()
 }
 
 // Run implements the cli.Command interface

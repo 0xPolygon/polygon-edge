@@ -140,17 +140,29 @@ type Meta struct {
 	UI   cli.Ui
 	addr string
 
-	flagMap map[string]FlagDescriptor
+	flagMap    map[string]FlagDescriptor
+	helperText string
 }
 
 // GenerateHelp is a utility function called by every command's Help() method
-func (m *Meta) GenerateHelp(synopsys string) string {
+func (m *Meta) GenerateHelp(synopsys string, usage string) string {
 	helpOutput := ""
+
+	flagCounter := 0
 	for flagEl, descriptor := range m.flagMap {
-		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n\n"
+		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n"
+		flagCounter++
+
+		if flagCounter < len(m.flagMap) {
+			helpOutput += "\n"
+		}
 	}
 
-	return fmt.Sprintf("Description:\n\n%s\nFlags:\n\n%s", synopsys, helpOutput)
+	if len(m.flagMap) > 0 {
+		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n\nFlags:\n\n%s", synopsys, usage, helpOutput)
+	} else {
+		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n", synopsys, usage)
+	}
 }
 
 // GenerateFlagDesc generates the flag descriptions in a readable format

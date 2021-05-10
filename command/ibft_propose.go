@@ -13,14 +13,52 @@ type IbftPropose struct {
 	Meta
 }
 
+// DefineFlags defines the command flags
+func (p *IbftPropose) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	if len(p.flagMap) > 0 {
+		// No need to redefine the flags again
+		return
+	}
+
+	p.flagMap["add"] = FlagDescriptor{
+		description: "Proposes a new validator to be added to the validator set",
+		arguments: []string{
+			"ETH_ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["del"] = FlagDescriptor{
+		description: "Proposes a new validator to be removed from the validator set",
+		arguments: []string{
+			"ETH_ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+}
+
+// GetHelperText returns a simple description of the command
+func (p *IbftPropose) GetHelperText() string {
+	return "Proposes a new candidate to be added to the snapshot list"
+}
+
 // Help implements the cli.IbftPropose interface
 func (p *IbftPropose) Help() string {
-	return ""
+	p.DefineFlags()
+	usage := "ibft propose [--add ETH_ADDRESS]\n\t"
+	usage += "ibft propose [--del ETH_ADDRESS]"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.IbftPropose interface
 func (p *IbftPropose) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.IbftPropose interface
@@ -38,13 +76,13 @@ func (p *IbftPropose) Run(args []string) int {
 
 	if add == del {
 		// either (add=true, del=true) or (add=false, del=false)
-		p.UI.Error("only one of add and del needs to be set")
+		p.UI.Error("Either add or del needs to be set")
 		return 1
 	}
 
 	args = flags.Args()
 	if len(args) != 1 {
-		p.UI.Error("number expected")
+		p.UI.Error("only 1 argument expected")
 		return 1
 	}
 

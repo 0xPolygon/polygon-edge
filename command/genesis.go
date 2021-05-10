@@ -27,16 +27,94 @@ const (
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
 	UI cli.Ui
+	Meta
+}
+
+// DefineFlags defines the command flags
+func (c *GenesisCommand) DefineFlags() {
+	if c.flagMap == nil {
+		// Flag map not initialized
+		c.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	if len(c.flagMap) > 0 {
+		// No need to redefine the flags again
+		return
+	}
+
+	c.flagMap["data-dir"] = FlagDescriptor{
+		description: "Sets the directory for the Polygon SDK data",
+		arguments: []string{
+			"DATA_DIRECTORY",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["name"] = FlagDescriptor{
+		description: "Sets the name for the chain",
+		arguments: []string{
+			"NAME",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["premine"] = FlagDescriptor{
+		description: "Sets the premined accounts and balances",
+		arguments: []string{
+			"ADDRESS:VALUE",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["chainid"] = FlagDescriptor{
+		description: "Sets the ID of the chain",
+		arguments: []string{
+			"CHAIN_ID",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["ibft"] = FlagDescriptor{
+		description: "Sets the flag indicating IBFT consensus is used",
+		arguments: []string{
+			"USE_IBFT",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["ibft-validator"] = FlagDescriptor{
+		description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
+		arguments: []string{
+			"IBFT_VALIDATOR_LIST",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["ibft-validators-prefix-path"] = FlagDescriptor{
+		description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
+		arguments: []string{
+			"IBFT_VALIDATORS_PREFIX_PATH",
+		},
+		argumentsOptional: false,
+	}
+}
+
+// GetHelperText returns a simple description of the command
+func (c *GenesisCommand) GetHelperText() string {
+	return "Generates the genesis.json file, with passed in parameters"
 }
 
 // Help implements the cli.Command interface
 func (c *GenesisCommand) Help() string {
-	return ""
+	c.DefineFlags()
+	usage := "genesis --data-dir DATA_DIRECTORY --name NAME [--premine ADDRESS:VALUE]\n\t[--chainid CHAIN_ID] [--ibft USE_IBFT] [--ibft-validator IBFT_VALIDATOR_LIST]\n\t[--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]"
+
+	return c.GenerateHelp(c.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.Command interface
 func (c *GenesisCommand) Synopsis() string {
-	return ""
+	return c.GetHelperText()
 }
 
 // Run implements the cli.Command interface
@@ -95,7 +173,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			}
 		} else if ibftValidatorsPrefixPath != "" {
 			// read all folders with the ibftValidatorsPrefixPath and search for
-			// istambul addresses and also include the bootnodes if possible
+			// istanbul addresses and also include the bootnodes if possible
 			if validators, bootnodes, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
 				return 1

@@ -8,16 +8,24 @@ import (
 // VersionCommand is the command to show the version of the agent
 type VersionCommand struct {
 	UI cli.Ui
+	Meta
+}
+
+// GetHelperText returns a simple description of the command
+func (c *VersionCommand) GetHelperText() string {
+	return "Returns the current Polygon SDK version"
 }
 
 // Help implements the cli.Command interface
 func (c *VersionCommand) Help() string {
-	return "Returns the current Polygon SDK version"
+	usage := "version"
+
+	return c.GenerateHelp(c.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.Command interface
 func (c *VersionCommand) Synopsis() string {
-	return c.Help()
+	return c.GetHelperText()
 }
 
 // Run implements the cli.Command interface

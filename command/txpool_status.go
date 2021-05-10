@@ -13,14 +13,21 @@ type TxPoolStatus struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *TxPoolStatus) GetHelperText() string {
+	return "Returns the number of transactions in the pool"
+}
+
 // Help implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Help() string {
-	return "Returns the number of transactions in the pool"
+	usage := "txpool status"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Synopsis() string {
-	return p.Help()
+	return p.GetHelperText()
 }
 
 // Run implements the cli.TxPoolStatus interface
