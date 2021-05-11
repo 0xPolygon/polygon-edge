@@ -54,7 +54,7 @@ func TestState_AddMessages(t *testing.T) {
 	c.addMessage(msg("B", proto.MessageReq_Commit))
 	c.addMessage(msg("B", proto.MessageReq_Commit))
 
-	assert.Equal(t, c.numCommited(), 2)
+	assert.Equal(t, c.numCommitted(), 2)
 
 	// -- test prepare messages --
 	c.addMessage(msg("C", proto.MessageReq_Prepare))

@@ -19,13 +19,16 @@ type operator struct {
 	proto.UnimplementedIbftOperatorServer
 }
 
+// Status returns the status of the IBFT client
 func (o *operator) Status(ctx context.Context, req *empty.Empty) (*proto.IbftStatusResp, error) {
 	resp := &proto.IbftStatusResp{
 		Key: o.ibft.validatorKeyAddr.String(),
 	}
+
 	return resp, nil
 }
 
+// getNextCandidate returns a candidate from the snapshot
 func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 	o.candidatesLock.Lock()
 	defer o.candidatesLock.Unlock()
@@ -35,18 +38,20 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 	for i := 0; i < len(o.candidates); i++ {
 		addr := types.StringToAddress(o.candidates[i].Address)
 
+		// Define the delete callback method
 		delete := func() {
 			o.candidates = append(o.candidates[:i], o.candidates[i+1:]...)
 			i--
 		}
 
+		// Check if the candidate is already in the validator set, and wants to be added
 		if o.candidates[i].Auth && snap.Set.Includes(addr) {
-			// if add and its already in, we can remove it
 			delete()
 			continue
 		}
+
+		// Check if the candidate is not in the validator set, and wants to be removed
 		if !o.candidates[i].Auth && !snap.Set.Includes(addr) {
-			// if remove and already out of the validators we can remove it
 			delete()
 		}
 	}
@@ -60,14 +65,18 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		count := snap.Count(func(v *Vote) bool {
 			return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
 		})
+
 		if count == 0 {
+			// Candidate found
 			candidate = c
 			break
 		}
 	}
+
 	return candidate
 }
 
+// GetSnapshot returns the snapshot, based on the passed in request
 func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*proto.Snapshot, error) {
 	var snap *Snapshot
 	var err error
@@ -81,9 +90,11 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 		return nil, err
 	}
 	resp := snap.ToProto()
+
 	return resp, nil
 }
 
+// Propose proposes a new candidate to be added / removed from the validator set
 func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Empty, error) {
 	var addr types.Address
 	if err := addr.UnmarshalText([]byte(req.Address)); err != nil {
@@ -107,27 +118,29 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 	// safe checks
 	if req.Auth {
 		if snap.Set.Includes(addr) {
-			return nil, fmt.Errorf("is already a validator")
+			return nil, fmt.Errorf("the candidate is already a validator")
 		}
 	}
 	if !req.Auth {
 		if !snap.Set.Includes(addr) {
-			return nil, fmt.Errorf("cannot remove a validator if not in snapshot")
+			return nil, fmt.Errorf("cannot remove a validator if they're not in the snapshot")
 		}
 	}
 
-	// check if we have already vote for this candidate
+	// check if we have already voted for this candidate
 	count := snap.Count(func(v *Vote) bool {
 		return v.Address == addr && v.Validator == o.ibft.validatorKeyAddr
 	})
 	if count == 1 {
-		return nil, fmt.Errorf("we already voted for this address")
+		return nil, fmt.Errorf("already voted for this address")
 	}
 
 	o.candidates = append(o.candidates, req)
+
 	return &empty.Empty{}, nil
 }
 
+// Candidates returns the validator candidates list
 func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.CandidatesResp, error) {
 	o.candidatesLock.Lock()
 	defer o.candidatesLock.Unlock()
@@ -135,6 +148,8 @@ func (o *operator) Candidates(ctx context.Context, req *empty.Empty) (*proto.Can
 	resp := &proto.CandidatesResp{
 		Candidates: []*proto.Candidate{},
 	}
+
 	resp.Candidates = append(resp.Candidates, o.candidates...)
+
 	return resp, nil
 }

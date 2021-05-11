@@ -14,7 +14,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Consensus is the interface for consensus
+// Consensus is the public interface for consensus mechanism
+// Each consensus mechanism must implement this interface in order to be valid
 type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
@@ -34,12 +35,21 @@ type Config struct {
 	// Params are the params of the chain and the consensus
 	Params *chain.Params
 
-	// Specific configuration parameters for the backend
+	// Config defines specific configuration parameters for the backend
 	Config map[string]interface{}
 
-	// Path for the consensus protocol tos tore information
+	// Path is the directory path for the consensus protocol to store information
 	Path string
 }
 
 // Factory is the factory function to create a discovery backend
-type Factory func(context.Context, bool, *Config, *txpool.TxPool, *network.Server, *blockchain.Blockchain, *state.Executor, *grpc.Server, hclog.Logger) (Consensus, error)
+type Factory func(
+	context.Context,
+	bool, *Config,
+	*txpool.TxPool,
+	*network.Server,
+	*blockchain.Blockchain,
+	*state.Executor,
+	*grpc.Server,
+	hclog.Logger,
+) (Consensus, error)

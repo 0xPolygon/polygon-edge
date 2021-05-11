@@ -7,21 +7,31 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 )
 
+// msgQueue defines the structure that holds message queues for different IBFT states
 type msgQueue struct {
+	// Heap implementation for the round change message queue
 	roundChangeStateQueue msgQueueImpl
-	acceptStateQueue      msgQueueImpl
-	validateStateQueue    msgQueueImpl
+
+	// Heap implementation for the accept state message queue
+	acceptStateQueue msgQueueImpl
+
+	// Heap implementation for the validate state message queue
+	validateStateQueue msgQueueImpl
 
 	queueLock sync.Mutex
 }
 
+// pushMessage adds a new message to a message queue
 func (m *msgQueue) pushMessage(task *msgTask) {
 	m.queueLock.Lock()
+
 	queue := m.getQueue(msgToState(task.msg))
 	heap.Push(queue, task)
+
 	m.queueLock.Unlock()
 }
 
+// readMessage reads the message from a message queue, based on the current state and view
 func (m *msgQueue) readMessage(state IbftState, current *proto.View) *msgTask {
 	m.queueLock.Lock()
 	defer m.queueLock.Unlock()
@@ -64,6 +74,7 @@ func (m *msgQueue) readMessage(state IbftState, current *proto.View) *msgTask {
 	}
 }
 
+// getQueue checks the passed in state, and returns the corresponding message queue
 func (m *msgQueue) getQueue(state IbftState) *msgQueueImpl {
 	if state == RoundChangeState {
 		// round change
@@ -77,6 +88,7 @@ func (m *msgQueue) getQueue(state IbftState) *msgQueueImpl {
 	}
 }
 
+// newMsgQueue creates a new message queue structure
 func newMsgQueue() *msgQueue {
 	return &msgQueue{
 		roundChangeStateQueue: msgQueueImpl{},
@@ -85,17 +97,20 @@ func newMsgQueue() *msgQueue {
 	}
 }
 
-func protoTypeToMsg(typ proto.MessageReq_Type) MsgType {
-	if typ == proto.MessageReq_Preprepare {
+// protoTypeToMsg converts the proto message request type to a MsgType object
+func protoTypeToMsg(msgType proto.MessageReq_Type) MsgType {
+	if msgType == proto.MessageReq_Preprepare {
 		return msgPreprepare
-	} else if typ == proto.MessageReq_Prepare {
+	} else if msgType == proto.MessageReq_Prepare {
 		return msgPrepare
-	} else if typ == proto.MessageReq_Commit {
+	} else if msgType == proto.MessageReq_Commit {
 		return msgCommit
 	}
+
 	return msgRoundChange
 }
 
+// msgToState converts the message type to an IbftState
 func msgToState(msg MsgType) IbftState {
 	if msg == msgRoundChange {
 		// round change
@@ -107,11 +122,13 @@ func msgToState(msg MsgType) IbftState {
 		// prepare and commit
 		return ValidateState
 	}
+
 	panic("BUG: not expected")
 }
 
 type MsgType uint64
 
+// Define message types
 const (
 	// priority order for the messages
 	msgRoundChange MsgType = 0
@@ -120,6 +137,7 @@ const (
 	msgPrepare     MsgType = 3
 )
 
+// String returns the string representation of the message type
 func (m MsgType) String() string {
 	switch m {
 	case msgRoundChange:
@@ -145,6 +163,7 @@ type msgTask struct {
 
 type msgQueueImpl []*msgTask
 
+// head returns the head of the queue
 func (m msgQueueImpl) head() *msgTask {
 	return m[0]
 }
@@ -189,6 +208,13 @@ func (m *msgQueueImpl) Pop() interface{} {
 	return item
 }
 
+// cmpView compares two proto views.
+//
+// If v.Sequence == y.Sequence && v.Round == y.Round => 0
+//
+// If v.Sequence < y.Sequence => -1 ELSE => 1
+//
+// If v.Round < y.Round => -1 ELSE 1
 func cmpView(v, y *proto.View) int {
 	if v.Sequence != y.Sequence {
 		if v.Sequence < y.Sequence {
@@ -204,5 +230,6 @@ func cmpView(v, y *proto.View) int {
 			return 1
 		}
 	}
+
 	return 0
 }

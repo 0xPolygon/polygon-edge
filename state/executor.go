@@ -188,12 +188,14 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	var err error
 	if txn.From == emptyFrom {
+		// Decrypt the from address
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
 			return err
 		}
 	}
 
+	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
 	gasUsed, failed, err := t.Apply(msg)
@@ -245,6 +247,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, types.Hash) {
 	s2, root := t.state.Commit(t.config.EIP155)
+
 	return s2, types.BytesToHash(root)
 }
 
