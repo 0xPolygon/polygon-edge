@@ -181,12 +181,6 @@ func (s *Server) runDial() {
 	for {
 		slots := s.numOpenSlots()
 
-		/*
-			fmt.Println("-- slots --")
-			fmt.Println(s.config.MaxPeers, s.numPeers(), s.identity.numPending())
-			fmt.Println(slots)
-		*/
-
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.
@@ -399,10 +393,12 @@ func (s *Server) runJoinWatcher() error {
 	})
 }
 
-func (s *Server) Close() {
-	s.host.Close()
+func (s *Server) Close() error {
+	err := s.host.Close()
 	s.dialQueue.Close()
 	close(s.closeCh)
+
+	return err
 }
 
 func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {

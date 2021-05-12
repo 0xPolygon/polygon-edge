@@ -220,16 +220,19 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	return priv, nil
 }
 
+// ReadPrivKey reads a private key from the file path
 func ReadPrivKey(path string) (*ecdsa.PrivateKey, error) {
 	createFn := func() ([]byte, error) {
 		key, err := GenerateKey()
 		if err != nil {
 			return nil, err
 		}
+
 		buf, err := MarshallPrivateKey(key)
 		if err != nil {
 			return nil, err
 		}
+
 		return buf, nil
 	}
 	readFn := func(b []byte) (interface{}, error) {
@@ -237,15 +240,18 @@ func ReadPrivKey(path string) (*ecdsa.PrivateKey, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		key, err := ParsePrivateKey(buf)
 		if err != nil {
 			return nil, err
 		}
+
 		return key, nil
 	}
 	obj, err := keystore.CreateIfNotExists(path, createFn, readFn)
 	if err != nil {
 		return nil, err
 	}
+
 	return obj.(*ecdsa.PrivateKey), nil
 }

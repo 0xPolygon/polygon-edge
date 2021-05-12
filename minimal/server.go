@@ -65,6 +65,7 @@ var dirPaths = []string{
 	"libp2p",
 }
 
+// NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
 		logger:     logger,
@@ -186,6 +187,7 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	return account.Nonce
 }
 
+// setupConsensus sets up the consensus mechanism
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[engineName]
@@ -202,11 +204,23 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
+	consensus, err := engine(
+		context.Background(),
+		s.config.Seal,
+		config,
+		s.txpool,
+		s.network,
+		s.blockchain,
+		s.executor,
+		s.grpcServer,
+		s.logger.Named("consensus"),
+	)
+
 	if err != nil {
 		return err
 	}
 	s.consensus = consensus
+
 	return nil
 }
 
@@ -217,6 +231,8 @@ type jsonRPCHub struct {
 	*txpool.TxPool
 	*state.Executor
 }
+
+// HELPER + WRAPPER METHODS //
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	// the values in the trie are the hashed objects of the keys
@@ -279,6 +295,9 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]b
 	return transition.ReturnValue(), failed, nil
 }
 
+// SETUP //
+
+// setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
 		state:      s.state,
@@ -297,9 +316,11 @@ func (s *Server) setupJSONRPC() error {
 		return err
 	}
 	s.jsonrpcServer = srv
+
 	return nil
 }
 
+// setupGRPC sets up the grpc server and listens on tcp
 func (s *Server) setupGRPC() error {
 	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
 
@@ -315,6 +336,7 @@ func (s *Server) setupGRPC() error {
 	}()
 
 	s.logger.Info("GRPC server running", "addr", s.config.GRPCAddr.String())
+
 	return nil
 }
 
@@ -327,12 +349,22 @@ func (s *Server) Join(addr0 string, dur time.Duration) error {
 	return s.network.JoinAddr(addr0, dur)
 }
 
+// Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() {
+	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
 	}
-	s.network.Close()
-	s.consensus.Close()
+
+	// Close the networking layer
+	if err := s.network.Close(); err != nil {
+		s.logger.Error("failed to close networking", "err", err.Error())
+	}
+
+	// Close the consensus layer
+	if err := s.consensus.Close(); err != nil {
+		s.logger.Error("failed to close consensus", "err", err.Error())
+	}
 }
 
 // Entry is a backend configuration entry
@@ -341,24 +373,18 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
+// addPath sets the polygon-sdk path, if it's not set yet
 func (e *Entry) addPath(path string) {
 	if len(e.Config) == 0 {
 		e.Config = map[string]interface{}{}
 	}
+
 	if _, ok := e.Config["path"]; !ok {
 		e.Config["path"] = path
 	}
 }
 
-func addPath(paths []string, path string, entries map[string]*Entry) []string {
-	newpath := paths[0:]
-	newpath = append(newpath, path)
-	for name := range entries {
-		newpath = append(newpath, filepath.Join(path, name))
-	}
-	return newpath
-}
-
+// SetupDataDir sets up the polygon-sdk data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
@@ -370,25 +396,22 @@ func SetupDataDir(dataDir string, paths []string) error {
 			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
 		}
 	}
+
 	return nil
 }
 
+// createDir creates a file system directory if it doesn't exist
 func createDir(path string) error {
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
+
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(path, os.ModePerm); err != nil {
 			return err
 		}
 	}
-	return nil
-}
 
-func getSingleKey(i map[string]*Entry) string {
-	for k := range i {
-		return k
-	}
-	panic("internal. key not found")
+	return nil
 }

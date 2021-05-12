@@ -34,7 +34,7 @@ type SrvAccount struct {
 	Balance *big.Int
 }
 
-// Configuration for the test server
+// TestServerConfig is the configuration for the test server
 type TestServerConfig struct {
 	JsonRPCPort  int64         // The JSON RPC endpoint port
 	GRPCPort     int64         // The GRPC endpoint port
