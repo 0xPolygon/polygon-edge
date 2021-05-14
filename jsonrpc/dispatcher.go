@@ -397,6 +397,7 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 		if ok {
 			return res, nil
 		}
+		number = LatestBlockNumber
 	}
 	header, err := d.getBlockHeaderImpl(number)
 	if err != nil {

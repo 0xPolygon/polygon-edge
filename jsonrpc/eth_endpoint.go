@@ -6,11 +6,17 @@ import (
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/minimal/version"
 )
 
 // Eth is the eth jsonrpc endpoint
 type Eth struct {
 	d *Dispatcher
+}
+
+// Web3ClientVersion returns the version of the web3 client (web3_clientVersion)
+func (e *Eth) Web3ClientVersion() (interface{}, error) {
+	return fmt.Sprintf("polygon-sdk [%s]", version.GetVersion()), nil
 }
 
 // GetBlockByNumber returns information about a block by block number
@@ -429,10 +435,13 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 	if err != nil {
 		return nil, err
 	}
+
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
 	if err != nil {
-		return nil, err
+		// Account not found, return an empty account
+		return "0x", nil
 	}
+
 	return argBigPtr(acc.Balance), nil
 }
 
