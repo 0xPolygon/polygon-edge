@@ -99,6 +99,27 @@ func (g *Genesis) Hash() types.Hash {
 
 // ENCODING + DECODING //
 
+func encodeUint64(i uint64) *string {
+	if i == 0 {
+		return nil
+	}
+
+	bs := make([]byte, 8)
+	binary.BigEndian.PutUint64(bs, i)
+
+	res := hex.EncodeToHex(bs)
+	return &res
+}
+
+func encodeBytes(b []byte) *string {
+	if len(b) == 0 {
+		return nil
+	}
+
+	res := hex.EncodeToHex(b[:])
+	return &res
+}
+
 // MarshalJSON implements the json interface
 func (g *Genesis) MarshalJSON() ([]byte, error) {
 	type Genesis struct {

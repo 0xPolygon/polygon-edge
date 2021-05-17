@@ -204,18 +204,7 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(
-		context.Background(),
-		s.config.Seal,
-		config,
-		s.txpool,
-		s.network,
-		s.blockchain,
-		s.executor,
-		s.grpcServer,
-		s.logger.Named("consensus"),
-	)
-
+	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
 		return err
 	}
@@ -263,35 +252,43 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	account, err := j.GetAccount(root, addr)
+
 	if err != nil {
 		return nil, err
 	}
 
 	obj, err := j.getState(account.Root, slot.Bytes())
+
 	if err != nil {
 		return nil, err
 	}
+
 	return obj, nil
 }
 
 func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	res, ok := j.state.GetCode(hash)
+
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")
 	}
+
 	return res, nil
 }
 
 func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
 	transition, err := j.BeginTxn(header.StateRoot, header)
+
 	if err != nil {
 		return nil, false, err
 	}
 
 	_, failed, err := transition.Apply(txn)
+
 	if err != nil {
 		return nil, false, err
 	}
+
 	return transition.ReturnValue(), failed, nil
 }
 
@@ -307,8 +304,9 @@ func (s *Server) setupJSONRPC() error {
 	}
 
 	conf := &jsonrpc.Config{
-		Store: hub,
-		Addr:  s.config.JSONRPCAddr,
+		Store:   hub,
+		Addr:    s.config.JSONRPCAddr,
+		ChainID: uint64(s.config.Chain.Params.ChainID),
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)

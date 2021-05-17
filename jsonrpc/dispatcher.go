@@ -56,6 +56,7 @@ type Dispatcher struct {
 	serviceMap    map[string]*serviceData
 	endpoints     endpoints
 	filterManager *FilterManager
+	chainID       uint64
 }
 
 // newTestDispatcher returns a dispatcher without the filter manager, used for testing
@@ -70,10 +71,11 @@ func newTestDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatch
 	return d
 }
 
-func newDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store blockchainInterface, chainID uint64) *Dispatcher {
 	d := &Dispatcher{
-		logger: logger.Named("dispatcher"),
-		store:  store,
+		logger:  logger.Named("dispatcher"),
+		store:   store,
+		chainID: chainID,
 	}
 	d.registerEndpoints()
 	if store != nil {
@@ -415,6 +417,9 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	if arg.From == nil {
 		return nil, fmt.Errorf("from is empty")
 	}
+	if arg.Data != nil && arg.Input != nil {
+		return nil, fmt.Errorf("both input and data cannot be set")
+	}
 	if arg.Nonce == nil {
 		// get nonce from the pool
 		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
@@ -430,14 +435,22 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		// use the suggested gas price
 		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
 	}
+
+	var input []byte
+	if arg.Data != nil {
+		input = *arg.Data
+	} else if arg.Input != nil {
+		input = *arg.Input
+	}
 	if arg.To == nil {
-		if arg.Input == nil {
+		if input == nil {
 			return nil, fmt.Errorf("contract creation without data provided")
 		}
 	}
-	if arg.Input == nil {
-		arg.Input = argBytesPtr([]byte{})
+	if input == nil {
+		input = []byte{}
 	}
+
 	if arg.Gas == nil {
 		// TODO
 		arg.Gas = argUintPtr(1000000)
@@ -448,7 +461,7 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		Gas:      uint64(*arg.Gas),
 		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
 		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    *arg.Input,
+		Input:    input,
 		Nonce:    uint64(*arg.Nonce),
 	}
 	if arg.To != nil {

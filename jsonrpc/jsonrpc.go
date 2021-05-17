@@ -50,8 +50,9 @@ type dispatcherImpl interface {
 }
 
 type Config struct {
-	Store blockchainInterface
-	Addr  *net.TCPAddr
+	Store   blockchainInterface
+	Addr    *net.TCPAddr
+	ChainID uint64
 }
 
 // NewJSONRPC returns the JsonRPC http server
@@ -62,7 +63,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
-		dispatcher: newDispatcher(logger, config.Store),
+		dispatcher: newDispatcher(logger, config.Store, config.ChainID),
 	}
 
 	// start http server
@@ -128,6 +129,14 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 }
 
 func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+	if (*req).Method == "OPTIONS" {
+		return
+	}
+
 	handleErr := func(err error) {
 		w.Write([]byte(err.Error()))
 		return

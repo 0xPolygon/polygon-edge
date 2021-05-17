@@ -126,9 +126,9 @@ func (c *GenesisCommand) Run(args []string) int {
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
 	var name string
+	var consensus string
 
 	// ibft flags
-	var ibftConsensus bool
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
 
@@ -136,7 +136,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&name, "name", "example", "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", 100, "")
-	flags.BoolVar(&ibftConsensus, "ibft", false, "")
+	flags.StringVar(&consensus, "consensus", "pow", "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
@@ -159,12 +159,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var bootnodes chain.Bootnodes
 	var extraData []byte
 
-	// determine engine
-	consensus := "pow"
-	if ibftConsensus {
-		// extradata
-		consensus = "ibft"
-
+	if consensus == "ibft" {
 		// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
 		var validators []types.Address
 		if len(ibftValidators) != 0 {
@@ -173,7 +168,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			}
 		} else if ibftValidatorsPrefixPath != "" {
 			// read all folders with the ibftValidatorsPrefixPath and search for
-			// istanbul addresses and also include the bootnodes if possible
+			// istambul addresses and also include the bootnodes if possible
 			if validators, bootnodes, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
 				return 1

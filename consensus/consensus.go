@@ -38,7 +38,7 @@ type Config struct {
 	// Config defines specific configuration parameters for the backend
 	Config map[string]interface{}
 
-	// Path is the directory path for the consensus protocol to store information
+	// Path is the directory path for the consensus protocol tos tore information
 	Path string
 }
 

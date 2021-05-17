@@ -11,70 +11,87 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-const NumOfNodes = 3
-
 func TestDiscovery(t *testing.T) {
-	srvs := make([]*framework.TestServer, NumOfNodes)
-	for i := range srvs {
-		srvs[i] = framework.NewTestServer(t, func(config *framework.TestServerConfig) {
-		})
-	}
-	defer func() {
-		for _, s := range srvs {
-			s.Stop()
-		}
-	}()
-
-	time.Sleep(5 * time.Second)
-
-	p2pAddrs := make([]string, NumOfNodes)
-	for i, s := range srvs {
-		status, err := s.Operator().GetStatus(context.Background(), &empty.Empty{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		p2pAddrs[i] = status.P2PAddr
+	tests := []struct {
+		name     string
+		numNodes int
+		// Number of nodes that connects to left node as default
+		numInitConnectNodes int
+	}{
+		{
+			name:                "first 4 nodes should know each other",
+			numNodes:            5,
+			numInitConnectNodes: 4,
+		},
+		{
+			name:                "all should know each other",
+			numNodes:            5,
+			numInitConnectNodes: 5,
+		},
 	}
 
-	for i := 0; i < NumOfNodes-1; i++ {
-		srv, dest := srvs[i], p2pAddrs[i+1]
-		_, err := srv.Operator().PeersAdd(context.Background(), &proto.PeersAddRequest{
-			Id: dest,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	conf := func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDummy)
 	}
 
-	time.Sleep(time.Second * 60)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvs := make([]*framework.TestServer, tt.numNodes)
+			for i := range srvs {
+				srvs[i] = framework.NewTestServer(t, conf)
+			}
+			defer func() {
+				for _, s := range srvs {
+					s.Stop()
+				}
+			}()
 
-	for i, s := range srvs {
-		res, err := s.Operator().PeersList(context.Background(), &empty.Empty{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		addrs := make([]string, len(res.Peers))
-		for i, p := range res.Peers {
-			addr, id := p.Addrs[0], p.Id
-			addrs[i] = fmt.Sprintf("%s/p2p/%s", addr, id)
-		}
-
-		for j, target := range p2pAddrs {
-			if i == j {
-				continue
+			p2pAddrs := make([]string, tt.numNodes)
+			for i, s := range srvs {
+				status, err := s.Operator().GetStatus(context.Background(), &empty.Empty{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				p2pAddrs[i] = status.P2PAddr
 			}
 
-			found := false
-			for _, addr := range addrs {
-				if addr == target {
-					found = true
-					break
+			for i := 0; i < tt.numInitConnectNodes-1; i++ {
+				srv, dest := srvs[i], p2pAddrs[i+1]
+				_, err := srv.Operator().PeersAdd(context.Background(), &proto.PeersAddRequest{
+					Id: dest,
+				})
+				if err != nil {
+					t.Fatal(err)
 				}
 			}
-			if !found {
-				t.Errorf("Node %d couldn't find peer %s", i, target)
+			time.Sleep(10 * time.Second)
+
+			for i, s := range srvs {
+				res, err := s.Operator().PeersList(context.Background(), &empty.Empty{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				isAddrKnown := make(map[string]bool, len(res.Peers))
+				for _, p := range res.Peers {
+					addr, id := p.Addrs[0], p.Id
+					key := fmt.Sprintf("%s/p2p/%s", addr, id)
+					isAddrKnown[key] = true
+				}
+
+				for j, addr := range p2pAddrs {
+					shouldKnow := i != j && i < tt.numInitConnectNodes && j < tt.numInitConnectNodes
+					actual := isAddrKnown[addr]
+
+					if shouldKnow != actual {
+						if shouldKnow {
+							t.Errorf("node %d should know node %d, but doesn't know", i, j)
+						} else {
+							t.Errorf("node %d shouldn't know node %d, but knows", i, j)
+						}
+					}
+				}
 			}
-		}
+		})
 	}
 }
