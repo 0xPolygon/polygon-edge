@@ -21,6 +21,7 @@ import (
 
 const maxEnqueueSize = 50
 
+// syncPeer is a representation of the peer the node is syncing with
 type syncPeer struct {
 	peer   peer.ID
 	client proto.V1Client
@@ -35,10 +36,13 @@ type syncPeer struct {
 	enqueueCh   chan struct{}
 }
 
+// Number returns the latest peer block height
 func (s *syncPeer) Number() uint64 {
 	return s.number
 }
 
+// purgeBlocks purges the cache of broadcasted blocks the node has written so far
+// from the syncPeer
 func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
@@ -54,6 +58,7 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 	}
 }
 
+// popBlock pops a block from the block queue [BLOCKING]
 func (s *syncPeer) popBlock() (b *types.Block) {
 	for {
 		s.enqueueLock.Lock()
@@ -68,6 +73,7 @@ func (s *syncPeer) popBlock() (b *types.Block) {
 	}
 }
 
+// appendBlock adds a new block to the block queue
 func (s *syncPeer) appendBlock(b *types.Block) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
@@ -79,7 +85,7 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	// append to the end
 	s.enqueue = append(s.enqueue, b)
 
-	// update the number (TODO LOCK THIS)
+	// update the number and hash
 	s.number = b.Number()
 	s.hash = b.Hash()
 
@@ -89,20 +95,24 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	}
 }
 
+// Status defines the up to date information regarding the peer
 type Status struct {
-	Difficulty *big.Int
-	Hash       types.Hash
-	Number     uint64
+	Difficulty *big.Int   // Current difficulty
+	Hash       types.Hash // Latest block hash
+	Number     uint64     // Latest block number
 }
 
+// Copy creates a copy of the status
 func (s *Status) Copy() *Status {
 	ss := new(Status)
 	ss.Hash = s.Hash
 	ss.Number = s.Number
 	ss.Difficulty = new(big.Int).Set(s.Difficulty)
+
 	return ss
 }
 
+// toProto converts a Status object to a proto.V1Status
 func (s *Status) toProto() *proto.V1Status {
 	return &proto.V1Status{
 		Number:     s.Number,
@@ -111,6 +121,7 @@ func (s *Status) toProto() *proto.V1Status {
 	}
 }
 
+// statusFromProto extracts a Status object from a passed in proto.V1Status
 func statusFromProto(p *proto.V1Status) (*Status, error) {
 	s := new(Status)
 	if err := s.Hash.UnmarshalText([]byte(p.Hash)); err != nil {
@@ -123,6 +134,7 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 		return nil, fmt.Errorf("failed to decode difficulty")
 	}
 	s.Difficulty = diff
+
 	return s, nil
 }
 
@@ -131,9 +143,7 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peersLock sync.Mutex            // TODO: Remove
-	peers     map[peer.ID]*syncPeer // TODO: Remove
-	newPeerCh chan struct{}         // TODO: Remove
+	peers map[peer.ID]*syncPeer // TODO: Remove
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -144,20 +154,22 @@ type Syncer struct {
 	server *network.Server
 }
 
+// NewSyncer creates a new Syncer instance
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 	s := &Syncer{
 		logger:     logger.Named("syncer"),
 		peers:      map[peer.ID]*syncPeer{},
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
-		newPeerCh:  make(chan struct{}),
 		server:     server,
 	}
+
 	return s
 }
 
+// syncCurrentStatus taps into the blockchain event steam and updates the Syncer.status field
 func (s *Syncer) syncCurrentStatus() {
-	// get the current status of the syncer
+	// Get the current status of the syncer
 	currentHeader := s.blockchain.Header()
 	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
 
@@ -203,6 +215,7 @@ func (s *Syncer) syncCurrentStatus() {
 
 const syncerV1 = "/syncer/0.1"
 
+// enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
@@ -212,6 +225,7 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	}
 }
 
+// Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
 	// diff is number in ibft
 	diff := new(big.Int).SetUint64(b.Number())
@@ -234,19 +248,23 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 }
 
+// getStatus grabs the current status [Thread safe]
 func (s *Syncer) getStatus() *Status {
 	s.statusLock.Lock()
 	status := s.status.Copy()
 	s.statusLock.Unlock()
+
 	return status
 }
 
+// Start starts the syncer protocol
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
 
+	// Run the blockchain event listener loop
 	go s.syncCurrentStatus()
 
-	// register the grpc protocol for syncer
+	// Register the grpc protocol for syncer
 	grpc := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpc.GrpcServer(), s.serviceV1)
 
@@ -273,6 +291,7 @@ func (s *Syncer) Start() {
 	}()
 }
 
+// BestPeer returns the best peer by difficulty (if any)
 func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
@@ -293,6 +312,7 @@ func (s *Syncer) BestPeer() *syncPeer {
 	return bestPeer
 }
 
+// HandleUser is a helper method that is used to handle new user connections within the Syncer
 func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
@@ -315,13 +335,14 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	return nil
 }
 
+// findCommonAncestor returns the common ancestor header and fork
 func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.Header, *types.Header, error) {
 	h := s.blockchain.Header()
 
 	min := uint64(0) // genesis
 	max := h.Number
 
-	targetHeight := uint64(status.Number)
+	targetHeight := status.Number
 
 	if heightNumber := targetHeight; max > heightNumber {
 		max = heightNumber
@@ -340,12 +361,6 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 			header = genesis
 			break
 		}
-
-		/*
-			fmt.Println("- req -")
-			fmt.Println(min, max, m)
-			time.Sleep(1 * time.Second)
-		*/
 
 		found, err := getHeader(clt, &m, nil)
 		if err != nil {
@@ -380,6 +395,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	if fork == nil {
 		return nil, nil, fmt.Errorf("fork not found")
 	}
+
 	return header, fork, nil
 }
 
@@ -416,7 +432,7 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 	var lastTarget uint64
 
-	// sync up to the current known header for the
+	// sync up to the current known header
 	for {
 		// update target
 		target := p.status.Number
@@ -428,11 +444,12 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 		for {
 			s.logger.Debug("sync up to block", "from", startBlock.Number, "to", target)
 
-			// start to syncronize with it
+			// start to synchronize with it
 			sk := &skeleton{
 				span: 10,
 				num:  5,
 			}
+
 			if err := sk.build(p.client, startBlock.Hash); err != nil {
 				return fmt.Errorf("failed to build skeleton: %v", err)
 			}
@@ -444,11 +461,6 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 			// sync the data
 			for _, slot := range sk.slots {
-				/*
-					for _, b := range slot.blocks {
-						fmt.Printf("Block %d %s\n", b.Number(), b.Hash().String())
-					}
-				*/
 				if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
 					return fmt.Errorf("failed to write bulk sync blocks: %v", err)
 				}
