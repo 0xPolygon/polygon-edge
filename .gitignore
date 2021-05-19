@@ -4,7 +4,6 @@ genesis.json
 config*.json
 
 bin/
-pkg/
 
 test-chain*
 .idea
