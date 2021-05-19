@@ -4,10 +4,6 @@ download-spec-tests:
 	git submodule init
 	git submodule update
 
-.PHONY: build
-build: static-assets
-	./scripts/build.sh
-
 .PHONY: bindata
 bindata:
 	go-bindata -pkg chain -o ./chain/chain_bindata.go ./chain/chains
