@@ -6,7 +6,6 @@ import (
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/0xPolygon/minimal/version"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -17,11 +16,6 @@ type Eth struct {
 // ChainId returns the chain id of the client
 func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
-}
-
-// Web3ClientVersion returns the version of the web3 client (web3_clientVersion)
-func (e *Eth) Web3ClientVersion() (interface{}, error) {
-	return fmt.Sprintf("polygon-sdk [%s]", version.GetVersion()), nil
 }
 
 // GetBlockByNumber returns information about a block by block number
