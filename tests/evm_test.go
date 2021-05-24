@@ -2,12 +2,11 @@ package tests
 
 import (
 	"encoding/json"
+	"github.com/umbracle/fastrlp"
 	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
-
-	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -96,7 +95,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	for addr, alloc := range c.Post {
 		for key, val := range alloc.Storage {
 			if have := txn.GetState(addr, key); have != val {
-				t.Fatalf("wrong storage value at %x:\n  got  %x\n  want %x", key, have, val)
+				t.Fatalf("wrong storage value at %s:\n  got  %s\n  want %s\n at address %s", key, have, val, addr)
 			}
 		}
 	}

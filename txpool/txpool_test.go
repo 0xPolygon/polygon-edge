@@ -2,6 +2,7 @@ package txpool
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/minimal/crypto"
@@ -20,8 +21,9 @@ func TestMultipleTransactions(t *testing.T) {
 	from1 := types.Address{0x1}
 
 	txn0 := &types.Transaction{
-		From:  from1,
-		Nonce: 10,
+		From:     from1,
+		Nonce:    10,
+		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn0))
 	assert.NoError(t, pool.addImpl("", txn0))
@@ -31,7 +33,8 @@ func TestMultipleTransactions(t *testing.T) {
 
 	from2 := types.Address{0x2}
 	txn1 := &types.Transaction{
-		From: from2,
+		From:     from2,
+		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
 	assert.NoError(t, pool.addImpl("", txn1))
@@ -64,7 +67,11 @@ func TestBroadcast(t *testing.T) {
 	network.MultiJoin(t, pool1.network, pool2.network)
 
 	// broadcast txn1 from pool1
-	txn1 := &types.Transaction{}
+	txn1 := &types.Transaction{
+		Value:    big.NewInt(10),
+		GasPrice: big.NewInt(1),
+	}
+
 	txn1, err := signer.SignTx(txn1, key0)
 	assert.NoError(t, err)
 
