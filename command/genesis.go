@@ -21,7 +21,7 @@ import (
 const (
 	genesisFileName       = "./genesis.json"
 	defaultChainID        = 100
-	defaultPremineBalance = "0x100000000000000000000000000"
+	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -135,7 +135,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&dataDir, "data-dir", "", "")
 	flags.StringVar(&name, "name", "example", "")
 	flags.Var(&premine, "premine", "")
-	flags.Uint64Var(&chainID, "chainid", 100, "")
+	flags.Uint64Var(&chainID, "chainid", defaultChainID, "")
 	flags.StringVar(&consensus, "consensus", "pow", "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
