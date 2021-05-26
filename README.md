@@ -1,5 +1,5 @@
 
-![Banner](.github/banner.jpg)
+![Banner](.github/banner.png)
 
 ## Polygon SDK
 
