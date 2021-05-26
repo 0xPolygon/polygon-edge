@@ -22,6 +22,7 @@ func ecrecoverImpl(sig, msg []byte) (types.Address, error) {
 	if err != nil {
 		return types.Address{}, err
 	}
+
 	return crypto.PubKeyToAddress(pub), nil
 }
 
@@ -36,6 +37,7 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 	if err != nil {
 		return types.Address{}, err
 	}
+
 	return ecrecoverImpl(extra.Seal, msg)
 }
 
@@ -53,6 +55,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 	if err != nil {
 		return nil, err
 	}
+
 	return seal, nil
 }
 
@@ -62,14 +65,17 @@ func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return nil, err
 	}
+
 	extra.Seal = seal
 	if err := PutIbftExtra(h, extra); err != nil {
 		return nil, err
 	}
+
 	return h, nil
 }
 
@@ -94,15 +100,17 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	if err != nil {
 		return nil, err
 	}
+
 	extra.CommittedSeal = seals
 	if err := PutIbftExtra(h, extra); err != nil {
 		return nil, err
 	}
+
 	return h, nil
 }
 
 func signHash(h *types.Header) ([]byte, error) {
-	//hash := istambulHeaderHash(h)
+	//hash := istanbulHeaderHash(h)
 	//return hash.Bytes(), nil
 
 	h = h.Copy() // make a copy since we update the extra field
@@ -110,8 +118,8 @@ func signHash(h *types.Header) ([]byte, error) {
 	arena := fastrlp.DefaultArenaPool.Get()
 	defer fastrlp.DefaultArenaPool.Put(arena)
 
-	// when hashign the block for signing we have to remove from
-	// the extra field the seal and commitedseal items
+	// when hashing the block for signing we have to remove from
+	// the extra field the seal and committed seal items
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return nil, err
@@ -134,6 +142,7 @@ func signHash(h *types.Header) ([]byte, error) {
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 
 	buf := keccak.Keccak256Rlp(nil, vv)
+
 	return buf, nil
 }
 
@@ -142,9 +151,11 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	if !snap.Set.Includes(signer) {
 		return fmt.Errorf("not found signer")
 	}
+
 	return nil
 }
 
@@ -153,6 +164,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	if len(extra.CommittedSeal) == 0 {
 		return fmt.Errorf("empty committed seals")
 	}
@@ -185,6 +197,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	if validSeals <= 2*snap.Set.MinFaultyNodes() {
 		return fmt.Errorf("not enough seals to seal block")
 	}
+
 	return nil
 }
 
@@ -193,15 +206,19 @@ func validateMsg(msg *proto.MessageReq) error {
 	if err != nil {
 		return err
 	}
+
 	buf, err := hex.DecodeHex(msg.Signature)
 	if err != nil {
 		return err
 	}
+
 	addr, err := ecrecoverImpl(buf, signMsg)
 	if err != nil {
 		return err
 	}
+
 	msg.From = addr.String()
+
 	return nil
 }
 
@@ -210,10 +227,13 @@ func signMsg(key *ecdsa.PrivateKey, msg *proto.MessageReq) error {
 	if err != nil {
 		return err
 	}
+
 	sig, err := crypto.Sign(key, crypto.Keccak256(signMsg))
 	if err != nil {
 		return err
 	}
+
 	msg.Signature = hex.EncodeToHex(sig)
+
 	return nil
 }

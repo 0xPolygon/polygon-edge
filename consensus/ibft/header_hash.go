@@ -6,15 +6,17 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-func istambulHeaderHash(h *types.Header) types.Hash {
+// istanbulHeaderHash defines the custom implementation for getting the header hash,
+// because of the extraData field
+func istanbulHeaderHash(h *types.Header) types.Hash {
 	// this function replaces extra so we need to make a copy
 	h = h.Copy() // Remove later
 
 	arena := fastrlp.DefaultArenaPool.Get()
 	defer fastrlp.DefaultArenaPool.Put(arena)
 
-	// when hashign the block for signing we have to remove from
-	// the extra field the seal and commitedseal items
+	// when hashing the block for signing we have to remove from
+	// the extra field the seal and committed seal items
 	extra, err := getIbftExtra(h)
 	if err != nil {
 		return types.Hash{}
@@ -37,5 +39,6 @@ func istambulHeaderHash(h *types.Header) types.Hash {
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 
 	buf := keccak.Keccak256Rlp(nil, vv)
+
 	return types.BytesToHash(buf)
 }

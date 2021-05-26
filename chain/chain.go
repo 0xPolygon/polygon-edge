@@ -15,10 +15,12 @@ import (
 var (
 	// GenesisGasLimit is the default gas limit of the Genesis block.
 	GenesisGasLimit uint64 = 4712388
+
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty = big.NewInt(131072)
 )
 
+// Chain is the blockchain chain configuration
 type Chain struct {
 	Name      string    `json:"name"`
 	Genesis   *Genesis  `json:"genesis"`
@@ -50,11 +52,14 @@ type Genesis struct {
 	ParentHash types.Hash `json:"parentHash"`
 }
 
-func (g *Genesis) ToBlock() *types.Header {
+// GenesisHeader converts the initially defined genesis struct to a header
+func (g *Genesis) GenesisHeader() *types.Header {
 	stateRoot := types.EmptyRootHash
+
 	if g.StateRoot != types.ZeroHash {
 		stateRoot = g.StateRoot
 	}
+
 	head := &types.Header{
 		Number:       g.Number,
 		Nonce:        g.Nonce,
@@ -71,22 +76,28 @@ func (g *Genesis) ToBlock() *types.Header {
 		ReceiptsRoot: types.EmptyRootHash,
 		TxRoot:       types.EmptyRootHash,
 	}
+
+	// Set default values if none are passed in
 	if g.GasLimit == 0 {
 		head.GasLimit = GenesisGasLimit
 	}
+
 	if g.Difficulty == 0 {
 		head.Difficulty = GenesisDifficulty.Uint64()
 	}
+
 	return head
 }
 
+// Hash computes the genesis hash
 func (g *Genesis) Hash() types.Hash {
-	header := g.ToBlock()
+	header := g.GenesisHeader()
 	header.ComputeHash()
+
 	return header.Hash
 }
 
-// Decoding
+// ENCODING + DECODING //
 
 func encodeUint64(i uint64) *string {
 	if i == 0 {
@@ -128,11 +139,11 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	var enc Genesis
 	enc.Nonce = hex.EncodeToHex(g.Nonce[:])
 
-	enc.Timestamp = encodeUint64(g.Timestamp)
-	enc.ExtraData = encodeBytes(g.ExtraData)
+	enc.Timestamp = types.EncodeUint64(g.Timestamp)
+	enc.ExtraData = types.EncodeBytes(g.ExtraData)
 
-	enc.GasLimit = encodeUint64(g.GasLimit)
-	enc.Difficulty = encodeUint64(g.Difficulty)
+	enc.GasLimit = types.EncodeUint64(g.GasLimit)
+	enc.Difficulty = types.EncodeUint64(g.Difficulty)
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
@@ -145,8 +156,8 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		enc.Alloc = &alloc
 	}
 
-	enc.Number = encodeUint64(g.Number)
-	enc.GasUsed = encodeUint64(g.GasUsed)
+	enc.Number = types.EncodeUint64(g.Number)
+	enc.GasUsed = types.EncodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
 
 	return json.Marshal(&enc)
@@ -255,7 +266,7 @@ type genesisAccountEncoder struct {
 	PrivateKey *string                   `json:"secretKey,omitempty"`
 }
 
-// Encoding
+// ENCODING //
 
 func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	obj := &genesisAccountEncoder{}
@@ -277,7 +288,7 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	return json.Marshal(obj)
 }
 
-// Decoding
+// DECODING //
 
 func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
@@ -335,6 +346,7 @@ func Import(chain string) (*Chain, error) {
 	if err == nil {
 		return c, nil
 	}
+
 	return ImportFromFile(chain)
 }
 
@@ -344,6 +356,7 @@ func ImportFromName(chain string) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return importChain(data)
 }
 
@@ -353,6 +366,7 @@ func ImportFromFile(filename string) (*Chain, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return importChain(data)
 }
 
@@ -364,5 +378,6 @@ func importChain(content []byte) (*Chain, error) {
 	if engines := chain.Params.Engine; len(engines) != 1 {
 		return nil, fmt.Errorf("Expected one consensus engine but found %d", len(engines))
 	}
+
 	return chain, nil
 }

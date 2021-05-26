@@ -18,22 +18,28 @@ type LogFilter struct {
 	Topics    [][]types.Hash
 }
 
+// addTopicSet adds specific topics to the log filter topics
 func (l *LogFilter) addTopicSet(set ...string) error {
 	if l.Topics == nil {
 		l.Topics = [][]types.Hash{}
 	}
+
 	res := []types.Hash{}
 	for _, i := range set {
 		item := types.Hash{}
 		if err := item.UnmarshalText([]byte(i)); err != nil {
 			return err
 		}
+
 		res = append(res, item)
 	}
+
 	l.Topics = append(l.Topics, res)
+
 	return nil
 }
 
+// addAddress Adds the address to the log filter
 func (l *LogFilter) addAddress(raw string) error {
 	if l.Addresses == nil {
 		l.Addresses = []types.Address{}
@@ -42,20 +48,24 @@ func (l *LogFilter) addAddress(raw string) error {
 	if err := addr.UnmarshalText([]byte(raw)); err != nil {
 		return err
 	}
+
 	l.Addresses = append(l.Addresses, addr)
+
 	return nil
 }
 
 func decodeLogFilterFromInterface(i interface{}) (*LogFilter, error) {
-	// once the log filter is decoded as map[string]interface we cannot use unmarshaljson
+	// once the log filter is decoded as map[string]interface we cannot use unmarshal json
 	raw, err := json.Marshal(i)
 	if err != nil {
 		return nil, err
 	}
+
 	filter := &LogFilter{}
 	if err := json.Unmarshal(raw, &filter); err != nil {
 		return nil, err
 	}
+
 	return filter, nil
 }
 

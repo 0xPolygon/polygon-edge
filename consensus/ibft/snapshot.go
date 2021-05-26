@@ -22,10 +22,11 @@ var (
 	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 )
 
+// setupSnapshot sets up the snapshot store for the IBFT object
 func (i *Ibft) setupSnapshot() error {
 	i.store = newSnapshotStore()
 
-	// read from storage
+	// Read from storage
 	if i.config.Path != "" {
 		if err := i.store.loadFromPath(i.config.Path); err != nil {
 			return err
@@ -39,13 +40,13 @@ func (i *Ibft) setupSnapshot() error {
 	}
 
 	if header.Number == 0 {
-		// add genesis
+		// Add genesis
 		if err := i.addHeaderSnap(header); err != nil {
 			return err
 		}
 	}
 
-	// some of the data might get lost due to ungrateful disconnections
+	// Some of the data might get lost due to ungrateful disconnections
 	if header.Number > meta.LastBlock {
 		i.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
 
@@ -62,40 +63,48 @@ func (i *Ibft) setupSnapshot() error {
 			}
 		}
 	}
+
 	return nil
 }
 
+// addHeaderSnap creates the initial snapshot, and adds it to the snapshot store
 func (i *Ibft) addHeaderSnap(header *types.Header) error {
-	// genesis header needs to be set by hand, all the other
+	// Genesis header needs to be set by hand, all the other
 	// snapshots are set as part of processHeaders
 	extra, err := getIbftExtra(header)
 	if err != nil {
 		return err
 	}
 
-	// create the first snapshot from the genesis
+	// Create the first snapshot from the genesis
 	snap := &Snapshot{
 		Hash:   header.Hash.String(),
 		Number: header.Number,
 		Votes:  []*Vote{},
 		Set:    extra.Validators,
 	}
+
 	i.store.add(snap)
+
 	return nil
 }
 
+// getLatestSnapshot returns the latest snapshot object
 func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 	meta, err := i.getSnapshotMetadata()
 	if err != nil {
 		return nil, err
 	}
+
 	snap, err := i.getSnapshot(meta.LastBlock)
 	if err != nil {
 		return nil, err
 	}
+
 	return snap, nil
 }
 
+// saveSnapDataToFile saves the snapshot store to a file
 func (i *Ibft) saveSnapDataToFile() error {
 	if i.config.Path == "" {
 		return nil
@@ -103,6 +112,9 @@ func (i *Ibft) saveSnapDataToFile() error {
 	return i.store.saveToPath(i.config.Path)
 }
 
+// processHeaders is the powerhouse method in the snapshot module.
+
+// It processes passed in headers, and updates the snapshot / snapshot store
 func (i *Ibft) processHeaders(headers []*types.Header) error {
 	if len(headers) == 0 {
 		return nil
@@ -114,6 +126,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 	snap := parentSnap.Copy()
 
+	// saveSnap is a callback function for saving the passed in header to the snapshot store
 	saveSnap := func(h *types.Header) error {
 		if snap.Equal(parentSnap) {
 			return nil
@@ -126,6 +139,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 		parentSnap = snap
 		snap = parentSnap.Copy()
+
 		return nil
 	}
 
@@ -136,8 +150,10 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 		if err != nil {
 			return err
 		}
+
+		// Check if the recovered validator is part of the validator set
 		if !snap.Set.Includes(validator) {
-			return fmt.Errorf("unauthroized validator")
+			return fmt.Errorf("unauthorized validator")
 		}
 
 		if number%i.epochSize == 0 {
@@ -148,7 +164,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 				return err
 			}
 
-			// remove in-memory snaphots from two epochs before this one
+			// remove in-memory snapshots from two epochs before this one
 			epoch := int(number/i.epochSize) - 2
 			if epoch > 0 {
 				purgeBlock := uint64(epoch) * i.epochSize
@@ -233,40 +249,51 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 	// update the metadata
 	i.store.updateLastBlock(headers[len(headers)-1].Number)
+
 	return nil
 }
 
+// getSnapshotMetadata returns the latest snapshot metadata
 func (i *Ibft) getSnapshotMetadata() (*snapshotMetadata, error) {
 	meta := &snapshotMetadata{
 		LastBlock: i.store.getLastBlock(),
 	}
+
 	return meta, nil
 }
 
+// getSnapshot returns the snapshot at the specified block height
 func (i *Ibft) getSnapshot(num uint64) (*Snapshot, error) {
 	snap := i.store.find(num)
+
 	return snap, nil
 }
 
+// Vote defines the vote structure
 type Vote struct {
 	Validator types.Address
 	Address   types.Address
 	Authorize bool
 }
 
+// Equal checks if two votes are equal
 func (v *Vote) Equal(vv *Vote) bool {
 	if v.Validator != vv.Validator {
 		return false
 	}
+
 	if v.Address != vv.Address {
 		return false
 	}
+
 	if v.Authorize != vv.Authorize {
 		return false
 	}
+
 	return true
 }
 
+// Copy makes a copy of the vote, and returns it
 func (v *Vote) Copy() *Vote {
 	vv := new(Vote)
 	*vv = *v
@@ -288,10 +315,13 @@ type Snapshot struct {
 	Set ValidatorSet
 }
 
+// snapshotMetadata defines the metadata for the snapshot
 type snapshotMetadata struct {
+	// LastBlock represents the latest block in the snapshot
 	LastBlock uint64
 }
 
+// Equal checks if two snapshots are equal
 func (s *Snapshot) Equal(ss *Snapshot) bool {
 	// we only check if Votes and Set are equal since Number and Hash
 	// are only meant to be used for indexing
@@ -309,6 +339,8 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 	return true
 }
 
+// Count returns the vote tally.
+// The count increases if the callback function returns true
 func (s *Snapshot) Count(h func(v *Vote) bool) (count int) {
 	for _, v := range s.Votes {
 		if h(v) {
@@ -318,6 +350,7 @@ func (s *Snapshot) Count(h func(v *Vote) bool) (count int) {
 	return
 }
 
+// RemoveVotes removes votes from the snapshot, based on the passed in callback
 func (s *Snapshot) RemoveVotes(h func(v *Vote) bool) {
 	for i := 0; i < len(s.Votes); i++ {
 		if h(s.Votes[i]) {
@@ -327,19 +360,24 @@ func (s *Snapshot) RemoveVotes(h func(v *Vote) bool) {
 	}
 }
 
+// Copy makes a copy of the snapshot
 func (s *Snapshot) Copy() *Snapshot {
 	// Do not need to copy Number and Hash
 	ss := &Snapshot{
 		Votes: make([]*Vote, len(s.Votes)),
 		Set:   ValidatorSet{},
 	}
+
 	for indx, vote := range s.Votes {
 		ss.Votes[indx] = vote.Copy()
 	}
+
 	ss.Set = append(ss.Set, s.Set...)
+
 	return ss
 }
 
+// ToProto converts the snapshot to a Proto snapshot
 func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
 		Validators: []*proto.Snapshot_Validator{},
@@ -363,23 +401,32 @@ func (s *Snapshot) ToProto() *proto.Snapshot {
 			Address: val.String(),
 		})
 	}
+
 	return resp
 }
 
+// snapshotStore defines the structure of the stored snapshots
 type snapshotStore struct {
+	// lastNumber is the latest block number stored
 	lastNumber uint64
-	lock       sync.Mutex
-	list       snapshotSortedList
+
+	// lock is the snapshotStore mutex
+	lock sync.Mutex
+
+	// list represents the actual snapshot sorted list
+	list snapshotSortedList
 }
 
+// newSnapshotStore returns a new snapshot store
 func newSnapshotStore() *snapshotStore {
 	return &snapshotStore{
 		list: snapshotSortedList{},
 	}
 }
 
+// loadFromPath loads a saved snapshot store from the specified file system path
 func (s *snapshotStore) loadFromPath(path string) error {
-	// load metadata
+	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
 		return err
@@ -388,7 +435,7 @@ func (s *snapshotStore) loadFromPath(path string) error {
 		s.lastNumber = meta.LastBlock
 	}
 
-	// load snapshots
+	// Load snapshots
 	snaps := []*Snapshot{}
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
 		return err
@@ -396,33 +443,39 @@ func (s *snapshotStore) loadFromPath(path string) error {
 	for _, snap := range snaps {
 		s.add(snap)
 	}
+
 	return nil
 }
 
+// saveToPath saves the snapshot store as a file to the specified path
 func (s *snapshotStore) saveToPath(path string) error {
-	// write snapshots
+	// Write snapshots
 	if err := writeDataStore(filepath.Join(path, "snapshots"), s.list); err != nil {
 		return err
 	}
 
-	// write metadata
+	// Write metadata
 	meta := &snapshotMetadata{
 		LastBlock: s.lastNumber,
 	}
 	if err := writeDataStore(filepath.Join(path, "metadata"), meta); err != nil {
 		return err
 	}
+
 	return nil
 }
 
+// getLastBlock returns the latest block number from the snapshot store. [Thread safe]
 func (s *snapshotStore) getLastBlock() uint64 {
 	return atomic.LoadUint64(&s.lastNumber)
 }
 
+// updateLastBlock sets the latest block number in the snapshot store. [Thread safe]
 func (s *snapshotStore) updateLastBlock(num uint64) {
 	atomic.StoreUint64(&s.lastNumber, num)
 }
 
+// deleteLower deletes snapshots that have a block number lower than the passed in parameter
 func (s *snapshotStore) deleteLower(num uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -433,6 +486,7 @@ func (s *snapshotStore) deleteLower(num uint64) {
 	s.list = s.list[i:]
 }
 
+// find returns the snapshot at a specific block height
 func (s *snapshotStore) find(num uint64) *Snapshot {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -449,18 +503,23 @@ func (s *snapshotStore) find(num uint64) *Snapshot {
 	i := sort.Search(len(s.list), func(i int) bool {
 		return s.list[i].Number >= num
 	})
+
 	if i < len(s.list) {
 		if i == 0 {
 			return s.list[0]
 		}
+
 		if s.list[i].Number == num {
 			return s.list[i]
 		}
+
 		return s.list[i-1]
 	}
+
 	return nil
 }
 
+// add adds a new snapshot to the snapshot store
 func (s *snapshotStore) add(snap *Snapshot) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -470,41 +529,52 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	sort.Sort(&s.list)
 }
 
+// snapshotSortedList defines the sorted snapshot list
 type snapshotSortedList []*Snapshot
 
+// Len returns the size of the sorted snapshot list
 func (s snapshotSortedList) Len() int {
 	return len(s)
 }
 
+// Swap swaps two values in the sorted snapshot list
 func (s snapshotSortedList) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
+// Less checks if the element at index I has a lower number than the element at index J
 func (s snapshotSortedList) Less(i, j int) bool {
 	return s[i].Number < s[j].Number
 }
 
+// readDataStore attempts to read the specific file from file storage
 func readDataStore(path string, obj interface{}) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	}
+
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
+
 	if err := json.Unmarshal(data, obj); err != nil {
 		return err
 	}
+
 	return nil
 }
 
+// writeDataStore attempts to write the specific file to file storage
 func writeDataStore(path string, obj interface{}) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
+
 	if err := ioutil.WriteFile(path, data, 0755); err != nil {
 		return err
 	}
+
 	return nil
 }

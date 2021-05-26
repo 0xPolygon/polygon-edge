@@ -253,8 +253,9 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	}
 
 	resp := Response{
-		ID:     req.ID,
-		Result: data,
+		ID:      req.ID,
+		JSONRPC: "2.0",
+		Result:  data,
 	}
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
@@ -399,6 +400,7 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 		if ok {
 			return res, nil
 		}
+		number = LatestBlockNumber
 	}
 	header, err := d.getBlockHeaderImpl(number)
 	if err != nil {

@@ -7,11 +7,14 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+// Subscription is the blockchain subscription interface
 type Subscription interface {
 	GetEventCh() chan *Event
 	GetEvent() *Event
 	Close()
 }
+
+// FOR TESTING PURPOSES //
 
 type MockSubscription struct {
 	eventCh chan *Event
@@ -37,12 +40,16 @@ func (m *MockSubscription) GetEvent() *Event {
 func (m *MockSubscription) Close() {
 }
 
+/////////////////////////
+
+// subscription is the Blockchain event subscription object
 type subscription struct {
-	updateCh chan struct{}
-	closeCh  chan struct{}
-	elem     *eventElem
+	updateCh chan struct{} // Channel for update information
+	closeCh  chan struct{} // Channel for close signals
+	elem     *eventElem    // Reference to the blockchain event wrapper
 }
 
+// GetEventCh creates a new event channel, and returns it
 func (s *subscription) GetEventCh() chan *Event {
 	eventCh := make(chan *Event)
 	go func() {
@@ -51,18 +58,21 @@ func (s *subscription) GetEventCh() chan *Event {
 			eventCh <- evnt
 		}
 	}()
+
 	return eventCh
 }
 
+// GetEvent returns the event from the subscription (BLOCKING)
 func (s *subscription) GetEvent() *Event {
 	for {
 		if s.elem.next != nil {
 			s.elem = s.elem.next
 			evnt := s.elem.event
+
 			return evnt
 		}
 
-		// wait for an update
+		// Wait for an update
 		select {
 		case <-s.updateCh:
 			continue
@@ -72,6 +82,7 @@ func (s *subscription) GetEvent() *Event {
 	}
 }
 
+// Close closes the subscription
 func (s *subscription) Close() {
 	close(s.closeCh)
 }
@@ -79,13 +90,14 @@ func (s *subscription) Close() {
 type EventType int
 
 const (
-	EventHead EventType = iota
-	EventReorg
-	EventFork
+	EventHead  EventType = iota // New head event
+	EventReorg                  // Chain reorganization event
+	EventFork                   // Chain fork event
 )
 
+// Event is the blockchain event that gets passed to the listeners
 type Event struct {
-	// Old chain removed if there was a reorg
+	// Old chain (removed headers) if there was a reorg
 	OldChain []*types.Header
 
 	// New part of the chain (or a fork)
@@ -102,39 +114,51 @@ type Event struct {
 	Source string
 }
 
+// Header returns the latest block header for the event
 func (e *Event) Header() *types.Header {
 	return e.NewChain[len(e.NewChain)-1]
 }
 
+// SetDifficulty sets the event difficulty
 func (e *Event) SetDifficulty(b *big.Int) {
 	e.Difficulty = new(big.Int).Set(b)
 }
 
-func (e *Event) AddNewHeader(h *types.Header) {
-	hh := h.Copy()
+// AddNewHeader appends a header to the event's NewChain array
+func (e *Event) AddNewHeader(newHeader *types.Header) {
+	header := newHeader.Copy()
 	if e.NewChain == nil {
+		// Array doesn't exist yet, create it
 		e.NewChain = []*types.Header{}
 	}
-	e.NewChain = append(e.NewChain, hh)
+
+	e.NewChain = append(e.NewChain, header)
 }
 
-func (e *Event) AddOldHeader(h *types.Header) {
-	hh := h.Copy()
+// AddOldHeader appends a header to the event's OldChain array
+func (e *Event) AddOldHeader(oldHeader *types.Header) {
+	header := oldHeader.Copy()
 	if e.OldChain == nil {
+		// Array doesn't exist yet, create it
 		e.OldChain = []*types.Header{}
 	}
-	e.OldChain = append(e.OldChain, hh)
+
+	e.OldChain = append(e.OldChain, header)
 }
 
+// SubscribeEvents returns a blockchain event subscription
 func (b *Blockchain) SubscribeEvents() Subscription {
 	return b.stream.subscribe()
 }
 
+// eventElem contains the event, as well as the next list event
 type eventElem struct {
 	event *Event
 	next  *eventElem
 }
 
+// eventStream is the structure that contains the event list,
+// as well as the update channel which it uses to notify of updates
 type eventStream struct {
 	lock sync.Mutex
 	head *eventElem
@@ -143,6 +167,7 @@ type eventStream struct {
 	updateCh []chan struct{}
 }
 
+// subscribe Creates a new blockchain event subscription
 func (e *eventStream) subscribe() *subscription {
 	head, updateCh := e.Head()
 	s := &subscription{
@@ -150,9 +175,11 @@ func (e *eventStream) subscribe() *subscription {
 		updateCh: updateCh,
 		closeCh:  make(chan struct{}),
 	}
+
 	return s
 }
 
+// Head returns the event list head
 func (e *eventStream) Head() (*eventElem, chan struct{}) {
 	e.lock.Lock()
 	head := e.head
@@ -164,25 +191,30 @@ func (e *eventStream) Head() (*eventElem, chan struct{}) {
 	e.updateCh = append(e.updateCh, ch)
 
 	e.lock.Unlock()
+
 	return head, ch
 }
 
+// push adds a new Event, and notifies listeners
 func (e *eventStream) push(event *Event) {
 	e.lock.Lock()
+
 	newHead := &eventElem{
 		event: event,
 	}
+
 	if e.head != nil {
 		e.head.next = newHead
 	}
 	e.head = newHead
 
-	// notify the subscriptors
+	// Notify the listeners
 	for _, update := range e.updateCh {
 		select {
 		case update <- struct{}{}:
 		default:
 		}
 	}
+
 	e.lock.Unlock()
 }

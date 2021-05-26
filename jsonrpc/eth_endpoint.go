@@ -437,10 +437,13 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 	if err != nil {
 		return nil, err
 	}
+
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
 	if err != nil {
-		return nil, err
+		// Account not found, return an empty account
+		return argUintPtr(0), nil
 	}
+
 	return argBigPtr(acc.Balance), nil
 }
 
@@ -465,10 +468,13 @@ func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, e
 		return nil, err
 	}
 
+	emptySlice := []byte{}
 	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
 	if err != nil {
-		return nil, fmt.Errorf("unable to fetch account code: %v", err)
+		// TODO This is just a workaround. Figure out why CodeHash is populated for regular accounts
+		return argBytesPtr(emptySlice), nil
 	}
+
 	return argBytesPtr(code), nil
 }
 

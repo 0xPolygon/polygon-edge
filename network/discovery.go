@@ -93,6 +93,7 @@ func (d *discovery) setup() error {
 	}
 
 	go d.run()
+
 	return nil
 }
 
@@ -106,14 +107,12 @@ func (d *discovery) call(peerID peer.ID) error {
 	// we have to add them to the peerstore so that they are
 	// available to all the libp2p services
 	for _, node := range nodes {
-		//fmt.Println("-- node --")
-		//fmt.Println(node)
-
 		d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
 		if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -137,6 +136,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		}
 		addrInfo = append(addrInfo, info)
 	}
+
 	return addrInfo, nil
 }
 
@@ -171,7 +171,10 @@ func (d *discovery) handleDiscovery() {
 	}
 }
 
-func (d *discovery) FindPeers(ctx context.Context, req *proto.FindPeersReq) (*proto.FindPeersResp, error) {
+func (d *discovery) FindPeers(
+	ctx context.Context,
+	req *proto.FindPeersReq,
+) (*proto.FindPeersResp, error) {
 	from := ctx.(*grpc.Context).PeerID
 
 	if req.Count > 16 {
@@ -196,5 +199,6 @@ func (d *discovery) FindPeers(ctx context.Context, req *proto.FindPeersReq) (*pr
 	resp := &proto.FindPeersResp{
 		Nodes: filtered,
 	}
+
 	return resp, nil
 }

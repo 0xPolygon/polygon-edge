@@ -13,13 +13,13 @@ import (
 	"github.com/imdario/mergo"
 )
 
+// Config defines the server configuration params
 type Config struct {
 	Chain       string                 `json:"chain"`
 	DataDir     string                 `json:"data_dir"`
 	GRPCAddr    string                 `json:"rpc_addr"`
 	JSONRPCAddr string                 `json:"jsonrpc_addr"`
 	Network     *Network               `json:"network"`
-	Telemetry   *Telemetry             `json:"telemetry"`
 	Seal        bool                   `json:"seal"`
 	LogLevel    string                 `json:"log_level"`
 	Consensus   map[string]interface{} `json:"consensus"`
@@ -28,23 +28,18 @@ type Config struct {
 	Join        string
 }
 
+// Network defines the network configuration params
 type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
-type Telemetry struct {
-	PrometheusPort int `json:"prometheus_port"`
-}
-
+// defaultConfig returns the default server configuration
 func defaultConfig() *Config {
 	return &Config{
 		Chain:   "test",
 		DataDir: "./test-chain",
-		Telemetry: &Telemetry{
-			PrometheusPort: 8080,
-		},
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
@@ -55,41 +50,50 @@ func defaultConfig() *Config {
 	}
 }
 
+// BuildConfig Builds the config based on set parameters
 func (c *Config) BuildConfig() (*minimal.Config, error) {
+	// Grab the default Minimal server config
 	conf := minimal.DefaultConfig()
 
-	// decode chain
+	// Decode the chain
 	cc, err := chain.Import(c.Chain)
 	if err != nil {
 		return nil, err
 	}
+
 	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
 
+	// JSON RPC + GRPC
 	if c.GRPCAddr != "" {
+		// If an address was passed in, parse it
 		if conf.GRPCAddr, err = resolveAddr(c.GRPCAddr); err != nil {
 			return nil, err
 		}
 	}
 	if c.JSONRPCAddr != "" {
+		// If an address was passed in, parse it
 		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
 	}
-	// network
+
+	// Network
 	{
 		if conf.Network.Addr, err = resolveAddr(c.Network.Addr); err != nil {
 			return nil, err
 		}
+
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
+
 		conf.Chain = cc
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
 	// and disable discovery of other nodes
-	// TODO: Disable networking altogheter.
+	// TODO: Disable networking altogether.
 	if c.Dev {
 		conf.Seal = true
 		conf.Network.NoDiscover = true
@@ -107,86 +111,100 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	return conf, nil
 }
 
+// resolveAddr resolves the passed in TCP address
 func resolveAddr(raw string) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", raw)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse addr '%s': %v", raw, err)
 	}
+
 	if addr.IP == nil {
 		addr.IP = net.ParseIP("127.0.0.1")
 	}
 	return addr, nil
 }
 
-func (c *Config) merge(c1 *Config) error {
-	if c1.DataDir != "" {
-		c.DataDir = c1.DataDir
+// mergeConfigWith merges the passed in configuration to the current configuration
+func (c *Config) mergeConfigWith(otherConfig *Config) error {
+	if otherConfig.DataDir != "" {
+		c.DataDir = otherConfig.DataDir
 	}
-	if c1.Chain != "" {
-		c.Chain = c1.Chain
+
+	if otherConfig.Chain != "" {
+		c.Chain = otherConfig.Chain
 	}
-	if c1.Dev {
+
+	if otherConfig.Dev {
 		c.Dev = true
 	}
-	if c1.DevInterval != 0 {
-		c.DevInterval = c1.DevInterval
+
+	if otherConfig.DevInterval != 0 {
+		c.DevInterval = otherConfig.DevInterval
 	}
-	if c1.Telemetry != nil {
-		if c1.Telemetry.PrometheusPort != 0 {
-			c.Telemetry.PrometheusPort = c1.Telemetry.PrometheusPort
-		}
-	}
-	if c1.Seal {
+
+	if otherConfig.Seal {
 		c.Seal = true
 	}
-	if c1.LogLevel != "" {
-		c.LogLevel = c1.LogLevel
+
+	if otherConfig.LogLevel != "" {
+		c.LogLevel = otherConfig.LogLevel
 	}
-	if c1.GRPCAddr != "" {
-		c.GRPCAddr = c1.GRPCAddr
+
+	if otherConfig.GRPCAddr != "" {
+		c.GRPCAddr = otherConfig.GRPCAddr
 	}
-	if c1.JSONRPCAddr != "" {
-		c.JSONRPCAddr = c1.JSONRPCAddr
+
+	if otherConfig.JSONRPCAddr != "" {
+		c.JSONRPCAddr = otherConfig.JSONRPCAddr
 	}
-	if c1.Join != "" {
-		c.Join = c1.Join
+
+	if otherConfig.Join != "" {
+		c.Join = otherConfig.Join
 	}
+
 	{
-		// network
-		if c1.Network.Addr != "" {
-			c.Network.Addr = c1.Network.Addr
+		// Network
+		if otherConfig.Network.Addr != "" {
+			c.Network.Addr = otherConfig.Network.Addr
 		}
-		if c1.Network.MaxPeers != 0 {
-			c.Network.MaxPeers = c1.Network.MaxPeers
+		if otherConfig.Network.MaxPeers != 0 {
+			c.Network.MaxPeers = otherConfig.Network.MaxPeers
 		}
-		if c1.Network.NoDiscover {
+		if otherConfig.Network.NoDiscover {
 			c.Network.NoDiscover = true
 		}
 	}
-	if err := mergo.Merge(&c.Consensus, c1.Consensus, mergo.WithOverride); err != nil {
+
+	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
 		return err
 	}
+
 	return nil
 }
 
+// readConfigFile reads the config file from the specified path, builds a Config object
+// and returns it.
+//
+//Supported file types: .json, .hcl
 func readConfigFile(path string) (*Config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var f func([]byte, interface{}) error
+	var unmarshalFunc func([]byte, interface{}) error
 	switch {
 	case strings.HasSuffix(path, ".hcl"):
-		f = hcl.Unmarshal
+		unmarshalFunc = hcl.Unmarshal
 	case strings.HasSuffix(path, ".json"):
-		f = json.Unmarshal
+		unmarshalFunc = json.Unmarshal
 	default:
 		return nil, fmt.Errorf("Suffix of %s is neither hcl nor json", path)
 	}
 
 	var config Config
-	if err := f(data, &config); err != nil {
+	if err := unmarshalFunc(data, &config); err != nil {
 		return nil, err
 	}
 

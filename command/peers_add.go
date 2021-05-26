@@ -11,14 +11,21 @@ type PeersAdd struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *PeersAdd) GetHelperText() string {
+	return "Adds a new peer to the peer list, using the peer's libp2p address"
+}
+
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
-	return ""
+	usage := "peers add PEER_ADDRESS"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.PeersAdd interface
 func (p *PeersAdd) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.PeersAdd interface

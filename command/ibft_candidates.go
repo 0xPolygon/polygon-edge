@@ -13,14 +13,21 @@ type IbftCandidates struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *IbftCandidates) GetHelperText() string {
+	return "Queries the current set of proposed candidates, as well as candidates that have not been included yet"
+}
+
 // Help implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Help() string {
-	return ""
+	usage := "ibft candidates"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.IbftCandidates interface

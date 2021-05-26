@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Dev consensus protocol seals any new transaction inmediatly
+// Dev consensus protocol seals any new transaction immediately
 type Dev struct {
 	logger hclog.Logger
 
@@ -29,7 +29,18 @@ type Dev struct {
 	executor   *state.Executor
 }
 
-func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
+// Factory implements the base factory method
+func Factory(
+	ctx context.Context,
+	sealing bool,
+	config *consensus.Config,
+	txpool *txpool.TxPool,
+	network *network.Server,
+	blockchain *blockchain.Blockchain,
+	executor *state.Executor,
+	srv *grpc.Server,
+	logger hclog.Logger,
+) (consensus.Consensus, error) {
 	logger = logger.Named("dev")
 
 	d := &Dev{
@@ -57,8 +68,10 @@ func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool
 	return d, nil
 }
 
+// Start starts the consensus mechanism
 func (d *Dev) Start() error {
 	go d.run()
+
 	return nil
 }
 
@@ -69,13 +82,15 @@ func (d *Dev) nextNotify() chan struct{} {
 			<-time.After(time.Duration(d.interval) * time.Second)
 			ch <- struct{}{}
 		}()
+
 		return ch
 	}
+
 	return d.notifyCh
 }
 
 func (d *Dev) run() {
-	d.logger.Info("started")
+	d.logger.Info("consensus started")
 
 	for {
 		// wait until there is a new txn
@@ -85,15 +100,19 @@ func (d *Dev) run() {
 			return
 		}
 
-		// pick txn from the pool and seal them
+		// There are new transactions in the pool, try to seal them
 		header := d.blockchain.Header()
-		if err := d.do(header); err != nil {
+		if err := d.writeNewBlock(header); err != nil {
 			d.logger.Error("failed to mine block", "err", err)
 		}
 	}
 }
 
-func (d *Dev) do(parent *types.Header) error {
+// writeNewBLock generates a new block based on transactions from the pool,
+// and writes them to the blockchain
+func (d *Dev) writeNewBlock(parent *types.Header) error {
+
+	// Generate the base block
 	num := parent.Number
 	header := &types.Header{
 		ParentHash: parent.Hash,
@@ -109,30 +128,47 @@ func (d *Dev) do(parent *types.Header) error {
 
 	txns := []*types.Transaction{}
 	for {
+		// Add transactions to the list until there are none left
 		txn, retFn := d.txpool.Pop()
+
 		if txn == nil {
 			break
 		}
+
+		// Execute the state transition
 		if err := transition.Write(txn); err != nil {
 			retFn()
+
 			break
 		}
+
 		txns = append(txns, txn)
 	}
 
+	// Commit the changes
 	_, root := transition.Commit()
 
+	// Update the header
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 
-	// header hash is computed inside buildBlock
-	block := consensus.BuildBlock(header, txns, transition.Receipts())
+	// Build the actual block
+	// The header hash is computed inside buildBlock
+	block := consensus.BuildBlock(consensus.BuildBlockParams{
+		Header:   header,
+		Txns:     txns,
+		Receipts: transition.Receipts(),
+	})
 
+	// Write the block to the blockchain
 	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
+
 	return nil
 }
+
+// REQUIRED BASE INTERFACE METHODS //
 
 func (d *Dev) VerifyHeader(parent *types.Header, header *types.Header) error {
 	// All blocks are valid

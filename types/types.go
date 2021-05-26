@@ -16,8 +16,6 @@ const (
 	AddressLength = 20
 )
 
-var emptyHash = [32]byte{}
-
 type Hash [HashLength]byte
 
 type Address [AddressLength]byte
@@ -26,6 +24,7 @@ func min(i, j int) int {
 	if i < j {
 		return i
 	}
+
 	return j
 }
 
@@ -100,16 +99,6 @@ func BytesToAddress(b []byte) Address {
 
 	copy(a[AddressLength-min:], b[len(b)-min:])
 	return a
-}
-
-func EmptyHash(hash Hash) bool {
-	return hash == emptyHash
-}
-
-// Hex2Bytes returns the bytes represented by the hexadecimal string str.
-func Hex2Bytes(str string) []byte {
-	h, _ := hex.DecodeString(str)
-	return h
 }
 
 func stringToBytes(str string) []byte {

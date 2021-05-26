@@ -27,6 +27,7 @@ func NewGrpcStream() *GrpcStream {
 		grpcServer: grpc.NewServer(grpc.UnaryInterceptor(interceptor)),
 	}
 	g.Serve()
+
 	return g
 }
 
@@ -35,7 +36,12 @@ type Context struct {
 	PeerID peer.ID
 }
 
-func interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func interceptor(
+	ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
 	peer, _ := grpcPeer.FromContext(ctx)
 
 	// we expect our libp2p wrapper
@@ -46,6 +52,7 @@ func interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInf
 		PeerID:  addr.id,
 	}
 	h, err := handler(ctx2, req)
+
 	return h, err
 }
 

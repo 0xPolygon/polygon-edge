@@ -12,14 +12,21 @@ type IbftStatus struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *IbftStatus) GetHelperText() string {
+	return "Returns the overall status of the IBFT client"
+}
+
 // Help implements the cli.IbftStatus interface
 func (p *IbftStatus) Help() string {
-	return ""
+	usage := "ibft status"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.IbftStatus interface
 func (p *IbftStatus) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.IbftStatus interface

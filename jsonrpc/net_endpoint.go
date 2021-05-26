@@ -7,15 +7,16 @@ type Net struct {
 
 // Version returns the current network id
 func (n *Net) Version() (interface{}, error) {
-	return nil, nil
+	//return fmt.Sprintf("%x", n.d.chainID), nil
+	return argUintPtr(n.d.chainID), nil
 }
 
 // Listening returns true if client is actively listening for network connections
 func (n *Net) Listening() (interface{}, error) {
-	return nil, nil
+	return true, nil
 }
 
 // PeerCount returns number of peers currently connected to the client
 func (n *Net) PeerCount() (interface{}, error) {
-	return nil, nil
+	return argUintPtr(0), nil
 }

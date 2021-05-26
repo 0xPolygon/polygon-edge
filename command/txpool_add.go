@@ -15,34 +15,106 @@ type TxPoolAdd struct {
 	Meta
 }
 
+// DefineFlags defines the command flags
+func (p *TxPoolAdd) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	if len(p.flagMap) > 0 {
+		// No need to redefine the flags again
+		return
+	}
+
+	p.flagMap["from"] = FlagDescriptor{
+		description: "The sender address",
+		arguments: []string{
+			"ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["to"] = FlagDescriptor{
+		description: "The receiver address",
+		arguments: []string{
+			"ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["value"] = FlagDescriptor{
+		description: "The value of the transaction",
+		arguments: []string{
+			"VALUE",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["gasPrice"] = FlagDescriptor{
+		description: "The gas price",
+		arguments: []string{
+			"GASPRICE",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["gasLimit"] = FlagDescriptor{
+		description: "The specified gas limit",
+		arguments: []string{
+			"LIMIT",
+		},
+		argumentsOptional: false,
+	}
+
+	p.flagMap["nonce"] = FlagDescriptor{
+		description: "The nonce of the transaction",
+		arguments: []string{
+			"NONCE",
+		},
+		argumentsOptional: false,
+	}
+}
+
+// GetHelperText returns a simple description of the command
+func (p *TxPoolAdd) GetHelperText() string {
+	return "Adds a new transaction to the transaction pool"
+}
+
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
-	return ""
+	p.DefineFlags()
+	usage := "txpool add --from ADDRESS --to ADDRESS --value VALUE\n\t--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
 	flags := p.FlagSet("txpool add")
 
-	// address types
+	// Address types
 	var fromRaw, toRaw string
 
-	// big int types
+	// BigInt types
 	var valueRaw, gasPriceRaw string
 
 	var nonce, gasLimit uint64
 
+	// Define the flags
 	flags.StringVar(&fromRaw, "from", "", "")
 	flags.StringVar(&toRaw, "to", "", "")
 	flags.StringVar(&valueRaw, "value", "", "")
 	flags.StringVar(&gasPriceRaw, "gasPrice", "0x100000", "")
 	flags.Uint64Var(&gasLimit, "gasLimit", 1000000, "")
 	flags.Uint64Var(&nonce, "nonce", 0, "")
+
+	// Save the flags for the help method
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())

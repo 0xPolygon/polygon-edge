@@ -33,12 +33,14 @@ func (c *Command) Run(args []string) int {
 	conf, err := readConfig(args)
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
 	config, err := conf.BuildConfig()
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -50,6 +52,7 @@ func (c *Command) Run(args []string) int {
 	server, err := minimal.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -57,9 +60,11 @@ func (c *Command) Run(args []string) int {
 		// make a non-blocking join request
 		server.Join(conf.Join, 0)
 	}
+
 	return c.handleSignals(server.Close)
 }
 
+// handleSignals listens for any client related signals, and closes the client accordingly
 func (c *Command) handleSignals(closeFn func()) int {
 	signalCh := make(chan os.Signal, 4)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -72,6 +77,7 @@ func (c *Command) handleSignals(closeFn func()) int {
 	c.UI.Output(fmt.Sprintf("Caught signal: %v", sig))
 	c.UI.Output("Gracefully shutting down agent...")
 
+	// Call the Minimal server close callback
 	gracefulCh := make(chan struct{})
 	go func() {
 		if closeFn != nil {
@@ -94,8 +100,7 @@ func readConfig(args []string) (*Config, error) {
 	config := defaultConfig()
 
 	cliConfig := &Config{
-		Telemetry: &Telemetry{},
-		Network:   &Network{},
+		Network: &Network{},
 	}
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
@@ -121,17 +126,20 @@ func readConfig(args []string) (*Config, error) {
 	}
 
 	if configFile != "" {
-		conf2, err := readConfigFile(configFile)
+		// A config file has been passed in, parse it
+		diskConfigFile, err := readConfigFile(configFile)
 		if err != nil {
 			return nil, err
 		}
-		if err := config.merge(conf2); err != nil {
+
+		if err := config.mergeConfigWith(diskConfigFile); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := config.merge(cliConfig); err != nil {
+	if err := config.mergeConfigWith(cliConfig); err != nil {
 		return nil, err
 	}
+
 	return config, nil
 }

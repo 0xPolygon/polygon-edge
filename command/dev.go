@@ -11,7 +11,8 @@ type DevCommand struct {
 
 // Help implements the cli.Command interface
 func (c *DevCommand) Help() string {
-	return ""
+	return "dev \"bypasses\" consensus and networking and starts a blockchain locally. " +
+		"It starts a local node and mines every transaction in a separate block"
 }
 
 // Synopsis implements the cli.Command interface

@@ -26,6 +26,7 @@ func (t *Topic) Publish(obj proto.Message) error {
 	if err != nil {
 		return err
 	}
+
 	return t.topic.Publish(context.Background(), data)
 }
 
@@ -36,6 +37,7 @@ func (t *Topic) Subscribe(handler func(obj interface{})) error {
 	}
 
 	go t.readLoop(sub, handler)
+
 	return nil
 }
 
@@ -67,10 +69,12 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	tt := &Topic{
 		logger: s.logger.Named(protoID),
 		topic:  topic,
 		typ:    reflect.TypeOf(obj).Elem(),
 	}
+
 	return tt, nil
 }

@@ -241,13 +241,16 @@ func TestEthTransfer(t *testing.T) {
 			preSendData.previousSenderBalance = balanceSender
 			preSendData.previousReceiverBalance = balanceReceiver
 
+			toAddress := web3.Address(testCase.recipient)
+
+			gasPrice := uint64(1048576)
+
 			// Create the transaction
-			recipient := web3.Address(testCase.recipient)
 			txnObject := &web3.Transaction{
 				From:     web3.Address(testCase.sender),
-				To:       &recipient,
-				GasPrice: 100,
-				Gas:      100,
+				To:       &toAddress,
+				GasPrice: gasPrice,
+				Gas:      1000000,
 				Value:    testCase.amount,
 			}
 
@@ -260,7 +263,12 @@ func TestEthTransfer(t *testing.T) {
 			}
 
 			// Wait until the transaction goes through
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Second)
+
+			receipt, err := rpcClient.Eth().GetTransactionReceipt(txnHash)
+			if receipt == nil {
+				t.Fatalf("Unable to fetch receipt")
+			}
 
 			// Fetch the balances after sending
 			balanceSender, errSender = rpcClient.Eth().GetBalance(
@@ -277,17 +285,24 @@ func TestEthTransfer(t *testing.T) {
 
 			checkSenderReceiver(errSender, errReceiver, t)
 
+			expandedGasUsed := new(big.Int).Mul(
+				big.NewInt(int64(receipt.GasUsed)),
+				big.NewInt(int64(gasPrice)),
+			)
+
 			if !testCase.shouldFail {
+				spentAmount := new(big.Int).Add(testCase.amount, expandedGasUsed)
+
 				// Check the sender balance
 				assert.Equalf(t,
-					new(big.Int).Sub(preSendData.previousSenderBalance, testCase.amount),
+					new(big.Int).Sub(preSendData.previousSenderBalance, spentAmount),
 					balanceSender,
 					"Sender balance incorrect")
 
 				// Check the receiver balance
 				assert.Equalf(t,
-					new(big.Int).Add(preSendData.previousReceiverBalance, testCase.amount),
-					balanceReceiver,
+					new(big.Int).Add(preSendData.previousReceiverBalance, testCase.amount).String(),
+					balanceReceiver.String(),
 					"Receiver balance incorrect")
 			}
 		})

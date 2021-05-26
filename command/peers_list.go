@@ -13,14 +13,21 @@ type PeersList struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *PeersList) GetHelperText() string {
+	return "Returns the list of connected peers, including the current node"
+}
+
 // Help implements the cli.PeersList interface
 func (p *PeersList) Help() string {
-	return ""
+	usage := "peers list"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.PeersList interface
 func (p *PeersList) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.PeersList interface

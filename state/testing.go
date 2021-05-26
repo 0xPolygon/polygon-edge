@@ -46,11 +46,6 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 	t.Run("", func(t *testing.T) {
 		testWriteEmptyState(t, buildPreState)
 	})
-	/*
-		t.Run("", func(t *testing.T) {
-			testUpdateStateInPreState(t, buildPreState)
-		})
-	*/
 	t.Run("", func(t *testing.T) {
 		testUpdateStateWithEmpty(t, buildPreState)
 	})

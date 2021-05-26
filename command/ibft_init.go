@@ -15,14 +15,21 @@ type IbftInit struct {
 	Meta
 }
 
+// GetHelperText returns a simple description of the command
+func (p *IbftInit) GetHelperText() string {
+	return "Initializes IBFT for the Polygon SDK, in the specified directory"
+}
+
 // Help implements the cli.IbftInit interface
 func (p *IbftInit) Help() string {
-	return ""
+	usage := "ibft init DATA_DIRECTORY"
+
+	return p.GenerateHelp(p.Synopsis(), usage)
 }
 
 // Synopsis implements the cli.IbftInit interface
 func (p *IbftInit) Synopsis() string {
-	return ""
+	return p.GetHelperText()
 }
 
 // Run implements the cli.IbftInit interface
@@ -35,7 +42,7 @@ func (p *IbftInit) Run(args []string) int {
 
 	args = flags.Args()
 	if len(args) != 1 {
-		p.UI.Error("number expected")
+		p.UI.Error("required argument (data directory) not passed in")
 		return 1
 	}
 

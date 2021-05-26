@@ -20,6 +20,7 @@ type Config struct {
 	Seal    bool
 }
 
+// DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
 func DefaultConfig() *Config {
 	return &Config{
 		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545},

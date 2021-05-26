@@ -10,8 +10,7 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-// prefix
-
+// Prefixes for the key-value store
 var (
 	// DIFFICULTY is the difficulty prefix
 	DIFFICULTY = []byte("d")
@@ -37,19 +36,20 @@ var (
 	// SNAPSHOTS is the prefix for snapshots
 	SNAPSHOTS = []byte("s")
 
-	// TRANSACTION is the prefix for transactions
+	// TX_LOOKUP_PREFIX is the prefix for transaction lookups
 	TX_LOOKUP_PREFIX = []byte("l")
 )
 
-// sub-prefix
-
+// Sub-prefixes
 var (
 	HASH   = []byte("hash")
 	NUMBER = []byte("number")
 	EMPTY  = []byte("empty")
 )
 
-// KV is a key value storage interface
+// KV is a key value storage interface.
+//
+// KV = Key-Value
 type KV interface {
 	Close() error
 	Set(p []byte, v []byte) error
@@ -93,7 +93,7 @@ func (s *KeyValueStorage) WriteCanonicalHash(n uint64, hash types.Hash) error {
 	return s.set(CANONICAL, s.encodeUint(n), hash.Bytes())
 }
 
-// -- head --
+// HEAD //
 
 // ReadHeadHash returns the hash of the head
 func (s *KeyValueStorage) ReadHeadHash() (types.Hash, bool) {
@@ -126,7 +126,7 @@ func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
 	return s.set(HEAD, NUMBER, s.encodeUint(n))
 }
 
-// -- fork --
+// FORK //
 
 // WriteForks writes the current forks
 func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
@@ -141,7 +141,7 @@ func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
 	return *forks, err
 }
 
-// -- difficulty --
+// DIFFICULTY //
 
 // WriteDiff writes the difficulty
 func (s *KeyValueStorage) WriteDiff(hash types.Hash, diff *big.Int) error {
@@ -157,7 +157,7 @@ func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
 	return big.NewInt(0).SetBytes(v), true
 }
 
-// -- header --
+// HEADER //
 
 // WriteHeader writes the header
 func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
@@ -191,7 +191,7 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 	return nil
 }
 
-// -- body --
+// BODY //
 
 // WriteBody writes the body
 func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
@@ -205,14 +205,14 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
 	return body, err
 }
 
-// -- snapshots --
+// SNAPSHOTS //
 
-// WriteBody writes the body
+// WriteSnapshot writes the snapshot to the DB
 func (s *KeyValueStorage) WriteSnapshot(hash types.Hash, blob []byte) error {
 	return s.set(SNAPSHOTS, hash.Bytes(), blob)
 }
 
-// ReadBody reads the body
+// ReadSnapshot reads the snapshot from the DB
 func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
 	data, ok := s.get(SNAPSHOTS, hash.Bytes())
 	if !ok {
@@ -221,7 +221,7 @@ func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
 	return data, true
 }
 
-// -- receipts --
+// RECEIPTS //
 
 // WriteReceipts writes the receipts
 func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
@@ -236,16 +236,16 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error
 	return *receipts, err
 }
 
-// -- tx lookup --
+// TX LOOKUP //
 
-// WriteReceipts writes the receipts
+// WriteTxLookup maps the transaction hash to the block hash
 func (s *KeyValueStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
 	ar := &fastrlp.Arena{}
 	vr := ar.NewBytes(blockHash.Bytes())
 	return s.write2(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
 }
 
-// ReadReceipts reads the receipts
+// ReadTxLookup reads the block hash using the transaction hash
 func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	parser := &fastrlp.Parser{}
 	v := s.read2(TX_LOOKUP_PREFIX, hash.Bytes(), parser)
@@ -262,7 +262,7 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	return types.BytesToHash(blockHash), true
 }
 
-// -- write ops --
+// WRITE OPERATIONS //
 
 func (s *KeyValueStorage) writeRLP(p, k []byte, raw types.RLPMarshaler) error {
 	var data []byte
