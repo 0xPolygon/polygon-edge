@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // serviceV1 is the GRPC server implementation for the v1 protocol
@@ -28,7 +29,13 @@ type rlpObject interface {
 }
 
 func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Empty, error) {
-	id := ctx.(*grpc.Context).PeerID
+	var id peer.ID
+
+	if ctx, ok := ctx.(*grpc.Context); ok {
+		id = ctx.PeerID
+	} else {
+		return &empty.Empty{}, nil
+	}
 
 	b := new(types.Block)
 	if err := b.UnmarshalRLP(req.Raw.Value); err != nil {
@@ -39,13 +46,12 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 }
 
 // GetCurrent implements the V1Server interface
-func (s *serviceV1) GetCurrent(ctx context.Context, in *empty.Empty) (*proto.V1Status, error) {
-	status := s.syncer.status.toProto()
-	return status, nil
+func (s *serviceV1) GetCurrent(_ context.Context, _ *empty.Empty) (*proto.V1Status, error) {
+	return s.syncer.status.toProto(), nil
 }
 
 // GetObjectsByHash implements the V1Server interface
-func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest) (*proto.Response, error) {
+func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) (*proto.Response, error) {
 	hashes, err := req.DecodeHashes()
 	if err != nil {
 		return nil, err
@@ -55,24 +61,22 @@ func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest
 	}
 	for _, hash := range hashes {
 		var obj rlpObject
-		var found bool
 
 		if req.Type == proto.HashRequest_BODIES {
-			obj, found = s.store.GetBodyByHash(hash)
+			obj, _ = s.store.GetBodyByHash(hash)
 		} else if req.Type == proto.HashRequest_RECEIPTS {
 			var raw []*types.Receipt
 			raw, err = s.store.GetReceiptsByHash(hash)
 			if err != nil {
 				return nil, err
 			}
-			found = true
 
 			receipts := types.Receipts(raw)
 			obj = &receipts
 		}
 
 		var data []byte
-		if found {
+		if obj != nil {
 			data = obj.MarshalRLPTo(nil)
 		} else {
 			data = []byte{}
@@ -90,9 +94,9 @@ func (s *serviceV1) GetObjectsByHash(ctx context.Context, req *proto.HashRequest
 const maxHeadersAmount = 190
 
 // GetHeaders implements the V1Server interface
-func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest) (*proto.Response, error) {
+func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) (*proto.Response, error) {
 	if req.Number != 0 && req.Hash != "" {
-		return nil, fmt.Errorf("cannot have both")
+		return nil, fmt.Errorf("cannot provide both a number and a hash")
 	}
 	if req.Amount > maxHeadersAmount {
 		req.Amount = maxHeadersAmount
@@ -132,8 +136,7 @@ func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest
 	// resp
 	addData(origin)
 
-	count := int64(1)
-	for count < req.Amount {
+	for count := int64(1); count < req.Amount; {
 		block := int64(origin.Number) + skip
 
 		if block < 0 {
@@ -154,7 +157,7 @@ func (s *serviceV1) GetHeaders(ctx context.Context, req *proto.GetHeadersRequest
 
 // Helper functions to decode responses from the grpc layer
 func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Body, error) {
-	input := []string{}
+	input := make([]string, 0, len(hashes))
 	for _, h := range hashes {
 		input = append(input, h.String())
 	}
@@ -162,7 +165,7 @@ func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]
 	if err != nil {
 		return nil, err
 	}
-	res := []*types.Body{}
+	res := make([]*types.Body, 0, len(resp.Objs))
 	for _, obj := range resp.Objs {
 		var body types.Body
 		if obj.Spec.Value != nil {

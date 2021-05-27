@@ -520,12 +520,37 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 }
 
 // SubscribeCh returns an event of of subscription events
-func (s *Server) SubscribeCh() (chan *PeerEvent, error) {
+func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
+
+	var closed bool
+	var mutex sync.Mutex
+
+	isClosed := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return closed
+	}
+
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		ch <- evnt
+		if !isClosed() {
+			ch <- evnt
+		}
 	})
-	return ch, err
+	if err != nil {
+		close(ch)
+		return nil, err
+	}
+
+	go func() {
+		<-s.closeCh
+		mutex.Lock()
+		closed = true
+		mutex.Unlock()
+		close(ch)
+	}()
+
+	return ch, nil
 }
 
 func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -265,16 +266,24 @@ func (s *Syncer) Start() {
 	go s.syncCurrentStatus()
 
 	// Register the grpc protocol for syncer
-	grpc := libp2pGrpc.NewGrpcStream()
-	proto.RegisterV1Server(grpc.GrpcServer(), s.serviceV1)
+	grpcStream := libp2pGrpc.NewGrpcStream()
+	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 
-	s.server.Register(syncerV1, grpc)
+	s.server.Register(syncerV1, grpcStream)
 
-	updateCh, _ := s.server.SubscribeCh()
+	updateCh, err := s.server.SubscribeCh()
+	if err != nil {
+		s.logger.Error("failed to subscribe", "err", err)
+		return
+	}
 
 	go func() {
 		for {
-			evnt := <-updateCh
+			evnt, ok := <-updateCh
+			if !ok {
+				return
+			}
+
 			if evnt.Type != network.PeerEventConnected {
 				continue
 			}
@@ -325,13 +334,12 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	if err != nil {
 		return err
 	}
-	peer := &syncPeer{
+	s.peers[peerID] = &syncPeer{
 		peer:      peerID,
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
 	}
-	s.peers[peerID] = peer
 	return nil
 }
 
@@ -379,21 +387,26 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 				min = m + 1
 			} else {
 				if m == 0 {
-					return nil, nil, fmt.Errorf("genesis does not match?")
+					return nil, nil, errors.New("genesis does not match?")
 				}
 				max = m - 1
 			}
 		}
 	}
 
+	var num uint64
+	if header != nil {
+		num = header.Number
+	}
+
 	// get the block fork
-	forkNum := header.Number + 1
+	forkNum := num + 1
 	fork, err := getHeader(clt, &forkNum, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
+		return nil, nil, fmt.Errorf("failed to get fork at num %d", num)
 	}
 	if fork == nil {
-		return nil, nil, fmt.Errorf("fork not found")
+		return nil, nil, errors.New("fork not found")
 	}
 
 	return header, fork, nil
