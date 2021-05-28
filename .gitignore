@@ -1,5 +1,6 @@
 peers.json
 genesis.json
+!/e2e/genesis.json
 *-packr.go
 config*.json
 

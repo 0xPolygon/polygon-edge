@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/compiler"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -137,8 +136,10 @@ func (t *TestServer) Stop() {
 }
 
 func NewTestServerFromGenesis(t *testing.T) *TestServer {
-	c, err := chain.ImportFromFile("../genesis.json")
-	assert.NoError(t, err)
+	c, err := chain.ImportFromFile("genesis.json")
+	if err != nil {
+		t.Fatalf("Failed to import chain from file: genesis.json: %v", err)
+	}
 
 	config := &TestServerConfig{
 		PremineAccts: []*SrvAccount{},
@@ -282,7 +283,7 @@ var emptyAddr web3.Address
 func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
-	if txn.From == emptyAddr {
+	if t.Config != nil && len(t.Config.PremineAccts) != 0 && txn.From == emptyAddr {
 		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
 	}
 	if txn.GasPrice == 0 {

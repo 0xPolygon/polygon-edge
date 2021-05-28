@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      geth:
+        image: ethereum/client-go
+        ports:
+          - 8545:8545
+          - 30303:30303
+
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          version: 3.12.0
+
+      - name: Install Solidity
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install snapd
+          sudo snap install core
+          sudo snap install solc
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Go tools
+        run: |
+          GO111MODULE=on go get -v -u google.golang.org/protobuf/cmd/protoc-gen-go@v1.25
+          GO111MODULE=on go get -v -u google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+
+      - name: Generate code
+        run: make protoc
+
+      - name: Go dependencies
+        run: |
+          go mod tidy -v
+          go mod vendor -v
+          go clean -modcache
+
+      - name: Download spec tests
+        run: make download-spec-tests
+
+#      - name: golangci-lint
+#        uses: golangci/golangci-lint-action@v2
+#        with:
+#          version: v1.39
+#          args: --verbose
+
+      - name: Go build
+        run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
+
+      - name: Go test
+        run: go test -v ./...

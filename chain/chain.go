@@ -3,6 +3,7 @@ package chain
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -364,10 +365,15 @@ func ImportFromName(chain string) (*Chain, error) {
 func ImportFromFile(filename string) (*Chain, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read file %v: %w", filename, err)
 	}
 
-	return importChain(data)
+	chain, err := importChain(data)
+	if err != nil {
+		return nil, fmt.Errorf("import chain: %w", err)
+	}
+
+	return chain, nil
 }
 
 func importChain(content []byte) (*Chain, error) {
@@ -375,8 +381,11 @@ func importChain(content []byte) (*Chain, error) {
 	if err := json.Unmarshal(content, &chain); err != nil {
 		return nil, err
 	}
+	if chain.Params == nil {
+		return nil, errors.New("params are missing from chain")
+	}
 	if engines := chain.Params.Engine; len(engines) != 1 {
-		return nil, fmt.Errorf("Expected one consensus engine but found %d", len(engines))
+		return nil, fmt.Errorf("expected one consensus engine but found %d", len(engines))
 	}
 
 	return chain, nil
