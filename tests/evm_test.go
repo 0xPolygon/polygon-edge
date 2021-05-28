@@ -2,11 +2,14 @@ package tests
 
 import (
 	"encoding/json"
-	"github.com/umbracle/fastrlp"
 	"io/ioutil"
 	"math/big"
+	"reflect"
 	"strings"
 	"testing"
+	"unsafe"
+
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -58,6 +61,16 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	e, _ := executor.BeginTxn(root, c.Env.ToHeader(t))
+	{
+		// todo: workaround fix to pass the test
+		// we need to consider best way to give GasPrice and Origin as context value into evm in test
+		t := reflect.ValueOf(e).Elem()
+		ctx := t.FieldByName("ctx")
+		gasPrice := (*types.Hash)(unsafe.Pointer(ctx.FieldByName("GasPrice").UnsafeAddr()))
+		origin := (*types.Address)(unsafe.Pointer(ctx.FieldByName("Origin").UnsafeAddr()))
+		*gasPrice = types.BytesToHash(env.GasPrice.Bytes())
+		*origin = env.Origin
+	}
 
 	evmR := evm.NewEVM()
 
