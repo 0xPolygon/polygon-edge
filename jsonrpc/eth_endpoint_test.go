@@ -319,11 +319,14 @@ func TestEth_State_GetBalance(t *testing.T) {
 
 	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, LatestBlockNumber)
 	assert.NoError(t, err)
+	assert.NotNil(t, balance)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	_, err = dispatcher.endpoints.Eth.GetBalance(addr1, LatestBlockNumber)
-	assert.Error(t, err)
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, LatestBlockNumber)
+	assert.NoError(t, err)
+	assert.NotNil(t, balance)
+	assert.Equal(t, balance, argUintPtr(0))
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
