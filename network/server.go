@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
-	libp2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -575,8 +574,4 @@ type PeerEvent struct {
 	// Desc is used to include more contextual
 	// information for the event
 	Desc string
-}
-
-func IDFromPriv(priv libp2pcrypto.PrivKey) (peer.ID, error) {
-	return peer.IDFromPublicKey(priv.GetPublic())
 }
