@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -23,6 +24,10 @@ func TestNewFilter_Logs(t *testing.T) {
 	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
 	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
 
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping test")
+	}
+
 	_, addr := fr.DeployContract(cc)
 
 	client := fr.JSONRPC()
@@ -39,6 +44,10 @@ func TestNewFilter_Logs(t *testing.T) {
 }
 
 func TestNewFilter_Block(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping test")
+	}
+
 	target := web3.HexToAddress("0x1010101010101010101010101010101010101010")
 
 	fr := framework.NewTestServerFromGenesis(t)

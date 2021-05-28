@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"os"
 	"testing"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
@@ -19,6 +20,10 @@ func TestEncoding(t *testing.T) {
 
 	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
 	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
+
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping test")
+	}
 
 	_, addr := fr.DeployContract(cc)
 
