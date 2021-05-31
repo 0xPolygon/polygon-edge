@@ -7,6 +7,9 @@ import (
 	"github.com/0xPolygon/minimal/network"
 )
 
+const DefaultGRPCPort int = 8545
+const DefaultJSONRPCPort int = 9632
+
 // Config is used to parametrize the minimal client
 type Config struct {
 	Chain *chain.Chain
@@ -23,8 +26,8 @@ type Config struct {
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
 func DefaultConfig() *Config {
 	return &Config{
-		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545},
-		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9632},
+		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
+		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
 		Network:     network.DefaultConfig(),
 	}
 }

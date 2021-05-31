@@ -200,7 +200,7 @@ func (m *Meta) GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string
 // FlagSet adds some default commands to handle grpc connections with the server
 func (m *Meta) FlagSet(n string) *flag.FlagSet {
 	f := flag.NewFlagSet(n, flag.ContinueOnError)
-	f.StringVar(&m.addr, "address", "127.0.0.1:9632", "Address of the http api")
+	f.StringVar(&m.addr, "address", fmt.Sprintf("%s:%d", "127.0.0.1", minimal.DefaultGRPCPort), "Address of the http api")
 
 	return f
 }
