@@ -116,8 +116,8 @@ func (c *GenesisCommand) GetHelperText() string {
 // Help implements the cli.Command interface
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
-	usage := `genesis --bootnode BOOTNODE_URL [--data-dir DATA_DIRECTORY] [--name NAME]
-	[--chainid CHAIN_ID] [--premine ADDRESS:VALUE] [--consensus CONSENSUS_PROTOCOL]
+	usage := `genesis [--data-dir DATA_DIRECTORY] [--name NAME] [--chainid CHAIN_ID]
+	[--premine ADDRESS:VALUE] [--bootnode BOOTNODE_URL] [--consensus CONSENSUS_PROTOCOL]
 	[--ibft-validator IBFT_VALIDATOR_LIST] [--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]`
 
 	return c.GenerateHelp(c.Synopsis(), usage)
@@ -166,10 +166,6 @@ func (c *GenesisCommand) Run(args []string) int {
 	}
 	if !os.IsNotExist(err) {
 		c.UI.Error(fmt.Sprintf("Genesis (%s) already exists", genesisPath))
-		return 1
-	}
-	if bootnodes == nil {
-		c.UI.Error("At least one bootnode must be specified")
 		return 1
 	}
 
