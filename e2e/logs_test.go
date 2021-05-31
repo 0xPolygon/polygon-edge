@@ -32,6 +32,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		fr.TxnTo(addr, "setA1")
 	}
+	time.Sleep(10 * time.Second)
 
 	res, err := client.Eth().GetFilterChanges(id)
 	assert.NoError(t, err)
