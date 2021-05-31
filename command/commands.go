@@ -3,6 +3,7 @@ package command
 import (
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/minimal/minimal"
 	"os"
 
 	"github.com/0xPolygon/minimal/command/server"
