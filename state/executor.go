@@ -319,8 +319,10 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	return gas, failed, err
 }
 
-func (t *Transition) Context() runtime.TxContext {
-	return t.ctx
+// ContextPtr returns reference of context
+// This method is called only by test
+func (t *Transition) ContextPtr() *runtime.TxContext {
+	return &t.ctx
 }
 
 func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {

@@ -2,11 +2,12 @@ package tests
 
 import (
 	"encoding/json"
-	"github.com/umbracle/fastrlp"
 	"io/ioutil"
 	"math/big"
 	"strings"
 	"testing"
+
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -58,6 +59,9 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	e, _ := executor.BeginTxn(root, c.Env.ToHeader(t))
+	ctx := e.ContextPtr()
+	ctx.GasPrice = types.BytesToHash(env.GasPrice.Bytes())
+	ctx.Origin = env.Origin
 
 	evmR := evm.NewEVM()
 

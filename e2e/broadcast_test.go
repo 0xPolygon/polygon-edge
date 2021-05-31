@@ -54,7 +54,7 @@ func TestBroadcast(t *testing.T) {
 			}()
 
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
-			time.Sleep(20 * time.Second)
+			time.Sleep(15 * time.Second)
 
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,
@@ -74,7 +74,7 @@ func TestBroadcast(t *testing.T) {
 				t.Fatalf("failed to send transaction, err=%+v", err)
 			}
 
-			time.Sleep(20 * time.Second)
+			time.Sleep(30 * time.Second)
 
 			for i, srv := range srvs {
 				res, err := srv.TxnPoolOperator().Status(context.Background(), &emptypb.Empty{})

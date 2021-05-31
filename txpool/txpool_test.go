@@ -102,7 +102,8 @@ func TestTxnQueue_Promotion(t *testing.T) {
 	addr1 := types.Address{0x1}
 
 	pool.addImpl("", &types.Transaction{
-		From: addr1,
+		From:     addr1,
+		GasPrice: big.NewInt(1),
 	})
 
 	nonce, _ := pool.GetNonce(addr1)
@@ -111,8 +112,9 @@ func TestTxnQueue_Promotion(t *testing.T) {
 	// though txn0 is not being processed yet and the current nonce is 0
 	// we need to consider that txn0 is on the sorted pool so this one is promoted too
 	pool.addImpl("", &types.Transaction{
-		From:  addr1,
-		Nonce: 1,
+		From:     addr1,
+		Nonce:    1,
+		GasPrice: big.NewInt(1),
 	})
 
 	nonce, _ = pool.GetNonce(addr1)

@@ -102,6 +102,7 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	}
 	for _, txn := range block.Transactions {
 		if txn.Hash == hash {
+			// todo: need to add blockHash, blockNumber, and transactionIndex
 			return toTransaction(txn), nil
 		}
 	}
