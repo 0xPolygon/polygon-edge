@@ -64,7 +64,7 @@ func TestDiscovery(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(30 * time.Second)
 
 			for i, s := range srvs {
 				res, err := s.Operator().PeersList(context.Background(), &empty.Empty{})
