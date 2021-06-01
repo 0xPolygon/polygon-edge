@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -32,6 +33,7 @@ type Config struct {
 type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
+	NatAddr    string `json:"nat_addr"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
@@ -83,6 +85,10 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 	{
 		if conf.Network.Addr, err = resolveAddr(c.Network.Addr); err != nil {
 			return nil, err
+		}
+
+		if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
+			return nil, errors.New("Could not parse NAT IP address")
 		}
 
 		conf.Network.NoDiscover = c.Network.NoDiscover
@@ -167,6 +173,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		// Network
 		if otherConfig.Network.Addr != "" {
 			c.Network.Addr = otherConfig.Network.Addr
+		}
+		if otherConfig.Network.NatAddr != "" {
+			c.Network.NatAddr = otherConfig.Network.NatAddr
 		}
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers
