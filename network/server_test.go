@@ -24,16 +24,16 @@ func TestConnLimit_Inbound(t *testing.T) {
 	srv2 := CreateServer(t, conf)
 
 	// One slot left, it can connect 0->1
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 1*time.Second))
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 5*time.Second))
 
 	// srv2 tries to connect to srv0 but srv0 is already connected
 	// to max peers
-	assert.Error(t, srv2.Join(srv1.AddrInfo(), 1*time.Second))
+	assert.Error(t, srv2.Join(srv1.AddrInfo(), 5*time.Second))
 
 	srv0.Disconnect(srv1.host.ID(), "bye")
 
 	// try to connect again
-	assert.NoError(t, srv2.Join(srv1.AddrInfo(), 1*time.Second))
+	assert.NoError(t, srv2.Join(srv1.AddrInfo(), 5*time.Second))
 }
 
 func TestConnLimit_Outbound(t *testing.T) {
