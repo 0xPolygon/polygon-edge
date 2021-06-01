@@ -1,6 +1,8 @@
 package network
 
 import (
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -143,4 +145,37 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
+}
+
+func TestNat(t *testing.T) {
+	testIP := "192.0.2.1"
+	testPort := 2001
+	testMultiAddrString := fmt.Sprintf("/ip4/%s/tcp/%d", testIP, testPort)
+
+	srv := CreateServer(t, func(c *Config) {
+		c.NatAddr = net.ParseIP(testIP)
+	})
+
+	t.Run("NAT IP should not be found in listen addresses", func(t *testing.T) {
+		listenAddresses := srv.host.Network().ListenAddresses()
+
+		for _, addr := range listenAddresses {
+			assert.NotEqual(t, addr.String(), testMultiAddrString)
+		}
+	})
+
+	t.Run("NAT IP should be found in registered server addresses", func(t *testing.T) {
+		addrInfo := srv.AddrInfo()
+		listenAddresses := addrInfo.Addrs
+
+		found := false
+		for _, addr := range listenAddresses {
+			if addr.String() == testMultiAddrString {
+				found = true
+				break
+			}
+		}
+
+		assert.True(t, found)
+	})
 }
