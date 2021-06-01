@@ -136,7 +136,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var dataDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
-	var bootnodes helperFlags.BootnodeFlags
+	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
 
