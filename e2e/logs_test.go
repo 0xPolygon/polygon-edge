@@ -9,28 +9,22 @@ import (
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/testutil"
 )
 
 func TestNewFilter_Logs(t *testing.T) {
 	fr := framework.NewTestServerFromGenesis(t)
 
-	cc := &testutil.Contract{}
-	cc.AddEvent(testutil.NewEvent("A").
-		Add("address", true).
-		Add("address", true))
-
-	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
-	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
-
-	_, addr := fr.DeployContract(cc)
+	contractAddr, err := fr.DeployContract(byteCode)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	client := fr.JSONRPC()
 	id, err := client.Eth().NewFilter(&web3.LogFilter{})
 	assert.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		fr.TxnTo(addr, "setA1")
+		fr.TxnTo(contractAddr, "setA1")
 	}
 	time.Sleep(10 * time.Second)
 

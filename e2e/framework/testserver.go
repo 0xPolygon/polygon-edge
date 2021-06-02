@@ -17,9 +17,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/compiler"
 	"github.com/umbracle/go-web3/jsonrpc"
-	"github.com/umbracle/go-web3/testutil"
 	"golang.org/x/crypto/sha3"
 
 	"google.golang.org/grpc"
@@ -254,22 +252,18 @@ func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer 
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(c *testutil.Contract) (*compiler.Artifact, web3.Address) {
-	solcContract, err := c.Compile()
+func (t *TestServer) DeployContract(binary string) (web3.Address, error) {
+	buf, err := hex.DecodeString(binary)
 	if err != nil {
-		panic(err)
-	}
-	buf, err := hex.DecodeString(solcContract.Bin)
-	if err != nil {
-		panic(err)
+		return web3.Address{}, err
 	}
 	receipt, err := t.SendTxn(&web3.Transaction{
 		Input: buf,
 	})
 	if err != nil {
-		panic(err)
+		return web3.Address{}, err
 	}
-	return solcContract, receipt.ContractAddress
+	return receipt.ContractAddress, nil
 }
 
 const (

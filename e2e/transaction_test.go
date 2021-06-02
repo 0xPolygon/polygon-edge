@@ -15,11 +15,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-var (
-	addr0 = types.Address{}
-	addr1 = types.Address{0x1}
-)
-
 func TestSignedTransaction(t *testing.T) {
 	fr := framework.NewTestServerFromGenesis(t)
 
