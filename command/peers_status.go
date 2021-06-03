@@ -19,6 +19,8 @@ func (p *PeersStatus) GetHelperText() string {
 
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "peers status PEER_ID"
 
 	return p.GenerateHelp(p.Synopsis(), usage)

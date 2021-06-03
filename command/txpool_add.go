@@ -22,11 +22,6 @@ func (p *TxPoolAdd) DefineFlags() {
 		p.flagMap = make(map[string]FlagDescriptor)
 	}
 
-	if len(p.flagMap) > 0 {
-		// No need to redefine the flags again
-		return
-	}
-
 	p.flagMap["from"] = FlagDescriptor{
 		description: "The sender address",
 		arguments: []string{
@@ -83,8 +78,11 @@ func (p *TxPoolAdd) GetHelperText() string {
 
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
+	p.Meta.DefineFlags()
 	p.DefineFlags()
-	usage := "txpool add --from ADDRESS --to ADDRESS --value VALUE\n\t--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]"
+
+	usage := `txpool add --from ADDRESS --to ADDRESS --value VALUE
+	--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]`
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }

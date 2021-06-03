@@ -20,6 +20,8 @@ func (p *PeersList) GetHelperText() string {
 
 // Help implements the cli.PeersList interface
 func (p *PeersList) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "peers list"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
