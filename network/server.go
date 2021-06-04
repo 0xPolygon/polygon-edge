@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
-	libp2pcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -22,9 +21,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+const DefaultLibp2pPort int = 1478
+
 type Config struct {
 	NoDiscover bool
 	Addr       *net.TCPAddr
+	NatAddr    net.IP
 	DataDir    string
 	MaxPeers   uint64
 	Chain      *chain.Chain
@@ -33,7 +35,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		NoDiscover: false,
-		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1478},
+		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
 		MaxPeers:   10,
 	}
 }
@@ -80,16 +82,30 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", config.Addr.IP.String(), config.Addr.Port))
+
+	listenAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", config.Addr.IP.String(), config.Addr.Port))
 	if err != nil {
 		return nil, err
+	}
+
+	addrsFactory := func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+		if config.NatAddr != nil {
+			addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", config.NatAddr.String(), config.Addr.Port))
+
+			if addr != nil {
+				addrs = append(addrs, addr)
+			}
+		}
+
+		return addrs
 	}
 
 	host, err := libp2p.New(
 		context.Background(),
 		// Use noise as the encryption protocol
 		libp2p.Security(noise.ID, noise.New),
-		libp2p.ListenAddrs(addr),
+		libp2p.ListenAddrs(listenAddr),
+		libp2p.AddrsFactory(addrsFactory),
 		libp2p.Identity(key),
 	)
 	if err != nil {
@@ -105,7 +121,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		logger:           logger,
 		config:           config,
 		host:             host,
-		addrs:            []multiaddr.Multiaddr{addr},
+		addrs:            host.Addrs(),
 		peers:            map[peer.ID]*Peer{},
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
@@ -542,10 +558,16 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
 func AddrInfoToString(addr *peer.AddrInfo) string {
-	if len(addr.Addrs) != 1 {
-		panic("Not supported")
+	if len(addr.Addrs) == 1 {
+		return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
 	}
-	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+
+	result := ""
+	for _, a := range addr.Addrs {
+		result += fmt.Sprintf("%s/p2p/%s\n", a, addr.ID.String())
+	}
+
+	return result
 }
 
 type PeerConnectedEvent struct {
@@ -575,8 +597,4 @@ type PeerEvent struct {
 	// Desc is used to include more contextual
 	// information for the event
 	Desc string
-}
-
-func IDFromPriv(priv libp2pcrypto.PrivKey) (peer.ID, error) {
-	return peer.IDFromPublicKey(priv.GetPublic())
 }

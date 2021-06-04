@@ -116,6 +116,7 @@ func readConfig(args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
+	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")

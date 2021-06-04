@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"path/filepath"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
@@ -60,12 +61,20 @@ func (p *IbftInit) Run(args []string) int {
 	}
 
 	// try to create also a libp2p address
-	if _, err := network.ReadLibp2pKey(filepath.Join(pathName, "libp2p")); err != nil {
+	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(pathName, "libp2p"))
+	if err != nil {
+		p.UI.Error(err.Error())
+		return 1
+	}
+
+	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	p.UI.Output(fmt.Sprintf("Public key: %s", crypto.PubKeyToAddress(&key.PublicKey)))
+	p.UI.Output(fmt.Sprintf("Node ID: %s", nodeId.String()))
 	p.UI.Output("Done!")
 	return 0
 }
