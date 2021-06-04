@@ -16,6 +16,21 @@ type IbftInit struct {
 	Meta
 }
 
+func (i *IbftInit) DefineFlags() {
+	if i.flagMap == nil {
+		// Flag map not initialized
+		i.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	i.flagMap["data-dir"] = FlagDescriptor{
+		description: fmt.Sprintf("Sets the directory for the Polygon SDK data"),
+		arguments: []string{
+			"DATA_DIRECTORY",
+		},
+		argumentsOptional: false,
+	}
+}
+
 // GetHelperText returns a simple description of the command
 func (p *IbftInit) GetHelperText() string {
 	return "Initializes IBFT for the Polygon SDK, in the specified directory"
@@ -23,7 +38,9 @@ func (p *IbftInit) GetHelperText() string {
 
 // Help implements the cli.IbftInit interface
 func (p *IbftInit) Help() string {
-	usage := "ibft init DATA_DIRECTORY"
+	p.DefineFlags()
+
+	usage := "ibft init --data-dir DATA_DIRECTORY"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -36,32 +53,34 @@ func (p *IbftInit) Synopsis() string {
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
 	flags := p.FlagSet("ibft init")
+
+	var dataDir string
+	flags.StringVar(&dataDir, "data-dir", "", "")
+
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	args = flags.Args()
-	if len(args) != 1 {
+	if dataDir == "" {
 		p.UI.Error("required argument (data directory) not passed in")
 		return 1
 	}
 
-	pathName := args[0]
-	if err := minimal.SetupDataDir(pathName, []string{"consensus", "libp2p"}); err != nil {
+	if err := minimal.SetupDataDir(dataDir, []string{"consensus", "libp2p"}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to write the ibft private key
-	key, err := crypto.ReadPrivKey(filepath.Join(pathName, "consensus", ibft.IbftKeyName))
+	key, err := crypto.ReadPrivKey(filepath.Join(dataDir, "consensus", ibft.IbftKeyName))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to create also a libp2p address
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(pathName, "libp2p"))
+	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(dataDir, "libp2p"))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

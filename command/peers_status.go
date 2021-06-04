@@ -12,6 +12,21 @@ type PeersStatus struct {
 	Meta
 }
 
+func (p *PeersStatus) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	p.flagMap["libp2p-node-id"] = FlagDescriptor{
+		description: fmt.Sprintf("A unique reference to a specific peer within p2p network"),
+		arguments: []string{
+			"PEER_ID",
+		},
+		argumentsOptional: false,
+	}
+}
+
 // GetHelperText returns a simple description of the command
 func (p *PeersStatus) GetHelperText() string {
 	return "Returns the status of the specified peer, using the libp2p ID of the peer"
@@ -19,7 +34,9 @@ func (p *PeersStatus) GetHelperText() string {
 
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
-	usage := "peers status PEER_ID"
+	p.DefineFlags()
+
+	usage := "peers status --libp2p-node-id PEER_ID"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -32,14 +49,17 @@ func (p *PeersStatus) Synopsis() string {
 // Run implements the cli.PeersStatus interface
 func (p *PeersStatus) Run(args []string) int {
 	flags := p.FlagSet("peers status")
+
+	var nodeId string
+	flags.StringVar(&nodeId, "libp2p-node-id", "", "")
+
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	args = flags.Args()
-	if len(args) != 1 {
-		p.UI.Error("peer id argument not provided")
+	if nodeId == "" {
+		p.UI.Error("libp2p-node-id argument not provided")
 		return 1
 	}
 
@@ -50,7 +70,7 @@ func (p *PeersStatus) Run(args []string) int {
 	}
 
 	clt := proto.NewSystemClient(conn)
-	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: args[0]})
+	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeId})
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
