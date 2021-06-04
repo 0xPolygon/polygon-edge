@@ -20,6 +20,8 @@ func (p *TxPoolStatus) GetHelperText() string {
 
 // Help implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "txpool status"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
