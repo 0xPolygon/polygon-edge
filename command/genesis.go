@@ -13,15 +13,16 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/mitchellh/cli"
 )
 
 const (
 	genesisFileName       = "./genesis.json"
+	defaultChainName	  = "example"
 	defaultChainID        = 100
 	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
+	defaultConsensus	  = "pow"
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -43,7 +44,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.flagMap["data-dir"] = FlagDescriptor{
-		description: "Sets the directory for the Polygon SDK data",
+		description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
 		arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -51,7 +52,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.flagMap["name"] = FlagDescriptor{
-		description: "Sets the name for the chain",
+		description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
 		arguments: []string{
 			"NAME",
 		},
@@ -59,7 +60,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.flagMap["premine"] = FlagDescriptor{
-		description: "Sets the premined accounts and balances",
+		description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
 		arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -67,17 +68,25 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.flagMap["chainid"] = FlagDescriptor{
-		description: "Sets the ID of the chain",
+		description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
 		arguments: []string{
 			"CHAIN_ID",
 		},
 		argumentsOptional: false,
 	}
 
-	c.flagMap["ibft"] = FlagDescriptor{
-		description: "Sets the flag indicating IBFT consensus is used",
+	c.flagMap["consensus"] = FlagDescriptor{
+		description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
 		arguments: []string{
-			"USE_IBFT",
+			"CONSENSUS_PROTOCOL",
+		},
+		argumentsOptional: false,
+	}
+
+	c.flagMap["bootnode"] = FlagDescriptor{
+		description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
+		arguments: []string{
+			"BOOTNODE_URL",
 		},
 		argumentsOptional: false,
 	}
@@ -107,7 +116,9 @@ func (c *GenesisCommand) GetHelperText() string {
 // Help implements the cli.Command interface
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
-	usage := "genesis --data-dir DATA_DIRECTORY --name NAME [--premine ADDRESS:VALUE]\n\t[--chainid CHAIN_ID] [--ibft USE_IBFT] [--ibft-validator IBFT_VALIDATOR_LIST]\n\t[--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]"
+	usage := `genesis [--data-dir DATA_DIRECTORY] [--name NAME] [--chainid CHAIN_ID]
+	[--premine ADDRESS:VALUE] [--bootnode BOOTNODE_URL] [--consensus CONSENSUS_PROTOCOL]
+	[--ibft-validator IBFT_VALIDATOR_LIST] [--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]`
 
 	return c.GenerateHelp(c.Synopsis(), usage)
 }
@@ -125,6 +136,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var dataDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
+	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
 
@@ -133,10 +145,11 @@ func (c *GenesisCommand) Run(args []string) int {
 	var ibftValidatorsPrefixPath string
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
-	flags.StringVar(&name, "name", "example", "")
+	flags.StringVar(&name, "name", defaultChainName, "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", defaultChainID, "")
-	flags.StringVar(&consensus, "consensus", "pow", "")
+	flags.Var(&bootnodes, "bootnode", "")
+	flags.StringVar(&consensus, "consensus", defaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
@@ -156,7 +169,6 @@ func (c *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
-	var bootnodes chain.Bootnodes
 	var extraData []byte
 
 	if consensus == "ibft" {
@@ -167,9 +179,8 @@ func (c *GenesisCommand) Run(args []string) int {
 				validators = append(validators, types.StringToAddress(val))
 			}
 		} else if ibftValidatorsPrefixPath != "" {
-			// read all folders with the ibftValidatorsPrefixPath and search for
-			// istambul addresses and also include the bootnodes if possible
-			if validators, bootnodes, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
+			// read all folders with the ibftValidatorsPrefixPath and search for Istanbul addresses
+			if validators, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
 				return 1
 			}
@@ -245,16 +256,14 @@ func (c *GenesisCommand) Run(args []string) int {
 	return 0
 }
 
-func readValidatorsByRegexp(prefix string) ([]types.Address, []string, error) {
+func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 	validators := []types.Address{}
-	bootnodes := []string{}
 
 	files, err := ioutil.ReadDir(".")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	bootnodePort := 10001
 	for _, file := range files {
 		path := file.Name()
 		if !file.IsDir() {
@@ -274,27 +283,10 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, []string, error) {
 
 		priv, err := crypto.ReadPrivKey(possibleConsensusPath)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
-
-		// check if the libp2p path exists too
-		if _, err := os.Stat(filepath.Join(path, "libp2p", network.Libp2pKeyName)); os.IsNotExist(err) {
-			continue
-		}
-		libp2pKey, err := network.ReadLibp2pKey(filepath.Join(path, "libp2p"))
-		if err != nil {
-			return nil, nil, err
-		}
-		peerID, err := network.IDFromPriv(libp2pKey)
-		if err != nil {
-			return nil, nil, err
-		}
-		addr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePort, peerID.String())
-		bootnodes = append(bootnodes, addr)
-
-		bootnodePort += 10000
 	}
 
-	return validators, bootnodes, nil
+	return validators, nil
 }
