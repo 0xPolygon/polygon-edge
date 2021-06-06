@@ -89,14 +89,17 @@ func NewBlockchain(
 		stream:    &eventStream{},
 	}
 
-	var storage storage.Storage
-	var err error
+	var (
+		db  storage.Storage
+		err error
+	)
+
 	if dataDir == "" {
-		if storage, err = memory.NewMemoryStorage(nil); err != nil {
+		if db, err = memory.NewMemoryStorage(nil); err != nil {
 			return nil, err
 		}
 	} else {
-		if storage, err = leveldb.NewLevelDBStorage(
+		if db, err = leveldb.NewLevelDBStorage(
 			filepath.Join(dataDir, "blockchain"),
 			logger,
 		); err != nil {
@@ -104,21 +107,13 @@ func NewBlockchain(
 		}
 	}
 
-	b.db = storage
+	b.db = db
 
 	b.headersCache, _ = lru.New(100)
 	b.difficultyCache, _ = lru.New(100)
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
-
-	if _, ok := consensus.(*MockVerifier); ok {
-		// if we are using mock consensus we can compute right away the genesis since
-		// this consensus does not change the header hash
-		if err := b.ComputeGenesis(); err != nil {
-			return nil, err
-		}
-	}
 
 	// Initialize the average gas price
 	b.averageGasPrice = big.NewInt(0)
