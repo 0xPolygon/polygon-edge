@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/minimal/network/grpc"
@@ -96,7 +97,7 @@ const maxHeadersAmount = 190
 // GetHeaders implements the V1Server interface
 func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) (*proto.Response, error) {
 	if req.Number != 0 && req.Hash != "" {
-		return nil, fmt.Errorf("cannot provide both a number and a hash")
+		return nil, errors.New("cannot provide both a number and a hash")
 	}
 	if req.Amount > maxHeadersAmount {
 		req.Amount = maxHeadersAmount

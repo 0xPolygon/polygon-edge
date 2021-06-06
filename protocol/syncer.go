@@ -394,16 +394,15 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 		}
 	}
 
-	var num uint64
-	if header != nil {
-		num = header.Number
+	if header == nil {
+		return nil, nil, errors.New("header is nil")
 	}
 
 	// get the block fork
-	forkNum := num + 1
+	forkNum := header.Number + 1
 	fork, err := getHeader(clt, &forkNum, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get fork at num %d", num)
+		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
 	}
 	if fork == nil {
 		return nil, nil, errors.New("fork not found")
