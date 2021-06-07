@@ -20,11 +20,6 @@ func (p *IbftSnapshot) DefineFlags() {
 		p.flagMap = make(map[string]FlagDescriptor)
 	}
 
-	if len(p.flagMap) > 0 {
-		// No need to redefine the flags again
-		return
-	}
-
 	p.flagMap["number"] = FlagDescriptor{
 		description: "The block height (number) for the snapshot",
 		arguments: []string{
@@ -41,7 +36,9 @@ func (p *IbftSnapshot) GetHelperText() string {
 
 // Help implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Help() string {
+	p.Meta.DefineFlags()
 	p.DefineFlags()
+
 	usage := "ibft snapshot [--number BLOCK_NUMBER]"
 
 	return p.GenerateHelp(p.Synopsis(), usage)

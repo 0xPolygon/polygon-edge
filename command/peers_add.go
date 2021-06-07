@@ -34,6 +34,7 @@ func (p *PeersAdd) GetHelperText() string {
 
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
+	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	usage := "peers add --libp2p-address PEER_ADDRESS"

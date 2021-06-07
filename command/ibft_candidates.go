@@ -20,6 +20,8 @@ func (p *IbftCandidates) GetHelperText() string {
 
 // Help implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "ibft candidates"
 
 	return p.GenerateHelp(p.Synopsis(), usage)

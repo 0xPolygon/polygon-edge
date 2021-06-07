@@ -34,6 +34,7 @@ func (p *PeersStatus) GetHelperText() string {
 
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
+	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	usage := "peers status --libp2p-node-id PEER_ID"

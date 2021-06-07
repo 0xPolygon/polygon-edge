@@ -20,11 +20,6 @@ func (p *IbftPropose) DefineFlags() {
 		p.flagMap = make(map[string]FlagDescriptor)
 	}
 
-	if len(p.flagMap) > 0 {
-		// No need to redefine the flags again
-		return
-	}
-
 	p.flagMap["add"] = FlagDescriptor{
 		description: "Proposes a new validator to be added to the validator set",
 		arguments: []string{
@@ -49,9 +44,10 @@ func (p *IbftPropose) GetHelperText() string {
 
 // Help implements the cli.IbftPropose interface
 func (p *IbftPropose) Help() string {
+	p.Meta.DefineFlags()
 	p.DefineFlags()
-	usage := "ibft propose [--add ETH_ADDRESS]\n\t"
-	usage += "ibft propose [--del ETH_ADDRESS]"
+
+	usage := "ibft propose [--add ETH_ADDRESS | --del ETH_ADDRESS]"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }

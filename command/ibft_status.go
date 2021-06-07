@@ -19,6 +19,8 @@ func (p *IbftStatus) GetHelperText() string {
 
 // Help implements the cli.IbftStatus interface
 func (p *IbftStatus) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "ibft status"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
@@ -32,10 +34,6 @@ func (p *IbftStatus) Synopsis() string {
 // Run implements the cli.IbftStatus interface
 func (p *IbftStatus) Run(args []string) int {
 	flags := p.FlagSet("ibft propose")
-
-	var add, del bool
-	flags.BoolVar(&add, "add", false, "add")
-	flags.BoolVar(&del, "del", false, "del")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
