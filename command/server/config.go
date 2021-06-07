@@ -87,8 +87,10 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 			return nil, err
 		}
 
-		if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
-			return nil, errors.New("Could not parse NAT IP address")
+		if c.Network.NatAddr != "" {
+			if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
+				return nil, errors.New("Could not parse NAT IP address")
+			}
 		}
 
 		conf.Network.NoDiscover = c.Network.NoDiscover

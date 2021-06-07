@@ -558,13 +558,16 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
 func AddrInfoToString(addr *peer.AddrInfo) string {
-	if len(addr.Addrs) == 1 {
-		return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
-	}
-
 	result := ""
-	for _, a := range addr.Addrs {
-		result += fmt.Sprintf("%s/p2p/%s\n", a, addr.ID.String())
+
+	end := len(addr.Addrs) - 1
+
+	for i, a := range addr.Addrs {
+		result += fmt.Sprintf("%s/p2p/%s", a, addr.ID.String())
+
+		if i != end {
+			result += ", "
+		}
 	}
 
 	return result
