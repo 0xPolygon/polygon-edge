@@ -42,7 +42,6 @@ func TestDiscovery(t *testing.T) {
 				}
 				srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
 					config.SetConsensus(framework.ConsensusDummy)
-					config.SetShowsLog(i == 0)
 				})
 				srvs = append(srvs, srv)
 			}
