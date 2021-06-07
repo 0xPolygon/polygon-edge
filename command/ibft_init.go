@@ -1,6 +1,7 @@
 package command
 
 import (
+	"flag"
 	"fmt"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"path/filepath"
@@ -35,7 +36,7 @@ func (p *IbftInit) Synopsis() string {
 
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
-	flags := p.FlagSet("ibft init")
+	flags := flag.NewFlagSet("ibft init", flag.ContinueOnError)
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1

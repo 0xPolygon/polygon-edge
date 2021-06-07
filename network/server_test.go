@@ -149,12 +149,14 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 
 func TestNat(t *testing.T) {
 	testIP := "192.0.2.1"
-	testPort := 2001
+	testPort := 1500 // important to be less than 2000 because of other tests and more than 1024 because of OS security
 	testMultiAddrString := fmt.Sprintf("/ip4/%s/tcp/%d", testIP, testPort)
 
 	srv := CreateServer(t, func(c *Config) {
 		c.NatAddr = net.ParseIP(testIP)
+		c.Addr.Port = testPort
 	})
+	defer srv.Close()
 
 	t.Run("NAT IP should not be found in listen addresses", func(t *testing.T) {
 		listenAddresses := srv.host.Network().ListenAddresses()
