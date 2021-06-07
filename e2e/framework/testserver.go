@@ -122,9 +122,7 @@ type InitIBFTResult struct {
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	args := []string{
-		"ibft",
-		"init",
-		t.Config.IBFTDir,
+		"ibft", "init", t.Config.IBFTDir,
 	}
 
 	cmd := exec.Command(polygonSDKCmd, args...)
@@ -151,6 +149,7 @@ func (t *TestServer) GenerateGenesis() error {
 	args := []string{
 		"genesis",
 	}
+
 	// add premines
 	for _, acct := range t.Config.PremineAccts {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
@@ -167,6 +166,8 @@ func (t *TestServer) GenerateGenesis() error {
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}
+	case ConsensusDev:
+		args = append(args, "--consensus", "dev")
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
@@ -193,6 +194,8 @@ func (t *TestServer) Start() error {
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
 		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
+	case ConsensusDev:
+		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
 	case ConsensusDummy:
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
@@ -200,14 +203,14 @@ func (t *TestServer) Start() error {
 	if t.Config.Seal {
 		args = append(args, "--seal")
 	}
-	if t.Config.DevMode {
-		args = append(args, "--dev")
-	}
 
 	// todo: keep this until fix of nat issue
 	args = append(args, "--nat", "127.0.0.1")
-	args = append(args, "--log-level", "debug")
 	//
+
+	if t.Config.ShowsLog {
+		args = append(args, "--log-level", "debug")
+	}
 
 	t.ReleaseReservedPorts()
 

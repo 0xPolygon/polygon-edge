@@ -1,28 +1,31 @@
 package e2e
 
 import (
+	"os"
 	"testing"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEncoding(t *testing.T) {
+	_, from := framework.GenerateKeyAndAddr(t)
+
 	dataDir, err := framework.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
-		config.SetDev(true)
+		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetConsensus(framework.ConsensusDummy)
-		config.SetShowsLog(true)
-		config.Premine(types.StringToAddress("0xdf7fd4830f4cc1440b469615e9996e9fde92608f"), framework.EthToWei(10))
+		config.Premine(from, framework.EthToWei(10))
 	})
 	t.Cleanup(func() {
 		srv.Stop()
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
 	})
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)

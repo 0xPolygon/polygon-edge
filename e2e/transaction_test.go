@@ -7,76 +7,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/wallet"
-
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
 )
 
 func TestSignedTransaction(t *testing.T) {
-	var privKeyRaw = "0x4b2216c76f1b4c60c44d41986863e7337bc1a317d6a9366adfd8966fe2ac05f6"
-	key, err := wallet.NewWalletFromPrivKey(hex.MustDecodeHex(privKeyRaw))
+	key, err := wallet.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// todo: same code
 	dataDir, err := framework.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defaultCfg := func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusIBFT)
-		config.SetIBFTDirPrefix(IBFTDirPrefix)
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(types.Address(key.Address()), framework.EthToWei(10))
 		config.SetSeal(true)
-	}
-
-	srvs := make([]*framework.TestServer, 0, IBFTMinNodes)
-	bootnodes := make([]string, 0, IBFTMinNodes)
-	for i := 0; i < IBFTMinNodes; i++ {
-		srv := framework.NewTestServer(t, dataDir, defaultCfg)
-		res, err := srv.InitIBFT()
-		if err != nil {
-			t.Fatal(err)
-		}
-		libp2pAddr := framework.ToLocalIPv4LibP2pAddr(srv.Config.LibP2PPort, res.NodeID)
-
-		srvs = append(srvs, srv)
-		bootnodes = append(bootnodes, libp2pAddr)
-	}
+	})
 	t.Cleanup(func() {
-		for _, srv := range srvs {
-			srv.Stop()
-		}
+		ibftManager.StopServers()
 		if err := os.RemoveAll(dataDir); err != nil {
 			t.Log(err)
 		}
 	})
 
-	// Generate genesis.json
-	srvs[0].Config.SetBootnodes(bootnodes)
-	if err := srvs[0].GenerateGenesis(); err != nil {
-		t.Fatal(err)
-	}
-	for _, srv := range srvs {
-		if err := srv.Start(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	time.Sleep(time.Second * 5)
-	for _, srv := range srvs {
-		if err := srv.WaitForReady(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	//
+	ibftManager.StartServers()
 
-	clt := srvs[0].JSONRPC()
+	srv := ibftManager.GetServer(0)
+	clt := srv.JSONRPC()
 
 	// check there is enough balance
 	balance, err := clt.Eth().GetBalance(key.Address(), web3.Latest)
@@ -113,7 +76,7 @@ func TestSignedTransaction(t *testing.T) {
 		hash, err := clt.Eth().SendRawTransaction(data)
 		assert.NoError(t, err)
 
-		srvs[0].WaitForReceipt(hash)
+		srv.WaitForReceipt(hash)
 	}
 }
 
@@ -156,16 +119,20 @@ func TestPreminedBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
-		config.SetConsensus(framework.ConsensusDummy)
-		config.SetDev(true)
 	})
 	t.Cleanup(func() {
 		srv.Stop()
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
 	})
+
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +144,7 @@ func TestPreminedBalance(t *testing.T) {
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
+			t.Logf("balance %+v", balance)
 
 			if err != nil && !testCase.shouldFail {
 				assert.Failf(t, "Uncaught error", err.Error())
@@ -246,18 +214,21 @@ func TestEthTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
-		config.SetDev(true)
+		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetConsensus(framework.ConsensusDummy)
-		config.SetShowsLog(true)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
 	t.Cleanup(func() {
 		srv.Stop()
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
 	})
+
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
