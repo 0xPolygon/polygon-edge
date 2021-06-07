@@ -2,8 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/0xPolygon/minimal/minimal/proto"
 )
 
@@ -19,7 +17,7 @@ func (p *PeersAdd) DefineFlags() {
 	}
 
 	p.flagMap["libp2p-address"] = FlagDescriptor{
-		description: fmt.Sprintf("Peer's libp2p address in the multiaddr format"),
+		description: "Peer's libp2p address in the multiaddr format",
 		arguments: []string{
 			"PEER_ADDRESS",
 		},

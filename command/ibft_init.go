@@ -24,7 +24,7 @@ func (i *IbftInit) DefineFlags() {
 	}
 
 	i.flagMap["data-dir"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets the directory for the Polygon SDK data"),
+		description: "Sets the directory for the Polygon SDK data",
 		arguments: []string{
 			"DATA_DIRECTORY",
 		},

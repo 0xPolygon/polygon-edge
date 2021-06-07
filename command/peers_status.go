@@ -19,7 +19,7 @@ func (p *PeersStatus) DefineFlags() {
 	}
 
 	p.flagMap["libp2p-node-id"] = FlagDescriptor{
-		description: fmt.Sprintf("A unique reference to a specific peer within p2p network"),
+		description: "A unique reference to a specific peer within p2p network",
 		arguments: []string{
 			"PEER_ID",
 		},
