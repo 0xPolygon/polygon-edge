@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -16,14 +17,66 @@ import (
 )
 
 func TestSignedTransaction(t *testing.T) {
-	fr := framework.NewTestServerFromGenesis(t)
-
-	// 0xdf7fd4830f4cc1440b469615e9996e9fde92608f
 	var privKeyRaw = "0x4b2216c76f1b4c60c44d41986863e7337bc1a317d6a9366adfd8966fe2ac05f6"
 	key, err := wallet.NewWalletFromPrivKey(hex.MustDecodeHex(privKeyRaw))
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	clt := fr.JSONRPC()
+	// todo: same code
+	dataDir, err := framework.TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defaultCfg := func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusIBFT)
+		config.SetIBFTDirPrefix(IBFTDirPrefix)
+		config.Premine(types.Address(key.Address()), framework.EthToWei(10))
+		config.SetSeal(true)
+	}
+
+	srvs := make([]*framework.TestServer, 0, IBFTMinNodes)
+	bootnodes := make([]string, 0, IBFTMinNodes)
+	for i := 0; i < IBFTMinNodes; i++ {
+		srv := framework.NewTestServer(t, dataDir, defaultCfg)
+		res, err := srv.InitIBFT()
+		if err != nil {
+			t.Fatal(err)
+		}
+		libp2pAddr := framework.ToLocalIPv4LibP2pAddr(srv.Config.LibP2PPort, res.NodeID)
+
+		srvs = append(srvs, srv)
+		bootnodes = append(bootnodes, libp2pAddr)
+	}
+	t.Cleanup(func() {
+		for _, srv := range srvs {
+			srv.Stop()
+		}
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
+	})
+
+	// Generate genesis.json
+	srvs[0].Config.SetBootnodes(bootnodes)
+	if err := srvs[0].GenerateGenesis(); err != nil {
+		t.Fatal(err)
+	}
+	for _, srv := range srvs {
+		if err := srv.Start(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(time.Second * 5)
+	for _, srv := range srvs {
+		if err := srv.WaitForReady(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	//
+
+	clt := srvs[0].JSONRPC()
 
 	// check there is enough balance
 	balance, err := clt.Eth().GetBalance(key.Address(), web3.Latest)
@@ -60,7 +113,7 @@ func TestSignedTransaction(t *testing.T) {
 		hash, err := clt.Eth().SendRawTransaction(data)
 		assert.NoError(t, err)
 
-		fr.WaitForReceipt(hash)
+		srvs[0].WaitForReceipt(hash)
 	}
 }
 
@@ -99,36 +152,40 @@ func TestPreminedBalance(t *testing.T) {
 		},
 	}
 
-	srv := framework.NewTestServer(t, func(config *framework.TestServerConfig) {
+	dataDir, err := framework.TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
+		config.SetConsensus(framework.ConsensusDummy)
+		config.SetDev(true)
 	})
-	defer srv.Stop()
+	t.Cleanup(func() {
+		srv.Stop()
+	})
+	if err := srv.GenerateGenesis(); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
 
 	rpcClient := srv.JSONRPC()
-
 	for _, testCase := range testTable {
-
 		t.Run(testCase.name, func(t *testing.T) {
-
 			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
 
 			if err != nil && !testCase.shouldFail {
 				assert.Failf(t, "Uncaught error", err.Error())
 			}
-
 			if !testCase.shouldFail {
 				assert.Equalf(t, testCase.balance, balance, "Balances don't match")
 			}
 		})
 	}
-}
-
-func ethToWei(ethValue int64) *big.Int {
-	return new(big.Int).Mul(
-		big.NewInt(ethValue),
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 }
 
 func TestEthTransfer(t *testing.T) {
@@ -139,7 +196,7 @@ func TestEthTransfer(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("1"),
-			ethToWei(50), // 50 ETH
+			framework.EthToWei(50), // 50 ETH
 		},
 		// Empty account
 		{
@@ -148,7 +205,7 @@ func TestEthTransfer(t *testing.T) {
 		// Valid account #2
 		{
 			types.StringToAddress("3"),
-			ethToWei(10), // 10 ETH
+			framework.EthToWei(10), // 10 ETH
 		},
 	}
 
@@ -164,7 +221,7 @@ func TestEthTransfer(t *testing.T) {
 			"Valid ETH transfer #1",
 			validAccounts[0].address,
 			validAccounts[2].address,
-			ethToWei(10), // 10 ETH
+			framework.EthToWei(10), // 10 ETH
 			false,
 		},
 		{
@@ -172,7 +229,7 @@ func TestEthTransfer(t *testing.T) {
 			"Invalid ETH transfer",
 			validAccounts[1].address,
 			validAccounts[2].address,
-			ethToWei(100),
+			framework.EthToWei(100),
 			true,
 		},
 		{
@@ -180,20 +237,33 @@ func TestEthTransfer(t *testing.T) {
 			"Valid ETH transfer #2",
 			validAccounts[2].address,
 			validAccounts[1].address,
-			ethToWei(5), // 5 ETH
+			framework.EthToWei(5), // 5 ETH
 			false,
 		},
 	}
 
-	srv := framework.NewTestServer(t, func(config *framework.TestServerConfig) {
+	dataDir, err := framework.TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
 		config.SetDev(true)
 		config.SetSeal(true)
-
+		config.SetConsensus(framework.ConsensusDummy)
+		config.SetShowsLog(true)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
-	defer srv.Stop()
+	t.Cleanup(func() {
+		srv.Stop()
+	})
+	if err := srv.GenerateGenesis(); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
 
 	checkSenderReceiver := func(errSender error, errReceiver error, t *testing.T) {
 		if errSender != nil || errReceiver != nil {

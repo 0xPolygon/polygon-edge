@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -36,8 +35,34 @@ type TestServer struct {
 
 	Config *TestServerConfig
 	cmd    *exec.Cmd
-	OutBuf bytes.Buffer
-	ErrBuf bytes.Buffer
+}
+
+func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallback) *TestServer {
+	t.Helper()
+
+	// Reserve ports
+	ports, err := FindAvailablePorts(3, initialPort, initialPort+10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sets the services to start on open ports
+	config := &TestServerConfig{
+		ReservedPorts: ports,
+		GRPCPort:      ports[0].Port(),
+		LibP2PPort:    ports[1].Port(),
+		JsonRPCPort:   ports[2].Port(),
+		RootDir:       rootDir,
+	}
+
+	if callback != nil {
+		callback(config)
+	}
+
+	return &TestServer{
+		t:      t,
+		Config: config,
+	}
 }
 
 func (t *TestServer) GrpcAddr() string {
@@ -95,21 +120,21 @@ type InitIBFTResult struct {
 	NodeID    string
 }
 
-func (t *TestServer) InitIbft(index int) (*InitIBFTResult, error) {
+func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	args := []string{
 		"ibft",
 		"init",
-		fmt.Sprintf("%s%d", t.Config.IbftDirPrefix, index),
+		t.Config.IBFTDir,
 	}
 
 	cmd := exec.Command(polygonSDKCmd, args...)
-	cmd.Dir = t.Config.DataDir
+	cmd.Dir = t.Config.RootDir
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 
-	res := InitIBFTResult{}
+	res := &InitIBFTResult{}
 	for _, line := range strings.Split(string(output), "\n") {
 		if strings.HasPrefix(line, "Public key:") {
 			res.PublicKey = strings.Trim(strings.TrimPrefix(line, "Public Key:"), " ")
@@ -119,7 +144,7 @@ func (t *TestServer) InitIbft(index int) (*InitIBFTResult, error) {
 		}
 	}
 
-	return &res, nil
+	return res, nil
 }
 
 func (t *TestServer) GenerateGenesis() error {
@@ -135,67 +160,74 @@ func (t *TestServer) GenerateGenesis() error {
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
 		args = append(args, "--consensus", "ibft")
-		if t.Config.IbftDirPrefix == "" {
+		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
 		}
+		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}
-		args = append(args, "--ibft-validators-prefix-path", t.Config.IbftDirPrefix)
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
 
 	cmd := exec.Command(polygonSDKCmd, args...)
-	cmd.Dir = t.Config.DataDir
+	cmd.Dir = t.Config.RootDir
 
 	return cmd.Run()
 }
 
-func (s *TestServer) Start(t *testing.T, i int) error {
+func (t *TestServer) Start() error {
 	args := []string{
 		"server",
-		// add data dir
-		"--data-dir", filepath.Join(s.Config.DataDir, fmt.Sprintf("%s%d", s.Config.IbftDirPrefix, i)),
 		// add custom chain
-		"--chain", filepath.Join(s.Config.DataDir, "genesis.json"),
+		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", s.Config.GRPCPort),
+		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
 		// enable libp2p
-		"--libp2p", fmt.Sprintf(":%d", s.Config.LibP2PPort),
+		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", s.Config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	if s.Config.Seal {
+	switch t.Config.Consensus {
+	case ConsensusIBFT:
+		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
+	case ConsensusDummy:
+		args = append(args, "--data-dir", t.Config.RootDir)
+	}
+
+	if t.Config.Seal {
 		args = append(args, "--seal")
 	}
-	if s.Config.DevMode {
+	if t.Config.DevMode {
 		args = append(args, "--dev")
 	}
 
 	// todo: keep this until fix of nat issue
-	args = append(args, "--nat", "0.0.0.0")
+	args = append(args, "--nat", "127.0.0.1")
 	args = append(args, "--log-level", "debug")
 	//
 
-	s.ReleaseReservedPorts()
-
-	stdout := io.Writer(os.Stdout)
+	t.ReleaseReservedPorts()
 
 	// Start the server
-	s.cmd = exec.Command(polygonSDKCmd, args...)
-	s.cmd.Dir = s.Config.DataDir
-	s.cmd.Stdout = stdout
-	s.cmd.Stderr = stdout
+	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd.Dir = t.Config.RootDir
 
-	if err := s.cmd.Start(); err != nil {
-		t.Fatalf("err: %s", err)
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		t.cmd.Stdout = stdout
+		t.cmd.Stderr = stdout
+	}
+
+	if err := t.cmd.Start(); err != nil {
+		t.t.Fatalf("err: %s", err)
 	}
 
 	// todo: timeout
 	for {
-		if _, err := s.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
+		if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
 			break
 		}
 		time.Sleep(time.Second)
@@ -271,6 +303,27 @@ func (t *TestServer) WaitForReceipt(hash web3.Hash) (*web3.Receipt, error) {
 	return receipt, nil
 }
 
+func (t *TestServer) WaitForReady() error {
+	client := t.JSONRPC()
+
+	count := 0
+	for {
+		num, err := client.Eth().BlockNumber()
+		if err != nil {
+			return err
+		}
+		if num > 0 {
+			break
+		}
+
+		if count++; count > 5 {
+			return errors.New("timeout")
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
 func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
 	sig := MethodSig(method)
 	receipt, err := t.SendTxn(&web3.Transaction{
@@ -281,32 +334,4 @@ func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
 		t.t.Fatal(err)
 	}
 	return receipt
-}
-
-func NewTestServer(t *testing.T, dataDir string, callback TestServerConfigCallback) *TestServer {
-	t.Helper()
-
-	// Reserve ports
-	ports, err := FindAvailablePorts(3, initialPort, initialPort+10000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Sets the services to start on open ports
-	config := &TestServerConfig{
-		ReservedPorts: ports,
-		GRPCPort:      ports[0].Port(),
-		LibP2PPort:    ports[1].Port(),
-		JsonRPCPort:   ports[2].Port(),
-		DataDir:       dataDir,
-	}
-
-	if callback != nil {
-		callback(config)
-	}
-
-	return &TestServer{
-		t:      t,
-		Config: config,
-	}
 }

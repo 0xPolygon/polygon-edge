@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/0xPolygon/minimal/crypto"
@@ -57,7 +58,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 				errCh <- err
 				return
 			}
-			dstAddr := dstStatus.P2PAddr
+			dstAddr := strings.Split(dstStatus.P2PAddr, "\n")[0]
 
 			_, err = srcClient.PeersAdd(context.Background(), &proto.PeersAddRequest{
 				Id: dstAddr,

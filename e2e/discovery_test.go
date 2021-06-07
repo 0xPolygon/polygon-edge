@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,21 +32,36 @@ func TestDiscovery(t *testing.T) {
 		},
 	}
 
-	conf := func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDummy)
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, tt.numNodes)
-			for i := range srvs {
-				srvs[i] = framework.NewTestServer(t, conf)
+			srvs := make([]*framework.TestServer, 0, tt.numNodes)
+			for i := 0; i < tt.numNodes; i++ {
+				dataDir, err := framework.TempDir()
+				if err != nil {
+					t.Fatal(err)
+				}
+				srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
+					config.SetConsensus(framework.ConsensusDummy)
+					config.SetShowsLog(i == 0)
+				})
+				srvs = append(srvs, srv)
 			}
-			defer func() {
+			t.Cleanup(func() {
 				for _, s := range srvs {
 					s.Stop()
+					if err := os.RemoveAll(s.Config.RootDir); err != nil {
+						t.Log(err)
+					}
 				}
-			}()
+			})
+			for _, s := range srvs {
+				if err := s.GenerateGenesis(); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.Start(); err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			p2pAddrs := make([]string, tt.numNodes)
 			for i, s := range srvs {
@@ -52,7 +69,7 @@ func TestDiscovery(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				p2pAddrs[i] = status.P2PAddr
+				p2pAddrs[i] = strings.Split(status.P2PAddr, "\n")[0]
 			}
 
 			for i := 0; i < tt.numInitConnectNodes-1; i++ {

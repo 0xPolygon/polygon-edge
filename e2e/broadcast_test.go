@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -38,20 +39,36 @@ func TestBroadcast(t *testing.T) {
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
 		config.SetSeal(true)
-		config.Premine(senderAddr, ethToWei(10))
+		config.Premine(senderAddr, framework.EthToWei(10))
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, tt.numNodes)
-			for i := range srvs {
-				srvs[i] = framework.NewTestServer(t, conf)
+			srvs := make([]*framework.TestServer, 0, tt.numNodes)
+			for i := 0; i < tt.numNodes; i++ {
+				dataDir, err := framework.TempDir()
+				if err != nil {
+					t.Fatal(err)
+				}
+				srv := framework.NewTestServer(t, dataDir, conf)
+				srvs = append(srvs, srv)
 			}
-			defer func() {
+			t.Cleanup(func() {
 				for _, srv := range srvs {
 					srv.Stop()
+					if err := os.RemoveAll(srv.Config.RootDir); err != nil {
+						t.Log(err)
+					}
 				}
-			}()
+			})
+			for _, s := range srvs {
+				if err := s.GenerateGenesis(); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.Start(); err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
 			time.Sleep(15 * time.Second)
@@ -60,7 +77,7 @@ func TestBroadcast(t *testing.T) {
 				Nonce:    0,
 				From:     senderAddr,
 				To:       &receiverAddr,
-				Value:    ethToWei(1),
+				Value:    framework.EthToWei(1),
 				Gas:      1000000,
 				GasPrice: big.NewInt(10000),
 				Input:    []byte{},
@@ -77,7 +94,11 @@ func TestBroadcast(t *testing.T) {
 			time.Sleep(30 * time.Second)
 
 			for i, srv := range srvs {
-				res, err := srv.TxnPoolOperator().Status(context.Background(), &emptypb.Empty{})
+				ctx := context.Background()
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+
+				res, err := srv.TxnPoolOperator().Status(ctx, &emptypb.Empty{})
 				if err != nil {
 					t.Error(err)
 					continue
