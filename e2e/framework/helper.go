@@ -10,13 +10,16 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func EthToWei(ethValue int64) *big.Int {
@@ -49,38 +52,101 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		t.Fatal("not an even number")
 	}
 
-	errCh := make(chan error)
+	errCh := make(chan error, len(srvs)/2)
 	for i := 0; i < len(srvs); i += 2 {
-		go func(src, dst *TestServer, errCh chan<- error) {
+		src, dst := srvs[i], srvs[i+1]
+		go func() {
 			srcClient, dstClient := src.Operator(), dst.Operator()
 			dstStatus, err := dstClient.GetStatus(context.Background(), &empty.Empty{})
 			if err != nil {
 				errCh <- err
 				return
 			}
-			dstAddr := strings.Split(dstStatus.P2PAddr, "\n")[0]
-
+			dstAddr := strings.Split(dstStatus.P2PAddr, ",")[0]
 			_, err = srcClient.PeersAdd(context.Background(), &proto.PeersAddRequest{
 				Id: dstAddr,
 			})
-			if err != nil {
-				errCh <- err
-			}
-			errCh <- nil
-		}(srvs[i], srvs[i+1], errCh)
+			errCh <- err
+		}()
 	}
 
 	errCount := 0
 	for i := 0; i < len(srvs)/2; i++ {
-		err := <-errCh
-		if err != nil {
+		if err := <-errCh; err != nil {
 			errCount++
-			t.Errorf("failed to connect from %d to %d, err=%+v ", 2*i, 2*i+1, err)
+			t.Errorf("failed to connect from %d to %d, error=%+v ", 2*i, 2*i+1, err)
 		}
 	}
 	if errCount > 0 {
 		t.Fail()
 	}
+}
+
+// WaitUntilPeerConnects waits until server connects to required number of peers
+// otherwise returns timeout
+func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int) (*proto.PeersListResponse, error) {
+	clt := srv.Operator()
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		res, _ := clt.PeersList(subCtx, &empty.Empty{})
+		if res != nil && len(res.Peers) >= requiredNum {
+			return res, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*proto.PeersListResponse), nil
+}
+
+// WaitUntilTxPoolFilled waits until node has required number of transactions in txpool,
+// otherwise returns timeout
+func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uint64) (*txpoolProto.TxnPoolStatusResp, error) {
+	clt := srv.TxnPoolOperator()
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		res, _ := clt.Status(subCtx, &emptypb.Empty{})
+		if res != nil && res.Length >= requiredNum {
+			return res, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*txpoolProto.TxnPoolStatusResp), nil
+}
+
+func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
+	type result struct {
+		data interface{}
+		err  error
+	}
+	resCh := make(chan result, 1)
+	go func() {
+		defer close(resCh)
+		for {
+			select {
+			case <-ctx.Done():
+				resCh <- result{nil, ErrTimeout}
+				return
+			default:
+				res, retry := f()
+				if !retry {
+					resCh <- result{res, nil}
+					return
+				}
+			}
+			time.Sleep(time.Second)
+		}
+	}()
+	res := <-resCh
+	return res.data, res.err
 }
 
 // MethodSig returns the signature of a non-parametrized function

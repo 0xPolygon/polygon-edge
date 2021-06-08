@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/umbracle/go-web3"
@@ -28,6 +27,10 @@ type TestServerConfigCallback func(*TestServerConfig)
 const (
 	initialPort   = 12000
 	polygonSDKCmd = "polygon-sdk"
+)
+
+var (
+	ErrTimeout = errors.New("timeout")
 )
 
 type TestServer struct {
@@ -204,10 +207,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--seal")
 	}
 
-	// todo: keep this until fix of nat issue
-	args = append(args, "--nat", "127.0.0.1")
-	//
-
 	if t.Config.ShowsLog {
 		args = append(args, "--log-level", "debug")
 	}
@@ -228,25 +227,13 @@ func (t *TestServer) Start(ctx context.Context) error {
 		return err
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		defer close(errCh)
-		for {
-			select {
-			case <-ctx.Done():
-				errCh <- errors.New("timeout")
-				return
-			default:
-				if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
-					errCh <- nil
-					return
-				}
-			}
-			time.Sleep(time.Second)
+	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
+			return nil, false
 		}
-	}()
-
-	return <-errCh
+		return nil, true
+	})
+	return err
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
@@ -293,63 +280,41 @@ func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.
 func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
-	type getReceiptResult struct {
+	type result struct {
 		receipt *web3.Receipt
 		err     error
 	}
-	resCh := make(chan getReceiptResult, 1)
 
-	go func() {
-		defer close(resCh)
-		for {
-			select {
-			case <-ctx.Done():
-				resCh <- getReceiptResult{nil, errors.New("timeout")}
-				return
-			default:
-				receipt, err := client.Eth().GetTransactionReceipt(hash)
-				if err != nil && err.Error() != "not found" {
-					resCh <- getReceiptResult{nil, err}
-					return
-				}
-				if receipt != nil {
-					resCh <- getReceiptResult{receipt, nil}
-					return
-				}
-			}
-			time.Sleep(time.Second)
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		receipt, err := client.Eth().GetTransactionReceipt(hash)
+		if err != nil && err.Error() != "not found" {
+			return result{receipt, err}, false
 		}
-	}()
-	res := <-resCh
-	return res.receipt, res.err
+		if receipt != nil {
+			return result{receipt, nil}, false
+		}
+		return nil, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	data := res.(result)
+	return data.receipt, data.err
 }
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	client := t.JSONRPC()
-
-	errCh := make(chan error, 1)
-	go func() {
-		defer close(errCh)
-		for {
-			select {
-			case <-ctx.Done():
-				errCh <- errors.New("timeout")
-				return
-			default:
-				num, err := client.Eth().BlockNumber()
-				if err != nil {
-					errCh <- err
-					return
-				}
-				if num > 0 {
-					errCh <- nil
-					return
-				}
-			}
-			time.Sleep(time.Second)
+	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		num, err := client.Eth().BlockNumber()
+		if err != nil {
+			return nil, true
 		}
-	}()
-	return <-errCh
+		if num == 0 {
+			return nil, true
+		}
+		return num, false
+	})
+	return err
 }
 
 func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {

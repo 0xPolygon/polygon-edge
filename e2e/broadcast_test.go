@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -10,7 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcast(t *testing.T) {
@@ -38,8 +39,8 @@ func TestBroadcast(t *testing.T) {
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
-		config.SetSeal(true)
 		config.Premine(senderAddr, framework.EthToWei(10))
+		config.SetSeal(true)
 	}
 
 	for _, tt := range tests {
@@ -73,7 +74,25 @@ func TestBroadcast(t *testing.T) {
 			}
 
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
-			time.Sleep(30 * time.Second)
+
+			// Check the connections
+			for i, srv := range srvs {
+				// Required number of connections
+				numRequiredConnections := 0
+				if i < tt.numConnectedNodes {
+					if i == 0 || i == tt.numConnectedNodes-1 {
+						numRequiredConnections = 1
+					} else {
+						numRequiredConnections = 2
+					}
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err := framework.WaitUntilPeerConnects(ctx, srv, numRequiredConnections)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,
@@ -93,25 +112,26 @@ func TestBroadcast(t *testing.T) {
 				t.Fatalf("failed to send transaction, err=%+v", err)
 			}
 
-			time.Sleep(30 * time.Second)
-
 			for i, srv := range srvs {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-
-				res, err := srv.TxnPoolOperator().Status(ctx, &emptypb.Empty{})
-				if err != nil {
-					t.Error(err)
-					continue
-				}
-
-				numStoredTx := 0
+				shouldHaveTxPool := false
+				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
 				if i < tt.numConnectedNodes {
-					numStoredTx = 1
+					shouldHaveTxPool = true
+					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
 				}
-				if res.Length != uint64(numStoredTx) {
-					t.Errorf("node %d expected to store %d transactions, but got %d", i, numStoredTx, res.Length)
-				}
+
+				t.Run(subTestName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
+
+					if shouldHaveTxPool {
+						assert.NoError(t, err)
+						assert.Equal(t, uint64(1), res.Length)
+					} else {
+						assert.ErrorIs(t, err, framework.ErrTimeout)
+					}
+				})
 			}
 		})
 	}
