@@ -18,6 +18,8 @@ func (p *PeersAdd) GetHelperText() string {
 
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
+	p.Meta.DefineFlags()
+
 	usage := "peers add PEER_ADDRESS"
 
 	return p.GenerateHelp(p.Synopsis(), usage)

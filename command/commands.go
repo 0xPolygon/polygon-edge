@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/minimal/minimal"
 	"os"
+	"strings"
 
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/mitchellh/cli"
@@ -136,13 +137,11 @@ type HelpGenerator interface {
 
 // Meta is a helper utility for the commands
 type Meta struct {
-	HelpGenerator
-
 	UI   cli.Ui
 	addr string
 
-	flagMap    map[string]FlagDescriptor
-	helperText string
+	flagMap        map[string]FlagDescriptor
+	hasGlobalFlags bool
 }
 
 // GenerateHelp is a utility function called by every command's Help() method
@@ -156,6 +155,14 @@ func (m *Meta) GenerateHelp(synopsys string, usage string) string {
 
 		if flagCounter < len(m.flagMap) {
 			helpOutput += "\n"
+		}
+	}
+
+	if m.hasGlobalFlags {
+		if strings.Count(usage, "--") > 1 {
+			usage = fmt.Sprintf("%s\n\t%s", usage, globalFlagsUsage())
+		} else {
+			usage = fmt.Sprintf("%s %s", usage, globalFlagsUsage())
 		}
 	}
 
@@ -198,10 +205,24 @@ func (m *Meta) GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string
 	return fmt.Sprintf("%s\n%s", topRow, bottomRow)
 }
 
+// DefineFlags sets global flags used by several commands
+func (m *Meta) DefineFlags() {
+	m.hasGlobalFlags = true
+	m.flagMap = make(map[string]FlagDescriptor)
+
+	m.flagMap["grpc-address"] = FlagDescriptor{
+		description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", minimal.DefaultGRPCPort),
+		arguments: []string{
+			"GRPC_ADDRESS",
+		},
+		argumentsOptional: false,
+	}
+}
+
 // FlagSet adds some default commands to handle grpc connections with the server
 func (m *Meta) FlagSet(n string) *flag.FlagSet {
 	f := flag.NewFlagSet(n, flag.ContinueOnError)
-	f.StringVar(&m.addr, "address", fmt.Sprintf("%s:%d", "127.0.0.1", minimal.DefaultGRPCPort), "Address of the http api")
+	f.StringVar(&m.addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", minimal.DefaultGRPCPort), "")
 
 	return f
 }
@@ -214,6 +235,10 @@ func (m *Meta) Conn() (*grpc.ClientConn, error) {
 	}
 
 	return conn, nil
+}
+
+func globalFlagsUsage() string {
+	return `[--grpc-address GRPC_ADDRESS]`
 }
 
 // OUTPUT FORMATTING //

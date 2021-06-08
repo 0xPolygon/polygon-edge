@@ -20,6 +20,8 @@ func (c *StatusCommand) GetHelperText() string {
 
 // Help implements the cli.Command interface
 func (c *StatusCommand) Help() string {
+	c.Meta.DefineFlags()
+
 	usage := "status"
 
 	return c.GenerateHelp(c.Synopsis(), usage)

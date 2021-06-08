@@ -23,6 +23,8 @@ func (m *MonitorCommand) GetHelperText() string {
 
 // Help implements the cli.Command interface
 func (m *MonitorCommand) Help() string {
+	m.Meta.DefineFlags()
+
 	usage := "monitor"
 
 	return m.GenerateHelp(m.Synopsis(), usage)
