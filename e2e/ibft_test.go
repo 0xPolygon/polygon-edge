@@ -1,9 +1,11 @@
 package e2e
 
 import (
+	"context"
 	"math/big"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
@@ -31,7 +33,9 @@ func TestIbft_Transfer(t *testing.T) {
 			t.Log(err)
 		}
 	})
-	ibftManager.StartServers()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
 	for i := 0; i < 3; i++ {
@@ -53,7 +57,10 @@ func TestIbft_Transfer(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, hash)
 
-		receipt, err := srv.WaitForReceipt(hash)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		receipt, err := srv.WaitForReceipt(ctx, hash)
+
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
 	}

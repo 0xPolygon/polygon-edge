@@ -178,7 +178,7 @@ func (t *TestServer) GenerateGenesis() error {
 	return cmd.Run()
 }
 
-func (t *TestServer) Start() error {
+func (t *TestServer) Start(ctx context.Context) error {
 	args := []string{
 		"server",
 		// add custom chain
@@ -225,27 +225,37 @@ func (t *TestServer) Start() error {
 	}
 
 	if err := t.cmd.Start(); err != nil {
-		t.t.Fatalf("err: %s", err)
+		return err
 	}
 
-	// todo: timeout
-	for {
-		if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
-			break
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		for {
+			select {
+			case <-ctx.Done():
+				errCh <- errors.New("timeout")
+				return
+			default:
+				if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
+					errCh <- nil
+					return
+				}
+			}
+			time.Sleep(time.Second)
 		}
-		time.Sleep(time.Second)
-	}
+	}()
 
-	return nil
+	return <-errCh
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(binary string) (web3.Address, error) {
+func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
 		return web3.Address{}, err
 	}
-	receipt, err := t.SendTxn(&web3.Transaction{
+	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		Input: buf,
 	})
 	if err != nil {
@@ -261,7 +271,7 @@ const (
 
 var emptyAddr web3.Address
 
-func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
+func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
 	if txn.From == emptyAddr {
@@ -277,59 +287,74 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.WaitForReceipt(hash)
+	return t.WaitForReceipt(ctx, hash)
 }
 
-func (t *TestServer) WaitForReceipt(hash web3.Hash) (*web3.Receipt, error) {
+func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
-	var receipt *web3.Receipt
-	var count uint64
-	var err error
+	type getReceiptResult struct {
+		receipt *web3.Receipt
+		err     error
+	}
+	resCh := make(chan getReceiptResult, 1)
 
-	for {
-		receipt, err = client.Eth().GetTransactionReceipt(hash)
-		if err != nil {
-			if err.Error() != "not found" {
-				return nil, err
+	go func() {
+		defer close(resCh)
+		for {
+			select {
+			case <-ctx.Done():
+				resCh <- getReceiptResult{nil, errors.New("timeout")}
+				return
+			default:
+				receipt, err := client.Eth().GetTransactionReceipt(hash)
+				if err != nil && err.Error() != "not found" {
+					resCh <- getReceiptResult{nil, err}
+					return
+				}
+				if receipt != nil {
+					resCh <- getReceiptResult{receipt, nil}
+					return
+				}
 			}
+			time.Sleep(time.Second)
 		}
-		if receipt != nil {
-			break
-		}
-		if count > 5 {
-			return nil, fmt.Errorf("timeout")
-		}
-		time.Sleep(1 * time.Second)
-		count++
-	}
-	return receipt, nil
+	}()
+	res := <-resCh
+	return res.receipt, res.err
 }
 
-func (t *TestServer) WaitForReady() error {
+func (t *TestServer) WaitForReady(ctx context.Context) error {
 	client := t.JSONRPC()
 
-	count := 0
-	for {
-		num, err := client.Eth().BlockNumber()
-		if err != nil {
-			return err
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		for {
+			select {
+			case <-ctx.Done():
+				errCh <- errors.New("timeout")
+				return
+			default:
+				num, err := client.Eth().BlockNumber()
+				if err != nil {
+					errCh <- err
+					return
+				}
+				if num > 0 {
+					errCh <- nil
+					return
+				}
+			}
+			time.Sleep(time.Second)
 		}
-		if num > 0 {
-			break
-		}
-
-		if count++; count > 5 {
-			return errors.New("timeout")
-		}
-		time.Sleep(1 * time.Second)
-	}
-	return nil
+	}()
+	return <-errCh
 }
 
-func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
+func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
 	sig := MethodSig(method)
-	receipt, err := t.SendTxn(&web3.Transaction{
+	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		To:    &address,
 		Input: sig,
 	})

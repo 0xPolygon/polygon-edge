@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"os"
@@ -34,11 +35,15 @@ func TestNewFilter_Logs(t *testing.T) {
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Start(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	contractAddr, err := srv.DeployContract(sampleByteCode)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel1()
+	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +54,9 @@ func TestNewFilter_Logs(t *testing.T) {
 
 	numCalls := 10
 	for i := 0; i < numCalls; i++ {
-		srv.TxnTo(contractAddr, "setA1")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.TxnTo(ctx, contractAddr, "setA1")
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)
@@ -83,7 +90,9 @@ func TestNewFilter_Block(t *testing.T) {
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Start(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +111,6 @@ func TestNewFilter_Block(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	}
-	time.Sleep(5 * time.Second)
 
 	// there should be three changes
 	blocks, err := client.Eth().GetFilterChangesBlock(id)

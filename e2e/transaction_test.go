@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"os"
@@ -36,7 +37,9 @@ func TestSignedTransaction(t *testing.T) {
 		}
 	})
 
-	ibftManager.StartServers()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
 	clt := srv.JSONRPC()
@@ -76,7 +79,9 @@ func TestSignedTransaction(t *testing.T) {
 		hash, err := clt.Eth().SendRawTransaction(data)
 		assert.NoError(t, err)
 
-		srv.WaitForReceipt(hash)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.WaitForReceipt(ctx, hash)
 	}
 }
 
@@ -136,7 +141,9 @@ func TestPreminedBalance(t *testing.T) {
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Start(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,7 +239,9 @@ func TestEthTransfer(t *testing.T) {
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Start(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,10 +307,12 @@ func TestEthTransfer(t *testing.T) {
 				assert.Failf(t, "Uncaught error", err.Error())
 			}
 
-			// Wait until the transaction goes through
-			time.Sleep(5 * time.Second)
-
-			receipt, err := rpcClient.Eth().GetTransactionReceipt(txnHash)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if receipt == nil {
 				t.Fatalf("Unable to fetch receipt")
 			}

@@ -57,7 +57,9 @@ func TestDiscovery(t *testing.T) {
 				if err := s.GenerateGenesis(); err != nil {
 					t.Fatal(err)
 				}
-				if err := s.Start(); err != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := s.Start(ctx); err != nil {
 					t.Fatal(err)
 				}
 			}

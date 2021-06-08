@@ -1,9 +1,9 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 	"testing"
-	"time"
 )
 
 type IBFTServersManager struct {
@@ -42,15 +42,14 @@ func NewIBFTServersManager(t *testing.T, numNodes int, rootDir string, ibftDirPr
 	return &IBFTServersManager{t, srvs}
 }
 
-func (m *IBFTServersManager) StartServers() {
+func (m *IBFTServersManager) StartServers(ctx context.Context) {
 	for _, srv := range m.servers {
-		if err := srv.Start(); err != nil {
+		if err := srv.Start(ctx); err != nil {
 			m.t.Fatal(err)
 		}
 	}
-	time.Sleep(time.Second * 5)
 	for _, srv := range m.servers {
-		if err := srv.WaitForReady(); err != nil {
+		if err := srv.WaitForReady(ctx); err != nil {
 			m.t.Fatal(err)
 		}
 	}

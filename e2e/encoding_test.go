@@ -1,8 +1,10 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/stretchr/testify/assert"
@@ -30,17 +32,22 @@ func TestEncoding(t *testing.T) {
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.Start(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	contractAddr, err := srv.DeployContract(sampleByteCode)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	contractAddr, err := srv.DeployContract(ctx, sampleByteCode)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// send a transaction
-	receipt := srv.TxnTo(contractAddr, "setA1")
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt := srv.TxnTo(ctx, contractAddr, "setA1")
 
 	// try to get the transaction
 	client := srv.JSONRPC().Eth()
