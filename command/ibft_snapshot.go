@@ -87,27 +87,46 @@ func (p *IbftSnapshot) Run(args []string) int {
 }
 
 func printSnapshot(s *proto.Snapshot) (output string) {
-	output = formatKV([]string{
+	output += "\n[INFO]\n"
+	output += formatKV([]string{
 		fmt.Sprintf("Block|%d", s.Number),
 		fmt.Sprintf("Hash|%s", s.Hash),
 	})
 
-	votes := make([]string, len(s.Votes)+1)
-	votes[0] = "Proposer|Address|Authorize"
-	for i, d := range s.Votes {
-		votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Validator, d.Proposed, d.Auth)
+	output += "\n"
+
+	var votes []string = nil
+	if len(s.Votes) == 0 {
+		votes = make([]string, 1)
+		votes[0] = "No votes found"
+	} else {
+		votes = make([]string, len(s.Votes)+1)
+		votes[0] = "Proposer|Address|Authorize"
+		for i, d := range s.Votes {
+			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Validator, d.Proposed, d.Auth)
+		}
 	}
 
-	output += "\nVotes\n"
+	output += "\n[VOTES]\n"
 	output += formatList(votes)
 
-	validators := make([]string, len(s.Validators)+1)
-	validators[0] = "Address"
-	for i, d := range s.Validators {
-		validators[i+1] = d.Address
+	output += "\n"
+
+	var validators []string = nil
+	if len(s.Validators) == 0 {
+		validators = make([]string, 1)
+		validators[0] = "No validators found"
+	} else {
+		validators = make([]string, len(s.Validators)+1)
+		validators[0] = "Address"
+		for i, d := range s.Validators {
+			validators[i+1] = d.Address
+		}
 	}
 
-	output += "\nValidators\n"
+	output += "\n"
+
+	output += "\n[VALIDATORS]\n"
 	output += formatList(validators)
 
 	return output

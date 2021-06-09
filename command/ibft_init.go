@@ -3,8 +3,9 @@ package command
 import (
 	"flag"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"path/filepath"
+
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
@@ -74,8 +75,14 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(fmt.Sprintf("Public key: %s", crypto.PubKeyToAddress(&key.PublicKey)))
-	p.UI.Output(fmt.Sprintf("Node ID: %s", nodeId.String()))
-	p.UI.Output("Done!")
+	output := formatKV([]string{
+		fmt.Sprintf("Public key|%s", crypto.PubKeyToAddress(&key.PublicKey)),
+		fmt.Sprintf("Node ID|%s", nodeId.String()),
+	})
+
+	output += "\nDone!\n"
+
+	p.UI.Output(output)
+
 	return 0
 }
