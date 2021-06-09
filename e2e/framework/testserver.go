@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/umbracle/go-web3"
@@ -228,7 +229,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 	}
 
 	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		if _, err := t.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
 			return nil, false
 		}
 		return nil, true

@@ -17,6 +17,12 @@ func NewIBFTServersManager(t *testing.T, numNodes int, rootDir string, ibftDirPr
 	t.Helper()
 
 	srvs, bootnodes := make([]*TestServer, 0, numNodes), make([]string, 0, numNodes)
+	t.Cleanup(func() {
+		for _, s := range srvs {
+			s.Stop()
+		}
+	})
+
 	for i := 0; i < numNodes; i++ {
 		srv := NewTestServer(t, rootDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)

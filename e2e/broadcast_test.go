@@ -46,14 +46,6 @@ func TestBroadcast(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := make([]*framework.TestServer, 0, tt.numNodes)
-			for i := 0; i < tt.numNodes; i++ {
-				dataDir, err := framework.TempDir()
-				if err != nil {
-					t.Fatal(err)
-				}
-				srv := framework.NewTestServer(t, dataDir, conf)
-				srvs = append(srvs, srv)
-			}
 			t.Cleanup(func() {
 				for _, srv := range srvs {
 					srv.Stop()
@@ -62,15 +54,24 @@ func TestBroadcast(t *testing.T) {
 					}
 				}
 			})
-			for _, s := range srvs {
-				if err := s.GenerateGenesis(); err != nil {
+
+			for i := 0; i < tt.numNodes; i++ {
+				dataDir, err := framework.TempDir()
+				if err != nil {
+					t.Fatal(err)
+				}
+				srv := framework.NewTestServer(t, dataDir, conf)
+
+				if err := srv.GenerateGenesis(); err != nil {
 					t.Fatal(err)
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
-				if err := s.Start(ctx); err != nil {
+				if err := srv.Start(ctx); err != nil {
 					t.Fatal(err)
 				}
+
+				srvs = append(srvs, srv)
 			}
 
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])

@@ -32,6 +32,7 @@ func TestNewFilter_Logs(t *testing.T) {
 			t.Log(err)
 		}
 	})
+
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TestNewFilter_Block(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		_, err := client.Eth().SendTransaction(&web3.Transaction{
+		hash, err := client.Eth().SendTransaction(&web3.Transaction{
 			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
 			To:       &toAddr,
 			GasPrice: 10000,
@@ -109,6 +110,11 @@ func TestNewFilter_Block(t *testing.T) {
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(i),
 		})
+		assert.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err = srv.WaitForReceipt(ctx, hash)
 		assert.NoError(t, err)
 	}
 

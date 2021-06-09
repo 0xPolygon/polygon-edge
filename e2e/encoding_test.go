@@ -29,6 +29,7 @@ func TestEncoding(t *testing.T) {
 			t.Log(err)
 		}
 	})
+
 	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}

@@ -33,6 +33,7 @@ func TestIbft_Transfer(t *testing.T) {
 			t.Log(err)
 		}
 	})
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	ibftManager.StartServers(ctx)
