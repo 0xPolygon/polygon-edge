@@ -305,6 +305,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
+	// TODO: Maybe there is no need for snapshot here, since snapshot is also created inside apply()
 	s := t.state.Snapshot()
 	returnValue, gas, failed, err := t.apply(msg)
 	if err != nil {
@@ -367,9 +368,11 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 
 	// deduct the upfront max gas cost
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
+	// TODO: No need to reassign upfrontGasCost on the left
 	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 	balance := t.state.GetBalance(msg.From)
 
+	// TODO: Remove if, let SubBalance return error
 	if balance.Cmp(upfrontGasCost) < 0 {
 		return 0, fmt.Errorf("balance %s not enough to pay gas %s", balance, upfrontGasCost)
 	}
@@ -391,11 +394,12 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 	txn := t.state
 	s := txn.Snapshot()
 
-	gas, err := t.preCheck(msg)
+	leftoverGas, err := t.preCheck(msg)
 	if err != nil {
 		return nil, 0, false, err
 	}
-	if gas > msg.Gas {
+	// TODO: Check if this is even possible
+	if leftoverGas > msg.Gas {
 		return nil, 0, false, errorVMOutOfGas
 	}
 
@@ -411,10 +415,10 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 	var returnValue []byte
 
 	if msg.IsContractCreation() {
-		_, gasLeft, subErr = t.Create2(msg.From, msg.Input, value, gas)
+		_, gasLeft, subErr = t.Create2(msg.From, msg.Input, value, leftoverGas)
 	} else {
 		txn.IncrNonce(msg.From)
-		returnValue, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, gas)
+		returnValue, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, leftoverGas)
 	}
 	if subErr != nil {
 		// fmt.Printf("suberr: %s\n", subErr.Error())
@@ -427,6 +431,7 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 
 	gasUsed := msg.Gas - gasLeft
 	refund := gasUsed / 2
+	// Refund can go up to half the gas used
 	if refund > txn.GetRefund() {
 		refund = txn.GetRefund()
 	}
@@ -526,7 +531,7 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]by
 
 	gas := msg.Gas
 
-	// Incremene the nonce of the caller
+	// Increment the nonce of the caller
 	t.state.IncrNonce(msg.Caller)
 
 	// Check if there if there is a collision and the address already exists
@@ -548,11 +553,11 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]by
 		return nil, gas, runtime.ErrNotEnoughFunds
 	}
 
-	code, gas, err := t.run(msg, host)
+	code, leftoverGas, err := t.run(msg, host)
 
 	if err != nil {
 		t.state.RevertToSnapshot(snapshot)
-		return code, gas, err
+		return code, leftoverGas, err
 	}
 
 	if t.config.EIP158 && len(code) > spuriousDragonMaxCodeSize {
@@ -563,19 +568,19 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]by
 
 	gasCost := uint64(len(code)) * 200
 
-	if gas < gasCost {
+	if leftoverGas < gasCost {
 		// Out of gas creating the contract
 		if t.config.Homestead {
 			t.state.RevertToSnapshot(snapshot)
-			gas = 0
+			leftoverGas = 0
 		}
-		return nil, gas, runtime.ErrCodeStoreOutOfGas
+		return nil, leftoverGas, runtime.ErrCodeStoreOutOfGas
 	}
 
-	gas -= gasCost
+	leftoverGas -= gasCost
 	t.state.SetCode(msg.Address, code)
 
-	return code, gas, nil
+	return code, leftoverGas, nil
 }
 
 func (t *Transition) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
