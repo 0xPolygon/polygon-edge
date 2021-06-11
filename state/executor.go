@@ -123,6 +123,10 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Trans
 	newTxn := NewTxn(e.state, auxSnap2)
 
 	env2 := runtime.TxContext{
+		// TODO:	This seems like an error as this would mean that whoever we are voting for/against being a validator
+		//			in this block, would get the gas fees spent by transaction executions.
+		//			Quite possibly, we should do an ecrecover of the istanbul extra data in the header to get the
+		//			address of the proposer and set it as a coinbase address in the TxContext.
 		Coinbase:   header.Miner,
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
