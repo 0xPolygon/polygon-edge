@@ -18,8 +18,8 @@ func (p *PeersStatus) DefineFlags() {
 		p.flagMap = make(map[string]FlagDescriptor)
 	}
 
-	p.flagMap["libp2p-node-id"] = FlagDescriptor{
-		description: "A unique reference to a specific peer within p2p network",
+	p.flagMap["peer-id"] = FlagDescriptor{
+		description: "Libp2p node ID of a specific peer within p2p network",
 		arguments: []string{
 			"PEER_ID",
 		},
@@ -29,7 +29,7 @@ func (p *PeersStatus) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (p *PeersStatus) GetHelperText() string {
-	return "Returns the status of the specified peer, using the libp2p ID of the peer"
+	return "Returns the status of the specified peer, using the libp2p ID of the peer node"
 }
 
 // Help implements the cli.PeersStatus interface
@@ -37,7 +37,7 @@ func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "peers status --libp2p-node-id PEER_ID"
+	usage := "peers status --peer-id PEER_ID"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -52,7 +52,7 @@ func (p *PeersStatus) Run(args []string) int {
 	flags := p.FlagSet("peers status")
 
 	var nodeId string
-	flags.StringVar(&nodeId, "libp2p-node-id", "", "")
+	flags.StringVar(&nodeId, "peer-id", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
@@ -60,7 +60,7 @@ func (p *PeersStatus) Run(args []string) int {
 	}
 
 	if nodeId == "" {
-		p.UI.Error("libp2p-node-id argument not provided")
+		p.UI.Error("peer-id argument not provided")
 		return 1
 	}
 
