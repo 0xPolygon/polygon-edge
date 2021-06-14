@@ -2,13 +2,27 @@ package command
 
 import (
 	"context"
-
 	"github.com/0xPolygon/minimal/minimal/proto"
 )
 
 // PeersAdd is the PeersAdd to start the sever
 type PeersAdd struct {
 	Meta
+}
+
+func (p *PeersAdd) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]FlagDescriptor)
+	}
+
+	p.flagMap["libp2p-address"] = FlagDescriptor{
+		description: "Peer's libp2p address in the multiaddr format",
+		arguments: []string{
+			"PEER_ADDRESS",
+		},
+		argumentsOptional: false,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -19,8 +33,9 @@ func (p *PeersAdd) GetHelperText() string {
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
 	p.Meta.DefineFlags()
+	p.DefineFlags()
 
-	usage := "peers add PEER_ADDRESS"
+	usage := "peers add --libp2p-address PEER_ADDRESS"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -33,14 +48,17 @@ func (p *PeersAdd) Synopsis() string {
 // Run implements the cli.PeersAdd interface
 func (p *PeersAdd) Run(args []string) int {
 	flags := p.FlagSet("peers add")
+
+	var peerAddress string
+	flags.StringVar(&peerAddress, "libp2p-address", "", "")
+
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	args = flags.Args()
-	if len(args) != 1 {
-		p.UI.Error("peer id argument expected")
+	if peerAddress == "" {
+		p.UI.Error("libp2p-address argument expected")
 		return 1
 	}
 
@@ -51,7 +69,7 @@ func (p *PeersAdd) Run(args []string) int {
 	}
 
 	clt := proto.NewSystemClient(conn)
-	if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: args[0]}); err != nil {
+	if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: peerAddress}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
