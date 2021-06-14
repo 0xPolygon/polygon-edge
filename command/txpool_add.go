@@ -81,7 +81,7 @@ func (p *TxPoolAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := `txpool add --from ADDRESS --to ADDRESS --value VALUE
+	usage := `txpool-add --from ADDRESS --to ADDRESS --value VALUE
 	--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]`
 
 	return p.GenerateHelp(p.Synopsis(), usage)
@@ -94,7 +94,7 @@ func (p *TxPoolAdd) Synopsis() string {
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
-	flags := p.FlagSet("txpool add")
+	flags := p.FlagSet("txpool-add")
 
 	// Address types
 	var fromRaw, toRaw string
@@ -122,22 +122,22 @@ func (p *TxPoolAdd) Run(args []string) int {
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode from address: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode from address: %v", err))
 		return 1
 	}
 	to := types.Address{}
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to address: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
 		return 1
 	}
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to value: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
 		return 1
 	}
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to gasPrice: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
 		return 1
 	}
 
@@ -165,9 +165,24 @@ func (p *TxPoolAdd) Run(args []string) int {
 		// from is not encoded in the rlp
 		From: from.String(),
 	}
+
 	if _, err := clt.AddTxn(context.Background(), msg); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to add txn: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to add transaction: %v", err))
 		return 1
 	}
+
+	output := "\n[ADD TRANSACTION]\n"
+	output += "Successfully added transaction:\n"
+
+	output += formatKV([]string{
+		fmt.Sprintf("FROM|%s", fromRaw),
+		fmt.Sprintf("TO|%s", toRaw),
+		fmt.Sprintf("VALUE|%s", valueRaw),
+		fmt.Sprintf("GAS PRICE|%s", gasPriceRaw),
+		fmt.Sprintf("GAS LIMIT|%d", gasLimit),
+	})
+
+	output += "\n"
+
 	return 0
 }
