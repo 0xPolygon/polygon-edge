@@ -18,7 +18,7 @@ type MonitorCommand struct {
 
 // GetHelperText returns a simple description of the command
 func (m *MonitorCommand) GetHelperText() string {
-	return "Starts logging client activity"
+	return "Starts logging block add / remove events on the blockchain"
 }
 
 // Help implements the cli.Command interface
@@ -64,15 +64,24 @@ func (m *MonitorCommand) Run(args []string) int {
 		for {
 			evnt, err := stream.Recv()
 			if err != nil {
-				m.UI.Error(fmt.Sprintf("failed to read event: %v", err))
+				m.UI.Error(fmt.Sprintf("Failed to read event: %v", err))
 				break
 			}
-			fmt.Println("-- event --")
+
+			m.UI.Info("\n[BLOCK EVENT]\n")
 			for _, add := range evnt.Added {
-				fmt.Printf("Add block: Num %d Hash %s\n", add.Number, add.Hash)
+				m.UI.Info(formatKV([]string{
+					fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
+					fmt.Sprintf("Block Number|%d", add.Number),
+					fmt.Sprintf("Block Hash|%s", add.Hash),
+				}))
 			}
 			for _, del := range evnt.Removed {
-				fmt.Printf("Delete block: Num %d Hash %s\n", del.Number, del.Hash)
+				m.UI.Info(formatKV([]string{
+					fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
+					fmt.Sprintf("Block Number|%d", del.Number),
+					fmt.Sprintf("Block Hash|%s", del.Hash),
+				}))
 			}
 		}
 		doneCh <- struct{}{}

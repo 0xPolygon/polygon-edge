@@ -54,6 +54,17 @@ func (c *StatusCommand) Run(args []string) int {
 		return 1
 	}
 
-	fmt.Println(status)
+	output := "\n[CLIENT STATUS]\n"
+	output += formatKV([]string{
+		fmt.Sprintf("Network (Chain ID)|%d", status.Network),
+		fmt.Sprintf("Current Block Number (base 10)|%d", status.Current.Number),
+		fmt.Sprintf("Current Block Hash|%s", status.Current.Hash),
+		fmt.Sprintf("Libp2p Address|%s", status.P2PAddr),
+	})
+
+	output += "\n"
+
+	c.UI.Info(output)
+
 	return 0
 }
