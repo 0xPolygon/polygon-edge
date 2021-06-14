@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -18,13 +19,15 @@ func (p *IbftStatus) GetHelperText() string {
 	return "Returns the current validator key of the IBFT client"
 }
 
+func (p *IbftStatus) GetBaseCommand() string {
+	return "ibft-status"
+}
+
 // Help implements the cli.IbftStatus interface
 func (p *IbftStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft-status"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftStatus interface
@@ -34,7 +37,7 @@ func (p *IbftStatus) Synopsis() string {
 
 // Run implements the cli.IbftStatus interface
 func (p *IbftStatus) Run(args []string) int {
-	flags := p.FlagSet("ibft-status")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())

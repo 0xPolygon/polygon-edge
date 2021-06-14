@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/types"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -18,13 +19,15 @@ func (c *StatusCommand) GetHelperText() string {
 	return "Returns the status of the Polygon SDK client"
 }
 
+func (c *StatusCommand) GetBaseCommand() string {
+	return "status"
+}
+
 // Help implements the cli.Command interface
 func (c *StatusCommand) Help() string {
 	c.Meta.DefineFlags()
 
-	usage := "status"
-
-	return c.GenerateHelp(c.Synopsis(), usage)
+	return types.GenerateHelp(c.Synopsis(), c.GetBaseCommand(), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -35,7 +38,7 @@ func (c *StatusCommand) Synopsis() string {
 // Run implements the cli.Command interface
 func (c *StatusCommand) Run(args []string) int {
 
-	flags := c.FlagSet("status")
+	flags := c.FlagSet(c.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(err.Error())
 		return 1

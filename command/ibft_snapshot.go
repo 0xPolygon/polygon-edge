@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // IbftSnapshot is the command to query the snapshot
@@ -17,15 +18,16 @@ type IbftSnapshot struct {
 func (p *IbftSnapshot) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["number"] = FlagDescriptor{
+	p.flagMap["number"] = MetaFlagDescriptor{
 		description: "The block height (number) for the snapshot",
 		arguments: []string{
 			"BLOCK_NUMBER",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 }
 
@@ -34,14 +36,16 @@ func (p *IbftSnapshot) GetHelperText() string {
 	return "Returns the IBFT snapshot at the latest block number, unless a block number is specified"
 }
 
+func (p *IbftSnapshot) GetBaseCommand() string {
+	return "ibft-snapshot"
+}
+
 // Help implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "ibft-snapshot [--number BLOCK_NUMBER]"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftSnapshot interface
@@ -51,7 +55,7 @@ func (p *IbftSnapshot) Synopsis() string {
 
 // Run implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Run(args []string) int {
-	flags := p.FlagSet("ibft-snapshot")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	// query a specific snapshot
 	var number int64

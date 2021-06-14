@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -18,13 +19,15 @@ func (p *IbftCandidates) GetHelperText() string {
 	return "Queries the current set of proposed candidates, as well as candidates that have not been included yet"
 }
 
+func (p *IbftCandidates) GetBaseCommand() string {
+	return "ibft-candidates"
+}
+
 // Help implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft-candidates"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
@@ -34,7 +37,7 @@ func (p *IbftCandidates) Synopsis() string {
 
 // Run implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Run(args []string) int {
-	flags := p.FlagSet("ibft-candidates")
+	flags := p.FlagSet(p.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1

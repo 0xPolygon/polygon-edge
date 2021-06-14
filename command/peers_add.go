@@ -6,6 +6,7 @@ import (
 
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // PeersAdd is the PeersAdd to start the sever
@@ -17,15 +18,16 @@ type PeersAdd struct {
 func (p *PeersAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["a"] = FlagDescriptor{
+	p.flagMap["a"] = MetaFlagDescriptor{
 		description: "Specifies the libp2p address of the peer in the format /ip4/<ip_address>/tcp/<port>/p2p/<node_id>",
 		arguments: []string{
 			"PEER_ADDRESS",
 		},
 		argumentsOptional: false,
+		flagOptional:      false,
 	}
 }
 
@@ -34,14 +36,16 @@ func (p *PeersAdd) GetHelperText() string {
 	return "Adds new peers to the peer list, using the peer's libp2p address"
 }
 
+func (p *PeersAdd) GetBaseCommand() string {
+	return "peers-add"
+}
+
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "peers-add -a PEER_ADDRESS [-a PEER_ADDRESS ...]"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersAdd interface
@@ -51,7 +55,7 @@ func (p *PeersAdd) Synopsis() string {
 
 // Run implements the cli.PeersAdd interface
 func (p *PeersAdd) Run(args []string) int {
-	flags := p.FlagSet("peers-add")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
 	flags.Var(&passedInAddresses, "a", "")

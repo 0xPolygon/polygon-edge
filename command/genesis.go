@@ -19,10 +19,10 @@ import (
 
 const (
 	genesisFileName       = "./genesis.json"
-	defaultChainName	  = "example"
+	defaultChainName      = "example"
 	defaultChainID        = 100
 	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	defaultConsensus	  = "pow"
+	defaultConsensus      = "pow"
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -35,7 +35,7 @@ type GenesisCommand struct {
 func (c *GenesisCommand) DefineFlags() {
 	if c.flagMap == nil {
 		// Flag map not initialized
-		c.flagMap = make(map[string]FlagDescriptor)
+		c.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
 	if len(c.flagMap) > 0 {
@@ -43,68 +43,76 @@ func (c *GenesisCommand) DefineFlags() {
 		return
 	}
 
-	c.flagMap["data-dir"] = FlagDescriptor{
+	c.flagMap["data-dir"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
 		arguments: []string{
 			"DATA_DIRECTORY",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["name"] = FlagDescriptor{
+	c.flagMap["name"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
 		arguments: []string{
 			"NAME",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["premine"] = FlagDescriptor{
+	c.flagMap["premine"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
 		arguments: []string{
 			"ADDRESS:VALUE",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["chainid"] = FlagDescriptor{
+	c.flagMap["chainid"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
 		arguments: []string{
 			"CHAIN_ID",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["consensus"] = FlagDescriptor{
+	c.flagMap["consensus"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
 		arguments: []string{
 			"CONSENSUS_PROTOCOL",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["bootnode"] = FlagDescriptor{
+	c.flagMap["bootnode"] = MetaFlagDescriptor{
 		description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
 		arguments: []string{
 			"BOOTNODE_URL",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["ibft-validator"] = FlagDescriptor{
+	c.flagMap["ibft-validator"] = MetaFlagDescriptor{
 		description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
 		arguments: []string{
 			"IBFT_VALIDATOR_LIST",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	c.flagMap["ibft-validators-prefix-path"] = FlagDescriptor{
+	c.flagMap["ibft-validators-prefix-path"] = MetaFlagDescriptor{
 		description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
 		arguments: []string{
 			"IBFT_VALIDATORS_PREFIX_PATH",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 }
 
@@ -113,14 +121,15 @@ func (c *GenesisCommand) GetHelperText() string {
 	return "Generates the genesis.json file, with passed in parameters"
 }
 
+func (c *GenesisCommand) GetBaseCommand() string {
+	return "genesis"
+}
+
 // Help implements the cli.Command interface
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
-	usage := `genesis [--data-dir DATA_DIRECTORY] [--name NAME] [--chainid CHAIN_ID]
-	[--premine ADDRESS:VALUE] [--bootnode BOOTNODE_URL] [--consensus CONSENSUS_PROTOCOL]
-	[--ibft-validator IBFT_VALIDATOR_LIST] [--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]`
 
-	return c.GenerateHelp(c.Synopsis(), usage)
+	return types.GenerateHelp(c.Synopsis(), types.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -130,7 +139,7 @@ func (c *GenesisCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *GenesisCommand) Run(args []string) int {
-	flags := flag.NewFlagSet("genesis", flag.ContinueOnError)
+	flags := flag.NewFlagSet(c.GetBaseCommand(), flag.ContinueOnError)
 	flags.Usage = func() {}
 
 	var dataDir string

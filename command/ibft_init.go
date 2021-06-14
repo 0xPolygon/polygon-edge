@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
@@ -25,9 +26,9 @@ func (p *IbftInit) GetHelperText() string {
 
 // Help implements the cli.IbftInit interface
 func (p *IbftInit) Help() string {
-	usage := "ibft-init DATA_DIRECTORY"
+	usage := fmt.Sprintf("%s DATA_DIRECTORY", p.GetBaseCommand())
 
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), usage, p.flagMap)
 }
 
 // Synopsis implements the cli.IbftInit interface
@@ -35,9 +36,13 @@ func (p *IbftInit) Synopsis() string {
 	return p.GetHelperText()
 }
 
+func (p *IbftInit) GetBaseCommand() string {
+	return "ibft-init"
+}
+
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
-	flags := flag.NewFlagSet("ibft-init", flag.ContinueOnError)
+	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1

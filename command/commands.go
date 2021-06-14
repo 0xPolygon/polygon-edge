@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 
@@ -126,11 +126,28 @@ func Commands() map[string]cli.CommandFactory {
 	}
 }
 
-// FlagDescriptor contains the description elements for a command flag
-type FlagDescriptor struct {
+// MetaFlagDescriptor contains the description elements for a command flag. Implements types.FlagDescriptor
+type MetaFlagDescriptor struct {
 	description       string   // Flag description
 	arguments         []string // Arguments list
 	argumentsOptional bool     // Flag indicating if flag arguments are optional
+	flagOptional      bool
+}
+
+func (m MetaFlagDescriptor) GetDescription() string {
+	return m.description
+}
+
+func (m MetaFlagDescriptor) GetArgumentsList() []string {
+	return m.arguments
+}
+
+func (m MetaFlagDescriptor) GetArgumentsOptional() bool {
+	return m.argumentsOptional
+}
+
+func (m MetaFlagDescriptor) GetFlagOptional() bool {
+	return m.flagOptional
 }
 
 type HelpGenerator interface {
@@ -142,82 +159,22 @@ type Meta struct {
 	UI   cli.Ui
 	addr string
 
-	flagMap        map[string]FlagDescriptor
+	flagMap        map[string]types.FlagDescriptor
 	hasGlobalFlags bool
-}
-
-// GenerateHelp is a utility function called by every command's Help() method
-func (m *Meta) GenerateHelp(synopsys string, usage string) string {
-	helpOutput := ""
-
-	flagCounter := 0
-	for flagEl, descriptor := range m.flagMap {
-		helpOutput += m.GenerateFlagDesc(flagEl, descriptor) + "\n"
-		flagCounter++
-
-		if flagCounter < len(m.flagMap) {
-			helpOutput += "\n"
-		}
-	}
-
-	if m.hasGlobalFlags {
-		if strings.Count(usage, "--") > 1 {
-			usage = fmt.Sprintf("%s\n\t%s", usage, globalFlagsUsage())
-		} else {
-			usage = fmt.Sprintf("%s %s", usage, globalFlagsUsage())
-		}
-	}
-
-	if len(m.flagMap) > 0 {
-		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n\nFlags:\n\n%s", synopsys, usage, helpOutput)
-	} else {
-		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n", synopsys, usage)
-	}
-}
-
-// GenerateFlagDesc generates the flag descriptions in a readable format
-func (m *Meta) GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string {
-	// Generate the top row (with various flags)
-	topRow := fmt.Sprintf("--%s", flagEl)
-
-	argLength := len(descriptor.arguments)
-
-	if argLength > 0 {
-		topRow += " "
-		if descriptor.argumentsOptional {
-			topRow += "["
-		}
-
-		for argIndx, argument := range descriptor.arguments {
-			topRow += argument
-
-			if argIndx < argLength-1 && argLength > 1 {
-				topRow += " "
-			}
-		}
-
-		if descriptor.argumentsOptional {
-			topRow += "]"
-		}
-	}
-
-	// Generate the bottom description
-	bottomRow := fmt.Sprintf("\t%s", descriptor.description)
-
-	return fmt.Sprintf("%s\n%s", topRow, bottomRow)
 }
 
 // DefineFlags sets global flags used by several commands
 func (m *Meta) DefineFlags() {
 	m.hasGlobalFlags = true
-	m.flagMap = make(map[string]FlagDescriptor)
+	m.flagMap = make(map[string]types.FlagDescriptor)
 
-	m.flagMap["grpc-address"] = FlagDescriptor{
+	m.flagMap["grpc-address"] = MetaFlagDescriptor{
 		description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", minimal.DefaultGRPCPort),
 		arguments: []string{
 			"GRPC_ADDRESS",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 }
 
@@ -237,10 +194,6 @@ func (m *Meta) Conn() (*grpc.ClientConn, error) {
 	}
 
 	return conn, nil
-}
-
-func globalFlagsUsage() string {
-	return `[--grpc-address GRPC_ADDRESS]`
 }
 
 // OUTPUT FORMATTING //

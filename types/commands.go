@@ -1,0 +1,131 @@
+package types
+
+import (
+	"fmt"
+)
+
+// FlagDescriptor contains the description elements for a command flag
+type FlagDescriptor interface {
+	GetDescription() string     // Gets the flag description
+	GetArgumentsList() []string // Gets the list of arguments for the flag
+	GetArgumentsOptional() bool // Checks if the flag arguments are optional
+	GetFlagOptional() bool      // Checks if the flag itself is optional
+}
+
+func globalFlagsUsage() string {
+	return `[--grpc-address GRPC_ADDRESS]`
+}
+
+// GenerateHelp is a utility function called by every command's Help() method
+func GenerateHelp(synopsys string, usage string, flagMap map[string]FlagDescriptor) string {
+	helpOutput := ""
+
+	flagCounter := 0
+	for flagEl, descriptor := range flagMap {
+		helpOutput += GenerateFlagDesc(flagEl, descriptor) + "\n"
+		flagCounter++
+
+		if flagCounter < len(flagMap) {
+			helpOutput += "\n"
+		}
+	}
+
+	if len(flagMap) > 0 {
+		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n\nFlags:\n\n%s", synopsys, usage, helpOutput)
+	} else {
+		return fmt.Sprintf("Description:\n\n%s\n\nUsage:\n\n\t%s\n", synopsys, usage)
+	}
+}
+
+// GenerateFlagDesc generates the flag descriptions in a readable format
+func GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string {
+	// Generate the top row (with various flags)
+	topRow := fmt.Sprintf("--%s", flagEl)
+
+	argumentsOptional := descriptor.GetArgumentsOptional()
+	argumentsList := descriptor.GetArgumentsList()
+
+	argLength := len(argumentsList)
+
+	if argLength > 0 {
+		topRow += " "
+		if argumentsOptional {
+			topRow += "["
+		}
+
+		for argIndx, argument := range argumentsList {
+			topRow += argument
+
+			if argIndx < argLength-1 && argLength > 1 {
+				topRow += " "
+			}
+		}
+
+		if argumentsOptional {
+			topRow += "]"
+		}
+	}
+
+	// Generate the bottom description
+	bottomRow := fmt.Sprintf("\t%s", descriptor.GetDescription())
+
+	return fmt.Sprintf("%s\n%s", topRow, bottomRow)
+}
+
+// GenerateUsage is a helper function for generating command usage text
+func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string {
+	output := baseCommand + " "
+
+	maxFlagsPerLine := 3 // Just an arbitrary value, can be anything reasonable
+
+	var addedFlags int // Keeps track of when a newline character needs to be inserted
+	for flagEl, descriptor := range flagMap {
+		// Open the flag bracket
+		if descriptor.GetFlagOptional() {
+			output += "["
+		}
+
+		// Add the actual flag name
+		output += fmt.Sprintf("--%s", flagEl)
+
+		// Open the argument bracket
+		if descriptor.GetArgumentsOptional() {
+			output += " ["
+		}
+
+		argumentsList := descriptor.GetArgumentsList()
+
+		// Add the flag arguments list
+		for argIndex, argument := range argumentsList {
+			if argIndex == 0 {
+				// Only called for the first argument
+				output += " "
+			}
+
+			output += argument
+
+			if argIndex < len(argumentsList)-1 {
+				output += " "
+			}
+		}
+
+		// Close the argument bracket
+		if descriptor.GetArgumentsOptional() {
+			output += "]"
+		}
+
+		// Close the flag bracket
+		if descriptor.GetFlagOptional() {
+			output += "]"
+		}
+
+		addedFlags++
+		if addedFlags%maxFlagsPerLine == 0 {
+			output += "\n\t"
+		} else {
+			output += " "
+		}
+	}
+
+	return output
+}

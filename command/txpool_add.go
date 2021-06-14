@@ -19,10 +19,10 @@ type TxPoolAdd struct {
 func (p *TxPoolAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["from"] = FlagDescriptor{
+	p.flagMap["from"] = MetaFlagDescriptor{
 		description: "The sender address",
 		arguments: []string{
 			"ADDRESS",
@@ -30,7 +30,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		argumentsOptional: false,
 	}
 
-	p.flagMap["to"] = FlagDescriptor{
+	p.flagMap["to"] = MetaFlagDescriptor{
 		description: "The receiver address",
 		arguments: []string{
 			"ADDRESS",
@@ -38,7 +38,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		argumentsOptional: false,
 	}
 
-	p.flagMap["value"] = FlagDescriptor{
+	p.flagMap["value"] = MetaFlagDescriptor{
 		description: "The value of the transaction",
 		arguments: []string{
 			"VALUE",
@@ -46,7 +46,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		argumentsOptional: false,
 	}
 
-	p.flagMap["gasPrice"] = FlagDescriptor{
+	p.flagMap["gasPrice"] = MetaFlagDescriptor{
 		description: "The gas price",
 		arguments: []string{
 			"GASPRICE",
@@ -54,20 +54,22 @@ func (p *TxPoolAdd) DefineFlags() {
 		argumentsOptional: false,
 	}
 
-	p.flagMap["gasLimit"] = FlagDescriptor{
+	p.flagMap["gasLimit"] = MetaFlagDescriptor{
 		description: "The specified gas limit",
 		arguments: []string{
 			"LIMIT",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 
-	p.flagMap["nonce"] = FlagDescriptor{
+	p.flagMap["nonce"] = MetaFlagDescriptor{
 		description: "The nonce of the transaction",
 		arguments: []string{
 			"NONCE",
 		},
 		argumentsOptional: false,
+		flagOptional:      true,
 	}
 }
 
@@ -76,15 +78,16 @@ func (p *TxPoolAdd) GetHelperText() string {
 	return "Adds a new transaction to the transaction pool"
 }
 
+func (p *TxPoolAdd) GetBaseCommand() string {
+	return "txpool-add"
+}
+
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := `txpool-add --from ADDRESS --to ADDRESS --value VALUE
-	--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]`
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
@@ -94,7 +97,7 @@ func (p *TxPoolAdd) Synopsis() string {
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
-	flags := p.FlagSet("txpool-add")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	// Address types
 	var fromRaw, toRaw string

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -25,9 +26,7 @@ func (m *MonitorCommand) GetHelperText() string {
 func (m *MonitorCommand) Help() string {
 	m.Meta.DefineFlags()
 
-	usage := "monitor"
-
-	return m.GenerateHelp(m.Synopsis(), usage)
+	return types.GenerateHelp(m.Synopsis(), types.GenerateUsage("monitor", m.flagMap), m.flagMap)
 }
 
 // Synopsis implements the cli.Command interface

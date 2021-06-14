@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -18,13 +19,15 @@ func (p *TxPoolStatus) GetHelperText() string {
 	return "Returns the number of transactions in the pool"
 }
 
+func (p *TxPoolStatus) GetBaseCommand() string {
+	return "txpool-status"
+}
+
 // Help implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "txpool-status"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.TxPoolStatus interface
@@ -34,7 +37,7 @@ func (p *TxPoolStatus) Synopsis() string {
 
 // Run implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Run(args []string) int {
-	flags := p.FlagSet("txpool-status")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())

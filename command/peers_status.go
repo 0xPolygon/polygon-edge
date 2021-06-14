@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/types"
 )
 
 // PeersStatus is the PeersStatus to start the sever
@@ -17,13 +18,17 @@ func (p *PeersStatus) GetHelperText() string {
 	return "Returns the status of the specified peer, using the libp2p ID of the peer"
 }
 
+func (p *PeersStatus) GetBaseCommand() string {
+	return "peers-status"
+}
+
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "peers-status PEER_ID"
+	usage := fmt.Sprintf("%s PEER_ID", p.GetBaseCommand())
 
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), usage, p.flagMap)
 }
 
 // Synopsis implements the cli.PeersStatus interface
@@ -33,7 +38,7 @@ func (p *PeersStatus) Synopsis() string {
 
 // Run implements the cli.PeersStatus interface
 func (p *PeersStatus) Run(args []string) int {
-	flags := p.FlagSet("peers-status")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	var peerId string
 	flags.StringVar(&peerId, "id", "", "")

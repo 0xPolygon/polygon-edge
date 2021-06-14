@@ -18,23 +18,25 @@ type IbftPropose struct {
 func (p *IbftPropose) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["a"] = FlagDescriptor{
+	p.flagMap["a"] = MetaFlagDescriptor{
 		description: "Address of the account to be voted for",
 		arguments: []string{
 			"ETH_ADDRESS",
 		},
 		argumentsOptional: false,
+		flagOptional:      false,
 	}
 
-	p.flagMap["vote"] = FlagDescriptor{
+	p.flagMap["vote"] = MetaFlagDescriptor{
 		description: "Proposes a change to the validator set (add = true, remove = false)",
 		arguments: []string{
 			"VOTE",
 		},
 		argumentsOptional: false,
+		flagOptional:      false,
 	}
 }
 
@@ -43,14 +45,16 @@ func (p *IbftPropose) GetHelperText() string {
 	return "Proposes a new candidate to be added or removed from the validator set"
 }
 
+func (p *IbftPropose) GetBaseCommand() string {
+	return "ibft-propose"
+}
+
 // Help implements the cli.IbftPropose interface
 func (p *IbftPropose) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "ibft-propose --a ETH_ADDRESS --vote VOTE "
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftPropose interface
@@ -60,7 +64,7 @@ func (p *IbftPropose) Synopsis() string {
 
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
-	flags := p.FlagSet("ibft-propose")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	var vote bool
 	var ethAddress string
