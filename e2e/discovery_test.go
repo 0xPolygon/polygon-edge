@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -32,39 +31,13 @@ func TestDiscovery(t *testing.T) {
 		},
 	}
 
-	conf := func(config *framework.TestServerConfig) {
+	conf := func(config *framework.TestServerConfig, index int) {
 		config.SetConsensus(framework.ConsensusDummy)
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, 0, tt.numNodes)
-			t.Cleanup(func() {
-				for _, s := range srvs {
-					s.Stop()
-					if err := os.RemoveAll(s.Config.RootDir); err != nil {
-						t.Log(err)
-					}
-				}
-			})
-
-			for i := 0; i < tt.numNodes; i++ {
-				dataDir, err := framework.TempDir()
-				if err != nil {
-					t.Fatal(err)
-				}
-				srv := framework.NewTestServer(t, dataDir, conf)
-				if err := srv.GenerateGenesis(); err != nil {
-					t.Fatal(err)
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := srv.Start(ctx); err != nil {
-					t.Fatal(err)
-				}
-
-				srvs = append(srvs, srv)
-			}
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 
 			p2pAddrs := make([]string, tt.numNodes)
 			for i, s := range srvs {

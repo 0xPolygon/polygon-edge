@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestBroadcast(t *testing.T) {
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	conf := func(config *framework.TestServerConfig) {
+	conf := func(config *framework.TestServerConfig, index int) {
 		config.SetConsensus(framework.ConsensusDummy)
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
@@ -45,35 +44,7 @@ func TestBroadcast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, 0, tt.numNodes)
-			t.Cleanup(func() {
-				for _, srv := range srvs {
-					srv.Stop()
-					if err := os.RemoveAll(srv.Config.RootDir); err != nil {
-						t.Log(err)
-					}
-				}
-			})
-
-			for i := 0; i < tt.numNodes; i++ {
-				dataDir, err := framework.TempDir()
-				if err != nil {
-					t.Fatal(err)
-				}
-				srv := framework.NewTestServer(t, dataDir, conf)
-
-				if err := srv.GenerateGenesis(); err != nil {
-					t.Fatal(err)
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := srv.Start(ctx); err != nil {
-					t.Fatal(err)
-				}
-
-				srvs = append(srvs, srv)
-			}
-
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
 
 			// Check the connections

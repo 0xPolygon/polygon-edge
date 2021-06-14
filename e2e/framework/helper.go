@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -216,4 +217,38 @@ func FindAvailablePorts(n, from, to int) ([]ReservedPort, error) {
 		nextFrom = newPort.Port() + 1
 	}
 	return ports, nil
+}
+
+func NewTestServers(t *testing.T, num int, setConfig func(*TestServerConfig, int)) []*TestServer {
+	t.Helper()
+
+	srvs := make([]*TestServer, 0, num)
+	t.Cleanup(func() {
+		for _, srv := range srvs {
+			srv.Stop()
+			if err := os.RemoveAll(srv.Config.RootDir); err != nil {
+				t.Log(err)
+			}
+		}
+	})
+
+	for i := 0; i < num; i++ {
+		dataDir, err := TempDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
+			setConfig(config, i)
+		})
+		if err := srv.GenerateGenesis(); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		srvs = append(srvs, srv)
+	}
+	return srvs
 }
