@@ -57,7 +57,7 @@ func (p *PeersAdd) Run(args []string) int {
 	flags := p.FlagSet(p.GetBaseCommand())
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
-	flags.Var(&passedInAddresses, "a", "")
+	flags.Var(&passedInAddresses, "addr", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
