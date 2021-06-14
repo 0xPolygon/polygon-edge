@@ -126,7 +126,7 @@ type InitIBFTResult struct {
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	args := []string{
-		"ibft", "init", t.Config.IBFTDir,
+		"ibft", "init", "--data-dir", t.Config.IBFTDir,
 	}
 
 	cmd := exec.Command(polygonSDKCmd, args...)
