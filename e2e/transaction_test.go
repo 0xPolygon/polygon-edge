@@ -159,7 +159,8 @@ func TestEthTransfer(t *testing.T) {
 		// Empty account
 		{
 			types.StringToAddress("2"),
-			big.NewInt(0)},
+			big.NewInt(0),
+		},
 		// Valid account #2
 		{
 			types.StringToAddress("3"),
@@ -229,7 +230,6 @@ func TestEthTransfer(t *testing.T) {
 	}
 
 	rpcClient := srv.JSONRPC()
-
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the balances before sending
@@ -263,24 +263,21 @@ func TestEthTransfer(t *testing.T) {
 
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
+			assert.NoError(t, err)
+			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			assert.NoError(t, err)
+			assert.NotNil(t, receipt)
+
 			if testCase.shouldSuccess {
-				assert.NoError(t, err)
-
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				receipt, err := srv.WaitForReceipt(ctx, txnHash)
-
-				assert.NoError(t, err)
-				assert.NotNil(t, receipt)
-
 				fee = new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
 					big.NewInt(int64(txnObject.GasPrice)),
 				)
-			} else {
-				assert.Error(t, err)
 			}
-			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
 
 			// Fetch the balances after sending
 			balanceSender, err = rpcClient.Eth().GetBalance(
@@ -295,19 +292,29 @@ func TestEthTransfer(t *testing.T) {
 			)
 			assert.NoError(t, err)
 
-			spentAmount := big.NewInt(0)
+			expectedSenderBalance := previousSenderBalance
 			if testCase.shouldSuccess {
-				spentAmount = new(big.Int).Add(testCase.amount, fee)
+				expectedSenderBalance = previousSenderBalance.Sub(
+					previousSenderBalance,
+					new(big.Int).Add(testCase.amount, fee),
+				)
+			}
+			expectedReceiverBalance := previousReceiverBalance
+			if testCase.shouldSuccess {
+				expectedReceiverBalance = previousReceiverBalance.Add(
+					previousReceiverBalance,
+					testCase.amount,
+				)
 			}
 
 			// Check the balances
 			assert.Equalf(t,
-				new(big.Int).Sub(previousSenderBalance, spentAmount),
+				expectedSenderBalance,
 				balanceSender,
 				"Sender balance incorrect")
 			assert.Equalf(t,
-				new(big.Int).Add(previousReceiverBalance, testCase.amount).String(),
-				balanceReceiver.String(),
+				expectedReceiverBalance,
+				balanceReceiver,
 				"Receiver balance incorrect")
 		})
 	}
