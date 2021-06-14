@@ -22,7 +22,7 @@ func (p *IbftCandidates) GetHelperText() string {
 func (p *IbftCandidates) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft candidates"
+	usage := "ibft-candidates"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -34,7 +34,7 @@ func (p *IbftCandidates) Synopsis() string {
 
 // Run implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Run(args []string) int {
-	flags := p.FlagSet("ibft candidates")
+	flags := p.FlagSet("ibft-candidates")
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
@@ -53,13 +53,39 @@ func (p *IbftCandidates) Run(args []string) int {
 		return 1
 	}
 
+	output := "\n[IBFT CANDIDATES]\n"
+
 	if len(resp.Candidates) == 0 {
-		p.UI.Output("No candidates")
-		return 0
+		output += "No candidates found"
+	} else {
+		output += fmt.Sprintf("Number of candidates: %d\n\n", len(resp.Candidates))
+
+		output += formatCandidates(resp.Candidates)
 	}
 
-	for _, c := range resp.Candidates {
-		p.UI.Output(fmt.Sprintf("%s %v", c.Address, c.Auth))
-	}
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
+}
+
+func formatCandidates(candidates []*ibftOp.Candidate) string {
+	var generatedCandidates []string
+
+	generatedCandidates = append(generatedCandidates, "Address|Vote")
+
+	for _, c := range candidates {
+		generatedCandidates = append(generatedCandidates, fmt.Sprintf("%s|%s", c.Address, voteToString(c.Auth)))
+	}
+
+	return formatKV(generatedCandidates)
+}
+
+func voteToString(vote bool) string {
+	if vote {
+		return "ADD"
+	}
+
+	return "REMOVE"
 }

@@ -54,7 +54,14 @@ func (p *PeersList) Run(args []string) int {
 	}
 
 	output := "\n[PEERS LIST]\n"
-	output += formatPeers(resp.Peers)
+
+	if len(resp.Peers) == 0 {
+		output += "No peers found"
+	} else {
+		output += fmt.Sprintf("Number of peers: %d\n\n", len(resp.Peers))
+
+		output += formatPeers(resp.Peers)
+	}
 
 	output += "\n"
 
@@ -64,16 +71,6 @@ func (p *PeersList) Run(args []string) int {
 }
 
 func formatPeers(peers []*proto.Peer) string {
-	if len(peers) == 0 {
-		return "No peers found"
-	}
-
-	rows := make([]string, len(peers)+1)
-	rows[0] = "ID"
-	for i, d := range peers {
-		rows[i+1] = fmt.Sprintf("%s", d.Id)
-	}
-
 	var generatedRows []string
 	for i := 0; i < len(peers); i++ {
 		generatedRows = append(generatedRows, fmt.Sprintf("[%d]|%s", i, peers[i].Id))

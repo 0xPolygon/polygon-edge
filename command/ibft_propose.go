@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
@@ -20,18 +21,18 @@ func (p *IbftPropose) DefineFlags() {
 		p.flagMap = make(map[string]FlagDescriptor)
 	}
 
-	p.flagMap["add"] = FlagDescriptor{
-		description: "Proposes a new validator to be added to the validator set",
+	p.flagMap["a"] = FlagDescriptor{
+		description: "Address of the account to be voted for",
 		arguments: []string{
 			"ETH_ADDRESS",
 		},
 		argumentsOptional: false,
 	}
 
-	p.flagMap["del"] = FlagDescriptor{
-		description: "Proposes a new validator to be removed from the validator set",
+	p.flagMap["vote"] = FlagDescriptor{
+		description: "Proposes a change to the validator set (add = true, remove = false)",
 		arguments: []string{
-			"ETH_ADDRESS",
+			"VOTE",
 		},
 		argumentsOptional: false,
 	}
@@ -39,7 +40,7 @@ func (p *IbftPropose) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (p *IbftPropose) GetHelperText() string {
-	return "Proposes a new candidate to be added to the snapshot list"
+	return "Proposes a new candidate to be added or removed from the validator set"
 }
 
 // Help implements the cli.IbftPropose interface
@@ -47,7 +48,7 @@ func (p *IbftPropose) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "ibft propose [--add ETH_ADDRESS | --del ETH_ADDRESS]"
+	usage := "ibft-propose --a ETH_ADDRESS --vote VOTE "
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -59,32 +60,27 @@ func (p *IbftPropose) Synopsis() string {
 
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
-	flags := p.FlagSet("ibft propose")
+	flags := p.FlagSet("ibft-propose")
 
-	var add, del bool
-	flags.BoolVar(&add, "add", false, "add")
-	flags.BoolVar(&del, "del", false, "del")
+	var vote bool
+	var ethAddress string
+
+	flags.BoolVar(&vote, "vote", false, "")
+	flags.StringVar(&ethAddress, "a", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	if add == del {
-		// either (add=true, del=true) or (add=false, del=false)
-		p.UI.Error("Either add or del needs to be set")
-		return 1
-	}
-
-	args = flags.Args()
-	if len(args) != 1 {
-		p.UI.Error("only 1 argument expected")
+	if ethAddress == "" {
+		p.UI.Error("Account address not specified")
 		return 1
 	}
 
 	var addr types.Address
-	if err := addr.UnmarshalText([]byte(args[0])); err != nil {
-		p.UI.Error("failed to decode addr")
+	if err := addr.UnmarshalText([]byte(ethAddress)); err != nil {
+		p.UI.Error("Failed to decode address")
 		return 1
 	}
 
@@ -97,12 +93,22 @@ func (p *IbftPropose) Run(args []string) int {
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
-		Auth:    add,
+		Auth:    vote,
 	}
+
 	_, err = clt.Propose(context.Background(), req)
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
+
+	output := "\n[IBFT PROPOSE]\n"
+
+	if vote {
+		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", ethAddress)
+	} else {
+		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", ethAddress)
+	}
+
 	return 0
 }

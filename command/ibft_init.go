@@ -25,7 +25,7 @@ func (p *IbftInit) GetHelperText() string {
 
 // Help implements the cli.IbftInit interface
 func (p *IbftInit) Help() string {
-	usage := "ibft init DATA_DIRECTORY"
+	usage := "ibft-init DATA_DIRECTORY"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -37,7 +37,7 @@ func (p *IbftInit) Synopsis() string {
 
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
-	flags := flag.NewFlagSet("ibft init", flag.ContinueOnError)
+	flags := flag.NewFlagSet("ibft-init", flag.ContinueOnError)
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
@@ -75,12 +75,14 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	output := formatKV([]string{
-		fmt.Sprintf("Public key|%s", crypto.PubKeyToAddress(&key.PublicKey)),
+	output := "\n[IBFT INIT]\n"
+
+	output += formatKV([]string{
+		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&key.PublicKey)),
 		fmt.Sprintf("Node ID|%s", nodeId.String()),
 	})
 
-	output += "\nDone!\n"
+	output += "\n"
 
 	p.UI.Output(output)
 

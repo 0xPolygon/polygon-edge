@@ -22,7 +22,7 @@ func (p *IbftStatus) GetHelperText() string {
 func (p *IbftStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft status"
+	usage := "ibft-status"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -34,7 +34,7 @@ func (p *IbftStatus) Synopsis() string {
 
 // Run implements the cli.IbftStatus interface
 func (p *IbftStatus) Run(args []string) int {
-	flags := p.FlagSet("ibft status")
+	flags := p.FlagSet("ibft-status")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
@@ -58,6 +58,8 @@ func (p *IbftStatus) Run(args []string) int {
 	output += formatKV([]string{
 		fmt.Sprintf("Vaidator key|%d", resp.Key),
 	})
+
+	output += "\n"
 
 	p.UI.Output(output)
 

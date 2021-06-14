@@ -39,7 +39,7 @@ func (p *IbftSnapshot) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "ibft snapshot [--number BLOCK_NUMBER]"
+	usage := "ibft-snapshot [--number BLOCK_NUMBER]"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -51,7 +51,7 @@ func (p *IbftSnapshot) Synopsis() string {
 
 // Run implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Run(args []string) int {
-	flags := p.FlagSet("ibft snapshot")
+	flags := p.FlagSet("ibft-snapshot")
 
 	// query a specific snapshot
 	var number int64
@@ -87,7 +87,7 @@ func (p *IbftSnapshot) Run(args []string) int {
 }
 
 func printSnapshot(s *proto.Snapshot) (output string) {
-	output += "\n[INFO]\n"
+	output += "\n[IBFT SNAPSHOT]\n"
 	output += formatKV([]string{
 		fmt.Sprintf("Block|%d", s.Number),
 		fmt.Sprintf("Hash|%s", s.Hash),
