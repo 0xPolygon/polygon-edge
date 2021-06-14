@@ -219,7 +219,7 @@ func FindAvailablePorts(n, from, to int) ([]ReservedPort, error) {
 	return ports, nil
 }
 
-func NewTestServers(t *testing.T, num int, setConfig func(*TestServerConfig, int)) []*TestServer {
+func NewTestServers(t *testing.T, num int, setConfig func(int, *TestServerConfig)) []*TestServer {
 	t.Helper()
 
 	srvs := make([]*TestServer, 0, num)
@@ -238,7 +238,7 @@ func NewTestServers(t *testing.T, num int, setConfig func(*TestServerConfig, int
 			t.Fatal(err)
 		}
 		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
-			setConfig(config, i)
+			setConfig(i, config)
 		})
 		if err := srv.GenerateGenesis(); err != nil {
 			t.Fatal(err)

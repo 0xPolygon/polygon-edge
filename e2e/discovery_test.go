@@ -31,7 +31,7 @@ func TestDiscovery(t *testing.T) {
 		},
 	}
 
-	conf := func(config *framework.TestServerConfig, index int) {
+	conf := func(index int, config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
 	}
 
