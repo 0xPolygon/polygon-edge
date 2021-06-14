@@ -12,10 +12,6 @@ type FlagDescriptor interface {
 	GetFlagOptional() bool      // Checks if the flag itself is optional
 }
 
-func globalFlagsUsage() string {
-	return `[--grpc-address GRPC_ADDRESS]`
-}
-
 // GenerateHelp is a utility function called by every command's Help() method
 func GenerateHelp(synopsys string, usage string, flagMap map[string]FlagDescriptor) string {
 	helpOutput := ""
