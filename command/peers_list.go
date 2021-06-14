@@ -22,7 +22,7 @@ func (p *PeersList) GetHelperText() string {
 func (p *PeersList) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "peers list"
+	usage := "peers-list"
 
 	return p.GenerateHelp(p.Synopsis(), usage)
 }
@@ -34,7 +34,7 @@ func (p *PeersList) Synopsis() string {
 
 // Run implements the cli.PeersList interface
 func (p *PeersList) Run(args []string) int {
-	flags := p.FlagSet("peers list")
+	flags := p.FlagSet("peers-list")
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
@@ -53,13 +53,19 @@ func (p *PeersList) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(formatPeers(resp.Peers))
+	output := "\n[PEERS LIST]\n"
+	output += formatPeers(resp.Peers)
+
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
 }
 
 func formatPeers(peers []*proto.Peer) string {
 	if len(peers) == 0 {
-		return "No deployments found"
+		return "No peers found"
 	}
 
 	rows := make([]string, len(peers)+1)
@@ -67,5 +73,11 @@ func formatPeers(peers []*proto.Peer) string {
 	for i, d := range peers {
 		rows[i+1] = fmt.Sprintf("%s", d.Id)
 	}
-	return formatList(rows)
+
+	var generatedRows []string
+	for i := 0; i < len(peers); i++ {
+		generatedRows = append(generatedRows, fmt.Sprintf("[%d]|%s", i, peers[i].Id))
+	}
+
+	return formatKV(generatedRows)
 }
