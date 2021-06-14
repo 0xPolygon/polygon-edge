@@ -13,9 +13,24 @@ type PeersStatus struct {
 	Meta
 }
 
+func (p *PeersStatus) DefineFlags() {
+	if p.flagMap == nil {
+		// Flag map not initialized
+		p.flagMap = make(map[string]types.FlagDescriptor)
+	}
+
+	p.flagMap["peer-id"] = MetaFlagDescriptor{
+		description: "Libp2p node ID of a specific peer within p2p network",
+		arguments: []string{
+			"PEER_ID",
+		},
+		argumentsOptional: false,
+	}
+}
+
 // GetHelperText returns a simple description of the command
 func (p *PeersStatus) GetHelperText() string {
-	return "Returns the status of the specified peer, using the libp2p ID of the peer"
+	return "Returns the status of the specified peer, using the libp2p ID of the peer node"
 }
 
 func (p *PeersStatus) GetBaseCommand() string {
@@ -25,10 +40,9 @@ func (p *PeersStatus) GetBaseCommand() string {
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
+	p.DefineFlags()
 
-	usage := fmt.Sprintf("%s PEER_ID", p.GetBaseCommand())
-
-	return types.GenerateHelp(p.Synopsis(), usage, p.flagMap)
+	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersStatus interface
@@ -40,16 +54,16 @@ func (p *PeersStatus) Synopsis() string {
 func (p *PeersStatus) Run(args []string) int {
 	flags := p.FlagSet(p.GetBaseCommand())
 
-	var peerId string
-	flags.StringVar(&peerId, "id", "", "")
+	var nodeId string
+	flags.StringVar(&nodeId, "peer-id", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	if peerId == "" {
-		p.UI.Error("The PEER_ID argument is missing")
+	if nodeId == "" {
+		p.UI.Error("peer-id argument not provided")
 		return 1
 	}
 
@@ -60,7 +74,7 @@ func (p *PeersStatus) Run(args []string) int {
 	}
 
 	clt := proto.NewSystemClient(conn)
-	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: peerId})
+	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeId})
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

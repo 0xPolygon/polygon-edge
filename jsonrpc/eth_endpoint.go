@@ -100,10 +100,9 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 		// block receipts not found
 		return nil, nil
 	}
-	for _, txn := range block.Transactions {
+	for idx, txn := range block.Transactions {
 		if txn.Hash == hash {
-			// todo: need to add blockHash, blockNumber, and transactionIndex
-			return toTransaction(txn), nil
+			return toTransaction(txn, block, idx), nil
 		}
 	}
 	// txn not found (this should not happen)

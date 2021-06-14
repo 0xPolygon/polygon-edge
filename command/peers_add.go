@@ -14,15 +14,14 @@ type PeersAdd struct {
 	Meta
 }
 
-// DefineFlags defines the command flags
 func (p *PeersAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
 		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["a"] = MetaFlagDescriptor{
-		description: "Specifies the libp2p address of the peer in the format /ip4/<ip_address>/tcp/<port>/p2p/<node_id>",
+	p.flagMap["addr"] = MetaFlagDescriptor{
+		description: "Peer's libp2p address in the multiaddr format",
 		arguments: []string{
 			"PEER_ADDRESS",
 		},
