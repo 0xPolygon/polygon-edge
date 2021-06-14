@@ -38,8 +38,17 @@ rm -rf polygon-sdk-*
 
 Constant values that used in some e2e tests are defined in `e2e/const.go`.
 Mock contract are pre-compiled and the result is stored in `const.go` in order to avoid dependencies of solc command (solidity compiler).
-`e2e/sample.go` is original source code, and you can get byte code by following command.
+
+You can get the byte code from original program by following command.
 
 ```shell
 $ solc --bin e2e/sample.sol
+```
+
+Currently you need to build with version 0.5.x compiler. You can check the compiler version by `solc --version`.
+
+```shell
+$ solc --version
+solc, the solidity compiler commandline interface
+Version: 0.5.17+commit.d19bba13.Darwin.appleclang
 ```

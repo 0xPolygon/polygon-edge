@@ -32,11 +32,11 @@ func TestDiscovery(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		conf := func(config *framework.TestServerConfig) {
-			config.SetConsensus(framework.ConsensusDummy)
-		}
+	conf := func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDummy)
+	}
 
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := make([]*framework.TestServer, 0, tt.numNodes)
 			t.Cleanup(func() {
@@ -88,10 +88,10 @@ func TestDiscovery(t *testing.T) {
 			}
 
 			for i, srv := range srvs {
-				shouldKnowPeers := false
+				shouldKnowPeers := true
 				subTestName := fmt.Sprintf("node %d should know other peers", i)
-				if i < tt.numInitConnectNodes {
-					shouldKnowPeers = true
+				if i >= tt.numInitConnectNodes {
+					shouldKnowPeers = false
 					subTestName = fmt.Sprintf("node %d shouldn't know other peers", i)
 				}
 

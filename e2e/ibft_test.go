@@ -39,7 +39,7 @@ func TestIbft_Transfer(t *testing.T) {
 	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < IBFTMinNodes-1; i++ {
 		txn := &types.Transaction{
 			From:     senderAddr,
 			To:       &receiverAddr,
@@ -64,5 +64,6 @@ func TestIbft_Transfer(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
+		assert.Equal(t, receipt.TransactionHash, hash)
 	}
 }

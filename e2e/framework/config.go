@@ -57,7 +57,7 @@ func (t *TestServerConfig) SetIBFTDirPrefix(ibftDirPrefix string) {
 	t.IBFTDirPrefix = ibftDirPrefix
 }
 
-// SetIBFTDirPrefix callback sets prefix of IBFT directories
+// SetIBFTDir callback sets the name of data directory for IBFT
 func (t *TestServerConfig) SetIBFTDir(ibftDir string) {
 	t.IBFTDir = ibftDir
 }
@@ -72,7 +72,7 @@ func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 	t.Bootnodes = bootnodes
 }
 
-// SetBootnodes sets bootnodes
+// SetShowsLog sets flag for logging
 func (t *TestServerConfig) SetShowsLog(f bool) {
 	t.ShowsLog = f
 }

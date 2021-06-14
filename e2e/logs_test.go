@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -121,5 +120,5 @@ func TestNewFilter_Block(t *testing.T) {
 	// there should be three changes
 	blocks, err := client.Eth().GetFilterChangesBlock(id)
 	assert.NoError(t, err)
-	fmt.Println(blocks)
+	assert.Len(t, blocks, 3)
 }
