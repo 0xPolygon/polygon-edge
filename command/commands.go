@@ -3,13 +3,14 @@ package command
 import (
 	"flag"
 	"fmt"
-	"github.com/0xPolygon/minimal/minimal"
 	"os"
 	"strings"
 
 	"github.com/0xPolygon/minimal/command/server"
+	"github.com/0xPolygon/minimal/minimal"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
+
 	"google.golang.org/grpc"
 )
 
@@ -34,11 +35,12 @@ func Commands() map[string]cli.CommandFactory {
 				UI: ui,
 			}, nil
 		},
-		"dev": func() (cli.Command, error) {
-			return &DevCommand{
-				UI: ui,
-			}, nil
-		},
+		// TODO The task to implement the dev command should start here
+		//"dev": func() (cli.Command, error) {
+		//	return &DevCommand{
+		//		UI: ui,
+		//	}, nil
+		//},
 		"genesis": func() (cli.Command, error) {
 			return &GenesisCommand{
 				UI: ui,
@@ -47,17 +49,17 @@ func Commands() map[string]cli.CommandFactory {
 
 		// PEER COMMANDS //
 
-		"peers add": func() (cli.Command, error) {
+		"peers-add": func() (cli.Command, error) {
 			return &PeersAdd{
 				Meta: meta,
 			}, nil
 		},
-		"peers status": func() (cli.Command, error) {
+		"peers-status": func() (cli.Command, error) {
 			return &PeersStatus{
 				Meta: meta,
 			}, nil
 		},
-		"peers list": func() (cli.Command, error) {
+		"peers-list": func() (cli.Command, error) {
 			return &PeersList{
 				Meta: meta,
 			}, nil
@@ -65,27 +67,27 @@ func Commands() map[string]cli.CommandFactory {
 
 		// IBFT COMMANDS //
 
-		"ibft init": func() (cli.Command, error) {
+		"ibft-init": func() (cli.Command, error) {
 			return &IbftInit{
 				Meta: meta,
 			}, nil
 		},
-		"ibft snapshot": func() (cli.Command, error) {
+		"ibft-snapshot": func() (cli.Command, error) {
 			return &IbftSnapshot{
 				Meta: meta,
 			}, nil
 		},
-		"ibft candidates": func() (cli.Command, error) {
+		"ibft-candidates": func() (cli.Command, error) {
 			return &IbftCandidates{
 				Meta: meta,
 			}, nil
 		},
-		"ibft propose": func() (cli.Command, error) {
+		"ibft-propose": func() (cli.Command, error) {
 			return &IbftPropose{
 				Meta: meta,
 			}, nil
 		},
-		"ibft status": func() (cli.Command, error) {
+		"ibft-status": func() (cli.Command, error) {
 			return &IbftStatus{
 				Meta: meta,
 			}, nil
@@ -93,12 +95,12 @@ func Commands() map[string]cli.CommandFactory {
 
 		// TXPOOL COMMANDS //
 
-		"txpool add": func() (cli.Command, error) {
+		"txpool-add": func() (cli.Command, error) {
 			return &TxPoolAdd{
 				Meta: meta,
 			}, nil
 		},
-		"txpool status": func() (cli.Command, error) {
+		"txpool-status": func() (cli.Command, error) {
 			return &TxPoolStatus{
 				Meta: meta,
 			}, nil
