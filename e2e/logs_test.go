@@ -3,50 +3,22 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 )
 
-func newLogsTestServer(t *testing.T, addr types.Address) *framework.TestServer {
-	t.Helper()
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
+func TestNewFilter_Logs(t *testing.T) {
+	_, addr := framework.GenerateKeyAndAddr(t)
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, framework.EthToWei(10))
 		config.SetSeal(true)
 	})
-	t.Cleanup(func() {
-		srv.Stop()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
-	})
-
-	if err := srv.GenerateGenesis(); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	return srv
-}
-
-func TestNewFilter_Logs(t *testing.T) {
-	_, addr := framework.GenerateKeyAndAddr(t)
-	srv := newLogsTestServer(t, addr)
+	srv := srvs[0]
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
@@ -77,7 +49,12 @@ func TestNewFilter_Block(t *testing.T) {
 	_, to := framework.GenerateKeyAndAddr(t)
 	toAddr := web3.HexToAddress(to.String())
 
-	srv := newLogsTestServer(t, from)
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.Premine(from, framework.EthToWei(10))
+		config.SetSeal(true)
+	})
+	srv := srvs[0]
 	client := srv.JSONRPC()
 
 	id, err := client.Eth().NewBlockFilter()

@@ -26,7 +26,7 @@ func TestSignedTransaction(t *testing.T) {
 
 	preminedAmount := framework.EthToWei(10)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(types.Address(senderAddr), preminedAmount)
+		config.Premine(senderAddr, preminedAmount)
 		config.SetSeal(true)
 	})
 	t.Cleanup(func() {
@@ -109,32 +109,13 @@ func TestPreminedBalance(t *testing.T) {
 		},
 	}
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		for _, acc := range preminedAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
-	t.Cleanup(func() {
-		srv.Stop()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
-	})
-
-	if err := srv.GenerateGenesis(); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
+	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
 	for _, testCase := range testTable {
@@ -201,33 +182,14 @@ func TestEthTransfer(t *testing.T) {
 		},
 	}
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	srv := framework.NewTestServer(t, dataDir, func(config *framework.TestServerConfig) {
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
-	t.Cleanup(func() {
-		srv.Stop()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
-	})
-
-	if err := srv.GenerateGenesis(); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
+	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
 	for _, testCase := range testTable {
