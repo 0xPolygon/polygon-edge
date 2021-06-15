@@ -21,7 +21,7 @@ func (p *IbftPropose) DefineFlags() {
 		p.flagMap = make(map[string]types.FlagDescriptor)
 	}
 
-	p.flagMap["a"] = MetaFlagDescriptor{
+	p.flagMap["addr"] = MetaFlagDescriptor{
 		description: "Address of the account to be voted for",
 		arguments: []string{
 			"ETH_ADDRESS",
@@ -31,12 +31,12 @@ func (p *IbftPropose) DefineFlags() {
 	}
 
 	p.flagMap["vote"] = MetaFlagDescriptor{
-		description: "Proposes a change to the validator set (add = true, remove = false)",
+		description: "Proposes a change to the validator set (add = true, remove = false). Default: true",
 		arguments: []string{
 			"VOTE",
 		},
 		argumentsOptional: false,
-		flagOptional:      false,
+		flagOptional:      true,
 	}
 }
 
@@ -69,8 +69,8 @@ func (p *IbftPropose) Run(args []string) int {
 	var vote bool
 	var ethAddress string
 
-	flags.BoolVar(&vote, "vote", false, "")
-	flags.StringVar(&ethAddress, "a", "", "")
+	flags.BoolVar(&vote, "vote", true, "")
+	flags.StringVar(&ethAddress, "addr", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())

@@ -99,7 +99,7 @@ func (p *PeersAdd) Run(args []string) int {
 	})
 
 	if len(addedPeers) > 0 {
-		output += "\n\n[LIST OF DIALED PEERS]\n"
+		output += "\n\n[LIST OF ADDED PEERS]\n"
 		output += formatList(addedPeers)
 	}
 

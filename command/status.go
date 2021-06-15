@@ -27,7 +27,7 @@ func (c *StatusCommand) GetBaseCommand() string {
 func (c *StatusCommand) Help() string {
 	c.Meta.DefineFlags()
 
-	return types.GenerateHelp(c.Synopsis(), c.GetBaseCommand(), c.flagMap)
+	return types.GenerateHelp(c.Synopsis(), types.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface

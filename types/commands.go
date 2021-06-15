@@ -8,8 +8,8 @@ import (
 type FlagDescriptor interface {
 	GetDescription() string     // Gets the flag description
 	GetArgumentsList() []string // Gets the list of arguments for the flag
-	GetArgumentsOptional() bool // Checks if the flag arguments are optional
-	GetFlagOptional() bool      // Checks if the flag itself is optional
+	AreArgumentsOptional() bool // Checks if the flag arguments are optional
+	IsFlagOptional() bool       // Checks if the flag itself is optional
 }
 
 // GenerateHelp is a utility function called by every command's Help() method
@@ -38,7 +38,7 @@ func GenerateFlagDesc(flagEl string, descriptor FlagDescriptor) string {
 	// Generate the top row (with various flags)
 	topRow := fmt.Sprintf("--%s", flagEl)
 
-	argumentsOptional := descriptor.GetArgumentsOptional()
+	argumentsOptional := descriptor.AreArgumentsOptional()
 	argumentsList := descriptor.GetArgumentsList()
 
 	argLength := len(argumentsList)
@@ -77,7 +77,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 	var addedFlags int // Keeps track of when a newline character needs to be inserted
 	for flagEl, descriptor := range flagMap {
 		// Open the flag bracket
-		if descriptor.GetFlagOptional() {
+		if descriptor.IsFlagOptional() {
 			output += "["
 		}
 
@@ -85,7 +85,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 		output += fmt.Sprintf("--%s", flagEl)
 
 		// Open the argument bracket
-		if descriptor.GetArgumentsOptional() {
+		if descriptor.AreArgumentsOptional() {
 			output += " ["
 		}
 
@@ -106,12 +106,12 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 		}
 
 		// Close the argument bracket
-		if descriptor.GetArgumentsOptional() {
+		if descriptor.AreArgumentsOptional() {
 			output += "]"
 		}
 
 		// Close the flag bracket
-		if descriptor.GetFlagOptional() {
+		if descriptor.IsFlagOptional() {
 			output += "]"
 		}
 

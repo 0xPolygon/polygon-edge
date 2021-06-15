@@ -99,13 +99,11 @@ func printSnapshot(s *proto.Snapshot) (output string) {
 
 	output += "\n"
 
-	var votes []string = nil
+	votes := make([]string, len(s.Votes)+1)
 	if len(s.Votes) == 0 {
-		votes = make([]string, 1)
 		votes[0] = "No votes found"
 	} else {
-		votes = make([]string, len(s.Votes)+1)
-		votes[0] = "Proposer|Address|Authorize"
+		votes[0] = "PROPOSER|ADDRESS|VOTE TO ADD"
 		for i, d := range s.Votes {
 			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Validator, d.Proposed, d.Auth)
 		}
@@ -116,13 +114,11 @@ func printSnapshot(s *proto.Snapshot) (output string) {
 
 	output += "\n"
 
-	var validators []string = nil
+	validators := make([]string, len(s.Validators)+1)
 	if len(s.Validators) == 0 {
-		validators = make([]string, 1)
 		validators[0] = "No validators found"
 	} else {
-		validators = make([]string, len(s.Validators)+1)
-		validators[0] = "Address"
+		validators[0] = "ADDRESS"
 		for i, d := range s.Validators {
 			validators[i+1] = d.Address
 		}

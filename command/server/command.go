@@ -31,11 +31,11 @@ func (s ServerFlagDescriptor) GetArgumentsList() []string {
 	return s.arguments
 }
 
-func (s ServerFlagDescriptor) GetArgumentsOptional() bool {
+func (s ServerFlagDescriptor) AreArgumentsOptional() bool {
 	return s.argumentsOptional
 }
 
-func (s ServerFlagDescriptor) GetFlagOptional() bool {
+func (s ServerFlagDescriptor) IsFlagOptional() bool {
 	return s.flagOptional
 }
 
@@ -67,7 +67,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["seal"] = ServerFlagDescriptor{
-		description: "Sets the flag indicating that the client should seal blocks. Default false",
+		description: "Sets the flag indicating that the client should seal blocks. Default: false",
 		arguments: []string{
 			"SHOULD_SEAL",
 		},
@@ -83,7 +83,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["chain"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default %s", defaultConfig().Chain),
+		description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", defaultConfig().Chain),
 		arguments: []string{
 			"GENESIS_FILE",
 		},
@@ -91,7 +91,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["data-dir"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default %s", defaultConfig().DataDir),
+		description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", defaultConfig().DataDir),
 		arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -99,7 +99,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["grpc"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default address: 127.0.0.1:%d", minimal.DefaultGRPCPort),
+		description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultGRPCPort),
 		arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -107,7 +107,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["jsonrpc"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default address: 127.0.0.1:%d", minimal.DefaultJSONRPCPort),
+		description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultJSONRPCPort),
 		arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -115,7 +115,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["libp2p"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Sets the address and port for the libp2p service (address:port). Default address: 127.0.0.1:%d", network.DefaultLibp2pPort),
+		description: fmt.Sprintf("Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d", network.DefaultLibp2pPort),
 		arguments: []string{
 			"LIBP2P_ADDRESS",
 		},
@@ -139,7 +139,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["no-discover"] = ServerFlagDescriptor{
-		description: "Sets the client's discoverability for other peers. Default false",
+		description: "Prevents the client from discovering other peers. Default: false",
 		arguments: []string{
 			"NO_DISCOVER",
 		},
@@ -147,7 +147,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["max-peers"] = ServerFlagDescriptor{
-		description: fmt.Sprintf("Sets the client's max peer count. Default %d", defaultConfig().Network.MaxPeers),
+		description: fmt.Sprintf("Sets the client's max peer count. Default: %d", defaultConfig().Network.MaxPeers),
 		arguments: []string{
 			"PEER_COUNT",
 		},
@@ -155,7 +155,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["dev"] = ServerFlagDescriptor{
-		description: "Sets the client to dev mode. Default false",
+		description: "Sets the client to dev mode. Default: false",
 		arguments: []string{
 			"DEV_MODE",
 		},
@@ -163,7 +163,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["dev-interval"] = ServerFlagDescriptor{
-		description: "Sets the client's dev notification interval. Default 0",
+		description: "Sets the client's dev notification interval. Default: 0",
 		arguments: []string{
 			"DEV_INTERVAL",
 		},

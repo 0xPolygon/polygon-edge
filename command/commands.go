@@ -142,11 +142,11 @@ func (m MetaFlagDescriptor) GetArgumentsList() []string {
 	return m.arguments
 }
 
-func (m MetaFlagDescriptor) GetArgumentsOptional() bool {
+func (m MetaFlagDescriptor) AreArgumentsOptional() bool {
 	return m.argumentsOptional
 }
 
-func (m MetaFlagDescriptor) GetFlagOptional() bool {
+func (m MetaFlagDescriptor) IsFlagOptional() bool {
 	return m.flagOptional
 }
 

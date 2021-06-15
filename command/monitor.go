@@ -22,11 +22,15 @@ func (m *MonitorCommand) GetHelperText() string {
 	return "Starts logging block add / remove events on the blockchain"
 }
 
+func (m *MonitorCommand) GetBaseCommand() string {
+	return "monitor"
+}
+
 // Help implements the cli.Command interface
 func (m *MonitorCommand) Help() string {
 	m.Meta.DefineFlags()
 
-	return types.GenerateHelp(m.Synopsis(), types.GenerateUsage("monitor", m.flagMap), m.flagMap)
+	return types.GenerateHelp(m.Synopsis(), types.GenerateUsage(m.GetBaseCommand(), m.flagMap), m.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -36,7 +40,7 @@ func (m *MonitorCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (m *MonitorCommand) Run(args []string) int {
-	flags := m.FlagSet("monitor")
+	flags := m.FlagSet(m.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		m.UI.Error(err.Error())
 		return 1
