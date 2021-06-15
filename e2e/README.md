@@ -32,6 +32,20 @@ cd /tmp/
 rm -rf polygon-sdk-*
 ````
 
+### Clean the golang test cache
+
+Golang caches test results, and may not even run a test, causing tests to fail on some machines and work on others.
+````bash
+go clean -testcache
+````
+
+This command cleans the test cache, and should be added to the runtime config.
+
+Another way to disable test caching altogether is to add the following flag when running go test `-count=1`:
+````bash
+go test ./... -count=1
+````
+
 ## Note
 
 ### constants
