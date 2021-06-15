@@ -1,15 +1,33 @@
-package types
+package helper
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // FlagDescriptor contains the description elements for a command flag
-type FlagDescriptor interface {
-	GetDescription() string     // Gets the flag description
-	GetArgumentsList() []string // Gets the list of arguments for the flag
-	AreArgumentsOptional() bool // Checks if the flag arguments are optional
-	IsFlagOptional() bool       // Checks if the flag itself is optional
+type FlagDescriptor struct {
+	Description       string   // Flag description
+	Arguments         []string // Arguments list
+	ArgumentsOptional bool     // Flag indicating if flag arguments are optional
+	FlagOptional      bool
+}
+
+// GetDescription ets the flag description
+func (fd *FlagDescriptor) GetDescription() string {
+	return fd.Description
+}
+
+// GetArgumentsList gets the list of arguments for the flag
+func (fd *FlagDescriptor) GetArgumentsList() []string {
+	return fd.Arguments
+}
+
+// AreArgumentsOptional checks if the flag arguments are optional
+func (fd *FlagDescriptor) AreArgumentsOptional() bool {
+	return fd.ArgumentsOptional
+}
+
+// IsFlagOptional checks if the flag itself is optional
+func (fd *FlagDescriptor) IsFlagOptional() bool {
+	return fd.FlagOptional
 }
 
 // GenerateHelp is a utility function called by every command's Help() method

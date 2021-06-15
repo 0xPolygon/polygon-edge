@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -27,7 +27,7 @@ func (c *StatusCommand) GetBaseCommand() string {
 func (c *StatusCommand) Help() string {
 	c.Meta.DefineFlags()
 
-	return types.GenerateHelp(c.Synopsis(), types.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface

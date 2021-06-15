@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 )
 
 // PeersAdd is the PeersAdd to start the sever
@@ -17,16 +17,16 @@ type PeersAdd struct {
 func (p *PeersAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]types.FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["addr"] = MetaFlagDescriptor{
-		description: "Peer's libp2p address in the multiaddr format",
-		arguments: []string{
+	p.flagMap["addr"] = helper.FlagDescriptor{
+		Description: "Peer's libp2p address in the multiaddr format",
+		Arguments: []string{
 			"PEER_ADDRESS",
 		},
-		argumentsOptional: false,
-		flagOptional:      false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 }
 
@@ -44,7 +44,7 @@ func (p *PeersAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersAdd interface

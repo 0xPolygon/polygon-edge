@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -27,7 +27,7 @@ func (p *PeersList) GetBaseCommand() string {
 func (p *PeersList) Help() string {
 	p.Meta.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersList interface

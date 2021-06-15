@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -30,7 +30,7 @@ func (m *MonitorCommand) GetBaseCommand() string {
 func (m *MonitorCommand) Help() string {
 	m.Meta.DefineFlags()
 
-	return types.GenerateHelp(m.Synopsis(), types.GenerateUsage(m.GetBaseCommand(), m.flagMap), m.flagMap)
+	return helper.GenerateHelp(m.Synopsis(), helper.GenerateUsage(m.GetBaseCommand(), m.flagMap), m.flagMap)
 }
 
 // Synopsis implements the cli.Command interface

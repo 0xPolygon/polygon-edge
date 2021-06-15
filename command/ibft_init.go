@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/libp2p/go-libp2p-core/peer"
-
-	"github.com/0xPolygon/minimal/types"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
@@ -23,16 +22,16 @@ type IbftInit struct {
 func (i *IbftInit) DefineFlags() {
 	if i.flagMap == nil {
 		// Flag map not initialized
-		i.flagMap = make(map[string]types.FlagDescriptor)
+		i.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	i.flagMap["data-dir"] = MetaFlagDescriptor{
-		description: "Sets the directory for the Polygon SDK data",
-		arguments: []string{
+	i.flagMap["data-dir"] = helper.FlagDescriptor{
+		Description: "Sets the directory for the Polygon SDK data",
+		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
-		argumentsOptional: false,
-		flagOptional:      false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 }
 
@@ -45,7 +44,7 @@ func (p *IbftInit) GetHelperText() string {
 func (p *IbftInit) Help() string {
 	p.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftInit interface

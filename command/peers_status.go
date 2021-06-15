@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/types"
 )
 
 // PeersStatus is the PeersStatus to start the sever
@@ -16,15 +16,15 @@ type PeersStatus struct {
 func (p *PeersStatus) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]types.FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["peer-id"] = MetaFlagDescriptor{
-		description: "Libp2p node ID of a specific peer within p2p network",
-		arguments: []string{
+	p.flagMap["peer-id"] = helper.FlagDescriptor{
+		Description: "Libp2p node ID of a specific peer within p2p network",
+		Arguments: []string{
 			"PEER_ID",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 }
 
@@ -42,7 +42,7 @@ func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersStatus interface

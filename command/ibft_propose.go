@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/types"
@@ -18,25 +19,25 @@ type IbftPropose struct {
 func (p *IbftPropose) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]types.FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["addr"] = MetaFlagDescriptor{
-		description: "Address of the account to be voted for",
-		arguments: []string{
+	p.flagMap["addr"] = helper.FlagDescriptor{
+		Description: "Address of the account to be voted for",
+		Arguments: []string{
 			"ETH_ADDRESS",
 		},
-		argumentsOptional: false,
-		flagOptional:      false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 
-	p.flagMap["vote"] = MetaFlagDescriptor{
-		description: "Proposes a change to the validator set (add = true, remove = false). Default: true",
-		arguments: []string{
+	p.flagMap["vote"] = helper.FlagDescriptor{
+		Description: "Proposes a change to the validator set (add = true, remove = false). Default: true",
+		Arguments: []string{
 			"VOTE",
 		},
-		argumentsOptional: false,
-		flagOptional:      true,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
@@ -54,7 +55,7 @@ func (p *IbftPropose) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftPropose interface

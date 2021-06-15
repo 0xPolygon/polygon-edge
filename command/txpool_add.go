@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
@@ -19,57 +20,57 @@ type TxPoolAdd struct {
 func (p *TxPoolAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]types.FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["from"] = MetaFlagDescriptor{
-		description: "The sender address",
-		arguments: []string{
+	p.flagMap["from"] = helper.FlagDescriptor{
+		Description: "The sender address",
+		Arguments: []string{
 			"ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["to"] = MetaFlagDescriptor{
-		description: "The receiver address",
-		arguments: []string{
+	p.flagMap["to"] = helper.FlagDescriptor{
+		Description: "The receiver address",
+		Arguments: []string{
 			"ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["value"] = MetaFlagDescriptor{
-		description: "The value of the transaction",
-		arguments: []string{
+	p.flagMap["value"] = helper.FlagDescriptor{
+		Description: "The value of the transaction",
+		Arguments: []string{
 			"VALUE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasPrice"] = MetaFlagDescriptor{
-		description: "The gas price",
-		arguments: []string{
+	p.flagMap["gasPrice"] = helper.FlagDescriptor{
+		Description: "The gas price",
+		Arguments: []string{
 			"GASPRICE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasLimit"] = MetaFlagDescriptor{
-		description: "The specified gas limit",
-		arguments: []string{
+	p.flagMap["gasLimit"] = helper.FlagDescriptor{
+		Description: "The specified gas limit",
+		Arguments: []string{
 			"LIMIT",
 		},
-		argumentsOptional: false,
-		flagOptional:      true,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	p.flagMap["nonce"] = MetaFlagDescriptor{
-		description: "The nonce of the transaction",
-		arguments: []string{
+	p.flagMap["nonce"] = helper.FlagDescriptor{
+		Description: "The nonce of the transaction",
+		Arguments: []string{
 			"NONCE",
 		},
-		argumentsOptional: false,
-		flagOptional:      true,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
@@ -87,7 +88,7 @@ func (p *TxPoolAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface

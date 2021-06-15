@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -27,7 +27,7 @@ func (p *TxPoolStatus) GetBaseCommand() string {
 func (p *TxPoolStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	return types.GenerateHelp(p.Synopsis(), types.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.TxPoolStatus interface

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 
@@ -126,30 +126,6 @@ func Commands() map[string]cli.CommandFactory {
 	}
 }
 
-// MetaFlagDescriptor contains the description elements for a command flag. Implements types.FlagDescriptor
-type MetaFlagDescriptor struct {
-	description       string   // Flag description
-	arguments         []string // Arguments list
-	argumentsOptional bool     // Flag indicating if flag arguments are optional
-	flagOptional      bool
-}
-
-func (m MetaFlagDescriptor) GetDescription() string {
-	return m.description
-}
-
-func (m MetaFlagDescriptor) GetArgumentsList() []string {
-	return m.arguments
-}
-
-func (m MetaFlagDescriptor) AreArgumentsOptional() bool {
-	return m.argumentsOptional
-}
-
-func (m MetaFlagDescriptor) IsFlagOptional() bool {
-	return m.flagOptional
-}
-
 type HelpGenerator interface {
 	DefineFlags()
 }
@@ -159,22 +135,22 @@ type Meta struct {
 	UI   cli.Ui
 	addr string
 
-	flagMap        map[string]types.FlagDescriptor
+	flagMap        map[string]helper.FlagDescriptor
 	hasGlobalFlags bool
 }
 
 // DefineFlags sets global flags used by several commands
 func (m *Meta) DefineFlags() {
 	m.hasGlobalFlags = true
-	m.flagMap = make(map[string]types.FlagDescriptor)
+	m.flagMap = make(map[string]helper.FlagDescriptor)
 
-	m.flagMap["grpc-address"] = MetaFlagDescriptor{
-		description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", minimal.DefaultGRPCPort),
-		arguments: []string{
+	m.flagMap["grpc-address"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", minimal.DefaultGRPCPort),
+		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
-		argumentsOptional: false,
-		flagOptional:      true,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
