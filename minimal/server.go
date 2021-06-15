@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 
@@ -104,7 +105,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.state = st
 
 	m.executor = state.NewExecutor(config.Chain.Params, st)
+	// Add the system runtime
+	m.executor.SetRuntime(system.NewSystem())
+
+	// Add the precompiled runtime
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
+
+	// Add the EVM runtime
 	m.executor.SetRuntime(evm.NewEVM())
 
 	// compute the genesis root state
