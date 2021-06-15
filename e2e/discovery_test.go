@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,15 +37,7 @@ func TestDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, tt.numNodes)
-			for i := range srvs {
-				srvs[i] = framework.NewTestServer(t, conf)
-			}
-			defer func() {
-				for _, s := range srvs {
-					s.Stop()
-				}
-			}()
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 
 			p2pAddrs := make([]string, tt.numNodes)
 			for i, s := range srvs {
@@ -52,45 +45,63 @@ func TestDiscovery(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				p2pAddrs[i] = status.P2PAddr
+				p2pAddrs[i] = strings.Split(status.P2PAddr, ",")[0]
 			}
 
 			for i := 0; i < tt.numInitConnectNodes-1; i++ {
 				srv, dest := srvs[i], p2pAddrs[i+1]
-				_, err := srv.Operator().PeersAdd(context.Background(), &proto.PeersAddRequest{
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_, err := srv.Operator().PeersAdd(ctx, &proto.PeersAddRequest{
 					Id: dest,
 				})
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
-			time.Sleep(30 * time.Second)
 
-			for i, s := range srvs {
-				res, err := s.Operator().PeersList(context.Background(), &empty.Empty{})
-				if err != nil {
-					t.Fatal(err)
+			for i, srv := range srvs {
+				shouldKnowPeers := true
+				subTestName := fmt.Sprintf("node %d should know other peers", i)
+				if i >= tt.numInitConnectNodes {
+					shouldKnowPeers = false
+					subTestName = fmt.Sprintf("node %d shouldn't know other peers", i)
 				}
 
-				isAddrKnown := make(map[string]bool, len(res.Peers))
-				for _, p := range res.Peers {
-					addr, id := p.Addrs[0], p.Id
-					key := fmt.Sprintf("%s/p2p/%s", addr, id)
-					isAddrKnown[key] = true
-				}
+				t.Run(subTestName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					res, err := framework.WaitUntilPeerConnects(ctx, srv, tt.numInitConnectNodes-1)
 
-				for j, addr := range p2pAddrs {
-					shouldKnow := i != j && i < tt.numInitConnectNodes && j < tt.numInitConnectNodes
-					actual := isAddrKnown[addr]
-
-					if shouldKnow != actual {
-						if shouldKnow {
-							t.Errorf("node %d should know node %d, but doesn't know", i, j)
+					if err != nil {
+						if shouldKnowPeers {
+							t.Error(err)
 						} else {
-							t.Errorf("node %d shouldn't know node %d, but knows", i, j)
+							// server expected to be isolated
+							return
 						}
 					}
-				}
+
+					isAddrKnown := make(map[string]bool, len(res.Peers))
+					for _, p := range res.Peers {
+						addr, id := p.Addrs[0], p.Id
+						key := fmt.Sprintf("%s/p2p/%s", addr, id)
+						isAddrKnown[key] = true
+					}
+
+					for j, addr := range p2pAddrs {
+						shouldKnow := i != j && i < tt.numInitConnectNodes && j < tt.numInitConnectNodes
+						actual := isAddrKnown[addr]
+
+						if shouldKnow != actual {
+							if shouldKnow {
+								t.Errorf("node %d should know node %d, but doesn't know", i, j)
+							} else {
+								t.Errorf("node %d shouldn't know node %d, but knows", i, j)
+							}
+						}
+					}
+				})
 			}
 		})
 	}

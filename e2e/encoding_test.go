@@ -1,34 +1,39 @@
 package e2e
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3/testutil"
 )
 
 func TestEncoding(t *testing.T) {
-	fr := framework.NewTestServerFromGenesis(t)
+	_, from := framework.GenerateKeyAndAddr(t)
 
-	// deploy a contract
-	cc := &testutil.Contract{}
-	cc.AddEvent(testutil.NewEvent("A").
-		Add("address", true).
-		Add("address", true))
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.Premine(from, framework.EthToWei(10))
+	})
+	srv := srvs[0]
 
-	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
-	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	contractAddr, err := srv.DeployContract(ctx, sampleByteCode)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	_, addr := fr.DeployContract(cc)
-
-	// send a transaction
-	receipt := fr.TxnTo(addr, "setA1")
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt := srv.TxnTo(ctx, contractAddr, "setA1")
 
 	// try to get the transaction
-	client := fr.JSONRPC().Eth()
+	client := srv.JSONRPC().Eth()
 
-	_, err := client.GetTransactionByHash(receipt.TransactionHash)
+	_, err = client.GetTransactionByHash(receipt.TransactionHash)
 	assert.NoError(t, err)
 
 	_, err = client.GetBlockByHash(receipt.BlockHash, true)
