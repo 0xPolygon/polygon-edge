@@ -368,6 +368,37 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			// epoch transition creates new snapshot
+			epoch:      1,
+			validators: []string{"A", "B", "C"},
+			headers: []mockHeader{
+				{
+					// block 1
+					action: mine("A"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+				{
+					// block 2
+					action: mine("B"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+				{
+					// block 3
+					action: mine("C"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run("", func(t *testing.T) {
@@ -432,6 +463,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				// get latest snapshot
 				snap, err := ibft.getSnapshot(header.Number)
 				assert.NoError(t, err)
+				assert.NotNil(t, snap)
 
 				result := c.headers[indx].snapshot
 				if result != nil {
