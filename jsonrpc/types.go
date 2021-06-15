@@ -10,32 +10,38 @@ import (
 )
 
 type transaction struct {
-	Nonce    argUint64      `json:"nonce"`
-	GasPrice argBig         `json:"gasPrice"`
-	Gas      argUint64      `json:"gas"`
-	To       *types.Address `json:"to"`
-	Value    argBig         `json:"value"`
-	Input    argBytes       `json:"input"`
-	V        argByte        `json:"v"`
-	R        argBytes       `json:"r"`
-	S        argBytes       `json:"s"`
-	Hash     types.Hash     `json:"hash"`
-	From     types.Address  `json:"from"`
+	Nonce       argUint64      `json:"nonce"`
+	GasPrice    argBig         `json:"gasPrice"`
+	Gas         argUint64      `json:"gas"`
+	To          *types.Address `json:"to"`
+	Value       argBig         `json:"value"`
+	Input       argBytes       `json:"input"`
+	V           argByte        `json:"v"`
+	R           argBytes       `json:"r"`
+	S           argBytes       `json:"s"`
+	Hash        types.Hash     `json:"hash"`
+	From        types.Address  `json:"from"`
+	BlockHash   types.Hash     `json:"blockHash"`
+	BlockNumber argUint64      `json:"blockNumber"`
+	TxIndex     argUint64      `json:"transactionIndex"`
 }
 
-func toTransaction(t *types.Transaction) *transaction {
+func toTransaction(t *types.Transaction, b *types.Block, txIndex int) *transaction {
 	return &transaction{
-		Nonce:    argUint64(t.Nonce),
-		GasPrice: argBig(*t.GasPrice),
-		Gas:      argUint64(t.Gas),
-		To:       t.To,
-		Value:    argBig(*t.Value),
-		Input:    argBytes(t.Input),
-		V:        argByte(t.V),
-		R:        argBytes(t.R),
-		S:        argBytes(t.S),
-		Hash:     t.Hash,
-		From:     t.From,
+		Nonce:       argUint64(t.Nonce),
+		GasPrice:    argBig(*t.GasPrice),
+		Gas:         argUint64(t.Gas),
+		To:          t.To,
+		Value:       argBig(*t.Value),
+		Input:       argBytes(t.Input),
+		V:           argByte(t.V),
+		R:           argBytes(t.R),
+		S:           argBytes(t.S),
+		Hash:        t.Hash,
+		From:        t.From,
+		BlockHash:   b.Hash(),
+		BlockNumber: argUint64(b.Number()),
+		TxIndex:     argUint64(txIndex),
 	}
 }
 
@@ -80,8 +86,8 @@ func toBlock(b *types.Block) *block {
 		Hash:         h.Hash,
 		Transactions: []*transaction{},
 	}
-	for _, txn := range b.Transactions {
-		res.Transactions = append(res.Transactions, toTransaction(txn))
+	for idx, txn := range b.Transactions {
+		res.Transactions = append(res.Transactions, toTransaction(txn, b, idx))
 	}
 	return res
 }

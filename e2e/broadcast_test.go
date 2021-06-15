@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
-	"google.golang.org/protobuf/types/known/emptypb"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcast(t *testing.T) {
@@ -37,30 +38,39 @@ func TestBroadcast(t *testing.T) {
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
+		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
-		config.Premine(senderAddr, ethToWei(10))
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := make([]*framework.TestServer, tt.numNodes)
-			for i := range srvs {
-				srvs[i] = framework.NewTestServer(t, conf)
-			}
-			defer func() {
-				for _, srv := range srvs {
-					srv.Stop()
-				}
-			}()
-
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
-			time.Sleep(15 * time.Second)
+
+			// Check the connections
+			for i, srv := range srvs {
+				// Required number of connections
+				numRequiredConnections := 0
+				if i < tt.numConnectedNodes {
+					if i == 0 || i == tt.numConnectedNodes-1 {
+						numRequiredConnections = 1
+					} else {
+						numRequiredConnections = 2
+					}
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err := framework.WaitUntilPeerConnects(ctx, srv, numRequiredConnections)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,
 				From:     senderAddr,
 				To:       &receiverAddr,
-				Value:    ethToWei(1),
+				Value:    framework.EthToWei(1),
 				Gas:      1000000,
 				GasPrice: big.NewInt(10000),
 				Input:    []byte{},
@@ -74,22 +84,26 @@ func TestBroadcast(t *testing.T) {
 				t.Fatalf("failed to send transaction, err=%+v", err)
 			}
 
-			time.Sleep(30 * time.Second)
-
 			for i, srv := range srvs {
-				res, err := srv.TxnPoolOperator().Status(context.Background(), &emptypb.Empty{})
-				if err != nil {
-					t.Error(err)
-					continue
+				shouldHaveTxPool := false
+				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
+				if i < tt.numConnectedNodes {
+					shouldHaveTxPool = true
+					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
 				}
 
-				numStoredTx := 0
-				if i < tt.numConnectedNodes {
-					numStoredTx = 1
-				}
-				if res.Length != uint64(numStoredTx) {
-					t.Errorf("node %d expected to store %d transactions, but got %d", i, numStoredTx, res.Length)
-				}
+				t.Run(subTestName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
+
+					if shouldHaveTxPool {
+						assert.NoError(t, err)
+						assert.Equal(t, uint64(1), res.Length)
+					} else {
+						assert.ErrorIs(t, err, framework.ErrTimeout)
+					}
+				})
 			}
 		})
 	}

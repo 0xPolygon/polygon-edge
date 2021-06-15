@@ -129,10 +129,6 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	// TODO: This is difficult to understand, and the error is unneeded
 	// saveSnap is a callback function for saving the passed in header to the snapshot store
 	saveSnap := func(h *types.Header) error {
-		if snap.Equal(parentSnap) {
-			return nil
-		}
-
 		snap.Number = h.Number
 		snap.Hash = h.Hash.String()
 
@@ -245,8 +241,10 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			})
 		}
 
-		if err := saveSnap(h); err != nil {
-			return nil
+		if !snap.Equal(parentSnap) {
+			if err := saveSnap(h); err != nil {
+				return nil
+			}
 		}
 	}
 
