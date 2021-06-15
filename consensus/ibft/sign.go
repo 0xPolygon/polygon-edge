@@ -14,6 +14,7 @@ import (
 
 func commitMsg(b []byte) []byte {
 	// message that the nodes need to sign to commit to a block
+	// TODO: EIP-650 says the COMMIT_MSG_CODE is 1, not 2
 	return crypto.Keccak256(b, []byte{byte(2)})
 }
 
@@ -109,6 +110,7 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	return h, nil
 }
 
+// TODO: This function is called signHash, we are doing no signing
 func signHash(h *types.Header) ([]byte, error) {
 	//hash := istanbulHeaderHash(h)
 	//return hash.Bytes(), nil
@@ -124,6 +126,9 @@ func signHash(h *types.Header) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// This will effectively remove the Seal and Commited Seal fields, while keeping proposer vanity and validator set
+	// 		because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()
@@ -159,22 +164,25 @@ func verifySigner(snap *Snapshot, header *types.Header) error {
 	return nil
 }
 
+// verifyCommitedFields is checking for consensus proof in the header
 func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	extra, err := getIbftExtra(header)
 	if err != nil {
 		return err
 	}
 
+	// TODO: Check locking mechanism impl
 	if len(extra.CommittedSeal) == 0 {
 		return fmt.Errorf("empty committed seals")
 	}
 
 	// get the message that needs to be signed
+	// this not signing! just removing the fields that should be signed
 	signMsg, err := signHash(header)
 	if err != nil {
 		return err
 	}
-	signMsg = commitMsg(signMsg)
+	signMsg = commitMsg(signMsg) // TODO: Rename signMsg to msgToSign or rawMsg
 
 	visited := map[types.Address]struct{}{}
 	for _, seal := range extra.CommittedSeal {
@@ -193,6 +201,9 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 		}
 	}
 
+	// Valid commited seals must be at least 2F+1
+	// 	2F 	is the required number of honest validators who provided the commited seals
+	// 	+1	is the proposer
 	validSeals := len(visited)
 	if validSeals <= 2*snap.Set.MinFaultyNodes() {
 		return fmt.Errorf("not enough seals to seal block")

@@ -515,7 +515,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	// Validate the chain
-	for i := 0; i < size; i++ {
+	for i := 0; i < size; i++ { // TODO: Check why didn't we range here
 		block := blocks[i]
 
 		// Check the parent numbers
@@ -539,8 +539,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 
 		// Verify body data
-		if hash := buildroot.CalculateUncleRoot(block.Uncles);
-			hash != block.Header.Sha3Uncles {
+		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
 
 			return fmt.Errorf(
 				"uncle root hash mismatch: have %s, want %s",
@@ -550,8 +549,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		}
 
 		// TODO, the wrapper around transactions
-		if hash := buildroot.CalculateTransactionsRoot(block.Transactions);
-			hash != block.Header.TxRoot {
+		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
 
 			return fmt.Errorf(
 				"transaction root hash mismatch: have %s, want %s",
