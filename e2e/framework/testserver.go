@@ -3,99 +3,70 @@ package framework
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync/atomic"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/compiler"
 	"github.com/umbracle/go-web3/jsonrpc"
-	"github.com/umbracle/go-web3/testutil"
-	"golang.org/x/crypto/sha3"
 
 	"google.golang.org/grpc"
 
-	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
 )
-
-type ConsensusType int
-
-const (
-	ConsensusIBFT ConsensusType = iota
-	ConsensusDummy
-)
-
-type SrvAccount struct {
-	Addr    types.Address
-	Balance *big.Int
-}
-
-// TestServerConfig for the test server
-type TestServerConfig struct {
-	JsonRPCPort  int64         // The JSON RPC endpoint port
-	GRPCPort     int64         // The GRPC endpoint port
-	LibP2PPort   int64         // The Libp2p endpoint port
-	Seal         bool          // Flag indicating if blocks should be sealed
-	DataDir      string        // The directory for the data files
-	PremineAccts []*SrvAccount // Accounts with existing balances (genesis accounts)
-	DevMode      bool          // Toggles the dev mode
-	Consensus    ConsensusType // Consensus Type
-}
-
-// CALLBACKS //
-
-// Premine callback specifies an account with a balance (in WEI)
-func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
-	if t.PremineAccts == nil {
-		t.PremineAccts = []*SrvAccount{}
-	}
-	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
-		Addr:    addr,
-		Balance: amount,
-	})
-}
-
-// SetDev callback toggles the dev mode
-func (t *TestServerConfig) SetDev(state bool) {
-	t.DevMode = state
-}
-
-// SetDev callback toggles the dev mode
-func (t *TestServerConfig) SetConsensus(c ConsensusType) {
-	t.Consensus = c
-}
-
-// SetSeal callback toggles the seal mode
-func (t *TestServerConfig) SetSeal(state bool) {
-	t.Seal = state
-}
 
 type TestServerConfigCallback func(*TestServerConfig)
 
-var initialPort = int64(12000)
+const (
+	initialPort   = 12000
+	polygonSDKCmd = "polygon-sdk"
+)
 
-func getOpenPort() int64 {
-	port := atomic.AddInt64(&initialPort, 1)
-	return port
-}
+var (
+	ErrTimeout = errors.New("timeout")
+)
 
 type TestServer struct {
 	t *testing.T
 
 	Config *TestServerConfig
 	cmd    *exec.Cmd
+}
+
+func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallback) *TestServer {
+	t.Helper()
+
+	// Reserve ports
+	ports, err := FindAvailablePorts(3, initialPort, initialPort+10000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sets the services to start on open ports
+	config := &TestServerConfig{
+		ReservedPorts: ports,
+		GRPCPort:      ports[0].Port(),
+		LibP2PPort:    ports[1].Port(),
+		JsonRPCPort:   ports[2].Port(),
+		RootDir:       rootDir,
+	}
+
+	if callback != nil {
+		callback(config)
+	}
+
+	return &TestServer{
+		t:      t,
+		Config: config,
+	}
 }
 
 func (t *TestServer) GrpcAddr() string {
@@ -130,146 +101,158 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
+func (t *TestServer) ReleaseReservedPorts() {
+	for _, p := range t.Config.ReservedPorts {
+		if err := p.Close(); err != nil {
+			t.t.Error(err)
+		}
+	}
+	t.Config.ReservedPorts = nil
+}
+
 func (t *TestServer) Stop() {
-	if err := t.cmd.Process.Kill(); err != nil {
-		t.t.Error(err)
+	t.ReleaseReservedPorts()
+	if t.cmd != nil {
+		if err := t.cmd.Process.Kill(); err != nil {
+			t.t.Error(err)
+		}
 	}
 }
 
-func NewTestServerFromGenesis(t *testing.T) *TestServer {
-	c, err := chain.ImportFromFile("../genesis.json")
-	assert.NoError(t, err)
-
-	config := &TestServerConfig{
-		PremineAccts: []*SrvAccount{},
-		JsonRPCPort:  8545,
-	}
-
-	for addr := range c.Genesis.Alloc {
-		config.PremineAccts = append(config.PremineAccts, &SrvAccount{Addr: addr})
-	}
-
-	srv := &TestServer{
-		Config: config,
-	}
-	return srv
+type InitIBFTResult struct {
+	PublicKey string
+	NodeID    string
 }
 
-func NewTestServer(t *testing.T, callback TestServerConfigCallback) *TestServer {
-	path := "polygon-sdk"
-
-	// Sets the services to start on open ports
-	config := &TestServerConfig{
-		JsonRPCPort: getOpenPort(),
-		GRPCPort:    getOpenPort(),
-		LibP2PPort:  getOpenPort(),
+func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
+	args := []string{
+		"ibft", "init", "--data-dir", t.Config.IBFTDir,
 	}
 
-	// Sets the data directory
-	dataDir, err := ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
+	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd.Dir = t.Config.RootDir
+	output, err := cmd.Output()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
-	config.DataDir = dataDir
-	if callback != nil {
-		callback(config)
-	}
-
-	// Build genesis file
-	{
-		args := []string{
-			"genesis",
-			// add data dir
-			"--data-dir", dataDir,
+	res := &InitIBFTResult{}
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.HasPrefix(line, "Public key:") {
+			res.PublicKey = strings.Trim(strings.TrimPrefix(line, "Public Key:"), " ")
 		}
-		// add premines
-		for _, acct := range config.PremineAccts {
-			args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
-		}
-
-		// add consensus flags
-		switch config.Consensus {
-		case ConsensusIBFT:
-			args = append(args, "--consensus", "ibft")
-		case ConsensusDummy:
-			args = append(args, "--consensus", "dummy")
-		}
-
-		vcmd := exec.Command(path, args...)
-		vcmd.Stdout = nil
-		vcmd.Stderr = nil
-		if err := vcmd.Run(); err != nil {
-			t.Skipf("polygon-sdk genesis failed: %v", err)
+		if strings.HasPrefix(line, "Node ID:") {
+			res.NodeID = strings.Trim(strings.TrimPrefix(line, "Node ID:"), " ")
 		}
 	}
 
-	// Build arguments
+	return res, nil
+}
+
+func (t *TestServer) GenerateGenesis() error {
+	args := []string{
+		"genesis",
+	}
+
+	// add premines
+	for _, acct := range t.Config.PremineAccts {
+		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
+	}
+
+	// add consensus flags
+	switch t.Config.Consensus {
+	case ConsensusIBFT:
+		args = append(args, "--consensus", "ibft")
+		if t.Config.IBFTDirPrefix == "" {
+			return errors.New("prefix of IBFT directory is not set")
+		}
+		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
+		for _, bootnode := range t.Config.Bootnodes {
+			args = append(args, "--bootnode", bootnode)
+		}
+	case ConsensusDev:
+		args = append(args, "--consensus", "dev")
+	case ConsensusDummy:
+		args = append(args, "--consensus", "dummy")
+	}
+
+	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd.Dir = t.Config.RootDir
+
+	return cmd.Run()
+}
+
+func (t *TestServer) Start(ctx context.Context) error {
 	args := []string{
 		"server",
-		// add data dir
-		"--data-dir", dataDir,
 		// add custom chain
-		"--chain", filepath.Join(dataDir, "genesis.json"),
+		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", config.GRPCPort),
+		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
 		// enable libp2p
-		"--libp2p", fmt.Sprintf(":%d", config.LibP2PPort),
+		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	if config.Seal {
+	switch t.Config.Consensus {
+	case ConsensusIBFT:
+		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
+	case ConsensusDev:
+		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
+	case ConsensusDummy:
+		args = append(args, "--data-dir", t.Config.RootDir)
+	}
+
+	if t.Config.Seal {
 		args = append(args, "--seal")
 	}
 
-	if config.DevMode {
-		args = append(args, "--dev")
+	if t.Config.ShowsLog {
+		args = append(args, "--log-level", "debug")
 	}
 
-	stdout := io.Writer(os.Stdout)
-	stderr := io.Writer(os.Stdout)
+	t.ReleaseReservedPorts()
 
 	// Start the server
-	cmd := exec.Command(path, args...)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("err: %s", err)
+	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd.Dir = t.Config.RootDir
+
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		t.cmd.Stdout = stdout
+		t.cmd.Stderr = stdout
 	}
 
-	srv := &TestServer{
-		t:      t,
-		Config: config,
-		cmd:    cmd,
+	if err := t.cmd.Start(); err != nil {
+		return err
 	}
 
-	// wait until is ready
-	for {
-		if _, err := srv.Operator().GetStatus(context.Background(), &empty.Empty{}); err == nil {
-			break
+	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
+			return nil, false
 		}
-	}
-	return srv
+		return nil, true
+	})
+	return err
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(c *testutil.Contract) (*compiler.Artifact, web3.Address) {
-	solcContract, err := c.Compile()
+func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Address, error) {
+	buf, err := hex.DecodeString(binary)
 	if err != nil {
-		panic(err)
+		return web3.Address{}, err
 	}
-	buf, err := hex.DecodeString(solcContract.Bin)
-	if err != nil {
-		panic(err)
-	}
-	receipt, err := t.SendTxn(&web3.Transaction{
+	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		Input: buf,
 	})
 	if err != nil {
-		panic(err)
+		return web3.Address{}, err
 	}
-	return solcContract, receipt.ContractAddress
+	return receipt.ContractAddress, nil
 }
 
 const (
@@ -279,7 +262,7 @@ const (
 
 var emptyAddr web3.Address
 
-func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
+func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
 	if txn.From == emptyAddr {
@@ -295,38 +278,52 @@ func (t *TestServer) SendTxn(txn *web3.Transaction) (*web3.Receipt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.WaitForReceipt(hash)
+	return t.WaitForReceipt(ctx, hash)
 }
 
-func (t *TestServer) WaitForReceipt(hash web3.Hash) (*web3.Receipt, error) {
+func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
 	client := t.JSONRPC()
 
-	var receipt *web3.Receipt
-	var count uint64
-	var err error
+	type result struct {
+		receipt *web3.Receipt
+		err     error
+	}
 
-	for {
-		receipt, err = client.Eth().GetTransactionReceipt(hash)
-		if err != nil {
-			if err.Error() != "not found" {
-				return nil, err
-			}
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		receipt, err := client.Eth().GetTransactionReceipt(hash)
+		if err != nil && err.Error() != "not found" {
+			return result{receipt, err}, false
 		}
 		if receipt != nil {
-			break
+			return result{receipt, nil}, false
 		}
-		if count > 5 {
-			return nil, fmt.Errorf("timeout")
-		}
-		time.Sleep(1 * time.Second)
-		count++
+		return nil, true
+	})
+	if err != nil {
+		return nil, err
 	}
-	return receipt, nil
+	data := res.(result)
+	return data.receipt, data.err
 }
 
-func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
+func (t *TestServer) WaitForReady(ctx context.Context) error {
+	client := t.JSONRPC()
+	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		num, err := client.Eth().BlockNumber()
+		if err != nil {
+			return nil, true
+		}
+		if num == 0 {
+			return nil, true
+		}
+		return num, false
+	})
+	return err
+}
+
+func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
 	sig := MethodSig(method)
-	receipt, err := t.SendTxn(&web3.Transaction{
+	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		To:    &address,
 		Input: sig,
 	})
@@ -334,12 +331,4 @@ func (t *TestServer) TxnTo(address web3.Address, method string) *web3.Receipt {
 		t.t.Fatal(err)
 	}
 	return receipt
-}
-
-// MethodSig returns the signature of a non-parametrized function
-func MethodSig(name string) []byte {
-	h := sha3.NewLegacyKeccak256()
-	h.Write([]byte(name + "()"))
-	b := h.Sum(nil)
-	return b[:4]
 }

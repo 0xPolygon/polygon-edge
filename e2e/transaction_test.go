@@ -1,76 +1,85 @@
 package e2e
 
 import (
-	"fmt"
+	"context"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/wallet"
-
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
-)
-
-var (
-	addr0 = types.Address{}
-	addr1 = types.Address{0x1}
 )
 
 func TestSignedTransaction(t *testing.T) {
-	fr := framework.NewTestServerFromGenesis(t)
+	signer := &crypto.FrontierSigner{}
+	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	// 0xdf7fd4830f4cc1440b469615e9996e9fde92608f
-	var privKeyRaw = "0x4b2216c76f1b4c60c44d41986863e7337bc1a317d6a9366adfd8966fe2ac05f6"
-	key, err := wallet.NewWalletFromPrivKey(hex.MustDecodeHex(privKeyRaw))
-	assert.NoError(t, err)
+	dataDir, err := framework.TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	clt := fr.JSONRPC()
+	preminedAmount := framework.EthToWei(10)
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+		config.Premine(senderAddr, preminedAmount)
+		config.SetSeal(true)
+	})
+	t.Cleanup(func() {
+		ibftManager.StopServers()
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+	clt := srv.JSONRPC()
 
 	// check there is enough balance
-	balance, err := clt.Eth().GetBalance(key.Address(), web3.Latest)
+	balance, err := clt.Eth().GetBalance(web3.Address(senderAddr), web3.Latest)
 	assert.NoError(t, err)
-
-	fmt.Println("-- balance --")
-	fmt.Println(balance)
+	assert.Equal(t, preminedAmount, balance)
 
 	// latest nonce
-	lastNonce, err := clt.Eth().GetNonce(key.Address(), web3.Latest)
+	lastNonce, err := clt.Eth().GetNonce(web3.Address(senderAddr), web3.Latest)
 	assert.NoError(t, err)
-
-	target := web3.Address{0x1}
-
-	// get the chain id and the signer
-	chainID, err := clt.Eth().ChainID()
-	assert.NoError(t, err)
-
-	signer := wallet.NewEIP155Signer(chainID.Uint64())
 
 	for i := 0; i < 5; i++ {
-		txn := &web3.Transaction{
-			From:     key.Address(),
-			To:       &target,
-			GasPrice: 10000,
+		txn := &types.Transaction{
+			From:     senderAddr,
+			To:       &receiverAddr,
+			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 			Nonce:    lastNonce + uint64(i),
 		}
-		txn, err = signer.SignTx(txn, key)
+		txn, err = signer.SignTx(txn, senderKey)
 		assert.NoError(t, err)
 
 		data := txn.MarshalRLP()
 		hash, err := clt.Eth().SendRawTransaction(data)
 		assert.NoError(t, err)
 
-		fr.WaitForReceipt(hash)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		receipt, err := srv.WaitForReceipt(ctx, hash)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, receipt)
+		assert.Equal(t, receipt.TransactionHash, hash)
 	}
 }
 
 func TestPreminedBalance(t *testing.T) {
-	validAccounts := []struct {
+	preminedAccounts := []struct {
 		address types.Address
 		balance *big.Int
 	}{
@@ -79,61 +88,43 @@ func TestPreminedBalance(t *testing.T) {
 	}
 
 	testTable := []struct {
-		name       string
-		address    types.Address
-		balance    *big.Int
-		shouldFail bool
+		name    string
+		address types.Address
+		balance *big.Int
 	}{
 		{
 			"Account with 0 balance",
-			validAccounts[0].address,
-			validAccounts[0].balance,
-			false,
+			preminedAccounts[0].address,
+			preminedAccounts[0].balance,
 		},
 		{
 			"Account with valid balance",
-			validAccounts[1].address,
-			validAccounts[1].balance,
-			false,
+			preminedAccounts[1].address,
+			preminedAccounts[1].balance,
 		},
 		{
 			"Account not in genesis",
 			types.StringToAddress("3"),
 			big.NewInt(0),
-			true,
 		},
 	}
 
-	srv := framework.NewTestServer(t, func(config *framework.TestServerConfig) {
-		for _, acc := range validAccounts {
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		for _, acc := range preminedAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
-	defer srv.Stop()
+	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
-
 	for _, testCase := range testTable {
-
 		t.Run(testCase.name, func(t *testing.T) {
-
 			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
-
-			if err != nil && !testCase.shouldFail {
-				assert.Failf(t, "Uncaught error", err.Error())
-			}
-
-			if !testCase.shouldFail {
-				assert.Equalf(t, testCase.balance, balance, "Balances don't match")
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.balance, balance)
 		})
 	}
-}
-
-func ethToWei(ethValue int64) *big.Int {
-	return new(big.Int).Mul(
-		big.NewInt(ethValue),
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 }
 
 func TestEthTransfer(t *testing.T) {
@@ -144,167 +135,149 @@ func TestEthTransfer(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("1"),
-			ethToWei(50), // 50 ETH
+			framework.EthToWei(50), // 50 ETH
 		},
 		// Empty account
 		{
 			types.StringToAddress("2"),
-			big.NewInt(0)},
+			big.NewInt(0),
+		},
 		// Valid account #2
 		{
 			types.StringToAddress("3"),
-			ethToWei(10), // 10 ETH
+			framework.EthToWei(10), // 10 ETH
 		},
 	}
 
 	testTable := []struct {
-		name       string
-		sender     types.Address
-		recipient  types.Address
-		amount     *big.Int
-		shouldFail bool
+		name          string
+		sender        types.Address
+		recipient     types.Address
+		amount        *big.Int
+		shouldSuccess bool
 	}{
 		{
 			// ACC #1 -> ACC #3
 			"Valid ETH transfer #1",
 			validAccounts[0].address,
 			validAccounts[2].address,
-			ethToWei(10), // 10 ETH
-			false,
+			framework.EthToWei(10),
+			true,
 		},
 		{
 			// ACC #2 -> ACC #3
 			"Invalid ETH transfer",
 			validAccounts[1].address,
 			validAccounts[2].address,
-			ethToWei(100),
-			true,
+			framework.EthToWei(100),
+			false,
 		},
 		{
-			// ACC #2 -> ACC #1
+			// ACC #3 -> ACC #2
 			"Valid ETH transfer #2",
 			validAccounts[2].address,
 			validAccounts[1].address,
-			ethToWei(5), // 5 ETH
-			false,
+			framework.EthToWei(5),
+			true,
 		},
 	}
 
-	srv := framework.NewTestServer(t, func(config *framework.TestServerConfig) {
-		config.SetDev(true)
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
 	})
-	defer srv.Stop()
-
-	checkSenderReceiver := func(errSender error, errReceiver error, t *testing.T) {
-		if errSender != nil || errReceiver != nil {
-			if errSender != nil {
-				assert.Failf(t, "Uncaught error", errSender.Error())
-			} else {
-				assert.Failf(t, "Uncaught error", errReceiver.Error())
-			}
-		}
-	}
+	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
-
 	for _, testCase := range testTable {
-
 		t.Run(testCase.name, func(t *testing.T) {
-
-			preSendData := struct {
-				previousSenderBalance   *big.Int
-				previousReceiverBalance *big.Int
-			}{
-				previousSenderBalance:   big.NewInt(0),
-				previousReceiverBalance: big.NewInt(0),
-			}
-
 			// Fetch the balances before sending
-			balanceSender, errSender := rpcClient.Eth().GetBalance(
+			balanceSender, err := rpcClient.Eth().GetBalance(
 				web3.Address(testCase.sender),
 				web3.Latest,
 			)
+			assert.NoError(t, err)
 
-			balanceReceiver, errReceiver := rpcClient.Eth().GetBalance(
+			balanceReceiver, err := rpcClient.Eth().GetBalance(
 				web3.Address(testCase.recipient),
 				web3.Latest,
 			)
-
-			checkSenderReceiver(errSender, errReceiver, t)
+			assert.NoError(t, err)
 
 			// Set the preSend balances
-			preSendData.previousSenderBalance = balanceSender
-			preSendData.previousReceiverBalance = balanceReceiver
-
-			toAddress := web3.Address(testCase.recipient)
-
-			gasPrice := uint64(1048576)
+			previousSenderBalance := balanceSender
+			previousReceiverBalance := balanceReceiver
 
 			// Create the transaction
+			toAddr := web3.Address(testCase.recipient)
 			txnObject := &web3.Transaction{
 				From:     web3.Address(testCase.sender),
-				To:       &toAddress,
-				GasPrice: gasPrice,
+				To:       &toAddr,
+				GasPrice: uint64(1048576),
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
 
+			fee := big.NewInt(0)
+
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
+			assert.NoError(t, err)
+			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
 
-			// Error checking
-			if err != nil && !testCase.shouldFail {
-				assert.Failf(t, "Uncaught error", err.Error())
-			}
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			assert.NoError(t, err)
+			assert.NotNil(t, receipt)
 
-			// Wait until the transaction goes through
-			time.Sleep(5 * time.Second)
-
-			receipt, err := rpcClient.Eth().GetTransactionReceipt(txnHash)
-			if receipt == nil {
-				t.Fatalf("Unable to fetch receipt")
+			if testCase.shouldSuccess {
+				fee = new(big.Int).Mul(
+					big.NewInt(int64(receipt.GasUsed)),
+					big.NewInt(int64(txnObject.GasPrice)),
+				)
 			}
 
 			// Fetch the balances after sending
-			balanceSender, errSender = rpcClient.Eth().GetBalance(
+			balanceSender, err = rpcClient.Eth().GetBalance(
 				web3.Address(testCase.sender),
 				web3.Latest,
 			)
+			assert.NoError(t, err)
 
-			balanceReceiver, errReceiver = rpcClient.Eth().GetBalance(
+			balanceReceiver, err = rpcClient.Eth().GetBalance(
 				web3.Address(testCase.recipient),
 				web3.Latest,
 			)
+			assert.NoError(t, err)
 
-			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
-
-			checkSenderReceiver(errSender, errReceiver, t)
-
-			expandedGasUsed := new(big.Int).Mul(
-				big.NewInt(int64(receipt.GasUsed)),
-				big.NewInt(int64(gasPrice)),
-			)
-
-			if !testCase.shouldFail {
-				spentAmount := new(big.Int).Add(testCase.amount, expandedGasUsed)
-
-				// Check the sender balance
-				assert.Equalf(t,
-					new(big.Int).Sub(preSendData.previousSenderBalance, spentAmount),
-					balanceSender,
-					"Sender balance incorrect")
-
-				// Check the receiver balance
-				assert.Equalf(t,
-					new(big.Int).Add(preSendData.previousReceiverBalance, testCase.amount).String(),
-					balanceReceiver.String(),
-					"Receiver balance incorrect")
+			expectedSenderBalance := previousSenderBalance
+			if testCase.shouldSuccess {
+				expectedSenderBalance = previousSenderBalance.Sub(
+					previousSenderBalance,
+					new(big.Int).Add(testCase.amount, fee),
+				)
 			}
+			expectedReceiverBalance := previousReceiverBalance
+			if testCase.shouldSuccess {
+				expectedReceiverBalance = previousReceiverBalance.Add(
+					previousReceiverBalance,
+					testCase.amount,
+				)
+			}
+
+			// Check the balances
+			assert.Equalf(t,
+				expectedSenderBalance,
+				balanceSender,
+				"Sender balance incorrect")
+			assert.Equalf(t,
+				expectedReceiverBalance,
+				balanceReceiver,
+				"Receiver balance incorrect")
 		})
 	}
 }
