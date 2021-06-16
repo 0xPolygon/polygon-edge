@@ -330,6 +330,10 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.GasPrice, err = stringToBigInt(dec.GasPrice)
+	if err != nil {
+		return err
+	}
+
 	t.Nonce, err = stringToUint64(dec.Nonce)
 	if err != nil {
 		return err
