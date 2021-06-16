@@ -161,7 +161,7 @@ func (d *discovery) handleDiscovery() {
 		if len(d.peers) > 0 {
 			target := d.peers[rand.Intn(len(d.peers))]
 			if err := d.call(target); err != nil {
-				// d.srv.logger.Error("failed to dial bootnode", "err", err)
+				d.srv.logger.Error("failed to dial bootnode", "err", err)
 			}
 		}
 	}
