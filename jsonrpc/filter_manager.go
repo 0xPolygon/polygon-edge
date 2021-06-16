@@ -180,7 +180,7 @@ func (f *FilterManager) Run() {
 		if filter == nil {
 			timeoutCh = nil
 		} else {
-			timeoutCh = time.After(filter.timestamp.Sub(time.Now()))
+			timeoutCh = time.After(time.Until(filter.timestamp))
 		}
 
 		select {
