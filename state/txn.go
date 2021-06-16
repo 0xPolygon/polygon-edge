@@ -98,6 +98,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 }
 
 func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
+	// Check what this first fetch tries to do? Why is it here?
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
 		obj := val.(*StateObject)
@@ -261,8 +262,8 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 		return runtime.StorageUnchanged
 	}
 
-	current := oldValue
-	original := txn.GetCommittedState(addr, key)
+	current := oldValue                          // current - storage dirtied by previous lines of this contract
+	original := txn.GetCommittedState(addr, key) // storage slot before this transaction started
 
 	txn.SetState(addr, key, value)
 
@@ -289,7 +290,7 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 		}
 		return runtime.StorageModified
 	}
-	if original != zeroHash {
+	if original != zeroHash { // Storage slot was populated before this transaction started
 		if current == zeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
 		} else if value == zeroHash { // delete slot (2.2.1.2)
@@ -297,7 +298,8 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 		}
 	}
 	if original == value {
-		if original == zeroHash { // reset to original inexistent slot (2.2.2.1)
+		if original == zeroHash { // reset to original nonexistent slot (2.2.2.1)
+			// Storage was used as memory (allocation and deallocation occurred within the same contract)
 			if config.Istanbul {
 				txn.AddRefund(19200)
 			} else {
@@ -329,15 +331,15 @@ func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
 	})
 }
 
-// GetState returns the state of the address at a given hash
-func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
+// GetState returns the state of the address at a given key
+func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return types.Hash{}
 	}
 
 	if object.Txn != nil {
-		if val, ok := object.Txn.Get(hash.Bytes()); ok {
+		if val, ok := object.Txn.Get(key.Bytes()); ok {
 			if val == nil {
 				return types.Hash{}
 			}
@@ -345,7 +347,8 @@ func (txn *Txn) GetState(addr types.Address, hash types.Hash) types.Hash {
 		}
 	}
 
-	k := txn.hashit(hash.Bytes())
+	// Under which condition is this called?
+	k := txn.hashit(key.Bytes())
 	return object.GetCommitedState(types.BytesToHash(k))
 }
 
@@ -469,12 +472,12 @@ func (txn *Txn) GetRefund() uint64 {
 }
 
 // GetCommittedState returns the state of the address in the trie
-func (txn *Txn) GetCommittedState(addr types.Address, hash types.Hash) types.Hash {
+func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash {
 	obj, ok := txn.getStateObject(addr)
 	if !ok {
 		return types.Hash{}
 	}
-	return obj.GetCommitedState(types.BytesToHash(txn.hashit(hash.Bytes())))
+	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
 }
 
 func (txn *Txn) TouchAccount(addr types.Address) {

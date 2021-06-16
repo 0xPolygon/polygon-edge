@@ -120,8 +120,8 @@ func (s *StateObject) Empty() bool {
 
 var stateStateParserPool fastrlp.ParserPool
 
-func (s *StateObject) GetCommitedState(hash types.Hash) types.Hash {
-	val, ok := s.Account.Trie.Get(hash.Bytes())
+func (s *StateObject) GetCommitedState(key types.Hash) types.Hash {
+	val, ok := s.Account.Trie.Get(key.Bytes())
 	if !ok {
 		return types.Hash{}
 	}

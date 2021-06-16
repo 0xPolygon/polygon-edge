@@ -126,6 +126,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 	snap := parentSnap.Copy()
 
+	// TODO: This is difficult to understand, and the error is unneeded
 	// saveSnap is a callback function for saving the passed in header to the snapshot store
 	saveSnap := func(h *types.Header) error {
 		snap.Number = h.Number
@@ -142,18 +143,18 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	for _, h := range headers {
 		number := h.Number
 
-		validator, err := ecrecoverFromHeader(h)
+		proposer, err := ecrecoverFromHeader(h)
 		if err != nil {
 			return err
 		}
 
-		// Check if the recovered validator is part of the validator set
-		if !snap.Set.Includes(validator) {
-			return fmt.Errorf("unauthorized validator")
+		// Check if the recovered proposer is part of the validator set
+		if !snap.Set.Includes(proposer) {
+			return fmt.Errorf("unauthorized proposer")
 		}
 
 		if number%i.epochSize == 0 {
-			// during a checkpoint block, we reset the voles
+			// during a checkpoint block, we reset the votes
 			// and there cannot be any proposals
 			snap.Votes = nil
 			if err := saveSnap(h); err != nil {
@@ -197,17 +198,18 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			}
 		}
 
-		count := snap.Count(func(v *Vote) bool {
-			return v.Validator == validator && v.Address == h.Miner
+		voteCount := snap.Count(func(v *Vote) bool {
+			return v.Validator == proposer && v.Address == h.Miner
 		})
-		if count > 1 {
+
+		if voteCount > 1 {
 			// there can only be one vote per validator per address
 			return fmt.Errorf("more than one proposal per validator per address found")
 		}
-		if count == 0 {
+		if voteCount == 0 {
 			// cast the new vote since there is no one yet
 			snap.Votes = append(snap.Votes, &Vote{
-				Validator: validator,
+				Validator: proposer,
 				Address:   h.Miner,
 				Authorize: authorize,
 			})
@@ -218,12 +220,13 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return v.Address == h.Miner
 		})
 
+		// If more than a half of all validators voted
 		if tally > snap.Set.Len()/2 {
 			if authorize {
-				// add the proposal to the validator list
+				// add the candidate to the validators list
 				snap.Set.Add(h.Miner)
 			} else {
-				// remove the proposal from the validators list
+				// remove the candidate from the validators list
 				snap.Set.Del(h.Miner)
 
 				// remove any votes casted by the removed validator
@@ -484,7 +487,7 @@ func (s *snapshotStore) deleteLower(num uint64) {
 	s.list = s.list[i:]
 }
 
-// find returns the snapshot at a specific block height
+// find returns the index of the first closest snapshot to the number specified
 func (s *snapshotStore) find(num uint64) *Snapshot {
 	s.lock.Lock()
 	defer s.lock.Unlock()
