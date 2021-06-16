@@ -925,7 +925,7 @@ func opPush(n int) instruction {
 
 		v := c.push1()
 		if ip+1+n > len(ins) {
-			v.SetBytes(append(ins[ip+1:len(ins)], make([]byte, n)...))
+			v.SetBytes(append(ins[ip+1:], make([]byte, n)...))
 		} else {
 			v.SetBytes(ins[ip+1 : ip+1+n])
 		}

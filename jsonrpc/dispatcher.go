@@ -268,7 +268,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		d.serviceMap = map[string]*serviceData{}
 	}
 	if serviceName == "" {
-		panic(fmt.Sprintf("jsonrpc: serviceName cannot be empty"))
+		panic("jsonrpc: serviceName cannot be empty")
 	}
 
 	st := reflect.TypeOf(service)

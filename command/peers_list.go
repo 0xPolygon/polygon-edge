@@ -2,8 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
@@ -65,7 +63,7 @@ func formatPeers(peers []*proto.Peer) string {
 	rows := make([]string, len(peers)+1)
 	rows[0] = "ID"
 	for i, d := range peers {
-		rows[i+1] = fmt.Sprintf("%s", d.Id)
+		rows[i+1] = d.Id
 	}
 	return formatList(rows)
 }

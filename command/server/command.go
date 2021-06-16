@@ -69,10 +69,7 @@ func (c *Command) handleSignals(closeFn func()) int {
 	signalCh := make(chan os.Signal, 4)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	var sig os.Signal
-	select {
-	case sig = <-signalCh:
-	}
+	sig := <-signalCh
 
 	c.UI.Output(fmt.Sprintf("Caught signal: %v", sig))
 	c.UI.Output("Gracefully shutting down agent...")

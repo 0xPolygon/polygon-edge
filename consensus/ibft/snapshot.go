@@ -326,10 +326,8 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 			return false
 		}
 	}
-	if !s.Set.Equal(&ss.Set) {
-		return false
-	}
-	return true
+
+	return s.Set.Equal(&ss.Set)
 }
 
 // Count returns the vote tally.

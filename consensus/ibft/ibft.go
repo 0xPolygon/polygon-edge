@@ -323,11 +323,8 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			isValidator = i.isValidSnapshot()
-			if isValidator {
-				return false // stop the handler
-			}
 
-			return true
+			return !isValidator
 		})
 
 		if isValidator {

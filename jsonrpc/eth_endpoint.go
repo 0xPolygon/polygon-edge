@@ -278,10 +278,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return nil, err
 		}
 
-		var accountBalance *big.Int
-		accountBalance = acc.Balance
-
-		available := new(big.Int).Set(accountBalance)
+		available := new(big.Int).Set(acc.Balance)
 
 		if transaction.Value != nil {
 			if valueInt.Cmp(available) >= 0 {
