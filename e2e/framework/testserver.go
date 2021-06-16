@@ -126,8 +126,8 @@ func (t *TestServer) Stop() {
 }
 
 type InitIBFTResult struct {
-	PublicKey string
-	NodeID    string
+	Address string
+	NodeID  string
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
@@ -164,7 +164,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 		return nil, err
 	}
 
-	res.PublicKey = crypto.PubKeyToAddress(&key.PublicKey).String()
+	res.Address = crypto.PubKeyToAddress(&key.PublicKey).String()
 	res.NodeID = nodeId.String()
 
 	return res, nil
