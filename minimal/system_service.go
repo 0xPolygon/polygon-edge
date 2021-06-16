@@ -43,6 +43,9 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 
 	for {
 		evnt := sub.GetEvent()
+		if evnt == nil {
+			break
+		}
 		pEvent := &proto.BlockchainEvent{
 			Added:   []*proto.BlockchainEvent_Header{},
 			Removed: []*proto.BlockchainEvent_Header{},
