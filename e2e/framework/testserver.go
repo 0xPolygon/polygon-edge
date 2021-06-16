@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,9 +132,11 @@ type InitIBFTResult struct {
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	ibftInitCmd := command.IbftInit{}
-	args := []string{
-		ibftInitCmd.GetBaseCommand(), "--data-dir", t.Config.IBFTDir,
-	}
+	var args []string
+
+	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")
+	args = append(args, commandSlice...)
+	args = append(args, "--data-dir", t.Config.IBFTDir)
 
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
