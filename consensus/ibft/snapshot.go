@@ -49,21 +49,25 @@ func (i *Ibft) setupSnapshot() error {
 	currentEpoch := (header.Number / i.epochSize)
 	snapshot, _ := i.getSnapshot(header.Number)
 	if snapshot == nil {
-		// If snapshot for current block cannot be found,
-		// restore snapshot by the block of beggining of epoch
+		i.logger.Info("snapshot was not found, generate snapshot for beginning of current epoch", "current epoch", currentEpoch)
 		beginHeight := currentEpoch * i.epochSize
 		beginHeader, ok := i.blockchain.GetHeaderByNumber(beginHeight)
 		if !ok {
-			return fmt.Errorf("header %d not found", beginHeight)
+			return fmt.Errorf("header at %d not found", beginHeight)
 		}
 
 		if err := i.addHeaderSnap(beginHeader); err != nil {
 			return err
 		}
 		i.store.updateLastBlock(beginHeight)
-		snapshot, _ = i.getSnapshot(header.Number)
-	}
 
+		if snapshot, err = i.getSnapshot(header.Number); err != nil {
+			return err
+		}
+		if meta, err = i.getSnapshotMetadata(); err != nil {
+			return err
+		}
+	}
 	if metaEpoch := (meta.LastBlock / i.epochSize); metaEpoch < currentEpoch {
 		i.store.updateLastBlock(snapshot.Number)
 	}
