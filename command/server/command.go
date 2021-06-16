@@ -199,7 +199,9 @@ func (c *Command) Run(args []string) int {
 
 	if conf.Join != "" {
 		// make a non-blocking join request
-		server.Join(conf.Join, 0)
+		if err = server.Join(conf.Join, 0); err != nil {
+			c.UI.Error(fmt.Sprintf("Failed to join address %s: %v", conf.Join, err))
+		}
 	}
 
 	return c.handleSignals(server.Close)
@@ -210,10 +212,7 @@ func (c *Command) handleSignals(closeFn func()) int {
 	signalCh := make(chan os.Signal, 4)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	var sig os.Signal
-	select {
-	case sig = <-signalCh:
-	}
+	sig := <-signalCh
 
 	output := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
 	output += "Gracefully shutting down client...\n"
