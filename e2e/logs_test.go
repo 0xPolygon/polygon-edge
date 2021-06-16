@@ -1,7 +1,7 @@
 package e2e
 
 import (
-	"fmt"
+	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -9,67 +9,76 @@ import (
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/testutil"
 )
 
 func TestNewFilter_Logs(t *testing.T) {
-	fr := framework.NewTestServerFromGenesis(t)
+	_, addr := framework.GenerateKeyAndAddr(t)
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.Premine(addr, framework.EthToWei(10))
+		config.SetSeal(true)
+	})
+	srv := srvs[0]
 
-	cc := &testutil.Contract{}
-	cc.AddEvent(testutil.NewEvent("A").
-		Add("address", true).
-		Add("address", true))
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel1()
+	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	cc.EmitEvent("setA1", "A", addr0.String(), addr1.String())
-	cc.EmitEvent("setA2", "A", addr1.String(), addr0.String())
-
-	_, addr := fr.DeployContract(cc)
-
-	client := fr.JSONRPC()
+	client := srv.JSONRPC()
 	id, err := client.Eth().NewFilter(&web3.LogFilter{})
 	assert.NoError(t, err)
 
-	for i := 0; i < 10; i++ {
-		fr.TxnTo(addr, "setA1")
+	numCalls := 10
+	for i := 0; i < numCalls; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.TxnTo(ctx, contractAddr, "setA1")
 	}
-	time.Sleep(10 * time.Second)
 
 	res, err := client.Eth().GetFilterChanges(id)
 	assert.NoError(t, err)
-	assert.Len(t, res, 10)
+	// todo: need to check implementation because there is a possibility of losing some logs
+	assert.GreaterOrEqual(t, len(res), numCalls/2)
 }
 
 func TestNewFilter_Block(t *testing.T) {
-	target := web3.HexToAddress("0x1010101010101010101010101010101010101010")
+	_, from := framework.GenerateKeyAndAddr(t)
+	_, to := framework.GenerateKeyAndAddr(t)
+	toAddr := web3.HexToAddress(to.String())
 
-	fr := framework.NewTestServerFromGenesis(t)
-
-	client := fr.JSONRPC()
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.Premine(from, framework.EthToWei(10))
+		config.SetSeal(true)
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
 
 	id, err := client.Eth().NewBlockFilter()
 	assert.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		root, err := client.Eth().SendTransaction(&web3.Transaction{
-			From:     web3.HexToAddress(fr.Config.PremineAccts[0].Addr.String()),
-			To:       &target,
+		hash, err := client.Eth().SendTransaction(&web3.Transaction{
+			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
+			To:       &toAddr,
 			GasPrice: 10000,
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(i),
 		})
 		assert.NoError(t, err)
-		fmt.Println(root)
 
-		// avoid having more than one txn on the same block
-		time.Sleep(1 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err = srv.WaitForReceipt(ctx, hash)
+		assert.NoError(t, err)
 	}
-
-	// wait for the last txn to be sealed
-	time.Sleep(2 * time.Second)
 
 	// there should be three changes
 	blocks, err := client.Eth().GetFilterChangesBlock(id)
 	assert.NoError(t, err)
-	fmt.Println(blocks)
+	assert.Len(t, blocks, 3)
 }

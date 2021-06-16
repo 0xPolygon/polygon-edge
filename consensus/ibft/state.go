@@ -301,7 +301,9 @@ func (v *ValidatorSet) Includes(addr types.Address) bool {
 	return v.Index(addr) != -1
 }
 
+// TODO: Rename to MAX instead of MIN faulty nodes
 // MinFaultyNodes returns the required minimum number of faulty nodes, based on the current validator set
 func (v *ValidatorSet) MinFaultyNodes() int {
+	// numberOfValidators / 3
 	return int(math.Ceil(float64(len(*v))/3)) - 1
 }
