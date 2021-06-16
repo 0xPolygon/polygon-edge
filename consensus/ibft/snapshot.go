@@ -104,14 +104,6 @@ func (i *Ibft) getLatestSnapshot() (*Snapshot, error) {
 	return snap, nil
 }
 
-// saveSnapDataToFile saves the snapshot store to a file
-func (i *Ibft) saveSnapDataToFile() error {
-	if i.config.Path == "" {
-		return nil
-	}
-	return i.store.saveToPath(i.config.Path)
-}
-
 // processHeaders is the powerhouse method in the snapshot module.
 
 // It processes passed in headers, and updates the snapshot / snapshot store

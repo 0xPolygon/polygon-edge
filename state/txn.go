@@ -1,17 +1,12 @@
 package state
 
 import (
-	"fmt"
-	"hash"
-	"math/big"
-	"strconv"
-
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
+	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
@@ -244,15 +239,6 @@ func (txn *Txn) AddLog(log *types.Log) {
 }
 
 // State
-
-func isZeros(b []byte) bool {
-	for _, i := range b {
-		if i != 0x0 {
-			return false
-		}
-	}
-	return true
-}
 
 var zeroHash types.Hash
 
@@ -562,58 +548,6 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	txn.txn.Delete(refundIndex)
 }
 
-func (txn *Txn) show(i *iradix.Txn) {
-	fmt.Println("##################################################################################")
-
-	i.Root().Walk(func(k []byte, v interface{}) bool {
-		a, ok := v.(*StateObject)
-		if !ok {
-			// We also have logs, avoid those
-			return false
-		}
-		fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
-		fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
-		fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
-		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
-		fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
-		fmt.Printf("# State root: %s\n", a.Account.Root.String())
-		if a.Txn != nil {
-			a.Txn.Root().Walk(func(k []byte, v interface{}) bool {
-				if v == nil {
-					fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(k))
-				} else {
-					fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(k), hex.EncodeToHex(v.([]byte)))
-				}
-				return false
-			})
-		}
-		return false
-	})
-	fmt.Println("##################################################################################")
-}
-
-func show(objs []*Object) {
-	fmt.Println("##################################################################################")
-
-	for _, obj := range objs {
-		fmt.Printf("# ----------------- %s -------------------\n", obj.Address.String())
-		fmt.Printf("# Deleted: %v\n", obj.Deleted)
-		fmt.Printf("# Balance: %s\n", obj.Balance.String())
-		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(obj.Nonce)))
-		fmt.Printf("# Code hash: %s\n", obj.CodeHash.String())
-		fmt.Printf("# State root: %s\n", obj.Root.String())
-
-		for _, entry := range obj.Storage {
-			if entry.Deleted {
-				fmt.Printf("#\t%s: EMPTY\n", hex.EncodeToHex(entry.Key))
-			} else {
-				fmt.Printf("#\t%s: %s\n", hex.EncodeToHex(entry.Key), hex.EncodeToHex(entry.Val))
-			}
-		}
-	}
-	fmt.Println("##################################################################################")
-}
-
 func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 	txn.CleanDeleteObjects(deleteEmptyObjects)
 
@@ -661,17 +595,4 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 
 	t, hash := txn.snapshot.Commit(objs)
 	return t, hash
-}
-
-type hashImpl interface {
-	hash.Hash
-	Read(b []byte) (int, error)
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-	return b[:needLen]
 }

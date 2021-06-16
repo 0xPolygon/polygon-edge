@@ -10,13 +10,10 @@ import (
 var (
 	addr1 = types.StringToAddress("1")
 	addr2 = types.StringToAddress("2")
-	addr3 = types.StringToAddress("3")
-	addr5 = types.StringToAddress("5")
 
 	hash1 = types.StringToHash("1")
 	hash2 = types.StringToHash("2")
 	hash3 = types.StringToHash("3")
-	hash4 = types.StringToHash("4")
 )
 
 func TestFilterDecode(t *testing.T) {

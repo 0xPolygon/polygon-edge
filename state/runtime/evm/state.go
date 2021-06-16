@@ -34,7 +34,6 @@ var (
 	errOutOfGas       = fmt.Errorf("out of gas")
 	errStackUnderflow = fmt.Errorf("stack underflow")
 	errStackOverflow  = fmt.Errorf("stack overflow")
-	errInvalidOpcode  = fmt.Errorf("invalid opcode")
 	errReadOnly       = fmt.Errorf("read only")
 	errInvalidJump    = fmt.Errorf("invalid jump")
 	errOpCodeNotFound = fmt.Errorf("opcode not found")
@@ -48,8 +47,6 @@ type state struct {
 	ip   int
 	code []byte
 	tmp  []byte
-
-	debug bool
 
 	host   runtime.Host
 	msg    *runtime.Contract // change with msg
@@ -173,10 +170,6 @@ func (c *state) pop() *big.Int {
 	return o
 }
 
-func (c *state) peek() *big.Int {
-	return c.stack[c.sp-1]
-}
-
 func (c *state) peekAt(n int) *big.Int {
 	return c.stack[c.sp-n]
 }
@@ -195,14 +188,6 @@ func (c *state) consumeGas(gas uint64) bool {
 	return true
 }
 
-func (c *state) showStack() string {
-	str := []string{}
-	for i := 0; i < c.sp; i++ {
-		str = append(str, c.stack[i].String())
-	}
-	return "Stack: " + strings.Join(str, ",")
-}
-
 func (c *state) resetReturnData() {
 	c.returnData = c.returnData[:0]
 }
@@ -219,9 +204,6 @@ func (c *state) Run() ([]byte, error) {
 		}
 
 		op := OpCode(c.code[c.ip])
-
-		//fmt.Printf("%d OP [%d]: %s (%d)\n", c.ip, c.msg.Depth, op.String(), c.gas)
-		//fmt.Println(c.showStack())
 
 		inst := dispatchTable[op]
 		if inst.inst == nil {

@@ -248,15 +248,6 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 }
 
-// getStatus grabs the current status [Thread safe]
-func (s *Syncer) getStatus() *Status {
-	s.statusLock.Lock()
-	status := s.status.Copy()
-	s.statusLock.Unlock()
-
-	return status
-}
-
 // Start starts the syncer protocol
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
