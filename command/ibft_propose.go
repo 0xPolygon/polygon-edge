@@ -32,12 +32,12 @@ func (p *IbftPropose) DefineFlags() {
 	}
 
 	p.flagMap["vote"] = helper.FlagDescriptor{
-		Description: "Proposes a change to the validator set (add = true, remove = false). Default: true",
+		Description: "Proposes a change to the validator set. Possible values: [add, remove]",
 		Arguments: []string{
 			"VOTE",
 		},
 		ArgumentsOptional: false,
-		FlagOptional:      true,
+		FlagOptional:      false,
 	}
 }
 
@@ -67,14 +67,24 @@ func (p *IbftPropose) Synopsis() string {
 func (p *IbftPropose) Run(args []string) int {
 	flags := p.FlagSet(p.GetBaseCommand())
 
-	var vote bool
+	var vote string
 	var ethAddress string
 
-	flags.BoolVar(&vote, "vote", true, "")
+	flags.StringVar(&vote, "vote", "", "")
 	flags.StringVar(&ethAddress, "addr", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
+		return 1
+	}
+
+	if vote == "" {
+		p.UI.Error("Vote value not specified")
+		return 1
+	}
+
+	if vote != "add" && vote != "remove" {
+		p.UI.Error("Invalid vote value (should be 'add' or 'remove')")
 		return 1
 	}
 
@@ -98,7 +108,7 @@ func (p *IbftPropose) Run(args []string) int {
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
-		Auth:    vote,
+		Auth:    vote == "add",
 	}
 
 	_, err = clt.Propose(context.Background(), req)
@@ -109,7 +119,7 @@ func (p *IbftPropose) Run(args []string) int {
 
 	output := "\n[IBFT PROPOSE]\n"
 
-	if vote {
+	if vote == "add" {
 		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", ethAddress)
 	} else {
 		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", ethAddress)
