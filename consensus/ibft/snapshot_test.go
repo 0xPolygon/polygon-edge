@@ -123,12 +123,13 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 	}
 
 	var cases = []struct {
+		name       string
 		epoch      uint64
 		validators []string
 		headers    []mockHeader
 	}{
 		{
-			// single validator casts no vote
+			name: "single validator casts no vote",
 			validators: []string{
 				"A",
 			},
@@ -142,7 +143,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// single validator votes to add two peers
+			name:       "single validator votes to add two peers",
 			validators: []string{"A"},
 			headers: []mockHeader{
 				{
@@ -170,7 +171,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// single validator dropping himself
+			name:       "single validator dropping himself",
 			validators: []string{"A"},
 			headers: []mockHeader{
 				{
@@ -182,7 +183,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// two validators, dropping requires consensus
+			name:       "two validators, dropping requires consensus",
 			validators: []string{"A", "B"},
 			headers: []mockHeader{
 				{
@@ -203,7 +204,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// adding votes are only counted once per validator and target
+			name:       "adding votes are only counted once per validator and target",
 			validators: []string{"A", "B"},
 			headers: []mockHeader{
 				{
@@ -227,7 +228,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// delete votes are only counted once per validator and target
+			name:       "delete votes are only counted once per validator and target",
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
@@ -251,7 +252,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// multiple (add, delete) votes are possible
+			name:       "multiple (add, delete) votes are possible",
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
@@ -287,7 +288,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// votes from desauthorized nodes are discarded inmediately
+			name:       "votes from deauthorized nodes are discarded immediately",
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				// validator C makes two votes (add and delete)
@@ -333,7 +334,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 		{
-			// epoch transition resets all votes
+			name:       "epoch transition resets all votes",
 			epoch:      3,
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
@@ -368,9 +369,40 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "epoch transition creates new snapshot",
+			epoch:      1,
+			validators: []string{"A", "B", "C"},
+			headers: []mockHeader{
+				{
+					// block 1
+					action: mine("A"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+				{
+					// block 2
+					action: mine("B"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+				{
+					// block 3
+					action: mine("C"),
+					snapshot: &mockSnapshot{
+						validators: []string{"A", "B", "C"},
+						votes:      []mockVote{},
+					},
+				},
+			},
+		},
 	}
 	for _, c := range cases {
-		t.Run("", func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			epoch := c.epoch
 			if epoch == 0 {
 				epoch = 1000
@@ -432,6 +464,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				// get latest snapshot
 				snap, err := ibft.getSnapshot(header.Number)
 				assert.NoError(t, err)
+				assert.NotNil(t, snap)
 
 				result := c.headers[indx].snapshot
 				if result != nil {

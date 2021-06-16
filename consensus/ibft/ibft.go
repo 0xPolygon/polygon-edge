@@ -226,7 +226,7 @@ func (i *Ibft) start() {
 		select {
 		case <-i.closeCh:
 			return
-		default:
+		default: // Default is here because we would block until we receive something in the closeCh
 		}
 
 		// Start the state machine loop
@@ -863,6 +863,9 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
+	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
+	// 		This is achieved by specifying the miner field to zeroes,
+	// 		because then the value in the Nonce will not be taken into consideration.
 	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
 		return fmt.Errorf("invalid nonce")
 	}
