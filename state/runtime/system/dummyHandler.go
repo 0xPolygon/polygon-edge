@@ -1,6 +1,8 @@
 package system
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // dummyHandler is just an example handler for system contract
 type dummyHandler struct {
@@ -8,15 +10,15 @@ type dummyHandler struct {
 }
 
 // gas returns the fixed gas price of the operation
-func (d dummyHandler) gas(_ []byte) uint64 {
+func (d *dummyHandler) gas(_ []byte) uint64 {
 	fmt.Print("\n\n[Dummy Handler] Gas calculation called\n\n")
 
 	return 40000
 }
 
 // run executes the system contract method
-func (d dummyHandler) run(input []byte) ([]byte, error) {
-	fmt.Printf("\n\n[Dummy Handler] Called with input %v\n\n", input)
+func (d *dummyHandler) run(state *systemState) ([]byte, error) {
+	fmt.Printf("\n\n[Dummy Handler] Called with input %v\n\n", state.contract.Input)
 
-	return input, nil
+	return state.contract.Input, nil
 }

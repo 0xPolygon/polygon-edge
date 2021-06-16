@@ -19,7 +19,7 @@ type systemContract interface {
 	gas(input []byte) uint64
 
 	// run defines the system contract implementation
-	run(input []byte) ([]byte, error)
+	run(state *systemState) ([]byte, error)
 }
 
 // setupHandlers defines which addresses are assigned to which system contract handlers
@@ -48,25 +48,33 @@ func NewSystem() *System {
 }
 
 // Run represents the actual runtime implementation, after the CanRun check passes
-func (s *System) Run(c *runtime.Contract, _ runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
+func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
 	// TODO Define the Staking runtime implementation
+	// Get the system state from the pool and set it up
+	sysState := acquireSystemState()
+	sysState.host = host
+	sysState.contract = contract
+
 	// Grab the corresponding system contract
-	sysContract := s.systemContracts[c.CodeAddress]
+	sysContract := s.systemContracts[contract.CodeAddress]
 
 	// Calculate the gas cost, see if there is an overflow
-	gasCost := sysContract.gas(c.Input)
-	if c.Gas < gasCost {
+	gasCost := sysContract.gas(contract.Input)
+	if contract.Gas < gasCost {
 		return nil, 0, runtime.ErrGasOverflow
 	}
-	c.Gas = c.Gas - gasCost
+	contract.Gas = contract.Gas - gasCost
 
 	// Run the system contract
-	ret, err := sysContract.run(c.Input)
+	ret, err := sysContract.run(sysState)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return ret, c.Gas, err
+	// Put the system state back into the pool
+	releaseSystemState(sysState)
+
+	return ret, contract.Gas, err
 }
 
 // CanRun checks if the current runtime can execute the query

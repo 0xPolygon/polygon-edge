@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-
 	"sync"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -64,6 +63,7 @@ type state struct {
 	sp    int
 
 	// remove later
+	// TODO Should be removed since it's never used anywhere
 	evm *EVM
 
 	err  error
@@ -97,6 +97,7 @@ func (c *state) reset() {
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]
 	c.code = c.code[:0]
+	// TODO Not sure this should be commented out
 	// c.returnData = c.returnData[:0]
 	c.memory = c.memory[:0]
 }
