@@ -169,21 +169,20 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("ADD BALANCE: %s %s\n", addr.String(), balance.String())
-	/*
-		if balance.Sign() == 0 {
-			return
-		}
-	*/
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
 
+// AddStakedBalance increases the staked balance by the specific amount
+func (txn *Txn) AddStakedBalance(addr types.Address, balance *big.Int) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.Add(object.Account.StakedBalance, balance)
+	})
+}
+
 // SubBalance reduces the balance
 func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("SUB BALANCE: %s %s\n", addr.String(), balance.String())
-
 	if balance.Sign() == 0 {
 		return
 	}
@@ -192,11 +191,27 @@ func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
 	})
 }
 
+// SubStakedBalance reduces the staked balance
+func (txn *Txn) SubStakedBalance(addr types.Address, balance *big.Int) {
+	if balance.Sign() == 0 {
+		return
+	}
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.Sub(object.Account.StakedBalance, balance)
+	})
+}
+
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("SET BALANCE: %s %s\n", addr.String(), balance.String())
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
+	})
+}
+
+// SetStakedBalance sets the staked balance
+func (txn *Txn) SetStakedBalance(addr types.Address, balance *big.Int) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.SetBytes(balance.Bytes())
 	})
 }
 
@@ -207,6 +222,15 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 		return big.NewInt(0)
 	}
 	return object.Account.Balance
+}
+
+// GetStakedBalance returns the account's staked balance
+func (txn *Txn) GetStakedBalance(addr types.Address) *big.Int {
+	object, exists := txn.getStateObject(addr)
+	if !exists {
+		return big.NewInt(0)
+	}
+	return object.Account.StakedBalance
 }
 
 func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
@@ -574,6 +598,7 @@ func (txn *Txn) show(i *iradix.Txn) {
 		fmt.Printf("# ----------------- %s -------------------\n", hex.EncodeToHex(k))
 		fmt.Printf("# Deleted: %v, Suicided: %v\n", a.Deleted, a.Suicide)
 		fmt.Printf("# Balance: %s\n", a.Account.Balance.String())
+		fmt.Printf("# Staked Balance: %s\n", a.Account.StakedBalance.String())
 		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(a.Account.Nonce)))
 		fmt.Printf("# Code hash: %s\n", hex.EncodeToHex(a.Account.CodeHash))
 		fmt.Printf("# State root: %s\n", a.Account.Root.String())
@@ -599,6 +624,7 @@ func show(objs []*Object) {
 		fmt.Printf("# ----------------- %s -------------------\n", obj.Address.String())
 		fmt.Printf("# Deleted: %v\n", obj.Deleted)
 		fmt.Printf("# Balance: %s\n", obj.Balance.String())
+		fmt.Printf("# Staked Balance: %s\n", obj.StakedBalance.String())
 		fmt.Printf("# Nonce: %s\n", strconv.Itoa(int(obj.Nonce)))
 		fmt.Printf("# Code hash: %s\n", obj.CodeHash.String())
 		fmt.Printf("# State root: %s\n", obj.Root.String())
@@ -629,13 +655,14 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		}
 
 		obj := &Object{
-			Nonce:     a.Account.Nonce,
-			Address:   types.BytesToAddress(k),
-			Balance:   a.Account.Balance,
-			Root:      a.Account.Root,
-			CodeHash:  types.BytesToHash(a.Account.CodeHash),
-			DirtyCode: a.DirtyCode,
-			Code:      a.Code,
+			Nonce:         a.Account.Nonce,
+			Address:       types.BytesToAddress(k),
+			Balance:       a.Account.Balance,
+			StakedBalance: a.Account.StakedBalance,
+			Root:          a.Account.Root,
+			CodeHash:      types.BytesToHash(a.Account.CodeHash),
+			DirtyCode:     a.DirtyCode,
+			Code:          a.Code,
 		}
 		if a.Deleted {
 			obj.Deleted = true
