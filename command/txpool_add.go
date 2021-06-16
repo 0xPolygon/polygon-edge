@@ -80,7 +80,7 @@ func (p *TxPoolAdd) GetHelperText() string {
 }
 
 func (p *TxPoolAdd) GetBaseCommand() string {
-	return "txpool-add"
+	return "txpool add"
 }
 
 // Help implements the cli.TxPoolAdd interface

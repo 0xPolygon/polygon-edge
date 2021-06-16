@@ -53,7 +53,7 @@ func (p *IbftInit) Synopsis() string {
 }
 
 func (p *IbftInit) GetBaseCommand() string {
-	return "ibft-init"
+	return "ibft init"
 }
 
 // Run implements the cli.IbftInit interface

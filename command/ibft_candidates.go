@@ -20,7 +20,7 @@ func (p *IbftCandidates) GetHelperText() string {
 }
 
 func (p *IbftCandidates) GetBaseCommand() string {
-	return "ibft-candidates"
+	return "ibft candidates"
 }
 
 // Help implements the cli.IbftCandidates interface

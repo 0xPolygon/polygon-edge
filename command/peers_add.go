@@ -36,7 +36,7 @@ func (p *PeersAdd) GetHelperText() string {
 }
 
 func (p *PeersAdd) GetBaseCommand() string {
-	return "peers-add"
+	return "peers add"
 }
 
 // Help implements the cli.PeersAdd interface

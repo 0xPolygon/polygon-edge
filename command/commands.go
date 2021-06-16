@@ -26,14 +26,35 @@ func Commands() map[string]cli.CommandFactory {
 		UI: ui,
 	}
 
+	// Grab a reference to the commands
+	serverCmd := server.Command{UI: ui}
+	genesisCmd := GenesisCommand{UI: ui}
+	monitorCmd := MonitorCommand{Meta: meta}
+	statusCmd := StatusCommand{Meta: meta}
+	versionCmd := VersionCommand{UI: ui}
+
+	ibftCmd := IbftCommand{}
+	ibftCandidatesCmd := IbftCandidates{Meta: meta}
+	ibftInitCmd := IbftInit{Meta: meta}
+	ibftProposeCmd := IbftPropose{Meta: meta}
+	ibftSnapshotCmd := IbftSnapshot{Meta: meta}
+	ibftStatusCmd := IbftStatus{Meta: meta}
+
+	peersCmd := PeersCommand{}
+	peersAddCmd := PeersAdd{Meta: meta}
+	peersListCmd := PeersList{Meta: meta}
+	peersStatusCmd := PeersStatus{Meta: meta}
+
+	txPoolCmd := TxPoolCommand{}
+	txPoolAddCmd := TxPoolAdd{Meta: meta}
+	txPoolStatusCmd := TxPoolStatus{Meta: meta}
+
 	return map[string]cli.CommandFactory{
 
 		// GENERIC SDK COMMANDS //
 
-		"server": func() (cli.Command, error) {
-			return &server.Command{
-				UI: ui,
-			}, nil
+		serverCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &serverCmd, nil
 		},
 		// TODO The task to implement the dev command should start here
 		//"dev": func() (cli.Command, error) {
@@ -41,87 +62,69 @@ func Commands() map[string]cli.CommandFactory {
 		//		UI: ui,
 		//	}, nil
 		//},
-		"genesis": func() (cli.Command, error) {
-			return &GenesisCommand{
-				UI: ui,
-			}, nil
+		genesisCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &genesisCmd, nil
 		},
 
 		// PEER COMMANDS //
 
-		"peers-add": func() (cli.Command, error) {
-			return &PeersAdd{
-				Meta: meta,
-			}, nil
+		peersCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &peersCmd, nil
 		},
-		"peers-status": func() (cli.Command, error) {
-			return &PeersStatus{
-				Meta: meta,
-			}, nil
+		peersAddCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &peersAddCmd, nil
 		},
-		"peers-list": func() (cli.Command, error) {
-			return &PeersList{
-				Meta: meta,
-			}, nil
+		peersStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &peersStatusCmd, nil
+		},
+		peersListCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &peersListCmd, nil
 		},
 
 		// IBFT COMMANDS //
 
-		"ibft-init": func() (cli.Command, error) {
-			return &IbftInit{
-				Meta: meta,
-			}, nil
+		ibftCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftCmd, nil
 		},
-		"ibft-snapshot": func() (cli.Command, error) {
-			return &IbftSnapshot{
-				Meta: meta,
-			}, nil
+
+		ibftInitCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftInitCmd, nil
 		},
-		"ibft-candidates": func() (cli.Command, error) {
-			return &IbftCandidates{
-				Meta: meta,
-			}, nil
+		ibftSnapshotCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftSnapshotCmd, nil
 		},
-		"ibft-propose": func() (cli.Command, error) {
-			return &IbftPropose{
-				Meta: meta,
-			}, nil
+		ibftCandidatesCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftCandidatesCmd, nil
 		},
-		"ibft-status": func() (cli.Command, error) {
-			return &IbftStatus{
-				Meta: meta,
-			}, nil
+		ibftProposeCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftProposeCmd, nil
+		},
+		ibftStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftStatusCmd, nil
 		},
 
 		// TXPOOL COMMANDS //
 
-		"txpool-add": func() (cli.Command, error) {
-			return &TxPoolAdd{
-				Meta: meta,
-			}, nil
+		txPoolCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &txPoolCmd, nil
 		},
-		"txpool-status": func() (cli.Command, error) {
-			return &TxPoolStatus{
-				Meta: meta,
-			}, nil
+		txPoolAddCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &txPoolAddCmd, nil
+		},
+		txPoolStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &txPoolStatusCmd, nil
 		},
 
 		// BLOCKCHAIN COMMANDS //
 
-		"status": func() (cli.Command, error) {
-			return &StatusCommand{
-				Meta: meta,
-			}, nil
+		statusCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &statusCmd, nil
 		},
-		"monitor": func() (cli.Command, error) {
-			return &MonitorCommand{
-				Meta: meta,
-			}, nil
+		monitorCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &monitorCmd, nil
 		},
-		"version": func() (cli.Command, error) {
-			return &VersionCommand{
-				UI: ui,
-			}, nil
+		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &versionCmd, nil
 		},
 	}
 }

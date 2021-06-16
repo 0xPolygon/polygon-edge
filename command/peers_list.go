@@ -20,7 +20,7 @@ func (p *PeersList) GetHelperText() string {
 }
 
 func (p *PeersList) GetBaseCommand() string {
-	return "peers-list"
+	return "peers list"
 }
 
 // Help implements the cli.PeersList interface

@@ -34,7 +34,7 @@ func (p *PeersStatus) GetHelperText() string {
 }
 
 func (p *PeersStatus) GetBaseCommand() string {
-	return "peers-status"
+	return "peers status"
 }
 
 // Help implements the cli.PeersStatus interface

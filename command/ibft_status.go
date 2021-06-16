@@ -20,7 +20,7 @@ func (p *IbftStatus) GetHelperText() string {
 }
 
 func (p *IbftStatus) GetBaseCommand() string {
-	return "ibft-status"
+	return "ibft status"
 }
 
 // Help implements the cli.IbftStatus interface

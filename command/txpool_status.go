@@ -20,7 +20,7 @@ func (p *TxPoolStatus) GetHelperText() string {
 }
 
 func (p *TxPoolStatus) GetBaseCommand() string {
-	return "txpool-status"
+	return "txpool status"
 }
 
 // Help implements the cli.TxPoolStatus interface

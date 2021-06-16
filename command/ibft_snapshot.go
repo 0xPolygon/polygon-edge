@@ -37,7 +37,7 @@ func (p *IbftSnapshot) GetHelperText() string {
 }
 
 func (p *IbftSnapshot) GetBaseCommand() string {
-	return "ibft-snapshot"
+	return "ibft snapshot"
 }
 
 // Help implements the cli.IbftSnapshot interface

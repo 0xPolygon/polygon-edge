@@ -32,7 +32,9 @@ func (p *IbftPropose) DefineFlags() {
 	}
 
 	p.flagMap["vote"] = helper.FlagDescriptor{
-		Description: "Proposes a change to the validator set. Possible values: [add, remove]",
+		Description: fmt.Sprintf(
+			"Proposes a change to the validator set. Possible values: [%s, %s]", positive, negative,
+		),
 		Arguments: []string{
 			"VOTE",
 		},
@@ -47,7 +49,7 @@ func (p *IbftPropose) GetHelperText() string {
 }
 
 func (p *IbftPropose) GetBaseCommand() string {
-	return "ibft-propose"
+	return "ibft propose"
 }
 
 // Help implements the cli.IbftPropose interface
@@ -62,6 +64,12 @@ func (p *IbftPropose) Help() string {
 func (p *IbftPropose) Synopsis() string {
 	return p.GetHelperText()
 }
+
+// Extracting it out so we have it in a variable
+var (
+	positive = "auth"
+	negative = "drop"
+)
 
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
@@ -83,8 +91,8 @@ func (p *IbftPropose) Run(args []string) int {
 		return 1
 	}
 
-	if vote != "add" && vote != "remove" {
-		p.UI.Error("Invalid vote value (should be 'add' or 'remove')")
+	if vote != positive && vote != negative {
+		p.UI.Error(fmt.Sprintf("Invalid vote value (should be '%s' or '%s')", positive, negative))
 		return 1
 	}
 
@@ -108,7 +116,7 @@ func (p *IbftPropose) Run(args []string) int {
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
-		Auth:    vote == "add",
+		Auth:    vote == positive,
 	}
 
 	_, err = clt.Propose(context.Background(), req)
@@ -119,7 +127,7 @@ func (p *IbftPropose) Run(args []string) int {
 
 	output := "\n[IBFT PROPOSE]\n"
 
-	if vote == "add" {
+	if vote == positive {
 		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", ethAddress)
 	} else {
 		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", ethAddress)
