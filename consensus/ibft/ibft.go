@@ -24,6 +24,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	DefaultEpochSize = 100000
+)
+
 type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
@@ -86,7 +90,7 @@ func Factory(
 		txpool:       txpool,
 		state:        &currentState{},
 		network:      network,
-		epochSize:    100000,
+		epochSize:    DefaultEpochSize,
 		syncNotifyCh: make(chan bool),
 		sealing:      sealing,
 	}
