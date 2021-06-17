@@ -10,7 +10,7 @@ type FlagDescriptor struct {
 	FlagOptional      bool
 }
 
-// GetDescription ets the flag description
+// GetDescription gets the flag description
 func (fd *FlagDescriptor) GetDescription() string {
 	return fd.Description
 }
