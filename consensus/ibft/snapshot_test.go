@@ -331,11 +331,9 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			blockchain := blockchain.TestBlockchain(t, genesis)
 			initialHeaders := buildHeaders(pool, genesis, c.headers)
 			for _, h := range initialHeaders {
-				if err := blockchain.WriteHeaders([]*types.Header{h}); err != nil {
-					t.Logf("err %+v", err)
-				}
+				err := blockchain.WriteHeaders([]*types.Header{h})
+				assert.NoError(t, err)
 			}
-			t.Logf("current %+v", blockchain.Header().Number)
 
 			ibft := &Ibft{
 				epochSize:  epoch,
@@ -352,11 +350,6 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			saveSnapshots(t, tmpDir, c.savedSnapshots)
 
 			assert.NoError(t, ibft.setupSnapshot())
-
-			for i, s := range ibft.store.list {
-				t.Logf("result snapshot [%d] = %+v", i, s)
-			}
-
 			assert.Equal(t, c.expectedResult.LastBlock, ibft.store.getLastBlock())
 			assert.Equal(t, c.expectedResult.Snapshots, ([]*Snapshot)(ibft.store.list))
 		})
