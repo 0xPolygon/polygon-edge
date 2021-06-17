@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -63,6 +64,9 @@ func (m *MonitorCommand) Run(args []string) int {
 	go func() {
 		for {
 			evnt, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
 			if err != nil {
 				m.UI.Error(fmt.Sprintf("failed to read event: %v", err))
 				break

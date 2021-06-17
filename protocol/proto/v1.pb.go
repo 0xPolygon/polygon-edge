@@ -119,10 +119,13 @@ type GetHeadersRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Number int64  `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
-	Hash   string `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
-	Skip   int64  `protobuf:"varint,3,opt,name=skip,proto3" json:"skip,omitempty"`
-	Amount int64  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	// Provide a number or hash
+	Number int64 `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
+	// Provide a number or hash
+	Hash string `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	Skip int64  `protobuf:"varint,3,opt,name=skip,proto3" json:"skip,omitempty"`
+	// Provide an amount not greater than 190
+	Amount int64 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 }
 
 func (x *GetHeadersRequest) Reset() {

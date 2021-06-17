@@ -19,9 +19,12 @@ message GetCurrentResponse {
 }
 
 message GetHeadersRequest {
+    // Provide a number or hash
     int64 number = 1;
+    // Provide a number or hash
     string hash = 2;
     int64 skip = 3;
+    // Provide an amount not greater than 190
     int64 amount = 4;
 }
 

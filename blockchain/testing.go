@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -158,7 +159,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, state.NewExecutor(config.Params, st))
+	b, err := newBlockChain(config, state.NewExecutor(config.Params, st))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,9 +213,26 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	config := &chain.Chain{
 		Genesis: genesis,
 	}
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, &mockExecutor{})
+	b, err := newBlockChain(config, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return b
+}
+
+func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) {
+	if executor == nil {
+		executor = &mockExecutor{}
+	}
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
+	if err != nil {
+		return nil, err
+	}
+	// if we are using mock consensus we can compute right away the genesis since
+	// this consensus does not change the header hash
+	if err = b.ComputeGenesis(); err != nil {
+		return nil, fmt.Errorf("compute genisis: %w", err)
+	}
+	return b, nil
 }
