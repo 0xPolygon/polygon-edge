@@ -17,6 +17,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func getTempDir(t *testing.T) string {
+	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	})
+	return tmpDir
+}
+
 type testerAccount struct {
 	alias string
 	priv  *ecdsa.PrivateKey
@@ -315,20 +326,12 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		}
 
 		t.Run(c.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
-			assert.NoError(t, err)
-			t.Cleanup(func() {
-				if err := os.RemoveAll(tmpDir); err != nil {
-					t.Error(err)
-				}
-			})
-
+			tmpDir := getTempDir(t)
 			// Build blockchain with headers
 			blockchain := blockchain.TestBlockchain(t, genesis)
 			initialHeaders := buildHeaders(pool, genesis, c.headers)
 			for _, h := range initialHeaders {
-				err = blockchain.WriteHeaders([]*types.Header{h})
-				if err != nil {
+				if err := blockchain.WriteHeaders([]*types.Header{h}); err != nil {
 					t.Logf("err %+v", err)
 				}
 			}
@@ -776,14 +779,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 }
 
 func TestSnapshot_Store_SaveLoad(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
-	assert.NoError(t, err)
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Error(err)
-		}
-	})
-
+	tmpDir := getTempDir(t)
 	store0 := newSnapshotStore()
 	for i := 0; i < 10; i++ {
 		store0.add(&Snapshot{
