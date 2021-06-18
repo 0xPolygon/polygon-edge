@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
@@ -23,7 +23,20 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
-          args: --verbose --disable staticcheck --disable errcheck
+          args: --disable staticcheck --disable errcheck
+          skip-go-installation: true
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15.x
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Go build
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
