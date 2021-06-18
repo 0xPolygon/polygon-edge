@@ -27,5 +27,8 @@ jobs:
       - name: Go build
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
 
+      - name: Add artifacts directory to the path
+        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
+
       - name: Go test
         run: CI=true go test -v ./...
