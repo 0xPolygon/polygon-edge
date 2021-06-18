@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
@@ -18,13 +19,15 @@ func (p *PeersList) GetHelperText() string {
 	return "Returns the list of connected peers, including the current node"
 }
 
+func (p *PeersList) GetBaseCommand() string {
+	return "peers list"
+}
+
 // Help implements the cli.PeersList interface
 func (p *PeersList) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "peers list"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersList interface
@@ -34,7 +37,7 @@ func (p *PeersList) Synopsis() string {
 
 // Run implements the cli.PeersList interface
 func (p *PeersList) Run(args []string) int {
-	flags := p.FlagSet("peers list")
+	flags := p.FlagSet(p.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
@@ -53,19 +56,28 @@ func (p *PeersList) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(formatPeers(resp.Peers))
+	output := "\n[PEERS LIST]\n"
+
+	if len(resp.Peers) == 0 {
+		output += "No peers found"
+	} else {
+		output += fmt.Sprintf("Number of peers: %d\n\n", len(resp.Peers))
+
+		output += formatPeers(resp.Peers)
+	}
+
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
 }
 
 func formatPeers(peers []*proto.Peer) string {
-	if len(peers) == 0 {
-		return "No deployments found"
+	var generatedRows []string
+	for i := 0; i < len(peers); i++ {
+		generatedRows = append(generatedRows, fmt.Sprintf("[%d]|%s", i, peers[i].Id))
 	}
 
-	rows := make([]string, len(peers)+1)
-	rows[0] = "ID"
-	for i, d := range peers {
-		rows[i+1] = fmt.Sprintf("%s", d.Id)
-	}
-	return formatList(rows)
+	return formatKV(generatedRows)
 }

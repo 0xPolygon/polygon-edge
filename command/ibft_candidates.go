@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
@@ -18,13 +19,15 @@ func (p *IbftCandidates) GetHelperText() string {
 	return "Queries the current set of proposed candidates, as well as candidates that have not been included yet"
 }
 
+func (p *IbftCandidates) GetBaseCommand() string {
+	return "ibft candidates"
+}
+
 // Help implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft candidates"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
@@ -34,7 +37,7 @@ func (p *IbftCandidates) Synopsis() string {
 
 // Run implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Run(args []string) int {
-	flags := p.FlagSet("ibft candidates")
+	flags := p.FlagSet(p.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
@@ -53,13 +56,39 @@ func (p *IbftCandidates) Run(args []string) int {
 		return 1
 	}
 
+	output := "\n[IBFT CANDIDATES]\n"
+
 	if len(resp.Candidates) == 0 {
-		p.UI.Output("No candidates")
-		return 0
+		output += "No candidates found"
+	} else {
+		output += fmt.Sprintf("Number of candidates: %d\n\n", len(resp.Candidates))
+
+		output += formatCandidates(resp.Candidates)
 	}
 
-	for _, c := range resp.Candidates {
-		p.UI.Output(fmt.Sprintf("%s %v", c.Address, c.Auth))
-	}
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
+}
+
+func formatCandidates(candidates []*ibftOp.Candidate) string {
+	var generatedCandidates []string
+
+	generatedCandidates = append(generatedCandidates, "Address|Vote")
+
+	for _, c := range candidates {
+		generatedCandidates = append(generatedCandidates, fmt.Sprintf("%s|%s", c.Address, voteToString(c.Auth)))
+	}
+
+	return formatKV(generatedCandidates)
+}
+
+func voteToString(vote bool) string {
+	if vote {
+		return "ADD"
+	}
+
+	return "REMOVE"
 }

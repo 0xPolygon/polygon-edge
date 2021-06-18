@@ -2,7 +2,9 @@ package command
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
@@ -14,16 +16,18 @@ type IbftStatus struct {
 
 // GetHelperText returns a simple description of the command
 func (p *IbftStatus) GetHelperText() string {
-	return "Returns the overall status of the IBFT client"
+	return "Returns the current validator key of the IBFT client"
+}
+
+func (p *IbftStatus) GetBaseCommand() string {
+	return "ibft status"
 }
 
 // Help implements the cli.IbftStatus interface
 func (p *IbftStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	usage := "ibft status"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftStatus interface
@@ -33,12 +37,13 @@ func (p *IbftStatus) Synopsis() string {
 
 // Run implements the cli.IbftStatus interface
 func (p *IbftStatus) Run(args []string) int {
-	flags := p.FlagSet("ibft propose")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
+
 	conn, err := p.Conn()
 	if err != nil {
 		p.UI.Error(err.Error())
@@ -52,6 +57,14 @@ func (p *IbftStatus) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(resp.Key)
+	var output = "\n[VALIDATOR STATUS]\n"
+	output += formatKV([]string{
+		fmt.Sprintf("Vaidator key|%s", resp.Key),
+	})
+
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
 }
