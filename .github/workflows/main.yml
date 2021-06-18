@@ -23,7 +23,6 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
-          args: --disable staticcheck --disable errcheck
           skip-go-installation: true
   test:
     runs-on: ubuntu-latest
