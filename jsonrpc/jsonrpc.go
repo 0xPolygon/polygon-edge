@@ -139,8 +139,8 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 
 	handleErr := func(err error) {
 		w.Write([]byte(err.Error()))
+		return
 	}
-
 	if req.Method == "GET" {
 		w.Write([]byte("PolygonSDK JSON-RPC"))
 		return
