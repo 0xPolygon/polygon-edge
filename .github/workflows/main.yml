@@ -28,4 +28,4 @@ jobs:
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
 
       - name: Go test
-        run: CI=true go test -v ./...t
+        run: CI=true go test -v ./...
