@@ -22,7 +22,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
-          args: --verbose
+          args: --verbose --disable staticcheck --disable errcheck
 
       - name: Go build
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
