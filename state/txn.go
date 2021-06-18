@@ -53,7 +53,7 @@ func newTxn(state State, snapshot Snapshot) *Txn {
 
 func (txn *Txn) hashit(src []byte) []byte {
 	txn.hash.Reset()
-	txn.hash.Write(src)
+	txn.hash.Write(src) //nolint
 	// hashit is used to make queries so we do not need to
 	// make copies of the result
 	return txn.hash.Read()

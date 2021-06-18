@@ -447,7 +447,7 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 			// fill skeleton
 			for indx := range sk.slots {
-				sk.fillSlot(uint64(indx), p.client)
+				sk.fillSlot(uint64(indx), p.client) //nolint
 			}
 
 			// sync the data

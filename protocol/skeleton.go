@@ -41,7 +41,7 @@ func (s *skeleton) build(clt proto.V1Client, ancestor types.Hash) error {
 	if err != nil {
 		return err
 	}
-	s.addSkeleton(headers)
+	s.addSkeleton(headers) // nolint
 	return nil
 }
 
