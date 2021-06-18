@@ -13,7 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/command"
+	"github.com/0xPolygon/minimal/command/server"
+	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 
@@ -120,38 +126,54 @@ func (t *TestServer) Stop() {
 }
 
 type InitIBFTResult struct {
-	PublicKey string
-	NodeID    string
+	Address string
+	NodeID  string
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	args := []string{
-		"ibft", "init", "--data-dir", t.Config.IBFTDir,
-	}
+	ibftInitCmd := command.IbftInit{}
+	var args []string
+
+	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")
+	args = append(args, commandSlice...)
+	args = append(args, "--data-dir", t.Config.IBFTDir)
 
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
-	output, err := cmd.Output()
+	_, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 
 	res := &InitIBFTResult{}
-	for _, line := range strings.Split(string(output), "\n") {
-		if strings.HasPrefix(line, "Public key:") {
-			res.PublicKey = strings.Trim(strings.TrimPrefix(line, "Public Key:"), " ")
-		}
-		if strings.HasPrefix(line, "Node ID:") {
-			res.NodeID = strings.Trim(strings.TrimPrefix(line, "Node ID:"), " ")
-		}
+	// Read the private key
+	key, err := crypto.ReadPrivKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
+	if err != nil {
+		return nil, err
 	}
+
+	// Read the Libp2p key
+	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "libp2p"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the node ID from the private key
+	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	if err != nil {
+		return nil, err
+	}
+
+	res.Address = crypto.PubKeyToAddress(&key.PublicKey).String()
+	res.NodeID = nodeId.String()
 
 	return res, nil
 }
 
 func (t *TestServer) GenerateGenesis() error {
+	genesisCmd := command.GenesisCommand{}
 	args := []string{
-		"genesis",
+		genesisCmd.GetBaseCommand(),
 	}
 
 	// add premines
@@ -183,8 +205,9 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
+	serverCmd := server.Command{}
 	args := []string{
-		"server",
+		serverCmd.GetBaseCommand(),
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc

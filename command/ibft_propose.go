@@ -2,7 +2,9 @@ package command
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/types"
@@ -17,29 +19,37 @@ type IbftPropose struct {
 func (p *IbftPropose) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["add"] = FlagDescriptor{
-		description: "Proposes a new validator to be added to the validator set",
-		arguments: []string{
+	p.flagMap["addr"] = helper.FlagDescriptor{
+		Description: "Address of the account to be voted for",
+		Arguments: []string{
 			"ETH_ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 
-	p.flagMap["del"] = FlagDescriptor{
-		description: "Proposes a new validator to be removed from the validator set",
-		arguments: []string{
-			"ETH_ADDRESS",
+	p.flagMap["vote"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf(
+			"Proposes a change to the validator set. Possible values: [%s, %s]", positive, negative,
+		),
+		Arguments: []string{
+			"VOTE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 }
 
 // GetHelperText returns a simple description of the command
 func (p *IbftPropose) GetHelperText() string {
-	return "Proposes a new candidate to be added to the snapshot list"
+	return "Proposes a new candidate to be added or removed from the validator set"
+}
+
+func (p *IbftPropose) GetBaseCommand() string {
+	return "ibft propose"
 }
 
 // Help implements the cli.IbftPropose interface
@@ -47,9 +57,7 @@ func (p *IbftPropose) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "ibft propose [--add ETH_ADDRESS | --del ETH_ADDRESS]"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftPropose interface
@@ -57,34 +65,45 @@ func (p *IbftPropose) Synopsis() string {
 	return p.GetHelperText()
 }
 
+// Extracting it out so we have it in a variable
+var (
+	positive = "auth"
+	negative = "drop"
+)
+
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
-	flags := p.FlagSet("ibft propose")
+	flags := p.FlagSet(p.GetBaseCommand())
 
-	var add, del bool
-	flags.BoolVar(&add, "add", false, "add")
-	flags.BoolVar(&del, "del", false, "del")
+	var vote string
+	var ethAddress string
+
+	flags.StringVar(&vote, "vote", "", "")
+	flags.StringVar(&ethAddress, "addr", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	if add == del {
-		// either (add=true, del=true) or (add=false, del=false)
-		p.UI.Error("Either add or del needs to be set")
+	if vote == "" {
+		p.UI.Error("Vote value not specified")
 		return 1
 	}
 
-	args = flags.Args()
-	if len(args) != 1 {
-		p.UI.Error("only 1 argument expected")
+	if vote != positive && vote != negative {
+		p.UI.Error(fmt.Sprintf("Invalid vote value (should be '%s' or '%s')", positive, negative))
+		return 1
+	}
+
+	if ethAddress == "" {
+		p.UI.Error("Account address not specified")
 		return 1
 	}
 
 	var addr types.Address
-	if err := addr.UnmarshalText([]byte(args[0])); err != nil {
-		p.UI.Error("failed to decode addr")
+	if err := addr.UnmarshalText([]byte(ethAddress)); err != nil {
+		p.UI.Error("Failed to decode address")
 		return 1
 	}
 
@@ -97,12 +116,22 @@ func (p *IbftPropose) Run(args []string) int {
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	req := &proto.Candidate{
 		Address: addr.String(),
-		Auth:    add,
+		Auth:    vote == positive,
 	}
+
 	_, err = clt.Propose(context.Background(), req)
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
+
+	output := "\n[IBFT PROPOSE]\n"
+
+	if vote == positive {
+		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", ethAddress)
+	} else {
+		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", ethAddress)
+	}
+
 	return 0
 }

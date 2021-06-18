@@ -2,6 +2,10 @@ package command
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/0xPolygon/minimal/command/helper"
+	helperFlags "github.com/0xPolygon/minimal/helper/flags"
 	"github.com/0xPolygon/minimal/minimal/proto"
 )
 
@@ -13,21 +17,26 @@ type PeersAdd struct {
 func (p *PeersAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["libp2p-address"] = FlagDescriptor{
-		description: "Peer's libp2p address in the multiaddr format",
-		arguments: []string{
+	p.flagMap["addr"] = helper.FlagDescriptor{
+		Description: "Peer's libp2p address in the multiaddr format",
+		Arguments: []string{
 			"PEER_ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 }
 
 // GetHelperText returns a simple description of the command
 func (p *PeersAdd) GetHelperText() string {
-	return "Adds a new peer to the peer list, using the peer's libp2p address"
+	return "Adds new peers to the peer list, using the peer's libp2p address"
+}
+
+func (p *PeersAdd) GetBaseCommand() string {
+	return "peers add"
 }
 
 // Help implements the cli.PeersAdd interface
@@ -35,9 +44,7 @@ func (p *PeersAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "peers add --libp2p-address PEER_ADDRESS"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersAdd interface
@@ -47,33 +54,63 @@ func (p *PeersAdd) Synopsis() string {
 
 // Run implements the cli.PeersAdd interface
 func (p *PeersAdd) Run(args []string) int {
-	flags := p.FlagSet("peers add")
+	flags := p.FlagSet(p.GetBaseCommand())
 
-	var peerAddress string
-	flags.StringVar(&peerAddress, "libp2p-address", "", "")
+	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
+	flags.Var(&passedInAddresses, "addr", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	if peerAddress == "" {
-		p.UI.Error("libp2p-address argument expected")
+	if len(passedInAddresses) < 1 {
+		p.UI.Error("At least 1 peer address is required")
 		return 1
 	}
 
+	// Connect to the gRPC layer
 	conn, err := p.Conn()
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
+	var peersAdded int
+	var addedPeers []string
+	var visibleErrors []string
+
+	// Adds all the peers and breaks if it hits an error
 	clt := proto.NewSystemClient(conn)
-	if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: peerAddress}); err != nil {
-		p.UI.Error(err.Error())
-		return 1
+	for _, address := range passedInAddresses {
+		if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: address}); err != nil {
+			visibleErrors = append(visibleErrors, err.Error())
+			break
+		}
+
+		peersAdded++
+		addedPeers = append(addedPeers, address)
 	}
 
-	p.UI.Info("Peer added")
+	var output = "\n[PEERS ADDED]\n"
+	output += formatKV([]string{
+		fmt.Sprintf("Peers listed|%d", len(passedInAddresses)), // The number of peers the user wanted to add
+		fmt.Sprintf("Peers added|%d", peersAdded),              // The number of peers that have been added
+	})
+
+	if len(addedPeers) > 0 {
+		output += "\n\n[LIST OF ADDED PEERS]\n"
+		output += formatList(addedPeers)
+	}
+
+	if len(visibleErrors) > 0 {
+		output += "\n\n[ERRORS]\n"
+		output += formatList(visibleErrors)
+	}
+
+	output += "\n"
+
+	p.UI.Info(output)
+
 	return 0
 }
