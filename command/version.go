@@ -1,6 +1,7 @@
 package command
 
 import (
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/version"
 	"github.com/mitchellh/cli"
 )
@@ -16,11 +17,13 @@ func (c *VersionCommand) GetHelperText() string {
 	return "Returns the current Polygon SDK version"
 }
 
+func (c *VersionCommand) GetBaseCommand() string {
+	return "version"
+}
+
 // Help implements the cli.Command interface
 func (c *VersionCommand) Help() string {
-	usage := "version"
-
-	return c.GenerateHelp(c.Synopsis(), usage)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface

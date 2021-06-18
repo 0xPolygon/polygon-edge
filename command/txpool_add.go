@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
@@ -19,55 +20,57 @@ type TxPoolAdd struct {
 func (p *TxPoolAdd) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["from"] = FlagDescriptor{
-		description: "The sender address",
-		arguments: []string{
+	p.flagMap["from"] = helper.FlagDescriptor{
+		Description: "The sender address",
+		Arguments: []string{
 			"ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["to"] = FlagDescriptor{
-		description: "The receiver address",
-		arguments: []string{
+	p.flagMap["to"] = helper.FlagDescriptor{
+		Description: "The receiver address",
+		Arguments: []string{
 			"ADDRESS",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["value"] = FlagDescriptor{
-		description: "The value of the transaction",
-		arguments: []string{
+	p.flagMap["value"] = helper.FlagDescriptor{
+		Description: "The value of the transaction",
+		Arguments: []string{
 			"VALUE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasPrice"] = FlagDescriptor{
-		description: "The gas price",
-		arguments: []string{
+	p.flagMap["gasPrice"] = helper.FlagDescriptor{
+		Description: "The gas price",
+		Arguments: []string{
 			"GASPRICE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasLimit"] = FlagDescriptor{
-		description: "The specified gas limit",
-		arguments: []string{
+	p.flagMap["gasLimit"] = helper.FlagDescriptor{
+		Description: "The specified gas limit",
+		Arguments: []string{
 			"LIMIT",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	p.flagMap["nonce"] = FlagDescriptor{
-		description: "The nonce of the transaction",
-		arguments: []string{
+	p.flagMap["nonce"] = helper.FlagDescriptor{
+		Description: "The nonce of the transaction",
+		Arguments: []string{
 			"NONCE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
@@ -76,15 +79,16 @@ func (p *TxPoolAdd) GetHelperText() string {
 	return "Adds a new transaction to the transaction pool"
 }
 
+func (p *TxPoolAdd) GetBaseCommand() string {
+	return "txpool add"
+}
+
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := `txpool add --from ADDRESS --to ADDRESS --value VALUE
-	--gasPrice GASPRICE [--gasLimit LIMIT] [--nonce NONCE]`
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
@@ -94,7 +98,7 @@ func (p *TxPoolAdd) Synopsis() string {
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
-	flags := p.FlagSet("txpool add")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	// Address types
 	var fromRaw, toRaw string
@@ -122,22 +126,22 @@ func (p *TxPoolAdd) Run(args []string) int {
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode from address: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode from address: %v", err))
 		return 1
 	}
 	to := types.Address{}
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to address: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
 		return 1
 	}
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to value: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
 		return 1
 	}
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("failed to decode to gasPrice: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
 		return 1
 	}
 
@@ -165,9 +169,24 @@ func (p *TxPoolAdd) Run(args []string) int {
 		// from is not encoded in the rlp
 		From: from.String(),
 	}
+
 	if _, err := clt.AddTxn(context.Background(), msg); err != nil {
-		p.UI.Error(fmt.Sprintf("failed to add txn: %v", err))
+		p.UI.Error(fmt.Sprintf("Failed to add transaction: %v", err))
 		return 1
 	}
+
+	output := "\n[ADD TRANSACTION]\n"
+	output += "Successfully added transaction:\n"
+
+	output += formatKV([]string{
+		fmt.Sprintf("FROM|%s", fromRaw),
+		fmt.Sprintf("TO|%s", toRaw),
+		fmt.Sprintf("VALUE|%s", valueRaw),
+		fmt.Sprintf("GAS PRICE|%s", gasPriceRaw),
+		fmt.Sprintf("GAS LIMIT|%d", gasLimit),
+	})
+
+	output += "\n"
+
 	return 0
 }
