@@ -58,12 +58,8 @@ func (c *Command) Run(args []string) int {
 
 	if conf.Join != "" {
 		// make a non-blocking join request
-		err := server.Join(conf.Join, 0) //nolint
-
-		if err != nil {
-			c.UI.Error(err.Error())
-
-			return 1
+		if err = server.Join(conf.Join, 0); err != nil {
+			c.UI.Error(fmt.Sprintf("Failed to join address %s: %v", conf.Join, err))
 		}
 	}
 

@@ -7,6 +7,8 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
+type void struct{}
+
 // Subscription is the blockchain subscription interface
 type Subscription interface {
 	GetEventCh() chan *Event
@@ -44,9 +46,9 @@ func (m *MockSubscription) Close() {
 
 // subscription is the Blockchain event subscription object
 type subscription struct {
-	updateCh chan struct{} // Channel for update information
-	closeCh  chan struct{} // Channel for close signals
-	elem     *eventElem    // Reference to the blockchain event wrapper
+	updateCh chan void  // Channel for update information
+	closeCh  chan void  // Channel for close signals
+	elem     *eventElem // Reference to the blockchain event wrapper
 }
 
 // GetEventCh creates a new event channel, and returns it
@@ -55,6 +57,9 @@ func (s *subscription) GetEventCh() chan *Event {
 	go func() {
 		for {
 			evnt := s.GetEvent()
+			if evnt == nil {
+				return
+			}
 			eventCh <- evnt
 		}
 	}()
@@ -164,7 +169,7 @@ type eventStream struct {
 	head *eventElem
 
 	// channel to notify updates
-	updateCh []chan struct{}
+	updateCh []chan void
 }
 
 // subscribe Creates a new blockchain event subscription
@@ -173,20 +178,20 @@ func (e *eventStream) subscribe() *subscription {
 	s := &subscription{
 		elem:     head,
 		updateCh: updateCh,
-		closeCh:  make(chan struct{}),
+		closeCh:  make(chan void),
 	}
 
 	return s
 }
 
 // Head returns the event list head
-func (e *eventStream) Head() (*eventElem, chan struct{}) {
+func (e *eventStream) Head() (*eventElem, chan void) {
 	e.lock.Lock()
 	head := e.head
 
-	ch := make(chan struct{})
+	ch := make(chan void)
 	if e.updateCh == nil {
-		e.updateCh = []chan struct{}{}
+		e.updateCh = make([]chan void, 0)
 	}
 	e.updateCh = append(e.updateCh, ch)
 
@@ -211,7 +216,7 @@ func (e *eventStream) push(event *Event) {
 	// Notify the listeners
 	for _, update := range e.updateCh {
 		select {
-		case update <- struct{}{}:
+		case update <- void{}:
 		default:
 		}
 	}
