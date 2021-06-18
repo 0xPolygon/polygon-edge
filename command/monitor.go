@@ -3,10 +3,12 @@ package command
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 )
@@ -18,16 +20,18 @@ type MonitorCommand struct {
 
 // GetHelperText returns a simple description of the command
 func (m *MonitorCommand) GetHelperText() string {
-	return "Starts logging client activity"
+	return "Starts logging block add / remove events on the blockchain"
+}
+
+func (m *MonitorCommand) GetBaseCommand() string {
+	return "monitor"
 }
 
 // Help implements the cli.Command interface
 func (m *MonitorCommand) Help() string {
 	m.Meta.DefineFlags()
 
-	usage := "monitor"
-
-	return m.GenerateHelp(m.Synopsis(), usage)
+	return helper.GenerateHelp(m.Synopsis(), helper.GenerateUsage(m.GetBaseCommand(), m.flagMap), m.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -37,7 +41,7 @@ func (m *MonitorCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (m *MonitorCommand) Run(args []string) int {
-	flags := m.FlagSet("monitor")
+	flags := m.FlagSet(m.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		m.UI.Error(err.Error())
 		return 1
@@ -63,16 +67,28 @@ func (m *MonitorCommand) Run(args []string) int {
 	go func() {
 		for {
 			evnt, err := stream.Recv()
-			if err != nil {
-				m.UI.Error(fmt.Sprintf("failed to read event: %v", err))
+			if err == io.EOF {
 				break
 			}
-			fmt.Println("-- event --")
+			if err != nil {
+				m.UI.Error(fmt.Sprintf("Failed to read event: %v", err))
+				break
+			}
+
+			m.UI.Info("\n[BLOCK EVENT]\n")
 			for _, add := range evnt.Added {
-				fmt.Printf("Add block: Num %d Hash %s\n", add.Number, add.Hash)
+				m.UI.Info(formatKV([]string{
+					fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
+					fmt.Sprintf("Block Number|%d", add.Number),
+					fmt.Sprintf("Block Hash|%s", add.Hash),
+				}))
 			}
 			for _, del := range evnt.Removed {
-				fmt.Printf("Delete block: Num %d Hash %s\n", del.Number, del.Hash)
+				m.UI.Info(formatKV([]string{
+					fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
+					fmt.Sprintf("Block Number|%d", del.Number),
+					fmt.Sprintf("Block Hash|%s", del.Hash),
+				}))
 			}
 		}
 		doneCh <- struct{}{}

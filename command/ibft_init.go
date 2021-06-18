@@ -3,8 +3,10 @@ package command
 import (
 	"flag"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"path/filepath"
+
+	"github.com/0xPolygon/minimal/command/helper"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
@@ -20,15 +22,16 @@ type IbftInit struct {
 func (i *IbftInit) DefineFlags() {
 	if i.flagMap == nil {
 		// Flag map not initialized
-		i.flagMap = make(map[string]FlagDescriptor)
+		i.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	i.flagMap["data-dir"] = FlagDescriptor{
-		description: "Sets the directory for the Polygon SDK data",
-		arguments: []string{
+	i.flagMap["data-dir"] = helper.FlagDescriptor{
+		Description: "Sets the directory for the Polygon SDK data",
+		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      false,
 	}
 }
 
@@ -41,9 +44,7 @@ func (p *IbftInit) GetHelperText() string {
 func (p *IbftInit) Help() string {
 	p.DefineFlags()
 
-	usage := "ibft init --data-dir DATA_DIRECTORY"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.IbftInit interface
@@ -51,10 +52,13 @@ func (p *IbftInit) Synopsis() string {
 	return p.GetHelperText()
 }
 
+func (p *IbftInit) GetBaseCommand() string {
+	return "ibft init"
+}
+
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
-	flags := flag.NewFlagSet("ibft init", flag.ContinueOnError)
-
+	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
 	var dataDir string
 	flags.StringVar(&dataDir, "data-dir", "", "")
 
@@ -93,8 +97,16 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	p.UI.Output(fmt.Sprintf("Public key: %s", crypto.PubKeyToAddress(&key.PublicKey)))
-	p.UI.Output(fmt.Sprintf("Node ID: %s", nodeId.String()))
-	p.UI.Output("Done!")
+	output := "\n[IBFT INIT]\n"
+
+	output += formatKV([]string{
+		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&key.PublicKey)),
+		fmt.Sprintf("Node ID|%s", nodeId.String()),
+	})
+
+	output += "\n"
+
+	p.UI.Output(output)
+
 	return 0
 }

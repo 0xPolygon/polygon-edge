@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -18,13 +19,15 @@ func (c *StatusCommand) GetHelperText() string {
 	return "Returns the status of the Polygon SDK client"
 }
 
+func (c *StatusCommand) GetBaseCommand() string {
+	return "status"
+}
+
 // Help implements the cli.Command interface
 func (c *StatusCommand) Help() string {
 	c.Meta.DefineFlags()
 
-	usage := "status"
-
-	return c.GenerateHelp(c.Synopsis(), usage)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -35,7 +38,7 @@ func (c *StatusCommand) Synopsis() string {
 // Run implements the cli.Command interface
 func (c *StatusCommand) Run(args []string) int {
 
-	flags := c.FlagSet("status")
+	flags := c.FlagSet(c.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -54,6 +57,17 @@ func (c *StatusCommand) Run(args []string) int {
 		return 1
 	}
 
-	fmt.Println(status)
+	output := "\n[CLIENT STATUS]\n"
+	output += formatKV([]string{
+		fmt.Sprintf("Network (Chain ID)|%d", status.Network),
+		fmt.Sprintf("Current Block Number (base 10)|%d", status.Current.Number),
+		fmt.Sprintf("Current Block Hash|%s", status.Current.Hash),
+		fmt.Sprintf("Libp2p Address|%s", status.P2PAddr),
+	})
+
+	output += "\n"
+
+	c.UI.Info(output)
+
 	return 0
 }

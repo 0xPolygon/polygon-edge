@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
 )
 
@@ -15,15 +16,15 @@ type PeersStatus struct {
 func (p *PeersStatus) DefineFlags() {
 	if p.flagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]FlagDescriptor)
+		p.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["peer-id"] = FlagDescriptor{
-		description: "Libp2p node ID of a specific peer within p2p network",
-		arguments: []string{
+	p.flagMap["peer-id"] = helper.FlagDescriptor{
+		Description: "Libp2p node ID of a specific peer within p2p network",
+		Arguments: []string{
 			"PEER_ID",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
 	}
 }
 
@@ -32,14 +33,16 @@ func (p *PeersStatus) GetHelperText() string {
 	return "Returns the status of the specified peer, using the libp2p ID of the peer node"
 }
 
+func (p *PeersStatus) GetBaseCommand() string {
+	return "peers status"
+}
+
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	usage := "peers status --peer-id PEER_ID"
-
-	return p.GenerateHelp(p.Synopsis(), usage)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
 }
 
 // Synopsis implements the cli.PeersStatus interface
@@ -49,7 +52,7 @@ func (p *PeersStatus) Synopsis() string {
 
 // Run implements the cli.PeersStatus interface
 func (p *PeersStatus) Run(args []string) int {
-	flags := p.FlagSet("peers status")
+	flags := p.FlagSet(p.GetBaseCommand())
 
 	var nodeId string
 	flags.StringVar(&nodeId, "peer-id", "", "")
@@ -77,8 +80,21 @@ func (p *PeersStatus) Run(args []string) int {
 		return 1
 	}
 
-	fmt.Println("-- PEER STATUS --")
-	fmt.Println(resp)
+	var output = "\n[PEER STATUS]\n"
+	output += formatPeerStatus(resp)
+
+	output += "\n"
+
+	p.UI.Info(output)
 
 	return 0
+}
+
+// formatPeerStatus formats the peer status response for a single peer
+func formatPeerStatus(peer *proto.Peer) string {
+	return formatKV([]string{
+		fmt.Sprintf("ID|%s", peer.Id),
+		fmt.Sprintf("Protocols|%s", peer.Protocols),
+		fmt.Sprintf("Addresses|%s", peer.Addrs),
+	})
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
 	helperFlags "github.com/0xPolygon/minimal/helper/flags"
@@ -19,10 +20,10 @@ import (
 
 const (
 	genesisFileName       = "./genesis.json"
-	defaultChainName	  = "example"
+	defaultChainName      = "example"
 	defaultChainID        = 100
 	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	defaultConsensus	  = "pow"
+	defaultConsensus      = "pow"
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -35,7 +36,7 @@ type GenesisCommand struct {
 func (c *GenesisCommand) DefineFlags() {
 	if c.flagMap == nil {
 		// Flag map not initialized
-		c.flagMap = make(map[string]FlagDescriptor)
+		c.flagMap = make(map[string]helper.FlagDescriptor)
 	}
 
 	if len(c.flagMap) > 0 {
@@ -43,68 +44,76 @@ func (c *GenesisCommand) DefineFlags() {
 		return
 	}
 
-	c.flagMap["data-dir"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
-		arguments: []string{
+	c.flagMap["data-dir"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
+		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["name"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
-		arguments: []string{
+	c.flagMap["name"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
+		Arguments: []string{
 			"NAME",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["premine"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
-		arguments: []string{
+	c.flagMap["premine"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
+		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["chainid"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
-		arguments: []string{
+	c.flagMap["chainid"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
+		Arguments: []string{
 			"CHAIN_ID",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["consensus"] = FlagDescriptor{
-		description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
-		arguments: []string{
+	c.flagMap["consensus"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
+		Arguments: []string{
 			"CONSENSUS_PROTOCOL",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["bootnode"] = FlagDescriptor{
-		description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
-		arguments: []string{
+	c.flagMap["bootnode"] = helper.FlagDescriptor{
+		Description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
+		Arguments: []string{
 			"BOOTNODE_URL",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validator"] = FlagDescriptor{
-		description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
-		arguments: []string{
+	c.flagMap["ibft-validator"] = helper.FlagDescriptor{
+		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
+		Arguments: []string{
 			"IBFT_VALIDATOR_LIST",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validators-prefix-path"] = FlagDescriptor{
-		description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
-		arguments: []string{
+	c.flagMap["ibft-validators-prefix-path"] = helper.FlagDescriptor{
+		Description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
+		Arguments: []string{
 			"IBFT_VALIDATORS_PREFIX_PATH",
 		},
-		argumentsOptional: false,
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
@@ -113,14 +122,15 @@ func (c *GenesisCommand) GetHelperText() string {
 	return "Generates the genesis.json file, with passed in parameters"
 }
 
+func (c *GenesisCommand) GetBaseCommand() string {
+	return "genesis"
+}
+
 // Help implements the cli.Command interface
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
-	usage := `genesis [--data-dir DATA_DIRECTORY] [--name NAME] [--chainid CHAIN_ID]
-	[--premine ADDRESS:VALUE] [--bootnode BOOTNODE_URL] [--consensus CONSENSUS_PROTOCOL]
-	[--ibft-validator IBFT_VALIDATOR_LIST] [--ibft-validators-prefix-path IBFT_VALIDATORS_PREFIX_PATH]`
 
-	return c.GenerateHelp(c.Synopsis(), usage)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -130,7 +140,7 @@ func (c *GenesisCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *GenesisCommand) Run(args []string) int {
-	flags := flag.NewFlagSet("genesis", flag.ContinueOnError)
+	flags := flag.NewFlagSet(c.GetBaseCommand(), flag.ContinueOnError)
 	flags.Usage = func() {}
 
 	var dataDir string
