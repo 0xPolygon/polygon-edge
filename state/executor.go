@@ -283,7 +283,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	// TODO: Maybe there is no need for snapshot here, since snapshot is also created inside apply()
 	s := t.state.Snapshot()
-	returnValue, gas, failed, err := t.apply(msg)
+	returnValue, gasUsed, failed, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -293,7 +293,7 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	}
 
 	t.returnValue = returnValue
-	return gas, failed, err
+	return gasUsed, failed, err
 }
 
 // ContextPtr returns reference of context

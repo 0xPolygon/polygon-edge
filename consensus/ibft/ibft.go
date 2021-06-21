@@ -422,8 +422,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 // The Accept state always checks the snapshot, and the validator set. If the current node is not in the validators set,
 // it moves back to the Sync state. On the other hand, if the node is a validator, it calculates the proposer.
 // If it turns out that the current node is the proposer, it builds a block, and sends preprepare and then prepare messages.
-// On the other hand, if the node is a validator, it calculates the proposer. If it turns out that the current node is the proposer,
-// it builds a block, and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence)
