@@ -317,6 +317,31 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:      "should not count votes from the beginning of current epoch as there cannot be any proposals during the checkpoint block",
+			epochSize: 3,
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, vote("B", "F", true)),
+				newMockHeader(validators, skipVote("C")),
+				newMockHeader(validators, vote("D", "E", true)),
+				newMockHeader(validators, skipVote("D")),
+				newMockHeader(validators, vote("C", "F", true)),
+				newMockHeader(validators, vote("A", "F", true)),
+			},
+			savedSnapshots: nil,
+			expectedResult: snapshotData{
+				LastBlock: 7,
+				Snapshots: []*Snapshot{
+					newSnapshot(6, validatorSet, []*Vote{}),
+					newSnapshot(7, validatorSet, []*Vote{{
+						Validator: pool.get("A").Address(),
+						Address:   pool.get("F").Address(),
+						Authorize: true,
+					}}),
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
