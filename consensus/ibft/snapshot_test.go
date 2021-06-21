@@ -111,18 +111,18 @@ func (ap *testerAccountPool) ValidatorSet() ValidatorSet {
 
 type mockVote struct {
 	validator string
-	voted     string
+	candidate string
 	auth      bool
 }
 
-func mine(validator string) mockVote {
+func skipVote(validator string) mockVote {
 	return mockVote{validator: validator}
 }
 
-func vote(validator, voted string, auth bool) mockVote {
+func vote(validator, candidate string, auth bool) mockVote {
 	return mockVote{
 		validator: validator,
-		voted:     voted,
+		candidate: candidate,
 		auth:      auth,
 	}
 }
@@ -161,11 +161,11 @@ func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders [
 			MixHash:    IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
-		if v.voted != "" {
-			// if voted is empty, we are just creating a new block
+		if v.candidate != "" {
+			// if candidate is empty, we are just creating a new block
 			// without votes
-			pool.add(v.voted)
-			h.Miner = pool.get(v.voted).Address()
+			pool.add(v.candidate)
+			h.Miner = pool.get(v.candidate).Address()
 		}
 		if v.auth {
 			// add auth to the vote
@@ -233,7 +233,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 	}
 	var cases = []struct {
 		name           string
-		epoch          uint64
+		epochSize      uint64
 		headers        []mockHeader
 		savedSnapshots []*Snapshot
 		expectedResult snapshotData
@@ -251,8 +251,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		{
 			name: "should load from file and advance to latest height without any update if they are in same epoch",
 			headers: []mockHeader{
-				newMockHeader(validators, mine("A")),
-				newMockHeader(validators, mine("B")),
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
 			},
 			savedSnapshots: []*Snapshot{
 				newSnapshot(0, validatorSet, []*Vote{}),
@@ -267,8 +267,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		{
 			name: "should generate snapshot from genesis because of no snapshot file",
 			headers: []mockHeader{
-				newMockHeader(validators, mine("A")),
-				newMockHeader(validators, mine("B")),
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
 			},
 			savedSnapshots: nil,
 			expectedResult: snapshotData{
@@ -279,13 +279,13 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:  "should generate snapshot from beginning of current epoch because of no snapshot file",
-			epoch: 3,
+			name:      "should generate snapshot from beginning of current epoch because of no snapshot file",
+			epochSize: 3,
 			headers: []mockHeader{
-				newMockHeader(validators, mine("A")),
-				newMockHeader(validators, mine("B")),
-				newMockHeader(validators, mine("C")),
-				newMockHeader(validators, mine("D")),
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
+				newMockHeader(validators, skipVote("C")),
+				newMockHeader(validators, skipVote("D")),
 			},
 			savedSnapshots: nil,
 			expectedResult: snapshotData{
@@ -296,12 +296,12 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:  "should recover votes from the beginning of current epoch",
-			epoch: 3,
+			name:      "should recover votes from the beginning of current epoch",
+			epochSize: 3,
 			headers: []mockHeader{
-				newMockHeader(validators, mine("A")),
+				newMockHeader(validators, skipVote("A")),
 				newMockHeader(validators, vote("B", "F", true)),
-				newMockHeader(validators, mine("C")),
+				newMockHeader(validators, skipVote("C")),
 				newMockHeader(validators, vote("D", "E", true)),
 			},
 			savedSnapshots: nil,
@@ -320,9 +320,9 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		epoch := c.epoch
-		if epoch == 0 {
-			epoch = 10
+		epochSize := c.epochSize
+		if epochSize == 0 {
+			epochSize = 10
 		}
 
 		t.Run(c.name, func(t *testing.T) {
@@ -336,7 +336,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			}
 
 			ibft := &Ibft{
-				epochSize:  epoch,
+				epochSize:  epochSize,
 				blockchain: blockchain,
 				config: &consensus.Config{
 					Path: tmpDir,
@@ -359,7 +359,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 func TestSnapshot_ProcessHeaders(t *testing.T) {
 	var cases = []struct {
 		name       string
-		epoch      uint64
+		epochSize  uint64
 		validators []string
 		headers    []mockHeader
 	}{
@@ -370,7 +370,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 			headers: []mockHeader{
 				{
-					action: mine("A"),
+					action: skipVote("A"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A"},
 					},
@@ -390,7 +390,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					},
 				},
 				{
-					action: mine("B"),
+					action: skipVote("B"),
 				},
 				{
 					// one vote from A is NOT enough to promote C
@@ -570,7 +570,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 		},
 		{
 			name:       "epoch transition resets all votes",
-			epoch:      3,
+			epochSize:  3,
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
@@ -596,7 +596,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 3 (do not vote)
-					action: mine("B"),
+					action: skipVote("B"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -606,12 +606,12 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 		},
 		{
 			name:       "epoch transition creates new snapshot",
-			epoch:      1,
+			epochSize:  1,
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
 					// block 1
-					action: mine("A"),
+					action: skipVote("A"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -619,7 +619,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 2
-					action: mine("B"),
+					action: skipVote("B"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -627,7 +627,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 3
-					action: mine("C"),
+					action: skipVote("C"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -638,9 +638,9 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			epoch := c.epoch
-			if epoch == 0 {
-				epoch = 1000
+			epochSize := c.epochSize
+			if epochSize == 0 {
+				epochSize = 1000
 			}
 
 			pool := newTesterAccountPool()
@@ -652,7 +652,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 			// process the headers independently
 			ibft := &Ibft{
-				epochSize:  epoch,
+				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}
@@ -681,7 +681,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					for _, v := range result.votes {
 						resSnap.Votes = append(resSnap.Votes, &Vote{
 							Validator: pool.get(v.validator).Address(),
-							Address:   pool.get(v.voted).Address(),
+							Address:   pool.get(v.candidate).Address(),
 							Authorize: v.auth,
 						})
 					}
@@ -706,7 +706,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 			// Process headers all at the same time should have the same result
 			ibft1 := &Ibft{
-				epochSize:  epoch,
+				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}

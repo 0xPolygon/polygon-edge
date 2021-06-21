@@ -75,7 +75,7 @@ func (i *Ibft) setupSnapshot() error {
 		}
 	}
 
-	// Some of the data might get lost due to ungrateful disconnections
+	// Process headers if we missed some blocks in the current epoch
 	if header.Number > meta.LastBlock {
 		i.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
 
