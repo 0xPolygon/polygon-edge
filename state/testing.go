@@ -147,20 +147,6 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	assert.False(t, txn.Exist(addr1))
 }
 
-func testUpdateStateInPreState(t *testing.T, buildPreState buildPreState) {
-	// update state that was already set in prestate
-	state, snap := buildPreState(defaultPreState)
-
-	txn := newTxn(state, snap)
-	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
-
-	txn.SetState(addr1, hash1, hash2)
-	snap, _ = txn.Commit(false)
-
-	txn = newTxn(state, snap)
-	assert.Equal(t, hash2, txn.GetState(addr1, hash1))
-}
-
 func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	// If the state (in prestate) is updated to empty it should be removed
 	state, snap := buildPreState(defaultPreState)

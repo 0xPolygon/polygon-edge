@@ -177,21 +177,6 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	return b
 }
 
-func createGenesis(header *types.Header) *chain.Genesis {
-	genesis := &chain.Genesis{
-		Nonce:      header.Nonce,
-		ExtraData:  header.ExtraData,
-		GasLimit:   header.GasLimit,
-		Difficulty: header.Difficulty,
-		Mixhash:    header.MixHash,
-		Coinbase:   header.Miner,
-		ParentHash: header.ParentHash,
-		Number:     header.Number,
-		Timestamp:  header.Timestamp,
-	}
-	return genesis
-}
-
 type MockVerifier struct {
 }
 

@@ -64,7 +64,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	}
 
 	executor, _ := xxx.BeginTxn(pastRoot, c.Env.ToHeader(t))
-	_, _, err = executor.Apply(msg)
+	executor.Apply(msg) //nolint:errcheck
 
 	txn := executor.Txn()
 

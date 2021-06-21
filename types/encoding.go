@@ -51,10 +51,8 @@ func ParseBytes(val *string) ([]byte, error) {
 		return []byte{}, nil
 	}
 
-	str := *val
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-	}
+	str := strings.TrimPrefix(*val, "0x")
+
 	return hex.DecodeString(str)
 }
 

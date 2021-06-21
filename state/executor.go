@@ -241,7 +241,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// Set the receipt logs and create a bloom for filtering
-	receipt.Logs = buildLogs(logs, txn.Hash, types.Hash{}, uint(len(t.receipts)))
+	receipt.Logs = logs
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
@@ -253,34 +253,6 @@ func (t *Transition) Commit() (Snapshot, types.Hash) {
 	s2, root := t.state.Commit(t.config.EIP155)
 
 	return s2, types.BytesToHash(root)
-}
-
-// Block rewards at different forks
-var (
-	// FrontierBlockReward is the block reward for the Frontier fork
-	FrontierBlockReward = big.NewInt(5e+18)
-
-	// ByzantiumBlockReward is the block reward for the Byzantium fork
-	ByzantiumBlockReward = big.NewInt(3e+18)
-
-	// ConstantinopleBlockReward is the block reward for the Constantinople fork
-	ConstantinopleBlockReward = big.NewInt(2e+18)
-)
-
-var (
-	big8  = big.NewInt(8)
-	big32 = big.NewInt(32)
-)
-
-func buildLogs(logs []*types.Log, txHash, blockHash types.Hash, txIndex uint) []*types.Log {
-	newLogs := []*types.Log{}
-
-	for _, log := range logs {
-		newLog := log
-		newLogs = append(newLogs, newLog)
-	}
-
-	return newLogs
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

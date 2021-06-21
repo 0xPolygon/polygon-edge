@@ -62,7 +62,7 @@ func NewTxPool(logger hclog.Logger, sealing bool, store store, grpcServer *grpc.
 		logger:     logger.Named("txpool"),
 		store:      store,
 		idlePeriod: defaultIdlePeriod,
-		queue:      make(map[types.Address]*txQueue, 0),
+		queue:      make(map[types.Address]*txQueue),
 		network:    network,
 		sorted:     newTxPriceHeap(),
 		sealing:    sealing,
