@@ -3,6 +3,7 @@ package system
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 )
 
 // stakingHandler implements the staking logic for the System runtime
@@ -21,6 +22,7 @@ func (sh *stakingHandler) gas(_ []byte) uint64 {
 func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 	fmt.Printf("\n\n[Staking Handler RUN]\n\n [STAKER]: %s\n[AMOUNT]: %s\n\n", state.contract.Caller, state.contract.Value)
 
+	debug.PrintStack()
 	// Grab the value being staked
 	potentialStake := state.contract.Value
 

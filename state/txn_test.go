@@ -100,7 +100,8 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 	account := &Account{
 		Nonce:   p.Nonce,
 		Balance: big.NewInt(int64(p.Balance)),
-		Root:    root,
+		// TODO Mock the Staked balance
+		Root: root,
 	}
 	return account, snap
 }

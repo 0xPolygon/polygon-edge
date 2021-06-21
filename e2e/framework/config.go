@@ -15,8 +15,9 @@ const (
 )
 
 type SrvAccount struct {
-	Addr    types.Address
-	Balance *big.Int
+	Addr          types.Address
+	Balance       *big.Int
+	StakedBalance *big.Int
 }
 
 // TestServerConfig for the test server
@@ -42,8 +43,9 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 		t.PremineAccts = []*SrvAccount{}
 	}
 	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
-		Addr:    addr,
-		Balance: amount,
+		Addr:          addr,
+		Balance:       amount,
+		StakedBalance: big.NewInt(0),
 	})
 }
 

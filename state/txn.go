@@ -140,10 +140,11 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 	if !exists && create {
 		object = &StateObject{
 			Account: &Account{
-				Balance:  big.NewInt(0),
-				Trie:     txn.state.NewSnapshot(),
-				CodeHash: emptyCodeHash,
-				Root:     emptyStateHash,
+				Balance:       big.NewInt(0),
+				StakedBalance: big.NewInt(0),
+				Trie:          txn.state.NewSnapshot(),
+				CodeHash:      emptyCodeHash,
+				Root:          emptyStateHash,
 			},
 		}
 	}
@@ -528,10 +529,11 @@ func (txn *Txn) Empty(addr types.Address) bool {
 func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
-			CodeHash: emptyCodeHash,
-			Root:     emptyStateHash,
+			Balance:       big.NewInt(0),
+			StakedBalance: big.NewInt(0),
+			Trie:          txn.state.NewSnapshot(),
+			CodeHash:      emptyCodeHash,
+			Root:          emptyStateHash,
 		},
 	}
 }
@@ -539,16 +541,18 @@ func newStateObject(txn *Txn) *StateObject {
 func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
-			CodeHash: emptyCodeHash,
-			Root:     emptyStateHash,
+			Balance:       big.NewInt(0),
+			StakedBalance: big.NewInt(0),
+			Trie:          txn.state.NewSnapshot(),
+			CodeHash:      emptyCodeHash,
+			Root:          emptyStateHash,
 		},
 	}
 
 	prev, ok := txn.getStateObject(addr)
 	if ok {
 		obj.Account.Balance.SetBytes(prev.Account.Balance.Bytes())
+		obj.Account.StakedBalance.SetBytes(prev.Account.StakedBalance.Bytes())
 	}
 
 	txn.txn.Insert(addr.Bytes(), obj)

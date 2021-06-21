@@ -108,7 +108,13 @@ func (a *Account) Copy() *Account {
 	aa.CodeHash = a.CodeHash
 	aa.Root = a.Root
 	aa.Trie = a.Trie
-	aa.StakedBalance = big.NewInt(1).SetBytes(a.StakedBalance.Bytes())
+
+	// TODO not sure if needed
+	if a.StakedBalance == nil {
+		aa.StakedBalance = big.NewInt(0)
+	} else {
+		aa.StakedBalance = big.NewInt(0).SetBytes(a.StakedBalance.Bytes())
+	}
 
 	return aa
 }

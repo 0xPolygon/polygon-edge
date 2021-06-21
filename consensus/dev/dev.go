@@ -111,7 +111,6 @@ func (d *Dev) run() {
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
-
 	// Generate the base block
 	num := parent.Number
 	header := &types.Header{
