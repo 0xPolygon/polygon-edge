@@ -81,6 +81,7 @@ func TestOperator_Propose(t *testing.T) {
 	ibft := &Ibft{
 		blockchain: blockchain.TestBlockchain(t, pool.genesis()),
 		config:     &consensus.Config{},
+		epochSize:  DefaultEpochSize,
 	}
 	assert.NoError(t, ibft.setupSnapshot())
 

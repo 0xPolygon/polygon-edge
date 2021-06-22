@@ -538,6 +538,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		updateCh:         make(chan struct{}),
 		operator:         &operator{},
 		state:            newState(),
+		epochSize:        DefaultEpochSize,
 	}
 
 	// by default set the state to (1, 0)

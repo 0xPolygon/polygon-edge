@@ -46,7 +46,36 @@ func (i *Ibft) setupSnapshot() error {
 		}
 	}
 
-	// Some of the data might get lost due to ungrateful disconnections
+	// If the snapshot is not found, or the latest snapshot belongs to a previous epoch,
+	// we need to start rebuilding the snapshot from the beginning of the current epoch
+	// in order to have all the votes and validators correctly set in the snapshot,
+	// since they reset every epoch.
+
+	// Get epoch of latest header and saved metadata
+	currentEpoch := header.Number / i.epochSize
+	metaEpoch := meta.LastBlock / i.epochSize
+	snapshot, _ := i.getSnapshot(header.Number)
+	if snapshot == nil || metaEpoch < currentEpoch {
+		// Restore snapshot at the beginning of the current epoch by block header
+		// if list doesn't have any snapshots to calculate snapshot for the next header
+		i.logger.Info("snapshot was not found, restore snapshot at beginning of current epoch", "current epoch", currentEpoch)
+		beginHeight := currentEpoch * i.epochSize
+		beginHeader, ok := i.blockchain.GetHeaderByNumber(beginHeight)
+		if !ok {
+			return fmt.Errorf("header at %d not found", beginHeight)
+		}
+
+		if err := i.addHeaderSnap(beginHeader); err != nil {
+			return err
+		}
+		i.store.updateLastBlock(beginHeight)
+
+		if meta, err = i.getSnapshotMetadata(); err != nil {
+			return err
+		}
+	}
+
+	// Process headers if we missed some blocks in the current epoch
 	if header.Number > meta.LastBlock {
 		i.logger.Info("syncing past snapshots", "from", meta.LastBlock, "to", header.Number)
 
