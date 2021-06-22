@@ -65,7 +65,6 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 		return err
 	}
 
-	// TODO not sure if this is the best way to check
 	if len(elems) != 5 {
 		return fmt.Errorf("account has an invalid field count")
 	}
@@ -93,7 +92,11 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if a.CodeHash, err = elems[3].GetBytes(a.CodeHash[:0]); err != nil {
 		return err
 	}
-	return nil
+
+	// Staking implementation
+	err = elems[4].GetBigInt(a.StakedBalance)
+
+	return err
 }
 
 func (a *Account) String() string {
@@ -108,13 +111,7 @@ func (a *Account) Copy() *Account {
 	aa.CodeHash = a.CodeHash
 	aa.Root = a.Root
 	aa.Trie = a.Trie
-
-	// TODO not sure if needed
-	if a.StakedBalance == nil {
-		aa.StakedBalance = big.NewInt(0)
-	} else {
-		aa.StakedBalance = big.NewInt(0).SetBytes(a.StakedBalance.Bytes())
-	}
+	aa.StakedBalance = big.NewInt(1).SetBytes(a.StakedBalance.Bytes())
 
 	return aa
 }
@@ -132,7 +129,10 @@ type StateObject struct {
 }
 
 func (s *StateObject) Empty() bool {
-	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
+	return s.Account.Nonce == 0 &&
+		s.Account.Balance.Sign() == 0 &&
+		s.Account.StakedBalance.Sign() == 0 &&
+		bytes.Equal(s.Account.CodeHash, emptyCodeHash)
 }
 
 var stateStateParserPool fastrlp.ParserPool
