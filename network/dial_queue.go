@@ -90,14 +90,6 @@ func (d *dialQueue) add(addr *peer.AddrInfo, priority uint64) {
 	}
 }
 
-// size returns the size of the dial queue (Threadsafe)
-func (d *dialQueue) size() int {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	return d.heap.Len()
-}
-
 type dialTask struct {
 	index int
 

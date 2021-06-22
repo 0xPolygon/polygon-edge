@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -91,14 +90,6 @@ func stringToHashT(t *testing.T, str string) types.Hash {
 		t.Fatal(err)
 	}
 	return address
-}
-
-func stringToBigIntT(t *testing.T, str string) *big.Int {
-	n, err := stringToBigInt(str)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return n
 }
 
 func stringToUint64(str string) (uint64, error) {
@@ -339,6 +330,10 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.GasPrice, err = stringToBigInt(dec.GasPrice)
+	if err != nil {
+		return err
+	}
+
 	t.Nonce, err = stringToUint64(dec.Nonce)
 	if err != nil {
 		return err
@@ -436,110 +431,6 @@ var Forks = map[string]*chain.Forks{
 		Constantinople: chain.NewFork(0),
 		Petersburg:     chain.NewFork(0),
 	},
-}
-
-type header struct {
-	header *types.Header
-}
-
-func (h *header) UnmarshalJSON(input []byte) error {
-	h.header = &types.Header{}
-
-	type headerUnmarshall struct {
-		Bloom            *types.Bloom
-		Coinbase         *types.Address
-		MixHash          *types.Hash
-		Nonce            *string
-		Number           *string
-		Hash             *types.Hash
-		ParentHash       *types.Hash
-		ReceiptTrie      *types.Hash
-		StateRoot        *types.Hash
-		TransactionsTrie *types.Hash
-		UncleHash        *types.Hash
-		ExtraData        *string
-		Difficulty       *string
-		GasLimit         *string
-		GasUsed          *string
-		Timestamp        *string
-	}
-
-	var err error
-
-	var dec headerUnmarshall
-	if err := json.Unmarshal(input, &dec); err != nil {
-		return err
-	}
-
-	if dec.Bloom != nil {
-		h.header.LogsBloom = *dec.Bloom
-	}
-	if dec.Coinbase != nil {
-		h.header.Miner = *dec.Coinbase
-	}
-	if dec.MixHash != nil {
-		h.header.MixHash = *dec.MixHash
-	}
-
-	nonce, err := types.ParseUint64orHex(dec.Nonce)
-	if err != nil {
-		return err
-	}
-	if nonce != 0 {
-		binary.BigEndian.PutUint64(h.header.Nonce[:], nonce)
-	}
-
-	h.header.Number, err = types.ParseUint64orHex(dec.Number)
-	if err != nil {
-		return err
-	}
-
-	if dec.ParentHash != nil {
-		h.header.ParentHash = *dec.ParentHash
-	}
-	if dec.ReceiptTrie != nil {
-		h.header.ReceiptsRoot = *dec.ReceiptTrie
-	}
-	if dec.StateRoot != nil {
-		h.header.StateRoot = *dec.StateRoot
-	}
-	if dec.TransactionsTrie != nil {
-		h.header.TxRoot = *dec.TransactionsTrie
-	}
-	if dec.UncleHash != nil {
-		h.header.Sha3Uncles = *dec.UncleHash
-	}
-
-	h.header.ExtraData, err = types.ParseBytes(dec.ExtraData)
-	if err != nil {
-		return err
-	}
-
-	h.header.Difficulty, err = types.ParseUint64orHex(dec.Difficulty)
-	if err != nil {
-		return err
-	}
-
-	h.header.GasLimit, err = types.ParseUint64orHex(dec.GasLimit)
-	if err != nil {
-		return err
-	}
-	h.header.GasUsed, err = types.ParseUint64orHex(dec.GasUsed)
-	if err != nil {
-		return err
-	}
-	h.header.Timestamp, err = types.ParseUint64orHex(dec.Timestamp)
-	if err != nil {
-		return err
-	}
-
-	h.header.ComputeHash()
-	if dec.Hash != nil {
-		if hash := h.header.Hash; hash != *dec.Hash {
-			return fmt.Errorf("hash mismatch: found %s but expected %s", hash.String(), (*dec.Hash).String())
-		}
-	}
-	return nil
 }
 
 func contains(l []string, name string) bool {

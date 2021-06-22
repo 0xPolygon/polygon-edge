@@ -22,10 +22,10 @@ var (
 
 // Chain is the blockchain chain configuration
 type Chain struct {
-	Name      string    `json:"name"`
-	Genesis   *Genesis  `json:"genesis"`
-	Params    *Params   `json:"params"`
-	Bootnodes []string	`json:"bootnodes"`
+	Name      string   `json:"name"`
+	Genesis   *Genesis `json:"genesis"`
+	Params    *Params  `json:"params"`
+	Bootnodes []string `json:"bootnodes"`
 }
 
 // Genesis specifies the header fields, state of a genesis block
@@ -93,29 +93,6 @@ func (g *Genesis) Hash() types.Hash {
 	header.ComputeHash()
 
 	return header.Hash
-}
-
-// ENCODING + DECODING //
-
-func encodeUint64(i uint64) *string {
-	if i == 0 {
-		return nil
-	}
-
-	bs := make([]byte, 8)
-	binary.BigEndian.PutUint64(bs, i)
-
-	res := hex.EncodeToHex(bs)
-	return &res
-}
-
-func encodeBytes(b []byte) *string {
-	if len(b) == 0 {
-		return nil
-	}
-
-	res := hex.EncodeToHex(b[:])
-	return &res
 }
 
 // MarshalJSON implements the json interface

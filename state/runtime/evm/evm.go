@@ -9,7 +9,6 @@ var _ runtime.Runtime = &EVM{}
 
 // EVM is the ethereum virtual machine
 type EVM struct {
-	vs []state
 }
 
 // NewEVM creates a new EVM

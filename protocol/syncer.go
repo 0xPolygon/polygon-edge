@@ -249,15 +249,6 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 }
 
-// getStatus grabs the current status [Thread safe]
-func (s *Syncer) getStatus() *Status {
-	s.statusLock.Lock()
-	status := s.status.Copy()
-	s.statusLock.Unlock()
-
-	return status
-}
-
 // Start starts the syncer protocol
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
@@ -468,7 +459,7 @@ func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
 
 			// fill skeleton
 			for indx := range sk.slots {
-				sk.fillSlot(uint64(indx), p.client)
+				sk.fillSlot(uint64(indx), p.client) //nolint
 			}
 
 			// sync the data

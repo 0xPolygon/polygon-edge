@@ -39,9 +39,7 @@ func DecodeString(str string) ([]byte, error) {
 
 // DecodeHex converts a hex string to a byte array
 func DecodeHex(str string) ([]byte, error) {
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-	}
+	str = strings.TrimPrefix(str, "0x")
 
 	return hex.DecodeString(str)
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"testing"
 
@@ -12,8 +13,20 @@ import (
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
+
+func getTempDir(t *testing.T) string {
+	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Error(err)
+		}
+	})
+	return tmpDir
+}
 
 type testerAccount struct {
 	alias string
@@ -96,35 +109,282 @@ func (ap *testerAccountPool) ValidatorSet() ValidatorSet {
 	return v
 }
 
-func TestSnapshot_ProcessHeaders(t *testing.T) {
-	type mockVote struct {
-		validator string
-		voted     string
-		auth      bool
+type mockVote struct {
+	validator string
+	candidate string
+	auth      bool
+}
+
+func skipVote(validator string) mockVote {
+	return mockVote{validator: validator}
+}
+
+func vote(validator, candidate string, auth bool) mockVote {
+	return mockVote{
+		validator: validator,
+		candidate: candidate,
+		auth:      auth,
 	}
-	mine := func(validator string) mockVote {
-		return mockVote{validator: validator}
+}
+
+type mockSnapshot struct {
+	validators []string
+	votes      []mockVote
+}
+
+type mockHeader struct {
+	action   mockVote
+	snapshot *mockSnapshot
+}
+
+func newMockHeader(validators []string, vote mockVote) mockHeader {
+	return mockHeader{
+		action: vote,
+		snapshot: &mockSnapshot{
+			validators: validators,
+			votes:      []mockVote{},
+		},
 	}
-	vote := func(validator, voted string, auth bool) mockVote {
-		return mockVote{
-			validator: validator,
-			voted:     voted,
-			auth:      auth,
+}
+
+func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
+	headers := make([]*types.Header, 0, len(mockHeaders))
+	parentHash := genesis.Hash()
+	for num, header := range mockHeaders {
+		v := header.action
+		pool.add(v.validator)
+
+		h := &types.Header{
+			Number:     uint64(num + 1),
+			ParentHash: parentHash,
+			Miner:      types.ZeroAddress,
+			MixHash:    IstanbulDigest,
+			ExtraData:  genesis.ExtraData,
+		}
+		if v.candidate != "" {
+			// if candidate is empty, we are just creating a new block
+			// without votes
+			pool.add(v.candidate)
+			h.Miner = pool.get(v.candidate).Address()
+		}
+		if v.auth {
+			// add auth to the vote
+			h.Nonce = nonceAuthVote
+		} else {
+			h.Nonce = nonceDropVote
+		}
+
+		// sign the vote
+		h = pool.get(v.validator).sign(h)
+		h.ComputeHash()
+
+		parentHash = h.Hash
+		headers = append(headers, h)
+	}
+	return headers
+}
+
+func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots []*Snapshot) {
+	t.Helper()
+	for _, s := range snapshots {
+		hash := b.GetHashByNumber(s.Number)
+		assert.NotNil(t, hash)
+		s.Hash = hash.String()
+	}
+}
+
+func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
+	if snapshots == nil {
+		return
+	}
+
+	store := newSnapshotStore()
+	for _, snap := range snapshots {
+		store.add(snap)
+	}
+	err := store.saveToPath(path)
+	assert.NoError(t, err)
+}
+
+func TestSnapshot_setupSnapshot(t *testing.T) {
+	// Current validators
+	validators := []string{"A", "B", "C", "D"}
+	// New voted validators
+	candidateValidators := []string{"E", "F"}
+
+	pool := newTesterAccountPool()
+	pool.add(validators...)
+	validatorSet := pool.ValidatorSet()
+	genesis := pool.genesis()
+
+	pool.add(candidateValidators...)
+
+	newSnapshot := func(n uint64, set ValidatorSet, votes []*Vote) *Snapshot {
+		return &Snapshot{
+			Number: n,
+			Set:    set,
+			Votes:  votes,
 		}
 	}
 
-	type mockSnapshot struct {
-		validators []string
-		votes      []mockVote
+	type snapshotData struct {
+		LastBlock uint64
+		Snapshots []*Snapshot
 	}
-	type mockHeader struct {
-		action   mockVote
-		snapshot *mockSnapshot
+	var cases = []struct {
+		name           string
+		epochSize      uint64
+		headers        []mockHeader
+		savedSnapshots []*Snapshot
+		expectedResult snapshotData
+	}{
+		{
+			name:    "should create genesis",
+			headers: []mockHeader{},
+			expectedResult: snapshotData{
+				LastBlock: 0,
+				Snapshots: []*Snapshot{
+					newSnapshot(0, validatorSet, []*Vote{}),
+				},
+			},
+		},
+		{
+			name: "should load from file and advance to latest height without any update if they are in same epoch",
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
+			},
+			savedSnapshots: []*Snapshot{
+				newSnapshot(0, validatorSet, []*Vote{}),
+			},
+			expectedResult: snapshotData{
+				LastBlock: 2,
+				Snapshots: []*Snapshot{
+					newSnapshot(0, validatorSet, []*Vote{}),
+				},
+			},
+		},
+		{
+			name: "should generate snapshot from genesis because of no snapshot file",
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
+			},
+			savedSnapshots: nil,
+			expectedResult: snapshotData{
+				LastBlock: 2,
+				Snapshots: []*Snapshot{
+					newSnapshot(0, validatorSet, []*Vote{}),
+				},
+			},
+		},
+		{
+			name:      "should generate snapshot from beginning of current epoch because of no snapshot file",
+			epochSize: 3,
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, skipVote("B")),
+				newMockHeader(validators, skipVote("C")),
+				newMockHeader(validators, skipVote("D")),
+			},
+			savedSnapshots: nil,
+			expectedResult: snapshotData{
+				LastBlock: 4,
+				Snapshots: []*Snapshot{
+					newSnapshot(3, validatorSet, []*Vote{}),
+				},
+			},
+		},
+		{
+			name:      "should recover votes from the beginning of current epoch",
+			epochSize: 3,
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, vote("B", "F", true)),
+				newMockHeader(validators, skipVote("C")),
+				newMockHeader(validators, vote("D", "E", true)),
+			},
+			savedSnapshots: nil,
+			expectedResult: snapshotData{
+				LastBlock: 4,
+				Snapshots: []*Snapshot{
+					newSnapshot(3, validatorSet, []*Vote{}),
+					newSnapshot(4, validatorSet, []*Vote{{
+						Validator: pool.get("D").Address(),
+						Address:   pool.get("E").Address(),
+						Authorize: true,
+					}}),
+				},
+			},
+		},
+		{
+			name:      "should not count votes from the beginning of current epoch as there cannot be any proposals during the checkpoint block",
+			epochSize: 3,
+			headers: []mockHeader{
+				newMockHeader(validators, skipVote("A")),
+				newMockHeader(validators, vote("B", "F", true)),
+				newMockHeader(validators, skipVote("C")),
+				newMockHeader(validators, vote("D", "E", true)),
+				newMockHeader(validators, skipVote("D")),
+				newMockHeader(validators, vote("C", "F", true)),
+				newMockHeader(validators, vote("A", "F", true)),
+			},
+			savedSnapshots: nil,
+			expectedResult: snapshotData{
+				LastBlock: 7,
+				Snapshots: []*Snapshot{
+					newSnapshot(6, validatorSet, []*Vote{}),
+					newSnapshot(7, validatorSet, []*Vote{{
+						Validator: pool.get("A").Address(),
+						Address:   pool.get("F").Address(),
+						Authorize: true,
+					}}),
+				},
+			},
+		},
 	}
 
+	for _, c := range cases {
+		epochSize := c.epochSize
+		if epochSize == 0 {
+			epochSize = 10
+		}
+
+		t.Run(c.name, func(t *testing.T) {
+			tmpDir := getTempDir(t)
+			// Build blockchain with headers
+			blockchain := blockchain.TestBlockchain(t, genesis)
+			initialHeaders := buildHeaders(pool, genesis, c.headers)
+			for _, h := range initialHeaders {
+				err := blockchain.WriteHeaders([]*types.Header{h})
+				assert.NoError(t, err)
+			}
+
+			ibft := &Ibft{
+				epochSize:  epochSize,
+				blockchain: blockchain,
+				config: &consensus.Config{
+					Path: tmpDir,
+				},
+				logger: hclog.NewNullLogger(),
+			}
+
+			// Write Hash to snapshots
+			updateHashesInSnapshots(t, blockchain, c.savedSnapshots)
+			updateHashesInSnapshots(t, blockchain, c.expectedResult.Snapshots)
+			saveSnapshots(t, tmpDir, c.savedSnapshots)
+
+			assert.NoError(t, ibft.setupSnapshot())
+			assert.Equal(t, c.expectedResult.LastBlock, ibft.store.getLastBlock())
+			assert.Equal(t, c.expectedResult.Snapshots, ([]*Snapshot)(ibft.store.list))
+		})
+	}
+}
+
+func TestSnapshot_ProcessHeaders(t *testing.T) {
 	var cases = []struct {
 		name       string
-		epoch      uint64
+		epochSize  uint64
 		validators []string
 		headers    []mockHeader
 	}{
@@ -135,7 +395,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 			headers: []mockHeader{
 				{
-					action: mine("A"),
+					action: skipVote("A"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A"},
 					},
@@ -155,7 +415,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					},
 				},
 				{
-					action: mine("B"),
+					action: skipVote("B"),
 				},
 				{
 					// one vote from A is NOT enough to promote C
@@ -335,7 +595,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 		},
 		{
 			name:       "epoch transition resets all votes",
-			epoch:      3,
+			epochSize:  3,
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
@@ -361,7 +621,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 3 (do not vote)
-					action: mine("B"),
+					action: skipVote("B"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -371,12 +631,12 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 		},
 		{
 			name:       "epoch transition creates new snapshot",
-			epoch:      1,
+			epochSize:  1,
 			validators: []string{"A", "B", "C"},
 			headers: []mockHeader{
 				{
 					// block 1
-					action: mine("A"),
+					action: skipVote("A"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -384,7 +644,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 2
-					action: mine("B"),
+					action: skipVote("B"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -392,7 +652,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				},
 				{
 					// block 3
-					action: mine("C"),
+					action: skipVote("C"),
 					snapshot: &mockSnapshot{
 						validators: []string{"A", "B", "C"},
 						votes:      []mockVote{},
@@ -403,55 +663,21 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			epoch := c.epoch
-			if epoch == 0 {
-				epoch = 1000
+			epochSize := c.epochSize
+			if epochSize == 0 {
+				epochSize = 1000
 			}
 
 			pool := newTesterAccountPool()
 			pool.add(c.validators...)
-
 			genesis := pool.genesis()
 
 			// create votes
-			parentHash := types.Hash{}
-
-			headers := []*types.Header{}
-			for num, header := range c.headers {
-				v := header.action
-				pool.add(v.validator)
-
-				h := &types.Header{
-					Number:     uint64(num + 1),
-					ParentHash: parentHash,
-					Miner:      types.ZeroAddress,
-					MixHash:    IstanbulDigest,
-					ExtraData:  genesis.ExtraData,
-				}
-				if v.voted != "" {
-					// if voted is empty, we are just creating a new block
-					// without votes
-					pool.add(v.voted)
-					h.Miner = pool.get(v.voted).Address()
-				}
-				if v.auth {
-					// add auth to the vote
-					h.Nonce = nonceAuthVote
-				} else {
-					h.Nonce = nonceDropVote
-				}
-
-				// sign the vote
-				h = pool.get(v.validator).sign(h)
-				h.ComputeHash()
-
-				parentHash = h.Hash
-				headers = append(headers, h)
-			}
+			headers := buildHeaders(pool, genesis, c.headers)
 
 			// process the headers independently
 			ibft := &Ibft{
-				epochSize:  epoch,
+				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}
@@ -480,7 +706,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 					for _, v := range result.votes {
 						resSnap.Votes = append(resSnap.Votes, &Vote{
 							Validator: pool.get(v.validator).Address(),
-							Address:   pool.get(v.voted).Address(),
+							Address:   pool.get(v.candidate).Address(),
 							Authorize: v.auth,
 						})
 					}
@@ -505,7 +731,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 
 			// Process headers all at the same time should have the same result
 			ibft1 := &Ibft{
-				epochSize:  epoch,
+				epochSize:  epochSize,
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}
@@ -571,9 +797,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 }
 
 func TestSnapshot_Store_SaveLoad(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
-	assert.NoError(t, err)
-
+	tmpDir := getTempDir(t)
 	store0 := newSnapshotStore()
 	for i := 0; i < 10; i++ {
 		store0.add(&Snapshot{

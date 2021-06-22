@@ -87,7 +87,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	val, tail = m.p.get(tail, 32)
 	expLen := new(big.Int).SetBytes(val)
 
-	val, tail = m.p.get(tail, 32)
+	val, _ = m.p.get(tail, 32)
 	modLen := new(big.Int).SetBytes(val)
 
 	if len(input) > 96 {
@@ -155,7 +155,7 @@ func (m *modExp) run(input []byte) ([]byte, error) {
 	val, input = m.p.get(input, int(exponentLen))
 	exponent := new(big.Int).SetBytes(val)
 
-	val, input = m.p.get(input, int(modulusLen))
+	val, _ = m.p.get(input, int(modulusLen))
 	modulus := new(big.Int).SetBytes(val)
 
 	var res []byte
