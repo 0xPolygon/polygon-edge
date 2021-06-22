@@ -3,7 +3,7 @@ package precompiled
 import (
 	"crypto/sha256"
 
-	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"

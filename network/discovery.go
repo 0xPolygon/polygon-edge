@@ -41,10 +41,6 @@ func (d *discovery) setBootnodes(bootnodes []*peer.AddrInfo) {
 	d.bootnodes = bootnodes
 }
 
-func (d *discovery) notify() {
-	d.notifyCh <- struct{}{}
-}
-
 func (d *discovery) setup() error {
 	d.notifyCh = make(chan struct{}, 5)
 	d.peers = []peer.ID{}
@@ -165,7 +161,7 @@ func (d *discovery) handleDiscovery() {
 		if len(d.peers) > 0 {
 			target := d.peers[rand.Intn(len(d.peers))]
 			if err := d.call(target); err != nil {
-				// d.srv.logger.Error("failed to dial bootnode", "err", err)
+				d.srv.logger.Error("failed to dial bootnode", "err", err)
 			}
 		}
 	}

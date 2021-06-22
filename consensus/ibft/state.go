@@ -83,11 +83,6 @@ func newState() *currentState {
 	return c
 }
 
-// setView sets the passed in view
-func (c *currentState) setView(v *proto.View) {
-	c.view = v
-}
-
 // getState returns the current state
 func (c *currentState) getState() IbftState {
 	stateAddr := (*uint64)(&c.state)
@@ -146,10 +141,6 @@ func (c *currentState) lock() {
 	c.locked = true
 }
 
-func (c *currentState) isLocked() bool {
-	return c.locked
-}
-
 func (c *currentState) unlock() {
 	c.block = nil
 	c.locked = false
@@ -158,16 +149,6 @@ func (c *currentState) unlock() {
 // cleanRound deletes the specific round messages
 func (c *currentState) cleanRound(round uint64) {
 	delete(c.roundMessages, round)
-}
-
-// numRounds returns the number of round messages
-func (c *currentState) numRounds(round uint64) int {
-	obj, ok := c.roundMessages[round]
-	if !ok {
-		return 0
-	}
-
-	return len(obj)
 }
 
 // AddRoundMessage adds a message to the round, and returns the round message size

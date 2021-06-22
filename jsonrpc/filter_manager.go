@@ -117,10 +117,6 @@ func (f *Filter) isBlockFilter() bool {
 	return f.block != nil
 }
 
-func (f *Filter) match() bool {
-	return false
-}
-
 var defaultTimeout = 1 * time.Minute
 
 type FilterManager struct {
@@ -184,7 +180,7 @@ func (f *FilterManager) Run() {
 		if filter == nil {
 			timeoutCh = nil
 		} else {
-			timeoutCh = time.After(filter.timestamp.Sub(time.Now()))
+			timeoutCh = time.After(time.Until(filter.timestamp))
 		}
 
 		select {

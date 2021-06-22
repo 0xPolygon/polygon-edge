@@ -21,10 +21,6 @@ func invalidMethod(method string) error {
 	return &ErrorObject{Code: -32601, Message: fmt.Sprintf("The method %s does not exist/is not available", method)}
 }
 
-func invalidArguments(method string) error {
-	return &ErrorObject{Code: -32602, Message: fmt.Sprintf("invalid arguments to %s", method)}
-}
-
 type serviceData struct {
 	sv      reflect.Value
 	funcMap map[string]*funcData
@@ -49,8 +45,6 @@ type endpoints struct {
 	// Staking endpoints
 	Stake *Stake
 }
-
-type enabledEndpoints map[string]struct{}
 
 // Dispatcher handles jsonrpc requests
 type Dispatcher struct {
@@ -283,7 +277,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		d.serviceMap = map[string]*serviceData{}
 	}
 	if serviceName == "" {
-		panic(fmt.Sprintf("jsonrpc: serviceName cannot be empty"))
+		panic("jsonrpc: serviceName cannot be empty")
 	}
 
 	st := reflect.TypeOf(service)
@@ -322,13 +316,6 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		sv:      reflect.ValueOf(service),
 		funcMap: funcMap,
 	}
-}
-
-func removePtr(t reflect.Type) reflect.Type {
-	for t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return t
 }
 
 func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, reqt []reflect.Type, err error) {

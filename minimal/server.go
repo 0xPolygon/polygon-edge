@@ -378,17 +378,6 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
-// addPath sets the polygon-sdk path, if it's not set yet
-func (e *Entry) addPath(path string) {
-	if len(e.Config) == 0 {
-		e.Config = map[string]interface{}{}
-	}
-
-	if _, ok := e.Config["path"]; !ok {
-		e.Config["path"] = path
-	}
-}
-
 // SetupDataDir sets up the polygon-sdk data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {

@@ -612,10 +612,13 @@ func min(i, j uint64) uint64 {
 func opCallDataLoad(c *state) {
 	offset := c.top()
 
+	// TODO:	Check what memory allocations do we save with this since
+	// 			sync.Pool requires a pointer to a slice in order to save some memory.
+	// 			see: https://staticcheck.io/docs/checks#SA6002
 	buf := bufPool.Get().([]byte)
 	c.setBytes(buf[:32], c.msg.Input, 32, offset)
 	offset.SetBytes(buf[:32])
-	bufPool.Put(buf)
+	bufPool.Put(buf) //nolint:staticcheck
 }
 
 func opCallDataSize(c *state) {
@@ -925,7 +928,7 @@ func opPush(n int) instruction {
 
 		v := c.push1()
 		if ip+1+n > len(ins) {
-			v.SetBytes(append(ins[ip+1:len(ins)], make([]byte, n)...))
+			v.SetBytes(append(ins[ip+1:], make([]byte, n)...))
 		} else {
 			v.SetBytes(ins[ip+1 : ip+1+n])
 		}
