@@ -2,8 +2,9 @@ package e2e
 
 import (
 	"context"
+	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/umbracle/go-web3"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -18,20 +19,9 @@ func TestIbft_Transfer(t *testing.T) {
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
-	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -48,7 +38,7 @@ func TestIbft_Transfer(t *testing.T) {
 			Value:    framework.EthToWei(1),
 			Nonce:    uint64(i),
 		}
-		txn, err = signer.SignTx(txn, senderKey)
+		txn, err := signer.SignTx(txn, senderKey)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,4 +56,75 @@ func TestIbft_Transfer(t *testing.T) {
 		assert.NotNil(t, receipt)
 		assert.Equal(t, receipt.TransactionHash, hash)
 	}
+}
+
+func TestIbft_TransactionFeeRecipient(t *testing.T) {
+	signer := &crypto.FrontierSigner{}
+	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	_, receiverAddr := framework.GenerateKeyAndAddr(t)
+
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+		config.Premine(senderAddr, framework.EthToWei(10))
+		config.SetSeal(true)
+		config.SetShowsLog(true)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+	clt := srv.JSONRPC()
+
+	// get latest nonce
+	lastNonce, err := clt.Eth().GetNonce(web3.Address(senderAddr), web3.Latest)
+	assert.NoError(t, err)
+
+	txn := &types.Transaction{
+		From:     senderAddr,
+		To:       &receiverAddr,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    framework.EthToWei(1),
+		Nonce:    lastNonce,
+	}
+	txn, err = signer.SignTx(txn, senderKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := txn.MarshalRLP()
+
+	hash, err := clt.Eth().SendRawTransaction(data)
+	assert.NoError(t, err)
+	assert.NotNil(t, hash)
+
+	ctx1, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt, err := srv.WaitForReceipt(ctx1, hash)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+	assert.Equal(t, receipt.TransactionHash, hash)
+
+	// Get the block proposer from the extra data seal
+	assert.NotNil(t, receipt.BlockHash)
+	block, err := clt.Eth().GetBlockByHash(receipt.BlockHash, false)
+	assert.NoError(t, err)
+	extraData := &ibft.IstanbulExtra{}
+	extraDataWithoutVanity := block.ExtraData[ibft.IstanbulExtraVanity:]
+	err = extraData.UnmarshalRLP(extraDataWithoutVanity)
+	assert.NoError(t, err)
+
+	bHash, err := block.Hash.MarshalText()
+	assert.NoError(t, err)
+	proposerPubKey, err := crypto.RecoverPubkey(extraData.Seal, bHash)
+	assert.NoError(t, err)
+	proposerAddr := crypto.PubKeyToAddress(proposerPubKey)
+
+	// Given that this is the first transaction on the blockchain, proposer's balance should be equal to the tx fee
+	balanceProposer, err := clt.Eth().GetBalance(web3.Address(proposerAddr), web3.Latest)
+	assert.NoError(t, err)
+
+	txFee := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), txn.GasPrice)
+	assert.Equalf(t, txFee, balanceProposer, "Proposer didn't get appropriate transaction fee")
 }

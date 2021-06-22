@@ -158,8 +158,8 @@ func MethodSig(name string) []byte {
 	return b[:4]
 }
 
-// TempDir returns direcotry path in tmp with random directory name
-func TempDir() (string, error) {
+// tempDir returns directory path in tmp with random directory name
+func tempDir() (string, error) {
 	return ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
 }
 
@@ -233,7 +233,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	})
 
 	for i := 0; i < num; i++ {
-		dataDir, err := TempDir()
+		dataDir, err := tempDir()
 		if err != nil {
 			t.Fatal(err)
 		}

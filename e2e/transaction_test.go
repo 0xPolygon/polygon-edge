@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -19,21 +18,10 @@ func TestSignedTransaction(t *testing.T) {
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, preminedAmount)
 		config.SetSeal(true)
-	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
