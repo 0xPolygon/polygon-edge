@@ -37,6 +37,14 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	return key, addr
 }
 
+func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
+	pubKey, err := crypto.RecoverPubkey(signature, crypto.Keccak256(hash.Bytes()))
+	if err != nil {
+		return types.Address{}, err
+	}
+	return crypto.PubKeyToAddress(pubKey), nil
+}
+
 func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
 	t.Helper()
 	dials := []*TestServer{}

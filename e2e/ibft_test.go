@@ -66,7 +66,6 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
-		config.SetShowsLog(true)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -115,11 +114,8 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 	err = extraData.UnmarshalRLP(extraDataWithoutVanity)
 	assert.NoError(t, err)
 
-	bHash, err := block.Hash.MarshalText()
+	proposerAddr, err := framework.EcrecoverFromBlockhash(types.Hash(block.Hash), extraData.Seal)
 	assert.NoError(t, err)
-	proposerPubKey, err := crypto.RecoverPubkey(extraData.Seal, bHash)
-	assert.NoError(t, err)
-	proposerAddr := crypto.PubKeyToAddress(proposerPubKey)
 
 	// Given that this is the first transaction on the blockchain, proposer's balance should be equal to the tx fee
 	balanceProposer, err := clt.Eth().GetBalance(web3.Address(proposerAddr), web3.Latest)
