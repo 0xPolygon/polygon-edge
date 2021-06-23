@@ -30,14 +30,24 @@ func (i *identity) numPending() int64 {
 	return atomic.LoadInt64(&i.pendingSize)
 }
 
+func (i *identity) isPending(id peer.ID) bool {
+	val, ok := i.pending.Load(id)
+	if !ok {
+		return false
+	}
+	return val.(bool)
+}
+
 func (i *identity) delPending(id peer.ID) {
-	i.pending.Delete(id)
-	atomic.AddInt64(&i.pendingSize, -1)
+	if _, loaded := i.pending.LoadAndDelete(id); loaded {
+		atomic.AddInt64(&i.pendingSize, -1)
+	}
 }
 
 func (i *identity) setPending(id peer.ID) {
-	i.pending.Store(id, true)
-	atomic.AddInt64(&i.pendingSize, 1)
+	if _, loaded := i.pending.LoadOrStore(id, true); !loaded {
+		atomic.AddInt64(&i.pendingSize, 1)
+	}
 }
 
 func (i *identity) setup() {
@@ -66,7 +76,15 @@ func (i *identity) setup() {
 			i.setPending(peerID)
 
 			go func() {
-				defer i.delPending(peerID)
+				defer func() {
+					if i.isPending(peerID) {
+						i.delPending(peerID)
+						i.srv.emitEvent(&PeerEvent{
+							PeerID: peerID,
+							Type:   PeerEventDialCompleted,
+						})
+					}
+				}()
 
 				if err := i.handleConnected(peerID); err != nil {
 					i.srv.Disconnect(peerID, err.Error())

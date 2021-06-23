@@ -182,9 +182,12 @@ func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDisconnected {
+		switch evnt.Type {
+		case PeerEventConnected, PeerEventConnectedFailed, PeerEventDisconnected, PeerEventDialCompleted:
+		default:
 			return
 		}
+
 		select {
 		case notifyCh <- struct{}{}:
 		default:
@@ -612,6 +615,7 @@ const (
 	PeerEventConnectedFailed   = "PeerConnectedFailed"
 	PeerEventDisconnected      = "PeerDisconnected"
 	PeerEventDialConnectedNode = "PeerDialConnectedNode"
+	PeerEventDialCompleted     = "PeerDialCompleted"
 )
 
 type PeerEvent struct {
