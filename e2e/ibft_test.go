@@ -23,9 +23,6 @@ func TestIbft_Transfer(t *testing.T) {
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
 	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -69,9 +66,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
-	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
+		config.SetShowsLog(true)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

@@ -23,9 +23,6 @@ func TestSignedTransaction(t *testing.T) {
 		config.Premine(senderAddr, preminedAmount)
 		config.SetSeal(true)
 	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
