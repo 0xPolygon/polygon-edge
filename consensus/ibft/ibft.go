@@ -374,7 +374,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
 
-	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
+	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.validatorKeyAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -909,6 +909,11 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	return nil
+}
+
+// GetBlockCreator retrieves the block signer from the extra data field
+func (i *Ibft) GetBlockCreator(header *types.Header) (types.Address, error) {
+	return ecrecoverFromHeader(header)
 }
 
 // Close closes the IBFT consensus mechanism, and does write back to disk
