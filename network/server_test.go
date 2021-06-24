@@ -69,14 +69,14 @@ func TestPeersLifecycle(t *testing.T) {
 	srv1 := CreateServer(t, conf)
 
 	// 0 -> 1 (connect)
-	connectedCh := asyncWaitForEvent(srv1, 15*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	connectedCh := asyncWaitForEvent(srv1, 5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 0))
 	// 1 should receive the connected event as well
 	assert.True(t, <-connectedCh)
 
 	// 1 -> 0 (disconnect)
-	disconnectedCh0 := asyncWaitForEvent(srv0, 15*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
-	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
+	disconnectedCh0 := asyncWaitForEvent(srv0, 5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	disconnectedCh1 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
 	srv1.Disconnect(srv0.AddrInfo().ID, "bye")
 	// both 0 and 1 should receive a disconnect event
 	assert.True(t, <-disconnectedCh0)
