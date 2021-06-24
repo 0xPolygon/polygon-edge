@@ -48,35 +48,48 @@ func TestConnLimit_Outbound(t *testing.T) {
 	srv2 := CreateServer(t, conf)
 
 	// One slot left, it can connect 0->1
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 1*time.Second))
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 5*time.Second))
 
 	// No slots left (timeout)
-	err := srv0.Join(srv2.AddrInfo(), 1*time.Second)
+	err := srv0.Join(srv2.AddrInfo(), 5*time.Second)
 	assert.Error(t, err)
 
 	// Disconnect 0 and 1 (sync)
-	srv0.Disconnect(srv1.host.ID(), "bye")
-
 	// Now srv0 is trying to connect to srv2 since there are slots left
-	connected := srv0.waitForEvent(2*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
-	assert.True(t, connected)
+	connectedCh := asyncWaitForEvent(srv0, 5*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
+	srv0.Disconnect(srv1.host.ID(), "bye")
+	assert.True(t, <-connectedCh)
 }
 
 func TestPeersLifecycle(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	conf := func(c *Config) {
+		c.NoDiscover = true
+	}
+	srv0 := CreateServer(t, conf)
+	srv1 := CreateServer(t, conf)
 
 	// 0 -> 1 (connect)
+	connectedCh := asyncWaitForEvent(srv1, 15*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 0))
-
 	// 1 should receive the connected event as well
-	assert.True(t, srv1.waitForEvent(5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID)))
+	assert.True(t, <-connectedCh)
 
 	// 1 -> 0 (disconnect)
+	disconnectedCh0 := asyncWaitForEvent(srv0, 15*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
 	srv1.Disconnect(srv0.AddrInfo().ID, "bye")
-
 	// both 0 and 1 should receive a disconnect event
-	assert.True(t, srv0.waitForEvent(5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID)))
+	assert.True(t, <-disconnectedCh0)
+	assert.True(t, <-disconnectedCh1)
+}
+
+func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent) bool) <-chan bool {
+	resCh := make(chan bool, 1)
+	go func(ch chan<- bool) {
+		resCh <- s.waitForEvent(timeout, handler)
+		close(resCh)
+	}(resCh)
+	return resCh
 }
 
 func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
@@ -144,7 +157,7 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 	srv1 := CreateServer(t, nil)
 
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
+	assert.NoError(t, srv1.Join(srv0.AddrInfo(), DefaultJoinTimeout))
 }
 
 func TestNat(t *testing.T) {
