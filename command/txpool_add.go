@@ -188,5 +188,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	output += "\n"
 
+	p.UI.Info(output)
+
 	return 0
 }

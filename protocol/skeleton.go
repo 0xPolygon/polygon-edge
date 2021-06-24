@@ -25,10 +25,9 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 }
 
 type skeleton struct {
-	slots   []*slot
-	span    int64
-	num     int64
-	headers []*types.Header
+	slots []*slot
+	span  int64
+	num   int64
 }
 
 func (s *skeleton) LastHeader() *types.Header {
@@ -42,7 +41,7 @@ func (s *skeleton) build(clt proto.V1Client, ancestor types.Hash) error {
 	if err != nil {
 		return err
 	}
-	s.addSkeleton(headers)
+	s.addSkeleton(headers) // nolint
 	return nil
 }
 
@@ -113,8 +112,7 @@ func (s *skeleton) addSkeleton(headers []*types.Header) error {
 }
 
 type slot struct {
-	hash      types.Hash
-	number    uint64
-	blocks    []*types.Block
-	completed bool
+	hash   types.Hash
+	number uint64
+	blocks []*types.Block
 }

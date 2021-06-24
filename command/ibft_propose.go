@@ -128,10 +128,12 @@ func (p *IbftPropose) Run(args []string) int {
 	output := "\n[IBFT PROPOSE]\n"
 
 	if vote == positive {
-		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", ethAddress)
+		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set\n", ethAddress)
 	} else {
-		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", ethAddress)
+		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set\n", ethAddress)
 	}
+
+	p.UI.Info(output)
 
 	return 0
 }

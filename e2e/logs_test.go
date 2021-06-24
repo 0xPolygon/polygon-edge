@@ -40,8 +40,7 @@ func TestNewFilter_Logs(t *testing.T) {
 
 	res, err := client.Eth().GetFilterChanges(id)
 	assert.NoError(t, err)
-	// todo: need to check implementation because there is a possibility of losing some logs
-	assert.GreaterOrEqual(t, len(res), numCalls/2)
+	assert.Equal(t, len(res), numCalls)
 }
 
 func TestNewFilter_Block(t *testing.T) {
