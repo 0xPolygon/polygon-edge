@@ -67,6 +67,10 @@ func (i *identity) setup() {
 			// limit by MaxPeers on incomming requests since we already limit
 			// the outgoing requests
 			if conn.Stat().Direction == network.DirInbound {
+				if i.isPending(peerID) {
+					// handshake has already started
+					return
+				}
 				if i.srv.numOpenSlots() == 0 {
 					i.srv.Disconnect(peerID, "no available slots")
 					return
