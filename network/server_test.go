@@ -86,8 +86,8 @@ func TestPeersLifecycle(t *testing.T) {
 func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent) bool) <-chan bool {
 	resCh := make(chan bool, 1)
 	go func(ch chan<- bool) {
-		resCh <- s.waitForEvent(timeout, handler)
-		close(resCh)
+		ch <- s.waitForEvent(timeout, handler)
+		close(ch)
 	}(resCh)
 	return resCh
 }
