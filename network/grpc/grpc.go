@@ -26,7 +26,6 @@ func NewGrpcStream() *GrpcStream {
 		streamCh:   make(chan network.Stream),
 		grpcServer: grpc.NewServer(grpc.UnaryInterceptor(interceptor)),
 	}
-	g.Serve()
 
 	return g
 }

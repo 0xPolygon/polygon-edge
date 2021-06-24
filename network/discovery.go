@@ -67,6 +67,7 @@ func (d *discovery) setup() error {
 
 	grpc := grpc.NewGrpcStream()
 	proto.RegisterDiscoveryServer(grpc.GrpcServer(), d)
+	grpc.Serve()
 
 	d.srv.Register(discProto, grpc)
 

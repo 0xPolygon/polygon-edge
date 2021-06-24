@@ -54,6 +54,7 @@ func (i *identity) setup() {
 	// register the protobuf protocol
 	grpc := grpc.NewGrpcStream()
 	proto.RegisterIdentityServer(grpc.GrpcServer(), i)
+	grpc.Serve()
 
 	i.srv.Register(identityProtoV1, grpc)
 
