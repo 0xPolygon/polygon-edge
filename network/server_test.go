@@ -30,7 +30,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	// to max peers
 	assert.Error(t, srv2.Join(srv1.AddrInfo(), 5*time.Second))
 
-	disconnectedCh := asyncWaitForEvent(srv0, 5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	disconnectedCh := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
 	srv0.Disconnect(srv1.host.ID(), "bye")
 	assert.True(t, <-disconnectedCh)
 
@@ -77,8 +77,8 @@ func TestPeersLifecycle(t *testing.T) {
 	assert.True(t, <-connectedCh)
 
 	// 1 -> 0 (disconnect)
-	disconnectedCh0 := asyncWaitForEvent(srv0, 5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
-	disconnectedCh1 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
+	disconnectedCh0 := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
 	srv1.Disconnect(srv0.AddrInfo().ID, "bye")
 	// both 0 and 1 should receive a disconnect event
 	assert.True(t, <-disconnectedCh0)
