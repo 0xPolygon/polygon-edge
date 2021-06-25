@@ -560,12 +560,13 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	for indx, block := range blocks {
 		header := block.Header
 
-		if err := b.writeBody(block); err != nil {
-			return err
-		}
 		// Process and validate the block
 		res, err := b.processBlock(blocks[indx])
 		if err != nil {
+			return err
+		}
+
+		if err := b.writeBody(block); err != nil {
 			return err
 		}
 
