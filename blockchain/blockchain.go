@@ -579,7 +579,6 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if err := b.writeHeaderImpl(evnt, header); err != nil {
 			return err
 		}
-		b.dispatchEvent(evnt)
 
 		// write the receipts, do it only after the header has been written.
 		// Otherwise, a client might ask for a header once the receipt is valid
@@ -587,6 +586,8 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 		if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
 			return err
 		}
+
+		b.dispatchEvent(evnt)
 
 		// Update the average gas price
 		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
