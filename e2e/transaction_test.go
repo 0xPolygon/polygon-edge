@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,6 @@ import (
 )
 
 func TestSignedTransaction(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
@@ -36,33 +34,21 @@ func TestSignedTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, preminedAmount, balance)
 
-	// latest nonce
-	lastNonce, err := clt.Eth().GetNonce(web3.Address(senderAddr), web3.Latest)
-	assert.NoError(t, err)
-
 	for i := 0; i < 5; i++ {
-		txn := &types.Transaction{
+		txn := &framework.PreparedTransaction{
 			From:     senderAddr,
 			To:       &receiverAddr,
 			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
-			Nonce:    lastNonce + uint64(i),
 		}
-		txn, err = signer.SignTx(txn, senderKey)
-		assert.NoError(t, err)
-
-		data := txn.MarshalRLP()
-		hash, err := clt.Eth().SendRawTransaction(data)
-		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		receipt, err := srv.WaitForReceipt(ctx, hash)
-
+		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
-		assert.Equal(t, receipt.TransactionHash, hash)
+		assert.NotNil(t, receipt.TransactionHash)
 	}
 }
 
