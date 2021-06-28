@@ -21,8 +21,8 @@ import (
 )
 
 var (
-	stateTests       = "GeneralStateTests"
-	legacyStateTests = "LegacyTests/Constantinople/GeneralStateTests"
+	stateTests       = "GeneralStateTests"                            //nolint
+	legacyStateTests = "LegacyTests/Constantinople/GeneralStateTests" //nolint
 )
 
 type stateCase struct {
@@ -35,10 +35,12 @@ type stateCase struct {
 
 var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
+//nolint
 type accountTrie interface {
 	Get(k []byte) ([]byte, bool)
 }
 
+//nolint
 type legacyAccount struct {
 	Nonce    uint64
 	Balance  *big.Int
@@ -47,6 +49,7 @@ type legacyAccount struct {
 	Trie     accountTrie
 }
 
+//nolint
 func (a *legacyAccount) marshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 	v := ar.NewArray()
 	v.Set(ar.NewUint(a.Nonce))
@@ -57,19 +60,22 @@ func (a *legacyAccount) marshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 	return v
 }
 
-var stateTestArenaPool fastrlp.ArenaPool
+var stateTestArenaPool fastrlp.ArenaPool //nolint
 
+//nolint
 func hashIt(k []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write(k)
 	return h.Sum(nil)
 }
 
+//nolint
 type coinbaseParams struct {
 	coinbaseAddress types.Address
 	shouldInclude   bool
 }
 
+//nolint
 func pruneStakedAccounts(
 	snapshot state.Snapshot,
 	accountMap map[types.Address]*chain.GenesisAccount,
