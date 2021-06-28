@@ -32,19 +32,36 @@ func setupContract(params contractSetupParams) *runtime.Contract {
 }
 
 func TestSystem_CanRun(t *testing.T) {
+	systemRuntime := NewSystem()
+
 	testTable := []struct {
 		name     string
 		contract *runtime.Contract
 		canRun   bool
 	}{
 		{
-			"Valid System runtime address",
+			"Valid System runtime address (Staking)",
 			setupContract(
 				contractSetupParams{
 					depth:  0,
 					origin: types.StringToAddress("0"),
 					from:   types.StringToAddress("0"),
-					to:     types.StringToAddress("1001"), // Staking handler
+					to:     types.StringToAddress(GetOperationsMap()["staking"]), // Staking handler
+					value:  nil,
+					gas:    0,
+					code:   nil,
+				},
+			),
+			true,
+		},
+		{
+			"Valid System runtime address (Unstaking)",
+			setupContract(
+				contractSetupParams{
+					depth:  0,
+					origin: types.StringToAddress("0"),
+					from:   types.StringToAddress("0"),
+					to:     types.StringToAddress(GetOperationsMap()["unstaking"]), // Unstaking handler
 					value:  nil,
 					gas:    0,
 					code:   nil,
@@ -68,8 +85,6 @@ func TestSystem_CanRun(t *testing.T) {
 			false,
 		},
 	}
-
-	systemRuntime := NewSystem()
 
 	for _, testCase := range testTable {
 		canRun := systemRuntime.CanRun(testCase.contract, nil, nil)

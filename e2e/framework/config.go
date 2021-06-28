@@ -37,6 +37,7 @@ type TestServerConfig struct {
 }
 
 // CALLBACKS //
+
 // Premine callback specifies an account with a balance (in WEI)
 func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
@@ -46,6 +47,18 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 		Addr:          addr,
 		Balance:       amount,
 		StakedBalance: big.NewInt(0),
+	})
+}
+
+// PremineWithStake callback specifies an account with a balance, as well as a staked balance (in WEI)
+func (t *TestServerConfig) PremineWithStake(addr types.Address, amount *big.Int, stakedAmount *big.Int) {
+	if t.PremineAccts == nil {
+		t.PremineAccts = []*SrvAccount{}
+	}
+	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
+		Addr:          addr,
+		Balance:       amount,
+		StakedBalance: stakedAmount,
 	})
 }
 

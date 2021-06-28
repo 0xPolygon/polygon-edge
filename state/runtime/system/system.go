@@ -22,9 +22,22 @@ type systemContract interface {
 	run(state *systemState) ([]byte, error)
 }
 
+// operationsAddressMap defines an operation -> address (string) mapping
+var operationsMap = map[string]string{
+	"staking":   "1001",
+	"unstaking": "1002",
+}
+
+// GetOperationsMap returns the operations map,
+// so system operations know their address
+func GetOperationsMap() map[string]string {
+	return operationsMap
+}
+
 // setupHandlers defines which addresses are assigned to which system contract handlers
 func (s *System) setupHandlers() {
-	s.registerHandler("1001", &stakingHandler{s})
+	s.registerHandler(operationsMap["staking"], &stakingHandler{s})
+	s.registerHandler(operationsMap["unstaking"], &unstakingHandler{s})
 }
 
 // registerHandler registers a new systemContract handler for the specified address
@@ -49,7 +62,6 @@ func NewSystem() *System {
 
 // Run represents the actual runtime implementation, after the CanRun check passes
 func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
-	// TODO Define the Staking runtime implementation
 	// Get the system state from the pool and set it up
 	sysState := acquireSystemState()
 	sysState.host = host
