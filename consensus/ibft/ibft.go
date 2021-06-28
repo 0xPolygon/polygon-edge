@@ -474,7 +474,6 @@ func (i *Ibft) runAcceptState() { // start new round
 	i.state.CalcProposer(lastProposer)
 
 	if i.state.proposer == i.validatorKeyAddr {
-		fmt.Printf("\nwe are the proposer num=%d\n", number)
 		logger.Info("we are the proposer", "block", number)
 
 		if !i.state.locked {
@@ -507,7 +506,6 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	fmt.Printf("\nwe are the validator num=%d\n", number)
 	i.logger.Info("proposer calculated", "proposer", i.state.proposer, "block", number)
 
 	// we are NOT a proposer for the block. Then, we have to wait
