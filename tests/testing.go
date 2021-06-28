@@ -204,6 +204,7 @@ func buildState(t *testing.T, allocs map[types.Address]*chain.GenesisAccount) (s
 		txn.CreateAccount(addr)
 		txn.SetNonce(addr, alloc.Nonce)
 		txn.SetBalance(addr, alloc.Balance)
+		//txn.SetStakedBalance(addr, big.NewInt(0))
 
 		if len(alloc.Code) != 0 {
 			txn.SetCode(addr, alloc.Code)
@@ -318,12 +319,6 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 			if err != nil {
 				return err
 			}
-			/*
-				v, ok := math.ParseBig256(i)
-				if !ok {
-					return fmt.Errorf("invalid tx value %q", i)
-				}
-			*/
 			value = v
 		}
 		t.Value = append(t.Value, value)

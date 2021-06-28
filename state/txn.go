@@ -1,9 +1,10 @@
 package state
 
 import (
+	"math/big"
+
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
-	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
@@ -620,7 +621,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		objs = append(objs, obj)
 		return false
 	})
-	// show(objs)
 
 	t, hash := txn.snapshot.Commit(objs)
 	return t, hash
