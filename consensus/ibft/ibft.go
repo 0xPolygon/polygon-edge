@@ -376,7 +376,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
+	nextValidators, err := i.GetNextValidators(parent)
+	if err != nil {
+		return nil, err
+	}
+	putIbftExtraValidators(header, nextValidators)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
@@ -470,6 +474,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	i.state.CalcProposer(lastProposer)
 
 	if i.state.proposer == i.validatorKeyAddr {
+		fmt.Printf("\nwe are the proposer num=%d\n", number)
 		logger.Info("we are the proposer", "block", number)
 
 		if !i.state.locked {
@@ -502,6 +507,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
+	fmt.Printf("\nwe are the validator num=%d\n", number)
 	i.logger.Info("proposer calculated", "proposer", i.state.proposer, "block", number)
 
 	// we are NOT a proposer for the block. Then, we have to wait
@@ -860,8 +866,17 @@ func (i *Ibft) isSealing() bool {
 // verifyHeaderImpl implements the actual header verification logic
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
-	if _, err := getIbftExtra(header); err != nil {
+	extra, err := getIbftExtra(header)
+	if err != nil {
 		return err
+	}
+	// check validators in extra equals to validator set in contract
+	validtors, err := i.GetNextValidators(parent)
+	if err != nil {
+		return err
+	}
+	if !validtors.Equal((*ValidatorSet)(&extra.Validators)) {
+		return fmt.Errorf("invalid validator set")
 	}
 
 	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.

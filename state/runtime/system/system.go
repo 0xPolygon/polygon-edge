@@ -8,6 +8,10 @@ import (
 
 var _ runtime.Runtime = &System{}
 
+const (
+	AddrStaking = "1001"
+)
+
 // System is the implementation for the system (staking) runtime
 type System struct {
 	systemContracts map[types.Address]systemContract
@@ -19,12 +23,12 @@ type systemContract interface {
 	gas(input []byte) uint64
 
 	// run defines the system contract implementation
-	run(state *systemState) ([]byte, error)
+	run(state *systemState, config *chain.ForksInTime) ([]byte, error)
 }
 
 // setupHandlers defines which addresses are assigned to which system contract handlers
 func (s *System) setupHandlers() {
-	s.registerHandler("1001", &stakingHandler{s})
+	s.registerHandler(AddrStaking, &stakingHandler{s})
 }
 
 // registerHandler registers a new systemContract handler for the specified address
@@ -48,7 +52,7 @@ func NewSystem() *System {
 }
 
 // Run represents the actual runtime implementation, after the CanRun check passes
-func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
+func (s *System) Run(contract *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
 	// TODO Define the Staking runtime implementation
 	// Get the system state from the pool and set it up
 	sysState := acquireSystemState()
@@ -66,7 +70,7 @@ func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.For
 	contract.Gas = contract.Gas - gasCost
 
 	// Run the system contract
-	ret, err := sysContract.run(sysState)
+	ret, err := sysContract.run(sysState, config)
 	if err != nil {
 		return nil, 0, err
 	}
