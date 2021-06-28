@@ -376,11 +376,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	nextValidators, err := i.GetNextValidators(parent)
-	if err != nil {
-		return nil, err
-	}
-	putIbftExtraValidators(header, nextValidators)
+	putIbftExtraValidators(header, snap.Set)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
@@ -864,17 +860,8 @@ func (i *Ibft) isSealing() bool {
 // verifyHeaderImpl implements the actual header verification logic
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
-	extra, err := getIbftExtra(header)
-	if err != nil {
+	if _, err := getIbftExtra(header); err != nil {
 		return err
-	}
-	// check validators in extra equals to validator set in contract
-	validtors, err := i.GetNextValidators(parent)
-	if err != nil {
-		return err
-	}
-	if !validtors.Equal((*ValidatorSet)(&extra.Validators)) {
-		return fmt.Errorf("invalid validator set")
 	}
 
 	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.

@@ -164,15 +164,6 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	for _, h := range headers {
 		number := h.Number
 
-		// If validators in snapshot doesn't equal to validator set in extra data, then update the snapshot
-		extra, err := getIbftExtra(h)
-		if err != nil {
-			return err
-		}
-		if !snap.Set.Equal((*ValidatorSet)(&extra.Validators)) {
-			snap.Set = extra.Validators
-		}
-
 		proposer, err := ecrecoverFromHeader(h)
 		if err != nil {
 			return err
@@ -200,8 +191,75 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			continue
 		}
 
-		if err := i.applyVote(snap, h, proposer); err != nil {
-			return err
+		// if we have a miner address, this might be a vote
+		if h.Miner == types.ZeroAddress {
+			continue
+		}
+
+		// the nonce selects the action
+		var authorize bool
+		if h.Nonce == nonceAuthVote {
+			authorize = true
+		} else if h.Nonce == nonceDropVote {
+			authorize = false
+		} else {
+			return fmt.Errorf("incorrect vote nonce")
+		}
+
+		// validate the vote
+		if authorize {
+			// we can only authorize if they are not on the validators list
+			if snap.Set.Includes(h.Miner) {
+				continue
+			}
+		} else {
+			// we can only remove if they are part of the validators list
+			if !snap.Set.Includes(h.Miner) {
+				continue
+			}
+		}
+
+		voteCount := snap.Count(func(v *Vote) bool {
+			return v.Validator == proposer && v.Address == h.Miner
+		})
+
+		if voteCount > 1 {
+			// there can only be one vote per validator per address
+			return fmt.Errorf("more than one proposal per validator per address found")
+		}
+		if voteCount == 0 {
+			// cast the new vote since there is no one yet
+			snap.Votes = append(snap.Votes, &Vote{
+				Validator: proposer,
+				Address:   h.Miner,
+				Authorize: authorize,
+			})
+		}
+
+		// check the tally for the proposed validator
+		tally := snap.Count(func(v *Vote) bool {
+			return v.Address == h.Miner
+		})
+
+		// If more than a half of all validators voted
+		if tally > snap.Set.Len()/2 {
+			if authorize {
+				// add the candidate to the validators list
+				snap.Set.Add(h.Miner)
+			} else {
+				// remove the candidate from the validators list
+				snap.Set.Del(h.Miner)
+
+				// remove any votes casted by the removed validator
+				snap.RemoveVotes(func(v *Vote) bool {
+					return v.Validator == h.Miner
+				})
+			}
+
+			// remove all the votes that promoted this validator
+			snap.RemoveVotes(func(v *Vote) bool {
+				return v.Address == h.Miner
+			})
 		}
 
 		if !snap.Equal(parentSnap) {
@@ -213,81 +271,6 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 	// update the metadata
 	i.store.updateLastBlock(headers[len(headers)-1].Number)
-
-	return nil
-}
-
-func (i *Ibft) applyVote(snap *Snapshot, h *types.Header, proposer types.Address) error {
-	// if we have a miner address, this might be a vote
-	if h.Miner == types.ZeroAddress {
-		return nil
-	}
-
-	// the nonce selects the action
-	var authorize bool
-	if h.Nonce == nonceAuthVote {
-		authorize = true
-	} else if h.Nonce == nonceDropVote {
-		authorize = false
-	} else {
-		return fmt.Errorf("incorrect vote nonce")
-	}
-
-	// validate the vote
-	if authorize {
-		// we can only authorize if they are not on the validators list
-		if snap.Set.Includes(h.Miner) {
-			return nil
-		}
-	} else {
-		// we can only remove if they are part of the validators list
-		if !snap.Set.Includes(h.Miner) {
-			return nil
-		}
-	}
-
-	voteCount := snap.Count(func(v *Vote) bool {
-		return v.Validator == proposer && v.Address == h.Miner
-	})
-
-	if voteCount > 1 {
-		// there can only be one vote per validator per address
-		return fmt.Errorf("more than one proposal per validator per address found")
-	}
-	if voteCount == 0 {
-		// cast the new vote since there is no one yet
-		snap.Votes = append(snap.Votes, &Vote{
-			Validator: proposer,
-			Address:   h.Miner,
-			Authorize: authorize,
-		})
-	}
-
-	// check the tally for the proposed validator
-	tally := snap.Count(func(v *Vote) bool {
-		return v.Address == h.Miner
-	})
-
-	// If more than a half of all validators voted
-	if tally > snap.Set.Len()/2 {
-		if authorize {
-			// add the candidate to the validators list
-			snap.Set.Add(h.Miner)
-		} else {
-			// remove the candidate from the validators list
-			snap.Set.Del(h.Miner)
-
-			// remove any votes casted by the removed validator
-			snap.RemoveVotes(func(v *Vote) bool {
-				return v.Validator == h.Miner
-			})
-		}
-
-		// remove all the votes that promoted this validator
-		snap.RemoveVotes(func(v *Vote) bool {
-			return v.Address == h.Miner
-		})
-	}
 
 	return nil
 }

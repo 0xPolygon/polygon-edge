@@ -16,8 +16,6 @@ import (
 	"github.com/0xPolygon/minimal/command"
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/0xPolygon/minimal/consensus/ibft"
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
-	ibftProto "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -107,14 +105,6 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 		t.t.Fatal(err)
 	}
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
-}
-
-func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
-	if err != nil {
-		t.t.Fatal(err)
-	}
-	return ibftOp.NewIbftOperatorClient(conn)
 }
 
 func (t *TestServer) ReleaseReservedPorts() {
@@ -352,27 +342,6 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 		return num, false
 	})
 	return err
-}
-
-func (t *TestServer) WaitForIBFTSnapshot(ctx context.Context, number uint64) (*ibftProto.Snapshot, error) {
-	client := t.IBFTOperator()
-	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		receipt, _ := client.GetSnapshot(context.Background(), &ibftProto.SnapshotReq{
-			Number: number,
-		})
-		if receipt != nil && receipt.Number >= number {
-			return receipt, false
-		}
-		return nil, true
-	})
-	if err != nil {
-		return nil, err
-	}
-	snapshot, ok := res.(*ibftProto.Snapshot)
-	if !ok {
-		return nil, fmt.Errorf("data is not snapshot: %T", snapshot)
-	}
-	return snapshot, err
 }
 
 func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
