@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -13,13 +14,21 @@ type IBFTServersManager struct {
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 
-func NewIBFTServersManager(t *testing.T, numNodes int, rootDir string, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
+func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
 	t.Helper()
+
+	rootDir, err := TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	srvs, bootnodes := make([]*TestServer, 0, numNodes), make([]string, 0, numNodes)
 	t.Cleanup(func() {
 		for _, s := range srvs {
 			s.Stop()
+		}
+		if err := os.RemoveAll(rootDir); err != nil {
+			t.Log(err)
 		}
 	})
 

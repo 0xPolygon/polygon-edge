@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -18,20 +17,9 @@ func TestIbft_Transfer(t *testing.T) {
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
-	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -48,7 +36,7 @@ func TestIbft_Transfer(t *testing.T) {
 			Value:    framework.EthToWei(1),
 			Nonce:    uint64(i),
 		}
-		txn, err = signer.SignTx(txn, senderKey)
+		txn, err := signer.SignTx(txn, senderKey)
 		if err != nil {
 			t.Fatal(err)
 		}
