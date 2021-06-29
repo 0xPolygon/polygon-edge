@@ -318,7 +318,7 @@ type PreparedTransaction struct {
 
 // SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
 func (t *TestServer) SendRawTx(ctx context.Context, tx *PreparedTransaction, signerKey *ecdsa.PrivateKey) (*web3.Receipt, error) {
-	signer := &crypto.FrontierSigner{}
+	signer := crypto.NewEIP155Signer(100)
 	client := t.JSONRPC()
 
 	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
