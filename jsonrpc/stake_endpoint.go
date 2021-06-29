@@ -18,8 +18,6 @@ func (s *Stake) GetStakedBalance(address types.Address, number BlockNumber) (int
 	}
 
 	acc, err := s.d.store.GetAccount(header.StateRoot, address)
-	// TODO Consider tackling this: `error getting storage snapshot`,
-	// when the account is not initialized
 	if err != nil {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil

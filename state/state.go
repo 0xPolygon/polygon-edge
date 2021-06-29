@@ -40,23 +40,6 @@ type Account struct {
 	StakedBalance *big.Int
 }
 
-type AccountLegacy struct {
-	Nonce    uint64
-	Balance  *big.Int
-	Root     types.Hash
-	CodeHash []byte
-	Trie     accountTrie
-}
-
-func (a *AccountLegacy) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
-	v := ar.NewArray()
-	v.Set(ar.NewUint(a.Nonce))
-	v.Set(ar.NewBigInt(a.Balance))
-	v.Set(ar.NewBytes(a.Root.Bytes()))
-	v.Set(ar.NewBytes(a.CodeHash))
-	return v
-}
-
 func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 	v := ar.NewArray()
 	v.Set(ar.NewUint(a.Nonce))
@@ -206,20 +189,6 @@ type Object struct {
 	Deleted       bool
 
 	// TODO: Move this to executor
-	DirtyCode bool
-	Code      []byte
-
-	Storage []*StorageObject
-}
-
-type ObjectLegacy struct {
-	Address  types.Address
-	CodeHash types.Hash
-	Balance  *big.Int
-	Root     types.Hash
-	Nonce    uint64
-	Deleted  bool
-
 	DirtyCode bool
 	Code      []byte
 

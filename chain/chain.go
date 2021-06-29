@@ -260,7 +260,6 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	if g.StakedBalance != nil {
 		obj.StakedBalance = types.EncodeBigInt(g.StakedBalance)
 	}
-	//
 	if g.Nonce != 0 {
 		obj.Nonce = types.EncodeUint64(g.Nonce)
 	}

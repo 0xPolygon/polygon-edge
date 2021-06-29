@@ -100,7 +100,7 @@ func TestSystem_StakeAmount(t *testing.T) {
 				&out,
 				web3.Address(testCase.staker),
 				web3.Latest.String(),
-			); callErr != nil && testCase.shouldSucceed {
+			); callErr != nil {
 				t.Fatalf("Unable to fetch staked balance")
 			}
 
@@ -161,7 +161,7 @@ func TestSystem_StakeAmount(t *testing.T) {
 				&out,
 				web3.Address(testCase.staker),
 				web3.Latest.String(),
-			); callErr != nil && testCase.shouldSucceed {
+			); callErr != nil {
 				t.Fatalf("Unable to fetch staked balance")
 			}
 
