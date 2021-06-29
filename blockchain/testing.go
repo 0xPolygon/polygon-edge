@@ -184,10 +184,14 @@ func (m *MockVerifier) VerifyHeader(parent, header *types.Header) error {
 	return nil
 }
 
+func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, error) {
+	return header.Miner, nil
+}
+
 type mockExecutor struct {
 }
 
-func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*state.BlockResult, error) {
+func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error) {
 	return &state.BlockResult{}, nil
 }
 

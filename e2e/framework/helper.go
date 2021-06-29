@@ -37,6 +37,14 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	return key, addr
 }
 
+func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
+	pubKey, err := crypto.RecoverPubkey(signature, crypto.Keccak256(hash.Bytes()))
+	if err != nil {
+		return types.Address{}, err
+	}
+	return crypto.PubKeyToAddress(pubKey), nil
+}
+
 func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
 	t.Helper()
 	dials := []*TestServer{}
@@ -158,8 +166,8 @@ func MethodSig(name string) []byte {
 	return b[:4]
 }
 
-// TempDir returns direcotry path in tmp with random directory name
-func TempDir() (string, error) {
+// tempDir returns directory path in tmp with random directory name
+func tempDir() (string, error) {
 	return ioutil.TempDir("/tmp", "polygon-sdk-e2e-")
 }
 
@@ -233,7 +241,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	})
 
 	for i := 0; i < num; i++ {
-		dataDir, err := TempDir()
+		dataDir, err := tempDir()
 		if err != nil {
 			t.Fatal(err)
 		}

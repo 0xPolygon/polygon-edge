@@ -121,7 +121,11 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
-	transition, err := d.executor.BeginTxn(parent.StateRoot, header)
+	miner, err := d.GetBlockCreator(header)
+	if err != nil {
+		return err
+	}
+	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
 	if err != nil {
 		return err
 	}
@@ -173,6 +177,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 func (d *Dev) VerifyHeader(parent *types.Header, header *types.Header) error {
 	// All blocks are valid
 	return nil
+}
+
+func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
+	return header.Miner, nil
 }
 
 func (d *Dev) Prepare(header *types.Header) error {
