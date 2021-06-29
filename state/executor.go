@@ -154,7 +154,7 @@ func (e *Executor) SubscribeStakingEvent() *StakingEventSubscription {
 	return sub
 }
 
-// SubscribeStakingEvent unsubscribes staking event
+// UnsubscribeStakingEvent removes given subscription from list
 func (e *Executor) UnsubscribeStakingEvent(target *StakingEventSubscription) {
 	e.stakingEventSubscriptionsLock.Lock()
 	defer e.stakingEventSubscriptionsLock.Unlock()
@@ -167,7 +167,7 @@ func (e *Executor) UnsubscribeStakingEvent(target *StakingEventSubscription) {
 	e.stakingEventSubscriptions = newSubs
 }
 
-// PublishStakingEvent publishes a staking event to subscribers
+// PublishStakingEvent publishes a staking event to subscriptions
 func (e *Executor) PublishStakingEvent(event *StakingEvent) {
 	e.stakingEventSubscriptionsLock.Lock()
 	defer e.stakingEventSubscriptionsLock.Unlock()
@@ -712,8 +712,8 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 
 func (t *Transition) EmitStakedEvent(staker types.Address, amount *big.Int) {
 	t.r.PublishStakingEvent(&StakingEvent{
-		Number:  t.ctx.Number,
 		Type:    StakingEventStaked,
+		Number:  t.ctx.Number,
 		Address: staker,
 		Amount:  amount,
 	})
