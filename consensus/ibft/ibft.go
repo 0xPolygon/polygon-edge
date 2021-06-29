@@ -311,8 +311,36 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		resCh, closeCh := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+			return true
+		})
+		unsubscribe := func() []*state.StakingEvent {
+			closeCh <- void{}
+			return <-resCh
+		}
+
+		// updateNextValidators updates state.nextValidators with latest block and staking events
+		updateNextValidators := func(header *types.Header) error {
+			events := unsubscribe()
+
+			// Get Next Validators
+			latestStakingEvents := []*state.StakingEvent{}
+			for _, e := range events {
+				if e.Number == int64(header.Number) {
+					latestStakingEvents = append(latestStakingEvents, e)
+				}
+			}
+			nextValidators, err := i.getNextValidatorSet(header, latestStakingEvents)
+			if err != nil {
+				return err
+			}
+			i.state.nextValidators = nextValidators
+			return nil
+		}
+
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
+			unsubscribe()
 			continue
 		}
 
@@ -320,6 +348,7 @@ func (i *Ibft) runSyncState() {
 		// we can just move ahead
 		if i.isValidSnapshot() {
 			i.setState(AcceptState)
+			updateNextValidators(i.blockchain.Header())
 			continue
 		}
 
@@ -330,6 +359,7 @@ func (i *Ibft) runSyncState() {
 
 			return !isValidator
 		})
+		updateNextValidators(i.blockchain.Header())
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -376,7 +406,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, snap.Set)
+	putIbftExtraValidators(header, i.state.validators)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
@@ -447,16 +477,15 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if !snap.Set.Includes(i.validatorKeyAddr) {
-		// we are not a validator anymore, move back to sync state
+	validators := i.getValidatorSet(snap)
+	if !validators.Includes(i.validatorKeyAddr) {
 		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
-		return
 	}
 
 	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
-	i.state.validators = snap.Set
+	i.state.validators = validators
 
 	// reset round messages
 	i.state.resetRoundMsgs()
@@ -503,7 +532,6 @@ func (i *Ibft) runAcceptState() { // start new round
 	}
 
 	i.logger.Info("proposer calculated", "proposer", i.state.proposer, "block", number)
-
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
@@ -541,16 +569,22 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 		} else {
 			// since its a new block, we have to verify it first
+			if err := i.verifyValidatorSet(block.Header); err != nil {
+				i.logger.Error("block verification failed", "err", err)
+				i.handleStateErr(errBlockVerificationFailed)
+				continue
+			}
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-			} else {
-				i.state.block = block
-
-				// send prepare message and wait for validations
-				i.sendPrepareMsg()
-				i.setState(ValidateState)
+				continue
 			}
+
+			i.state.block = block
+
+			// send prepare message and wait for validations
+			i.sendPrepareMsg()
+			i.setState(ValidateState)
 		}
 	}
 }
@@ -641,9 +675,23 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash()
 
+	// Subscribe staking events
+	resCh, closeCh := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+		return e.Number == int64(header.Number)
+	})
+
 	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
+
+	closeCh <- void{}
+	stakingEvents := <-resCh
+
+	nextValidators, err := i.getNextValidatorSet(header, stakingEvents)
+	if err != nil {
+		return err
+	}
+	i.state.nextValidators = nextValidators
 
 	// increase the sequence number and reset the round if any
 	i.state.view = &proto.View{
@@ -860,7 +908,8 @@ func (i *Ibft) isSealing() bool {
 // verifyHeaderImpl implements the actual header verification logic
 func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) error {
 	// ensure the extra data is correctly formatted
-	if _, err := getIbftExtra(header); err != nil {
+	_, err := getIbftExtra(header)
+	if err != nil {
 		return err
 	}
 
