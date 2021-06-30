@@ -8,15 +8,12 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-type void struct{}
-
-// SubscribeStakingEvent returns 2 channels to get list of StakingEvent and notify to finish subscription
-// list will be sent to resCh after send a signal to closeCh
-func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) (<-chan []*state.StakingEvent, chan<- void) {
+// SubscribeStakingEvent subscribes staking events that matches conditions and returns stop subscription function
+// stop subscription function stops subscription and returns received events
+func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) func() []*state.StakingEvent {
 	resCh := make(chan []*state.StakingEvent, 1)
-	closeCh := make(chan void, 1)
-
 	subscription := i.executor.SubscribeStakingEvent()
+
 	go func() {
 		events := []*state.StakingEvent{}
 		// collect until channel ends
@@ -27,16 +24,14 @@ func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) (<-chan
 		}
 		resCh <- events
 	}()
-	go func() {
-		<-closeCh
+
+	// this function stops subscription and return received events
+	return func() []*state.StakingEvent {
 		i.executor.UnsubscribeStakingEvent(subscription)
-		// wait until all event reaches
 		subscription.WaitForDone()
 		close(subscription.EventCh)
-		close(closeCh)
-	}()
-
-	return resCh, closeCh
+		return <-resCh
+	}
 }
 
 // getNextValidatorSet returns the validator set for the next

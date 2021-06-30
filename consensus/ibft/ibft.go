@@ -310,35 +310,41 @@ func (i *Ibft) runSyncState() {
 			}
 			continue
 		}
-		beginHeader := i.blockchain.Header()
 
-		resCh, closeCh := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+		numberBulkUpdateFrom := i.blockchain.Header().Number
+		stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 			return true
 		})
-		unsubscribe := func() []*state.StakingEvent {
-			closeCh <- void{}
-			return <-resCh
-		}
 
-		// updateNextValidators updates state.nextValidators with latest block and staking events
-		updateNextValidators := func(header *types.Header) error {
-			events := unsubscribe()
-			return i.bulkUpdateSnapshots(beginHeader.Number, header.Number, events)
+		updateSnapshots := func(number uint64, events []*state.StakingEvent) {
+			if len(events) == 0 {
+				return
+			}
+			header := i.blockchain.Header()
+			fmt.Printf("\n\n bulkUpdateSnapshots from %d to %d events %+v\n\n", number, header.Number, events)
+			i.bulkUpdateSnapshots(number, header.Number, events)
 		}
 
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
-			unsubscribe()
+
+			// Update by the number of the header that has been merged successful
+			updateSnapshots(numberBulkUpdateFrom, stopSubscription())
 			continue
 		}
+		updateSnapshots(numberBulkUpdateFrom, stopSubscription())
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
 			i.setState(AcceptState)
-			updateNextValidators(i.blockchain.Header())
 			continue
 		}
+
+		numberSyncFrom := i.blockchain.Header().Number
+		stopSubscription = i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+			return true
+		})
 
 		// start watch mode
 		var isValidator bool
@@ -347,7 +353,8 @@ func (i *Ibft) runSyncState() {
 
 			return !isValidator
 		})
-		updateNextValidators(i.blockchain.Header())
+
+		updateSnapshots(numberSyncFrom, stopSubscription())
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -660,7 +667,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header.ComputeHash()
 
 	// Subscribe staking events
-	resCh, closeCh := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+	stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 		return e.Number == int64(header.Number)
 	})
 
@@ -668,9 +675,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	closeCh <- void{}
-	stakingEvents := <-resCh
-
+	stakingEvents := stopSubscription()
 	nextValidators, err := i.getNextValidatorSet(header, stakingEvents)
 	if err != nil {
 		return err
