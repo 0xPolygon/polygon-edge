@@ -321,7 +321,6 @@ func (i *Ibft) runSyncState() {
 				return
 			}
 			header := i.blockchain.Header()
-			fmt.Printf("\n\n bulkUpdateSnapshots from %d to %d events %+v\n\n", number, header.Number, events)
 			i.bulkUpdateSnapshots(number, header.Number, events)
 		}
 
