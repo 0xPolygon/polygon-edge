@@ -1,12 +1,12 @@
 package system
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/stretchr/testify/assert"
 )
 
 type contractSetupParams struct {
@@ -32,8 +32,6 @@ func setupContract(params contractSetupParams) *runtime.Contract {
 }
 
 func TestSystem_CanRun(t *testing.T) {
-	systemRuntime := NewSystem()
-
 	testTable := []struct {
 		name     string
 		contract *runtime.Contract
@@ -86,10 +84,18 @@ func TestSystem_CanRun(t *testing.T) {
 		},
 	}
 
+	systemRuntime := NewSystem()
+
 	for _, testCase := range testTable {
-		canRun := systemRuntime.CanRun(testCase.contract, nil, nil)
-		if !canRun && testCase.canRun {
-			t.Fatal(fmt.Sprintf("[%s] Runtime doesn't recognize address %s", testCase.name, testCase.contract.CodeAddress))
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			runResult := systemRuntime.CanRun(testCase.contract, nil, nil)
+			assert.Equalf(
+				t,
+				testCase.canRun,
+				runResult,
+				"Runtime doesn't recognize address %s",
+				testCase.contract.CodeAddress,
+			)
+		})
 	}
 }
