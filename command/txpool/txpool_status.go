@@ -1,4 +1,4 @@
-package command
+package txpool
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // TxPoolStatus is the command to query the snapshot
 type TxPoolStatus struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -27,7 +27,7 @@ func (p *TxPoolStatus) GetBaseCommand() string {
 func (p *TxPoolStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.TxPoolStatus interface
@@ -63,7 +63,7 @@ func (p *TxPoolStatus) Run(args []string) int {
 
 	output := "\n[TXPOOL STATUS]\n"
 
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Number of transactions in pool:|%d", resp.Length),
 	})
 

@@ -1,4 +1,4 @@
-package command
+package peers
 
 import (
 	"context"
@@ -11,16 +11,16 @@ import (
 
 // PeersAdd is the PeersAdd to start the sever
 type PeersAdd struct {
-	Meta
+	helper.Meta
 }
 
 func (p *PeersAdd) DefineFlags() {
-	if p.flagMap == nil {
+	if p.FlagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]helper.FlagDescriptor)
+		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["addr"] = helper.FlagDescriptor{
+	p.FlagMap["Addr"] = helper.FlagDescriptor{
 		Description: "Peer's libp2p address in the multiaddr format",
 		Arguments: []string{
 			"PEER_ADDRESS",
@@ -44,7 +44,7 @@ func (p *PeersAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.PeersAdd interface
@@ -57,7 +57,7 @@ func (p *PeersAdd) Run(args []string) int {
 	flags := p.FlagSet(p.GetBaseCommand())
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
-	flags.Var(&passedInAddresses, "addr", "")
+	flags.Var(&passedInAddresses, "Addr", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
@@ -93,19 +93,19 @@ func (p *PeersAdd) Run(args []string) int {
 	}
 
 	var output = "\n[PEERS ADDED]\n"
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Peers listed|%d", len(passedInAddresses)), // The number of peers the user wanted to add
 		fmt.Sprintf("Peers added|%d", peersAdded),              // The number of peers that have been added
 	})
 
 	if len(addedPeers) > 0 {
 		output += "\n\n[LIST OF ADDED PEERS]\n"
-		output += formatList(addedPeers)
+		output += helper.FormatList(addedPeers)
 	}
 
 	if len(visibleErrors) > 0 {
 		output += "\n\n[ERRORS]\n"
-		output += formatList(visibleErrors)
+		output += helper.FormatList(visibleErrors)
 	}
 
 	output += "\n"

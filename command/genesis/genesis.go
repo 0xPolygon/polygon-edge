@@ -1,4 +1,4 @@
-package command
+package genesis
 
 import (
 	"encoding/json"
@@ -29,22 +29,22 @@ const (
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
 	UI cli.Ui
-	Meta
+	helper.Meta
 }
 
 // DefineFlags defines the command flags
 func (c *GenesisCommand) DefineFlags() {
-	if c.flagMap == nil {
+	if c.FlagMap == nil {
 		// Flag map not initialized
-		c.flagMap = make(map[string]helper.FlagDescriptor)
+		c.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	if len(c.flagMap) > 0 {
+	if len(c.FlagMap) > 0 {
 		// No need to redefine the flags again
 		return
 	}
 
-	c.flagMap["data-dir"] = helper.FlagDescriptor{
+	c.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -53,7 +53,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["name"] = helper.FlagDescriptor{
+	c.FlagMap["name"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
 		Arguments: []string{
 			"NAME",
@@ -62,7 +62,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["premine"] = helper.FlagDescriptor{
+	c.FlagMap["premine"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
 		Arguments: []string{
 			"ADDRESS:VALUE",
@@ -71,7 +71,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["chainid"] = helper.FlagDescriptor{
+	c.FlagMap["chainid"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
 		Arguments: []string{
 			"CHAIN_ID",
@@ -80,7 +80,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["consensus"] = helper.FlagDescriptor{
+	c.FlagMap["consensus"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
 		Arguments: []string{
 			"CONSENSUS_PROTOCOL",
@@ -89,7 +89,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["bootnode"] = helper.FlagDescriptor{
+	c.FlagMap["bootnode"] = helper.FlagDescriptor{
 		Description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
 		Arguments: []string{
 			"BOOTNODE_URL",
@@ -98,7 +98,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validator"] = helper.FlagDescriptor{
+	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
 		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATOR_LIST",
@@ -107,7 +107,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validators-prefix-path"] = helper.FlagDescriptor{
+	c.FlagMap["ibft-validators-prefix-path"] = helper.FlagDescriptor{
 		Description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATORS_PREFIX_PATH",
@@ -130,7 +130,7 @@ func (c *GenesisCommand) GetBaseCommand() string {
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
 
-	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -234,10 +234,10 @@ func (c *GenesisCommand) Run(args []string) int {
 			var addr types.Address
 			val := defaultPremineBalance
 			if indx := strings.Index(prem, ":"); indx != -1 {
-				// <addr>:<balance>
+				// <Addr>:<balance>
 				addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
 			} else {
-				// <addr>
+				// <Addr>
 				addr = types.StringToAddress(prem)
 			}
 

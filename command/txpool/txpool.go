@@ -1,4 +1,4 @@
-package command
+package txpool
 
 import "github.com/mitchellh/cli"
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xPolygon/minimal/command"
+	"github.com/0xPolygon/minimal/command/util"
 	"github.com/mitchellh/cli"
 )
 
@@ -14,7 +14,7 @@ func main() {
 
 // Run starts the cli
 func Run(args []string) int {
-	commands := command.Commands()
+	commands := util.Commands()
 
 	cli := &cli.CLI{
 		Name:     "polygon",

@@ -1,12 +1,7 @@
 package server
 
 import (
-	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal"
@@ -15,15 +10,15 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-// Command is the command to start the sever
-type Command struct {
+// ServerCommand is the command to start the sever
+type ServerCommand struct {
 	UI cli.Ui
 
 	flagMap map[string]helper.FlagDescriptor
 }
 
 // DefineFlags defines the command flags
-func (c *Command) DefineFlags() {
+func (c *ServerCommand) DefineFlags() {
 	if c.flagMap == nil {
 		// Flag map not initialized
 		c.flagMap = make(map[string]helper.FlagDescriptor)
@@ -35,7 +30,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["log-level"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", defaultConfig().LogLevel),
+		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", helper.DefaultConfig().LogLevel),
 		Arguments: []string{
 			"LOG_LEVEL",
 		},
@@ -59,7 +54,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["chain"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", defaultConfig().Chain),
+		Description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", helper.DefaultConfig().Chain),
 		Arguments: []string{
 			"GENESIS_FILE",
 		},
@@ -67,7 +62,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["data-dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", defaultConfig().DataDir),
+		Description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", helper.DefaultConfig().DataDir),
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -123,7 +118,7 @@ func (c *Command) DefineFlags() {
 	}
 
 	c.flagMap["max-peers"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", defaultConfig().Network.MaxPeers),
+		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
 		Arguments: []string{
 			"PEER_COUNT",
 		},
@@ -145,33 +140,32 @@ func (c *Command) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
-
 }
 
 // GetHelperText returns a simple description of the command
-func (c *Command) GetHelperText() string {
+func (c *ServerCommand) GetHelperText() string {
 	return "The default command that starts the Polygon-SDK client, by bootstrapping all modules together"
 }
 
-func (c *Command) GetBaseCommand() string {
+func (c *ServerCommand) GetBaseCommand() string {
 	return "server"
 }
 
 // Help implements the cli.Command interface
-func (c *Command) Help() string {
+func (c *ServerCommand) Help() string {
 	c.DefineFlags()
 
 	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
 }
 
 // Synopsis implements the cli.Command interface
-func (c *Command) Synopsis() string {
+func (c *ServerCommand) Synopsis() string {
 	return c.GetHelperText()
 }
 
 // Run implements the cli.Command interface
-func (c *Command) Run(args []string) int {
-	conf, err := readConfig(c.GetBaseCommand(), args)
+func (c *ServerCommand) Run(args []string) int {
+	conf, err := helper.ReadConfig(c.GetBaseCommand(), args)
 	if err != nil {
 		c.UI.Error(err.Error())
 
@@ -204,85 +198,5 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	return c.handleSignals(server.Close)
-}
-
-// handleSignals listens for any client related signals, and closes the client accordingly
-func (c *Command) handleSignals(closeFn func()) int {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
-	sig := <-signalCh
-
-	output := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
-	output += "Gracefully shutting down client...\n"
-
-	c.UI.Output(output)
-
-	// Call the Minimal server close callback
-	gracefulCh := make(chan struct{})
-	go func() {
-		if closeFn != nil {
-			closeFn()
-		}
-		close(gracefulCh)
-	}()
-
-	select {
-	case <-signalCh:
-		return 1
-	case <-time.After(5 * time.Second):
-		return 1
-	case <-gracefulCh:
-		return 0
-	}
-}
-
-func readConfig(baseCommand string, args []string) (*Config, error) {
-	config := defaultConfig()
-
-	cliConfig := &Config{
-		Network: &Network{},
-	}
-
-	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
-	flags.Usage = func() {}
-
-	var configFile string
-	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
-	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
-	flags.StringVar(&configFile, "config", "", "")
-	flags.StringVar(&cliConfig.Chain, "chain", "", "")
-	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
-	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
-	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
-	flags.StringVar(&cliConfig.Join, "join", "", "")
-	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
-	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
-	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
-	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
-	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
-	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
-
-	if err := flags.Parse(args); err != nil {
-		return nil, err
-	}
-
-	if configFile != "" {
-		// A config file has been passed in, parse it
-		diskConfigFile, err := readConfigFile(configFile)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := config.mergeConfigWith(diskConfigFile); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := config.mergeConfigWith(cliConfig); err != nil {
-		return nil, err
-	}
-
-	return config, nil
+	return helper.HandleSignals(server.Close, c.UI)
 }
