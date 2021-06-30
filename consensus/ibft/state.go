@@ -47,9 +47,6 @@ type currentState struct {
 	// validators represent the current validator set
 	validators ValidatorSet
 
-	// validators represent the validator set for next block
-	nextValidators ValidatorSet
-
 	// state is the current state
 	state uint64
 

@@ -310,6 +310,7 @@ func (i *Ibft) runSyncState() {
 			}
 			continue
 		}
+		beginHeader := i.blockchain.Header()
 
 		resCh, closeCh := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 			return true
@@ -322,20 +323,7 @@ func (i *Ibft) runSyncState() {
 		// updateNextValidators updates state.nextValidators with latest block and staking events
 		updateNextValidators := func(header *types.Header) error {
 			events := unsubscribe()
-
-			// Get Next Validators
-			latestStakingEvents := []*state.StakingEvent{}
-			for _, e := range events {
-				if e.Number == int64(header.Number) {
-					latestStakingEvents = append(latestStakingEvents, e)
-				}
-			}
-			nextValidators, err := i.getNextValidatorSet(header, latestStakingEvents)
-			if err != nil {
-				return err
-			}
-			i.state.nextValidators = nextValidators
-			return nil
+			return i.bulkUpdateSnapshots(beginHeader.Number, header.Number, events)
 		}
 
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
@@ -406,7 +394,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
-	putIbftExtraValidators(header, i.state.validators)
+	putIbftExtraValidators(header, snap.Set)
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header)
 	if err != nil {
@@ -470,22 +458,20 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 		return
 	}
-	snap, err := i.getSnapshot(parent.Number)
+	snap, err := i.getSnapshot(number)
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", parent.Number)
 		i.setState(SyncState)
 		return
 	}
-
-	validators := i.getValidatorSet(snap)
-	if !validators.Includes(i.validatorKeyAddr) {
+	if !snap.Set.Includes(i.validatorKeyAddr) {
 		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
 	}
 
 	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
-	i.state.validators = validators
+	i.state.validators = snap.Set
 
 	// reset round messages
 	i.state.resetRoundMsgs()
@@ -568,23 +554,15 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errIncorrectBlockLocked)
 			}
 		} else {
-			// since its a new block, we have to verify it first
-			if err := i.verifyValidatorSet(block.Header); err != nil {
-				i.logger.Error("block verification failed", "err", err)
-				i.handleStateErr(errBlockVerificationFailed)
-				continue
-			}
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-				continue
+			} else {
+				i.state.block = block
+				// send prepare message and wait for validations
+				i.sendPrepareMsg()
+				i.setState(ValidateState)
 			}
-
-			i.state.block = block
-
-			// send prepare message and wait for validations
-			i.sendPrepareMsg()
-			i.setState(ValidateState)
 		}
 	}
 }
@@ -691,9 +669,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	i.state.nextValidators = nextValidators
-	// need to update a snapshot because snapshot at the height has been created inside WriteBlocks
-	if err := i.updateSnapshot(header, i.state.validators); err != nil {
+	// prepare snapshot for next sequence
+	if err := i.updateSnapshotValidators(header.Number+1, nextValidators); err != nil {
 		return err
 	}
 
@@ -946,7 +923,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 
 // VerifyHeader wrapper for verifying headers
 func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
-	snap, err := i.getSnapshot(parent.Number)
+	snap, err := i.getSnapshot(header.Number)
 	if err != nil {
 		return err
 	}

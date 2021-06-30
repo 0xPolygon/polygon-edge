@@ -8,17 +8,38 @@ import (
 	"github.com/0xPolygon/minimal/types"
 )
 
-// getValidatorSet returns validator set from parent snapshot and validator set in state
-func (i *Ibft) getValidatorSet(parentSnap *Snapshot) ValidatorSet {
-	// prioritize i.state.nextValidators
-	validators := i.state.nextValidators
-	if len(validators) == 0 {
-		validators = parentSnap.Set
-	}
-	return validators
+type void struct{}
+
+// SubscribeStakingEvent returns 2 channels to get list of StakingEvent and notify to finish subscription
+// list will be sent to resCh after send a signal to closeCh
+func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) (<-chan []*state.StakingEvent, chan<- void) {
+	resCh := make(chan []*state.StakingEvent, 1)
+	closeCh := make(chan void, 1)
+
+	subscription := i.executor.SubscribeStakingEvent()
+	go func() {
+		events := []*state.StakingEvent{}
+		// collect until channel ends
+		for e := range subscription.EventCh {
+			if f(e) {
+				events = append(events, e)
+			}
+		}
+		resCh <- events
+	}()
+	go func() {
+		<-closeCh
+		i.executor.UnsubscribeStakingEvent(subscription)
+		// wait until all event reaches
+		subscription.WaitForDone()
+		close(subscription.EventCh)
+		close(closeCh)
+	}()
+
+	return resCh, closeCh
 }
 
-// getNextValidatorSet returns the validator set in the next sequence of given header
+// getNextValidatorSet returns the validator set for the next
 func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.StakingEvent) (ValidatorSet, error) {
 	transition, err := i.executor.BeginTxn(header.StateRoot, header)
 	if err != nil {
@@ -51,73 +72,62 @@ func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.
 	return nextValidators, nil
 }
 
-type void struct{}
-
-// SubscribeStakingEvent returns 2 channels to get list of StakingEvent and notify to finish subscription
-// list will be sent to resCh after send a signal to closeCh
-func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) (<-chan []*state.StakingEvent, chan<- void) {
-	resCh := make(chan []*state.StakingEvent, 1)
-	closeCh := make(chan void, 1)
-
-	subscription := i.executor.SubscribeStakingEvent()
-	go func() {
-		events := []*state.StakingEvent{}
-		// collect until channel ends
-		for e := range subscription.EventCh {
-			if f(e) {
-				events = append(events, e)
-			}
-		}
-		resCh <- events
-	}()
-	go func() {
-		<-closeCh
-		i.executor.UnsubscribeStakingEvent(subscription)
-		// wait until all event reaches
-		subscription.WaitForDone()
-		close(subscription.EventCh)
-		close(closeCh)
-	}()
-
-	return resCh, closeCh
-}
-
-// verifyValidatorSet verifies validator set in extra data of header equals to the validators in state
-func (i *Ibft) verifyValidatorSet(header *types.Header) error {
-	extra, err := getIbftExtra(header)
-	if err != nil {
-		return err
-	}
-
-	// check use same validator set
-	extraValidatorSet := ValidatorSet(extra.Validators)
-	stateValidatorSet := ValidatorSet(i.state.validators)
-	if !extraValidatorSet.Equal(&stateValidatorSet) {
-		return fmt.Errorf("wrong validator set")
-	}
-	return nil
-}
-
-// updateSnapshot updates snapshot with given validator set
-func (i *Ibft) updateSnapshot(header *types.Header, validators ValidatorSet) error {
-	snap, err := i.getSnapshot(header.Number)
+// updateSnapshotValidators overwrite validators in snapshot at given height
+func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) error {
+	snap, err := i.getSnapshot(num)
 	if err != nil {
 		return err
 	}
 	if snap == nil {
-		return fmt.Errorf("cannot find the snapshot at %d", header.Number)
+		return fmt.Errorf("cannot find snapshot at %d", num)
 	}
-
 	if !snap.Set.Equal(&validators) {
 		newSnap := snap.Copy()
-		newSnap.Number = header.Number
-		newSnap.Hash = header.Hash.String()
+		newSnap.Number = num
+		newSnap.Hash = ""
 		newSnap.Set = validators
+		i.store.add(newSnap)
+	}
+	return nil
+}
 
-		if snap.Number != newSnap.Number {
-			i.store.add(newSnap)
-		} else {
-			i.store.replace(newSnap)
+// bulkUpdateSnapshots updates validators in multiple snapshots
+func (i *Ibft) bulkUpdateSnapshots(begin, end uint64, events []*state.StakingEvent) error {
+	for n := begin; n <= end; n++ {
+		header, ok := i.blockchain.GetHeaderByNumber(n)
+		if !ok {
+			return fmt.Errorf("cannot find header at %d", n)
+		}
+		// get events happened at given height
+		es := []*state.StakingEvent{}
+		for _, e := range events {
+			if uint64(e.Number) == n {
+				es = append(es, e)
+			}
+		}
+		validators, err := i.getNextValidatorSet(header, es)
+		if err != nil {
+			return err
+		}
+
+		snap, err := i.getSnapshot(n)
+		if err != nil {
+			return err
+		}
+		if snap == nil {
+			return fmt.Errorf("cannot find snapshot at %d", n)
+		}
+		if !snap.Set.Equal(&validators) {
+			newSnap := snap.Copy()
+			newSnap.Number = header.Number
+			newSnap.Hash = header.Hash.String()
+			newSnap.Set = validators
+
+			if snap.Number == newSnap.Number {
+				i.store.replace(newSnap)
+			} else {
+				i.store.add(newSnap)
+			}
 		}
 	}
 	return nil
