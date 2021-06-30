@@ -464,9 +464,12 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 		return
 	}
+
 	if !snap.Set.Includes(i.validatorKeyAddr) {
+		// we are not a validator anymore, move back to sync state
 		i.logger.Info("we are not a validator anymore")
 		i.setState(SyncState)
+		return
 	}
 
 	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
@@ -518,6 +521,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	}
 
 	i.logger.Info("proposer calculated", "proposer", i.state.proposer, "block", number)
+
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
@@ -554,11 +558,13 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errIncorrectBlockLocked)
 			}
 		} else {
+			// since its a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 			} else {
 				i.state.block = block
+
 				// send prepare message and wait for validations
 				i.sendPrepareMsg()
 				i.setState(ValidateState)
@@ -669,7 +675,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	// prepare snapshot for next sequence
+	// prepare snapshot for the next sequence
 	if err := i.updateSnapshotValidators(header.Number+1, nextValidators); err != nil {
 		return err
 	}
