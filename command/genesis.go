@@ -241,59 +241,55 @@ func (c *GenesisCommand) Run(args []string) int {
 		Bootnodes: bootnodes,
 	}
 
-	if len(premine) != 0 {
-		for _, prem := range premine {
-			var addr types.Address
-			val := defaultPremineBalance
-			if indx := strings.Index(prem, ":"); indx != -1 {
-				// <addr>:<balance>
-				addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
-			} else {
-				// <addr>
-				addr = types.StringToAddress(prem)
-			}
+	for _, prem := range premine {
+		var addr types.Address
+		val := defaultPremineBalance
+		if indx := strings.Index(prem, ":"); indx != -1 {
+			// <addr>:<balance>
+			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
+		} else {
+			// <addr>
+			addr = types.StringToAddress(prem)
+		}
 
-			amount, err := types.ParseUint256orHex(&val)
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
-				return 1
-			}
-			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
-				Balance: amount,
-			}
+		amount, err := types.ParseUint256orHex(&val)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
+			return 1
+		}
+		cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
+			Balance: amount,
 		}
 	}
 
-	if len(prestake) != 0 {
-		for _, pres := range prestake {
-			var addr types.Address
-			val := defaultPrestakeBalance
-			if indx := strings.Index(pres, ":"); indx != -1 {
-				// <addr>:<balance>
-				addr, val = types.StringToAddress(pres[:indx]), pres[indx+1:]
-			} else {
-				// <addr>
-				addr = types.StringToAddress(pres)
-			}
+	for _, pres := range prestake {
+		var addr types.Address
+		val := defaultPrestakeBalance
+		if indx := strings.Index(pres, ":"); indx != -1 {
+			// <addr>:<balance>
+			addr, val = types.StringToAddress(pres[:indx]), pres[indx+1:]
+		} else {
+			// <addr>
+			addr = types.StringToAddress(pres)
+		}
 
-			stakeAmount, err := types.ParseUint256orHex(&val)
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("failed to parse stake amount %s: %v", val, err))
-				return 1
-			}
+		stakeAmount, err := types.ParseUint256orHex(&val)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("failed to parse stake amount %s: %v", val, err))
+			return 1
+		}
 
-			previousAccount := cc.Genesis.Alloc[addr]
+		previousAccount := cc.Genesis.Alloc[addr]
 
-			if previousAccount != nil {
-				// Account already has a premined balance
-				previousAccount.StakedBalance = stakeAmount
-				cc.Genesis.Alloc[addr] = previousAccount
-			} else {
-				// Account doesn't have a premined balance
-				cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
-					Balance:       big.NewInt(0),
-					StakedBalance: stakeAmount,
-				}
+		if previousAccount != nil {
+			// Account already has a premined balance
+			previousAccount.StakedBalance = stakeAmount
+			cc.Genesis.Alloc[addr] = previousAccount
+		} else {
+			// Account doesn't have a premined balance
+			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
+				Balance:       big.NewInt(0),
+				StakedBalance: stakeAmount,
 			}
 		}
 	}
