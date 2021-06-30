@@ -3,11 +3,9 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -15,25 +13,13 @@ import (
 )
 
 func TestSignedTransaction(t *testing.T) {
-	signer := crypto.NewEIP155Signer(100)
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, preminedAmount)
 		config.SetSeal(true)
-	})
-	t.Cleanup(func() {
-		ibftManager.StopServers()
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -48,33 +34,21 @@ func TestSignedTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, preminedAmount, balance)
 
-	// latest nonce
-	lastNonce, err := clt.Eth().GetNonce(web3.Address(senderAddr), web3.Latest)
-	assert.NoError(t, err)
-
 	for i := 0; i < 5; i++ {
-		txn := &types.Transaction{
+		txn := &framework.PreparedTransaction{
 			From:     senderAddr,
 			To:       &receiverAddr,
 			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
-			Nonce:    lastNonce + uint64(i),
 		}
-		txn, err = signer.SignTx(txn, senderKey)
-		assert.NoError(t, err)
-
-		data := txn.MarshalRLP()
-		hash, err := clt.Eth().SendRawTransaction(data)
-		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		receipt, err := srv.WaitForReceipt(ctx, hash)
-
+		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
-		assert.Equal(t, receipt.TransactionHash, hash)
+		assert.NotNil(t, receipt.TransactionHash)
 	}
 }
 

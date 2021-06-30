@@ -20,6 +20,9 @@ type Consensus interface {
 	// VerifyHeader verifies the header is correct
 	VerifyHeader(parent, header *types.Header) error
 
+	// GetBlockCreator retrieves the block creator (or signer) given the block header
+	GetBlockCreator(header *types.Header) (types.Address, error)
+
 	// Start starts the consensus
 	Start() error
 

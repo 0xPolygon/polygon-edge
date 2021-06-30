@@ -44,15 +44,17 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 	srv1 := CreateServer(t, discoveryConfig)
 	srv2 := CreateServer(t, discoveryConfig)
 
+	// server0 should connect to server2 by discovery
+	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
+
 	// serial join, srv0 -> srv1 -> srv2
 	MultiJoin(t,
 		srv0, srv1,
 		srv1, srv2,
 	)
 
-	// wait for the propagation
-	time.Sleep(5 * time.Second)
-
+	// wait until server0 connects to server2
+	assert.True(t, <-connectedCh)
 	assert.Len(t, srv0.host.Peerstore().Peers(), 3)
 	assert.Len(t, srv1.host.Peerstore().Peers(), 3)
 	assert.Len(t, srv2.host.Peerstore().Peers(), 3)
