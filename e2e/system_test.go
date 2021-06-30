@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
@@ -73,37 +72,7 @@ func getStakedBalance(
 	return stakedBalance
 }
 
-var signer = crypto.NewEIP155Signer(100)
-
-type sendParams struct {
-	fromAddress types.Address
-	toAddress   types.Address
-	value       *big.Int
-	signingKey  *ecdsa.PrivateKey
-	t           *testing.T
-	rpcClient   *jsonrpc.Client
-}
-
 var defaultGasPrice = big.NewInt(1048576)
-
-func sendRawTransaction(params sendParams) (web3.Hash, error) {
-	// Create the transaction
-	txnObject := &types.Transaction{
-		From:     params.fromAddress,
-		To:       &(params.toAddress),
-		GasPrice: defaultGasPrice,
-		Gas:      1000000,
-		Value:    params.value,
-	}
-
-	signedTxn, err := signer.SignTx(txnObject, params.signingKey)
-	assert.NoError(params.t, err)
-
-	data := signedTxn.MarshalRLP()
-
-	// Do the transfer
-	return params.rpcClient.Eth().SendRawTransaction(data)
-}
 
 func TestSystem_StakeAmount(t *testing.T) {
 	addressKeyPairs := generateAddressKeyPairs(2, t)
@@ -167,24 +136,20 @@ func TestSystem_StakeAmount(t *testing.T) {
 			previousAccountBalance, _ := big.NewInt(0).SetString(accountBalance.String(), 10)
 			previousStakedBalance, _ := big.NewInt(0).SetString(stakedBalance.String(), 10)
 
-			txnHash, err := sendRawTransaction(sendParams{
-				fromAddress: testCase.staker,
-				toAddress:   stakingAddress,
-				value:       testCase.stakeAmount,
-				signingKey:  addressKeyPairs[indx].privateKey,
-				t:           t,
-				rpcClient:   rpcClient,
-			})
-
-			assert.NoError(t, err)
-			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
+			preparedTxn := &framework.PreparedTransaction{
+				From:     testCase.staker,
+				To:       &stakingAddress,
+				GasPrice: defaultGasPrice,
+				Gas:      1000000,
+				Value:    testCase.stakeAmount,
+			}
 
 			fee := big.NewInt(0)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			receipt, err := srv.SendRawTx(ctx, preparedTxn, addressKeyPairs[indx].privateKey)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, receipt)
@@ -303,25 +268,20 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 			previousStakedBalance, _ := big.NewInt(0).SetString(stakedBalance.String(), 10)
 
 			// Do the transfer
-			txnHash, err := sendRawTransaction(sendParams{
-				fromAddress: testCase.staker,
-				toAddress:   unstakingAddress,
-				value:       big.NewInt(0),
-				signingKey:  addressKeyPairs[indx].privateKey,
-				t:           t,
-				rpcClient:   rpcClient,
-			})
-
-			assert.NoError(t, err)
-			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
+			preparedTxn := &framework.PreparedTransaction{
+				From:     testCase.staker,
+				To:       &unstakingAddress,
+				GasPrice: defaultGasPrice,
+				Gas:      1000000,
+				Value:    big.NewInt(0),
+			}
 
 			fee := big.NewInt(0)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			receipt, err := srv.WaitForReceipt(ctx, txnHash)
-
+			receipt, err := srv.SendRawTx(ctx, preparedTxn, addressKeyPairs[indx].privateKey)
 			assert.NoError(t, err)
 			assert.NotNil(t, receipt)
 
