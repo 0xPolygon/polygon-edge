@@ -591,6 +591,10 @@ func (t *Transition) GetBalance(addr types.Address) *big.Int {
 	return t.state.GetBalance(addr)
 }
 
+func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
+	t.state.AddStakedBalance(addr, balance)
+}
+
 func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	return t.state.GetState(addr, key)
 }

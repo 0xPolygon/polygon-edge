@@ -41,6 +41,9 @@ type endpoints struct {
 	Eth  *Eth
 	Web3 *Web3
 	Net  *Net
+
+	// Staking endpoints
+	Stake *Stake
 }
 
 // Dispatcher handles jsonrpc requests
@@ -84,9 +87,15 @@ func (d *Dispatcher) registerEndpoints() {
 	d.endpoints.Net = &Net{d}
 	d.endpoints.Web3 = &Web3{d}
 
+	// Staking endpoints
+	d.endpoints.Stake = &Stake{d}
+
 	d.registerService("eth", d.endpoints.Eth)
 	d.registerService("net", d.endpoints.Net)
 	d.registerService("web3", d.endpoints.Web3)
+
+	// Register staking endpoints
+	d.registerService("stake", d.endpoints.Stake)
 }
 
 func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) {

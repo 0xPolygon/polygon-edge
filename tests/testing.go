@@ -318,12 +318,6 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 			if err != nil {
 				return err
 			}
-			/*
-				v, ok := math.ParseBig256(i)
-				if !ok {
-					return fmt.Errorf("invalid tx value %q", i)
-				}
-			*/
 			value = v
 		}
 		t.Value = append(t.Value, value)

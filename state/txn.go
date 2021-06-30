@@ -1,9 +1,10 @@
 package state
 
 import (
+	"math/big"
+
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
-	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
@@ -135,10 +136,11 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 	if !exists && create {
 		object = &StateObject{
 			Account: &Account{
-				Balance:  big.NewInt(0),
-				Trie:     txn.state.NewSnapshot(),
-				CodeHash: emptyCodeHash,
-				Root:     emptyStateHash,
+				Balance:       big.NewInt(0),
+				StakedBalance: big.NewInt(0),
+				Trie:          txn.state.NewSnapshot(),
+				CodeHash:      emptyCodeHash,
+				Root:          emptyStateHash,
 			},
 		}
 	}
@@ -164,21 +166,20 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("ADD BALANCE: %s %s\n", addr.String(), balance.String())
-	/*
-		if balance.Sign() == 0 {
-			return
-		}
-	*/
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
 
+// AddStakedBalance increases the staked balance by the specific amount
+func (txn *Txn) AddStakedBalance(addr types.Address, balance *big.Int) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.Add(object.Account.StakedBalance, balance)
+	})
+}
+
 // SubBalance reduces the balance
 func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("SUB BALANCE: %s %s\n", addr.String(), balance.String())
-
 	if balance.Sign() == 0 {
 		return
 	}
@@ -189,7 +190,6 @@ func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
 
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("SET BALANCE: %s %s\n", addr.String(), balance.String())
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
 	})
@@ -490,10 +490,11 @@ func (txn *Txn) Empty(addr types.Address) bool {
 func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
-			CodeHash: emptyCodeHash,
-			Root:     emptyStateHash,
+			Balance:       big.NewInt(0),
+			StakedBalance: big.NewInt(0),
+			Trie:          txn.state.NewSnapshot(),
+			CodeHash:      emptyCodeHash,
+			Root:          emptyStateHash,
 		},
 	}
 }
@@ -501,16 +502,18 @@ func newStateObject(txn *Txn) *StateObject {
 func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
-			Balance:  big.NewInt(0),
-			Trie:     txn.state.NewSnapshot(),
-			CodeHash: emptyCodeHash,
-			Root:     emptyStateHash,
+			Balance:       big.NewInt(0),
+			StakedBalance: big.NewInt(0),
+			Trie:          txn.state.NewSnapshot(),
+			CodeHash:      emptyCodeHash,
+			Root:          emptyStateHash,
 		},
 	}
 
 	prev, ok := txn.getStateObject(addr)
 	if ok {
 		obj.Account.Balance.SetBytes(prev.Account.Balance.Bytes())
+		obj.Account.StakedBalance.SetBytes(prev.Account.StakedBalance.Bytes())
 	}
 
 	txn.txn.Insert(addr.Bytes(), obj)
@@ -563,13 +566,14 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		}
 
 		obj := &Object{
-			Nonce:     a.Account.Nonce,
-			Address:   types.BytesToAddress(k),
-			Balance:   a.Account.Balance,
-			Root:      a.Account.Root,
-			CodeHash:  types.BytesToHash(a.Account.CodeHash),
-			DirtyCode: a.DirtyCode,
-			Code:      a.Code,
+			Nonce:         a.Account.Nonce,
+			Address:       types.BytesToAddress(k),
+			Balance:       a.Account.Balance,
+			StakedBalance: a.Account.StakedBalance,
+			Root:          a.Account.Root,
+			CodeHash:      types.BytesToHash(a.Account.CodeHash),
+			DirtyCode:     a.DirtyCode,
+			Code:          a.Code,
 		}
 		if a.Deleted {
 			obj.Deleted = true
@@ -591,7 +595,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		objs = append(objs, obj)
 		return false
 	})
-	// show(objs)
 
 	t, hash := txn.snapshot.Commit(objs)
 	return t, hash

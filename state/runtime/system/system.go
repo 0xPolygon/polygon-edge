@@ -24,7 +24,7 @@ type systemContract interface {
 
 // setupHandlers defines which addresses are assigned to which system contract handlers
 func (s *System) setupHandlers() {
-	s.registerHandler("1001", &dummyHandler{s})
+	s.registerHandler("1001", &stakingHandler{s})
 }
 
 // registerHandler registers a new systemContract handler for the specified address

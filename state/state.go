@@ -35,6 +35,9 @@ type Account struct {
 	Root     types.Hash
 	CodeHash []byte
 	Trie     accountTrie
+
+	// System contract expansion //
+	StakedBalance *big.Int
 }
 
 func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
@@ -43,6 +46,7 @@ func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 	v.Set(ar.NewBigInt(a.Balance))
 	v.Set(ar.NewBytes(a.Root.Bytes()))
 	v.Set(ar.NewBytes(a.CodeHash))
+	v.Set(ar.NewBigInt(a.StakedBalance))
 	return v
 }
 
@@ -60,8 +64,9 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if len(elems) != 4 {
-		return fmt.Errorf("bad")
+
+	if len(elems) != 5 {
+		return fmt.Errorf("account has an invalid field count")
 	}
 
 	// nonce
@@ -72,6 +77,10 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if a.Balance == nil {
 		a.Balance = new(big.Int)
 	}
+	if a.StakedBalance == nil {
+		a.StakedBalance = new(big.Int)
+	}
+
 	if err = elems[1].GetBigInt(a.Balance); err != nil {
 		return err
 	}
@@ -83,11 +92,15 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if a.CodeHash, err = elems[3].GetBytes(a.CodeHash[:0]); err != nil {
 		return err
 	}
-	return nil
+
+	// Staking implementation
+	err = elems[4].GetBigInt(a.StakedBalance)
+
+	return err
 }
 
 func (a *Account) String() string {
-	return fmt.Sprintf("%d %s", a.Nonce, a.Balance.String())
+	return fmt.Sprintf("%d %s %s", a.Nonce, a.Balance.String(), a.StakedBalance.String())
 }
 
 func (a *Account) Copy() *Account {
@@ -98,6 +111,7 @@ func (a *Account) Copy() *Account {
 	aa.CodeHash = a.CodeHash
 	aa.Root = a.Root
 	aa.Trie = a.Trie
+	aa.StakedBalance = big.NewInt(1).SetBytes(a.StakedBalance.Bytes())
 
 	return aa
 }
@@ -115,7 +129,10 @@ type StateObject struct {
 }
 
 func (s *StateObject) Empty() bool {
-	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
+	return s.Account.Nonce == 0 &&
+		s.Account.Balance.Sign() == 0 &&
+		s.Account.StakedBalance.Sign() == 0 &&
+		bytes.Equal(s.Account.CodeHash, emptyCodeHash)
 }
 
 var stateStateParserPool fastrlp.ParserPool
@@ -163,12 +180,13 @@ func (s *StateObject) Copy() *StateObject {
 
 // Object is the serialization of the radix object (can be merged to StateObject?).
 type Object struct {
-	Address  types.Address
-	CodeHash types.Hash
-	Balance  *big.Int
-	Root     types.Hash
-	Nonce    uint64
-	Deleted  bool
+	Address       types.Address
+	CodeHash      types.Hash
+	Balance       *big.Int
+	StakedBalance *big.Int
+	Root          types.Hash
+	Nonce         uint64
+	Deleted       bool
 
 	// TODO: Move this to executor
 	DirtyCode bool

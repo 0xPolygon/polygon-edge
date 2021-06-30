@@ -15,7 +15,7 @@ import (
 )
 
 func TestSignedTransaction(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
+	signer := crypto.NewEIP155Signer(100)
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
