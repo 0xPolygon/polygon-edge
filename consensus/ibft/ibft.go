@@ -692,6 +692,10 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 	i.state.nextValidators = nextValidators
+	// need to update a snapshot because snapshot at the height has been created inside WriteBlocks
+	if err := i.updateSnapshot(header, i.state.validators); err != nil {
+		return err
+	}
 
 	// increase the sequence number and reset the round if any
 	i.state.view = &proto.View{

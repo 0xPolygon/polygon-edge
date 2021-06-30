@@ -97,3 +97,28 @@ func (i *Ibft) verifyValidatorSet(header *types.Header) error {
 	}
 	return nil
 }
+
+// updateSnapshot updates snapshot with given validator set
+func (i *Ibft) updateSnapshot(header *types.Header, validators ValidatorSet) error {
+	snap, err := i.getSnapshot(header.Number)
+	if err != nil {
+		return err
+	}
+	if snap == nil {
+		return fmt.Errorf("cannot find the snapshot at %d", header.Number)
+	}
+
+	if !snap.Set.Equal(&validators) {
+		newSnap := snap.Copy()
+		newSnap.Number = header.Number
+		newSnap.Hash = header.Hash.String()
+		newSnap.Set = validators
+
+		if snap.Number != newSnap.Number {
+			i.store.add(newSnap)
+		} else {
+			i.store.replace(newSnap)
+		}
+	}
+	return nil
+}
