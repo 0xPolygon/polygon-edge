@@ -38,7 +38,7 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 		return nil, nil
 	}
 
-	// Decrease the staked balance on the unstaking address
+	// Decrease the staked balance on the staking address
 	state.host.SubBalance(stakingAddress, stakedBalance)
 
 	// Decrease the staked amount from the account's staked balance
