@@ -284,7 +284,6 @@ func (c *GenesisCommand) Run(args []string) int {
 		if previousAccount != nil {
 			// Account already has a premined balance
 			previousAccount.StakedBalance = stakeAmount
-			cc.Genesis.Alloc[addr] = previousAccount
 		} else {
 			// Account doesn't have a premined balance
 			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{

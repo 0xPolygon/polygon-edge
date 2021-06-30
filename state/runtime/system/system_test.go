@@ -44,7 +44,7 @@ func TestSystem_CanRun(t *testing.T) {
 					depth:  0,
 					origin: types.StringToAddress("0"),
 					from:   types.StringToAddress("0"),
-					to:     types.StringToAddress(GetOperationsMap()["staking"]), // Staking handler
+					to:     types.StringToAddress(StakingAddress), // Staking handler
 					value:  nil,
 					gas:    0,
 					code:   nil,
@@ -59,7 +59,7 @@ func TestSystem_CanRun(t *testing.T) {
 					depth:  0,
 					origin: types.StringToAddress("0"),
 					from:   types.StringToAddress("0"),
-					to:     types.StringToAddress(GetOperationsMap()["unstaking"]), // Unstaking handler
+					to:     types.StringToAddress(UnstakingAddress), // Unstaking handler
 					value:  nil,
 					gas:    0,
 					code:   nil,

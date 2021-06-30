@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 )
 
 type addressKeyPair struct {
@@ -32,10 +33,80 @@ func generateAddressKeyPairs(num int, t *testing.T) []*addressKeyPair {
 	return pairs
 }
 
+// getAccountBalance is a helper method for fetching the Balance field of an account
+func getAccountBalance(
+	address types.Address,
+	rpcClient *jsonrpc.Client,
+	t *testing.T,
+) *big.Int {
+	accountBalance, err := rpcClient.Eth().GetBalance(
+		web3.Address(address),
+		web3.Latest,
+	)
+
+	assert.NoError(t, err)
+
+	return accountBalance
+}
+
+// getStakedBalance is a helper method for fetching the StakedBalance field of an account
+func getStakedBalance(
+	address types.Address,
+	rpcClient *jsonrpc.Client,
+	t *testing.T,
+) *big.Int {
+	var out string
+	if callErr := rpcClient.Call(
+		"stake_getStakedBalance",
+		&out,
+		web3.Address(address),
+		web3.Latest.String(),
+	); callErr != nil {
+		t.Fatalf("Unable to fetch staked balance")
+	}
+
+	stakedBalance, ok := new(big.Int).SetString(out[2:], 16)
+	if !ok {
+		t.Fatalf("Unable to convert staked balance response to big.Int")
+	}
+
+	return stakedBalance
+}
+
+var signer = crypto.NewEIP155Signer(100)
+
+type sendParams struct {
+	fromAddress types.Address
+	toAddress   types.Address
+	value       *big.Int
+	signingKey  *ecdsa.PrivateKey
+	t           *testing.T
+	rpcClient   *jsonrpc.Client
+}
+
+var defaultGasPrice = big.NewInt(1048576)
+
+func sendRawTransaction(params sendParams) (web3.Hash, error) {
+	// Create the transaction
+	txnObject := &types.Transaction{
+		From:     params.fromAddress,
+		To:       &(params.toAddress),
+		GasPrice: defaultGasPrice,
+		Gas:      1000000,
+		Value:    params.value,
+	}
+
+	signedTxn, err := signer.SignTx(txnObject, params.signingKey)
+	assert.NoError(params.t, err)
+
+	data := signedTxn.MarshalRLP()
+
+	// Do the transfer
+	return params.rpcClient.Eth().SendRawTransaction(data)
+}
+
 func TestSystem_StakeAmount(t *testing.T) {
 	addressKeyPairs := generateAddressKeyPairs(2, t)
-
-	signer := crypto.NewEIP155Signer(100)
 
 	validAccounts := []struct {
 		address types.Address
@@ -53,7 +124,7 @@ func TestSystem_StakeAmount(t *testing.T) {
 		},
 	}
 
-	stakingAddress := types.StringToAddress(system.GetOperationsMap()["staking"])
+	stakingAddress := types.StringToAddress(system.StakingAddress)
 
 	testTable := []struct {
 		name          string
@@ -89,51 +160,26 @@ func TestSystem_StakeAmount(t *testing.T) {
 	for indx, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the staker balance before sending the transaction
-			accountBalance, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.staker),
-				web3.Latest,
-			)
-			assert.NoError(t, err)
-
-			var out string
-			if callErr := rpcClient.Call(
-				"stake_getStakedBalance",
-				&out,
-				web3.Address(testCase.staker),
-				web3.Latest.String(),
-			); callErr != nil {
-				t.Fatalf("Unable to fetch staked balance")
-			}
-
-			stakedBalance, ok := new(big.Int).SetString(out[2:], 16)
-			if !ok {
-				t.Fatalf("Unable to convert staked balance response to big.Int")
-			}
+			accountBalance := getAccountBalance(testCase.staker, rpcClient, t)
+			stakedBalance := getStakedBalance(testCase.staker, rpcClient, t)
 
 			// Set the preSend balances
 			previousAccountBalance, _ := big.NewInt(0).SetString(accountBalance.String(), 10)
 			previousStakedBalance, _ := big.NewInt(0).SetString(stakedBalance.String(), 10)
 
-			// Create the transaction
-			txnObject := &types.Transaction{
-				From:     testCase.staker,
-				To:       &stakingAddress,
-				GasPrice: big.NewInt(1048576),
-				Gas:      1000000,
-				Value:    testCase.stakeAmount,
-			}
+			txnHash, err := sendRawTransaction(sendParams{
+				fromAddress: testCase.staker,
+				toAddress:   stakingAddress,
+				value:       testCase.stakeAmount,
+				signingKey:  addressKeyPairs[indx].privateKey,
+				t:           t,
+				rpcClient:   rpcClient,
+			})
 
-			signedTxn, err := signer.SignTx(txnObject, addressKeyPairs[indx].privateKey)
-			assert.NoError(t, err)
-
-			data := signedTxn.MarshalRLP()
-
-			fee := big.NewInt(0)
-
-			// Do the transfer
-			txnHash, err := rpcClient.Eth().SendRawTransaction(data)
 			assert.NoError(t, err)
 			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
+
+			fee := big.NewInt(0)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -146,30 +192,13 @@ func TestSystem_StakeAmount(t *testing.T) {
 			if testCase.shouldSucceed {
 				fee = new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(txnObject.GasPrice.Int64()),
+					big.NewInt(defaultGasPrice.Int64()),
 				)
 			}
 
 			// Fetch the balance after sending
-			accountBalance, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.staker),
-				web3.Latest,
-			)
-			assert.NoError(t, err)
-
-			if callErr := rpcClient.Call(
-				"stake_getStakedBalance",
-				&out,
-				web3.Address(testCase.staker),
-				web3.Latest.String(),
-			); callErr != nil {
-				t.Fatalf("Unable to fetch staked balance")
-			}
-
-			stakedBalance, ok = new(big.Int).SetString(out[2:], 16)
-			if !ok {
-				t.Fatalf("Unable to convert staked balance response to big.Int")
-			}
+			accountBalance = getAccountBalance(testCase.staker, rpcClient, t)
+			stakedBalance = getStakedBalance(testCase.staker, rpcClient, t)
 
 			accountBalanceExpected := previousAccountBalance
 			if testCase.shouldSucceed {
@@ -204,10 +233,8 @@ func TestSystem_StakeAmount(t *testing.T) {
 func TestSystem_UnstakeAmount(t *testing.T) {
 	addressKeyPairs := generateAddressKeyPairs(2, t)
 
-	signer := crypto.NewEIP155Signer(100)
-
-	stakingAddress := types.StringToAddress(system.GetOperationsMap()["staking"])
-	unstakingAddress := types.StringToAddress(system.GetOperationsMap()["unstaking"])
+	stakingAddress := types.StringToAddress(system.StakingAddress)
+	unstakingAddress := types.StringToAddress(system.UnstakingAddress)
 
 	validAccounts := []struct {
 		address       types.Address
@@ -229,7 +256,7 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 		// Valid account without stake
 		{
 			addressKeyPairs[1].address,
-			big.NewInt(0),
+			framework.EthToWei(0),
 			framework.EthToWei(0),
 		},
 	}
@@ -268,51 +295,27 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 	for indx, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the staker balance before sending the transaction
-			accountBalance, err := rpcClient.Eth().GetBalance(
-				web3.Address(testCase.staker),
-				web3.Latest,
-			)
-			assert.NoError(t, err)
-
-			var out string
-			if callErr := rpcClient.Call(
-				"stake_getStakedBalance",
-				&out,
-				web3.Address(testCase.staker),
-				web3.Latest.String(),
-			); callErr != nil && testCase.shouldSucceed {
-				t.Fatalf("Unable to fetch staked balance")
-			}
-
-			stakedBalance, ok := new(big.Int).SetString(out[2:], 16)
-			if !ok {
-				t.Fatalf("Unable to convert staked balance response to big.Int")
-			}
+			accountBalance := getAccountBalance(testCase.staker, rpcClient, t)
+			stakedBalance := getStakedBalance(testCase.staker, rpcClient, t)
 
 			// Set the preSend balances
 			previousAccountBalance, _ := big.NewInt(0).SetString(accountBalance.String(), 10)
 			previousStakedBalance, _ := big.NewInt(0).SetString(stakedBalance.String(), 10)
 
-			// Create the transaction
-			txnObject := &types.Transaction{
-				From:     testCase.staker,
-				To:       &unstakingAddress,
-				GasPrice: big.NewInt(1048576),
-				Gas:      1000000,
-				Value:    big.NewInt(0),
-			}
-
-			signedTxn, err := signer.SignTx(txnObject, addressKeyPairs[indx].privateKey)
-			assert.NoError(t, err)
-
-			data := signedTxn.MarshalRLP()
-
-			fee := big.NewInt(0)
-
 			// Do the transfer
-			txnHash, err := rpcClient.Eth().SendRawTransaction(data)
+			txnHash, err := sendRawTransaction(sendParams{
+				fromAddress: testCase.staker,
+				toAddress:   unstakingAddress,
+				value:       big.NewInt(0),
+				signingKey:  addressKeyPairs[indx].privateKey,
+				t:           t,
+				rpcClient:   rpcClient,
+			})
+
 			assert.NoError(t, err)
 			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
+
+			fee := big.NewInt(0)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -325,30 +328,13 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 			if testCase.shouldSucceed {
 				fee = new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(txnObject.GasPrice.Int64()),
+					big.NewInt(defaultGasPrice.Int64()),
 				)
 			}
 
 			// Fetch the balance after sending
-			accountBalance, err = rpcClient.Eth().GetBalance(
-				web3.Address(testCase.staker),
-				web3.Latest,
-			)
-			assert.NoError(t, err)
-
-			if callErr := rpcClient.Call(
-				"stake_getStakedBalance",
-				&out,
-				web3.Address(testCase.staker),
-				web3.Latest.String(),
-			); callErr != nil && testCase.shouldSucceed {
-				t.Fatalf("Unable to fetch staked balance")
-			}
-
-			stakedBalance, ok = new(big.Int).SetString(out[2:], 16)
-			if !ok {
-				t.Fatalf("Unable to convert staked balance response to big.Int")
-			}
+			accountBalance = getAccountBalance(testCase.staker, rpcClient, t)
+			stakedBalance = getStakedBalance(testCase.staker, rpcClient, t)
 
 			accountBalanceExpected := previousAccountBalance
 			if testCase.shouldSucceed {

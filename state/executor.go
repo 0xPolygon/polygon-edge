@@ -50,7 +50,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
 
-	unstakingAddress := types.StringToAddress(system.GetOperationsMap()["unstaking"])
+	unstakingAddress := types.StringToAddress(system.UnstakingAddress)
 
 	for addr, account := range alloc {
 		if account.Balance != nil {

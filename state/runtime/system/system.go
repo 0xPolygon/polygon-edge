@@ -22,22 +22,15 @@ type systemContract interface {
 	run(state *systemState) ([]byte, error)
 }
 
-// operationsAddressMap defines an operation -> address (string) mapping
-var operationsMap = map[string]string{
-	"staking":   "1001",
-	"unstaking": "1002",
-}
-
-// GetOperationsMap returns the operations map,
-// so system operations know their address
-func GetOperationsMap() map[string]string {
-	return operationsMap
-}
+var (
+	StakingAddress   = "1001"
+	UnstakingAddress = "1002"
+)
 
 // setupHandlers defines which addresses are assigned to which system contract handlers
 func (s *System) setupHandlers() {
-	s.registerHandler(operationsMap["staking"], &stakingHandler{s})
-	s.registerHandler(operationsMap["unstaking"], &unstakingHandler{s})
+	s.registerHandler(StakingAddress, &stakingHandler{s})
+	s.registerHandler(UnstakingAddress, &unstakingHandler{s})
 }
 
 // registerHandler registers a new systemContract handler for the specified address

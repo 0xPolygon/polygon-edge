@@ -204,7 +204,6 @@ func buildState(t *testing.T, allocs map[types.Address]*chain.GenesisAccount) (s
 		txn.CreateAccount(addr)
 		txn.SetNonce(addr, alloc.Nonce)
 		txn.SetBalance(addr, alloc.Balance)
-		//txn.SetStakedBalance(addr, big.NewInt(0))
 
 		if len(alloc.Code) != 0 {
 			txn.SetCode(addr, alloc.Code)
