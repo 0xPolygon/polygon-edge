@@ -47,10 +47,11 @@ type Blockchain struct {
 
 type Verifier interface {
 	VerifyHeader(parent, header *types.Header) error
+	GetBlockCreator(header *types.Header) (types.Address, error)
 }
 
 type Executor interface {
-	ProcessBlock(parentRoot types.Hash, block *types.Block) (*state.BlockResult, error)
+	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error)
 }
 
 // UpdateGasPriceAvg Updates the rolling average value of the gas price
@@ -168,6 +169,10 @@ func (b *Blockchain) ComputeGenesis() error {
 	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
 
 	return nil
+}
+
+func (b *Blockchain) GetConsensus() Verifier {
+	return b.consensus
 }
 
 // SetConsensus sets the consensus
@@ -630,7 +635,12 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("unknown ancestor")
 	}
 
-	result, err := b.executor.ProcessBlock(parent.StateRoot, block)
+	blockCreator, err := b.consensus.GetBlockCreator(header)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := b.executor.ProcessBlock(parent.StateRoot, block, blockCreator)
 	if err != nil {
 		return nil, err
 	}

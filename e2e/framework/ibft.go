@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -13,18 +14,27 @@ type IBFTServersManager struct {
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 
-func NewIBFTServersManager(t *testing.T, numNodes int, rootDir string, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
+func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
 	t.Helper()
 
-	srvs, bootnodes := make([]*TestServer, 0, numNodes), make([]string, 0, numNodes)
+	dataDir, err := tempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srvs := make([]*TestServer, 0, numNodes)
+	bootnodes := make([]string, 0, numNodes)
 	t.Cleanup(func() {
 		for _, s := range srvs {
 			s.Stop()
 		}
+		if err := os.RemoveAll(dataDir); err != nil {
+			t.Log(err)
+		}
 	})
 
 	for i := 0; i < numNodes; i++ {
-		srv := NewTestServer(t, rootDir, func(config *TestServerConfig) {
+		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)
 			config.SetIBFTDirPrefix(ibftDirPrefix)
 			config.SetIBFTDir(fmt.Sprintf("%s%d", ibftDirPrefix, i))

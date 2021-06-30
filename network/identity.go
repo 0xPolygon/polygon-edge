@@ -30,20 +30,31 @@ func (i *identity) numPending() int64 {
 	return atomic.LoadInt64(&i.pendingSize)
 }
 
+func (i *identity) isPending(id peer.ID) bool {
+	val, ok := i.pending.Load(id)
+	if !ok {
+		return false
+	}
+	return val.(bool)
+}
+
 func (i *identity) delPending(id peer.ID) {
-	i.pending.Delete(id)
-	atomic.AddInt64(&i.pendingSize, -1)
+	if _, loaded := i.pending.LoadAndDelete(id); loaded {
+		atomic.AddInt64(&i.pendingSize, -1)
+	}
 }
 
 func (i *identity) setPending(id peer.ID) {
-	i.pending.Store(id, true)
-	atomic.AddInt64(&i.pendingSize, 1)
+	if _, loaded := i.pending.LoadOrStore(id, true); !loaded {
+		atomic.AddInt64(&i.pendingSize, 1)
+	}
 }
 
 func (i *identity) setup() {
 	// register the protobuf protocol
 	grpc := grpc.NewGrpcStream()
 	proto.RegisterIdentityServer(grpc.GrpcServer(), i)
+	grpc.Serve()
 
 	i.srv.Register(identityProtoV1, grpc)
 
@@ -56,6 +67,10 @@ func (i *identity) setup() {
 			// limit by MaxPeers on incomming requests since we already limit
 			// the outgoing requests
 			if conn.Stat().Direction == network.DirInbound {
+				if i.isPending(peerID) {
+					// handshake has already started
+					return
+				}
 				if i.srv.numOpenSlots() == 0 {
 					i.srv.Disconnect(peerID, "no available slots")
 					return
@@ -66,7 +81,15 @@ func (i *identity) setup() {
 			i.setPending(peerID)
 
 			go func() {
-				defer i.delPending(peerID)
+				defer func() {
+					if i.isPending(peerID) {
+						i.delPending(peerID)
+						i.srv.emitEvent(&PeerEvent{
+							PeerID: peerID,
+							Type:   PeerEventDialCompleted,
+						})
+					}
+				}()
 
 				if err := i.handleConnected(peerID); err != nil {
 					i.srv.Disconnect(peerID, err.Error())
