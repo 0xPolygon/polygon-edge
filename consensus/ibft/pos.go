@@ -67,7 +67,7 @@ func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.
 	return nextValidators, nil
 }
 
-// updateSnapshotValidators overwrite validators in snapshot at given height
+// updateSnapshotValidators update validators in snapshot at given height
 func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) error {
 	snap, err := i.getSnapshot(num)
 	if err != nil {
@@ -78,10 +78,15 @@ func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) err
 	}
 	if !snap.Set.Equal(&validators) {
 		newSnap := snap.Copy()
-		newSnap.Number = num
-		newSnap.Hash = ""
 		newSnap.Set = validators
-		i.store.add(newSnap)
+		if snap.Number != num {
+			// create new one
+			newSnap.Number = num
+			newSnap.Hash = ""
+			i.store.add(newSnap)
+		} else {
+			i.store.replace(newSnap)
+		}
 	}
 	return nil
 }
@@ -104,26 +109,7 @@ func (i *Ibft) bulkUpdateSnapshots(begin, end uint64, events []*state.StakingEve
 		if err != nil {
 			return err
 		}
-
-		snap, err := i.getSnapshot(n)
-		if err != nil {
-			return err
-		}
-		if snap == nil {
-			return fmt.Errorf("cannot find snapshot at %d", n)
-		}
-		if !snap.Set.Equal(&validators) {
-			newSnap := snap.Copy()
-			newSnap.Number = header.Number
-			newSnap.Hash = header.Hash.String()
-			newSnap.Set = validators
-
-			if snap.Number == newSnap.Number {
-				i.store.replace(newSnap)
-			} else {
-				i.store.add(newSnap)
-			}
-		}
+		i.updateSnapshotValidators(n, validators)
 	}
 	return nil
 }
