@@ -226,19 +226,21 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 
 // GenesisAccount is an account in the state of the genesis block.
 type GenesisAccount struct {
-	Code       []byte                    `json:"code,omitempty"`
-	Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
-	Balance    *big.Int                  `json:"balance,omitempty"`
-	Nonce      uint64                    `json:"nonce,omitempty"`
-	PrivateKey []byte                    `json:"secretKey,omitempty"` // for tests
+	Code          []byte                    `json:"code,omitempty"`
+	Storage       map[types.Hash]types.Hash `json:"storage,omitempty"`
+	Balance       *big.Int                  `json:"balance,omitempty"`
+	StakedBalance *big.Int                  `json:"stakedBalance,omitempty"` // Staking implementation
+	Nonce         uint64                    `json:"nonce,omitempty"`
+	PrivateKey    []byte                    `json:"secretKey,omitempty"` // for tests
 }
 
 type genesisAccountEncoder struct {
-	Code       *string                   `json:"code,omitempty"`
-	Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
-	Balance    *string                   `json:"balance"`
-	Nonce      *string                   `json:"nonce,omitempty"`
-	PrivateKey *string                   `json:"secretKey,omitempty"`
+	Code          *string                   `json:"code,omitempty"`
+	Storage       map[types.Hash]types.Hash `json:"storage,omitempty"`
+	Balance       *string                   `json:"balance"`
+	StakedBalance *string                   `json:"stakedBalance"`
+	Nonce         *string                   `json:"nonce,omitempty"`
+	PrivateKey    *string                   `json:"secretKey,omitempty"`
 }
 
 // ENCODING //
@@ -254,6 +256,10 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	if g.Balance != nil {
 		obj.Balance = types.EncodeBigInt(g.Balance)
 	}
+	// Staking implementation
+	if g.StakedBalance != nil {
+		obj.StakedBalance = types.EncodeBigInt(g.StakedBalance)
+	}
 	if g.Nonce != 0 {
 		obj.Nonce = types.EncodeUint64(g.Nonce)
 	}
@@ -267,11 +273,12 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 
 func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	type GenesisAccount struct {
-		Code       *string                   `json:"code,omitempty"`
-		Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
-		Balance    *string                   `json:"balance"`
-		Nonce      *string                   `json:"nonce,omitempty"`
-		PrivateKey *string                   `json:"secretKey,omitempty"`
+		Code          *string                   `json:"code,omitempty"`
+		Storage       map[types.Hash]types.Hash `json:"storage,omitempty"`
+		Balance       *string                   `json:"balance"`
+		StakedBalance *string                   `json:"stakedBalance"` // Staking implementation
+		Nonce         *string                   `json:"nonce,omitempty"`
+		PrivateKey    *string                   `json:"secretKey,omitempty"`
 	}
 
 	var dec GenesisAccount
@@ -301,6 +308,12 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	if subErr != nil {
 		parseError("balance", subErr)
 	}
+	// Staking implementation
+	g.StakedBalance, subErr = types.ParseUint256orHex(dec.StakedBalance)
+	if subErr != nil {
+		parseError("stakedBalance", subErr)
+	}
+
 	g.Nonce, subErr = types.ParseUint64orHex(dec.Nonce)
 	if subErr != nil {
 		parseError("nonce", subErr)

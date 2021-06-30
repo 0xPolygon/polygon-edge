@@ -34,7 +34,7 @@ func TestGossip(t *testing.T) {
 	select {
 	case msg := <-msgCh:
 		assert.Equal(t, msg.Msg, "a")
-	case <-time.After(1 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
 }

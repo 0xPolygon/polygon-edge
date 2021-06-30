@@ -1,12 +1,12 @@
 package system
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/stretchr/testify/assert"
 )
 
 type contractSetupParams struct {
@@ -38,13 +38,28 @@ func TestSystem_CanRun(t *testing.T) {
 		canRun   bool
 	}{
 		{
-			"Valid System runtime address",
+			"Valid System runtime address (Staking)",
 			setupContract(
 				contractSetupParams{
 					depth:  0,
 					origin: types.StringToAddress("0"),
 					from:   types.StringToAddress("0"),
-					to:     types.StringToAddress("1001"), // Staking handler
+					to:     types.StringToAddress(GetOperationsMap()["staking"]), // Staking handler
+					value:  nil,
+					gas:    0,
+					code:   nil,
+				},
+			),
+			true,
+		},
+		{
+			"Valid System runtime address (Unstaking)",
+			setupContract(
+				contractSetupParams{
+					depth:  0,
+					origin: types.StringToAddress("0"),
+					from:   types.StringToAddress("0"),
+					to:     types.StringToAddress(GetOperationsMap()["unstaking"]), // Unstaking handler
 					value:  nil,
 					gas:    0,
 					code:   nil,
@@ -72,9 +87,15 @@ func TestSystem_CanRun(t *testing.T) {
 	systemRuntime := NewSystem()
 
 	for _, testCase := range testTable {
-		canRun := systemRuntime.CanRun(testCase.contract, nil, nil)
-		if !canRun && testCase.canRun {
-			t.Fatal(fmt.Sprintf("[%s] Runtime doesn't recognize address %s", testCase.name, testCase.contract.CodeAddress))
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			runResult := systemRuntime.CanRun(testCase.contract, nil, nil)
+			assert.Equalf(
+				t,
+				testCase.canRun,
+				runResult,
+				"Runtime doesn't recognize address %s",
+				testCase.contract.CodeAddress,
+			)
+		})
 	}
 }

@@ -2,10 +2,13 @@ package framework
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/minimal/types"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -189,6 +192,7 @@ func (t *TestServer) GenerateGenesis() error {
 	// add premines
 	for _, acct := range t.Config.PremineAccts {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
+		args = append(args, "--prestake", acct.Addr.String()+":0x"+acct.StakedBalance.Text(16))
 	}
 
 	// add consensus flags
@@ -312,6 +316,46 @@ func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.
 		return nil, err
 	}
 	return t.WaitForReceipt(ctx, hash)
+}
+
+type PreparedTransaction struct {
+	From     types.Address
+	GasPrice *big.Int
+	Gas      uint64
+	To       *types.Address
+	Value    *big.Int
+	Input    []byte
+}
+
+// SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
+func (t *TestServer) SendRawTx(ctx context.Context, tx *PreparedTransaction, signerKey *ecdsa.PrivateKey) (*web3.Receipt, error) {
+	signer := crypto.NewEIP155Signer(100)
+	client := t.JSONRPC()
+
+	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
+	if err != nil {
+		return nil, err
+	}
+
+	signedTx, err := signer.SignTx(&types.Transaction{
+		From:     tx.From,
+		GasPrice: tx.GasPrice,
+		Gas:      tx.Gas,
+		To:       tx.To,
+		Value:    tx.Value,
+		Input:    tx.Input,
+		Nonce:    nextNonce,
+	}, signerKey)
+	if err != nil {
+		return nil, err
+	}
+
+	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+	if err != nil {
+		return nil, err
+	}
+
+	return t.WaitForReceipt(ctx, txHash)
 }
 
 func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {

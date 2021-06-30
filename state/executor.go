@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -79,9 +80,16 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
 
+	unstakingAddress := types.StringToAddress(system.GetOperationsMap()["unstaking"])
+
 	for addr, account := range alloc {
 		if account.Balance != nil {
 			txn.AddBalance(addr, account.Balance)
+		}
+		if account.StakedBalance != nil {
+			txn.AddStakedBalance(addr, account.StakedBalance)
+
+			txn.AddBalance(unstakingAddress, account.StakedBalance)
 		}
 		if account.Nonce != 0 {
 			txn.SetNonce(addr, account.Nonce)
@@ -110,8 +118,8 @@ type BlockResult struct {
 }
 
 // ProcessBlock already does all the handling of the whole process, TODO
-func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block) (*BlockResult, error) {
-	txn, err := e.BeginTxn(parentRoot, block.Header)
+func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*BlockResult, error) {
+	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +188,7 @@ func (e *Executor) PublishStakingEvent(event *StakingEvent) {
 	}
 }
 
-func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Transition, error) {
+func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbaseReceiver types.Address) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
 
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
@@ -191,11 +199,7 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header) (*Trans
 	newTxn := NewTxn(e.state, auxSnap2)
 
 	env2 := runtime.TxContext{
-		// TODO:	This seems like an error as this would mean that whoever we are voting for/against being a validator
-		//			in this block, would get the gas fees spent by transaction executions.
-		//			Quite possibly, we should do an ecrecover of the istanbul extra data in the header to get the
-		//			address of the proposer and set it as a coinbase address in the TxContext.
-		Coinbase:   header.Miner,
+		Coinbase:   coinbaseReceiver,
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
@@ -351,7 +355,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	// TODO: Maybe there is no need for snapshot here, since snapshot is also created inside apply()
 	s := t.state.Snapshot()
-	returnValue, gas, failed, err := t.apply(msg)
+	returnValue, gasUsed, failed, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -361,7 +365,7 @@ func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
 	}
 
 	t.returnValue = returnValue
-	return gas, failed, err
+	return gasUsed, failed, err
 }
 
 // ContextPtr returns reference of context

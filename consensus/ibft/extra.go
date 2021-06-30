@@ -12,10 +12,10 @@ var (
 	// to identify whether the block is from Istanbul consensus engine
 	IstanbulDigest = types.StringToHash("0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365")
 
-	// IstanbulExtraVanity represents a fixed number of extra-data bytes reserved for validator vanity
+	// IstanbulExtraVanity represents a fixed number of extra-data bytes reserved for proposer vanity
 	IstanbulExtraVanity = 32
 
-	// IstanbulExtraSeal represents the fixed number of extra-data bytes reserved for validator seal
+	// IstanbulExtraSeal represents the fixed number of extra-data bytes reserved for proposer seal
 	IstanbulExtraSeal = 65
 )
 
