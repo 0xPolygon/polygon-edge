@@ -277,7 +277,6 @@ func (t *Transition) GetTxnHash() types.Hash {
 
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
-	// TODO: Maybe there is no need for snapshot here, since snapshot is also created inside apply()
 	s := t.state.Snapshot()
 	returnValue, gasUsed, failed, err := t.apply(msg)
 	if err != nil {
@@ -357,14 +356,15 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	return gasAvailable, nil
 }
 
-func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error) {
+func (t *Transition) apply(msg *types.Transaction) (
+	[]byte, uint64, bool, error,
+) {
 	// check if there is enough gas in the pool
 	if err := t.subGasPool(msg.Gas); err != nil {
 		return nil, 0, false, err
 	}
 
 	txn := t.state
-	s := txn.Snapshot()
 
 	leftoverGas, err := t.preCheck(msg)
 	if err != nil {
@@ -396,7 +396,6 @@ func (t *Transition) apply(msg *types.Transaction) ([]byte, uint64, bool, error)
 		// fmt.Printf("suberr: %s\n", subErr.Error())
 
 		if subErr == runtime.ErrNotEnoughFunds {
-			txn.RevertToSnapshot(s)
 			return nil, 0, false, subErr
 		}
 	}
