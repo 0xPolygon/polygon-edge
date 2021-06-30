@@ -206,6 +206,7 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 
 	signer := crypto.NewEIP155Signer(100)
 
+	stakingAddress := types.StringToAddress(system.GetOperationsMap()["staking"])
 	unstakingAddress := types.StringToAddress(system.GetOperationsMap()["unstaking"])
 
 	validAccounts := []struct {
@@ -213,9 +214,9 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 		balance       *big.Int
 		stakedBalance *big.Int
 	}{
-		// Unstaking address initialization
+		// Staking address initialization
 		{
-			unstakingAddress,
+			stakingAddress,
 			framework.EthToWei(10), // 10 ETH has been staked in the past
 			framework.EthToWei(0),
 		},
