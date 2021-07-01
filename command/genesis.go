@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,11 +20,12 @@ import (
 )
 
 const (
-	genesisFileName       = "./genesis.json"
-	defaultChainName      = "example"
-	defaultChainID        = 100
-	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	defaultConsensus      = "pow"
+	genesisFileName        = "./genesis.json"
+	defaultChainName       = "example"
+	defaultChainID         = 100
+	defaultPremineBalance  = "0x3635C9ADC5DEA00000" // 1000 ETH
+	defaultPrestakeBalance = "0x0"                  // 0 ETH
+	defaultConsensus       = "pow"
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -64,6 +66,15 @@ func (c *GenesisCommand) DefineFlags() {
 
 	c.flagMap["premine"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
+		Arguments: []string{
+			"ADDRESS:VALUE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
+	c.flagMap["prestake"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the prestaked balance for accounts. Default prestaked balance: %s", defaultPrestakeBalance),
 		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -145,6 +156,7 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	var dataDir string
 	var premine helperFlags.ArrayFlags
+	var prestake helperFlags.ArrayFlags
 	var chainID uint64
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
@@ -157,6 +169,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&dataDir, "data-dir", "", "")
 	flags.StringVar(&name, "name", defaultChainName, "")
 	flags.Var(&premine, "premine", "")
+	flags.Var(&prestake, "prestake", "")
 	flags.Uint64Var(&chainID, "chainid", defaultChainID, "")
 	flags.Var(&bootnodes, "bootnode", "")
 	flags.StringVar(&consensus, "consensus", defaultConsensus, "")
@@ -228,26 +241,54 @@ func (c *GenesisCommand) Run(args []string) int {
 		Bootnodes: bootnodes,
 	}
 
-	if len(premine) != 0 {
-		for _, prem := range premine {
+	for _, prem := range premine {
+		var addr types.Address
+		val := defaultPremineBalance
+		if indx := strings.Index(prem, ":"); indx != -1 {
+			// <addr>:<balance>
+			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
+		} else {
+			// <addr>
+			addr = types.StringToAddress(prem)
+		}
 
-			var addr types.Address
-			val := defaultPremineBalance
-			if indx := strings.Index(prem, ":"); indx != -1 {
-				// <addr>:<balance>
-				addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
-			} else {
-				// <addr>
-				addr = types.StringToAddress(prem)
-			}
+		amount, err := types.ParseUint256orHex(&val)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
+			return 1
+		}
+		cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
+			Balance: amount,
+		}
+	}
 
-			amount, err := types.ParseUint256orHex(&val)
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
-				return 1
-			}
+	for _, pres := range prestake {
+		var addr types.Address
+		val := defaultPrestakeBalance
+		if indx := strings.Index(pres, ":"); indx != -1 {
+			// <addr>:<balance>
+			addr, val = types.StringToAddress(pres[:indx]), pres[indx+1:]
+		} else {
+			// <addr>
+			addr = types.StringToAddress(pres)
+		}
+
+		stakeAmount, err := types.ParseUint256orHex(&val)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("failed to parse stake amount %s: %v", val, err))
+			return 1
+		}
+
+		previousAccount := cc.Genesis.Alloc[addr]
+
+		if previousAccount != nil {
+			// Account already has a premined balance
+			previousAccount.StakedBalance = stakeAmount
+		} else {
+			// Account doesn't have a premined balance
 			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
-				Balance: amount,
+				Balance:       big.NewInt(0),
+				StakedBalance: stakeAmount,
 			}
 		}
 	}

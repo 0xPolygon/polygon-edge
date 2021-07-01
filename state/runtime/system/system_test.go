@@ -38,13 +38,28 @@ func TestSystem_CanRun(t *testing.T) {
 		canRun   bool
 	}{
 		{
-			"Valid System runtime address",
+			"Valid System runtime address (Staking)",
 			setupContract(
 				contractSetupParams{
 					depth:  0,
 					origin: types.StringToAddress("0"),
 					from:   types.StringToAddress("0"),
-					to:     types.StringToAddress("1001"), // Staking handler
+					to:     types.StringToAddress(StakingAddress), // Staking handler
+					value:  nil,
+					gas:    0,
+					code:   nil,
+				},
+			),
+			true,
+		},
+		{
+			"Valid System runtime address (Unstaking)",
+			setupContract(
+				contractSetupParams{
+					depth:  0,
+					origin: types.StringToAddress("0"),
+					from:   types.StringToAddress("0"),
+					to:     types.StringToAddress(UnstakingAddress), // Unstaking handler
 					value:  nil,
 					gas:    0,
 					code:   nil,

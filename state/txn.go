@@ -188,10 +188,27 @@ func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
 	})
 }
 
+// SubStakedBalance reduces the staked balance
+func (txn *Txn) SubStakedBalance(addr types.Address, balance *big.Int) {
+	if balance.Sign() == 0 {
+		return
+	}
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.Sub(object.Account.StakedBalance, balance)
+	})
+}
+
 // SetBalance sets the balance
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
+	})
+}
+
+// SetStakedBalance sets the staked balance
+func (txn *Txn) SetStakedBalance(addr types.Address, balance *big.Int) {
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.Account.StakedBalance.SetBytes(balance.Bytes())
 	})
 }
 
@@ -202,6 +219,15 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 		return big.NewInt(0)
 	}
 	return object.Account.Balance
+}
+
+// GetStakedBalance returns the account's staked balance
+func (txn *Txn) GetStakedBalance(addr types.Address) *big.Int {
+	object, exists := txn.getStateObject(addr)
+	if !exists {
+		return big.NewInt(0)
+	}
+	return object.Account.StakedBalance
 }
 
 func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {

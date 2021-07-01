@@ -60,7 +60,11 @@ type Host interface {
 	GetStorage(addr types.Address, key types.Hash) types.Hash
 	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
 	GetBalance(addr types.Address) *big.Int
+	AddBalance(addr types.Address, balance *big.Int)
+	SubBalance(addr types.Address, balance *big.Int)
+	GetStakedBalance(addr types.Address) *big.Int
 	AddStakedBalance(addr types.Address, balance *big.Int)
+	SubStakedBalance(addr types.Address, balance *big.Int)
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
 	GetCode(addr types.Address) []byte

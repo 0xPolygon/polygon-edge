@@ -22,9 +22,15 @@ type systemContract interface {
 	run(state *systemState) ([]byte, error)
 }
 
+var (
+	StakingAddress   = "1001"
+	UnstakingAddress = "1002"
+)
+
 // setupHandlers defines which addresses are assigned to which system contract handlers
 func (s *System) setupHandlers() {
-	s.registerHandler("1001", &stakingHandler{s})
+	s.registerHandler(StakingAddress, &stakingHandler{s})
+	s.registerHandler(UnstakingAddress, &unstakingHandler{s})
 }
 
 // registerHandler registers a new systemContract handler for the specified address
@@ -49,7 +55,6 @@ func NewSystem() *System {
 
 // Run represents the actual runtime implementation, after the CanRun check passes
 func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
-	// TODO Define the Staking runtime implementation
 	// Get the system state from the pool and set it up
 	sysState := acquireSystemState()
 	sysState.host = host
