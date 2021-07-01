@@ -76,6 +76,7 @@ type Host interface {
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
 	EmitStakedEvent(types.Address, *big.Int)
+	EmitUnstakedEvent(types.Address, *big.Int)
 }
 
 var (

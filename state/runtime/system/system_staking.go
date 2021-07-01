@@ -21,7 +21,6 @@ func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 	// Increase the account's staked balance
 	state.host.AddStakedBalance(staker, potentialStake)
 
-	// TODO: emit staked event to executor
 	state.host.EmitStakedEvent(staker, potentialStake)
 
 	return nil, nil

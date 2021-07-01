@@ -31,7 +31,8 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 type StakingEventType string
 
 const (
-	StakingEventStaked StakingEventType = "Staked"
+	StakingEventStaked   StakingEventType = "Staked"
+	StakingEventUnstaked StakingEventType = "Unstaked"
 )
 
 type StakingEvent struct {
@@ -717,6 +718,15 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 func (t *Transition) EmitStakedEvent(staker types.Address, amount *big.Int) {
 	t.r.PublishStakingEvent(&StakingEvent{
 		Type:    StakingEventStaked,
+		Number:  t.ctx.Number,
+		Address: staker,
+		Amount:  amount,
+	})
+}
+
+func (t *Transition) EmitUnstakedEvent(staker types.Address, amount *big.Int) {
+	t.r.PublishStakingEvent(&StakingEvent{
+		Type:    StakingEventUnstaked,
 		Number:  t.ctx.Number,
 		Address: staker,
 		Amount:  amount,

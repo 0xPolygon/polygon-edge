@@ -36,7 +36,7 @@ func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) func() 
 
 // getNextValidatorSet returns the validator set for the next
 func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.StakingEvent) (ValidatorSet, error) {
-	transition, err := i.executor.BeginTxn(header.StateRoot, header)
+	transition, err := i.executor.BeginTxn(header.StateRoot, header, header.Miner)
 	if err != nil {
 		return nil, err
 	}
@@ -49,14 +49,23 @@ func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.
 		return nil, fmt.Errorf("cannot find the snapshot at %d", header.Number)
 	}
 
-	nextValidators := make(ValidatorSet, 0, len(snap.Set))
-
-	// FIXME: keep current validators for now because genesis validators haven't staked
-	nextValidators = append(nextValidators, snap.Set...)
-
 	threshold := big.NewInt(0)
+	nextValidators := make(ValidatorSet, 0, len(snap.Set))
+	isChecked := make(map[types.Address]bool)
+
+	// Check staked balance of current validators
+	for _, v := range snap.Set {
+		isChecked[v] = true
+		stakedBalance := transition.GetStakedBalance(v)
+		if stakedBalance.Cmp(threshold) == 1 {
+			nextValidators.Add(v)
+		}
+	}
+	// Check staker/unstaker
 	for _, e := range stakingEvents {
-		if !nextValidators.Includes(e.Address) {
+		if !isChecked[e.Address] {
+			isChecked[e.Address] = true
+
 			stakedBalance := transition.GetStakedBalance(e.Address)
 			if stakedBalance.Cmp(threshold) == 1 {
 				nextValidators.Add(e.Address)
