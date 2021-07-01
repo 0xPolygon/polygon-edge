@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/types"
 	"io"
 	"math/big"
 	"os"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/minimal/types"
 
 	"github.com/0xPolygon/minimal/command"
 	"github.com/0xPolygon/minimal/command/server"

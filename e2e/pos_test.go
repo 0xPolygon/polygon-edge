@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
@@ -18,19 +17,11 @@ func TestPoS_Stake(t *testing.T) {
 	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
 	stakingContractAddr := types.StringToAddress("1001")
 
-	dataDir, err := framework.TempDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, dataDir, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(stakerAddr, framework.EthToWei(10))
+		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
 		config.SetSeal(true)
 		config.SetShowsLog(i == 0)
-	})
-	t.Cleanup(func() {
-		if err := os.RemoveAll(dataDir); err != nil {
-			t.Log(err)
-		}
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -48,7 +39,7 @@ func TestPoS_Stake(t *testing.T) {
 		Value:    framework.EthToWei(1),
 		Nonce:    0,
 	}
-	txn, err = signer.SignTx(txn, stakerKey)
+	txn, err := signer.SignTx(txn, stakerKey)
 	if err != nil {
 		t.Fatal(err)
 	}

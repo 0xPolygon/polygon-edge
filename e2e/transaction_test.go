@@ -19,6 +19,7 @@ func TestSignedTransaction(t *testing.T) {
 	preminedAmount := framework.EthToWei(10)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, preminedAmount)
+		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
 		config.SetSeal(true)
 	})
 
