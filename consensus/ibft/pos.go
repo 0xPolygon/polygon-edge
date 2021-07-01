@@ -115,7 +115,7 @@ func (i *Ibft) bulkUpdateSnapshots(events []*state.StakingEvent) error {
 	// group by number and find begin and end index
 	for _, e := range events {
 		n := uint64(e.Number)
-		if n > end {
+		if n > latest {
 			// ignore larger number than latest
 			continue
 		}
