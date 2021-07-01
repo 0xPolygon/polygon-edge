@@ -311,27 +311,18 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		numberBulkUpdateFrom := i.blockchain.Header().Number
 		stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 			return true
 		})
-
-		updateSnapshots := func(number uint64, events []*state.StakingEvent) {
-			if len(events) == 0 {
-				return
-			}
-			header := i.blockchain.Header()
-			i.bulkUpdateSnapshots(number, header.Number, events)
-		}
 
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 
 			// Update by the number of the header that has been merged successful
-			updateSnapshots(numberBulkUpdateFrom, stopSubscription())
+			i.bulkUpdateSnapshots(stopSubscription())
 			continue
 		}
-		updateSnapshots(numberBulkUpdateFrom, stopSubscription())
+		i.bulkUpdateSnapshots(stopSubscription())
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
@@ -340,7 +331,6 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		numberSyncFrom := i.blockchain.Header().Number
 		stopSubscription = i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 			return true
 		})
@@ -353,7 +343,7 @@ func (i *Ibft) runSyncState() {
 			return !isValidator
 		})
 
-		updateSnapshots(numberSyncFrom, stopSubscription())
+		i.bulkUpdateSnapshots(stopSubscription())
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -462,7 +452,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		i.setState(SyncState)
 		return
 	}
-	snap, err := i.getSnapshot(number)
+	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", parent.Number)
 		i.setState(SyncState)
@@ -677,8 +667,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	// prepare snapshot for the next sequence
-	if err := i.updateSnapshotValidators(header.Number+1, nextValidators); err != nil {
+	// update validators in snapshot
+	if err := i.updateSnapshotValidators(header.Number, nextValidators); err != nil {
 		return err
 	}
 
@@ -931,7 +921,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 
 // VerifyHeader wrapper for verifying headers
 func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
-	snap, err := i.getSnapshot(header.Number)
+	snap, err := i.getSnapshot(parent.Number)
 	if err != nil {
 		return err
 	}

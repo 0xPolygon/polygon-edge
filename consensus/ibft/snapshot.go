@@ -141,7 +141,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 		return nil
 	}
 
-	parentSnap, err := i.getSnapshot(headers[0].Number)
+	parentSnap, err := i.getSnapshot(headers[0].Number - 1)
 	if err != nil {
 		return err
 	}
@@ -153,11 +153,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 		snap.Number = h.Number
 		snap.Hash = h.Hash.String()
 
-		if parentSnap.Number == snap.Number {
-			i.store.replace(snap)
-		} else {
-			i.store.add(snap)
-		}
+		i.store.add(snap)
 
 		parentSnap = snap
 		snap = parentSnap.Copy()

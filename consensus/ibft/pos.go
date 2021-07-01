@@ -76,7 +76,7 @@ func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.
 	return nextValidators, nil
 }
 
-// updateSnapshotValidators update validators in snapshot at given height
+// updateSnapshotValidators updates validators in snapshot at given height
 func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) error {
 	snap, err := i.getSnapshot(num)
 	if err != nil {
@@ -100,21 +100,51 @@ func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) err
 	return nil
 }
 
-// bulkUpdateSnapshots updates validators in multiple snapshots
-func (i *Ibft) bulkUpdateSnapshots(begin, end uint64, events []*state.StakingEvent) error {
+// bulkUpdateSnapshots updates validator set in multiple snapshots
+// ignore events with greater number than end
+func (i *Ibft) bulkUpdateSnapshots(events []*state.StakingEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	latest := i.blockchain.Header().Number
+	numToEvents := map[uint64][]*state.StakingEvent{}
+	begin := latest
+	end := uint64(0)
+
+	// group by number and find begin and end index
+	for _, e := range events {
+		n := uint64(e.Number)
+		if n > end {
+			// ignore larger number than latest
+			continue
+		}
+
+		if _, ok := numToEvents[n]; ok {
+			numToEvents[n] = append(numToEvents[n], e)
+		} else {
+			numToEvents[n] = []*state.StakingEvent{e}
+
+			if n < begin {
+				begin = n
+			}
+			if n > end {
+				end = n
+			}
+		}
+	}
+
 	for n := begin; n <= end; n++ {
+		events, ok := numToEvents[n]
+		if !ok || len(events) == 0 {
+			continue
+		}
+
 		header, ok := i.blockchain.GetHeaderByNumber(n)
 		if !ok {
 			return fmt.Errorf("cannot find header at %d", n)
 		}
-		// get events happened at given height
-		es := []*state.StakingEvent{}
-		for _, e := range events {
-			if uint64(e.Number) == n {
-				es = append(es, e)
-			}
-		}
-		validators, err := i.getNextValidatorSet(header, es)
+		validators, err := i.getNextValidatorSet(header, events)
 		if err != nil {
 			return err
 		}

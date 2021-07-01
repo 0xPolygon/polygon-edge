@@ -21,7 +21,6 @@ func TestPoS_Stake(t *testing.T) {
 		config.Premine(stakerAddr, framework.EthToWei(10))
 		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
 		config.SetSeal(true)
-		config.SetShowsLog(i == 0)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -57,7 +56,7 @@ func TestPoS_Stake(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// staker will join from next block
-	snapshot, err := srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber+1)
+	snapshot, err := srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber)
 	assert.NoError(t, err)
 	assert.NotNil(t, snapshot)
 
@@ -68,5 +67,5 @@ func TestPoS_Stake(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, "staker should join to validator set, but didn't")
+	assert.True(t, found, "staker should be in validator set, but isn't")
 }
