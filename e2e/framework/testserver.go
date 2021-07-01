@@ -166,7 +166,6 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 		return nil, err
 	}
 
-	// Read the Libp2p key
 	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "libp2p"))
 	if err != nil {
 		return nil, err
@@ -233,13 +232,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	switch t.Config.Consensus {
-	case ConsensusIBFT:
-		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
-	case ConsensusDev:
-		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
-	case ConsensusDummy:
-		args = append(args, "--data-dir", t.Config.RootDir)
+	args = append(args, "--data-dir", t.DataDir())
+
+	if t.Config.Consensus == ConsensusDev {
+		args = append(args, "--dev")
 	}
 
 	if t.Config.Seal {
@@ -276,6 +272,19 @@ func (t *TestServer) Start(ctx context.Context) error {
 		return nil, true
 	})
 	return err
+}
+
+func (t *TestServer) DataDir() string {
+	switch t.Config.Consensus {
+	case ConsensusIBFT:
+		return filepath.Join(t.Config.RootDir, t.Config.IBFTDir)
+	default:
+		return t.Config.RootDir
+	}
+}
+
+func (t *TestServer) PrivateKey() (*ecdsa.PrivateKey, error) {
+	return crypto.ReadPrivKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
