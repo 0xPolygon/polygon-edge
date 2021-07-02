@@ -85,13 +85,19 @@ func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) err
 	if snap == nil {
 		return fmt.Errorf("cannot find snapshot at %d", num)
 	}
+
 	if !snap.Set.Equal(&validators) {
 		newSnap := snap.Copy()
 		newSnap.Set = validators
 		if snap.Number != num {
 			// create new one
+			header, ok := i.blockchain.GetHeaderByNumber(num)
+			if !ok {
+				return fmt.Errorf("cannot find header at %d", num)
+			}
+
 			newSnap.Number = num
-			newSnap.Hash = ""
+			newSnap.Hash = header.Hash.String()
 			i.store.add(newSnap)
 		} else {
 			i.store.replace(newSnap)
