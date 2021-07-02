@@ -34,10 +34,11 @@ func Commands() map[string]cli.CommandFactory {
 	versionCmd := VersionCommand{UI: ui}
 
 	ibftCmd := IbftCommand{}
-	ibftCandidatesCmd := IbftCandidates{Meta: meta}
 	ibftInitCmd := IbftInit{Meta: meta}
-	ibftProposeCmd := IbftPropose{Meta: meta}
 	ibftSnapshotCmd := IbftSnapshot{Meta: meta}
+	// Disable voting temporarily for PoS
+	// ibftCandidatesCmd := IbftCandidates{Meta: meta}
+	// ibftProposeCmd := IbftPropose{Meta: meta}
 	ibftStatusCmd := IbftStatus{Meta: meta}
 
 	peersCmd := PeersCommand{}
@@ -93,12 +94,13 @@ func Commands() map[string]cli.CommandFactory {
 		ibftSnapshotCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftSnapshotCmd, nil
 		},
-		ibftCandidatesCmd.GetBaseCommand(): func() (cli.Command, error) {
-			return &ibftCandidatesCmd, nil
-		},
-		ibftProposeCmd.GetBaseCommand(): func() (cli.Command, error) {
-			return &ibftProposeCmd, nil
-		},
+		// Disable voting temporarily for PoS
+		// ibftCandidatesCmd.GetBaseCommand(): func() (cli.Command, error) {
+		// 	return &ibftCandidatesCmd, nil
+		// },
+		// ibftProposeCmd.GetBaseCommand(): func() (cli.Command, error) {
+		// 	return &ibftProposeCmd, nil
+		// },
 		ibftStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftStatusCmd, nil
 		},

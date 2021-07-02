@@ -358,6 +358,11 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			for _, h := range initialHeaders {
 				err := blockchain.WriteHeaders([]*types.Header{h})
 				assert.NoError(t, err)
+
+				// Disable voting temporarily for PoS
+				if h.Miner != types.ZeroAddress {
+					t.Skip("Skip the test because voting function is temporarily disabled")
+				}
 			}
 
 			ibft := &Ibft{
@@ -683,6 +688,11 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			}
 			assert.NoError(t, ibft.setupSnapshot())
 			for indx, header := range headers {
+				// Disable voting temporarily for PoS
+				if header.Miner != types.ZeroAddress {
+					t.Skip("Skip the test because voting function is temporarily disabled")
+				}
+
 				if err := ibft.processHeaders([]*types.Header{header}); err != nil {
 					t.Fatal(err)
 				}
@@ -757,6 +767,8 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 }
 
 func TestSnapshot_PurgeSnapshots(t *testing.T) {
+	t.Skip("Skip the test because voting function is temporarily disabled")
+
 	pool := newTesterAccountPool()
 	pool.add("a", "b", "c")
 
