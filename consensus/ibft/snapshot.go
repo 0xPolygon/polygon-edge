@@ -210,6 +210,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 }
 
 // applyVote applies vote in the header to the snapshot
+// nolint
 func (i *Ibft) applyVote(header *types.Header, proposer types.Address, snap *Snapshot) error {
 	// if we have a miner address, this might be a vote
 	if header.Miner == types.ZeroAddress {
