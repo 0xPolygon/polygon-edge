@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string)
 func TestPoS_Stake(t *testing.T) {
 	signer := &crypto.FrontierSigner{}
 	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
-	stakingContractAddr := types.StringToAddress("1001")
+	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 
 	numGenesisValidators := IBFTMinNodes
 	ibftManager := framework.NewIBFTServersManager(t, numGenesisValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
@@ -77,7 +78,7 @@ func TestPoS_Stake(t *testing.T) {
 
 func TestPoS_Unstake(t *testing.T) {
 	signer := &crypto.FrontierSigner{}
-	unstakingContractAddr := types.StringToAddress("1002")
+	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
 
 	// The last genesis validator will leave from validator set by unstaking
 	numGenesisValidators := IBFTMinNodes + 1
