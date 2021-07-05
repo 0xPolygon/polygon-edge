@@ -1,17 +1,32 @@
 package helper
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/0xPolygon/minimal/chain"
+	helperFlags "github.com/0xPolygon/minimal/helper/flags"
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 	"google.golang.org/grpc"
+)
+
+const (
+	GenesisFileName       = "./genesis.json"
+	DefaultChainName      = "example"
+	DefaultChainID        = 100
+	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
+	DefaultConsensus      = "pow"
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -188,7 +203,102 @@ func HandleSignals(closeFn func(), ui cli.Ui) int {
 	}
 }
 
-func ReadDevConfig(baseCommand string, args []string) (*Config, error) {
+func DoesGenesisExist(genesisPath string) error {
+	_, err := os.Stat(genesisPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat (%s): %w", genesisPath, err)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("genesis file at path (%s) already exists", genesisPath)
+	}
+
+	return nil
+}
+
+// FillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
+func FillPremineMap(
+	premineMap map[types.Address]*chain.GenesisAccount,
+	premine helperFlags.ArrayFlags,
+) error {
+	for _, prem := range premine {
+		var addr types.Address
+		val := DefaultPremineBalance
+		if indx := strings.Index(prem, ":"); indx != -1 {
+			// <Addr>:<balance>
+			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
+		} else {
+			// <Addr>
+			addr = types.StringToAddress(prem)
+		}
+
+		amount, err := types.ParseUint256orHex(&val)
+		if err != nil {
+			return fmt.Errorf("failed to parse amount %s: %v", val, err)
+		}
+		premineMap[addr] = &chain.GenesisAccount{
+			Balance: amount,
+		}
+	}
+
+	return nil
+}
+
+// WriteGenesisToDisk writes the passed in configuration to a genesis.json file at the specified path
+func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
+	data, err := json.MarshalIndent(chain, "", "    ")
+	if err != nil {
+		return fmt.Errorf("failed to generate genesis: %w", err)
+	}
+	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write genesis: %w", err)
+	}
+
+	return nil
+}
+
+// generateDevGenesis generates a base dev genesis file with premined balances
+func generateDevGenesis(config *Config, premine helperFlags.ArrayFlags) error {
+	if err := minimal.SetupDataDir(config.DataDir, []string{"consensus", "libp2p"}); err != nil {
+		return err
+	}
+
+	genesisPath := filepath.Join(".", GenesisFileName)
+
+	if err := DoesGenesisExist(genesisPath); err != nil {
+		return err
+	}
+
+	cc := &chain.Chain{
+		Name: config.Chain,
+		Genesis: &chain.Genesis{
+			GasLimit:   5000,
+			Difficulty: 1,
+			Alloc:      map[types.Address]*chain.GenesisAccount{},
+			ExtraData:  []byte{},
+		},
+		Params: &chain.Params{
+			ChainID: 100,
+			Forks:   chain.AllForksEnabled,
+			Engine: map[string]interface{}{
+				"dev": nil,
+			},
+		},
+		Bootnodes: []string{},
+	}
+
+	if err := FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
+		return err
+	}
+
+	if err := WriteGenesisToDisk(cc, genesisPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// BootstrapDevCommand creates a config and generates the dev genesis file
+func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	config := DefaultConfig()
 
 	cliConfig := &Config{
@@ -204,12 +314,10 @@ func ReadDevConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	var configFile string
+	var premine helperFlags.ArrayFlags
+
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
-	flags.StringVar(&cliConfig.Chain, "chain", "", "")
-	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
-	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
-	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
-	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
+	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 
 	if err := flags.Parse(args); err != nil {
@@ -229,6 +337,10 @@ func ReadDevConfig(baseCommand string, args []string) (*Config, error) {
 	}
 
 	if err := config.mergeConfigWith(cliConfig); err != nil {
+		return nil, err
+	}
+
+	if err := generateDevGenesis(config, premine); err != nil {
 		return nil, err
 	}
 
