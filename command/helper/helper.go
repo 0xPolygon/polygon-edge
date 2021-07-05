@@ -2,6 +2,7 @@ package helper
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -203,13 +204,37 @@ func HandleSignals(closeFn func(), ui cli.Ui) int {
 	}
 }
 
-func DoesGenesisExist(genesisPath string) error {
+const (
+	StatError   = "StatError"
+	ExistsError = "ExistsError"
+)
+
+type GenesisGenError struct {
+	message   string
+	errorType string
+}
+
+func (g *GenesisGenError) GetMessage() string {
+	return g.message
+}
+
+func (g *GenesisGenError) GetType() string {
+	return g.errorType
+}
+
+func DoesGenesisExist(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat (%s): %w", genesisPath, err)
+		return &GenesisGenError{
+			message:   fmt.Sprintf("failed to stat (%s): %w", genesisPath, err),
+			errorType: StatError,
+		}
 	}
 	if !os.IsNotExist(err) {
-		return fmt.Errorf("genesis file at path (%s) already exists", genesisPath)
+		return &GenesisGenError{
+			message:   fmt.Sprintf("genesis file at path (%s) already exists", genesisPath),
+			errorType: ExistsError,
+		}
 	}
 
 	return nil
@@ -257,19 +282,24 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 }
 
 // generateDevGenesis generates a base dev genesis file with premined balances
-func generateDevGenesis(config *Config, premine helperFlags.ArrayFlags) error {
-	if err := minimal.SetupDataDir(config.DataDir, []string{"consensus", "libp2p"}); err != nil {
-		return err
-	}
-
+func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags) error {
 	genesisPath := filepath.Join(".", GenesisFileName)
 
-	if err := DoesGenesisExist(genesisPath); err != nil {
-		return err
+	generateError := DoesGenesisExist(genesisPath)
+
+	if generateError != nil {
+		switch generateError.GetType() {
+		case StatError:
+			// Unable to stat file
+			return errors.New(generateError.GetMessage())
+		case ExistsError:
+			// Not an error for the dev command, it shouldn't regenerate the genesis
+			return nil
+		}
 	}
 
 	cc := &chain.Chain{
-		Name: config.Chain,
+		Name: chainName,
 		Genesis: &chain.Genesis{
 			GasLimit:   5000,
 			Difficulty: 1,
@@ -280,7 +310,7 @@ func generateDevGenesis(config *Config, premine helperFlags.ArrayFlags) error {
 			ChainID: 100,
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
-				"dev": nil,
+				"dev": map[string]interface{}{},
 			},
 		},
 		Bootnodes: []string{},
@@ -290,11 +320,7 @@ func generateDevGenesis(config *Config, premine helperFlags.ArrayFlags) error {
 		return err
 	}
 
-	if err := WriteGenesisToDisk(cc, genesisPath); err != nil {
-		return err
-	}
-
-	return nil
+	return WriteGenesisToDisk(cc, genesisPath)
 }
 
 // BootstrapDevCommand creates a config and generates the dev genesis file
@@ -309,11 +335,11 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	}
 	cliConfig.Seal = true
 	cliConfig.Dev = true
+	cliConfig.Chain = "genesis.json"
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var configFile string
 	var premine helperFlags.ArrayFlags
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
@@ -324,23 +350,11 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
-	if configFile != "" {
-		// A config file has been passed in, parse it
-		diskConfigFile, err := readConfigFile(configFile)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := config.mergeConfigWith(diskConfigFile); err != nil {
-			return nil, err
-		}
-	}
-
 	if err := config.mergeConfigWith(cliConfig); err != nil {
 		return nil, err
 	}
 
-	if err := generateDevGenesis(config, premine); err != nil {
+	if err := generateDevGenesis(config.Chain, premine); err != nil {
 		return nil, err
 	}
 
