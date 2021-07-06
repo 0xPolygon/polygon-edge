@@ -226,7 +226,7 @@ func DoesGenesisExist(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
 	if err != nil && !os.IsNotExist(err) {
 		return &GenesisGenError{
-			message:   fmt.Sprintf("failed to stat (%s): %w", genesisPath, err),
+			message:   fmt.Sprintf("failed to stat (%s): %v", genesisPath, err),
 			errorType: StatError,
 		}
 	}
