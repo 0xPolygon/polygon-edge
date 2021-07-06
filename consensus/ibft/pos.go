@@ -13,11 +13,12 @@ import (
 func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) func() []*state.StakingEvent {
 	resCh := make(chan []*state.StakingEvent, 1)
 	subscription := i.executor.SubscribeStakingEvent()
+	eventCh := subscription.EventCh()
 
 	go func() {
 		events := []*state.StakingEvent{}
 		// collect until channel ends
-		for e := range subscription.EventCh {
+		for e := range eventCh {
 			if f(e) {
 				events = append(events, e)
 			}
@@ -28,15 +29,14 @@ func (i *Ibft) SubscribeStakingEvent(f func(e *state.StakingEvent) bool) func() 
 	// this function stops subscription and return received events
 	return func() []*state.StakingEvent {
 		i.executor.UnsubscribeStakingEvent(subscription)
-		subscription.WaitForDone()
-		close(subscription.EventCh)
+		subscription.Close()
 		return <-resCh
 	}
 }
 
 // getNextValidatorSet returns the validator set for the next
 func (i *Ibft) getNextValidatorSet(header *types.Header, stakingEvents []*state.StakingEvent) (ValidatorSet, error) {
-	transition, err := i.executor.BeginTxn(header.StateRoot, header, header.Miner)
+	transition, err := i.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (i *Ibft) updateSnapshotValidators(num uint64, validators ValidatorSet) err
 }
 
 // bulkUpdateSnapshots updates validator set in multiple snapshots
-// ignore events with greater number than end
+// ignore events with a greater block number than the latest header's block number in memory
 func (i *Ibft) bulkUpdateSnapshots(events []*state.StakingEvent) error {
 	if len(events) == 0 {
 		return nil
@@ -154,7 +154,9 @@ func (i *Ibft) bulkUpdateSnapshots(events []*state.StakingEvent) error {
 		if err != nil {
 			return err
 		}
-		i.updateSnapshotValidators(n, validators)
+		if err := i.updateSnapshotValidators(n, validators); err != nil {
+			return err
+		}
 	}
 	return nil
 }

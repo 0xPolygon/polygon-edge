@@ -1,9 +1,15 @@
 package framework
 
 import (
+	"crypto/ecdsa"
 	"math/big"
+	"path/filepath"
 
+	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/types"
+	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 )
 
 type ConsensusType int
@@ -40,6 +46,26 @@ type TestServerConfig struct {
 	Consensus               ConsensusType            // Consensus Type
 	Bootnodes               []string                 // Bootnode Addresses
 	ShowsLog                bool
+}
+
+// DataDir returns path of data directory server uses
+func (t *TestServerConfig) DataDir() string {
+	switch t.Consensus {
+	case ConsensusIBFT:
+		return filepath.Join(t.RootDir, t.IBFTDir)
+	default:
+		return t.RootDir
+	}
+}
+
+// PrivateKey returns a private key in data directory
+func (t *TestServerConfig) PrivateKey() (*ecdsa.PrivateKey, error) {
+	return crypto.ReadPrivKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
+}
+
+// Libp2pKey returns a private key for libp2p in data directory
+func (t *TestServerConfig) Libp2pKey() (libp2pCrypto.PrivKey, error) {
+	return network.ReadLibp2pKey(filepath.Join(t.DataDir(), "libp2p"))
 }
 
 // CALLBACKS //

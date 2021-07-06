@@ -43,14 +43,19 @@ type StakingEvent struct {
 }
 
 type StakingEventSubscription struct {
-	EventCh chan *StakingEvent
+	eventCh chan *StakingEvent
 	wg      *sync.WaitGroup
 }
 
-func (s *StakingEventSubscription) WaitForDone() {
+func (s *StakingEventSubscription) EventCh() <-chan *StakingEvent {
+	return s.eventCh
+}
+
+func (s *StakingEventSubscription) Close() {
 	if s.wg != nil {
 		s.wg.Wait()
 	}
+	close(s.eventCh)
 }
 
 // Executor is the main entity
@@ -156,7 +161,7 @@ func (e *Executor) SubscribeStakingEvent() *StakingEventSubscription {
 	e.stakingEventSubscriptionsLock.Lock()
 	defer e.stakingEventSubscriptionsLock.Unlock()
 	sub := &StakingEventSubscription{
-		EventCh: make(chan *StakingEvent),
+		eventCh: make(chan *StakingEvent),
 		wg:      &sync.WaitGroup{},
 	}
 	e.stakingEventSubscriptions = append(e.stakingEventSubscriptions, sub)
@@ -176,14 +181,14 @@ func (e *Executor) UnsubscribeStakingEvent(target *StakingEventSubscription) {
 	e.stakingEventSubscriptions = newSubs
 }
 
-// PublishStakingEvent publishes a staking event to subscriptions
-func (e *Executor) PublishStakingEvent(event *StakingEvent) {
+// publishStakingEvent publishes a staking event to subscriptions
+func (e *Executor) publishStakingEvent(event *StakingEvent) {
 	e.stakingEventSubscriptionsLock.Lock()
 	defer e.stakingEventSubscriptionsLock.Unlock()
 	for _, sub := range e.stakingEventSubscriptions {
 		sub.wg.Add(1)
 		go func(sub *StakingEventSubscription) {
-			sub.EventCh <- event
+			sub.eventCh <- event
 			sub.wg.Done()
 		}(sub)
 	}
@@ -716,7 +721,7 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 }
 
 func (t *Transition) EmitStakedEvent(staker types.Address, amount *big.Int) {
-	t.r.PublishStakingEvent(&StakingEvent{
+	t.r.publishStakingEvent(&StakingEvent{
 		Type:    StakingEventStaked,
 		Number:  t.ctx.Number,
 		Address: staker,
@@ -725,7 +730,7 @@ func (t *Transition) EmitStakedEvent(staker types.Address, amount *big.Int) {
 }
 
 func (t *Transition) EmitUnstakedEvent(staker types.Address, amount *big.Int) {
-	t.r.PublishStakingEvent(&StakingEvent{
+	t.r.publishStakingEvent(&StakingEvent{
 		Type:    StakingEventUnstaked,
 		Number:  t.ctx.Number,
 		Address: staker,

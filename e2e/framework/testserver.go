@@ -19,11 +19,9 @@ import (
 
 	"github.com/0xPolygon/minimal/command"
 	"github.com/0xPolygon/minimal/command/server"
-	"github.com/0xPolygon/minimal/consensus/ibft"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	ibftProto "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
@@ -160,13 +158,12 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	res := &InitIBFTResult{}
-	// Read the private key
-	key, err := crypto.ReadPrivKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
+	key, err := t.Config.PrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "libp2p"))
+	libp2pKey, err := t.Config.Libp2pKey()
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +229,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	args = append(args, "--data-dir", t.DataDir())
+	args = append(args, "--data-dir", t.Config.DataDir())
 
 	if t.Config.Consensus == ConsensusDev {
 		args = append(args, "--dev")
@@ -272,19 +269,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 		return nil, true
 	})
 	return err
-}
-
-func (t *TestServer) DataDir() string {
-	switch t.Config.Consensus {
-	case ConsensusIBFT:
-		return filepath.Join(t.Config.RootDir, t.Config.IBFTDir)
-	default:
-		return t.Config.RootDir
-	}
-}
-
-func (t *TestServer) PrivateKey() (*ecdsa.PrivateKey, error) {
-	return crypto.ReadPrivKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
@@ -408,10 +392,13 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) WaitForIBFTSnapshot(ctx context.Context, number uint64) (*ibftProto.Snapshot, error) {
+func (t *TestServer) WaitForIBFTSnapshot(ctx context.Context, number uint64, timeoutForRequest time.Duration) (*ibftProto.Snapshot, error) {
 	client := t.IBFTOperator()
 	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		receipt, _ := client.GetSnapshot(context.Background(), &ibftProto.SnapshotReq{
+		ctx, cancel := context.WithTimeout(ctx, timeoutForRequest)
+		defer cancel()
+
+		receipt, _ := client.GetSnapshot(ctx, &ibftProto.SnapshotReq{
 			Number: number,
 		})
 		if receipt != nil && receipt.Number >= number {

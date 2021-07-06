@@ -24,7 +24,6 @@ func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string)
 }
 
 func TestPoS_Stake(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
 	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 
@@ -42,42 +41,31 @@ func TestPoS_Stake(t *testing.T) {
 	srv := ibftManager.GetServer(0)
 
 	// Stake Balance
-	txn := &types.Transaction{
+	txn := &framework.PreparedTransaction{
 		From:     stakerAddr,
 		To:       &stakingContractAddr,
 		GasPrice: big.NewInt(10000),
 		Gas:      1000000,
 		Value:    framework.EthToWei(1),
-		Nonce:    0,
 	}
-	txn, err := signer.SignTx(txn, stakerKey)
-	assert.NoError(t, err)
-
-	data := txn.MarshalRLP()
-	hash, err := srv.JSONRPC().Eth().SendRawTransaction(data)
-	assert.NoError(t, err)
-	assert.NotNil(t, hash)
-
-	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	receipt, err := srv.WaitForReceipt(ctx, hash)
+	receipt, err := srv.SendRawTx(ctx, txn, stakerKey)
 	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
 
 	// Check validator set
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	snapshot, err := srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber)
+	snapshot, err := srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber, 5*time.Second)
 	assert.NoError(t, err)
 	assert.NotNil(t, snapshot)
 
 	validator := findValidatorByAddress(snapshot.Validators, stakerAddr.String())
 	assert.Len(t, snapshot.Validators, numGenesisValidators+1)
-	assert.NotNil(t, validator, "account should have joined to validator set, but doesn't belong to")
+	assert.NotNil(t, validator, "expected staker to join the validator set")
 }
 
 func TestPoS_Unstake(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
 	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
 
 	// The last genesis validator will leave from validator set by unstaking
@@ -95,14 +83,14 @@ func TestPoS_Unstake(t *testing.T) {
 
 	// Get key of last node
 	unstakerSrv := ibftManager.GetServer(IBFTMinNodes)
-	unstakerKey, err := unstakerSrv.PrivateKey()
+	unstakerKey, err := unstakerSrv.Config.PrivateKey()
 	assert.NoError(t, err)
 	unstakerAddr := crypto.PubKeyToAddress(&unstakerKey.PublicKey)
 
 	// Check the validator is in validator set
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	snapshot, err := srv.WaitForIBFTSnapshot(ctx, 0)
+	snapshot, err := srv.WaitForIBFTSnapshot(ctx, 0, 5*time.Second)
 	assert.NoError(t, err)
 	assert.NotNil(t, snapshot)
 
@@ -110,36 +98,26 @@ func TestPoS_Unstake(t *testing.T) {
 	assert.NotNil(t, validator, "account should be genesis validator, but isn't")
 
 	// Send transaction to unstake
-	txn := &types.Transaction{
+	txn := &framework.PreparedTransaction{
 		From:     unstakerAddr,
 		To:       &unstakingContractAddr,
 		GasPrice: big.NewInt(10000),
 		Gas:      1000000,
 		Value:    framework.EthToWei(0),
-		Nonce:    0,
 	}
-	txn, err = signer.SignTx(txn, unstakerKey)
-	assert.NoError(t, err)
-
-	data := txn.MarshalRLP()
-	hash, err := srv.JSONRPC().Eth().SendRawTransaction(data)
-	assert.NoError(t, err)
-	assert.NotNil(t, hash)
-
-	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	receipt, err := srv.WaitForReceipt(ctx, hash)
+	receipt, err := srv.SendRawTx(ctx, txn, unstakerKey)
 	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
 
 	// Check validator set
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	snapshot, err = srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber)
+	snapshot, err = srv.WaitForIBFTSnapshot(ctx, receipt.BlockNumber, 5*time.Second)
 	assert.NoError(t, err)
 	assert.NotNil(t, snapshot)
 
 	validator = findValidatorByAddress(snapshot.Validators, unstakerAddr.String())
-	assert.Nil(t, validator, "account should have left from validator set, but still belongs to")
+	assert.Nil(t, validator, "account should have left from validator set, but still belongs to it")
 	assert.Len(t, snapshot.Validators, numGenesisValidators-1)
 }
