@@ -239,16 +239,13 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 }
 
 func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	obj, err := j.getState(root, addr.Bytes())
+	obj, _ := j.getState(root, addr.Bytes())
 	var account state.Account
-
-	if err != nil {
-		return &account, nil
-	}
 
 	if err := account.UnmarshalRlp(obj); err != nil {
 		return nil, err
 	}
+
 	return &account, nil
 }
 
