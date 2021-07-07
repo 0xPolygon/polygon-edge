@@ -193,12 +193,12 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 		// Disable voting temporarily for PoS
 		// if err := i.applyVote(h, proposer, snap); err != nil {
-		// 	return nil
+		// 	return err
 		// }
 
 		if !snap.Equal(parentSnap) {
 			if err := saveSnap(h); err != nil {
-				return nil
+				return err
 			}
 		}
 	}
