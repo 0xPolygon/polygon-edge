@@ -627,7 +627,11 @@ func (i *Ibft) runValidateState() {
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
-		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal)) // TODO: Validate
+		sealBytes := hex.MustDecodeHex(commit.Seal)
+		if len(sealBytes) != IstanbulExtraSeal {
+			return fmt.Errorf("invalid committed seal")
+		}
+		committedSeals = append(committedSeals, sealBytes)
 	}
 
 	header, err := writeCommittedSeals(block.Header, committedSeals)
