@@ -279,7 +279,12 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 }
 
 func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
-	transition, err := j.BeginTxn(header.StateRoot, header)
+	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
+	if err != nil {
+		return nil, false, err
+	}
+
+	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 
 	if err != nil {
 		return nil, false, err

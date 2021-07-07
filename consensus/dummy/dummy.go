@@ -51,6 +51,10 @@ func (d *Dummy) VerifyHeader(parent *types.Header, header *types.Header) error {
 	return nil
 }
 
+func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
+	return header.Miner, nil
+}
+
 func (d *Dummy) Close() error {
 	close(d.closeCh)
 	return nil
