@@ -314,15 +314,24 @@ func (i *Ibft) runSyncState() {
 		stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
 			return true
 		})
+		bulkUpdateSnapshots := func(events []*state.StakingEvent) bool {
+			if err := i.bulkUpdateSnapshots(events); err != nil {
+				i.logger.Error("failed to bulk update snapshots", "err", err)
+				return false
+			}
+			return true
+		}
 
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 
 			// Update by the number of the header that has been merged successful
-			i.bulkUpdateSnapshots(stopSubscription())
+			_ = bulkUpdateSnapshots(stopSubscription())
 			continue
 		}
-		i.bulkUpdateSnapshots(stopSubscription())
+		if ok := bulkUpdateSnapshots(stopSubscription()); !ok {
+			continue
+		}
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
@@ -343,7 +352,9 @@ func (i *Ibft) runSyncState() {
 			return !isValidator
 		})
 
-		i.bulkUpdateSnapshots(stopSubscription())
+		if ok := bulkUpdateSnapshots(stopSubscription()); !ok {
+			continue
+		}
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
