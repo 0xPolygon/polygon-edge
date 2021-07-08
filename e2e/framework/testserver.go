@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/types"
 	"io"
 	"math/big"
 	"os"
@@ -16,11 +15,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/types"
+
 	"github.com/0xPolygon/minimal/command"
 	"github.com/0xPolygon/minimal/command/server"
-	"github.com/0xPolygon/minimal/consensus/ibft"
+	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	ibftProto "github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/network"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
@@ -110,6 +111,14 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
+func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return ibftOp.NewIbftOperatorClient(conn)
+}
+
 func (t *TestServer) ReleaseReservedPorts() {
 	for _, p := range t.Config.ReservedPorts {
 		if err := p.Close(); err != nil {
@@ -149,14 +158,12 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	res := &InitIBFTResult{}
-	// Read the private key
-	key, err := crypto.ReadPrivKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
+	key, err := t.Config.PrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	// Read the Libp2p key
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "libp2p"))
+	libp2pKey, err := t.Config.Libp2pKey()
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +229,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	switch t.Config.Consensus {
-	case ConsensusIBFT:
-		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
-	case ConsensusDev:
-		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
-	case ConsensusDummy:
-		args = append(args, "--data-dir", t.Config.RootDir)
+	args = append(args, "--data-dir", t.Config.DataDir())
+
+	if t.Config.Consensus == ConsensusDev {
+		args = append(args, "--dev")
 	}
 
 	if t.Config.Seal {
@@ -386,6 +390,30 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 		return num, false
 	})
 	return err
+}
+
+func (t *TestServer) WaitForIBFTSnapshot(ctx context.Context, number uint64, timeoutForRequest time.Duration) (*ibftProto.Snapshot, error) {
+	client := t.IBFTOperator()
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		ctx, cancel := context.WithTimeout(ctx, timeoutForRequest)
+		defer cancel()
+
+		receipt, _ := client.GetSnapshot(ctx, &ibftProto.SnapshotReq{
+			Number: number,
+		})
+		if receipt != nil && receipt.Number >= number {
+			return receipt, false
+		}
+		return nil, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	snapshot, ok := res.(*ibftProto.Snapshot)
+	if !ok {
+		return nil, fmt.Errorf("data is not snapshot: %T", snapshot)
+	}
+	return snapshot, err
 }
 
 func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {

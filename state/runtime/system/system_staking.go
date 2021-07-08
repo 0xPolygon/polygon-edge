@@ -21,7 +21,7 @@ func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 	// Increase the account's staked balance
 	state.host.AddStakedBalance(staker, potentialStake)
 
-	// TODO Add the staker to the validator set after this point + checks
+	state.host.EmitStakedEvent(staker, potentialStake)
 
 	return nil, nil
 }

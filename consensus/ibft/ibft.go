@@ -311,8 +311,25 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+			return true
+		})
+		bulkUpdateSnapshots := func(events []*state.StakingEvent) bool {
+			if err := i.bulkUpdateSnapshots(events); err != nil {
+				i.logger.Error("failed to bulk update snapshots", "err", err)
+				return false
+			}
+			return true
+		}
+
 		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
+
+			// Update by the number of the header that has been merged successful
+			_ = bulkUpdateSnapshots(stopSubscription())
+			continue
+		}
+		if ok := bulkUpdateSnapshots(stopSubscription()); !ok {
 			continue
 		}
 
@@ -323,6 +340,10 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		stopSubscription = i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+			return true
+		})
+
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
@@ -330,6 +351,10 @@ func (i *Ibft) runSyncState() {
 
 			return !isValidator
 		})
+
+		if ok := bulkUpdateSnapshots(stopSubscription()); !ok {
+			continue
+		}
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -639,7 +664,22 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash()
 
+	// Subscribe staking events
+	stopSubscription := i.SubscribeStakingEvent(func(e *state.StakingEvent) bool {
+		return e.Number == int64(header.Number)
+	})
+
 	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+		return err
+	}
+
+	stakingEvents := stopSubscription()
+	nextValidators, err := i.getNextValidatorSet(header, stakingEvents)
+	if err != nil {
+		return err
+	}
+	// update validators in snapshot
+	if err := i.updateSnapshotValidators(header.Number, nextValidators); err != nil {
 		return err
 	}
 

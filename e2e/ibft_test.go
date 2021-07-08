@@ -2,11 +2,12 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/minimal/consensus/ibft"
-	"github.com/umbracle/go-web3"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/umbracle/go-web3"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/types"
@@ -19,6 +20,7 @@ func TestIbft_Transfer(t *testing.T) {
 
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
+		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
 		config.SetSeal(true)
 	})
 
@@ -71,6 +73,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 
 			ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 				config.Premine(senderAddr, framework.EthToWei(10))
+				config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
 				config.SetSeal(true)
 			})
 

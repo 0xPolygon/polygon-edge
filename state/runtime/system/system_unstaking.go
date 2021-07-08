@@ -49,6 +49,7 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	state.host.AddBalance(staker, stakedBalance)
 
 	// TODO Remove the staker from the validator set after this point + checks
+	state.host.EmitUnstakedEvent(staker, stakedBalance)
 
 	return nil, nil
 }

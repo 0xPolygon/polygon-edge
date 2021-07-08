@@ -549,6 +549,19 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	sort.Sort(&s.list)
 }
 
+// replace replaces a snapshot with the snapshot at same number
+func (s *snapshotStore) replace(snap *Snapshot) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for i, sn := range s.list {
+		if sn.Number == snap.Number {
+			s.list[i] = snap
+			return
+		}
+	}
+}
+
 // snapshotSortedList defines the sorted snapshot list
 type snapshotSortedList []*Snapshot
 

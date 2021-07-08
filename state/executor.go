@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
@@ -27,6 +28,36 @@ type GetHashByNumber = func(i uint64) types.Hash
 
 type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
+type StakingEventType string
+
+const (
+	StakingEventStaked   StakingEventType = "Staked"
+	StakingEventUnstaked StakingEventType = "Unstaked"
+)
+
+type StakingEvent struct {
+	Number  int64
+	Type    StakingEventType
+	Address types.Address
+	Amount  *big.Int
+}
+
+type StakingEventSubscription struct {
+	eventCh chan *StakingEvent
+	wg      *sync.WaitGroup
+}
+
+func (s *StakingEventSubscription) EventCh() <-chan *StakingEvent {
+	return s.eventCh
+}
+
+func (s *StakingEventSubscription) Close() {
+	if s.wg != nil {
+		s.wg.Wait()
+	}
+	close(s.eventCh)
+}
+
 // Executor is the main entity
 type Executor struct {
 	config   *chain.Params
@@ -35,14 +66,19 @@ type Executor struct {
 	GetHash  GetHashByNumberHelper
 
 	PostHook func(txn *Transition)
+
+	stakingEventSubscriptions     []*StakingEventSubscription
+	stakingEventSubscriptionsLock sync.Mutex
 }
 
 // NewExecutor creates a new executor
 func NewExecutor(config *chain.Params, s State) *Executor {
 	return &Executor{
-		config:   config,
-		runtimes: []runtime.Runtime{},
-		state:    s,
+		config:                        config,
+		runtimes:                      []runtime.Runtime{},
+		state:                         s,
+		stakingEventSubscriptions:     []*StakingEventSubscription{},
+		stakingEventSubscriptionsLock: sync.Mutex{},
 	}
 }
 
@@ -118,6 +154,44 @@ func (e *Executor) State() State {
 // StateAt returns snapshot at given root
 func (e *Executor) StateAt(root types.Hash) (Snapshot, error) {
 	return e.state.NewSnapshotAt(root)
+}
+
+// SubscribeStakingEvent subscribes staking event at given number
+func (e *Executor) SubscribeStakingEvent() *StakingEventSubscription {
+	e.stakingEventSubscriptionsLock.Lock()
+	defer e.stakingEventSubscriptionsLock.Unlock()
+	sub := &StakingEventSubscription{
+		eventCh: make(chan *StakingEvent),
+		wg:      &sync.WaitGroup{},
+	}
+	e.stakingEventSubscriptions = append(e.stakingEventSubscriptions, sub)
+	return sub
+}
+
+// UnsubscribeStakingEvent removes given subscription from list
+func (e *Executor) UnsubscribeStakingEvent(target *StakingEventSubscription) {
+	e.stakingEventSubscriptionsLock.Lock()
+	defer e.stakingEventSubscriptionsLock.Unlock()
+	newSubs := []*StakingEventSubscription{}
+	for _, s := range e.stakingEventSubscriptions {
+		if s != target {
+			newSubs = append(newSubs, s)
+		}
+	}
+	e.stakingEventSubscriptions = newSubs
+}
+
+// publishStakingEvent publishes a staking event to subscriptions
+func (e *Executor) publishStakingEvent(event *StakingEvent) {
+	e.stakingEventSubscriptionsLock.Lock()
+	defer e.stakingEventSubscriptionsLock.Unlock()
+	for _, sub := range e.stakingEventSubscriptions {
+		sub.wg.Add(1)
+		go func(sub *StakingEventSubscription) {
+			sub.eventCh <- event
+			sub.wg.Done()
+		}(sub)
+	}
 }
 
 func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbaseReceiver types.Address) (*Transition, error) {
@@ -644,4 +718,22 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 		return t.applyCreate(c, h)
 	}
 	return t.applyCall(c, c.Type, h)
+}
+
+func (t *Transition) EmitStakedEvent(staker types.Address, amount *big.Int) {
+	t.r.publishStakingEvent(&StakingEvent{
+		Type:    StakingEventStaked,
+		Number:  t.ctx.Number,
+		Address: staker,
+		Amount:  amount,
+	})
+}
+
+func (t *Transition) EmitUnstakedEvent(staker types.Address, amount *big.Int) {
+	t.r.publishStakingEvent(&StakingEvent{
+		Type:    StakingEventUnstaked,
+		Number:  t.ctx.Number,
+		Address: staker,
+		Amount:  amount,
+	})
 }
