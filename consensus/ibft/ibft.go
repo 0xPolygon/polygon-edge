@@ -381,15 +381,16 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		GasLimit:   100000000, // placeholder for now
 	}
 
+	// Disable voting temporarily for PoS
 	// try to pick a candidate
-	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
-		header.Miner = types.StringToAddress(candidate.Address)
-		if candidate.Auth {
-			header.Nonce = nonceAuthVote
-		} else {
-			header.Nonce = nonceDropVote
-		}
-	}
+	// if candidate := i.operator.getNextCandidate(snap); candidate != nil {
+	// 	header.Miner = types.StringToAddress(candidate.Address)
+	// 	if candidate.Auth {
+	// 		header.Nonce = nonceAuthVote
+	// 	} else {
+	// 		header.Nonce = nonceDropVote
+	// 	}
+	// }
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
