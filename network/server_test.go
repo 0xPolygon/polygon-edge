@@ -176,7 +176,7 @@ func TestNat(t *testing.T) {
 	t.Run("there should be multiple listening addresses", func(t *testing.T) {
 		listenAddresses := srv.host.Network().ListenAddresses()
 
-		assert.GreaterOrEqual(t, len(listenAddresses), 1)
+		assert.Greater(t, len(listenAddresses), 1)
 	})
 
 	t.Run("there should only be a single registered server address", func(t *testing.T) {
