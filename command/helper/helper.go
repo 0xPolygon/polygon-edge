@@ -342,7 +342,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	var premine helperFlags.ArrayFlags
 
-	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
+	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 
