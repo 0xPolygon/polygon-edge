@@ -627,7 +627,7 @@ func (i *Ibft) runValidateState() {
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
-		// no need to check the format of seal is correct here because writeCommittedSeals will check
+		// no need to check the format of seal here because writeCommittedSeals will check
 		committedSeals = append(committedSeals, hex.MustDecodeHex(commit.Seal))
 	}
 
