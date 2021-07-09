@@ -332,9 +332,9 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	// validate nonce
 	nonce := t.state.GetNonce(msg.From)
 	if nonce < msg.Nonce {
-		return 0, fmt.Errorf("nonce is too low: %d < %d", nonce, msg.Nonce)
+		return 0, fmt.Errorf("nonce is too big: %d < %d", nonce, msg.Nonce)
 	} else if nonce > msg.Nonce {
-		return 0, fmt.Errorf("nonce is too big: %d > %d", nonce, msg.Nonce)
+		return 0, fmt.Errorf("nonce is too low: %d > %d", nonce, msg.Nonce)
 	}
 
 	// deduct the upfront max gas cost

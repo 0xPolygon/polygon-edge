@@ -173,6 +173,19 @@ func TestNat(t *testing.T) {
 	})
 	defer srv.Close()
 
+	t.Run("there should be multiple listening addresses", func(t *testing.T) {
+		listenAddresses := srv.host.Network().ListenAddresses()
+
+		assert.Greater(t, len(listenAddresses), 1)
+	})
+
+	t.Run("there should only be a single registered server address", func(t *testing.T) {
+		addrInfo := srv.AddrInfo()
+		registeredAddresses := addrInfo.Addrs
+
+		assert.Equal(t, len(registeredAddresses), 1)
+	})
+
 	t.Run("NAT IP should not be found in listen addresses", func(t *testing.T) {
 		listenAddresses := srv.host.Network().ListenAddresses()
 
@@ -183,10 +196,10 @@ func TestNat(t *testing.T) {
 
 	t.Run("NAT IP should be found in registered server addresses", func(t *testing.T) {
 		addrInfo := srv.AddrInfo()
-		listenAddresses := addrInfo.Addrs
+		registeredAddresses := addrInfo.Addrs
 
 		found := false
-		for _, addr := range listenAddresses {
+		for _, addr := range registeredAddresses {
 			if addr.String() == testMultiAddrString {
 				found = true
 				break
