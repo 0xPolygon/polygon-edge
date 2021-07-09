@@ -376,10 +376,10 @@ func opSar(c *state) {
 }
 
 // memory operations
-
 var bufPool = sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 128)
+		buf := make([]byte, 128)
+		return &buf
 	},
 }
 
@@ -612,13 +612,11 @@ func min(i, j uint64) uint64 {
 func opCallDataLoad(c *state) {
 	offset := c.top()
 
-	// TODO:	Check what memory allocations do we save with this since
-	// 			sync.Pool requires a pointer to a slice in order to save some memory.
-	// 			see: https://staticcheck.io/docs/checks#SA6002
-	buf := bufPool.Get().([]byte)
+	bufPtr := bufPool.Get().(*[]byte)
+	buf := *bufPtr
 	c.setBytes(buf[:32], c.msg.Input, 32, offset)
 	offset.SetBytes(buf[:32])
-	bufPool.Put(buf) //nolint:staticcheck
+	bufPool.Put(bufPtr)
 }
 
 func opCallDataSize(c *state) {
