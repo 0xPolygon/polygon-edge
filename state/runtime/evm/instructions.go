@@ -376,8 +376,11 @@ func opSar(c *state) {
 }
 
 // memory operations
+
 var bufPool = sync.Pool{
 	New: func() interface{} {
+		// Store pointer to avoid heap allocation in caller
+		// Please check SA6002 in StaticCheck for details
 		buf := make([]byte, 128)
 		return &buf
 	},
