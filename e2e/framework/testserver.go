@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/command/genesis"
-	ibft2 "github.com/0xPolygon/minimal/command/ibft"
+	ibftCommand "github.com/0xPolygon/minimal/command/ibft"
 	"github.com/0xPolygon/minimal/types"
 
 	"github.com/0xPolygon/minimal/command/server"
@@ -136,7 +136,7 @@ type InitIBFTResult struct {
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	ibftInitCmd := ibft2.IbftInit{}
+	ibftInitCmd := ibftCommand.IbftInit{}
 	var args []string
 
 	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")

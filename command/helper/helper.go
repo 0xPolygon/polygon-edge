@@ -209,20 +209,24 @@ const (
 	ExistsError = "ExistsError"
 )
 
+// GenesisGenError is a specific error type for generating genesis
 type GenesisGenError struct {
 	message   string
 	errorType string
 }
 
+// GetMessage returns the message of the genesis generation error
 func (g *GenesisGenError) GetMessage() string {
 	return g.message
 }
 
+// GetType returns the type of the genesis generation error
 func (g *GenesisGenError) GetType() string {
 	return g.errorType
 }
 
-func DoesGenesisExist(genesisPath string) *GenesisGenError {
+// VerifyGenesisExistence checks if the genesis file at the specified path is present
+func VerifyGenesisExistence(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
 	if err != nil && !os.IsNotExist(err) {
 		return &GenesisGenError{
@@ -249,10 +253,10 @@ func FillPremineMap(
 		var addr types.Address
 		val := DefaultPremineBalance
 		if indx := strings.Index(prem, ":"); indx != -1 {
-			// <Addr>:<balance>
+			// <addr>:<balance>
 			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
 		} else {
-			// <Addr>
+			// <addr>
 			addr = types.StringToAddress(prem)
 		}
 
@@ -285,7 +289,7 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags) error {
 	genesisPath := filepath.Join(".", GenesisFileName)
 
-	generateError := DoesGenesisExist(genesisPath)
+	generateError := VerifyGenesisExistence(genesisPath)
 
 	if generateError != nil {
 		switch generateError.GetType() {
@@ -419,13 +423,11 @@ type Meta struct {
 	UI   cli.Ui
 	Addr string
 
-	FlagMap        map[string]FlagDescriptor
-	HasGlobalFlags bool
+	FlagMap map[string]FlagDescriptor
 }
 
 // DefineFlags sets global flags used by several commands
 func (m *Meta) DefineFlags() {
-	m.HasGlobalFlags = true
 	m.FlagMap = make(map[string]FlagDescriptor)
 
 	m.FlagMap["grpc-address"] = FlagDescriptor{

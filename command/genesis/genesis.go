@@ -161,7 +161,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var err error = nil
 
 	genesisPath := filepath.Join(dataDir, helper.GenesisFileName)
-	if generateError := helper.DoesGenesisExist(genesisPath); generateError != nil {
+	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
 		c.UI.Error(generateError.GetMessage())
 		return 1
 	}

@@ -20,7 +20,7 @@ func (p *PeersAdd) DefineFlags() {
 		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.FlagMap["Addr"] = helper.FlagDescriptor{
+	p.FlagMap["addr"] = helper.FlagDescriptor{
 		Description: "Peer's libp2p address in the multiaddr format",
 		Arguments: []string{
 			"PEER_ADDRESS",
@@ -57,7 +57,7 @@ func (p *PeersAdd) Run(args []string) int {
 	flags := p.FlagSet(p.GetBaseCommand())
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
-	flags.Var(&passedInAddresses, "Addr", "")
+	flags.Var(&passedInAddresses, "addr", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
