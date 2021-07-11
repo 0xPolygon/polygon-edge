@@ -3,9 +3,11 @@ package minimal
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -210,8 +212,19 @@ func (s *Server) setupConsensus() error {
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
+		Hub:    consensusHubs[engineName],
 	}
-	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
+	consensus, err := engine(
+		context.Background(),
+		s.config.Seal,
+		config,
+		s.txpool,
+		s.network,
+		s.blockchain,
+		s.executor,
+		s.grpcServer,
+		s.logger.Named("consensus"),
+	)
 	if err != nil {
 		return err
 	}
@@ -302,6 +315,86 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]b
 	}
 
 	return transition.ReturnValue(), failed, nil
+}
+
+var stakingHubInstance StakingHub
+
+// NewStakingHub initializes the stakingHubInstance singleton
+func NewStakingHub() *StakingHub {
+	var once sync.Once
+	once.Do(func() {
+		stakingHubInstance = StakingHub{
+			stakingMap:       make(map[types.Address]*big.Int),
+			stakingThreshold: big.NewInt(0),
+		}
+	})
+
+	return &stakingHubInstance
+}
+
+// Staking //
+
+// StakingHub acts as a hub (manager) for staked account balances
+type StakingHub struct {
+	// Address -> Stake
+	stakingMap map[types.Address]*big.Int
+
+	// The lowest staked amount in the validator set
+	stakingThreshold *big.Int
+}
+
+// saveToDisk is a helper method for periodically saving the stake data to disk
+func (sh *StakingHub) saveToDisk() {
+	// TODO
+}
+
+// isStaker is a helper method to check whether or not an address has a staked balance
+func (sh *StakingHub) isStaker(address types.Address) bool {
+	if _, ok := sh.stakingMap[address]; ok {
+		return true
+	}
+
+	return false
+}
+
+// IncreaseStake increases the account's staked balance, or sets it if the account wasn't
+// in the stakingMap
+func (sh *StakingHub) IncreaseStake(address types.Address, stakeBalance *big.Int) {
+	if !sh.isStaker(address) {
+		sh.stakingMap[address] = stakeBalance
+	} else {
+		sh.stakingMap[address] = big.NewInt(0).Add(sh.stakingMap[address], stakeBalance)
+	}
+}
+
+// ResetStake resets the account's staked balance
+func (sh *StakingHub) ResetStake(address types.Address) {
+	if sh.isStaker(address) {
+		delete(sh.stakingMap, address)
+	}
+}
+
+// GetStakedBalance returns an accounts staked balance if it is a staker.
+// Returns 0 if the address is not a staker
+func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
+	if sh.isStaker(address) {
+		return sh.stakingMap[address]
+	}
+
+	return big.NewInt(0)
+}
+
+// GetStakerAddresses returns a list of all addresses that have a stake > 0
+func (sh *StakingHub) GetStakerAddresses() []types.Address {
+	stakers := make([]types.Address, len(sh.stakingMap))
+
+	var indx = 0
+	for address := range sh.stakingMap {
+		stakers[indx] = address
+		indx++
+	}
+
+	return stakers
 }
 
 // SETUP //
