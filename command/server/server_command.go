@@ -181,7 +181,7 @@ func (c *ServerCommand) Run(args []string) int {
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:  "polygon",
-		Level: hclog.LevelFromString("debug"),
+		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
 	server, err := minimal.NewServer(logger, config)

@@ -35,7 +35,7 @@ func (c *GenesisCommand) DefineFlags() {
 		return
 	}
 
-	c.FlagMap["data-dir"] = helper.FlagDescriptor{
+	c.FlagMap["dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the directory for the Polygon SDK genesis data. Default: %s", helper.GenesisFileName),
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -134,7 +134,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags := flag.NewFlagSet(c.GetBaseCommand(), flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var dataDir string
+	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
@@ -145,7 +145,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
 
-	flags.StringVar(&dataDir, "data-dir", "", "")
+	flags.StringVar(&baseDir, "dir", "", "")
 	flags.StringVar(&name, "name", helper.DefaultChainName, "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
@@ -160,7 +160,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	}
 	var err error = nil
 
-	genesisPath := filepath.Join(dataDir, helper.GenesisFileName)
+	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
 	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
 		c.UI.Error(generateError.GetMessage())
 		return 1
