@@ -1,11 +1,8 @@
 package minimal
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"net"
 	"os"
@@ -329,188 +326,23 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]b
 	return transition.ReturnValue(), failed, nil
 }
 
-var stakingHubInstance StakingHub
+var stakingHubInstance types.StakingHub
 
 // newStakingHub initializes the stakingHubInstance singleton
-func newStakingHub() *StakingHub {
+func newStakingHub(directory string) *types.StakingHub {
 	var once sync.Once
 	once.Do(func() {
-		stakingHubInstance = StakingHub{
-			stakingMap:       make(map[types.Address]*big.Int),
-			stakingThreshold: big.NewInt(0),
-			closeCh:          make(chan struct{}),
+		stakingHubInstance = types.StakingHub{
+			StakingMap:       make(map[types.Address]*big.Int),
+			StakingThreshold: big.NewInt(0),
+			CloseCh:          make(chan struct{}),
+			WorkingDirectory: directory,
 		}
 
-		go stakingHubInstance.saveToDisk()
+		go stakingHubInstance.SaveToDisk()
 	})
 
 	return &stakingHubInstance
-}
-
-// Staking //
-
-// StakingHub acts as a hub (manager) for staked account balances
-type StakingHub struct {
-	// Address -> Stake
-	stakingMap map[types.Address]*big.Int
-
-	// The lowest staked amount in the validator set
-	stakingThreshold *big.Int
-
-	// Write-back period (in s) for backup staking data
-	writebackPeriod time.Duration
-
-	// Mutex
-	stakingMutex sync.Mutex
-
-	// Close channel
-	closeCh chan struct{}
-}
-
-func (sh *StakingHub) CloseStakingHub() {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	// Alert the closing channel
-	sh.closeCh <- struct{}{}
-}
-
-// saveToDisk is a helper method for periodically saving the stake data to disk
-func (sh *StakingHub) saveToDisk() {
-	for {
-		select {
-		case <-sh.closeCh:
-			return
-		default:
-		}
-
-		// Save the current staking map to disk, in JSON
-		mappings := sh.GetStakerMappings()
-
-		reader, err := sh.marshalJSON(mappings)
-		if err != nil {
-			continue
-		}
-
-		// Save the json to workingDirectory/stakingMap.json
-		file, err := os.Create(filepath.Join(workingDirectory, "stakingMap.json"))
-		if err != nil {
-			_ = file.Close()
-			continue
-		}
-		_, _ = io.Copy(file, reader)
-
-		// Sleep for the writeback period
-		time.Sleep(sh.writebackPeriod * time.Second)
-	}
-}
-
-// marshalJSON generates the json object for staker mappings
-func (sh *StakingHub) marshalJSON(mappings []StakerMapping) (io.Reader, error) {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	b, err := json.MarshalIndent(mappings, "", "\t")
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(b), nil
-}
-
-// isStaker is a helper method to check whether or not an address has a staked balance
-func (sh *StakingHub) isStaker(address types.Address) bool {
-	if _, ok := sh.stakingMap[address]; ok {
-		return true
-	}
-
-	return false
-}
-
-// IncreaseStake increases the account's staked balance, or sets it if the account wasn't
-// in the stakingMap
-func (sh *StakingHub) IncreaseStake(address types.Address, stakeBalance *big.Int) {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	if !sh.isStaker(address) {
-		sh.stakingMap[address] = stakeBalance
-	} else {
-		sh.stakingMap[address] = big.NewInt(0).Add(sh.stakingMap[address], stakeBalance)
-	}
-}
-
-// DecreaseStake decreases the account's staked balance if the account is present
-func (sh *StakingHub) DecreaseStake(address types.Address, unstakeBalance *big.Int) {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	if sh.isStaker(address) {
-		sh.stakingMap[address] = big.NewInt(0).Sub(sh.stakingMap[address], unstakeBalance)
-	}
-}
-
-// ResetStake resets the account's staked balance
-func (sh *StakingHub) ResetStake(address types.Address) {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	if sh.isStaker(address) {
-		delete(sh.stakingMap, address)
-	}
-}
-
-// GetStakedBalance returns an accounts staked balance if it is a staker.
-// Returns 0 if the address is not a staker
-func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	if sh.isStaker(address) {
-		return sh.stakingMap[address]
-	}
-
-	return big.NewInt(0)
-}
-
-// GetStakerAddresses returns a list of all addresses that have a stake > 0
-func (sh *StakingHub) GetStakerAddresses() []types.Address {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	stakers := make([]types.Address, len(sh.stakingMap))
-
-	var indx = 0
-	for address := range sh.stakingMap {
-		stakers[indx] = address
-		indx++
-	}
-
-	return stakers
-}
-
-// StakerMapping is a representation of a staked account balance
-type StakerMapping struct {
-	Address types.Address `json:"address"`
-	Stake   *big.Int      `json:"stake"`
-}
-
-// GetStakerMappings returns the staking addresses and their staking balances
-func (sh *StakingHub) GetStakerMappings() []StakerMapping {
-	sh.stakingMutex.Lock()
-	defer sh.stakingMutex.Unlock()
-
-	mappings := make([]StakerMapping, len(sh.stakingMap))
-
-	var indx = 0
-	for address, stake := range sh.stakingMap {
-		mappings[indx] = StakerMapping{
-			Address: address,
-			Stake:   stake,
-		}
-		indx++
-	}
-
-	return mappings
 }
 
 // SETUP //

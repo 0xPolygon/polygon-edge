@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/0xPolygon/minimal/minimal"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 
@@ -689,19 +688,19 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 }
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
-	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub := t.r.GetConsensusHub().(*types.StakingHub)
 	hub.GetStakedBalance(addr)
 
 	return hub.GetStakedBalance(addr)
 }
 
 func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
-	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub := t.r.GetConsensusHub().(*types.StakingHub)
 	hub.IncreaseStake(addr, balance)
 }
 
 func (t *Transition) SubStakedBalance(addr types.Address, balance *big.Int) {
-	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub := t.r.GetConsensusHub().(*types.StakingHub)
 	hub.DecreaseStake(addr, balance)
 }
 
