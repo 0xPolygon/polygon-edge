@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/0xPolygon/minimal/minimal"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 
@@ -69,6 +70,8 @@ type Executor struct {
 
 	stakingEventSubscriptions     []*StakingEventSubscription
 	stakingEventSubscriptionsLock sync.Mutex
+
+	consensusHub interface{}
 }
 
 // NewExecutor creates a new executor
@@ -80,6 +83,14 @@ func NewExecutor(config *chain.Params, s State) *Executor {
 		stakingEventSubscriptions:     []*StakingEventSubscription{},
 		stakingEventSubscriptionsLock: sync.Mutex{},
 	}
+}
+
+func (e *Executor) SetConsensusHub(hub interface{}) {
+	e.consensusHub = hub
+}
+
+func (e *Executor) GetConsensusHub() interface{} {
+	return e.consensusHub
 }
 
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
@@ -678,15 +689,20 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 }
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
-	return t.state.GetStakedBalance(addr)
+	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub.GetStakedBalance(addr)
+
+	return hub.GetStakedBalance(addr)
 }
 
 func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
-	t.state.AddStakedBalance(addr, balance)
+	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub.IncreaseStake(addr, balance)
 }
 
 func (t *Transition) SubStakedBalance(addr types.Address, balance *big.Int) {
-	t.state.SubStakedBalance(addr, balance)
+	hub := t.r.GetConsensusHub().(*minimal.StakingHub)
+	hub.DecreaseStake(addr, balance)
 }
 
 func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {
