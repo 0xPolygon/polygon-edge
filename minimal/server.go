@@ -3,11 +3,9 @@ package minimal
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -78,8 +76,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
-	workingDirectory = config.DataDir
 
+	// Spin up the staking hub if the consensus engine is ibft-pos
+	if config.Chain.Params.GetEngine() == chain.IBFTEngine {
+		types.GetStakingHub().SetWorkingDirectory(config.DataDir)
+	}
 	// Generate all the paths in the dataDir
 	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
@@ -109,9 +110,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	m.executor = state.NewExecutor(config.Chain.Params, st)
 
-	// Set the consensus helper hub
-	m.executor.SetConsensusHub(consensusHubs[config.Chain.Params.GetEngine()])
-
 	// Add the system runtime
 	m.executor.SetRuntime(system.NewSystem())
 
@@ -122,7 +120,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.executor.SetRuntime(evm.NewEVM())
 
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	genesisRoot := m.executor.WriteGenesis(
+		config.Chain.Genesis.Alloc,
+		config.Chain.Genesis.AllocStake,
+	)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
@@ -201,10 +202,6 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	return account.Nonce
 }
 
-var (
-	workingDirectory string
-)
-
 // setupConsensus sets up the consensus mechanism
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
@@ -221,7 +218,6 @@ func (s *Server) setupConsensus() error {
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
-		Hub:    consensusHubs[engineName],
 	}
 	consensus, err := engine(
 		context.Background(),
@@ -324,25 +320,6 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]b
 	}
 
 	return transition.ReturnValue(), failed, nil
-}
-
-var stakingHubInstance types.StakingHub
-
-// newStakingHub initializes the stakingHubInstance singleton
-func newStakingHub(directory string) *types.StakingHub {
-	var once sync.Once
-	once.Do(func() {
-		stakingHubInstance = types.StakingHub{
-			StakingMap:       make(map[types.Address]*big.Int),
-			StakingThreshold: big.NewInt(0),
-			CloseCh:          make(chan struct{}),
-			WorkingDirectory: directory,
-		}
-
-		go stakingHubInstance.SaveToDisk()
-	})
-
-	return &stakingHubInstance
 }
 
 // SETUP //

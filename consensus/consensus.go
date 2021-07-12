@@ -43,10 +43,6 @@ type Config struct {
 
 	// Path is the directory path for the consensus protocol tos tore information
 	Path string
-
-	// Hub is a helper hub created by Minimal to assist with specific consensus queries
-	// Example: minimal.stakingHub
-	Hub interface{}
 }
 
 // Factory is the factory function to create a discovery backend

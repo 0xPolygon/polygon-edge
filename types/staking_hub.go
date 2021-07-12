@@ -32,6 +32,28 @@ type StakingHub struct {
 	CloseCh chan struct{}
 }
 
+var stakingHubInstance StakingHub
+
+// GetStakingHub initializes the stakingHubInstance singleton
+func GetStakingHub() *StakingHub {
+	var once sync.Once
+	once.Do(func() {
+		stakingHubInstance = StakingHub{
+			StakingMap:       make(map[Address]*big.Int),
+			StakingThreshold: big.NewInt(0),
+			CloseCh:          make(chan struct{}),
+		}
+	})
+
+	return &stakingHubInstance
+}
+
+func (sh *StakingHub) SetWorkingDirectory(directory string) {
+	sh.WorkingDirectory = directory
+
+	go sh.SaveToDisk()
+}
+
 func (sh *StakingHub) CloseStakingHub() {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()

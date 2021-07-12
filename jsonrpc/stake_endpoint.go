@@ -17,11 +17,13 @@ func (s *Stake) GetStakedBalance(address types.Address, number BlockNumber) (int
 		return nil, err
 	}
 
-	acc, err := s.d.store.GetAccount(header.StateRoot, address)
+	_, err = s.d.store.GetAccount(header.StateRoot, address)
 	if err != nil {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil
 	}
 
-	return argBigPtr(acc.StakedBalance), nil
+	stakingHub := types.GetStakingHub()
+
+	return argBigPtr(stakingHub.GetStakedBalance(address)), nil
 }

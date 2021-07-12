@@ -69,8 +69,6 @@ type Executor struct {
 
 	stakingEventSubscriptions     []*StakingEventSubscription
 	stakingEventSubscriptionsLock sync.Mutex
-
-	consensusHub interface{}
 }
 
 // NewExecutor creates a new executor
@@ -84,15 +82,10 @@ func NewExecutor(config *chain.Params, s State) *Executor {
 	}
 }
 
-func (e *Executor) SetConsensusHub(hub interface{}) {
-	e.consensusHub = hub
-}
-
-func (e *Executor) GetConsensusHub() interface{} {
-	return e.consensusHub
-}
-
-func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
+func (e *Executor) WriteGenesis(
+	alloc map[types.Address]*chain.GenesisAccount,
+	allocStake map[types.Address]*big.Int,
+) types.Hash {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
 
@@ -101,11 +94,6 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	for addr, account := range alloc {
 		if account.Balance != nil {
 			txn.AddBalance(addr, account.Balance)
-		}
-		if account.StakedBalance != nil {
-			txn.AddStakedBalance(addr, account.StakedBalance)
-
-			txn.AddBalance(stakingAddress, account.StakedBalance)
 		}
 		if account.Nonce != 0 {
 			txn.SetNonce(addr, account.Nonce)
@@ -116,6 +104,13 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		for key, value := range account.Storage {
 			txn.SetState(addr, key, value)
 		}
+	}
+
+	hub := types.GetStakingHub()
+	for addr, stakeBalance := range allocStake {
+		hub.IncreaseStake(addr, stakeBalance)
+
+		txn.AddBalance(stakingAddress, stakeBalance)
 	}
 
 	_, root := txn.Commit(false)
@@ -688,19 +683,19 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 }
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
-	hub := t.r.GetConsensusHub().(*types.StakingHub)
+	hub := types.GetStakingHub()
 	hub.GetStakedBalance(addr)
 
 	return hub.GetStakedBalance(addr)
 }
 
 func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
-	hub := t.r.GetConsensusHub().(*types.StakingHub)
+	hub := types.GetStakingHub()
 	hub.IncreaseStake(addr, balance)
 }
 
 func (t *Transition) SubStakedBalance(addr types.Address, balance *big.Int) {
-	hub := t.r.GetConsensusHub().(*types.StakingHub)
+	hub := types.GetStakingHub()
 	hub.DecreaseStake(addr, balance)
 }
 

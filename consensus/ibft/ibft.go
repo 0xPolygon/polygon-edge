@@ -96,7 +96,7 @@ func Factory(
 		epochSize:    DefaultEpochSize,
 		syncNotifyCh: make(chan bool),
 		sealing:      sealing,
-		stakingHub:   config.Hub.(*types.StakingHub),
+		stakingHub:   types.GetStakingHub(),
 	}
 
 	// Istanbul requires a different header hash function

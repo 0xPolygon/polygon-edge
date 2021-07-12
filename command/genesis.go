@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -279,18 +278,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			return 1
 		}
 
-		previousAccount := cc.Genesis.Alloc[addr]
-
-		if previousAccount != nil {
-			// Account already has a premined balance
-			previousAccount.StakedBalance = stakeAmount
-		} else {
-			// Account doesn't have a premined balance
-			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
-				Balance:       big.NewInt(0),
-				StakedBalance: stakeAmount,
-			}
-		}
+		cc.Genesis.AllocStake[addr] = stakeAmount
 	}
 
 	data, err := json.MarshalIndent(cc, "", "    ")

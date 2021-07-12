@@ -12,9 +12,3 @@ var consensusBackends = map[string]consensus.Factory{
 	"ibft":  consensusIBFT.Factory,
 	"dummy": consensusDummy.Factory,
 }
-
-var consensusHubs = map[string]interface{}{
-	"dev":   nil,
-	"ibft":  newStakingHub(workingDirectory), // Returns a singleton
-	"dummy": nil,
-}
