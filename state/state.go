@@ -61,7 +61,7 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 		return err
 	}
 
-	if len(elems) != 5 {
+	if len(elems) != 4 {
 		return fmt.Errorf("account has an invalid field count")
 	}
 

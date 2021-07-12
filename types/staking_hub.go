@@ -51,7 +51,7 @@ func GetStakingHub() *StakingHub {
 func (sh *StakingHub) SetWorkingDirectory(directory string) {
 	sh.WorkingDirectory = directory
 
-	go sh.SaveToDisk()
+	//go sh.SaveToDisk()
 }
 
 func (sh *StakingHub) CloseStakingHub() {
@@ -60,6 +60,8 @@ func (sh *StakingHub) CloseStakingHub() {
 
 	// Alert the closing channel
 	sh.CloseCh <- struct{}{}
+
+	close(sh.CloseCh)
 }
 
 // SaveToDisk is a helper method for periodically saving the stake data to disk
