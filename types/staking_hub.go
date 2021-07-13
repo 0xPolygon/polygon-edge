@@ -3,12 +3,15 @@ package types
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 // StakingHub acts as a hub (manager) for staked account balances
@@ -25,18 +28,22 @@ type StakingHub struct {
 	// Write-back period (in s) for backup staking data
 	WritebackPeriod time.Duration
 
+	// Logger for logging errors and information
+	Logger hclog.Logger
+
 	// Mutex
 	StakingMutex sync.Mutex
 
 	// Close channel
-	CloseCh chan struct{}
+	CloseCh chan struct {
+	}
 }
 
 var stakingHubInstance StakingHub
+var once sync.Once
 
 // GetStakingHub initializes the stakingHubInstance singleton
 func GetStakingHub() *StakingHub {
-	var once sync.Once
 	once.Do(func() {
 		stakingHubInstance = StakingHub{
 			StakingMap:       make(map[Address]*big.Int),
@@ -48,12 +55,19 @@ func GetStakingHub() *StakingHub {
 	return &stakingHubInstance
 }
 
+// SetWorkingDirectory sets the writeback directory for the staking map
 func (sh *StakingHub) SetWorkingDirectory(directory string) {
 	sh.WorkingDirectory = directory
 
-	//go sh.SaveToDisk()
+	go sh.SaveToDisk()
 }
 
+// SetLogger sets the StakingHub logger
+func (sh *StakingHub) SetLogger(logger hclog.Logger) {
+	sh.Logger = logger.Named("staking-hub")
+}
+
+// CloseStakingHub stops the writeback process
 func (sh *StakingHub) CloseStakingHub() {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
@@ -82,12 +96,23 @@ func (sh *StakingHub) SaveToDisk() {
 		}
 
 		// Save the json to workingDirectory/StakingMap.json
-		file, err := os.Create(filepath.Join(sh.WorkingDirectory, "StakingMap.json"))
+		file, err := os.Create(filepath.Join(sh.WorkingDirectory, "staking-map.json"))
 		if err != nil {
 			_ = file.Close()
+			sh.Logger.Error("unable to create the writeback file")
+
 			continue
 		}
-		_, _ = io.Copy(file, reader)
+
+		_, err = io.Copy(file, reader)
+		if err != nil {
+			sh.Logger.Error("unable to write date into writeback file")
+		}
+
+		err = file.Close()
+		if err != nil {
+			sh.Logger.Error("unable to close writeback file")
+		}
 
 		// Sleep for the writeback period
 		time.Sleep(sh.WritebackPeriod * time.Second)
@@ -126,6 +151,8 @@ func (sh *StakingHub) IncreaseStake(address Address, stakeBalance *big.Int) {
 	} else {
 		sh.StakingMap[address] = big.NewInt(0).Add(sh.StakingMap[address], stakeBalance)
 	}
+
+	sh.Logger.Info(fmt.Sprintf("Stake increase:\t%s %s\n", address.String(), stakeBalance.String()))
 }
 
 // DecreaseStake decreases the account's staked balance if the account is present
@@ -136,6 +163,8 @@ func (sh *StakingHub) DecreaseStake(address Address, unstakeBalance *big.Int) {
 	if sh.isStaker(address) {
 		sh.StakingMap[address] = big.NewInt(0).Sub(sh.StakingMap[address], unstakeBalance)
 	}
+
+	sh.Logger.Info(fmt.Sprintf("Stake decrease:\t%s %s\n", address.String(), unstakeBalance.String()))
 }
 
 // ResetStake resets the account's staked balance
@@ -146,6 +175,8 @@ func (sh *StakingHub) ResetStake(address Address) {
 	if sh.isStaker(address) {
 		delete(sh.StakingMap, address)
 	}
+
+	sh.Logger.Info(fmt.Sprintf("Stake reset:\t%s\n", address.String()))
 }
 
 // GetStakedBalance returns an accounts staked balance if it is a staker.

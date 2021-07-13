@@ -684,8 +684,6 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
 	hub := types.GetStakingHub()
-	hub.GetStakedBalance(addr)
-
 	return hub.GetStakedBalance(addr)
 }
 

@@ -79,6 +79,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// Spin up the staking hub if the consensus engine is ibft-pos
 	if config.Chain.Params.GetEngine() == chain.IBFTEngine {
+		types.GetStakingHub().SetLogger(logger)
 		types.GetStakingHub().SetWorkingDirectory(config.DataDir)
 	}
 	// Generate all the paths in the dataDir
