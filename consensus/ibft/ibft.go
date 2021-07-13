@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol"
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -69,7 +70,7 @@ type Ibft struct {
 	forceTimeoutCh bool
 
 	// Staking hub used for interacting with other modules
-	stakingHub *types.StakingHub
+	stakingHub *staking.StakingHub
 }
 
 // Factory implements the base consensus Factory method
@@ -96,7 +97,7 @@ func Factory(
 		epochSize:    DefaultEpochSize,
 		syncNotifyCh: make(chan bool),
 		sealing:      sealing,
-		stakingHub:   types.GetStakingHub(),
+		stakingHub:   staking.GetStakingHub(),
 	}
 
 	// Istanbul requires a different header hash function

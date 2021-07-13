@@ -15,6 +15,7 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/minimal/proto"
+	"github.com/0xPolygon/minimal/staking"
 	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -239,6 +240,8 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 			}
 		}
 	})
+
+	staking.GetStakingHub()
 
 	for i := 0; i < num; i++ {
 		dataDir, err := tempDir()

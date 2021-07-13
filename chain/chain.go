@@ -114,6 +114,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		Mixhash    types.Hash                  `json:"mixHash"`
 		Coinbase   types.Address               `json:"coinbase"`
 		Alloc      *map[string]*GenesisAccount `json:"alloc,omitempty"`
+		AllocStake *map[string]*big.Int        `json:"allocStake,omitempty"`
 		Number     *string                     `json:"number,omitempty"`
 		GasUsed    *string                     `json:"gasUsed,omitempty"`
 		ParentHash types.Hash                  `json:"parentHash"`
@@ -139,6 +140,14 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		enc.Alloc = &alloc
 	}
 
+	if g.AllocStake != nil {
+		allocStake := make(map[string]*big.Int, len(g.AllocStake))
+		for k, v := range g.AllocStake {
+			allocStake[k.String()] = v
+		}
+		enc.AllocStake = &allocStake
+	}
+
 	enc.Number = types.EncodeUint64(g.Number)
 	enc.GasUsed = types.EncodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
@@ -157,6 +166,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		Mixhash    *types.Hash                `json:"mixHash"`
 		Coinbase   *types.Address             `json:"coinbase"`
 		Alloc      map[string]*GenesisAccount `json:"alloc"`
+		AllocStake map[string]*big.Int        `json:"allocStake"`
 		Number     *string                    `json:"number"`
 		GasUsed    *string                    `json:"gasUsed"`
 		ParentHash *types.Hash                `json:"parentHash"`
@@ -212,6 +222,12 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		g.Alloc = make(map[types.Address]*GenesisAccount, len(dec.Alloc))
 		for k, v := range dec.Alloc {
 			g.Alloc[types.StringToAddress(k)] = v
+		}
+	}
+	if dec.AllocStake != nil {
+		g.AllocStake = make(map[types.Address]*big.Int, len(dec.AllocStake))
+		for k, v := range dec.AllocStake {
+			g.AllocStake[types.StringToAddress(k)] = v
 		}
 	}
 

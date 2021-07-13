@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 
@@ -106,7 +107,7 @@ func (e *Executor) WriteGenesis(
 		}
 	}
 
-	hub := types.GetStakingHub()
+	hub := staking.GetStakingHub()
 	for addr, stakeBalance := range allocStake {
 		hub.IncreaseStake(addr, stakeBalance)
 
@@ -682,17 +683,17 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 }
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
-	hub := types.GetStakingHub()
+	hub := staking.GetStakingHub()
 	return hub.GetStakedBalance(addr)
 }
 
 func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
-	hub := types.GetStakingHub()
+	hub := staking.GetStakingHub()
 	hub.IncreaseStake(addr, balance)
 }
 
 func (t *Transition) SubStakedBalance(addr types.Address, balance *big.Int) {
-	hub := types.GetStakingHub()
+	hub := staking.GetStakingHub()
 	hub.DecreaseStake(addr, balance)
 }
 

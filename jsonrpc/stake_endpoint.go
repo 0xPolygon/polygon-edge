@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -23,7 +24,7 @@ func (s *Stake) GetStakedBalance(address types.Address, number BlockNumber) (int
 		return argUintPtr(0), nil
 	}
 
-	stakingHub := types.GetStakingHub()
+	stakingHub := staking.GetStakingHub()
 
 	return argBigPtr(stakingHub.GetStakedBalance(address)), nil
 }

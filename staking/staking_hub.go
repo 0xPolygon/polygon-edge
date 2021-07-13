@@ -1,4 +1,4 @@
-package types
+package staking
 
 import (
 	"bytes"
@@ -11,13 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
 
 // StakingHub acts as a hub (manager) for staked account balances
 type StakingHub struct {
 	// Address -> Stake
-	StakingMap map[Address]*big.Int
+	StakingMap map[types.Address]*big.Int
 
 	// The lowest staked amount in the validator set
 	StakingThreshold *big.Int
@@ -46,7 +47,7 @@ var once sync.Once
 func GetStakingHub() *StakingHub {
 	once.Do(func() {
 		stakingHubInstance = StakingHub{
-			StakingMap:       make(map[Address]*big.Int),
+			StakingMap:       make(map[types.Address]*big.Int),
 			StakingThreshold: big.NewInt(0),
 			CloseCh:          make(chan struct{}),
 		}
@@ -99,18 +100,20 @@ func (sh *StakingHub) SaveToDisk() {
 		file, err := os.Create(filepath.Join(sh.WorkingDirectory, "staking-map.json"))
 		if err != nil {
 			_ = file.Close()
-			sh.Logger.Error("unable to create the writeback file")
+			if sh.Logger != nil {
+				sh.Logger.Error("unable to create the writeback file")
+			}
 
 			continue
 		}
 
 		_, err = io.Copy(file, reader)
-		if err != nil {
+		if err != nil && sh.Logger != nil {
 			sh.Logger.Error("unable to write date into writeback file")
 		}
 
 		err = file.Close()
-		if err != nil {
+		if err != nil && sh.Logger != nil {
 			sh.Logger.Error("unable to close writeback file")
 		}
 
@@ -132,7 +135,7 @@ func (sh *StakingHub) marshalJSON(mappings []StakerMapping) (io.Reader, error) {
 }
 
 // isStaker is a helper method to check whether or not an address has a staked balance
-func (sh *StakingHub) isStaker(address Address) bool {
+func (sh *StakingHub) isStaker(address types.Address) bool {
 	if _, ok := sh.StakingMap[address]; ok {
 		return true
 	}
@@ -142,7 +145,7 @@ func (sh *StakingHub) isStaker(address Address) bool {
 
 // IncreaseStake increases the account's staked balance, or sets it if the account wasn't
 // in the StakingMap
-func (sh *StakingHub) IncreaseStake(address Address, stakeBalance *big.Int) {
+func (sh *StakingHub) IncreaseStake(address types.Address, stakeBalance *big.Int) {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
@@ -152,23 +155,27 @@ func (sh *StakingHub) IncreaseStake(address Address, stakeBalance *big.Int) {
 		sh.StakingMap[address] = big.NewInt(0).Add(sh.StakingMap[address], stakeBalance)
 	}
 
-	sh.Logger.Info(fmt.Sprintf("Stake increase:\t%s %s\n", address.String(), stakeBalance.String()))
+	if sh.Logger != nil {
+		sh.Logger.Info(fmt.Sprintf("Stake increase:\t%s %s\n", address.String(), stakeBalance.String()))
+	}
 }
 
 // DecreaseStake decreases the account's staked balance if the account is present
-func (sh *StakingHub) DecreaseStake(address Address, unstakeBalance *big.Int) {
+func (sh *StakingHub) DecreaseStake(address types.Address, unstakeBalance *big.Int) {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
-	if sh.isStaker(address) {
+	if sh.isStaker(address) && sh.StakingMap[address].Cmp(unstakeBalance) >= 0 {
 		sh.StakingMap[address] = big.NewInt(0).Sub(sh.StakingMap[address], unstakeBalance)
-	}
 
-	sh.Logger.Info(fmt.Sprintf("Stake decrease:\t%s %s\n", address.String(), unstakeBalance.String()))
+		if sh.Logger != nil {
+			sh.Logger.Info(fmt.Sprintf("Stake decrease:\t%s %s\n", address.String(), unstakeBalance.String()))
+		}
+	}
 }
 
 // ResetStake resets the account's staked balance
-func (sh *StakingHub) ResetStake(address Address) {
+func (sh *StakingHub) ResetStake(address types.Address) {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
@@ -176,12 +183,14 @@ func (sh *StakingHub) ResetStake(address Address) {
 		delete(sh.StakingMap, address)
 	}
 
-	sh.Logger.Info(fmt.Sprintf("Stake reset:\t%s\n", address.String()))
+	if sh.Logger != nil {
+		sh.Logger.Info(fmt.Sprintf("Stake reset:\t%s\n", address.String()))
+	}
 }
 
 // GetStakedBalance returns an accounts staked balance if it is a staker.
 // Returns 0 if the address is not a staker
-func (sh *StakingHub) GetStakedBalance(address Address) *big.Int {
+func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
@@ -193,11 +202,11 @@ func (sh *StakingHub) GetStakedBalance(address Address) *big.Int {
 }
 
 // GetStakerAddresses returns a list of all addresses that have a stake > 0
-func (sh *StakingHub) GetStakerAddresses() []Address {
+func (sh *StakingHub) GetStakerAddresses() []types.Address {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
-	stakers := make([]Address, len(sh.StakingMap))
+	stakers := make([]types.Address, len(sh.StakingMap))
 
 	var indx = 0
 	for address := range sh.StakingMap {
@@ -210,8 +219,8 @@ func (sh *StakingHub) GetStakerAddresses() []Address {
 
 // StakerMapping is a representation of a staked account balance
 type StakerMapping struct {
-	Address Address  `json:"address"`
-	Stake   *big.Int `json:"stake"`
+	Address types.Address `json:"address"`
+	Stake   *big.Int      `json:"stake"`
 }
 
 // GetStakerMappings returns the staking addresses and their staking balances

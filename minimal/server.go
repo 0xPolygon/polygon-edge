@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/txpool"
@@ -80,8 +81,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// Spin up the staking hub if the consensus engine is ibft-pos
 	if config.Chain.Params.GetEngine() == chain.IBFTEngine {
-		types.GetStakingHub().SetLogger(logger)
-		types.GetStakingHub().SetWorkingDirectory(config.DataDir)
+		staking.GetStakingHub().SetLogger(logger)
+		staking.GetStakingHub().SetWorkingDirectory(config.DataDir)
 	}
 	// Generate all the paths in the dataDir
 	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
@@ -397,7 +398,7 @@ func (s *Server) Close() {
 	}
 
 	// Close the staking hub if present
-	types.GetStakingHub().CloseStakingHub()
+	staking.GetStakingHub().CloseStakingHub()
 }
 
 // Entry is a backend configuration entry
