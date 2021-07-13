@@ -2,6 +2,7 @@ package minimal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -259,7 +260,7 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	}
 	result, ok := snap.Get(key)
 	if !ok {
-		return nil, fmt.Errorf("error getting storage snapshot")
+		return nil, errors.New("given root and slot not found in storage")
 	}
 	return result, nil
 }
