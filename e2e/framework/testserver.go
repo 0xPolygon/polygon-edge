@@ -189,7 +189,7 @@ func (t *TestServer) GenerateGenesis() error {
 	// add premines
 	for _, acct := range t.Config.PremineAccts {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
-		//args = append(args, "--prestake", acct.Addr.String()+":0x"+acct.StakedBalance.Text(16))
+		args = append(args, "--prestake", acct.Addr.String()+":0x"+acct.StakedBalance.Text(16))
 	}
 
 	// add consensus flags

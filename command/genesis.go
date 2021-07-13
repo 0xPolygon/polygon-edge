@@ -24,7 +24,7 @@ const (
 	defaultChainName       = "example"
 	defaultChainID         = 100
 	defaultPremineBalance  = "0x3635C9ADC5DEA00000" // 1000 ETH
-	defaultPrestakeBalance = "0x0"                  // 0 ETH
+	defaultPrestakeBalance = "0x8AC7230489E80000"   // 10 ETH
 	defaultConsensus       = "pow"
 )
 
