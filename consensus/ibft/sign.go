@@ -88,12 +88,12 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	h = h.Copy()
 
 	if len(seals) == 0 {
-		return nil, fmt.Errorf("bad")
+		return nil, fmt.Errorf("empty committed seals")
 	}
 
 	for _, seal := range seals {
 		if len(seal) != IstanbulExtraSeal {
-			return nil, fmt.Errorf("bad")
+			return nil, fmt.Errorf("invalid committed seal length")
 		}
 	}
 
@@ -171,7 +171,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 		return err
 	}
 
-	// TODO: Check locking mechanism impl
+	// Committed seals shouldn't be empty
 	if len(extra.CommittedSeal) == 0 {
 		return fmt.Errorf("empty committed seals")
 	}
