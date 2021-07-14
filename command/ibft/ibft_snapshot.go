@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 
 // IbftSnapshot is the command to query the snapshot
 type IbftSnapshot struct {
-	Meta
+	helper.Meta
 }
 
 // DefineFlags defines the command flags
 func (p *IbftSnapshot) DefineFlags() {
-	if p.flagMap == nil {
+	if p.FlagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]helper.FlagDescriptor)
+		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["number"] = helper.FlagDescriptor{
+	p.FlagMap["number"] = helper.FlagDescriptor{
 		Description: "The block height (number) for the snapshot",
 		Arguments: []string{
 			"BLOCK_NUMBER",
@@ -45,7 +45,7 @@ func (p *IbftSnapshot) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.IbftSnapshot interface
@@ -92,7 +92,7 @@ func (p *IbftSnapshot) Run(args []string) int {
 
 func printSnapshot(s *proto.Snapshot) (output string) {
 	output += "\n[IBFT SNAPSHOT]\n"
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Block|%d", s.Number),
 		fmt.Sprintf("Hash|%s", s.Hash),
 	})
@@ -110,7 +110,7 @@ func printSnapshot(s *proto.Snapshot) (output string) {
 	}
 
 	output += "\n[VOTES]\n"
-	output += formatList(votes)
+	output += helper.FormatList(votes)
 
 	output += "\n"
 
@@ -127,7 +127,7 @@ func printSnapshot(s *proto.Snapshot) (output string) {
 	output += "\n"
 
 	output += "\n[VALIDATORS]\n"
-	output += formatList(validators)
+	output += helper.FormatList(validators)
 
 	return output
 }

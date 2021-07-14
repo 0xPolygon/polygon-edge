@@ -1,4 +1,4 @@
-package command
+package peers
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // PeersList is the PeersList to start the sever
 type PeersList struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -27,7 +27,7 @@ func (p *PeersList) GetBaseCommand() string {
 func (p *PeersList) Help() string {
 	p.Meta.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.PeersList interface
@@ -79,5 +79,5 @@ func formatPeers(peers []*proto.Peer) string {
 		generatedRows = append(generatedRows, fmt.Sprintf("[%d]|%s", i, peers[i].Id))
 	}
 
-	return formatKV(generatedRows)
+	return helper.FormatKV(generatedRows)
 }

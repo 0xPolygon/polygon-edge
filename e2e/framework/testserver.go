@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/types"
 	"io"
 	"math/big"
 	"os"
@@ -16,7 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/command"
+	"github.com/0xPolygon/minimal/command/genesis"
+	ibftCommand "github.com/0xPolygon/minimal/command/ibft"
+	"github.com/0xPolygon/minimal/types"
+
 	"github.com/0xPolygon/minimal/command/server"
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
@@ -134,7 +136,7 @@ type InitIBFTResult struct {
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	ibftInitCmd := command.IbftInit{}
+	ibftInitCmd := ibftCommand.IbftInit{}
 	var args []string
 
 	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")
@@ -174,7 +176,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 }
 
 func (t *TestServer) GenerateGenesis() error {
-	genesisCmd := command.GenesisCommand{}
+	genesisCmd := genesis.GenesisCommand{}
 	args := []string{
 		genesisCmd.GetBaseCommand(),
 	}
@@ -208,7 +210,7 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
-	serverCmd := server.Command{}
+	serverCmd := server.ServerCommand{}
 	args := []string{
 		serverCmd.GetBaseCommand(),
 		// add custom chain

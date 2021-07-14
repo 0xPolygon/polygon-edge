@@ -1,4 +1,4 @@
-package command
+package version
 
 import (
 	"github.com/0xPolygon/minimal/command/helper"
@@ -9,7 +9,7 @@ import (
 // VersionCommand is the command to show the version of the agent
 type VersionCommand struct {
 	UI cli.Ui
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -23,7 +23,7 @@ func (c *VersionCommand) GetBaseCommand() string {
 
 // Help implements the cli.Command interface
 func (c *VersionCommand) Help() string {
-	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface

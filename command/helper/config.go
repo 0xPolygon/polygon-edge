@@ -1,4 +1,4 @@
-package server
+package helper
 
 import (
 	"encoding/json"
@@ -37,8 +37,8 @@ type Network struct {
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
-// defaultConfig returns the default server configuration
-func defaultConfig() *Config {
+// DefaultConfig returns the default server configuration
+func DefaultConfig() *Config {
 	return &Config{
 		Chain:   "test",
 		DataDir: "./test-chain",
