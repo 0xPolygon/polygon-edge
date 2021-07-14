@@ -15,13 +15,17 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+type StakingEventType string
+
+var (
+	StakingEvent   StakingEventType = "staking"
+	UnstakingEvent StakingEventType = "unstaking"
+)
+
 // StakingHub acts as a hub (manager) for staked account balances
 type StakingHub struct {
 	// Address -> Stake
 	StakingMap map[types.Address]*big.Int
-
-	// The lowest staked amount in the validator set
-	StakingThreshold *big.Int
 
 	// Specifies the working directory for the Polygon SDK (location for writeback)
 	WorkingDirectory string
@@ -32,7 +36,14 @@ type StakingHub struct {
 	// Logger for logging errors and information
 	Logger hclog.Logger
 
-	// Mutex
+	// Event queue defines staking / unstaking events
+	// which are read by modules that do final transaction sealing
+	EventQueue []PendingEvent
+
+	// Event list mutex
+	EventQueueMutex sync.Mutex
+
+	// Staking map mutex
 	StakingMutex sync.Mutex
 
 	// Close channel
@@ -47,9 +58,9 @@ var once sync.Once
 func GetStakingHub() *StakingHub {
 	once.Do(func() {
 		stakingHubInstance = StakingHub{
-			StakingMap:       make(map[types.Address]*big.Int),
-			StakingThreshold: big.NewInt(0),
-			CloseCh:          make(chan struct{}),
+			StakingMap: make(map[types.Address]*big.Int),
+			EventQueue: make([]PendingEvent, 0),
+			CloseCh:    make(chan struct{}),
 		}
 	})
 
@@ -77,6 +88,60 @@ func (sh *StakingHub) CloseStakingHub() {
 	sh.CloseCh <- struct{}{}
 
 	close(sh.CloseCh)
+}
+
+// PendingEvent contains useful information about a staking / unstaking event
+type PendingEvent struct {
+	Address   types.Address
+	Value     *big.Int
+	EventType StakingEventType
+}
+
+// Compare checks if the two events match
+func (pe *PendingEvent) Compare(event PendingEvent) bool {
+	if pe.EventType == event.EventType &&
+		pe.Address.String() == event.Address.String() &&
+		pe.Value.Cmp(event.Value) == 0 {
+		return true
+	}
+
+	return false
+}
+
+// AddPendingEvent pushes an event to the event queue
+func (sh *StakingHub) AddPendingEvent(event PendingEvent) {
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	sh.EventQueue = append(sh.EventQueue, event)
+}
+
+// RemovePendingEvent removes the pending event from the event queue if it exists
+func (sh *StakingHub) RemovePendingEvent(event PendingEvent) {
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	foundIndx := -1
+	for indx, el := range sh.EventQueue {
+		if el.Compare(event) {
+			foundIndx = indx
+		}
+	}
+
+	if foundIndx >= 0 {
+		sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
+	}
+}
+
+// ContainsPendingEvent checks if an identical event is present in the queue
+func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
+	for _, el := range sh.EventQueue {
+		if el.Compare(event) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SaveToDisk is a helper method for periodically saving the stake data to disk

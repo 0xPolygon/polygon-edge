@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -40,15 +41,17 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	}
 
 	// Decrease the staked amount from the account's staked balance
-	state.host.SubStakedBalance(staker, stakedBalance)
+	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
+		Address:   staker,
+		Value:     big.NewInt(0),
+		EventType: staking.UnstakingEvent,
+	})
 
 	// Decrease the staked balance on the staking address
 	state.host.SubBalance(stakingAddress, stakedBalance)
 
 	// Increase the account's actual balance
 	state.host.AddBalance(staker, stakedBalance)
-
-	state.host.EmitUnstakedEvent(staker, stakedBalance)
 
 	return nil, nil
 }

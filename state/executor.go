@@ -329,6 +329,43 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
+	// Check if the transaction matches a staking / unstaking event
+	if msg.To != nil && (*(msg.To) == types.StringToAddress(system.StakingAddress) ||
+		(*msg.To) == types.StringToAddress(system.UnstakingAddress)) {
+		var eventType staking.StakingEventType
+
+		if *msg.To == types.StringToAddress(system.StakingAddress) {
+			eventType = staking.StakingEvent
+		} else {
+			eventType = staking.UnstakingEvent
+		}
+
+		pendingEvent := staking.PendingEvent{
+			Address:   msg.From,
+			Value:     msg.Value,
+			EventType: eventType,
+		}
+
+		hub := staking.GetStakingHub()
+
+		if hub.ContainsPendingEvent(pendingEvent) {
+			// Remove the event from the queue
+			hub.RemovePendingEvent(pendingEvent)
+
+			// Execute the changes on the staking map
+			// Alert the consensus layer of the event
+			if eventType == staking.StakingEvent {
+				hub.IncreaseStake(msg.From, msg.Value)
+				t.EmitStakedEvent(msg.From, msg.Value)
+			} else {
+				prevStake := hub.GetStakedBalance(msg.From)
+
+				hub.ResetStake(msg.From)
+				t.EmitUnstakedEvent(msg.From, prevStake)
+			}
+		}
+	}
+
 	return nil
 }
 
