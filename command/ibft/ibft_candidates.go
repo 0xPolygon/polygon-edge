@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // IbftCandidates is the command to query the snapshot
 type IbftCandidates struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -27,7 +27,7 @@ func (p *IbftCandidates) GetBaseCommand() string {
 func (p *IbftCandidates) Help() string {
 	p.Meta.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
@@ -82,7 +82,7 @@ func formatCandidates(candidates []*ibftOp.Candidate) string {
 		generatedCandidates = append(generatedCandidates, fmt.Sprintf("%s|%s", c.Address, voteToString(c.Auth)))
 	}
 
-	return formatKV(generatedCandidates)
+	return helper.FormatKV(generatedCandidates)
 }
 
 func voteToString(vote bool) string {

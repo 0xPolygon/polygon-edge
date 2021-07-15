@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import "github.com/mitchellh/cli"
 

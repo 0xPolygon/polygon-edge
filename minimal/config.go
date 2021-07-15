@@ -7,8 +7,8 @@ import (
 	"github.com/0xPolygon/minimal/network"
 )
 
-const DefaultGRPCPort int = 8545
-const DefaultJSONRPCPort int = 9632
+const DefaultGRPCPort int = 9632
+const DefaultJSONRPCPort int = 8545
 
 // Config is used to parametrize the minimal client
 type Config struct {

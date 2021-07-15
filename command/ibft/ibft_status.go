@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // IbftStatus is the command to query the snapshot
 type IbftStatus struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -27,7 +27,7 @@ func (p *IbftStatus) GetBaseCommand() string {
 func (p *IbftStatus) Help() string {
 	p.Meta.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.IbftStatus interface
@@ -58,7 +58,7 @@ func (p *IbftStatus) Run(args []string) int {
 	}
 
 	var output = "\n[VALIDATOR STATUS]\n"
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Vaidator key|%s", resp.Key),
 	})
 

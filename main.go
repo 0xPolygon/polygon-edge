@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xPolygon/minimal/command"
+	"github.com/0xPolygon/minimal/command/util"
 	"github.com/mitchellh/cli"
 )
 
@@ -14,7 +14,7 @@ func main() {
 
 // Run starts the cli
 func Run(args []string) int {
-	commands := command.Commands()
+	commands := util.Commands()
 
 	cli := &cli.CLI{
 		Name:     "polygon",
@@ -30,25 +30,3 @@ func Run(args []string) int {
 
 	return exitCode
 }
-
-/*
-import (
-	logger "github.com/hashicorp/go-hclog"
-
-	"github.com/0xPolygon/minimal/command"
-	_ "github.com/0xPolygon/minimal/command/agent"
-	_ "github.com/0xPolygon/minimal/command/debug"
-	_ "github.com/0xPolygon/minimal/command/dev"
-	_ "github.com/0xPolygon/minimal/command/genesis"
-	_ "github.com/0xPolygon/minimal/command/ibft-genesis"
-	_ "github.com/0xPolygon/minimal/command/peers"
-	_ "github.com/0xPolygon/minimal/command/version"
-)
-
-func main() {
-	// TODO: Change time format for the logger?
-	if err := command.Run(); err != nil {
-		logger.Default().Error(err.Error())
-	}
-}
-*/
