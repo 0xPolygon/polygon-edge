@@ -1,4 +1,4 @@
-package command
+package status
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 // StatusCommand is the command to show the version of the agent
 type StatusCommand struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -27,7 +27,7 @@ func (c *StatusCommand) GetBaseCommand() string {
 func (c *StatusCommand) Help() string {
 	c.Meta.DefineFlags()
 
-	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -58,7 +58,7 @@ func (c *StatusCommand) Run(args []string) int {
 	}
 
 	output := "\n[CLIENT STATUS]\n"
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Network (Chain ID)|%d", status.Network),
 		fmt.Sprintf("Current Block Number (base 10)|%d", status.Current.Number),
 		fmt.Sprintf("Current Block Hash|%s", status.Current.Hash),

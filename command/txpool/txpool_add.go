@@ -1,4 +1,4 @@
-package command
+package txpool
 
 import (
 	"context"
@@ -13,17 +13,17 @@ import (
 
 // TxPoolAdd is the command to query the snapshot
 type TxPoolAdd struct {
-	Meta
+	helper.Meta
 }
 
 // DefineFlags defines the command flags
 func (p *TxPoolAdd) DefineFlags() {
-	if p.flagMap == nil {
+	if p.FlagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]helper.FlagDescriptor)
+		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["from"] = helper.FlagDescriptor{
+	p.FlagMap["from"] = helper.FlagDescriptor{
 		Description: "The sender address",
 		Arguments: []string{
 			"ADDRESS",
@@ -31,7 +31,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	p.flagMap["to"] = helper.FlagDescriptor{
+	p.FlagMap["to"] = helper.FlagDescriptor{
 		Description: "The receiver address",
 		Arguments: []string{
 			"ADDRESS",
@@ -39,7 +39,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	p.flagMap["value"] = helper.FlagDescriptor{
+	p.FlagMap["value"] = helper.FlagDescriptor{
 		Description: "The value of the transaction",
 		Arguments: []string{
 			"VALUE",
@@ -47,7 +47,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasPrice"] = helper.FlagDescriptor{
+	p.FlagMap["gasPrice"] = helper.FlagDescriptor{
 		Description: "The gas price",
 		Arguments: []string{
 			"GASPRICE",
@@ -55,7 +55,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	p.flagMap["gasLimit"] = helper.FlagDescriptor{
+	p.FlagMap["gasLimit"] = helper.FlagDescriptor{
 		Description: "The specified gas limit",
 		Arguments: []string{
 			"LIMIT",
@@ -64,7 +64,7 @@ func (p *TxPoolAdd) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	p.flagMap["nonce"] = helper.FlagDescriptor{
+	p.FlagMap["nonce"] = helper.FlagDescriptor{
 		Description: "The nonce of the transaction",
 		Arguments: []string{
 			"NONCE",
@@ -88,7 +88,7 @@ func (p *TxPoolAdd) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.TxPoolAdd interface
@@ -178,7 +178,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 	output := "\n[ADD TRANSACTION]\n"
 	output += "Successfully added transaction:\n"
 
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("FROM|%s", fromRaw),
 		fmt.Sprintf("TO|%s", toRaw),
 		fmt.Sprintf("VALUE|%s", valueRaw),

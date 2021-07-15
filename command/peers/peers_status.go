@@ -1,4 +1,4 @@
-package command
+package peers
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 
 // PeersStatus is the PeersStatus to start the sever
 type PeersStatus struct {
-	Meta
+	helper.Meta
 }
 
 func (p *PeersStatus) DefineFlags() {
-	if p.flagMap == nil {
+	if p.FlagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]helper.FlagDescriptor)
+		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["peer-id"] = helper.FlagDescriptor{
+	p.FlagMap["peer-id"] = helper.FlagDescriptor{
 		Description: "Libp2p node ID of a specific peer within p2p network",
 		Arguments: []string{
 			"PEER_ID",
@@ -42,7 +42,7 @@ func (p *PeersStatus) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.PeersStatus interface
@@ -92,7 +92,7 @@ func (p *PeersStatus) Run(args []string) int {
 
 // formatPeerStatus formats the peer status response for a single peer
 func formatPeerStatus(peer *proto.Peer) string {
-	return formatKV([]string{
+	return helper.FormatKV([]string{
 		fmt.Sprintf("ID|%s", peer.Id),
 		fmt.Sprintf("Protocols|%s", peer.Protocols),
 		fmt.Sprintf("Addresses|%s", peer.Addrs),
