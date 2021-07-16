@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -276,7 +275,7 @@ func FillPremineMap(
 
 // FillPrestakeMap fills the premine map for the genesis.json file with passed in account staked balances
 func FillPrestakeMap(
-	prestakeMap map[types.Address]*big.Int,
+	prestakeMap map[types.Address]*chain.GenesisStake,
 	prestake helperFlags.ArrayFlags,
 ) error {
 	for _, prem := range prestake {
@@ -295,7 +294,7 @@ func FillPrestakeMap(
 			return fmt.Errorf("failed to parse amount %s: %v", val, err)
 		}
 
-		prestakeMap[addr] = amount
+		prestakeMap[addr] = &chain.GenesisStake{StakedBalance: amount}
 	}
 
 	return nil
@@ -337,7 +336,7 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, presta
 			GasLimit:   5000,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
-			AllocStake: map[types.Address]*big.Int{},
+			AllocStake: map[types.Address]*chain.GenesisStake{},
 			ExtraData:  []byte{},
 		},
 		Params: &chain.Params{

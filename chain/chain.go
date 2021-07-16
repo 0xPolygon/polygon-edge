@@ -47,7 +47,7 @@ type Genesis struct {
 	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 
 	// Initial staked balance
-	AllocStake map[types.Address]*big.Int
+	AllocStake map[types.Address]*GenesisStake `json:"allocStake,omitempty"`
 
 	// Override
 	StateRoot types.Hash
@@ -114,7 +114,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		Mixhash    types.Hash                  `json:"mixHash"`
 		Coinbase   types.Address               `json:"coinbase"`
 		Alloc      *map[string]*GenesisAccount `json:"alloc,omitempty"`
-		AllocStake *map[string]*big.Int        `json:"allocStake,omitempty"`
+		AllocStake *map[string]*GenesisStake   `json:"allocStake,omitempty"`
 		Number     *string                     `json:"number,omitempty"`
 		GasUsed    *string                     `json:"gasUsed,omitempty"`
 		ParentHash types.Hash                  `json:"parentHash"`
@@ -141,7 +141,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	}
 
 	if g.AllocStake != nil {
-		allocStake := make(map[string]*big.Int, len(g.AllocStake))
+		allocStake := make(map[string]*GenesisStake, len(g.AllocStake))
 		for k, v := range g.AllocStake {
 			allocStake[k.String()] = v
 		}
@@ -166,7 +166,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		Mixhash    *types.Hash                `json:"mixHash"`
 		Coinbase   *types.Address             `json:"coinbase"`
 		Alloc      map[string]*GenesisAccount `json:"alloc"`
-		AllocStake map[string]*big.Int        `json:"allocStake"`
+		AllocStake map[string]*GenesisStake   `json:"allocStake"`
 		Number     *string                    `json:"number"`
 		GasUsed    *string                    `json:"gasUsed"`
 		ParentHash *types.Hash                `json:"parentHash"`
@@ -225,7 +225,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		}
 	}
 	if dec.AllocStake != nil {
-		g.AllocStake = make(map[types.Address]*big.Int, len(dec.AllocStake))
+		g.AllocStake = make(map[types.Address]*GenesisStake, len(dec.AllocStake))
 		for k, v := range dec.AllocStake {
 			g.AllocStake[types.StringToAddress(k)] = v
 		}
@@ -257,6 +257,14 @@ type GenesisAccount struct {
 	PrivateKey []byte                    `json:"secretKey,omitempty"` // for tests
 }
 
+type GenesisStake struct {
+	StakedBalance *big.Int `json:"stakedBalance,omitempty"`
+}
+
+type genesisStakeEncoder struct {
+	StakedBalance *string `json:"stakedBalance"`
+}
+
 type genesisAccountEncoder struct {
 	Code       *string                   `json:"code,omitempty"`
 	Storage    map[types.Hash]types.Hash `json:"storage,omitempty"`
@@ -283,6 +291,14 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	}
 	if g.PrivateKey != nil {
 		obj.PrivateKey = types.EncodeBytes(g.PrivateKey)
+	}
+	return json.Marshal(obj)
+}
+
+func (g *GenesisStake) MarshalJSON() ([]byte, error) {
+	obj := &genesisStakeEncoder{}
+	if g.StakedBalance != nil {
+		obj.StakedBalance = types.EncodeBigInt(g.StakedBalance)
 	}
 	return json.Marshal(obj)
 }
@@ -340,6 +356,33 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 
 	return err
 }
+
+func (g *GenesisStake) UnmarshalJSON(data []byte) error {
+	type GenesisStake struct {
+		StakedBalance *string `json:"stakedBalance"`
+	}
+
+	var dec GenesisStake
+	if err := json.Unmarshal(data, &dec); err != nil {
+		return err
+	}
+
+	var err error
+	var subErr error
+
+	parseError := func(field string, subErr error) {
+		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
+	}
+
+	g.StakedBalance, subErr = types.ParseUint256orHex(dec.StakedBalance)
+	if subErr != nil {
+		parseError("stakedBalance", subErr)
+	}
+
+	return err
+}
+
+// Import / Export
 
 func Import(chain string) (*Chain, error) {
 	c, err := ImportFromName(chain)

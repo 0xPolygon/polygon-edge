@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -215,7 +214,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			GasLimit:   5000,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
-			AllocStake: map[types.Address]*big.Int{},
+			AllocStake: map[types.Address]*chain.GenesisStake{},
 			ExtraData:  extraData,
 		},
 		Params: &chain.Params{

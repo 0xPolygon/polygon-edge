@@ -85,7 +85,7 @@ func NewExecutor(config *chain.Params, s State) *Executor {
 
 func (e *Executor) WriteGenesis(
 	alloc map[types.Address]*chain.GenesisAccount,
-	allocStake map[types.Address]*big.Int,
+	allocStake map[types.Address]*chain.GenesisStake,
 ) types.Hash {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(e.state, snap)
@@ -108,10 +108,10 @@ func (e *Executor) WriteGenesis(
 	}
 
 	hub := staking.GetStakingHub()
-	for addr, stakeBalance := range allocStake {
-		hub.IncreaseStake(addr, stakeBalance)
+	for addr, stake := range allocStake {
+		hub.IncreaseStake(addr, stake.StakedBalance)
 
-		txn.AddBalance(stakingAddress, stakeBalance)
+		txn.AddBalance(stakingAddress, stake.StakedBalance)
 	}
 
 	_, root := txn.Commit(false)
