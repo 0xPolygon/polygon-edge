@@ -126,6 +126,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 		From     types.Address
 		GasPrice *big.Int
 		Nonce    uint64
+		Index    int
 	}
 
 	addr1 := types.Address{0x1}
@@ -190,5 +191,27 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Nonce:    1,
 			},
 		})
+	})
+
+	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
+		assert.NoError(t, err)
+		pool.EnableDev()
+
+		pool.addImpl("", &types.Transaction{
+			From:     addr2,
+			GasPrice: big.NewInt(2),
+		})
+
+		pool.addImpl("", &types.Transaction{
+			From:     addr1,
+			GasPrice: big.NewInt(1),
+		})
+
+		firstTransaction, _ := pool.Pop()
+		assert.Equal(t, big.NewInt(1), firstTransaction.GasPrice)
+
+		secondTransaction, _ := pool.Pop()
+		assert.Equal(t, big.NewInt(2), secondTransaction.GasPrice)
 	})
 }
