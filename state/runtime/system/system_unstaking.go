@@ -40,6 +40,12 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 		return nil, errors.New("Invalid unstake request")
 	}
 
+	// Decrease the staked balance on the staking address
+	state.host.SubBalance(stakingAddress, stakedBalance)
+
+	// Increase the account's actual balance
+	state.host.AddBalance(staker, stakedBalance)
+
 	// Decrease the staked amount from the account's staked balance
 	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
 		Address:   staker,
@@ -47,11 +53,7 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 		EventType: staking.UnstakingEvent,
 	})
 
-	// Decrease the staked balance on the staking address
-	state.host.SubBalance(stakingAddress, stakedBalance)
-
-	// Increase the account's actual balance
-	state.host.AddBalance(staker, stakedBalance)
+	state.host.EmitUnstakedEvent(staker, stakedBalance)
 
 	return nil, nil
 }

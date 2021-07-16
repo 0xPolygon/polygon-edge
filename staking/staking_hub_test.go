@@ -14,6 +14,21 @@ func EthToWei(ethValue int64) *big.Int {
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 }
 
+type testStakeMapping struct {
+	address types.Address
+	stake   *big.Int
+}
+
+func instantiateStakingMap(mappings []testStakeMapping) {
+	hub := GetStakingHub()
+
+	hub.StakingMutex.Lock()
+	for _, stakePair := range mappings {
+		hub.StakingMap[stakePair.address] = stakePair.stake
+	}
+	hub.StakingMutex.Unlock()
+}
+
 func TestStakingHub_GetInstance(t *testing.T) {
 	testTable := []struct {
 		name         string
@@ -126,11 +141,16 @@ func TestStakingHub_IncreaseStake(t *testing.T) {
 	}
 
 	hub := GetStakingHub()
-
 	// Instantiate the staking map
+	var mappings []testStakeMapping
 	for _, stakePair := range validStakes {
-		hub.StakingMap[stakePair.address] = stakePair.initialStake
+		mappings = append(mappings, testStakeMapping{
+			address: stakePair.address,
+			stake:   stakePair.initialStake,
+		})
 	}
+
+	instantiateStakingMap(mappings)
 
 	// Increase the stake
 	for _, stakePair := range validStakes {
@@ -173,9 +193,14 @@ func TestStakingHub_DecreaseStake(t *testing.T) {
 	hub := GetStakingHub()
 
 	// Instantiate the staking map
+	var mappings []testStakeMapping
 	for _, stakePair := range validStakes {
-		hub.StakingMap[stakePair.address] = stakePair.initialStake
+		mappings = append(mappings, testStakeMapping{
+			address: stakePair.address,
+			stake:   stakePair.initialStake,
+		})
 	}
+	instantiateStakingMap(mappings)
 
 	// Decrease the stake
 	for _, stakePair := range validStakes {
@@ -221,9 +246,14 @@ func TestStakingHub_ResetStake(t *testing.T) {
 	hub := GetStakingHub()
 
 	// Instantiate the staking map
+	var mappings []testStakeMapping
 	for _, stakePair := range validStakes {
-		hub.StakingMap[stakePair.address] = stakePair.initialStake
+		mappings = append(mappings, testStakeMapping{
+			address: stakePair.address,
+			stake:   stakePair.initialStake,
+		})
 	}
+	instantiateStakingMap(mappings)
 
 	// Reset the stake
 	for _, stakePair := range validStakes {

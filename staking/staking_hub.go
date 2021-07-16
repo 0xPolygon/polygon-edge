@@ -113,7 +113,10 @@ func (sh *StakingHub) AddPendingEvent(event PendingEvent) {
 	sh.EventQueueMutex.Lock()
 	defer sh.EventQueueMutex.Unlock()
 
-	sh.EventQueue = append(sh.EventQueue, event)
+	// Check to avoid double addition
+	if !sh.hasEvent(event) {
+		sh.EventQueue = append(sh.EventQueue, event)
+	}
 }
 
 // RemovePendingEvent removes the pending event from the event queue if it exists
@@ -133,8 +136,8 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) {
 	}
 }
 
-// ContainsPendingEvent checks if an identical event is present in the queue
-func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
+// hasEvent checks if an identical event is present in the queue. Not thread safe
+func (sh *StakingHub) hasEvent(event PendingEvent) bool {
 	for _, el := range sh.EventQueue {
 		if el.Compare(event) {
 			return true
@@ -142,6 +145,14 @@ func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
 	}
 
 	return false
+}
+
+// ContainsPendingEvent checks if an identical event is present in the queue
+func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	return sh.hasEvent(event)
 }
 
 // SaveToDisk is a helper method for periodically saving the stake data to disk

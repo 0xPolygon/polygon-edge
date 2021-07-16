@@ -27,5 +27,7 @@ func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 		EventType: staking.StakingEvent,
 	})
 
+	state.host.EmitStakedEvent(staker, potentialStake)
+
 	return nil, nil
 }

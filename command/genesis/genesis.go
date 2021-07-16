@@ -233,24 +233,9 @@ func (c *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
-	for _, pres := range prestake {
-		var addr types.Address
-		val := helper.DefaultPrestakeBalance
-		if indx := strings.Index(pres, ":"); indx != -1 {
-			// <addr>:<balance>
-			addr, val = types.StringToAddress(pres[:indx]), pres[indx+1:]
-		} else {
-			// <addr>
-			addr = types.StringToAddress(pres)
-		}
-
-		stakeAmount, err := types.ParseUint256orHex(&val)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("failed to parse stake amount %s: %v", val, err))
-			return 1
-		}
-
-		cc.Genesis.AllocStake[addr] = stakeAmount
+	if err = helper.FillPrestakeMap(cc.Genesis.AllocStake, prestake); err != nil {
+		c.UI.Error(err.Error())
+		return 1
 	}
 
 	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
