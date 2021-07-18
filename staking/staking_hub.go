@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -20,6 +21,10 @@ type StakingEventType string
 var (
 	StakingEvent   StakingEventType = "staking"
 	UnstakingEvent StakingEventType = "unstaking"
+)
+
+var (
+	defaultFileName = "staking-map.json"
 )
 
 // StakingHub acts as a hub (manager) for staked account balances
@@ -71,7 +76,36 @@ func GetStakingHub() *StakingHub {
 func (sh *StakingHub) SetWorkingDirectory(directory string) {
 	sh.WorkingDirectory = directory
 
-	go sh.SaveToDisk()
+	err := sh.readFromDisk()
+	if err != nil {
+		// Log as warning because reading this map is not crucial
+		sh.log(err.Error(), logWarning)
+	}
+
+	go sh.saveToDisk()
+}
+
+// LogType defines possible log types for the logger
+type LogType string
+
+var (
+	logInfo    LogType = "info"
+	logError   LogType = "error"
+	logWarning LogType = "warning"
+)
+
+// log logs the output to the console if the logger is set
+func (sh *StakingHub) log(output string, logType LogType) {
+	if sh.Logger != nil {
+		switch logType {
+		case logInfo:
+			sh.Logger.Info(output)
+		case logError:
+			sh.Logger.Error(output)
+		case logWarning:
+			sh.Logger.Warn(output)
+		}
+	}
 }
 
 // SetLogger sets the StakingHub logger
@@ -155,8 +189,8 @@ func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
 	return sh.hasEvent(event)
 }
 
-// SaveToDisk is a helper method for periodically saving the stake data to disk
-func (sh *StakingHub) SaveToDisk() {
+// saveToDisk is a helper method for periodically saving the stake data to disk
+func (sh *StakingHub) saveToDisk() {
 	for {
 		select {
 		case <-sh.CloseCh:
@@ -173,29 +207,60 @@ func (sh *StakingHub) SaveToDisk() {
 		}
 
 		// Save the json to workingDirectory/StakingMap.json
-		file, err := os.Create(filepath.Join(sh.WorkingDirectory, "staking-map.json"))
+		file, err := os.Create(filepath.Join(sh.WorkingDirectory, defaultFileName))
 		if err != nil {
 			_ = file.Close()
-			if sh.Logger != nil {
-				sh.Logger.Error("unable to create the writeback file")
-			}
+			sh.log("unable to create writeback file", logError)
 
 			continue
 		}
 
 		_, err = io.Copy(file, reader)
-		if err != nil && sh.Logger != nil {
-			sh.Logger.Error("unable to write date into writeback file")
+		if err != nil {
+			sh.log("unable to write date into writeback file", logError)
 		}
 
 		err = file.Close()
-		if err != nil && sh.Logger != nil {
-			sh.Logger.Error("unable to close writeback file")
+		if err != nil {
+			sh.log("unable to close writeback file", logError)
 		}
 
 		// Sleep for the writeback period
 		time.Sleep(sh.WritebackPeriod * time.Second)
 	}
+}
+
+// readFromDisk reads the staking map from a previously saved disk copy, if it exists
+func (sh *StakingHub) readFromDisk() error {
+	// Check if the file exists
+	mapFile, err := os.Open(filepath.Join(sh.WorkingDirectory, defaultFileName))
+	if err != nil {
+		return fmt.Errorf("no exiting map file is present")
+	}
+
+	byteValue, _ := ioutil.ReadAll(mapFile)
+
+	var stakingMap []StakerMapping
+
+	// Unmarshal the json
+	if err = json.Unmarshal(byteValue, &stakingMap); err != nil {
+		return fmt.Errorf("unable to unmarshal staking map")
+	}
+
+	// Close the file
+	if err = mapFile.Close(); err != nil {
+		return fmt.Errorf("unable to close staking file")
+	}
+
+	// Update the staking map using the read data
+	sh.StakingMutex.Lock()
+	defer sh.StakingMutex.Unlock()
+
+	for _, val := range stakingMap {
+		sh.StakingMap[val.Address] = val.Stake
+	}
+
+	return nil
 }
 
 // marshalJSON generates the json object for staker mappings
@@ -231,9 +296,10 @@ func (sh *StakingHub) IncreaseStake(address types.Address, stakeBalance *big.Int
 		sh.StakingMap[address] = big.NewInt(0).Add(sh.StakingMap[address], stakeBalance)
 	}
 
-	if sh.Logger != nil {
-		sh.Logger.Info(fmt.Sprintf("Stake increase:\t%s %s\n", address.String(), stakeBalance.String()))
-	}
+	sh.log(
+		fmt.Sprintf("Stake increase:\t%s %s", address.String(), stakeBalance.String()),
+		logInfo,
+	)
 }
 
 // DecreaseStake decreases the account's staked balance if the account is present
@@ -244,9 +310,10 @@ func (sh *StakingHub) DecreaseStake(address types.Address, unstakeBalance *big.I
 	if sh.isStaker(address) && sh.StakingMap[address].Cmp(unstakeBalance) >= 0 {
 		sh.StakingMap[address] = big.NewInt(0).Sub(sh.StakingMap[address], unstakeBalance)
 
-		if sh.Logger != nil {
-			sh.Logger.Info(fmt.Sprintf("Stake decrease:\t%s %s\n", address.String(), unstakeBalance.String()))
-		}
+		sh.log(
+			fmt.Sprintf("Stake decrease:\t%s %s", address.String(), unstakeBalance.String()),
+			logInfo,
+		)
 	}
 }
 
@@ -259,9 +326,10 @@ func (sh *StakingHub) ResetStake(address types.Address) {
 		delete(sh.StakingMap, address)
 	}
 
-	if sh.Logger != nil {
-		sh.Logger.Info(fmt.Sprintf("Stake reset:\t%s\n", address.String()))
-	}
+	sh.log(
+		fmt.Sprintf("Stake reset:\t%s", address.String()),
+		logInfo,
+	)
 }
 
 // GetStakedBalance returns an accounts staked balance if it is a staker.

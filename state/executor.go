@@ -129,6 +129,74 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
+// getStakingEventType is a helper method for getting the type of system event
+func getStakingEventType(toAddress types.Address) staking.StakingEventType {
+	if toAddress == types.StringToAddress(system.StakingAddress) {
+		return staking.StakingEvent
+	}
+
+	return staking.UnstakingEvent
+}
+
+// constructPendingEvent is a helper method for constructing a pending event
+func constructPendingEvent(
+	toAddress types.Address,
+	fromAddress types.Address,
+	value *big.Int,
+) staking.PendingEvent {
+	eventType := getStakingEventType(toAddress)
+
+	return staking.PendingEvent{
+		Address:   fromAddress,
+		Value:     value,
+		EventType: eventType,
+	}
+}
+
+// cleanDiscardedEvents is a helper method for clearing discarded pending events
+func cleanDiscardedEvents(transactions []*types.Transaction) {
+	for _, discardedTxn := range transactions {
+		// Remove a pending event for the discarded transaction
+		if system.IsSystemEvent(discardedTxn.To) {
+			pendingEvent := constructPendingEvent(
+				*discardedTxn.To,
+				discardedTxn.From,
+				discardedTxn.Value,
+			)
+
+			hub := staking.GetStakingHub()
+			if hub.ContainsPendingEvent(pendingEvent) {
+				// Remove the event from the queue
+				hub.RemovePendingEvent(pendingEvent)
+			}
+		}
+	}
+}
+
+// commitApprovedEvents is a helper method for committing pending events that passed all checks
+func commitApprovedEvents(transactions []*types.Transaction) {
+	for _, t := range transactions {
+		// Check if the transaction matches a staking / unstaking event
+		if system.IsSystemEvent(t.To) {
+			pendingEvent := constructPendingEvent(*t.To, t.From, t.Value)
+
+			hub := staking.GetStakingHub()
+
+			if hub.ContainsPendingEvent(pendingEvent) {
+				// Remove the event from the queue
+				hub.RemovePendingEvent(pendingEvent)
+
+				// Execute the changes on the staking map
+				if pendingEvent.EventType == staking.StakingEvent {
+					hub.IncreaseStake(t.From, t.Value)
+				} else {
+					hub.ResetStake(t.From)
+				}
+			}
+		}
+	}
+}
+
 // ProcessBlock already does all the handling of the whole process, TODO
 func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*BlockResult, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
@@ -139,46 +207,18 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 	txn.block = block
 	for _, t := range block.Transactions {
 		if err := txn.Write(t); err != nil {
+			// Because block processing termination is here,
+			// the executor needs to handle any "stale" pending events,
+			// since every transaction in this block is discarded
+			cleanDiscardedEvents(block.Transactions)
+
 			return nil, err
-		}
-
-		// Check if the transaction matches a staking / unstaking event
-		if t.To != nil && (*(t.To) == types.StringToAddress(system.StakingAddress) ||
-			(*t.To) == types.StringToAddress(system.UnstakingAddress)) {
-
-			var eventType staking.StakingEventType
-
-			if *t.To == types.StringToAddress(system.StakingAddress) {
-				eventType = staking.StakingEvent
-			} else {
-				eventType = staking.UnstakingEvent
-			}
-
-			pendingEvent := staking.PendingEvent{
-				Address:   t.From,
-				Value:     t.Value,
-				EventType: eventType,
-			}
-
-			hub := staking.GetStakingHub()
-
-			if hub.ContainsPendingEvent(pendingEvent) {
-				// Remove the event from the queue
-				hub.RemovePendingEvent(pendingEvent)
-
-				// Execute the changes on the staking map
-				if eventType == staking.StakingEvent {
-					hub.IncreaseStake(t.From, t.Value)
-				} else {
-					prevStake := hub.GetStakedBalance(t.From)
-					if prevStake.Cmp(big.NewInt(0)) != 0 {
-						hub.ResetStake(t.From)
-					}
-				}
-			}
 		}
 	}
 	_, root := txn.Commit()
+
+	// Checks are passed, do staking logic if possible
+	commitApprovedEvents(block.Transactions)
 
 	res := &BlockResult{
 		Root:     root,
