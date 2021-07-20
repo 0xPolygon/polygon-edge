@@ -60,11 +60,7 @@ var (
 )
 
 // CanRun implements the runtime interface
-func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
-	//fmt.Println("-- can run --")
-	//fmt.Println(config)
-	//fmt.Println(config.Byzantium)
-
+func (p *Precompiled) CanRun(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) bool {
 	if _, ok := p.contracts[c.CodeAddress]; !ok {
 		return false
 	}
