@@ -143,10 +143,12 @@ func constructPendingEvent(
 	toAddress types.Address,
 	fromAddress types.Address,
 	value *big.Int,
+	blockNumber uint64,
 ) staking.PendingEvent {
 	eventType := getStakingEventType(toAddress)
 
 	return staking.PendingEvent{
+		Number:    int64(blockNumber),
 		Address:   fromAddress,
 		Value:     value,
 		EventType: eventType,
@@ -154,7 +156,7 @@ func constructPendingEvent(
 }
 
 // cleanDiscardedEvents is a helper method for clearing discarded pending events
-func cleanDiscardedEvents(transactions []*types.Transaction) {
+func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64) {
 	for _, discardedTxn := range transactions {
 		// Remove a pending event for the discarded transaction
 		if system.IsSystemEvent(discardedTxn.To) {
@@ -162,6 +164,7 @@ func cleanDiscardedEvents(transactions []*types.Transaction) {
 				*discardedTxn.To,
 				discardedTxn.From,
 				discardedTxn.Value,
+				blockNumber,
 			)
 
 			hub := staking.GetStakingHub()
@@ -174,11 +177,16 @@ func cleanDiscardedEvents(transactions []*types.Transaction) {
 }
 
 // commitApprovedEvents is a helper method for committing pending events that passed all checks
-func commitApprovedEvents(transactions []*types.Transaction) {
+func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64) {
 	for _, t := range transactions {
 		// Check if the transaction matches a staking / unstaking event
 		if system.IsSystemEvent(t.To) {
-			pendingEvent := constructPendingEvent(*t.To, t.From, t.Value)
+			pendingEvent := constructPendingEvent(
+				*t.To,
+				t.From,
+				t.Value,
+				blockNumber,
+			)
 
 			hub := staking.GetStakingHub()
 
@@ -210,7 +218,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 			// Because block processing termination is here,
 			// the executor needs to handle any "stale" pending events,
 			// since every transaction in this block is discarded
-			cleanDiscardedEvents(block.Transactions)
+			cleanDiscardedEvents(block.Transactions, block.Number())
 
 			return nil, err
 		}
@@ -218,7 +226,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 	_, root := txn.Commit()
 
 	// Checks are passed, do staking logic if possible
-	commitApprovedEvents(block.Transactions)
+	commitApprovedEvents(block.Transactions, block.Number())
 
 	res := &BlockResult{
 		Root:     root,
