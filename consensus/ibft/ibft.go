@@ -619,14 +619,6 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
-			i.logger.Info(
-				"final committed",
-				"sequence", i.state.view.Sequence,
-				"hash", block.Hash(),
-				"validators", len(i.state.validators),
-				"rounds", i.state.view.Round+1,
-				"committed", i.state.numCommitted(),
-			)
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
@@ -652,6 +644,15 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
+
+	i.logger.Info(
+		"final committed",
+		"sequence", i.state.view.Sequence,
+		"hash", block.Hash(),
+		"validators", len(i.state.validators),
+		"rounds", i.state.view.Round+1,
+		"committed", i.state.numCommitted(),
+	)
 
 	// increase the sequence number and reset the round if any
 	i.state.view = &proto.View{
