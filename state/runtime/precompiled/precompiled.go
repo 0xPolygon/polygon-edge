@@ -92,7 +92,7 @@ func (p *Precompiled) Name() string {
 }
 
 // Run runs an execution
-func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
+func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) (returnValue []byte, gasLeft uint64, err error) {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 
@@ -101,11 +101,11 @@ func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.
 	}
 
 	c.Gas = c.Gas - gasCost
-	ret, err := contract.run(c.Input)
+	returnValue, err = contract.run(c.Input)
 	if err != nil {
 		return nil, 0, err
 	}
-	return ret, c.Gas, err
+	return returnValue, c.Gas, err
 }
 
 var zeroPadding = make([]byte, 64)
