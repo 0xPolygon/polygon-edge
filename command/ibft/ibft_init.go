@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import (
 	"flag"
@@ -16,16 +16,16 @@ import (
 
 // IbftInit is the command to query the snapshot
 type IbftInit struct {
-	Meta
+	helper.Meta
 }
 
 func (i *IbftInit) DefineFlags() {
-	if i.flagMap == nil {
+	if i.FlagMap == nil {
 		// Flag map not initialized
-		i.flagMap = make(map[string]helper.FlagDescriptor)
+		i.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	i.flagMap["data-dir"] = helper.FlagDescriptor{
+	i.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: "Sets the directory for the Polygon SDK data",
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -44,7 +44,7 @@ func (p *IbftInit) GetHelperText() string {
 func (p *IbftInit) Help() string {
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.IbftInit interface
@@ -99,7 +99,7 @@ func (p *IbftInit) Run(args []string) int {
 
 	output := "\n[IBFT INIT]\n"
 
-	output += formatKV([]string{
+	output += helper.FormatKV([]string{
 		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&key.PublicKey)),
 		fmt.Sprintf("Node ID|%s", nodeId.String()),
 	})

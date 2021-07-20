@@ -1,4 +1,4 @@
-package command
+package peers
 
 import "github.com/mitchellh/cli"
 

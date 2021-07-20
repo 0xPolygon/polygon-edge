@@ -1,4 +1,4 @@
-package command
+package ibft
 
 import (
 	"context"
@@ -12,17 +12,17 @@ import (
 
 // IbftPropose is the command to query the snapshot
 type IbftPropose struct {
-	Meta
+	helper.Meta
 }
 
 // DefineFlags defines the command flags
 func (p *IbftPropose) DefineFlags() {
-	if p.flagMap == nil {
+	if p.FlagMap == nil {
 		// Flag map not initialized
-		p.flagMap = make(map[string]helper.FlagDescriptor)
+		p.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	p.flagMap["addr"] = helper.FlagDescriptor{
+	p.FlagMap["addr"] = helper.FlagDescriptor{
 		Description: "Address of the account to be voted for",
 		Arguments: []string{
 			"ETH_ADDRESS",
@@ -31,7 +31,7 @@ func (p *IbftPropose) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	p.flagMap["vote"] = helper.FlagDescriptor{
+	p.FlagMap["vote"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
 			"Proposes a change to the validator set. Possible values: [%s, %s]", positive, negative,
 		),
@@ -57,7 +57,7 @@ func (p *IbftPropose) Help() string {
 	p.Meta.DefineFlags()
 	p.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.flagMap), p.flagMap)
+	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
 // Synopsis implements the cli.IbftPropose interface

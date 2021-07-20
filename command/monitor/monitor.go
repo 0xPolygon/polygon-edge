@@ -1,4 +1,4 @@
-package command
+package monitor
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 
 // MonitorCommand is the command to Monitor to the blockchain events
 type MonitorCommand struct {
-	Meta
+	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
@@ -31,7 +31,7 @@ func (m *MonitorCommand) GetBaseCommand() string {
 func (m *MonitorCommand) Help() string {
 	m.Meta.DefineFlags()
 
-	return helper.GenerateHelp(m.Synopsis(), helper.GenerateUsage(m.GetBaseCommand(), m.flagMap), m.flagMap)
+	return helper.GenerateHelp(m.Synopsis(), helper.GenerateUsage(m.GetBaseCommand(), m.FlagMap), m.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -77,14 +77,14 @@ func (m *MonitorCommand) Run(args []string) int {
 
 			m.UI.Info("\n[BLOCK EVENT]\n")
 			for _, add := range evnt.Added {
-				m.UI.Info(formatKV([]string{
+				m.UI.Info(helper.FormatKV([]string{
 					fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
 					fmt.Sprintf("Block Number|%d", add.Number),
 					fmt.Sprintf("Block Hash|%s", add.Hash),
 				}))
 			}
 			for _, del := range evnt.Removed {
-				m.UI.Info(formatKV([]string{
+				m.UI.Info(helper.FormatKV([]string{
 					fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
 					fmt.Sprintf("Block Number|%d", del.Number),
 					fmt.Sprintf("Block Hash|%s", del.Hash),

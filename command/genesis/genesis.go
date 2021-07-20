@@ -1,7 +1,6 @@
-package command
+package genesis
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -18,43 +17,35 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const (
-	genesisFileName       = "./genesis.json"
-	defaultChainName      = "example"
-	defaultChainID        = 100
-	defaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	defaultConsensus      = "pow"
-)
-
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
 	UI cli.Ui
-	Meta
+	helper.Meta
 }
 
 // DefineFlags defines the command flags
 func (c *GenesisCommand) DefineFlags() {
-	if c.flagMap == nil {
+	if c.FlagMap == nil {
 		// Flag map not initialized
-		c.flagMap = make(map[string]helper.FlagDescriptor)
+		c.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	if len(c.flagMap) > 0 {
+	if len(c.FlagMap) > 0 {
 		// No need to redefine the flags again
 		return
 	}
 
-	c.flagMap["data-dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the Polygon SDK data. Default: %s", genesisFileName),
+	c.FlagMap["dir"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the directory for the Polygon SDK genesis data. Default: %s", helper.GenesisFileName),
 		Arguments: []string{
-			"DATA_DIRECTORY",
+			"DIRECTORY",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
 
-	c.flagMap["name"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the name for the chain. Default: %s", defaultChainName),
+	c.FlagMap["name"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the name for the chain. Default: %s", helper.DefaultChainName),
 		Arguments: []string{
 			"NAME",
 		},
@@ -62,8 +53,8 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["premine"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", defaultPremineBalance),
+	c.FlagMap["premine"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", helper.DefaultPremineBalance),
 		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -71,8 +62,8 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["chainid"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", defaultChainID),
+	c.FlagMap["chainid"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", helper.DefaultChainID),
 		Arguments: []string{
 			"CHAIN_ID",
 		},
@@ -80,8 +71,8 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["consensus"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets consensus protocol. Default: %s", defaultConsensus),
+	c.FlagMap["consensus"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets consensus protocol. Default: %s", helper.DefaultConsensus),
 		Arguments: []string{
 			"CONSENSUS_PROTOCOL",
 		},
@@ -89,7 +80,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["bootnode"] = helper.FlagDescriptor{
+	c.FlagMap["bootnode"] = helper.FlagDescriptor{
 		Description: "Multiaddr URL for p2p discovery bootstrap. This flag can be used multiple times.",
 		Arguments: []string{
 			"BOOTNODE_URL",
@@ -98,7 +89,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validator"] = helper.FlagDescriptor{
+	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
 		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATOR_LIST",
@@ -107,7 +98,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["ibft-validators-prefix-path"] = helper.FlagDescriptor{
+	c.FlagMap["ibft-validators-prefix-path"] = helper.FlagDescriptor{
 		Description: "Prefix path for validator folder directory. Needs to be present if ibft-validator is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATORS_PREFIX_PATH",
@@ -130,7 +121,7 @@ func (c *GenesisCommand) GetBaseCommand() string {
 func (c *GenesisCommand) Help() string {
 	c.DefineFlags()
 
-	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface
@@ -143,7 +134,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags := flag.NewFlagSet(c.GetBaseCommand(), flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var dataDir string
+	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
@@ -154,12 +145,12 @@ func (c *GenesisCommand) Run(args []string) int {
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
 
-	flags.StringVar(&dataDir, "data-dir", "", "")
-	flags.StringVar(&name, "name", defaultChainName, "")
+	flags.StringVar(&baseDir, "dir", "", "")
+	flags.StringVar(&name, "name", helper.DefaultChainName, "")
 	flags.Var(&premine, "premine", "")
-	flags.Uint64Var(&chainID, "chainid", defaultChainID, "")
+	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
 	flags.Var(&bootnodes, "bootnode", "")
-	flags.StringVar(&consensus, "consensus", defaultConsensus, "")
+	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
@@ -167,15 +158,11 @@ func (c *GenesisCommand) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
 		return 1
 	}
+	var err error = nil
 
-	genesisPath := filepath.Join(dataDir, genesisFileName)
-	_, err := os.Stat(genesisPath)
-	if err != nil && !os.IsNotExist(err) {
-		c.UI.Error(fmt.Sprintf("Failed to stat (%s): %v", genesisPath, err))
-		return 1
-	}
-	if !os.IsNotExist(err) {
-		c.UI.Error(fmt.Sprintf("Genesis (%s) already exists", genesisPath))
+	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
+	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
+		c.UI.Error(generateError.GetMessage())
 		return 1
 	}
 
@@ -228,41 +215,21 @@ func (c *GenesisCommand) Run(args []string) int {
 		Bootnodes: bootnodes,
 	}
 
-	if len(premine) != 0 {
-		for _, prem := range premine {
-
-			var addr types.Address
-			val := defaultPremineBalance
-			if indx := strings.Index(prem, ":"); indx != -1 {
-				// <addr>:<balance>
-				addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
-			} else {
-				// <addr>
-				addr = types.StringToAddress(prem)
-			}
-
-			amount, err := types.ParseUint256orHex(&val)
-			if err != nil {
-				c.UI.Error(fmt.Sprintf("failed to parse amount %s: %v", val, err))
-				return 1
-			}
-			cc.Genesis.Alloc[addr] = &chain.GenesisAccount{
-				Balance: amount,
-			}
-		}
-	}
-
-	data, err := json.MarshalIndent(cc, "", "    ")
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to generate genesis: %v", err))
-		return 1
-	}
-	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to write genesis: %v", err))
+	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
+		c.UI.Error(err.Error())
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Genesis written to %s", genesisPath))
+	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
+	output := "\n[GENESIS SUCCESS]\n"
+	output += fmt.Sprintf("Genesis written to %s\n", genesisPath)
+
+	c.UI.Info(output)
+
 	return 0
 }
 

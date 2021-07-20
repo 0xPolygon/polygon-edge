@@ -12,10 +12,6 @@ import (
 
 var upgrader = websocket.Upgrader{}
 
-var (
-	defaultHttpAddr = &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545}
-)
-
 type serverType int
 
 const (
@@ -57,9 +53,6 @@ type Config struct {
 
 // NewJSONRPC returns the JsonRPC http server
 func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
-	if config.Addr == nil {
-		config.Addr = defaultHttpAddr
-	}
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
