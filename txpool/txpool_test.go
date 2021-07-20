@@ -189,7 +189,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 			},
 			{
 				From:     addr1,
-				GasPrice: big.NewInt(1),
+				GasPrice: big.NewInt(3),
 				Nonce:    1,
 			},
 		})
