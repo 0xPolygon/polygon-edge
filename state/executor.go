@@ -368,11 +368,11 @@ func (t *Transition) apply(msg *types.Transaction) (
 
 	leftoverGas, err := t.preCheck(msg)
 	if err != nil {
-		return nil, 0, false, err
+		return nil, 0, true, err
 	}
 	// TODO: Check if this is even possible
 	if leftoverGas > msg.Gas {
-		return nil, 0, false, errorVMOutOfGas
+		return nil, 0, true, errorVMOutOfGas
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
@@ -391,12 +391,10 @@ func (t *Transition) apply(msg *types.Transaction) (
 		txn.IncrNonce(msg.From)
 		returnValue, gasLeft, subErr = t.Call2(msg.From, *msg.To, msg.Input, value, leftoverGas)
 	}
-	if subErr != nil {
-		// fmt.Printf("suberr: %s\n", subErr.Error())
 
-		if subErr == runtime.ErrNotEnoughFunds {
-			return nil, 0, false, subErr
-		}
+	// If the error was due to not enough funds, we return the subErr as err so that the transition can be rolled back.
+	if subErr == runtime.ErrNotEnoughFunds {
+		return nil, 0, true, subErr
 	}
 
 	gasUsed = msg.Gas - gasLeft
