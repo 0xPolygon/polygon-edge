@@ -394,6 +394,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		}
 		txns = append(txns, txn)
 	}
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -618,6 +619,14 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
+			i.logger.Info(
+				"final committed",
+				"sequence", i.state.view.Sequence,
+				"hash", block.Hash(),
+				"validators", len(i.state.validators),
+				"rounds", i.state.view.Round+1,
+				"committed", i.state.numCommitted(),
+			)
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
