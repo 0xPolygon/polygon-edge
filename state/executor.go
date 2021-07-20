@@ -423,18 +423,18 @@ func (t *Transition) apply(msg *types.Transaction) (
 	return returnValue, gasUsed, subErr != nil, nil
 }
 
-func (t *Transition) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
+func (t *Transition) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) (returnValue []byte, gasLeft uint64, err error) {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
 	return t.applyCreate(contract, t)
 }
 
-func (t *Transition) Call2(caller types.Address, to types.Address, input []byte, value *big.Int, gas uint64) ([]byte, uint64, error) {
+func (t *Transition) Call2(caller types.Address, to types.Address, input []byte, value *big.Int, gas uint64) (returnValue []byte, gasLeft uint64, err error) {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
 	return t.applyCall(c, runtime.Call, t)
 }
 
-func (t *Transition) run(contract *runtime.Contract, host runtime.Host) ([]byte, uint64, error) {
+func (t *Transition) run(contract *runtime.Contract, host runtime.Host) (returnValue []byte, gasLeft uint64, err error) {
 	for _, r := range t.r.runtimes {
 		if r.CanRun(contract, host, &t.config) {
 			return r.Run(contract, host, &t.config)
@@ -458,7 +458,7 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	return nil
 }
 
-func (t *Transition) applyCall(c *runtime.Contract, callType runtime.CallType, host runtime.Host) ([]byte, uint64, error) {
+func (t *Transition) applyCall(c *runtime.Contract, callType runtime.CallType, host runtime.Host) (returnValue []byte, gasLeft uint64, err error) {
 	if c.Depth > int(1024)+1 {
 		return nil, c.Gas, runtime.ErrDepth
 	}
@@ -468,16 +468,16 @@ func (t *Transition) applyCall(c *runtime.Contract, callType runtime.CallType, h
 
 	if callType == runtime.Call {
 		// Transfers only allowed on calls
-		if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+		if err = t.transfer(c.Caller, c.Address, c.Value); err != nil {
 			return nil, c.Gas, err
 		}
 	}
 
-	ret, gas, err := t.run(c, host)
+	returnValue, gasLeft, err = t.run(c, host)
 	if err != nil {
 		t.state.RevertToSnapshot(snapshot)
 	}
-	return ret, gas, err
+	return returnValue, gasLeft, err
 }
 
 var emptyHash types.Hash
@@ -494,7 +494,7 @@ func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
 	return false
 }
 
-func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]byte, uint64, error) {
+func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) (returnValue []byte, gasLeft uint64, err error) {
 	if msg.Depth > int(1024)+1 {
 		return nil, msg.Gas, runtime.ErrDepth
 	}
@@ -523,34 +523,34 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) ([]by
 		return nil, gas, runtime.ErrNotEnoughFunds
 	}
 
-	code, leftoverGas, err := t.run(msg, host)
+	returnValue, gasLeft, err = t.run(msg, host)
 
 	if err != nil {
 		t.state.RevertToSnapshot(snapshot)
-		return code, leftoverGas, err
+		return returnValue, gasLeft, err
 	}
 
-	if t.config.EIP158 && len(code) > spuriousDragonMaxCodeSize {
+	if t.config.EIP158 && len(returnValue) > spuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
 		t.state.RevertToSnapshot(snapshot)
 		return nil, 0, runtime.ErrMaxCodeSizeExceeded
 	}
 
-	gasCost := uint64(len(code)) * 200
+	gasCost := uint64(len(returnValue)) * 200
 
-	if leftoverGas < gasCost {
+	if gasLeft < gasCost {
 		// Out of gas creating the contract
 		if t.config.Homestead {
 			t.state.RevertToSnapshot(snapshot)
-			leftoverGas = 0
+			gasLeft = 0
 		}
-		return nil, leftoverGas, runtime.ErrCodeStoreOutOfGas
+		return nil, gasLeft, runtime.ErrCodeStoreOutOfGas
 	}
 
-	leftoverGas -= gasCost
-	t.state.SetCode(msg.Address, code)
+	gasLeft -= gasCost
+	t.state.SetCode(msg.Address, returnValue)
 
-	return code, leftoverGas, nil
+	return returnValue, gasLeft, nil
 }
 
 func (t *Transition) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
