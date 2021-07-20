@@ -50,9 +50,7 @@ func TestStakingHub_GetInstance(t *testing.T) {
 
 			for i := 0; i < testCase.numInstances; i++ {
 				instances[i] = GetStakingHub()
-			}
 
-			for i := 0; i < testCase.numInstances; i++ {
 				assert.NotNilf(t, instances[i], "Staking hub instance invalid")
 			}
 
