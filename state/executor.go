@@ -276,7 +276,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (uint64, bool, error) {
+func (t *Transition) Apply(msg *types.Transaction) (gasUsed uint64, failed bool, err error) {
 	s := t.state.Snapshot()
 	returnValue, gasUsed, failed, err := t.apply(msg)
 	if err != nil {
@@ -357,7 +357,7 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 }
 
 func (t *Transition) apply(msg *types.Transaction) (
-	[]byte, uint64, bool, error,
+	returnValue []byte, gasUsed uint64, failed bool, err error,
 ) {
 	// check if there is enough gas in the pool
 	if err := t.subGasPool(msg.Gas); err != nil {
@@ -384,7 +384,6 @@ func (t *Transition) apply(msg *types.Transaction) (
 
 	var subErr error
 	var gasLeft uint64
-	var returnValue []byte
 
 	if msg.IsContractCreation() {
 		_, gasLeft, subErr = t.Create2(msg.From, msg.Input, value, leftoverGas)
@@ -400,7 +399,7 @@ func (t *Transition) apply(msg *types.Transaction) (
 		}
 	}
 
-	gasUsed := msg.Gas - gasLeft
+	gasUsed = msg.Gas - gasLeft
 	refund := gasUsed / 2
 	// Refund can go up to half the gas used
 	if refund > txn.GetRefund() {
