@@ -126,6 +126,7 @@ func (sh *StakingHub) CloseStakingHub() {
 
 // PendingEvent contains useful information about a staking / unstaking event
 type PendingEvent struct {
+	Number    int64
 	Address   types.Address
 	Value     *big.Int
 	EventType StakingEventType
@@ -135,7 +136,8 @@ type PendingEvent struct {
 func (pe *PendingEvent) Compare(event PendingEvent) bool {
 	if pe.EventType == event.EventType &&
 		pe.Address.String() == event.Address.String() &&
-		pe.Value.Cmp(event.Value) == 0 {
+		pe.Value.Cmp(event.Value) == 0 &&
+		pe.Number == event.Number {
 		return true
 	}
 

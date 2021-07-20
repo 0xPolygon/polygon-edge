@@ -46,8 +46,12 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	// Increase the account's actual balance
 	state.host.AddBalance(staker, stakedBalance)
 
+	// Grab the transaction context
+	ctx := state.host.GetTxContext()
+
 	// Decrease the staked amount from the account's staked balance
 	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
+		Number:    ctx.Number,
 		Address:   staker,
 		Value:     big.NewInt(0),
 		EventType: staking.UnstakingEvent,
