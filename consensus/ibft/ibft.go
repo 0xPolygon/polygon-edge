@@ -394,6 +394,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		}
 		txns = append(txns, txn)
 	}
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -643,6 +644,15 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
+
+	i.logger.Info(
+		"block committed",
+		"sequence", i.state.view.Sequence,
+		"hash", block.Hash(),
+		"validators", len(i.state.validators),
+		"rounds", i.state.view.Round+1,
+		"committed", i.state.numCommitted(),
+	)
 
 	// increase the sequence number and reset the round if any
 	i.state.view = &proto.View{
