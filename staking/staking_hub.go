@@ -155,12 +155,14 @@ func (sh *StakingHub) AddPendingEvent(event PendingEvent) {
 	}
 }
 
-// RemovePendingEvent removes the pending event from the event queue if it exists
-func (sh *StakingHub) RemovePendingEvent(event PendingEvent) {
+// RemovePendingEvent removes the pending event from the event queue if it exists.
+// Returns a boolean flag indicating if an event was found and removed
+func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 	sh.EventQueueMutex.Lock()
 	defer sh.EventQueueMutex.Unlock()
 
 	foundIndx := -1
+	foundFlag := false
 	for indx, el := range sh.EventQueue {
 		if el.Compare(event) {
 			foundIndx = indx
@@ -169,7 +171,10 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) {
 
 	if foundIndx >= 0 {
 		sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
+		foundFlag = true
 	}
+
+	return foundFlag
 }
 
 // hasEvent checks if an identical event is present in the queue. Not thread safe

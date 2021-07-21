@@ -168,10 +168,9 @@ func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64)
 			)
 
 			hub := staking.GetStakingHub()
-			if hub.ContainsPendingEvent(pendingEvent) {
-				// Remove the event from the queue
-				hub.RemovePendingEvent(pendingEvent)
-			}
+
+			// Remove the event from the queue if it is present
+			hub.RemovePendingEvent(pendingEvent)
 		}
 	}
 }
@@ -190,10 +189,8 @@ func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64)
 
 			hub := staking.GetStakingHub()
 
-			if hub.ContainsPendingEvent(pendingEvent) {
-				// Remove the event from the queue
-				hub.RemovePendingEvent(pendingEvent)
-
+			// Remove the event from the queue if it is present
+			if hub.RemovePendingEvent(pendingEvent) {
 				// Execute the changes on the staking map
 				if pendingEvent.EventType == staking.StakingEvent {
 					hub.IncreaseStake(t.From, t.Value)
