@@ -646,7 +646,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	}
 
 	i.logger.Info(
-		"final committed",
+		"block committed",
 		"sequence", i.state.view.Sequence,
 		"hash", block.Hash(),
 		"validators", len(i.state.validators),
