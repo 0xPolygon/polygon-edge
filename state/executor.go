@@ -15,10 +15,6 @@ const (
 	spuriousDragonMaxCodeSize = 24576
 )
 
-var (
-	errorVMOutOfGas = fmt.Errorf("out of gas")
-)
-
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
 
 // GetHashByNumber returns the hash function of a block number
