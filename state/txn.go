@@ -93,7 +93,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 }
 
 func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
-	// Check what this first fetch tries to do? Why is it here?
+	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
 		obj := val.(*StateObject)
@@ -324,6 +324,7 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		return types.Hash{}
 	}
 
+	// Get account state from radix tree
 	if object.Txn != nil {
 		if val, ok := object.Txn.Get(key.Bytes()); ok {
 			if val == nil {
@@ -333,7 +334,7 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
-	// Under which condition is this called?
+	// Get account state from trie tree
 	k := txn.hashit(key.Bytes())
 	return object.GetCommitedState(types.BytesToHash(k))
 }

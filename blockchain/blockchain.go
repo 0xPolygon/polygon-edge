@@ -515,9 +515,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	// Validate the chain
-	for i := 0; i < size; i++ { // TODO: Check why didn't we range here
-		block := blocks[i]
-
+	for i, block := range blocks {
 		// Check the parent numbers
 		if block.Number()-1 != parent.Number {
 			return fmt.Errorf(
