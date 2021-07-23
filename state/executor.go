@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/types"
 )
 
 const (
@@ -24,6 +25,7 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Executor is the main entity
 type Executor struct {
+	logger   hclog.Logger
 	config   *chain.Params
 	runtimes []runtime.Runtime
 	state    State
@@ -33,8 +35,9 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor
-func NewExecutor(config *chain.Params, s State) *Executor {
+func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	return &Executor{
+		logger:   logger,
 		config:   config,
 		runtimes: []runtime.Runtime{},
 		state:    s,
@@ -128,6 +131,7 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbas
 	}
 
 	txn := &Transition{
+		logger:   e.logger,
 		r:        e,
 		ctx:      env2,
 		state:    newTxn,
@@ -143,6 +147,8 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbas
 }
 
 type Transition struct {
+	logger hclog.Logger
+
 	// dummy
 	auxState State
 
@@ -196,7 +202,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	gasUsed, failed, err := t.Apply(msg)
 	if err != nil {
-		fmt.Printf("Apply err: %v", err)
+		t.logger.Error("failed to apply tx", "err", err)
 	}
 	t.totalGas += gasUsed
 
