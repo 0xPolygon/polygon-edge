@@ -47,14 +47,6 @@ func (d *DevCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
-
-	d.FlagMap["gas-limit"] = helper.FlagDescriptor{
-		Description: "Sets the gas limit of each block. Default: 5000",
-		Arguments: []string{
-			"GAS_LIMIT",
-		},
-		FlagOptional: true,
-	}
 }
 
 func (d *DevCommand) GetHelperText() string {
