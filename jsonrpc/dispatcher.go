@@ -41,7 +41,6 @@ type endpoints struct {
 	Eth  *Eth
 	Web3 *Web3
 	Net  *Net
-	Txpool *Txpool
 }
 
 // Dispatcher handles jsonrpc requests
@@ -84,12 +83,10 @@ func (d *Dispatcher) registerEndpoints() {
 	d.endpoints.Eth = &Eth{d}
 	d.endpoints.Net = &Net{d}
 	d.endpoints.Web3 = &Web3{d}
-	d.endpoints.Txpool = &Txpool{d}
 
 	d.registerService("eth", d.endpoints.Eth)
 	d.registerService("net", d.endpoints.Net)
 	d.registerService("web3", d.endpoints.Web3)
-	d.registerService("txpool", d.endpoints.Txpool)
 }
 
 func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) {
