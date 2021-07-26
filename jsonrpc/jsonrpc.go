@@ -146,13 +146,6 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	}(ws)
 
 	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
-
-	initialOutput := "[Polygon SDK WebSocket]" + " Successfully connected!"
-
-	if wrapConn.WriteMessage(websocket.TextMessage, []byte(initialOutput)) != nil {
-		return
-	}
-
 	// Run the listen loop
 	for {
 		// Read the incoming message
