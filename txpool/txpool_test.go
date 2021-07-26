@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
@@ -47,8 +48,7 @@ func TestMultipleTransactions(t *testing.T) {
 func TestBroadcast(t *testing.T) {
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it
-	key0, _ := crypto.GenerateKey()
-	addr0 := crypto.PubKeyToAddress(&key0.PublicKey)
+	key0, addr0 := tests.GenerateKeyAndAddr(t)
 
 	fmt.Println("-- addr")
 	fmt.Println(addr0)

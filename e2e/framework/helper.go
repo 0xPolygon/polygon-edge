@@ -2,7 +2,6 @@ package framework
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -18,7 +17,6 @@ import (
 	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -27,14 +25,6 @@ func EthToWei(ethValue int64) *big.Int {
 	return new(big.Int).Mul(
 		big.NewInt(ethValue),
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-}
-
-func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
-	t.Helper()
-	key, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	addr := crypto.PubKeyToAddress(&key.PublicKey)
-	return key, addr
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {

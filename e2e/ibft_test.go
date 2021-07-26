@@ -2,20 +2,21 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/umbracle/go-web3"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIbft_Transfer(t *testing.T) {
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
-	_, receiverAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, framework.EthToWei(10))
@@ -66,8 +67,8 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
-			_, receiverAddr := framework.GenerateKeyAndAddr(t)
+			senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+			_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 			ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 				config.Premine(senderAddr, framework.EthToWei(10))
