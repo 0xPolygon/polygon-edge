@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -22,12 +21,6 @@ import (
 	"golang.org/x/crypto/sha3"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
-
-func EthToWei(ethValue int64) *big.Int {
-	return new(big.Int).Mul(
-		big.NewInt(ethValue),
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-}
 
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()

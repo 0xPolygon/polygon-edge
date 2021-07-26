@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/consensus/ibft"
+	"github.com/0xPolygon/minimal/helper/currency"
 	"github.com/umbracle/go-web3"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
@@ -19,8 +20,8 @@ func TestIbft_Transfer(t *testing.T) {
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(senderAddr, framework.EthToWei(10))
-		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
+		config.Premine(senderAddr, currency.EthToWei(10))
+		config.PremineValidatorBalance(big.NewInt(0), currency.EthToWei(10))
 		config.SetSeal(true)
 	})
 
@@ -35,7 +36,7 @@ func TestIbft_Transfer(t *testing.T) {
 			To:       &receiverAddr,
 			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
-			Value:    framework.EthToWei(1),
+			Value:    currency.EthToWei(1),
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -57,7 +58,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 		{
 			name:         "transfer transaction",
 			contractCall: false,
-			txAmount:     framework.EthToWei(1),
+			txAmount:     currency.EthToWei(1),
 		},
 		{
 			name:         "contract function execution",
@@ -72,8 +73,8 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
 			ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-				config.Premine(senderAddr, framework.EthToWei(10))
-				config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
+				config.Premine(senderAddr, currency.EthToWei(10))
+				config.PremineValidatorBalance(big.NewInt(0), currency.EthToWei(10))
 				config.SetSeal(true)
 			})
 

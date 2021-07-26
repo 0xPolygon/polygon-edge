@@ -25,10 +25,10 @@ func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 
 	// Increase the account's staked balance
 	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
-		Number:    ctx.Number,
-		Address:   staker,
-		Value:     potentialStake,
-		EventType: staking.StakingEvent,
+		BlockNumber: ctx.Number,
+		Address:     staker,
+		Value:       potentialStake,
+		EventType:   staking.StakingEvent,
 	})
 
 	state.host.EmitStakedEvent(staker, potentialStake)

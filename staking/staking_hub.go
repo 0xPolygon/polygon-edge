@@ -21,6 +21,7 @@ type StakingEventType string
 var (
 	StakingEvent   StakingEventType = "staking"
 	UnstakingEvent StakingEventType = "unstaking"
+	UnknownEvent   StakingEventType = "unknown"
 )
 
 var (
@@ -126,10 +127,10 @@ func (sh *StakingHub) CloseStakingHub() {
 
 // PendingEvent contains useful information about a staking / unstaking event
 type PendingEvent struct {
-	Number    int64
-	Address   types.Address
-	Value     *big.Int
-	EventType StakingEventType
+	BlockNumber int64
+	Address     types.Address
+	Value       *big.Int
+	EventType   StakingEventType
 }
 
 // Compare checks if the two events match
@@ -137,7 +138,7 @@ func (pe *PendingEvent) Compare(event PendingEvent) bool {
 	if pe.EventType == event.EventType &&
 		pe.Address.String() == event.Address.String() &&
 		pe.Value.Cmp(event.Value) == 0 &&
-		pe.Number == event.Number {
+		pe.BlockNumber == event.BlockNumber {
 		return true
 	}
 
@@ -162,7 +163,6 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 	defer sh.EventQueueMutex.Unlock()
 
 	foundIndx := -1
-	foundFlag := false
 	for indx, el := range sh.EventQueue {
 		if el.Compare(event) {
 			foundIndx = indx
@@ -171,10 +171,12 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 
 	if foundIndx >= 0 {
 		sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
-		foundFlag = true
+		return true
 	}
 
-	return foundFlag
+	sh.log(fmt.Sprintf("Unable to find pending event %v", event), logWarning)
+
+	return false
 }
 
 // hasEvent checks if an identical event is present in the queue. Not thread safe
@@ -188,14 +190,6 @@ func (sh *StakingHub) hasEvent(event PendingEvent) bool {
 	return false
 }
 
-// ContainsPendingEvent checks if an identical event is present in the queue
-func (sh *StakingHub) ContainsPendingEvent(event PendingEvent) bool {
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
-
-	return sh.hasEvent(event)
-}
-
 // saveToDisk is a helper method for periodically saving the stake data to disk
 func (sh *StakingHub) saveToDisk() {
 	for {
@@ -206,14 +200,14 @@ func (sh *StakingHub) saveToDisk() {
 		}
 
 		// Save the current staking map to disk, in JSON
-		mappings := sh.GetStakerMappings()
+		mappings := sh.getStakerMappings()
 
 		reader, err := sh.marshalJSON(mappings)
 		if err != nil {
 			continue
 		}
 
-		// Save the json to workingDirectory/StakingMap.json
+		// Save the json to workingDirectory/staking-map.json
 		file, err := os.Create(filepath.Join(sh.WorkingDirectory, defaultFileName))
 		if err != nil {
 			_ = file.Close()
@@ -245,9 +239,12 @@ func (sh *StakingHub) readFromDisk() error {
 		return fmt.Errorf("no exiting map file is present")
 	}
 
-	byteValue, _ := ioutil.ReadAll(mapFile)
+	byteValue, err := ioutil.ReadAll(mapFile)
+	if err != nil {
+		return fmt.Errorf("unable to read map file")
+	}
 
-	var stakingMap []StakerMapping
+	var stakingMap []stakerMapping
 
 	// Unmarshal the json
 	if err = json.Unmarshal(byteValue, &stakingMap); err != nil {
@@ -271,10 +268,7 @@ func (sh *StakingHub) readFromDisk() error {
 }
 
 // marshalJSON generates the json object for staker mappings
-func (sh *StakingHub) marshalJSON(mappings []StakerMapping) (io.Reader, error) {
-	sh.StakingMutex.Lock()
-	defer sh.StakingMutex.Unlock()
-
+func (sh *StakingHub) marshalJSON(mappings []stakerMapping) (io.Reader, error) {
 	b, err := json.MarshalIndent(mappings, "", "\t")
 	if err != nil {
 		return nil, err
@@ -352,38 +346,22 @@ func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
 	return big.NewInt(0)
 }
 
-// GetStakerAddresses returns a list of all addresses that have a stake > 0
-func (sh *StakingHub) GetStakerAddresses() []types.Address {
-	sh.StakingMutex.Lock()
-	defer sh.StakingMutex.Unlock()
-
-	stakers := make([]types.Address, len(sh.StakingMap))
-
-	var indx = 0
-	for address := range sh.StakingMap {
-		stakers[indx] = address
-		indx++
-	}
-
-	return stakers
-}
-
-// StakerMapping is a representation of a staked account balance
-type StakerMapping struct {
+// stakerMapping is a representation of a staked account balance
+type stakerMapping struct {
 	Address types.Address `json:"address"`
 	Stake   *big.Int      `json:"stake"`
 }
 
 // GetStakerMappings returns the staking addresses and their staking balances
-func (sh *StakingHub) GetStakerMappings() []StakerMapping {
+func (sh *StakingHub) getStakerMappings() []stakerMapping {
 	sh.StakingMutex.Lock()
 	defer sh.StakingMutex.Unlock()
 
-	mappings := make([]StakerMapping, len(sh.StakingMap))
+	mappings := make([]stakerMapping, len(sh.StakingMap))
 
 	var indx = 0
 	for address, stake := range sh.StakingMap {
-		mappings[indx] = StakerMapping{
+		mappings[indx] = stakerMapping{
 			Address: address,
 			Stake:   stake,
 		}

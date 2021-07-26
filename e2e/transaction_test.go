@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/currency"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
@@ -16,10 +17,10 @@ func TestSignedTransaction(t *testing.T) {
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	_, receiverAddr := framework.GenerateKeyAndAddr(t)
 
-	preminedAmount := framework.EthToWei(10)
+	preminedAmount := currency.EthToWei(10)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(senderAddr, preminedAmount)
-		config.PremineValidatorBalance(big.NewInt(0), framework.EthToWei(10))
+		config.PremineValidatorBalance(big.NewInt(0), currency.EthToWei(10))
 		config.SetSeal(true)
 	})
 
@@ -110,7 +111,7 @@ func TestEthTransfer(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("1"),
-			framework.EthToWei(50), // 50 ETH
+			currency.EthToWei(50), // 50 ETH
 		},
 		// Empty account
 		{
@@ -120,7 +121,7 @@ func TestEthTransfer(t *testing.T) {
 		// Valid account #2
 		{
 			types.StringToAddress("3"),
-			framework.EthToWei(10), // 10 ETH
+			currency.EthToWei(10), // 10 ETH
 		},
 	}
 
@@ -136,7 +137,7 @@ func TestEthTransfer(t *testing.T) {
 			"Valid ETH transfer #1",
 			validAccounts[0].address,
 			validAccounts[2].address,
-			framework.EthToWei(10),
+			currency.EthToWei(10),
 			true,
 		},
 		{
@@ -144,7 +145,7 @@ func TestEthTransfer(t *testing.T) {
 			"Invalid ETH transfer",
 			validAccounts[1].address,
 			validAccounts[2].address,
-			framework.EthToWei(100),
+			currency.EthToWei(100),
 			false,
 		},
 		{
@@ -152,7 +153,7 @@ func TestEthTransfer(t *testing.T) {
 			"Valid ETH transfer #2",
 			validAccounts[2].address,
 			validAccounts[1].address,
-			framework.EthToWei(5),
+			currency.EthToWei(5),
 			true,
 		},
 	}

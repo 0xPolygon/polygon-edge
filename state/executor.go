@@ -5,13 +5,12 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/0xPolygon/minimal/staking"
-	"github.com/0xPolygon/minimal/state/runtime/system"
-	"github.com/0xPolygon/minimal/types"
-
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/state/runtime/system"
+	"github.com/0xPolygon/minimal/types"
 )
 
 const (
@@ -131,11 +130,14 @@ type BlockResult struct {
 
 // getStakingEventType is a helper method for getting the type of system event
 func getStakingEventType(toAddress types.Address) staking.StakingEventType {
-	if toAddress == types.StringToAddress(system.StakingAddress) {
+	switch toAddress {
+	case types.StringToAddress(system.StakingAddress):
 		return staking.StakingEvent
+	case types.StringToAddress(system.UnstakingAddress):
+		return staking.UnstakingEvent
+	default:
+		return staking.UnknownEvent
 	}
-
-	return staking.UnstakingEvent
 }
 
 // constructPendingEvent is a helper method for constructing a pending event
@@ -144,14 +146,14 @@ func constructPendingEvent(
 	fromAddress types.Address,
 	value *big.Int,
 	blockNumber uint64,
-) staking.PendingEvent {
+) *staking.PendingEvent {
 	eventType := getStakingEventType(toAddress)
 
-	return staking.PendingEvent{
-		Number:    int64(blockNumber),
-		Address:   fromAddress,
-		Value:     value,
-		EventType: eventType,
+	return &staking.PendingEvent{
+		BlockNumber: int64(blockNumber),
+		Address:     fromAddress,
+		Value:       value,
+		EventType:   eventType,
 	}
 }
 
@@ -167,10 +169,11 @@ func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64)
 				blockNumber,
 			)
 
-			hub := staking.GetStakingHub()
-
-			// Remove the event from the queue if it is present
-			hub.RemovePendingEvent(pendingEvent)
+			if pendingEvent.EventType != staking.UnknownEvent {
+				hub := staking.GetStakingHub()
+				// Remove the event from the queue if it is present
+				hub.RemovePendingEvent(*pendingEvent)
+			}
 		}
 	}
 }
@@ -187,15 +190,17 @@ func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64)
 				blockNumber,
 			)
 
-			hub := staking.GetStakingHub()
+			if pendingEvent.EventType != staking.UnknownEvent {
+				hub := staking.GetStakingHub()
 
-			// Remove the event from the queue if it is present
-			if hub.RemovePendingEvent(pendingEvent) {
-				// Execute the changes on the staking map
-				if pendingEvent.EventType == staking.StakingEvent {
-					hub.IncreaseStake(t.From, t.Value)
-				} else {
-					hub.ResetStake(t.From)
+				// Remove the event from the queue if it is present
+				if hub.RemovePendingEvent(*pendingEvent) {
+					// Execute the changes on the staking map
+					if pendingEvent.EventType == staking.StakingEvent {
+						hub.IncreaseStake(t.From, t.Value)
+					} else {
+						hub.ResetStake(t.From)
+					}
 				}
 			}
 		}
@@ -766,16 +771,6 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
 	hub := staking.GetStakingHub()
 	return hub.GetStakedBalance(addr)
-}
-
-func (t *Transition) AddStakedBalance(addr types.Address, balance *big.Int) {
-	hub := staking.GetStakingHub()
-	hub.IncreaseStake(addr, balance)
-}
-
-func (t *Transition) SubStakedBalance(addr types.Address, balance *big.Int) {
-	hub := staking.GetStakingHub()
-	hub.DecreaseStake(addr, balance)
 }
 
 func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {

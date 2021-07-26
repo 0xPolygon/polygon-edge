@@ -51,10 +51,10 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 
 	// Decrease the staked amount from the account's staked balance
 	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
-		Number:    ctx.Number,
-		Address:   staker,
-		Value:     big.NewInt(0),
-		EventType: staking.UnstakingEvent,
+		BlockNumber: ctx.Number,
+		Address:     staker,
+		Value:       big.NewInt(0),
+		EventType:   staking.UnstakingEvent,
 	})
 
 	state.host.EmitUnstakedEvent(staker, stakedBalance)

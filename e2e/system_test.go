@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/currency"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -84,7 +85,7 @@ func TestSystem_StakeAmount(t *testing.T) {
 		// Valid account #1
 		{
 			addressKeyPairs[0].address,
-			framework.EthToWei(50), // 50 ETH
+			currency.EthToWei(50), // 50 ETH
 		},
 		// Empty account
 		{
@@ -104,13 +105,13 @@ func TestSystem_StakeAmount(t *testing.T) {
 		{
 			"Valid stake",
 			validAccounts[0].address,
-			framework.EthToWei(10),
+			currency.EthToWei(10),
 			true,
 		},
 		{
 			"Invalid stake",
 			validAccounts[1].address,
-			framework.EthToWei(100),
+			currency.EthToWei(100),
 			false,
 		},
 	}
@@ -209,20 +210,20 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 		// Staking address initialization
 		{
 			stakingAddress,
-			framework.EthToWei(10), // 10 ETH has been staked in the past
-			framework.EthToWei(0),
+			currency.EthToWei(10), // 10 ETH has been staked in the past
+			currency.EthToWei(0),
 		},
 		// Valid account with stake
 		{
 			addressKeyPairs[0].address,
-			framework.EthToWei(50), // 50 ETH
-			framework.EthToWei(10), // 10 ETH
+			currency.EthToWei(50), // 50 ETH
+			currency.EthToWei(10), // 10 ETH
 		},
 		// Valid account without stake
 		{
 			addressKeyPairs[1].address,
-			framework.EthToWei(0),
-			framework.EthToWei(0),
+			currency.EthToWei(0),
+			currency.EthToWei(0),
 		},
 	}
 
@@ -235,13 +236,13 @@ func TestSystem_UnstakeAmount(t *testing.T) {
 		{
 			"Valid unstake",
 			validAccounts[1].address,
-			framework.EthToWei(10),
+			currency.EthToWei(10),
 			true,
 		},
 		{
 			"Invalid unstake",
 			validAccounts[2].address,
-			framework.EthToWei(100),
+			currency.EthToWei(100),
 			false,
 		},
 	}

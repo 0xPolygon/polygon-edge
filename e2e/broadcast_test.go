@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/currency"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -38,7 +39,7 @@ func TestBroadcast(t *testing.T) {
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
-		config.Premine(senderAddr, framework.EthToWei(10))
+		config.Premine(senderAddr, currency.EthToWei(10))
 		config.SetSeal(true)
 	}
 
@@ -70,7 +71,7 @@ func TestBroadcast(t *testing.T) {
 				Nonce:    0,
 				From:     senderAddr,
 				To:       &receiverAddr,
-				Value:    framework.EthToWei(1),
+				Value:    currency.EthToWei(1),
 				Gas:      1000000,
 				GasPrice: big.NewInt(10000),
 				Input:    []byte{},

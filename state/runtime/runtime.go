@@ -63,8 +63,6 @@ type Host interface {
 	AddBalance(addr types.Address, balance *big.Int)
 	SubBalance(addr types.Address, balance *big.Int)
 	GetStakedBalance(addr types.Address) *big.Int
-	AddStakedBalance(addr types.Address, balance *big.Int)
-	SubStakedBalance(addr types.Address, balance *big.Int)
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
 	GetCode(addr types.Address) []byte
