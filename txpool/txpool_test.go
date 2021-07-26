@@ -14,6 +14,67 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestAddingTransaction(t *testing.T) {
+	senderPriv, _ := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+
+	testCases := []struct {
+		name          string
+		txValue       *big.Int
+		txGasLimit    uint64
+		txGasPrice    *big.Int
+		shouldSucceed bool
+	}{
+		{
+			name:          "transfer transaction",
+			txValue:       big.NewInt(10),
+			txGasLimit:    100000,
+			txGasPrice:    big.NewInt(0),
+			shouldSucceed: true,
+		},
+		{
+			name:          "should fail with gas too low error",
+			txValue:       big.NewInt(10),
+			txGasLimit:    1,
+			txGasPrice:    big.NewInt(1),
+			shouldSucceed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
+			if err != nil {
+				t.Fatal("Failed to initialize transaction pool:", err)
+			}
+			signer := crypto.NewEIP155Signer(100)
+			pool.AddSigner(signer)
+
+			tx := &types.Transaction{
+				To:       &receiverAddr,
+				Value:    tc.txValue,
+				Gas:      tc.txGasLimit,
+				GasPrice: tc.txGasPrice,
+			}
+
+			signedTx, err := signer.SignTx(tx, senderPriv)
+			if err != nil {
+				t.Fatal("Failed to sign transaction:", err)
+			}
+			err = pool.AddTx(signedTx)
+
+			if tc.shouldSucceed {
+				assert.NoError(t, err, "Expected adding transaction to succeed")
+				assert.NotEmpty(t, pool.Length(), "Expected pool to not be empty")
+				assert.True(t, pool.sorted.Contains(signedTx), "Expected pool to contain added transaction")
+			} else {
+				assert.Error(t, err, "Expected adding transaction to fail")
+				assert.Empty(t, pool.Length(), "Expected pool to be empty")
+			}
+		})
+	}
+}
+
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
