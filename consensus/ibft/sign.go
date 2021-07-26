@@ -34,7 +34,7 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 		return types.Address{}, err
 	}
 	// get the sig
-	msg, err := getHeaderHash(h)
+	msg, err := calculateHeaderHash(h)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -43,16 +43,17 @@ func ecrecoverFromHeader(h *types.Header) (types.Address, error) {
 }
 
 func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byte, error) {
-	sig, err := getHeaderHash(h)
+	hash, err := calculateHeaderHash(h)
 	if err != nil {
 		return nil, err
 	}
 
 	// if we are singing the commited seals we need to do something more
+	msg := hash
 	if committed {
-		sig = commitMsg(sig)
+		msg = commitMsg(hash)
 	}
-	seal, err := crypto.Sign(prv, crypto.Keccak256(sig))
+	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 	return h, nil
 }
 
-func getHeaderHash(h *types.Header) ([]byte, error) {
+func calculateHeaderHash(h *types.Header) ([]byte, error) {
 	//hash := istanbulHeaderHash(h)
 	//return hash.Bytes(), nil
 
@@ -177,7 +178,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 
 	// get the message that needs to be signed
 	// this not signing! just removing the fields that should be signed
-	hash, err := getHeaderHash(header)
+	hash, err := calculateHeaderHash(header)
 	if err != nil {
 		return err
 	}

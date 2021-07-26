@@ -15,6 +15,10 @@ const (
 	spuriousDragonMaxCodeSize = 24576
 )
 
+var (
+	errorVMOutOfGas = fmt.Errorf("out of gas")
+)
+
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
 
 // GetHashByNumber returns the hash function of a block number
@@ -364,6 +368,10 @@ func (t *Transition) apply(msg *types.Transaction) (
 	leftoverGas, err := t.preCheck(msg)
 	if err != nil {
 		return nil, 0, false, err
+	}
+	// TODO: Check if this is even possible
+	if leftoverGas > msg.Gas {
+		return nil, 0, false, errorVMOutOfGas
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)

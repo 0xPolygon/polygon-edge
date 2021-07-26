@@ -1,9 +1,10 @@
 package state
 
 import (
+	"math/big"
+
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
-	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
@@ -324,7 +325,9 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		return types.Hash{}
 	}
 
-	// Get account state from radix tree
+	// Try to get account state from radix tree first
+	// Because the latest account state should be in in-memory radix tree
+	// if account state update happened in previous transactions of same block
 	if object.Txn != nil {
 		if val, ok := object.Txn.Get(key.Bytes()); ok {
 			if val == nil {
@@ -334,7 +337,7 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
-	// Get account state from trie tree
+	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
 	k := txn.hashit(key.Bytes())
 	return object.GetCommitedState(types.BytesToHash(k))
 }
