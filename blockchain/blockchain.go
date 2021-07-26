@@ -592,6 +592,17 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 		// Update the average gas price
 		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
+
+		logArgs := []interface{}{
+			"number", header.Number,
+			"hash", header.Hash,
+			"txns", len(block.Transactions),
+		}
+		if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
+			diff := header.Timestamp - prevHeader.Timestamp
+			logArgs = append(logArgs, "generation_time_in_sec", diff)
+		}
+		b.logger.Info("new block", logArgs...)
 	}
 
 	b.logger.Info("new head", "hash", b.Header().Hash, "number", b.Header().Number)
