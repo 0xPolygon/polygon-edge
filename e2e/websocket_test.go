@@ -101,8 +101,12 @@ func TestWS_Response(t *testing.T) {
 			t.Fatalf("Unable to unmarshal WS result: %v", wsError)
 		}
 
-		foundBalance, wsError := types.ParseUint256orHex(&balanceHex)
-		if wsError = json.Unmarshal(res.Result, &balanceHex); wsError != nil {
+		foundBalance, parseError := types.ParseUint256orHex(&balanceHex)
+		if parseError != nil {
+			t.Fatalf(fmt.Sprintf("Unable to parse WS result balance: %v", parseError))
+		}
+
+		if wsError := json.Unmarshal(res.Result, &balanceHex); wsError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", wsError)
 		}
 
@@ -144,8 +148,11 @@ func TestWS_Response(t *testing.T) {
 			t.Fatalf("Unable to unmarshal WS result: %v", wsError)
 		}
 
-		blockNumInt, wsError := types.ParseUint256orHex(&blockNum)
-		if wsError = json.Unmarshal(res.Result, &blockNum); wsError != nil {
+		blockNumInt, parseError := types.ParseUint256orHex(&blockNum)
+		if parseError != nil {
+			t.Fatalf(fmt.Sprintf("Unable to parse WS result balance: %v", parseError))
+		}
+		if wsError := json.Unmarshal(res.Result, &blockNum); wsError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", wsError)
 		}
 

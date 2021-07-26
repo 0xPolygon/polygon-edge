@@ -146,6 +146,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	}(ws)
 
 	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
+	j.logger.Info("Websocket connection established")
 	// Run the listen loop
 	for {
 		// Read the incoming message
