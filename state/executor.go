@@ -773,6 +773,11 @@ func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
 	return hub.GetStakedBalance(addr)
 }
 
+func (t *Transition) ComputeStakeAfterEvents(balance *big.Int, event staking.PendingEvent) *big.Int {
+	hub := staking.GetStakingHub()
+	return hub.ComputeStakeAfterEvents(balance, event)
+}
+
 func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	return t.state.GetState(addr, key)
 }

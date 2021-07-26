@@ -346,6 +346,38 @@ func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
 	return big.NewInt(0)
 }
 
+// ComputeStakeAfterEvents goes over the pending events and returns the difference in value between staked and unstaked events
+// for the current address and block number
+func (sh *StakingHub) ComputeStakeAfterEvents(balance *big.Int, contextEvent PendingEvent) *big.Int {
+	stakedTally := balance
+
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	// Go over events which have not yet been committed to find what will be
+	// the final staking tally for this address
+	for _, event := range sh.EventQueue {
+		// Check that we are working in the correct context
+		if event.BlockNumber != contextEvent.BlockNumber ||
+			event.Address.String() != contextEvent.Address.String() {
+			continue
+		}
+
+		// Skip over the context event
+		if event.Compare(contextEvent) {
+			continue
+		}
+
+		if event.EventType == StakingEvent {
+			stakedTally.Add(stakedTally, event.Value)
+		} else if event.EventType == UnstakingEvent {
+			stakedTally = big.NewInt(0)
+		}
+	}
+
+	return stakedTally
+}
+
 // stakerMapping is a representation of a staked account balance
 type stakerMapping struct {
 	Address types.Address `json:"address"`
