@@ -28,6 +28,7 @@ const (
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
+	DefaultGasLimit       = 5000
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -349,7 +350,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.Uint64Var(&gaslimit, "gas-limit", 5000, "")
+	flags.Uint64Var(&gaslimit, "gas-limit", DefaultGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 
 	if err := flags.Parse(args); err != nil {
