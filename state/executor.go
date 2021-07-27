@@ -299,37 +299,6 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {
-	cost := uint64(0)
-
-	// Contract creation is only paid on the homestead fork
-	if msg.IsContractCreation() && t.config.Homestead {
-		cost += 53000
-	} else {
-		cost += 21000
-	}
-
-	payload := msg.Input
-	if len(payload) > 0 {
-		zeros := 0
-		for i := 0; i < len(payload); i++ {
-			if payload[i] == 0 {
-				zeros++
-			}
-		}
-		nonZeros := len(payload) - zeros
-		cost += uint64(zeros) * 4
-
-		nonZeroCost := uint64(68)
-		if t.config.Istanbul {
-			nonZeroCost = 16
-		}
-		cost += uint64(nonZeros) * nonZeroCost
-	}
-
-	return uint64(cost)
-}
-
 func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	// validate nonce
 	nonce := t.state.GetNonce(msg.From)
@@ -352,7 +321,7 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	t.state.SubBalance(msg.From, upfrontGasCost)
 
 	// calculate gas available for the transaction
-	intrinsicGas := t.transactionGasCost(msg)
+	intrinsicGas := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if intrinsicGas > msg.Gas {
 		return 0, fmt.Errorf("out of gas")
 	}
@@ -616,4 +585,35 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 		return t.applyCreate(c, h)
 	}
 	return t.applyCall(c, c.Type, h)
+}
+
+func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) uint64 {
+	cost := uint64(0)
+
+	// Contract creation is only paid on the homestead fork
+	if msg.IsContractCreation() && isHomestead {
+		cost += 53000
+	} else {
+		cost += 21000
+	}
+
+	payload := msg.Input
+	if len(payload) > 0 {
+		zeros := 0
+		for i := 0; i < len(payload); i++ {
+			if payload[i] == 0 {
+				zeros++
+			}
+		}
+		nonZeros := len(payload) - zeros
+		cost += uint64(zeros) * 4
+
+		nonZeroCost := uint64(68)
+		if isIstanbul {
+			nonZeroCost = 16
+		}
+		cost += uint64(nonZeros) * nonZeroCost
+	}
+
+	return cost
 }

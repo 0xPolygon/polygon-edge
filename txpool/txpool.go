@@ -2,7 +2,9 @@ package txpool
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
+	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"sort"
 	"sync"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -19,6 +22,10 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
+)
+
+var (
+	ErrIntrinsicGas = errors.New("intrinsic gas too low")
 )
 
 type store interface {
@@ -33,9 +40,9 @@ type signer interface {
 
 // TxPool is a pool of transactions
 type TxPool struct {
-	logger hclog.Logger
-	signer signer
-
+	logger     hclog.Logger
+	signer     signer
+	forks      chain.ForksInTime
 	store      store
 	idlePeriod time.Duration
 
@@ -60,6 +67,7 @@ type TxPool struct {
 func NewTxPool(
 	logger hclog.Logger,
 	sealing bool,
+	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
@@ -72,6 +80,7 @@ func NewTxPool(
 		network:    network,
 		sorted:     newTxPriceHeap(),
 		sealing:    sealing,
+		forks:      forks,
 	}
 
 	if network != nil {
@@ -278,6 +287,11 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 			return fmt.Errorf("negative value")
 		}
 	*/
+	// Make sure the transaction has more gas than the basic transaction fee
+	intrinsicGas := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
+	if tx.Gas < intrinsicGas {
+		return ErrIntrinsicGas
+	}
 	return nil
 }
 
