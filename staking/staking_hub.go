@@ -64,9 +64,10 @@ var once sync.Once
 func GetStakingHub() *StakingHub {
 	once.Do(func() {
 		stakingHubInstance = StakingHub{
-			StakingMap: make(map[types.Address]*big.Int),
-			EventQueue: make([]PendingEvent, 0),
-			CloseCh:    make(chan struct{}),
+			StakingMap:      make(map[types.Address]*big.Int),
+			EventQueue:      make([]PendingEvent, 0),
+			CloseCh:         make(chan struct{}),
+			WritebackPeriod: 60 * time.Second,
 		}
 	})
 
@@ -363,11 +364,6 @@ func (sh *StakingHub) ComputeStakeAfterEvents(balance *big.Int, contextEvent Pen
 			continue
 		}
 
-		// Skip over the context event
-		if event.Compare(contextEvent) {
-			continue
-		}
-
 		if event.EventType == StakingEvent {
 			stakedTally.Add(stakedTally, event.Value)
 		} else if event.EventType == UnstakingEvent {
@@ -401,4 +397,13 @@ func (sh *StakingHub) getStakerMappings() []stakerMapping {
 	}
 
 	return mappings
+}
+
+// ClearEvents resets the event queue. Called from the consensus layer
+// to discard any events that might have been created during initial block creation
+func (sh *StakingHub) ClearEvents() {
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	sh.EventQueue = make([]PendingEvent, 0)
 }

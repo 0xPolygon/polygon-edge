@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/protocol"
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -422,6 +423,10 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 
 	_, root := transition.Commit()
+	// If we are the proposer, these events will be added in Validate state again
+	// No need to double add them here and have complicated logic in unstaking
+	staking.GetStakingHub().ClearEvents()
+
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 

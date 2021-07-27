@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/consensus"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -150,6 +151,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 	// Commit the changes
 	_, root := transition.Commit()
+	staking.GetStakingHub().ClearEvents()
 
 	// Update the header
 	header.StateRoot = root
