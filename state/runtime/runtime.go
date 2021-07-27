@@ -67,10 +67,20 @@ type Host interface {
 	GetTxContext() TxContext
 	GetBlockHash(number int64) types.Hash
 	EmitLog(addr types.Address, topics []types.Hash, data []byte)
-	Callx(*Contract, Host) ([]byte, uint64, error)
+	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
 }
+
+// ExecutionResult includes all output after executing given evm
+// message no matter the execution itself is successful or not.
+type ExecutionResult struct {
+	ReturnValue []byte // Returned data from the runtime (function result or data supplied with revert opcode)
+	GasLeft     uint64 // Total gas left as result of execution
+	Err         error  // Any error encountered during the execution, listed below
+}
+
+func (r *ExecutionResult) Failed() bool { return r.Err != nil }
 
 var (
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")
@@ -101,7 +111,7 @@ const (
 
 // Runtime can process contracts
 type Runtime interface {
-	Run(c *Contract, host Host, config *chain.ForksInTime) ([]byte, uint64, error)
+	Run(c *Contract, host Host, config *chain.ForksInTime) *ExecutionResult
 	CanRun(c *Contract, host Host, config *chain.ForksInTime) bool
 	Name() string
 }

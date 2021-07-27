@@ -27,7 +27,7 @@ func (e *EVM) Name() string {
 }
 
 // Run implements the runtime interface
-func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) (returnValue []byte, gasLeft uint64, err error) {
+func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
 
 	contract := acquireState()
 	contract.resetReturnData()
@@ -44,9 +44,10 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 	ret, err := contract.Run()
 
 	// We are probably doing this append magic to make sure that the slice doesn't have more capacity than it needs
+	var returnValue []byte
 	returnValue = append(returnValue[:0], ret...)
 
-	gasLeft = contract.gas
+	gasLeft := contract.gas
 
 	releaseState(contract)
 
@@ -54,5 +55,9 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 		gasLeft = 0
 	}
 
-	return returnValue, gasLeft, err
+	return &runtime.ExecutionResult{
+		ReturnValue: returnValue,
+		GasLeft:     gasLeft,
+		Err:         err,
+	}
 }

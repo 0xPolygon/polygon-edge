@@ -92,20 +92,33 @@ func (p *Precompiled) Name() string {
 }
 
 // Run runs an execution
-func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) (returnValue []byte, gasLeft uint64, err error) {
+func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 
+	// In the case of not enough gas for precompiled execution we return ErrGasOverflow as opposed to ErrGasConsumed
 	if c.Gas < gasCost {
-		return nil, 0, runtime.ErrGasOverflow
+		return &runtime.ExecutionResult{
+			GasLeft: 0,
+			Err:     runtime.ErrGasOverflow,
+		}
 	}
 
 	c.Gas = c.Gas - gasCost
-	returnValue, err = contract.run(c.Input)
-	if err != nil {
-		return nil, 0, err
+	returnValue, err := contract.run(c.Input)
+
+	result := &runtime.ExecutionResult{
+		ReturnValue: returnValue,
+		GasLeft:     c.Gas,
+		Err:         err,
 	}
-	return returnValue, c.Gas, err
+
+	if result.Failed() {
+		result.GasLeft = 0
+		result.ReturnValue = nil
+	}
+
+	return result
 }
 
 var zeroPadding = make([]byte, 64)
