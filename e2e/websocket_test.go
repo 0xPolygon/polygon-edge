@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -35,7 +34,7 @@ func constructWSRequest(id int, method string, params []string) ([]byte, error) 
 	return json.Marshal(request)
 }
 
-func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) (jsonrpc.Response, error) {
+func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Response {
 	if wsError := ws.WriteMessage(websocket.TextMessage, request); wsError != nil {
 		t.Fatalf("Unable to write message to WS connection: %v", wsError)
 	}
@@ -49,7 +48,7 @@ func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) (jsonrpc.Re
 		t.Fatalf("Unable to unmarshal WS response: %v", wsError)
 	}
 
-	return res, wsError
+	return res
 }
 
 func TestWS_Response(t *testing.T) {
@@ -84,15 +83,18 @@ func TestWS_Response(t *testing.T) {
 
 	t.Run("Valid account balance", func(t *testing.T) {
 		requestID := 1
+
 		request, constructErr := constructWSRequest(
 			requestID,
 			"eth_getBalance",
 			[]string{preminedAccounts[0].address.String(), "latest"},
 		)
 
-		assert.Nilf(t, constructErr, fmt.Sprintf("Unable to construct request: %v", constructErr))
+		if constructErr != nil {
+			t.Fatalf("Unable to construct request: %v", constructErr)
+		}
 
-		res, _ := getWSResponse(t, ws, request)
+		res := getWSResponse(t, ws, request)
 
 		assert.Equalf(t, res.ID, float64(requestID), "Invalid response ID")
 
@@ -103,7 +105,7 @@ func TestWS_Response(t *testing.T) {
 
 		foundBalance, parseError := types.ParseUint256orHex(&balanceHex)
 		if parseError != nil {
-			t.Fatalf(fmt.Sprintf("Unable to parse WS result balance: %v", parseError))
+			t.Fatalf("Unable to parse WS result balance: %v", parseError)
 		}
 
 		if wsError := json.Unmarshal(res.Result, &balanceHex); wsError != nil {
@@ -137,9 +139,11 @@ func TestWS_Response(t *testing.T) {
 			[]string{},
 		)
 
-		assert.Nilf(t, constructErr, fmt.Sprintf("Unable to construct request: %v", constructErr))
+		if constructErr != nil {
+			t.Fatalf("Unable to construct request: %v", constructErr)
+		}
 
-		res, _ := getWSResponse(t, ws, request)
+		res := getWSResponse(t, ws, request)
 
 		assert.Equalf(t, res.ID, float64(requestID), "Invalid response ID")
 
@@ -150,12 +154,12 @@ func TestWS_Response(t *testing.T) {
 
 		blockNumInt, parseError := types.ParseUint256orHex(&blockNum)
 		if parseError != nil {
-			t.Fatalf(fmt.Sprintf("Unable to parse WS result balance: %v", parseError))
+			t.Fatalf("Unable to parse WS result balance: %v", parseError)
 		}
 		if wsError := json.Unmarshal(res.Result, &blockNum); wsError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", wsError)
 		}
 
-		assert.Greaterf(t, blockNumInt.Cmp(big.NewInt(0)), 0, "Invalid block number")
+		assert.Equalf(t, 1, blockNumInt.Cmp(big.NewInt(0)), "Invalid block number")
 	})
 }
