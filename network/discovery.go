@@ -158,7 +158,7 @@ func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
 
 	p := d.peers.find(peerID)
 	if p == nil {
-		return nil, fmt.Errorf("peer not found in peers")
+		return nil, fmt.Errorf("peer not found in list")
 	}
 
 	// return the existing stream if stream has been opened
