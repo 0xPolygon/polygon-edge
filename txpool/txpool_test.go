@@ -44,6 +44,45 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.Equal(t, pool.Length(), uint64(1))
 }
 
+func TestGetQueuedAndPendingTransactions(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+
+	from1 := types.Address{0x1}
+	txn0 := &types.Transaction{
+		From:     from1,
+		Nonce:    0,
+		Value:		big.NewInt(106),
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn0))
+
+	from2 := types.Address{0x2}
+	txn1 := &types.Transaction{
+		From:     from2,
+		Nonce:	1,
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn1))
+
+	from3 := types.Address{0x3}
+	txn2 := &types.Transaction{
+		From:     from3,
+		Nonce:	2,
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn2))
+
+	queuedTxs, pendingTxs := pool.GetTxs()
+	
+	assert.Len(t, queuedTxs, 2)
+	assert.Len(t, pendingTxs, 1)
+	for key := range pendingTxs {
+		assert.Equal(t, pendingTxs[key][0].Value, big.NewInt(106))
+	}	
+}
+
 func TestBroadcast(t *testing.T) {
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it

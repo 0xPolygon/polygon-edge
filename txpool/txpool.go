@@ -205,6 +205,27 @@ func (t *TxPool) addImpl(ctx string, txns ...*types.Transaction) error {
 	return nil
 }
 
+// GetTxs gets both queued and pending transactions
+func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
+	queue := t.queue
+	for addr, queuedTxn := range queue {
+		for _, tx := range queuedTxn.txs {
+			queuedTxs[addr] = make(map[uint64]*types.Transaction)
+			queuedTxs[addr][tx.Nonce] = tx
+		}
+	}
+
+	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
+	sortedPricedTxs := t.sorted.index
+	for _, sortedPricedTx := range sortedPricedTxs {
+		pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
+		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
+	}
+
+	return queuedTxs, pendingTxs
+}
+
 func (t *TxPool) Length() uint64 {
 	return t.sorted.Length()
 }
