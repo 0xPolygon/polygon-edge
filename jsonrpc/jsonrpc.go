@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-var upgrader = websocket.Upgrader{}
-
 type serverType int
 
 const (
@@ -89,35 +87,101 @@ func (j *JSONRPC) setupHTTP() error {
 	return nil
 }
 
-type wrapWsConn struct {
-	conn *websocket.Conn
+// wsUpgrader defines upgrade parameters for the WS connection
+var wsUpgrader = websocket.Upgrader{
+	// Uses the default HTTP buffer sizes for Read / Write buffers.
+	// Documentation specifies that they are 4096B in size.
+	// There is no need to have them be 4x in size when requests / responses
+	// shouldn't exceed 1024B
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
-func (w *wrapWsConn) WriteMessage(b []byte) error {
-	return w.conn.WriteMessage(0, b)
+// wsWrapper is a wrapping object for the web socket connection and logger
+type wsWrapper struct {
+	ws     *websocket.Conn // the actual WS connection
+	logger hclog.Logger    // module logger
+}
+
+// WriteMessage writes out the message to the WS peer
+func (w *wsWrapper) WriteMessage(
+	messageType int,
+	data []byte,
+) error {
+	writeErr := w.ws.WriteMessage(messageType, data)
+	if writeErr != nil {
+		w.logger.Error(
+			fmt.Sprintf("Unable to write WS message, %s", writeErr.Error()),
+		)
+	}
+
+	return writeErr
+}
+
+// isSupportedWSType returns a status indicating if the message type is supported
+func isSupportedWSType(messageType int) bool {
+	return messageType == websocket.TextMessage ||
+		messageType == websocket.BinaryMessage
 }
 
 func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
-	c, err := upgrader.Upgrade(w, req, nil)
+	// CORS rule - Allow requests from anywhere
+	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	// Upgrade the connection to a WS one
+	ws, err := wsUpgrader.Upgrade(w, req, nil)
 	if err != nil {
+		j.logger.Error(fmt.Sprintf("Unable to upgrade to a WS connection, %s", err.Error()))
 		return
 	}
-	defer c.Close()
 
-	wrapConn := &wrapWsConn{conn: c}
-	for {
-		_, message, err := c.ReadMessage()
+	// Defer WS closure
+	defer func(ws *websocket.Conn) {
+		err = ws.Close()
 		if err != nil {
+			j.logger.Error(
+				fmt.Sprintf("Unable to gracefully close WS connection, %s", err.Error()),
+			)
+		}
+	}(ws)
+
+	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
+	j.logger.Info("Websocket connection established")
+	// Run the listen loop
+	for {
+		// Read the incoming message
+		msgType, message, err := ws.ReadMessage()
+		if err != nil {
+			if websocket.IsCloseError(err,
+				websocket.CloseGoingAway,
+				websocket.CloseNormalClosure,
+				websocket.CloseAbnormalClosure,
+			) {
+				// Accepted close codes
+				j.logger.Info("Closing WS connection gracefully")
+			} else {
+				j.logger.Error(fmt.Sprintf("Unable to read WS message, %s", err.Error()))
+				j.logger.Info("Closing WS connection with error")
+			}
+
 			break
 		}
-		go func() {
-			resp, err := j.dispatcher.HandleWs(message, wrapConn)
-			if err != nil {
-				wrapConn.WriteMessage(resp)
-			} else {
-				wrapConn.WriteMessage([]byte(fmt.Sprintf(err.Error())))
-			}
-		}()
+
+		if isSupportedWSType(msgType) {
+			go func() {
+				resp, handleErr := j.dispatcher.HandleWs(message, wrapConn)
+				if handleErr != nil {
+					j.logger.Error(fmt.Sprintf("Unable to handle WS request, %s", handleErr.Error()))
+
+					_ = wrapConn.WriteMessage(
+						msgType,
+						[]byte(fmt.Sprintf("WS Handle error: %s", handleErr.Error())),
+					)
+				} else {
+					_ = wrapConn.WriteMessage(msgType, resp)
+				}
+			}()
+		}
 	}
 }
 

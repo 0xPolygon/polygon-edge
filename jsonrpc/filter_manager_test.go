@@ -179,7 +179,7 @@ type mockWsConn struct {
 	msgCh chan []byte
 }
 
-func (m *mockWsConn) WriteMessage(b []byte) error {
+func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
 	m.msgCh <- b
 	return nil
 }
