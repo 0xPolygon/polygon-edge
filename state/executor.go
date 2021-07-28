@@ -413,11 +413,12 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	}
 
 	gasUsed := msg.Gas - result.GasLeft
-	refund := gasUsed / 2
+	refund := txn.GetRefund()
 
 	// Refund can go up to half the gas used
-	if refund > txn.GetRefund() {
-		refund = txn.GetRefund()
+	maxRefund := gasUsed / 2
+	if refund > maxRefund {
+		refund = maxRefund
 	}
 
 	result.GasLeft += refund
