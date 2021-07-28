@@ -330,7 +330,7 @@ func (t *Transition) intrinsicGasCost(msg *types.Transaction) uint64 {
 		cost += uint64(nonZeros) * nonZeroCost
 	}
 
-	return uint64(cost)
+	return cost
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
