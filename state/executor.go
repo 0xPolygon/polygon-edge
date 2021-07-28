@@ -287,6 +287,10 @@ func (t *Transition) Apply(msg *types.Transaction) (gasUsed uint64, failed bool,
 		t.r.PostHook(t)
 	}
 
+	if result == nil {
+		return 0, false, err
+	}
+
 	t.returnValue = result.ReturnValue
 
 	gasUsed = msg.Gas - result.GasLeft
@@ -354,8 +358,6 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 }
 
 func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
-	result = &runtime.ExecutionResult{}
-
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -369,18 +371,18 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	txn := t.state
 
 	// 1. the nonce of the message caller is correct
-	if err := t.nonceCheck(msg); err != nil {
-		return result, err
+	if err = t.nonceCheck(msg); err != nil {
+		return
 	}
 
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	if err := t.subGasLimitPrice(msg); err != nil {
-		return result, err
+	if err = t.subGasLimitPrice(msg); err != nil {
+		return
 	}
 
 	// 3. the amount of gas required is available in the block
-	if err := t.subGasPool(msg.Gas); err != nil {
-		return result, err
+	if err = t.subGasPool(msg.Gas); err != nil {
+		return
 	}
 
 	// 4. the purchased gas is enough to cover intrinsic usage
