@@ -497,12 +497,6 @@ func (t *Transition) applyCall(c *runtime.Contract, callType runtime.CallType, h
 	result := t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
-		// @TODO: Geth does a ErrExecutionReverted check here, to see if we should zero out gasLeft or not
-		/*
-			if err != ErrExecutionReverted {
-				gas = 0
-			}
-		*/
 	}
 
 	return result

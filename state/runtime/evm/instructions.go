@@ -1113,7 +1113,7 @@ func opCall(op OpCode) instruction {
 			v.Set(one)
 		}
 
-		if !result.Failed() || result.Err == runtime.ErrExecutionReverted {
+		if result.Succeeded() || result.Err == runtime.ErrExecutionReverted {
 			if len(result.ReturnValue) != 0 {
 				copy(c.memory[offset:offset+size], result.ReturnValue)
 			}

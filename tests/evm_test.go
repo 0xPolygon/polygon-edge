@@ -71,7 +71,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	result := evmR.Run(contract, e, &config)
 
 	if c.Gas == "" {
-		if !result.Failed() {
+		if result.Succeeded() {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")
 		}
 		if result.GasLeft > 0 {

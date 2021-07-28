@@ -80,7 +80,8 @@ type ExecutionResult struct {
 	Err         error  // Any error encountered during the execution, listed below
 }
 
-func (r *ExecutionResult) Failed() bool { return r.Err != nil }
+func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
+func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
 
 var (
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")
