@@ -202,7 +202,7 @@ func (i *Ibft) createKey() error {
 
 	if i.validatorKey == nil {
 		// generate a validator private key
-		validatorKey, err := crypto.ReadPrivKey(filepath.Join(i.config.Path, IbftKeyName))
+		validatorKey, err := crypto.GenerateOrReadPrivateKey(filepath.Join(i.config.Path, IbftKeyName))
 		if err != nil {
 			return err
 		}

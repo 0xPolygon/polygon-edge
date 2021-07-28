@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	hexCore "encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -220,35 +219,47 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	return priv, nil
 }
 
-// ReadPrivKey reads a private key from the file path
-func ReadPrivKey(path string) (*ecdsa.PrivateKey, error) {
-	createFn := func() ([]byte, error) {
-		key, err := GenerateKey()
-		if err != nil {
-			return nil, err
-		}
-
-		buf, err := MarshallPrivateKey(key)
-		if err != nil {
-			return nil, err
-		}
-
-		return buf, nil
+// generateKeyAndMarshall generates a new private key and serializes it to a byte array
+func generateKeyAndMarshall() ([]byte, error) {
+	key, err := GenerateKey()
+	if err != nil {
+		return nil, err
 	}
-	readFn := func(b []byte) (interface{}, error) {
-		buf, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
 
-		key, err := ParsePrivateKey(buf)
-		if err != nil {
-			return nil, err
-		}
-
-		return key, nil
+	buf, err := MarshallPrivateKey(key)
+	if err != nil {
+		return nil, err
 	}
-	obj, err := keystore.CreateIfNotExists(path, createFn, readFn)
+
+	return buf, nil
+}
+
+// bytesToPrivateKey reads the input byte array and constructs a private key if possible
+func bytesToPrivateKey(input []byte) (interface{}, error) {
+	decoded, err := hex.DecodeString(string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the key is properly formatted
+	if len(decoded) != 32 {
+		// Key must be exactly 64 chars (32B) long
+		return nil, fmt.Errorf("invalid key length (%dB), should be 32B", len(decoded))
+	}
+
+	// Convert decoded bytes to a private key
+	key, err := ParsePrivateKey(decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+// GenerateOrReadPrivateKey generates a private key at the specified path,
+// or reads it if a key file is present
+func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
+	obj, err := keystore.CreateIfNotExists(path, generateKeyAndMarshall, bytesToPrivateKey)
 	if err != nil {
 		return nil, err
 	}

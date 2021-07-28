@@ -3,9 +3,11 @@ package types
 import (
 	"database/sql/driver"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/helper/keccak"
 )
 
 var ZeroAddress = Address{}
@@ -56,9 +58,37 @@ func (h *Hash) Scan(src interface{}) error {
 	return nil
 }
 
+// EIP55 returns the checksummed address with 0x prefix
+// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
 func (a Address) EIP55() string {
-	// TODO
-	return hex.EncodeToHex(a[:])
+	addrBytes := a.Bytes() // 20 bytes
+
+	// Encode to hex
+	lowercaseHex := hex.EncodeToHex(addrBytes)[2:] // without the 0x prefix
+
+	hashedAddress := hex.EncodeToHex(keccak.Keccak256(nil, []byte(lowercaseHex)))[2:]
+
+	checksummedBuffer := ""
+	// Iterate over each character in the hashed address
+	for index, character := range lowercaseHex {
+		if character >= '0' && character <= '9' {
+			// Numbers in range [0, 9] are ignored,
+			// because they can't be uppercased
+			checksummedBuffer += string(character)
+		} else {
+			// Look through range {a, b, c, d, e, f}
+
+			// Check if the corresponding hex digit in the hash is 8 or higher
+			hashedNibble, _ := strconv.ParseInt(string(hashedAddress[index]), 16, 64)
+			if hashedNibble > 7 {
+				checksummedBuffer += strings.ToUpper(string(character))
+			} else {
+				checksummedBuffer += string(character)
+			}
+		}
+	}
+
+	return "0x" + checksummedBuffer
 }
 
 func (a Address) String() string {
