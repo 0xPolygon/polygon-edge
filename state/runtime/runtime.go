@@ -82,6 +82,7 @@ type ExecutionResult struct {
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
 func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
+func (r *ExecutionResult) Reverted() bool  { return r.Err == ErrExecutionReverted }
 
 var (
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")

@@ -1045,7 +1045,8 @@ func opCreate(op OpCode) instruction {
 		}
 
 		c.gas += result.GasLeft
-		if result.Err == runtime.ErrExecutionReverted {
+
+		if result.Reverted() {
 			c.returnData = append(c.returnData[:0], result.ReturnValue...)
 		}
 	}
@@ -1112,7 +1113,7 @@ func opCall(op OpCode) instruction {
 			v.Set(zero)
 		}
 
-		if result.Succeeded() || result.Err == runtime.ErrExecutionReverted {
+		if result.Succeeded() || result.Reverted() {
 			if len(result.ReturnValue) != 0 {
 				copy(c.memory[offset:offset+size], result.ReturnValue)
 			}
