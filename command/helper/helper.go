@@ -28,6 +28,7 @@ const (
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
+	DefaultGasLimit       = 5000
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -286,7 +287,7 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 }
 
 // generateDevGenesis generates a base dev genesis file with premined balances
-func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags) error {
+func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLimit uint64) error {
 	genesisPath := filepath.Join(".", GenesisFileName)
 
 	generateError := VerifyGenesisExistence(genesisPath)
@@ -305,7 +306,7 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags) error 
 	cc := &chain.Chain{
 		Name: chainName,
 		Genesis: &chain.Genesis{
-			GasLimit:   5000,
+			GasLimit:   gasLimit,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  []byte{},
@@ -345,9 +346,11 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	var premine helperFlags.ArrayFlags
+	var gaslimit uint64
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
+	flags.Uint64Var(&gaslimit, "gas-limit", DefaultGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 
 	if err := flags.Parse(args); err != nil {
@@ -358,7 +361,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := generateDevGenesis(config.Chain, premine); err != nil {
+	if err := generateDevGenesis(config.Chain, premine, gaslimit); err != nil {
 		return nil, err
 	}
 
