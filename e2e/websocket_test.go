@@ -108,10 +108,6 @@ func TestWS_Response(t *testing.T) {
 			t.Fatalf("Unable to parse WS result balance: %v", parseError)
 		}
 
-		if wsError := json.Unmarshal(res.Result, &balanceHex); wsError != nil {
-			t.Fatalf("Unable to parse WS result balance: %v", wsError)
-		}
-
 		preminedAccounts[0].balance.Cmp(foundBalance)
 		assert.Equalf(t, 0, preminedAccounts[0].balance.Cmp(foundBalance), "Balances don't match")
 	})
@@ -155,9 +151,6 @@ func TestWS_Response(t *testing.T) {
 		blockNumInt, parseError := types.ParseUint256orHex(&blockNum)
 		if parseError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", parseError)
-		}
-		if wsError := json.Unmarshal(res.Result, &blockNum); wsError != nil {
-			t.Fatalf("Unable to parse WS result balance: %v", wsError)
 		}
 
 		assert.Equalf(t, 1, blockNumInt.Cmp(big.NewInt(0)), "Invalid block number")
