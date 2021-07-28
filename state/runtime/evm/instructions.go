@@ -1103,14 +1103,13 @@ func opCall(op OpCode) instruction {
 
 		contract.Type = callType
 
-		//ret, gas, err := c.host.Callx(contract, c.host)
 		result := c.host.Callx(contract, c.host)
 
 		v := c.push1()
-		if result.Err != nil {
-			v.Set(zero)
-		} else {
+		if result.Succeeded() {
 			v.Set(one)
+		} else {
+			v.Set(zero)
 		}
 
 		if result.Succeeded() || result.Err == runtime.ErrExecutionReverted {

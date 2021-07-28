@@ -353,9 +353,7 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	return nil
 }
 
-func (t *Transition) apply(msg *types.Transaction) (
-	result *runtime.ExecutionResult, err error,
-) {
+func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	result = &runtime.ExecutionResult{}
 
 	// First check this message satisfies all consensus rules before
@@ -395,7 +393,7 @@ func (t *Transition) apply(msg *types.Transaction) (
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return result, fmt.Errorf("Not enough funds for transfer with given value.")
+		return result, fmt.Errorf("not enough funds for transfer with given value")
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
