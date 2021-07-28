@@ -58,9 +58,9 @@ func (h *Hash) Scan(src interface{}) error {
 	return nil
 }
 
-// EIP55 returns the checksummed address with 0x prefix
+// eip55 returns the checksummed address with 0x prefix
 // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
-func (a Address) EIP55() string {
+func (a Address) eip55() string {
 	addrBytes := a.Bytes() // 20 bytes
 
 	// Encode to hex
@@ -92,7 +92,7 @@ func (a Address) EIP55() string {
 }
 
 func (a Address) String() string {
-	return a.EIP55()
+	return a.eip55()
 }
 
 func (a Address) Bytes() []byte {

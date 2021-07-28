@@ -1,9 +1,14 @@
 package crypto
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"math/big"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
@@ -158,4 +163,89 @@ func TestVV(t *testing.T) {
 
 	ValidateSignatureValues(0, []byte{0x0, 0x1, 0x2, 0x3}, []byte{0x1, 0x2, 0x3})
 
+}
+
+func getAddressFromKey(key crypto.PrivateKey, t *testing.T) types.Address {
+	privateKeyConv := key.(*ecdsa.PrivateKey)
+	assert.NotNil(t, privateKeyConv)
+
+	publicKey := privateKeyConv.PublicKey
+
+	return PubKeyToAddress(&publicKey)
+}
+
+func TestPrivateKeyRead(t *testing.T) {
+	// Write private keys to disk, check if read is ok
+	testTable := []struct {
+		name               string
+		privateKeyHex      string
+		checksummedAddress string
+		shouldFail         bool
+	}{
+		// Generated with Ganache
+		{
+			"Valid address #1",
+			"0c3d062cd3c642735af6a3c1492d761d39a668a67617a457113eaf50860e9e3f",
+			"0x81e83Dc147B81Db5771D998A2C265cc710BE43a5",
+			false,
+		},
+		{
+			"Valid address #2",
+			"71e6439122f6a44884132d54a978318d7218021a5d8f39fd24f440774d564d87",
+			"0xCe1f32314aD63F18123b822a23c214DabAA9F7Cf",
+			false,
+		},
+		{
+			"Valid address #3",
+			"c6435f6cb3a8f19111737b72944a0b4a7e52d8a6e95f1ebaa2881679f2087709",
+			"0x47B7DAc4361062Dfc43d0EA6A2a4C3d27bBcCbdb",
+			false,
+		},
+		{
+			"Invalid key",
+			"c6435f6cb3a8f19111737b72944a0b4a7e52d8a6e95f1ebaa2881679f",
+			"",
+			true,
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			privateKey, err := bytesToPrivateKey([]byte(testCase.privateKeyHex))
+			if err != nil && !testCase.shouldFail {
+				t.Fatalf("Unable to parse private key, %v", err)
+			}
+
+			if !testCase.shouldFail {
+				address := getAddressFromKey(privateKey, t)
+				assert.Equal(t, testCase.checksummedAddress, address.String())
+			} else {
+				assert.Nil(t, privateKey)
+			}
+		})
+	}
+}
+
+func TestPrivateKeyGeneration(t *testing.T) {
+	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
+	t.Cleanup(func() {
+		_ = os.Remove(tempFile)
+	})
+
+	// Generate the private key and write it to a file
+	writtenKey, err := GenerateOrReadPrivateKey(tempFile)
+	if err != nil {
+		t.Fatalf("Unable to generate private key, %v", err)
+	}
+	writtenAddress := getAddressFromKey(writtenKey, t)
+
+	// Read existing key and check if it matches
+	readKey, err := GenerateOrReadPrivateKey(tempFile)
+	if err != nil {
+		t.Fatalf("Unable to read private key, %v", err)
+	}
+	readAddress := getAddressFromKey(readKey, t)
+
+	assert.True(t, writtenKey.Equal(readKey))
+	assert.Equal(t, writtenAddress.String(), readAddress.String())
 }
