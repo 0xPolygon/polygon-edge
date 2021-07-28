@@ -160,51 +160,42 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (t *TxPool) addImpl(ctx string, txns ...*types.Transaction) error {
-	if len(txns) == 0 {
-		return nil
+func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
+	// Since this is a single point of inclusion for new transactions both
+	// to the promoted queue and pending queue we use this point to calculate the hash
+	tx.ComputeHash()
+
+	err := t.validateTx(tx)
+	if err != nil {
+		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
+		return err
 	}
 
-	from := txns[0].From
-	for _, txn := range txns {
-		// Since this is a single point of inclusion for new transactions both
-		// to the promoted queue and pending queue we use this point to calculate the hash
-		txn.ComputeHash()
-
-		err := t.validateTx(txn)
+	if tx.From == types.ZeroAddress {
+		tx.From, err = t.signer.Sender(tx)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid sender")
 		}
-
-		if txn.From == types.ZeroAddress {
-			txn.From, err = t.signer.Sender(txn)
-			if err != nil {
-				return fmt.Errorf("invalid sender")
-			}
-			from = txn.From
-		} else {
-			// only if we are in dev mode we can accept
-			// a transaction without validation
-			if !t.dev {
-				return fmt.Errorf("cannot accept non-encrypted txn")
-			}
+	} else {
+		// only if we are in dev mode we can accept
+		// a transaction without validation
+		if !t.dev {
+			return fmt.Errorf("cannot accept non-encrypted txn")
 		}
-
-		t.logger.Debug("add txn", "ctx", ctx, "hash", txn.Hash, "from", from)
 	}
 
-	txnsQueue, ok := t.queue[from]
+	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
+
+	txnsQueue, ok := t.queue[tx.From]
 	if !ok {
 		stateRoot := t.store.Header().StateRoot
 
 		// initialize the txn queue for the account
 		txnsQueue = newTxQueue()
-		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, from)
-		t.queue[from] = txnsQueue
+		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, tx.From)
+		t.queue[tx.From] = txnsQueue
 	}
-	for _, txn := range txns {
-		txnsQueue.Add(txn)
-	}
+	txnsQueue.Add(tx)
 
 	for _, promoted := range txnsQueue.Promote() {
 		t.sorted.Push(promoted)
