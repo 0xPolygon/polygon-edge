@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/types"
@@ -13,10 +14,6 @@ import (
 
 const (
 	spuriousDragonMaxCodeSize = 24576
-)
-
-var (
-	errorVMOutOfGas = fmt.Errorf("out of gas")
 )
 
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
@@ -247,7 +244,7 @@ func (t *Transition) Commit() (Snapshot, types.Hash) {
 
 func (t *Transition) subGasPool(amount uint64) error {
 	if t.gasPool < amount {
-		return fmt.Errorf("gas limit reached in the pool")
+		return ErrBlockLimitReached
 	}
 	t.gasPool -= amount
 	return nil
@@ -290,8 +287,7 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-//@TODO: We don't have uint overflow check here
-func (t *Transition) intrinsicGasCost(msg *types.Transaction) uint64 {
+func (t *Transition) intrinsicGasCost(msg *types.Transaction) (uint64, error) {
 	cost := uint64(0)
 
 	// Contract creation is only paid on the homestead fork
@@ -303,23 +299,33 @@ func (t *Transition) intrinsicGasCost(msg *types.Transaction) uint64 {
 
 	payload := msg.Input
 	if len(payload) > 0 {
-		zeros := 0
+		zeros := uint64(0)
 		for i := 0; i < len(payload); i++ {
 			if payload[i] == 0 {
 				zeros++
 			}
 		}
-		nonZeros := len(payload) - zeros
-		cost += uint64(zeros) * 4
 
+		nonZeros := uint64(len(payload)) - zeros
 		nonZeroCost := uint64(68)
 		if t.config.Istanbul {
 			nonZeroCost = 16
 		}
-		cost += uint64(nonZeros) * nonZeroCost
+
+		if (math.MaxUint64-cost)/nonZeroCost < nonZeros {
+			return 0, ErrIntrinsicGasOverflow
+		}
+
+		cost += nonZeros * nonZeroCost
+
+		if (math.MaxUint64-cost)/4 < zeros {
+			return 0, ErrIntrinsicGasOverflow
+		}
+
+		cost += zeros * 4
 	}
 
-	return cost
+	return cost, nil
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
@@ -327,20 +333,36 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 
-	return t.state.SubBalance(msg.From, upfrontGasCost)
+	err := t.state.SubBalance(msg.From, upfrontGasCost)
+
+	if err == runtime.ErrNotEnoughFunds {
+		return ErrNotEnoughFundsForGas
+	}
+
+	return nil
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	nonce := t.state.GetNonce(msg.From)
 
-	if nonce < msg.Nonce {
-		return fmt.Errorf("nonce is too big: %d < %d", nonce, msg.Nonce)
-	} else if nonce > msg.Nonce {
-		return fmt.Errorf("nonce is too low: %d > %d", nonce, msg.Nonce)
+	if nonce != msg.Nonce {
+		return ErrNonceIncorrect
 	}
 
 	return nil
 }
+
+// errors that can originate in the consensus rules checks of the apply method below
+// surfacing of these errors reject the transaction thus not including it in the block
+
+var (
+	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
+	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
+	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
+	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
+	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
+	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
+)
 
 func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	// First check this message satisfies all consensus rules before
@@ -349,8 +371,8 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	// 1. the nonce of the message caller is correct
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
 	// 3. the amount of gas required is available in the block
-	// 4. the purchased gas is enough to cover intrinsic usage
-	// 5. there is no overflow when calculating intrinsic gas
+	// 4. there is no overflow when calculating intrinsic gas
+	// 5. the purchased gas is enough to cover intrinsic usage
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 
 	txn := t.state
@@ -370,17 +392,22 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 		return
 	}
 
-	// 4. the purchased gas is enough to cover intrinsic usage
-	// @TODO: We should check clause 5 (uint overflow) inside intrinsicGasCost()
-	gasAvailable := msg.Gas - t.intrinsicGasCost(msg)
+	// 4. there is no overflow when calculating intrinsic gas
+	intrinsicGasCost, err := t.intrinsicGasCost(msg)
+	if err != nil {
+		return
+	}
+
+	// 5. the purchased gas is enough to cover intrinsic usage
+	gasAvailable := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasAvailable > msg.Gas {
-		return nil, fmt.Errorf("out of gas")
+		return nil, ErrNotEnoughIntrinsicGas
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, fmt.Errorf("not enough funds for transfer with given value")
+		return nil, ErrNotEnoughFunds
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
