@@ -77,12 +77,26 @@ type Host interface {
 type ExecutionResult struct {
 	ReturnValue []byte // Returned data from the runtime (function result or data supplied with revert opcode)
 	GasLeft     uint64 // Total gas left as result of execution
+	GasUsed     uint64 // Total gas used as result of execution
 	Err         error  // Any error encountered during the execution, listed below
 }
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
 func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
 func (r *ExecutionResult) Reverted() bool  { return r.Err == ErrExecutionReverted }
+
+func (r *ExecutionResult) CalculateGasUsed(gasLimit uint64, refund uint64) {
+	r.GasUsed = gasLimit - r.GasLeft
+
+	// Refund can go up to half the gas used
+	maxRefund := r.GasUsed / 2
+	if refund > maxRefund {
+		refund = maxRefund
+	}
+
+	r.GasLeft += refund
+	r.GasUsed -= refund
+}
 
 var (
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")

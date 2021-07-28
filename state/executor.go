@@ -293,10 +293,9 @@ func (t *Transition) Apply(msg *types.Transaction) (gasUsed uint64, failed bool,
 
 	t.returnValue = result.ReturnValue
 
-	gasUsed = msg.Gas - result.GasLeft
 	failed = result.Failed() || err != nil
 
-	return gasUsed, failed, err
+	return result.GasUsed, failed, err
 }
 
 // ContextPtr returns reference of context
@@ -412,24 +411,15 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasAvailable)
 	}
 
-	gasUsed := msg.Gas - result.GasLeft
 	refund := txn.GetRefund()
-
-	// Refund can go up to half the gas used
-	maxRefund := gasUsed / 2
-	if refund > maxRefund {
-		refund = maxRefund
-	}
-
-	result.GasLeft += refund
-	gasUsed -= refund
+	result.CalculateGasUsed(msg.Gas, refund)
 
 	// refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
 	txn.AddBalance(msg.From, remaining)
 
 	// pay the coinbase
-	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(gasUsed), gasPrice)
+	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), gasPrice)
 	txn.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
 	// return gas to the pool
