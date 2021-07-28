@@ -163,13 +163,6 @@ type Transition struct {
 	// result
 	receipts []*types.Receipt
 	totalGas uint64
-
-	// The return value for the contract execution
-	returnValue []byte
-}
-
-func (t *Transition) ReturnValue() []byte {
-	return t.returnValue
 }
 
 func (t *Transition) TotalGas() uint64 {
@@ -198,11 +191,12 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	gasUsed, failed, err := t.Apply(msg)
+	result, err := t.Apply(msg)
 	if err != nil {
 		fmt.Printf("Apply err: %v", err)
+		return err
 	}
-	t.totalGas += gasUsed
+	t.totalGas += result.GasUsed
 
 	logs := t.state.Logs()
 
@@ -211,14 +205,14 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TxHash:            txn.Hash,
-		GasUsed:           gasUsed,
+		GasUsed:           result.GasUsed,
 	}
 
 	if t.config.Byzantium {
 		// The suicided accounts are set as deleted for the next iteration
 		t.state.CleanDeleteObjects(true)
 
-		if failed {
+		if result.Failed() {
 			receipt.SetStatus(types.ReceiptFailed)
 		} else {
 			receipt.SetStatus(types.ReceiptSuccess)
@@ -276,9 +270,9 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (gasUsed uint64, failed bool, err error) {
+func (t *Transition) Apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	s := t.state.Snapshot()
-	result, err := t.apply(msg)
+	result, err = t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -287,15 +281,7 @@ func (t *Transition) Apply(msg *types.Transaction) (gasUsed uint64, failed bool,
 		t.r.PostHook(t)
 	}
 
-	if result == nil {
-		return 0, false, err
-	}
-
-	t.returnValue = result.ReturnValue
-
-	failed = result.Failed() || err != nil
-
-	return result.GasUsed, failed, err
+	return
 }
 
 // ContextPtr returns reference of context
@@ -389,12 +375,12 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	gasAvailable := msg.Gas - t.intrinsicGasCost(msg)
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasAvailable > msg.Gas {
-		return result, err
+		return nil, fmt.Errorf("out of gas")
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return result, fmt.Errorf("not enough funds for transfer with given value")
+		return nil, fmt.Errorf("not enough funds for transfer with given value")
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)

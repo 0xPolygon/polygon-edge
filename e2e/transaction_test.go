@@ -205,8 +205,14 @@ func TestEthTransfer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			receipt, err := srv.WaitForReceipt(ctx, txnHash)
-			assert.NoError(t, err)
-			assert.NotNil(t, receipt)
+
+			if testCase.shouldSuccess {
+				assert.NoError(t, err)
+				assert.NotNil(t, receipt)
+			} else { // When an invalid transaction is supplied, there should be no receipt.
+				assert.Error(t, err)
+				assert.Nil(t, receipt)
+			}
 
 			if testCase.shouldSuccess {
 				fee = new(big.Int).Mul(

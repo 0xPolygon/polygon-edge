@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"github.com/0xPolygon/minimal/state/runtime"
 	"sync"
 	"testing"
 	"time"
@@ -215,7 +216,7 @@ type mockStore struct {
 	receipts     map[types.Hash][]*types.Receipt
 }
 
-func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
 	panic("implement me")
 }
 
