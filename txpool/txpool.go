@@ -53,8 +53,7 @@ type TxPool struct {
 	sorted *txPriceHeap
 
 	// network stack
-	network *network.Server
-	topic   *network.Topic
+	topic *network.Topic
 
 	sealing  bool
 	dev      bool
@@ -77,7 +76,6 @@ func NewTxPool(
 		store:      store,
 		idlePeriod: defaultIdlePeriod,
 		queue:      make(map[types.Address]*txQueue),
-		network:    network,
 		sorted:     newTxPriceHeap(),
 		sealing:    sealing,
 		forks:      forks,
