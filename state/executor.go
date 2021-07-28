@@ -514,10 +514,10 @@ func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
 	return false
 }
 
-func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	gasLimit := msg.Gas
+func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
+	gasLimit := c.Gas
 
-	if msg.Depth > int(1024)+1 {
+	if c.Depth > int(1024)+1 {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     runtime.ErrDepth,
@@ -525,10 +525,10 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) *runt
 	}
 
 	// Increment the nonce of the caller
-	t.state.IncrNonce(msg.Caller)
+	t.state.IncrNonce(c.Caller)
 
 	// Check if there if there is a collision and the address already exists
-	if t.hasCodeOrNonce(msg.Address) {
+	if t.hasCodeOrNonce(c.Address) {
 		return &runtime.ExecutionResult{
 			GasLeft: 0,
 			Err:     runtime.ErrContractAddressCollision,
@@ -540,19 +540,19 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) *runt
 
 	if t.config.EIP158 {
 		// Force the creation of the account
-		t.state.CreateAccount(msg.Address)
-		t.state.IncrNonce(msg.Address)
+		t.state.CreateAccount(c.Address)
+		t.state.IncrNonce(c.Address)
 	}
 
 	// Transfer the value
-	if err := t.transfer(msg.Caller, msg.Address, msg.Value); err != nil {
+	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     runtime.ErrNotEnoughFunds,
 		}
 	}
 
-	result := t.run(msg, host)
+	result := t.run(c, host)
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
@@ -584,7 +584,7 @@ func (t *Transition) applyCreate(msg *runtime.Contract, host runtime.Host) *runt
 	}
 
 	result.GasLeft -= gasCost
-	t.state.SetCode(msg.Address, result.ReturnValue)
+	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
 }
