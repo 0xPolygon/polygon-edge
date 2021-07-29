@@ -25,6 +25,13 @@ func expectJSONResult(data []byte, v interface{}) error {
 	return nil
 }
 
+func expectBatchJSONResult(data []byte, v interface{}) error {
+	if err := json.Unmarshal(data, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func TestDispatcherWebsocket(t *testing.T) {
 	store := newMockStore()
 
@@ -152,4 +159,21 @@ func TestDispatcherFuncDecode(t *testing.T) {
 			t.Fatal("bad")
 		}
 	}
+}
+
+func TestDispatcherBatchRequest(t *testing.T) {
+	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
+	s.registerEndpoints()
+
+	resp, err := s.Handle([]byte(`[
+    {"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x1", true]},
+    {"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
+    {"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]}
+]`))
+	assert.NoError(t, err)
+
+	var res []Response
+	assert.NoError(t, expectBatchJSONResult(resp, &res))
+	assert.Len(t, res, 3)
+	assert.Equal(t, res[0].Error, internalError)
 }
