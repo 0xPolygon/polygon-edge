@@ -754,7 +754,7 @@ func (i *Ibft) runRoundChangeState() {
 			// start a new round inmediatly
 			i.state.view.Round = msg.View.Round
 			i.setState(AcceptState)
-		} else if num == i.state.validators.MinFaultyNodes()+1 {
+		} else if num == i.state.validators.MaxFaultyNodes()+1 {
 			// weak certificate, try to catch up if our round number is smaller
 			if i.state.view.Round < msg.View.Round {
 				// update timer

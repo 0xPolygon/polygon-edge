@@ -339,8 +339,7 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 
 	// deduct the upfront max gas cost
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
-	// TODO: No need to reassign upfrontGasCost on the left
-	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
+	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 	balance := t.state.GetBalance(msg.From)
 
 	// TODO: Remove if, let SubBalance return error
