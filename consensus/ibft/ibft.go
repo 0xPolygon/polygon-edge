@@ -506,9 +506,9 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timerCh := i.randomTimeout()
+	timeout := i.randomTimeout()
 	for i.getState() == AcceptState {
-		msg, ok := i.getNextMessage(timerCh)
+		msg, ok := i.getNextMessage(timeout)
 		if !ok {
 			return
 		}
@@ -571,9 +571,9 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timerCh := i.randomTimeout()
+	timeout := i.randomTimeout()
 	for i.getState() == ValidateState {
-		msg, ok := i.getNextMessage(timerCh)
+		msg, ok := i.getNextMessage(timeout)
 		if !ok {
 			// closing
 			return
@@ -733,10 +733,9 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timerCh := i.randomTimeout()
-
+	timeout := i.randomTimeout()
 	for i.getState() == RoundChangeState {
-		msg, ok := i.getNextMessage(timerCh)
+		msg, ok := i.getNextMessage(timeout)
 		if !ok {
 			// closing
 			return
@@ -758,7 +757,7 @@ func (i *Ibft) runRoundChangeState() {
 			// weak certificate, try to catch up if our round number is smaller
 			if i.state.view.Round < msg.View.Round {
 				// update timer
-				timerCh = i.randomTimeout()
+				timeout = i.randomTimeout()
 				sendRoundChange(msg.View.Round)
 			}
 		}
@@ -845,20 +844,13 @@ func (i *Ibft) forceTimeout() {
 }
 
 // randomTimeout calculates the timeout duration depending on the current round
-func (i *Ibft) randomTimeout() chan struct{} {
+func (i *Ibft) randomTimeout() time.Duration {
 	timeout := time.Duration(10000) * time.Millisecond
 	round := i.state.view.Round
 	if round > 0 {
 		timeout += time.Duration(math.Pow(2, float64(round))) * time.Second
 	}
-
-	doneCh := make(chan struct{})
-	go func() {
-		time.Sleep(timeout)
-		doneCh <- struct{}{}
-	}()
-
-	return doneCh
+	return timeout
 }
 
 // isSealing checks if the current node is sealing blocks
@@ -946,10 +938,8 @@ func (i *Ibft) Close() error {
 }
 
 // getNextMessage reads a new message from the message queue
-func (i *Ibft) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
-	if stopCh == nil {
-		stopCh = make(chan struct{})
-	}
+func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
+	timeoutCh := time.After(timeout)
 	for {
 		msg := i.msgQueue.readMessage(i.getState(), i.state.view)
 		if msg != nil {
@@ -964,7 +954,7 @@ func (i *Ibft) getNextMessage(stopCh chan struct{}) (*proto.MessageReq, bool) {
 		// wait until there is a new message or
 		// someone closes the stopCh (i.e. timeout for round change)
 		select {
-		case <-stopCh:
+		case <-timeoutCh:
 			return nil, true
 		case <-i.closeCh:
 			return nil, false
