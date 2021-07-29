@@ -35,30 +35,20 @@ func (t *Txpool) Content() (interface{}, error) {
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address] = make(map[uint64]*transaction)
 		for nonce, tx := range nonces {
-			// placeholder block to pass toTransaction
-			mockBlock := &types.Block{
-				Header: &types.Header{
-					Hash: types.Hash{0x0},
-					Number: uint64(0),
-				},
-			}
+			blockHash, _ := t.d.store.ReadTxLookup(tx.Hash)
+			block, _ := t.d.store.GetBlockByHash(blockHash, false)
 			// using 0 as txIndex
-			pendingRpcTxns[address][nonce] = toTransaction(tx, mockBlock, 0)
+			pendingRpcTxns[address][nonce] = toTransaction(tx, block, 0)
 		}
   }
 	queuedRpcTxns := make(map[types.Address]map[uint64]*transaction)
 	for address, nonces := range queuedTxs {
 		queuedRpcTxns[address] = make(map[uint64]*transaction)
 		for nonce, tx := range nonces {
-			// placeholder block to pass toTransaction
-			mockBlock := &types.Block{
-				Header: &types.Header{
-					Hash: types.Hash{0x0},
-					Number: uint64(0),
-				},
-			}
+			blockHash, _ := t.d.store.ReadTxLookup(tx.Hash)
+			block, _ := t.d.store.GetBlockByHash(blockHash, false)
 			// using 0 as txIndex
-			queuedRpcTxns[address][nonce] = toTransaction(tx, mockBlock, 0)
+			queuedRpcTxns[address][nonce] = toTransaction(tx, block, 0)
 		}
   }
 
