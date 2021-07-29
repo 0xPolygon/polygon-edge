@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -23,12 +24,45 @@ var discProto = "/disc/0.1"
 
 const defaultBucketSize = 20
 
+// referencePeer is a representation of the peer the node is requesting for new peers
+type referencePeer struct {
+	id     peer.ID
+	stream interface{}
+}
+
+type referencePeers []*referencePeer
+
+func (ps *referencePeers) find(id peer.ID) *referencePeer {
+	for _, p := range *ps {
+		if p.id == id {
+			return p
+		}
+	}
+	return nil
+}
+
+func (ps *referencePeers) delete(id peer.ID) *referencePeer {
+	idx := -1
+	for i, p := range *ps {
+		if p.id == id {
+			idx = i
+			break
+		}
+	}
+	if idx != -1 {
+		deletePeer := (*ps)[idx]
+		(*ps) = append((*ps)[:idx], (*ps)[idx+1:]...)
+		return deletePeer
+	}
+	return nil
+}
+
 type discovery struct {
 	proto.UnimplementedDiscoveryServer
 	srv          *Server
 	routingTable *kb.RoutingTable
 
-	peers     []peer.ID
+	peers     referencePeers
 	peersLock sync.Mutex
 
 	notifyCh chan struct{}
@@ -43,7 +77,7 @@ func (d *discovery) setBootnodes(bootnodes []*peer.AddrInfo) {
 
 func (d *discovery) setup() error {
 	d.notifyCh = make(chan struct{}, 5)
-	d.peers = []peer.ID{}
+	d.peers = referencePeers{}
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
 
@@ -69,21 +103,26 @@ func (d *discovery) setup() error {
 
 	// send all the nodes we connect to the routing table
 	err = d.srv.SubscribeFn(func(evnt *PeerEvent) {
-		if evnt.Type != PeerEventConnected {
-			return
-		}
 		peerID := evnt.PeerID
-
-		// add peer to the routing table and to our local peer
-		_, err := d.routingTable.TryAddPeer(peerID, false, false)
-		if err != nil {
-			d.srv.logger.Error("failed to add peer to routing table", "err", err)
-			return
+		switch evnt.Type {
+		case PeerEventConnected:
+			// add peer to the routing table and to our local peer
+			_, err := d.routingTable.TryAddPeer(peerID, false, false)
+			if err != nil {
+				d.srv.logger.Error("failed to add peer to routing table", "err", err)
+				return
+			}
+			d.peersLock.Lock()
+			d.peers = append(d.peers, &referencePeer{
+				id:     peerID,
+				stream: nil,
+			})
+			d.peersLock.Unlock()
+		case PeerEventDisconnected:
+			d.peersLock.Lock()
+			d.peers.delete(peerID)
+			d.peersLock.Unlock()
 		}
-
-		d.peersLock.Lock()
-		d.peers = append(d.peers, peerID)
-		d.peersLock.Unlock()
 	})
 	if err != nil {
 		return err
@@ -113,12 +152,35 @@ func (d *discovery) call(peerID peer.ID) error {
 	return nil
 }
 
-func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
-	conn, err := d.srv.NewProtoStream(discProto, peerID)
+func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
+	d.peersLock.Lock()
+	defer d.peersLock.Unlock()
+
+	p := d.peers.find(peerID)
+	if p == nil {
+		return nil, fmt.Errorf("peer not found in list")
+	}
+
+	// return the existing stream if stream has been opened
+	if p.stream != nil {
+		return p.stream, nil
+	}
+
+	stream, err := d.srv.NewProtoStream(discProto, peerID)
 	if err != nil {
 		return nil, err
 	}
-	clt := proto.NewDiscoveryClient(conn.(*rawGrpc.ClientConn))
+	p.stream = stream
+
+	return p.stream, nil
+}
+
+func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
+	stream, err := d.getStream(peerID)
+	if err != nil {
+		return nil, err
+	}
+	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
 	if err != nil {
@@ -161,7 +223,7 @@ func (d *discovery) handleDiscovery() {
 		// take a random peer and find peers
 		if len(d.peers) > 0 {
 			target := d.peers[rand.Intn(len(d.peers))]
-			if err := d.call(target); err != nil {
+			if err := d.call(target.id); err != nil {
 				d.srv.logger.Error("failed to dial bootnode", "err", err)
 			}
 		}
