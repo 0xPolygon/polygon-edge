@@ -20,7 +20,7 @@ func TestKeyEncoding(t *testing.T) {
 		priv, _ := GenerateKey()
 
 		// marshall private key
-		buf, err := MarshallPrivateKey(priv)
+		buf, err := MarshalPrivateKey(priv)
 		assert.NoError(t, err)
 
 		priv0, err := ParsePrivateKey(buf)
@@ -29,7 +29,7 @@ func TestKeyEncoding(t *testing.T) {
 		assert.Equal(t, priv, priv0)
 
 		// marshall public key
-		buf = MarshallPublicKey(&priv.PublicKey)
+		buf = MarshalPublicKey(&priv.PublicKey)
 
 		pub0, err := ParsePublicKey(buf)
 		assert.NoError(t, err)

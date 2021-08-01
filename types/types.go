@@ -3,8 +3,8 @@ package types
 import (
 	"database/sql/driver"
 	"fmt"
-	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/helper/keccak"
@@ -63,32 +63,24 @@ func (h *Hash) Scan(src interface{}) error {
 func (a Address) eip55() string {
 	addrBytes := a.Bytes() // 20 bytes
 
-	// Encode to hex
-	lowercaseHex := hex.EncodeToHex(addrBytes)[2:] // without the 0x prefix
-
+	// Encode to hex without the 0x prefix
+	lowercaseHex := hex.EncodeToHex(addrBytes)[2:]
 	hashedAddress := hex.EncodeToHex(keccak.Keccak256(nil, []byte(lowercaseHex)))[2:]
 
-	checksummedBuffer := ""
+	result := make([]rune, len(lowercaseHex))
 	// Iterate over each character in the hashed address
-	for index, character := range lowercaseHex {
-		if character >= '0' && character <= '9' {
-			// Numbers in range [0, 9] are ignored,
+	for idx, ch := range lowercaseHex {
+		if ch >= '0' && ch <= '9' || hashedAddress[idx] >= '0' && hashedAddress[idx] <= '7' {
+			// Numbers in range [0, 9] are ignored (as well as hashed values [0, 7]),
 			// because they can't be uppercased
-			checksummedBuffer += string(character)
+			result[idx] = ch
 		} else {
-			// Look through range {a, b, c, d, e, f}
-
-			// Check if the corresponding hex digit in the hash is 8 or higher
-			hashedNibble, _ := strconv.ParseInt(string(hashedAddress[index]), 16, 64)
-			if hashedNibble > 7 {
-				checksummedBuffer += strings.ToUpper(string(character))
-			} else {
-				checksummedBuffer += string(character)
-			}
+			// The current character / hashed character is in the range [8, f]
+			result[idx] = unicode.ToUpper(ch)
 		}
 	}
 
-	return "0x" + checksummedBuffer
+	return "0x" + string(result)
 }
 
 func (a Address) String() string {
