@@ -99,7 +99,7 @@ func (c *currentState) setState(s IbftState) {
 
 // NumValid returns the number of required messages
 func (c *currentState) NumValid() int {
-	return 2 * c.validators.MinFaultyNodes()
+	return 2 * c.validators.MaxFaultyNodes()
 }
 
 // getErr returns the current error, if any, and consumes it
@@ -111,7 +111,7 @@ func (c *currentState) getErr() error {
 }
 
 func (c *currentState) maxRound() (maxRound uint64, found bool) {
-	num := c.validators.MinFaultyNodes() + 1
+	num := c.validators.MaxFaultyNodes() + 1
 
 	for k, round := range c.roundMessages {
 		if len(round) < num {
@@ -282,9 +282,8 @@ func (v *ValidatorSet) Includes(addr types.Address) bool {
 	return v.Index(addr) != -1
 }
 
-// TODO: Rename to MAX instead of MIN faulty nodes
-// MinFaultyNodes returns the required minimum number of faulty nodes, based on the current validator set
-func (v *ValidatorSet) MinFaultyNodes() int {
+// MaxFaultyNodes returns the maximum number of allowed faulty nodes, based on the current validator set
+func (v *ValidatorSet) MaxFaultyNodes() int {
 	// numberOfValidators / 3
 	return int(math.Ceil(float64(len(*v))/3)) - 1
 }

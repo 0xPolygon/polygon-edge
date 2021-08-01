@@ -147,18 +147,16 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 	snap := parentSnap.Copy()
 
-	// TODO: This is difficult to understand, and the error is unneeded
-	// saveSnap is a callback function for saving the passed in header to the snapshot store
-	saveSnap := func(h *types.Header) error {
+	// saveSnap is a callback function to set height and hash in current snapshot with given header
+	// and store the snapshot to snapshot store
+	saveSnap := func(h *types.Header) {
 		snap.Number = h.Number
 		snap.Hash = h.Hash.String()
-
 		i.store.add(snap)
 
+		// use saved snapshot as new parent and clone it for next
 		parentSnap = snap
 		snap = parentSnap.Copy()
-
-		return nil
 	}
 
 	for _, h := range headers {
@@ -178,9 +176,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			// during a checkpoint block, we reset the votes
 			// and there cannot be any proposals
 			snap.Votes = nil
-			if err := saveSnap(h); err != nil {
-				return err
-			}
+			saveSnap(h)
 
 			// remove in-memory snapshots from two epochs before this one
 			epoch := int(number/i.epochSize) - 2
@@ -263,9 +259,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 		}
 
 		if !snap.Equal(parentSnap) {
-			if err := saveSnap(h); err != nil {
-				return nil
-			}
+			saveSnap(h)
 		}
 	}
 
