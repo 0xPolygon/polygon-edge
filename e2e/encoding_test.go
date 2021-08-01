@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/currency"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ func TestEncoding(t *testing.T) {
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.Premine(from, currency.EthToWei(10))
+		config.Premine(from, tests.EthToWei(10))
 	})
 	srv := srvs[0]
 

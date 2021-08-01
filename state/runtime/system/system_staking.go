@@ -1,6 +1,8 @@
 package system
 
-import "github.com/0xPolygon/minimal/staking"
+import (
+	"github.com/0xPolygon/minimal/staking"
+)
 
 // stakingHandler implements the staking logic for the System runtime
 type stakingHandler struct {

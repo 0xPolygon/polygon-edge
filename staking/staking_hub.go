@@ -151,10 +151,7 @@ func (sh *StakingHub) AddPendingEvent(event PendingEvent) {
 	sh.EventQueueMutex.Lock()
 	defer sh.EventQueueMutex.Unlock()
 
-	// Check to avoid double addition
-	if !sh.hasEvent(event) {
-		sh.EventQueue = append(sh.EventQueue, event)
-	}
+	sh.EventQueue = append(sh.EventQueue, event)
 }
 
 // RemovePendingEvent removes the pending event from the event queue if it exists.
@@ -277,7 +274,9 @@ func (sh *StakingHub) marshalJSON(mappings []stakerMapping) (io.Reader, error) {
 	return bytes.NewReader(b), nil
 }
 
-// isStaker is a helper method to check whether or not an address has a staked balance
+// isStaker is a helper method to check whether or not an address has a staked balance.
+// The staking status is block based, meaning that if the address is a staker at block A, this
+// method will return true for all calls within the context of block A.
 func (sh *StakingHub) isStaker(address types.Address) bool {
 	if _, ok := sh.StakingMap[address]; ok {
 		return true
@@ -399,11 +398,33 @@ func (sh *StakingHub) getStakerMappings() []stakerMapping {
 	return mappings
 }
 
-// ClearEvents resets the event queue. Called from the consensus layer
-// to discard any events that might have been created during initial block creation
+// ClearEvents resets the event queue
 func (sh *StakingHub) ClearEvents() {
 	sh.EventQueueMutex.Lock()
 	defer sh.EventQueueMutex.Unlock()
 
 	sh.EventQueue = make([]PendingEvent, 0)
+}
+
+// ClearUnknownEvents purges the event queue of UnknownEvents
+func (sh *StakingHub) ClearUnknownEvents() {
+	sh.EventQueueMutex.Lock()
+	defer sh.EventQueueMutex.Unlock()
+
+	foundIndxs := make([]int, 0)
+	for indx, el := range sh.EventQueue {
+		if el.EventType == UnknownEvent {
+			foundIndxs = append(foundIndxs, indx)
+		}
+	}
+
+	if len(foundIndxs) > 0 {
+		prevSize := len(foundIndxs)
+
+		for _, foundIndx := range foundIndxs {
+			sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
+		}
+
+		sh.log(fmt.Sprintf("Cleared [%d] unknown pending events", prevSize), logWarning)
+	}
 }

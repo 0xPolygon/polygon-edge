@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/currency"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -47,8 +47,8 @@ func TestPoS_Stake(t *testing.T) {
 
 	numGenesisValidators := IBFTMinNodes
 	ibftManager := framework.NewIBFTServersManager(t, numGenesisValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.PremineWithStake(stakerAddr, currency.EthToWei(10), currency.EthToWei(10))
-		config.PremineValidatorBalance(big.NewInt(0), currency.EthToWei(10))
+		config.PremineWithStake(stakerAddr, tests.EthToWei(10), tests.EthToWei(10))
+		config.PremineValidatorBalance(big.NewInt(0), tests.EthToWei(10))
 		config.SetSeal(true)
 	})
 
@@ -64,7 +64,7 @@ func TestPoS_Stake(t *testing.T) {
 		To:       &stakingContractAddr,
 		GasPrice: big.NewInt(10000),
 		Gas:      1000000,
-		Value:    currency.EthToWei(1),
+		Value:    tests.EthToWei(1),
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -90,7 +90,7 @@ func TestPoS_Unstake(t *testing.T) {
 	numGenesisValidators := IBFTMinNodes + 1
 	ibftManager := framework.NewIBFTServersManager(t, numGenesisValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		// Premine to send unstake transaction
-		config.PremineValidatorBalance(currency.EthToWei(1), currency.EthToWei(10))
+		config.PremineValidatorBalance(tests.EthToWei(1), tests.EthToWei(10))
 		config.SetSeal(true)
 	})
 
@@ -121,7 +121,7 @@ func TestPoS_Unstake(t *testing.T) {
 		To:       &unstakingContractAddr,
 		GasPrice: big.NewInt(10000),
 		Gas:      1000000,
-		Value:    currency.EthToWei(0),
+		Value:    tests.EthToWei(0),
 	}
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -146,7 +146,7 @@ func TestPoS_UnstakeAttack(t *testing.T) {
 	numGenesisValidators := IBFTMinNodes + 1
 	gasPrice := big.NewInt(10000)
 	receiptArr := make([]*web3.Receipt, numGenesisValidators)
-	defaultBalance := currency.EthToWei(10)
+	defaultBalance := tests.EthToWei(10)
 
 	// Set up the manager
 	ibftManager := framework.NewIBFTServersManager(t, numGenesisValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
@@ -178,7 +178,7 @@ func TestPoS_UnstakeAttack(t *testing.T) {
 			To:       &unstakingContractAddr,
 			GasPrice: gasPrice,
 			Gas:      1000000,
-			Value:    currency.EthToWei(0),
+			Value:    tests.EthToWei(0),
 		}
 
 		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
@@ -222,8 +222,9 @@ func TestPoS_UnstakeAttack(t *testing.T) {
 		fee,
 	)
 
-	actualStakedBalance := getStakedBalance(referenceAddr, srv.JSONRPC(), t)
-	actualBalance := getAccountBalance(referenceAddr, srv.JSONRPC(), t)
+	client := srv.JSONRPC()
+	actualStakedBalance := getStakedBalance(referenceAddr, client, t)
+	actualBalance := getAccountBalance(referenceAddr, client, t)
 
 	// Make sure the account balance matches up
 	assert.Equalf(t,

@@ -176,6 +176,8 @@ func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64)
 			}
 		}
 	}
+
+	clearUnknownEvents()
 }
 
 // commitApprovedEvents is a helper method for committing pending events that passed all checks
@@ -205,6 +207,14 @@ func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64)
 			}
 		}
 	}
+
+	clearUnknownEvents()
+}
+
+// clearUnknownEvents purges the staking event queue of any leftover unknown events
+func clearUnknownEvents() {
+	hub := staking.GetStakingHub()
+	hub.ClearUnknownEvents()
 }
 
 // ProcessBlock already does all the handling of the whole process, TODO

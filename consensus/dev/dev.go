@@ -151,6 +151,9 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 	// Commit the changes
 	_, root := transition.Commit()
+	// Since the block transactions are firstly written, then the block is built (causing the txns to be written again),
+	// no need to double add staking / unstaking events that might have been added in the initial txn write,
+	// and have complicated logic in unstaking
 	staking.GetStakingHub().ClearEvents()
 
 	// Update the header

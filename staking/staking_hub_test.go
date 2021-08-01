@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/helper/currency"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -74,19 +74,19 @@ func TestStakingHub_GetStakedBalance(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("123"),
-			currency.EthToWei(50), // 50 ETH
+			tests.EthToWei(50), // 50 ETH
 		},
 
 		// Valid account #2
 		{
 			types.StringToAddress("456"),
-			currency.EthToWei(10), // 10 ETH
+			tests.EthToWei(10), // 10 ETH
 		},
 
 		// Valid account #3
 		{
 			types.StringToAddress("789"),
-			currency.EthToWei(5), // 5 ETH
+			tests.EthToWei(5), // 5 ETH
 		},
 	}
 
@@ -114,22 +114,22 @@ func TestStakingHub_IncreaseStake(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("123"),
-			currency.EthToWei(50), // 50 ETH
-			currency.EthToWei(5),  // 5 ETH
+			tests.EthToWei(50), // 50 ETH
+			tests.EthToWei(5),  // 5 ETH
 		},
 
 		// Valid account #2
 		{
 			types.StringToAddress("456"),
-			currency.EthToWei(10), // 10 ETH
-			currency.EthToWei(1),  // 1 ETH
+			tests.EthToWei(10), // 10 ETH
+			tests.EthToWei(1),  // 1 ETH
 		},
 
 		// Valid account #3
 		{
 			types.StringToAddress("789"),
-			currency.EthToWei(0),  // 0 ETH
-			currency.EthToWei(10), // 10 ETH
+			tests.EthToWei(0),  // 0 ETH
+			tests.EthToWei(10), // 10 ETH
 		},
 	}
 
@@ -164,22 +164,22 @@ func TestStakingHub_DecreaseStake(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("123"),
-			currency.EthToWei(50), // 50 ETH
-			currency.EthToWei(5),  // 5 ETH
+			tests.EthToWei(50), // 50 ETH
+			tests.EthToWei(5),  // 5 ETH
 		},
 
 		// Valid account #2
 		{
 			types.StringToAddress("456"),
-			currency.EthToWei(10), // 10 ETH
-			currency.EthToWei(1),  // 1 ETH
+			tests.EthToWei(10), // 10 ETH
+			tests.EthToWei(1),  // 1 ETH
 		},
 
 		// Invalid account #3
 		{
 			types.StringToAddress("789"),
-			currency.EthToWei(0),  // 0 ETH
-			currency.EthToWei(10), // 10 ETH
+			tests.EthToWei(0),  // 0 ETH
+			tests.EthToWei(10), // 10 ETH
 		},
 	}
 
@@ -220,19 +220,19 @@ func TestStakingHub_ResetStake(t *testing.T) {
 		// Valid account #1
 		{
 			types.StringToAddress("123"),
-			currency.EthToWei(50), // 50 ETH
+			tests.EthToWei(50), // 50 ETH
 		},
 
 		// Valid account #2
 		{
 			types.StringToAddress("456"),
-			currency.EthToWei(10), // 10 ETH
+			tests.EthToWei(10), // 10 ETH
 		},
 
 		// Valid account #3
 		{
 			types.StringToAddress("789"),
-			currency.EthToWei(0), // 0 ETH
+			tests.EthToWei(0), // 0 ETH
 		},
 	}
 

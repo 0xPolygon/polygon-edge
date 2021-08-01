@@ -1,4 +1,4 @@
-package currency
+package tests
 
 import "math/big"
 

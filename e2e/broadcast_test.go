@@ -9,13 +9,13 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/currency"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcast(t *testing.T) {
-	tests := []struct {
+	testTable := []struct {
 		name     string
 		numNodes int
 		// Number of nodes that connects to left node
@@ -39,11 +39,11 @@ func TestBroadcast(t *testing.T) {
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
-		config.Premine(senderAddr, currency.EthToWei(10))
+		config.Premine(senderAddr, tests.EthToWei(10))
 		config.SetSeal(true)
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
@@ -71,7 +71,7 @@ func TestBroadcast(t *testing.T) {
 				Nonce:    0,
 				From:     senderAddr,
 				To:       &receiverAddr,
-				Value:    currency.EthToWei(1),
+				Value:    tests.EthToWei(1),
 				Gas:      1000000,
 				GasPrice: big.NewInt(10000),
 				Input:    []byte{},

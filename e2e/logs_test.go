@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/currency"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 )
@@ -16,7 +16,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	_, addr := framework.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(addr, currency.EthToWei(10))
+		config.Premine(addr, tests.EthToWei(10))
 		config.SetSeal(true)
 	})
 	srv := srvs[0]
@@ -51,7 +51,7 @@ func TestNewFilter_Block(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(from, currency.EthToWei(10))
+		config.Premine(from, tests.EthToWei(10))
 		config.SetSeal(true)
 	})
 	srv := srvs[0]
