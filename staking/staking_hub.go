@@ -177,17 +177,6 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 	return false
 }
 
-// hasEvent checks if an identical event is present in the queue. Not thread safe
-func (sh *StakingHub) hasEvent(event PendingEvent) bool {
-	for _, el := range sh.EventQueue {
-		if el.Compare(event) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // saveToDisk is a helper method for periodically saving the stake data to disk
 func (sh *StakingHub) saveToDisk() {
 	for {
