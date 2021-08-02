@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -187,6 +188,24 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 		return 0
 	}
 	return account.Nonce
+}
+
+func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) *big.Int {
+	zeroValue := big.NewInt(0)
+
+	snap, err := t.state.NewSnapshotAt(root)
+	if err != nil {
+		return zeroValue
+	}
+	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
+	if !ok {
+		return zeroValue
+	}
+	var account state.Account
+	if err = account.UnmarshalRlp(result); err != nil {
+		return zeroValue
+	}
+	return account.Balance
 }
 
 // setupConsensus sets up the consensus mechanism

@@ -2,11 +2,11 @@ package txpool
 
 import (
 	"fmt"
-	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"strconv"
 	"testing"
 
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/network"
@@ -18,6 +18,26 @@ import (
 var forks = &chain.Forks{
 	Homestead: chain.NewFork(0),
 	Istanbul:  chain.NewFork(0),
+}
+
+type mockStore struct {
+}
+
+func (m *mockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
+	return 0
+}
+
+func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (m *mockStore) GetBalance(root types.Hash, addr types.Address) *big.Int {
+	balance, _ := big.NewInt(0).SetString("10000000000000000000", 10)
+	return balance
+}
+
+func (m *mockStore) Header() *types.Header {
+	return &types.Header{}
 }
 
 const validGasLimit uint64 = 100000
@@ -96,6 +116,7 @@ func TestMultipleTransactions(t *testing.T) {
 		Nonce:    10,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn0))
 	assert.NoError(t, pool.addImpl("", txn0))
@@ -108,6 +129,7 @@ func TestMultipleTransactions(t *testing.T) {
 		From:     from2,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
 	assert.NoError(t, pool.addImpl("", txn1))
@@ -151,21 +173,6 @@ func TestBroadcast(t *testing.T) {
 
 	assert.NoError(t, pool1.AddTx(txn1))
 	fmt.Println(pool1.Length())
-}
-
-type mockStore struct {
-}
-
-func (m *mockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
-	return 0
-}
-
-func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
-	return nil, false
-}
-
-func (m *mockStore) Header() *types.Header {
-	return &types.Header{}
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {

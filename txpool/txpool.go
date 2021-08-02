@@ -4,11 +4,12 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/minimal/chain"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
@@ -25,12 +26,18 @@ const (
 )
 
 var (
-	ErrIntrinsicGas = errors.New("intrinsic gas too low")
+	ErrIntrinsicGas      = errors.New("intrinsic gas too low")
+	ErrNegativeValue     = errors.New("negative value")
+	ErrNonEncryptedTxn   = errors.New("non-encrypted transaction")
+	ErrInvalidSender     = errors.New("invalid sender")
+	ErrNonceTooLow       = errors.New("nonce too low")
+	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
 )
 
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
+	GetBalance(root types.Hash, addr types.Address) *big.Int
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
@@ -171,19 +178,6 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 		return err
 	}
 
-	if tx.From == types.ZeroAddress {
-		tx.From, err = t.signer.Sender(tx)
-		if err != nil {
-			return fmt.Errorf("invalid sender")
-		}
-	} else {
-		// only if we are in dev mode we can accept
-		// a transaction without validation
-		if !t.dev {
-			return fmt.Errorf("cannot accept non-encrypted txn")
-		}
-	}
-
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
 	txnsQueue, ok := t.queue[tx.From]
@@ -267,20 +261,51 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	}
 }
 
+// validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(tx *types.Transaction) error {
-	/*
-		if tx.Size() > 32*1024 {
-			return fmt.Errorf("oversize data")
-		}
-		if tx.Value.Sign() < 0 {
-			return fmt.Errorf("negative value")
-		}
-	*/
 	// Make sure the transaction has more gas than the basic transaction fee
 	intrinsicGas := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
 	if tx.Gas < intrinsicGas {
 		return ErrIntrinsicGas
 	}
+
+	// Check if the transaction has a strictly positive value
+	if tx.Value.Sign() < 0 {
+		return ErrNegativeValue
+	}
+
+	if !t.dev && tx.From != types.ZeroAddress {
+		// Only if we are in dev mode we can accept
+		// a transaction without validation
+		return ErrNonEncryptedTxn
+	}
+
+	// Check if the transaction is signed properly
+	var signerErr error
+	if tx.From == types.ZeroAddress {
+		tx.From, signerErr = t.signer.Sender(tx)
+		if signerErr != nil {
+			return ErrInvalidSender
+		}
+	}
+
+	// Grab the state root for the latest block
+	stateRoot := t.store.Header().StateRoot
+	accountBalance := t.store.GetBalance(stateRoot, tx.From)
+
+	// Check if the sender has enough funds to execute the transaction
+	if accountBalance.Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
+	}
+
+	// Check nonce ordering
+	if t.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+		return ErrNonceTooLow
+	}
+
+	// Make sure the transaction doesn't exceed the block limit
+	// TODO: Awaiting separate PR
+
 	return nil
 }
 
