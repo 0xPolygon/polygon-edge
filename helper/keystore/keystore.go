@@ -10,7 +10,7 @@ import (
 type createFn func() ([]byte, error)
 
 // CreateIfNotExists generates a private key at the specified path,
-// or reads it if a key file is present
+// or reads the file on that path if it is present
 func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -20,9 +20,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	var keyBuff []byte
 	if !os.IsNotExist(err) {
 		// Key exists
-
-		// Read the Base64 encoded key from the disk.
-		// Base64 decoding is done later on
+		
 		keyBuff, err = ioutil.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read private key from disk (%s), %v", path, err)

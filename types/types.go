@@ -58,9 +58,9 @@ func (h *Hash) Scan(src interface{}) error {
 	return nil
 }
 
-// eip55 returns the checksummed address with 0x prefix
+// checksumEncode returns the checksummed address with 0x prefix, as by EIP-55
 // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
-func (a Address) eip55() string {
+func (a Address) checksumEncode() string {
 	addrBytes := a.Bytes() // 20 bytes
 
 	// Encode to hex without the 0x prefix
@@ -68,7 +68,7 @@ func (a Address) eip55() string {
 	hashedAddress := hex.EncodeToHex(keccak.Keccak256(nil, []byte(lowercaseHex)))[2:]
 
 	result := make([]rune, len(lowercaseHex))
-	// Iterate over each character in the hashed address
+	// Iterate over each character in the lowercase hex address
 	for idx, ch := range lowercaseHex {
 		if ch >= '0' && ch <= '9' || hashedAddress[idx] >= '0' && hashedAddress[idx] <= '7' {
 			// Numbers in range [0, 9] are ignored (as well as hashed values [0, 7]),
@@ -84,7 +84,7 @@ func (a Address) eip55() string {
 }
 
 func (a Address) String() string {
-	return a.eip55()
+	return a.checksumEncode()
 }
 
 func (a Address) Bytes() []byte {
