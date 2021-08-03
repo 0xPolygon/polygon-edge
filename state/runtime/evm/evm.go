@@ -17,7 +17,7 @@ func NewEVM() *EVM {
 }
 
 // CanRun implements the runtime interface
-func (e *EVM) CanRun(_ *runtime.Contract, _ runtime.Host, _ *chain.ForksInTime) bool {
+func (e *EVM) CanRun(*runtime.Contract, runtime.Host, *chain.ForksInTime) bool {
 	return true
 }
 
