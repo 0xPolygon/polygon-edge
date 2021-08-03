@@ -56,8 +56,8 @@ func TestWS_Response(t *testing.T) {
 		address types.Address
 		balance *big.Int
 	}{
-		{types.StringToAddress("1"), big.NewInt(10)},
-		{types.StringToAddress("2"), big.NewInt(20)},
+		{types.StringToAddress("1"), framework.EthToWei(10)},
+		{types.StringToAddress("2"), framework.EthToWei(20)},
 	}
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
