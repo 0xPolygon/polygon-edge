@@ -293,47 +293,6 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-func (t *Transition) intrinsicGasCost(msg *types.Transaction) (uint64, error) {
-	cost := uint64(0)
-
-	// Contract creation is only paid on the homestead fork
-	if msg.IsContractCreation() && t.config.Homestead {
-		cost += 53000
-	} else {
-		cost += 21000
-	}
-
-	payload := msg.Input
-	if len(payload) > 0 {
-		zeros := uint64(0)
-		for i := 0; i < len(payload); i++ {
-			if payload[i] == 0 {
-				zeros++
-			}
-		}
-
-		nonZeros := uint64(len(payload)) - zeros
-		nonZeroCost := uint64(68)
-		if t.config.Istanbul {
-			nonZeroCost = 16
-		}
-
-		if (math.MaxUint64-cost)/nonZeroCost < nonZeros {
-			return 0, ErrIntrinsicGasOverflow
-		}
-
-		cost += nonZeros * nonZeroCost
-
-		if (math.MaxUint64-cost)/4 < zeros {
-			return 0, ErrIntrinsicGasOverflow
-		}
-
-		cost += zeros * 4
-	}
-
-	return cost, nil
-}
-
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	// deduct the upfront max gas cost
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
@@ -399,7 +358,7 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
-	intrinsicGasCost, err := t.intrinsicGasCost(msg)
+	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if err != nil {
 		return
 	}
@@ -664,7 +623,7 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 	return t.applyCall(c, c.Type, h)
 }
 
-func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) uint64 {
+func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {
 	cost := uint64(0)
 
 	// Contract creation is only paid on the homestead fork
@@ -676,21 +635,31 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) ui
 
 	payload := msg.Input
 	if len(payload) > 0 {
-		zeros := 0
+		zeros := uint64(0)
 		for i := 0; i < len(payload); i++ {
 			if payload[i] == 0 {
 				zeros++
 			}
 		}
-		nonZeros := len(payload) - zeros
-		cost += uint64(zeros) * 4
 
+		nonZeros := uint64(len(payload)) - zeros
 		nonZeroCost := uint64(68)
 		if isIstanbul {
 			nonZeroCost = 16
 		}
-		cost += uint64(nonZeros) * nonZeroCost
+
+		if (math.MaxUint64-cost)/nonZeroCost < nonZeros {
+			return 0, ErrIntrinsicGasOverflow
+		}
+
+		cost += nonZeros * nonZeroCost
+
+		if (math.MaxUint64-cost)/4 < zeros {
+			return 0, ErrIntrinsicGasOverflow
+		}
+
+		cost += zeros * 4
 	}
 
-	return cost
+	return cost, nil
 }
