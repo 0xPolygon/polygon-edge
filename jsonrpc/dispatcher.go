@@ -225,7 +225,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			d.logger.Debug("failed to dispatch", "method", "batch method", "err", err)
+			d.internalError("batch method", err)
 			errorResponse := Response{
 				ID: req.ID,
 				JSONRPC: "2.0",
