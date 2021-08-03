@@ -128,7 +128,7 @@ func TestEthTransfer(t *testing.T) {
 		sender        types.Address
 		recipient     types.Address
 		amount        *big.Int
-		shouldSuccess bool
+		shouldSucceed bool
 	}{
 		{
 			// ACC #1 -> ACC #3
@@ -206,7 +206,7 @@ func TestEthTransfer(t *testing.T) {
 			defer cancel()
 			receipt, err := srv.WaitForReceipt(ctx, txnHash)
 
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
 				assert.NoError(t, err)
 				assert.NotNil(t, receipt)
 			} else { // When an invalid transaction is supplied, there should be no receipt.
@@ -214,7 +214,7 @@ func TestEthTransfer(t *testing.T) {
 				assert.Nil(t, receipt)
 			}
 
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
 				fee = new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
 					big.NewInt(int64(txnObject.GasPrice)),
@@ -235,14 +235,14 @@ func TestEthTransfer(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
 				expectedSenderBalance = previousSenderBalance.Sub(
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
 				)
 			}
 			expectedReceiverBalance := previousReceiverBalance
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
 				expectedReceiverBalance = previousReceiverBalance.Add(
 					previousReceiverBalance,
 					testCase.amount,
