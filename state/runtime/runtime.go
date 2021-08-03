@@ -85,7 +85,7 @@ func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
 func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
 func (r *ExecutionResult) Reverted() bool  { return r.Err == ErrExecutionReverted }
 
-func (r *ExecutionResult) CalculateGasUsed(gasLimit uint64, refund uint64) {
+func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
 	r.GasUsed = gasLimit - r.GasLeft
 
 	// Refund can go up to half the gas used

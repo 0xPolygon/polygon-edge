@@ -425,7 +425,7 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	}
 
 	refund := txn.GetRefund()
-	result.CalculateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(msg.Gas, refund)
 
 	// refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
