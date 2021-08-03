@@ -186,6 +186,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		From:     addr1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	})
 
 	nonce, _ := pool.GetNonce(addr1)
@@ -198,6 +199,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Nonce:    1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	})
 
 	nonce, _ = pool.GetNonce(addr1)
@@ -212,6 +214,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 		GasPrice *big.Int
 		Nonce    uint64
 		Index    int
+		Value    *big.Int
 	}
 
 	addr1 := types.Address{0x1}
@@ -228,6 +231,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      testCase.Gas,
 				GasPrice: testCase.GasPrice,
 				Nonce:    testCase.Nonce,
+				Value:    testCase.Value,
 			})
 			assert.NoError(t, err)
 		}
@@ -242,6 +246,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      transaction.Gas,
 				GasPrice: transaction.GasPrice,
 				Nonce:    transaction.Nonce,
+				Value:    transaction.Value,
 			}
 
 			assert.EqualValues(t, testCase, actual)
@@ -257,11 +262,13 @@ func TestTxnQueue_Heap(t *testing.T) {
 				From:     addr1,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(2),
+				Value:    big.NewInt(0),
 			},
 			{
 				From:     addr2,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(1),
+				Value:    big.NewInt(0),
 			},
 		})
 
@@ -274,12 +281,14 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(2),
 				Nonce:    0,
+				Value:    big.NewInt(0),
 			},
 			{
 				From:     addr1,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(3),
 				Nonce:    1,
+				Value:    big.NewInt(0),
 			},
 		})
 	})
@@ -297,6 +306,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				From:     types.StringToAddress(strconv.Itoa(i + 1)),
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(int64(i + 1)),
+				Value:    big.NewInt(0),
 			}
 
 			addErr := pool.addImpl("", txns[i])
