@@ -238,7 +238,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		// unmarshal response from handleReq so that we can re-marshal as batch responses
 		var resp Response
 		if err := json.Unmarshal(response, &resp); err != nil {
-			d.logger.Debug("failed to dispatch", "method", "batch method", "err", err)
+			d.internalError("batch method", err)
 			errorResponse := Response{
 				ID: req.ID,
 				JSONRPC: "2.0",
