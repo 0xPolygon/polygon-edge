@@ -213,11 +213,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// log request
-	req.Body = ioutil.NopCloser(bytes.NewReader(data))
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(req.Body)
-	newStr := buf.String()
-	j.logger.Debug("handle", "request", newStr)
+	j.logger.Debug("handle", "request", string(data))
 
 	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
