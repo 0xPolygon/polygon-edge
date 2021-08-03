@@ -24,7 +24,7 @@ func TestState_FaultyNodes(t *testing.T) {
 	for _, c := range cases {
 		pool := newTesterAccountPool(int(c.Network))
 		vals := pool.ValidatorSet()
-		assert.Equal(t, vals.MinFaultyNodes(), int(c.Faulty))
+		assert.Equal(t, vals.MaxFaultyNodes(), int(c.Faulty))
 	}
 }
 

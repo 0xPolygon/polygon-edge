@@ -109,7 +109,7 @@ func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) 
 }
 
 type wsConn interface {
-	WriteMessage(b []byte) error
+	WriteMessage(messageType int, data []byte) error
 }
 
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {

@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -72,7 +73,7 @@ var ethSubscriptionTemplate = `{
 
 func (f *Filter) sendMessage(msg string) error {
 	res := fmt.Sprintf(ethSubscriptionTemplate, f.id, msg)
-	if err := f.ws.WriteMessage([]byte(res)); err != nil {
+	if err := f.ws.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
 		return err
 	}
 	return nil

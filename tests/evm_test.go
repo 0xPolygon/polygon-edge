@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -53,7 +54,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 
 	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 
-	executor := state.NewExecutor(&mainnetChainConfig, s)
+	executor := state.NewExecutor(&mainnetChainConfig, s, hclog.NewNullLogger())
 	executor.GetHash = func(*types.Header) func(i uint64) types.Hash {
 		return vmTestBlockHash
 	}
