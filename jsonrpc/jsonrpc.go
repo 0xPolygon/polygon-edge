@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
