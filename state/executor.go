@@ -399,9 +399,9 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	}
 
 	// 5. the purchased gas is enough to cover intrinsic usage
-	gasAvailable := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if gasAvailable > msg.Gas {
+	if gasLeft > msg.Gas {
 		return nil, ErrNotEnoughIntrinsicGas
 	}
 
@@ -418,10 +418,10 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	t.ctx.Origin = msg.From
 
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, gasAvailable)
+		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
 		txn.IncrNonce(msg.From)
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasAvailable)
+		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
 	refund := txn.GetRefund()
