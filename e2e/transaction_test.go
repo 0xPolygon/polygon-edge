@@ -214,13 +214,6 @@ func TestEthTransfer(t *testing.T) {
 				assert.Nil(t, receipt)
 			}
 
-			if testCase.shouldSucceed {
-				fee = new(big.Int).Mul(
-					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(int64(txnObject.GasPrice)),
-				)
-			}
-
 			// Fetch the balances after sending
 			balanceSender, err = rpcClient.Eth().GetBalance(
 				web3.Address(testCase.sender),
@@ -236,6 +229,11 @@ func TestEthTransfer(t *testing.T) {
 
 			expectedSenderBalance := previousSenderBalance
 			if testCase.shouldSucceed {
+				fee = new(big.Int).Mul(
+					big.NewInt(int64(receipt.GasUsed)),
+					big.NewInt(int64(txnObject.GasPrice)),
+				)
+
 				expectedSenderBalance = previousSenderBalance.Sub(
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
