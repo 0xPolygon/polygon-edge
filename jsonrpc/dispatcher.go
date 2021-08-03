@@ -205,7 +205,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
-	if len(x) == 0 || x[0] != '[' {
+	if len(x) == 0 {
+		return nil, invalidJSONRequest
+	}
+	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
 			return nil, invalidJSONRequest
