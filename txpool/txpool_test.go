@@ -2,10 +2,11 @@ package txpool
 
 import (
 	"fmt"
-	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"strconv"
 	"testing"
+
+	"github.com/0xPolygon/minimal/chain"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/tests"
@@ -117,7 +118,7 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetQueuedAndPendingTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -125,6 +126,7 @@ func TestGetQueuedAndPendingTransactions(t *testing.T) {
 	txn0 := &types.Transaction{
 		From:     from1,
 		Nonce:    0,
+		Gas:      validGasLimit,
 		Value:		big.NewInt(106),
 		GasPrice: big.NewInt(1),
 	}
@@ -134,6 +136,7 @@ func TestGetQueuedAndPendingTransactions(t *testing.T) {
 	txn1 := &types.Transaction{
 		From:     from2,
 		Nonce:	1,
+		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
@@ -142,6 +145,7 @@ func TestGetQueuedAndPendingTransactions(t *testing.T) {
 	txn2 := &types.Transaction{
 		From:     from3,
 		Nonce:	2,
+		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn2))
