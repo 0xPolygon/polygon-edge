@@ -112,6 +112,19 @@ type wsConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
+
+// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0 can only be a string or a non-decimal integer
+func formatFilterResponse(id interface{}, resp string) (string, error) {
+	switch t := id.(type) {
+	case string:
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":"%s"}`, t, resp), nil
+	case float64:
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
+	default:
+		return "", invalidJSONRequest
+	}
+}
+
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -175,7 +188,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 			return nil, err
 		}
 
-		resp := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, req.ID, filterID)
+		resp, err := formatFilterResponse(req.ID, filterID)
+		if err != nil {
+			return nil, err
+		}
 		return []byte(resp), nil
 	}
 
@@ -189,7 +205,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		if ok {
 			res = "true"
 		}
-		resp := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, req.ID, res)
+		resp, err := formatFilterResponse(req.ID, res)
+		if err != nil {
+			return nil, err
+		}
 		return []byte(resp), nil
 	}
 
