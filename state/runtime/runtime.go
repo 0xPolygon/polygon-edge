@@ -67,9 +67,35 @@ type Host interface {
 	GetTxContext() TxContext
 	GetBlockHash(number int64) types.Hash
 	EmitLog(addr types.Address, topics []types.Hash, data []byte)
-	Callx(*Contract, Host) ([]byte, uint64, error)
+	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
+}
+
+// ExecutionResult includes all output after executing given evm
+// message no matter the execution itself is successful or not.
+type ExecutionResult struct {
+	ReturnValue []byte // Returned data from the runtime (function result or data supplied with revert opcode)
+	GasLeft     uint64 // Total gas left as result of execution
+	GasUsed     uint64 // Total gas used as result of execution
+	Err         error  // Any error encountered during the execution, listed below
+}
+
+func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
+func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
+func (r *ExecutionResult) Reverted() bool  { return r.Err == ErrExecutionReverted }
+
+func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
+	r.GasUsed = gasLimit - r.GasLeft
+
+	// Refund can go up to half the gas used
+	maxRefund := r.GasUsed / 2
+	if refund > maxRefund {
+		refund = maxRefund
+	}
+
+	r.GasLeft += refund
+	r.GasUsed -= refund
 }
 
 var (
@@ -101,7 +127,7 @@ const (
 
 // Runtime can process contracts
 type Runtime interface {
-	Run(c *Contract, host Host, config *chain.ForksInTime) ([]byte, uint64, error)
+	Run(c *Contract, host Host, config *chain.ForksInTime) *ExecutionResult
 	CanRun(c *Contract, host Host, config *chain.ForksInTime) bool
 	Name() string
 }

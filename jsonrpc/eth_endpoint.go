@@ -221,15 +221,15 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 	}
 
 	// The return value of the execution is saved in the transition (returnValue field)
-	returnValue, failed, err := e.d.store.ApplyTxn(header, transaction)
+	result, err := e.d.store.ApplyTxn(header, transaction)
 	if err != nil {
 		return nil, err
 	}
 
-	if failed {
+	if result.Failed() {
 		return nil, fmt.Errorf("unable to execute call")
 	}
-	return argBytesPtr(returnValue), nil
+	return argBytesPtr(result.ReturnValue), nil
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
@@ -309,12 +309,13 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		_, failed, err := e.d.store.ApplyTxn(header, txn)
+		result, err := e.d.store.ApplyTxn(header, txn)
+
 		if err != nil {
-			return failed, err
+			return true, err
 		}
 
-		return failed, nil
+		return result.Failed(), nil
 	}
 
 	// Start the binary search for the lowest possible gas price

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/minimal/state/runtime"
 	"net"
 	"os"
 	"path/filepath"
@@ -278,25 +279,21 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 
 	if err != nil {
-		return nil, false, err
+		return
 	}
 
-	_, failed, err := transition.Apply(txn)
+	result, err = transition.Apply(txn)
 
-	if err != nil {
-		return nil, false, err
-	}
-
-	return transition.ReturnValue(), failed, nil
+	return
 }
 
 // SETUP //

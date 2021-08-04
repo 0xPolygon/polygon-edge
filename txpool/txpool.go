@@ -277,7 +277,11 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	*/
 	// Make sure the transaction has more gas than the basic transaction fee
-	intrinsicGas := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
+	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
+	if err != nil {
+		return err
+	}
+
 	if tx.Gas < intrinsicGas {
 		return ErrIntrinsicGas
 	}
