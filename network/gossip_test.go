@@ -1,12 +1,33 @@
 package network
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	testproto "github.com/0xPolygon/minimal/network/proto/test"
 	"github.com/stretchr/testify/assert"
 )
+
+func NumSubscribers(srv *Server, topic string) int {
+	return len(srv.ps.ListPeers(topic))
+}
+
+func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expectedNumPeers int) error {
+	for {
+		if n := NumSubscribers(srv, topic); n >= expectedNumPeers {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("canceled")
+		case <-time.After(100 * time.Millisecond):
+			continue
+		}
+	}
+
+}
 
 func TestGossip(t *testing.T) {
 	srv0 := CreateServer(t, nil)
@@ -27,6 +48,11 @@ func TestGossip(t *testing.T) {
 	topic1.Subscribe(func(obj interface{}) {
 		msgCh <- obj.(*testproto.AReq)
 	})
+
+	// wait until build mesh
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	WaitForSubscribers(ctx, srv0, topicName, 1)
 
 	// publish in topic0
 	assert.NoError(t, topic0.Publish(&testproto.AReq{Msg: "a"}))

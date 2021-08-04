@@ -67,6 +67,9 @@ func TestBroadcast(t *testing.T) {
 				}
 			}
 
+			// wait until gossip protocol build mesh network
+			time.Sleep(time.Second * 2)
+
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,
 				From:     senderAddr,
