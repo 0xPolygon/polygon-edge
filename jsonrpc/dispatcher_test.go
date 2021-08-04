@@ -25,6 +25,26 @@ func expectJSONResult(data []byte, v interface{}) error {
 	return nil
 }
 
+func TestDispatcherWebsocketStringId(t *testing.T) {
+	store := newMockStore()
+
+	s := newDispatcher(hclog.NewNullLogger(), store, 0)
+	s.registerEndpoints()
+
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
+	}
+
+	req := []byte(`{
+		"method": "eth_subscribe",
+		"params": ["newHeads"],
+		"id": "abc"
+	}`)
+	if _, err := s.HandleWs(req, mock); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDispatcherWebsocket(t *testing.T) {
 	store := newMockStore()
 
@@ -58,6 +78,25 @@ func TestDispatcherWebsocket(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("bad")
 	}
+}
+
+func TestDispatcherWebsocketInvalidRequestFormats(t *testing.T) {
+	store := newMockStore()
+
+	s := newDispatcher(hclog.NewNullLogger(), store, 0)
+	s.registerEndpoints()
+
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
+	}
+
+	req := []byte(`{
+		"method": "eth_subscribe",
+		"params": ["newHeads"],
+		"id": 2.1
+	}`)
+	_, err := s.HandleWs(req, mock);
+	assert.Error(t, err)
 }
 
 type mockService struct {
