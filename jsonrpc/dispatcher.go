@@ -440,8 +440,7 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	}
 
 	if arg.Gas == nil {
-		// TODO
-		arg.Gas = argUintPtr(1000000)
+		arg.Gas = argUintPtr(0)
 	}
 
 	txn := &types.Transaction{
