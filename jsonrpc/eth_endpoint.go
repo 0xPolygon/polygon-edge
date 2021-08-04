@@ -169,7 +169,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		Root:              raw.Root,
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
-		Status:            raw.Status,
+		Status:            argUint64(*raw.Status),
 		TxHash:            txn.Hash,
 		TxIndex:           argUint64(indx),
 		BlockHash:         block.Hash(),
