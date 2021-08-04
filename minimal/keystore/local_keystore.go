@@ -32,7 +32,7 @@ func (k *LocalKeystore) Get() (*ecdsa.PrivateKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		buf, err := crypto.MarshallPrivateKey(key)
+		buf, err := crypto.MarshalPrivateKey(key)
 		if err != nil {
 			return nil, err
 		}

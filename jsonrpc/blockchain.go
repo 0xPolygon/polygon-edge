@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"github.com/0xPolygon/minimal/state/runtime"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/blockchain"
@@ -50,7 +51,7 @@ type blockchainInterface interface {
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 
 	// ApplyTxn applies a transaction object to the blockchain
-	ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error)
+	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) (uint64, bool)
@@ -113,8 +114,8 @@ func (b *nullBlockchainInterface) GetBlockByNumber(num uint64, full bool) (*type
 	return nil, false
 }
 
-func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
-	return nil, false, nil
+func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+	return nil, nil
 }
 
 func (b *nullBlockchainInterface) GetCode(hash types.Hash) ([]byte, error) {

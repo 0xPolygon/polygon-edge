@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -112,7 +113,7 @@ func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) 
 }
 
 type wsConn interface {
-	WriteMessage(b []byte) error
+	WriteMessage(messageType int, data []byte) error
 }
 
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {
@@ -205,11 +206,58 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
-	var req Request
-	if err := json.Unmarshal(reqBody, &req); err != nil {
+
+	x := bytes.TrimLeft(reqBody, " \t\r\n")
+	if len(x) == 0 {
 		return nil, invalidJSONRequest
 	}
-	return d.handleReq(req)
+	if x[0] == '{' {
+		var req Request
+		if err := json.Unmarshal(reqBody, &req); err != nil {
+			return nil, invalidJSONRequest
+		}
+		return d.handleReq(req)
+	}
+
+	// handle batch requests
+	var requests []Request
+	if err := json.Unmarshal(reqBody, &requests); err != nil {
+		return nil, d.internalError("batch method", err)
+	}
+	var responses []Response
+	for _, req := range requests {
+		var response, err = d.handleReq(req)
+		if err != nil {
+			d.internalError("batch method", err)
+			errorResponse := Response{
+				ID: req.ID,
+				JSONRPC: "2.0",
+				Error: internalError,
+			}
+			responses = append(responses, errorResponse)
+			continue
+		}
+	
+		// unmarshal response from handleReq so that we can re-marshal as batch responses
+		var resp Response
+		if err := json.Unmarshal(response, &resp); err != nil {
+			d.internalError("batch method", err)
+			errorResponse := Response{
+				ID: req.ID,
+				JSONRPC: "2.0",
+				Error: invalidJSONRequest,
+			}
+			responses = append(responses, errorResponse)
+			continue
+		}
+		responses = append(responses, resp)
+	}
+	
+	respBytes, err := json.Marshal(responses)
+	if err != nil {
+		return nil, d.internalError("batch method", err)
+	}
+	return respBytes, nil
 }
 
 func (d *Dispatcher) handleReq(req Request) ([]byte, error) {

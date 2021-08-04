@@ -78,7 +78,7 @@ func (p *IbftInit) Run(args []string) int {
 	}
 
 	// try to write the ibft private key
-	key, err := crypto.ReadPrivKey(filepath.Join(dataDir, "consensus", ibft.IbftKeyName))
+	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, "consensus", ibft.IbftKeyName))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/state"
@@ -47,7 +49,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 	s, _, pastRoot := buildState(t, c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s)
+	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 

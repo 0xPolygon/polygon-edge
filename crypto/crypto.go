@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	hexCore "encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/helper/hex"
@@ -89,7 +88,8 @@ func ParsePrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
 	return prv.ToECDSA(), nil
 }
 
-func MarshallPrivateKey(priv *ecdsa.PrivateKey) ([]byte, error) {
+// MarshalPrivateKey serializes the private key's D value to a []byte
+func MarshalPrivateKey(priv *ecdsa.PrivateKey) ([]byte, error) {
 	return (*btcec.PrivateKey)(priv).Serialize(), nil
 }
 
@@ -102,13 +102,13 @@ func GenerateKey() (*ecdsa.PrivateKey, error) {
 func ParsePublicKey(buf []byte) (*ecdsa.PublicKey, error) {
 	x, y := elliptic.Unmarshal(S256, buf)
 	if x == nil || y == nil {
-		return nil, fmt.Errorf("cannot unmarshall")
+		return nil, fmt.Errorf("cannot unmarshal")
 	}
 	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
 }
 
-// MarshallPublicKey marshalls a public key on the secp256k1 elliptic curve.
-func MarshallPublicKey(pub *ecdsa.PublicKey) []byte {
+// MarshalPublicKey marshals a public key on the secp256k1 elliptic curve.
+func MarshalPublicKey(pub *ecdsa.PublicKey) []byte {
 	return elliptic.Marshal(S256, pub.X, pub.Y)
 }
 
@@ -117,7 +117,7 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return MarshallPublicKey(pub), nil
+	return MarshalPublicKey(pub), nil
 }
 
 // RecoverPubkey verifies the compact signature "signature" of "hash" for the
@@ -173,7 +173,7 @@ func Keccak256(v ...[]byte) []byte {
 
 // PubKeyToAddress returns the Ethereum address of a public key
 func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
-	buf := Keccak256(MarshallPublicKey(pub)[1:])[12:]
+	buf := Keccak256(MarshalPublicKey(pub)[1:])[12:]
 	return types.BytesToAddress(buf)
 }
 
@@ -220,38 +220,57 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	return priv, nil
 }
 
-// ReadPrivKey reads a private key from the file path
-func ReadPrivKey(path string) (*ecdsa.PrivateKey, error) {
-	createFn := func() ([]byte, error) {
-		key, err := GenerateKey()
-		if err != nil {
-			return nil, err
-		}
-
-		buf, err := MarshallPrivateKey(key)
-		if err != nil {
-			return nil, err
-		}
-
-		return buf, nil
-	}
-	readFn := func(b []byte) (interface{}, error) {
-		buf, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := ParsePrivateKey(buf)
-		if err != nil {
-			return nil, err
-		}
-
-		return key, nil
-	}
-	obj, err := keystore.CreateIfNotExists(path, createFn, readFn)
+// generateKeyAndMarshal generates a new private key and serializes it to a byte array
+func generateKeyAndMarshal() ([]byte, error) {
+	key, err := GenerateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	return obj.(*ecdsa.PrivateKey), nil
+	buf, err := MarshalPrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+// bytesToPrivateKey reads the input byte array and constructs a private key if possible
+func bytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
+	// The key file on disk should be encoded in Base64,
+	// so it must be decoded before it can be parsed by ParsePrivateKey
+	decoded, err := hex.DecodeString(string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the key is properly formatted
+	if len(decoded) != 32 {
+		// Key must be exactly 64 chars (32B) long
+		return nil, fmt.Errorf("invalid key length (%dB), should be 32B", len(decoded))
+	}
+
+	// Convert decoded bytes to a private key
+	key, err := ParsePrivateKey(decoded)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+// GenerateOrReadPrivateKey generates a private key at the specified path,
+// or reads it if a key file is present
+func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
+	keyBuff, err := keystore.CreateIfNotExists(path, generateKeyAndMarshal)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey, err := bytesToPrivateKey(keyBuff)
+	if err != nil {
+		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
+	}
+
+	return privateKey, nil
 }
