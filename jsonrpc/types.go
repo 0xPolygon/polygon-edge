@@ -46,42 +46,46 @@ func toTransaction(t *types.Transaction, b *types.Block, txIndex int) *transacti
 }
 
 type uncle struct {
-	ParentHash    types.Hash    `json:"parentHash"`
-	Sha3Uncles    types.Hash    `json:"sha3Uncles"`
-	Miner         types.Address `json:"miner"`
-	StateRoot     types.Hash    `json:"stateRoot"`
-	TxRoot        types.Hash    `json:"transactionsRoot"`
-	ReceiptsRoot  types.Hash    `json:"receiptsRoot"`
-	LogsBloom     types.Bloom   `json:"logsBloom"`
-	Difficulty    argUint64     `json:"difficulty"`
-	Number        argUint64     `json:"number"`
-	GasLimit      argUint64     `json:"gasLimit"`
-	GasUsed       argUint64     `json:"gasUsed"`
-	Timestamp     argUint64     `json:"timestamp"`
-	ExtraData     argBytes      `json:"extraData"`
-	MixHash       types.Hash    `json:"mixHash"`
-	Nonce         types.Nonce   `json:"nonce"`
-	Hash          types.Hash    `json:"hash"`
+	ParentHash        types.Hash    `json:"parentHash"`
+	Sha3Uncles        types.Hash    `json:"sha3Uncles"`
+	Miner             types.Address `json:"miner"`
+	StateRoot         types.Hash    `json:"stateRoot"`
+	TxRoot            types.Hash    `json:"transactionsRoot"`
+	ReceiptsRoot      types.Hash    `json:"receiptsRoot"`
+	LogsBloom         types.Bloom   `json:"logsBloom"`
+	Difficulty        argUint64     `json:"difficulty"`
+  TotalDifficulty   argUint64     `json:"totalDifficulty"`
+  Size              argUint64     `json:"size"`
+	Number            argUint64     `json:"number"`
+	GasLimit          argUint64     `json:"gasLimit"`
+	GasUsed           argUint64     `json:"gasUsed"`
+	Timestamp         argUint64     `json:"timestamp"`
+	ExtraData         argBytes      `json:"extraData"`
+	MixHash           types.Hash    `json:"mixHash"`
+	Nonce             types.Nonce   `json:"nonce"`
+	Hash              types.Hash    `json:"hash"`
 }
 
 func toUncle(u *types.Header) *uncle {
 	return &uncle{
-		ParentHash:   u.ParentHash,
-		Sha3Uncles:   u.Sha3Uncles,
-		Miner:        u.Miner,
-		StateRoot:    u.StateRoot,
-		TxRoot:       u.TxRoot,
-		ReceiptsRoot: u.ReceiptsRoot,
-		LogsBloom:    u.LogsBloom,
-		Difficulty:   argUint64(u.Difficulty),
-		Number:       argUint64(u.Number),
-		GasLimit:     argUint64(u.GasLimit),
-		GasUsed:      argUint64(u.GasUsed),
-		Timestamp:    argUint64(u.Timestamp),
-		ExtraData:    argBytes(u.ExtraData),
-		MixHash:      u.MixHash,
-		Nonce:        u.Nonce,
-		Hash:         u.Hash,
+		ParentHash:       u.ParentHash,
+		Sha3Uncles:       u.Sha3Uncles,
+		Miner:            u.Miner,
+		StateRoot:        u.StateRoot,
+		TxRoot:           u.TxRoot,
+		ReceiptsRoot:     u.ReceiptsRoot,
+		LogsBloom:        u.LogsBloom,
+		Difficulty:       argUint64(u.Difficulty),
+		TotalDifficulty:  argUint64(u.Difficulty),  // not needed for POS 
+		Size:             argUint64(0),             // should derive actual size
+		Number:           argUint64(u.Number),
+		GasLimit:         argUint64(u.GasLimit),
+		GasUsed:          argUint64(u.GasUsed),
+		Timestamp:        argUint64(u.Timestamp),
+		ExtraData:        argBytes(u.ExtraData),
+		MixHash:          u.MixHash,
+		Nonce:            u.Nonce,
+		Hash:             u.Hash,
 	}
 }
 
