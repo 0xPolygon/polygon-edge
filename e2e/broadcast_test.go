@@ -9,12 +9,13 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcast(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		name     string
 		numNodes int
 		// Number of nodes that connects to left node
@@ -33,8 +34,8 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	signer := &crypto.FrontierSigner{}
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
-	_, receiverAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
@@ -42,7 +43,7 @@ func TestBroadcast(t *testing.T) {
 		config.SetSeal(true)
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])

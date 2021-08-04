@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 )
 
 func TestSignedTransaction(t *testing.T) {
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
-	_, receiverAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	preminedAmount := framework.EthToWei(10)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {

@@ -4,19 +4,16 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/minimal/types"
 )
 
 const (
 	spuriousDragonMaxCodeSize = 24576
-)
-
-var (
-	errorVMOutOfGas = fmt.Errorf("out of gas")
 )
 
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
@@ -28,6 +25,7 @@ type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Executor is the main entity
 type Executor struct {
+	logger   hclog.Logger
 	config   *chain.Params
 	runtimes []runtime.Runtime
 	state    State
@@ -37,8 +35,9 @@ type Executor struct {
 }
 
 // NewExecutor creates a new executor
-func NewExecutor(config *chain.Params, s State) *Executor {
+func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	return &Executor{
+		logger:   logger,
 		config:   config,
 		runtimes: []runtime.Runtime{},
 		state:    s,
@@ -132,6 +131,7 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbas
 	}
 
 	txn := &Transition{
+		logger:   e.logger,
 		r:        e,
 		ctx:      env2,
 		state:    newTxn,
@@ -147,6 +147,8 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbas
 }
 
 type Transition struct {
+	logger hclog.Logger
+
 	// dummy
 	auxState State
 
@@ -200,7 +202,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	gasUsed, failed, err := t.Apply(msg)
 	if err != nil {
-		fmt.Printf("Apply err: %v", err)
+		t.logger.Error("failed to apply tx", "err", err)
 	}
 	t.totalGas += gasUsed
 
@@ -297,37 +299,6 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
-func (t *Transition) transactionGasCost(msg *types.Transaction) uint64 {
-	cost := uint64(0)
-
-	// Contract creation is only paid on the homestead fork
-	if msg.IsContractCreation() && t.config.Homestead {
-		cost += 53000
-	} else {
-		cost += 21000
-	}
-
-	payload := msg.Input
-	if len(payload) > 0 {
-		zeros := 0
-		for i := 0; i < len(payload); i++ {
-			if payload[i] == 0 {
-				zeros++
-			}
-		}
-		nonZeros := len(payload) - zeros
-		cost += uint64(zeros) * 4
-
-		nonZeroCost := uint64(68)
-		if t.config.Istanbul {
-			nonZeroCost = 16
-		}
-		cost += uint64(nonZeros) * nonZeroCost
-	}
-
-	return uint64(cost)
-}
-
 func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	// validate nonce
 	nonce := t.state.GetNonce(msg.From)
@@ -349,7 +320,10 @@ func (t *Transition) preCheck(msg *types.Transaction) (uint64, error) {
 	t.state.SubBalance(msg.From, upfrontGasCost)
 
 	// calculate gas available for the transaction
-	intrinsicGas := t.transactionGasCost(msg)
+	intrinsicGas := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
+	if intrinsicGas > msg.Gas {
+		return 0, fmt.Errorf("out of gas")
+	}
 	gasAvailable := msg.Gas - intrinsicGas
 
 	return gasAvailable, nil
@@ -368,10 +342,6 @@ func (t *Transition) apply(msg *types.Transaction) (
 	leftoverGas, err := t.preCheck(msg)
 	if err != nil {
 		return nil, 0, false, err
-	}
-	// TODO: Check if this is even possible
-	if leftoverGas > msg.Gas {
-		return nil, 0, false, errorVMOutOfGas
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
@@ -614,4 +584,35 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) ([]byte, uint64,
 		return t.applyCreate(c, h)
 	}
 	return t.applyCall(c, c.Type, h)
+}
+
+func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) uint64 {
+	cost := uint64(0)
+
+	// Contract creation is only paid on the homestead fork
+	if msg.IsContractCreation() && isHomestead {
+		cost += 53000
+	} else {
+		cost += 21000
+	}
+
+	payload := msg.Input
+	if len(payload) > 0 {
+		zeros := 0
+		for i := 0; i < len(payload); i++ {
+			if payload[i] == 0 {
+				zeros++
+			}
+		}
+		nonZeros := len(payload) - zeros
+		cost += uint64(zeros) * 4
+
+		nonZeroCost := uint64(68)
+		if isIstanbul {
+			nonZeroCost = 16
+		}
+		cost += uint64(nonZeros) * nonZeroCost
+	}
+
+	return cost
 }
