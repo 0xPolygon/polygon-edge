@@ -275,7 +275,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	valueInt := new(big.Int).Set(transaction.Value)
 
 	// If the sender address is present, recalculate the ceiling to his balance
-	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 
 		// Get the account balance
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
