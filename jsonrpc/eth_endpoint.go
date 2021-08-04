@@ -220,6 +220,11 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 
+	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
+	if transaction.Gas == 0 {
+		transaction.Gas = header.GasLimit
+	}
+
 	// The return value of the execution is saved in the transition (returnValue field)
 	result, err := e.d.store.ApplyTxn(header, transaction)
 	if err != nil {
