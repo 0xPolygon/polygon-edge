@@ -129,7 +129,7 @@ func TestEthTransfer(t *testing.T) {
 		sender        types.Address
 		recipient     types.Address
 		amount        *big.Int
-		shouldSuccess bool
+		shouldSucceed bool
 	}{
 		{
 			// ACC #1 -> ACC #3
@@ -206,14 +206,13 @@ func TestEthTransfer(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			receipt, err := srv.WaitForReceipt(ctx, txnHash)
-			assert.NoError(t, err)
-			assert.NotNil(t, receipt)
 
-			if testCase.shouldSuccess {
-				fee = new(big.Int).Mul(
-					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(int64(txnObject.GasPrice)),
-				)
+			if testCase.shouldSucceed {
+				assert.NoError(t, err)
+				assert.NotNil(t, receipt)
+			} else { // When an invalid transaction is supplied, there should be no receipt.
+				assert.Error(t, err)
+				assert.Nil(t, receipt)
 			}
 
 			// Fetch the balances after sending
@@ -230,14 +229,19 @@ func TestEthTransfer(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
+				fee = new(big.Int).Mul(
+					big.NewInt(int64(receipt.GasUsed)),
+					big.NewInt(int64(txnObject.GasPrice)),
+				)
+
 				expectedSenderBalance = previousSenderBalance.Sub(
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
 				)
 			}
 			expectedReceiverBalance := previousReceiverBalance
-			if testCase.shouldSuccess {
+			if testCase.shouldSucceed {
 				expectedReceiverBalance = previousReceiverBalance.Add(
 					previousReceiverBalance,
 					testCase.amount,

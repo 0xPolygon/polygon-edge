@@ -69,13 +69,13 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	code := e.GetCode(c.Exec.Address)
 	contract := runtime.NewContractCall(1, c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, code, c.Exec.Data)
 
-	ret, gas, err := evmR.Run(contract, e, &config)
+	result := evmR.Run(contract, e, &config)
 
 	if c.Gas == "" {
-		if err == nil {
+		if result.Succeeded() {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")
 		}
-		if gas > 0 {
+		if result.GasLeft > 0 {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned gas remaining > 0")
 		}
 		return
@@ -85,7 +85,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if c.Out == "" {
 		c.Out = "0x"
 	}
-	if ret := hex.EncodeToHex(ret); ret != c.Out {
+	if ret := hex.EncodeToHex(result.ReturnValue); ret != c.Out {
 		t.Fatalf("return mismatch: got %s, want %s", ret, c.Out)
 	}
 
@@ -106,8 +106,8 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	}
 
 	// check remaining gas
-	if expected := stringToUint64T(t, c.Gas); gas != expected {
-		t.Fatalf("gas remaining mismatch: got %d want %d", gas, expected)
+	if expected := stringToUint64T(t, c.Gas); result.GasLeft != expected {
+		t.Fatalf("gas left mismatch: got %d want %d", result.GasLeft, expected)
 	}
 }
 
