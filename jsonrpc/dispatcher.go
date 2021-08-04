@@ -403,7 +403,7 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
-		return nil, fmt.Errorf("from is empty")
+		arg.From = &types.Address{}
 	}
 	if arg.Data != nil && arg.Input != nil {
 		return nil, fmt.Errorf("both input and data cannot be set")
