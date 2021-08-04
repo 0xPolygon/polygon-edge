@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -113,13 +114,20 @@ type wsConn interface {
 }
 
 
-// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0 can only be a string or a non-decimal integer
+// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0 
+// can only be a string or a non-decimal integer
 func formatFilterResponse(id interface{}, resp string) (string, error) {
 	switch t := id.(type) {
 	case string:
 		return fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":"%s"}`, t, resp), nil
 	case float64:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
+		if t == math.Trunc(t) {
+			return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
+		} else {
+			return "", invalidJSONRequest
+		}
+	case nil:
+		return fmt.Sprintf(`{"jsonrpc":"2.0","result":"%s"}`, resp), nil
 	default:
 		return "", invalidJSONRequest
 	}
