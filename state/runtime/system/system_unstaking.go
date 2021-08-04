@@ -27,7 +27,7 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	// Grab the address calling the staking method
 	staker := state.contract.Caller
 
-	// Grab the staked balance for the account
+	// Grab the last recorded staked balance for the account
 	stakedBalance := state.host.GetStakedBalance(staker)
 
 	// Grab the balance on the staking address
@@ -53,7 +53,7 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	// Can't unstake if the value is different from 0
 	// Can't unstake if the account doesn't have stake
 	// Can't unstake if the account has pending events which cause it to not have stake
-	if stakingAccountBalance.Cmp(stakedBalance) < 0 ||
+	if stakingAccountBalance.Cmp(afterEventsStake) < 0 ||
 		state.contract.Value.Cmp(zeroValue) != 0 ||
 		stakedBalance.Cmp(zeroValue) == 0 ||
 		afterEventsStake.Cmp(zeroValue) == 0 {
@@ -64,13 +64,13 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	staking.GetStakingHub().AddPendingEvent(pendingEvent)
 
 	// Decrease the staked balance on the staking address
-	state.host.SubBalance(stakingAddress, stakedBalance)
+	state.host.SubBalance(stakingAddress, afterEventsStake)
 
 	// Increase the account's actual balance
-	state.host.AddBalance(staker, stakedBalance)
+	state.host.AddBalance(staker, afterEventsStake)
 
 	// Emit an unstaked event for the consensus layer
-	state.host.EmitUnstakedEvent(staker, stakedBalance)
+	state.host.EmitUnstakedEvent(staker, afterEventsStake)
 
 	return nil, nil
 }

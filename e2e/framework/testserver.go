@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -234,6 +235,9 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 	if t.Config.Consensus == ConsensusDev {
 		args = append(args, "--dev")
+		if t.Config.DevInterval != 0 {
+			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
+		}
 	}
 
 	if t.Config.Seal {

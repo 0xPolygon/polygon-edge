@@ -148,6 +148,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 		txns = append(txns, txn)
 	}
+	d.logger.Debug(fmt.Sprintf("Writing %d transactions to a block", len(txns)))
 
 	// Commit the changes
 	_, root := transition.Commit()

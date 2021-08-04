@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
@@ -12,9 +11,10 @@ import (
 	"github.com/0xPolygon/minimal/e2e/framework"
 	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/state/runtime/system"
+	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
 func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string) *proto.Snapshot_Validator {
@@ -36,7 +36,9 @@ func findValidatorInSet(
 	defer cancel()
 	snapshot, err := srv.WaitForIBFTSnapshot(ctx, blockNumber, 5*time.Second)
 	assert.NoError(t, err)
-	assert.NotNil(t, snapshot)
+	if snapshot == nil {
+		t.Fatalf("Unable to fetch snapshot, %v", err)
+	}
 
 	return findValidatorByAddress(snapshot.Validators, address.String()), snapshot
 }
@@ -140,108 +142,248 @@ func TestPoS_Unstake(t *testing.T) {
 	assert.Len(t, snapshot.Validators, numGenesisValidators-1)
 }
 
-func TestPoS_UnstakeAttack(t *testing.T) {
+func TestPoS_UnstakeExploit(t *testing.T) {
 	// Predefined values
 	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
-	numGenesisValidators := IBFTMinNodes + 1
+	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 	gasPrice := big.NewInt(10000)
-	receiptArr := make([]*web3.Receipt, numGenesisValidators)
+
+	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	defaultBalance := tests.EthToWei(10)
 
-	// Set up the manager
-	ibftManager := framework.NewIBFTServersManager(t, numGenesisValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.PremineValidatorBalance(defaultBalance, defaultBalance)
+	devInterval := 10
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.PremineWithStake(senderAddr, defaultBalance, defaultBalance)
 	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	ibftManager.StartServers(ctx)
-	srv := ibftManager.GetServer(0)
+	previousAccountBalance := getAccountBalance(senderAddr, client, t)
 
-	// Get key of last node
-	referenceSrv := ibftManager.GetServer(IBFTMinNodes)
-	referenceKey, err := referenceSrv.Config.PrivateKey()
-	assert.NoError(t, err)
-	referenceAddr := crypto.PubKeyToAddress(&referenceKey.PublicKey)
+	// Required default values
+	numTransactions := 5
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 0
 
-	// Check the validator is in validator set
-	validator, _ := findValidatorInSet(t, srv, referenceAddr, 0)
-	if validator == nil {
-		t.Fatalf("account should be genesis validator, but isn't")
-	}
+	// TxPool client
+	clt := srv.TxnPoolOperator()
 
-	// Set up the goroutine
-	sendFunc := func(wg *sync.WaitGroup, t *testing.T, index int) {
-		txn := &framework.PreparedTransaction{
-			From:     referenceAddr,
+	generateTx := func() *types.Transaction {
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
 			To:       &unstakingContractAddr,
 			GasPrice: gasPrice,
 			Gas:      1000000,
-			Value:    tests.EthToWei(0),
+			Value:    big.NewInt(0),
+			V:        1, // it is necessary to encode in rlp
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
 
-		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		receipt, err := srv.SendRawTx(ctx, txn, referenceKey)
-		assert.NoError(t, err)
-		assert.NotNil(t, receipt)
+		currentNonce++
 
-		receiptArr[index] = receipt
-
-		wg.Done()
+		return signedTx
 	}
 
-	// Add pending unstake transactions to the txpool
-	numTransactions := 5
+	// Test scenario:
+	// User has 10 ETH staked and a balance of 10 ETH
+	// Unstake -> Unstake -> Unstake -> Unstake...
+	// The code below tests numTransactions cycles of Unstake
+	// Expected result for tests: Staked: 0 ETH; Balance: ~20 ETH
 
-	// Send out multiple unstake transactions
-	var wg sync.WaitGroup
-
-	// WaitGroup will wait for numTransactions go routines to finish
-	wg.Add(numTransactions)
+	zeroEth := tests.EthToWei(0)
 	for i := 0; i < numTransactions; i++ {
-		go sendFunc(&wg, t, i)
+		var msg *txpoolOp.AddTxnReq
+		unstakeTxn := generateTx()
+
+		msg = &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: unstakeTxn.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		}
+
+		_, addErr := clt.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn, %v", addErr)
+		}
 	}
 
-	wg.Wait()
+	// Mandatory sleep for the dev consensus and executor to go through the txns
+	time.Sleep(time.Duration(devInterval+5) * time.Second)
 
-	fee := new(big.Int).Mul(
-		big.NewInt(int64(receiptArr[0].GasUsed)),
-		big.NewInt(gasPrice.Int64()),
+	// Check the balances
+	actualStakedBalance := getStakedBalance(senderAddr, client, t)
+	actualAccountBalance := getAccountBalance(senderAddr, client, t)
+	actualStakingAddrBalance := getAccountBalance(stakingContractAddr, client, t)
+
+	// Make sure the balances match up
+
+	// The account balance should be in the range of
+	// [previousBalance + stake refund - fees, previousBalance + stake refund]
+	prevAccountBalanceWithStake := big.NewInt(0).Add(previousAccountBalance, defaultBalance)
+	ballparkFeeValue := new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil) // 0.001 ETH
+
+	// previousBalance + stakeRefund - fees <= balance
+	assert.GreaterOrEqualf(t,
+		actualAccountBalance.String(),
+		(big.NewInt(0).Sub(prevAccountBalanceWithStake, ballparkFeeValue)).String(),
+		"Account balance mismatch after unstake exploit",
 	)
 
-	// Check to see if balances are valid
-
-	// Returned stake
-	expectedBalance := big.NewInt(0).Add(defaultBalance, defaultBalance)
-
-	// Subtract tx fees
-	expectedBalance = big.NewInt(0).Sub(
-		expectedBalance,
-		fee,
+	// balance <= previousBalance + stakeRefund
+	assert.LessOrEqualf(t,
+		actualAccountBalance.String(),
+		prevAccountBalanceWithStake.String(),
+		"Account balance mismatch after unstake exploit",
 	)
 
-	client := srv.JSONRPC()
-	actualStakedBalance := getStakedBalance(referenceAddr, client, t)
-	actualBalance := getAccountBalance(referenceAddr, client, t)
-
-	// Make sure the account balance matches up
 	assert.Equalf(t,
-		expectedBalance.String(),
-		actualBalance.String(),
-		"Balance mismatch after unstake",
+		zeroEth.String(),
+		actualStakedBalance.String(),
+		"Staked balance mismatch after unstake exploit",
 	)
+
+	assert.Equalf(t,
+		zeroEth.String(),
+		actualStakingAddrBalance.String(),
+		"Staked address balance mismatch after unstake exploit",
+	)
+}
+
+func TestPoS_StakeUnstakeExploit(t *testing.T) {
+	// Predefined values
+	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
+	stakingContractAddr := types.StringToAddress(system.StakingAddress)
+	gasPrice := big.NewInt(10000)
+
+	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	defaultBalance := tests.EthToWei(10)
+
+	devInterval := 10
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.PremineWithStake(senderAddr, defaultBalance, defaultBalance)
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	// Required default values
+	numTransactions := 6
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 0
+
+	// TxPool client
+	clt := srv.TxnPoolOperator()
+
+	generateTx := func(value *big.Int, to types.Address) *types.Transaction {
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &to,
+			GasPrice: gasPrice,
+			Gas:      1000000,
+			Value:    value,
+			V:        1, // it is necessary to encode in rlp
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	// Test scenario:
+	// User has 10 ETH staked and a balance of 10 ETH
+	// Unstake -> Stake 1 ETH -> Unstake -> Stake 1 ETH...
+	// The code below tests (numTransactions / 2) cycles of Unstake -> Stake 1 ETH
+	// Expected result for tests: Staked: 1 ETH; Balance: ~19 ETH
+
+	oneEth := tests.EthToWei(1)
+	zeroEth := tests.EthToWei(0)
+	for i := 0; i < numTransactions; i++ {
+		var msg *txpoolOp.AddTxnReq
+		if i%2 == 0 {
+			unstakeTxn := generateTx(zeroEth, unstakingContractAddr)
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: unstakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		} else {
+			stakeTxn := generateTx(oneEth, stakingContractAddr)
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: stakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		}
+
+		_, addErr := clt.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn, %v", addErr)
+		}
+	}
+
+	// Mandatory sleep for the dev consensus and executor to go through the txns
+	time.Sleep(time.Duration(devInterval+5) * time.Second)
+
+	// Check the balances
+	actualStakedBalance := getStakedBalance(senderAddr, client, t)
+	actualAccountBalance := getAccountBalance(senderAddr, client, t)
+	actualStakingAddrBalance := getAccountBalance(stakingContractAddr, client, t)
+
+	expStake := tests.EthToWei(1)
 
 	// Make sure the staked balance matches up
 	assert.Equalf(t,
-		big.NewInt(0).String(),
+		expStake.String(),
 		actualStakedBalance.String(),
-		"Staked balance mismatch after unstake",
+		"Staked balance mismatch after stake / unstake exploit",
 	)
 
-	// Check to see if the unstaker is still a validator
-	validator, snapshot := findValidatorInSet(t, srv, referenceAddr, receiptArr[0].BlockNumber)
-	assert.Nil(t, validator, "account should have left from validator set, but still belongs to it")
-	assert.Len(t, snapshot.Validators, numGenesisValidators-1)
+	assert.Equalf(t,
+		expStake.String(),
+		actualStakingAddrBalance.String(),
+		"Staked address balance mismatch after stake / unstake exploit",
+	)
+
+	// Make sure the account balances match up
+	ballparkFeeValue := new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil) // 0.001 ETH
+
+	// Account balance should be in the range
+	// referenceBalance = previousAccountBalance + stakeRefund - 1 ETH
+	// [referenceBalance - fees, referenceBalance]
+	referenceBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, defaultBalance), oneEth)
+
+	// referenceBalance - fees <= balance
+	assert.GreaterOrEqualf(t,
+		actualAccountBalance.String(),
+		(big.NewInt(0).Sub(referenceBalance, ballparkFeeValue)).String(),
+		"Account balance mismatch after unstake exploit",
+	)
+
+	// balance <= referenceBalance
+	assert.LessOrEqualf(t,
+		actualAccountBalance.String(),
+		referenceBalance.String(),
+		"Account balance mismatch after unstake exploit",
+	)
 }
