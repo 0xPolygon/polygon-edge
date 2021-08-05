@@ -365,8 +365,8 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		promote = append(promote, tx)
 		t.Pop()
 
-		nextTx := t.Peek()
-		if nextTx == nil {
+		var nextTx *types.Transaction
+		if nextTx = t.Peek(); nextTx == nil {
 			break
 		}
 
