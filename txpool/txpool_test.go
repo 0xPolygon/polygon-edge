@@ -222,7 +222,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 }
 
-func TestTxnOperatorAdd(t *testing.T) {
+func TestTxnOperatorAddNilRaw(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 
