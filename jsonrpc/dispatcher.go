@@ -114,13 +114,12 @@ type wsConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-
-// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0 
+// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0
 // can only be a string or a non-decimal integer
 func formatFilterResponse(id interface{}, resp string) (string, error) {
 	switch t := id.(type) {
 	case string:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":"%s"}`, t, resp), nil
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":"%s","result":"%s"}`, t, resp), nil
 	case float64:
 		if t == math.Trunc(t) {
 			return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
@@ -128,7 +127,7 @@ func formatFilterResponse(id interface{}, resp string) (string, error) {
 			return "", invalidJSONRequest
 		}
 	case nil:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","result":"%s"}`, resp), nil
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":"%s"}`, resp), nil
 	default:
 		return "", invalidJSONRequest
 	}
@@ -254,29 +253,29 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		if err != nil {
 			d.internalError("batch method", err)
 			errorResponse := Response{
-				ID: req.ID,
+				ID:      req.ID,
 				JSONRPC: "2.0",
-				Error: internalError,
+				Error:   internalError,
 			}
 			responses = append(responses, errorResponse)
 			continue
 		}
-	
+
 		// unmarshal response from handleReq so that we can re-marshal as batch responses
 		var resp Response
 		if err := json.Unmarshal(response, &resp); err != nil {
 			d.internalError("batch method", err)
 			errorResponse := Response{
-				ID: req.ID,
+				ID:      req.ID,
 				JSONRPC: "2.0",
-				Error: invalidJSONRequest,
+				Error:   invalidJSONRequest,
 			}
 			responses = append(responses, errorResponse)
 			continue
 		}
 		responses = append(responses, resp)
 	}
-	
+
 	respBytes, err := json.Marshal(responses)
 	if err != nil {
 		return nil, d.internalError("batch method", err)
