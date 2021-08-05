@@ -352,11 +352,11 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	}
 
 	promote := []*types.Transaction{}
-	higherNonceTx := []*types.Transaction{}
+	higherNonceTxs := []*types.Transaction{}
 
 	reinsertFunc := func() {
 		// Reinsert the tx back to the account specific transaction queue
-		for _, highNonceTx := range higherNonceTx {
+		for _, highNonceTx := range higherNonceTxs {
 			t.Push(highNonceTx)
 		}
 	}
@@ -373,7 +373,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		if tx.Nonce+1 != nextTx.Nonce {
 			// Tx that have a higher nonce are shelved for later
 			// when they can actually be parsed
-			higherNonceTx = append(higherNonceTx, nextTx)
+			higherNonceTxs = append(higherNonceTxs, nextTx)
 			break
 		}
 
