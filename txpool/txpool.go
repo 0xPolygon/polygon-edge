@@ -4,11 +4,12 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/minimal/chain"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
@@ -209,7 +210,9 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queue := t.queue
 	for addr, queuedTxn := range queue {
 		for _, tx := range queuedTxn.txs {
-			queuedTxs[addr] = make(map[uint64]*types.Transaction)
+			if _, ok := queuedTxs[addr]; !ok {
+				queuedTxs[addr] = make(map[uint64]*types.Transaction)
+			}
 			queuedTxs[addr][tx.Nonce] = tx
 		}
 	}
@@ -217,7 +220,9 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	sortedPricedTxs := t.sorted.index
 	for _, sortedPricedTx := range sortedPricedTxs {
-		pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
+		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
+			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
+		}
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
 	}
 

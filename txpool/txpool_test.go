@@ -127,7 +127,7 @@ func TestGetQueuedAndPendingTransactions(t *testing.T) {
 		From:     from1,
 		Nonce:    0,
 		Gas:      validGasLimit,
-		Value:		big.NewInt(106),
+		Value:    big.NewInt(106),
 		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn0))
@@ -135,28 +135,35 @@ func TestGetQueuedAndPendingTransactions(t *testing.T) {
 	from2 := types.Address{0x2}
 	txn1 := &types.Transaction{
 		From:     from2,
-		Nonce:	1,
+		Nonce:    1,
 		Gas:      validGasLimit,
+		Value:    big.NewInt(106),
 		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
 
-	from3 := types.Address{0x3}
 	txn2 := &types.Transaction{
-		From:     from3,
-		Nonce:	2,
+		From:     from2,
+		Nonce:    2,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
 	}
 	assert.NoError(t, pool.addImpl("", txn2))
 
+	from3 := types.Address{0x3}
+	txn3 := &types.Transaction{
+		From:     from3,
+		Nonce:    3,
+		Gas:      validGasLimit,
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn3))
+
 	queuedTxs, pendingTxs := pool.GetTxs()
-	
+
 	assert.Len(t, queuedTxs, 2)
 	assert.Len(t, pendingTxs, 1)
-	for key := range pendingTxs {
-		assert.Equal(t, pendingTxs[key][0].Value, big.NewInt(106))
-	}	
+	assert.Equal(t, pendingTxs[from1][txn0.Nonce].Value, big.NewInt(106))
 }
 
 func TestBroadcast(t *testing.T) {
