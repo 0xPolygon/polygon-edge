@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -23,26 +24,6 @@ func expectJSONResult(data []byte, v interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func TestDispatcherWebsocketStringId(t *testing.T) {
-	store := newMockStore()
-
-	s := newDispatcher(hclog.NewNullLogger(), store, 0)
-	s.registerEndpoints()
-
-	mock := &mockWsConn{
-		msgCh: make(chan []byte, 1),
-	}
-
-	req := []byte(`{
-		"method": "eth_subscribe",
-		"params": ["newHeads"],
-		"id": "abc"
-	}`)
-	if _, err := s.HandleWs(req, mock); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func expectBatchJSONResult(data []byte, v interface{}) error {
@@ -87,7 +68,7 @@ func TestDispatcherWebsocket(t *testing.T) {
 	}
 }
 
-func TestDispatcherWebsocketInvalidRequestFormats(t *testing.T) {
+func TestDispatcherWebsocketRequestFormats(t *testing.T) {
 	store := newMockStore()
 
 	s := newDispatcher(hclog.NewNullLogger(), store, 0)
@@ -97,13 +78,59 @@ func TestDispatcherWebsocketInvalidRequestFormats(t *testing.T) {
 		msgCh: make(chan []byte, 1),
 	}
 
-	req := []byte(`{
-		"method": "eth_subscribe",
-		"params": ["newHeads"],
-		"id": 2.1
-	}`)
-	_, err := s.HandleWs(req, mock);
-	assert.Error(t, err)
+	cases := []struct {
+		msg         []byte
+		expectError bool
+	}{
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": "abc"
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": null
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": 2.1
+			}`),
+			true,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"]
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": 2.0
+			}`),
+			false,
+		},
+	}
+	for _, c := range cases {
+		_, err := s.HandleWs(c.msg, mock)
+		if !c.expectError && err != nil {
+			t.Fatal("Error unexpected but found")
+		}
+		if c.expectError && err == nil {
+			t.Fatal("Error expected but not found")
+		}
+	}
 }
 
 type mockService struct {
