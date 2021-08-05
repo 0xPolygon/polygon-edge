@@ -175,8 +175,8 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-// addImpl validates the tx and adds it to the appropriate account pool.
-// Additionally, it updates the global valid transactions list
+// addImpl validates the tx and adds it to the appropriate account transaction queue.
+// Additionally, it updates the global valid transactions queue
 func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
