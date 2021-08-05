@@ -2,7 +2,6 @@ package jsonrpc
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
