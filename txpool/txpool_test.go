@@ -1,7 +1,9 @@
 package txpool
 
 import (
+	"context"
 	"fmt"
+	"github.com/0xPolygon/minimal/txpool/proto"
 	"math/big"
 	"strconv"
 	"testing"
@@ -218,4 +220,14 @@ func TestTxnQueue_Heap(t *testing.T) {
 			assert.Equalf(t, txns[i].GasPrice, txn.GasPrice, "Expected output mismatch")
 		}
 	})
+}
+
+func TestTxnOperatorAdd(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+
+	txnReq := new(proto.AddTxnReq)
+	response, err := pool.AddTxn(context.Background(), txnReq)
+	assert.Errorf(t, err, "transaction's field raw is empty")
+	assert.Nil(t, response)
 }
