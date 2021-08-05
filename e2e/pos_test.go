@@ -26,23 +26,6 @@ func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string)
 	return nil
 }
 
-func findValidatorInSet(
-	t *testing.T,
-	srv *framework.TestServer,
-	address types.Address,
-	blockNumber uint64,
-) (*proto.Snapshot_Validator, *proto.Snapshot) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	snapshot, err := srv.WaitForIBFTSnapshot(ctx, blockNumber, 5*time.Second)
-	assert.NoError(t, err)
-	if snapshot == nil {
-		t.Fatalf("Unable to fetch snapshot, %v", err)
-	}
-
-	return findValidatorByAddress(snapshot.Validators, address.String()), snapshot
-}
-
 func TestPoS_Stake(t *testing.T) {
 	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
