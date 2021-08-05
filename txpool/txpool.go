@@ -4,11 +4,12 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/chain"
 	"math/big"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/0xPolygon/minimal/chain"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
@@ -28,6 +29,9 @@ var (
 	ErrIntrinsicGas = errors.New("intrinsic gas too low")
 )
 
+var topicNameV1 = "txpool/0.1"
+
+// store interface defines State helper methods the Txpool should have access to
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
@@ -38,7 +42,11 @@ type signer interface {
 	Sender(tx *types.Transaction) (types.Address, error)
 }
 
-// TxPool is a pool of transactions
+// TxPool is module that handles pending transactions.
+//
+// There are fundamentally 2 queues in the txpool module:
+// - Account based transactions (accountTxHeapMap)
+// - Global valid transactions, from any account
 type TxPool struct {
 	logger     hclog.Logger
 	signer     signer
@@ -46,19 +54,27 @@ type TxPool struct {
 	store      store
 	idlePeriod time.Duration
 
-	// unsorted list of transactions per account
-	queue map[types.Address]*txQueue
+	// Unsorted min heap of transactions per account.
+	// The heap is min nonce based
+	accountTxHeapMap map[types.Address]*txHeapWrapper
 
-	// sorted list of current valid transactions
-	sorted *txPriceHeap
+	// Max price heap for all transactions that are valid
+	validTxHeap *txPriceHeap
 
-	// network stack
+	// Networking stack
 	topic *network.Topic
 
-	sealing  bool
-	dev      bool
+	// Flag indicating if the current node is a sealer,
+	// and should therefore gossip transactions
+	sealing bool
+
+	// Flag indicating if the current node is running in dev mode
+	dev bool
+
+	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
+	// Indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
 }
 
@@ -72,13 +88,13 @@ func NewTxPool(
 	network *network.Server,
 ) (*TxPool, error) {
 	txPool := &TxPool{
-		logger:     logger.Named("txpool"),
-		store:      store,
-		idlePeriod: defaultIdlePeriod,
-		queue:      make(map[types.Address]*txQueue),
-		sorted:     newTxPriceHeap(),
-		sealing:    sealing,
-		forks:      forks,
+		logger:           logger.Named("txpool"),
+		store:            store,
+		idlePeriod:       defaultIdlePeriod,
+		accountTxHeapMap: make(map[types.Address]*txHeapWrapper),
+		validTxHeap:      newTxPriceHeap(),
+		sealing:          sealing,
+		forks:            forks,
 	}
 
 	if network != nil {
@@ -97,8 +113,9 @@ func NewTxPool(
 	return txPool, nil
 }
 
+// GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	q, ok := t.queue[addr]
+	q, ok := t.accountTxHeapMap[addr]
 	if !ok {
 		return 0, false
 	}
@@ -106,11 +123,8 @@ func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 }
 
 func (t *TxPool) AddSigner(s signer) {
-	// TODO: We can add more types of signers here
 	t.signer = s
 }
-
-var topicNameV1 = "txpool/0.1"
 
 func (t *TxPool) handleGossipTxn(obj interface{}) {
 	if !t.sealing {
@@ -128,11 +142,12 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 	}
 }
 
+// EnableDev enables dev mode for the txpool
 func (t *TxPool) EnableDev() {
 	t.dev = true
 }
 
-// AddTx adds a new transaction to the pool
+// AddTx adds a new transaction to the pool and broadcasts it if networking is enabled
 func (t *TxPool) AddTx(tx *types.Transaction) error {
 	if err := t.addImpl("addTxn", tx); err != nil {
 		return err
@@ -160,6 +175,8 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
+// addImpl validates the tx and adds it to the appropriate account pool.
+// Additionally, it updates the global valid transactions list
 func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
@@ -186,38 +203,42 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
-	txnsQueue, ok := t.queue[tx.From]
+	txnsQueue, ok := t.accountTxHeapMap[tx.From]
 	if !ok {
 		stateRoot := t.store.Header().StateRoot
 
-		// initialize the txn queue for the account
-		txnsQueue = newTxQueue()
+		// Initialize the account based transaction heap
+		txnsQueue = newTxHeapWrapper()
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, tx.From)
-		t.queue[tx.From] = txnsQueue
+		t.accountTxHeapMap[tx.From] = txnsQueue
 	}
 	txnsQueue.Add(tx)
 
 	for _, promoted := range txnsQueue.Promote() {
-		t.sorted.Push(promoted)
+		t.validTxHeap.Push(promoted)
 	}
 	return nil
 }
 
+// Length returns the size of the valid transactions in the txpool
 func (t *TxPool) Length() uint64 {
-	return t.sorted.Length()
+	return t.validTxHeap.Length()
 }
 
+// Pop returns the max priced transaction from the
+// valid transactions heap in txpool
 func (t *TxPool) Pop() (*types.Transaction, func()) {
-	txn := t.sorted.Pop()
+	txn := t.validTxHeap.Pop()
 	if txn == nil {
 		return nil, nil
 	}
 	ret := func() {
-		t.sorted.Push(txn.tx)
+		t.validTxHeap.Push(txn.tx)
 	}
 	return txn.tx, ret
 }
 
+// ResetWithHeader does basic txpool housekeeping after a block write
 func (t *TxPool) ResetWithHeader(h *types.Header) {
 	evnt := &blockchain.Event{
 		NewChain: []*types.Header{h},
@@ -254,28 +275,21 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		}
 	}
 
-	// try to include again the transactions in the sorted list
+	// try to include again the transactions in the validTxHeap list
 	for _, txn := range addTxns {
 		if err := t.addImpl("reorg", txn); err != nil {
 			t.logger.Error("failed to add txn", "err", err)
 		}
 	}
 
-	// remove the mined transactions from the sorted list
+	// remove the mined transactions from the validTxHeap list
 	for _, txn := range delTxns {
-		t.sorted.Delete(txn)
+		t.validTxHeap.Delete(txn)
 	}
 }
 
+// validateTx does basic transaction validation
 func (t *TxPool) validateTx(tx *types.Transaction) error {
-	/*
-		if tx.Size() > 32*1024 {
-			return fmt.Errorf("oversize data")
-		}
-		if tx.Value.Sign() < 0 {
-			return fmt.Errorf("negative value")
-		}
-	*/
 	// Make sure the transaction has more gas than the basic transaction fee
 	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
 	if err != nil {
@@ -288,89 +302,128 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 	return nil
 }
 
-type txQueue struct {
-	txs       txHeap
+// txHeapWrapper is a wrapper object for account based transactions
+type txHeapWrapper struct {
+	// txs is the actual min heap (nonce ordered) for account transactions
+	txs txHeap
+
+	// nextNonce is a field indicating what should be the next
+	// valid nonce for the account transaction
 	nextNonce uint64
 }
 
-func newTxQueue() *txQueue {
-	return &txQueue{
+// newTxHeapWrapper creates a new account based tx heap
+func newTxHeapWrapper() *txHeapWrapper {
+	return &txHeapWrapper{
 		txs: txHeap{},
 	}
 }
 
-func (t *txQueue) Reset(txns ...*types.Transaction) {
-	lowestNonce := t.nextNonce
-	for _, txn := range txns {
-		if txn.Nonce < lowestNonce {
-			lowestNonce = txn.Nonce
-		}
-		t.Push(txn)
-	}
-	t.nextNonce = lowestNonce
-}
-
-// Add adds a new tx into the queue
-func (t *txQueue) Add(tx *types.Transaction) {
+// Add adds a new tx onto the account based tx heap
+func (t *txHeapWrapper) Add(tx *types.Transaction) {
 	t.Push(tx)
 }
 
-// Promote promotes all the new valid transactions
-func (t *txQueue) Promote() []*types.Transaction {
-	// Remove elements lower than nonce
+// pruneLowNonceTx removes any transactions from the account tx queue
+// that have a lower nonce than the current account nonce in state
+func (t *txHeapWrapper) pruneLowNonceTx() {
 	for {
+		// Grab the min-nonce transaction from the heap
 		tx := t.Peek()
 		if tx == nil || tx.Nonce >= t.nextNonce {
 			break
 		}
+
+		// Drop it from the heap
 		t.Pop()
 	}
+}
+
+// Promote promotes all the new valid transactions
+func (t *txHeapWrapper) Promote() []*types.Transaction {
+	// Remove elements lower than nonce
+	t.pruneLowNonceTx()
 
 	// Promote elements
 	tx := t.Peek()
 	if tx == nil || tx.Nonce != t.nextNonce {
+		// Nothing to promote
 		return nil
 	}
 
 	promote := []*types.Transaction{}
+	higherNonceTx := []*types.Transaction{}
+
+	reinsertFunc := func() {
+		// Reinsert the tx back to the account specific transaction queue
+		for _, highNonceTx := range higherNonceTx {
+			t.Push(highNonceTx)
+		}
+	}
+
 	for {
 		promote = append(promote, tx)
 		t.Pop()
 
-		tx2 := t.Peek()
-		if tx2 == nil || tx.Nonce+1 != tx2.Nonce {
+		nextTx := t.Peek()
+		if nextTx == nil {
 			break
 		}
-		tx = tx2
+
+		if tx.Nonce+1 != nextTx.Nonce {
+			// Tx that have a higher nonce are shelved for later
+			// when they can actually be parsed
+			higherNonceTx = append(higherNonceTx, nextTx)
+			break
+		}
+
+		tx = nextTx
 	}
+
 	if len(promote) == 0 {
+		// Nothing to promote
+		reinsertFunc()
+
 		return nil
 	}
 
+	// Find the last transaction to be promoted
 	lastTxn := promote[len(promote)-1]
+	// Grab its nonce value and set it as the reference next nonce
 	t.nextNonce = lastTxn.Nonce + 1
+
+	reinsertFunc()
 
 	return promote
 }
 
-func (t *txQueue) Peek() *types.Transaction {
+// Peek returns the lowest nonce transaction in the account based heap
+func (t *txHeapWrapper) Peek() *types.Transaction {
 	return t.txs.Peek()
 }
 
-func (t *txQueue) Push(tx *types.Transaction) {
-	// try to find the txn in the set
+// Push adds a transaction to the account based heap
+func (t *txHeapWrapper) Push(tx *types.Transaction) {
+	// Check if the current transaction has a higher or equal nonce
+	// than all the current transactions in the account based heap
 	i := sort.Search(len(t.txs), func(i int) bool {
 		return t.txs[0].Nonce >= tx.Nonce
 	})
+
+	// If sort.Search found something, it will return the index
+	// of the first found element for which func(i int) was true
 	if i < len(t.txs) && t.txs[i].Nonce == tx.Nonce {
-		// txns with the same nonce is on the list
+		// i is an index corresponding to an element in the
+		// account based heap, and the nonces match up, so this tx is discarded
 		return
 	}
 
+	// All checks have passed, add the tx to the account based heap
 	heap.Push(&t.txs, tx)
 }
 
-func (t *txQueue) Pop() *types.Transaction {
+// Pop removes the min-nonce transaction from the account based heap
+func (t *txHeapWrapper) Pop() *types.Transaction {
 	res := heap.Pop(&t.txs)
 	if res == nil {
 		return nil
@@ -379,9 +432,12 @@ func (t *txQueue) Pop() *types.Transaction {
 	return res.(*types.Transaction)
 }
 
-// Nonce ordered heap
+// Account based heap implementation //
+// The heap is min-nonce ordered //
 
 type txHeap []*types.Transaction
+
+// Required method definitions for the standard golang heap package
 
 func (t *txHeap) Peek() *types.Transaction {
 	if len(*t) == 0 {
@@ -414,7 +470,8 @@ func (t *txHeap) Pop() interface{} {
 	return x
 }
 
-// Price ordered heap
+// Price based heap implementation //
+// The heap is max-price ordered //
 
 type pricedTx struct {
 	tx    *types.Transaction
@@ -491,6 +548,8 @@ func (t *txPriceHeap) Contains(tx *types.Transaction) bool {
 }
 
 type txPriceHeapImpl []*pricedTx
+
+// Required method definitions for the standard golang heap package
 
 func (t txPriceHeapImpl) Len() int { return len(t) }
 
