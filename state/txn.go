@@ -165,27 +165,28 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 
 // AddBalance adds balance
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("ADD BALANCE: %s %s\n", addr.String(), balance.String())
-	/*
-		if balance.Sign() == 0 {
-			return
-		}
-	*/
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
 	})
 }
 
-// SubBalance reduces the balance
-func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
-	//fmt.Printf("SUB BALANCE: %s %s\n", addr.String(), balance.String())
-
-	if balance.Sign() == 0 {
-		return
+// SubBalance reduces the balance at address addr by amount
+func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
+	// If we try to reduce balance by 0, then it's a noop
+	if amount.Sign() == 0 {
+		return nil
 	}
+
+	// Check if we have enough balance to deduce amount from
+	if balance := txn.GetBalance(addr); balance.Cmp(amount) < 0 {
+		return runtime.ErrNotEnoughFunds
+	}
+
 	txn.upsertAccount(addr, true, func(object *StateObject) {
-		object.Account.Balance.Sub(object.Account.Balance, balance)
+		object.Account.Balance.Sub(object.Account.Balance, amount)
 	})
+
+	return nil
 }
 
 // SetBalance sets the balance
@@ -595,7 +596,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 		objs = append(objs, obj)
 		return false
 	})
-	// show(objs)
 
 	t, hash := txn.snapshot.Commit(objs)
 	return t, hash

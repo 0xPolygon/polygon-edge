@@ -152,7 +152,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 
 	res := &InitIBFTResult{}
 	// Read the private key
-	key, err := crypto.ReadPrivKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
+	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
 	if err != nil {
 		return nil, err
 	}

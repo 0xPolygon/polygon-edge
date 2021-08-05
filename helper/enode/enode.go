@@ -117,7 +117,7 @@ func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
 // PubkeyToEnode converts a public key to an enode
 func PubkeyToEnode(pub *ecdsa.PublicKey) ID {
 	var id ID
-	pbytes := crypto.MarshallPublicKey(pub)
+	pbytes := crypto.MarshalPublicKey(pub)
 	copy(id[:], pbytes[1:])
 	return id
 }

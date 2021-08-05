@@ -210,10 +210,15 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		handleErr(err)
 		return
 	}
+
+	// log request
+	j.logger.Debug("handle", "request", string(data))
+
 	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
 		handleErr(err)
 		return
 	}
+	j.logger.Debug("handle", "response", string(resp))
 	w.Write(resp)
 }
