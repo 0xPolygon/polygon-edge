@@ -169,15 +169,11 @@ func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64)
 				blockNumber,
 			)
 
-			if pendingEvent.EventType != staking.UnknownEvent {
-				hub := staking.GetStakingHub()
-				// Remove the event from the queue if it is present
-				hub.RemovePendingEvent(*pendingEvent)
-			}
+			hub := staking.GetStakingHub()
+			// Remove the event from the queue if it is present
+			hub.RemovePendingEvent(*pendingEvent)
 		}
 	}
-
-	clearUnknownEvents()
 }
 
 // commitApprovedEvents is a helper method for committing pending events that passed all checks
@@ -192,29 +188,19 @@ func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64)
 				blockNumber,
 			)
 
-			if pendingEvent.EventType != staking.UnknownEvent {
-				hub := staking.GetStakingHub()
+			hub := staking.GetStakingHub()
 
-				// Remove the event from the queue if it is present
-				if hub.RemovePendingEvent(*pendingEvent) {
-					// Execute the changes on the staking map
-					if pendingEvent.EventType == staking.StakingEvent {
-						hub.IncreaseStake(t.From, t.Value)
-					} else {
-						hub.ResetStake(t.From)
-					}
+			// Remove the event from the queue if it is present
+			if hub.RemovePendingEvent(*pendingEvent) {
+				// Execute the changes on the staking map
+				if pendingEvent.EventType == staking.StakingEvent {
+					hub.IncreaseStake(t.From, t.Value)
+				} else {
+					hub.ResetStake(t.From)
 				}
 			}
 		}
 	}
-
-	clearUnknownEvents()
-}
-
-// clearUnknownEvents purges the staking event queue of any leftover unknown events
-func clearUnknownEvents() {
-	hub := staking.GetStakingHub()
-	hub.ClearUnknownEvents()
 }
 
 // ProcessBlock already does all the handling of the whole process, TODO

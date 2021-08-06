@@ -394,26 +394,3 @@ func (sh *StakingHub) ClearEvents() {
 
 	sh.EventQueue = make([]PendingEvent, 0)
 }
-
-// ClearUnknownEvents purges the event queue of UnknownEvents
-func (sh *StakingHub) ClearUnknownEvents() {
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
-
-	foundIndxs := make([]int, 0)
-	for indx, el := range sh.EventQueue {
-		if el.EventType == UnknownEvent {
-			foundIndxs = append(foundIndxs, indx)
-		}
-	}
-
-	if len(foundIndxs) > 0 {
-		prevSize := len(foundIndxs)
-
-		for _, foundIndx := range foundIndxs {
-			sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
-		}
-
-		sh.log(fmt.Sprintf("Cleared [%d] unknown pending events", prevSize), logWarning)
-	}
-}
