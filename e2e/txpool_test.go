@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/tests"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -26,7 +27,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Predefined values
 	gasPrice := big.NewInt(10000)
 
-	referenceKey, referenceAddr := framework.GenerateKeyAndAddr(t)
+	referenceKey, referenceAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(10)
 
 	devInterval := 5

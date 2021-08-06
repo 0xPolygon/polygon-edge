@@ -2,7 +2,6 @@ package framework
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -29,14 +28,6 @@ func EthToWei(ethValue int64) *big.Int {
 	return new(big.Int).Mul(
 		big.NewInt(ethValue),
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
-}
-
-func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
-	t.Helper()
-	key, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	addr := crypto.PubKeyToAddress(&key.PublicKey)
-	return key, addr
 }
 
 // GetAccountBalance is a helper method for fetching the Balance field of an account
