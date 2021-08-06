@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/minimal/state/runtime"
 	"net"
 	"os"
 	"path/filepath"
@@ -104,7 +105,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	m.executor = state.NewExecutor(config.Chain.Params, st)
+	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 
@@ -126,7 +127,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		if m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, hub, m.grpcServer, m.network); err != nil {
+		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
+		if err != nil {
 			return nil, err
 		}
 
@@ -277,25 +279,21 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 
 	if err != nil {
-		return nil, false, err
+		return
 	}
 
-	_, failed, err := transition.Apply(txn)
+	result, err = transition.Apply(txn)
 
-	if err != nil {
-		return nil, false, err
-	}
-
-	return transition.ReturnValue(), failed, nil
+	return
 }
 
 // SETUP //

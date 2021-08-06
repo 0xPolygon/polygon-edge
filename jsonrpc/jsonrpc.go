@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -101,6 +102,7 @@ var wsUpgrader = websocket.Upgrader{
 type wsWrapper struct {
 	ws     *websocket.Conn // the actual WS connection
 	logger hclog.Logger    // module logger
+	writeLock sync.Mutex // writer lock
 }
 
 // WriteMessage writes out the message to the WS peer
@@ -108,6 +110,8 @@ func (w *wsWrapper) WriteMessage(
 	messageType int,
 	data []byte,
 ) error {
+	w.writeLock.Lock()
+	defer w.writeLock.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)
 	if writeErr != nil {
 		w.logger.Error(
@@ -210,10 +214,15 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		handleErr(err)
 		return
 	}
+
+	// log request
+	j.logger.Debug("handle", "request", string(data))
+
 	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
 		handleErr(err)
 		return
 	}
+	j.logger.Debug("handle", "response", string(resp))
 	w.Write(resp)
 }
