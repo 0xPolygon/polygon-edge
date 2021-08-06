@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"testing"
 
-  "github.com/0xPolygon/minimal/chain"
+  	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/network"
-  "github.com/0xPolygon/minimal/txpool/proto"
+  	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
