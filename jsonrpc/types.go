@@ -91,16 +91,16 @@ func toUncle(u *types.Header) *uncle {
 
 type block struct {
 	uncle
-	Transactions    []*transaction `json:"transactions"`
-	Uncles          []*uncle       `json:"uncles"`
+	Transactions []*transaction `json:"transactions"`
+	Uncles       []*uncle       `json:"uncles"`
 }
 
 func toBlock(b *types.Block) *block {
 	h := b.Header
 	res := &block{
-		uncle:           *toUncle(h),
-		Transactions:    []*transaction{},
-		Uncles:          []*uncle{},
+		uncle:        *toUncle(h),
+		Transactions: []*transaction{},
+		Uncles:       []*uncle{},
 	}
 	for idx, txn := range b.Transactions {
 		res.Transactions = append(res.Transactions, toTransaction(txn, b, idx))
