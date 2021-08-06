@@ -67,6 +67,71 @@ func TestDispatcherWebsocket(t *testing.T) {
 	}
 }
 
+func TestDispatcherWebsocketRequestFormats(t *testing.T) {
+	store := newMockStore()
+
+	s := newDispatcher(hclog.NewNullLogger(), store, 0)
+	s.registerEndpoints()
+
+	mock := &mockWsConn{
+		msgCh: make(chan []byte, 1),
+	}
+
+	cases := []struct {
+		msg         []byte
+		expectError bool
+	}{
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": "abc"
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": null
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": 2.1
+			}`),
+			true,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"]
+			}`),
+			false,
+		},
+		{
+			[]byte(`{
+				"method": "eth_subscribe",
+				"params": ["newHeads"],
+				"id": 2.0
+			}`),
+			false,
+		},
+	}
+	for _, c := range cases {
+		_, err := s.HandleWs(c.msg, mock)
+		if !c.expectError && err != nil {
+			t.Fatal("Error unexpected but found")
+		}
+		if c.expectError && err == nil {
+			t.Fatal("Error expected but not found")
+		}
+	}
+}
+
 type mockService struct {
 	msgCh chan interface{}
 }
