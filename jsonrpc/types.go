@@ -90,24 +90,7 @@ func toUncle(u *types.Header) *uncle {
 }
 
 type block struct {
-	ParentHash      types.Hash     `json:"parentHash"`
-	Sha3Uncles      types.Hash     `json:"sha3Uncles"`
-	Miner           types.Address  `json:"miner"`
-	StateRoot       types.Hash     `json:"stateRoot"`
-	TxRoot          types.Hash     `json:"transactionsRoot"`
-	ReceiptsRoot    types.Hash     `json:"receiptsRoot"`
-	LogsBloom       types.Bloom    `json:"logsBloom"`
-	Difficulty      argUint64      `json:"difficulty"`
-	TotalDifficulty argUint64      `json:"totalDifficulty"`
-	Size            argUint64      `json:"size"`
-	Number          argUint64      `json:"number"`
-	GasLimit        argUint64      `json:"gasLimit"`
-	GasUsed         argUint64      `json:"gasUsed"`
-	Timestamp       argUint64      `json:"timestamp"`
-	ExtraData       argBytes       `json:"extraData"`
-	MixHash         types.Hash     `json:"mixHash"`
-	Nonce           types.Nonce    `json:"nonce"`
-	Hash            types.Hash     `json:"hash"`
+	uncle
 	Transactions    []*transaction `json:"transactions"`
 	Uncles          []*uncle       `json:"uncles"`
 }
@@ -115,24 +98,7 @@ type block struct {
 func toBlock(b *types.Block) *block {
 	h := b.Header
 	res := &block{
-		ParentHash:      h.ParentHash,
-		Sha3Uncles:      h.Sha3Uncles,
-		Miner:           h.Miner,
-		StateRoot:       h.StateRoot,
-		TxRoot:          h.TxRoot,
-		ReceiptsRoot:    h.ReceiptsRoot,
-		LogsBloom:       h.LogsBloom,
-		Difficulty:      argUint64(h.Difficulty),
-		TotalDifficulty: argUint64(h.Difficulty), // not needed for POS
-		Size:            argUint64(0),            // should derive actual size
-		Number:          argUint64(h.Number),
-		GasLimit:        argUint64(h.GasLimit),
-		GasUsed:         argUint64(h.GasUsed),
-		Timestamp:       argUint64(h.Timestamp),
-		ExtraData:       argBytes(h.ExtraData),
-		MixHash:         h.MixHash,
-		Nonce:           h.Nonce,
-		Hash:            h.Hash,
+		uncle:           *toUncle(h),
 		Transactions:    []*transaction{},
 		Uncles:          []*uncle{},
 	}
