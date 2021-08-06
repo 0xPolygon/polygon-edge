@@ -67,6 +67,9 @@ func TestBroadcast(t *testing.T) {
 				}
 			}
 
+			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+			time.Sleep(time.Second * 2)
+
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,
 				From:     senderAddr,
