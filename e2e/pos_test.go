@@ -277,6 +277,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
 	defaultBalance := tests.EthToWei(10)
+	initialStakingAddrBalance := tests.EthToWei(1000)
 
 	devInterval := 10
 
@@ -286,6 +287,8 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.PremineWithStake(senderAddr, defaultBalance, defaultBalance)
+		// After this callback the staking contract address will have a balance of 1010 ETH
+		config.Premine(stakingContractAddr, initialStakingAddrBalance)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -378,7 +381,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	)
 
 	assert.Equalf(t,
-		expStake.String(),
+		(big.NewInt(0).Add(expStake, initialStakingAddrBalance)).String(),
 		actualStakingAddrBalance.String(),
 		"Staked address balance mismatch after stake / unstake exploit",
 	)
