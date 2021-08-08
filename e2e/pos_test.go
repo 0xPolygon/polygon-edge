@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"io"
 	"math/big"
 	"testing"
 	"time"
@@ -14,7 +15,9 @@ import (
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 )
 
 func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string) *proto.Snapshot_Validator {
@@ -125,6 +128,32 @@ func TestPoS_Unstake(t *testing.T) {
 	assert.Len(t, snapshot.Validators, numGenesisValidators-1)
 }
 
+func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
+	systemClient := srv.Operator()
+	ctx, cancelFn := context.WithCancel(context.Background())
+	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
+	if err != nil {
+		cancelFn()
+		t.Fatalf("Unable to subscribe to blockchain events")
+	}
+
+	evnt, err := stream.Recv()
+	if err == io.EOF {
+		t.Fatalf("Invalid stream close")
+	}
+	if err != nil {
+		t.Fatalf("Unable to read blockchain event")
+	}
+
+	if len(evnt.Added) != expectedBlocks {
+		t.Fatalf("Invalid number of blocks added")
+	}
+
+	cancelFn()
+
+	return evnt.Added[index].Number
+}
+
 func TestPoS_UnstakeExploit(t *testing.T) {
 	// Predefined values
 	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
@@ -200,8 +229,16 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		}
 	}
 
-	// Mandatory sleep for the dev consensus and executor to go through the txns
-	time.Sleep(time.Duration(devInterval+5) * time.Second)
+	// Set up the blockchain listener to catch the added block event
+	blockNum := waitForBlock(t, srv, 1, 0)
+
+	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
+	if blockErr != nil {
+		t.Fatalf("Unable to fetch block")
+	}
+
+	// Find how much the account paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(gasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
 	actualStakedBalance := getStakedBalance(senderAddr, client, t)
@@ -210,22 +247,12 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 
 	// Make sure the balances match up
 
-	// The account balance should be in the range of
-	// [previousBalance + stake refund - fees, previousBalance + stake refund]
-	prevAccountBalanceWithStake := big.NewInt(0).Add(previousAccountBalance, defaultBalance)
-	ballparkFeeValue := new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil) // 0.001 ETH
+	// expBalance = previousAccountBalance + stakeRefund - block fees
+	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(previousAccountBalance, defaultBalance), paidFee)
 
-	// previousBalance + stakeRefund - fees <= balance
-	assert.GreaterOrEqualf(t,
+	assert.Equalf(t,
+		expBalance.String(),
 		actualAccountBalance.String(),
-		(big.NewInt(0).Sub(prevAccountBalanceWithStake, ballparkFeeValue)).String(),
-		"Account balance mismatch after unstake exploit",
-	)
-
-	// balance <= previousBalance + stakeRefund
-	assert.LessOrEqualf(t,
-		actualAccountBalance.String(),
-		prevAccountBalanceWithStake.String(),
 		"Account balance mismatch after unstake exploit",
 	)
 
@@ -269,7 +296,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	currentNonce := 0
 
 	// TxPool client
-	clt := srv.TxnPoolOperator()
+	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(value *big.Int, to types.Address) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
@@ -319,14 +346,22 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			}
 		}
 
-		_, addErr := clt.AddTxn(context.Background(), msg)
+		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 	}
 
-	// Mandatory sleep for the dev consensus and executor to go through the txns
-	time.Sleep(time.Duration(devInterval+5) * time.Second)
+	// Set up the blockchain listener to catch the added block event
+	blockNum := waitForBlock(t, srv, 1, 0)
+
+	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
+	if blockErr != nil {
+		t.Fatalf("Unable to fetch block")
+	}
+
+	// Find how much the account paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(gasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
 	actualStakedBalance := getStakedBalance(senderAddr, client, t)
@@ -349,24 +384,14 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	)
 
 	// Make sure the account balances match up
-	ballparkFeeValue := new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil) // 0.001 ETH
 
-	// Account balance should be in the range
-	// referenceBalance = previousAccountBalance + stakeRefund - 1 ETH
-	// [referenceBalance - fees, referenceBalance]
-	referenceBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, defaultBalance), oneEth)
+	// expBalance = previousAccountBalance + stakeRefund - 1 ETH - block fees
+	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, defaultBalance), oneEth)
+	expBalance = big.NewInt(0).Sub(expBalance, paidFee)
 
-	// referenceBalance - fees <= balance
-	assert.GreaterOrEqualf(t,
+	assert.Equalf(t,
+		expBalance.String(),
 		actualAccountBalance.String(),
-		(big.NewInt(0).Sub(referenceBalance, ballparkFeeValue)).String(),
-		"Account balance mismatch after unstake exploit",
-	)
-
-	// balance <= referenceBalance
-	assert.LessOrEqualf(t,
-		actualAccountBalance.String(),
-		referenceBalance.String(),
 		"Account balance mismatch after unstake exploit",
 	)
 }
