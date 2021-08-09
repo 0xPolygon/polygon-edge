@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -31,14 +32,14 @@ func releaseState(s *state) {
 const stackSize = 1024
 
 var (
-	errOutOfGas       = fmt.Errorf("out of gas")
-	errStackUnderflow = fmt.Errorf("stack underflow")
-	errStackOverflow  = fmt.Errorf("stack overflow")
-	errReadOnly       = fmt.Errorf("read only")
-	errInvalidJump    = fmt.Errorf("invalid jump")
-	errOpCodeNotFound = fmt.Errorf("opcode not found")
-	errReturnBadSize  = fmt.Errorf("return bad size")
-	errRevert         = runtime.ErrExecutionReverted
+	errOutOfGas        = fmt.Errorf("out of gas")
+	errStackUnderflow  = fmt.Errorf("stack underflow")
+	errStackOverflow   = fmt.Errorf("stack overflow")
+	errWriteProtection = errors.New("write protection")
+	errInvalidJump     = fmt.Errorf("invalid jump")
+	errOpCodeNotFound  = fmt.Errorf("opcode not found")
+	errReturnBadSize   = fmt.Errorf("return bad size")
+	errRevert          = runtime.ErrExecutionReverted
 )
 
 // Instructions is the code of instructions
