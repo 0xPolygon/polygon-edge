@@ -35,6 +35,7 @@ var (
 	errOutOfGas        = fmt.Errorf("out of gas")
 	errStackUnderflow  = fmt.Errorf("stack underflow")
 	errStackOverflow   = fmt.Errorf("stack overflow")
+	errGasUintOverflow = errors.New("gas uint64 overflow")
 	errWriteProtection = errors.New("write protection")
 	errInvalidJump     = fmt.Errorf("invalid jump")
 	errOpCodeNotFound  = fmt.Errorf("opcode not found")
@@ -257,7 +258,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 	}
 
 	if !offset.IsUint64() || !size.IsUint64() {
-		c.exit(errOutOfGas)
+		c.exit(errGasUintOverflow)
 		return false
 	}
 
@@ -265,7 +266,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 	s := size.Uint64()
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
-		c.exit(errOutOfGas)
+		c.exit(errGasUintOverflow)
 		return false
 	}
 
