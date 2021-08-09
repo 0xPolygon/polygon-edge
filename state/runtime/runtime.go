@@ -106,6 +106,7 @@ var (
 	ErrJumpDestNotValid         = fmt.Errorf("jump destination is not valid")
 	ErrMemoryOverflow           = fmt.Errorf("error memory overflow")
 	ErrNotEnoughFunds           = fmt.Errorf("not enough funds")
+	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
 	ErrMaxCodeSizeExceeded      = errors.New("evm: max code size exceeded")
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
