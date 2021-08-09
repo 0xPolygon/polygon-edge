@@ -32,7 +32,7 @@ func releaseState(s *state) {
 const stackSize = 1024
 
 var (
-	errOutOfGas              = fmt.Errorf("out of gas")
+	errOutOfGas              = runtime.ErrOutOfGas
 	errStackUnderflow        = fmt.Errorf("stack underflow")
 	errStackOverflow         = fmt.Errorf("stack overflow")
 	errGasUintOverflow       = errors.New("gas uint64 overflow")

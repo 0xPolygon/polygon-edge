@@ -99,6 +99,7 @@ func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
 }
 
 var (
+	ErrOutOfGas                 = errors.New("out of gas")
 	ErrGasConsumed              = fmt.Errorf("gas has been consumed")
 	ErrGasOverflow              = fmt.Errorf("gas overflow")
 	ErrStackOverflow            = fmt.Errorf("stack overflow")
