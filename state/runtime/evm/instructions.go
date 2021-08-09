@@ -793,12 +793,12 @@ func opReturnDataCopy(c *state) {
 
 	end := length.Add(dataOffset, length)
 	if !end.IsUint64() {
-		c.exit(errOutOfGas)
+		c.exit(errReturnDataOutOfBounds)
 		return
 	}
 	size = end.Uint64()
 	if uint64(len(c.returnData)) < size {
-		c.exit(errReturnBadSize)
+		c.exit(errReturnDataOutOfBounds)
 		return
 	}
 

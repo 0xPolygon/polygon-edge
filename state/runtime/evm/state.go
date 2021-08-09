@@ -32,15 +32,15 @@ func releaseState(s *state) {
 const stackSize = 1024
 
 var (
-	errOutOfGas        = fmt.Errorf("out of gas")
-	errStackUnderflow  = fmt.Errorf("stack underflow")
-	errStackOverflow   = fmt.Errorf("stack overflow")
-	errGasUintOverflow = errors.New("gas uint64 overflow")
-	errWriteProtection = errors.New("write protection")
-	errInvalidJump     = fmt.Errorf("invalid jump")
-	errOpCodeNotFound  = fmt.Errorf("opcode not found")
-	errReturnBadSize   = fmt.Errorf("return bad size")
-	errRevert          = runtime.ErrExecutionReverted
+	errOutOfGas              = fmt.Errorf("out of gas")
+	errStackUnderflow        = fmt.Errorf("stack underflow")
+	errStackOverflow         = fmt.Errorf("stack overflow")
+	errGasUintOverflow       = errors.New("gas uint64 overflow")
+	errWriteProtection       = errors.New("write protection")
+	errInvalidJump           = fmt.Errorf("invalid jump")
+	errOpCodeNotFound        = fmt.Errorf("opcode not found")
+	errRevert                = runtime.ErrExecutionReverted
+	errReturnDataOutOfBounds = errors.New("return data out of bounds")
 )
 
 // Instructions is the code of instructions
