@@ -33,6 +33,7 @@ var (
 	ErrNonceTooLow         = errors.New("nonce too low")
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
 	ErrInvalidAccountState = errors.New("invalid account state")
+	ErrAlreadyKnown        = errors.New("already known")
 )
 
 type store interface {
@@ -193,7 +194,9 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 	txnsQueue.Add(tx)
 
 	for _, promoted := range txnsQueue.Promote() {
-		t.sorted.Push(promoted)
+		if pushErr := t.sorted.Push(promoted); pushErr != nil {
+			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
+		}
 	}
 	return nil
 }
@@ -208,7 +211,9 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 	ret := func() {
-		t.sorted.Push(txn.tx)
+		if pushErr := t.sorted.Push(txn.tx); pushErr != nil {
+			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
+		}
 	}
 	return txn.tx, ret
 }
@@ -489,7 +494,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 	price := new(big.Int).Set(tx.GasPrice)
 
 	if _, ok := t.index[tx.Hash]; ok {
-		return fmt.Errorf("tx %s already exists", tx.Hash)
+		return ErrAlreadyKnown
 	}
 
 	pTx := &pricedTx{
