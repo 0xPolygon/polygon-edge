@@ -297,14 +297,14 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 	stateRoot := t.store.Header().StateRoot
 	accountBalance := t.store.GetBalance(stateRoot, tx.From)
 
-	// Check if the sender has enough funds to execute the transaction
-	if accountBalance.Cmp(tx.Cost()) < 0 {
-		return ErrInsufficientFunds
-	}
-
 	// Check nonce ordering
 	if t.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
 		return ErrNonceTooLow
+	}
+
+	// Check if the sender has enough funds to execute the transaction
+	if accountBalance.Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
 	}
 
 	// Make sure the transaction doesn't exceed the block limit
