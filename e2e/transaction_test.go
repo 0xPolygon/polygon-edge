@@ -169,7 +169,7 @@ func TestEthTransfer(t *testing.T) {
 	rpcClient := srv.JSONRPC()
 	for indx, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			// @Vuksan Please remove this skip statement when JSON-RPC Error wrapping is added
+			// TODO @Vuksan Please remove this skip statement when JSON-RPC Error wrapping is added
 			if indx == 1 {
 				t.Skip()
 			}

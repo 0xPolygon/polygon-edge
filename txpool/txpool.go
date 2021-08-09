@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -263,16 +263,6 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(tx *types.Transaction) error {
-	// Make sure the transaction has more gas than the basic transaction fee
-	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
-	if err != nil {
-		return err
-	}
-
-	if tx.Gas < intrinsicGas {
-		return ErrIntrinsicGas
-	}
-
 	// Check if the transaction has a strictly positive value
 	if tx.Value.Sign() < 0 {
 		return ErrNegativeValue
@@ -309,6 +299,16 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 
 	// Make sure the transaction doesn't exceed the block limit
 	// TODO: Awaiting separate PR
+
+	// Make sure the transaction has more gas than the basic transaction fee
+	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
+	if err != nil {
+		return err
+	}
+
+	if tx.Gas < intrinsicGas {
+		return ErrIntrinsicGas
+	}
 
 	return nil
 }
