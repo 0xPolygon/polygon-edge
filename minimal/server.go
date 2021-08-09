@@ -191,22 +191,23 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	return account.Nonce
 }
 
-func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) *big.Int {
-	zeroValue := big.NewInt(0)
-
+func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	snap, err := t.state.NewSnapshotAt(root)
 	if err != nil {
-		return zeroValue
+		return nil, fmt.Errorf("unable to get snapshot for root, %v", err)
 	}
+
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
 	if !ok {
-		return zeroValue
+		return nil, fmt.Errorf("unable to get result from snapshot, %v", err)
 	}
+
 	var account state.Account
 	if err = account.UnmarshalRlp(result); err != nil {
-		return zeroValue
+		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %v", err)
 	}
-	return account.Balance
+
+	return account.Balance, nil
 }
 
 // setupConsensus sets up the consensus mechanism

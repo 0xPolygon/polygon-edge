@@ -26,18 +26,19 @@ const (
 )
 
 var (
-	ErrIntrinsicGas      = errors.New("intrinsic gas too low")
-	ErrNegativeValue     = errors.New("negative value")
-	ErrNonEncryptedTxn   = errors.New("non-encrypted transaction")
-	ErrInvalidSender     = errors.New("invalid sender")
-	ErrNonceTooLow       = errors.New("nonce too low")
-	ErrInsufficientFunds = errors.New("insufficient funds for gas * price + value")
+	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
+	ErrNegativeValue       = errors.New("negative value")
+	ErrNonEncryptedTxn     = errors.New("non-encrypted transaction")
+	ErrInvalidSender       = errors.New("invalid sender")
+	ErrNonceTooLow         = errors.New("nonce too low")
+	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState = errors.New("invalid account state")
 )
 
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
-	GetBalance(root types.Hash, addr types.Address) *big.Int
+	GetBalance(root types.Hash, addr types.Address) (*big.Int, error)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
@@ -285,7 +286,10 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 
 	// Grab the state root for the latest block
 	stateRoot := t.store.Header().StateRoot
-	accountBalance := t.store.GetBalance(stateRoot, tx.From)
+	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
+	if balanceErr != nil {
+		return ErrInvalidAccountState
+	}
 
 	// Check nonce ordering
 	if t.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
