@@ -23,7 +23,7 @@ var forks = &chain.Forks{
 type mockStore struct {
 }
 
-func (m *mockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
+func (m *mockStore) GetNonce(types.Hash, types.Address) uint64 {
 	return 0
 }
 
@@ -31,7 +31,7 @@ func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
 	return nil, false
 }
 
-func (m *mockStore) GetBalance(root types.Hash, addr types.Address) *big.Int {
+func (m *mockStore) GetBalance(types.Hash, types.Address) *big.Int {
 	balance, _ := big.NewInt(0).SetString("10000000000000000000", 10)
 	return balance
 }
