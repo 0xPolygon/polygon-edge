@@ -32,6 +32,7 @@ type TestServerConfig struct {
 	PremineAccts  []*SrvAccount // Accounts with existing balances (genesis accounts)
 	Consensus     ConsensusType // Consensus Type
 	Bootnodes     []string      // Bootnode Addresses
+	DevInterval   int           // Dev consensus update interval [s]
 	ShowsLog      bool
 }
 
@@ -55,6 +56,11 @@ func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 // SetIBFTDirPrefix callback sets prefix of IBFT directories
 func (t *TestServerConfig) SetIBFTDirPrefix(ibftDirPrefix string) {
 	t.IBFTDirPrefix = ibftDirPrefix
+}
+
+// SetDevInterval sets the update interval for the dev consensus
+func (t *TestServerConfig) SetDevInterval(interval int) {
+	t.DevInterval = interval
 }
 
 // SetIBFTDir callback sets the name of data directory for IBFT

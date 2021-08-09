@@ -319,3 +319,93 @@ func TestTxnQueue_Heap(t *testing.T) {
 		}
 	})
 }
+
+func generateTx(from types.Address, value *big.Int) *types.Transaction {
+	return &types.Transaction{
+		From:     from,
+		Nonce:    0,
+		Gas:      validGasLimit,
+		GasPrice: big.NewInt(1),
+		Value:    value,
+	}
+}
+
+func TestTxPool_ErrNegativeValue(t *testing.T) {
+	// Transactions with a negative value should be discarded
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+
+	refAddress := types.Address{0x1}
+	txn := generateTx(refAddress, big.NewInt(-5))
+
+	assert.ErrorIs(t, pool.addImpl("", txn), ErrNegativeValue)
+
+	assert.Nil(t, pool.queue[refAddress])
+	assert.Equal(t, pool.Length(), uint64(0))
+}
+
+func TestTxPool_ErrNonEncryptedTxn(t *testing.T) {
+	// Unencrypted transactions should be discarded if not in dev mode
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+
+	refAddress := types.Address{0x1}
+	txn := generateTx(refAddress, big.NewInt(0))
+
+	assert.ErrorIs(t, pool.addImpl("", txn), ErrNonEncryptedTxn)
+
+	assert.Nil(t, pool.queue[refAddress])
+	assert.Equal(t, pool.Length(), uint64(0))
+}
+
+func TestTxPool_ErrInvalidSender(t *testing.T) {
+	// Unencrypted transactions should be discarded if not in dev mode
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+	poolSigner := crypto.NewEIP155Signer(uint64(100))
+	pool.AddSigner(poolSigner)
+
+	refAddress := types.ZeroAddress
+	txn := generateTx(refAddress, big.NewInt(0))
+
+	assert.ErrorIs(t, pool.addImpl("", txn), ErrInvalidSender)
+
+	assert.Nil(t, pool.queue[refAddress])
+	assert.Equal(t, pool.Length(), uint64(0))
+}
+
+type faultyMockStore struct {
+}
+
+func (fms faultyMockStore) Header() *types.Header {
+	return &types.Header{}
+}
+
+func (fms faultyMockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
+	return 0
+}
+
+func (fms faultyMockStore) GetBlockByHash(hash types.Hash, b bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (fms faultyMockStore) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
+	return nil, fmt.Errorf("unable to fetch account state")
+}
+
+func TestTxPool_ErrInvalidAccountState(t *testing.T) {
+	// Transactions with a negative value should be discarded
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &faultyMockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+
+	refAddress := types.Address{0x1}
+	txn := generateTx(refAddress, big.NewInt(1))
+
+	assert.ErrorIs(t, pool.addImpl("", txn), ErrInvalidAccountState)
+
+	assert.Nil(t, pool.queue[refAddress])
+	assert.Equal(t, pool.Length(), uint64(0))
+}
