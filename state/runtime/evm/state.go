@@ -2,7 +2,6 @@ package evm
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -33,13 +32,13 @@ const stackSize = 1024
 
 var (
 	errOutOfGas              = runtime.ErrOutOfGas
-	errStackUnderflow        = fmt.Errorf("stack underflow")
-	errStackOverflow         = fmt.Errorf("stack overflow")
+	errStackUnderflow        = runtime.ErrStackUnderflow
+	errStackOverflow         = runtime.ErrStackOverflow
+	errRevert                = runtime.ErrExecutionReverted
 	errGasUintOverflow       = errors.New("gas uint64 overflow")
 	errWriteProtection       = errors.New("write protection")
-	errInvalidJump           = fmt.Errorf("invalid jump")
-	errOpCodeNotFound        = fmt.Errorf("opcode not found")
-	errRevert                = runtime.ErrExecutionReverted
+	errInvalidJump           = errors.New("invalid jump destination")
+	errOpCodeNotFound        = errors.New("opcode not found")
 	errReturnDataOutOfBounds = errors.New("return data out of bounds")
 )
 
