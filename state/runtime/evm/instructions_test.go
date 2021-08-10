@@ -139,7 +139,7 @@ func TestCreate(t *testing.T) {
 		mockHost    *mockHostForCreate
 	}{
 		{
-			name: "should succeed",
+			name: "should succeed in case of CREATE",
 			op:   CREATE,
 			contract: &runtime.Contract{
 				Static:  false,
@@ -213,6 +213,44 @@ func TestCreate(t *testing.T) {
 				},
 				stop: true,
 				err:  errWriteProtection,
+			},
+			mockHost: &mockHostForCreate{},
+		},
+		{
+			name:     "should throw errOpCodeNotFound when op is CREATE2 and config.Constantinople is not disabled",
+			op:       CREATE2,
+			contract: &runtime.Contract{},
+			config: &chain.ForksInTime{
+				Constantinople: false,
+			},
+			initState: &state{
+				gas: 1000,
+				sp:  3,
+				stack: []*big.Int{
+					big.NewInt(0x01), // length
+					big.NewInt(0x00), // offset
+					big.NewInt(0x00), // value
+				},
+				memory: []byte{
+					byte(REVERT),
+				},
+				stop: false,
+				err:  nil,
+			},
+			// shouldn't change any states except for stop and err
+			resultState: &state{
+				gas: 1000,
+				sp:  3,
+				stack: []*big.Int{
+					big.NewInt(0x01), // length
+					big.NewInt(0x00), // offset
+					big.NewInt(0x00), // value
+				},
+				memory: []byte{
+					byte(REVERT),
+				},
+				stop: true,
+				err:  errOpCodeNotFound,
 			},
 			mockHost: &mockHostForCreate{},
 		},
