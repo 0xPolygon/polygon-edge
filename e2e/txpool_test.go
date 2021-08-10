@@ -2,9 +2,9 @@ package e2e
 
 import (
 	"context"
+	"io"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
@@ -12,8 +12,35 @@ import (
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 )
+
+func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
+	systemClient := srv.Operator()
+	ctx, cancelFn := context.WithCancel(context.Background())
+	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
+	if err != nil {
+		cancelFn()
+		t.Fatalf("Unable to subscribe to blockchain events")
+	}
+
+	evnt, err := stream.Recv()
+	if err == io.EOF {
+		t.Fatalf("Invalid stream close")
+	}
+	if err != nil {
+		t.Fatalf("Unable to read blockchain event")
+	}
+
+	if len(evnt.Added) != expectedBlocks {
+		t.Fatalf("Invalid number of blocks added")
+	}
+
+	cancelFn()
+
+	return evnt.Added[index].Number
+}
 
 func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// Test scenario:
@@ -69,11 +96,9 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	}
 
 	generateReq := func(nonce uint64) *txpoolOp.AddTxnReq {
-		var msg *txpoolOp.AddTxnReq
-		unstakeTxn := generateTx(nonce)
-		msg = &txpoolOp.AddTxnReq{
+		msg := &txpoolOp.AddTxnReq{
 			Raw: &any.Any{
-				Value: unstakeTxn.MarshalRLP(),
+				Value: generateTx(nonce).MarshalRLP(),
 			},
 			From: types.ZeroAddress.String(),
 		}
@@ -92,8 +117,8 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		}
 	}
 
-	// Mandatory sleep for the dev consensus and executor to go through the txns
-	time.Sleep(time.Duration(devInterval+1) * time.Second)
+	// Wait for the state transition to be executed
+	_ = waitForBlock(t, srv, 1, 0)
 
 	// Get to account balance
 	// Only the first tx should've gone through
@@ -112,8 +137,8 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		t.Fatalf("Unable to add txn, %v", addErr)
 	}
 
-	// Mandatory sleep for the dev consensus and executor to go through the txns
-	time.Sleep(time.Duration(devInterval+1) * time.Second)
+	// Wait for the state transition to be executed
+	_ = waitForBlock(t, srv, 1, 0)
 
 	// Now both the added tx and the shelved tx should've gone through
 	toAccountBalance = framework.GetAccountBalance(toAddress, client, t)
