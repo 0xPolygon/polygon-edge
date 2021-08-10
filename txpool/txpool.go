@@ -380,13 +380,6 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		tx = nextTx
 	}
 
-	if len(promote) == 0 {
-		// Nothing to promote
-		reinsertFunc()
-
-		return nil
-	}
-
 	// Find the last transaction to be promoted
 	lastTxn := promote[len(promote)-1]
 	// Grab its nonce value and set it as the reference next nonce
