@@ -291,14 +291,15 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 
 	// Grab the state root for the latest block
 	stateRoot := t.store.Header().StateRoot
-	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
-	if balanceErr != nil {
-		return ErrInvalidAccountState
-	}
 
 	// Check nonce ordering
 	if t.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
 		return ErrNonceTooLow
+	}
+
+	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
+	if balanceErr != nil {
+		return ErrInvalidAccountState
 	}
 
 	// Check if the sender has enough funds to execute the transaction
