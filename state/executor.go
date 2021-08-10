@@ -298,10 +298,11 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 
-	err := t.state.SubBalance(msg.From, upfrontGasCost)
-
-	if err == runtime.ErrNotEnoughFunds {
-		return ErrNotEnoughFundsForGas
+	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+		if err == runtime.ErrNotEnoughFunds {
+			return ErrNotEnoughFundsForGas
+		}
+		return err
 	}
 
 	return nil
