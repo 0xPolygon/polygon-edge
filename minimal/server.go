@@ -199,7 +199,7 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
 	if !ok {
-		return nil, fmt.Errorf("unable to get result from snapshot, %v", err)
+		return big.NewInt(0), nil
 	}
 
 	var account state.Account
