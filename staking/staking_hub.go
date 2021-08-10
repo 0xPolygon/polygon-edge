@@ -268,7 +268,7 @@ func (sh *StakingHub) marshalJSON(mappings []stakerMapping) (io.Reader, error) {
 // method will return true for all calls within the context of block A.
 func (sh *StakingHub) isStaker(address types.Address) bool {
 	if _, ok := sh.StakingMap[address]; ok {
-		return true
+		return sh.StakingMap[address].Cmp(big.NewInt(0)) > 0
 	}
 
 	return false
