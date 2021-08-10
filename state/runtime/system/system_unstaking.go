@@ -55,7 +55,6 @@ func (uh *unstakingHandler) run(state *systemState) ([]byte, error) {
 	// Can't unstake if the account has pending events which cause it to not have stake
 	if stakingAccountBalance.Cmp(afterEventsStake) < 0 ||
 		state.contract.Value.Cmp(zeroValue) != 0 ||
-		stakedBalance.Cmp(zeroValue) == 0 ||
 		afterEventsStake.Cmp(zeroValue) == 0 {
 		return nil, errors.New("Invalid unstake request")
 	}

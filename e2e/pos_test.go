@@ -398,3 +398,129 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		"Account balance mismatch after unstake exploit",
 	)
 }
+
+func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
+	// Predefined values
+	unstakingContractAddr := types.StringToAddress(system.UnstakingAddress)
+	stakingContractAddr := types.StringToAddress(system.StakingAddress)
+	gasPrice := big.NewInt(10000)
+
+	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	defaultBalance := tests.EthToWei(5)
+	initialStakingAddrBalance := tests.EthToWei(100)
+
+	devInterval := 5
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.Premine(stakingContractAddr, initialStakingAddrBalance)
+		config.Premine(senderAddr, defaultBalance)
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	// Required default values
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 0
+
+	// TxPool client
+	txpoolClient := srv.TxnPoolOperator()
+
+	generateTx := func(value *big.Int, to types.Address) *types.Transaction {
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &to,
+			GasPrice: gasPrice,
+			Gas:      1000000,
+			Value:    value,
+			V:        1, // it is necessary to encode in rlp
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	// Test scenario:
+	// User has 0 ETH staked and a balance of 5 ETH
+	// Stake 2 ETH -> Unstake
+	// Expected result for tests: Staked: 0 ETH; Balance: ~5 ETH
+
+	oneEth := tests.EthToWei(1)
+	zeroEth := tests.EthToWei(0)
+	for i := 0; i < 2; i++ {
+		var msg *txpoolOp.AddTxnReq
+		if i%2 == 0 {
+			stakeTxn := generateTx(oneEth, stakingContractAddr)
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: stakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		} else {
+			unstakeTxn := generateTx(zeroEth, unstakingContractAddr)
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: unstakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		}
+
+		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn, %v", addErr)
+		}
+	}
+
+	// Set up the blockchain listener to catch the added block event
+	blockNum := waitForBlock(t, srv, 1, 0)
+
+	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
+	if blockErr != nil {
+		t.Fatalf("Unable to fetch block")
+	}
+
+	// Find how much the account paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(gasPrice, big.NewInt(int64(block.GasUsed)))
+
+	// Check the balances
+	actualStakedBalance := getStakedBalance(senderAddr, client, t)
+	actualAccountBalance := getAccountBalance(senderAddr, client, t)
+	actualStakingAddrBalance := getAccountBalance(stakingContractAddr, client, t)
+
+	expStake := big.NewInt(0)
+
+	// Make sure the staked balance matches up
+	assert.Equalf(t,
+		expStake.String(),
+		actualStakedBalance.String(),
+		"Staked balance mismatch after stake / unstake events",
+	)
+
+	assert.Equalf(t,
+		initialStakingAddrBalance.String(),
+		actualStakingAddrBalance.String(),
+		"Staked address balance mismatch after stake / unstake events",
+	)
+
+	// Make sure the account balances match up
+
+	// expBalance = previousAccountBalance - block fees
+	expBalance := big.NewInt(0).Sub(defaultBalance, paidFee)
+
+	assert.Equalf(t,
+		expBalance.String(),
+		actualAccountBalance.String(),
+		"Account balance mismatch after stake / unstake events",
+	)
+}
