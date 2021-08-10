@@ -330,51 +330,6 @@ func generateTx(from types.Address, value *big.Int) *types.Transaction {
 	}
 }
 
-func TestTxPool_ErrNegativeValue(t *testing.T) {
-	// Transactions with a negative value should be discarded
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
-	assert.NoError(t, err)
-	pool.EnableDev()
-
-	refAddress := types.Address{0x1}
-	txn := generateTx(refAddress, big.NewInt(-5))
-
-	assert.ErrorIs(t, pool.addImpl("", txn), ErrNegativeValue)
-
-	assert.Nil(t, pool.queue[refAddress])
-	assert.Equal(t, pool.Length(), uint64(0))
-}
-
-func TestTxPool_ErrNonEncryptedTxn(t *testing.T) {
-	// Unencrypted transactions should be discarded if not in dev mode
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
-	assert.NoError(t, err)
-
-	refAddress := types.Address{0x1}
-	txn := generateTx(refAddress, big.NewInt(0))
-
-	assert.ErrorIs(t, pool.addImpl("", txn), ErrNonEncryptedTxn)
-
-	assert.Nil(t, pool.queue[refAddress])
-	assert.Equal(t, pool.Length(), uint64(0))
-}
-
-func TestTxPool_ErrInvalidSender(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
-	assert.NoError(t, err)
-	pool.EnableDev()
-	poolSigner := crypto.NewEIP155Signer(uint64(100))
-	pool.AddSigner(poolSigner)
-
-	refAddress := types.ZeroAddress
-	txn := generateTx(refAddress, big.NewInt(0))
-
-	assert.ErrorIs(t, pool.addImpl("", txn), ErrInvalidSender)
-
-	assert.Nil(t, pool.queue[refAddress])
-	assert.Equal(t, pool.Length(), uint64(0))
-}
-
 type faultyMockStore struct {
 }
 
@@ -394,16 +349,70 @@ func (fms faultyMockStore) GetBalance(root types.Hash, addr types.Address) (*big
 	return nil, fmt.Errorf("unable to fetch account state")
 }
 
-func TestTxPool_ErrInvalidAccountState(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &faultyMockStore{}, nil, nil)
-	assert.NoError(t, err)
-	pool.EnableDev()
+func TestTxPool_ErrorCodes(t *testing.T) {
+	testTable := []struct {
+		name          string
+		refAddress    types.Address
+		txValue       *big.Int
+		mockStore     store
+		expectedError error
+		devMode       bool
+	}{
+		{
+			// Transactions with a negative value should be discarded
+			"ErrNegativeValue",
+			types.Address{0x1},
+			big.NewInt(-5),
+			&mockStore{},
+			ErrNegativeValue,
+			true,
+		},
+		{
+			// Unencrypted transactions should be discarded if not in dev mode
+			"ErrNonEncryptedTxn",
+			types.Address{0x1},
+			big.NewInt(0),
+			&mockStore{},
+			ErrNonEncryptedTxn,
+			false,
+		},
+		{
+			// Transaction should have a valid sender encrypted if it is from a zeroAddress
+			"ErrInvalidSender",
+			types.ZeroAddress,
+			big.NewInt(0),
+			&mockStore{},
+			ErrInvalidSender,
+			true,
+		},
+		{
+			// Transaction should query valid account state
+			"ErrInvalidAccountState",
+			types.Address{0x1},
+			big.NewInt(1),
+			&faultyMockStore{},
+			ErrInvalidAccountState,
+			true,
+		},
+	}
 
-	refAddress := types.Address{0x1}
-	txn := generateTx(refAddress, big.NewInt(1))
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), testCase.mockStore, nil, nil)
+			assert.NoError(t, err)
+			if testCase.devMode {
+				pool.EnableDev()
+			}
+			poolSigner := crypto.NewEIP155Signer(uint64(100))
+			pool.AddSigner(poolSigner)
 
-	assert.ErrorIs(t, pool.addImpl("", txn), ErrInvalidAccountState)
+			refAddress := testCase.refAddress
+			txn := generateTx(refAddress, testCase.txValue)
 
-	assert.Nil(t, pool.queue[refAddress])
-	assert.Equal(t, pool.Length(), uint64(0))
+			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
+
+			assert.Nil(t, pool.queue[refAddress])
+			assert.Equal(t, pool.Length(), uint64(0))
+		})
+	}
 }
