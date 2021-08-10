@@ -169,7 +169,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		Root:              raw.Root,
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
-		Status:            raw.Status,
+		Status:            argUint64(*raw.Status),
 		TxHash:            txn.Hash,
 		TxIndex:           argUint64(indx),
 		BlockHash:         block.Hash(),
@@ -218,6 +218,11 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
+	}
+
+	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
+	if transaction.Gas == 0 {
+		transaction.Gas = header.GasLimit
 	}
 
 	// The return value of the execution is saved in the transition (returnValue field)
@@ -270,7 +275,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	valueInt := new(big.Int).Set(transaction.Value)
 
 	// If the sender address is present, recalculate the ceiling to his balance
-	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 
 		// Get the account balance
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)

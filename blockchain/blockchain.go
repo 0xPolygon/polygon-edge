@@ -939,6 +939,10 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 		return nil, false
 	}
 
+	// if blockNumber 0 (genesis block), do not try and get the full block
+	if blockNumber == uint64(0) {
+		full = false
+	}
 	return b.GetBlockByHash(blockHash, full)
 }
 

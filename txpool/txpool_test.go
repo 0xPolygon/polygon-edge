@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -415,4 +417,14 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			assert.Equal(t, pool.Length(), uint64(0))
 		})
 	}
+}
+
+func TestTxnOperatorAddNilRaw(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+
+	txnReq := new(proto.AddTxnReq)
+	response, err := pool.AddTxn(context.Background(), txnReq)
+	assert.Errorf(t, err, "transaction's field raw is empty")
+	assert.Nil(t, response)
 }
