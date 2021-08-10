@@ -23,7 +23,9 @@ func TestSubGasLimitPrice(t *testing.T) {
 	tests := []struct {
 		name        string
 		preState    map[types.Address]*PreState
-		msg         *types.Transaction
+		from        types.Address
+		gas         uint64
+		gasPrice    int64
 		expectedErr error
 	}{
 		{
@@ -35,11 +37,9 @@ func TestSubGasLimitPrice(t *testing.T) {
 					State:   map[types.Hash]types.Hash{},
 				},
 			},
-			msg: &types.Transaction{
-				From:     addr1,
-				Gas:      10,
-				GasPrice: big.NewInt(10),
-			},
+			from:        addr1,
+			gas:         10,
+			gasPrice:    10,
 			expectedErr: nil,
 		},
 		{
@@ -51,11 +51,9 @@ func TestSubGasLimitPrice(t *testing.T) {
 					State:   map[types.Hash]types.Hash{},
 				},
 			},
-			msg: &types.Transaction{
-				From:     addr1,
-				Gas:      10,
-				GasPrice: big.NewInt(10),
-			},
+			from:     addr1,
+			gas:      10,
+			gasPrice: 10,
 			// should return ErrNotEnoughFundsForGas when state.SubBalance returns ErrNotEnoughFunds
 			expectedErr: ErrNotEnoughFundsForGas,
 		},
@@ -64,14 +62,20 @@ func TestSubGasLimitPrice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transition := newTestTransition(tt.preState)
-			err := transition.subGasLimitPrice(tt.msg)
+			msg := &types.Transaction{
+				From:     tt.from,
+				Gas:      tt.gas,
+				GasPrice: big.NewInt(tt.gasPrice),
+			}
+
+			err := transition.subGasLimitPrice(msg)
 
 			assert.Equal(t, tt.expectedErr, err)
 			if err == nil {
 				// should reduce cost for gas from balance
-				reducedAmount := new(big.Int).Mul(tt.msg.GasPrice, big.NewInt(int64(tt.msg.Gas)))
-				newBalance := transition.GetBalance(tt.msg.From)
-				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[tt.msg.From].Balance)), newBalance)
+				reducedAmount := new(big.Int).Mul(msg.GasPrice, big.NewInt(int64(msg.Gas)))
+				newBalance := transition.GetBalance(msg.From)
+				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From].Balance)), newBalance)
 				assert.Zero(t, diff.Cmp(reducedAmount))
 			}
 		})
