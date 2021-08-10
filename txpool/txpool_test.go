@@ -360,7 +360,6 @@ func TestTxPool_ErrNonEncryptedTxn(t *testing.T) {
 }
 
 func TestTxPool_ErrInvalidSender(t *testing.T) {
-	// Unencrypted transactions should be discarded if not in dev mode
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
@@ -396,7 +395,6 @@ func (fms faultyMockStore) GetBalance(root types.Hash, addr types.Address) (*big
 }
 
 func TestTxPool_ErrInvalidAccountState(t *testing.T) {
-	// Transactions with a negative value should be discarded
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &faultyMockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
