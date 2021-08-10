@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,6 @@ func TestSubGasLimitPrice(t *testing.T) {
 				addr1: {
 					Nonce:   0,
 					Balance: 1000,
-					State:   map[types.Hash]types.Hash{},
 				},
 			},
 			from:        addr1,
@@ -77,6 +77,74 @@ func TestSubGasLimitPrice(t *testing.T) {
 				newBalance := transition.GetBalance(msg.From)
 				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From].Balance)), newBalance)
 				assert.Zero(t, diff.Cmp(reducedAmount))
+			}
+		})
+	}
+}
+
+func TestTransfer(t *testing.T) {
+	tests := []struct {
+		name        string
+		preState    map[types.Address]*PreState
+		from        types.Address
+		to          types.Address
+		amount      int64
+		expectedErr error
+	}{
+		{
+			name: "should succeed",
+			preState: map[types.Address]*PreState{
+				addr1: {
+					Nonce:   0,
+					Balance: 1000,
+				},
+				addr2: {
+					Nonce:   0,
+					Balance: 0,
+				},
+			},
+			from:        addr1,
+			to:          addr2,
+			amount:      100,
+			expectedErr: nil,
+		},
+		{
+			name: "should fail by ErrNotEnoughFunds",
+			preState: map[types.Address]*PreState{
+				addr1: {
+					Nonce:   0,
+					Balance: 10,
+					State:   map[types.Hash]types.Hash{},
+				},
+			},
+			from:   addr1,
+			to:     addr2,
+			amount: 100,
+			// should return ErrInsufficientBalance when state.transfer returns ErrNotEnoughFunds
+			expectedErr: runtime.ErrInsufficientBalance,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transition := newTestTransition(tt.preState)
+
+			amount := big.NewInt(tt.amount)
+			err := transition.transfer(tt.from, tt.to, amount)
+
+			assert.Equal(t, tt.expectedErr, err)
+			if err == nil {
+				// should move balance
+				oldBalanceForFrom := big.NewInt(int64(tt.preState[tt.from].Balance))
+				oldBalanceForTo := big.NewInt(int64(tt.preState[tt.to].Balance))
+				newBalanceForFrom := new(big.Int).Sub(oldBalanceForFrom, amount)
+				newBalanceForTo := new(big.Int).Add(oldBalanceForTo, amount)
+
+				diffForFrom := new(big.Int).Sub(newBalanceForFrom, oldBalanceForFrom)
+				diffForTo := new(big.Int).Sub(newBalanceForTo, oldBalanceForTo)
+
+				assert.Zero(t, diffForFrom.Cmp(new(big.Int).Mul(big.NewInt(-1), amount)))
+				assert.Zero(t, diffForTo.Cmp(amount))
 			}
 		})
 	}
