@@ -56,3 +56,10 @@ func (t *Transaction) Copy() *Transaction {
 	copy(tt.Input[:], t.Input[:])
 	return tt
 }
+
+// Cost returns gas * gasPrice + value
+func (t *Transaction) Cost() *big.Int {
+	total := new(big.Int).Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
+	total.Add(total, t.Value)
+	return total
+}

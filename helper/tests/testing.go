@@ -2,10 +2,11 @@ package tests
 
 import (
 	"crypto/ecdsa"
+	"testing"
+
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {

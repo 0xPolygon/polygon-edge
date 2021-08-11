@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/minimal/state"
 
 	"github.com/0xPolygon/minimal/blockchain"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/any"
@@ -26,7 +26,14 @@ const (
 )
 
 var (
-	ErrIntrinsicGas = errors.New("intrinsic gas too low")
+	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
+	ErrNegativeValue       = errors.New("negative value")
+	ErrNonEncryptedTxn     = errors.New("non-encrypted transaction")
+	ErrInvalidSender       = errors.New("invalid sender")
+	ErrNonceTooLow         = errors.New("nonce too low")
+	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState = errors.New("invalid account state")
+	ErrAlreadyKnown        = errors.New("already known")
 )
 
 var topicNameV1 = "txpool/0.1"
@@ -35,6 +42,7 @@ var topicNameV1 = "txpool/0.1"
 type store interface {
 	Header() *types.Header
 	GetNonce(root types.Hash, addr types.Address) uint64
+	GetBalance(root types.Hash, addr types.Address) (*big.Int, error)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
@@ -188,19 +196,6 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 		return err
 	}
 
-	if tx.From == types.ZeroAddress {
-		tx.From, err = t.signer.Sender(tx)
-		if err != nil {
-			return fmt.Errorf("invalid sender")
-		}
-	} else {
-		// only if we are in dev mode we can accept
-		// a transaction without validation
-		if !t.dev {
-			return fmt.Errorf("cannot accept non-encrypted txn")
-		}
-	}
-
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
 	txnsQueue, ok := t.accountQueues[tx.From]
@@ -215,7 +210,9 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 	txnsQueue.Add(tx)
 
 	for _, promoted := range txnsQueue.Promote() {
-		t.pendingQueue.Push(promoted)
+		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
+			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
+		}
 	}
 	return nil
 }
@@ -233,7 +230,9 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 	ret := func() {
-		t.pendingQueue.Push(txn.tx)
+		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
+			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
+		}
 	}
 	return txn.tx, ret
 }
@@ -288,8 +287,49 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	}
 }
 
-// validateTx does basic transaction validation
+// validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(tx *types.Transaction) error {
+	// Check if the transaction has a strictly positive value
+	if tx.Value.Sign() < 0 {
+		return ErrNegativeValue
+	}
+
+	if !t.dev && tx.From != types.ZeroAddress {
+		// Only if we are in dev mode we can accept
+		// a transaction without validation
+		return ErrNonEncryptedTxn
+	}
+
+	// Check if the transaction is signed properly
+	var signerErr error
+	if tx.From == types.ZeroAddress {
+		tx.From, signerErr = t.signer.Sender(tx)
+		if signerErr != nil {
+			return ErrInvalidSender
+		}
+	}
+
+	// Grab the state root for the latest block
+	stateRoot := t.store.Header().StateRoot
+
+	// Check nonce ordering
+	if t.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+		return ErrNonceTooLow
+	}
+
+	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
+	if balanceErr != nil {
+		return ErrInvalidAccountState
+	}
+
+	// Check if the sender has enough funds to execute the transaction
+	if accountBalance.Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
+	}
+
+	// Make sure the transaction doesn't exceed the block limit
+	// TODO: Awaiting separate PR
+
 	// Make sure the transaction has more gas than the basic transaction fee
 	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
 	if err != nil {
@@ -299,6 +339,7 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 	if tx.Gas < intrinsicGas {
 		return ErrIntrinsicGas
 	}
+
 	return nil
 }
 
@@ -510,7 +551,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 	price := new(big.Int).Set(tx.GasPrice)
 
 	if _, ok := t.index[tx.Hash]; ok {
-		return fmt.Errorf("tx %s already exists", tx.Hash)
+		return ErrAlreadyKnown
 	}
 
 	pTx := &pricedTx{
