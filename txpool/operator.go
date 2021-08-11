@@ -12,7 +12,7 @@ import (
 // Status implements the GRPC status endpoint. Returns the number of transactions in the pool
 func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
 	resp := &proto.TxnPoolStatusResp{
-		Length: t.sorted.Length(),
+		Length: t.pendingQueue.Length(),
 	}
 
 	return resp, nil
