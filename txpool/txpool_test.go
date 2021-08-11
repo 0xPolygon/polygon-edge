@@ -96,7 +96,7 @@ func TestAddingTransaction(t *testing.T) {
 			if tc.shouldSucceed {
 				assert.NoError(t, err, "Expected adding transaction to succeed")
 				assert.NotEmpty(t, pool.Length(), "Expected pool to not be empty")
-				assert.True(t, pool.sorted.Contains(signedTx), "Expected pool to contain added transaction")
+				assert.True(t, pool.pendingQueue.Contains(signedTx), "Expected pool to contain added transaction")
 			} else {
 				assert.ErrorIs(t, err, ErrIntrinsicGas, "Expected adding transaction to fail")
 				assert.Empty(t, pool.Length(), "Expected pool to be empty")
@@ -123,7 +123,7 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.NoError(t, pool.addImpl("", txn0))
 	assert.NoError(t, pool.addImpl("", txn0))
 
-	assert.Len(t, pool.queue[from1].txs, 1)
+	assert.Len(t, pool.accountQueues[from1].txs, 1)
 	assert.Equal(t, pool.Length(), uint64(0))
 
 	from2 := types.Address{0x2}
@@ -136,7 +136,7 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.NoError(t, pool.addImpl("", txn1))
 	assert.NoError(t, pool.addImpl("", txn1))
 
-	assert.Len(t, pool.queue[from2].txs, 0)
+	assert.Len(t, pool.accountQueues[from2].txs, 0)
 	assert.Equal(t, pool.Length(), uint64(1))
 }
 
@@ -195,7 +195,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 	assert.Equal(t, nonce, uint64(1))
 
 	// though txn0 is not being processed yet and the current nonce is 0
-	// we need to consider that txn0 is on the sorted pool so this one is promoted too
+	// we need to consider that txn0 is on the pendingQueue pool so this one is promoted too
 	pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Nonce:    1,
@@ -413,7 +413,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
 
-			assert.Nil(t, pool.queue[refAddress])
+			assert.Nil(t, pool.accountQueues[refAddress])
 			assert.Equal(t, pool.Length(), uint64(0))
 		})
 	}

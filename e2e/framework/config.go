@@ -53,14 +53,14 @@ func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 	t.Consensus = c
 }
 
-// SetIBFTDirPrefix callback sets prefix of IBFT directories
-func (t *TestServerConfig) SetIBFTDirPrefix(ibftDirPrefix string) {
-	t.IBFTDirPrefix = ibftDirPrefix
-}
-
 // SetDevInterval sets the update interval for the dev consensus
 func (t *TestServerConfig) SetDevInterval(interval int) {
 	t.DevInterval = interval
+}
+
+// SetIBFTDirPrefix callback sets prefix of IBFT directories
+func (t *TestServerConfig) SetIBFTDirPrefix(ibftDirPrefix string) {
+	t.IBFTDirPrefix = ibftDirPrefix
 }
 
 // SetIBFTDir callback sets the name of data directory for IBFT
