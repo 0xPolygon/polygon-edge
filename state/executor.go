@@ -523,7 +523,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
-			Err:     runtime.ErrInsufficientBalance,
+			Err:     err,
 		}
 	}
 

@@ -135,16 +135,15 @@ func TestTransfer(t *testing.T) {
 			assert.Equal(t, tt.expectedErr, err)
 			if err == nil {
 				// should move balance
-				oldBalanceForFrom := big.NewInt(int64(tt.preState[tt.from].Balance))
-				oldBalanceForTo := big.NewInt(int64(tt.preState[tt.to].Balance))
-				newBalanceForFrom := new(big.Int).Sub(oldBalanceForFrom, amount)
-				newBalanceForTo := new(big.Int).Add(oldBalanceForTo, amount)
+				oldBalanceOfFrom := big.NewInt(int64(tt.preState[tt.from].Balance))
+				oldBalanceOfTo := big.NewInt(int64(tt.preState[tt.to].Balance))
+				newBalanceOfFrom := transition.GetBalance(tt.from)
+				newBalanceOfTo := transition.GetBalance(tt.to)
+				diffOfFrom := new(big.Int).Sub(newBalanceOfFrom, oldBalanceOfFrom)
+				diffOfTo := new(big.Int).Sub(newBalanceOfTo, oldBalanceOfTo)
 
-				diffForFrom := new(big.Int).Sub(newBalanceForFrom, oldBalanceForFrom)
-				diffForTo := new(big.Int).Sub(newBalanceForTo, oldBalanceForTo)
-
-				assert.Zero(t, diffForFrom.Cmp(new(big.Int).Mul(big.NewInt(-1), amount)))
-				assert.Zero(t, diffForTo.Cmp(amount))
+				assert.Zero(t, diffOfFrom.Cmp(new(big.Int).Mul(big.NewInt(-1), amount)))
+				assert.Zero(t, diffOfTo.Cmp(amount))
 			}
 		})
 	}

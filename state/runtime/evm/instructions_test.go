@@ -101,8 +101,6 @@ type mockHostForCreate struct {
 	callxResult *runtime.ExecutionResult
 }
 
-var _ runtime.Host = (*mockHostForCreate)(nil)
-
 func (m *mockHostForCreate) GetNonce(types.Address) uint64 {
 	return m.nonce
 }
@@ -217,7 +215,7 @@ func TestCreate(t *testing.T) {
 			mockHost: &mockHostForCreate{},
 		},
 		{
-			name:     "should throw errOpCodeNotFound when op is CREATE2 and config.Constantinople is not disabled",
+			name:     "should throw errOpCodeNotFound when op is CREATE2 and config.Constantinople is disabled",
 			op:       CREATE2,
 			contract: &runtime.Contract{},
 			config: &chain.ForksInTime{
