@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -99,19 +98,16 @@ func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
 }
 
 var (
-	ErrGasConsumed              = fmt.Errorf("gas has been consumed")
-	ErrGasOverflow              = fmt.Errorf("gas overflow")
-	ErrStackOverflow            = fmt.Errorf("stack overflow")
-	ErrStackUnderflow           = fmt.Errorf("stack underflow")
-	ErrJumpDestNotValid         = fmt.Errorf("jump destination is not valid")
-	ErrMemoryOverflow           = fmt.Errorf("error memory overflow")
-	ErrNotEnoughFunds           = fmt.Errorf("not enough funds")
+	ErrOutOfGas                 = errors.New("out of gas")
+	ErrStackOverflow            = errors.New("stack overflow")
+	ErrStackUnderflow           = errors.New("stack underflow")
+	ErrNotEnoughFunds           = errors.New("not enough funds")
+	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
 	ErrMaxCodeSizeExceeded      = errors.New("evm: max code size exceeded")
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
-	ErrOpcodeNotFound           = errors.New("opcode not found")
 	ErrExecutionReverted        = errors.New("execution was reverted")
-	ErrCodeStoreOutOfGas        = fmt.Errorf("code storage out of gas")
+	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
 )
 
 type CallType int

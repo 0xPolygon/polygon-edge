@@ -96,11 +96,11 @@ func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.For
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 
-	// In the case of not enough gas for precompiled execution we return ErrGasOverflow as opposed to ErrGasConsumed
+	// In the case of not enough gas for precompiled execution we return ErrOutOfGas
 	if c.Gas < gasCost {
 		return &runtime.ExecutionResult{
 			GasLeft: 0,
-			Err:     runtime.ErrGasOverflow,
+			Err:     runtime.ErrOutOfGas,
 		}
 	}
 

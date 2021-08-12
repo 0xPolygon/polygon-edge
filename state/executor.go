@@ -298,10 +298,11 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 
-	err := t.state.SubBalance(msg.From, upfrontGasCost)
-
-	if err == runtime.ErrNotEnoughFunds {
-		return ErrNotEnoughFundsForGas
+	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+		if err == runtime.ErrNotEnoughFunds {
+			return ErrNotEnoughFundsForGas
+		}
+		return err
 	}
 
 	return nil
@@ -372,7 +373,7 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, ErrNotEnoughFunds
+		return nil, runtime.ErrInsufficientBalance
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
@@ -435,6 +436,9 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	}
 
 	if err := t.state.SubBalance(from, amount); err != nil {
+		if err == runtime.ErrNotEnoughFunds {
+			return runtime.ErrInsufficientBalance
+		}
 		return err
 	}
 
@@ -519,7 +523,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
-			Err:     runtime.ErrNotEnoughFunds,
+			Err:     err,
 		}
 	}
 
