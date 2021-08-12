@@ -11,7 +11,7 @@ import (
 )
 
 func TestEncoding(t *testing.T) {
-	_, from := framework.GenerateKeyAndAddr(t)
+	_, from := tests.GenerateKeyAndAddr(t)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)

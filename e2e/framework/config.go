@@ -61,7 +61,7 @@ func (t *TestServerConfig) DataDir() string {
 
 // PrivateKey returns a private key in data directory
 func (t *TestServerConfig) PrivateKey() (*ecdsa.PrivateKey, error) {
-	return crypto.ReadPrivKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
+	return crypto.GenerateOrReadPrivateKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // Libp2pKey returns a private key for libp2p in data directory

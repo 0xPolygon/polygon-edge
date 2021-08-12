@@ -9,32 +9,37 @@ import (
 
 type createFn func() ([]byte, error)
 
-type readFn func(b []byte) (interface{}, error)
-
-func CreateIfNotExists(path string, create createFn, read readFn) (interface{}, error) {
+// CreateIfNotExists generates a private key at the specified path,
+// or reads the file on that path if it is present
+func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("failed to stat (%s): %v", path, err)
 	}
-	if os.IsNotExist(err) {
-		// create the file
-		buf, err := create()
+
+	var keyBuff []byte
+	if !os.IsNotExist(err) {
+		// Key exists
+		
+		keyBuff, err = ioutil.ReadFile(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to read private key from disk (%s), %v", path, err)
 		}
-		if err := ioutil.WriteFile(path, []byte(hex.EncodeToString(buf)), 0600); err != nil {
-			return nil, err
-		}
+
+		return keyBuff, nil
 	}
 
-	// read the file
-	raw, err := ioutil.ReadFile(path)
+	// Key doesn't exist yet, generate it
+	keyBuff, err = create()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to generate private key, %v", err)
 	}
-	obj, err := read(raw)
-	if err != nil {
-		return nil, err
+
+	// Encode it to a readable format (Base64) and write to disk
+	keyBuff = []byte(hex.EncodeToString(keyBuff))
+	if err = ioutil.WriteFile(path, keyBuff, 0600); err != nil {
+		return nil, fmt.Errorf("unable to write private key to disk (%s), %v", path, err)
 	}
-	return obj, nil
+
+	return keyBuff, nil
 }

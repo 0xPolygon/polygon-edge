@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewFilter_Logs(t *testing.T) {
-	_, addr := framework.GenerateKeyAndAddr(t)
+	_, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, tests.EthToWei(10))
@@ -45,8 +45,8 @@ func TestNewFilter_Logs(t *testing.T) {
 }
 
 func TestNewFilter_Block(t *testing.T) {
-	_, from := framework.GenerateKeyAndAddr(t)
-	_, to := framework.GenerateKeyAndAddr(t)
+	_, from := tests.GenerateKeyAndAddr(t)
+	_, to := tests.GenerateKeyAndAddr(t)
 	toAddr := web3.HexToAddress(to.String())
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {

@@ -15,7 +15,7 @@ import (
 )
 
 func TestBroadcast(t *testing.T) {
-	testTable := []struct {
+	testCases := []struct {
 		name     string
 		numNodes int
 		// Number of nodes that connects to left node
@@ -34,8 +34,8 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	signer := &crypto.FrontierSigner{}
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
-	_, receiverAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
@@ -43,7 +43,7 @@ func TestBroadcast(t *testing.T) {
 		config.SetSeal(true)
 	}
 
-	for _, tt := range testTable {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			srvs := framework.NewTestServers(t, tt.numNodes, conf)
 			framework.MultiJoinSerial(t, srvs[0:tt.numConnectedNodes])
@@ -66,6 +66,9 @@ func TestBroadcast(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+
+			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+			time.Sleep(time.Second * 2)
 
 			tx, err := signer.SignTx(&types.Transaction{
 				Nonce:    0,

@@ -160,6 +160,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	res := &InitIBFTResult{}
+	// Read the private key
 	key, err := t.Config.PrivateKey()
 	if err != nil {
 		return nil, err
@@ -231,7 +232,14 @@ func (t *TestServer) Start(ctx context.Context) error {
 		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
 	}
 
-	args = append(args, "--data-dir", t.Config.DataDir())
+	switch t.Config.Consensus {
+	case ConsensusIBFT:
+		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
+	case ConsensusDev:
+		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
+	case ConsensusDummy:
+		args = append(args, "--data-dir", t.Config.RootDir)
+	}
 
 	if t.Config.Consensus == ConsensusDev {
 		args = append(args, "--dev")

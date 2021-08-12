@@ -2,10 +2,10 @@ package framework
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -18,16 +18,26 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 	"golang.org/x/crypto/sha3"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
-	t.Helper()
-	key, err := crypto.GenerateKey()
+// GetAccountBalance is a helper method for fetching the Balance field of an account
+func GetAccountBalance(
+	address types.Address,
+	rpcClient *jsonrpc.Client,
+	t *testing.T,
+) *big.Int {
+	accountBalance, err := rpcClient.Eth().GetBalance(
+		web3.Address(address),
+		web3.Latest,
+	)
+
 	assert.NoError(t, err)
-	addr := crypto.PubKeyToAddress(&key.PublicKey)
-	return key, addr
+
+	return accountBalance
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {

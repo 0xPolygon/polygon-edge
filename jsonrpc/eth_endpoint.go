@@ -169,7 +169,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		Root:              raw.Root,
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
-		Status:            raw.Status,
+		Status:            argUint64(*raw.Status),
 		TxHash:            txn.Hash,
 		TxIndex:           argUint64(indx),
 		BlockHash:         block.Hash(),
@@ -220,16 +220,21 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 
+	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
+	if transaction.Gas == 0 {
+		transaction.Gas = header.GasLimit
+	}
+
 	// The return value of the execution is saved in the transition (returnValue field)
-	returnValue, failed, err := e.d.store.ApplyTxn(header, transaction)
+	result, err := e.d.store.ApplyTxn(header, transaction)
 	if err != nil {
 		return nil, err
 	}
 
-	if failed {
+	if result.Failed() {
 		return nil, fmt.Errorf("unable to execute call")
 	}
-	return argBytesPtr(returnValue), nil
+	return argBytesPtr(result.ReturnValue), nil
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
@@ -270,7 +275,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	valueInt := new(big.Int).Set(transaction.Value)
 
 	// If the sender address is present, recalculate the ceiling to his balance
-	if transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
+	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 
 		// Get the account balance
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
@@ -309,12 +314,13 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		_, failed, err := e.d.store.ApplyTxn(header, txn)
+		result, err := e.d.store.ApplyTxn(header, txn)
+
 		if err != nil {
-			return failed, err
+			return true, err
 		}
 
-		return failed, nil
+		return result.Failed(), nil
 	}
 
 	// Start the binary search for the lowest possible gas price
@@ -462,7 +468,7 @@ func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, e
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
 	if err != nil {
-		return nil, err
+		return "0x", nil
 	}
 
 	emptySlice := []byte{}

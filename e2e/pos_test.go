@@ -30,7 +30,7 @@ func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string)
 }
 
 func TestPoS_Stake(t *testing.T) {
-	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
+	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 
 	numGenesisValidators := IBFTMinNodes
@@ -160,7 +160,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 	gasPrice := big.NewInt(10000)
 
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := tests.EthToWei(10)
 
 	devInterval := 10
@@ -275,7 +275,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 	gasPrice := big.NewInt(10000)
 
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := tests.EthToWei(10)
 	initialStakingAddrBalance := tests.EthToWei(1000)
 
@@ -405,7 +405,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 	gasPrice := big.NewInt(10000)
 
-	senderKey, senderAddr := framework.GenerateKeyAndAddr(t)
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := tests.EthToWei(5)
 	initialStakingAddrBalance := tests.EthToWei(100)
 

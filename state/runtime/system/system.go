@@ -61,7 +61,7 @@ func NewSystem() *System {
 }
 
 // Run represents the actual runtime implementation, after the CanRun check passes
-func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) ([]byte, uint64, error) {
+func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) *runtime.ExecutionResult {
 	// Get the system state from the pool and set it up
 	sysState := acquireSystemState()
 	sysState.host = host
@@ -73,20 +73,27 @@ func (s *System) Run(contract *runtime.Contract, host runtime.Host, _ *chain.For
 	// Calculate the gas cost, see if there is an overflow
 	gasCost := sysContract.gas(contract.Input)
 	if contract.Gas < gasCost {
-		return nil, 0, runtime.ErrGasOverflow
+		return &runtime.ExecutionResult{
+			ReturnValue: nil,
+			GasLeft:     0,
+			Err:         runtime.ErrGasOverflow,
+		}
 	}
 	contract.Gas = contract.Gas - gasCost
 
 	// Run the system contract
 	ret, err := sysContract.run(sysState)
-	if err != nil {
-		return nil, 0, err
-	}
 
 	// Put the system state back into the pool
 	releaseSystemState(sysState)
 
-	return ret, contract.Gas, err
+	result := &runtime.ExecutionResult{
+		ReturnValue: ret,
+		GasLeft:     contract.Gas,
+		Err:         err,
+	}
+
+	return result
 }
 
 // CanRun checks if the current runtime can execute the query
