@@ -51,7 +51,7 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 
 	releaseState(contract)
 
-	if err != nil && err != runtime.ErrExecutionReverted {
+	if err != nil && err != errRevert {
 		gasLeft = 0
 	}
 

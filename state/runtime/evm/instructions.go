@@ -466,7 +466,7 @@ func opSload(c *state) {
 
 func opSStore(c *state) {
 	if c.inStaticCall() {
-		c.exit(errReadOnly)
+		c.exit(errWriteProtection)
 		return
 	}
 
@@ -793,12 +793,12 @@ func opReturnDataCopy(c *state) {
 
 	end := length.Add(dataOffset, length)
 	if !end.IsUint64() {
-		c.exit(errOutOfGas)
+		c.exit(errReturnDataOutOfBounds)
 		return
 	}
 	size = end.Uint64()
 	if uint64(len(c.returnData)) < size {
-		c.exit(errReturnBadSize)
+		c.exit(errReturnDataOutOfBounds)
 		return
 	}
 
@@ -866,7 +866,7 @@ func opGasLimit(c *state) {
 
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
-		c.exit(errReadOnly)
+		c.exit(errWriteProtection)
 		return
 	}
 
@@ -963,7 +963,7 @@ func opLog(size int) instruction {
 	size = size - 1
 	return func(c *state) {
 		if c.inStaticCall() {
-			c.exit(errReadOnly)
+			c.exit(errWriteProtection)
 			return
 		}
 
@@ -1004,7 +1004,7 @@ func opStop(c *state) {
 func opCreate(op OpCode) instruction {
 	return func(c *state) {
 		if c.inStaticCall() {
-			c.exit(errReadOnly)
+			c.exit(errWriteProtection)
 			return
 		}
 
@@ -1058,7 +1058,7 @@ func opCall(op OpCode) instruction {
 
 		if op == CALL && c.inStaticCall() {
 			if val := c.peekAt(3); val != nil && val.BitLen() > 0 {
-				c.exit(errReadOnly)
+				c.exit(errWriteProtection)
 				return
 			}
 		}

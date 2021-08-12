@@ -1,16 +1,17 @@
 package txpool
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"strconv"
 	"testing"
 
 	"github.com/0xPolygon/minimal/chain"
-
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,26 @@ import (
 var forks = &chain.Forks{
 	Homestead: chain.NewFork(0),
 	Istanbul:  chain.NewFork(0),
+}
+
+type mockStore struct {
+}
+
+func (m *mockStore) GetNonce(types.Hash, types.Address) uint64 {
+	return 0
+}
+
+func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (m *mockStore) GetBalance(types.Hash, types.Address) (*big.Int, error) {
+	balance, _ := big.NewInt(0).SetString("10000000000000000000", 10)
+	return balance, nil
+}
+
+func (m *mockStore) Header() *types.Header {
+	return &types.Header{}
 }
 
 const validGasLimit uint64 = 100000
@@ -75,7 +96,7 @@ func TestAddingTransaction(t *testing.T) {
 			if tc.shouldSucceed {
 				assert.NoError(t, err, "Expected adding transaction to succeed")
 				assert.NotEmpty(t, pool.Length(), "Expected pool to not be empty")
-				assert.True(t, pool.sorted.Contains(signedTx), "Expected pool to contain added transaction")
+				assert.True(t, pool.pendingQueue.Contains(signedTx), "Expected pool to contain added transaction")
 			} else {
 				assert.ErrorIs(t, err, ErrIntrinsicGas, "Expected adding transaction to fail")
 				assert.Empty(t, pool.Length(), "Expected pool to be empty")
@@ -97,11 +118,12 @@ func TestMultipleTransactions(t *testing.T) {
 		Nonce:    10,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn0))
 	assert.NoError(t, pool.addImpl("", txn0))
 
-	assert.Len(t, pool.queue[from1].txs, 1)
+	assert.Len(t, pool.accountQueues[from1].txs, 1)
 	assert.Equal(t, pool.Length(), uint64(0))
 
 	from2 := types.Address{0x2}
@@ -109,11 +131,12 @@ func TestMultipleTransactions(t *testing.T) {
 		From:     from2,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
 	assert.NoError(t, pool.addImpl("", txn1))
 
-	assert.Len(t, pool.queue[from2].txs, 0)
+	assert.Len(t, pool.accountQueues[from2].txs, 0)
 	assert.Equal(t, pool.Length(), uint64(1))
 }
 
@@ -206,21 +229,6 @@ func TestBroadcast(t *testing.T) {
 	fmt.Println(pool1.Length())
 }
 
-type mockStore struct {
-}
-
-func (m *mockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
-	return 0
-}
-
-func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
-	return nil, false
-}
-
-func (m *mockStore) Header() *types.Header {
-	return &types.Header{}
-}
-
 func TestTxnQueue_Promotion(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
@@ -232,18 +240,20 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		From:     addr1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	})
 
 	nonce, _ := pool.GetNonce(addr1)
 	assert.Equal(t, nonce, uint64(1))
 
 	// though txn0 is not being processed yet and the current nonce is 0
-	// we need to consider that txn0 is on the sorted pool so this one is promoted too
+	// we need to consider that txn0 is on the pendingQueue pool so this one is promoted too
 	pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Nonce:    1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
 	})
 
 	nonce, _ = pool.GetNonce(addr1)
@@ -258,6 +268,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 		GasPrice *big.Int
 		Nonce    uint64
 		Index    int
+		Value    *big.Int
 	}
 
 	addr1 := types.Address{0x1}
@@ -274,6 +285,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      testCase.Gas,
 				GasPrice: testCase.GasPrice,
 				Nonce:    testCase.Nonce,
+				Value:    testCase.Value,
 			})
 			assert.NoError(t, err)
 		}
@@ -288,6 +300,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      transaction.Gas,
 				GasPrice: transaction.GasPrice,
 				Nonce:    transaction.Nonce,
+				Value:    transaction.Value,
 			}
 
 			assert.EqualValues(t, testCase, actual)
@@ -303,11 +316,13 @@ func TestTxnQueue_Heap(t *testing.T) {
 				From:     addr1,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(2),
+				Value:    big.NewInt(0),
 			},
 			{
 				From:     addr2,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(1),
+				Value:    big.NewInt(0),
 			},
 		})
 
@@ -320,12 +335,14 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(2),
 				Nonce:    0,
+				Value:    big.NewInt(0),
 			},
 			{
 				From:     addr1,
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(3),
 				Nonce:    1,
+				Value:    big.NewInt(0),
 			},
 		})
 	})
@@ -343,6 +360,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 				From:     types.StringToAddress(strconv.Itoa(i + 1)),
 				Gas:      validGasLimit,
 				GasPrice: big.NewInt(int64(i + 1)),
+				Value:    big.NewInt(0),
 			}
 
 			addErr := pool.addImpl("", txns[i])
@@ -354,4 +372,111 @@ func TestTxnQueue_Heap(t *testing.T) {
 			assert.Equalf(t, txns[i].GasPrice, txn.GasPrice, "Expected output mismatch")
 		}
 	})
+}
+
+func generateTx(from types.Address, value *big.Int) *types.Transaction {
+	return &types.Transaction{
+		From:     from,
+		Nonce:    0,
+		Gas:      validGasLimit,
+		GasPrice: big.NewInt(1),
+		Value:    value,
+	}
+}
+
+type faultyMockStore struct {
+}
+
+func (fms faultyMockStore) Header() *types.Header {
+	return &types.Header{}
+}
+
+func (fms faultyMockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
+	return 0
+}
+
+func (fms faultyMockStore) GetBlockByHash(hash types.Hash, b bool) (*types.Block, bool) {
+	return nil, false
+}
+
+func (fms faultyMockStore) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
+	return nil, fmt.Errorf("unable to fetch account state")
+}
+
+func TestTxPool_ErrorCodes(t *testing.T) {
+	testTable := []struct {
+		name          string
+		refAddress    types.Address
+		txValue       *big.Int
+		mockStore     store
+		expectedError error
+		devMode       bool
+	}{
+		{
+			// Transactions with a negative value should be discarded
+			"ErrNegativeValue",
+			types.Address{0x1},
+			big.NewInt(-5),
+			&mockStore{},
+			ErrNegativeValue,
+			true,
+		},
+		{
+			// Unencrypted transactions should be discarded if not in dev mode
+			"ErrNonEncryptedTxn",
+			types.Address{0x1},
+			big.NewInt(0),
+			&mockStore{},
+			ErrNonEncryptedTxn,
+			false,
+		},
+		{
+			// Transaction should have a valid sender encrypted if it is from a zeroAddress
+			"ErrInvalidSender",
+			types.ZeroAddress,
+			big.NewInt(0),
+			&mockStore{},
+			ErrInvalidSender,
+			true,
+		},
+		{
+			// Transaction should query valid account state
+			"ErrInvalidAccountState",
+			types.Address{0x1},
+			big.NewInt(1),
+			&faultyMockStore{},
+			ErrInvalidAccountState,
+			true,
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), testCase.mockStore, nil, nil)
+			assert.NoError(t, err)
+			if testCase.devMode {
+				pool.EnableDev()
+			}
+			poolSigner := crypto.NewEIP155Signer(uint64(100))
+			pool.AddSigner(poolSigner)
+
+			refAddress := testCase.refAddress
+			txn := generateTx(refAddress, testCase.txValue)
+
+			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
+
+			assert.Nil(t, pool.accountQueues[refAddress])
+			assert.Equal(t, pool.Length(), uint64(0))
+		})
+	}
+}
+
+func TestTxnOperatorAddNilRaw(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+
+	txnReq := new(proto.AddTxnReq)
+	response, err := pool.AddTxn(context.Background(), txnReq)
+	assert.Errorf(t, err, "transaction's field raw is empty")
+	assert.Nil(t, response)
 }

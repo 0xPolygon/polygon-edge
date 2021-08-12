@@ -1,7 +1,7 @@
 package evm
 
 import (
-	"fmt"
+	"errors"
 	"math/big"
 	"strings"
 
@@ -31,14 +31,15 @@ func releaseState(s *state) {
 const stackSize = 1024
 
 var (
-	errOutOfGas       = fmt.Errorf("out of gas")
-	errStackUnderflow = fmt.Errorf("stack underflow")
-	errStackOverflow  = fmt.Errorf("stack overflow")
-	errReadOnly       = fmt.Errorf("read only")
-	errInvalidJump    = fmt.Errorf("invalid jump")
-	errOpCodeNotFound = fmt.Errorf("opcode not found")
-	errReturnBadSize  = fmt.Errorf("return bad size")
-	errRevert         = runtime.ErrExecutionReverted
+	errOutOfGas              = runtime.ErrOutOfGas
+	errStackUnderflow        = runtime.ErrStackUnderflow
+	errStackOverflow         = runtime.ErrStackOverflow
+	errRevert                = runtime.ErrExecutionReverted
+	errGasUintOverflow       = errors.New("gas uint64 overflow")
+	errWriteProtection       = errors.New("write protection")
+	errInvalidJump           = errors.New("invalid jump destination")
+	errOpCodeNotFound        = errors.New("opcode not found")
+	errReturnDataOutOfBounds = errors.New("return data out of bounds")
 )
 
 // Instructions is the code of instructions
@@ -256,7 +257,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 	}
 
 	if !offset.IsUint64() || !size.IsUint64() {
-		c.exit(errOutOfGas)
+		c.exit(errGasUintOverflow)
 		return false
 	}
 
@@ -264,7 +265,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 	s := size.Uint64()
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
-		c.exit(errOutOfGas)
+		c.exit(errGasUintOverflow)
 		return false
 	}
 
