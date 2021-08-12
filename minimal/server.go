@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/minimal/jsonrpc"
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/state/runtime/system"
@@ -81,11 +80,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
-	// Spin up the staking hub if the consensus engine is ibft-pos
-	if config.Chain.Params.GetEngine() == chain.IBFTEngine {
-		staking.GetStakingHub().SetLogger(logger)
-		staking.GetStakingHub().SetWorkingDirectory(config.DataDir)
-	}
 	// Generate all the paths in the dataDir
 	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
@@ -413,7 +407,7 @@ func (s *Server) Close() {
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
 	}
-	
+
 }
 
 // Entry is a backend configuration entry
