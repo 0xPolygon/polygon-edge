@@ -116,6 +116,10 @@ func Factory(
 		return nil, err
 	}
 
+	// Spin up the staking hub if the consensus engine is ibft-pos
+	staking.GetStakingHub().SetLogger(logger)
+	staking.GetStakingHub().SetWorkingDirectory(config.Path)
+
 	return p, nil
 }
 
@@ -980,6 +984,10 @@ func (i *Ibft) Close() error {
 			return err
 		}
 	}
+	
+	// Close the staking hub if present
+	staking.GetStakingHub().CloseStakingHub()
+
 	return nil
 }
 

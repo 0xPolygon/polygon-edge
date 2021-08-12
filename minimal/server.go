@@ -413,9 +413,7 @@ func (s *Server) Close() {
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
 	}
-
-	// Close the staking hub if present
-	staking.GetStakingHub().CloseStakingHub()
+	
 }
 
 // Entry is a backend configuration entry
