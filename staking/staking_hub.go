@@ -134,8 +134,8 @@ type PendingEvent struct {
 	EventType   StakingEventType
 }
 
-// Compare checks if the two events match
-func (pe *PendingEvent) Compare(event PendingEvent) bool {
+// Equals checks if the two events match
+func (pe *PendingEvent) Equals(event PendingEvent) bool {
 	if pe.EventType == event.EventType &&
 		pe.Address.String() == event.Address.String() &&
 		pe.Value.Cmp(event.Value) == 0 &&
@@ -162,7 +162,7 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 
 	foundIndx := -1
 	for indx, el := range sh.EventQueue {
-		if el.Compare(event) {
+		if el.Equals(event) {
 			foundIndx = indx
 			break
 		}
