@@ -164,6 +164,7 @@ func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
 	for indx, el := range sh.EventQueue {
 		if el.Compare(event) {
 			foundIndx = indx
+			break
 		}
 	}
 
