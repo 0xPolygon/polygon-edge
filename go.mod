@@ -20,7 +20,6 @@ require (
 	github.com/libp2p/go-libp2p-core v0.7.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-noise v0.1.1
-	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
 	github.com/mitchellh/cli v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
