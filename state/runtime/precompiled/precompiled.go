@@ -60,11 +60,7 @@ var (
 )
 
 // CanRun implements the runtime interface
-func (p *Precompiled) CanRun(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) bool {
-	//fmt.Println("-- can run --")
-	//fmt.Println(config)
-	//fmt.Println(config.Byzantium)
-
+func (p *Precompiled) CanRun(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) bool {
 	if _, ok := p.contracts[c.CodeAddress]; !ok {
 		return false
 	}
@@ -96,20 +92,33 @@ func (p *Precompiled) Name() string {
 }
 
 // Run runs an execution
-func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) ([]byte, uint64, error) {
+func (p *Precompiled) Run(c *runtime.Contract, _ runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
 	contract := p.contracts[c.CodeAddress]
 	gasCost := contract.gas(c.Input, config)
 
+	// In the case of not enough gas for precompiled execution we return ErrGasOverflow as opposed to ErrGasConsumed
 	if c.Gas < gasCost {
-		return nil, 0, runtime.ErrGasOverflow
+		return &runtime.ExecutionResult{
+			GasLeft: 0,
+			Err:     runtime.ErrGasOverflow,
+		}
 	}
 
 	c.Gas = c.Gas - gasCost
-	ret, err := contract.run(c.Input)
-	if err != nil {
-		return nil, 0, err
+	returnValue, err := contract.run(c.Input)
+
+	result := &runtime.ExecutionResult{
+		ReturnValue: returnValue,
+		GasLeft:     c.Gas,
+		Err:         err,
 	}
-	return ret, c.Gas, err
+
+	if result.Failed() {
+		result.GasLeft = 0
+		result.ReturnValue = nil
+	}
+
+	return result
 }
 
 var zeroPadding = make([]byte, 64)

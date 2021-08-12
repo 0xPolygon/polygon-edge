@@ -515,9 +515,7 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	// Validate the chain
-	for i := 0; i < size; i++ { // TODO: Check why didn't we range here
-		block := blocks[i]
-
+	for i, block := range blocks {
 		// Check the parent numbers
 		if block.Number()-1 != parent.Number {
 			return fmt.Errorf(
@@ -592,6 +590,17 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 
 		// Update the average gas price
 		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
+
+		logArgs := []interface{}{
+			"number", header.Number,
+			"hash", header.Hash,
+			"txns", len(block.Transactions),
+		}
+		if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
+			diff := header.Timestamp - prevHeader.Timestamp
+			logArgs = append(logArgs, "generation_time_in_sec", diff)
+		}
+		b.logger.Info("new block", logArgs...)
 	}
 
 	b.logger.Info("new head", "hash", b.Header().Hash, "number", b.Header().Number)
@@ -930,6 +939,10 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 		return nil, false
 	}
 
+	// if blockNumber 0 (genesis block), do not try and get the full block
+	if blockNumber == uint64(0) {
+		full = false
+	}
 	return b.GetBlockByHash(blockHash, full)
 }
 

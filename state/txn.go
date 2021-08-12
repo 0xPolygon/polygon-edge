@@ -94,7 +94,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 }
 
 func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
-	// Check what this first fetch tries to do? Why is it here?
+	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
 		obj := val.(*StateObject)
@@ -178,14 +178,23 @@ func (txn *Txn) AddStakedBalance(addr types.Address, balance *big.Int) {
 	})
 }
 
-// SubBalance reduces the balance
-func (txn *Txn) SubBalance(addr types.Address, balance *big.Int) {
-	if balance.Sign() == 0 {
-		return
+// SubBalance reduces the balance at address addr by amount
+func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
+	// If we try to reduce balance by 0, then it's a noop
+	if amount.Sign() == 0 {
+		return nil
 	}
+
+	// Check if we have enough balance to deduce amount from
+	if balance := txn.GetBalance(addr); balance.Cmp(amount) < 0 {
+		return runtime.ErrNotEnoughFunds
+	}
+
 	txn.upsertAccount(addr, true, func(object *StateObject) {
-		object.Account.Balance.Sub(object.Account.Balance, balance)
+		object.Account.Balance.Sub(object.Account.Balance, amount)
 	})
+
+	return nil
 }
 
 // SubStakedBalance reduces the staked balance
@@ -350,6 +359,9 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		return types.Hash{}
 	}
 
+	// Try to get account state from radix tree first
+	// Because the latest account state should be in in-memory radix tree
+	// if account state update happened in previous transactions of same block
 	if object.Txn != nil {
 		if val, ok := object.Txn.Get(key.Bytes()); ok {
 			if val == nil {
@@ -359,7 +371,7 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
-	// Under which condition is this called?
+	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
 	k := txn.hashit(key.Bytes())
 	return object.GetCommitedState(types.BytesToHash(k))
 }

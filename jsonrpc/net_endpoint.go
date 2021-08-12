@@ -1,5 +1,7 @@
 package jsonrpc
 
+import "strconv"
+
 // Net is the net jsonrpc endpoint
 type Net struct {
 	d *Dispatcher
@@ -7,8 +9,7 @@ type Net struct {
 
 // Version returns the current network id
 func (n *Net) Version() (interface{}, error) {
-	//return fmt.Sprintf("%x", n.d.chainID), nil
-	return argUintPtr(n.d.chainID), nil
+	return strconv.FormatUint(n.d.chainID, 10), nil
 }
 
 // Listening returns true if client is actively listening for network connections

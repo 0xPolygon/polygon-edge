@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/e2e/framework"
+	"github.com/0xPolygon/minimal/helper/tests"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/types"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func findValidatorByAddress(validators []*proto.Snapshot_Validator, addr string)
 }
 
 func TestPoS_Stake(t *testing.T) {
-	stakerKey, stakerAddr := framework.GenerateKeyAndAddr(t)
+	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	stakingContractAddr := types.StringToAddress(system.StakingAddress)
 
 	numGenesisValidators := IBFTMinNodes

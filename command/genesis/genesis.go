@@ -301,7 +301,7 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 			continue
 		}
 
-		priv, err := crypto.ReadPrivKey(possibleConsensusPath)
+		priv, err := crypto.GenerateOrReadPrivateKey(possibleConsensusPath)
 		if err != nil {
 			return nil, err
 		}

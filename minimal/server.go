@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/state/runtime/system"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
@@ -105,7 +107,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	m.executor = state.NewExecutor(config.Chain.Params, st)
+	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 	// Add the system runtime
 	m.executor.SetRuntime(system.NewSystem())
 
@@ -133,7 +135,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		if m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, hub, m.grpcServer, m.network); err != nil {
+		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
+		if err != nil {
 			return nil, err
 		}
 
@@ -193,6 +196,25 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 		return 0
 	}
 	return account.Nonce
+}
+
+func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
+	snap, err := t.state.NewSnapshotAt(root)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get snapshot for root, %v", err)
+	}
+
+	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
+	if !ok {
+		return big.NewInt(0), nil
+	}
+
+	var account state.Account
+	if err = account.UnmarshalRlp(result); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %v", err)
+	}
+
+	return account.Balance, nil
 }
 
 // setupConsensus sets up the consensus mechanism
@@ -284,25 +306,21 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) ([]byte, bool, error) {
+func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 
 	if err != nil {
-		return nil, false, err
+		return
 	}
 
-	_, failed, err := transition.Apply(txn)
+	result, err = transition.Apply(txn)
 
-	if err != nil {
-		return nil, false, err
-	}
-
-	return transition.ReturnValue(), failed, nil
+	return
 }
 
 // SETUP //
