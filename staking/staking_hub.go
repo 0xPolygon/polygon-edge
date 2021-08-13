@@ -121,9 +121,12 @@ func (sh *StakingHub) CloseStakingHub() {
 	defer sh.StakingMutex.Unlock()
 
 	// Alert the closing channel
-	sh.CloseCh <- struct{}{}
-
-	close(sh.CloseCh)
+	select {
+	case sh.CloseCh <- struct{}{}:
+		sh.log("Closing staking hub...", logInfo)
+	default:
+		sh.log("SH Writer not set up. Closing staking hub...", logInfo)
+	}
 }
 
 // PendingEvent contains useful information about a staking / unstaking event
@@ -183,6 +186,7 @@ func (sh *StakingHub) saveToDisk() {
 	for {
 		select {
 		case <-sh.CloseCh:
+			close(sh.CloseCh)
 			return
 		default:
 		}
