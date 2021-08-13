@@ -495,8 +495,7 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		arg.Value = argBytesPtr([]byte{})
 	}
 	if arg.GasPrice == nil {
-		// use the suggested gas price
-		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+		arg.GasPrice = argBytesPtr([]byte{})
 	}
 
 	var input []byte
