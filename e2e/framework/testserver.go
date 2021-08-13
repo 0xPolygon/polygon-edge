@@ -293,7 +293,7 @@ func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Ad
 
 const (
 	DefaultGasPrice = 1879048192 // 0x70000000
-	DefaultGasLimit = 5242880    // 0x500000
+	DefaultGasLimit = 4194304    // 0x400000
 )
 
 var emptyAddr web3.Address

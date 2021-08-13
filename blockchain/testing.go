@@ -155,6 +155,8 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 				EIP155:    chain.NewFork(0),
 				Homestead: chain.NewFork(0),
 			},
+			GasFloor: chain.DefaultGasFloor,
+			GasCeil:  chain.DefaultGasCeil,
 		},
 	}
 
@@ -197,10 +199,16 @@ func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, b
 
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
-		genesis = &chain.Genesis{}
+		genesis = &chain.Genesis{
+			GasLimit: chain.GenesisGasLimit,
+		}
 	}
 	config := &chain.Chain{
 		Genesis: genesis,
+		Params: &chain.Params{
+			GasFloor: chain.DefaultGasFloor,
+			GasCeil:  chain.DefaultGasCeil,
+		},
 	}
 	b, err := newBlockChain(config, nil)
 	if err != nil {
