@@ -478,17 +478,18 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
-	}
-	if arg.Data != nil && arg.Input != nil {
-		return nil, fmt.Errorf("both input and data cannot be set")
-	}
-	if arg.Nonce == nil {
+		arg.Nonce = argUintPtr(0)
+	} else if arg.Nonce == nil {
 		// get nonce from the pool
 		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
 		if err != nil {
 			return nil, err
 		}
 		arg.Nonce = argUintPtr(nonce)
+	}
+
+	if arg.Data != nil && arg.Input != nil {
+		return nil, fmt.Errorf("both input and data cannot be set")
 	}
 	if arg.Value == nil {
 		arg.Value = argBytesPtr([]byte{})
