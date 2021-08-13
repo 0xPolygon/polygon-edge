@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "example"
-	DefaultChainID        = 100
-	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	DefaultConsensus      = "pow"
-	DefaultGasLimit       = 5000
+	GenesisFileName        = "./genesis.json"
+	DefaultChainName       = "example"
+	DefaultChainID         = 100
+	DefaultPremineBalance  = "0x3635C9ADC5DEA00000" // 1000 ETH
+	DefaultConsensus       = "pow"
+	DefaultGasLimit        = 5000
+	DefaultGenesisGasLimit = 4712388
 )
 
 // FlagDescriptor contains the description elements for a command flag

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -89,6 +90,15 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
+	c.FlagMap["genesis-gas-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets gas limit of genesis block. Default: %d", helper.DefaultGenesisGasLimit),
+		Arguments: []string{
+			"GENESIS_GAS_LIMIT",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
 		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
@@ -140,6 +150,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
+	var genesisGasLimit string
 
 	// ibft flags
 	var ibftValidators helperFlags.ArrayFlags
@@ -151,6 +162,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
 	flags.Var(&bootnodes, "bootnode", "")
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
+	flags.StringVar(&genesisGasLimit, "genesis-gas-limit", strconv.FormatUint(helper.DefaultGenesisGasLimit, 10), "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 
@@ -197,10 +209,20 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
+	genesisGasLimitValue, err := types.ParseUint256orHex(&genesisGasLimit)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("failed to parse gas limit %s: %v", genesisGasLimit, err))
+		return 1
+	}
+	if !genesisGasLimitValue.IsUint64() {
+		c.UI.Error(fmt.Sprintf("gas limit is out of uint64 range: %s", genesisGasLimitValue.String()))
+		return 1
+	}
+
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
-			GasLimit:   5000,
+			GasLimit:   genesisGasLimitValue.Uint64(),
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  extraData,

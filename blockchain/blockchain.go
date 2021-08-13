@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	GasLimitBoundDivisor uint64 = 1024       // The bound divisor of the gas limit, used in update calculations.
-	MinGasLimit          uint64 = 5000       // Minimum the gas limit
-	MaxGasLimit          uint64 = 2 ^ 63 - 1 // Maximum the gas limit
+	GasLimitBoundDivisor uint64 = 1024               // The bound divisor of the gas limit, used in update calculations.
+	MinGasLimit          uint64 = 5000               // Minimum the gas limit
+	MaxGasLimit          uint64 = 0x7fffffffffffffff // Maximum the gas limit
 )
 
 // Blockchain is a blockchain reference
@@ -245,8 +245,8 @@ func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
 // calculateGasLimit calculates gas limit from parent gas
 func (b *Blockchain) calculateGasLimit(parentGasUsed, parentGasLimit uint64) uint64 {
 	// todo: remove magic number
-	gasFloor := uint64(1000)
-	gasCeil := uint64(2000)
+	gasFloor := uint64(0x47e7c5)
+	gasCeil := uint64(0x47e7c5)
 
 	// contrib = (parentGasUsed * 3 / 2) / 1024
 	contrib := (parentGasUsed + parentGasUsed/2) / GasLimitBoundDivisor
