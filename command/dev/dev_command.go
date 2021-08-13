@@ -55,6 +55,22 @@ func (d *DevCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	d.FlagMap["gas-floor"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets target gas floor for mined blocks. Default: %s", helper.DefaultConfig().GasFloor),
+		Arguments: []string{
+			"GAS_FLOOR",
+		},
+		FlagOptional: true,
+	}
+
+	d.FlagMap["gas-ceil"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets target gas ceiling for mined blocks. Default: %s", helper.DefaultConfig().GasCeil),
+		Arguments: []string{
+			"GAS_CEIL",
+		},
+		FlagOptional: true,
+	}
 }
 
 func (d *DevCommand) GetHelperText() string {

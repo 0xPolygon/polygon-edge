@@ -351,6 +351,8 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&gaslimit, "gas-limit", DefaultGasLimit, "")
+	flags.StringVar(&cliConfig.GasFloor, "gas-floor", DefaultConfig().GasFloor, "")
+	flags.StringVar(&cliConfig.GasCeil, "gas-ceil", DefaultConfig().GasCeil, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 
 	if err := flags.Parse(args); err != nil {
