@@ -117,9 +117,15 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   100000000, // placeholder for now
 		Timestamp:  uint64(time.Now().Unix()),
 	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return err
+	}
+	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {

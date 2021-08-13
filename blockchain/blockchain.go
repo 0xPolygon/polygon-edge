@@ -19,6 +19,11 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+const (
+	GasLimitBoundDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations.
+	MinGasLimit          uint64 = 5000 // Minimum the gas limit may ever be.
+)
+
 // Blockchain is a blockchain reference
 type Blockchain struct {
 	logger hclog.Logger // The logger object
@@ -224,6 +229,47 @@ func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 // Genesis returns the genesis block
 func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
+}
+
+// CalculateGasLimit returns the gas limit of the next block after parent
+func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
+	parent, ok := b.GetHeaderByNumber(number - 1)
+	if !ok {
+		return 0, fmt.Errorf("parent of (%d) not found", number)
+	}
+	// todo: EIP1559 support for London hardfolk
+	return b.calculateGasLimit(parent.GasUsed, parent.GasLimit), nil
+}
+
+// calculateGasLimit calculates gas limit from parent gas
+func (b *Blockchain) calculateGasLimit(parentGasUsed, parentGasLimit uint64) uint64 {
+	// todo: remove magic number
+	gasFloor := uint64(1000)
+	gasCeil := uint64(2000)
+
+	// contrib = (parentGasUsed * 3 / 2) / 1024
+	contrib := (parentGasUsed + parentGasUsed/2) / GasLimitBoundDivisor
+	// decay = parentGasLimit / 1024 -1
+	decay := parentGasLimit/GasLimitBoundDivisor - 1
+
+	limit := parentGasLimit - decay + contrib
+	if limit < MinGasLimit {
+		limit = MinGasLimit
+	}
+
+	// If we're outside our allowed gas range, we try to hone towards them
+	if limit < gasFloor {
+		limit = parentGasLimit + decay
+		if limit > gasFloor {
+			limit = gasFloor
+		}
+	} else if limit > gasCeil {
+		limit = parentGasLimit - decay
+		if limit < gasCeil {
+			limit = gasCeil
+		}
+	}
+	return limit
 }
 
 // writeGenesis wrapper for the genesis write function

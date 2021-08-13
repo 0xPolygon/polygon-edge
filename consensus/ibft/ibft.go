@@ -32,6 +32,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlocks(blocks []*types.Block) error
+	CalculateGasLimit(number uint64) (uint64, error)
 }
 
 // Ibft represents the IBFT consensus mechanism object
@@ -353,8 +354,14 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
-		GasLimit:   100000000, // placeholder for now
 	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+	header.GasLimit = gasLimit
 
 	// try to pick a candidate
 	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
