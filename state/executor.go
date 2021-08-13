@@ -129,18 +129,6 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
-// getStakingEventType is a helper method for getting the type of system event
-func getStakingEventType(toAddress types.Address) staking.StakingEventType {
-	switch toAddress {
-	case types.StringToAddress(system.StakingAddress):
-		return staking.StakingEvent
-	case types.StringToAddress(system.UnstakingAddress):
-		return staking.UnstakingEvent
-	default:
-		return staking.UnknownEvent
-	}
-}
-
 // cleanDirtyStakes is a helper method for clearing discarded staked events
 func cleanDirtyStakes() {
 	hub := staking.GetStakingHub()
