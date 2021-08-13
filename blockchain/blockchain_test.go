@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/minimal/blockchain/storage"
 	"github.com/0xPolygon/minimal/blockchain/storage/memory"
+	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -560,4 +561,83 @@ func TestBlockchainWriteBody(t *testing.T) {
 	body, ok := b.readBody(block.Hash())
 	fmt.Println(body)
 	fmt.Println(ok)
+}
+
+func TestCalculateGasLimit(t *testing.T) {
+	tests := []struct {
+		name             string
+		gasFloor         uint64
+		gasCeil          uint64
+		parentGasLimit   uint64
+		parentGasUsed    uint64
+		expectedGasLimit uint64
+	}{
+		// Based on TestCalcGasLimit1559 in go-ethereum
+		{
+			name:             "should increase next gas limit if previous gas used exceeded 2/3 gas limit",
+			gasFloor:         19980470,
+			gasCeil:          20019530,
+			parentGasLimit:   20000000,
+			parentGasUsed:    14000000, // gas used >> 2/3 parent gas limit
+			expectedGasLimit: 20000977,
+		},
+		{
+			name:             "should increase next gas limit if previous gas used equaled to 2/3 gas limit",
+			gasFloor:         19980470,
+			gasCeil:          20019530,
+			parentGasLimit:   20000001,
+			parentGasUsed:    13333334, // gas used = 2/3 parent gas limit
+			expectedGasLimit: 20000002,
+		},
+		{
+			name:             "should decrease next gas limit if previous gas used was less than 2/3 gas limit",
+			gasFloor:         19980470,
+			gasCeil:          20019530,
+			parentGasLimit:   20000000,
+			parentGasUsed:    10000000, // gas used << 2/3 parent gas limit
+			expectedGasLimit: 19995118,
+		},
+		{
+			name:             "should increase by (parent gas limit / 1024 - 1) if new gas limit less than gas floor",
+			gasFloor:         30000000,
+			gasCeil:          40000000,
+			parentGasLimit:   20000000,
+			parentGasUsed:    14000000,
+			expectedGasLimit: 20019530, // new gas limit is 20000977, but it's less than gas floor
+		},
+		{
+			name:             "should decrease by (parent gas limit / 1024 - 1) if new gas limit is greater than gas ceil",
+			gasFloor:         5000000,
+			gasCeil:          10000000,
+			parentGasLimit:   20000000,
+			parentGasUsed:    19000000,
+			expectedGasLimit: 19980470, // new gas limit is 20008302, but its' greater than gas ceil
+		},
+		{
+			name:             "should return 5000 if new gas limit is less than 5000",
+			gasFloor:         0,
+			gasCeil:          10000,
+			parentGasLimit:   5000,
+			parentGasUsed:    1000,
+			expectedGasLimit: 5000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewTestBlockchain(t, nil)
+			b.writeGenesis(&chain.Genesis{
+				GasLimit: tt.parentGasLimit,
+				GasUsed:  tt.parentGasUsed,
+			})
+			b.config.Params = &chain.Params{
+				GasFloor: tt.gasFloor,
+				GasCeil:  tt.gasCeil,
+			}
+
+			nextGas, err := b.CalculateGasLimit(1)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedGasLimit, nextGas)
+		})
+	}
 }
