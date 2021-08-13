@@ -898,6 +898,11 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return fmt.Errorf("wrong difficulty")
 	}
 
+	// verify gas used
+	if err := i.verifyGasLimit(header); err != nil {
+		return err
+	}
+
 	// verify the sealer
 	if err := verifySigner(snap, header); err != nil {
 		return err
@@ -929,6 +934,35 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 	}
 
 	return nil
+}
+
+func (i *Ibft) verifyGasLimit(header *types.Header) error {
+	if header.GasLimit < blockchain.MinGasLimit {
+		return fmt.Errorf("block gas limit falls %d", blockchain.MinGasLimit)
+	}
+	if header.GasLimit > blockchain.MaxGasLimit {
+		return fmt.Errorf("block gas limit exceeds %d", blockchain.MaxGasLimit)
+	}
+	if header.GasUsed > header.GasLimit {
+		return fmt.Errorf("block gas limit exceeds gas used, limit = %d, used=%d", header.GasLimit, header.GasUsed)
+	}
+
+	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
+	if !ok {
+		return fmt.Errorf("parent of %d not found", header.Number)
+	}
+
+	diff := int64(parent.GasLimit) - int64(header.GasLimit)
+	if diff < 0 {
+		diff *= -1
+	}
+	limit := parent.GasLimit / blockchain.GasLimitBoundDivisor
+	if uint64(diff) >= limit {
+		return fmt.Errorf("invalid gas limit, limit = %d, want %d +- %d", header.GasLimit, parent.GasLimit, limit-1)
+	}
+
+	return nil
+
 }
 
 // GetBlockCreator retrieves the block signer from the extra data field
