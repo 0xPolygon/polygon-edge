@@ -33,6 +33,10 @@ type StakingHub struct {
 	// Address -> Stake
 	StakingMap map[types.Address]*big.Int
 
+	// Dirty staking map that's modified during block execution
+	// Address -> Stake
+	DirtyStakingMap map[types.Address]*big.Int
+
 	// Specifies the working directory for the Polygon SDK (location for writeback)
 	WorkingDirectory string
 
@@ -42,15 +46,14 @@ type StakingHub struct {
 	// Logger for logging errors and information
 	Logger hclog.Logger
 
-	// Event queue defines staking / unstaking events
-	// which are read by modules that do final transaction sealing
-	EventQueue []PendingEvent
-
 	// Event list mutex
 	EventQueueMutex sync.Mutex
 
 	// Staking map mutex
 	StakingMutex sync.Mutex
+
+	// Dirty staking map mutex
+	DirtyStakingMutex sync.Mutex
 
 	// Close channel
 	CloseCh chan struct {
@@ -65,7 +68,7 @@ func GetStakingHub() *StakingHub {
 	once.Do(func() {
 		stakingHubInstance = StakingHub{
 			StakingMap:      make(map[types.Address]*big.Int),
-			EventQueue:      make([]PendingEvent, 0),
+			DirtyStakingMap: make(map[types.Address]*big.Int),
 			CloseCh:         make(chan struct{}),
 			WritebackPeriod: 60 * time.Second,
 		}
@@ -127,58 +130,6 @@ func (sh *StakingHub) CloseStakingHub() {
 	default:
 		sh.log("SH Writer not set up. Closing staking hub...", logInfo)
 	}
-}
-
-// PendingEvent contains useful information about a staking / unstaking event
-type PendingEvent struct {
-	BlockNumber int64
-	Address     types.Address
-	Value       *big.Int
-	EventType   StakingEventType
-}
-
-// Equals checks if the two events match
-func (pe *PendingEvent) Equals(event PendingEvent) bool {
-	if pe.EventType == event.EventType &&
-		pe.Address.String() == event.Address.String() &&
-		pe.Value.Cmp(event.Value) == 0 &&
-		pe.BlockNumber == event.BlockNumber {
-		return true
-	}
-
-	return false
-}
-
-// AddPendingEvent pushes an event to the event queue
-func (sh *StakingHub) AddPendingEvent(event PendingEvent) {
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
-
-	sh.EventQueue = append(sh.EventQueue, event)
-}
-
-// RemovePendingEvent removes the pending event from the event queue if it exists.
-// Returns a boolean flag indicating if an event was found and removed
-func (sh *StakingHub) RemovePendingEvent(event PendingEvent) bool {
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
-
-	foundIndx := -1
-	for indx, el := range sh.EventQueue {
-		if el.Equals(event) {
-			foundIndx = indx
-			break
-		}
-	}
-
-	if foundIndx >= 0 {
-		sh.EventQueue = append(sh.EventQueue[:foundIndx], sh.EventQueue[foundIndx+1:]...)
-		return true
-	}
-
-	sh.log(fmt.Sprintf("Unable to find pending event %v", event), logWarning)
-
-	return false
 }
 
 // saveToDisk is a helper method for periodically saving the stake data to disk
@@ -297,6 +248,75 @@ func (sh *StakingHub) IncreaseStake(address types.Address, stakeBalance *big.Int
 	)
 }
 
+// getDirtyReferenceBalance returns the staked balance:
+//
+// - if the account's staked balance is dirty, return the dirty staked balance
+//
+// - if the account's staked balance is not dirty, return the clean staked balance
+func (sh *StakingHub) getDirtyReferenceBalance(address types.Address) *big.Int {
+	var referenceBalance *big.Int
+	if sh.isDirtyStaker(address) {
+		// The staking entry is dirty, grab it
+		referenceBalance = sh.DirtyStakingMap[address]
+	} else {
+		// The staking entry is not dirty, get the clean record
+		referenceBalance = sh.getCleanStake(address)
+	}
+
+	return referenceBalance
+}
+
+// isDirtyStaker checks if the address has had its stake dirtied during the current block execution
+func (sh *StakingHub) isDirtyStaker(address types.Address) bool {
+	_, ok := sh.DirtyStakingMap[address]
+
+	return ok
+}
+
+// getCleanStake retrieves the clean staked balance for an address
+func (sh *StakingHub) getCleanStake(address types.Address) *big.Int {
+	sh.StakingMutex.Lock()
+	defer sh.StakingMutex.Unlock()
+
+	if !sh.isStaker(address) {
+		return big.NewInt(0)
+	}
+
+	return sh.StakingMap[address]
+}
+
+// IncreaseDirtyStake increases the account's dirty staked balance during the block execution
+func (sh *StakingHub) IncreaseDirtyStake(address types.Address, stakeBalance *big.Int) {
+	sh.DirtyStakingMutex.Lock()
+	defer sh.DirtyStakingMutex.Unlock()
+
+	referenceBalance := sh.getDirtyReferenceBalance(address)
+
+	sh.DirtyStakingMap[address] = big.NewInt(0).Add(referenceBalance, stakeBalance)
+
+	sh.log(
+		fmt.Sprintf("Dirty stake increase:\t%s %s", address.String(), stakeBalance.String()),
+		logInfo,
+	)
+}
+
+// CommitDirtyStakes commits any staking balance changes to the main staking map
+func (sh *StakingHub) CommitDirtyStakes() {
+	sh.DirtyStakingMutex.Lock()
+	defer sh.DirtyStakingMutex.Unlock()
+
+	sh.StakingMutex.Lock()
+	defer sh.StakingMutex.Unlock()
+
+	// Commit the dirty map to the clean one
+	for address, dirtyStake := range sh.DirtyStakingMap {
+		sh.StakingMap[address] = dirtyStake
+	}
+
+	// Clear out the dirty map
+	sh.DirtyStakingMap = make(map[types.Address]*big.Int)
+}
+
 // DecreaseStake decreases the account's staked balance if the account is present
 func (sh *StakingHub) DecreaseStake(address types.Address, unstakeBalance *big.Int) {
 	sh.StakingMutex.Lock()
@@ -310,6 +330,19 @@ func (sh *StakingHub) DecreaseStake(address types.Address, unstakeBalance *big.I
 			logInfo,
 		)
 	}
+}
+
+// ResetDirtyStake resets the account's dirty staked balance during block execution
+func (sh *StakingHub) ResetDirtyStake(address types.Address) {
+	sh.DirtyStakingMutex.Lock()
+	defer sh.DirtyStakingMutex.Unlock()
+
+	sh.DirtyStakingMap[address] = big.NewInt(0)
+
+	sh.log(
+		fmt.Sprintf("Dirty take reset:\t%s", address.String()),
+		logInfo,
+	)
 }
 
 // ResetStake resets the account's staked balance
@@ -340,31 +373,13 @@ func (sh *StakingHub) GetStakedBalance(address types.Address) *big.Int {
 	return big.NewInt(0)
 }
 
-// ComputeStakeAfterEvents goes over the pending events and returns the difference in value between staked and unstaked events
-// for the current address and block number
-func (sh *StakingHub) ComputeStakeAfterEvents(balance *big.Int, contextEvent PendingEvent) *big.Int {
-	stakedTally := balance
+// GetDirtyStakedBalance returns an account's dirty staked balance if it is a staker.
+// Returns 0 if the address is not a staker
+func (sh *StakingHub) GetDirtyStakedBalance(address types.Address) *big.Int {
+	sh.DirtyStakingMutex.Lock()
+	defer sh.DirtyStakingMutex.Unlock()
 
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
-
-	// Go over events which have not yet been committed to find what will be
-	// the final staking tally for this address
-	for _, event := range sh.EventQueue {
-		// Check that we are working in the correct context
-		if event.BlockNumber != contextEvent.BlockNumber ||
-			event.Address.String() != contextEvent.Address.String() {
-			continue
-		}
-
-		if event.EventType == StakingEvent {
-			stakedTally.Add(stakedTally, event.Value)
-		} else if event.EventType == UnstakingEvent {
-			stakedTally = big.NewInt(0)
-		}
-	}
-
-	return stakedTally
+	return sh.getDirtyReferenceBalance(address)
 }
 
 // stakerMapping is a representation of a staked account balance
@@ -392,10 +407,10 @@ func (sh *StakingHub) getStakerMappings() []stakerMapping {
 	return mappings
 }
 
-// ClearEvents resets the event queue
-func (sh *StakingHub) ClearEvents() {
-	sh.EventQueueMutex.Lock()
-	defer sh.EventQueueMutex.Unlock()
+// ClearDirtyStakes resets the dirty staking map
+func (sh *StakingHub) ClearDirtyStakes() {
+	sh.DirtyStakingMutex.Lock()
+	defer sh.DirtyStakingMutex.Unlock()
 
-	sh.EventQueue = make([]PendingEvent, 0)
+	sh.DirtyStakingMap = make(map[types.Address]*big.Int)
 }

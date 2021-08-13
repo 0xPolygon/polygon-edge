@@ -430,7 +430,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	_, root := transition.Commit()
 	// If we are the proposer, these events will be added in Validate state again
 	// No need to double add them here and have complicated logic in unstaking
-	staking.GetStakingHub().ClearEvents()
+	staking.GetStakingHub().ClearDirtyStakes()
 
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
@@ -984,7 +984,7 @@ func (i *Ibft) Close() error {
 			return err
 		}
 	}
-	
+
 	// Close the staking hub if present
 	staking.GetStakingHub().CloseStakingHub()
 

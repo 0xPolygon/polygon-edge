@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/staking"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -64,7 +63,6 @@ type Host interface {
 	AddBalance(addr types.Address, balance *big.Int)
 	SubBalance(addr types.Address, balance *big.Int)
 	GetStakedBalance(addr types.Address) *big.Int
-	ComputeStakeAfterEvents(balance *big.Int, event staking.PendingEvent) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
 	GetCode(addr types.Address) []byte

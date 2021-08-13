@@ -141,67 +141,16 @@ func getStakingEventType(toAddress types.Address) staking.StakingEventType {
 	}
 }
 
-// constructPendingEvent is a helper method for constructing a pending event
-func constructPendingEvent(
-	toAddress types.Address,
-	fromAddress types.Address,
-	value *big.Int,
-	blockNumber uint64,
-) *staking.PendingEvent {
-	eventType := getStakingEventType(toAddress)
-
-	return &staking.PendingEvent{
-		BlockNumber: int64(blockNumber),
-		Address:     fromAddress,
-		Value:       value,
-		EventType:   eventType,
-	}
+// cleanDirtyStakes is a helper method for clearing discarded staked events
+func cleanDirtyStakes() {
+	hub := staking.GetStakingHub()
+	hub.ClearDirtyStakes()
 }
 
-// cleanDiscardedEvents is a helper method for clearing discarded pending events
-func cleanDiscardedEvents(transactions []*types.Transaction, blockNumber uint64) {
-	for _, discardedTxn := range transactions {
-		// Remove a pending event for the discarded transaction
-		if system.IsSystemEvent(discardedTxn.To) {
-			pendingEvent := constructPendingEvent(
-				*discardedTxn.To,
-				discardedTxn.From,
-				discardedTxn.Value,
-				blockNumber,
-			)
-
-			hub := staking.GetStakingHub()
-			// Remove the event from the queue if it is present
-			hub.RemovePendingEvent(*pendingEvent)
-		}
-	}
-}
-
-// commitApprovedEvents is a helper method for committing pending events that passed all checks
-func commitApprovedEvents(transactions []*types.Transaction, blockNumber uint64) {
-	for _, t := range transactions {
-		// Check if the transaction matches a staking / unstaking event
-		if system.IsSystemEvent(t.To) {
-			pendingEvent := constructPendingEvent(
-				*t.To,
-				t.From,
-				t.Value,
-				blockNumber,
-			)
-
-			hub := staking.GetStakingHub()
-
-			// Remove the event from the queue if it is present
-			if hub.RemovePendingEvent(*pendingEvent) {
-				// Execute the changes on the staking map
-				if pendingEvent.EventType == staking.StakingEvent {
-					hub.IncreaseStake(t.From, t.Value)
-				} else {
-					hub.ResetStake(t.From)
-				}
-			}
-		}
-	}
+// commitDirtyStakes is a helper method for updating the staking map with dirty stakes
+func commitDirtyStakes() {
+	hub := staking.GetStakingHub()
+	hub.CommitDirtyStakes()
 }
 
 // ProcessBlock already does all the handling of the whole process, TODO
@@ -217,7 +166,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 			// Because block processing termination is here,
 			// the executor needs to handle any "stale" pending events,
 			// since every transaction in this block is discarded
-			cleanDiscardedEvents(block.Transactions, block.Number())
+			cleanDirtyStakes()
 
 			return nil, err
 		}
@@ -225,7 +174,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 	_, root := txn.Commit()
 
 	// Checks are passed, do staking logic if possible
-	commitApprovedEvents(block.Transactions, block.Number())
+	commitDirtyStakes()
 
 	res := &BlockResult{
 		Root:     root,
@@ -773,12 +722,7 @@ func (t *Transition) SubBalance(addr types.Address, balance *big.Int) {
 
 func (t *Transition) GetStakedBalance(addr types.Address) *big.Int {
 	hub := staking.GetStakingHub()
-	return hub.GetStakedBalance(addr)
-}
-
-func (t *Transition) ComputeStakeAfterEvents(balance *big.Int, event staking.PendingEvent) *big.Int {
-	hub := staking.GetStakingHub()
-	return hub.ComputeStakeAfterEvents(balance, event)
+	return hub.GetDirtyStakedBalance(addr)
 }
 
 func (t *Transition) GetStorage(addr types.Address, key types.Hash) types.Hash {

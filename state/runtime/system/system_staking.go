@@ -22,16 +22,8 @@ func (sh *stakingHandler) run(state *systemState) ([]byte, error) {
 	// Grab the address calling the staking method
 	staker := state.contract.Caller
 
-	// Grab the transaction context
-	ctx := state.host.GetTxContext()
-
 	// Increase the account's staked balance
-	staking.GetStakingHub().AddPendingEvent(staking.PendingEvent{
-		BlockNumber: ctx.Number,
-		Address:     staker,
-		Value:       potentialStake,
-		EventType:   staking.StakingEvent,
-	})
+	staking.GetStakingHub().IncreaseDirtyStake(staker, potentialStake)
 
 	state.host.EmitStakedEvent(staker, potentialStake)
 
