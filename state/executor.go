@@ -174,6 +174,10 @@ func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
 
+func (t *Transition) AvailableGas() uint64 {
+	return t.gasPool
+}
+
 func (t *Transition) Receipts() []*types.Receipt {
 	return t.receipts
 }

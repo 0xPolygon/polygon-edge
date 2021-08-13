@@ -134,8 +134,12 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	for {
 		// Add transactions to the list until there are none left
 		txn, retFn := d.txpool.Pop()
-
 		if txn == nil {
+			break
+		}
+		if gas := transition.AvailableGas(); gas < state.TxGas {
+			d.logger.Info("Block doesn't have enough gas to process new transaction", "remaining", gas, "minimum required gas", state.TxGas)
+			retFn()
 			break
 		}
 

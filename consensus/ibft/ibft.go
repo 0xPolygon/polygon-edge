@@ -388,6 +388,12 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		if txn == nil {
 			break
 		}
+		if gas := transition.AvailableGas(); gas < state.TxGas {
+			i.logger.Info("Block doesn't have enough gas to process new transaction", "remaining", gas, "minimum required gas", state.TxGas)
+			retFn()
+			break
+		}
+
 		if err := transition.Write(txn); err != nil {
 			retFn()
 			break
