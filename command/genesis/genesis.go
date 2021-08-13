@@ -91,7 +91,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["genesis-gas-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets gas limit of genesis block. Default: %d", helper.DefaultGenesisGasLimit),
+		Description: fmt.Sprintf("Sets gas limit of genesis block. Default: %d", chain.GenesisGasLimit),
 		Arguments: []string{
 			"GENESIS_GAS_LIMIT",
 		},
@@ -162,7 +162,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
 	flags.Var(&bootnodes, "bootnode", "")
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
-	flags.StringVar(&genesisGasLimit, "genesis-gas-limit", strconv.FormatUint(helper.DefaultGenesisGasLimit, 10), "")
+	flags.StringVar(&genesisGasLimit, "genesis-gas-limit", strconv.FormatUint(chain.GenesisGasLimit, 10), "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 

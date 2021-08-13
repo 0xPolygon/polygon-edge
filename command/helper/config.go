@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )
@@ -18,6 +19,8 @@ import (
 type Config struct {
 	Chain       string                 `json:"chain"`
 	DataDir     string                 `json:"data_dir"`
+	GasFloor    string                 `json:"gas_floor"`
+	GasCeil     string                 `json:"gas_ceil"`
 	GRPCAddr    string                 `json:"rpc_addr"`
 	JSONRPCAddr string                 `json:"jsonrpc_addr"`
 	Network     *Network               `json:"network"`
@@ -40,8 +43,10 @@ type Network struct {
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:   "test",
-		DataDir: "./test-chain",
+		Chain:    "test",
+		DataDir:  "./test-chain",
+		GasFloor: fmt.Sprintf("0x%x", chain.DefaultGasFloor),
+		GasCeil:  fmt.Sprintf("0x%x", chain.DefaultGasCeil),
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
@@ -95,8 +100,28 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
+	}
 
-		conf.Chain = cc
+	// Target gas limit
+	if c.GasFloor != "" {
+		value, err := types.ParseUint256orHex(&c.GasFloor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %+v", c.GasFloor, err)
+		}
+		if !value.IsUint64() {
+			return nil, fmt.Errorf("gas floor is out of uint64 range: %s", c.GasFloor)
+		}
+		conf.Chain.Params.GasFloor = value.Uint64()
+	}
+	if c.GasCeil != "" {
+		value, err := types.ParseUint256orHex(&c.GasCeil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %+v", c.GasCeil, err)
+		}
+		if !value.IsUint64() {
+			return nil, fmt.Errorf("gas floor is out of uint64 range: %s", c.GasCeil)
+		}
+		conf.Chain.Params.GasCeil = value.Uint64()
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -153,6 +178,14 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.Seal {
 		c.Seal = true
+	}
+
+	if otherConfig.GasFloor != "" {
+		c.GasFloor = otherConfig.GasFloor
+	}
+
+	if otherConfig.GasCeil != "" {
+		c.GasCeil = otherConfig.GasCeil
 	}
 
 	if otherConfig.LogLevel != "" {

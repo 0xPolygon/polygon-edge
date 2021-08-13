@@ -23,13 +23,12 @@ import (
 )
 
 const (
-	GenesisFileName        = "./genesis.json"
-	DefaultChainName       = "example"
-	DefaultChainID         = 100
-	DefaultPremineBalance  = "0x3635C9ADC5DEA00000" // 1000 ETH
-	DefaultConsensus       = "pow"
-	DefaultGasLimit        = 5000
-	DefaultGenesisGasLimit = 4712388
+	GenesisFileName       = "./genesis.json"
+	DefaultChainName      = "example"
+	DefaultChainID        = 100
+	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
+	DefaultConsensus      = "pow"
+	DefaultGasLimit       = 5000
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -385,6 +384,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&configFile, "config", "", "")
 	flags.StringVar(&cliConfig.Chain, "chain", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
+	flags.StringVar(&cliConfig.GasFloor, "gas-floor", DefaultConfig().GasFloor, "")
+	flags.StringVar(&cliConfig.GasCeil, "gas-ceil", DefaultConfig().GasCeil, "")
 	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")

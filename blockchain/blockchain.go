@@ -244,10 +244,6 @@ func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
 
 // calculateGasLimit calculates gas limit from parent gas
 func (b *Blockchain) calculateGasLimit(parentGasUsed, parentGasLimit uint64) uint64 {
-	// todo: remove magic number
-	gasFloor := uint64(0x47e7c5)
-	gasCeil := uint64(0x47e7c5)
-
 	// contrib = (parentGasUsed * 3 / 2) / 1024
 	contrib := (parentGasUsed + parentGasUsed/2) / GasLimitBoundDivisor
 	// decay = parentGasLimit / 1024 -1
@@ -258,6 +254,8 @@ func (b *Blockchain) calculateGasLimit(parentGasUsed, parentGasLimit uint64) uin
 		limit = MinGasLimit
 	}
 
+	gasFloor := b.Config().GasFloor
+	gasCeil := b.Config().GasCeil
 	// If we're outside our allowed gas range, we try to hone towards them
 	if limit < gasFloor {
 		limit = parentGasLimit + decay

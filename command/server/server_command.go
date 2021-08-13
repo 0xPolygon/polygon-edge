@@ -69,6 +69,22 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["gas-floor"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets target gas floor for mined blocks. Default: %s", helper.DefaultConfig().GasFloor),
+		Arguments: []string{
+			"GAS_FLOOR",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["gas-ceil"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets target gas ceiling for mined blocks. Default: %s", helper.DefaultConfig().GasCeil),
+		Arguments: []string{
+			"GAS_CEIL",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["grpc"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultGRPCPort),
 		Arguments: []string{
