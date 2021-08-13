@@ -5,16 +5,18 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/minimal/chain"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
 	spuriousDragonMaxCodeSize = 24576
+
+	TxGas                 uint64 = 21000 // Per transaction not creating a contract
+	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
 )
 
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
@@ -632,9 +634,9 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 
 	// Contract creation is only paid on the homestead fork
 	if msg.IsContractCreation() && isHomestead {
-		cost += 53000
+		cost += TxGasContractCreation
 	} else {
-		cost += 21000
+		cost += TxGas
 	}
 
 	payload := msg.Input

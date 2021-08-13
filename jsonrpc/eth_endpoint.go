@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/minimal/state"
 	"github.com/0xPolygon/minimal/types"
 )
 
@@ -244,7 +245,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return nil, err
 	}
 
-	const standardGas uint64 = 21000
+	const standardGas uint64 = state.TxGas
 
 	number := LatestBlockNumber
 	if rawNum != nil {
