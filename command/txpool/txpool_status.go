@@ -6,7 +6,7 @@ import (
 
 	"github.com/0xPolygon/minimal/command/helper"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // TxPoolStatus is the command to query the snapshot

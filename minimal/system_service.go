@@ -6,8 +6,8 @@ import (
 
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type systemService struct {
@@ -141,6 +141,6 @@ func (s *systemService) PeersList(
 
 		resp.Peers = append(resp.Peers, peer)
 	}
-	
+
 	return resp, nil
 }

@@ -16,9 +16,10 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/crypto/sha3"
+
 	"google.golang.org/protobuf/types/known/emptypb"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 func EthToWei(ethValue int64) *big.Int {
