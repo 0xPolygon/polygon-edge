@@ -251,7 +251,6 @@ github.com/multiformats/go-multiaddr-dns
 # github.com/multiformats/go-multiaddr-fmt v0.1.0
 github.com/multiformats/go-multiaddr-fmt
 # github.com/multiformats/go-multiaddr-net v0.2.0
-## explicit
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.3
 github.com/multiformats/go-multibase
