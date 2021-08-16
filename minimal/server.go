@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/minimal/state/runtime"
+	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	"github.com/0xPolygon/minimal/network"
 	"github.com/0xPolygon/minimal/state"
+	"github.com/0xPolygon/minimal/state/runtime"
 	"github.com/0xPolygon/minimal/txpool"
 	"github.com/0xPolygon/minimal/types"
 
@@ -188,6 +189,25 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 		return 0
 	}
 	return account.Nonce
+}
+
+func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
+	snap, err := t.state.NewSnapshotAt(root)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get snapshot for root, %v", err)
+	}
+
+	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
+	if !ok {
+		return big.NewInt(0), nil
+	}
+
+	var account state.Account
+	if err = account.UnmarshalRlp(result); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %v", err)
+	}
+
+	return account.Balance, nil
 }
 
 // setupConsensus sets up the consensus mechanism

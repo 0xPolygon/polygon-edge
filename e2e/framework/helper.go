@@ -16,6 +16,10 @@ import (
 	"github.com/0xPolygon/minimal/minimal/proto"
 	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 	"golang.org/x/crypto/sha3"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -26,6 +30,22 @@ func EthToWei(ethValue int64) *big.Int {
 	return new(big.Int).Mul(
 		big.NewInt(ethValue),
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+}
+
+// GetAccountBalance is a helper method for fetching the Balance field of an account
+func GetAccountBalance(
+	address types.Address,
+	rpcClient *jsonrpc.Client,
+	t *testing.T,
+) *big.Int {
+	accountBalance, err := rpcClient.Eth().GetBalance(
+		web3.Address(address),
+		web3.Latest,
+	)
+
+	assert.NoError(t, err)
+
+	return accountBalance
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
