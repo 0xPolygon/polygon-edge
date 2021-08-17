@@ -233,7 +233,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	// test with leading whitespace ("  \t\n\n\r")
 	leftBytes := []byte{0x20, 0x20, 0x09, 0x0A, 0x0A, 0x0D}
 	resp, err := s.Handle(append(leftBytes, []byte(`[
-    {"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x1", true]},
+    {"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1", true]},
     {"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
     {"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
 		{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}
@@ -243,6 +243,6 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	var res []Response
 	assert.NoError(t, expectBatchJSONResult(resp, &res))
 	assert.Len(t, res, 4)
-	assert.Equal(t, res[0].Error, internalError)
+	assert.Equal(t, internalError, res[0].Error)
 	assert.Nil(t, res[3].Error)
 }

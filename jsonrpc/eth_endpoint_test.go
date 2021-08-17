@@ -152,22 +152,28 @@ func TestEth_Block_GetBlockByNumber(t *testing.T) {
 
 	cases := []struct {
 		blockNum BlockNumber
+		isNotNil bool
 		err      bool
 	}{
-		{LatestBlockNumber, false},
-		{EarliestBlockNumber, true},
-		{BlockNumber(-50), true},
-		{BlockNumber(0), false},
-		{BlockNumber(2), false},
-		{BlockNumber(50), true},
+		{LatestBlockNumber, true, false},
+		{EarliestBlockNumber, false, true},
+		{BlockNumber(0), true, false},
+		{BlockNumber(2), true, false},
+		{BlockNumber(50), false, false},
 	}
 	for _, c := range cases {
-		_, err := dispatcher.endpoints.Eth.GetBlockByNumber(c.blockNum, false)
-		if err != nil && !c.err {
-			t.Fatal(err)
+		res, err := dispatcher.endpoints.Eth.GetBlockByNumber(c.blockNum, false)
+
+		if c.isNotNil {
+			assert.NotNil(t, res, "expected to return block, but got nil")
+		} else {
+			assert.Nil(t, res, "expected to return nil, but got data")
 		}
-		if err == nil && c.err {
-			t.Fatal("bad")
+
+		if c.err {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
 		}
 	}
 }
@@ -182,11 +188,13 @@ func TestEth_Block_GetBlockByHash(t *testing.T) {
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	_, err := dispatcher.endpoints.Eth.GetBlockByHash(hash1, false)
+	res, err := dispatcher.endpoints.Eth.GetBlockByHash(hash1, false)
 	assert.NoError(t, err)
+	assert.NotNil(t, res)
 
-	_, err = dispatcher.endpoints.Eth.GetBlockByHash(hash2, false)
-	assert.Error(t, err)
+	res, err = dispatcher.endpoints.Eth.GetBlockByHash(hash2, false)
+	assert.NoError(t, err)
+	assert.Nil(t, res)
 }
 
 func TestEth_Block_BlockNumber(t *testing.T) {

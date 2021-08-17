@@ -37,7 +37,7 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 
 	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
-		return nil, fmt.Errorf("unable to get block by num %v", num)
+		return nil, nil
 	}
 	return toBlock(block, fullTx), nil
 }
@@ -46,7 +46,7 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) {
 	block, ok := e.d.store.GetBlockByHash(hash, true)
 	if !ok {
-		return nil, fmt.Errorf("unable to get block by hash %v", hash)
+		return nil, nil
 	}
 	return toBlock(block, fullTx), nil
 }
