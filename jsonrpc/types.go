@@ -96,7 +96,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		LogsBloom:       h.LogsBloom,
 		Difficulty:      argUint64(h.Difficulty),
 		TotalDifficulty: argUint64(h.Difficulty), // not needed for POS
-		Size:            argUint64(0),            // should derive actual size
+		Size:            argUint64(b.Size()),
 		Number:          argUint64(h.Number),
 		GasLimit:        argUint64(h.GasLimit),
 		GasUsed:         argUint64(h.GasUsed),
