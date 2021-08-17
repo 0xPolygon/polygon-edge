@@ -19,7 +19,7 @@ func (e *Eth) ChainId() (interface{}, error) {
 }
 
 // GetBlockByNumber returns information about a block by block number
-func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, error) {
+func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
 	var num uint64
 	switch number {
 	case LatestBlockNumber:
@@ -35,20 +35,20 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, erro
 		num = uint64(number)
 	}
 
-	block, ok := e.d.store.GetBlockByNumber(num, full)
+	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
 		return nil, fmt.Errorf("unable to get block by num %v", num)
 	}
-	return toBlock(block), nil
+	return toBlock(block, fullTx), nil
 }
 
 // GetBlockByHash returns information about a block by hash
-func (e *Eth) GetBlockByHash(hash types.Hash, full bool) (interface{}, error) {
-	block, ok := e.d.store.GetBlockByHash(hash, full)
+func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) {
+	block, ok := e.d.store.GetBlockByHash(hash, true)
 	if !ok {
 		return nil, fmt.Errorf("unable to get block by hash %v", hash)
 	}
-	return toBlock(block), nil
+	return toBlock(block, fullTx), nil
 }
 
 // BlockNumber returns current block number
