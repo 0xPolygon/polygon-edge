@@ -8,10 +8,10 @@ import (
 	"github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	any "google.golang.org/protobuf/types/known/anypb"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // serviceV1 is the GRPC server implementation for the v1 protocol

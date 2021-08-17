@@ -8,9 +8,9 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft/proto"
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	any "google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestTransition_ValidateState_Prepare(t *testing.T) {

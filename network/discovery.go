@@ -12,8 +12,8 @@ import (
 	rawGrpc "google.golang.org/grpc"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
 )
 
 func init() {

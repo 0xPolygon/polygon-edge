@@ -13,11 +13,11 @@ import (
 	libp2pGrpc "github.com/0xPolygon/minimal/network/grpc"
 	"github.com/0xPolygon/minimal/protocol/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
+	any "google.golang.org/protobuf/types/known/anypb"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 const maxEnqueueSize = 50
