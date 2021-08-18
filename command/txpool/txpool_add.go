@@ -8,7 +8,7 @@ import (
 	"github.com/0xPolygon/minimal/txpool/proto"
 	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
 	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/any"
+	any "google.golang.org/protobuf/types/known/anypb"
 )
 
 // TxPoolAdd is the command to query the snapshot

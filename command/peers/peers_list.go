@@ -6,7 +6,7 @@ import (
 
 	"github.com/0xPolygon/minimal/command/helper"
 	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // PeersList is the PeersList to start the sever

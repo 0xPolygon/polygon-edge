@@ -6,7 +6,7 @@ import (
 
 	"github.com/0xPolygon/minimal/command/helper"
 	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // IbftStatus is the command to query the snapshot

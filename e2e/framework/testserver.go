@@ -24,10 +24,10 @@ import (
 	"github.com/0xPolygon/minimal/consensus/ibft"
 	"github.com/0xPolygon/minimal/crypto"
 	"github.com/0xPolygon/minimal/network"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 
 	"google.golang.org/grpc"
 

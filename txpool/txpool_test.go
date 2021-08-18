@@ -140,6 +140,58 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.Equal(t, pool.Length(), uint64(1))
 }
 
+func TestGetPendingAndQueuedTransactions(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+
+	from1 := types.Address{0x1}
+	txn0 := &types.Transaction{
+		From:     from1,
+		Nonce:    0,
+		Gas:      validGasLimit,
+		Value:    big.NewInt(106),
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn0))
+
+	from2 := types.Address{0x2}
+	txn1 := &types.Transaction{
+		From:     from2,
+		Nonce:    1,
+		Gas:      validGasLimit,
+		Value:    big.NewInt(106),
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn1))
+
+	from3 := types.Address{0x3}
+	txn2 := &types.Transaction{
+		From:     from3,
+		Nonce:    2,
+		Gas:      validGasLimit,
+		Value:    big.NewInt(107),
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn2))
+
+	from4 := types.Address{0x4}
+	txn3 := &types.Transaction{
+		From:     from4,
+		Nonce:    5,
+		Gas:      validGasLimit,
+		Value:    big.NewInt(108),
+		GasPrice: big.NewInt(1),
+	}
+	assert.NoError(t, pool.addImpl("", txn3))
+
+	pendingTxs, queuedTxs := pool.GetTxs()
+
+	assert.Len(t, pendingTxs, 1)
+	assert.Len(t, queuedTxs, 3)
+	assert.Equal(t, pendingTxs[from1][txn0.Nonce].Value, big.NewInt(106))
+}
+
 func TestBroadcast(t *testing.T) {
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it
