@@ -493,7 +493,7 @@ func DirectoryExists(directoryPath string) bool {
 	}
 
 	// Check if the directory exists, and that it's actually a directory if there is a hit
-	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || !fileInfo.IsDir() {
+	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && !fileInfo.IsDir()) {
 		return false
 	}
 
