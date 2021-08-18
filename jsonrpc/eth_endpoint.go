@@ -32,6 +32,9 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
+		if number < 0 {
+			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
+		}
 		num = uint64(number)
 	}
 
