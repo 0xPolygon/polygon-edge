@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/0xPolygon/minimal/helper/hex"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -85,6 +86,9 @@ type Block struct {
 	Header       *Header
 	Transactions []*Transaction
 	Uncles       []*Header
+
+	// Cache
+	size atomic.Value // *uint64
 }
 
 func (b *Block) Hash() Hash {
@@ -104,6 +108,18 @@ func (b *Block) Body() *Body {
 		Transactions: b.Transactions,
 		Uncles:       b.Uncles,
 	}
+}
+
+func (b *Block) Size() uint64 {
+	sizePtr := b.size.Load()
+	if sizePtr == nil {
+		bytes := b.MarshalRLP()
+		size := uint64(len(bytes))
+		b.size.Store(&size)
+		return size
+	}
+
+	return *sizePtr.(*uint64)
 }
 
 func CalcUncleHash(uncles []*Header) Hash {
