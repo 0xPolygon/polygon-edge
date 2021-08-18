@@ -475,6 +475,10 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 }
 
 func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
+	if arg.Data != nil && arg.Input != nil {
+		return nil, fmt.Errorf("both input and data cannot be set")
+	}
+
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
@@ -486,10 +490,6 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 			return nil, err
 		}
 		arg.Nonce = argUintPtr(nonce)
-	}
-
-	if arg.Data != nil && arg.Input != nil {
-		return nil, fmt.Errorf("both input and data cannot be set")
 	}
 	if arg.Value == nil {
 		arg.Value = argBytesPtr([]byte{})
