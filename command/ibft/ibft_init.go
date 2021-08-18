@@ -64,6 +64,11 @@ func generateAlreadyInitializedError(directory string) string {
 	return output
 }
 
+var (
+	CONSENSUS_DIR = "consensus"
+	LIBP2P_DIR    = "libp2p"
+)
+
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
 	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
@@ -80,30 +85,28 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	subDirectories := []string{"consensus", "libp2p"}
-
 	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range subDirectories {
+	for _, subDirectory := range []string{CONSENSUS_DIR, LIBP2P_DIR} {
 		if helper.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
 			p.UI.Error(generateAlreadyInitializedError(dataDir))
 			return 1
 		}
 	}
 
-	if err := minimal.SetupDataDir(dataDir, subDirectories); err != nil {
+	if err := minimal.SetupDataDir(dataDir, []string{CONSENSUS_DIR, LIBP2P_DIR}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to write the ibft private key
-	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, subDirectories[0], ibft.IbftKeyName))
+	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, CONSENSUS_DIR, ibft.IbftKeyName))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to create also a libp2p address
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(dataDir, subDirectories[1]))
+	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(dataDir, LIBP2P_DIR))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
