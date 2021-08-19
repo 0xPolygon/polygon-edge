@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 

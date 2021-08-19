@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -40,9 +40,9 @@ func (f *funcData) numParams() int {
 }
 
 type endpoints struct {
-	Eth  *Eth
-	Web3 *Web3
-	Net  *Net
+	Eth    *Eth
+	Web3   *Web3
+	Net    *Net
 	Txpool *Txpool
 }
 

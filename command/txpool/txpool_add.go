@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/txpool/proto"
-	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/txpool/proto"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 

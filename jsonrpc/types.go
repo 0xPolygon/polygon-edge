@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // For union type of transaction and types.Hash

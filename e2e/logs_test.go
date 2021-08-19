@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/tests"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 )

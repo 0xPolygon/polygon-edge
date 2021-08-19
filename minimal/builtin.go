@@ -1,11 +1,11 @@
 package minimal
 
 import (
-	consensusDev "github.com/0xPolygon/minimal/consensus/dev"
-	consensusDummy "github.com/0xPolygon/minimal/consensus/dummy"
-	consensusIBFT "github.com/0xPolygon/minimal/consensus/ibft"
+	consensusDev "github.com/0xPolygon/polygon-sdk/consensus/dev"
+	consensusDummy "github.com/0xPolygon/polygon-sdk/consensus/dummy"
+	consensusIBFT "github.com/0xPolygon/polygon-sdk/consensus/ibft"
 
-	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/polygon-sdk/consensus"
 )
 
 var consensusBackends = map[string]consensus.Factory{
