@@ -547,7 +547,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 		Transactions: []*types.Transaction{
 			{
 				Value: big.NewInt(10),
-				V:     1,
+				V:     []byte{1},
 			},
 		},
 	}

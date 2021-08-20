@@ -11,44 +11,130 @@ import (
 func TestFrontierSigner(t *testing.T) {
 	signer := &FrontierSigner{}
 
-	addr0 := types.Address{0x1}
+	toAddress := types.StringToAddress("1")
 	key, err := GenerateKey()
 	assert.NoError(t, err)
 
 	txn := &types.Transaction{
-		To:       &addr0,
+		To:       &toAddress,
 		Value:    big.NewInt(10),
 		GasPrice: big.NewInt(0),
 	}
-	txn, err = signer.SignTx(txn, key)
+	signedTx, err := signer.SignTx(txn, key)
 	assert.NoError(t, err)
 
-	from, err := signer.Sender(txn)
+	from, err := signer.Sender(signedTx)
 	assert.NoError(t, err)
 	assert.Equal(t, from, PubKeyToAddress(&key.PublicKey))
 }
 
-func TestEIP1155Signer(t *testing.T) {
-	signer1 := NewEIP155Signer(1)
+func TestEIP155Signer_Sender(t *testing.T) {
+	toAddress := types.StringToAddress("1")
 
-	addr0 := types.Address{0x1}
-	key, err := GenerateKey()
-	assert.NoError(t, err)
-
-	txn := &types.Transaction{
-		To:       &addr0,
-		Value:    big.NewInt(10),
-		GasPrice: big.NewInt(0),
+	testTable := []struct {
+		name    string
+		chainID *big.Int
+	}{
+		{
+			"mainnet",
+			big.NewInt(1),
+		},
+		{
+			"expanse mainnet",
+			big.NewInt(2),
+		},
+		{
+			"ropsten",
+			big.NewInt(3),
+		},
+		{
+			"rinkeby",
+			big.NewInt(4),
+		},
+		{
+			"goerli",
+			big.NewInt(5),
+		},
+		{
+			"kovan",
+			big.NewInt(42),
+		},
+		{
+			"geth private",
+			big.NewInt(1337),
+		},
+		{
+			"mega large",
+			big.NewInt(0).Exp(big.NewInt(2), big.NewInt(20), nil), // 2**20
+		},
 	}
-	txn, err = signer1.SignTx(txn, key)
-	assert.NoError(t, err)
 
-	from, err := signer1.Sender(txn)
-	assert.NoError(t, err)
-	assert.Equal(t, from, PubKeyToAddress(&key.PublicKey))
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			key, keyGenError := GenerateKey()
+			if keyGenError != nil {
+				t.Fatalf("Unable to generate key")
+			}
 
-	// try to use a signer with another chain id
-	signer2 := NewEIP155Signer(2)
-	_, err = signer2.Sender(txn)
-	assert.Error(t, err)
+			txn := &types.Transaction{
+				To:       &toAddress,
+				Value:    big.NewInt(1),
+				GasPrice: big.NewInt(0),
+			}
+
+			signer := NewEIP155Signer(testCase.chainID.Uint64())
+
+			signedTx, signErr := signer.SignTx(txn, key)
+			if signErr != nil {
+				t.Fatalf("Unable to sign transaction")
+			}
+
+			recoveredSender, recoverErr := signer.Sender(signedTx)
+			if recoverErr != nil {
+				t.Fatalf("Unable to recover sender")
+			}
+
+			assert.Equal(t, recoveredSender.String(), PubKeyToAddress(&key.PublicKey).String())
+		})
+	}
+}
+
+func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
+	chainIDS := []uint64{1, 10, 100}
+	toAddress := types.StringToAddress("1")
+
+	for _, chainIDTop := range chainIDS {
+		key, keyGenError := GenerateKey()
+		if keyGenError != nil {
+			t.Fatalf("Unable to generate key")
+		}
+
+		txn := &types.Transaction{
+			To:       &toAddress,
+			Value:    big.NewInt(1),
+			GasPrice: big.NewInt(0),
+		}
+
+		signer := NewEIP155Signer(chainIDTop)
+
+		signedTx, signErr := signer.SignTx(txn, key)
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction")
+		}
+
+		for _, chainIDBottom := range chainIDS {
+			signerBottom := NewEIP155Signer(chainIDBottom)
+
+			recoveredSender, recoverErr := signerBottom.Sender(signedTx)
+			if chainIDTop == chainIDBottom {
+				// Addresses should match, no error should be present
+				assert.NoError(t, recoverErr)
+
+				assert.Equal(t, recoveredSender.String(), PubKeyToAddress(&key.PublicKey).String())
+			} else {
+				// There should be an error for mismatched chain IDs
+				assert.Error(t, recoverErr)
+			}
+		}
+	}
 }

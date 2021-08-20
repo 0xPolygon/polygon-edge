@@ -55,6 +55,15 @@ func (d *DevCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	d.FlagMap["chainid"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", helper.DefaultChainID),
+		Arguments: []string{
+			"CHAIN_ID",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 func (d *DevCommand) GetHelperText() string {

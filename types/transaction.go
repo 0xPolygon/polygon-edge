@@ -13,7 +13,7 @@ type Transaction struct {
 	To       *Address
 	Value    *big.Int
 	Input    []byte
-	V        byte
+	V        []byte
 	R        []byte
 	S        []byte
 	Hash     Hash

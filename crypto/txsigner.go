@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"math/bits"
 
 	"github.com/0xPolygon/minimal/chain"
@@ -21,6 +22,9 @@ type TxSigner interface {
 
 	// SignTx signs a transaction
 	SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*types.Transaction, error)
+
+	// calculateV calculates the V value based on the type of signer used
+	calculateV(parity byte) []byte
 }
 
 // NewSigner creates a new signer object (EIP155 or FrontierSigner)
@@ -74,9 +78,18 @@ func (f *FrontierSigner) Hash(tx *types.Transaction) types.Hash {
 	return calcTxHash(tx, 0)
 }
 
+// Magic numbers from Ethereum, used in v calculation
+var (
+	big27 = big.NewInt(27)
+	big35 = big.NewInt(35)
+)
+
 // Sender decodes the signature and returns the sender of the transaction
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	sig, err := encodeSignature(tx.R, tx.S, tx.V-27)
+	refV := big.NewInt(0).SetBytes(tx.V)
+	refV.Sub(refV, big27)
+
+	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -107,9 +120,17 @@ func (f *FrontierSigner) SignTx(
 
 	tx.R = sig[:32]
 	tx.S = sig[32:64]
-	tx.V = byte(sig[64] + 27)
+	tx.V = f.calculateV(sig[64])
 
 	return tx, nil
+}
+
+// calculateV returns the V value for transactions pre EIP155
+func (f *FrontierSigner) calculateV(parity byte) []byte {
+	reference := big.NewInt(int64(parity))
+	reference.Add(reference, big27)
+
+	return reference.Bytes()
 }
 
 // NewEIP155Signer returns a new EIP155Signer object
@@ -130,7 +151,9 @@ func (e *EIP155Signer) Hash(tx *types.Transaction) types.Hash {
 func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	protected := true
 
-	if vv := uint(tx.V); bits.Len(vv) <= 8 {
+	// Check if v value conforms to an earlier standard (before EIP155)
+	bigV := big.NewInt(0).SetBytes(tx.V)
+	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
 		protected = vv != 27 && vv != 28
 	}
 
@@ -138,11 +161,13 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 		return (&FrontierSigner{}).Sender(tx)
 	}
 
-	v := tx.V - byte(e.chainID*2)
-	v -= 8
-	v -= 27
+	// Reverse the V calculation to find the original V in the range [0, 1]
+	// v = CHAIN_ID * 2 + 35 + {0, 1}
+	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
+	bigV.Sub(bigV, mulOperand)
+	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, v)
+	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -173,9 +198,20 @@ func (e *EIP155Signer) SignTx(
 
 	tx.R = sig[:32]
 	tx.S = sig[32:64]
-	tx.V = byte(sig[64]+35) + (byte(e.chainID) * 2)
+	tx.V = e.calculateV(sig[64])
 
 	return tx, nil
+}
+
+// calculateV returns the V value for transaction signatures. Based on EIP155
+func (e *EIP155Signer) calculateV(parity byte) []byte {
+	reference := big.NewInt(int64(parity))
+	reference.Add(reference, big35)
+	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
+
+	reference.Add(reference, mulOperand)
+
+	return reference.Bytes()
 }
 
 // encodeSignature generates a signature value based on the R, S and V value
