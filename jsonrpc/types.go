@@ -139,12 +139,6 @@ type Log struct {
 	Removed     bool          `json:"removed"`
 }
 
-type argByte byte
-
-func (a argByte) MarshalText() ([]byte, error) {
-	return encodeToHex([]byte{byte(a)}), nil
-}
-
 type argBig big.Int
 
 func argBigPtr(b *big.Int) *argBig {
