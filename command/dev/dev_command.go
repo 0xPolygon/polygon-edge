@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -99,7 +99,7 @@ func (d *DevCommand) Run(args []string) int {
 		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
-	server, err := minimal.NewServer(logger, config)
+	server, err := server.NewServer(logger, config)
 	if err != nil {
 		d.UI.Error(err.Error())
 

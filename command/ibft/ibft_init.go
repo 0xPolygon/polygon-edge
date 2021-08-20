@@ -10,8 +10,8 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/minimal"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server"
 )
 
 // IbftInit is the command to query the snapshot
@@ -72,7 +72,7 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	if err := minimal.SetupDataDir(dataDir, []string{"consensus", "libp2p"}); err != nil {
+	if err := server.SetupDataDir(dataDir, []string{"consensus", "libp2p"}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}

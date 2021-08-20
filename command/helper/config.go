@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )
@@ -53,9 +53,9 @@ func DefaultConfig() *Config {
 }
 
 // BuildConfig Builds the config based on set parameters
-func (c *Config) BuildConfig() (*minimal.Config, error) {
-	// Grab the default Minimal server config
-	conf := minimal.DefaultConfig()
+func (c *Config) BuildConfig() (*server.Config, error) {
+	// Grab the default server config
+	conf := server.DefaultConfig()
 
 	// Decode the chain
 	cc, err := chain.Import(c.Chain)

@@ -1,4 +1,4 @@
-package minimal
+package server
 
 import (
 	"net"

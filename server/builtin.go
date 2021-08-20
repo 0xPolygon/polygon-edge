@@ -1,4 +1,4 @@
-package minimal
+package server
 
 import (
 	consensusDev "github.com/0xPolygon/polygon-sdk/consensus/dev"

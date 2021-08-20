@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
