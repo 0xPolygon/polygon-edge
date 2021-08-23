@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 func BenchmarkFast(b *testing.B) {

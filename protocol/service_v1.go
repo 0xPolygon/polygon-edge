@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/network/grpc"
-	"github.com/0xPolygon/minimal/protocol/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/network/grpc"
+	"github.com/0xPolygon/polygon-sdk/protocol/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	any "google.golang.org/protobuf/types/known/anypb"

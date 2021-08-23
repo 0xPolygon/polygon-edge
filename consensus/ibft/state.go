@@ -5,8 +5,8 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/0xPolygon/minimal/consensus/ibft/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type IbftState uint32

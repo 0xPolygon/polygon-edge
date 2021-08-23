@@ -3,9 +3,9 @@ package jsonrpc
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/version"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/version"
 )
 
 // Web3 is the web3 jsonrpc endpoint

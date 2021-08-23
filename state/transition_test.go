@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/state/runtime"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )

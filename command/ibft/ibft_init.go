@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/0xPolygon/minimal/command/helper"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/libp2p/go-libp2p-core/peer"
 
-	"github.com/0xPolygon/minimal/consensus/ibft"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/network"
 )
 
 // IbftInit is the command to query the snapshot

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )

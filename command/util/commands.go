@@ -3,16 +3,16 @@ package util
 import (
 	"os"
 
-	"github.com/0xPolygon/minimal/command/dev"
-	"github.com/0xPolygon/minimal/command/genesis"
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/command/ibft"
-	"github.com/0xPolygon/minimal/command/monitor"
-	"github.com/0xPolygon/minimal/command/peers"
-	"github.com/0xPolygon/minimal/command/server"
-	"github.com/0xPolygon/minimal/command/status"
-	"github.com/0xPolygon/minimal/command/txpool"
-	"github.com/0xPolygon/minimal/command/version"
+	"github.com/0xPolygon/polygon-sdk/command/dev"
+	"github.com/0xPolygon/polygon-sdk/command/genesis"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/command/ibft"
+	"github.com/0xPolygon/polygon-sdk/command/monitor"
+	"github.com/0xPolygon/polygon-sdk/command/peers"
+	"github.com/0xPolygon/polygon-sdk/command/server"
+	"github.com/0xPolygon/polygon-sdk/command/status"
+	"github.com/0xPolygon/polygon-sdk/command/txpool"
+	"github.com/0xPolygon/polygon-sdk/command/version"
 	"github.com/mitchellh/cli"
 )
 

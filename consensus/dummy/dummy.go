@@ -3,12 +3,12 @@ package dummy
 import (
 	"context"
 
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/txpool"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/consensus"
+	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/txpool"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )

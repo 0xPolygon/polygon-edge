@@ -1,9 +1,9 @@
 package buildroot
 
 import (
-	"github.com/0xPolygon/minimal/helper/keccak"
-	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
 )
 
