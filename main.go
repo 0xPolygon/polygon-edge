@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xPolygon/minimal/command/util"
+	"github.com/0xPolygon/polygon-sdk/command/util"
 	"github.com/mitchellh/cli"
 )
 

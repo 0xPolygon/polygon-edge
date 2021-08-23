@@ -3,8 +3,8 @@ package dev
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/minimal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )

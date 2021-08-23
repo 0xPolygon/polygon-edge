@@ -10,26 +10,26 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/state/runtime"
-	"github.com/0xPolygon/minimal/txpool"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/jsonrpc"
+	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/txpool"
+	"github.com/0xPolygon/polygon-sdk/types"
 
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 
-	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
-	"github.com/0xPolygon/minimal/state/runtime/evm"
-	"github.com/0xPolygon/minimal/state/runtime/precompiled"
+	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
+	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
+	"github.com/0xPolygon/polygon-sdk/state/runtime/precompiled"
 
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/consensus"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/consensus"
 )
 
 // Minimal is the central manager of the blockchain client

@@ -1,8 +1,8 @@
 package version
 
 import (
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/version"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/version"
 	"github.com/mitchellh/cli"
 )
 

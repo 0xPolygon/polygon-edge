@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 type Transaction struct {

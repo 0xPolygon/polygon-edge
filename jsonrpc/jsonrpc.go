@@ -100,9 +100,9 @@ var wsUpgrader = websocket.Upgrader{
 
 // wsWrapper is a wrapping object for the web socket connection and logger
 type wsWrapper struct {
-	ws     *websocket.Conn // the actual WS connection
-	logger hclog.Logger    // module logger
-	writeLock sync.Mutex // writer lock
+	ws        *websocket.Conn // the actual WS connection
+	logger    hclog.Logger    // module logger
+	writeLock sync.Mutex      // writer lock
 }
 
 // WriteMessage writes out the message to the WS peer
@@ -190,6 +190,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 }
 
 func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")

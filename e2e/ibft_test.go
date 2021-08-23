@@ -2,15 +2,16 @@ package e2e
 
 import (
 	"context"
-	"github.com/umbracle/go-web3"
 	"math/big"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/consensus/ibft"
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/tests"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/umbracle/go-web3"
+
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
 
