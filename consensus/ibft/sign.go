@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/consensus/ibft/proto"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
 )
 

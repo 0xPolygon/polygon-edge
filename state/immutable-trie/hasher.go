@@ -5,7 +5,7 @@ import (
 	"hash"
 	"sync"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 )

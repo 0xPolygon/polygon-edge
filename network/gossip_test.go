@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	testproto "github.com/0xPolygon/minimal/network/proto/test"
+	testproto "github.com/0xPolygon/polygon-sdk/network/proto/test"
 	"github.com/stretchr/testify/assert"
 )
 

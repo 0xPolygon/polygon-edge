@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/state/runtime/evm"
-	"github.com/0xPolygon/minimal/state/runtime/precompiled"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
+	"github.com/0xPolygon/polygon-sdk/state/runtime/precompiled"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 var (

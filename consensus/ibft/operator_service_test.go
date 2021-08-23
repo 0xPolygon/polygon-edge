@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/consensus"
-	"github.com/0xPolygon/minimal/consensus/ibft/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/consensus"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
 

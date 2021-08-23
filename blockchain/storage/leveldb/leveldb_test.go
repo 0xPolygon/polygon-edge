@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
+	"github.com/0xPolygon/polygon-sdk/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 )
 

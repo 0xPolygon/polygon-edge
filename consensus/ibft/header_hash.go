@@ -1,8 +1,8 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
 )
 

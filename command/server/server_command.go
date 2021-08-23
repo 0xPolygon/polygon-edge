@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )

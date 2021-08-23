@@ -3,9 +3,9 @@ package precompiled
 import (
 	"encoding/binary"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/state/runtime"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 var _ runtime.Runtime = &Precompiled{}

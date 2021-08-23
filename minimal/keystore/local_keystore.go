@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 )
 
 // LocalKeystore loads the key from a local file

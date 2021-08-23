@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"

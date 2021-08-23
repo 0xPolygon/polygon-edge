@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestDiscovery(t *testing.T) {

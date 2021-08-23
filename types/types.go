@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 var ZeroAddress = Address{}

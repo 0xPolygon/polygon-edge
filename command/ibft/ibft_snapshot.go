@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/consensus/ibft/proto"
-	ibftOp "github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 )
 
 // IbftSnapshot is the command to query the snapshot

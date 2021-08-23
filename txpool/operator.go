@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Status implements the GRPC status endpoint. Returns the number of transactions in the pool

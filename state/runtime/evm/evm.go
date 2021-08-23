@@ -1,8 +1,8 @@
 package evm
 
 import (
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
 )
 
 var _ runtime.Runtime = &EVM{}

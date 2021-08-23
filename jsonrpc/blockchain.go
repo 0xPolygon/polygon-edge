@@ -1,12 +1,12 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/minimal/state/runtime"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // stateHelperInterface Wrapper for these state functions
