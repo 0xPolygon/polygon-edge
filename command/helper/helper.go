@@ -286,8 +286,15 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	return nil
 }
 
+type devGenesisParams struct {
+	chainName string
+	premine   helperFlags.ArrayFlags
+	gasLimit  uint64
+	chainID   uint64
+}
+
 // generateDevGenesis generates a base dev genesis file with premined balances
-func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLimit uint64) error {
+func generateDevGenesis(params devGenesisParams) error {
 	genesisPath := filepath.Join(".", GenesisFileName)
 
 	generateError := VerifyGenesisExistence(genesisPath)
@@ -304,15 +311,15 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLim
 	}
 
 	cc := &chain.Chain{
-		Name: chainName,
+		Name: params.chainName,
 		Genesis: &chain.Genesis{
-			GasLimit:   gasLimit,
+			GasLimit:   params.gasLimit,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  []byte{},
 		},
 		Params: &chain.Params{
-			ChainID: 100,
+			ChainID: int(params.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				"dev": map[string]interface{}{},
@@ -321,7 +328,7 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLim
 		Bootnodes: []string{},
 	}
 
-	if err := FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
+	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err
 	}
 
@@ -347,11 +354,13 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	var premine helperFlags.ArrayFlags
 	var gaslimit uint64
+	var chainID uint64
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
 	flags.Uint64Var(&gaslimit, "gas-limit", DefaultGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -361,7 +370,12 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := generateDevGenesis(config.Chain, premine, gaslimit); err != nil {
+	if err := generateDevGenesis(devGenesisParams{
+		chainName: config.Chain,
+		premine:   premine,
+		gasLimit:  gaslimit,
+		chainID:   chainID,
+	}); err != nil {
 		return nil, err
 	}
 
