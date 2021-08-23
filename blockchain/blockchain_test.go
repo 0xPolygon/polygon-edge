@@ -626,10 +626,11 @@ func TestCalculateGasLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewTestBlockchain(t, nil)
-			b.writeGenesis(&chain.Genesis{
+			err := b.writeGenesis(&chain.Genesis{
 				GasLimit: tt.parentGasLimit,
 				GasUsed:  tt.parentGasUsed,
 			})
+			assert.NoError(t, err, "failed to write genesis")
 			b.config.Params = &chain.Params{
 				GasFloor: tt.gasFloor,
 				GasCeil:  tt.gasCeil,
