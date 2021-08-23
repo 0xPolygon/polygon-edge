@@ -143,11 +143,6 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		if txn == nil {
 			break
 		}
-		if gas := transition.AvailableGas(); gas < state.TxGas {
-			d.logger.Info("Block doesn't have enough gas to process new transaction", "remaining", gas, "minimum required gas", state.TxGas)
-			retFn()
-			break
-		}
 
 		// Execute the state transition
 		if err := transition.Write(txn); err != nil {

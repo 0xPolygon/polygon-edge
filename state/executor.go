@@ -197,6 +197,11 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		}
 	}
 
+	if gas := t.AvailableGas(); gas < TxGas {
+		t.logger.Info("Block doesn't have enough gas to process new transaction", "remaining", gas, "minimum required gas", TxGas)
+		return ErrBlockLimitReached
+	}
+
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
