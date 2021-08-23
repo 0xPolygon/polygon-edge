@@ -23,8 +23,8 @@ type TxSigner interface {
 	// SignTx signs a transaction
 	SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*types.Transaction, error)
 
-	// calculateV calculates the V value based on the type of signer used
-	calculateV(parity byte) []byte
+	// CalculateV calculates the V value based on the type of signer used
+	CalculateV(parity byte) []byte
 }
 
 // NewSigner creates a new signer object (EIP155 or FrontierSigner)
@@ -120,13 +120,13 @@ func (f *FrontierSigner) SignTx(
 
 	tx.R = sig[:32]
 	tx.S = sig[32:64]
-	tx.V = f.calculateV(sig[64])
+	tx.V = f.CalculateV(sig[64])
 
 	return tx, nil
 }
 
 // calculateV returns the V value for transactions pre EIP155
-func (f *FrontierSigner) calculateV(parity byte) []byte {
+func (f *FrontierSigner) CalculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big27)
 
@@ -198,13 +198,13 @@ func (e *EIP155Signer) SignTx(
 
 	tx.R = sig[:32]
 	tx.S = sig[32:64]
-	tx.V = e.calculateV(sig[64])
+	tx.V = e.CalculateV(sig[64])
 
 	return tx, nil
 }
 
 // calculateV returns the V value for transaction signatures. Based on EIP155
-func (e *EIP155Signer) calculateV(parity byte) []byte {
+func (e *EIP155Signer) CalculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big35)
 	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
