@@ -21,7 +21,7 @@ type transaction struct {
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`
 	Input       argBytes       `json:"input"`
-	V           argByte        `json:"v"`
+	V           argBytes       `json:"v"`
 	R           argBytes       `json:"r"`
 	S           argBytes       `json:"s"`
 	Hash        types.Hash     `json:"hash"`
@@ -50,7 +50,7 @@ func toTransaction(t *types.Transaction, b *types.Block, txIndex int) *transacti
 		To:          t.To,
 		Value:       argBig(*t.Value),
 		Input:       argBytes(t.Input),
-		V:           argByte(t.V),
+		V:           argBytes(t.V),
 		R:           argBytes(t.R),
 		S:           argBytes(t.S),
 		Hash:        t.Hash,
@@ -147,12 +147,6 @@ type Log struct {
 	BlockHash   types.Hash    `json:"blockHash"`
 	LogIndex    argUint64     `json:"logIndex"`
 	Removed     bool          `json:"removed"`
-}
-
-type argByte byte
-
-func (a argByte) MarshalText() ([]byte, error) {
-	return encodeToHex([]byte{byte(a)}), nil
 }
 
 type argBig big.Int

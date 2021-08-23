@@ -68,7 +68,7 @@ func generateTx(params generateTxReqParams) *types.Transaction {
 		GasPrice: params.gasPrice,
 		Gas:      1000000,
 		Value:    params.value,
-		V:        1, // it is necessary to encode in rlp
+		V:        []byte{1}, // it is necessary to encode in rlp
 	}, params.referenceKey)
 
 	if signErr != nil {
@@ -213,7 +213,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 			GasPrice: gasPrice,
 			Gas:      1000000,
 			Value:    oneEth,
-			V:        1, // it is necessary to encode in rlp
+			V:        []byte{1}, // it is necessary to encode in rlp
 		}, referenceKey)
 
 		if signErr != nil {
