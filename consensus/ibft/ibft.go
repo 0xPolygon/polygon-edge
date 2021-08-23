@@ -933,13 +933,13 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 
 func (i *Ibft) verifyGasLimit(header *types.Header) error {
 	if header.GasLimit < blockchain.MinGasLimit {
-		return fmt.Errorf("block gas limit falls %d", blockchain.MinGasLimit)
+		return fmt.Errorf("block gas limit below %d", blockchain.MinGasLimit)
 	}
 	if header.GasLimit > blockchain.MaxGasLimit {
 		return fmt.Errorf("block gas limit exceeds %d", blockchain.MaxGasLimit)
 	}
 	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("block gas limit exceeds gas used, limit = %d, used=%d", header.GasLimit, header.GasUsed)
+		return fmt.Errorf("block gas used exceeds gas limit, limit = %d, used=%d", header.GasLimit, header.GasUsed)
 	}
 
 	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)

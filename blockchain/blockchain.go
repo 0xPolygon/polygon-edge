@@ -238,7 +238,7 @@ func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
 	if !ok {
 		return 0, fmt.Errorf("parent of (%d) not found", number)
 	}
-	// todo: EIP1559 support for London hardfolk
+	// todo: EIP1559 support for London hardfork
 	return b.calculateGasLimit(parent.GasUsed, parent.GasLimit), nil
 }
 
