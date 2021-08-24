@@ -159,7 +159,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 		Value:    value,
 		GasPrice: gasPrice,
 		Nonce:    nonce,
-		V:        1, // it is necessary to encode in rlp
+		V:        []byte{1}, // it is necessary to encode in rlp
 	}
 
 	msg := &proto.AddTxnReq{
