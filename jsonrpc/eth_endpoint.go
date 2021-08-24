@@ -197,8 +197,12 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number Block
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return types.ZeroHash, nil
+		}
 		return nil, err
 	}
+
 	return argBytesPtr(result), nil
 }
 
@@ -366,7 +370,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
-	var result []*Log
+	result := make([]*Log, 0)
 	parseReceipts := func(header *types.Header) error {
 		receipts, err := e.d.store.GetReceiptsByHash(header.Hash)
 		if err != nil {
@@ -457,6 +461,9 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (interface{}, error) {
 	nonce, err := e.d.getNextNonce(address, number)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return argUintPtr(0), nil
+		}
 		return nil, err
 	}
 	return argUintPtr(nonce), nil
