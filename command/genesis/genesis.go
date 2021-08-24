@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/consensus/ibft"
-	"github.com/0xPolygon/minimal/crypto"
-	helperFlags "github.com/0xPolygon/minimal/helper/flags"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 )
 

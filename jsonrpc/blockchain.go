@@ -1,12 +1,12 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/minimal/state/runtime"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // stateHelperInterface Wrapper for these state functions
@@ -40,6 +40,9 @@ type blockchainInterface interface {
 
 	// AddTx adds a new transaction to the tx pool
 	AddTx(tx *types.Transaction) error
+
+	// Gets tx pool transactions currently pending for inclusion and currently queued for validation
+	GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
@@ -89,6 +92,10 @@ func (b *nullBlockchainInterface) GetAvgGasPrice() *big.Int {
 
 func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 	return nil
+}
+
+func (b *nullBlockchainInterface) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+	return nil, nil
 }
 
 func (b *nullBlockchainInterface) State() state.State {

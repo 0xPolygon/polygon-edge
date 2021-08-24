@@ -8,9 +8,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )

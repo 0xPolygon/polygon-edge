@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/state"
-	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/state"
+	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/minimal/types"
-	"github.com/0xPolygon/minimal/types/buildroot"
+	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-sdk/types/buildroot"
 )
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
@@ -106,7 +106,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 			Gas:      0,
 			GasPrice: big.NewInt(0),
 			Input:    header.Hash.Bytes(),
-			V:        0x27,
+			V:        []byte{0x27},
 		}
 		t0.ComputeHash()
 

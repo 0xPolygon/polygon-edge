@@ -5,14 +5,6 @@ github.com/bgentry/speakeasy
 # github.com/btcsuite/btcd v0.21.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
-github.com/btcsuite/btcd/chaincfg
-github.com/btcsuite/btcd/chaincfg/chainhash
-github.com/btcsuite/btcd/wire
-# github.com/btcsuite/btcutil v1.0.2
-github.com/btcsuite/btcutil
-github.com/btcsuite/btcutil/base58
-github.com/btcsuite/btcutil/bech32
-github.com/btcsuite/btcutil/hdkeychain
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
@@ -189,7 +181,6 @@ github.com/libp2p/go-libp2p-nat
 github.com/libp2p/go-libp2p-noise
 github.com/libp2p/go-libp2p-noise/pb
 # github.com/libp2p/go-libp2p-peerstore v0.2.6
-## explicit
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
 github.com/libp2p/go-libp2p-peerstore/pstoremem
@@ -260,7 +251,6 @@ github.com/multiformats/go-multiaddr-dns
 # github.com/multiformats/go-multiaddr-fmt v0.1.0
 github.com/multiformats/go-multiaddr-fmt
 # github.com/multiformats/go-multiaddr-net v0.2.0
-## explicit
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.3
 github.com/multiformats/go-multibase
@@ -307,9 +297,6 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/tyler-smith/go-bip39 v1.1.0
-github.com/tyler-smith/go-bip39
-github.com/tyler-smith/go-bip39/wordlists
 # github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 ## explicit
 github.com/umbracle/fastrlp
@@ -319,12 +306,9 @@ github.com/umbracle/go-eth-bn256
 # github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 ## explicit
 github.com/umbracle/go-web3
-github.com/umbracle/go-web3/compiler
 github.com/umbracle/go-web3/jsonrpc
 github.com/umbracle/go-web3/jsonrpc/codec
 github.com/umbracle/go-web3/jsonrpc/transport
-github.com/umbracle/go-web3/testutil
-github.com/umbracle/go-web3/wallet
 # github.com/valyala/bytebufferpool v1.0.0
 github.com/valyala/bytebufferpool
 # github.com/valyala/fasthttp v1.4.0
@@ -367,7 +351,6 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/internal/subtle
-golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa

@@ -13,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/0xPolygon/minimal/chain"
-	helperFlags "github.com/0xPolygon/minimal/helper/flags"
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 	"google.golang.org/grpc"
@@ -286,8 +286,15 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	return nil
 }
 
+type devGenesisParams struct {
+	chainName string
+	premine   helperFlags.ArrayFlags
+	gasLimit  uint64
+	chainID   uint64
+}
+
 // generateDevGenesis generates a base dev genesis file with premined balances
-func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLimit uint64) error {
+func generateDevGenesis(params devGenesisParams) error {
 	genesisPath := filepath.Join(".", GenesisFileName)
 
 	generateError := VerifyGenesisExistence(genesisPath)
@@ -304,15 +311,15 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLim
 	}
 
 	cc := &chain.Chain{
-		Name: chainName,
+		Name: params.chainName,
 		Genesis: &chain.Genesis{
-			GasLimit:   gasLimit,
+			GasLimit:   params.gasLimit,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  []byte{},
 		},
 		Params: &chain.Params{
-			ChainID: 100,
+			ChainID: int(params.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				"dev": map[string]interface{}{},
@@ -321,7 +328,7 @@ func generateDevGenesis(chainName string, premine helperFlags.ArrayFlags, gasLim
 		Bootnodes: []string{},
 	}
 
-	if err := FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
+	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err
 	}
 
@@ -347,6 +354,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	var premine helperFlags.ArrayFlags
 	var gaslimit uint64
+	var chainID uint64
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
@@ -354,6 +362,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.GasFloor, "gas-floor", DefaultConfig().GasFloor, "")
 	flags.StringVar(&cliConfig.GasCeil, "gas-ceil", DefaultConfig().GasCeil, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -363,7 +372,12 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := generateDevGenesis(config.Chain, premine, gaslimit); err != nil {
+	if err := generateDevGenesis(devGenesisParams{
+		chainName: config.Chain,
+		premine:   premine,
+		gasLimit:  gaslimit,
+		chainID:   chainID,
+	}); err != nil {
 		return nil, err
 	}
 
@@ -486,4 +500,20 @@ func FormatKV(in []string) string {
 	columnConf.Glue = " = "
 
 	return columnize.Format(in, columnConf)
+}
+
+// DirectoryExists checks if the directory at the specified path exists
+func DirectoryExists(directoryPath string) bool {
+	// Grab the absolute filepath
+	pathAbs, err := filepath.Abs(directoryPath)
+	if err != nil {
+		return false
+	}
+
+	// Check if the directory exists, and that it's actually a directory if there is a hit
+	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && !fileInfo.IsDir()) {
+		return false
+	}
+
+	return true
 }

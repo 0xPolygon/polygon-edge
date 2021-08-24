@@ -5,10 +5,10 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/state/runtime"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 )
 

@@ -3,8 +3,8 @@ package dev
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/minimal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -70,6 +70,15 @@ func (d *DevCommand) DefineFlags() {
 			"GAS_CEIL",
 		},
 		FlagOptional: true,
+	}
+
+	d.FlagMap["chainid"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", helper.DefaultChainID),
+		Arguments: []string{
+			"CHAIN_ID",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 

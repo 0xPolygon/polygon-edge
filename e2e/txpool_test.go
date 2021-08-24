@@ -8,12 +8,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/helper/tests"
-	"github.com/0xPolygon/minimal/txpool"
-	txpoolOp "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	"github.com/0xPolygon/polygon-sdk/txpool"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ func generateTx(params generateTxReqParams) *types.Transaction {
 		GasPrice: params.gasPrice,
 		Gas:      1000000,
 		Value:    params.value,
-		V:        1, // it is necessary to encode in rlp
+		V:        []byte{1}, // it is necessary to encode in rlp
 	}, params.referenceKey)
 
 	if signErr != nil {
@@ -213,7 +213,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 			GasPrice: gasPrice,
 			Gas:      1000000,
 			Value:    oneEth,
-			V:        1, // it is necessary to encode in rlp
+			V:        []byte{1}, // it is necessary to encode in rlp
 		}, referenceKey)
 
 		if signErr != nil {

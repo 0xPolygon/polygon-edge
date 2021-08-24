@@ -12,16 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/minimal/proto"
-	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
-	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"golang.org/x/crypto/sha3"
-	"google.golang.org/protobuf/types/known/emptypb"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 func EthToWei(ethValue int64) *big.Int {
@@ -127,7 +126,7 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		res, _ := clt.Status(subCtx, &emptypb.Empty{})
+		res, _ := clt.Status(subCtx, &empty.Empty{})
 		if res != nil && res.Length >= requiredNum {
 			return res, false
 		}

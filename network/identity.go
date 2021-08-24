@@ -8,11 +8,11 @@ import (
 
 	rawGrpc "google.golang.org/grpc"
 
-	"github.com/0xPolygon/minimal/network/grpc"
-	"github.com/0xPolygon/minimal/network/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/0xPolygon/polygon-sdk/network/grpc"
+	"github.com/0xPolygon/polygon-sdk/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var identityProtoV1 = "/id/0.1"

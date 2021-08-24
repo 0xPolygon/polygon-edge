@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal/proto"
-	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // PeersList is the PeersList to start the sever

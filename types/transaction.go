@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/0xPolygon/minimal/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 type Transaction struct {
@@ -13,7 +13,7 @@ type Transaction struct {
 	To       *Address
 	Value    *big.Int
 	Input    []byte
-	V        byte
+	V        []byte
 	R        []byte
 	S        []byte
 	Hash     Hash

@@ -9,13 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/state"
-
-	"github.com/0xPolygon/minimal/blockchain"
-	"github.com/0xPolygon/minimal/network"
-	"github.com/0xPolygon/minimal/txpool/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
@@ -215,6 +214,32 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 		}
 	}
 	return nil
+}
+
+// GetTxs gets both pending and queued transactions
+func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+
+	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
+	sortedPricedTxs := t.pendingQueue.index
+	for _, sortedPricedTx := range sortedPricedTxs {
+		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
+			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
+		}
+		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
+	}
+
+	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
+	queue := t.accountQueues
+	for addr, queuedTxn := range queue {
+		for _, tx := range queuedTxn.txs {
+			if _, ok := queuedTxs[addr]; !ok {
+				queuedTxs[addr] = make(map[uint64]*types.Transaction)
+			}
+			queuedTxs[addr][tx.Nonce] = tx
+		}
+	}
+
+	return pendingTxs, queuedTxs
 }
 
 // Length returns the size of the valid transactions in the txpool

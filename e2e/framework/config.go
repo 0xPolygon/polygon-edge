@@ -3,7 +3,7 @@ package framework
 import (
 	"math/big"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type ConsensusType int
