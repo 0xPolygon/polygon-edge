@@ -304,8 +304,10 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 		inArgs[i+1] = val.Elem()
 	}
 
-	if err := json.Unmarshal(req.Params, &inputs); err != nil {
-		return nil, invalidJSONRequest
+	if req.Params != nil {
+		if err := json.Unmarshal(req.Params, &inputs); err != nil {
+			return nil, invalidJSONRequest
+		}
 	}
 
 	output := fd.fv.Call(inArgs)
