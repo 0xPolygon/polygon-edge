@@ -198,7 +198,7 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number Block
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
 		if err == ErrStateNotFound {
-			return types.ZeroHash, nil
+			return argBytesPtr(types.ZeroHash[:]), nil
 		}
 		return nil, err
 	}
