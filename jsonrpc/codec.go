@@ -12,13 +12,20 @@ import (
 type Request struct {
 	ID     interface{}     `json:"id"`
 	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
+	Params json.RawMessage `json:"params,omitempty"`
+}
+
+// ErrorResponse is a jsonrpc error response
+type ErrorResponse struct {
+	JSONRPC string       `json:"jsonrpc"`
+	ID      interface{}  `json:"id,omitempty"`
+	Error   *ErrorObject `json:"error"`
 }
 
 // Response is a jsonrpc response
 type Response struct {
-	ID      interface{}     `json:"id"`
 	JSONRPC string          `json:"jsonrpc"`
+	ID      interface{}     `json:"id"`
 	Result  json.RawMessage `json:"result"`
 	Error   *ErrorObject    `json:"error,omitempty"`
 }

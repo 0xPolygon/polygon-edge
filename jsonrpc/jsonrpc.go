@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -100,9 +101,9 @@ var wsUpgrader = websocket.Upgrader{
 
 // wsWrapper is a wrapping object for the web socket connection and logger
 type wsWrapper struct {
-	ws     *websocket.Conn // the actual WS connection
-	logger hclog.Logger    // module logger
-	writeLock sync.Mutex // writer lock
+	ws        *websocket.Conn // the actual WS connection
+	logger    hclog.Logger    // module logger
+	writeLock sync.Mutex      // writer lock
 }
 
 // WriteMessage writes out the message to the WS peer
@@ -198,8 +199,12 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	handleErr := func(err error) {
-		w.Write([]byte(err.Error()))
+	handleErr := func(rsp ErrorResponse) {
+		if data, err := json.Marshal(rsp); err != nil {
+			w.Write([]byte(err.Error()))
+		} else {
+			w.Write(data)
+		}
 	}
 	if req.Method == "GET" {
 		w.Write([]byte("PolygonSDK JSON-RPC"))
@@ -211,7 +216,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		handleErr(err)
+		w.Write([]byte(err.Error()))
 		return
 	}
 
@@ -220,7 +225,14 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 
 	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
-		handleErr(err)
+		id := err.(*ErrorObject).Data
+		err.(*ErrorObject).Data = nil
+		errorResponse := ErrorResponse{
+			JSONRPC: "2.0",
+			ID:      id,
+			Error:   err.(*ErrorObject),
+		}
+		handleErr(errorResponse)
 		return
 	}
 	j.logger.Debug("handle", "response", string(resp))

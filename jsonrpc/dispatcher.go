@@ -17,10 +17,11 @@ import (
 var (
 	invalidJSONRequest = &ErrorObject{Code: -32600, Message: "invalid json request"}
 	internalError      = &ErrorObject{Code: -32603, Message: "internal error"}
+	invalidParams      = &ErrorObject{Code: -32602, Message: "invalid params"}
 )
 
-func invalidMethod(method string) error {
-	return &ErrorObject{Code: -32601, Message: fmt.Sprintf("The method %s does not exist/is not available", method)}
+func invalidMethod(requestID interface{}, method string) error {
+	return &ErrorObject{Code: -32601, Message: fmt.Sprintf("The method %s does not exist/is not available", method), Data: requestID}
 }
 
 type serviceData struct {
@@ -40,9 +41,9 @@ func (f *funcData) numParams() int {
 }
 
 type endpoints struct {
-	Eth  *Eth
-	Web3 *Web3
-	Net  *Net
+	Eth    *Eth
+	Web3   *Web3
+	Net    *Net
 	Txpool *Txpool
 }
 
@@ -97,18 +98,18 @@ func (d *Dispatcher) registerEndpoints() {
 func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) {
 	callName := strings.SplitN(req.Method, "_", 2)
 	if len(callName) != 2 {
-		return nil, nil, invalidMethod(req.Method)
+		return nil, nil, invalidMethod(req.ID, req.Method)
 	}
 
 	serviceName, funcName := callName[0], callName[1]
 
 	service, ok := d.serviceMap[serviceName]
 	if !ok {
-		return nil, nil, invalidMethod(req.Method)
+		return nil, nil, invalidMethod(req.ID, req.Method)
 	}
 	fd, ok := service.funcMap[funcName]
 	if !ok {
-		return nil, nil, invalidMethod(req.Method)
+		return nil, nil, invalidMethod(req.ID, req.Method)
 	}
 	return service, fd, nil
 }
@@ -242,20 +243,24 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		if err := json.Unmarshal(reqBody, &req); err != nil {
 			return nil, invalidJSONRequest
 		}
+		if req.Method == "" {
+			//TODO:Add id if required
+			return nil, invalidJSONRequest
+		}
 		return d.handleReq(req)
 	}
 
 	// handle batch requests
 	var requests []Request
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
-		return nil, d.internalError("batch method", err)
+		return nil, d.internalError(nil, "batch method", err)
 	}
-	var responses []Response
+	var responses []interface{}
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			d.internalError("batch method", err)
-			errorResponse := Response{
+			d.internalError(req.ID, "batch method", err)
+			errorResponse := ErrorResponse{
 				ID:      req.ID,
 				JSONRPC: "2.0",
 				Error:   internalError,
@@ -267,11 +272,11 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		// unmarshal response from handleReq so that we can re-marshal as batch responses
 		var resp Response
 		if err := json.Unmarshal(response, &resp); err != nil {
-			d.internalError("batch method", err)
-			errorResponse := Response{
+			d.internalError(req.ID, "batch method", err)
+			errorResponse := ErrorResponse{
 				ID:      req.ID,
 				JSONRPC: "2.0",
-				Error:   invalidJSONRequest,
+				Error:   internalError,
 			}
 			responses = append(responses, errorResponse)
 			continue
@@ -281,7 +286,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	respBytes, err := json.Marshal(responses)
 	if err != nil {
-		return nil, d.internalError("batch method", err)
+		return nil, d.internalError(nil, "batch method", err)
 	}
 	return respBytes, nil
 }
@@ -305,13 +310,15 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	}
 
 	if err := json.Unmarshal(req.Params, &inputs); err != nil {
-		return nil, invalidJSONRequest
+		invalidParams.Data = req.ID
+		return nil, invalidParams
 	}
 
 	output := fd.fv.Call(inArgs)
 	err = getError(output[1])
 	if err != nil {
-		return nil, d.internalError(req.Method, err)
+		fmt.Println("he", err)
+		return nil, d.internalError(req.ID, req.Method, err)
 	}
 
 	var data []byte
@@ -319,7 +326,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
-			return nil, d.internalError(req.Method, err)
+			return nil, d.internalError(req.ID, req.Method, err)
 		}
 	}
 
@@ -330,13 +337,15 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	}
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
-		return nil, d.internalError(req.Method, err)
+		return nil, d.internalError(req.ID, req.Method, err)
 	}
 	return respBytes, nil
 }
 
-func (d *Dispatcher) internalError(method string, err error) error {
+func (d *Dispatcher) internalError(id interface{}, method string, err error) error {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	internalError.Data = id
+	internalError.Message = err.Error()
 	return internalError
 }
 
