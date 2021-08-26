@@ -15,7 +15,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -448,7 +448,7 @@ func (m *Meta) DefineFlags() {
 	m.FlagMap = make(map[string]FlagDescriptor)
 
 	m.FlagMap["grpc-address"] = FlagDescriptor{
-		Description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", minimal.DefaultGRPCPort),
+		Description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", server.DefaultGRPCPort),
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -460,7 +460,7 @@ func (m *Meta) DefineFlags() {
 // FlagSet adds some default commands to handle grpc connections with the server
 func (m *Meta) FlagSet(n string) *flag.FlagSet {
 	f := flag.NewFlagSet(n, flag.ContinueOnError)
-	f.StringVar(&m.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", minimal.DefaultGRPCPort), "")
+	f.StringVar(&m.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
 
 	return f
 }
