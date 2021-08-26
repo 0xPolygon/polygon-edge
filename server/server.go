@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -256,7 +255,7 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	}
 	result, ok := snap.Get(key)
 	if !ok {
-		return nil, errors.New("given root and slot not found in storage")
+		return nil, jsonrpc.ErrStateNotFound
 	}
 	return result, nil
 }
