@@ -297,14 +297,13 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	inArgs := make([]reflect.Value, fd.inNum)
 	inArgs[0] = service.sv
 
-	inputs := make([]interface{}, fd.numParams())
-	for i := 0; i < fd.inNum-1; i++ {
-		val := reflect.New(fd.reqt[i+1])
-		inputs[i] = val.Interface()
-		inArgs[i+1] = val.Elem()
-	}
-
 	if req.Params != nil {
+		inputs := make([]interface{}, fd.numParams())
+		for i := 0; i < fd.inNum-1; i++ {
+			val := reflect.New(fd.reqt[i+1])
+			inputs[i] = val.Interface()
+			inArgs[i+1] = val.Elem()
+		}
 		if err := json.Unmarshal(req.Params, &inputs); err != nil {
 			return nil, invalidJSONRequest
 		}
