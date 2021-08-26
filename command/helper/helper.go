@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"github.com/0xPolygon/polygon-sdk/minimal"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
@@ -29,6 +31,8 @@ const (
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
 	DefaultGasLimit       = 5000
+	DefaultStakedBalance  = "0x8AC7230489E80000" // 10 ETH
+	StakingSCBytecode     = "0x608060405234801561001057600080fd5b50600436106100365760003560e01c80633a02a42d1461003b5780639ab3f49f1461006b575b600080fd5b61005560048036038101906100509190610110565b61009b565b604051610062919061014c565b60405180910390f35b61008560048036038101906100809190610110565b6100e3565b604051610092919061014c565b60405180910390f35b60008060008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050919050565b60006020528060005260406000206000915090505481565b60008135905061010a816101a8565b92915050565b600060208284031215610126576101256101a3565b5b6000610134848285016100fb565b91505092915050565b61014681610199565b82525050565b6000602082019050610161600083018461013d565b92915050565b600061017282610179565b9050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000819050919050565b600080fd5b6101b181610167565b81146101bc57600080fd5b5056fea26469706673582212205e7dd039b669194a66412efcd2c3c34df36654023b8b229e4e44d7a6e909bb8464736f6c63430008070033"
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -512,4 +516,48 @@ func DirectoryExists(directoryPath string) bool {
 	}
 
 	return true
+}
+
+// PredeployStakingSC is a helper method for setting up the staking smart contract account,
+// using the passed in validators as prestaked validators
+func PredeployStakingSC(
+	premineMap map[types.Address]*chain.GenesisAccount,
+	validators []types.Address,
+) error {
+	// Set the code for the staking smart contract
+	// Code retrieved from https://github.com/0xPolygon/staking-contracts
+	stakingAccount := &chain.GenesisAccount{
+		Code: []byte(StakingSCBytecode),
+	}
+
+	// Parse the default staked balance value into *big.Int
+	val := DefaultStakedBalance
+	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		return fmt.Errorf("unable to generate DefaultStatkedBalance, %v", err)
+	}
+
+	// Generate the empty account storage map
+	storageMap := make(map[types.Hash]types.Hash)
+	for _, validator := range validators {
+		// Get the storage slot key
+		storageKey := staking.GetStorageMappingIndex(validator, 0)
+
+		// Set the storage slot location to be the prestaked balance
+		storageMap[types.BytesToHash(storageKey)] = types.BytesToHash(bigDefaultStakedBalance.Bytes())
+	}
+
+	// Save the storage map
+	stakingAccount.Storage = storageMap
+
+	// Set the Staking SC balance to numValidators * defaultStakedBalance
+	stakingAccount.Balance = big.NewInt(0).Mul(
+		big.NewInt(int64(len(validators))),
+		bigDefaultStakedBalance,
+	)
+
+	// Add the account to the premine map so the executor can apply it to state
+	premineMap[types.StringToAddress("1001")] = stakingAccount
+
+	return nil
 }

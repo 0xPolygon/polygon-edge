@@ -168,9 +168,10 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	var extraData []byte
 
+	// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
+	var validators []types.Address
+
 	if consensus == "ibft" {
-		// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
-		var validators []types.Address
 		if len(ibftValidators) != 0 {
 			for _, val := range ibftValidators {
 				validators = append(validators, types.StringToAddress(val))
@@ -181,7 +182,6 @@ func (c *GenesisCommand) Run(args []string) int {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
 				return 1
 			}
-
 		} else {
 			c.UI.Error("cannot load validators for ibft")
 			return 1
@@ -193,6 +193,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			Seal:          []byte{},
 			CommittedSeal: [][]byte{},
 		}
+
 		extraData = make([]byte, ibft.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
@@ -213,6 +214,11 @@ func (c *GenesisCommand) Run(args []string) int {
 			},
 		},
 		Bootnodes: bootnodes,
+	}
+
+	if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
+		c.UI.Error(err.Error())
+		return 1
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
