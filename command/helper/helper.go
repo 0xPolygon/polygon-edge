@@ -539,22 +539,29 @@ func PredeployStakingSC(
 
 	// Generate the empty account storage map
 	storageMap := make(map[types.Hash]types.Hash)
-	for _, validator := range validators {
-		// Get the storage slot key
-		storageKey := staking.GetStorageMappingIndex(validator, 0)
+	trueByteValue := []byte{1}
+	stakedAmount := big.NewInt(0)
+	for indx, validator := range validators {
+		// Update the total staked amount
+		stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
 
-		// Set the storage slot location to be the prestaked balance
-		storageMap[types.BytesToHash(storageKey)] = types.BytesToHash(bigDefaultStakedBalance.Bytes())
+		// Get the storage indexes
+		storageIndexes := staking.GetStorageIndexes(validator, int64(indx))
+
+		// Set the values for the storage slots
+
+		storageMap[types.BytesToHash(storageIndexes.ValidatorsIndex)] = types.BytesToHash(validator.Bytes())
+		storageMap[types.BytesToHash(storageIndexes.AddressToIsValidatorIndex)] = types.BytesToHash(trueByteValue)
+		storageMap[types.BytesToHash(storageIndexes.AddressToStakedAmountIndex)] = types.BytesToHash(bigDefaultStakedBalance.Bytes())
+		storageMap[types.BytesToHash(storageIndexes.AddressToValidatorIndexIndex)] = types.BytesToHash(big.NewInt(int64(indx)).Bytes())
+		storageMap[types.BytesToHash(storageIndexes.StakedAmountIndex)] = types.BytesToHash(stakedAmount.Bytes())
 	}
 
 	// Save the storage map
 	stakingAccount.Storage = storageMap
 
 	// Set the Staking SC balance to numValidators * defaultStakedBalance
-	stakingAccount.Balance = big.NewInt(0).Mul(
-		big.NewInt(int64(len(validators))),
-		bigDefaultStakedBalance,
-	)
+	stakingAccount.Balance = stakedAmount
 
 	// Add the account to the premine map so the executor can apply it to state
 	premineMap[types.StringToAddress("1001")] = stakingAccount
