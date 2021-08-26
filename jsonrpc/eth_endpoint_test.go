@@ -349,7 +349,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 				switch testCase.name {
 				case "Found matching logs, fromBlock < toBlock":
 					assert.Lenf(t, foundLogs, 3, "Invalid number of logs found")
-				case "Found matching logs, toBlock == fromBlock":
+				case "Found matching logs, fromBlock == toBlock":
 					assert.Lenf(t, foundLogs, 1, "Invalid number of logs found")
 				case "No logs found":
 					assert.Lenf(t, foundLogs, 0, "Invalid number of logs found")
