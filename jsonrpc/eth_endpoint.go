@@ -425,7 +425,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	if to < from {
 		return nil, fmt.Errorf("incorrect range")
 	}
-	for i := from; i < to; i++ {
+	for i := from; i <= to; i++ {
 		header, ok := e.d.store.GetHeaderByNumber(i)
 		if !ok {
 			break
