@@ -77,8 +77,8 @@ func NewMethodNotFoundError(method string) *methodNotFoundError {
 	e := &methodNotFoundError{fmt.Sprintf("the method %s does not exist/is not available", method)}
 	return e
 }
-func NewInvalidRequestError(msg string) *methodNotFoundError {
-	e := &methodNotFoundError{msg}
+func NewInvalidRequestError(msg string) *invalidRequestError {
+	e := &invalidRequestError{msg}
 	return e
 }
 func NewInvalidParamsError(msg string) *invalidParamsError {

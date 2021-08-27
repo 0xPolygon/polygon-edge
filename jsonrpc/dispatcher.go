@@ -258,16 +258,6 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 			continue
 		}
 
-		// unmarshal response from handleReq so that we can re-marshal as batch responses
-
-		// if err := json.Unmarshal(response, &resp); err != nil {
-		// 	d.internalError(req.ID, "batch method", err)
-		// 	fmt.Println("hereeeee", err)
-		// 	fmt.Println(string(response))
-		// 	errorResponse := NewRpcResponse(req.ID, "2.0", nil, NewInternalError("Internal error"))
-		// 	responses = append(responses, errorResponse)
-		// 	continue
-		// }
 		resp := NewRpcResponse(req.ID, "2.0", response, nil)
 		responses = append(responses, resp)
 	}
@@ -304,6 +294,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
+		d.internalError(req.Method, err)
 		return nil, NewInternalError("Internal error")
 	}
 
@@ -313,6 +304,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
+			d.internalError(req.Method, err)
 			return nil, NewInternalError("Internal error")
 		}
 	}
@@ -320,7 +312,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 }
 
-func (d *Dispatcher) internalError(id interface{}, method string, err error) {
+func (d *Dispatcher) internalError(method string, err error) {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
 }
 
