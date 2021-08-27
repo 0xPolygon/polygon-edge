@@ -15,6 +15,13 @@ type Request struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+// Response is a jsonrpc response interface
+type Response interface {
+	Id() interface{}
+	Data() json.RawMessage
+	Bytes() ([]byte, error)
+}
+
 // ErrorResponse is a jsonrpc error response
 type ErrorResponse struct {
 	JSONRPC string       `json:"jsonrpc"`
@@ -22,12 +29,53 @@ type ErrorResponse struct {
 	Error   *ErrorObject `json:"error"`
 }
 
-// Response is a jsonrpc response
-type Response struct {
+// Id returns error response id
+func (e *ErrorResponse) Id() interface{} {
+	return e.ID
+}
+
+// Data returns ErrorObject
+func (e *ErrorResponse) Data() json.RawMessage {
+
+	data, err := json.Marshal(e.Error)
+	if err != nil {
+		return json.RawMessage(err.Error())
+	}
+	return data
+}
+
+// Bytes return the serialized response
+func (e *ErrorResponse) Bytes() ([]byte, error) {
+
+	return json.Marshal(e)
+}
+
+// SuccessResponse is a jsonrpc  success response
+type SuccessResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      interface{}     `json:"id"`
 	Result  json.RawMessage `json:"result"`
 	Error   *ErrorObject    `json:"error,omitempty"`
+}
+
+// Id returns success response id
+func (s *SuccessResponse) Id() interface{} {
+	return s.ID
+}
+
+// Data returns the result
+func (s *SuccessResponse) Data() json.RawMessage {
+
+	if s.Result != nil {
+		return s.Result
+	}
+	return json.RawMessage("No Data")
+}
+
+// Bytes return the serialized response
+func (e *SuccessResponse) Bytes() ([]byte, error) {
+
+	return json.Marshal(e)
 }
 
 // ErrorObject is a jsonrpc error
@@ -84,4 +132,31 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 	}
 	*b = num
 	return nil
+}
+
+// NewRpcErrorResponse is used to create a custom error response
+func NewRpcErrorResponse(id interface{}, errCode int, err error, jsonrpcver string) *ErrorResponse {
+	errObject := &ErrorObject{errCode, err.Error(), nil}
+
+	response := &ErrorResponse{
+		JSONRPC: jsonrpcver,
+		ID:      id,
+		Error:   errObject,
+	}
+	return response
+}
+
+// NewRpcResponse returns Success/Error response object
+func NewRpcResponse(id interface{}, jsonrpcver string, reply []byte, err Error) Response {
+
+	var response Response
+	switch err.(type) {
+	case nil:
+		response = &SuccessResponse{JSONRPC: jsonrpcver, ID: id, Result: reply}
+	default:
+		jsonerr := &ErrorObject{Code: err.ErrorCode(), Message: err.Error()}
+		response = &ErrorResponse{JSONRPC: jsonrpcver, ID: id, Error: jsonerr}
+	}
+
+	return response
 }
