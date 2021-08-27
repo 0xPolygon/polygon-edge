@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -13,16 +12,6 @@ import (
 	"github.com/0xPolygon/minimal/types"
 	"github.com/hashicorp/go-hclog"
 )
-
-var (
-	invalidJSONRequest = &ErrorObject{Code: -32600, Message: "invalid json request"}
-	internalError      = &ErrorObject{Code: -32603, Message: "internal error"}
-	invalidParams      = &ErrorObject{Code: -32602, Message: "invalid params"}
-)
-
-func invalidMethod(requestID interface{}, method string) error {
-	return &ErrorObject{Code: -32601, Message: fmt.Sprintf("The method %s does not exist/is not available", method), Data: requestID}
-}
 
 type serviceData struct {
 	sv      reflect.Value
@@ -95,21 +84,21 @@ func (d *Dispatcher) registerEndpoints() {
 	d.registerService("txpool", d.endpoints.Txpool)
 }
 
-func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, error) {
+func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) {
 	callName := strings.SplitN(req.Method, "_", 2)
 	if len(callName) != 2 {
-		return nil, nil, invalidMethod(req.ID, req.Method)
+		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
 
 	serviceName, funcName := callName[0], callName[1]
 
 	service, ok := d.serviceMap[serviceName]
 	if !ok {
-		return nil, nil, invalidMethod(req.ID, req.Method)
+		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
 	fd, ok := service.funcMap[funcName]
 	if !ok {
-		return nil, nil, invalidMethod(req.ID, req.Method)
+		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
 	return service, fd, nil
 }
@@ -118,37 +107,18 @@ type wsConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0
-// can only be a string or a non-decimal integer
-func formatFilterResponse(id interface{}, resp string) (string, error) {
-	switch t := id.(type) {
-	case string:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":"%s","result":"%s"}`, t, resp), nil
-	case float64:
-		if t == math.Trunc(t) {
-			return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
-		} else {
-			return "", invalidJSONRequest
-		}
-	case nil:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":"%s"}`, resp), nil
-	default:
-		return "", invalidJSONRequest
-	}
-}
-
-func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {
+func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return "", invalidJSONRequest
+		return "", NewInvalidRequestError("Invalid json request")
 	}
 	if len(params) == 0 {
-		return "", invalidJSONRequest
+		return "", NewInvalidParamsError("Invalid params")
 	}
 
 	subscribeMethod, ok := params[0].(string)
 	if !ok {
-		return "", fmt.Errorf("subscribe method '%s' not found", params[0])
+		return "", NewSubscriptionNotFoundError(params[0].(string))
 	}
 
 	var filterID string
@@ -158,29 +128,29 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, error) {
 	} else if subscribeMethod == "logs" {
 		logFilter, err := decodeLogFilterFromInterface(params[1])
 		if err != nil {
-			return "", err
+			return "", NewInternalError(err.Error())
 		}
 		filterID = d.filterManager.NewLogFilter(logFilter, conn)
 
 	} else {
-		return "", fmt.Errorf("subscribe method %s not found", subscribeMethod)
+		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
 
 	return filterID, nil
 }
 
-func (d *Dispatcher) handleUnsubscribe(req Request) (bool, error) {
+func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
-		return false, invalidJSONRequest
+		return false, NewInvalidRequestError("Invalid json request")
 	}
 	if len(params) != 1 {
-		return false, invalidJSONRequest
+		return false, NewInvalidParamsError("Invalid params")
 	}
 
 	filterID, ok := params[0].(string)
 	if !ok {
-		return false, fmt.Errorf("unsubscribe filter not found")
+		return false, NewSubscriptionNotFoundError(params[0].(string))
 	}
 
 	return d.filterManager.Uninstall(filterID), nil
@@ -189,7 +159,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, error) {
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
-		return nil, invalidJSONRequest
+		return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
 	// if the request method is eth_subscribe we need to create a
@@ -197,14 +167,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if req.Method == "eth_subscribe" {
 		filterID, err := d.handleSubscribe(req, conn)
 		if err != nil {
-			return nil, err
+			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
-		resp, err := formatFilterResponse(req.ID, filterID)
-		if err != nil {
-			return nil, err
-		}
-		return []byte(resp), nil
+		return NewRpcResponse(req.ID, "2.0", []byte(filterID), nil).Bytes()
 	}
 
 	if req.Method == "eth_unsubscribe" {
@@ -217,11 +183,9 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		if ok {
 			res = "true"
 		}
-		resp, err := formatFilterResponse(req.ID, res)
-		if err != nil {
-			return nil, err
-		}
-		return []byte(resp), nil
+
+		NewRpcResponse(req.ID, "2.0", []byte(res), nil).Bytes()
+
 	}
 
 	// its a normal query that we handle with the dispatcher
@@ -229,55 +193,48 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+	return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
 	if len(x) == 0 {
-		return nil, invalidJSONRequest
+		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
-			return nil, invalidJSONRequest
+
+			return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 		if req.Method == "" {
-			//TODO:Add id if required
-			return nil, invalidJSONRequest
+			return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
-		return d.handleReq(req)
+		resp, err := d.handleReq(req)
+
+		return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
 	}
 
 	// handle batch requests
 	var requests []Request
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
-		return nil, d.internalError(nil, "batch method", err)
+		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
-	var responses []interface{}
+	var responses []Response
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			d.internalError(req.ID, "batch method", err)
-			errorResponse := ErrorResponse{
-				ID:      req.ID,
-				JSONRPC: "2.0",
-				Error:   internalError,
-			}
+			errorResponse := NewRpcResponse(req.ID, "2.0", nil, err)
 			responses = append(responses, errorResponse)
 			continue
 		}
 
 		// unmarshal response from handleReq so that we can re-marshal as batch responses
-		var resp Response
-		if err := json.Unmarshal(response, &resp); err != nil {
+		var resp *SuccessResponse
+		if err := json.Unmarshal(response, resp); err != nil {
 			d.internalError(req.ID, "batch method", err)
-			errorResponse := ErrorResponse{
-				ID:      req.ID,
-				JSONRPC: "2.0",
-				Error:   internalError,
-			}
+			errorResponse := NewRpcResponse(req.ID, "2.0", nil, NewInternalError("Internal error"))
 			responses = append(responses, errorResponse)
 			continue
 		}
@@ -286,17 +243,17 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	respBytes, err := json.Marshal(responses)
 	if err != nil {
-		return nil, d.internalError(nil, "batch method", err)
+		return NewRpcResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
 	}
 	return respBytes, nil
 }
 
-func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
+func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	d.logger.Debug("request", "method", req.Method, "id", req.ID)
 
-	service, fd, err := d.getFnHandler(req)
-	if err != nil {
-		return nil, err
+	service, fd, ferr := d.getFnHandler(req)
+	if ferr != nil {
+		return nil, ferr
 	}
 
 	inArgs := make([]reflect.Value, fd.inNum)
@@ -310,43 +267,30 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, error) {
 	}
 
 	if err := json.Unmarshal(req.Params, &inputs); err != nil {
-		invalidParams.Data = req.ID
-		return nil, invalidParams
+
+		return nil, NewInvalidParamsError("Invalid Params")
 	}
 
 	output := fd.fv.Call(inArgs)
-	err = getError(output[1])
-	if err != nil {
-		fmt.Println("he", err)
-		return nil, d.internalError(req.ID, req.Method, err)
+	if err := getError(output[1]); err != nil {
+		return nil, NewInternalError("Internal error")
 	}
 
 	var data []byte
+	var err error
 	res := output[0].Interface()
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
-			return nil, d.internalError(req.ID, req.Method, err)
+			return nil, NewInternalError("Internal error")
 		}
 	}
+	return data, nil
 
-	resp := Response{
-		ID:      req.ID,
-		JSONRPC: "2.0",
-		Result:  data,
-	}
-	respBytes, err := json.Marshal(resp)
-	if err != nil {
-		return nil, d.internalError(req.ID, req.Method, err)
-	}
-	return respBytes, nil
 }
 
-func (d *Dispatcher) internalError(id interface{}, method string, err error) error {
+func (d *Dispatcher) internalError(id interface{}, method string, err error) {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
-	internalError.Data = id
-	internalError.Message = err.Error()
-	return internalError
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) {
