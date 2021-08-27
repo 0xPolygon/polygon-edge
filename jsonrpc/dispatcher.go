@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -107,6 +108,24 @@ type wsConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
+// as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0
+// can only be a string or a non-decimal integer
+func formatFilterResponse(id interface{}, resp string) (string, Error) {
+	switch t := id.(type) {
+	case string:
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":"%s","result":"%s"}`, t, resp), nil
+	case float64:
+		if t == math.Trunc(t) {
+			return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
+		} else {
+			return "", NewInvalidRequestError("Invalid json request")
+		}
+	case nil:
+		return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":"%s"}`, resp), nil
+	default:
+		return "", NewInvalidRequestError("Invalid json request")
+	}
+}
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -159,6 +178,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
+
 		return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
@@ -169,8 +189,11 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		if err != nil {
 			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
-
-		return NewRpcResponse(req.ID, "2.0", []byte(filterID), nil).Bytes()
+		resp, err := formatFilterResponse(req.ID, filterID)
+		if err != nil {
+			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+		}
+		return []byte(resp), nil
 	}
 
 	if req.Method == "eth_unsubscribe" {
@@ -184,7 +207,12 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 			res = "true"
 		}
 
-		NewRpcResponse(req.ID, "2.0", []byte(res), nil).Bytes()
+		resp, err := formatFilterResponse(req.ID, res)
+		if err != nil {
+			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+		}
+
+		return []byte(resp), nil
 
 	}
 

@@ -122,11 +122,16 @@ func TestDispatcherWebsocketRequestFormats(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		_, err := s.HandleWs(c.msg, mock)
-		if !c.expectError && err != nil {
+		data, err := s.HandleWs(c.msg, mock)
+		resp := new(SuccessResponse)
+		merr := json.Unmarshal(data, resp)
+		if merr != nil {
+			t.Fatal("Invalid response")
+		}
+		if !c.expectError && (resp.Error != nil || err != nil) {
 			t.Fatal("Error unexpected but found")
 		}
-		if c.expectError && err == nil {
+		if c.expectError && (resp.Error == nil && err == nil) {
 			t.Fatal("Error expected but not found")
 		}
 	}

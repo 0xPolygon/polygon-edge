@@ -1,7 +1,8 @@
 package jsonrpc
 
-import ("fmt"
-       "errors"
+import (
+	"errors"
+	"fmt"
 )
 
 var (
