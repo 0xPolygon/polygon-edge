@@ -34,7 +34,7 @@ func constructWSRequest(id int, method string, params []string) ([]byte, error) 
 	return json.Marshal(request)
 }
 
-func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Response {
+func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.SuccessResponse {
 	if wsError := ws.WriteMessage(websocket.TextMessage, request); wsError != nil {
 		t.Fatalf("Unable to write message to WS connection: %v", wsError)
 	}
@@ -43,7 +43,7 @@ func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Res
 		t.Fatalf("Unable to read message from WS connection: %v", wsError)
 	}
 
-	var res jsonrpc.Response
+	var res jsonrpc.SuccessResponse
 	if wsError = json.Unmarshal(response, &res); wsError != nil {
 		t.Fatalf("Unable to unmarshal WS response: %v", wsError)
 	}

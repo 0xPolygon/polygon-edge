@@ -12,7 +12,7 @@ import (
 )
 
 func expectJSONResult(data []byte, v interface{}) error {
-	var resp Response
+	var resp SuccessResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return err
 	}
@@ -240,9 +240,10 @@ func TestDispatcherBatchRequest(t *testing.T) {
 ]`)...))
 	assert.NoError(t, err)
 
-	var res []Response
+	var res []SuccessResponse
 	assert.NoError(t, expectBatchJSONResult(resp, &res))
 	assert.Len(t, res, 4)
-	assert.Equal(t, res[0].Error, internalError)
+	jsonerr := &ErrorObject{Code: -32603, Message: "Internal error"}
+	assert.Equal(t, res[0].Error, jsonerr)
 	assert.Nil(t, res[3].Error)
 }
