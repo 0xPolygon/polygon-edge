@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -42,7 +41,7 @@ type JSONRPC struct {
 
 type dispatcherImpl interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
-	Handle([]byte) ([]byte, error)
+	Handle(reqBody []byte) ([]byte, error)
 }
 
 type Config struct {
@@ -198,14 +197,6 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	if (*req).Method == "OPTIONS" {
 		return
 	}
-
-	handleErr := func(rsp ErrorResponse) {
-		if data, err := json.Marshal(rsp); err != nil {
-			w.Write([]byte(err.Error()))
-		} else {
-			w.Write(data)
-		}
-	}
 	if req.Method == "GET" {
 		w.Write([]byte("PolygonSDK JSON-RPC"))
 		return
@@ -224,17 +215,12 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	j.logger.Debug("handle", "request", string(data))
 
 	resp, err := j.dispatcher.Handle(data)
+
 	if err != nil {
-		id := err.(*ErrorObject).Data
-		err.(*ErrorObject).Data = nil
-		errorResponse := ErrorResponse{
-			JSONRPC: "2.0",
-			ID:      id,
-			Error:   err.(*ErrorObject),
-		}
-		handleErr(errorResponse)
-		return
+		w.Write([]byte(err.Error()))
+	} else {
+		w.Write(resp)
 	}
 	j.logger.Debug("handle", "response", string(resp))
-	w.Write(resp)
+
 }
