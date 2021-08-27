@@ -259,13 +259,16 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		}
 
 		// unmarshal response from handleReq so that we can re-marshal as batch responses
-		var resp *SuccessResponse
-		if err := json.Unmarshal(response, resp); err != nil {
-			d.internalError(req.ID, "batch method", err)
-			errorResponse := NewRpcResponse(req.ID, "2.0", nil, NewInternalError("Internal error"))
-			responses = append(responses, errorResponse)
-			continue
-		}
+
+		// if err := json.Unmarshal(response, &resp); err != nil {
+		// 	d.internalError(req.ID, "batch method", err)
+		// 	fmt.Println("hereeeee", err)
+		// 	fmt.Println(string(response))
+		// 	errorResponse := NewRpcResponse(req.ID, "2.0", nil, NewInternalError("Internal error"))
+		// 	responses = append(responses, errorResponse)
+		// 	continue
+		// }
+		resp := NewRpcResponse(req.ID, "2.0", response, nil)
 		responses = append(responses, resp)
 	}
 
