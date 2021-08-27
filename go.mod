@@ -1,4 +1,4 @@
-module github.com/0xPolygon/minimal
+module github.com/0xPolygon/polygon-sdk
 
 go 1.14
 

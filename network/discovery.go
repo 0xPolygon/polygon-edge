@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/minimal/network/grpc"
-	"github.com/0xPolygon/minimal/network/proto"
+	"github.com/0xPolygon/polygon-sdk/network/grpc"
+	"github.com/0xPolygon/polygon-sdk/network/proto"
 	rawGrpc "google.golang.org/grpc"
 
 	"github.com/libp2p/go-libp2p-core/peer"

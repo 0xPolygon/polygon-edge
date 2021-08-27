@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -19,7 +19,7 @@ func (e *Eth) ChainId() (interface{}, error) {
 }
 
 // GetBlockByNumber returns information about a block by block number
-func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, error) {
+func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
 	var num uint64
 	switch number {
 	case LatestBlockNumber:
@@ -32,23 +32,26 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, full bool) (interface{}, erro
 		return nil, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
+		if number < 0 {
+			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
+		}
 		num = uint64(number)
 	}
 
-	block, ok := e.d.store.GetBlockByNumber(num, full)
+	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
-		return nil, fmt.Errorf("unable to get block by num %v", num)
+		return nil, nil
 	}
-	return toBlock(block), nil
+	return toBlock(block, fullTx), nil
 }
 
 // GetBlockByHash returns information about a block by hash
-func (e *Eth) GetBlockByHash(hash types.Hash, full bool) (interface{}, error) {
-	block, ok := e.d.store.GetBlockByHash(hash, full)
+func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) {
+	block, ok := e.d.store.GetBlockByHash(hash, true)
 	if !ok {
-		return nil, fmt.Errorf("unable to get block by hash %v", hash)
+		return nil, nil
 	}
-	return toBlock(block), nil
+	return toBlock(block, fullTx), nil
 }
 
 // BlockNumber returns current block number
@@ -194,8 +197,12 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number Block
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return argBytesPtr(types.ZeroHash[:]), nil
+		}
 		return nil, err
 	}
+
 	return argBytesPtr(result), nil
 }
 
@@ -363,7 +370,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
-	var result []*Log
+	result := make([]*Log, 0)
 	parseReceipts := func(header *types.Header) error {
 		receipts, err := e.d.store.GetReceiptsByHash(header.Hash)
 		if err != nil {
@@ -454,6 +461,9 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (interface{}, error) {
 	nonce, err := e.d.getNextNonce(address, number)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return argUintPtr(0), nil
+		}
 		return nil, err
 	}
 	return argUintPtr(nonce), nil

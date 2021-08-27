@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 )
 
 func ParseUint64orHex(val *string) (uint64, error) {

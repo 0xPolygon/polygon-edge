@@ -1,6 +1,12 @@
 package jsonrpc
 
-import "fmt"
+import ("fmt"
+       "errors"
+)
+
+var (
+	ErrStateNotFound = errors.New("given root and slot not found in storage")
+)
 
 type Error interface {
 	Error() string

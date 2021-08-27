@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"sync"
 
-	"github.com/0xPolygon/minimal/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 )
 
 // msgQueue defines the structure that holds message queues for different IBFT states

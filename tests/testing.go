@@ -10,15 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/hex"
-	itrie "github.com/0xPolygon/minimal/state/immutable-trie"
-	"github.com/0xPolygon/minimal/state/runtime"
-
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/state"
-
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/state"
+	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // TESTS is the default location of the tests folder

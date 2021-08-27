@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -251,7 +251,7 @@ func testBody(t *testing.T, m MockStorage) {
 		Gas:      11,
 		GasPrice: big.NewInt(11),
 		Input:    []byte{1, 2},
-		V:        1,
+		V:        []byte{1},
 	}
 	t0.ComputeHash()
 
@@ -263,7 +263,7 @@ func testBody(t *testing.T, m MockStorage) {
 		Gas:      22,
 		GasPrice: big.NewInt(11),
 		Input:    []byte{4, 5},
-		V:        2,
+		V:        []byte{2},
 	}
 	t1.ComputeHash()
 
@@ -309,7 +309,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 		Nonce:    1000,
 		Gas:      50,
 		GasPrice: new(big.Int).SetUint64(100),
-		V:        11,
+		V:        []byte{11},
 	}
 	body := &types.Body{
 		Transactions: []*types.Transaction{txn},

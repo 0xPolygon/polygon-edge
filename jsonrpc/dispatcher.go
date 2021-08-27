@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -431,14 +431,15 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 }
 
 func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	// set default values
-	if arg.From == nil {
-		arg.From = &types.ZeroAddress
-	}
 	if arg.Data != nil && arg.Input != nil {
 		return nil, fmt.Errorf("both input and data cannot be set")
 	}
-	if arg.Nonce == nil {
+
+	// set default values
+	if arg.From == nil {
+		arg.From = &types.ZeroAddress
+		arg.Nonce = argUintPtr(0)
+	} else if arg.Nonce == nil {
 		// get nonce from the pool
 		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
 		if err != nil {
@@ -450,8 +451,7 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		arg.Value = argBytesPtr([]byte{})
 	}
 	if arg.GasPrice == nil {
-		// use the suggested gas price
-		arg.GasPrice = argBytesPtr(d.store.GetAvgGasPrice().Bytes())
+		arg.GasPrice = argBytesPtr([]byte{})
 	}
 
 	var input []byte

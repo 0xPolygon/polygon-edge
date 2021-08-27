@@ -3,7 +3,7 @@ package precompiled
 import (
 	"testing"
 
-	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/stretchr/testify/assert"
 )
 
