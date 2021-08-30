@@ -1,15 +1,17 @@
 package staking
 
 import (
+	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
-// padLeftOrTrim left-pads the passed in byte array to the specified size,
+// PadLeftOrTrim left-pads the passed in byte array to the specified size,
 // or trims the array if it exceeds the passed in size
-func padLeftOrTrim(bb []byte, size int) []byte {
+func PadLeftOrTrim(bb []byte, size int) []byte {
 	l := len(bb)
 	if l == size {
 		return bb
@@ -31,8 +33,8 @@ func getAddressMapping(address types.Address, slot int64) []byte {
 	bigSlot := big.NewInt(slot)
 
 	finalSlice := append(
-		padLeftOrTrim(address.Bytes(), 32),
-		padLeftOrTrim(bigSlot.Bytes(), 32)...,
+		PadLeftOrTrim(address.Bytes(), 32),
+		PadLeftOrTrim(bigSlot.Bytes(), 32)...,
 	)
 	keccakValue := keccak.Keccak256(nil, finalSlice)
 
@@ -42,9 +44,11 @@ func getAddressMapping(address types.Address, slot int64) []byte {
 // getIndexWithOffset is a helper method for adding an offset to the already found keccak hash
 func getIndexWithOffset(keccakHash []byte, offset int64) []byte {
 	bigOffset := big.NewInt(offset)
-	bigKeccak := big.NewInt(0).SetBytes(keccakHash) // TODO check if this is correct
+	bigKeccak := big.NewInt(0).SetBytes(keccakHash)
 
-	return (big.NewInt(0).Add(bigKeccak, bigOffset)).Bytes()
+	bigKeccak.Add(bigKeccak, bigOffset)
+
+	return bigKeccak.Bytes()
 }
 
 // GetStorageIndexes is a helper function for getting the correct indexes
@@ -57,18 +61,26 @@ func GetStorageIndexes(address types.Address, index int64) *StorageIndexes {
 
 	// Get the indexes for the mappings
 	storageIndexes.AddressToIsValidatorIndex = getAddressMapping(address, addressToIsValidatorSlot)
+	fmt.Printf("1: %s\n", hex.EncodeToHex(storageIndexes.AddressToIsValidatorIndex))
+
 	storageIndexes.AddressToStakedAmountIndex = getAddressMapping(address, addressToStakedAmountSlot)
+	fmt.Printf("2: %s\n", hex.EncodeToHex(storageIndexes.AddressToStakedAmountIndex))
+
 	storageIndexes.AddressToValidatorIndexIndex = getAddressMapping(address, addressToValidatorIndexSlot)
+	fmt.Printf("3: %s\n", hex.EncodeToHex(storageIndexes.AddressToValidatorIndexIndex))
 
 	// Get the indexes for _validators, _stakedAmount
-	paddedStakedAmount := padLeftOrTrim(big.NewInt(stakedAmountSlot).Bytes(), 32)
-	paddedValidatorsArray := padLeftOrTrim(big.NewInt(validatorsSlot).Bytes(), 32)
-
-	// Index for regular types is calculated as the keccak256(slot)
-	storageIndexes.StakedAmountIndex = keccak.Keccak256(nil, paddedStakedAmount)
+	// Index for regular types is calculated as just the regular slot
+	storageIndexes.StakedAmountIndex = big.NewInt(stakedAmountSlot).Bytes()
+	fmt.Printf("4: %s\n", hex.EncodeToHex(storageIndexes.StakedAmountIndex))
 
 	// Index for array types is calculated as keccak(slot) + index
-	storageIndexes.ValidatorsIndex = getIndexWithOffset(keccak.Keccak256(nil, paddedValidatorsArray), index)
+	// The slot for the dynamic arrays that's put in the keccak needs to be in hex form (padded 64 chars)
+	storageIndexes.ValidatorsIndex = getIndexWithOffset(
+		keccak.Keccak256(nil, PadLeftOrTrim(big.NewInt(validatorsSlot).Bytes(), 32)),
+		index,
+	)
+	fmt.Printf("5: %s\n", hex.EncodeToHex(storageIndexes.ValidatorsIndex))
 
 	return &storageIndexes
 }
@@ -85,9 +97,9 @@ type StorageIndexes struct {
 
 // Slot definitions for SC storage
 var (
-	validatorsSlot              = int64(1) // Slot 1
-	addressToIsValidatorSlot    = int64(2) // Slot 2
-	addressToStakedAmountSlot   = int64(3) // Slot 3
-	addressToValidatorIndexSlot = int64(4) // Slot 4
-	stakedAmountSlot            = int64(5) // Slot 5
+	validatorsSlot              = int64(0) // Slot 0
+	addressToIsValidatorSlot    = int64(1) // Slot 1
+	addressToStakedAmountSlot   = int64(2) // Slot 2
+	addressToValidatorIndexSlot = int64(3) // Slot 3
+	stakedAmountSlot            = int64(4) // Slot 4
 )

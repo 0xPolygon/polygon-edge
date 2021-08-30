@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -561,6 +562,8 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	result.GasLeft -= gasCost
 	t.state.SetCode(c.Address, result.ReturnValue)
 
+	myVal := hex.EncodeToHex(result.ReturnValue)
+	fmt.Println(myVal)
 	return result
 }
 
