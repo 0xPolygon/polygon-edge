@@ -294,7 +294,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
-		d.internalError(req.Method, err)
+		d.logInternalError(req.Method, err)
 		return nil, NewInternalError("Internal error")
 	}
 
@@ -304,7 +304,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	if res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
-			d.internalError(req.Method, err)
+			d.logInternalError(req.Method, err)
 			return nil, NewInternalError("Internal error")
 		}
 	}
@@ -312,7 +312,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 }
 
-func (d *Dispatcher) internalError(method string, err error) {
+func (d *Dispatcher) logInternalError(method string, err error) {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
 }
 

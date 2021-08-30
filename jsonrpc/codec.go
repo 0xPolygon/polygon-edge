@@ -135,8 +135,8 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 }
 
 // NewRpcErrorResponse is used to create a custom error response
-func NewRpcErrorResponse(id interface{}, errCode int, err error, jsonrpcver string) *ErrorResponse {
-	errObject := &ErrorObject{errCode, err.Error(), nil}
+func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver string) Response {
+	errObject := &ErrorObject{errCode, err, nil}
 
 	response := &ErrorResponse{
 		JSONRPC: jsonrpcver,
@@ -154,8 +154,7 @@ func NewRpcResponse(id interface{}, jsonrpcver string, reply []byte, err Error) 
 	case nil:
 		response = &SuccessResponse{JSONRPC: jsonrpcver, ID: id, Result: reply}
 	default:
-		jsonerr := &ErrorObject{Code: err.ErrorCode(), Message: err.Error()}
-		response = &ErrorResponse{JSONRPC: jsonrpcver, ID: id, Error: jsonerr}
+		response = NewRpcErrorResponse(id, err.ErrorCode(), err.Error(), jsonrpcver)
 	}
 
 	return response
