@@ -16,23 +16,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/command/genesis"
-	ibftCommand "github.com/0xPolygon/minimal/command/ibft"
-	"github.com/0xPolygon/minimal/types"
-
-	"github.com/0xPolygon/minimal/command/server"
-	"github.com/0xPolygon/minimal/consensus/ibft"
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/command/genesis"
+	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
+	"github.com/0xPolygon/polygon-sdk/command/server"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
+	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
-	empty "google.golang.org/protobuf/types/known/emptypb"
-
 	"google.golang.org/grpc"
-
-	"github.com/0xPolygon/minimal/minimal/proto"
-	txpoolProto "github.com/0xPolygon/minimal/txpool/proto"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)

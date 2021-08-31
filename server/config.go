@@ -1,10 +1,10 @@
-package minimal
+package server
 
 import (
 	"net"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/network"
 )
 
 const DefaultGRPCPort int = 9632

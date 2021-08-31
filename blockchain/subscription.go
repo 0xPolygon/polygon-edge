@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type void struct{}

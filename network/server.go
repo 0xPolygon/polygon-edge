@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/event"

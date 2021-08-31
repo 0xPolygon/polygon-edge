@@ -6,10 +6,10 @@ import (
 	"math/bits"
 	"sync"
 
-	"github.com/0xPolygon/minimal/crypto"
-	"github.com/0xPolygon/minimal/helper/keccak"
-	"github.com/0xPolygon/minimal/state/runtime"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type instruction func(c *state)

@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal"
-	"github.com/0xPolygon/minimal/network"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -70,7 +70,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["grpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultGRPCPort),
+		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -78,7 +78,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultJSONRPCPort),
+		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultJSONRPCPort),
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -184,7 +184,7 @@ func (c *ServerCommand) Run(args []string) int {
 		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
-	server, err := minimal.NewServer(logger, config)
+	server, err := server.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
 

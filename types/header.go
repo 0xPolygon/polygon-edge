@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/0xPolygon/minimal/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
 )

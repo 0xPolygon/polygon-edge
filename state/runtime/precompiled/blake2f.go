@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/bits"
 
-	"github.com/0xPolygon/minimal/chain"
+	"github.com/0xPolygon/polygon-sdk/chain"
 )
 
 type blake2f struct {

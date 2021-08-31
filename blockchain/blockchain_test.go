@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/0xPolygon/minimal/blockchain/storage"
-	"github.com/0xPolygon/minimal/blockchain/storage/memory"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/blockchain/storage"
+	"github.com/0xPolygon/polygon-sdk/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 func TestGenesis(t *testing.T) {
@@ -547,7 +547,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 		Transactions: []*types.Transaction{
 			{
 				Value: big.NewInt(10),
-				V:     1,
+				V:     []byte{1},
 			},
 		},
 	}

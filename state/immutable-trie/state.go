@@ -5,8 +5,8 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type State struct {

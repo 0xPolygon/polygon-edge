@@ -9,9 +9,9 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/0xPolygon/minimal/helper/hex"
-	"github.com/0xPolygon/minimal/state"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type mockAccount2 struct {
@@ -66,7 +66,7 @@ func (m *mockAccountStore) Header() *types.Header {
 func (m *mockAccountStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
 	acct, ok := m.accounts[addr]
 	if !ok {
-		return nil, fmt.Errorf("not found")
+		return nil, ErrStateNotFound
 	}
 	return acct.account, nil
 }
@@ -83,11 +83,11 @@ func (m *mockAccountStore) GetCode(hash types.Hash) ([]byte, error) {
 func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	acct, ok := m.accounts[addr]
 	if !ok {
-		return nil, fmt.Errorf("not found")
+		return nil, ErrStateNotFound
 	}
 	val, ok := acct.storage[slot]
 	if !ok {
-		return nil, fmt.Errorf("not found")
+		return nil, ErrStateNotFound
 	}
 	return val.Bytes(), nil
 }
@@ -338,20 +338,66 @@ func TestEth_State_GetBalance(t *testing.T) {
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
-	store := &mockAccountStore{}
+	tests := []struct {
+		name          string
+		initialNonces map[types.Address]uint64
+		target        types.Address
+		blockNumber   BlockNumber
+		succeeded     bool
+		expectedNonce *argUint64
+	}{
+		{
+			name: "should return nonce for existing account",
+			initialNonces: map[types.Address]uint64{
+				addr0: 100,
+			},
+			target:        addr0,
+			blockNumber:   LatestBlockNumber,
+			succeeded:     true,
+			expectedNonce: argUintPtr(100),
+		},
+		{
+			name: "should return zero for non-existing account",
+			initialNonces: map[types.Address]uint64{
+				addr0: 100,
+			},
+			target:        addr1,
+			blockNumber:   LatestBlockNumber,
+			succeeded:     true,
+			expectedNonce: argUintPtr(0),
+		},
+		{
+			name: "should return error for non-existing header",
+			initialNonces: map[types.Address]uint64{
+				addr0: 100,
+			},
+			target:        addr0,
+			blockNumber:   100,
+			succeeded:     false,
+			expectedNonce: nil,
+		},
+	}
 
-	acct0 := store.AddAccount(addr0)
-	acct0.Nonce(100)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &mockAccountStore{}
 
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+			for addr, nonce := range tt.initialNonces {
+				account := store.AddAccount(addr)
+				account.Nonce(nonce)
+			}
+			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	balance, err := dispatcher.endpoints.Eth.GetTransactionCount(addr0, LatestBlockNumber)
-	assert.NoError(t, err)
-	assert.Equal(t, balance, argUintPtr(100))
-
-	// address not found
-	_, err = dispatcher.endpoints.Eth.GetTransactionCount(addr1, LatestBlockNumber)
-	assert.Error(t, err)
+			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, tt.blockNumber)
+			if tt.succeeded {
+				assert.NoError(t, err)
+				assert.NotNil(t, nonce)
+				assert.Equal(t, tt.expectedNonce, nonce)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }
 
 var (
@@ -380,19 +426,89 @@ func TestEth_State_GetCode(t *testing.T) {
 }
 
 func TestEth_State_GetStorageAt(t *testing.T) {
-	store := &mockAccountStore{}
+	tests := []struct {
+		name           string
+		initialStorage map[types.Address]map[types.Hash]types.Hash
+		address        types.Address
+		index          types.Hash
+		blockNumber    BlockNumber
+		succeeded      bool
+		expectedData   *argBytes
+	}{
+		{
+			name: "should return data for existing slot",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash1,
+			blockNumber:  LatestBlockNumber,
+			succeeded:    true,
+			expectedData: argBytesPtr([]byte(hash1[:])),
+		},
+		{
+			name: "should return 32 bytes filled with zero for undefined slot",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  LatestBlockNumber,
+			succeeded:    true,
+			expectedData: argBytesPtr(types.ZeroHash[:]),
+		},
+		{
+			name: "should return 32 bytes filled with zero for non-existing account",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  LatestBlockNumber,
+			succeeded:    true,
+			expectedData: argBytesPtr(types.ZeroHash[:]),
+		},
+		{
+			name: "should return error for non-existing header",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  100,
+			succeeded:    false,
+			expectedData: nil,
+		},
+	}
 
-	acct0 := store.AddAccount(addr0)
-	acct0.Storage(hash1, hash1)
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	res, err := dispatcher.endpoints.Eth.GetStorageAt(acct0.address, hash1, LatestBlockNumber)
-	assert.NoError(t, err)
-	assert.Equal(t, res, argBytesPtr(hash1.Bytes()))
-
-	// slot not found
-	_, err = dispatcher.endpoints.Eth.GetStorageAt(acct0.address, hash2, LatestBlockNumber)
-	assert.Error(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &mockAccountStore{}
+			for addr, storage := range tt.initialStorage {
+				account := store.AddAccount(addr)
+				for index, data := range storage {
+					account.Storage(index, data)
+				}
+			}
+			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+			res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, tt.blockNumber)
+			if tt.succeeded {
+				assert.NoError(t, err)
+				assert.NotNil(t, res)
+				assert.Equal(t, tt.expectedData, res)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }
 
 type mockStoreTxn struct {
@@ -416,7 +532,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 
 	txn := &types.Transaction{
 		From: addr0,
-		V:    1,
+		V:    []byte{1},
 	}
 	txn.ComputeHash()
 

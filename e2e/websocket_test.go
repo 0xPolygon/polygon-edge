@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/minimal/e2e/framework"
-	"github.com/0xPolygon/minimal/jsonrpc"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/jsonrpc"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"

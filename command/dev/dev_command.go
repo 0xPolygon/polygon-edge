@@ -3,8 +3,8 @@ package dev
 import (
 	"fmt"
 
-	"github.com/0xPolygon/minimal/command/helper"
-	"github.com/0xPolygon/minimal/minimal"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -55,6 +55,15 @@ func (d *DevCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	d.FlagMap["chainid"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", helper.DefaultChainID),
+		Arguments: []string{
+			"CHAIN_ID",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 func (d *DevCommand) GetHelperText() string {
@@ -99,7 +108,7 @@ func (d *DevCommand) Run(args []string) int {
 		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
-	server, err := minimal.NewServer(logger, config)
+	server, err := server.NewServer(logger, config)
 	if err != nil {
 		d.UI.Error(err.Error())
 

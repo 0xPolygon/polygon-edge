@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/minimal/protocol/proto"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/protocol/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Header, error) {

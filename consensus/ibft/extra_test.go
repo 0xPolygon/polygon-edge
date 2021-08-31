@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 func TestExtraEncoding(t *testing.T) {

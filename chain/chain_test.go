@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 var emptyAddr types.Address

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/minimal/chain"
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 // TxContext is the context of the transaction

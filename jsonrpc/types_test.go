@@ -9,7 +9,7 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/0xPolygon/minimal/types"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
 
