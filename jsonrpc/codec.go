@@ -46,6 +46,7 @@ const (
 )
 
 type BlockNumber int64
+type OptionalBlockNumber *int64
 
 func stringToBlockNumber(str string) (BlockNumber, error) {
 	if str == "" {
