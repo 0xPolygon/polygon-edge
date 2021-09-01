@@ -96,6 +96,7 @@ func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot 
 type mockBlockStore2 struct {
 	nullBlockchainInterface
 	blocks []*types.Block
+	topics []types.Hash
 }
 
 func (m *mockBlockStore2) add(blocks ...*types.Block) {
@@ -117,9 +118,7 @@ func (m *mockBlockStore2) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, 
 						},
 					},
 					{
-						Topics: []types.Hash{
-							types.StringToHash("4"), types.StringToHash("5"), types.StringToHash("6"),
-						},
+						Topics: m.topics,
 					},
 				},
 			},
@@ -138,9 +137,7 @@ func (m *mockBlockStore2) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, 
 			{
 				Logs: []*types.Log{
 					{
-						Topics: []types.Hash{
-							types.StringToHash("4"), types.StringToHash("5"), types.StringToHash("6"),
-						},
+						Topics: m.topics,
 					},
 				},
 			},
@@ -150,9 +147,7 @@ func (m *mockBlockStore2) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, 
 			{
 				Logs: []*types.Log{
 					{
-						Topics: []types.Hash{
-							types.StringToHash("4"), types.StringToHash("5"), types.StringToHash("6"),
-						},
+						Topics: m.topics,
 					},
 				},
 			},
@@ -287,16 +282,16 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 func TestEth_Block_GetLogs(t *testing.T) {
 
 	// Topics we're searching for
-	var topics = [][]types.Hash{
-		{types.StringToHash("4")},
-		{types.StringToHash("5")},
-		{types.StringToHash("6")},
-	}
+	topic1 := types.StringToHash("4")
+	topic2 := types.StringToHash("5")
+	topic3 := types.StringToHash("6")
+	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
 
 	testTable := []struct {
-		name          string
-		filterOptions *LogFilter
-		shouldFail    bool
+		name           string
+		filterOptions  *LogFilter
+		shouldFail     bool
+		expectedLength int
 	}{
 		{"Found matching logs, fromBlock < toBlock",
 			&LogFilter{
@@ -304,28 +299,29 @@ func TestEth_Block_GetLogs(t *testing.T) {
 				toBlock:   3,
 				Topics:    topics,
 			},
-			false},
+			false, 3},
 		{"Found matching logs, fromBlock == toBlock",
 			&LogFilter{
 				fromBlock: 2,
 				toBlock:   2,
 				Topics:    topics,
 			},
-			false},
+			false, 1},
 		{"No logs found", &LogFilter{
 			fromBlock: 4,
 			toBlock:   5,
 			Topics:    topics,
-		}, false},
+		}, false, 0},
 		{"Invalid block range", &LogFilter{
 			fromBlock: 10,
 			toBlock:   5,
 			Topics:    topics,
-		}, true},
+		}, true, 0},
 	}
 
 	// setup test
 	store := &mockBlockStore2{}
+	store.topics = []types.Hash{topic1, topic2, topic3}
 	for i := 0; i < 4; i++ {
 		store.add(&types.Block{
 			Header: &types.Header{
@@ -348,11 +344,11 @@ func TestEth_Block_GetLogs(t *testing.T) {
 			} else if !testCase.shouldFail {
 				switch testCase.name {
 				case "Found matching logs, fromBlock < toBlock":
-					assert.Lenf(t, foundLogs, 3, "Invalid number of logs found")
+					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 				case "Found matching logs, fromBlock == toBlock":
-					assert.Lenf(t, foundLogs, 1, "Invalid number of logs found")
+					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 				case "No logs found":
-					assert.Lenf(t, foundLogs, 0, "Invalid number of logs found")
+					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 				}
 			}
 		})
