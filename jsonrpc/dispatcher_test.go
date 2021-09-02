@@ -12,7 +12,7 @@ import (
 )
 
 func expectJSONResult(data []byte, v interface{}) error {
-	var resp Response
+	var resp SuccessResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return err
 	}
@@ -122,11 +122,16 @@ func TestDispatcherWebsocketRequestFormats(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		_, err := s.HandleWs(c.msg, mock)
-		if !c.expectError && err != nil {
+		data, err := s.HandleWs(c.msg, mock)
+		resp := new(SuccessResponse)
+		merr := json.Unmarshal(data, resp)
+		if merr != nil {
+			t.Fatal("Invalid response")
+		}
+		if !c.expectError && (resp.Error != nil || err != nil) {
 			t.Fatal("Error unexpected but found")
 		}
-		if c.expectError && err == nil {
+		if c.expectError && (resp.Error == nil && err == nil) {
 			t.Fatal("Error expected but not found")
 		}
 	}
@@ -236,13 +241,14 @@ func TestDispatcherBatchRequest(t *testing.T) {
     {"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1", true]},
     {"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
     {"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
-		{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}
+	{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}
 ]`)...))
 	assert.NoError(t, err)
 
-	var res []Response
+	var res []SuccessResponse
 	assert.NoError(t, expectBatchJSONResult(resp, &res))
 	assert.Len(t, res, 4)
-	assert.Equal(t, internalError, res[0].Error)
+	jsonerr := &ErrorObject{Code: -32602, Message: "Invalid Params"}
+	assert.Equal(t, res[0].Error, jsonerr)
 	assert.Nil(t, res[3].Error)
 }
