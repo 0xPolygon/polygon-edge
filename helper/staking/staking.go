@@ -1,10 +1,8 @@
 package staking
 
 import (
-	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
@@ -60,19 +58,16 @@ func GetStorageIndexes(address types.Address, index int64) *StorageIndexes {
 	storageIndexes := StorageIndexes{}
 
 	// Get the indexes for the mappings
+	// The index for the mapping is retrieved with:
+	// keccak(address . slot)
+	// . stands for concatenation (basically appending the bytes)
 	storageIndexes.AddressToIsValidatorIndex = getAddressMapping(address, addressToIsValidatorSlot)
-	fmt.Printf("1: %s\n", hex.EncodeToHex(storageIndexes.AddressToIsValidatorIndex))
-
 	storageIndexes.AddressToStakedAmountIndex = getAddressMapping(address, addressToStakedAmountSlot)
-	fmt.Printf("2: %s\n", hex.EncodeToHex(storageIndexes.AddressToStakedAmountIndex))
-
 	storageIndexes.AddressToValidatorIndexIndex = getAddressMapping(address, addressToValidatorIndexSlot)
-	fmt.Printf("3: %s\n", hex.EncodeToHex(storageIndexes.AddressToValidatorIndexIndex))
 
 	// Get the indexes for _validators, _stakedAmount
 	// Index for regular types is calculated as just the regular slot
 	storageIndexes.StakedAmountIndex = big.NewInt(stakedAmountSlot).Bytes()
-	fmt.Printf("4: %s\n", hex.EncodeToHex(storageIndexes.StakedAmountIndex))
 
 	// Index for array types is calculated as keccak(slot) + index
 	// The slot for the dynamic arrays that's put in the keccak needs to be in hex form (padded 64 chars)
@@ -80,7 +75,10 @@ func GetStorageIndexes(address types.Address, index int64) *StorageIndexes {
 		keccak.Keccak256(nil, PadLeftOrTrim(big.NewInt(validatorsSlot).Bytes(), 32)),
 		index,
 	)
-	fmt.Printf("5: %s\n", hex.EncodeToHex(storageIndexes.ValidatorsIndex))
+
+	// For any dynamic array in Solidity, the size of the actual array should be
+	// located on slot x
+	storageIndexes.ValidatorsArraySizeIndex = []byte{byte(validatorsSlot)}
 
 	return &storageIndexes
 }
@@ -89,6 +87,7 @@ func GetStorageIndexes(address types.Address, index int64) *StorageIndexes {
 // need to be modified
 type StorageIndexes struct {
 	ValidatorsIndex              []byte // []address
+	ValidatorsArraySizeIndex     []byte // []address size
 	AddressToIsValidatorIndex    []byte // mapping(address => bool)
 	AddressToStakedAmountIndex   []byte // mapping(address => uint256)
 	AddressToValidatorIndexIndex []byte // mapping(address => uint256)
