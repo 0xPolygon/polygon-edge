@@ -655,8 +655,6 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		if err := i.updateValidators(header.Number); err != nil {
 			return err
 		}
-	} else {
-		fmt.Printf("\n\nskip updateing validators\n\n")
 	}
 
 	i.logger.Info(
