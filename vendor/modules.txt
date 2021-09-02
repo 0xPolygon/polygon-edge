@@ -236,6 +236,8 @@ github.com/minio/sha256-simd
 # github.com/mitchellh/cli v1.0.0
 ## explicit
 github.com/mitchellh/cli
+# github.com/mitchellh/mapstructure v1.1.2
+github.com/mitchellh/mapstructure
 # github.com/mr-tron/base58 v1.2.0
 github.com/mr-tron/base58/base58
 # github.com/multiformats/go-base32 v0.0.3
@@ -306,6 +308,7 @@ github.com/umbracle/go-eth-bn256
 # github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 ## explicit
 github.com/umbracle/go-web3
+github.com/umbracle/go-web3/abi
 github.com/umbracle/go-web3/jsonrpc
 github.com/umbracle/go-web3/jsonrpc/codec
 github.com/umbracle/go-web3/jsonrpc/transport
