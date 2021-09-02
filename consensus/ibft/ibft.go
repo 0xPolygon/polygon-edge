@@ -387,18 +387,20 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		return nil, err
 	}
 	txns := []*types.Transaction{}
-	for {
-		txn, retFn := i.txpool.Pop()
-		if txn == nil {
-			break
+	if !i.IsLastOfEpoch(header.Number) {
+		for {
+			txn, retFn := i.txpool.Pop()
+			if txn == nil {
+				break
+			}
+			if err := transition.Write(txn); err != nil {
+				retFn()
+				break
+			}
+			txns = append(txns, txn)
 		}
-		if err := transition.Write(txn); err != nil {
-			retFn()
-			break
-		}
-		txns = append(txns, txn)
+		i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 	}
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -547,13 +549,18 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-			} else {
-				i.state.block = block
-
-				// send prepare message and wait for validations
-				i.sendPrepareMsg()
-				i.setState(ValidateState)
+				continue
 			}
+			if i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
+				i.logger.Error("block verification failed, block at the end of epoch has transactions")
+				i.handleStateErr(errBlockVerificationFailed)
+				continue
+			}
+
+			i.state.block = block
+			// send prepare message and wait for validations
+			i.sendPrepareMsg()
+			i.setState(ValidateState)
 		}
 	}
 }
