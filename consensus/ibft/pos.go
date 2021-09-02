@@ -40,9 +40,10 @@ func (i *Ibft) updateValidators(num uint64) error {
 	if !snap.Set.Equal(&validators) {
 		newSnap := snap.Copy()
 		newSnap.Set = validators
+		newSnap.Number = header.Number
+		newSnap.Hash = header.Hash.String()
+
 		if snap.Number != header.Number {
-			newSnap.Number = header.Number
-			newSnap.Hash = header.Hash.String()
 			i.store.add(newSnap)
 		} else {
 			i.store.replace(newSnap)
@@ -53,9 +54,27 @@ func (i *Ibft) updateValidators(num uint64) error {
 
 func (i *Ibft) batchUpdateValidators(from, to uint64) error {
 	for n := from; n <= to; n++ {
-		if err := i.updateValidators(n); err != nil {
-			return err
+		if i.IsLastOfEpoch(n) {
+			if err := i.updateValidators(n); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func (i *Ibft) GetEpoch(number uint64) uint64 {
+	if number%i.epochSize == 0 {
+		return number / i.epochSize
+	} else {
+		return number/i.epochSize + 1
+	}
+}
+
+func (i *Ibft) IsFirstOfEpoch(number uint64) bool {
+	return number%i.epochSize == 1
+}
+
+func (i *Ibft) IsLastOfEpoch(number uint64) bool {
+	return number > 0 && number%i.epochSize == 0
 }

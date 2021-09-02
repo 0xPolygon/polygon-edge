@@ -649,8 +649,12 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if err := i.updateValidators(header.Number); err != nil {
-		return err
+	if i.IsLastOfEpoch(header.Number) {
+		if err := i.updateValidators(header.Number); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("\n\nskip updateing validators\n\n")
 	}
 
 	i.logger.Info(
