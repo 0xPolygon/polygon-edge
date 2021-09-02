@@ -49,7 +49,7 @@ func (d *DevCommand) DefineFlags() {
 	}
 
 	d.FlagMap["gas-limit"] = helper.FlagDescriptor{
-		Description: "Sets the gas limit of each block. Default: 5000",
+		Description: fmt.Sprintf("Sets the gas limit of each block. Default: %d", helper.DefaultGasLimit),
 		Arguments: []string{
 			"GAS_LIMIT",
 		},
