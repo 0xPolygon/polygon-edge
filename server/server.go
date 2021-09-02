@@ -1,8 +1,7 @@
-package minimal
+package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -14,8 +13,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
-	"github.com/0xPolygon/polygon-sdk/minimal/proto"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/txpool"
@@ -256,7 +255,7 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	}
 	result, ok := snap.Get(key)
 	if !ok {
-		return nil, errors.New("given root and slot not found in storage")
+		return nil, jsonrpc.ErrStateNotFound
 	}
 	return result, nil
 }
