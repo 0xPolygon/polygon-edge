@@ -387,18 +387,20 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		return nil, err
 	}
 	txns := []*types.Transaction{}
-	for {
-		txn, retFn := i.txpool.Pop()
-		if txn == nil {
-			break
+	if !i.IsLastOfEpoch(header.Number) {
+		for {
+			txn, retFn := i.txpool.Pop()
+			if txn == nil {
+				break
+			}
+			if err := transition.Write(txn); err != nil {
+				retFn()
+				break
+			}
+			txns = append(txns, txn)
 		}
-		if err := transition.Write(txn); err != nil {
-			retFn()
-			break
-		}
-		txns = append(txns, txn)
+		i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 	}
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
 	_, root := transition.Commit()
 	header.StateRoot = root
