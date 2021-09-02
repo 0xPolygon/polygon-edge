@@ -549,13 +549,18 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-			} else {
-				i.state.block = block
-
-				// send prepare message and wait for validations
-				i.sendPrepareMsg()
-				i.setState(ValidateState)
+				continue
 			}
+			if i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
+				i.logger.Error("block verification failed, block at the end of epoch has transactions")
+				i.handleStateErr(errBlockVerificationFailed)
+				continue
+			}
+
+			i.state.block = block
+			// send prepare message and wait for validations
+			i.sendPrepareMsg()
+			i.setState(ValidateState)
 		}
 	}
 }
