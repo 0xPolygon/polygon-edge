@@ -111,6 +111,11 @@ func Test_decodeValidators(t *testing.T) {
 }
 
 func TestQueryValidators(t *testing.T) {
+	method := abis.StakingABI.Methods["validators"]
+	if method == nil {
+		t.Fail()
+	}
+
 	type MockArgs struct {
 		addr types.Address
 		tx   *types.Transaction
@@ -120,9 +125,6 @@ func TestQueryValidators(t *testing.T) {
 		res   *runtime.ExecutionResult
 		err   error
 	}
-
-	method := abis.StakingABI.Methods["validators"]
-	assert.NotNil(t, method)
 
 	tests := []struct {
 		name        string
