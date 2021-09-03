@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/contracts/abis"
-	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
@@ -38,7 +38,12 @@ func decodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, 
 	return addresses, nil
 }
 
-func QueryValidators(t *state.Transition, from types.Address) ([]types.Address, error) {
+type TxQueryHandler interface {
+	Apply(*types.Transaction) (*runtime.ExecutionResult, error)
+	GetNonce(types.Address) uint64
+}
+
+func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, error) {
 	method, ok := abis.StakingABI.Methods["validators"]
 	if !ok {
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
