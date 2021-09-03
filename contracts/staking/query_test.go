@@ -16,10 +16,6 @@ var (
 	addr2 = types.StringToAddress("2")
 )
 
-var (
-	hash1 = types.StringToHash("1")
-)
-
 func leftPad(buf []byte, n int) []byte {
 	l := len(buf)
 	if l > n {
