@@ -41,7 +41,7 @@ type JSONRPC struct {
 
 type dispatcherImpl interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
-	Handle([]byte) ([]byte, error)
+	Handle(reqBody []byte) ([]byte, error)
 }
 
 type Config struct {
@@ -198,10 +198,6 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	if (*req).Method == "OPTIONS" {
 		return
 	}
-
-	handleErr := func(err error) {
-		w.Write([]byte(err.Error()))
-	}
 	if req.Method == "GET" {
 		w.Write([]byte("PolygonSDK JSON-RPC"))
 		return
@@ -212,7 +208,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		handleErr(err)
+		w.Write([]byte(err.Error()))
 		return
 	}
 
@@ -220,10 +216,12 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	j.logger.Debug("handle", "request", string(data))
 
 	resp, err := j.dispatcher.Handle(data)
+
 	if err != nil {
-		handleErr(err)
-		return
+		w.Write([]byte(err.Error()))
+	} else {
+		w.Write(resp)
 	}
 	j.logger.Debug("handle", "response", string(resp))
-	w.Write(resp)
+
 }
