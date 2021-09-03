@@ -99,48 +99,48 @@ func TestIsFirstOfEpoch(t *testing.T) {
 
 func TestIsLastOfEpoch(t *testing.T) {
 	tests := []struct {
-		num     uint64
-		isFirst bool
+		num    uint64
+		isLast bool
 	}{
 		// genesis
 		{
-			num:     0,
-			isFirst: false,
+			num:    0,
+			isLast: false,
 		},
 		// first number
 		{
-			num:     1,
-			isFirst: false,
+			num:    1,
+			isLast: false,
 		},
 		{
-			num:     5,
-			isFirst: false,
+			num:    5,
+			isLast: false,
 		},
 		// end of first epoch
 		{
-			num:     10,
-			isFirst: true,
+			num:    10,
+			isLast: true,
 		},
 		// first of second epoch
 		{
-			num:     11,
-			isFirst: false,
+			num:    11,
+			isLast: false,
 		},
 		// last of second epoch
 		{
-			num:     20,
-			isFirst: true,
+			num:    20,
+			isLast: true,
 		},
 	}
 
 	for _, tt := range tests {
-		name := fmt.Sprintf("IsLastOfEpoch should return %t for number %d", tt.isFirst, tt.num)
+		name := fmt.Sprintf("IsLastOfEpoch should return %t for number %d", tt.isLast, tt.num)
 		t.Run(name, func(t *testing.T) {
 			ibft := &Ibft{
 				epochSize: TestEpochSize,
 			}
 			res := ibft.IsLastOfEpoch(tt.num)
-			assert.Equal(t, tt.isFirst, res)
+			assert.Equal(t, tt.isLast, res)
 		})
 	}
 }
