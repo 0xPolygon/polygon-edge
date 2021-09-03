@@ -319,7 +319,7 @@ var (
 	uninitializedAddress = types.Address{0x99}
 )
 
-func createInt64Pointer(x int64) *int64 {
+func createBlockNumberPointer(x BlockNumber) *BlockNumber {
 	return &x
 }
 
@@ -331,12 +331,12 @@ func TestEth_State_GetBalance(t *testing.T) {
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, createInt64Pointer(int64(LatestBlockNumber)))
+	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, createBlockNumberPointer(LatestBlockNumber))
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, createInt64Pointer(int64(LatestBlockNumber)))
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, createBlockNumberPointer(LatestBlockNumber))
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
 
@@ -351,7 +351,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 		name          string
 		initialNonces map[types.Address]uint64
 		target        types.Address
-		blockNumber   OptionalBlockNumber
+		blockNumber   *BlockNumber
 		succeeded     bool
 		expectedNonce *argUint64
 	}{
@@ -361,7 +361,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   createInt64Pointer(int64(LatestBlockNumber)),
+			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
 			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
@@ -371,7 +371,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr1,
-			blockNumber:   createInt64Pointer(int64(LatestBlockNumber)),
+			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
 			succeeded:     true,
 			expectedNonce: argUintPtr(0),
 		},
@@ -381,7 +381,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   createInt64Pointer(100),
+			blockNumber:   createBlockNumberPointer(100),
 			succeeded:     false,
 			expectedNonce: nil,
 		},
@@ -432,13 +432,13 @@ func TestEth_State_GetCode(t *testing.T) {
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	t.Run("Initialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, createInt64Pointer(int64(LatestBlockNumber)))
+		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, createBlockNumberPointer(LatestBlockNumber))
 		assert.NoError(t, err)
 		assert.Equal(t, code, argBytesPtr(code0))
 	})
 
 	t.Run("Uninitialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, createInt64Pointer(int64(LatestBlockNumber)))
+		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, createBlockNumberPointer(LatestBlockNumber))
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
 	})
@@ -456,7 +456,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 		initialStorage map[types.Address]map[types.Hash]types.Hash
 		address        types.Address
 		index          types.Hash
-		blockNumber    OptionalBlockNumber
+		blockNumber    *BlockNumber
 		succeeded      bool
 		expectedData   *argBytes
 	}{
@@ -469,7 +469,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash1,
-			blockNumber:  createInt64Pointer(int64(LatestBlockNumber)),
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr([]byte(hash1[:])),
 		},
@@ -482,7 +482,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createInt64Pointer(int64(LatestBlockNumber)),
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -495,7 +495,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createInt64Pointer(int64(LatestBlockNumber)),
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -508,7 +508,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createInt64Pointer(int64(100)),
+			blockNumber:  createBlockNumberPointer(100),
 			succeeded:    false,
 			expectedData: nil,
 		},
