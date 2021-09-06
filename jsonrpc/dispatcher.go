@@ -295,7 +295,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
 		d.logInternalError(req.Method, err)
-		return nil, NewInternalError("Internal error")
+		return nil, NewInvalidRequestError(err.Error())
 	}
 
 	var data []byte
