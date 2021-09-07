@@ -442,10 +442,7 @@ func (d *Dispatcher) isAccountAvailable(addr types.Address) (isAvailable bool) {
 		return false
 	}
 	_, err = d.store.GetAccount(header.StateRoot, addr)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 
 }
 func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
