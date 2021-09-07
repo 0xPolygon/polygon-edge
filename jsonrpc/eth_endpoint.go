@@ -1,11 +1,13 @@
 package jsonrpc
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/fastrlp"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -81,6 +83,9 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 
 // SendTransaction creates new message call transaction or a contract creation, if the data field contains code.
 func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
+	if !e.d.isAccountAvailable(*arg.From) {
+		return nil, errors.New("unknown account")
+	}
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
 		return nil, err
@@ -188,6 +193,10 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 // GetStorageAt returns the contract storage at the index position
 func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number BlockNumber) (interface{}, error) {
+	//Set the block number to latest
+	if BlockNumber(0) == number {
+		number = LatestBlockNumber
+	}
 	// Fetch the requested header
 	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
@@ -202,8 +211,17 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number Block
 		}
 		return nil, err
 	}
-
-	return argBytesPtr(result), nil
+	//Parse the RLP value
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(result)
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	data, err := v.Bytes()
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	return argBytesPtr(data), nil
 }
 
 // GasPrice returns the average gas price based on the last x blocks
@@ -471,6 +489,12 @@ func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (in
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, error) {
+
+	//Set the block number to latest
+	if BlockNumber(0) == number {
+		number = LatestBlockNumber
+	}
+
 	header, err := e.d.getBlockHeaderImpl(number)
 	if err != nil {
 		return nil, err
