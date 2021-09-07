@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -215,6 +216,7 @@ type mockStore struct {
 	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
+	accounts     map[types.Address]*state.Account
 }
 
 func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
@@ -222,7 +224,10 @@ func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*run
 }
 
 func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	panic("implement me")
+	if acc, ok := m.accounts[addr]; ok {
+		return acc, nil
+	}
+	return nil, errors.New("given root and slot not found in storage")
 }
 
 func (m *mockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
@@ -233,10 +238,15 @@ func (m *mockStore) GetCode(hash types.Hash) ([]byte, error) {
 	panic("implement me")
 }
 
+func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
+	m.accounts[addr] = account
+}
+
 func newMockStore() *mockStore {
 	return &mockStore{
 		header:       &types.Header{Number: 0},
 		subscription: blockchain.NewMockSubscription(),
+		accounts:     map[types.Address]*state.Account{},
 	}
 }
 
