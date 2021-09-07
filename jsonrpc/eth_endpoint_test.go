@@ -342,14 +342,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 				// If there is an error and test isn't expected to fail
 				t.Fatalf("Error: %v", logError)
 			} else if !testCase.shouldFail {
-				switch testCase.name {
-				case "Found matching logs, fromBlock < toBlock":
-					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-				case "Found matching logs, fromBlock == toBlock":
-					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-				case "No logs found":
-					assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-				}
+				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
 			}
 		})
 	}
