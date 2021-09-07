@@ -228,7 +228,7 @@ func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
 		return nil, err
 	}
 	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(BlockNumber(*number))
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
