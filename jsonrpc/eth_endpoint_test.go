@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -19,10 +20,10 @@ type mockAccount2 struct {
 	address types.Address
 	code    []byte
 	account *state.Account
-	storage map[types.Hash]types.Hash
+	storage map[types.Hash][]byte
 }
 
-func (m *mockAccount2) Storage(k, v types.Hash) {
+func (m *mockAccount2) Storage(k types.Hash, v []byte) {
 	m.storage[k] = v
 }
 
@@ -53,7 +54,7 @@ func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
 		store:   m,
 		address: addr,
 		account: &state.Account{},
-		storage: map[types.Hash]types.Hash{},
+		storage: make(map[types.Hash][]byte),
 	}
 	m.accounts[addr] = acct
 	return acct
@@ -89,7 +90,7 @@ func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot 
 	if !ok {
 		return nil, ErrStateNotFound
 	}
-	return val.Bytes(), nil
+	return val, nil
 }
 
 type mockBlockStore2 struct {
@@ -495,7 +496,10 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			for addr, storage := range tt.initialStorage {
 				account := store.AddAccount(addr)
 				for index, data := range storage {
-					account.Storage(index, data)
+					a := &fastrlp.Arena{}
+					value := a.NewBytes(data.Bytes())
+					newData := value.MarshalTo(nil)
+					account.Storage(index, newData)
 				}
 			}
 			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
@@ -513,8 +517,8 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 
 type mockStoreTxn struct {
 	nullBlockchainInterface
-
-	txn *types.Transaction
+	accounts map[types.Address]*mockAccount2
+	txn      *types.Transaction
 }
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
@@ -525,7 +529,30 @@ func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 func (m *mockStoreTxn) GetNonce(addr types.Address) (uint64, bool) {
 	return 1, false
 }
+func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
+	if m.accounts == nil {
+		m.accounts = map[types.Address]*mockAccount2{}
+	}
+	acct := &mockAccount2{
+		address: addr,
+		account: &state.Account{},
+		storage: make(map[types.Hash][]byte),
+	}
+	m.accounts[addr] = acct
+	return acct
+}
 
+func (m *mockStoreTxn) Header() *types.Header {
+	return &types.Header{}
+}
+
+func (m *mockStoreTxn) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	acct, ok := m.accounts[addr]
+	if !ok {
+		return nil, ErrStateNotFound
+	}
+	return acct.account, nil
+}
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
@@ -549,6 +576,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 
 func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
+	store.AddAccount(addr0)
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	arg := &txnArgs{
