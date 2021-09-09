@@ -42,8 +42,6 @@ func TestPoS_Stake(t *testing.T) {
 			config.SetEpochSize(2) // Need to leave room for the endblock
 			config.PremineValidatorBalance(defaultBalance)
 			config.Premine(stakerAddr, defaultBalance)
-
-			config.SetShowsLog(true)
 		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
