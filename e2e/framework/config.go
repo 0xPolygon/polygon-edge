@@ -1,8 +1,12 @@
 package framework
 
 import (
+	"crypto/ecdsa"
 	"math/big"
+	"path/filepath"
 
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -36,6 +40,21 @@ type TestServerConfig struct {
 	DevInterval             int           // Dev consensus update interval [s]
 	EpochSize               uint64        // The epoch size in blocks for the IBFT layer
 	ShowsLog                bool
+}
+
+// DataDir returns path of data directory server uses
+func (t *TestServerConfig) DataDir() string {
+	switch t.Consensus {
+	case ConsensusIBFT:
+		return filepath.Join(t.RootDir, t.IBFTDir)
+	default:
+		return t.RootDir
+	}
+}
+
+// PrivateKey returns a private key in data directory
+func (t *TestServerConfig) PrivateKey() (*ecdsa.PrivateKey, error) {
+	return crypto.GenerateOrReadPrivateKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // CALLBACKS //

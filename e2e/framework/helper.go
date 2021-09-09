@@ -107,6 +107,33 @@ func StakeAmount(
 	return nil
 }
 
+// UnstakeAmount is a helper function for unstaking the entire amount on the Staking SC
+func UnstakeAmount(
+	from types.Address,
+	senderKey *ecdsa.PrivateKey,
+	srv *TestServer,
+) (*web3.Receipt, error) {
+	// Stake Balance
+	txn := &PreparedTransaction{
+		From:     from,
+		To:       &staking.AddrStakingContract,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		Gas:      DefaultGasLimit,
+		Value:    big.NewInt(0),
+		Input:    MethodSig("unstake"),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to call Staking contract method, %v", err)
+	}
+
+	return receipt, nil
+}
+
 // GetStakedAmount is a helper function for getting the staked amount on the Staking SC
 func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, error) {
 	stakedAmountMethod, ok := abis.StakingABI.Methods["stakedAmount"]
