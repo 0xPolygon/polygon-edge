@@ -16,7 +16,7 @@ var (
 	AddrStakingContract = types.StringToAddress("1001")
 )
 
-func decodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
+func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
 		return nil, err
@@ -61,5 +61,5 @@ func QueryValidators(t *state.Transition, from types.Address) ([]types.Address, 
 		return nil, res.Err
 	}
 
-	return decodeValidators(method, res.ReturnValue)
+	return DecodeValidators(method, res.ReturnValue)
 }

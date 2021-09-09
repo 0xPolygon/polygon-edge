@@ -106,6 +106,15 @@ func (c *GenesisCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["epoch-size"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the epoch size for the chain. Default %d", ibft.DefaultEpochSize),
+		Arguments: []string{
+			"EPOCH_SIZE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -137,6 +146,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
+	var epochSize uint64
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
@@ -153,6 +163,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
+	flags.Uint64Var(&epochSize, "epoch-size", ibft.DefaultEpochSize, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -214,6 +225,13 @@ func (c *GenesisCommand) Run(args []string) int {
 			},
 		},
 		Bootnodes: bootnodes,
+	}
+
+	// Set the epoch size if the consensus is IBFT
+	if consensus == "ibft" {
+		cc.Params.Engine[consensus] = map[string]interface{}{
+			"epochSize": epochSize,
+		}
 	}
 
 	if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {

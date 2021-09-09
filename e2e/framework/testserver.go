@@ -195,6 +195,10 @@ func (t *TestServer) GenerateGenesis() error {
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}
+
+		if t.Config.EpochSize != 0 {
+			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
+		}
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
 	case ConsensusDummy:

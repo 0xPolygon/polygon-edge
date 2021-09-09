@@ -81,6 +81,15 @@ func Factory(
 	srv *grpc.Server,
 	logger hclog.Logger,
 ) (consensus.Consensus, error) {
+	var epochSize uint64
+	if definedEpochSize, ok := config.Config["epochSize"]; !ok {
+		// No epoch size defined, use the default one
+		epochSize = DefaultEpochSize
+	} else {
+		// Epoch size is defined, use the passed in one
+		epochSize = uint64(definedEpochSize.(float64))
+	}
+
 	p := &Ibft{
 		logger:       logger.Named("ibft"),
 		config:       config,
@@ -90,7 +99,7 @@ func Factory(
 		txpool:       txpool,
 		state:        &currentState{},
 		network:      network,
-		epochSize:    DefaultEpochSize,
+		epochSize:    epochSize,
 		syncNotifyCh: make(chan bool),
 		sealing:      sealing,
 	}

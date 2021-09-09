@@ -21,22 +21,25 @@ type SrvAccount struct {
 
 // TestServerConfig for the test server
 type TestServerConfig struct {
-	ReservedPorts []ReservedPort
-	JsonRPCPort   int           // The JSON RPC endpoint port
-	GRPCPort      int           // The GRPC endpoint port
-	LibP2PPort    int           // The Libp2p endpoint port
-	Seal          bool          // Flag indicating if blocks should be sealed
-	RootDir       string        // The root directory for test environment
-	IBFTDirPrefix string        // The prefix of data directory for IBFT
-	IBFTDir       string        // The name of data directory for IBFT
-	PremineAccts  []*SrvAccount // Accounts with existing balances (genesis accounts)
-	Consensus     ConsensusType // Consensus Type
-	Bootnodes     []string      // Bootnode Addresses
-	DevInterval   int           // Dev consensus update interval [s]
-	ShowsLog      bool
+	ReservedPorts           []ReservedPort
+	JsonRPCPort             int           // The JSON RPC endpoint port
+	GRPCPort                int           // The GRPC endpoint port
+	LibP2PPort              int           // The Libp2p endpoint port
+	Seal                    bool          // Flag indicating if blocks should be sealed
+	RootDir                 string        // The root directory for test environment
+	IBFTDirPrefix           string        // The prefix of data directory for IBFT
+	IBFTDir                 string        // The name of data directory for IBFT
+	PremineAccts            []*SrvAccount // Accounts with existing balances (genesis accounts)
+	GenesisValidatorBalance *big.Int      // Genesis balance for the validators
+	Consensus               ConsensusType // Consensus Type
+	Bootnodes               []string      // Bootnode Addresses
+	DevInterval             int           // Dev consensus update interval [s]
+	EpochSize               uint64        // The epoch size in blocks for the IBFT layer
+	ShowsLog                bool
 }
 
 // CALLBACKS //
+
 // Premine callback specifies an account with a balance (in WEI)
 func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
@@ -46,6 +49,11 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 		Addr:    addr,
 		Balance: amount,
 	})
+}
+
+// PremineValidatorBalance callback sets the genesis balance of the validator the server manages (in WEI)
+func (t *TestServerConfig) PremineValidatorBalance(balance *big.Int) {
+	t.GenesisValidatorBalance = balance
 }
 
 // SetConsensus callback sets consensus
@@ -81,4 +89,10 @@ func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 // SetShowsLog sets flag for logging
 func (t *TestServerConfig) SetShowsLog(f bool) {
 	t.ShowsLog = f
+}
+
+// SetEpochSize sets the epoch size for the consensus layer.
+// It controls the rate at which the validator set is updated
+func (t *TestServerConfig) SetEpochSize(epochSize uint64) {
+	t.EpochSize = epochSize
 }

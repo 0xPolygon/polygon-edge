@@ -12,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/contracts/abis"
+	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/minimal/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -43,6 +46,61 @@ func GetAccountBalance(
 	assert.NoError(t, err)
 
 	return accountBalance
+}
+
+// GetValidatorSet returns the validator set from the SC
+func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Address, error) {
+	validatorsMethod, ok := abis.StakingABI.Methods["validators"]
+	if !ok {
+		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
+	}
+
+	selector := validatorsMethod.ID()
+	response, err := rpcClient.Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(from),
+			To:       web3.Address(staking.AddrStakingContract),
+			Data:     selector[:],
+			GasPrice: 100000000,
+			Value:    big.NewInt(0),
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to call Staking contract method, %v", err)
+	}
+
+	byteResponse, decodeError := hex.DecodeHex(response)
+	if decodeError != nil {
+		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeError)
+	}
+
+	return staking.DecodeValidators(validatorsMethod, byteResponse)
+}
+
+// StakeAmount is a helper function for staking an amount on the Staking SC
+func StakeAmount(from types.Address, amount *big.Int, rpcClient *jsonrpc.Client) error {
+	stakeMethod, ok := abis.StakingABI.Methods["stake"]
+	if !ok {
+		return errors.New("stake method doesn't exist in Staking contract ABI")
+	}
+
+	selector := stakeMethod.ID()
+	_, err := rpcClient.Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(from),
+			To:       web3.Address(staking.AddrStakingContract),
+			Data:     selector[:],
+			GasPrice: 100000000,
+			Value:    amount,
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return fmt.Errorf("Unable to call Staking contract method, %v", err)
+	}
+
+	return nil
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
