@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -60,7 +61,7 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 		&web3.CallMsg{
 			From:     web3.Address(from),
 			To:       web3.Address(staking.AddrStakingContract),
-			Data:     selector[:],
+			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
 		},
@@ -79,28 +80,61 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 }
 
 // StakeAmount is a helper function for staking an amount on the Staking SC
-func StakeAmount(from types.Address, amount *big.Int, rpcClient *jsonrpc.Client) error {
-	stakeMethod, ok := abis.StakingABI.Methods["stake"]
-	if !ok {
-		return errors.New("stake method doesn't exist in Staking contract ABI")
+func StakeAmount(
+	from types.Address,
+	senderKey *ecdsa.PrivateKey,
+	amount *big.Int,
+	srv *TestServer,
+) error {
+	// Stake Balance
+	txn := &PreparedTransaction{
+		From:     from,
+		To:       &staking.AddrStakingContract,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    amount,
+		Input:    MethodSig("stake"),
 	}
 
-	selector := stakeMethod.ID()
-	_, err := rpcClient.Eth().Call(
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := srv.SendRawTx(ctx, txn, senderKey)
+
+	if err != nil {
+		return fmt.Errorf("unable to call Staking contract method, %v", err)
+	}
+
+	return nil
+}
+
+// GetStakedAmount is a helper function for getting the staked amount on the Staking SC
+func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, error) {
+	stakedAmountMethod, ok := abis.StakingABI.Methods["stakedAmount"]
+	if !ok {
+		return nil, errors.New("stakedAmount method doesn't exist in Staking contract ABI")
+	}
+
+	selector := stakedAmountMethod.ID()
+	response, err := rpcClient.Eth().Call(
 		&web3.CallMsg{
 			From:     web3.Address(from),
 			To:       web3.Address(staking.AddrStakingContract),
-			Data:     selector[:],
+			Data:     selector,
 			GasPrice: 100000000,
-			Value:    amount,
+			Value:    big.NewInt(0),
 		},
 		web3.Latest,
 	)
 	if err != nil {
-		return fmt.Errorf("Unable to call Staking contract method, %v", err)
+		return nil, fmt.Errorf("Unable to call Staking contract method, %v", err)
 	}
 
-	return nil
+	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("Unable to decode hex response")
+	}
+
+	return bigResponse, nil
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
