@@ -187,9 +187,12 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number BlockNumber) (interface{}, error) {
+func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
+	if number == nil {
+		return nil, fmt.Errorf("block parameter is required")
+	}
 	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -216,13 +219,16 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
+	if number == nil {
+		return nil, fmt.Errorf("block parameter is required")
+	}
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
 		return nil, err
 	}
 	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -442,8 +448,11 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 }
 
 // GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.d.getBlockHeaderImpl(number)
+func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
+	if number == nil {
+		return nil, fmt.Errorf("block parameter is required")
+	}
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -458,8 +467,11 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (interface{}, error) {
-	nonce, err := e.d.getNextNonce(address, number)
+func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
+	if number == nil {
+		return nil, fmt.Errorf("block parameter is required")
+	}
+ 	nonce, err := e.d.getNextNonce(address, *number)
 	if err != nil {
 		if err == ErrStateNotFound {
 			return argUintPtr(0), nil
@@ -470,8 +482,11 @@ func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (in
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.d.getBlockHeaderImpl(number)
+func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
+	if number == nil {
+		return nil, fmt.Errorf("block parameter is required")
+	}
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
