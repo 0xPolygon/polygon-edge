@@ -2,7 +2,9 @@ package network
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -208,4 +210,41 @@ func TestNat(t *testing.T) {
 
 		assert.True(t, found)
 	})
+}
+
+func TestSelfConnection_WithBootNodes(t *testing.T) {
+
+	//Create a temporary directory for storing the key file
+	directoryName, err := ioutil.TempDir(os.TempDir(), "")
+	assert.NoError(t, err)
+	key, err := ReadLibp2pKey(directoryName)
+	assert.NoError(t, err)
+	peerId, err := peer.IDFromPrivateKey(key)
+	assert.NoError(t, err)
+
+	t.Run("Server bootnodes list should be empty", func(t *testing.T) {
+		hostSelfAddr := "/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()
+		conf := func(c *Config) {
+			c.NoDiscover = false
+			c.DataDir = directoryName
+			c.Chain.Bootnodes = []string{hostSelfAddr}
+		}
+		srv0 := CreateServer(t, conf)
+		assert.Empty(t, srv0.discovery.bootnodes)
+	})
+
+	t.Run("Server bootnodes list should not contain host peer address", func(t *testing.T) {
+		hostSelfAddr := "/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()
+		peerAddr := "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"
+		conf := func(c *Config) {
+			c.NoDiscover = false
+			c.DataDir = directoryName
+			c.Chain.Bootnodes = []string{hostSelfAddr, peerAddr}
+		}
+		srv0 := CreateServer(t, conf)
+		assert.NotContains(t, srv0.discovery.bootnodes, hostSelfAddr)
+	})
+
+	//remove the temporary directory
+	assert.NoError(t, os.RemoveAll(directoryName))
 }
