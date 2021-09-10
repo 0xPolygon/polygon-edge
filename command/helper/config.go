@@ -22,6 +22,7 @@ type Config struct {
 	JSONRPCAddr string                 `json:"jsonrpc_addr"`
 	Network     *Network               `json:"network"`
 	Seal        bool                   `json:"seal"`
+	TxPool      *TxPool                `json:"tx_pool"`
 	LogLevel    string                 `json:"log_level"`
 	Consensus   map[string]interface{} `json:"consensus"`
 	Dev         bool
@@ -37,6 +38,11 @@ type Network struct {
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
+// TxPool defines the TxPool configuration params
+type TxPool struct {
+	PriceLimit uint64 `json:"price_limit"`
+}
+
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
@@ -46,7 +52,10 @@ func DefaultConfig() *Config {
 			NoDiscover: false,
 			MaxPeers:   20,
 		},
-		Seal:      false,
+		Seal: false,
+		TxPool: &TxPool{
+			PriceLimit: 1,
+		},
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
 	}
@@ -65,6 +74,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	conf.Chain = cc
 	conf.Seal = c.Seal
+	conf.PriceLimit = c.TxPool.PriceLimit
 	conf.DataDir = c.DataDir
 
 	// JSON RPC + GRPC
@@ -186,6 +196,8 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 			c.Network.NoDiscover = true
 		}
 	}
+
+	c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
 		return err

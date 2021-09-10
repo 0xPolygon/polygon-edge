@@ -29,10 +29,19 @@ var (
 	ErrNegativeValue       = errors.New("negative value")
 	ErrNonEncryptedTxn     = errors.New("non-encrypted transaction")
 	ErrInvalidSender       = errors.New("invalid sender")
+	ErrUnderpriced         = errors.New("transaction underpriced")
 	ErrNonceTooLow         = errors.New("nonce too low")
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
+)
+
+type TxOrigin = string
+
+const (
+	OriginAddTxn TxOrigin = "addTxn"
+	OriginReorg  TxOrigin = "reorg"
+	OriginGossip TxOrigin = "gossip"
 )
 
 var topicNameV1 = "txpool/0.1"
@@ -78,6 +87,9 @@ type TxPool struct {
 	// Flag indicating if the current node is running in dev mode
 	dev bool
 
+	// priceLimit is a lower threshold for gas price
+	priceLimit uint64
+
 	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
@@ -89,6 +101,7 @@ type TxPool struct {
 func NewTxPool(
 	logger hclog.Logger,
 	sealing bool,
+	priceLimit uint64,
 	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
@@ -101,6 +114,7 @@ func NewTxPool(
 		accountQueues: make(map[types.Address]*txHeapWrapper),
 		pendingQueue:  newTxPriceHeap(),
 		sealing:       sealing,
+		priceLimit:    priceLimit,
 		forks:         forks,
 	}
 
@@ -143,7 +157,7 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
-		if err := t.addImpl("gossip", txn); err != nil {
+		if err := t.addImpl(OriginGossip, txn); err != nil {
 			t.logger.Error("failed to add broadcasted txn", "err", err)
 		}
 	}
@@ -156,7 +170,7 @@ func (t *TxPool) EnableDev() {
 
 // AddTx adds a new transaction to the pool and broadcasts it if networking is enabled
 func (t *TxPool) AddTx(tx *types.Transaction) error {
-	if err := t.addImpl("addTxn", tx); err != nil {
+	if err := t.addImpl(OriginAddTxn, tx); err != nil {
 		return err
 	}
 
@@ -184,12 +198,12 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 
 // addImpl validates the tx and adds it to the appropriate account transaction queue.
 // Additionally, it updates the global valid transactions queue
-func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
+func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
 
-	err := t.validateTx(tx)
+	err := t.validateTx(ctx, tx)
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
@@ -301,7 +315,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// try to include again the transactions in the pendingQueue list
 	for _, txn := range addTxns {
-		if err := t.addImpl("reorg", txn); err != nil {
+		if err := t.addImpl(OriginReorg, txn); err != nil {
 			t.logger.Error("failed to add txn", "err", err)
 		}
 	}
@@ -313,7 +327,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
-func (t *TxPool) validateTx(tx *types.Transaction) error {
+func (t *TxPool) validateTx(ctx TxOrigin, tx *types.Transaction) error {
 	// Check if the transaction has a strictly positive value
 	if tx.Value.Sign() < 0 {
 		return ErrNegativeValue
@@ -332,6 +346,11 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		if signerErr != nil {
 			return ErrInvalidSender
 		}
+	}
+
+	// Ignore non-local transactions under priceLimit
+	if ctx != OriginAddTxn && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
+		return ErrUnderpriced
 	}
 
 	// Grab the state root for the latest block

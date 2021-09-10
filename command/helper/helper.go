@@ -29,6 +29,7 @@ const (
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
 	DefaultGasLimit       = 5000
+	DefaultPriceLimit     = 1
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -344,6 +345,9 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 			NoDiscover: true,
 			MaxPeers:   0,
 		},
+		TxPool: &TxPool{
+			PriceLimit: 0,
+		},
 	}
 	cliConfig.Seal = true
 	cliConfig.Dev = true
@@ -387,6 +391,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 	cliConfig := &Config{
 		Network: &Network{},
+		TxPool:  &TxPool{},
 	}
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
@@ -405,6 +410,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 

@@ -125,6 +125,14 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["price-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Arguments: []string{
+			"PRICE_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["dev"] = helper.FlagDescriptor{
 		Description: "Sets the client to dev mode. Default: false",
 		Arguments: []string{

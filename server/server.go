@@ -127,7 +127,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
+		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.config.PriceLimit, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
 		if err != nil {
 			return nil, err
 		}

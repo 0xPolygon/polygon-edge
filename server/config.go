@@ -18,9 +18,10 @@ type Config struct {
 	GRPCAddr    *net.TCPAddr
 	LibP2PAddr  *net.TCPAddr
 
-	Network *network.Config
-	DataDir string
-	Seal    bool
+	Network    *network.Config
+	DataDir    string
+	Seal       bool
+	PriceLimit uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
