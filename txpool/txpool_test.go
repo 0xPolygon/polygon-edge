@@ -22,6 +22,10 @@ var forks = &chain.Forks{
 	Istanbul:  chain.NewFork(0),
 }
 
+const (
+	defaultPriceLimit uint64 = 1
+)
+
 type mockStore struct {
 }
 
@@ -73,7 +77,7 @@ func TestAddingTransaction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 			if err != nil {
 				t.Fatal("Failed to initialize transaction pool:", err)
 			}
@@ -107,7 +111,7 @@ func TestAddingTransaction(t *testing.T) {
 
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -141,7 +145,7 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -204,7 +208,7 @@ func TestBroadcast(t *testing.T) {
 
 	createPool := func() (*TxPool, *network.Server) {
 		server := network.CreateServer(t, nil)
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, server)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, server)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 		return pool, server
@@ -230,7 +234,7 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -275,7 +279,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	addr2 := types.Address{0x2}
 
 	test := func(t *testing.T, testTable []TestCase) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 
@@ -348,7 +352,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 
 	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 
@@ -374,12 +378,12 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 }
 
-func generateTx(from types.Address, value *big.Int) *types.Transaction {
+func generateTx(from types.Address, value, gasPrice *big.Int) *types.Transaction {
 	return &types.Transaction{
 		From:     from,
 		Nonce:    0,
 		Gas:      validGasLimit,
-		GasPrice: big.NewInt(1),
+		GasPrice: gasPrice,
 		Value:    value,
 	}
 }
@@ -408,6 +412,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 		name          string
 		refAddress    types.Address
 		txValue       *big.Int
+		gasPrice      *big.Int
 		mockStore     store
 		expectedError error
 		devMode       bool
@@ -417,6 +422,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			"ErrNegativeValue",
 			types.Address{0x1},
 			big.NewInt(-5),
+			big.NewInt(1),
 			&mockStore{},
 			ErrNegativeValue,
 			true,
@@ -426,6 +432,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			"ErrNonEncryptedTxn",
 			types.Address{0x1},
 			big.NewInt(0),
+			big.NewInt(1),
 			&mockStore{},
 			ErrNonEncryptedTxn,
 			false,
@@ -435,6 +442,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			"ErrInvalidSender",
 			types.ZeroAddress,
 			big.NewInt(0),
+			big.NewInt(1),
 			&mockStore{},
 			ErrInvalidSender,
 			true,
@@ -444,15 +452,26 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			"ErrInvalidAccountState",
 			types.Address{0x1},
 			big.NewInt(1),
+			big.NewInt(1),
 			&faultyMockStore{},
 			ErrInvalidAccountState,
+			true,
+		},
+		{
+			// Transaction's GasPrice should exceed GasLimit in TxPool configuration
+			"ErrUnderpriced",
+			types.Address{0x1},
+			big.NewInt(1),
+			big.NewInt(0),
+			&faultyMockStore{},
+			ErrUnderpriced,
 			true,
 		},
 	}
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), testCase.mockStore, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), testCase.mockStore, nil, nil)
 			assert.NoError(t, err)
 			if testCase.devMode {
 				pool.EnableDev()
@@ -461,7 +480,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			pool.AddSigner(poolSigner)
 
 			refAddress := testCase.refAddress
-			txn := generateTx(refAddress, testCase.txValue)
+			txn := generateTx(refAddress, testCase.txValue, testCase.gasPrice)
 
 			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
 
@@ -472,7 +491,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 }
 
 func TestTxnOperatorAddNilRaw(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 
 	txnReq := new(proto.AddTxnReq)

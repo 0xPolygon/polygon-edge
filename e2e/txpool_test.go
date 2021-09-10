@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
@@ -275,4 +277,82 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		toAccountBalance.String(),
 		"To address balance mismatch after gap transaction",
 	)
+}
+
+func TestGasLimit(t *testing.T) {
+	testCases := []struct {
+		name             string
+		numNodes         int
+		gasPrice         int64
+		numReceivedNodes int64
+	}{
+		{
+			name:             "tx should not propagate if gas price is zero",
+			numNodes:         5,
+			gasPrice:         0,
+			numReceivedNodes: 1, // only first node receive
+		},
+		{
+			name:             "tx should propagate",
+			numNodes:         5,
+			gasPrice:         100,
+			numReceivedNodes: 5,
+		},
+	}
+
+	signer := &crypto.FrontierSigner{}
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+
+	conf := func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDummy)
+		config.Premine(senderAddr, framework.EthToWei(10))
+		config.SetSeal(true)
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			srvs := framework.NewTestServers(t, tt.numNodes, conf)
+			framework.MultiJoinSerial(t, srvs)
+
+			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+			time.Sleep(time.Second * 2)
+
+			tx, err := signer.SignTx(&types.Transaction{
+				Nonce:    0,
+				From:     senderAddr,
+				To:       &receiverAddr,
+				Value:    framework.EthToWei(1),
+				Gas:      1000000,
+				GasPrice: big.NewInt(tt.gasPrice),
+				Input:    []byte{},
+			}, senderKey)
+			assert.NoError(t, err, "failed to sign transaction")
+
+			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
+			assert.NoError(t, err, "failed to send transaction")
+
+			for i, srv := range srvs {
+				shouldHaveTxPool := false
+				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
+				if i < int(tt.numReceivedNodes) {
+					shouldHaveTxPool = true
+					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
+				}
+
+				t.Run(subTestName, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
+
+					if shouldHaveTxPool {
+						assert.NoError(t, err)
+						assert.Equal(t, uint64(1), res.Length)
+					} else {
+						assert.ErrorIs(t, err, framework.ErrTimeout)
+					}
+				})
+			}
+		})
+	}
 }
