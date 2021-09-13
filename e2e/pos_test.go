@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -331,5 +332,154 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		zeroEth.String(),
 		actualStakingSCBalance.String(),
 		"Staked address balance mismatch after unstake exploit",
+	)
+}
+
+// generateStakingAddresses is a helper method for generating dummy staking addresses
+func generateStakingAddresses(numAddresses int) []types.Address {
+	result := make([]types.Address, numAddresses)
+
+	for i := 0; i < numAddresses; i++ {
+		result[i] = types.StringToAddress(strconv.Itoa(i + 100))
+	}
+
+	return result
+}
+
+// Test scenario:
+// User has 10 ETH staked and a balance of 100 ETH
+// Unstake -> Stake 1 ETH -> Unstake -> Stake 1 ETH...
+// The code below tests (numTransactions / 2) cycles of Unstake -> Stake 1 ETH
+// Expected result for tests: Staked: 1 ETH; Balance: ~119 ETH
+func TestPoS_StakeUnstakeExploit(t *testing.T) {
+	// Predefined values
+	stakingContractAddr := staking.AddrStakingContract
+	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
+	defaultBalance := framework.EthToWei(100)
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	numDummyStakers := 100
+
+	devInterval := 10 // s
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.Premine(senderAddr, defaultBalance)
+		// This call will add numDummyStakers + 1 staking address to the staking SC.
+		// This is done in order to pump the stakedAmount value on the staking SC
+		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyStakers), senderAddr))
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	initialStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
+	if fetchError != nil {
+		t.Fatalf("Unable to fetch staking SC balance, %v", fetchError)
+	}
+
+	assert.Equalf(t,
+		(big.NewInt(0).Mul(big.NewInt(int64(numDummyStakers+1)), bigDefaultStakedBalance)).String(),
+		initialStakingSCBalance.String(),
+		"Staked address balance mismatch before stake / unstake exploit",
+	)
+
+	// Required default values
+	numTransactions := 6
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 0
+
+	// TxPool client
+	txpoolClient := srv.TxnPoolOperator()
+
+	generateTx := func(value *big.Int, methodName string) *types.Transaction {
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &stakingContractAddr,
+			GasPrice: bigGasPrice,
+			Gas:      framework.DefaultGasLimit,
+			Value:    value,
+			V:        []byte{1}, // it is necessary to encode in rlp
+			Input:    framework.MethodSig(methodName),
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	oneEth := framework.EthToWei(1)
+	zeroEth := framework.EthToWei(0)
+	for i := 0; i < numTransactions; i++ {
+		var msg *txpoolOp.AddTxnReq
+		if i%2 == 0 {
+			unstakeTxn := generateTx(zeroEth, "unstake")
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: unstakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		} else {
+			stakeTxn := generateTx(oneEth, "stake")
+			msg = &txpoolOp.AddTxnReq{
+				Raw: &any.Any{
+					Value: stakeTxn.MarshalRLP(),
+				},
+				From: types.ZeroAddress.String(),
+			}
+		}
+
+		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn, %v", addErr)
+		}
+	}
+
+	// Set up the blockchain listener to catch the added block event
+	blockNum := waitForBlock(t, srv, 1, 0)
+
+	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
+	if blockErr != nil {
+		t.Fatalf("Unable to fetch block")
+	}
+
+	// Find how much the account paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+
+	// Check the balances
+	actualAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	actualStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
+	if fetchError != nil {
+		t.Fatalf("Unable to fetch staking SC balance, %v", fetchError)
+	}
+
+	expStake := big.NewInt(0).Mul(big.NewInt(int64(numDummyStakers)), bigDefaultStakedBalance)
+	expStake.Add(expStake, oneEth)
+
+	assert.Equalf(t,
+		expStake.String(),
+		actualStakingSCBalance.String(),
+		"Staked address balance mismatch after stake / unstake exploit",
+	)
+
+	// Make sure the account balances match up
+
+	// expBalance = previousAccountBalance + stakeRefund - 1 ETH - block fees
+	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(defaultBalance, bigDefaultStakedBalance), oneEth)
+	expBalance = big.NewInt(0).Sub(expBalance, paidFee)
+
+	assert.Equalf(t,
+		expBalance.String(),
+		actualAccountBalance.String(),
+		"Account balance mismatch after stake / unstake exploit",
 	)
 }
