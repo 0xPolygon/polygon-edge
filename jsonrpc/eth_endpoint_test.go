@@ -320,6 +320,9 @@ var (
 	uninitializedAddress = types.Address{0x99}
 )
 
+func createBlockNumberPointer(x BlockNumber) *BlockNumber {
+	return &x
+}
 func TestEth_State_GetBalance(t *testing.T) {
 	store := &mockAccountStore{}
 
@@ -328,12 +331,12 @@ func TestEth_State_GetBalance(t *testing.T) {
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, LatestBlockNumber)
+	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, createBlockNumberPointer(LatestBlockNumber))
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, LatestBlockNumber)
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, createBlockNumberPointer(LatestBlockNumber))
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
 }
@@ -343,7 +346,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 		name          string
 		initialNonces map[types.Address]uint64
 		target        types.Address
-		blockNumber   BlockNumber
+		blockNumber   *BlockNumber
 		succeeded     bool
 		expectedNonce *argUint64
 	}{
@@ -353,7 +356,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   LatestBlockNumber,
+			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
 			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
@@ -363,7 +366,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr1,
-			blockNumber:   LatestBlockNumber,
+			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
 			succeeded:     true,
 			expectedNonce: argUintPtr(0),
 		},
@@ -373,7 +376,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   100,
+			blockNumber:   createBlockNumberPointer(100),
 			succeeded:     false,
 			expectedNonce: nil,
 		},
@@ -414,13 +417,13 @@ func TestEth_State_GetCode(t *testing.T) {
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	t.Run("Initialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, LatestBlockNumber)
+		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, createBlockNumberPointer(LatestBlockNumber))
 		assert.NoError(t, err)
 		assert.Equal(t, code, argBytesPtr(code0))
 	})
 
 	t.Run("Uninitialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, LatestBlockNumber)
+		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, createBlockNumberPointer(LatestBlockNumber))
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
 	})
@@ -432,7 +435,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 		initialStorage map[types.Address]map[types.Hash]types.Hash
 		address        types.Address
 		index          types.Hash
-		blockNumber    BlockNumber
+		blockNumber    *BlockNumber
 		succeeded      bool
 		expectedData   *argBytes
 	}{
@@ -445,7 +448,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash1,
-			blockNumber:  LatestBlockNumber,
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr([]byte(hash1[:])),
 		},
@@ -458,7 +461,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  LatestBlockNumber,
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -471,7 +474,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  LatestBlockNumber,
+			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -484,7 +487,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  100,
+			blockNumber:  createBlockNumberPointer(100),
 			succeeded:    false,
 			expectedData: nil,
 		},
