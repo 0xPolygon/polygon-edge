@@ -11,8 +11,11 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
@@ -27,6 +30,17 @@ func foundInValidatorSet(validatorSet []types.Address, searchValidator types.Add
 	}
 
 	return false
+}
+
+// getBigDefaultStakedBalance returns the default staked balance as a *big.Int
+func getBigDefaultStakedBalance(t *testing.T) *big.Int {
+	val := helper.DefaultStakedBalance
+	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		t.Fatalf("unable to parse DefaultStakedBalance, %v", err)
+	}
+
+	return bigDefaultStakedBalance
 }
 
 // validateValidatorSet makes sure that the address is present / not present in the
@@ -99,11 +113,7 @@ func TestPoS_Stake(t *testing.T) {
 	validateValidatorSet(stakerAddr, client, t, true, numGenesisValidators+1)
 
 	// Check the SC balance
-	val := helper.DefaultStakedBalance
-	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		t.Fatalf("unable to generate DefaultStatkedBalance, %v", err)
-	}
+	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 
 	scBalance := framework.GetAccountBalance(staking.AddrStakingContract, client, t)
 	expectedBalance := big.NewInt(0).Mul(
@@ -169,11 +179,7 @@ func TestPoS_Unstake(t *testing.T) {
 	validateValidatorSet(unstakerAddr, client, t, false, numGenesisValidators-1)
 
 	// Check the SC balance
-	val := helper.DefaultStakedBalance
-	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		t.Fatalf("unable to generate DefaultStatkedBalance, %v", err)
-	}
+	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 
 	scBalance := framework.GetAccountBalance(staking.AddrStakingContract, client, t)
 	expectedBalance := big.NewInt(0).Mul(
@@ -202,4 +208,128 @@ func TestPoS_Unstake(t *testing.T) {
 	expectedAccountBalance.Sub(expectedAccountBalance, fee)
 
 	assert.Equal(t, expectedAccountBalance.String(), accountBalance.String())
+}
+
+// Test scenario:
+// User has 10 ETH staked and a balance of 10 ETH
+// Unstake -> Unstake -> Unstake -> Unstake...
+// The code below tests numTransactions cycles of Unstake
+// Expected result for tests: Staked: 0 ETH; Balance: ~20 ETH
+func TestPoS_UnstakeExploit(t *testing.T) {
+	// Predefined values
+	stakingContractAddr := staking.AddrStakingContract
+
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
+	defaultBalance := framework.EthToWei(100)
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+
+	devInterval := 10 // s
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.Premine(senderAddr, defaultBalance)
+		config.SetDevStakingAddresses([]types.Address{senderAddr})
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	previousAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+
+	// Check if the stake is present on the SC
+	actualStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
+	if fetchError != nil {
+		t.Fatalf("Unable to fetch staking SC balance, %v", fetchError)
+	}
+
+	assert.Equalf(t,
+		bigDefaultStakedBalance.String(),
+		actualStakingSCBalance.String(),
+		"Staked address balance mismatch before unstake exploit",
+	)
+
+	// Required default values
+	numTransactions := 5
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 0
+
+	// TxPool client
+	clt := srv.TxnPoolOperator()
+
+	generateTx := func() *types.Transaction {
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &stakingContractAddr,
+			GasPrice: bigGasPrice,
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			V:        []byte{1}, // it is necessary to encode in rlp,
+			Input:    framework.MethodSig("unstake"),
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	zeroEth := framework.EthToWei(0)
+	for i := 0; i < numTransactions; i++ {
+		var msg *txpoolOp.AddTxnReq
+		unstakeTxn := generateTx()
+
+		msg = &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: unstakeTxn.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		}
+
+		_, addErr := clt.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn, %v", addErr)
+		}
+	}
+
+	// Set up the blockchain listener to catch the added block event
+	blockNum := waitForBlock(t, srv, 1, 0)
+
+	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), true)
+	if blockErr != nil {
+		t.Fatalf("Unable to fetch block")
+	}
+
+	// Find how much the account paid for all the transactions in this block
+	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
+
+	// Check the balances
+	actualAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	actualStakingSCBalance, fetchError = framework.GetStakedAmount(senderAddr, client)
+	if fetchError != nil {
+		t.Fatalf("Unable to fetch staking SC balance, %v", fetchError)
+	}
+
+	// Make sure the balances match up
+
+	// expBalance = previousAccountBalance + stakeRefund - block fees
+	expBalance := big.NewInt(0).Sub(big.NewInt(0).Add(previousAccountBalance, bigDefaultStakedBalance), paidFee)
+
+	assert.Equalf(t,
+		expBalance.String(),
+		actualAccountBalance.String(),
+		"Account balance mismatch after unstake exploit",
+	)
+
+	assert.Equalf(t,
+		zeroEth.String(),
+		actualStakingSCBalance.String(),
+		"Staked address balance mismatch after unstake exploit",
+	)
 }

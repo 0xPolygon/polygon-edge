@@ -209,6 +209,15 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
+	// Check if any addresses should be prestaked in the dev consensus
+	if consensus == "dev" {
+		if len(ibftValidators) != 0 {
+			for _, val := range ibftValidators {
+				validators = append(validators, types.StringToAddress(val))
+			}
+		}
+	}
+
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{

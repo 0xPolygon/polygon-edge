@@ -26,19 +26,20 @@ type SrvAccount struct {
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
-	JsonRPCPort             int           // The JSON RPC endpoint port
-	GRPCPort                int           // The GRPC endpoint port
-	LibP2PPort              int           // The Libp2p endpoint port
-	Seal                    bool          // Flag indicating if blocks should be sealed
-	RootDir                 string        // The root directory for test environment
-	IBFTDirPrefix           string        // The prefix of data directory for IBFT
-	IBFTDir                 string        // The name of data directory for IBFT
-	PremineAccts            []*SrvAccount // Accounts with existing balances (genesis accounts)
-	GenesisValidatorBalance *big.Int      // Genesis balance for the validators
-	Consensus               ConsensusType // Consensus Type
-	Bootnodes               []string      // Bootnode Addresses
-	DevInterval             int           // Dev consensus update interval [s]
-	EpochSize               uint64        // The epoch size in blocks for the IBFT layer
+	JsonRPCPort             int             // The JSON RPC endpoint port
+	GRPCPort                int             // The GRPC endpoint port
+	LibP2PPort              int             // The Libp2p endpoint port
+	Seal                    bool            // Flag indicating if blocks should be sealed
+	RootDir                 string          // The root directory for test environment
+	IBFTDirPrefix           string          // The prefix of data directory for IBFT
+	IBFTDir                 string          // The name of data directory for IBFT
+	PremineAccts            []*SrvAccount   // Accounts with existing balances (genesis accounts)
+	GenesisValidatorBalance *big.Int        // Genesis balance for the validators
+	DevStakers              []types.Address // List of initial staking addresses for the staking SC with dev consensus
+	Consensus               ConsensusType   // Consensus Type
+	Bootnodes               []string        // Bootnode Addresses
+	DevInterval             int             // Dev consensus update interval [s]
+	EpochSize               uint64          // The epoch size in blocks for the IBFT layer
 	ShowsLog                bool
 }
 
@@ -83,6 +84,14 @@ func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 // SetDevInterval sets the update interval for the dev consensus
 func (t *TestServerConfig) SetDevInterval(interval int) {
 	t.DevInterval = interval
+}
+
+// SetDevStakingAddresses sets the Staking smart contract staker addresses for the dev mode.
+// These addresses should be passed into the `ibft-validator` flag in genesis generation.
+// Since invoking the dev consensus will not generate the ibft base folders, this is the only way
+// to signalize to the genesis creation process who the validators are
+func (t *TestServerConfig) SetDevStakingAddresses(stakingAddresses []types.Address) {
+	t.DevStakers = stakingAddresses
 }
 
 // SetIBFTDirPrefix callback sets prefix of IBFT directories

@@ -201,6 +201,11 @@ func (t *TestServer) GenerateGenesis() error {
 		}
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
+
+		// Set up any initial staker addresses for the predeployed Staking SC
+		for _, stakerAddress := range t.Config.DevStakers {
+			args = append(args, "--ibft-validator", stakerAddress.String())
+		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
