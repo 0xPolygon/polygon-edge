@@ -320,10 +320,6 @@ var (
 	uninitializedAddress = types.Address{0x99}
 )
 
-func createBlockNumberPointer(x BlockNumber) *BlockNumber {
-	return &x
-}
-
 func TestEth_State_GetBalance(t *testing.T) {
 	store := &mockAccountStore{}
 
@@ -342,9 +338,9 @@ func TestEth_State_GetBalance(t *testing.T) {
 	assert.Equal(t, balance, argUintPtr(0))
 
 	// block number not passed
-	_, err = dispatcher.endpoints.Eth.GetBalance(addr0, nil)
-	assert.Error(t, err)
-	assert.Equal(t, err.Error(), "block parameter is required")
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr0, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
@@ -393,7 +389,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 			},
 			target:        addr0,
 			blockNumber:   nil,
-			succeeded:     false,
+			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
 	}
@@ -445,9 +441,9 @@ func TestEth_State_GetCode(t *testing.T) {
 	})
 
 	t.Run("No block number passed should error", func(t *testing.T) {
-		_, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, nil)
-		assert.Error(t, err)
-		assert.Equal(t, err.Error(), "block parameter is required")
+		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, code, "0x")
 	})
 }
 
@@ -523,8 +519,8 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			address:      addr0,
 			index:        hash2,
 			blockNumber:  nil,
-			succeeded:    false,
-			expectedData: nil,
+			succeeded:    true,
+			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
 	}
 
