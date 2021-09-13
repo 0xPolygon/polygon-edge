@@ -195,7 +195,6 @@ func (c *ServerCommand) Run(args []string) int {
 
 		return 1
 	}
-	fmt.Printf("\n\nconf %+v\n\n", conf.TxPool)
 
 	config, err := conf.BuildConfig()
 	if err != nil {
@@ -203,8 +202,6 @@ func (c *ServerCommand) Run(args []string) int {
 
 		return 1
 	}
-
-	fmt.Printf("\n\nconfig %+v\n\n", config)
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:  "polygon",
