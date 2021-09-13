@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 const DefaultGRPCPort int = 9632
@@ -21,6 +22,8 @@ type Config struct {
 	Network    *network.Config
 	DataDir    string
 	Seal       bool
+	Locals     []types.Address
+	NoLocals   bool
 	PriceLimit uint64
 }
 

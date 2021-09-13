@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )
@@ -40,6 +41,8 @@ type Network struct {
 
 // TxPool defines the TxPool configuration params
 type TxPool struct {
+	Locals     string `json:"locals"`
+	NoLocals   bool   `json:"no_locals"`
 	PriceLimit uint64 `json:"price_limit"`
 }
 
@@ -74,7 +77,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	conf.Chain = cc
 	conf.Seal = c.Seal
-	conf.PriceLimit = c.TxPool.PriceLimit
 	conf.DataDir = c.DataDir
 
 	// JSON RPC + GRPC
@@ -107,6 +109,19 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Network.MaxPeers = c.Network.MaxPeers
 
 		conf.Chain = cc
+	}
+
+	// TxPool
+	{
+		if c.TxPool.Locals != "" {
+			strAddrs := strings.Split(c.TxPool.Locals, ",")
+			conf.Locals = make([]types.Address, len(strAddrs))
+			for i, sAddr := range strAddrs {
+				conf.Locals[i] = types.StringToAddress(sAddr)
+			}
+		}
+		conf.NoLocals = c.TxPool.NoLocals
+		conf.PriceLimit = c.TxPool.PriceLimit
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -197,7 +212,18 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 	}
 
-	c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
+	{
+		// TxPool
+		if otherConfig.TxPool.Locals != "" {
+			c.TxPool.Locals = otherConfig.TxPool.Locals
+		}
+		if otherConfig.TxPool.NoLocals {
+			c.TxPool.NoLocals = otherConfig.TxPool.NoLocals
+		}
+		if otherConfig.TxPool.PriceLimit != 0 {
+			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
+		}
+	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
 		return err

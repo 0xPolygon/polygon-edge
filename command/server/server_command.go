@@ -125,6 +125,22 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["locals"] = helper.FlagDescriptor{
+		Description: "Sets comma separated accounts whose transactions are treated as locals",
+		Arguments: []string{
+			"LOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["nolocals"] = helper.FlagDescriptor{
+		Description: "Sets flag to disable price exemptions for locally submitted transactions",
+		Arguments: []string{
+			"NOLOCALS",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
 		Arguments: []string{
@@ -179,6 +195,7 @@ func (c *ServerCommand) Run(args []string) int {
 
 		return 1
 	}
+	fmt.Printf("\n\nconf %+v\n\n", conf.TxPool)
 
 	config, err := conf.BuildConfig()
 	if err != nil {
@@ -186,6 +203,8 @@ func (c *ServerCommand) Run(args []string) int {
 
 		return 1
 	}
+
+	fmt.Printf("\n\nconfig %+v\n\n", config)
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:  "polygon",

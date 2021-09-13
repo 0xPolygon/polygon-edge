@@ -87,6 +87,12 @@ type TxPool struct {
 	// Flag indicating if the current node is running in dev mode
 	dev bool
 
+	// Whether local transaction handling should be disabled
+	noLocals bool
+
+	// Addresses that should be treated as local
+	locals *localAccounts
+
 	// priceLimit is a lower threshold for gas price
 	priceLimit uint64
 
@@ -101,6 +107,8 @@ type TxPool struct {
 func NewTxPool(
 	logger hclog.Logger,
 	sealing bool,
+	locals []types.Address,
+	noLocals bool,
 	priceLimit uint64,
 	forks chain.ForksInTime,
 	store store,
@@ -114,6 +122,8 @@ func NewTxPool(
 		accountQueues: make(map[types.Address]*txHeapWrapper),
 		pendingQueue:  newTxPriceHeap(),
 		sealing:       sealing,
+		locals:        newLocalAccounts(locals),
+		noLocals:      noLocals,
 		priceLimit:    priceLimit,
 		forks:         forks,
 	}
@@ -203,7 +213,11 @@ func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
 
-	err := t.validateTx(ctx, tx)
+	// should treat as local in the following cases
+	// (1) noLocals is false and Tx is local transaction
+	// (2) from in tx is in locals addresses
+	isLocal := (!t.noLocals && ctx == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
+	err := t.validateTx(tx, isLocal)
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
@@ -221,6 +235,11 @@ func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
 		t.accountQueues[tx.From] = txnsQueue
 	}
 	txnsQueue.Add(tx)
+
+	// Ignore check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	if isLocal && !t.locals.containsAddr(tx.From) {
+		t.locals.addAddr(tx.From)
+	}
 
 	for _, promoted := range txnsQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
@@ -327,7 +346,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
-func (t *TxPool) validateTx(ctx TxOrigin, tx *types.Transaction) error {
+func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 	// Check if the transaction has a strictly positive value
 	if tx.Value.Sign() < 0 {
 		return ErrNegativeValue
@@ -349,7 +368,7 @@ func (t *TxPool) validateTx(ctx TxOrigin, tx *types.Transaction) error {
 	}
 
 	// Ignore non-local transactions under priceLimit
-	if ctx != OriginAddTxn && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
+	if !isLocal && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
 		return ErrUnderpriced
 	}
 
@@ -659,4 +678,39 @@ func (t *txPriceHeapImpl) Pop() interface{} {
 	job.index = -1
 	*t = old[0 : n-1]
 	return job
+}
+
+type localAccounts struct {
+	accounts map[types.Address]bool
+	mutex    sync.RWMutex
+}
+
+func newLocalAccounts(addrs []types.Address) *localAccounts {
+	accounts := make(map[types.Address]bool, len(addrs))
+	for _, addr := range addrs {
+		accounts[addr] = true
+	}
+	return &localAccounts{
+		accounts: accounts,
+		mutex:    sync.RWMutex{},
+	}
+}
+
+func (a *localAccounts) containsAddr(addr types.Address) bool {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+	return a.accounts[addr]
+}
+
+func (a *localAccounts) containsTxSender(signer signer, tx *types.Transaction) bool {
+	if addr, err := signer.Sender(tx); err == nil {
+		return a.containsAddr(addr)
+	}
+	return false
+}
+
+func (a *localAccounts) addAddr(addr types.Address) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	a.accounts[addr] = true
 }

@@ -26,6 +26,11 @@ const (
 	defaultPriceLimit uint64 = 1
 )
 
+var (
+	addr1 = types.Address{0x1}
+	addr2 = types.Address{0x2}
+)
+
 type mockStore struct {
 }
 
@@ -44,6 +49,12 @@ func (m *mockStore) GetBalance(types.Hash, types.Address) (*big.Int, error) {
 
 func (m *mockStore) Header() *types.Header {
 	return &types.Header{}
+}
+
+type mockSigner struct{}
+
+func (s *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	return tx.From, nil
 }
 
 const validGasLimit uint64 = 100000
@@ -77,7 +88,7 @@ func TestAddingTransaction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 			if err != nil {
 				t.Fatal("Failed to initialize transaction pool:", err)
 			}
@@ -111,9 +122,10 @@ func TestAddingTransaction(t *testing.T) {
 
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 
 	from1 := types.Address{0x1}
 
@@ -145,9 +157,10 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 
 	from1 := types.Address{0x1}
 	txn0 := &types.Transaction{
@@ -208,7 +221,7 @@ func TestBroadcast(t *testing.T) {
 
 	createPool := func() (*TxPool, *network.Server) {
 		server := network.CreateServer(t, nil)
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, server)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, server)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 		return pool, server
@@ -234,11 +247,10 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
-
-	addr1 := types.Address{0x1}
+	pool.AddSigner(&mockSigner{})
 
 	pool.addImpl("", &types.Transaction{
 		From:     addr1,
@@ -275,13 +287,11 @@ func TestTxnQueue_Heap(t *testing.T) {
 		Value    *big.Int
 	}
 
-	addr1 := types.Address{0x1}
-	addr2 := types.Address{0x2}
-
 	test := func(t *testing.T, testTable []TestCase) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
+		pool.AddSigner(&mockSigner{})
 
 		for _, testCase := range testTable {
 			err := pool.addImpl("", &types.Transaction{
@@ -352,9 +362,10 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 
 	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
+		pool.AddSigner(&mockSigner{})
 
 		numTxns := 5
 		txns := make([]*types.Transaction, numTxns)
@@ -471,7 +482,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), testCase.mockStore, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), testCase.mockStore, nil, nil)
 			assert.NoError(t, err)
 			if testCase.devMode {
 				pool.EnableDev()
@@ -491,11 +502,124 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 }
 
 func TestTxnOperatorAddNilRaw(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 
 	txnReq := new(proto.AddTxnReq)
 	response, err := pool.AddTxn(context.Background(), txnReq)
 	assert.Errorf(t, err, "transaction's field raw is empty")
 	assert.Nil(t, response)
+}
+
+func TestPriceLimit(t *testing.T) {
+	signer := crypto.NewEIP155Signer(uint64(100))
+	key, from := tests.GenerateKeyAndAddr(t)
+
+	tests := []struct {
+		name string
+		// TxPool config
+		noLocals   bool            // enables accepting all local transactions
+		locals     []types.Address // white list
+		priceLimit uint64
+		// Tx
+		origin   TxOrigin
+		gasPrice *big.Int
+		// Result
+		err error
+		len uint64
+	}{
+		// Local transactions
+		{
+			name:       "should accept local transaction",
+			noLocals:   false,
+			locals:     nil,
+			priceLimit: 100000,
+			origin:     OriginAddTxn,
+			gasPrice:   big.NewInt(0),
+			err:        nil,
+			len:        1,
+		},
+		{
+			name:       "should reject local transaction with lower gas price",
+			noLocals:   true,
+			locals:     nil,
+			priceLimit: 100000,
+			origin:     OriginAddTxn,
+			gasPrice:   big.NewInt(0),
+			err:        ErrUnderpriced,
+			len:        0,
+		},
+		{
+			name:       "should accept local transaction when NoLocals is enabled but account is in local addrs list",
+			noLocals:   true,
+			locals:     []types.Address{from},
+			priceLimit: 100000,
+			origin:     OriginAddTxn,
+			gasPrice:   big.NewInt(0),
+			err:        nil,
+			len:        1,
+		},
+		// Remote transactions (Gossip)
+		{
+			name:       "should reject remote transaction (via Gossip) with lower gas price as default",
+			noLocals:   false,
+			locals:     nil,
+			priceLimit: 100000,
+			origin:     OriginGossip,
+			gasPrice:   big.NewInt(0),
+			err:        ErrUnderpriced,
+			len:        0,
+		},
+		{
+			name:       "should accept remote transaction (via Gossip) when account is in local addrs list",
+			noLocals:   true,
+			locals:     []types.Address{from},
+			priceLimit: 100000,
+			origin:     OriginGossip,
+			gasPrice:   big.NewInt(0),
+			err:        nil,
+			len:        1,
+		},
+		// Remote Transaction (Reorg)
+		{
+			name:       "should reject remote transaction (by Reorg) with lower gas price as default",
+			noLocals:   false,
+			locals:     nil,
+			priceLimit: 100000,
+			origin:     OriginReorg,
+			gasPrice:   big.NewInt(0),
+			err:        ErrUnderpriced,
+			len:        0,
+		},
+		{
+			name:       "should accept remote transaction (by Reorg) when account is in local addrs list",
+			noLocals:   true,
+			locals:     []types.Address{from},
+			priceLimit: 100000,
+			origin:     OriginReorg,
+			gasPrice:   big.NewInt(0),
+			err:        nil,
+			len:        1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, tt.locals, tt.noLocals, tt.priceLimit, forks.At(0), &mockStore{}, nil, nil)
+			assert.NoError(t, err)
+			pool.AddSigner(signer)
+
+			tx, err := signer.SignTx(&types.Transaction{
+				To:       &addr1,
+				Nonce:    0,
+				Gas:      validGasLimit,
+				GasPrice: tt.gasPrice,
+				Value:    big.NewInt(0),
+			}, key)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.err, pool.addImpl(tt.origin, tx))
+			assert.Equal(t, tt.len, pool.Length())
+		})
+	}
 }
