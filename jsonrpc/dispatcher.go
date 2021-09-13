@@ -435,16 +435,6 @@ func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, erro
 	}
 }
 
-func (d *Dispatcher) isAccountAvailable(addr types.Address) (isAvailable bool) {
-	number := LatestBlockNumber
-	header, err := d.getBlockHeaderImpl(number)
-	if err != nil {
-		return false
-	}
-	_, err = d.store.GetAccount(header.StateRoot, addr)
-	return err == nil
-
-}
 func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
 	if number == PendingBlockNumber {
 		res, ok := d.store.GetNonce(address)
