@@ -236,7 +236,7 @@ func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
 	}
 	txnsQueue.Add(tx)
 
-	// Ignore check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
 	}
@@ -367,7 +367,7 @@ func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 		}
 	}
 
-	// Ignore non-local transactions under priceLimit
+	// Reject non-local transactions whose Gas Price is under priceLimit
 	if !isLocal && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
 		return ErrUnderpriced
 	}
