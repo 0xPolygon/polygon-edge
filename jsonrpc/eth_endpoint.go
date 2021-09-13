@@ -483,7 +483,8 @@ func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (i
 	if number == nil {
 		*number = LatestBlockNumber
 	}
-	nonce, err := e.d.getNextNonce(address, *number)
+ 	nonce, err := e.d.getNextNonce(address, *number)
+
 	if err != nil {
 		if err == ErrStateNotFound {
 			return argUintPtr(0), nil
@@ -500,7 +501,6 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 	if number == nil {
 		*number = LatestBlockNumber
 	}
-
 	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err

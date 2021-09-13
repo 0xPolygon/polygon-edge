@@ -323,6 +323,7 @@ var (
 func createBlockNumberPointer(x BlockNumber) *BlockNumber {
 	return &x
 }
+
 func TestEth_State_GetBalance(t *testing.T) {
 	store := &mockAccountStore{}
 
@@ -339,6 +340,11 @@ func TestEth_State_GetBalance(t *testing.T) {
 	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, createBlockNumberPointer(LatestBlockNumber))
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
+
+	// block number not passed
+	_, err = dispatcher.endpoints.Eth.GetBalance(addr0, nil)
+	assert.Error(t, err)
+	assert.Equal(t, err.Error(), "block parameter is required")
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
@@ -379,6 +385,16 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 			blockNumber:   createBlockNumberPointer(100),
 			succeeded:     false,
 			expectedNonce: nil,
+		},
+		{
+			name: "should return error for nil block parameter",
+			initialNonces: map[types.Address]uint64{
+				addr0: 100,
+			},
+			target:        addr0,
+			blockNumber:   nil,
+			succeeded:     false,
+			expectedNonce: argUintPtr(100),
 		},
 	}
 
@@ -426,6 +442,12 @@ func TestEth_State_GetCode(t *testing.T) {
 		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, createBlockNumberPointer(LatestBlockNumber))
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
+	})
+
+	t.Run("No block number passed should error", func(t *testing.T) {
+		_, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, nil)
+		assert.Error(t, err)
+		assert.Equal(t, err.Error(), "block parameter is required")
 	})
 }
 
@@ -488,6 +510,19 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			address:      addr0,
 			index:        hash2,
 			blockNumber:  createBlockNumberPointer(100),
+			succeeded:    false,
+			expectedData: nil,
+		},
+		{
+			name: "should return error for nil block parameter",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  nil,
 			succeeded:    false,
 			expectedData: nil,
 		},
