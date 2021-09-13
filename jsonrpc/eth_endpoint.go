@@ -191,7 +191,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
 	//Set the block number to latest
 	if number == nil {
-		*number = LatestBlockNumber
+		number = createBlockNumberPointer(LatestBlockNumber)
 	}
 	// Fetch the requested header
 	header, err := e.d.getBlockHeaderImpl(*number)
@@ -232,7 +232,7 @@ func (e *Eth) GasPrice() (interface{}, error) {
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
 	if number == nil {
-		*number = LatestBlockNumber
+		number = createBlockNumberPointer(LatestBlockNumber)
 	}
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
@@ -461,7 +461,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 // GetBalance returns the account's balance at the referenced block
 func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
 	if number == nil {
-		*number = LatestBlockNumber
+		number = createBlockNumberPointer(LatestBlockNumber)
 	}
 	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
@@ -481,9 +481,9 @@ func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{
 func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
 
 	if number == nil {
-		*number = LatestBlockNumber
+		number = createBlockNumberPointer(LatestBlockNumber)
 	}
- 	nonce, err := e.d.getNextNonce(address, *number)
+	nonce, err := e.d.getNextNonce(address, *number)
 
 	if err != nil {
 		if err == ErrStateNotFound {
@@ -499,7 +499,7 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 
 	//Set the block number to latest
 	if number == nil {
-		*number = LatestBlockNumber
+		number = createBlockNumberPointer(LatestBlockNumber)
 	}
 	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
@@ -546,4 +546,7 @@ func (e *Eth) UninstallFilter(id string) (bool, error) {
 func (e *Eth) Unsubscribe(id string) (bool, error) {
 	ok := e.d.filterManager.Uninstall(id)
 	return ok, nil
+}
+func createBlockNumberPointer(x BlockNumber) *BlockNumber {
+	return &x
 }
