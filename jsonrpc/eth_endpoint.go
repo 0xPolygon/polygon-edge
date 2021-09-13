@@ -547,6 +547,3 @@ func (e *Eth) Unsubscribe(id string) (bool, error) {
 	ok := e.d.filterManager.Uninstall(id)
 	return ok, nil
 }
-func createBlockNumberPointer(x BlockNumber) *BlockNumber {
-	return &x
-}
