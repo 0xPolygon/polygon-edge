@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 
@@ -43,6 +44,10 @@ func (m *mockAccount2) Balance(n uint64) {
 type mockAccountStore struct {
 	nullBlockchainInterface
 	accounts map[types.Address]*mockAccount2
+}
+
+func (m *mockAccountStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
 }
 
 func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
@@ -95,6 +100,10 @@ func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot 
 type mockBlockStore2 struct {
 	nullBlockchainInterface
 	blocks []*types.Block
+}
+
+func (m *mockBlockStore2) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
 }
 
 func (m *mockBlockStore2) add(blocks ...*types.Block) {
@@ -553,6 +562,10 @@ type mockStoreTxn struct {
 	nullBlockchainInterface
 
 	txn *types.Transaction
+}
+
+func (m *mockStoreTxn) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
 }
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
