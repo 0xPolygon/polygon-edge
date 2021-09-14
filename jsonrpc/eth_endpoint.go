@@ -211,7 +211,6 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *Bloc
 
 // GasPrice returns the average gas price based on the last x blocks
 func (e *Eth) GasPrice() (interface{}, error) {
-
 	// Grab the average gas price and convert it to a hex value
 	avgGasPrice := hex.EncodeBig(e.d.store.GetAvgGasPrice())
 
@@ -471,7 +470,7 @@ func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (i
 	if number == nil {
 		return nil, fmt.Errorf("block parameter is required")
 	}
- 	nonce, err := e.d.getNextNonce(address, *number)
+	nonce, err := e.d.getNextNonce(address, *number)
 	if err != nil {
 		if err == ErrStateNotFound {
 			return argUintPtr(0), nil

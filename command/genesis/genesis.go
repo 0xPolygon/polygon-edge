@@ -200,10 +200,11 @@ func (c *GenesisCommand) Run(args []string) int {
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
-			GasLimit:   5000,
+			GasLimit:   helper.GenesisGasLimit,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  extraData,
+			GasUsed:    helper.GenesisGasUsed,
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
