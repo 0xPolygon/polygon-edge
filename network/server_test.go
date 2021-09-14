@@ -223,6 +223,10 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	assert.NoError(t, err)
 	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
 	assert.NoError(t, err)
+	//remove the temporary directory
+	t.Cleanup(func() {
+		assert.NoError(t, os.RemoveAll(directoryName))
+	})
 	tests := []struct {
 		name         string
 		bootNodes    []string
@@ -255,6 +259,4 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		})
 	}
 
-	//remove the temporary directory
-	assert.NoError(t, os.RemoveAll(directoryName))
 }
