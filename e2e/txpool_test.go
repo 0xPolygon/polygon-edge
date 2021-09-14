@@ -280,31 +280,63 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 }
 
 func TestGasLimit(t *testing.T) {
-	testCases := []struct {
-		name             string
-		numNodes         int
-		gasPrice         int64
-		numReceivedNodes int64
-	}{
-		{
-			name:             "tx should not propagate if gas price is zero",
-			numNodes:         5,
-			gasPrice:         0,
-			numReceivedNodes: 1, // only first node receive
-		},
-		{
-			name:             "tx should propagate",
-			numNodes:         5,
-			gasPrice:         100,
-			numReceivedNodes: 5,
-		},
-	}
-
 	signer := &crypto.FrontierSigner{}
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
-	conf := func(config *framework.TestServerConfig) {
+	testCases := []struct {
+		name             string
+		numNodes         int
+		locals           []string
+		noLocals         bool
+		priceLimit       uint64
+		gasPrice         int64
+		err              error // JSON-RPC error
+		numReceivedNodes int64
+	}{
+		{
+			name:             "tx should propagate",
+			numNodes:         5,
+			locals:           nil,
+			noLocals:         false,
+			priceLimit:       10,
+			gasPrice:         100,
+			err:              nil,
+			numReceivedNodes: 5,
+		},
+		{
+			name:             "tx should be rejected due to low gas price",
+			numNodes:         5,
+			locals:           nil,
+			noLocals:         true,
+			priceLimit:       10,
+			gasPrice:         5,
+			err:              errors.New("{\"code\":-32603,\"message\":\"Internal error\"}"),
+			numReceivedNodes: 0,
+		},
+		{
+			name:             "tx should not propagate",
+			numNodes:         5,
+			locals:           nil,
+			noLocals:         false,
+			priceLimit:       10,
+			gasPrice:         0,
+			err:              nil,
+			numReceivedNodes: 1, // only first node receive
+		},
+		{
+			name:             "tx should propagate because sender address is treated as local transaction",
+			numNodes:         5,
+			locals:           []string{senderAddr.String()},
+			noLocals:         true,
+			priceLimit:       10,
+			gasPrice:         0,
+			err:              nil,
+			numReceivedNodes: 5, // only first node receive
+		},
+	}
+
+	defaultConfig := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
@@ -312,7 +344,12 @@ func TestGasLimit(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			srvs := framework.NewTestServers(t, tt.numNodes, conf)
+			srvs := framework.NewTestServers(t, tt.numNodes, func(config *framework.TestServerConfig) {
+				defaultConfig(config)
+				config.SetLocals(tt.locals)
+				config.SetNoLocals(tt.noLocals)
+				config.SetPriceLimit(&tt.priceLimit)
+			})
 			framework.MultiJoinSerial(t, srvs)
 
 			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
@@ -330,9 +367,14 @@ func TestGasLimit(t *testing.T) {
 			assert.NoError(t, err, "failed to sign transaction")
 
 			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
-			assert.NoError(t, err, "failed to send transaction")
+			if tt.err != nil {
+				assert.Equal(t, tt.err.Error(), err.Error())
+			} else {
+				assert.NoError(t, err, "failed to send transaction")
+			}
 
 			for i, srv := range srvs {
+				srv := srv
 				shouldHaveTxPool := false
 				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
 				if i < int(tt.numReceivedNodes) {
@@ -341,6 +383,7 @@ func TestGasLimit(t *testing.T) {
 				}
 
 				t.Run(subTestName, func(t *testing.T) {
+					t.Parallel()
 					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 					defer cancel()
 					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
