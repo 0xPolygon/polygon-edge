@@ -221,29 +221,39 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	assert.NoError(t, err)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
+	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
+	assert.NoError(t, err)
+	tests := []struct {
+		name         string
+		bootNodes    []string
+		expectedList []*peer.AddrInfo
+	}{
+		{
+			name:         "Should return an empty bootnodes list",
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()},
+			expectedList: []*peer.AddrInfo{},
+		},
 
-	t.Run("Server bootnodes list should be empty", func(t *testing.T) {
-		hostSelfAddr := "/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()
-		conf := func(c *Config) {
-			c.NoDiscover = false
-			c.DataDir = directoryName
-			c.Chain.Bootnodes = []string{hostSelfAddr}
-		}
-		srv0 := CreateServer(t, conf)
-		assert.Empty(t, srv0.discovery.bootnodes)
-	})
+		{
+			name:         "Should return an non empty bootnodes list",
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			expectedList: []*peer.AddrInfo{peerAddressInfo},
+		},
+	}
 
-	t.Run("Server bootnodes list should not contain host peer address", func(t *testing.T) {
-		hostSelfAddr := "/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()
-		peerAddr := "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"
-		conf := func(c *Config) {
-			c.NoDiscover = false
-			c.DataDir = directoryName
-			c.Chain.Bootnodes = []string{hostSelfAddr, peerAddr}
-		}
-		srv0 := CreateServer(t, conf)
-		assert.NotContains(t, srv0.discovery.bootnodes, hostSelfAddr)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conf := func(c *Config) {
+				c.NoDiscover = false
+				c.DataDir = directoryName
+				c.Chain.Bootnodes = tt.bootNodes
+			}
+			srv0 := CreateServer(t, conf)
+
+			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
+
+		})
+	}
 
 	//remove the temporary directory
 	assert.NoError(t, os.RemoveAll(directoryName))
