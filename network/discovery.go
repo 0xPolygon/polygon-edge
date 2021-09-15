@@ -119,7 +119,6 @@ func (d *discovery) setup() error {
 			})
 			d.peersLock.Unlock()
 		case PeerEventDisconnected:
-			d.routingTable.RemovePeer(peerID)
 			d.peersLock.Lock()
 			d.peers.delete(peerID)
 			d.peersLock.Unlock()
