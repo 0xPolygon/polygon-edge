@@ -279,7 +279,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	)
 }
 
-func TestGasLimit(t *testing.T) {
+func TestPriceLimit(t *testing.T) {
 	signer := &crypto.FrontierSigner{}
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)

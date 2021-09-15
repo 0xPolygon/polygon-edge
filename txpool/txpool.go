@@ -208,7 +208,7 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 
 // addImpl validates the tx and adds it to the appropriate account transaction queue.
 // Additionally, it updates the global valid transactions queue
-func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
+func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
@@ -216,14 +216,14 @@ func (t *TxPool) addImpl(ctx TxOrigin, tx *types.Transaction) error {
 	// should treat as local in the following cases
 	// (1) noLocals is false and Tx is local transaction
 	// (2) from in tx is in locals addresses
-	isLocal := (!t.noLocals && ctx == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
+	isLocal := (!t.noLocals && origin == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
 	err := t.validateTx(tx, isLocal)
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
 	}
 
-	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
+	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
 	txnsQueue, ok := t.accountQueues[tx.From]
 	if !ok {
