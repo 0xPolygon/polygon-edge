@@ -183,6 +183,14 @@ func (c *GenesisCommand) Run(args []string) int {
 	var validators []types.Address
 
 	if consensus == "ibft" {
+		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
+		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
+		// Check is placed here to avoid additional parsing if epochSize < 2
+		if epochSize < 2 {
+			c.UI.Error("Epoch size must be greater than 1")
+			return 1
+		}
+
 		if len(ibftValidators) != 0 {
 			for _, val := range ibftValidators {
 				validators = append(validators, types.StringToAddress(val))
