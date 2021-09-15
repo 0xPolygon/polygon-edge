@@ -52,9 +52,16 @@ func TestDialQueue(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
+	type Action string
+	const (
+		ActionAdd    Action = "add"
+		ActionDelete Action = "delete"
+		ActionPop    Action = "pop"
+	)
+
 	type task struct {
 		id     string
-		action string // "add"/"delete"/"pop"
+		action Action
 	}
 
 	tests := []struct {
@@ -67,7 +74,7 @@ func TestDel(t *testing.T) {
 			tasks: []task{
 				{
 					id:     "a",
-					action: "add",
+					action: ActionAdd,
 				},
 			},
 			expectedLen: 1,
@@ -77,11 +84,11 @@ func TestDel(t *testing.T) {
 			tasks: []task{
 				{
 					id:     "a",
-					action: "add",
+					action: ActionAdd,
 				},
 				{
 					id:     "a",
-					action: "delete",
+					action: ActionDelete,
 				},
 			},
 			expectedLen: 0,
@@ -91,11 +98,11 @@ func TestDel(t *testing.T) {
 			tasks: []task{
 				{
 					id:     "a",
-					action: "add",
+					action: ActionAdd,
 				},
 				{
 					id:     "b",
-					action: "delete",
+					action: ActionDelete,
 				},
 			},
 			expectedLen: 1,
@@ -105,11 +112,11 @@ func TestDel(t *testing.T) {
 			tasks: []task{
 				{
 					id:     "a",
-					action: "add",
+					action: ActionAdd,
 				},
 				{
 					id:     "a",
-					action: "pop",
+					action: ActionPop,
 				},
 			},
 			expectedLen: 0,
@@ -119,15 +126,15 @@ func TestDel(t *testing.T) {
 			tasks: []task{
 				{
 					id:     "a",
-					action: "add",
+					action: ActionAdd,
 				},
 				{
 					id:     "a",
-					action: "pop",
+					action: ActionPop,
 				},
 				{
 					id:     "a",
-					action: "delete",
+					action: ActionDelete,
 				},
 			},
 			expectedLen: 0,
@@ -141,13 +148,13 @@ func TestDel(t *testing.T) {
 				id := peer.ID(task.id)
 
 				switch task.action {
-				case "add":
+				case ActionAdd:
 					q.add(&peer.AddrInfo{
 						ID: id,
 					}, 1)
-				case "delete":
+				case ActionDelete:
 					q.del(id)
-				case "pop":
+				case ActionPop:
 					d := q.pop()
 					assert.Equal(t, id, d.addr.ID)
 				default:

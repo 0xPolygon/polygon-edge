@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func generateTestKey(t *testing.T) (crypto.PrivKey, string) {
+func GenerateLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	t.Helper()
 
 	dir, err := ioutil.TempDir(os.TempDir(), "")
@@ -227,12 +227,11 @@ func TestNat(t *testing.T) {
 	})
 }
 
-func TestConnectionWithNewIP(t *testing.T) {
+func TestReconnectionWithNewIP(t *testing.T) {
 	natIP := "127.0.0.1"
-	natPort := 1500
 
-	_, dir0 := generateTestKey(t)
-	_, dir1 := generateTestKey(t)
+	_, dir0 := GenerateLibp2pKey(t)
+	_, dir1 := GenerateLibp2pKey(t)
 
 	defaultConfig := func(c *Config) {
 		c.NoDiscover = true
@@ -251,7 +250,6 @@ func TestConnectionWithNewIP(t *testing.T) {
 		defaultConfig(c)
 		c.DataDir = dir1
 		c.NatAddr = net.ParseIP(natIP)
-		c.Addr.Port = natPort
 	})
 	t.Cleanup(func() {
 		srv0.Close()
@@ -260,20 +258,19 @@ func TestConnectionWithNewIP(t *testing.T) {
 	})
 
 	// srv0 connects to srv1
-	connectedCh := asyncWaitForEvent(srv1, 5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
 	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
 	assert.True(t, <-connectedCh)
 	assert.Len(t, srv0.peers, 1)
 	assert.Len(t, srv1.peers, 1)
 
-	// srv0 disconnect from srv1
-	disconnectedCh := asyncWaitForEvent(srv0, 5*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
-	srv0.Disconnect(srv1.host.ID(), "bye")
+	// srv1 terminates
+	disconnectedCh := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	srv1.host.Close()
 	assert.True(t, <-disconnectedCh)
-	assert.Len(t, srv0.peers, 0)
 
 	// srv0 connects to srv2
-	connectedCh = asyncWaitForEvent(srv2, 5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	connectedCh = asyncWaitForEvent(srv2, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
 	assert.NoError(t, srv0.Join(srv2.AddrInfo(), DefaultJoinTimeout))
 	assert.True(t, <-connectedCh)
 	assert.Len(t, srv0.peers, 1)
@@ -283,7 +280,7 @@ func TestConnectionWithNewIP(t *testing.T) {
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	//Create a temporary directory for storing the key file
-	key, directoryName := generateTestKey(t)
+	key, directoryName := GenerateLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
