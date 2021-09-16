@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -19,10 +20,10 @@ type mockAccount2 struct {
 	address types.Address
 	code    []byte
 	account *state.Account
-	storage map[types.Hash]types.Hash
+	storage map[types.Hash][]byte
 }
 
-func (m *mockAccount2) Storage(k, v types.Hash) {
+func (m *mockAccount2) Storage(k types.Hash, v []byte) {
 	m.storage[k] = v
 }
 
@@ -53,7 +54,7 @@ func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
 		store:   m,
 		address: addr,
 		account: &state.Account{},
-		storage: map[types.Hash]types.Hash{},
+		storage: make(map[types.Hash][]byte),
 	}
 	m.accounts[addr] = acct
 	return acct
@@ -89,7 +90,7 @@ func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot 
 	if !ok {
 		return nil, ErrStateNotFound
 	}
-	return val.Bytes(), nil
+	return val, nil
 }
 
 type mockBlockStore2 struct {
@@ -533,7 +534,10 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			for addr, storage := range tt.initialStorage {
 				account := store.AddAccount(addr)
 				for index, data := range storage {
-					account.Storage(index, data)
+					a := &fastrlp.Arena{}
+					value := a.NewBytes(data.Bytes())
+					newData := value.MarshalTo(nil)
+					account.Storage(index, newData)
 				}
 			}
 			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
