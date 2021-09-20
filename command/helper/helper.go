@@ -28,8 +28,9 @@ const (
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
-	DefaultGasLimit       = 5000
 	DefaultPriceLimit     = 1
+	GenesisGasUsed        = 458752  // 0x70000
+	GenesisGasLimit       = 5242880 // 0x500000
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -318,6 +319,7 @@ func generateDevGenesis(params devGenesisParams) error {
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  []byte{},
+			GasUsed:    GenesisGasUsed,
 		},
 		Params: &chain.Params{
 			ChainID: int(params.chainID),
@@ -360,10 +362,10 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.Uint64Var(&gaslimit, "gas-limit", DefaultGasLimit, "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
+	flags.Uint64Var(&gaslimit, "gas-limit", GenesisGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 

@@ -248,6 +248,9 @@ func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
 		return err
 	}
 
+	// Update the average gas price to take into account the genesis block
+	b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
+
 	// Advance the head
 	if _, err := b.advanceHead(header); err != nil {
 		return err

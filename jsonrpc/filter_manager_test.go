@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -217,6 +218,10 @@ type mockStore struct {
 	receiptsLock sync.Mutex
 	receipts     map[types.Hash][]*types.Receipt
 	accounts     map[types.Address]*state.Account
+}
+
+func (m *mockStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
 }
 
 func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {

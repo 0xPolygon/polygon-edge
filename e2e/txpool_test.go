@@ -311,7 +311,7 @@ func TestPriceLimit(t *testing.T) {
 			noLocals:         true,
 			priceLimit:       10,
 			gasPrice:         5,
-			err:              errors.New("{\"code\":-32603,\"message\":\"Internal error\"}"),
+			err:              errors.New("{\"code\":-32600,\"message\":\"transaction underpriced\"}"),
 			numReceivedNodes: 0,
 		},
 		{
