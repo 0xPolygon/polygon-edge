@@ -144,7 +144,8 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers map[peer.ID]*syncPeer // TODO: Remove
+	peers     map[peer.ID]*syncPeer
+	peersLock sync.RWMutex
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -219,8 +220,9 @@ const syncerV1 = "/syncer/0.1"
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
-
+	s.peersLock.RLock()
 	p, ok := s.peers[peerID]
+	s.peersLock.RUnlock()
 	if ok {
 		p.appendBlock(b)
 	}
@@ -228,6 +230,8 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
+	s.peersLock.RLock()
+	defer s.peersLock.RUnlock()
 	// diff is number in ibft
 	diff := new(big.Int).SetUint64(b.Number())
 
@@ -276,6 +280,12 @@ func (s *Syncer) Start() {
 				return
 			}
 
+			if evnt.Type == network.PeerEventDisconnected {
+				s.peersLock.Lock()
+				delete(s.peers, evnt.PeerID)
+				s.peersLock.Unlock()
+				continue
+			}
 			if evnt.Type != network.PeerEventConnected {
 				continue
 			}
@@ -296,7 +306,8 @@ func (s *Syncer) Start() {
 func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
-
+	s.peersLock.RLock()
+	defer s.peersLock.RUnlock()
 	for _, p := range s.peers {
 		status := p.status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
@@ -315,6 +326,8 @@ func (s *Syncer) BestPeer() *syncPeer {
 
 // HandleUser is a helper method that is used to handle new user connections within the Syncer
 func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
