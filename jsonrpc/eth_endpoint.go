@@ -55,6 +55,31 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 	return toBlock(block, fullTx), nil
 }
 
+func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
+	var num uint64
+	switch number {
+	case LatestBlockNumber:
+		num = e.d.store.Header().Number
+
+	case EarliestBlockNumber:
+		return nil, fmt.Errorf("fetching the earliest header is not supported")
+
+	case PendingBlockNumber:
+		return nil, fmt.Errorf("fetching the pending header is not supported")
+
+	default:
+		if number < 0 {
+			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
+		}
+		num = uint64(number)
+	}
+	block, ok := e.d.store.GetBlockByNumber(num, true)
+	if !ok {
+		return nil, nil
+	}
+	return len(block.Transactions), nil
+}
+
 // BlockNumber returns current block number
 func (e *Eth) BlockNumber() (interface{}, error) {
 	h := e.d.store.Header()
