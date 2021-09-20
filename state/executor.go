@@ -112,6 +112,11 @@ func (e *Executor) StateAt(root types.Hash) (Snapshot, error) {
 	return e.state.NewSnapshotAt(root)
 }
 
+// GetForksInTime returns the active forks at the given block height
+func (e *Executor) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	return e.config.Forks.At(blockNumber)
+}
+
 func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbaseReceiver types.Address) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
 

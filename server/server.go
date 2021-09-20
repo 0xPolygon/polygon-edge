@@ -272,6 +272,11 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 	return &account, nil
 }
 
+// GetForksInTime returns the active forks at the given block height
+func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	return j.Executor.GetForksInTime(blockNumber)
+}
+
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
 	account, err := j.GetAccount(root, addr)
 
