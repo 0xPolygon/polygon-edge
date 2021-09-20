@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/fastrlp"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -205,8 +206,17 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *Bloc
 		}
 		return nil, err
 	}
-
-	return argBytesPtr(result), nil
+	//Parse the RLP value
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(result)
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	data, err := v.Bytes()
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	return argBytesPtr(data), nil
 }
 
 // GasPrice returns the average gas price based on the last x blocks
@@ -439,7 +449,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	if to < from {
 		return nil, fmt.Errorf("incorrect range")
 	}
-	for i := from; i < to; i++ {
+	for i := from; i <= to; i++ {
 		header, ok := e.d.store.GetHeaderByNumber(i)
 		if !ok {
 			break
