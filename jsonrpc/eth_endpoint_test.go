@@ -327,13 +327,16 @@ func TestEth_State_GetBalance(t *testing.T) {
 	acct0.Balance(100)
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, createBlockNumberPointer(LatestBlockNumber))
+	blockNumber, err := createBlockNumberPointer("latest")
+	if err != nil {
+		assert.Error(t, err)
+	}
+	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, blockNumber)
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, createBlockNumberPointer(LatestBlockNumber))
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, blockNumber)
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
 
@@ -348,7 +351,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 		name          string
 		initialNonces map[types.Address]uint64
 		target        types.Address
-		blockNumber   *BlockNumber
+		blockNumber   string
 		succeeded     bool
 		expectedNonce *argUint64
 	}{
@@ -358,7 +361,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
+			blockNumber:   "latest",
 			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
@@ -368,7 +371,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr1,
-			blockNumber:   createBlockNumberPointer(LatestBlockNumber),
+			blockNumber:   "latest",
 			succeeded:     true,
 			expectedNonce: argUintPtr(0),
 		},
@@ -378,17 +381,17 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   createBlockNumberPointer(100),
+			blockNumber:   "100",
 			succeeded:     false,
 			expectedNonce: nil,
 		},
 		{
-			name: "should return error for nil block parameter",
+			name: "should not return error for empty block parameter",
 			initialNonces: map[types.Address]uint64{
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   nil,
+			blockNumber:   "",
 			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
@@ -403,8 +406,8 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				account.Nonce(nonce)
 			}
 			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, tt.blockNumber)
+			blockNumber, _ := createBlockNumberPointer(tt.blockNumber)
+			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, blockNumber)
 			if tt.succeeded {
 				assert.NoError(t, err)
 				assert.NotNil(t, nonce)
@@ -427,20 +430,24 @@ func TestEth_State_GetCode(t *testing.T) {
 	acct0.Code(code0)
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+	blockNumber, err := createBlockNumberPointer("latest")
+	if err != nil {
+		assert.Error(t, err)
+	}
 
 	t.Run("Initialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, createBlockNumberPointer(LatestBlockNumber))
+		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, blockNumber)
 		assert.NoError(t, err)
 		assert.Equal(t, code, argBytesPtr(code0))
 	})
 
 	t.Run("Uninitialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, createBlockNumberPointer(LatestBlockNumber))
+		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, blockNumber)
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
 	})
 
-	t.Run("No block number passed should error", func(t *testing.T) {
+	t.Run("No block number passed should not return error", func(t *testing.T) {
 		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
@@ -453,7 +460,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 		initialStorage map[types.Address]map[types.Hash]types.Hash
 		address        types.Address
 		index          types.Hash
-		blockNumber    *BlockNumber
+		blockNumber    string
 		succeeded      bool
 		expectedData   *argBytes
 	}{
@@ -466,7 +473,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash1,
-			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
+			blockNumber:  "latest",
 			succeeded:    true,
 			expectedData: argBytesPtr([]byte(hash1[:])),
 		},
@@ -479,7 +486,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
+			blockNumber:  "latest",
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -492,7 +499,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createBlockNumberPointer(LatestBlockNumber),
+			blockNumber:  "latest",
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -505,12 +512,12 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  createBlockNumberPointer(100),
+			blockNumber:  "100",
 			succeeded:    false,
 			expectedData: nil,
 		},
 		{
-			name: "should return error for nil block parameter",
+			name: "should not return error for empty block parameter",
 			initialStorage: map[types.Address]map[types.Hash]types.Hash{
 				addr0: {
 					hash1: hash1,
@@ -518,7 +525,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			},
 			address:      addr0,
 			index:        hash2,
-			blockNumber:  nil,
+			blockNumber:  "",
 			succeeded:    true,
 			expectedData: argBytesPtr(types.ZeroHash[:]),
 		},
@@ -537,7 +544,8 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 				}
 			}
 			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-			res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, tt.blockNumber)
+			blockNumber, _ := createBlockNumberPointer(tt.blockNumber)
+			res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, blockNumber)
 			if tt.succeeded {
 				assert.NoError(t, err)
 				assert.NotNil(t, res)

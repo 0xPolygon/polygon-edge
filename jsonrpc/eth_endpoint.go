@@ -189,9 +189,10 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 // GetStorageAt returns the contract storage at the index position
 func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
+
 	//Set the block number to latest
 	if number == nil {
-		number = createBlockNumberPointer(LatestBlockNumber)
+		number, _ = createBlockNumberPointer("latest")
 	}
 	// Fetch the requested header
 	header, err := e.d.getBlockHeaderImpl(*number)
@@ -231,8 +232,9 @@ func (e *Eth) GasPrice() (interface{}, error) {
 
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
+
 	if number == nil {
-		number = createBlockNumberPointer(LatestBlockNumber)
+		number, _ = createBlockNumberPointer("latest")
 	}
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
@@ -460,8 +462,9 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 
 // GetBalance returns the account's balance at the referenced block
 func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
+
 	if number == nil {
-		number = createBlockNumberPointer(LatestBlockNumber)
+		number, _ = createBlockNumberPointer("latest")
 	}
 	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
@@ -481,7 +484,7 @@ func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{
 func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
 
 	if number == nil {
-		number = createBlockNumberPointer(LatestBlockNumber)
+		number, _ = createBlockNumberPointer("latest")
 	}
 	nonce, err := e.d.getNextNonce(address, *number)
 
@@ -499,7 +502,7 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 
 	//Set the block number to latest
 	if number == nil {
-		number = createBlockNumberPointer(LatestBlockNumber)
+		number, _ = createBlockNumberPointer("latest")
 	}
 	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
