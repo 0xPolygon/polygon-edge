@@ -19,26 +19,31 @@ func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
 }
 
-// GetBlockByNumber returns information about a block by block number
-func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
-	var num uint64
+func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 	switch number {
 	case LatestBlockNumber:
-		num = e.d.store.Header().Number
+		return e.d.store.Header().Number, nil
 
 	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
+		return 0, fmt.Errorf("fetching the earliest header is not supported")
 
 	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
+		return 0, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		if number < 0 {
-			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
+			return 0, fmt.Errorf("invalid argument 0: block number larger than int64")
 		}
-		num = uint64(number)
+		return uint64(number), nil
 	}
+}
 
+// GetBlockByNumber returns information about a block by block number
+func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
+	num, err := GetNumericBlockNumber(number, e)
+	if err != nil {
+		return nil, err
+	}
 	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
 		return nil, nil
@@ -56,22 +61,9 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
-	var num uint64
-	switch number {
-	case LatestBlockNumber:
-		num = e.d.store.Header().Number
-
-	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		if number < 0 {
-			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
-		}
-		num = uint64(number)
+	num, err := GetNumericBlockNumber(number, e)
+	if err != nil {
+		return nil, err
 	}
 	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
