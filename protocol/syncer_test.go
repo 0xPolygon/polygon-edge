@@ -117,10 +117,12 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	bstores := createBlockStores(3)
 
-	bstores[0].WriteBlocks(blocks)
-	bstores[1].WriteBlocks(blocks)
-	bstores[2].WriteBlocks(blocks)
-
+	err := bstores[0].WriteBlocks(blocks)
+	assert.NoError(t, err)
+	err = bstores[1].WriteBlocks(blocks)
+	assert.NoError(t, err)
+	err = bstores[2].WriteBlocks(blocks)
+	assert.NoError(t, err)
 	sync0 := NewSyncer(hclog.NewNullLogger(), srv0, bstores[0])
 	sync1 := NewSyncer(hclog.NewNullLogger(), srv1, bstores[1])
 	sync2 := NewSyncer(hclog.NewNullLogger(), srv2, bstores[2])
@@ -131,10 +133,10 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	network.MultiJoin(t, srv0, srv1, srv0, srv2, srv1, srv2)
 	time.Sleep(1 * time.Second)
-	//Disconnect peer peer2
+	//Disconnect peer2
 	srv1.Disconnect(srv2.AddrInfo().ID, "testing")
 	time.Sleep(1 * time.Second)
-
+	//server1 syncer should not have disconnected peer
 	assert.NotContains(t, sync1.peers, srv2.AddrInfo().ID)
 
 }
