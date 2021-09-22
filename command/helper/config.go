@@ -27,6 +27,8 @@ type Config struct {
 	Dev         bool
 	DevInterval uint64
 	Join        string
+	KeyDir      string
+	ReadOnly    bool
 }
 
 // Network defines the network configuration params
@@ -41,11 +43,13 @@ type Network struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Chain:   "test",
-		DataDir: "./test-chain",
+		DataDir: "./test-chain-data",
+		KeyDir:  "./test-chain-keys",
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
 		},
+		ReadOnly:  false,
 		Seal:      false,
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
@@ -66,6 +70,8 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
+	conf.KeyDir = c.KeyDir
+	conf.ReadOnly = c.ReadOnly
 
 	// JSON RPC + GRPC
 	if c.GRPCAddr != "" {
@@ -139,6 +145,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.DataDir = otherConfig.DataDir
 	}
 
+	if otherConfig.KeyDir != "" {
+		c.KeyDir = otherConfig.KeyDir
+	}
+
 	if otherConfig.Chain != "" {
 		c.Chain = otherConfig.Chain
 	}
@@ -153,6 +163,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.Seal {
 		c.Seal = true
+	}
+
+	if otherConfig.ReadOnly {
+		c.ReadOnly = true
 	}
 
 	if otherConfig.LogLevel != "" {

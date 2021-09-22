@@ -20,6 +20,8 @@ type Config struct {
 
 	Network *network.Config
 	DataDir string
+	KeyDir string
+	ReadOnly bool
 	Seal    bool
 }
 

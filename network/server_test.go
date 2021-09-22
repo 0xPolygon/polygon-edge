@@ -249,7 +249,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			conf := func(c *Config) {
 				c.NoDiscover = false
-				c.DataDir = directoryName
+				c.KeyDir = directoryName
 				c.Chain.Bootnodes = tt.bootNodes
 			}
 			srv0 := CreateServer(t, conf)

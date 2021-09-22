@@ -17,8 +17,8 @@ var Libp2pKeyName = "libp2p.key"
 // The key must be named 'libp2p.key'
 //
 // If no key is found, it is generated and returned
-func ReadLibp2pKey(dataDir string) (crypto.PrivKey, error) {
-	if dataDir == "" {
+func ReadLibp2pKey(keyDir string) (crypto.PrivKey, error) {
+	if keyDir == "" {
 		// use an in-memory key
 		priv, _, err := crypto.GenerateKeyPair(crypto.Secp256k1, 256)
 		if err != nil {
@@ -28,7 +28,7 @@ func ReadLibp2pKey(dataDir string) (crypto.PrivKey, error) {
 		return priv, nil
 	}
 
-	path := filepath.Join(dataDir, Libp2pKeyName)
+	path := filepath.Join(keyDir, Libp2pKeyName)
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("failed to stat (%s): %v", path, err)

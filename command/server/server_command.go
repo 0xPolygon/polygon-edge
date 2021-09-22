@@ -69,6 +69,14 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["key-dir"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Specifics the data directory used for storing the libp2p key and validator key. Default: %s", helper.DefaultConfig().KeyDir),
+		Arguments: []string{
+			"KEY_DIRECTORY",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["grpc"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
 		Arguments: []string{
@@ -113,6 +121,13 @@ func (c *ServerCommand) DefineFlags() {
 		Description: "Prevents the client from discovering other peers. Default: false",
 		Arguments: []string{
 			"NO_DISCOVER",
+		},
+		FlagOptional: true,
+	}
+	c.flagMap["read-only"] = helper.FlagDescriptor{
+		Description: "Prevents the client from participating in consensus and writing to disk. Default: false",
+		Arguments: []string{
+			"READ_ONLY",
 		},
 		FlagOptional: true,
 	}

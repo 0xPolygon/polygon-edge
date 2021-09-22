@@ -27,7 +27,8 @@ type Config struct {
 	NoDiscover bool
 	Addr       *net.TCPAddr
 	NatAddr    net.IP
-	DataDir    string
+	KeyDir     string
+	ReadOnly bool
 	MaxPeers   uint64
 	Chain      *chain.Chain
 }
@@ -78,7 +79,7 @@ type Peer struct {
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
-	key, err := ReadLibp2pKey(config.DataDir)
+	key, err := ReadLibp2pKey(config.KeyDir)
 	if err != nil {
 		return nil, err
 	}

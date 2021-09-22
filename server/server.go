@@ -59,12 +59,15 @@ type Server struct {
 	txpool *txpool.TxPool
 }
 
-var dirPaths = []string{
+var dataDirPaths = []string{
 	"blockchain",
-	"consensus",
 	"keystore",
 	"trie",
+}
+
+var keyDirPaths = []string{
 	"libp2p",
+	"consensus",
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -77,17 +80,23 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
+	m.logger.Info("Key dir", "path", config.KeyDir)
 
 	// Generate all the paths in the dataDir
-	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := SetupDir(config.DataDir, dataDirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
+	}
+
+	// Generate all the paths in the keyDir
+	if err := SetupDir(config.KeyDir, keyDirPaths); err != nil {
+		return nil, fmt.Errorf("failed to create key directories: %v", err)
 	}
 
 	// start libp2p
 	{
 		netConfig := config.Network
 		netConfig.Chain = m.config.Chain
-		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
+		netConfig.KeyDir = filepath.Join(m.config.KeyDir, "libp2p")
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -162,8 +171,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := m.consensus.Start(); err != nil {
-		return nil, err
+	if config.ReadOnly == false {
+		if err := m.consensus.Start(); err != nil {
+			return nil, err
+		}
 	}
 
 	return m, nil
@@ -224,7 +235,7 @@ func (s *Server) setupConsensus() error {
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
-		Path:   filepath.Join(s.config.DataDir, "consensus"),
+		Path:   filepath.Join(s.config.KeyDir, "consensus"),
 	}
 	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
 	if err != nil {
@@ -399,8 +410,8 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
-// SetupDataDir sets up the polygon-sdk data directory and sub-folders
-func SetupDataDir(dataDir string, paths []string) error {
+// SetupDir sets up the polygon-sdk data directory and sub-folders
+func SetupDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
 	}

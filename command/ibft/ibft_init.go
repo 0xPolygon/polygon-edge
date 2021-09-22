@@ -24,14 +24,13 @@ func (i *IbftInit) DefineFlags() {
 		// Flag map not initialized
 		i.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
-
-	i.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: "Sets the directory for the Polygon SDK data",
+	i.FlagMap["key-dir"] = helper.FlagDescriptor{
+		Description: "Set the directory for the validator and libp2p keys",
 		Arguments: []string{
-			"DATA_DIRECTORY",
+			"KEY_DIRECTORY",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
+		ArgumentsOptional: true,
+		FlagOptional:      true,
 	}
 }
 
@@ -72,41 +71,41 @@ var (
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
 	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
-	var dataDir string
-	flags.StringVar(&dataDir, "data-dir", "", "")
+	var keyDir string
+	flags.StringVar(&keyDir, "key-dir", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	if dataDir == "" {
-		p.UI.Error("required argument (data directory) not passed in")
+	if keyDir == "" {
+		p.UI.Error("required argument (key directory) not passed in")
 		return 1
 	}
 
 	// Check if the sub-directories exist / are already populated
 	for _, subDirectory := range []string{consensusDir, libp2pDir} {
-		if helper.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			p.UI.Error(generateAlreadyInitializedError(dataDir))
+		if helper.DirectoryExists(filepath.Join(keyDir, subDirectory)) {
+			p.UI.Error(generateAlreadyInitializedError(keyDir))
 			return 1
 		}
 	}
 
-	if err := server.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
+	if err := server.SetupDir(keyDir, []string{consensusDir, libp2pDir}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to write the ibft private key
-	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, consensusDir, ibft.IbftKeyName))
+	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(keyDir, consensusDir, ibft.IbftKeyName))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
 	// try to create also a libp2p address
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(dataDir, libp2pDir))
+	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(keyDir, libp2pDir))
 	if err != nil {
 		p.UI.Error(err.Error())
 		return 1

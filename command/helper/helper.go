@@ -400,6 +400,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&configFile, "config", "", "")
 	flags.StringVar(&cliConfig.Chain, "chain", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
+	flags.StringVar(&cliConfig.KeyDir, "key-dir", "", "")
+	flags.BoolVar(&cliConfig.ReadOnly, "read-only", false, "")
 	flags.StringVar(&cliConfig.GRPCAddr, "grpc", "", "")
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
