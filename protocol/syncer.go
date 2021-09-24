@@ -25,6 +25,7 @@ const maxEnqueueSize = 50
 // syncPeer is a representation of the peer the node is syncing with
 type syncPeer struct {
 	peer   peer.ID
+	conn   *grpc.ClientConn
 	client proto.V1Client
 	status *Status
 
@@ -276,17 +277,21 @@ func (s *Syncer) Start() {
 				return
 			}
 
-			if evnt.Type != network.PeerEventConnected {
-				continue
-			}
+			switch evnt.Type {
+			case network.PeerEventConnected:
+				stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
+				if err != nil {
+					s.logger.Error("failed to open a stream", "err", err)
+					continue
+				}
+				if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
+					s.logger.Error("failed to handle user", "err", err)
+				}
 
-			stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
-			if err != nil {
-				s.logger.Error("failed to open a stream", "err", err)
-				continue
-			}
-			if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
-				s.logger.Error("failed to handle user", "err", err)
+			case network.PeerEventDisconnected:
+				if err := s.DeleteUser(evnt.PeerID); err != nil {
+					s.logger.Error("failed to delete user", "err", err)
+				}
 			}
 		}
 	}()
@@ -328,9 +333,20 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	}
 	s.peers[peerID] = &syncPeer{
 		peer:      peerID,
+		conn:      conn,
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
+		number:    status.Number,
+		hash:      status.Hash,
+	}
+	return nil
+}
+
+func (s *Syncer) DeleteUser(peerID peer.ID) error {
+	if p, ok := s.peers[peerID]; ok {
+		p.conn.Close()
+		delete(s.peers, peerID)
 	}
 	return nil
 }
