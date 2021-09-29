@@ -2,6 +2,7 @@ package types
 
 import (
 	"math/big"
+	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
@@ -18,6 +19,9 @@ type Transaction struct {
 	S        []byte
 	Hash     Hash
 	From     Address
+
+	// Cache
+	size atomic.Value
 }
 
 func (t *Transaction) IsContractCreation() bool {
@@ -62,4 +66,13 @@ func (t *Transaction) Cost() *big.Int {
 	total := new(big.Int).Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
 	total.Add(total, t.Value)
 	return total
+}
+
+func (t *Transaction) Size() uint64 {
+	if size := t.size.Load(); size != nil {
+		return size.(uint64)
+	}
+	size := uint64(len(t.MarshalRLP()))
+	t.size.Store(size)
+	return size
 }

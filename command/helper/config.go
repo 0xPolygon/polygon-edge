@@ -44,6 +44,7 @@ type TxPool struct {
 	Locals     string `json:"locals"`
 	NoLocals   bool   `json:"no_locals"`
 	PriceLimit uint64 `json:"price_limit"`
+	MaxSlots   uint64 `json:"max_slots"`
 }
 
 // DefaultConfig returns the default server configuration
@@ -58,6 +59,7 @@ func DefaultConfig() *Config {
 		Seal: false,
 		TxPool: &TxPool{
 			PriceLimit: 1,
+			MaxSlots:   4096,
 		},
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
@@ -122,6 +124,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		}
 		conf.NoLocals = c.TxPool.NoLocals
 		conf.PriceLimit = c.TxPool.PriceLimit
+		conf.MaxSlots = c.TxPool.MaxSlots
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -222,6 +225,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 		if otherConfig.TxPool.PriceLimit != 0 {
 			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
+		}
+		if otherConfig.TxPool.MaxSlots != 0 {
+			c.TxPool.MaxSlots = otherConfig.TxPool.MaxSlots
 		}
 	}
 

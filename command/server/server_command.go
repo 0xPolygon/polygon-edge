@@ -149,6 +149,14 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["max-slots"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets maximum slots in the pool. Default: %d", helper.DefaultConfig().TxPool.MaxSlots),
+		Arguments: []string{
+			"MAX_SLOTS",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["dev"] = helper.FlagDescriptor{
 		Description: "Sets the client to dev mode. Default: false",
 		Arguments: []string{

@@ -25,6 +25,7 @@ type Config struct {
 	Locals     []types.Address
 	NoLocals   bool
 	PriceLimit uint64
+	MaxSlots   uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
