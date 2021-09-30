@@ -145,8 +145,6 @@ func NewTxPool(
 		forks:         forks,
 	}
 
-	fmt.Printf("\n\nmax slots %d\n\n", maxSlots)
-
 	if network != nil {
 		// subscribe to the gossip protocol
 		topic, err := network.NewTopic(topicNameV1, &proto.Txn{})
@@ -247,7 +245,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 			return ErrUnderpriced
 		}
 
-		dropped, success := t.Discard(numSlots(tx), isLocal)
+		dropped, success := t.Discard(t.slots-t.maxSlots+numSlots(tx), isLocal)
 		if !success {
 			return ErrTxPoolOverflow
 		}
@@ -256,6 +254,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 				queue.Remove(tx.Hash)
 			}
 			t.pendingQueue.Delete(tx)
+			t.decreaseSlots(numSlots(tx))
 		}
 	}
 
@@ -271,7 +270,10 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.accountQueues[tx.From] = txnsQueue
 	}
 	txnsQueue.Add(tx)
-	atomic.AddUint64(&t.slots, tx.Size())
+	t.increaseSlots(numSlots(tx))
+	if !isLocal {
+		t.remoteTxns.Push(tx)
+	}
 
 	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
@@ -327,13 +329,13 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 
 	slots := numSlots(txn.tx)
 	// Subtracts tx slots
-	atomic.AddUint64(&t.slots, ^(slots - 1))
+	t.decreaseSlots(slots)
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
 		}
-		atomic.AddUint64(&t.slots, slots)
+		t.increaseSlots(slots)
 	}
 	return txn.tx, ret
 }
@@ -384,8 +386,9 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		atomic.AddUint64(&t.slots, ^(numSlots(txn) - 1))
+		t.decreaseSlots(numSlots(txn))
 		t.pendingQueue.Delete(txn)
+		t.remoteTxns.Delete(txn)
 	}
 }
 
@@ -484,6 +487,16 @@ func (t *TxPool) Discard(slots uint64, force bool) ([]*types.Transaction, bool) 
 		return nil, false
 	}
 	return dropped, true
+}
+
+// increaseSlots increases number of taken slots
+func (t *TxPool) increaseSlots(slots uint64) {
+	atomic.AddUint64(&t.slots, slots)
+}
+
+// increaseSlots decreases number of taken slots
+func (t *TxPool) decreaseSlots(slots uint64) {
+	atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
 // txHeapWrapper is a wrapper object for account based transactions
