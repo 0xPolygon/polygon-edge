@@ -27,11 +27,9 @@ type syncPeer struct {
 	peer   peer.ID
 	conn   *grpc.ClientConn
 	client proto.V1Client
-	status *Status
 
-	// current status
-	number uint64
-	hash   types.Hash
+	status     *Status
+	statusLock sync.RWMutex
 
 	enqueueLock sync.Mutex
 	enqueue     []*types.Block
@@ -40,7 +38,10 @@ type syncPeer struct {
 
 // Number returns the latest peer block height
 func (s *syncPeer) Number() uint64 {
-	return s.number
+	s.statusLock.RLock()
+	defer s.statusLock.RUnlock()
+
+	return s.status.Number
 }
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
@@ -87,14 +88,17 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	// append to the end
 	s.enqueue = append(s.enqueue, b)
 
-	// update the number and hash
-	s.number = b.Number()
-	s.hash = b.Hash()
-
 	select {
 	case s.enqueueCh <- struct{}{}:
 	default:
 	}
+}
+
+func (s *syncPeer) updateStatus(status *Status) {
+	s.statusLock.Lock()
+	defer s.statusLock.Unlock()
+
+	s.status = status
 }
 
 // Status defines the up to date information regarding the peer
@@ -121,6 +125,20 @@ func (s *Status) toProto() *proto.V1Status {
 		Hash:       s.Hash.String(),
 		Difficulty: s.Difficulty.String(),
 	}
+}
+
+// fromProto converts a proto.V1Status to a Status object
+func fromProto(status *proto.V1Status) (*Status, error) {
+	diff, ok := new(big.Int).SetString(status.Difficulty, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse difficulty: %s", status.Difficulty)
+	}
+
+	return &Status{
+		Number:     status.Number,
+		Hash:       types.StringToHash(status.Hash),
+		Difficulty: diff,
+	}, nil
 }
 
 // statusFromProto extracts a Status object from a passed in proto.V1Status
@@ -224,6 +242,14 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	p, ok := s.peers[peerID]
 	if ok {
 		p.appendBlock(b)
+	}
+}
+
+func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
+	s.logger.Debug("update peer status", "peer", peerID, "number", status.Number, "hash", status.Hash, "difficulty", status.Difficulty)
+
+	if p, ok := s.peers[peerID]; ok {
+		p.updateStatus(status)
 	}
 }
 
@@ -337,8 +363,6 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
-		number:    status.Number,
-		hash:      status.Hash,
 	}
 	return nil
 }

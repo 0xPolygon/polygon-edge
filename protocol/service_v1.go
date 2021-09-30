@@ -42,7 +42,13 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 	if err := b.UnmarshalRLP(req.Raw.Value); err != nil {
 		return nil, err
 	}
+	status, err := fromProto(req.Status)
+	if err != nil {
+		return nil, err
+	}
+
 	s.syncer.enqueueBlock(id, b)
+	s.syncer.updatePeerStatus(id, status)
 	return &empty.Empty{}, nil
 }
 
