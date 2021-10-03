@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	any "google.golang.org/protobuf/types/known/anypb"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -42,6 +43,11 @@ func (s *syncPeer) Number() uint64 {
 	defer s.statusLock.RUnlock()
 
 	return s.status.Number
+}
+
+// IsClosed returns whether peer's connectivity has been closed
+func (s *syncPeer) IsClosed() bool {
+	return s.conn.GetState() == connectivity.Shutdown
 }
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
@@ -450,8 +456,12 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 
 	// listen and enqueue the messages
 	for {
-		b := p.popBlock()
+		if p.IsClosed() {
+			s.logger.Error("Connection to a peer has closed already", "id", p.peer)
+			break
+		}
 
+		b := p.popBlock()
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
 			s.logger.Error("failed to write block", "err", err)
 			break
