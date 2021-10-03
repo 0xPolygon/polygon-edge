@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"sync"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -590,10 +591,31 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
 func AddrInfoToString(addr *peer.AddrInfo) string {
-	if len(addr.Addrs) != 1 {
-		panic("Not supported")
+	// Regex used for matching loopback addresses (IPv4 and IPv6)
+	// This regex will match:
+	// /ip4/localhost/tcp/<port>
+	// /ip4/127.0.0.1/tcp/<port>
+	// /ip4/<any other loopback>/tcp/<port>
+	// /ip6/<any loopback>/tcp/<port>
+	loopbackRegex := regexp.MustCompile(
+		"/^\\/ip4\\/127(?:\\.[0-9]+){0,2}\\.[0-9]+\\/tcp\\/\\d+$|^\\/ip4\\/localhost\\/tcp\\/\\d+$|^\\/ip6\\/(?:0*\\:)*?:?0*1\\/tcp\\/\\d+$/gm",
+	)
+
+	dialAddress := ""
+
+	// Find an address that's not a loopback address
+	for _, address := range addr.Addrs {
+		if !loopbackRegex.MatchString(address.String()) {
+			// Not a loopback address, dial address found
+			dialAddress = address.String()
+		}
 	}
-	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+
+	if dialAddress == "" {
+		panic("Unable to find appropriate dial address")
+	}
+
+	return dialAddress + "/p2p/" + addr.ID.String()
 }
 
 type PeerConnectedEvent struct {

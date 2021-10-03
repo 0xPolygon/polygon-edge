@@ -154,6 +154,95 @@ func TestEncodingPeerAddr(t *testing.T) {
 	assert.Equal(t, info, info2)
 }
 
+// constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs
+func constructMultiAddrs(addresses []string) ([]multiaddr.Multiaddr, error) {
+	returnAddrs := make([]multiaddr.Multiaddr, 0)
+
+	for _, addr := range addresses {
+		multiAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		returnAddrs = append(returnAddrs, multiAddr)
+	}
+
+	return returnAddrs, nil
+}
+
+func TestAddrInfoToString(t *testing.T) {
+	defaultPeerID := peer.ID("123")
+	defaultPort := 5000
+
+	// formatMultiaddr is a helper function for formatting an IP / port combination
+	formatMultiaddr := func(ipVersion string, address string, port int) string {
+		return fmt.Sprintf("/%s/%s/tcp/%d", ipVersion, address, port)
+	}
+
+	// formatExpectedOutput is a helper function for generating the expected output for AddrInfoToString
+	formatExpectedOutput := func(input string, peerID string) string {
+		return fmt.Sprintf("%s/p2p/%s", input, peerID)
+	}
+
+	testTable := []struct {
+		name      string
+		addresses []string
+		expected  string
+	}{
+		{
+			// A host address is explicitly specified
+			"Valid dial address found",
+			[]string{formatMultiaddr("ip4", "192.168.1.1", defaultPort)},
+			formatExpectedOutput(
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
+			// Multiple addresses that the host can listen on (0.0.0.0 special case)
+			"Ignore IPv4 loopback address",
+			[]string{
+				formatMultiaddr("ip4", "127.0.0.1", defaultPort),
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+			},
+			formatExpectedOutput(
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
+			// Multiple addresses that the host can listen on (0.0.0.0 special case)
+			"Ignore IPv6 loopback addresses",
+			[]string{
+				formatMultiaddr("ip6", "0:0:0:0:0:0:0:1", defaultPort),
+				formatMultiaddr("ip6", "::1", defaultPort),
+				formatMultiaddr("ip6", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", defaultPort),
+			},
+			formatExpectedOutput(
+				formatMultiaddr("ip6", "2001:db8:85a3::8a2e:370:7334", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Construct the multiaddrs
+			multiAddrs, constructErr := constructMultiAddrs(testCase.addresses)
+			if constructErr != nil {
+				t.Fatalf("Unable to construct multiaddrs, %v", constructErr)
+			}
+
+			dialAddress := AddrInfoToString(&peer.AddrInfo{
+				ID:    defaultPeerID,
+				Addrs: multiAddrs,
+			})
+
+			assert.Equal(t, testCase.expected, dialAddress)
+		})
+	}
+}
+
 func TestJoinWhenAlreadyConnected(t *testing.T) {
 	// if we try to join an already connected node, the watcher
 	// should finish as well
