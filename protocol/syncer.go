@@ -256,7 +256,7 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
 	// diff is number in ibft
-	diff := new(big.Int).SetUint64(b.Number())
+	diff := new(big.Int).SetUint64(b.Header.Difficulty)
 
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
