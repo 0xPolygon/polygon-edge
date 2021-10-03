@@ -589,18 +589,20 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 	return addr1, nil
 }
 
-// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
-func AddrInfoToString(addr *peer.AddrInfo) string {
+var (
 	// Regex used for matching loopback addresses (IPv4 and IPv6)
 	// This regex will match:
 	// /ip4/localhost/tcp/<port>
 	// /ip4/127.0.0.1/tcp/<port>
 	// /ip4/<any other loopback>/tcp/<port>
 	// /ip6/<any loopback>/tcp/<port>
-	loopbackRegex := regexp.MustCompile(
+	loopbackRegex = regexp.MustCompile(
 		`/^\\/ip4\\/127(?:\\.[0-9]+){0,2}\\.[0-9]+\\/tcp\\/\\d+$|^\\/ip4\\/localhost\\/tcp\\/\\d+$|^\\/ip6\\/(?:0*\\:)*?:?0*1\\/tcp\\/\\d+$/gm`,
 	)
+)
 
+// AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
+func AddrInfoToString(addr *peer.AddrInfo) string {
 	dialAddress := ""
 
 	// Find an address that's not a loopback address
