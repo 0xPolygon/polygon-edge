@@ -603,21 +603,26 @@ var (
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
 func AddrInfoToString(addr *peer.AddrInfo) string {
-	dialAddress := ""
+	// Safety check
+	if len(addr.Addrs) == 0 {
+		panic("No dial addresses found")
+	}
 
-	// Find an address that's not a loopback address
-	for _, address := range addr.Addrs {
-		if !loopbackRegex.MatchString(address.String()) {
-			// Not a loopback address, dial address found
-			dialAddress = address.String()
-			break
+	dialAddress := addr.Addrs[0].String()
+
+	// Try to see if a non loopback address is present in the list
+	if len(addr.Addrs) > 1 && loopbackRegex.MatchString(dialAddress) {
+		// Find an address that's not a loopback address
+		for _, address := range addr.Addrs {
+			if !loopbackRegex.MatchString(address.String()) {
+				// Not a loopback address, dial address found
+				dialAddress = address.String()
+				break
+			}
 		}
 	}
 
-	if dialAddress == "" {
-		panic("Unable to find appropriate dial address")
-	}
-
+	// Format output and return
 	return dialAddress + "/p2p/" + addr.ID.String()
 }
 
