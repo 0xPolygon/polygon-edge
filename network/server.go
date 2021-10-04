@@ -610,6 +610,7 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 		if !loopbackRegex.MatchString(address.String()) {
 			// Not a loopback address, dial address found
 			dialAddress = address.String()
+			break
 		}
 	}
 
