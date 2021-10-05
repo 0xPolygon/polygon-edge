@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -311,11 +313,11 @@ func getCount(
 	return bigResponse, nil
 }
 
-// Test scenario:
+// Test scenario (Dev mode):
 // Deploy the StressTest smart contract and send ~50 transactions
 // that modify it's state, and make sure that all
 // transactions were correctly executed
-func Test_TransactionLoop(t *testing.T) {
+func Test_TransactionDevLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
@@ -328,8 +330,6 @@ func Test_TransactionLoop(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.Premine(sender, defaultBalance)
-
-		config.SetShowsLog(true) // TODO remove
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -414,6 +414,141 @@ func Test_TransactionLoop(t *testing.T) {
 
 	// Set up the blockchain listener to catch the added block event
 	_ = waitForBlock(t, srv, 1, 0)
+
+	count, countErr = getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
+}
+
+// Test scenario (IBFT):
+// Deploy the StressTest smart contract and send ~50 transactions
+// that modify it's state, and make sure that all
+// transactions were correctly executed
+func Test_TransactionIBFTLoop(t *testing.T) {
+	senderKey, sender := tests.GenerateKeyAndAddr(t)
+	defaultBalance := framework.EthToWei(100)
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+
+	// Set up the test server
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+		config.Premine(sender, defaultBalance)
+		config.SetSeal(true)
+
+		config.SetShowsLog(true) // TODO remove
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+	client := srv.JSONRPC()
+
+	// Deploy the stress test contract
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer deployCancel()
+
+	buf, err := hex.DecodeString(stressTestBytecode)
+	if err != nil {
+		t.Fatalf("Unable to decode bytecode, %v", err)
+	}
+
+	deployTx := &framework.PreparedTransaction{
+		From:     sender,
+		GasPrice: big.NewInt(framework.DefaultGasPrice),
+		Gas:      framework.DefaultGasLimit,
+		Value:    big.NewInt(0),
+		Input:    buf,
+	}
+	receipt, err := srv.SendRawTx(deployCtx, deployTx, senderKey)
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+
+	contractAddr := receipt.ContractAddress
+	if err != nil {
+		t.Fatalf("Unable to send transaction, %v", err)
+	}
+
+	count, countErr := getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, "0", count.String(), "Count doesn't match")
+
+	// Send ~50 transactions
+	numTransactions := 50
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 1 // 1 because the first transaction was deployment
+
+	// TxPool client
+	clt := srv.TxnPoolOperator()
+
+	convAddress := types.StringToAddress(contractAddr.String())
+
+	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
+	if !ok {
+		t.Fatalf("Unable to get setName method")
+	}
+
+	generateTx := func() *types.Transaction {
+		encodedInput, encodeErr := setNameMethod.Inputs.Encode(
+			map[string]interface{}{
+				"sName": fmt.Sprintf("Name #%d", currentNonce),
+			},
+		)
+		if encodeErr != nil {
+			t.Fatalf("Unable to encode inputs, %v", encodeErr)
+		}
+
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &convAddress,
+			GasPrice: bigGasPrice,
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			V:        []byte{1}, // it is necessary to encode in rlp,
+			Input:    append(setNameMethod.ID(), encodedInput...),
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	for i := 0; i < numTransactions; i++ {
+		var msg *txpoolOp.AddTxnReq
+		setNameTxn := generateTx()
+
+		msg = &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: setNameTxn.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		}
+
+		_, addErr := clt.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
+		}
+	}
+
+	time.Sleep(time.Second * 60)
+	resp, err := clt.Status(context.Background(), &empty.Empty{})
+	if err != nil {
+		t.Fatalf("Unable to get txpool status, %v", err)
+	}
+	fmt.Printf("\n\nTxpool size: %d\n\n", resp.Length)
 
 	count, countErr = getCount(sender, contractAddr, client)
 	if countErr != nil {
