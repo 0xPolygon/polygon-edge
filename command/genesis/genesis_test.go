@@ -2,6 +2,7 @@ package genesis_test
 
 import (
 	"encoding/json"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/command/util"
 	"github.com/mitchellh/cli"
 	"io/ioutil"
@@ -10,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestGenesisBlockLimit(t *testing.T) {
+func TestCustomGenesisBlockLimit(t *testing.T) {
 	blockLimit := "10000000"
 	args := []string{
 		"genesis",
@@ -63,6 +64,64 @@ func TestGenesisBlockLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to convert block gas limit value to decimal: %v", err)
 	}
+	if gotBlockLimit != expectedBlockLimit {
+		t.Fatalf("invalid block gas limit. expected %d but got %d.", expectedBlockLimit, gotBlockLimit)
+	}
+
+	err = os.Remove("genesis.json")
+	if err != nil {
+		t.Fatalf("failed to remove genesis file: %v", err)
+	}
+}
+
+func TestDefaultGenesisBlockLimit(t *testing.T) {
+	args := []string{
+		"genesis",
+		"--consensus", "ibft",
+		"--ibft-validators-prefix-path", "test-chain-",
+		"--bootnode", "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW",
+	}
+
+	commands := util.Commands()
+
+	cli := &cli.CLI{
+		Name:     "polygon",
+		Args:     args,
+		Commands: commands,
+	}
+
+	_, err := cli.Run()
+	if err != nil {
+		t.Fatalf("cli should have run correctly: %v", err)
+	}
+
+	_, err = os.Stat("genesis.json")
+	if err != nil {
+		t.Fatalf("could not read file info: %v", err)
+	}
+
+	type genesisFile struct {
+		Genesis struct {
+			GasLimit string `json:"gasLimit"`
+		} `json:"genesis"`
+	}
+
+	file, err := ioutil.ReadFile("genesis.json")
+	if err != nil {
+		t.Fatalf("could not read file: %v", err)
+	}
+
+	data := genesisFile{}
+	err = json.Unmarshal(file, &data)
+	if err != nil {
+		t.Fatalf("failed to unmarshal genesis file into structure: %v", err)
+	}
+
+	gotBlockLimit, err := strconv.ParseInt(data.Genesis.GasLimit[2:], 16, 64)
+	if err != nil {
+		t.Fatalf("failed to convert hexadecimal value to decimal: %v", err)
+	}
+	expectedBlockLimit := int64(helper.GenesisGasLimit)
 	if gotBlockLimit != expectedBlockLimit {
 		t.Fatalf("invalid block gas limit. expected %d but got %d.", expectedBlockLimit, gotBlockLimit)
 	}
