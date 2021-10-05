@@ -459,7 +459,7 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 	// listen and enqueue the messages
 	for {
 		if p.IsClosed() {
-			s.logger.Error("Connection to a peer has closed already", "id", p.peer)
+			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
 
