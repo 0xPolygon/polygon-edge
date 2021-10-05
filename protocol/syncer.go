@@ -375,7 +375,9 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 
 func (s *Syncer) DeleteUser(peerID peer.ID) error {
 	if p, ok := s.peers[peerID]; ok {
-		p.conn.Close()
+		if err := p.conn.Close(); err != nil {
+			return err
+		}
 		delete(s.peers, peerID)
 	}
 	return nil
