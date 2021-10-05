@@ -252,7 +252,7 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 }
 
 func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
-	s.logger.Debug("update peer status", "peer", peerID, "number", status.Number, "hash", status.Hash, "difficulty", status.Difficulty)
+	s.logger.Debug("update peer status", "peer", peerID, "latest block number", status.Number, "latest block hash", status.Hash, "difficulty", status.Difficulty)
 
 	if p, ok := s.peers[peerID]; ok {
 		p.updateStatus(status)
