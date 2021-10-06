@@ -17,7 +17,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -437,8 +436,6 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(sender, defaultBalance)
 		config.SetSeal(true)
-
-		config.SetShowsLog(true) // TODO remove
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -543,18 +540,21 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 		}
 	}
 
-	time.Sleep(time.Second * 60)
-	resp, err := clt.Status(context.Background(), &empty.Empty{})
+	// Wait for an arbitrary period for these txns to get committed
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer waitCancel()
+
+	resp, err := framework.WaitUntilTxPoolEmpty(waitCtx, srv)
 	if err != nil {
 		t.Fatalf("Unable to get txpool status, %v", err)
 	}
-	fmt.Printf("\n\nTxpool size: %d\n\n", resp.Length)
+	assert.Equal(t, 0, int(resp.Length))
 
 	count, countErr = getCount(sender, contractAddr, client)
 	if countErr != nil {
 		t.Fatalf("Unable to call count method, %v", countErr)
 	}
 
-	// Check that the count is 0 before running the test
+	// Check that the count is correct
 	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
 }

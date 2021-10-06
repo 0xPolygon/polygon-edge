@@ -139,6 +139,26 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 	return res.(*txpoolProto.TxnPoolStatusResp), nil
 }
 
+// WaitUntilTxPoolEmpty waits until node has 0 transactions in txpool,
+// otherwise returns timeout
+func WaitUntilTxPoolEmpty(ctx context.Context, srv *TestServer) (*txpoolProto.TxnPoolStatusResp, error) {
+	clt := srv.TxnPoolOperator()
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		res, _ := clt.Status(subCtx, &empty.Empty{})
+		if res != nil && res.Length == 0 {
+			return res, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*txpoolProto.TxnPoolStatusResp), nil
+}
+
 func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
 	type result struct {
 		data interface{}
