@@ -167,13 +167,8 @@ func TestEthTransfer(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
-	for indx, testCase := range testTable {
+	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			// TODO @Vuksan Please remove this skip statement when JSON-RPC Error wrapping is added
-			if indx == 1 {
-				t.Skip()
-			}
-
 			// Fetch the balances before sending
 			balanceSender, err := rpcClient.Eth().GetBalance(
 				web3.Address(testCase.sender),
@@ -205,7 +200,12 @@ func TestEthTransfer(t *testing.T) {
 
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
-			assert.NoError(t, err)
+			if testCase.shouldSucceed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+
 			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -15,6 +16,7 @@ type stateHelperInterface interface {
 	GetAccount(root types.Hash, addr types.Address) (*state.Account, error)
 	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	GetCode(hash types.Hash) ([]byte, error)
+	GetForksInTime(blockNumber uint64) chain.ForksInTime
 }
 
 // blockchain is the interface with the blockchain required

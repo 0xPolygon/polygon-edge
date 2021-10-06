@@ -2,14 +2,33 @@ package jsonrpc
 
 import (
 	"encoding/json"
+	"errors"
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
+
+var (
+	oneEther = new(big.Int).Mul(
+		big.NewInt(1),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+)
+
+func toArgUint64Ptr(value uint64) *argUint64 {
+	argValue := argUint64(value)
+	return &argValue
+}
+
+func toArgBytesPtr(value []byte) *argBytes {
+	argValue := argBytes(value)
+	return &argValue
+}
 
 func expectJSONResult(data []byte, v interface{}) error {
 	var resp SuccessResponse
@@ -251,4 +270,173 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	jsonerr := &ErrorObject{Code: -32602, Message: "Invalid Params"}
 	assert.Equal(t, res[0].Error, jsonerr)
 	assert.Nil(t, res[3].Error)
+}
+
+func TestDecodeTxn(t *testing.T) {
+	tests := []struct {
+		name     string
+		accounts map[types.Address]*state.Account
+		arg      *txnArgs
+		res      *types.Transaction
+		err      error
+	}{
+		{
+			name: "should be failed when both Data and Input are given",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    toArgBytesPtr(big.NewInt(100).Bytes()),
+				Data:     toArgBytesPtr(big.NewInt(200).Bytes()),
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: nil,
+			err: errors.New("both input and data cannot be set"),
+		},
+		{
+			name: "should be failed when both To and Data doesn't set",
+			arg: &txnArgs{
+				From:     &addr1,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: nil,
+			err: errors.New("contract creation without data provided"),
+		},
+		{
+			name: "should be successful",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    0,
+			},
+			err: nil,
+		},
+		{
+			name: "should set zero address and zero nonce as default",
+			arg: &txnArgs{
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+			},
+			res: &types.Transaction{
+				From:     types.ZeroAddress,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    0,
+			},
+			err: nil,
+		},
+		{
+			name: "should set latest nonce as default",
+			accounts: map[types.Address]*state.Account{
+				addr1: {
+					Nonce: 10,
+				},
+			},
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    10,
+			},
+			err: nil,
+		},
+		{
+			name: "should set empty bytes as default Input",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(1),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    new(big.Int).SetBytes([]byte{}),
+				Input:    []byte{},
+				Nonce:    1,
+			},
+			err: nil,
+		},
+		{
+			name: "should set zero as default Gas",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(1),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      0,
+				GasPrice: big.NewInt(10000),
+				Value:    new(big.Int).SetBytes([]byte{}),
+				Input:    []byte{},
+				Nonce:    1,
+			},
+			err: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.res != nil {
+				tt.res.ComputeHash()
+			}
+			store := newMockStore()
+			for addr, acc := range tt.accounts {
+				store.SetAccount(addr, acc)
+			}
+
+			d := newTestDispatcher(hclog.NewNullLogger(), store)
+			res, err := d.decodeTxn(tt.arg)
+			assert.Equal(t, tt.res, res)
+			assert.Equal(t, tt.err, err)
+		})
+	}
 }
