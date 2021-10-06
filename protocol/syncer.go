@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	any "google.golang.org/protobuf/types/known/anypb"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -26,12 +27,11 @@ const maxEnqueueSize = 50
 // syncPeer is a representation of the peer the node is syncing with
 type syncPeer struct {
 	peer   peer.ID
+	conn   *grpc.ClientConn
 	client proto.V1Client
-	status *Status
 
-	// current status
-	number uint64
-	hash   types.Hash
+	status     *Status
+	statusLock sync.RWMutex
 
 	enqueueLock sync.Mutex
 	enqueue     []*types.Block
@@ -40,7 +40,15 @@ type syncPeer struct {
 
 // Number returns the latest peer block height
 func (s *syncPeer) Number() uint64 {
-	return s.number
+	s.statusLock.RLock()
+	defer s.statusLock.RUnlock()
+
+	return s.status.Number
+}
+
+// IsClosed returns whether peer's connectivity has been closed
+func (s *syncPeer) IsClosed() bool {
+	return s.conn.GetState() == connectivity.Shutdown
 }
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
@@ -87,14 +95,17 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	// append to the end
 	s.enqueue = append(s.enqueue, b)
 
-	// update the number and hash
-	s.number = b.Number()
-	s.hash = b.Hash()
-
 	select {
 	case s.enqueueCh <- struct{}{}:
 	default:
 	}
+}
+
+func (s *syncPeer) updateStatus(status *Status) {
+	s.statusLock.Lock()
+	defer s.statusLock.Unlock()
+
+	s.status = status
 }
 
 // Status defines the up to date information regarding the peer
@@ -121,6 +132,20 @@ func (s *Status) toProto() *proto.V1Status {
 		Hash:       s.Hash.String(),
 		Difficulty: s.Difficulty.String(),
 	}
+}
+
+// fromProto converts a proto.V1Status to a Status object
+func fromProto(status *proto.V1Status) (*Status, error) {
+	diff, ok := new(big.Int).SetString(status.Difficulty, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse difficulty: %s", status.Difficulty)
+	}
+
+	return &Status{
+		Number:     status.Number,
+		Hash:       types.StringToHash(status.Hash),
+		Difficulty: diff,
+	}, nil
 }
 
 // statusFromProto extracts a Status object from a passed in proto.V1Status
@@ -228,10 +253,18 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	}
 }
 
+func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
+	s.logger.Debug("update peer status", "peer", peerID, "latest block number", status.Number, "latest block hash", status.Hash, "difficulty", status.Difficulty)
+
+	if p, ok := s.peers.Load(peerID); ok {
+		p.(*syncPeer).updateStatus(status)
+	}
+}
+
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
 	// diff is number in ibft
-	diff := new(big.Int).SetUint64(b.Number())
+	diff := new(big.Int).SetUint64(b.Header.Difficulty)
 
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
@@ -286,22 +319,21 @@ func (s *Syncer) Start() {
 				return
 			}
 
-			if evnt.Type == network.PeerEventDisconnected {
-				s.peers.Delete(evnt.PeerID)
-				atomic.AddInt64(&s.peersNum, -1)
-				continue
-			}
-			if evnt.Type != network.PeerEventConnected {
-				continue
-			}
+			switch evnt.Type {
+			case network.PeerEventConnected:
+				stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
+				if err != nil {
+					s.logger.Error("failed to open a stream", "err", err)
+					continue
+				}
+				if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
+					s.logger.Error("failed to handle user", "err", err)
+				}
 
-			stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
-			if err != nil {
-				s.logger.Error("failed to open a stream", "err", err)
-				continue
-			}
-			if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
-				s.logger.Error("failed to handle user", "err", err)
+			case network.PeerEventDisconnected:
+				if err := s.DeleteUser(evnt.PeerID); err != nil {
+					s.logger.Error("failed to delete user", "err", err)
+				}
 			}
 		}
 	}()
@@ -350,11 +382,24 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 
 	s.peers.Store(peerID, &syncPeer{
 		peer:      peerID,
+		conn:      conn,
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
 	})
 	atomic.AddInt64(&s.peersNum, 1)
+
+	return nil
+}
+
+func (s *Syncer) DeleteUser(peerID peer.ID) error {
+	p, ok := s.peers.LoadAndDelete(peerID)
+	if ok {
+		atomic.AddInt64(&s.peersNum, -1)
+		if err := p.(*syncPeer).conn.Close(); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -434,8 +479,12 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 
 	// listen and enqueue the messages
 	for {
-		b := p.popBlock()
+		if p.IsClosed() {
+			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
+			break
+		}
 
+		b := p.popBlock()
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
 			s.logger.Error("failed to write block", "err", err)
 			break

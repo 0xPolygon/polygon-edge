@@ -280,16 +280,16 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	inArgs := make([]reflect.Value, fd.inNum)
 	inArgs[0] = service.sv
 
-	if req.Params != nil {
-		inputs := make([]interface{}, fd.numParams())
-		for i := 0; i < fd.inNum-1; i++ {
-			val := reflect.New(fd.reqt[i+1])
-			inputs[i] = val.Interface()
-			inArgs[i+1] = val.Elem()
-		}
-		if err := json.Unmarshal(req.Params, &inputs); err != nil {
-			return nil, NewInvalidParamsError("Invalid Params")
-		}
+	inputs := make([]interface{}, fd.numParams())
+	for i := 0; i < fd.inNum-1; i++ {
+		val := reflect.New(fd.reqt[i+1])
+		inputs[i] = val.Interface()
+		inArgs[i+1] = val.Elem()
+	}
+
+	if err := json.Unmarshal(req.Params, &inputs); err != nil {
+
+		return nil, NewInvalidParamsError("Invalid Params")
 	}
 
 	output := fd.fv.Call(inArgs)
