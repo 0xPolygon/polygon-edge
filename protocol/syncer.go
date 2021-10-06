@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"sync"
+	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/network"
@@ -144,8 +145,8 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers     map[peer.ID]*syncPeer
-	peersLock sync.RWMutex
+	peers    sync.Map // Maps peer.ID -> syncPeer
+	peersNum int64    // Number of entries in the peers map
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -160,7 +161,7 @@ type Syncer struct {
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 	s := &Syncer{
 		logger:     logger.Named("syncer"),
-		peers:      map[peer.ID]*syncPeer{},
+		peersNum:   0,
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		server:     server,
@@ -220,18 +221,15 @@ const syncerV1 = "/syncer/0.1"
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
-	s.peersLock.RLock()
-	p, ok := s.peers[peerID]
-	s.peersLock.RUnlock()
+
+	foundPeer, ok := s.peers.Load(peerID)
 	if ok {
-		p.appendBlock(b)
+		foundPeer.(*syncPeer).appendBlock(b)
 	}
 }
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
-	s.peersLock.RLock()
-	defer s.peersLock.RUnlock()
 	// diff is number in ibft
 	diff := new(big.Int).SetUint64(b.Number())
 
@@ -246,11 +244,19 @@ func (s *Syncer) Broadcast(b *types.Block) {
 			Value: b.MarshalRLP(),
 		},
 	}
-	for _, p := range s.peers {
-		if _, err := p.client.Notify(context.Background(), req); err != nil {
+
+	s.peers.Range(func(peerID, foundPeer interface{}) bool {
+		if _, err := foundPeer.(*syncPeer).client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
-	}
+
+		return true
+	})
+}
+
+// NumSyncPeers returns the number of peers in the sync map. [Thread safe]
+func (s *Syncer) NumSyncPeers() int64 {
+	return atomic.LoadInt64(&s.peersNum)
 }
 
 // Start starts the syncer protocol
@@ -281,9 +287,8 @@ func (s *Syncer) Start() {
 			}
 
 			if evnt.Type == network.PeerEventDisconnected {
-				s.peersLock.Lock()
-				delete(s.peers, evnt.PeerID)
-				s.peersLock.Unlock()
+				s.peers.Delete(evnt.PeerID)
+				atomic.AddInt64(&s.peersNum, -1)
 				continue
 			}
 			if evnt.Type != network.PeerEventConnected {
@@ -306,28 +311,31 @@ func (s *Syncer) Start() {
 func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
-	s.peersLock.RLock()
-	defer s.peersLock.RUnlock()
-	for _, p := range s.peers {
-		status := p.status
+
+	s.peers.Range(func(peerID, foundPeer interface{}) bool {
+		status := foundPeer.(*syncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = p, status.Difficulty
+			bestPeer, bestTd = foundPeer.(*syncPeer), status.Difficulty
 		}
-	}
+
+		return true
+	})
+
 	if bestPeer == nil {
 		return nil
 	}
+
 	curDiff := s.blockchain.CurrentTD()
+
 	if bestTd.Cmp(curDiff) <= 0 {
 		return nil
 	}
+
 	return bestPeer
 }
 
 // HandleUser is a helper method that is used to handle new user connections within the Syncer
 func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
-	s.peersLock.Lock()
-	defer s.peersLock.Unlock()
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
@@ -339,12 +347,15 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	if err != nil {
 		return err
 	}
-	s.peers[peerID] = &syncPeer{
+
+	s.peers.Store(peerID, &syncPeer{
 		peer:      peerID,
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
-	}
+	})
+	atomic.AddInt64(&s.peersNum, 1)
+
 	return nil
 }
 
