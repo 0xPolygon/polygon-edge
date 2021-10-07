@@ -29,6 +29,12 @@ func EthToWei(ethValue int64) *big.Int {
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 }
 
+func EthToWeiPrecise(ethValue int64, decimals int64) *big.Int {
+	return new(big.Int).Mul(
+		big.NewInt(ethValue),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil))
+}
+
 // GetAccountBalance is a helper method for fetching the Balance field of an account
 func GetAccountBalance(
 	address types.Address,

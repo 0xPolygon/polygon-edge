@@ -124,7 +124,7 @@ func NewTxPool(
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	mux, _ := t.accountQueuesMuxMap[addr]
+	var mux, _ = t.accountQueuesMuxMap[addr]
 	mux.RLock()
 	defer mux.RUnlock()
 
@@ -203,7 +203,7 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
-	mux, _ := t.accountQueuesMuxMap[tx.From]
+	var mux, _ = t.accountQueuesMuxMap[tx.From]
 	mux.Lock()
 	defer mux.Unlock()
 
@@ -241,7 +241,7 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
-		mux, _ := t.accountQueuesMuxMap[addr]
+		var mux, _ = t.accountQueuesMuxMap[addr]
 		mux.RLock()
 		for _, tx := range queuedTxn.txs {
 			if _, ok := queuedTxs[addr]; !ok {
