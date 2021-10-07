@@ -107,7 +107,7 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.FlagMap["blockLimit"] = helper.FlagDescriptor{
+	c.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
 		Description:       fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
 		Arguments:         []string{
 			"BLOCK_GAS_LIMIT",
@@ -154,7 +154,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var ibftValidators helperFlags.ArrayFlags
 	var ibftValidatorsPrefixPath string
 
-	var blockLimit uint64
+	var blockGasLimit uint64
 
 	flags.StringVar(&baseDir, "dir", "", "")
 	flags.StringVar(&name, "name", helper.DefaultChainName, "")
@@ -164,7 +164,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
-	flags.Uint64Var(&blockLimit, "blockLimit", helper.GenesisGasLimit, "")
+	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -212,7 +212,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
-			GasLimit:   blockLimit,
+			GasLimit:   blockGasLimit,
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  extraData,

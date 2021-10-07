@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"io"
 	"math/big"
 	"os"
@@ -200,6 +201,13 @@ func (t *TestServer) GenerateGenesis() error {
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
+
+	// add block gas limit
+	if t.Config.BlockGasLimit == 0 {
+		t.Config.BlockGasLimit = helper.GenesisGasLimit
+	}
+	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
+	args = append(args, "--block-gas-limit", blockGasLimit)
 
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
