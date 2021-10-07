@@ -63,7 +63,8 @@ type TxPool struct {
 
 	// Unsorted min heap of transactions per account.
 	// The heap is min nonce based
-	accountQueues map[types.Address]*txHeapWrapper
+	accountQueues       map[types.Address]*txHeapWrapper
+	accountQueuesMuxMap map[types.Address]sync.RWMutex
 
 	// Max price heap for all transactions that are valid
 	pendingQueue *txPriceHeap
@@ -95,13 +96,14 @@ func NewTxPool(
 	network *network.Server,
 ) (*TxPool, error) {
 	txPool := &TxPool{
-		logger:        logger.Named("txpool"),
-		store:         store,
-		idlePeriod:    defaultIdlePeriod,
-		accountQueues: make(map[types.Address]*txHeapWrapper),
-		pendingQueue:  newTxPriceHeap(),
-		sealing:       sealing,
-		forks:         forks,
+		logger:              logger.Named("txpool"),
+		store:               store,
+		idlePeriod:          defaultIdlePeriod,
+		accountQueues:       make(map[types.Address]*txHeapWrapper),
+		accountQueuesMuxMap: make(map[types.Address]sync.RWMutex),
+		pendingQueue:        newTxPriceHeap(),
+		sealing:             sealing,
+		forks:               forks,
 	}
 
 	if network != nil {
@@ -122,6 +124,10 @@ func NewTxPool(
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
+	mux, _ := t.accountQueuesMuxMap[addr]
+	mux.RLock()
+	defer mux.RUnlock()
+
 	q, ok := t.accountQueues[addr]
 	if !ok {
 		return 0, false
@@ -197,6 +203,10 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
+	mux, _ := t.accountQueuesMuxMap[tx.From]
+	mux.Lock()
+	defer mux.Unlock()
+
 	txnsQueue, ok := t.accountQueues[tx.From]
 	if !ok {
 		stateRoot := t.store.Header().StateRoot
@@ -231,12 +241,15 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
+		mux, _ := t.accountQueuesMuxMap[addr]
+		mux.RLock()
 		for _, tx := range queuedTxn.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
 			queuedTxs[addr][tx.Nonce] = tx
 		}
+		mux.RUnlock()
 	}
 
 	return pendingTxs, queuedTxs
