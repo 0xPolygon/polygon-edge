@@ -124,7 +124,7 @@ func TestBroadcast(t *testing.T) {
 
 			// Check peer's status
 			lastBlock := newBlocks[len(newBlocks)-1]
-			assert.Equal(t, BlockToStatus(lastBlock), peerInfo.status)
+			assert.Equal(t, HeaderToStatus(lastBlock.Header), peerInfo.status)
 		})
 	}
 }
@@ -301,7 +301,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			select {
 			case <-doneCh:
 				assert.True(t, tt.synced, "syncer shouldn't sync any block with peer, but did")
-				assert.Equal(t, BlockToStatus(latestBlock), syncer.status)
+				assert.Equal(t, HeaderToStatus(latestBlock.Header), syncer.status)
 				assert.Equal(t, tt.expectedHeight, syncer.status.Number)
 				break
 			case <-time.After(time.Second * 10):

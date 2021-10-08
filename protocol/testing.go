@@ -32,6 +32,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// CreateSyncer initialize syncer with server
 func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *network.Config)) *Syncer {
 	t.Helper()
 	if serverCfg == nil {
@@ -45,6 +46,7 @@ func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *ne
 	return syncer
 }
 
+// WaitUntilPeerConnected waits until syncer connects to given number of peers
 func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout time.Duration) {
 	t.Helper()
 
@@ -63,6 +65,7 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 	assert.NoError(t, err)
 }
 
+// WaitUntilProcessedAllEvents waits until syncer finish to process all blockchain events
 func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Duration) {
 	t.Helper()
 
@@ -77,11 +80,13 @@ func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Dura
 	assert.NoError(t, err)
 }
 
+// NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	seed := rand.Intn(maxSeed)
 	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))
 }
 
+// SetupSyncerNetwork connects syncers
 func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockchainShim) (syncer *Syncer, peerSyncers []*Syncer) {
 	t.Helper()
 
@@ -95,6 +100,7 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 	return
 }
 
+// GenerateNewBlocks returns new blocks from latest block of given chain
 func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Block {
 	t.Helper()
 
@@ -109,6 +115,7 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 	return blockchain.HeadersToBlocks(headers[currentHeight+1:])
 }
 
+// TryPopBlock tries to take block from peer's queue in syncer within timeout
 func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Duration) (*types.Block, bool) {
 	t.Helper()
 
@@ -128,6 +135,7 @@ func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Dura
 	}
 }
 
+// GetCurrentStatus return status by latest block in blockchain
 func GetCurrentStatus(b blockchainShim) *Status {
 	return &Status{
 		Hash:       b.Header().Hash,
@@ -136,6 +144,7 @@ func GetCurrentStatus(b blockchainShim) *Status {
 	}
 }
 
+// HeaderToStatus converts given header to Status
 func HeaderToStatus(h *types.Header) *Status {
 	return &Status{
 		Hash:       h.Hash,
@@ -144,10 +153,7 @@ func HeaderToStatus(h *types.Header) *Status {
 	}
 }
 
-func BlockToStatus(b *types.Block) *Status {
-	return HeaderToStatus(b.Header)
-}
-
+// mockBlockchain is a mock of blockhain for syncer tests
 type mockBlockchain struct {
 	blocks       []*types.Block
 	subscription *mockSubscription
@@ -221,6 +227,7 @@ func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
 	return nil
 }
 
+// mockSubscription is a mock of subscription for blockchain events
 type mockSubscription struct {
 	eventCh chan *blockchain.Event
 }
