@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -312,52 +313,19 @@ func getCount(
 	return bigResponse, nil
 }
 
-// Test scenario (Dev mode):
-// Deploy the StressTest smart contract and send ~50 transactions
-// that modify it's state, and make sure that all
-// transactions were correctly executed
-func Test_TransactionDevLoop(t *testing.T) {
-	senderKey, sender := tests.GenerateKeyAndAddr(t)
-	defaultBalance := framework.EthToWei(100)
+// addStressTestTxns adds numTransactions that call the
+// passed in StressTest smart contract method
+func addStressTestTxns(
+	t *testing.T,
+	srv *framework.TestServer,
+	numTransactions int,
+	contractAddr types.Address,
+	senderKey *ecdsa.PrivateKey,
+) {
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-
-	devInterval := 5 // s
-
-	// Set up the test server
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetDevInterval(devInterval)
-		config.Premine(sender, defaultBalance)
-	})
-	srv := srvs[0]
-	client := srv.JSONRPC()
-
-	// Deploy the stress test contract
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	count, countErr := getCount(sender, contractAddr, client)
-	if countErr != nil {
-		t.Fatalf("Unable to call count method, %v", countErr)
-	}
-
-	// Check that the count is 0 before running the test
-	assert.Equalf(t, "0", count.String(), "Count doesn't match")
-
-	// Send ~50 transactions
-	numTransactions := 50
 	signer := crypto.NewEIP155Signer(100)
 	currentNonce := 1 // 1 because the first transaction was deployment
-
-	// TxPool client
 	clt := srv.TxnPoolOperator()
-
-	convAddress := types.StringToAddress(contractAddr.String())
 
 	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
 	if !ok {
@@ -377,7 +345,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
 			Nonce:    uint64(currentNonce),
 			From:     types.ZeroAddress,
-			To:       &convAddress,
+			To:       &contractAddr,
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    big.NewInt(0),
@@ -410,6 +378,54 @@ func Test_TransactionDevLoop(t *testing.T) {
 			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
 		}
 	}
+}
+
+// Test scenario (Dev mode):
+// Deploy the StressTest smart contract and send ~50 transactions
+// that modify it's state, and make sure that all
+// transactions were correctly executed
+func Test_TransactionDevLoop(t *testing.T) {
+	senderKey, sender := tests.GenerateKeyAndAddr(t)
+	defaultBalance := framework.EthToWei(100)
+	devInterval := 5 // s
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.Premine(sender, defaultBalance)
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	// Deploy the stress test contract
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, countErr := getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, "0", count.String(), "Count doesn't match")
+
+	// Send ~50 transactions
+	numTransactions := 50
+
+	// Add stress test transactions
+	addStressTestTxns(
+		t,
+		srv,
+		numTransactions,
+		types.StringToAddress(contractAddr.String()),
+		senderKey,
+	)
 
 	// Set up the blockchain listener to catch the added block event
 	_ = waitForBlock(t, srv, 1, 0)
@@ -430,7 +446,6 @@ func Test_TransactionDevLoop(t *testing.T) {
 func Test_TransactionIBFTLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
-	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
 
 	// Set up the test server
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
@@ -480,65 +495,15 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	// Send ~50 transactions
 	numTransactions := 50
-	signer := crypto.NewEIP155Signer(100)
-	currentNonce := 1 // 1 because the first transaction was deployment
 
-	// TxPool client
-	clt := srv.TxnPoolOperator()
-
-	convAddress := types.StringToAddress(contractAddr.String())
-
-	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
-	if !ok {
-		t.Fatalf("Unable to get setName method")
-	}
-
-	generateTx := func() *types.Transaction {
-		encodedInput, encodeErr := setNameMethod.Inputs.Encode(
-			map[string]interface{}{
-				"sName": fmt.Sprintf("Name #%d", currentNonce),
-			},
-		)
-		if encodeErr != nil {
-			t.Fatalf("Unable to encode inputs, %v", encodeErr)
-		}
-
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &convAddress,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    big.NewInt(0),
-			V:        []byte{1}, // it is necessary to encode in rlp,
-			Input:    append(setNameMethod.ID(), encodedInput...),
-		}, senderKey)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
-		}
-
-		currentNonce++
-
-		return signedTx
-	}
-
-	for i := 0; i < numTransactions; i++ {
-		var msg *txpoolOp.AddTxnReq
-		setNameTxn := generateTx()
-
-		msg = &txpoolOp.AddTxnReq{
-			Raw: &any.Any{
-				Value: setNameTxn.MarshalRLP(),
-			},
-			From: types.ZeroAddress.String(),
-		}
-
-		_, addErr := clt.AddTxn(context.Background(), msg)
-		if addErr != nil {
-			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
-		}
-	}
+	// Add stress test transactions
+	addStressTestTxns(
+		t,
+		srv,
+		numTransactions,
+		types.StringToAddress(contractAddr.String()),
+		senderKey,
+	)
 
 	// Wait for an arbitrary period for these txns to get committed
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
