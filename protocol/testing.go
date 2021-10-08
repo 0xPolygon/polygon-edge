@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	maxHeight = 1024
-	maxSeed   = math.MaxInt32
+	maxSeed = math.MaxInt32
 )
 
 var (
