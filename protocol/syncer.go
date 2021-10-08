@@ -63,7 +63,7 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 		}
 	}
 	if indx != -1 {
-		s.enqueue = s.enqueue[indx:]
+		s.enqueue = s.enqueue[indx+1:]
 	}
 }
 

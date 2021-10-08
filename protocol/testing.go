@@ -40,11 +40,7 @@ func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *ne
 
 	srv := network.CreateServer(t, *serverCfg)
 	syncer := NewSyncer(hclog.NewNullLogger(), srv, blockchain)
-
 	syncer.Start()
-	t.Cleanup(func() {
-		srv.Close()
-	})
 
 	return syncer
 }
@@ -67,13 +63,23 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 	assert.NoError(t, err)
 }
 
+func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Duration) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		return nil, len(syncer.blockchain.SubscribeEvents().GetEventCh()) > 0
+	})
+	assert.NoError(t, err)
+}
+
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	seed := rand.Intn(maxSeed)
 	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))
-}
-
-func NewRandomChainWithRandomHeight(t *testing.T) blockchainShim {
-	return NewRandomChain(t, rand.Intn(maxHeight-1)+1)
 }
 
 func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockchainShim) (syncer *Syncer, peerSyncers []*Syncer) {
@@ -130,10 +136,118 @@ func GetCurrentStatus(b blockchainShim) *Status {
 	}
 }
 
-func BlockToStatus(b *types.Block) *Status {
+func HeaderToStatus(h *types.Header) *Status {
 	return &Status{
-		Hash:       b.Hash(),
-		Number:     b.Number(),
-		Difficulty: big.NewInt(0).SetUint64(b.Header.Difficulty),
+		Hash:       h.Hash,
+		Number:     h.Number,
+		Difficulty: big.NewInt(0).SetUint64(h.Difficulty),
 	}
+}
+
+func BlockToStatus(b *types.Block) *Status {
+	return HeaderToStatus(b.Header)
+}
+
+type mockBlockchain struct {
+	blocks       []*types.Block
+	subscription *mockSubscription
+}
+
+func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
+	return &mockBlockchain{
+		blocks:       blockchain.HeadersToBlocks(headers),
+		subscription: NewMockSubscription(),
+	}
+}
+
+func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
+	return b.subscription
+}
+
+func (b *mockBlockchain) Header() *types.Header {
+	l := len(b.blocks)
+	if l == 0 {
+		return nil
+	}
+	return b.blocks[l-1].Header
+}
+
+func (b *mockBlockchain) CurrentTD() *big.Int {
+	current := b.Header()
+	if current == nil {
+		return nil
+	}
+	return new(big.Int).SetUint64(current.Difficulty)
+}
+
+func (b *mockBlockchain) GetTD(hash types.Hash) (*big.Int, bool) {
+	for _, b := range b.blocks {
+		if b.Header.Hash == hash {
+			return new(big.Int).SetUint64(b.Header.Difficulty), true
+		}
+	}
+	return nil, false
+}
+
+func (b *mockBlockchain) GetReceiptsByHash(types.Hash) ([]*types.Receipt, error) {
+	panic("not implement")
+}
+
+func (b *mockBlockchain) GetBodyByHash(types.Hash) (*types.Body, bool) {
+	panic("not implement")
+}
+
+func (b *mockBlockchain) GetHeaderByHash(h types.Hash) (*types.Header, bool) {
+	for _, b := range b.blocks {
+		if b.Header.Hash == h {
+			return b.Header, true
+		}
+	}
+	return nil, false
+}
+
+func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
+	for _, b := range b.blocks {
+		if b.Header.Number == n {
+			return b.Header, true
+		}
+	}
+	return nil, false
+}
+
+func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
+	b.blocks = append(b.blocks, blocks...)
+	b.subscription.AppendBlocks(blocks)
+	return nil
+}
+
+type mockSubscription struct {
+	eventCh chan *blockchain.Event
+}
+
+func NewMockSubscription() *mockSubscription {
+	return &mockSubscription{
+		eventCh: make(chan *blockchain.Event, 2), // make with 2 capacities in order to check subsequent event easily
+	}
+}
+
+func (s *mockSubscription) AppendBlocks(blocks []*types.Block) {
+	for _, b := range blocks {
+		s.eventCh <- &blockchain.Event{
+			Difficulty: new(big.Int).SetUint64(b.Header.Difficulty),
+			NewChain:   []*types.Header{b.Header},
+		}
+	}
+}
+
+func (s *mockSubscription) GetEventCh() chan *blockchain.Event {
+	return s.eventCh
+}
+
+func (s *mockSubscription) GetEvent() *blockchain.Event {
+	return <-s.eventCh
+}
+
+func (s *mockSubscription) Close() {
+	close(s.eventCh)
 }
