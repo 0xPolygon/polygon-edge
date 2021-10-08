@@ -1,7 +1,5 @@
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 contract StressTest {
     string private name;
     uint256 private num;
