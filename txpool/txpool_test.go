@@ -123,7 +123,7 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.NoError(t, pool.addImpl("", txn0))
 	assert.NoError(t, pool.addImpl("", txn0))
 
-	assert.Len(t, pool.accountQueues[from1].txs, 1)
+	assert.Equal(t, pool.NumAccountTxs(from1), 1)
 	assert.Equal(t, pool.Length(), uint64(0))
 
 	from2 := types.Address{0x2}
@@ -136,7 +136,7 @@ func TestMultipleTransactions(t *testing.T) {
 	assert.NoError(t, pool.addImpl("", txn1))
 	assert.NoError(t, pool.addImpl("", txn1))
 
-	assert.Len(t, pool.accountQueues[from2].txs, 0)
+	assert.Equal(t, pool.NumAccountTxs(from2), 0)
 	assert.Equal(t, pool.Length(), uint64(1))
 }
 

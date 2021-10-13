@@ -63,8 +63,8 @@ type TxPool struct {
 
 	// Unsorted min heap of transactions per account.
 	// The heap is min nonce based
-	accountQueues       map[types.Address]*txHeapWrapper
-	accountQueuesMuxMap map[types.Address]sync.RWMutex
+	accountQueuesMux sync.Mutex
+	accountQueues    map[types.Address]*accountQueueWrapper
 
 	// Max price heap for all transactions that are valid
 	pendingQueue *txPriceHeap
@@ -96,14 +96,13 @@ func NewTxPool(
 	network *network.Server,
 ) (*TxPool, error) {
 	txPool := &TxPool{
-		logger:              logger.Named("txpool"),
-		store:               store,
-		idlePeriod:          defaultIdlePeriod,
-		accountQueues:       make(map[types.Address]*txHeapWrapper),
-		accountQueuesMuxMap: make(map[types.Address]sync.RWMutex),
-		pendingQueue:        newTxPriceHeap(),
-		sealing:             sealing,
-		forks:               forks,
+		logger:        logger.Named("txpool"),
+		store:         store,
+		idlePeriod:    defaultIdlePeriod,
+		accountQueues: make(map[types.Address]*accountQueueWrapper),
+		pendingQueue:  newTxPriceHeap(),
+		sealing:       sealing,
+		forks:         forks,
 	}
 
 	if network != nil {
@@ -122,17 +121,63 @@ func NewTxPool(
 	return txPool, nil
 }
 
+// accountQueueWrapper is the account based queue mux map implementation
+type accountQueueWrapper struct {
+	mux          sync.RWMutex
+	accountQueue *txHeapWrapper
+}
+
+// lockAccountQueue returns the corresponding account queue wrapper object, or creates it
+// if it doesn't exist in the account queue map
+func (t *TxPool) lockAccountQueue(address types.Address) *accountQueueWrapper {
+	// Lock the global map
+	t.accountQueuesMux.Lock()
+
+	accountQueue, ok := t.accountQueues[address]
+	if !ok {
+		// Account queue is not initialized yet, initialize it
+		stateRoot := t.store.Header().StateRoot
+
+		// Initialize the account based transaction heap
+		txnsQueue := newTxHeapWrapper()
+		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
+
+		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
+		t.accountQueues[address] = accountQueue
+	}
+	// Unlock the global map, since work is finished
+	t.accountQueuesMux.Unlock()
+
+	// Grab the lock for the specific account queue
+	accountQueue.mux.Lock()
+
+	return accountQueue
+}
+
+// unlock releases the account specific transaction queue mux.
+// Separated out into a function in case there needs to be additional teardown logic
+func (a *accountQueueWrapper) unlock() {
+	a.mux.Unlock()
+}
+
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	var mux, _ = t.accountQueuesMuxMap[addr]
-	mux.RLock()
-	defer mux.RUnlock()
+	mux := t.lockAccountQueue(addr)
+	defer mux.unlock()
 
-	q, ok := t.accountQueues[addr]
+	wrapper, ok := t.accountQueues[addr]
 	if !ok {
 		return 0, false
 	}
-	return q.nextNonce, true
+	return wrapper.accountQueue.nextNonce, true
+}
+
+// NumAccountTxs Returns the number of transactions in the account specific queue
+func (t *TxPool) NumAccountTxs(address types.Address) int {
+	mux := t.lockAccountQueue(address)
+	defer mux.unlock()
+
+	return len(t.accountQueues[address].accountQueue.txs)
 }
 
 func (t *TxPool) AddSigner(s signer) {
@@ -203,22 +248,13 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
-	var mux, _ = t.accountQueuesMuxMap[tx.From]
-	mux.Lock()
-	defer mux.Unlock()
+	mux := t.lockAccountQueue(tx.From)
+	defer mux.unlock()
 
-	txnsQueue, ok := t.accountQueues[tx.From]
-	if !ok {
-		stateRoot := t.store.Header().StateRoot
+	wrapper := t.accountQueues[tx.From]
+	wrapper.accountQueue.Add(tx)
 
-		// Initialize the account based transaction heap
-		txnsQueue = newTxHeapWrapper()
-		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, tx.From)
-		t.accountQueues[tx.From] = txnsQueue
-	}
-	txnsQueue.Add(tx)
-
-	for _, promoted := range txnsQueue.Promote() {
+	for _, promoted := range wrapper.accountQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
 		}
@@ -241,15 +277,14 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
-		var mux, _ = t.accountQueuesMuxMap[addr]
-		mux.RLock()
-		for _, tx := range queuedTxn.txs {
+		mux := t.lockAccountQueue(addr)
+		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
 			queuedTxs[addr][tx.Nonce] = tx
 		}
-		mux.RUnlock()
+		mux.unlock()
 	}
 
 	return pendingTxs, queuedTxs
