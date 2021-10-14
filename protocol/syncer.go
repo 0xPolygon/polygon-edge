@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/big"
 	"sync"
-	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/network"
@@ -170,8 +169,7 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers    sync.Map // Maps peer.ID -> syncPeer
-	peersNum int64    // Number of entries in the peers map
+	peers sync.Map // Maps peer.ID -> syncPeer
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -186,7 +184,6 @@ type Syncer struct {
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 	s := &Syncer{
 		logger:     logger.Named("syncer"),
-		peersNum:   0,
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		server:     server,
@@ -287,11 +284,6 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	})
 }
 
-// NumSyncPeers returns the number of peers in the sync map. [Thread safe]
-func (s *Syncer) NumSyncPeers() int64 {
-	return atomic.LoadInt64(&s.peersNum)
-}
-
 // Start starts the syncer protocol
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
@@ -387,7 +379,6 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 		status:    status,
 		enqueueCh: make(chan struct{}),
 	})
-	atomic.AddInt64(&s.peersNum, 1)
 
 	return nil
 }
@@ -395,7 +386,6 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 func (s *Syncer) DeleteUser(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
-		atomic.AddInt64(&s.peersNum, -1)
 		if err := p.(*syncPeer).conn.Close(); err != nil {
 			return err
 		}

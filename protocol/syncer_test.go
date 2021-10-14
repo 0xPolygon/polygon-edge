@@ -130,10 +130,22 @@ func createSyncers(count int, servers []*network.Server, blockStores []*mockBloc
 	return syncers
 }
 
+// numSyncPeers returns the number of sync peers
+func numSyncPeers(syncer *Syncer) int64 {
+	num := 0
+	syncer.peers.Range(func(key, value interface{}) bool {
+		num++
+
+		return true
+	})
+
+	return int64(num)
+}
+
 // WaitUntilSyncPeersNumber waits until the number of sync peers reaches a certain number, otherwise it times out
 func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum int64) (int64, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		numPeers := syncer.NumSyncPeers()
+		numPeers := numSyncPeers(syncer)
 		if numPeers == requiredNum {
 			return numPeers, false
 		}
