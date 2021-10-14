@@ -140,7 +140,6 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		}
 		// Execute the state transition
 		if err := transition.Write(txn); err != nil {
-			// TODO : Update this for obvious reasons...
 			if err.IsRecoverable {
 				retFn()
 			} else {
