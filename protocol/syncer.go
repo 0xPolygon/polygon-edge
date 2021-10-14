@@ -244,17 +244,26 @@ const syncerV1 = "/syncer/0.1"
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
-	foundPeer, ok := s.peers.Load(peerID)
+	peer, ok := s.peers.Load(peerID)
 	if ok {
-		foundPeer.(*syncPeer).appendBlock(b)
+		peer.(*syncPeer).appendBlock(b)
 	}
 }
 
 func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
-	s.logger.Debug("update peer status", "peer", peerID, "latest block number", status.Number, "latest block hash", status.Hash, "difficulty", status.Difficulty)
+	s.logger.Debug(
+		"update peer status",
+		"peer",
+		peerID,
+		"latest block number",
+		status.Number,
+		"latest block hash",
+		status.Hash, "difficulty",
+		status.Difficulty,
+	)
 
-	if p, ok := s.peers.Load(peerID); ok {
-		p.(*syncPeer).updateStatus(status)
+	if peer, ok := s.peers.Load(peerID); ok {
+		peer.(*syncPeer).updateStatus(status)
 	}
 }
 
@@ -275,8 +284,8 @@ func (s *Syncer) Broadcast(b *types.Block) {
 		},
 	}
 
-	s.peers.Range(func(peerID, foundPeer interface{}) bool {
-		if _, err := foundPeer.(*syncPeer).client.Notify(context.Background(), req); err != nil {
+	s.peers.Range(func(peerID, peer interface{}) bool {
+		if _, err := peer.(*syncPeer).client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
 
@@ -336,10 +345,10 @@ func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
 
-	s.peers.Range(func(peerID, foundPeer interface{}) bool {
-		status := foundPeer.(*syncPeer).status
+	s.peers.Range(func(peerID, peer interface{}) bool {
+		status := peer.(*syncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = foundPeer.(*syncPeer), status.Difficulty
+			bestPeer, bestTd = peer.(*syncPeer), status.Difficulty
 		}
 
 		return true
