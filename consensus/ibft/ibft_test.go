@@ -508,6 +508,10 @@ func (m *mockIbft) Gossip(msg *proto.MessageReq) error {
 	return nil
 }
 
+func (m *mockIbft) CalculateGasLimit(number uint64) (uint64, error) {
+	return m.blockchain.CalculateGasLimit(number)
+}
+
 func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	pool := newTesterAccountPool()
 	pool.add(accounts...)

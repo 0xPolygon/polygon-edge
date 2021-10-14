@@ -15,6 +15,9 @@ import (
 
 const (
 	spuriousDragonMaxCodeSize = 24576
+
+	TxGas                 uint64 = 21000 // Per transaction not creating a contract
+	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
 )
 
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
@@ -177,6 +180,10 @@ func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
 
+func (t *Transition) AvailableGas() uint64 {
+	return t.gasPool
+}
+
 func (t *Transition) Receipts() []*types.Receipt {
 	return t.receipts
 }
@@ -194,6 +201,16 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if gas := t.AvailableGas(); gas < TxGas {
+		t.logger.Info(
+			"Block doesn't have enough gas to process new transaction",
+			"remaining",
+			gas, "minimum required gas",
+			TxGas,
+		)
+		return ErrBlockLimitReached
 	}
 
 	// Make a local copy and apply the transaction
@@ -637,9 +654,9 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 
 	// Contract creation is only paid on the homestead fork
 	if msg.IsContractCreation() && isHomestead {
-		cost += 53000
+		cost += TxGasContractCreation
 	} else {
-		cost += 21000
+		cost += TxGas
 	}
 
 	payload := msg.Input
