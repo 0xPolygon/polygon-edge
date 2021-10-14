@@ -225,7 +225,7 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 // Since any discarded transaction should not affect the world state, the nextNonce should be reset to the value
 // it was set to before the transaction appeared.
 func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
-	txnsQueue, _ := t.accountQueues[tx.From]
+	txnsQueue := t.accountQueues[tx.From]
 	txnsQueue.nextNonce -= 1
 }
 
