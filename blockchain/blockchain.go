@@ -11,12 +11,17 @@ import (
 	"github.com/0xPolygon/polygon-sdk/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-sdk/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/0xPolygon/polygon-sdk/types/buildroot"
 
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
+)
+
+const (
+	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
 )
 
 // Blockchain is a blockchain reference
@@ -224,6 +229,40 @@ func (b *Blockchain) GetParent(header *types.Header) (*types.Header, bool) {
 // Genesis returns the genesis block
 func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
+}
+
+// CalculateGasLimit returns the gas limit of the next block after parent
+func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
+	parent, ok := b.GetHeaderByNumber(number - 1)
+	if !ok {
+		return 0, fmt.Errorf("parent of block %d not found", number)
+	}
+
+	return b.calculateGasLimit(parent.GasLimit), nil
+}
+
+// calculateGasLimit calculates gas limit in reference to the block gas target
+func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
+	// The gas limit cannot move more than 1/1024 * parentGasLimit
+	// in either direction per block
+	blockGasTarget := b.Config().BlockGasTarget
+
+	// Check if the gas limit is already at the target
+	if parentGasLimit == blockGasTarget {
+		// The gas limit is already at the target, no need to move it
+		return blockGasTarget
+	}
+
+	delta := parentGasLimit * 1 / BlockGasTargetDivisor
+	if parentGasLimit < blockGasTarget {
+		// The gas limit is lower than the gas target, so it should
+		// increase towards the target
+		return common.Min(blockGasTarget, parentGasLimit+delta)
+	} else {
+		// The gas limit is higher than the gas target, so it should
+		// decrease towards the target
+		return common.Max(blockGasTarget, common.Max(parentGasLimit-delta, 0))
+	}
 }
 
 // writeGenesis wrapper for the genesis write function

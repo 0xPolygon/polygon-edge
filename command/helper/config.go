@@ -10,23 +10,25 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )
 
 // Config defines the server configuration params
 type Config struct {
-	Chain       string                 `json:"chain"`
-	DataDir     string                 `json:"data_dir"`
-	GRPCAddr    string                 `json:"rpc_addr"`
-	JSONRPCAddr string                 `json:"jsonrpc_addr"`
-	Network     *Network               `json:"network"`
-	Seal        bool                   `json:"seal"`
-	LogLevel    string                 `json:"log_level"`
-	Consensus   map[string]interface{} `json:"consensus"`
-	Dev         bool
-	DevInterval uint64
-	Join        string
+	Chain          string                 `json:"chain"`
+	DataDir        string                 `json:"data_dir"`
+	BlockGasTarget string                 `json:"block_gas_target"`
+	GRPCAddr       string                 `json:"rpc_addr"`
+	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
+	Network        *Network               `json:"network"`
+	Seal           bool                   `json:"seal"`
+	LogLevel       string                 `json:"log_level"`
+	Consensus      map[string]interface{} `json:"consensus"`
+	Dev            bool
+	DevInterval    uint64
+	Join           string
 }
 
 // Network defines the network configuration params
@@ -40,8 +42,9 @@ type Network struct {
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:   "test",
-		DataDir: "./test-chain",
+		Chain:          "test",
+		DataDir:        "./test-chain",
+		BlockGasTarget: fmt.Sprintf("0x%x", chain.DefaultBlockGasTarget),
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
@@ -99,6 +102,19 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Chain = cc
 	}
 
+	// Target gas limit
+	if c.BlockGasTarget != "" {
+		value, err := types.ParseUint256orHex(&c.BlockGasTarget)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse gas target %s, %v", c.BlockGasTarget, err)
+		}
+		if !value.IsUint64() {
+			return nil, fmt.Errorf("gas target is too large (>64b) %s", c.BlockGasTarget)
+		}
+
+		conf.Chain.Params.BlockGasTarget = value.Uint64()
+	}
+
 	// if we are in dev mode, change the consensus protocol with 'dev'
 	// and disable discovery of other nodes
 	// TODO: Disable networking altogether.
@@ -149,6 +165,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.DevInterval != 0 {
 		c.DevInterval = otherConfig.DevInterval
+	}
+
+	if otherConfig.BlockGasTarget != "" {
+		c.BlockGasTarget = otherConfig.BlockGasTarget
 	}
 
 	if otherConfig.Seal {

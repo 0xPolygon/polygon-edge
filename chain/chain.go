@@ -18,6 +18,9 @@ var (
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty = big.NewInt(131072)
+
+	// DefaultBlockGasTarget is the default value for the block gas target for new blocks
+	DefaultBlockGasTarget uint64 = 8000000
 )
 
 // Chain is the blockchain chain configuration
@@ -32,14 +35,15 @@ type Chain struct {
 type Genesis struct {
 	Config *Params `json:"config"`
 
-	Nonce      [8]byte                           `json:"nonce"`
-	Timestamp  uint64                            `json:"timestamp"`
-	ExtraData  []byte                            `json:"extraData,omitempty"`
-	GasLimit   uint64                            `json:"gasLimit"`
-	Difficulty uint64                            `json:"difficulty"`
-	Mixhash    types.Hash                        `json:"mixHash"`
-	Coinbase   types.Address                     `json:"coinbase"`
-	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
+	Nonce          [8]byte                           `json:"nonce"`
+	Timestamp      uint64                            `json:"timestamp"`
+	ExtraData      []byte                            `json:"extraData,omitempty"`
+	GasLimit       uint64                            `json:"gasLimit"`
+	BlockGasTarget uint64                            `json:"blockGasTarget"`
+	Difficulty     uint64                            `json:"difficulty"`
+	Mixhash        types.Hash                        `json:"mixHash"`
+	Coinbase       types.Address                     `json:"coinbase"`
+	Alloc          map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 
 	// Override
 	StateRoot types.Hash
