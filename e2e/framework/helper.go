@@ -139,6 +139,24 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 	return res.(*txpoolProto.TxnPoolStatusResp), nil
 }
 
+// WaitUntilBlockMined waits until server mined block with bigger height than given height
+// otherwise returns timeout
+func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uint64) (uint64, error) {
+	clt := srv.JSONRPC().Eth()
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		height, err := clt.BlockNumber()
+		if err == nil && height >= desiredHeight {
+			return height, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return res.(uint64), nil
+}
+
 func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
 	type result struct {
 		data interface{}
