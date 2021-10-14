@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain/storage"
@@ -560,4 +561,51 @@ func TestBlockchainWriteBody(t *testing.T) {
 	body, ok := b.readBody(block.Hash())
 	fmt.Println(body)
 	fmt.Println(ok)
+}
+
+func TestCalculateGasLimit(t *testing.T) {
+	tests := []struct {
+		name             string
+		blockGasTarget   uint64
+		parentGasLimit   uint64
+		expectedGasLimit uint64
+	}{
+		// Based on TestCalcGasLimit1559 in go-ethereum
+		{
+			name:             "should increase next gas limit towards target",
+			blockGasTarget:   25000000,
+			parentGasLimit:   20000000,
+			expectedGasLimit: 20000000/1024 + 20000000,
+		},
+		{
+			name:             "should decrease next gas limit towards target",
+			blockGasTarget:   25000000,
+			parentGasLimit:   26000000,
+			expectedGasLimit: 26000000 - 26000000/1024,
+		},
+		{
+			name:             "should not alter gas limit",
+			blockGasTarget:   25000000,
+			parentGasLimit:   25000000,
+			expectedGasLimit: 25000000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewTestBlockchain(t, nil)
+			err := b.writeGenesis(&chain.Genesis{
+				GasLimit:       tt.parentGasLimit,
+				BlockGasTarget: tt.blockGasTarget,
+			})
+			assert.NoError(t, err, "failed to write genesis")
+			b.config.Params = &chain.Params{
+				BlockGasTarget: tt.blockGasTarget,
+			}
+
+			nextGas, err := b.CalculateGasLimit(1)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedGasLimit, nextGas)
+		})
+	}
 }
