@@ -389,7 +389,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 			break
 		}
 		if err := transition.Write(txn); err != nil {
-			retFn()
+			if err.IsRecoverable {
+				retFn()
+			} else {
+				i.txpool.DecreaseAccountNonce(txn)
+			}
 			break
 		}
 		txns = append(txns, txn)
