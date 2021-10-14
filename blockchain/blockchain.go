@@ -290,16 +290,17 @@ func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
 		return fmt.Errorf("parent difficulty not found")
 	}
 
-	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
-	if err := b.db.WriteCanonicalHeader(h, diff); err != nil {
+	// calculate new TD (IBFT)
+	newTD := big.NewInt(0).Add(td, big.NewInt(1))
+	if err := b.db.WriteCanonicalHeader(h, newTD); err != nil {
 		return err
 	}
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
-	event.SetDifficulty(diff)
+	event.SetDifficulty(newTD)
 
-	b.setCurrentHeader(h, diff)
+	b.setCurrentHeader(h, newTD)
 
 	return nil
 }
