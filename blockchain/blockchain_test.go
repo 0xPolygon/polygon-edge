@@ -570,7 +570,6 @@ func TestCalculateGasLimit(t *testing.T) {
 		parentGasLimit   uint64
 		expectedGasLimit uint64
 	}{
-		// Based on TestCalcGasLimit1559 in go-ethereum
 		{
 			name:             "should increase next gas limit towards target",
 			blockGasTarget:   25000000,
