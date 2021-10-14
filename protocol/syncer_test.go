@@ -201,6 +201,8 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to add sync peers, %v", err)
 	}
+	// Make sure the number of peers is correct
+	// -1 to exclude the current node
 	assert.Equal(t, int64(len(servers)-1), numPeers)
 
 	// Disconnect peer2
@@ -213,9 +215,14 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to disconnect sync peers, %v", err)
 	}
+	// Make sure a single peer disconnected
+	// Additional -1 to exclude the current node
 	assert.Equal(t, int64(len(servers)-2), numPeers)
 
 	// server1 syncer should have disconnected from server2 peer
 	_, found := syncers[1].peers.Load(peerToDisconnect)
+
+	// Make sure that the disconnected peer is not in the
+	// reference node's sync peer map
 	assert.False(t, found)
 }
