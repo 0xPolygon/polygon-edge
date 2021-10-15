@@ -142,7 +142,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(3),
+						Diff: big.NewInt(2),
 					},
 				},
 			},
@@ -152,7 +152,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x1),
 				mock(0x2),
 			},
-			TD: 0 + 1 + 2,
+			TD: 2,
 		},
 		{
 			Name: "Keep block with higher difficulty",
@@ -170,20 +170,20 @@ func TestInsertHeaders(t *testing.T) {
 					},
 				},
 				{
-					header: mock(0x3).Parent(0x1).Diff(5),
+					header: mock(0x3).Parent(0x1).Diff(3),
 					event: &evnt{
 						NewChain: []*header{
-							mock(0x3).Parent(0x1).Diff(5),
+							mock(0x3).Parent(0x1).Diff(3),
 						},
-						Diff: big.NewInt(6),
+						Diff: big.NewInt(3),
 					},
 				},
 				{
 					// This block has lower difficulty than the current chain (fork)
-					header: mock(0x2).Parent(0x1).Diff(3),
+					header: mock(0x2).Parent(0x1).Diff(2),
 					event: &evnt{
 						OldChain: []*header{
-							mock(0x2).Parent(0x1).Diff(3),
+							mock(0x2).Parent(0x1).Diff(2),
 						},
 					},
 				},
@@ -193,9 +193,9 @@ func TestInsertHeaders(t *testing.T) {
 			Chain: []*header{
 				mock(0x0),
 				mock(0x1),
-				mock(0x3).Parent(0x1).Diff(5),
+				mock(0x3).Parent(0x1).Diff(3),
 			},
-			TD: 0 + 1 + 5,
+			TD: 3,
 		},
 		{
 			Name: "Reorg",
@@ -218,7 +218,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(1 + 2),
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -227,40 +227,40 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(1 + 2 + 3),
+						Diff: big.NewInt(3),
 					},
 				},
 				{
 					// First reorg
-					header: mock(0x4).Parent(0x1).Diff(10).Number(2),
+					header: mock(0x4).Parent(0x1).Diff(4).Number(2),
 					event: &evnt{
 						// add block 4
 						NewChain: []*header{
-							mock(0x4).Parent(0x1).Diff(10).Number(2),
+							mock(0x4).Parent(0x1).Diff(4).Number(2),
 						},
 						// remove block 2 and 3
 						OldChain: []*header{
 							mock(0x2),
 							mock(0x3),
 						},
-						Diff: big.NewInt(1 + 10),
+						Diff: big.NewInt(4),
 					},
 				},
 				{
-					header: mock(0x5).Parent(0x4).Diff(11).Number(3),
+					header: mock(0x5).Parent(0x4).Diff(5).Number(3),
 					event: &evnt{
 						NewChain: []*header{
-							mock(0x5).Parent(0x4).Diff(11).Number(3),
+							mock(0x5).Parent(0x4).Diff(5).Number(3),
 						},
-						Diff: big.NewInt(1 + 10 + 11),
+						Diff: big.NewInt(5),
 					},
 				},
 				{
-					header: mock(0x6).Parent(0x3).Number(4),
+					header: mock(0x6).Parent(0x3).Number(4).Diff(4),
 					event: &evnt{
 						// lower difficulty, its a fork
 						OldChain: []*header{
-							mock(0x6).Parent(0x3).Number(4),
+							mock(0x6).Parent(0x3).Number(4).Diff(4),
 						},
 					},
 				},
@@ -270,10 +270,10 @@ func TestInsertHeaders(t *testing.T) {
 			Chain: []*header{
 				mock(0x0),
 				mock(0x1),
-				mock(0x4).Parent(0x1).Diff(10).Number(2),
-				mock(0x5).Parent(0x4).Diff(11).Number(3),
+				mock(0x4).Parent(0x1).Diff(4).Number(2),
+				mock(0x5).Parent(0x4).Diff(5).Number(3),
 			},
-			TD: 0 + 1 + 10 + 11,
+			TD: 5,
 		},
 		{
 			Name: "Forks in reorgs",
@@ -296,7 +296,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(1 + 2),
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -305,7 +305,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(1 + 2 + 3),
+						Diff: big.NewInt(3),
 					},
 				},
 				{
@@ -318,7 +318,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3),
 						},
-						Diff: big.NewInt(1 + 2 + 11),
+						Diff: big.NewInt(11),
 					},
 				},
 				{
@@ -348,7 +348,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x2),
 				mock(0x4).Parent(0x2).Diff(11),
 			},
-			TD: 0 + 1 + 2 + 11,
+			TD: 11,
 		},
 		{
 			Name: "Head from old long fork",
@@ -371,7 +371,7 @@ func TestInsertHeaders(t *testing.T) {
 						NewChain: []*header{
 							mock(0x2),
 						},
-						Diff: big.NewInt(1 + 2),
+						Diff: big.NewInt(2),
 					},
 				},
 				{
@@ -385,7 +385,7 @@ func TestInsertHeaders(t *testing.T) {
 							mock(0x1),
 							mock(0x2),
 						},
-						Diff: big.NewInt(0 + 5),
+						Diff: big.NewInt(5),
 					},
 				},
 				{
@@ -400,7 +400,7 @@ func TestInsertHeaders(t *testing.T) {
 						OldChain: []*header{
 							mock(0x3).Parent(0x0).Diff(5),
 						},
-						Diff: big.NewInt(1 + 2 + 10),
+						Diff: big.NewInt(10),
 					},
 				},
 			},
@@ -415,7 +415,7 @@ func TestInsertHeaders(t *testing.T) {
 				mock(0x2),
 				mock(0x4).Parent(0x2).Diff(10),
 			},
-			TD: 0 + 1 + 2 + 10,
+			TD: 10,
 		},
 	}
 
