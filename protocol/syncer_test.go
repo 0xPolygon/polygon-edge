@@ -20,6 +20,10 @@ type mockBlockStore struct {
 	td           *big.Int
 }
 
+func (m *mockBlockStore) CalculateGasLimit(number uint64) (uint64, error) {
+	panic("implement me")
+}
+
 func newMockBlockStore() *mockBlockStore {
 	bs := &mockBlockStore{
 		blocks:       make([]*types.Block, 0),

@@ -21,19 +21,20 @@ type SrvAccount struct {
 
 // TestServerConfig for the test server
 type TestServerConfig struct {
-	ReservedPorts []ReservedPort
-	JsonRPCPort   int           // The JSON RPC endpoint port
-	GRPCPort      int           // The GRPC endpoint port
-	LibP2PPort    int           // The Libp2p endpoint port
-	Seal          bool          // Flag indicating if blocks should be sealed
-	RootDir       string        // The root directory for test environment
-	IBFTDirPrefix string        // The prefix of data directory for IBFT
-	IBFTDir       string        // The name of data directory for IBFT
-	PremineAccts  []*SrvAccount // Accounts with existing balances (genesis accounts)
-	Consensus     ConsensusType // Consensus Type
-	Bootnodes     []string      // Bootnode Addresses
-	DevInterval   int           // Dev consensus update interval [s]
-	ShowsLog      bool
+	ReservedPorts  []ReservedPort
+	JsonRPCPort    int           // The JSON RPC endpoint port
+	GRPCPort       int           // The GRPC endpoint port
+	LibP2PPort     int           // The Libp2p endpoint port
+	Seal           bool          // Flag indicating if blocks should be sealed
+	RootDir        string        // The root directory for test environment
+	IBFTDirPrefix  string        // The prefix of data directory for IBFT
+	IBFTDir        string        // The name of data directory for IBFT
+	PremineAccts   []*SrvAccount // Accounts with existing balances (genesis accounts)
+	Consensus      ConsensusType // Consensus Type
+	Bootnodes      []string      // Bootnode Addresses
+	DevInterval    int           // Dev consensus update interval [s]
+	BlockGasTarget uint64        // Gas target for new blocks
+	ShowsLog       bool
 }
 
 // CALLBACKS //
@@ -46,6 +47,11 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 		Addr:    addr,
 		Balance: amount,
 	})
+}
+
+// SetBlockGasTarget sets the gas target for the test server
+func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
+	t.BlockGasTarget = target
 }
 
 // SetConsensus callback sets consensus

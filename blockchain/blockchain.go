@@ -716,7 +716,52 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("invalid receipts root")
 	}
 
+	if gasLimitErr := b.verifyGasLimit(header); gasLimitErr != nil {
+		return nil, fmt.Errorf("invalid gas limit, %v", gasLimitErr)
+	}
+
 	return result, nil
+}
+
+// verifyGasLimit is a helper function for validating a gas limit in a header
+func (b *Blockchain) verifyGasLimit(header *types.Header) error {
+	if header.GasUsed > header.GasLimit {
+		return fmt.Errorf(
+			"block gas used exceeds gas limit, limit = %d, used=%d",
+			header.GasLimit,
+			header.GasUsed,
+		)
+	}
+
+	// Skip block limit difference check for genesis
+	if header.Number == 0 {
+		return nil
+	}
+
+	// Grab the parent block
+	fmt.Printf("\n\nGETTING PARENT OF %d\n\n", header.Number)
+	parent, ok := b.GetHeaderByNumber(header.Number - 1)
+	if !ok {
+		return fmt.Errorf("parent of %d not found", header.Number)
+	}
+
+	// Find the absolute delta between the limits
+	diff := int64(parent.GasLimit) - int64(header.GasLimit)
+	if diff < 0 {
+		diff *= -1
+	}
+
+	limit := parent.GasLimit / BlockGasTargetDivisor
+	if uint64(diff) > limit {
+		return fmt.Errorf(
+			"invalid gas limit, limit = %d, want %d +- %d",
+			header.GasLimit,
+			parent.GasLimit,
+			limit-1,
+		)
+	}
+
+	return nil
 }
 
 // GetHashHelper is used by the EVM, so that the SC can get the hash of the header number

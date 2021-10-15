@@ -893,53 +893,12 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return fmt.Errorf("wrong difficulty")
 	}
 
-	// verify gas used
-	if err := i.verifyGasLimit(header); err != nil {
-		return err
-	}
-
 	// verify the sealer
 	if err := verifySigner(snap, header); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// verifyGasLimit is a helper function for validating a gas limit in a header
-func (i *Ibft) verifyGasLimit(header *types.Header) error {
-	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf(
-			"block gas used exceeds gas limit, limit = %d, used=%d",
-			header.GasLimit,
-			header.GasUsed,
-		)
-	}
-
-	// Grab the parent block
-	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
-	if !ok {
-		return fmt.Errorf("parent of %d not found", header.Number)
-	}
-
-	// Find the absolute delta between the limits
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
-	if diff < 0 {
-		diff *= -1
-	}
-
-	limit := parent.GasLimit / blockchain.BlockGasTargetDivisor
-	if uint64(diff) >= limit {
-		return fmt.Errorf(
-			"invalid gas limit, limit = %d, want %d +- %d",
-			header.GasLimit,
-			parent.GasLimit,
-			limit-1,
-		)
-	}
-
-	return nil
-
 }
 
 // VerifyHeader wrapper for verifying headers

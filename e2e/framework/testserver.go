@@ -181,6 +181,11 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
 
+	// add block gas target
+	if t.Config.BlockGasTarget != 0 {
+		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
+	}
+
 	// add consensus flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
