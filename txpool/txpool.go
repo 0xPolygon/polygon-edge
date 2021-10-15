@@ -43,7 +43,6 @@ type store interface {
 	GetNonce(root types.Hash, addr types.Address) uint64
 	GetBalance(root types.Hash, addr types.Address) (*big.Int, error)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
-	VerifyGasLimit(header *types.Header) error
 }
 
 type signer interface {
