@@ -43,6 +43,7 @@ type store interface {
 	GetNonce(root types.Hash, addr types.Address) uint64
 	GetBalance(root types.Hash, addr types.Address) (*big.Int, error)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
+	VerifyGasLimit(header *types.Header) error
 }
 
 type signer interface {
@@ -351,9 +352,6 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 	if accountBalance.Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
-
-	// Make sure the transaction doesn't exceed the block limit
-	// TODO: Awaiting separate PR
 
 	// Make sure the transaction has more gas than the basic transaction fee
 	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)

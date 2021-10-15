@@ -716,15 +716,15 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 		return nil, fmt.Errorf("invalid receipts root")
 	}
 
-	if gasLimitErr := b.verifyGasLimit(header); gasLimitErr != nil {
+	if gasLimitErr := b.VerifyGasLimit(header); gasLimitErr != nil {
 		return nil, fmt.Errorf("invalid gas limit, %v", gasLimitErr)
 	}
 
 	return result, nil
 }
 
-// verifyGasLimit is a helper function for validating a gas limit in a header
-func (b *Blockchain) verifyGasLimit(header *types.Header) error {
+// VerifyGasLimit is a helper function for validating a gas limit in a header
+func (b *Blockchain) VerifyGasLimit(header *types.Header) error {
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf(
 			"block gas used exceeds gas limit, limit = %d, used=%d",
@@ -739,7 +739,6 @@ func (b *Blockchain) verifyGasLimit(header *types.Header) error {
 	}
 
 	// Grab the parent block
-	fmt.Printf("\n\nGETTING PARENT OF %d\n\n", header.Number)
 	parent, ok := b.GetHeaderByNumber(header.Number - 1)
 	if !ok {
 		return fmt.Errorf("parent of %d not found", header.Number)
