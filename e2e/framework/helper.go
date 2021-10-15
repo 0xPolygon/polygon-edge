@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -103,7 +104,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 // otherwise returns timeout
 func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int) (*proto.PeersListResponse, error) {
 	clt := srv.Operator()
-	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		res, _ := clt.PeersList(subCtx, &empty.Empty{})
@@ -123,7 +124,7 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 // otherwise returns timeout
 func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uint64) (*txpoolProto.TxnPoolStatusResp, error) {
 	clt := srv.TxnPoolOperator()
-	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		res, _ := clt.Status(subCtx, &empty.Empty{})
@@ -137,33 +138,6 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 		return nil, err
 	}
 	return res.(*txpoolProto.TxnPoolStatusResp), nil
-}
-
-func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
-	type result struct {
-		data interface{}
-		err  error
-	}
-	resCh := make(chan result, 1)
-	go func() {
-		defer close(resCh)
-		for {
-			select {
-			case <-ctx.Done():
-				resCh <- result{nil, ErrTimeout}
-				return
-			default:
-				res, retry := f()
-				if !retry {
-					resCh <- result{res, nil}
-					return
-				}
-			}
-			time.Sleep(time.Second)
-		}
-	}()
-	res := <-resCh
-	return res.data, res.err
 }
 
 // MethodSig returns the signature of a non-parametrized function
