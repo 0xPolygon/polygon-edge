@@ -190,7 +190,7 @@ func (s *Server) checkPeerConnections() {
 	for {
 
 		select {
-		case <-time.After(60 * time.Second):
+		case <-time.After(30 * time.Second):
 		case <-s.closeCh:
 			return
 		}

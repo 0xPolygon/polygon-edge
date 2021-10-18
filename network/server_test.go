@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -212,6 +214,58 @@ func TestNat(t *testing.T) {
 	})
 }
 
+func WaitUntilPeerReconnects(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		if _, ok := srv.peers[id]; !ok {
+			return nil, true
+		}
+		return true, false
+
+	})
+	if err != nil {
+		return false, err
+	}
+	return res.(bool), nil
+}
+func TestPeerReconnection(t *testing.T) {
+	conf := func(c *Config) {
+		c.MaxPeers = 2
+		c.NoDiscover = false
+	}
+	//Create bootnode
+	bootNode := CreateServer(t, conf)
+
+	conf1 := func(c *Config) {
+		c.MaxPeers = 2
+		c.NoDiscover = false
+		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo())}
+	}
+
+	srv1 := CreateServer(t, conf1)
+	srv2 := CreateServer(t, conf1)
+	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
+	assert.True(t, <-connectedCh)
+
+	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
+	//disconnect from the boot node
+	disconnectedCh1 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
+	srv1.Disconnect(bootNode.AddrInfo().ID, "bye")
+
+	assert.True(t, <-disconnectedCh1, "hello")
+
+	//Stop second server
+	disconnectedCh2 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
+	assert.NoError(t, srv2.Close())
+	assert.True(t, <-disconnectedCh2)
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancelWait()
+	reconnected, err := WaitUntilPeerReconnects(waitCtx, srv1, bootNode.host.ID())
+	assert.NoError(t, err)
+	assert.True(t, reconnected)
+}
+
+// }
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	//Create a temporary directory for storing the key file
