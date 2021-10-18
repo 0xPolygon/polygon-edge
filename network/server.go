@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ import (
 )
 
 const DefaultLibp2pPort int = 1478
+
+const MinimumPeerConnections int64 = 1
 
 type Config struct {
 	NoDiscover bool
@@ -134,7 +137,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.identity.setup()
 
 	go srv.runDial()
-
+	go srv.checkPeerConnections()
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	if !config.NoDiscover {
@@ -180,6 +183,27 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	})
 
 	return srv, nil
+}
+
+// checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
+func (s *Server) checkPeerConnections() {
+	for {
+
+		select {
+		case <-time.After(60 * time.Second):
+		case <-s.closeCh:
+			return
+		}
+		if s.numPeers() < MinimumPeerConnections {
+			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
+				//TODO: dial peers from the peerstore
+			} else {
+				s.dialQueue.add(s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))], 10)
+			}
+
+		}
+
+	}
 }
 
 func (s *Server) runDial() {
@@ -241,8 +265,9 @@ func (s *Server) runDial() {
 	}
 }
 
-// PeerEventDialConnectedNode
 func (s *Server) numPeers() int64 {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
 	return int64(len(s.peers))
 }
 
