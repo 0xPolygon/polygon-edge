@@ -70,16 +70,21 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *syncPeer) popBlock() (b *types.Block) {
 	for {
-		s.enqueueLock.Lock()
-		if len(s.enqueue) != 0 {
-			b, s.enqueue = s.enqueue[0], s.enqueue[1:]
-			s.enqueueLock.Unlock()
-			return
-		}
+		if !s.IsClosed() {
+			s.enqueueLock.Lock()
+			if len(s.enqueue) != 0 {
+				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
+				s.enqueueLock.Unlock()
+				return
+			}
 
-		s.enqueueLock.Unlock()
-		<-s.enqueueCh
+			s.enqueueLock.Unlock()
+			<-s.enqueueCh
+		} else {
+			return nil
+		}
 	}
+
 }
 
 // appendBlock adds a new block to the block queue
@@ -379,6 +384,7 @@ func (s *Syncer) DeleteUser(peerID peer.ID) error {
 			return err
 		}
 		delete(s.peers, peerID)
+		close(p.enqueueCh)
 	}
 	return nil
 }
@@ -464,9 +470,11 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 		}
 
 		b := p.popBlock()
-		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
-			s.logger.Error("failed to write block", "err", err)
-			break
+		if b != nil {
+			if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
+				s.logger.Error("failed to write block", "err", err)
+				break
+			}
 		}
 		if !handler(b) {
 			break
