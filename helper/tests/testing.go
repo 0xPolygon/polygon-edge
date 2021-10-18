@@ -23,6 +23,7 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	addr := crypto.PubKeyToAddress(&key.PublicKey)
 	return key, addr
 }
+
 func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
 	type result struct {
 		data interface{}
@@ -49,3 +50,4 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 	res := <-resCh
 	return res.data, res.err
 }
+
