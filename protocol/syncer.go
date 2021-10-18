@@ -403,8 +403,7 @@ func (s *Syncer) DeleteUser(peerID peer.ID) error {
 		if err := p.(*syncPeer).conn.Close(); err != nil {
 			return err
 		}
-		delete(s.peers, peerID)
-		close(p.enqueueCh)
+		close(p.(*syncPeer).enqueueCh)
 	}
 
 	return nil
