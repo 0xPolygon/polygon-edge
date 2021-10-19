@@ -188,7 +188,7 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers map[peer.ID]*syncPeer // TODO: Remove
+	peers sync.Map // Maps peer.ID -> syncPeer
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -203,7 +203,6 @@ type Syncer struct {
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 	s := &Syncer{
 		logger:     logger.Named("syncer"),
-		peers:      map[peer.ID]*syncPeer{},
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		server:     server,
@@ -264,17 +263,26 @@ const syncerV1 = "/syncer/0.1"
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
 
-	p, ok := s.peers[peerID]
+	peer, ok := s.peers.Load(peerID)
 	if ok {
-		p.appendBlock(b)
+		peer.(*syncPeer).appendBlock(b)
 	}
 }
 
 func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
-	s.logger.Debug("update peer status", "peer", peerID, "latest block number", status.Number, "latest block hash", status.Hash, "difficulty", status.Difficulty)
+	s.logger.Debug(
+		"update peer status",
+		"peer",
+		peerID,
+		"latest block number",
+		status.Number,
+		"latest block hash",
+		status.Hash, "difficulty",
+		status.Difficulty,
+	)
 
-	if p, ok := s.peers[peerID]; ok {
-		p.updateStatus(status)
+	if peer, ok := s.peers.Load(peerID); ok {
+		peer.(*syncPeer).updateStatus(status)
 	}
 }
 
@@ -294,11 +302,14 @@ func (s *Syncer) Broadcast(b *types.Block) {
 			Value: b.MarshalRLP(),
 		},
 	}
-	for _, p := range s.peers {
-		if _, err := p.client.Notify(context.Background(), req); err != nil {
+
+	s.peers.Range(func(peerID, peer interface{}) bool {
+		if _, err := peer.(*syncPeer).client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
-	}
+
+		return true
+	})
 }
 
 // Start starts the syncer protocol
@@ -353,19 +364,25 @@ func (s *Syncer) BestPeer() *syncPeer {
 	var bestPeer *syncPeer
 	var bestTd *big.Int
 
-	for _, p := range s.peers {
-		status := p.status
+	s.peers.Range(func(peerID, peer interface{}) bool {
+		status := peer.(*syncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = p, status.Difficulty
+			bestPeer, bestTd = peer.(*syncPeer), status.Difficulty
 		}
-	}
+
+		return true
+	})
+
 	if bestPeer == nil {
 		return nil
 	}
+
 	curDiff := s.blockchain.CurrentTD()
+
 	if bestTd.Cmp(curDiff) <= 0 {
 		return nil
 	}
+
 	return bestPeer
 }
 
@@ -382,23 +399,26 @@ func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	if err != nil {
 		return err
 	}
-	s.peers[peerID] = &syncPeer{
+
+	s.peers.Store(peerID, &syncPeer{
 		peer:      peerID,
 		conn:      conn,
 		client:    clt,
 		status:    status,
 		enqueueCh: make(chan struct{}),
-	}
+	})
+
 	return nil
 }
 
 func (s *Syncer) DeleteUser(peerID peer.ID) error {
-	if p, ok := s.peers[peerID]; ok {
-		if err := p.conn.Close(); err != nil {
+	p, ok := s.peers.LoadAndDelete(peerID)
+	if ok {
+		if err := p.(*syncPeer).conn.Close(); err != nil {
 			return err
 		}
-		delete(s.peers, peerID)
 	}
+
 	return nil
 }
 
