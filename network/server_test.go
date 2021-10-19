@@ -214,7 +214,7 @@ func TestNat(t *testing.T) {
 	})
 }
 
-func WaitUntilPeerReconnects(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
+func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		if _, ok := srv.peers[id]; !ok {
 			return nil, true
@@ -260,7 +260,7 @@ func TestPeerReconnection(t *testing.T) {
 
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerReconnects(waitCtx, srv1, bootNode.host.ID())
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
 	assert.NoError(t, err)
 	assert.True(t, reconnected)
 }
