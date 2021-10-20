@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,6 +32,15 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// getPeer returns a peer with given ID in syncer's map
+func getPeer(syncer *Syncer, id peer.ID) *syncPeer {
+	rawPeer, ok := syncer.peers.Load(id)
+	if !ok {
+		return nil
+	}
+	return rawPeer.(*syncPeer)
+}
+
 // CreateSyncer initialize syncer with server
 func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *network.Config)) *Syncer {
 	t.Helper()
@@ -54,8 +64,17 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 		cancel()
 	})
 
+	countMap := func(m sync.Map) int {
+		count := 0
+		m.Range(func(key, value interface{}) bool {
+			count++
+			return true
+		})
+		return count
+	}
+
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		num := len(syncer.peers)
+		num := countMap(syncer.peers)
 		if num == numPeer {
 			return nil, false
 		}
@@ -118,7 +137,7 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Duration) (*types.Block, bool) {
 	t.Helper()
 
-	peer := syncer.peers[peerID]
+	peer := getPeer(syncer, peerID)
 	assert.NotNil(t, peer, "syncer doesn't have peer %s", peerID.String())
 
 	blockCh := make(chan *types.Block, 1)

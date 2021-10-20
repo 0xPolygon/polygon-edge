@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	ErrTimeout = errors.New("timeout")
+)
+
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
 	key, err := crypto.GenerateKey()
@@ -19,10 +23,6 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	addr := crypto.PubKeyToAddress(&key.PublicKey)
 	return key, addr
 }
-
-var (
-	ErrTimeout = errors.New("timeout")
-)
 
 func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
 	type result struct {
