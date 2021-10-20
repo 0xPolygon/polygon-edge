@@ -504,7 +504,49 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 		})
 	}
 }
+func TestTx_MaxSize(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 
+	tests := []struct {
+		name    string
+		address types.Address
+		succeed bool
+		size    uint64
+	}{
+
+		{
+			name:    "Tx_Data is greater than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: false,
+			size:    132096,
+		},
+		{
+			name:    "Tx_Data is less than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: true,
+			size:    1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := make([]byte, tt.size)
+			rand.Read(data)
+			txn := generateTx(tt.address, big.NewInt(0), big.NewInt(1), data)
+			err := pool.addImpl("", txn)
+			if tt.succeed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, err, ErrOversizedData)
+			}
+		})
+	}
+
+}
 func TestTxnOperatorAddNilRaw(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
@@ -682,14 +724,14 @@ func TestSizeLimit(t *testing.T) {
 		},
 		{
 			name:    "should reject remote tx if txpool is full and gas price is lower than any remote tx in the pool",
-			maxSlot: 10,
+			maxSlot: 3,
 			initialTxs: []addTx{
 				{
 					origin:   OriginGossip,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(5),
-					slot:     10,
+					slot:     2,
 				},
 			},
 			input: addTx{
@@ -697,22 +739,22 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(1),
-				slot:     5,
+				slot:     2,
 			},
 			err:   ErrUnderpriced,
 			len:   1,
-			slots: 10,
+			slots: 2,
 		},
 		{
 			name:    "should reject remote tx if txpool is full and failed to make space",
-			maxSlot: 10,
+			maxSlot: 3,
 			initialTxs: []addTx{
 				{
 					origin:   OriginAddTxn,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(5),
-					slot:     10,
+					slot:     3,
 				},
 			},
 			input: addTx{
@@ -720,22 +762,22 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(1),
-				slot:     5,
+				slot:     1,
 			},
 			err:   ErrTxPoolOverflow,
 			len:   1,
-			slots: 10,
+			slots: 3,
 		},
 		{
 			name:    "should discard existing transaction if gas price in new tx is more expensive",
-			maxSlot: 10,
+			maxSlot: 3,
 			initialTxs: []addTx{
 				{
 					origin:   OriginGossip,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(1),
-					slot:     10,
+					slot:     2,
 				},
 			},
 			input: addTx{
@@ -743,11 +785,11 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(5),
-				slot:     5,
+				slot:     2,
 			},
 			err:   nil,
 			len:   1,
-			slots: 5,
+			slots: 2,
 		},
 	}
 
