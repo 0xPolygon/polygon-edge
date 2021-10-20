@@ -64,7 +64,7 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 		cancel()
 	})
 
-	countMap := func(m sync.Map) int {
+	countMap := func(m *sync.Map) int {
 		count := 0
 		m.Range(func(key, value interface{}) bool {
 			count++
@@ -74,7 +74,7 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 	}
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		num := countMap(syncer.peers)
+		num := countMap(&syncer.peers)
 		if num == numPeer {
 			return nil, false
 		}
