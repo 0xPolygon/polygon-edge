@@ -155,18 +155,6 @@ func TestBestPeer(t *testing.T) {
 			bestPeerIndex: 1,
 		},
 		{
-			name:  "should find the first peer if there are multiple candidates",
-			chain: NewRandomChain(t, 100),
-			peersChain: []blockchainShim{
-				NewRandomChain(t, 10),
-				NewRandomChain(t, 1000),
-				NewRandomChain(t, 1000),
-				NewRandomChain(t, 100),
-			},
-			found:         true,
-			bestPeerIndex: 1,
-		},
-		{
 			name:  "shouldn't find if all peer doesn't have longer chain than syncer's chain",
 			chain: NewRandomChain(t, 1000),
 			peersChain: []blockchainShim{
