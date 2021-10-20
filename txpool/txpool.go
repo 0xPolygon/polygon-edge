@@ -22,6 +22,7 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
+	txMaxSize         = 128 * 1024 //128Kb
 )
 
 var (
@@ -34,6 +35,8 @@ var (
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
+	// ErrOversizedData is returned if size of a transction is greater than the specified limit
+	ErrOversizedData = errors.New("oversized data")
 )
 
 type TxOrigin = string
@@ -347,6 +350,12 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
+
+	//Check the transaction size to overcome DOS Attacks
+	if uint64(len(tx.MarshalRLP())) > txMaxSize {
+		return ErrOversizedData
+	}
+
 	// Check if the transaction has a strictly positive value
 	if tx.Value.Sign() < 0 {
 		return ErrNegativeValue

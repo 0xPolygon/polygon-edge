@@ -2,6 +2,7 @@ package txpool
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -389,13 +390,14 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 }
 
-func generateTx(from types.Address, value, gasPrice *big.Int) *types.Transaction {
+func generateTx(from types.Address, value, gasPrice *big.Int, input []byte) *types.Transaction {
 	return &types.Transaction{
 		From:     from,
 		Nonce:    0,
 		Gas:      validGasLimit,
 		GasPrice: gasPrice,
 		Value:    value,
+		Input:    input,
 	}
 }
 
@@ -491,7 +493,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			pool.AddSigner(poolSigner)
 
 			refAddress := testCase.refAddress
-			txn := generateTx(refAddress, testCase.txValue, testCase.gasPrice)
+			txn := generateTx(refAddress, testCase.txValue, testCase.gasPrice, nil)
 
 			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
 
@@ -500,7 +502,49 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 		})
 	}
 }
+func TestTx_MaxSize(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, 1, forks.At(0), &mockStore{}, nil, nil)
+	assert.NoError(t, err)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 
+	tests := []struct {
+		name    string
+		address types.Address
+		succeed bool
+		size    uint64
+	}{
+
+		{
+			name:    "Tx_Data is greater than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: false,
+			size:    132096,
+		},
+		{
+			name:    "Tx_Data is less than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: true,
+			size:    1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := make([]byte, tt.size)
+			rand.Read(data)
+			txn := generateTx(tt.address, big.NewInt(0), big.NewInt(1), data)
+			err := pool.addImpl("", txn)
+			if tt.succeed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, err, ErrOversizedData)
+			}
+		})
+	}
+
+}
 func TestTxnOperatorAddNilRaw(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)

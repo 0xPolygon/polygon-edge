@@ -120,13 +120,13 @@ func Factory(
 
 // Start starts the IBFT consensus
 func (i *Ibft) Start() error {
+	// Start the syncer
+	i.syncer.Start()
+
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
 	}
-
-	// Start the syncer
-	i.syncer.Start()
 
 	// Start the actual IBFT protocol
 	go i.start()
