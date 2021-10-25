@@ -117,7 +117,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   100000000, // placeholder for now
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 

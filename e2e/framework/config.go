@@ -33,6 +33,7 @@ type TestServerConfig struct {
 	Consensus      ConsensusType // Consensus Type
 	Bootnodes      []string      // Bootnode Addresses
 	DevInterval    int           // Dev consensus update interval [s]
+	BlockGasLimit  uint64        // Block gas limit
 	BlockGasTarget uint64        // Gas target for new blocks
 	ShowsLog       bool
 }
@@ -82,6 +83,11 @@ func (t *TestServerConfig) SetSeal(state bool) {
 // SetBootnodes sets bootnodes
 func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 	t.Bootnodes = bootnodes
+}
+
+// SetBlockLimit sets the block gas limit
+func (t *TestServerConfig) SetBlockLimit(limit uint64) {
+	t.BlockGasLimit = limit
 }
 
 // SetShowsLog sets flag for logging
