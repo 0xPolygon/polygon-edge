@@ -36,7 +36,7 @@ func TestSyncer(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Get latest block height
-	latestBlockHeight, err := ibftManager.GetServer(0).JSONRPC().Eth().BlockNumber()
+	latestBlockHeight, err := ibftManager.GetServer(0).GetLatestBlockHeight()
 	assert.NoError(t, err)
 
 	// Test if non-validator has latest block

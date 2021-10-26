@@ -79,8 +79,6 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 	}
 }
 
-// ErrPopTimeout
-
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *syncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
