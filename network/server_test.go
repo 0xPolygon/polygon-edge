@@ -227,6 +227,8 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool
 	}
 	return res.(bool), nil
 }
+
+// TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
 	conf := func(c *Config) {
 		c.MaxPeers = 2
@@ -243,6 +245,8 @@ func TestPeerReconnection(t *testing.T) {
 
 	srv1 := CreateServer(t, conf1)
 	srv2 := CreateServer(t, conf1)
+
+	//connect with the boot node
 	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
 	assert.True(t, <-connectedCh)
 
@@ -253,7 +257,7 @@ func TestPeerReconnection(t *testing.T) {
 
 	assert.True(t, <-disconnectedCh1, "hello")
 
-	//Stop second server
+	//disconnect from the second node
 	disconnectedCh2 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
 	assert.NoError(t, srv2.Close())
 	assert.True(t, <-disconnectedCh2)
@@ -265,7 +269,6 @@ func TestPeerReconnection(t *testing.T) {
 	assert.True(t, reconnected)
 }
 
-// }
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	//Create a temporary directory for storing the key file
