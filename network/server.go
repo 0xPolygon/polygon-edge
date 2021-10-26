@@ -199,10 +199,10 @@ func (s *Server) checkPeerConnections() {
 			return
 		} else if event.Type == PeerEventDisconnected {
 			if s.numPeers() < MinimumPeerConnections {
-				randomNode := s.getRandomBootNode()
-				if randomNode == nil || s.config.NoDiscover {
+				if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
 					//TODO: dial peers from the peerstore
 				} else {
+					randomNode := s.getRandomBootNode()
 					s.dialQueue.add(randomNode, 10)
 				}
 
@@ -277,10 +277,9 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	if len(s.discovery.bootnodes) > 0 {
-		return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
-	}
-	return nil
+
+	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
+
 }
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
