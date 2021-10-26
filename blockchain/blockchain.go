@@ -290,18 +290,16 @@ func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
 		return fmt.Errorf("parent difficulty not found")
 	}
 
-	_ = td
-	// calculate new TD (IBFT)
-	newTD := big.NewInt(0).SetUint64(h.Difficulty)
-	if err := b.db.WriteCanonicalHeader(h, newTD); err != nil {
+	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteCanonicalHeader(h, diff); err != nil {
 		return err
 	}
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
-	event.SetDifficulty(newTD)
+	event.SetDifficulty(diff)
 
-	b.setCurrentHeader(h, newTD)
+	b.setCurrentHeader(h, diff)
 
 	return nil
 }
@@ -333,9 +331,8 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 		currentDiff = td
 	}
 
-	_ = currentDiff
 	// Calculate the new difficulty
-	diff := big.NewInt(0).SetUint64(newHeader.Difficulty)
+	diff := big.NewInt(1).Add(currentDiff, new(big.Int).SetUint64(newHeader.Difficulty))
 	if err := b.db.WriteDiff(newHeader.Hash, diff); err != nil {
 		return nil, err
 	}
@@ -738,10 +735,10 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
 func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
-	currentHead := b.Header()
+	head := b.Header()
 
 	// Write the data
-	if header.ParentHash == currentHead.Hash {
+	if header.ParentHash == head.Hash {
 		// Fast path to save the new canonical header
 		return b.writeCanonicalHeader(evnt, header)
 	}
@@ -750,7 +747,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		return err
 	}
 
-	currentDiff, ok := b.readDiff(currentHead.Hash)
+	headerDiff, ok := b.readDiff(head.Hash)
 	if !ok {
 		panic("failed to get header difficulty")
 	}
@@ -764,13 +761,13 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		)
 	}
 
-	_ = parentDiff
-	incomingDiff := big.NewInt(0).SetUint64(header.Difficulty)
-
 	// Write the difficulty
 	if err := b.db.WriteDiff(
 		header.Hash,
-		incomingDiff,
+		big.NewInt(1).Add(
+			parentDiff,
+			new(big.Int).SetUint64(header.Difficulty),
+		),
 	); err != nil {
 		return err
 	}
@@ -778,10 +775,10 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	// Update the headers cache
 	b.headersCache.Add(header.Hash, header)
 
-	// Handle fork/reorg
-	if incomingDiff.Cmp(currentDiff) > 0 {
+	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
+	if incomingDiff.Cmp(headerDiff) > 0 {
 		// new block has higher difficulty, reorg the chain
-		if err := b.handleReorg(evnt, currentHead, header); err != nil {
+		if err := b.handleReorg(evnt, head, header); err != nil {
 			return err
 		}
 	} else {
