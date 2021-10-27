@@ -279,6 +279,13 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 }
 
 func TestInvalidTransactionRecover(t *testing.T) {
+	// Test scenario :
+	//
+	// 1. Send a transaction with gasLimit > block gas limit.
+	//		-> The transaction should not be applied, and the nonce should not be incremented.
+	//
+	// 2. Send a second transaction with a gasLimit < block gas limit.
+	//		-> The transaction should be applied, and the receiver balance increased.
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 	testTable := []struct {
