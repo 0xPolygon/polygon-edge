@@ -198,9 +198,7 @@ func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, b
 
 func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
-		genesis = &chain.Genesis{
-			BlockGasTarget: chain.DefaultBlockGasTarget,
-		}
+		genesis = &chain.Genesis{}
 	}
 	config := &chain.Chain{
 		Genesis: genesis,

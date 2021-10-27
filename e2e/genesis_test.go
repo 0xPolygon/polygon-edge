@@ -2,6 +2,9 @@ package e2e
 
 import (
 	"context"
+	"math/big"
+	"testing"
+
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
@@ -9,8 +12,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"math/big"
-	"testing"
 )
 
 // Test if the custom block gas limit is properly set
@@ -64,6 +65,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetBlockLimit(blockGasLimit)
 		config.Premine(senderAddress, framework.EthToWei(100))
+		config.SetBlockGasTarget(blockGasLimit)
 	})
 	srv := srvs[0]
 
@@ -82,7 +84,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		tx, err := signer.SignTx(&types.Transaction{
-			Nonce: uint64(i),
+			Nonce:    uint64(i),
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      blockGasLimit,
 			To:       &receiverAddress,
@@ -95,7 +97,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 		}
 
 		_, err = srv.TxnPoolOperator().AddTxn(context.Background(), &txpoolOp.AddTxnReq{
-			Raw:  &any.Any{
+			Raw: &any.Any{
 				Value: tx.MarshalRLP(),
 			},
 			From: types.ZeroAddress.String(),

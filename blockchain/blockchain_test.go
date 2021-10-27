@@ -594,8 +594,7 @@ func TestCalculateGasLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewTestBlockchain(t, nil)
 			err := b.writeGenesis(&chain.Genesis{
-				GasLimit:       tt.parentGasLimit,
-				BlockGasTarget: tt.blockGasTarget,
+				GasLimit: tt.parentGasLimit,
 			})
 			assert.NoError(t, err, "failed to write genesis")
 			b.config.Params = &chain.Params{

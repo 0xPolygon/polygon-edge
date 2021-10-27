@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -409,6 +410,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(chain.DefaultBlockGasTarget, 10), "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -90,15 +89,6 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.FlagMap["block-gas-target"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the target block gas limit for the chain. Default %d", chain.DefaultBlockGasTarget),
-		Arguments: []string{
-			"BLOCK_GAS_TARGET",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
-
 	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
 		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
@@ -159,7 +149,6 @@ func (c *GenesisCommand) Run(args []string) int {
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
-	var blockGasTarget string
 
 	// ibft flags
 	var ibftValidators helperFlags.ArrayFlags
@@ -175,7 +164,6 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
-	flags.StringVar(&blockGasTarget, "block-gas-target", strconv.FormatUint(chain.DefaultBlockGasTarget, 10), "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
 
 	if err := flags.Parse(args); err != nil {
@@ -221,27 +209,14 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
-	// Check the block gas target
-	blockGasTargetVal, err := types.ParseUint256orHex(&blockGasTarget)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to parse gas target %s: %v", blockGasTarget, err))
-		return 1
-	}
-
-	if !blockGasTargetVal.IsUint64() {
-		c.UI.Error(fmt.Sprintf("Gas target is too large (>64b) %s", blockGasTargetVal.String()))
-		return 1
-	}
-
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
-			GasLimit:       blockGasLimit,
-			BlockGasTarget: blockGasTargetVal.Uint64(),
-			Difficulty:     1,
-			Alloc:          map[types.Address]*chain.GenesisAccount{},
-			ExtraData:      extraData,
-			GasUsed:        helper.GenesisGasUsed,
+			GasLimit:   blockGasLimit,
+			Difficulty: 1,
+			Alloc:      map[types.Address]*chain.GenesisAccount{},
+			ExtraData:  extraData,
+			GasUsed:    helper.GenesisGasUsed,
 		},
 		Params: &chain.Params{
 			ChainID: int(chainID),
