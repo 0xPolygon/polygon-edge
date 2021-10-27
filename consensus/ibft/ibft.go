@@ -880,8 +880,8 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return fmt.Errorf("invalid sha3 uncles")
 	}
 
-	// difficulty has to be 1 (except for genesis block)
-	if header.Difficulty != 1 && header.Number != 0 {
+	// difficulty has to be 1 for each block
+	if header.Difficulty != 1 {
 		return fmt.Errorf("wrong difficulty")
 	}
 
