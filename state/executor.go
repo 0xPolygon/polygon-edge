@@ -370,61 +370,35 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, *T
 
 	// 1. the nonce of the message caller is correct
 	if err := t.nonceCheck(msg); err != nil {
-		return nil, &TransitionApplicationError{
-			Err:           err,
-			IsRecoverable: true,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
 	if err := t.subGasLimitPrice(msg); err != nil {
-		return nil, &TransitionApplicationError{
-			Err:           err,
-			IsRecoverable: true,
-		}
-	}
-
-	// the amount of gas required is lower than the specified block gas limit
-	if msg.Gas > t.gasPool {
-		return nil, &TransitionApplicationError{
-			Err:           ErrBlockLimitExceeded,
-			IsRecoverable: false,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 3. the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
-		return nil, &TransitionApplicationError{
-			Err:           err,
-			IsRecoverable: true,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
 	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if err != nil {
-		return nil, &TransitionApplicationError{
-			Err:           err,
-			IsRecoverable: true,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 5. the purchased gas is enough to cover intrinsic usage
 	gasLeft := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
-		return nil, &TransitionApplicationError{
-			Err:           ErrNotEnoughIntrinsicGas,
-			IsRecoverable: true,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, &TransitionApplicationError{
-			Err:           runtime.ErrInsufficientBalance,
-			IsRecoverable: true,
-		}
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
