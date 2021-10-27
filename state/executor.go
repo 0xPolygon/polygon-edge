@@ -192,10 +192,7 @@ func (t *Transition) Write(txn *types.Transaction) *TransitionApplicationError {
 		// Decrypt the from address
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
-			return &TransitionApplicationError{
-				Err:           err,
-				IsRecoverable: false,
-			}
+			return NewTransitionApplicationError(err, false)
 		}
 	}
 
@@ -333,7 +330,7 @@ var (
 	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
-	ErrBlockLimitExceeded     = fmt.Errorf("specified gas exceed block gas limit")
+	ErrBlockLimitExceeded     = fmt.Errorf("specified gas exceeds block gas limit")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
