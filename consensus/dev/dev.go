@@ -138,18 +138,23 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		if txn == nil {
 			break
 		}
-		// Execute the state transition
-		if err := transition.Write(txn); err != nil {
-			if err.IsRecoverable {
-				retFn()
-			} else {
-				d.txpool.DecreaseAccountNonce(txn)
+
+		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			d.txpool.DecreaseAccountNonce(txn)
+		} else {
+			// Execute the state transition
+			if err := transition.Write(txn); err != nil {
+				if err.IsRecoverable {
+					retFn()
+				} else {
+					d.txpool.DecreaseAccountNonce(txn)
+				}
+
+				break
 			}
 
-			break
+			txns = append(txns, txn)
 		}
-
-		txns = append(txns, txn)
 	}
 
 	// Commit the changes
