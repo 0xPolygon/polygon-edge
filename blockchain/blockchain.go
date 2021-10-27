@@ -285,21 +285,21 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 
 // writeCanonicalHeader writes the new header
 func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
-	td, ok := b.readDiff(h.ParentHash)
+	parentTD, ok := b.readDiff(h.ParentHash)
 	if !ok {
 		return fmt.Errorf("parent difficulty not found")
 	}
 
-	diff := big.NewInt(1).Add(td, new(big.Int).SetUint64(h.Difficulty))
-	if err := b.db.WriteCanonicalHeader(h, diff); err != nil {
+	currentTD := big.NewInt(1).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteCanonicalHeader(h, currentTD); err != nil {
 		return err
 	}
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
-	event.SetDifficulty(diff)
+	event.SetDifficulty(currentTD)
 
-	b.setCurrentHeader(h, diff)
+	b.setCurrentHeader(h, currentTD)
 
 	return nil
 }
@@ -322,25 +322,25 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 	}
 
 	// Check if there was a parent difficulty
-	currentDiff := big.NewInt(0)
+	parentTD := big.NewInt(0)
 	if newHeader.ParentHash != types.StringToHash("") {
 		td, ok := b.readDiff(newHeader.ParentHash)
 		if !ok {
 			return nil, fmt.Errorf("parent difficulty not found")
 		}
-		currentDiff = td
+		parentTD = td
 	}
 
 	// Calculate the new difficulty
-	diff := big.NewInt(1).Add(currentDiff, new(big.Int).SetUint64(newHeader.Difficulty))
-	if err := b.db.WriteDiff(newHeader.Hash, diff); err != nil {
+	newTD := big.NewInt(1).Add(parentTD, new(big.Int).SetUint64(newHeader.Difficulty))
+	if err := b.db.WriteDiff(newHeader.Hash, newTD); err != nil {
 		return nil, err
 	}
 
 	// Update the blockchain reference
-	b.setCurrentHeader(newHeader, diff)
+	b.setCurrentHeader(newHeader, newTD)
 
-	return diff, nil
+	return newTD, nil
 }
 
 // GetReceiptsByHash returns the receipts by their hash
