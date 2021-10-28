@@ -3,6 +3,7 @@ package dev
 import (
 	"fmt"
 
+	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
@@ -54,6 +55,15 @@ func (d *DevCommand) DefineFlags() {
 			"BLOCK_GAS_LIMIT",
 		},
 		FlagOptional: true,
+	}
+
+	d.FlagMap["block-gas-target"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the target block gas limit for the chain. Default %d", chain.DefaultBlockGasTarget),
+		Arguments: []string{
+			"BLOCK_GAS_TARGET",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
 	d.FlagMap["chainid"] = helper.FlagDescriptor{
