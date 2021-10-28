@@ -282,7 +282,6 @@ func (i *Ibft) isValidSnapshot() bool {
 
 		return true
 	}
-
 	return false
 }
 
@@ -743,6 +742,8 @@ func (i *Ibft) runRoundChangeState() {
 		if msg == nil {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
+			//update the timeout duration
+			timeout = i.randomTimeout()
 			continue
 		}
 
