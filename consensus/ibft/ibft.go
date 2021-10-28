@@ -388,11 +388,20 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		if txn == nil {
 			break
 		}
-		if err := transition.Write(txn); err != nil {
-			retFn()
-			break
+
+		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			i.txpool.DecreaseAccountNonce(txn)
+		} else {
+			if err := transition.Write(txn); err != nil {
+				if err.IsRecoverable {
+					retFn()
+				} else {
+					i.txpool.DecreaseAccountNonce(txn)
+				}
+				break
+			}
+			txns = append(txns, txn)
 		}
-		txns = append(txns, txn)
 	}
 	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
