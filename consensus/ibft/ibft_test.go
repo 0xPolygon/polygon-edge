@@ -470,6 +470,7 @@ func (m *mockIbft) DummyBlock() *types.Block {
 			ExtraData:  parent.ExtraData,
 			MixHash:    IstanbulDigest,
 			Sha3Uncles: types.EmptyUncleHash,
+			Difficulty: 1,
 		},
 	}
 	return block
