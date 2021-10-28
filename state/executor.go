@@ -330,15 +330,15 @@ var (
 	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
-	ErrBlockLimitExceeded     = fmt.Errorf("specified gas exceeds block gas limit")
+	ErrBlockLimitExceeded    = fmt.Errorf("specified gas exceeds block gas limit")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
 )
 
 type TransitionApplicationError struct {
-	Err				error
-	IsRecoverable	bool // Should the transaction be discarded, or put back in the queue.
+	Err           error
+	IsRecoverable bool // Should the transaction be discarded, or put back in the queue.
 }
 
 func (e *TransitionApplicationError) Error() string {
