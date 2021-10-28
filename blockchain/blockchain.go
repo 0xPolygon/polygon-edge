@@ -290,7 +290,7 @@ func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
 		return fmt.Errorf("parent difficulty not found")
 	}
 
-	currentTD := big.NewInt(1).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
+	currentTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
 	if err := b.db.WriteCanonicalHeader(h, currentTD); err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 	}
 
 	// Calculate the new difficulty
-	newTD := big.NewInt(1).Add(parentTD, new(big.Int).SetUint64(newHeader.Difficulty))
+	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(newHeader.Difficulty))
 	if err := b.db.WriteDiff(newHeader.Hash, newTD); err != nil {
 		return nil, err
 	}
@@ -747,12 +747,12 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		return err
 	}
 
-	headerDiff, ok := b.readDiff(head.Hash)
+	headerTD, ok := b.readDiff(head.Hash)
 	if !ok {
 		panic("failed to get header difficulty")
 	}
 
-	parentDiff, ok := b.readDiff(header.ParentHash)
+	parentTD, ok := b.readDiff(header.ParentHash)
 	if !ok {
 		return fmt.Errorf(
 			"parent of %s (%d) not found",
@@ -761,11 +761,11 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 		)
 	}
 
-	// Write the difficulty
+	// Write the total difficulty(== block number)
 	if err := b.db.WriteDiff(
 		header.Hash,
-		big.NewInt(1).Add(
-			parentDiff,
+		big.NewInt(0).Add(
+			parentTD,
 			new(big.Int).SetUint64(header.Difficulty),
 		),
 	); err != nil {
@@ -775,8 +775,8 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 	// Update the headers cache
 	b.headersCache.Add(header.Hash, header)
 
-	incomingDiff := big.NewInt(1).Add(parentDiff, new(big.Int).SetUint64(header.Difficulty))
-	if incomingDiff.Cmp(headerDiff) > 0 {
+	incomingDiff := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(header.Difficulty))
+	if incomingDiff.Cmp(headerTD) > 0 {
 		// new block has higher difficulty, reorg the chain
 		if err := b.handleReorg(evnt, head, header); err != nil {
 			return err
