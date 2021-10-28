@@ -325,6 +325,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
+			i.syncer.Broadcast(b)
 			isValidator = i.isValidSnapshot()
 
 			return !isValidator

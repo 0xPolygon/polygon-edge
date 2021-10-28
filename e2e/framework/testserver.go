@@ -126,6 +126,10 @@ func (t *TestServer) Stop() {
 	}
 }
 
+func (t *TestServer) GetLatestBlockHeight() (uint64, error) {
+	return t.JSONRPC().Eth().BlockNumber()
+}
+
 type InitIBFTResult struct {
 	Address string
 	NodeID  string
@@ -385,9 +389,8 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 }
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {
-	client := t.JSONRPC()
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		num, err := client.Eth().BlockNumber()
+		num, err := t.GetLatestBlockHeight()
 		if err != nil {
 			return nil, true
 		}
