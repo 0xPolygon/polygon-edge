@@ -120,13 +120,13 @@ func Factory(
 
 // Start starts the IBFT consensus
 func (i *Ibft) Start() error {
+	// Start the syncer
+	i.syncer.Start()
+
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
 	}
-
-	// Start the syncer
-	i.syncer.Start()
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -353,7 +353,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
-		GasLimit:   100000000, // placeholder for now
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 	}
 
 	// try to pick a candidate

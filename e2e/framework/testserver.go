@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"io"
 	"math/big"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/server"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
@@ -37,10 +39,6 @@ type TestServerConfigCallback func(*TestServerConfig)
 const (
 	initialPort   = 12000
 	polygonSDKCmd = "polygon-sdk"
-)
-
-var (
-	ErrTimeout = errors.New("timeout")
 )
 
 type TestServer struct {
@@ -201,6 +199,13 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--consensus", "dummy")
 	}
 
+	// add block gas limit
+	if t.Config.BlockGasLimit == 0 {
+		t.Config.BlockGasLimit = helper.GenesisGasLimit
+	}
+	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
+	args = append(args, "--block-gas-limit", blockGasLimit)
+
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
 
@@ -261,7 +266,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		return err
 	}
 
-	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -362,7 +367,7 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 		err     error
 	}
 
-	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		receipt, err := client.Eth().GetTransactionReceipt(hash)
 		if err != nil && err.Error() != "not found" {
 			return result{receipt, err}, false
@@ -381,7 +386,7 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	client := t.JSONRPC()
-	_, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		num, err := client.Eth().BlockNumber()
 		if err != nil {
 			return nil, true
