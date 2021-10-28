@@ -14,6 +14,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func GenerateLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
+	t.Helper()
+
+	dir, err := ioutil.TempDir(os.TempDir(), "")
+	assert.NoError(t, err)
+	key, err := ReadLibp2pKey(dir)
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		// remove directory after test is done
+		assert.NoError(t, os.RemoveAll(dir))
+	})
+
+	return key, dir
+}
+
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
 	conf := func(c *Config) {
@@ -301,21 +316,65 @@ func TestNat(t *testing.T) {
 	})
 }
 
+func TestReconnectionWithNewIP(t *testing.T) {
+	natIP := "127.0.0.1"
+
+	_, dir0 := GenerateLibp2pKey(t)
+	_, dir1 := GenerateLibp2pKey(t)
+
+	defaultConfig := func(c *Config) {
+		c.NoDiscover = true
+	}
+
+	srv0 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir0
+	})
+	srv1 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir1
+	})
+	// same ID to but diffrent IP from srv1
+	srv2 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir1
+		c.NatAddr = net.ParseIP(natIP)
+	})
+	t.Cleanup(func() {
+		srv0.Close()
+		srv1.Close()
+		srv2.Close()
+	})
+
+	// srv0 connects to srv1
+	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
+	assert.True(t, <-connectedCh)
+	assert.Len(t, srv0.peers, 1)
+	assert.Len(t, srv1.peers, 1)
+
+	// srv1 terminates
+	disconnectedCh := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	srv1.host.Close()
+	assert.True(t, <-disconnectedCh)
+
+	// srv0 connects to srv2
+	connectedCh = asyncWaitForEvent(srv2, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	assert.NoError(t, srv0.Join(srv2.AddrInfo(), DefaultJoinTimeout))
+	assert.True(t, <-connectedCh)
+	assert.Len(t, srv0.peers, 1)
+	assert.Len(t, srv2.peers, 1)
+}
+
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	//Create a temporary directory for storing the key file
-	directoryName, err := ioutil.TempDir(os.TempDir(), "")
-	assert.NoError(t, err)
-	key, err := ReadLibp2pKey(directoryName)
-	assert.NoError(t, err)
+	key, directoryName := GenerateLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
 	assert.NoError(t, err)
-	//remove the temporary directory
-	t.Cleanup(func() {
-		assert.NoError(t, os.RemoveAll(directoryName))
-	})
+
 	tests := []struct {
 		name         string
 		bootNodes    []string

@@ -303,6 +303,7 @@ func (s *Server) delPeer(id peer.ID) {
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
+	s.host.Network().ClosePeer(id)
 
 	s.emitEvent(&PeerEvent{
 		PeerID: id,
