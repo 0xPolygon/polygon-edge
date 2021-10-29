@@ -76,3 +76,7 @@ func (t *Transaction) Size() uint64 {
 	t.size.Store(size)
 	return size
 }
+
+func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
+	return t.Gas > blockGasLimit
+}

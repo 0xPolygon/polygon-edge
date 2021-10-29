@@ -36,6 +36,7 @@ type TestServerConfig struct {
 	NoLocals      bool          // Flag to disable price exemptions for locally transactions
 	PriceLimit    *uint64       // Minimum gas price limit to enforce for acceptance into the pool
 	DevInterval   int           // Dev consensus update interval [s]
+	BlockGasLimit uint64        // Block gas limit
 	ShowsLog      bool
 }
 
@@ -94,6 +95,11 @@ func (t *TestServerConfig) SetNoLocals(noLocals bool) {
 // SetLocals sets PriceLimit
 func (t *TestServerConfig) SetPriceLimit(priceLimit *uint64) {
 	t.PriceLimit = priceLimit
+}
+
+// SetBlockLimit sets the block gas limit
+func (t *TestServerConfig) SetBlockLimit(limit uint64) {
+	t.BlockGasLimit = limit
 }
 
 // SetShowsLog sets flag for logging

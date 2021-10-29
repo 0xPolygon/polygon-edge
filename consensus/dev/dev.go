@@ -117,7 +117,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   100000000, // placeholder for now
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
@@ -139,14 +139,22 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 			break
 		}
 
-		// Execute the state transition
-		if err := transition.Write(txn); err != nil {
-			retFn()
+		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			d.txpool.DecreaseAccountNonce(txn)
+		} else {
+			// Execute the state transition
+			if err := transition.Write(txn); err != nil {
+				if err.IsRecoverable {
+					retFn()
+				} else {
+					d.txpool.DecreaseAccountNonce(txn)
+				}
 
-			break
+				break
+			}
+
+			txns = append(txns, txn)
 		}
-
-		txns = append(txns, txn)
 	}
 
 	// Commit the changes

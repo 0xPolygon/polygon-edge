@@ -80,10 +80,10 @@ func (d *DevCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	d.FlagMap["gas-limit"] = helper.FlagDescriptor{
+	d.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
 		Description: "Sets the gas limit of each block. Default: 5000",
 		Arguments: []string{
-			"GAS_LIMIT",
+			"BLOCK_GAS_LIMIT",
 		},
 		FlagOptional: true,
 	}

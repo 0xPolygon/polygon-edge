@@ -504,7 +504,49 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 		})
 	}
 }
+func TestTx_MaxSize(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
+	assert.NoError(t, err)
 
+	tests := []struct {
+		name    string
+		address types.Address
+		succeed bool
+		size    uint64
+	}{
+
+		{
+			name:    "Tx_Data is greater than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: false,
+			size:    132096,
+		},
+		{
+			name:    "Tx_Data is less than MAX_SIZE",
+			address: types.Address{0x1},
+			succeed: true,
+			size:    1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := make([]byte, tt.size)
+			rand.Read(data)
+			txn := generateTx(tt.address, big.NewInt(0), big.NewInt(1), data)
+			err := pool.addImpl("", txn)
+			if tt.succeed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, err, ErrOversizedData)
+			}
+		})
+	}
+
+}
 func TestTxnOperatorAddNilRaw(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
