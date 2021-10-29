@@ -393,7 +393,7 @@ func TestPriceLimit(t *testing.T) {
 						assert.NoError(t, err)
 						assert.Equal(t, uint64(1), res.Length)
 					} else {
-						assert.ErrorIs(t, err, framework.ErrTimeout)
+						assert.ErrorIs(t, err, tests.ErrTimeout)
 					}
 				})
 			}
