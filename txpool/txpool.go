@@ -248,7 +248,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		}
 
 		dropped, success := t.Discard(t.slots-t.maxSlots+numSlots(tx), isLocal)
-		if !success {
+		if !isLocal && !success {
 			return ErrTxPoolOverflow
 		}
 		for _, tx := range dropped {

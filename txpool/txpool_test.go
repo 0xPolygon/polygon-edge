@@ -708,8 +708,8 @@ func TestSizeLimit(t *testing.T) {
 		slots uint64
 	}{
 		{
-			name:       "should add new tx when tx pool is empty",
-			maxSlot:    10,
+			name:       "should add new tx when tx pool has enough space",
+			maxSlot:    5,
 			initialTxs: nil,
 			input: addTx{
 				origin:   OriginAddTxn,
@@ -723,15 +723,15 @@ func TestSizeLimit(t *testing.T) {
 			slots: 2,
 		},
 		{
-			name:    "should reject remote tx if txpool is full and gas price is lower than any remote tx in the pool",
-			maxSlot: 10,
+			name:    "should reject new remote tx if txpool is full and the gas price is lower than any remote tx in the pool",
+			maxSlot: 4,
 			initialTxs: []addTx{
 				{
 					origin:   OriginGossip,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(5),
-					slot:     10,
+					slot:     3,
 				},
 			},
 			input: addTx{
@@ -739,22 +739,22 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(1),
-				slot:     5,
+				slot:     2,
 			},
 			err:   ErrUnderpriced,
 			len:   1,
-			slots: 10,
+			slots: 3,
 		},
 		{
-			name:    "should reject remote tx if txpool is full and failed to make space",
-			maxSlot: 10,
+			name:    "should reject new remote tx if txpool is full and failed to make space",
+			maxSlot: 4,
 			initialTxs: []addTx{
 				{
 					origin:   OriginAddTxn,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(5),
-					slot:     10,
+					slot:     3,
 				},
 			},
 			input: addTx{
@@ -762,22 +762,22 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(1),
-				slot:     5,
+				slot:     2,
 			},
 			err:   ErrTxPoolOverflow,
 			len:   1,
-			slots: 10,
+			slots: 3,
 		},
 		{
-			name:    "should discard existing transaction if gas price in new tx is more expensive",
-			maxSlot: 10,
+			name:    "should discard existing transactions if new tx set more expensive gas price",
+			maxSlot: 4,
 			initialTxs: []addTx{
 				{
 					origin:   OriginGossip,
 					account:  accounts[0],
 					nonce:    0,
 					gasPrice: big.NewInt(1),
-					slot:     10,
+					slot:     3,
 				},
 			},
 			input: addTx{
@@ -785,11 +785,34 @@ func TestSizeLimit(t *testing.T) {
 				account:  accounts[1],
 				nonce:    0,
 				gasPrice: big.NewInt(5),
-				slot:     5,
+				slot:     2,
 			},
 			err:   nil,
 			len:   1,
-			slots: 5,
+			slots: 2,
+		},
+		{
+			name:    "should discard existing remote transactions and add new tx forcibly if the new tx is local and set more expensive gas price",
+			maxSlot: 2,
+			initialTxs: []addTx{
+				{
+					origin:   OriginGossip,
+					account:  accounts[0],
+					nonce:    0,
+					gasPrice: big.NewInt(1),
+					slot:     2,
+				},
+			},
+			input: addTx{
+				origin:   OriginAddTxn,
+				account:  accounts[1],
+				nonce:    0,
+				gasPrice: big.NewInt(5),
+				slot:     3,
+			},
+			err:   nil,
+			len:   1,
+			slots: 3,
 		},
 	}
 
