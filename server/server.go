@@ -33,9 +33,10 @@ import (
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
-	logger hclog.Logger
-	config *Config
-	state  state.State
+	logger       hclog.Logger
+	config       *Config
+	state        state.State
+	stateStorage itrie.Storage
 
 	consensus consensus.Consensus
 
@@ -101,6 +102,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	m.stateStorage = stateStorage
 
 	st := itrie.NewState(stateStorage)
 	m.state = st
@@ -390,6 +392,11 @@ func (s *Server) Close() {
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
+	}
+
+	// Close the state storage
+	if err := s.stateStorage.Close(); err != nil {
+		s.logger.Error("failed to close storage for trie", "err", err.Error())
 	}
 }
 
