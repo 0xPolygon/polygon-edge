@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -123,13 +124,14 @@ func NewTxPool(
 
 // accountQueueWrapper is the account based queue mux map implementation
 type accountQueueWrapper struct {
-	mux          sync.RWMutex
+	mux          sync.RWMutex // mux for accessing the accountQueue
+	writeLock    int32        // flag indicating whether a write lock is held
 	accountQueue *txHeapWrapper
 }
 
 // lockAccountQueue returns the corresponding account queue wrapper object, or creates it
 // if it doesn't exist in the account queue map
-func (t *TxPool) lockAccountQueue(address types.Address) *accountQueueWrapper {
+func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQueueWrapper {
 	// Lock the global map
 	t.accountQueuesMux.Lock()
 
@@ -149,20 +151,32 @@ func (t *TxPool) lockAccountQueue(address types.Address) *accountQueueWrapper {
 	t.accountQueuesMux.Unlock()
 
 	// Grab the lock for the specific account queue
-	accountQueue.mux.Lock()
+	if writer {
+		accountQueue.mux.Lock()
+		atomic.StoreInt32(&accountQueue.writeLock, 1)
+	} else {
+		accountQueue.mux.RLock()
+		atomic.StoreInt32(&accountQueue.writeLock, 0)
+	}
 
 	return accountQueue
 }
 
 // unlock releases the account specific transaction queue mux.
-// Separated out into a function in case there needs to be additional teardown logic
+// Separated out into a function in case there needs to be additional teardown logic.
+// Code calling unlock shouldn't need to know the type of lock for the mux (writer / reader) to unlock it
 func (a *accountQueueWrapper) unlock() {
-	a.mux.Unlock()
+	// Grab the previous lock type and reset it
+	if atomic.SwapInt32(&a.writeLock, 0) == 1 {
+		a.mux.Unlock()
+	} else {
+		a.mux.RUnlock()
+	}
 }
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	mux := t.lockAccountQueue(addr)
+	mux := t.lockAccountQueue(addr, false)
 	defer mux.unlock()
 
 	wrapper, ok := t.accountQueues[addr]
@@ -174,7 +188,7 @@ func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
 func (t *TxPool) NumAccountTxs(address types.Address) int {
-	mux := t.lockAccountQueue(address)
+	mux := t.lockAccountQueue(address, false)
 	defer mux.unlock()
 
 	return len(t.accountQueues[address].accountQueue.txs)
@@ -248,7 +262,7 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
 
-	mux := t.lockAccountQueue(tx.From)
+	mux := t.lockAccountQueue(tx.From, true)
 	defer mux.unlock()
 
 	wrapper := t.accountQueues[tx.From]
@@ -277,7 +291,7 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
-		mux := t.lockAccountQueue(addr)
+		mux := t.lockAccountQueue(addr, false)
 		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
