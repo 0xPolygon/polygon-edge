@@ -142,7 +142,9 @@ func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Dura
 
 	blockCh := make(chan *types.Block, 1)
 	go func() {
-		blockCh <- peer.popBlock()
+		if block, _ := peer.popBlock(popTimeout); block != nil {
+			blockCh <- block
+		}
 	}()
 
 	select {
