@@ -349,7 +349,7 @@ func (s *Syncer) Start() {
 				}
 
 			case network.PeerEventDisconnected:
-				if err := s.DeleteUser(evnt.PeerID); err != nil {
+				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
 				}
 			}
