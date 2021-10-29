@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHandleUser(t *testing.T) {
+func TestHandleNewPeer(t *testing.T) {
 	tests := []struct {
 		name       string
 		chain      blockchainShim
@@ -49,7 +49,7 @@ func TestHandleUser(t *testing.T) {
 	}
 }
 
-func TestDeleteUser(t *testing.T) {
+func TestDeletePeer(t *testing.T) {
 	tests := []struct {
 		name                 string
 		chain                blockchainShim
