@@ -23,7 +23,7 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
-	txSlotSize        = 32 * 1024  // 32 kB
+	txSlotSize        = 32 * 1024  // 32kB
 	txMaxSize         = 128 * 1024 //128Kb
 )
 

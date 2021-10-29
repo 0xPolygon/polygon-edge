@@ -509,6 +509,8 @@ func TestTx_MaxSize(t *testing.T) {
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
 	assert.NoError(t, err)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 
 	tests := []struct {
 		name    string
