@@ -74,6 +74,10 @@ type TxPool struct {
 	// Networking stack
 	topic *network.Topic
 
+	// Minimum amount of additional gas required to re-submit a transaction.
+	// If equal to zero, transactions cannot be re-submitted.
+	speedUp uint64
+
 	// Flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
 	sealing bool
@@ -96,6 +100,7 @@ func NewTxPool(
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
+	speedUp uint64,
 ) (*TxPool, error) {
 	txPool := &TxPool{
 		logger:        logger.Named("txpool"),
@@ -105,6 +110,7 @@ func NewTxPool(
 		pendingQueue:  newTxPriceHeap(),
 		sealing:       sealing,
 		forks:         forks,
+		speedUp:       speedUp,
 	}
 
 	if network != nil {
@@ -120,6 +126,8 @@ func NewTxPool(
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
+
+	println("NewTxPool: speedUp=", speedUp) //DUSAN
 	return txPool, nil
 }
 
@@ -351,6 +359,8 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		return ErrNonceTooLow
 	}
 
+	// check underpriced same nonce tx
+
 	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
 	if balanceErr != nil {
 		return ErrInvalidAccountState
@@ -426,9 +436,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		return nil
 	}
 
-	promote := []*types.Transaction{}
 	higherNonceTxs := []*types.Transaction{}
-
 	reinsertFunc := func() {
 		// Reinsert the tx back to the account specific transaction queue
 		for _, highNonceTx := range higherNonceTxs {
@@ -436,6 +444,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		}
 	}
 
+	promote := []*types.Transaction{}
 	for {
 		promote = append(promote, tx)
 		t.Pop()

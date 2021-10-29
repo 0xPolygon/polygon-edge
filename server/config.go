@@ -20,6 +20,7 @@ type Config struct {
 
 	Network *network.Config
 	DataDir string
+	SpeedUp uint64
 	Seal    bool
 }
 

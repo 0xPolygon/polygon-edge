@@ -140,6 +140,14 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	c.flagMap["speed-up"] = helper.FlagDescriptor{
+		Description: "TODO",
+		Arguments: []string{
+			"SPEED_UP",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command

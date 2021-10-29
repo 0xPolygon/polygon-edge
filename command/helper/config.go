@@ -27,6 +27,7 @@ type Config struct {
 	Dev         bool
 	DevInterval uint64
 	Join        string
+	SpeedUp     uint64
 }
 
 // Network defines the network configuration params
@@ -66,6 +67,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	conf.Chain = cc
 	conf.Seal = c.Seal
 	conf.DataDir = c.DataDir
+	conf.SpeedUp = c.SpeedUp
 
 	// JSON RPC + GRPC
 	if c.GRPCAddr != "" {
@@ -169,6 +171,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.Join != "" {
 		c.Join = otherConfig.Join
+	}
+
+	if otherConfig.SpeedUp != 0 {
+		c.SpeedUp = otherConfig.SpeedUp
 	}
 
 	{

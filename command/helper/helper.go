@@ -409,6 +409,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&cliConfig.SpeedUp, "speed-up", 0, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
