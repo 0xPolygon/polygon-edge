@@ -63,3 +63,7 @@ func (t *Transaction) Cost() *big.Int {
 	total.Add(total, t.Value)
 	return total
 }
+
+func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
+	return t.Gas > blockGasLimit
+}
