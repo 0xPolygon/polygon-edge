@@ -297,17 +297,17 @@ func TestPriceLimit(t *testing.T) {
 	}{
 		{
 			name:             "tx should propagate",
-			numNodes:         5,
+			numNodes:         3,
 			locals:           nil,
 			noLocals:         false,
 			priceLimit:       10,
 			gasPrice:         100,
 			err:              nil,
-			numReceivedNodes: 5,
+			numReceivedNodes: 3,
 		},
 		{
 			name:             "tx should be rejected due to low gas price",
-			numNodes:         5,
+			numNodes:         3,
 			locals:           nil,
 			noLocals:         true,
 			priceLimit:       10,
@@ -317,7 +317,7 @@ func TestPriceLimit(t *testing.T) {
 		},
 		{
 			name:             "tx should not propagate",
-			numNodes:         5,
+			numNodes:         3,
 			locals:           nil,
 			noLocals:         false,
 			priceLimit:       10,
@@ -327,13 +327,13 @@ func TestPriceLimit(t *testing.T) {
 		},
 		{
 			name:             "tx should propagate because sender address is treated as local transaction",
-			numNodes:         5,
+			numNodes:         3,
 			locals:           []string{senderAddr.String()},
 			noLocals:         true,
 			priceLimit:       10,
 			gasPrice:         0,
 			err:              nil,
-			numReceivedNodes: 5, // only first node receive
+			numReceivedNodes: 3,
 		},
 	}
 
