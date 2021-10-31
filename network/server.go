@@ -187,29 +187,23 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
 func (s *Server) checkPeerConnections() {
-	updateCh, err := s.SubscribeCh()
-	if err != nil {
-		s.logger.Error("failed to subscribe", "err", err)
-		return
-	}
 	for {
-
-		event, ok := <-updateCh
-		if !ok {
+		select {
+		case <-time.After(30 * time.Second):
+		case <-s.closeCh:
 			return
-		} else if event.Type == PeerEventDisconnected {
-			if s.numPeers() < MinimumPeerConnections {
-				if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
-					//TODO: dial peers from the peerstore
-				} else {
-					randomNode := s.getRandomBootNode()
-					s.dialQueue.add(randomNode, 10)
-				}
-
-			}
 		}
+		if s.numPeers() < MinimumPeerConnections {
+			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
+				//TODO: dial peers from the peerstore
+			} else {
+				randomNode := s.getRandomBootNode()
+				s.dialQueue.add(randomNode, 10)
+			}
 
+		}
 	}
+
 }
 
 func (s *Server) runDial() {
