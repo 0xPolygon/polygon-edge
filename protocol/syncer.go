@@ -33,6 +33,7 @@ var (
 	ErrCommonAncestorNotFound = errors.New("header is nil")
 	ErrForkNotFound           = errors.New("fork not found")
 	ErrPopTimeout             = errors.New("timeout")
+	ErrConnectionClosed       = errors.New("connection closed")
 )
 
 // syncPeer is a representation of the peer the node is syncing with
@@ -91,15 +92,15 @@ func (s *syncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 				return
 			}
 
-		s.enqueueLock.Unlock()
-		select {
-		case <-s.enqueueCh:
-		case <-timeoutCh:
-			return nil, ErrPopTimeout
-		}
-      
+			s.enqueueLock.Unlock()
+			select {
+			case <-s.enqueueCh:
+			case <-timeoutCh:
+				return nil, ErrPopTimeout
+			}
+
 		} else {
-			return nil,nil
+			return nil, ErrConnectionClosed
 		}
 
 	}
@@ -516,7 +517,7 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Error("failed to write block", "err", err)
 			break
 		}
-		if !handler(b) {
+		if handler(b) {
 			break
 		}
 	}
