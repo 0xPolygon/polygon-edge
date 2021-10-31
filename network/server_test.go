@@ -371,8 +371,8 @@ func TestPeerReconnection(t *testing.T) {
 	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
 	assert.NoError(t, err)
 	assert.True(t, reconnected)
-  
-  
+
+}
 func TestReconnectionWithNewIP(t *testing.T) {
 	natIP := "127.0.0.1"
 

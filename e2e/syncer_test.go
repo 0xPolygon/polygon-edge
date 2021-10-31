@@ -19,7 +19,7 @@ func TestSyncer(t *testing.T) {
 	// Start IBFT cluster (4 Validator + 2 Non-Validator)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes+numNonValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.SetSeal(i < IBFTMinNodes)
-		config.SetShowsLog(i == IBFTMinNodes+numNonValidators-1)
+		//config.SetShowsLog(i == IBFTMinNodes+numNonValidators-1)
 	})
 	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(func() {
@@ -41,6 +41,9 @@ func TestSyncer(t *testing.T) {
 
 	// Test if non-validator has latest block
 	nonValidatorBlock, err := ibftManager.GetServer(IBFTMinNodes+numNonValidators-1).JSONRPC().Eth().GetBlockByNumber(web3.BlockNumber(latestBlockHeight), false)
+	//	log.Fatal("hereee", err)
 	assert.NoError(t, err)
+
 	assert.NotNil(t, nonValidatorBlock)
+	//	log.Fatal("qqqq", nonValidatorBlock)
 }
