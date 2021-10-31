@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"io"
 	"math/big"
 	"os"
@@ -125,6 +126,10 @@ func (t *TestServer) Stop() {
 	}
 }
 
+func (t *TestServer) GetLatestBlockHeight() (uint64, error) {
+	return t.JSONRPC().Eth().BlockNumber()
+}
+
 type InitIBFTResult struct {
 	Address string
 	NodeID  string
@@ -197,6 +202,13 @@ func (t *TestServer) GenerateGenesis() error {
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
+
+	// add block gas limit
+	if t.Config.BlockGasLimit == 0 {
+		t.Config.BlockGasLimit = helper.GenesisGasLimit
+	}
+	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
+	args = append(args, "--block-gas-limit", blockGasLimit)
 
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
@@ -377,9 +389,8 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 }
 
 func (t *TestServer) WaitForReady(ctx context.Context) error {
-	client := t.JSONRPC()
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		num, err := client.Eth().BlockNumber()
+		num, err := t.GetLatestBlockHeight()
 		if err != nil {
 			return nil, true
 		}

@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/network"
@@ -21,7 +22,18 @@ import (
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
-const maxEnqueueSize = 50
+const (
+	maxEnqueueSize = 50
+	popTimeout     = time.Second * 10
+)
+
+var (
+	ErrLoadLocalGenesisFailed = errors.New("failed to read local genesis")
+	ErrMismatchGenesis        = errors.New("genesis does not match?")
+	ErrCommonAncestorNotFound = errors.New("header is nil")
+	ErrForkNotFound           = errors.New("fork not found")
+	ErrPopTimeout             = errors.New("timeout")
+)
 
 // syncPeer is a representation of the peer the node is syncing with
 type syncPeer struct {
@@ -68,7 +80,8 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 }
 
 // popBlock pops a block from the block queue [BLOCKING]
-func (s *syncPeer) popBlock() (b *types.Block) {
+func (s *syncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
+	timeoutCh := time.After(timeout)
 	for {
 		if !s.IsClosed() {
 			s.enqueueLock.Lock()
@@ -78,11 +91,17 @@ func (s *syncPeer) popBlock() (b *types.Block) {
 				return
 			}
 
-			s.enqueueLock.Unlock()
-			<-s.enqueueCh
-		} else {
-			return nil
+		s.enqueueLock.Unlock()
+		select {
+		case <-s.enqueueCh:
+		case <-timeoutCh:
+			return nil, ErrPopTimeout
 		}
+      
+		} else {
+			return nil,nil
+		}
+
 	}
 
 }
@@ -430,7 +449,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 			// our common ancestor is the genesis
 			genesis, ok := s.blockchain.GetHeaderByNumber(0)
 			if !ok {
-				return nil, nil, fmt.Errorf("failed to read local genesis")
+				return nil, nil, ErrLoadLocalGenesisFailed
 			}
 			header = genesis
 			break
@@ -453,7 +472,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 				min = m + 1
 			} else {
 				if m == 0 {
-					return nil, nil, errors.New("genesis does not match?")
+					return nil, nil, ErrMismatchGenesis
 				}
 				max = m - 1
 			}
@@ -461,7 +480,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	}
 
 	if header == nil {
-		return nil, nil, errors.New("header is nil")
+		return nil, nil, ErrCommonAncestorNotFound
 	}
 
 	// get the block fork
@@ -471,7 +490,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
 	}
 	if fork == nil {
-		return nil, nil, errors.New("fork not found")
+		return nil, nil, ErrForkNotFound
 	}
 
 	return header, fork, nil
@@ -488,13 +507,14 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
-
-		b := p.popBlock()
-		if b != nil {
-			if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
-				s.logger.Error("failed to write block", "err", err)
-				break
-			}
+		b, err := p.popBlock(popTimeout)
+		if err != nil {
+			s.logger.Error("failed to pop block", "err", err)
+			break
+		}
+		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
+			s.logger.Error("failed to write block", "err", err)
+			break
 		}
 		if !handler(b) {
 			break

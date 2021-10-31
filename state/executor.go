@@ -184,7 +184,7 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
-func (t *Transition) Write(txn *types.Transaction) error {
+func (t *Transition) Write(txn *types.Transaction) *TransitionApplicationError {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error
@@ -192,17 +192,17 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		// Decrypt the from address
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
-			return err
+			return NewTransitionApplicationError(err, false)
 		}
 	}
 
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	result, err := t.Apply(msg)
-	if err != nil {
-		t.logger.Error("failed to apply tx", "err", err)
-		return err
+	result, e := t.Apply(msg)
+	if e != nil {
+		t.logger.Error("failed to apply tx", "err", e)
+		return e
 	}
 	t.totalGas += result.GasUsed
 
@@ -278,7 +278,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
+func (t *Transition) Apply(msg *types.Transaction) (result *runtime.ExecutionResult, err *TransitionApplicationError) {
 	s := t.state.Snapshot()
 	result, err = t.apply(msg)
 	if err != nil {
@@ -330,12 +330,29 @@ var (
 	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
+	ErrBlockLimitExceeded    = fmt.Errorf("specified gas exceeds block gas limit")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
 )
 
-func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionResult, err error) {
+type TransitionApplicationError struct {
+	Err           error
+	IsRecoverable bool // Should the transaction be discarded, or put back in the queue.
+}
+
+func (e *TransitionApplicationError) Error() string {
+	return fmt.Sprintf("%v, recoverable [%t]", e.Err, e.IsRecoverable)
+}
+
+func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApplicationError {
+	return &TransitionApplicationError{
+		Err:           err,
+		IsRecoverable: isRecoverable,
+	}
+}
+
+func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, *TransitionApplicationError) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -349,36 +366,36 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	txn := t.state
 
 	// 1. the nonce of the message caller is correct
-	if err = t.nonceCheck(msg); err != nil {
-		return
+	if err := t.nonceCheck(msg); err != nil {
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	if err = t.subGasLimitPrice(msg); err != nil {
-		return
+	if err := t.subGasLimitPrice(msg); err != nil {
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 3. the amount of gas required is available in the block
-	if err = t.subGasPool(msg.Gas); err != nil {
-		return
+	if err := t.subGasPool(msg.Gas); err != nil {
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
 	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if err != nil {
-		return
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 5. the purchased gas is enough to cover intrinsic usage
 	gasLeft := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
-		return nil, ErrNotEnoughIntrinsicGas
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, runtime.ErrInsufficientBalance
+		return nil, NewTransitionApplicationError(err, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
@@ -388,6 +405,7 @@ func (t *Transition) apply(msg *types.Transaction) (result *runtime.ExecutionRes
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
+	var result *runtime.ExecutionResult = nil
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {

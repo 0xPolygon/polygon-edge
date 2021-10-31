@@ -219,6 +219,18 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 	return nil
 }
 
+// DecreaseAccountNonce resets the nonce attached to an account whenever a transaction produce an error which is not
+// recoverable, meaning the transaction will be discarded.
+//
+// Since any discarded transaction should not affect the world state, the nextNonce should be reset to the value
+// it was set to before the transaction appeared.
+func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
+	if t.accountQueues[tx.From] != nil {
+		txnsQueue := t.accountQueues[tx.From]
+		txnsQueue.nextNonce -= 1
+	}
+}
+
 // GetTxs gets both pending and queued transactions
 func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
 
