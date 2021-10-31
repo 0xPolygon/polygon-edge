@@ -41,9 +41,6 @@ func TestSyncer(t *testing.T) {
 
 	// Test if non-validator has latest block
 	nonValidatorBlock, err := ibftManager.GetServer(IBFTMinNodes+numNonValidators-1).JSONRPC().Eth().GetBlockByNumber(web3.BlockNumber(latestBlockHeight), false)
-	//	log.Fatal("hereee", err)
 	assert.NoError(t, err)
-
 	assert.NotNil(t, nonValidatorBlock)
-	//	log.Fatal("qqqq", nonValidatorBlock)
 }
