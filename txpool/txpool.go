@@ -35,7 +35,8 @@ var (
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
 	// ErrOversizedData is returned if size of a transction is greater than the specified limit
-	ErrOversizedData = errors.New("oversized data")
+	ErrOversizedData     = errors.New("oversized data")
+	ErrRejectUnderpriced = errors.New("reject underpriced")
 )
 
 var topicNameV1 = "txpool/0.1"
@@ -76,7 +77,10 @@ type TxPool struct {
 
 	// Minimum amount of additional gas required to re-submit a transaction.
 	// If equal to zero, transactions cannot be re-submitted.
-	speedUp uint64
+	speedUpMin uint64
+
+	// Flag inidicatiing whether the tx received is a speed up
+	speedUp bool
 
 	// Flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
@@ -110,7 +114,7 @@ func NewTxPool(
 		pendingQueue:  newTxPriceHeap(),
 		sealing:       sealing,
 		forks:         forks,
-		speedUp:       speedUp,
+		speedUpMin:    speedUp,
 	}
 
 	if network != nil {
@@ -127,7 +131,6 @@ func NewTxPool(
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
 
-	println("NewTxPool: speedUp=", speedUp) //DUSAN
 	return txPool, nil
 }
 
@@ -217,6 +220,11 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, tx.From)
 		t.accountQueues[tx.From] = txnsQueue
 	}
+
+	if t.speedUp {
+		return t.speedUpTx(tx)
+	}
+
 	txnsQueue.Add(tx)
 
 	for _, promoted := range txnsQueue.Promote() {
@@ -359,7 +367,10 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		return ErrNonceTooLow
 	}
 
-	// check underpriced same nonce tx
+	// Reject underpriced tx
+	if err := t.checkResubmit(tx); err != nil {
+		return err
+	}
 
 	accountBalance, balanceErr := t.store.GetBalance(stateRoot, tx.From)
 	if balanceErr != nil {
@@ -387,6 +398,82 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 	return nil
 }
 
+func (t *TxPool) speedUpTx(tx *types.Transaction) error {
+	oldTx := t.findOldTx(tx)
+
+	if oldTx == nil {
+		// not supposed to happen
+		return errors.New("cannot speed up tx - old is not found")
+	}
+
+	// If the old tx is in the pending queue, we update the queue
+	if t.pendingQueue.Contains(oldTx) {
+		t.pendingQueue.Delete(oldTx)
+		t.pendingQueue.Push(tx)
+	} else {
+		// Otherwise, the old tx is in the acc specific queue
+		// waiting to be promoted
+		txQueue := t.accountQueues[tx.From]
+		i := sort.Search(txQueue.txs.Len(), func(i int) bool {
+			return txQueue.txs[i].Nonce >= tx.Nonce
+		})
+
+		// overwrite old
+		if i < txQueue.txs.Len() && txQueue.txs[i].Nonce == tx.Nonce {
+			txQueue.txs[i] = tx
+		}
+	}
+
+	// Speed up tx is done
+	t.speedUp = false
+
+	return nil
+}
+
+func (t *TxPool) checkResubmit(tx *types.Transaction) error {
+	oldTx := t.findOldTx(tx)
+	if oldTx == nil {
+		return nil
+	}
+
+	// Compare gas prices (old + speedUp < new)
+	exceedingPrice := big.NewInt(0).Add(
+		oldTx.GasPrice,
+		big.NewInt(0).SetUint64(t.speedUpMin))
+
+	if exceedingPrice.Cmp(tx.GasPrice) > 0 {
+		return ErrRejectUnderpriced
+	}
+
+	t.speedUp = true
+	return nil
+}
+
+func (t *TxPool) findOldTx(newTx *types.Transaction) *types.Transaction {
+	txQueue, ok := t.accountQueues[newTx.From]
+	if !ok {
+		// No data
+		return nil
+	}
+	// Old tx is in the pending queue
+	if txQueue.nextNonce == newTx.Nonce+1 {
+		return txQueue.lastPromoted
+	}
+
+	// Old tx is yet to be promoted to pending queue
+	if txQueue.nextNonce < newTx.Nonce {
+		i := sort.Search(txQueue.txs.Len(), func(i int) bool {
+			return txQueue.txs[i].Nonce >= newTx.Nonce
+		})
+
+		if i < txQueue.txs.Len() && txQueue.txs[i].Nonce == newTx.Nonce {
+			return txQueue.txs[i]
+		}
+	}
+
+	return nil
+}
+
 // txHeapWrapper is a wrapper object for account based transactions
 type txHeapWrapper struct {
 	// txs is the actual min heap (nonce ordered) for account transactions
@@ -395,6 +482,9 @@ type txHeapWrapper struct {
 	// nextNonce is a field indicating what should be the next
 	// valid nonce for the account transaction
 	nextNonce uint64
+
+	// Last tx that was promoted to pending queue
+	lastPromoted *types.Transaction
 }
 
 // newTxHeapWrapper creates a new account based tx heap
@@ -468,6 +558,8 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	lastTxn := promote[len(promote)-1]
 	// Grab its nonce value and set it as the reference next nonce
 	t.nextNonce = lastTxn.Nonce + 1
+	// Set the last promoted tx, in case of a speed up
+	t.lastPromoted = lastTxn
 
 	reinsertFunc()
 
@@ -481,21 +573,6 @@ func (t *txHeapWrapper) Peek() *types.Transaction {
 
 // Push adds a transaction to the account based heap
 func (t *txHeapWrapper) Push(tx *types.Transaction) {
-	// Check if the current transaction has a higher or equal nonce
-	// than all the current transactions in the account based heap
-	i := sort.Search(len(t.txs), func(i int) bool {
-		return t.txs[0].Nonce >= tx.Nonce
-	})
-
-	// If sort.Search found something, it will return the index
-	// of the first found element for which func(i int) was true
-	if i < len(t.txs) && t.txs[i].Nonce == tx.Nonce {
-		// i is an index corresponding to an element in the
-		// account based heap, and the nonces match up, so this tx is discarded
-		return
-	}
-
-	// All checks have passed, add the tx to the account based heap
 	heap.Push(&t.txs, tx)
 }
 
