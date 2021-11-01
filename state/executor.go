@@ -184,7 +184,7 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
-func (t *Transition) Write(txn *types.Transaction) *TransitionApplicationError {
+func (t *Transition) Write(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
 	var err error
@@ -278,9 +278,9 @@ func (t *Transition) GetTxnHash() types.Hash {
 }
 
 // Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (result *runtime.ExecutionResult, err *TransitionApplicationError) {
+func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
-	result, err = t.apply(msg)
+	result, err := t.apply(msg)
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -289,7 +289,7 @@ func (t *Transition) Apply(msg *types.Transaction) (result *runtime.ExecutionRes
 		t.r.PostHook(t)
 	}
 
-	return
+	return result, nil
 }
 
 // ContextPtr returns reference of context

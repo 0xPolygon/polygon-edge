@@ -144,7 +144,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		} else {
 			// Execute the state transition
 			if err := transition.Write(txn); err != nil {
-				if err.IsRecoverable {
+				if err.(*state.TransitionApplicationError).IsRecoverable {
 					retFn()
 				} else {
 					d.txpool.DecreaseAccountNonce(txn)

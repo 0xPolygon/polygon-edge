@@ -393,7 +393,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 			i.txpool.DecreaseAccountNonce(txn)
 		} else {
 			if err := transition.Write(txn); err != nil {
-				if err.IsRecoverable {
+				if err.(*state.TransitionApplicationError).IsRecoverable {
 					retFn()
 				} else {
 					i.txpool.DecreaseAccountNonce(txn)
