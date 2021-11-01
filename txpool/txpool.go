@@ -30,12 +30,21 @@ var (
 	ErrNegativeValue       = errors.New("negative value")
 	ErrNonEncryptedTxn     = errors.New("non-encrypted transaction")
 	ErrInvalidSender       = errors.New("invalid sender")
+	ErrUnderpriced         = errors.New("transaction underpriced")
 	ErrNonceTooLow         = errors.New("nonce too low")
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
 	// ErrOversizedData is returned if size of a transction is greater than the specified limit
 	ErrOversizedData = errors.New("oversized data")
+)
+
+type TxOrigin = string
+
+const (
+	OriginAddTxn TxOrigin = "addTxn"
+	OriginReorg  TxOrigin = "reorg"
+	OriginGossip TxOrigin = "gossip"
 )
 
 var topicNameV1 = "txpool/0.1"
@@ -81,6 +90,15 @@ type TxPool struct {
 	// Flag indicating if the current node is running in dev mode
 	dev bool
 
+	// Whether local transaction handling should be disabled
+	noLocals bool
+
+	// Addresses that should be treated as local
+	locals *localAccounts
+
+	// priceLimit is a lower threshold for gas price
+	priceLimit uint64
+
 	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
@@ -92,6 +110,9 @@ type TxPool struct {
 func NewTxPool(
 	logger hclog.Logger,
 	sealing bool,
+	locals []types.Address,
+	noLocals bool,
+	priceLimit uint64,
 	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
@@ -104,6 +125,9 @@ func NewTxPool(
 		accountQueues: make(map[types.Address]*txHeapWrapper),
 		pendingQueue:  newTxPriceHeap(),
 		sealing:       sealing,
+		locals:        newLocalAccounts(locals),
+		noLocals:      noLocals,
+		priceLimit:    priceLimit,
 		forks:         forks,
 	}
 
@@ -146,7 +170,7 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
-		if err := t.addImpl("gossip", txn); err != nil {
+		if err := t.addImpl(OriginGossip, txn); err != nil {
 			t.logger.Error("failed to add broadcasted txn", "err", err)
 		}
 	}
@@ -159,7 +183,7 @@ func (t *TxPool) EnableDev() {
 
 // AddTx adds a new transaction to the pool and broadcasts it if networking is enabled
 func (t *TxPool) AddTx(tx *types.Transaction) error {
-	if err := t.addImpl("addTxn", tx); err != nil {
+	if err := t.addImpl(OriginAddTxn, tx); err != nil {
 		return err
 	}
 
@@ -187,18 +211,22 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 
 // addImpl validates the tx and adds it to the appropriate account transaction queue.
 // Additionally, it updates the global valid transactions queue
-func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
+func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
 
-	err := t.validateTx(tx)
+	// should treat as local in the following cases
+	// (1) noLocals is false and Tx is local transaction
+	// (2) from in tx is in locals addresses
+	isLocal := (!t.noLocals && origin == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
+	err := t.validateTx(tx, isLocal)
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
 	}
 
-	t.logger.Debug("add txn", "ctx", ctx, "hash", tx.Hash, "from", tx.From)
+	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
 	txnsQueue, ok := t.accountQueues[tx.From]
 	if !ok {
@@ -210,6 +238,11 @@ func (t *TxPool) addImpl(ctx string, tx *types.Transaction) error {
 		t.accountQueues[tx.From] = txnsQueue
 	}
 	txnsQueue.Add(tx)
+
+	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	if isLocal && !t.locals.containsAddr(tx.From) {
+		t.locals.addAddr(tx.From)
+	}
 
 	for _, promoted := range txnsQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
@@ -316,7 +349,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// try to include again the transactions in the pendingQueue list
 	for _, txn := range addTxns {
-		if err := t.addImpl("reorg", txn); err != nil {
+		if err := t.addImpl(OriginReorg, txn); err != nil {
 			t.logger.Error("failed to add txn", "err", err)
 		}
 	}
@@ -328,7 +361,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
-func (t *TxPool) validateTx(tx *types.Transaction) error {
+func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 
 	//Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
@@ -353,6 +386,11 @@ func (t *TxPool) validateTx(tx *types.Transaction) error {
 		if signerErr != nil {
 			return ErrInvalidSender
 		}
+	}
+
+	// Reject non-local transactions whose Gas Price is under priceLimit
+	if !isLocal && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
+		return ErrUnderpriced
 	}
 
 	// Grab the state root for the latest block
@@ -661,4 +699,39 @@ func (t *txPriceHeapImpl) Pop() interface{} {
 	job.index = -1
 	*t = old[0 : n-1]
 	return job
+}
+
+type localAccounts struct {
+	accounts map[types.Address]bool
+	mutex    sync.RWMutex
+}
+
+func newLocalAccounts(addrs []types.Address) *localAccounts {
+	accounts := make(map[types.Address]bool, len(addrs))
+	for _, addr := range addrs {
+		accounts[addr] = true
+	}
+	return &localAccounts{
+		accounts: accounts,
+		mutex:    sync.RWMutex{},
+	}
+}
+
+func (a *localAccounts) containsAddr(addr types.Address) bool {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+	return a.accounts[addr]
+}
+
+func (a *localAccounts) containsTxSender(signer signer, tx *types.Transaction) bool {
+	if addr, err := signer.Sender(tx); err == nil {
+		return a.containsAddr(addr)
+	}
+	return false
+}
+
+func (a *localAccounts) addAddr(addr types.Address) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	a.accounts[addr] = true
 }
