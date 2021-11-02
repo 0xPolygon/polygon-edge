@@ -395,6 +395,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.Premine(sender, defaultBalance)
+		config.SetBlockLimit(20000000)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -451,6 +452,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(sender, defaultBalance)
 		config.SetSeal(true)
+		config.SetBlockLimit(20000000)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
