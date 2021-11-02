@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
+	"github.com/multiformats/go-multiaddr"
 )
 
 // Config defines the server configuration params
@@ -34,6 +35,7 @@ type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
 	NatAddr    string `json:"nat_addr"`
+	Dns        string `json:"dns"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
@@ -90,6 +92,18 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		if c.Network.NatAddr != "" {
 			if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
 				return nil, errors.New("Could not parse NAT IP address")
+			}
+		}
+
+		if c.Network.Dns != "" {
+			version, domain := parseDNSString(c.Network.Dns)
+			if version == "" || domain == "" {
+				return nil, errors.New("Could not parse DNS address")
+			}
+			var err error
+			conf.Network.Dns, err = multiaddr.NewMultiaddr(fmt.Sprintf("/%s/%s/tcp/%d", version, domain, conf.Network.Addr.Port))
+			if err != nil {
+				return nil, errors.New("Could not create a multi address")
 			}
 		}
 
@@ -179,6 +193,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		if otherConfig.Network.NatAddr != "" {
 			c.Network.NatAddr = otherConfig.Network.NatAddr
 		}
+		if otherConfig.Network.Dns != "" {
+			c.Network.Dns = otherConfig.Network.Dns
+		}
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers
 		}
@@ -220,4 +237,23 @@ func readConfigFile(path string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func parseDNSString(s string) (version string, name string) {
+	s = strings.Trim(s, "/")
+	fmt.Println(s)
+	split := strings.Split(s, "/")
+	if len(split) <= 1 {
+		return
+	}
+	switch split[0] {
+	case "dns":
+		version = "dns"
+	case "dns4":
+		version = "dns4"
+	case "dns6":
+		version = "dns6"
+	}
+	name = split[1]
+	return
 }
