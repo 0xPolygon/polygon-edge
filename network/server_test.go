@@ -403,8 +403,6 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 			srv0 := CreateServer(t, conf)
 
 			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
-
 		})
 	}
-
 }
