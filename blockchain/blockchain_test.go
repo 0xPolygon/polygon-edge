@@ -588,6 +588,18 @@ func TestCalculateGasLimit(t *testing.T) {
 			parentGasLimit:   25000000,
 			expectedGasLimit: 25000000,
 		},
+		{
+			name:             "should increase to the exact gas target if adding the delta surpasses it",
+			blockGasTarget:   25000000 + 25000000/1024 - 100, // - 100 so that it takes less than the delta to reach it
+			parentGasLimit:   25000000,
+			expectedGasLimit: 25000000 + 25000000/1024 - 100,
+		},
+		{
+			name:             "should decrease to the exact gas target if subtracting the delta surpasses it",
+			blockGasTarget:   25000000 - 25000000/1024 + 100, // + 100 so that it takes less than the delta to reach it
+			parentGasLimit:   25000000,
+			expectedGasLimit: 25000000 - 25000000/1024 + 100,
+		},
 	}
 
 	for _, tt := range tests {
