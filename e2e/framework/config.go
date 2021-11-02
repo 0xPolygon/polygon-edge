@@ -32,7 +32,11 @@ type TestServerConfig struct {
 	PremineAccts  []*SrvAccount // Accounts with existing balances (genesis accounts)
 	Consensus     ConsensusType // Consensus Type
 	Bootnodes     []string      // Bootnode Addresses
+	Locals        []string      // Accounts whose transactions are treated as locals
+	NoLocals      bool          // Flag to disable price exemptions for locally transactions
+	PriceLimit    *uint64       // Minimum gas price limit to enforce for acceptance into the pool
 	DevInterval   int           // Dev consensus update interval [s]
+	BlockGasLimit uint64        // Block gas limit
 	ShowsLog      bool
 }
 
@@ -76,6 +80,26 @@ func (t *TestServerConfig) SetSeal(state bool) {
 // SetBootnodes sets bootnodes
 func (t *TestServerConfig) SetBootnodes(bootnodes []string) {
 	t.Bootnodes = bootnodes
+}
+
+// SetLocals sets locals
+func (t *TestServerConfig) SetLocals(locals []string) {
+	t.Locals = locals
+}
+
+// SetLocals sets NoLocals flag
+func (t *TestServerConfig) SetNoLocals(noLocals bool) {
+	t.NoLocals = noLocals
+}
+
+// SetLocals sets PriceLimit
+func (t *TestServerConfig) SetPriceLimit(priceLimit *uint64) {
+	t.PriceLimit = priceLimit
+}
+
+// SetBlockLimit sets the block gas limit
+func (t *TestServerConfig) SetBlockLimit(limit uint64) {
+	t.BlockGasLimit = limit
 }
 
 // SetShowsLog sets flag for logging

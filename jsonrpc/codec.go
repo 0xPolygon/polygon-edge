@@ -124,6 +124,14 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 	return BlockNumber(n), nil
 }
 
+func createBlockNumberPointer(str string) (*BlockNumber, error) {
+	blockNumber, err := stringToBlockNumber(str)
+	if err != nil {
+		return nil, err
+	}
+	return &blockNumber, nil
+}
+
 // UnmarshalJSON automatically decodes the user input for the block number, when a JSON RPC method is called
 func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 	num, err := stringToBlockNumber(string(buffer))

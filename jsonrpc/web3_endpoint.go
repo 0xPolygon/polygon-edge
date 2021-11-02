@@ -22,7 +22,7 @@ func (w *Web3) ClientVersion() (interface{}, error) {
 func (w *Web3) Sha3(val string) (interface{}, error) {
 	v, err := hex.DecodeHex(val)
 	if err != nil {
-		return nil, err
+		return nil, NewInvalidRequestError("Invalid hex string")
 	}
 	dst := keccak.Keccak256(nil, v)
 
