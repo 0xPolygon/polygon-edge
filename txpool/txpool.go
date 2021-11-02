@@ -282,6 +282,11 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.locals.addAddr(tx.From)
 	}
 
+	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	if isLocal && !t.locals.containsAddr(tx.From) {
+		t.locals.addAddr(tx.From)
+	}
+
 	for _, promoted := range txnsQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
