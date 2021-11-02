@@ -44,7 +44,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Chain:          "test",
 		DataDir:        "./test-chain",
-		BlockGasTarget: fmt.Sprintf("0x%x", chain.DefaultBlockGasTarget),
+		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,

@@ -18,9 +18,6 @@ var (
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty = big.NewInt(131072)
-
-	// DefaultBlockGasTarget is the default value for the block gas target for new blocks
-	DefaultBlockGasTarget uint64 = 8000000
 )
 
 // Chain is the blockchain chain configuration

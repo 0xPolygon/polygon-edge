@@ -14,6 +14,11 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types/buildroot"
 )
 
+var (
+	// defaultBlockGasTarget is the default value for the block gas target for new blocks
+	defaultBlockGasTarget uint64 = 8000000
+)
+
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
 func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
 	head := func(i int64) *types.Header {
@@ -155,7 +160,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 				EIP155:    chain.NewFork(0),
 				Homestead: chain.NewFork(0),
 			},
-			BlockGasTarget: chain.DefaultBlockGasTarget,
+			BlockGasTarget: defaultBlockGasTarget,
 		},
 	}
 
@@ -203,7 +208,7 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	config := &chain.Chain{
 		Genesis: genesis,
 		Params: &chain.Params{
-			BlockGasTarget: chain.DefaultBlockGasTarget,
+			BlockGasTarget: defaultBlockGasTarget,
 		},
 	}
 	b, err := newBlockChain(config, nil)

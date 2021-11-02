@@ -247,6 +247,13 @@ func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
 	// in either direction per block
 	blockGasTarget := b.Config().BlockGasTarget
 
+	// Check if the gas limit target has been set
+	if blockGasTarget == 0 {
+		// The gas limit target has not been set,
+		// so it should use the parent gas limit
+		return parentGasLimit
+	}
+
 	// Check if the gas limit is already at the target
 	if parentGasLimit == blockGasTarget {
 		// The gas limit is already at the target, no need to move it

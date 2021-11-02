@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/server"
@@ -47,7 +46,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["block-gas-target"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the target block gas limit for the chain. Default %d", chain.DefaultBlockGasTarget),
+		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
 		Arguments: []string{
 			"BLOCK_GAS_TARGET",
 		},
