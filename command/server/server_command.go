@@ -102,9 +102,17 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["nat"] = helper.FlagDescriptor{
-		Description: "Sets the the external IP address without the port, as it can be seen by peers",
+		Description: "Sets the external IP address without the port, as it can be seen by peers",
 		Arguments: []string{
 			"NAT_ADDRESS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["dns"] = helper.FlagDescriptor{
+		Description: "Sets the host DNS address",
+		Arguments: []string{
+			"DNS_ADDRESS",
 		},
 		FlagOptional: true,
 	}
