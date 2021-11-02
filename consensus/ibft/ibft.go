@@ -282,7 +282,6 @@ func (i *Ibft) isValidSnapshot() bool {
 
 		return true
 	}
-
 	return false
 }
 
@@ -326,6 +325,7 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
+			i.syncer.Broadcast(b)
 			isValidator = i.isValidSnapshot()
 
 			return !isValidator
@@ -353,7 +353,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
-		GasLimit:   100000000, // placeholder for now
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 	}
 
 	// try to pick a candidate
@@ -388,11 +388,20 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		if txn == nil {
 			break
 		}
-		if err := transition.Write(txn); err != nil {
-			retFn()
-			break
+
+		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			i.txpool.DecreaseAccountNonce(txn)
+		} else {
+			if err := transition.Write(txn); err != nil {
+				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+					retFn()
+				} else {
+					i.txpool.DecreaseAccountNonce(txn)
+				}
+				break
+			}
+			txns = append(txns, txn)
 		}
-		txns = append(txns, txn)
 	}
 	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 
@@ -743,6 +752,8 @@ func (i *Ibft) runRoundChangeState() {
 		if msg == nil {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
+			//update the timeout duration
+			timeout = i.randomTimeout()
 			continue
 		}
 
