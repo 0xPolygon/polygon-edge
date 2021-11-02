@@ -583,7 +583,7 @@ func TestCalculateGasLimit(t *testing.T) {
 			expectedGasLimit: 26000000 - 26000000/1024,
 		},
 		{
-			name:             "should not alter gas limit",
+			name:             "should not alter gas limit when exactly the same",
 			blockGasTarget:   25000000,
 			parentGasLimit:   25000000,
 			expectedGasLimit: 25000000,
