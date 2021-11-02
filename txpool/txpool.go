@@ -64,8 +64,8 @@ type TxPool struct {
 
 	// Unsorted min heap of transactions per account.
 	// The heap is min nonce based
-	accountQueuesMux sync.Mutex
-	accountQueues    map[types.Address]*accountQueueWrapper
+	accountQueuesLock sync.Mutex
+	accountQueues     map[types.Address]*accountQueueWrapper
 
 	// Max price heap for all transactions that are valid
 	pendingQueue *txPriceHeap
@@ -122,9 +122,9 @@ func NewTxPool(
 	return txPool, nil
 }
 
-// accountQueueWrapper is the account based queue mux map implementation
+// accountQueueWrapper is the account based queue lock map implementation
 type accountQueueWrapper struct {
-	mux          sync.RWMutex // mux for accessing the accountQueue
+	lock         sync.RWMutex // lock for accessing the accountQueue
 	writeLock    int32        // flag indicating whether a write lock is held
 	accountQueue *txHeapWrapper
 }
@@ -133,7 +133,7 @@ type accountQueueWrapper struct {
 // if it doesn't exist in the account queue map
 func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQueueWrapper {
 	// Lock the global map
-	t.accountQueuesMux.Lock()
+	t.accountQueuesLock.Lock()
 
 	accountQueue, ok := t.accountQueues[address]
 	if !ok {
@@ -148,29 +148,29 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 		t.accountQueues[address] = accountQueue
 	}
 	// Unlock the global map, since work is finished
-	t.accountQueuesMux.Unlock()
+	t.accountQueuesLock.Unlock()
 
 	// Grab the lock for the specific account queue
 	if writer {
-		accountQueue.mux.Lock()
+		accountQueue.lock.Lock()
 		atomic.StoreInt32(&accountQueue.writeLock, 1)
 	} else {
-		accountQueue.mux.RLock()
+		accountQueue.lock.RLock()
 		atomic.StoreInt32(&accountQueue.writeLock, 0)
 	}
 
 	return accountQueue
 }
 
-// unlock releases the account specific transaction queue mux.
+// unlock releases the account specific transaction queue lock.
 // Separated out into a function in case there needs to be additional teardown logic.
-// Code calling unlock shouldn't need to know the type of lock for the mux (writer / reader) to unlock it
+// Code calling unlock shouldn't need to know the type of lock for the lock (writer / reader) to unlock it
 func (a *accountQueueWrapper) unlock() {
 	// Grab the previous lock type and reset it
 	if atomic.SwapInt32(&a.writeLock, 0) == 1 {
-		a.mux.Unlock()
+		a.lock.Unlock()
 	} else {
-		a.mux.RUnlock()
+		a.lock.RUnlock()
 	}
 }
 
