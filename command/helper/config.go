@@ -24,6 +24,7 @@ type Config struct {
 	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
 	Network        *Network               `json:"network"`
 	Seal           bool                   `json:"seal"`
+	TxPool         *TxPool                `json:"tx_pool"`
 	LogLevel       string                 `json:"log_level"`
 	Consensus      map[string]interface{} `json:"consensus"`
 	Dev            bool
@@ -39,6 +40,14 @@ type Network struct {
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
+// TxPool defines the TxPool configuration params
+type TxPool struct {
+	Locals     string `json:"locals"`
+	NoLocals   bool   `json:"no_locals"`
+	PriceLimit uint64 `json:"price_limit"`
+	MaxSlots   uint64 `json:"max_slots"`
+}
+
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
@@ -49,7 +58,11 @@ func DefaultConfig() *Config {
 			NoDiscover: false,
 			MaxPeers:   20,
 		},
-		Seal:      false,
+		Seal: false,
+		TxPool: &TxPool{
+			PriceLimit: 1,
+			MaxSlots:   4096,
+		},
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
 	}
@@ -100,6 +113,20 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Network.MaxPeers = c.Network.MaxPeers
 
 		conf.Chain = cc
+	}
+
+	// TxPool
+	{
+		if c.TxPool.Locals != "" {
+			strAddrs := strings.Split(c.TxPool.Locals, ",")
+			conf.Locals = make([]types.Address, len(strAddrs))
+			for i, sAddr := range strAddrs {
+				conf.Locals[i] = types.StringToAddress(sAddr)
+			}
+		}
+		conf.NoLocals = c.TxPool.NoLocals
+		conf.PriceLimit = c.TxPool.PriceLimit
+		conf.MaxSlots = c.TxPool.MaxSlots
 	}
 
 	// Target gas limit
@@ -204,6 +231,22 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 		if otherConfig.Network.NoDiscover {
 			c.Network.NoDiscover = true
+		}
+	}
+
+	{
+		// TxPool
+		if otherConfig.TxPool.Locals != "" {
+			c.TxPool.Locals = otherConfig.TxPool.Locals
+		}
+		if otherConfig.TxPool.NoLocals {
+			c.TxPool.NoLocals = otherConfig.TxPool.NoLocals
+		}
+		if otherConfig.TxPool.PriceLimit != 0 {
+			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
+		}
+		if otherConfig.TxPool.MaxSlots != 0 {
+			c.TxPool.MaxSlots = otherConfig.TxPool.MaxSlots
 		}
 	}
 

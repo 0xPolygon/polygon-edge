@@ -289,6 +289,50 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 	assert.Equal(t, argUintPtr(10), num)
 }
 
+func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
+	store := &mockBlockStore2{}
+	for i := 0; i < 10; i++ {
+		store.add(&types.Block{
+			Header: &types.Header{
+				Number: uint64(i),
+			},
+			Transactions: []*types.Transaction{{From: addr0}},
+		})
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	cases := []struct {
+		blockNum BlockNumber
+		isNotNil bool
+		err      bool
+	}{
+		{LatestBlockNumber, true, false},
+		{EarliestBlockNumber, false, true},
+		{BlockNumber(-50), false, true},
+		{BlockNumber(0), true, false},
+		{BlockNumber(2), true, false},
+		{BlockNumber(50), false, false},
+	}
+	for _, c := range cases {
+		res, err := dispatcher.endpoints.Eth.GetBlockTransactionCountByNumber(c.blockNum)
+
+		if c.isNotNil {
+			assert.NotNil(t, res, "expected to return block, but got nil")
+			assert.Equal(t, res, 1)
+		} else {
+			assert.Nil(t, res, "expected to return nil, but got data")
+		}
+
+		if c.err {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
+
 func TestEth_Block_GetLogs(t *testing.T) {
 
 	// Topics we're searching for
