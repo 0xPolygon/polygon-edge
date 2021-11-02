@@ -125,6 +125,38 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["locals"] = helper.FlagDescriptor{
+		Description: "Sets comma separated accounts whose transactions are treated as locals",
+		Arguments: []string{
+			"LOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["nolocals"] = helper.FlagDescriptor{
+		Description: "Sets flag to disable price exemptions for locally submitted transactions",
+		Arguments: []string{
+			"NOLOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["price-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Arguments: []string{
+			"PRICE_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["max-slots"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets maximum slots in the pool. Default: %d", helper.DefaultConfig().TxPool.MaxSlots),
+		Arguments: []string{
+			"MAX_SLOTS",
+		},
+		FlagOptional: true,
+	}
+
 	c.flagMap["dev"] = helper.FlagDescriptor{
 		Description: "Sets the client to dev mode. Default: false",
 		Arguments: []string{
