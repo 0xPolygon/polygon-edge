@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/umbracle/go-web3"
-
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
@@ -21,6 +19,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 )
 
 var (

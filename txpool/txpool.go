@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -22,6 +23,7 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
+	txSlotSize        = 32 * 1024  // 32kB
 	txMaxSize         = 128 * 1024 //128Kb
 )
 
@@ -30,6 +32,7 @@ var (
 	ErrNegativeValue       = errors.New("negative value")
 	ErrNonEncryptedTxn     = errors.New("non-encrypted transaction")
 	ErrInvalidSender       = errors.New("invalid sender")
+	ErrTxPoolOverflow      = errors.New("txpool is full")
 	ErrUnderpriced         = errors.New("transaction underpriced")
 	ErrNonceTooLow         = errors.New("nonce too low")
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
@@ -80,6 +83,15 @@ type TxPool struct {
 	// Max price heap for all transactions that are valid
 	pendingQueue *txPriceHeap
 
+	// Min price heap for all remote transactions
+	remoteTxns *txPriceHeap
+
+	// Number of used slots
+	slots uint64
+
+	// Maximum number of transaction slots for all accounts
+	maxSlots uint64
+
 	// Networking stack
 	topic *network.Topic
 
@@ -113,6 +125,7 @@ func NewTxPool(
 	locals []types.Address,
 	noLocals bool,
 	priceLimit uint64,
+	maxSlots uint64,
 	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
@@ -123,7 +136,10 @@ func NewTxPool(
 		store:         store,
 		idlePeriod:    defaultIdlePeriod,
 		accountQueues: make(map[types.Address]*txHeapWrapper),
-		pendingQueue:  newTxPriceHeap(),
+		pendingQueue:  newMaxTxPriceHeap(),
+		remoteTxns:    newMinTxPriceHeap(),
+		slots:         0,
+		maxSlots:      maxSlots,
 		sealing:       sealing,
 		locals:        newLocalAccounts(locals),
 		noLocals:      noLocals,
@@ -226,6 +242,24 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		return err
 	}
 
+	if t.slots+numSlots(tx) > t.maxSlots {
+		if !isLocal && t.Underpriced(tx) {
+			return ErrUnderpriced
+		}
+
+		dropped, success := t.Discard(t.slots-t.maxSlots+numSlots(tx), isLocal)
+		if !isLocal && !success {
+			return ErrTxPoolOverflow
+		}
+		for _, tx := range dropped {
+			if queue, ok := t.accountQueues[tx.From]; ok {
+				queue.Remove(tx.Hash)
+			}
+			t.pendingQueue.Delete(tx)
+			t.decreaseSlots(numSlots(tx))
+		}
+	}
+
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
 	txnsQueue, ok := t.accountQueues[tx.From]
@@ -238,6 +272,15 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.accountQueues[tx.From] = txnsQueue
 	}
 	txnsQueue.Add(tx)
+	t.increaseSlots(numSlots(tx))
+	if !isLocal {
+		t.remoteTxns.Push(tx)
+	}
+
+	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	if isLocal && !t.locals.containsAddr(tx.From) {
+		t.locals.addAddr(tx.From)
+	}
 
 	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
@@ -302,10 +345,16 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	if txn == nil {
 		return nil, nil
 	}
+
+	slots := numSlots(txn.tx)
+	// Subtracts tx slots
+	t.decreaseSlots(slots)
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
+			return
 		}
+		t.increaseSlots(slots)
 	}
 	return txn.tx, ret
 }
@@ -356,7 +405,9 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
+		t.decreaseSlots(numSlots(txn))
 		t.pendingQueue.Delete(txn)
+		t.remoteTxns.Delete(txn)
 	}
 }
 
@@ -425,6 +476,52 @@ func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 	}
 
 	return nil
+}
+
+// Underpriced checks whether given tx's price is less than any in remote transactions
+func (t *TxPool) Underpriced(tx *types.Transaction) bool {
+	lowestTx := t.remoteTxns.Pop()
+	if lowestTx == nil {
+		return false
+	}
+	// tx.GasPrice < lowestTx.Price
+	underpriced := tx.GasPrice.Cmp(lowestTx.price) < 0
+	t.remoteTxns.Push(lowestTx.tx)
+	return underpriced
+}
+
+func (t *TxPool) Discard(slots uint64, force bool) ([]*types.Transaction, bool) {
+	dropped := make([]*types.Transaction, 0)
+	for t.remoteTxns.Length() > 0 && slots > 0 {
+		tx := t.remoteTxns.Pop()
+		dropped = append(dropped, tx.tx)
+
+		txSlots := numSlots(tx.tx)
+		if slots >= txSlots {
+			slots -= txSlots
+		} else {
+			slots = 0
+		}
+	}
+
+	// Put back if couldn't make required space
+	if slots > 0 && !force {
+		for _, tx := range dropped {
+			t.remoteTxns.Push(tx)
+		}
+		return nil, false
+	}
+	return dropped, true
+}
+
+// increaseSlots increases number of taken slots
+func (t *TxPool) increaseSlots(slots uint64) {
+	atomic.AddUint64(&t.slots, slots)
+}
+
+// increaseSlots decreases number of taken slots
+func (t *TxPool) decreaseSlots(slots uint64) {
+	atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
 // txHeapWrapper is a wrapper object for account based transactions
@@ -550,6 +647,17 @@ func (t *txHeapWrapper) Pop() *types.Transaction {
 	return res.(*types.Transaction)
 }
 
+// Remove removes the transaction with given hash
+func (t *txHeapWrapper) Remove(hash types.Hash) bool {
+	for i, tx := range t.txs {
+		if tx.Hash == hash {
+			t.txs = append(t.txs[:i], t.txs[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 // Account based heap implementation //
 // The heap is min-nonce ordered //
 
@@ -589,8 +697,6 @@ func (t *txHeap) Pop() interface{} {
 }
 
 // Price based heap implementation //
-// The heap is max-price ordered //
-
 type pricedTx struct {
 	tx    *types.Transaction
 	from  types.Address
@@ -598,17 +704,11 @@ type pricedTx struct {
 	index int
 }
 
+// helper object for tx price heap
 type txPriceHeap struct {
 	lock  sync.Mutex
 	index map[types.Hash]*pricedTx
-	heap  txPriceHeapImpl
-}
-
-func newTxPriceHeap() *txPriceHeap {
-	return &txPriceHeap{
-		index: make(map[types.Hash]*pricedTx),
-		heap:  make(txPriceHeapImpl, 0),
-	}
+	heap  heap.Interface
 }
 
 func (t *txPriceHeap) Length() uint64 {
@@ -623,7 +723,7 @@ func (t *txPriceHeap) Delete(tx *types.Transaction) {
 	defer t.lock.Unlock()
 
 	if item, ok := t.index[tx.Hash]; ok {
-		heap.Remove(&t.heap, item.index)
+		heap.Remove(t.heap, item.index)
 		delete(t.index, tx.Hash)
 	}
 }
@@ -644,7 +744,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 		price: price,
 	}
 	t.index[tx.Hash] = pTx
-	heap.Push(&t.heap, pTx)
+	heap.Push(t.heap, pTx)
 	return nil
 }
 
@@ -655,7 +755,7 @@ func (t *txPriceHeap) Pop() *pricedTx {
 	if len(t.index) == 0 {
 		return nil
 	}
-	tx := heap.Pop(&t.heap).(*pricedTx)
+	tx := heap.Pop(t.heap).(*pricedTx)
 	delete(t.index, tx.tx.Hash)
 	return tx
 }
@@ -665,40 +765,95 @@ func (t *txPriceHeap) Contains(tx *types.Transaction) bool {
 	return ok
 }
 
-type txPriceHeapImpl []*pricedTx
+// return new max-price ordered tx heap
+func newMaxTxPriceHeap() *txPriceHeap {
+	return &txPriceHeap{
+		index: make(map[types.Hash]*pricedTx),
+		heap:  newMaxTxPriceHeapImpl(),
+	}
+}
+
+// return new min-price ordered tx heap
+func newMinTxPriceHeap() *txPriceHeap {
+	return &txPriceHeap{
+		index: make(map[types.Hash]*pricedTx),
+		heap:  newMinTxPriceHeapImpl(),
+	}
+}
 
 // Required method definitions for the standard golang heap package
-
-func (t txPriceHeapImpl) Len() int { return len(t) }
-
-func (t txPriceHeapImpl) Less(i, j int) bool {
-	if t[i].from == t[j].from {
-		return t[i].tx.Nonce < t[j].tx.Nonce
-	}
-
-	return t[i].price.Cmp(t[j].price) >= 0
+type txPriceHeapImplBase struct {
+	txs []*pricedTx
 }
 
-func (t txPriceHeapImpl) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
-	t[i].index = i
-	t[j].index = j
+func (t txPriceHeapImplBase) Len() int { return len(t.txs) }
+
+func (t txPriceHeapImplBase) Swap(i, j int) {
+	t.txs[i], t.txs[j] = t.txs[j], t.txs[i]
+	t.txs[i].index = i
+	t.txs[j].index = j
 }
 
-func (t *txPriceHeapImpl) Push(x interface{}) {
-	n := len(*t)
+func (t *txPriceHeapImplBase) Push(x interface{}) {
+	n := len(t.txs)
 	job := x.(*pricedTx)
 	job.index = n
-	*t = append(*t, job)
+	t.txs = append(t.txs, job)
 }
 
-func (t *txPriceHeapImpl) Pop() interface{} {
+func (t *txPriceHeapImplBase) Pop() interface{} {
 	old := *t
-	n := len(old)
-	job := old[n-1]
+	n := len(old.txs)
+	job := old.txs[n-1]
 	job.index = -1
-	*t = old[0 : n-1]
+	t.txs = old.txs[0 : n-1]
 	return job
+}
+
+func (t txPriceHeapImplBase) Less(i, j int) bool {
+	return i < j
+}
+
+// max price ordered tx heap implementation
+type maxTxPriceHeapImpl struct {
+	txPriceHeapImplBase
+}
+
+func newMaxTxPriceHeapImpl() heap.Interface {
+	return &maxTxPriceHeapImpl{
+		txPriceHeapImplBase: txPriceHeapImplBase{
+			make([]*pricedTx, 0),
+		},
+	}
+}
+
+func (t maxTxPriceHeapImpl) Less(i, j int) bool {
+	if t.txs[i].from == t.txs[j].from {
+		return t.txs[i].tx.Nonce < t.txs[j].tx.Nonce
+	}
+
+	return t.txs[i].price.Cmp(t.txs[j].price) >= 0
+}
+
+type minTxPriceHeapImpl struct {
+	txPriceHeapImplBase
+}
+
+// min price ordered tx heap implementation
+func newMinTxPriceHeapImpl() heap.Interface {
+	return &minTxPriceHeapImpl{
+		txPriceHeapImplBase: txPriceHeapImplBase{
+			make([]*pricedTx, 0),
+		},
+	}
+}
+
+func (t minTxPriceHeapImpl) Less(i, j int) bool {
+	if t.txs[i].from == t.txs[j].from {
+		return t.txs[i].tx.Nonce < t.txs[j].tx.Nonce
+	}
+
+	return t.txs[i].price.Cmp(t.txs[j].price) < 0
 }
 
 type localAccounts struct {
@@ -734,4 +889,9 @@ func (a *localAccounts) addAddr(addr types.Address) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	a.accounts[addr] = true
+}
+
+// numSlots calculates the number of slots for given transaction
+func numSlots(tx *types.Transaction) uint64 {
+	return (tx.Size() + txSlotSize - 1) / txSlotSize
 }

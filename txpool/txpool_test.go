@@ -2,6 +2,7 @@ package txpool
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -25,6 +26,7 @@ var forks = &chain.Forks{
 
 const (
 	defaultPriceLimit uint64 = 1
+	defaultMaxSlots   uint64 = 4096
 )
 
 var (
@@ -89,7 +91,7 @@ func TestAddingTransaction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 			if err != nil {
 				t.Fatal("Failed to initialize transaction pool:", err)
 			}
@@ -123,7 +125,7 @@ func TestAddingTransaction(t *testing.T) {
 
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -158,7 +160,7 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -222,7 +224,7 @@ func TestBroadcast(t *testing.T) {
 
 	createPool := func() (*TxPool, *network.Server) {
 		server := network.CreateServer(t, nil)
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, server)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 		return pool, server
@@ -248,7 +250,7 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -289,7 +291,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	}
 
 	test := func(t *testing.T, testTable []TestCase) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.AddSigner(&mockSigner{})
@@ -363,7 +365,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 
 	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.AddSigner(&mockSigner{})
@@ -484,7 +486,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), testCase.mockStore, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), testCase.mockStore, nil, nil)
 			assert.NoError(t, err)
 			if testCase.devMode {
 				pool.EnableDev()
@@ -503,7 +505,9 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 	}
 }
 func TestTx_MaxSize(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, 1, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -546,7 +550,7 @@ func TestTx_MaxSize(t *testing.T) {
 
 }
 func TestTxnOperatorAddNilRaw(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 	assert.NoError(t, err)
 
 	txnReq := new(proto.AddTxnReq)
@@ -649,7 +653,7 @@ func TestPriceLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, tt.locals, tt.noLocals, tt.priceLimit, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, tt.locals, tt.noLocals, tt.priceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil)
 			assert.NoError(t, err)
 			pool.AddSigner(signer)
 
@@ -664,6 +668,194 @@ func TestPriceLimit(t *testing.T) {
 
 			assert.Equal(t, tt.err, pool.addImpl(tt.origin, tx))
 			assert.Equal(t, tt.len, pool.Length())
+		})
+	}
+}
+
+func TestSizeLimit(t *testing.T) {
+	type account struct {
+		key  *ecdsa.PrivateKey
+		addr types.Address
+	}
+	type addTx struct {
+		origin   TxOrigin
+		account  *account
+		nonce    uint64
+		gasPrice *big.Int
+		slot     uint64
+	}
+
+	signer := crypto.NewEIP155Signer(uint64(100))
+	numAccounts := 3
+	accounts := make([]*account, numAccounts)
+	for i := range accounts {
+		key, addr := tests.GenerateKeyAndAddr(t)
+		accounts[i] = &account{
+			key:  key,
+			addr: addr,
+		}
+	}
+
+	tests := []struct {
+		name string
+		// TxPool config
+		maxSlot uint64
+		//
+		initialTxs []addTx
+		// input
+		input addTx
+		// result
+		err   error
+		len   uint64
+		slots uint64
+	}{
+		{
+			name:       "should add new tx when tx pool has enough space",
+			maxSlot:    5,
+			initialTxs: nil,
+			input: addTx{
+				origin:   OriginAddTxn,
+				account:  accounts[0],
+				nonce:    0,
+				gasPrice: big.NewInt(1),
+				slot:     2,
+			},
+			err:   nil,
+			len:   1,
+			slots: 2,
+		},
+		{
+			name:    "should reject new remote tx if txpool is full and the gas price is lower than any remote tx in the pool",
+			maxSlot: 4,
+			initialTxs: []addTx{
+				{
+					origin:   OriginGossip,
+					account:  accounts[0],
+					nonce:    0,
+					gasPrice: big.NewInt(5),
+					slot:     3,
+				},
+			},
+			input: addTx{
+				origin:   OriginGossip,
+				account:  accounts[1],
+				nonce:    0,
+				gasPrice: big.NewInt(1),
+				slot:     2,
+			},
+			err:   ErrUnderpriced,
+			len:   1,
+			slots: 3,
+		},
+		{
+			name:    "should reject new remote tx if txpool is full and failed to make space",
+			maxSlot: 4,
+			initialTxs: []addTx{
+				{
+					origin:   OriginAddTxn,
+					account:  accounts[0],
+					nonce:    0,
+					gasPrice: big.NewInt(5),
+					slot:     3,
+				},
+			},
+			input: addTx{
+				origin:   OriginGossip,
+				account:  accounts[1],
+				nonce:    0,
+				gasPrice: big.NewInt(1),
+				slot:     2,
+			},
+			err:   ErrTxPoolOverflow,
+			len:   1,
+			slots: 3,
+		},
+		{
+			name:    "should discard existing transactions if new tx set more expensive gas price",
+			maxSlot: 4,
+			initialTxs: []addTx{
+				{
+					origin:   OriginGossip,
+					account:  accounts[0],
+					nonce:    0,
+					gasPrice: big.NewInt(1),
+					slot:     3,
+				},
+			},
+			input: addTx{
+				origin:   OriginGossip,
+				account:  accounts[1],
+				nonce:    0,
+				gasPrice: big.NewInt(5),
+				slot:     2,
+			},
+			err:   nil,
+			len:   1,
+			slots: 2,
+		},
+		{
+			name:    "should discard existing remote transactions and add new tx forcibly if the new tx is local and set more expensive gas price",
+			maxSlot: 2,
+			initialTxs: []addTx{
+				{
+					origin:   OriginGossip,
+					account:  accounts[0],
+					nonce:    0,
+					gasPrice: big.NewInt(1),
+					slot:     2,
+				},
+			},
+			input: addTx{
+				origin:   OriginAddTxn,
+				account:  accounts[1],
+				nonce:    0,
+				gasPrice: big.NewInt(5),
+				slot:     3,
+			},
+			err:   nil,
+			len:   1,
+			slots: 3,
+		},
+	}
+
+	genTx := func(t *testing.T, arg *addTx) *types.Transaction {
+		t.Helper()
+
+		// base field should take 1 slot at least
+		size := txSlotSize * (arg.slot - 1)
+		if size <= 0 {
+			size = 1
+		}
+		input := make([]byte, size)
+		rand.Read(input)
+
+		tx, err := signer.SignTx(&types.Transaction{
+			To:       &addr1,
+			Nonce:    arg.nonce,
+			Gas:      100000000,
+			GasPrice: arg.gasPrice,
+			Value:    big.NewInt(0),
+			Input:    input,
+		}, arg.account.key)
+		assert.NoError(t, err)
+		return tx
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlot, forks.At(0), &mockStore{}, nil, nil)
+			assert.NoError(t, err)
+			pool.AddSigner(signer)
+
+			for _, arg := range tt.initialTxs {
+				tx := genTx(t, &arg)
+				assert.NoError(t, pool.addImpl(arg.origin, tx))
+			}
+
+			err = pool.addImpl(tt.input.origin, genTx(t, &tt.input))
+			assert.Equal(t, tt.err, err)
+			assert.Equal(t, tt.len, pool.Length())
+			assert.Equal(t, tt.slots, pool.slots)
 		})
 	}
 }
