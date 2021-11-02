@@ -180,10 +180,6 @@ func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
 
-func (t *Transition) AvailableGas() uint64 {
-	return t.gasPool
-}
-
 func (t *Transition) Receipts() []*types.Receipt {
 	return t.receipts
 }
@@ -201,16 +197,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if gas := t.AvailableGas(); gas < TxGas {
-		t.logger.Info(
-			"Block doesn't have enough gas to process new transaction",
-			"remaining",
-			gas, "minimum required gas",
-			TxGas,
-		)
-		return ErrBlockLimitReached
 	}
 
 	// Make a local copy and apply the transaction
