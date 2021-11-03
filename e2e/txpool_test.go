@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/umbracle/go-web3"
+	"fmt"
 	"io"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
@@ -18,6 +19,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
 )
 
 var (
@@ -278,6 +280,127 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	)
 }
 
+func TestPriceLimit(t *testing.T) {
+	signer := &crypto.FrontierSigner{}
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+
+	testCases := []struct {
+		name             string
+		numNodes         int
+		locals           []string
+		noLocals         bool
+		priceLimit       uint64
+		gasPrice         int64
+		err              error // JSON-RPC error
+		numReceivedNodes int64
+	}{
+		{
+			name:             "tx should propagate",
+			numNodes:         3,
+			locals:           nil,
+			noLocals:         false,
+			priceLimit:       10,
+			gasPrice:         100,
+			err:              nil,
+			numReceivedNodes: 3,
+		},
+		{
+			name:             "tx should be rejected due to low gas price",
+			numNodes:         3,
+			locals:           nil,
+			noLocals:         true,
+			priceLimit:       10,
+			gasPrice:         5,
+			err:              errors.New("{\"code\":-32600,\"message\":\"transaction underpriced\"}"),
+			numReceivedNodes: 0,
+		},
+		{
+			name:             "tx should not propagate",
+			numNodes:         3,
+			locals:           nil,
+			noLocals:         false,
+			priceLimit:       10,
+			gasPrice:         0,
+			err:              nil,
+			numReceivedNodes: 1, // only first node receive
+		},
+		{
+			name:             "tx should propagate because sender address is treated as local transaction",
+			numNodes:         3,
+			locals:           []string{senderAddr.String()},
+			noLocals:         true,
+			priceLimit:       10,
+			gasPrice:         0,
+			err:              nil,
+			numReceivedNodes: 3,
+		},
+	}
+
+	defaultConfig := func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDummy)
+		config.Premine(senderAddr, framework.EthToWei(10))
+		config.SetSeal(true)
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			srvs := framework.NewTestServers(t, tt.numNodes, func(config *framework.TestServerConfig) {
+				defaultConfig(config)
+				config.SetLocals(tt.locals)
+				config.SetNoLocals(tt.noLocals)
+				config.SetPriceLimit(&tt.priceLimit)
+			})
+			framework.MultiJoinSerial(t, srvs)
+
+			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+			time.Sleep(time.Second * 2)
+
+			tx, err := signer.SignTx(&types.Transaction{
+				Nonce:    0,
+				From:     senderAddr,
+				To:       &receiverAddr,
+				Value:    framework.EthToWei(1),
+				Gas:      1000000,
+				GasPrice: big.NewInt(tt.gasPrice),
+				Input:    []byte{},
+			}, senderKey)
+			assert.NoError(t, err, "failed to sign transaction")
+
+			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
+			if tt.err != nil {
+				assert.Equal(t, tt.err.Error(), err.Error())
+			} else {
+				assert.NoError(t, err, "failed to send transaction")
+			}
+
+			for i, srv := range srvs {
+				srv := srv
+				shouldHaveTxPool := false
+				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
+				if i < int(tt.numReceivedNodes) {
+					shouldHaveTxPool = true
+					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
+				}
+
+				t.Run(subTestName, func(t *testing.T) {
+					t.Parallel()
+					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
+
+					if shouldHaveTxPool {
+						assert.NoError(t, err)
+						assert.Equal(t, uint64(1), res.Length)
+					} else {
+						assert.ErrorIs(t, err, tests.ErrTimeout)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestInvalidTransactionRecover(t *testing.T) {
 	// Test scenario :
 	//
@@ -377,44 +500,44 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 	testTable := []struct {
-		name              string
-		sender            types.Address
-		senderKey         *ecdsa.PrivateKey
-		receiver          types.Address
-		nonce             uint64
-		gas               uint64
-		value             *big.Int
-		shouldSucceed     bool
+		name          string
+		sender        types.Address
+		senderKey     *ecdsa.PrivateKey
+		receiver      types.Address
+		nonce         uint64
+		gas           uint64
+		value         *big.Int
+		shouldSucceed bool
 	}{
 		{
-			name:              "Valid transaction #1",
-			sender:            senderAddress,
-			senderKey:         senderKey,
-			receiver:          receiverAddress,
-			nonce:             0,
-			gas:               framework.DefaultGasLimit - 1,
-			value:             oneEth,
-			shouldSucceed:     true,
+			name:          "Valid transaction #1",
+			sender:        senderAddress,
+			senderKey:     senderKey,
+			receiver:      receiverAddress,
+			nonce:         0,
+			gas:           framework.DefaultGasLimit - 1,
+			value:         oneEth,
+			shouldSucceed: true,
 		},
 		{
-			name:              "Invalid transaction (no enough gas remaining in pool)",
-			sender:            senderAddress,
-			senderKey:         senderKey,
-			receiver:          receiverAddress,
-			nonce:             1,
-			gas:               framework.DefaultGasLimit / 2,
-			value:             oneEth,
-			shouldSucceed:     false,
+			name:          "Invalid transaction (no enough gas remaining in pool)",
+			sender:        senderAddress,
+			senderKey:     senderKey,
+			receiver:      receiverAddress,
+			nonce:         1,
+			gas:           framework.DefaultGasLimit / 2,
+			value:         oneEth,
+			shouldSucceed: false,
 		},
 		{
-			name:              "Valid transaction #2",
-			sender:            senderAddress,
-			senderKey:         senderKey,
-			receiver:          receiverAddress,
-			nonce:             2,
-			gas:               framework.DefaultGasLimit / 2,
-			value:             oneEth,
-			shouldSucceed:     true,
+			name:          "Valid transaction #2",
+			sender:        senderAddress,
+			senderKey:     senderKey,
+			receiver:      receiverAddress,
+			nonce:         2,
+			gas:           framework.DefaultGasLimit / 2,
+			value:         oneEth,
+			shouldSucceed: true,
 		},
 	}
 
