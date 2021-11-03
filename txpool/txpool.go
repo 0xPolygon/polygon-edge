@@ -410,6 +410,7 @@ func (t *TxPool) speedUpTx(tx *types.Transaction) error {
 	if t.pendingQueue.Contains(oldTx) {
 		t.pendingQueue.Delete(oldTx)
 		t.pendingQueue.Push(tx)
+		t.accountQueues[tx.From].lastPromoted = tx
 	} else {
 		// Otherwise, the old tx is in the acc specific queue
 		// waiting to be promoted
