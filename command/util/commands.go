@@ -53,7 +53,7 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolAddCmd := txpool.TxPoolAdd{Meta: meta}
 	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
 
-	loadbotCmd := loadbot.LoadbotCommand{}
+	loadbotCmd := loadbot.LoadbotCommand{Meta: meta}
 
 	return map[string]cli.CommandFactory{
 
@@ -131,6 +131,7 @@ func Commands() map[string]cli.CommandFactory {
 		},
 
 		// LOADBOT COMMANDS //
+
 		loadbotCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &loadbotCmd, nil
 		},
