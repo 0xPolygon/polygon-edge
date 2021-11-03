@@ -46,3 +46,19 @@ jobs:
 
       - name: Go test
         run: go test ./...
+      - 
+        name: Prepare artifact for Deployer
+        uses: actions/upload-artifact@v2
+        with:
+          name: polygon-sdk_${{ github.sha }}
+          path: artifacts/
+  notify-deployer:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == 'true' || github.event_name == 'push'
+    steps:
+      -
+        name: Notify Deployer
+        run: |
+          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"polygon-sdk_$GITHUB_SHA"'" }}'
+
