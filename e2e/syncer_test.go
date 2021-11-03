@@ -19,7 +19,6 @@ func TestSyncer(t *testing.T) {
 	// Start IBFT cluster (4 Validator + 2 Non-Validator)
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes+numNonValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.SetSeal(i < IBFTMinNodes)
-		//config.SetShowsLog(i == IBFTMinNodes+numNonValidators-1)
 	})
 	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(func() {
