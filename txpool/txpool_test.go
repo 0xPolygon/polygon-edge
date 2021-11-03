@@ -74,7 +74,7 @@ func TestAddingTransaction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 			if err != nil {
 				t.Fatal("Failed to initialize transaction pool:", err)
 			}
@@ -106,9 +106,149 @@ func TestAddingTransaction(t *testing.T) {
 	}
 }
 
+func TestSpeedUpTx(t *testing.T) {
+
+	testTable := []struct {
+		name          string
+		speedUpAmount uint64
+		nonce         uint64
+		resendCount   int
+	}{
+		{
+			"Speed up 5x",
+			50,
+			10,
+			5,
+		},
+		{
+			"Speed up 10x",
+			100,
+			11,
+			10,
+		},
+		{
+			"Speed up 20x",
+			500,
+			12,
+			20,
+		},
+		{
+			"Speed up 50x",
+			1000,
+			0,
+			50,
+		},
+	}
+
+	from := types.Address{0x1}
+	for _, tt := range testTable {
+		println(tt.name)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, tt.speedUpAmount)
+		assert.NoError(t, err)
+		pool.EnableDev()
+
+		var highestBidder *big.Int
+
+		// Add multiple same-nonce txs
+		// but with higher gas price each time
+		for i := 0; i < tt.resendCount; i++ {
+			tx := &types.Transaction{
+				From:     from,
+				Nonce:    tt.nonce,
+				Gas:      validGasLimit,
+				GasPrice: big.NewInt(int64(10 + i*int(tt.speedUpAmount))),
+				Value:    big.NewInt(0),
+			}
+
+			assert.NoError(t, pool.addImpl("", tx))
+			highestBidder = tx.GasPrice
+
+		}
+
+		var finalizedTx *types.Transaction
+		if tt.nonce == 0 {
+			// tx0 will get promoted as soon as its added,
+			// so we check the pending queue instead
+			assert.Len(t, pool.accountQueues[from].txs, 0)
+			assert.Equal(t, pool.Length(), uint64(1))
+
+			finalizedTx, _ = pool.Pop()
+		} else {
+			assert.Len(t, pool.accountQueues[from].txs, 1)
+			assert.Equal(t, pool.Length(), uint64(0))
+
+			finalizedTx = pool.accountQueues[from].Pop()
+		}
+
+		assert.NotNil(t, finalizedTx)
+		assert.Equal(t, finalizedTx.GasPrice.Uint64(), highestBidder.Uint64())
+	}
+}
+func TestRejectUnderpricedTx(t *testing.T) {
+	testTable := []struct {
+		name          string
+		speedUpAmount uint64
+		nonce         uint64
+	}{
+		{
+			"Reject underpriced from account queue",
+			50,
+			10,
+		},
+		{
+			"Reject underpriced from promoted queue",
+			100,
+			0,
+		},
+	}
+
+	from := types.Address{0x1}
+	for _, tt := range testTable {
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, tt.speedUpAmount)
+		assert.NoError(t, err)
+		pool.EnableDev()
+
+		tx0 := &types.Transaction{
+			From:     from,
+			Nonce:    tt.nonce,
+			Gas:      validGasLimit,
+			GasPrice: big.NewInt(1),
+			Value:    big.NewInt(0),
+		}
+		assert.NoError(t, pool.addImpl("", tx0))
+
+		tx1 := &types.Transaction{
+			From:     from,
+			Nonce:    tt.nonce,
+			Gas:      validGasLimit,
+			GasPrice: big.NewInt(1), // same gas price as previous
+			Value:    big.NewInt(0),
+		}
+		assert.ErrorIs(t, ErrRejectUnderpriced, pool.addImpl("", tx1))
+
+		tx2 := &types.Transaction{
+			From:     from,
+			Nonce:    tt.nonce,
+			Gas:      validGasLimit,
+			GasPrice: big.NewInt(1 + int64(tt.speedUpAmount/2)), // higher, but still insufficient
+			Value:    big.NewInt(0),
+		}
+		assert.ErrorIs(t, ErrRejectUnderpriced, pool.addImpl("", tx2))
+
+		if tt.nonce == 0 {
+			// tx0 will get promoted as soon as its added,
+			// so we check the pending queue instead
+			assert.Len(t, pool.accountQueues[from].txs, 0)
+			assert.Equal(t, pool.Length(), uint64(1))
+		} else {
+			assert.Len(t, pool.accountQueues[from].txs, 1)
+			assert.Equal(t, pool.Length(), uint64(0))
+		}
+	}
+}
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -142,7 +282,7 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -205,7 +345,7 @@ func TestBroadcast(t *testing.T) {
 
 	createPool := func() (*TxPool, *network.Server) {
 		server := network.CreateServer(t, nil)
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, server)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, server, 0)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 		return pool, server
@@ -231,7 +371,7 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 	assert.NoError(t, err)
 	pool.EnableDev()
 
@@ -276,7 +416,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	addr2 := types.Address{0x2}
 
 	test := func(t *testing.T, testTable []TestCase) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 		assert.NoError(t, err)
 		pool.EnableDev()
 
@@ -349,7 +489,7 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 
 	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+		pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 		assert.NoError(t, err)
 		pool.EnableDev()
 
@@ -455,7 +595,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), testCase.mockStore, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), testCase.mockStore, nil, nil, 0)
 			assert.NoError(t, err)
 			if testCase.devMode {
 				pool.EnableDev()
@@ -474,7 +614,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 	}
 }
 func TestTx_MaxSize(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 	pool.EnableDev()
 	assert.NoError(t, err)
 
@@ -516,7 +656,7 @@ func TestTx_MaxSize(t *testing.T) {
 
 }
 func TestTxnOperatorAddNilRaw(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil)
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, forks.At(0), &mockStore{}, nil, nil, 0)
 	assert.NoError(t, err)
 
 	txnReq := new(proto.AddTxnReq)
