@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/command/ibft"
+	"github.com/0xPolygon/polygon-sdk/command/loadbot"
 	"github.com/0xPolygon/polygon-sdk/command/monitor"
 	"github.com/0xPolygon/polygon-sdk/command/peers"
 	"github.com/0xPolygon/polygon-sdk/command/server"
@@ -51,6 +52,8 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolCmd := txpool.TxPoolCommand{}
 	txPoolAddCmd := txpool.TxPoolAdd{Meta: meta}
 	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
+
+	loadbotCmd := loadbot.LoadbotCommand{}
 
 	return map[string]cli.CommandFactory{
 
@@ -125,6 +128,11 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &versionCmd, nil
+		},
+
+		// LOADBOT COMMANDS //
+		loadbotCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &loadbotCmd, nil
 		},
 	}
 }
