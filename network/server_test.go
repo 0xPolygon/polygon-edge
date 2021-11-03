@@ -366,7 +366,7 @@ func TestPeerReconnection(t *testing.T) {
 	assert.NoError(t, srv2.Close())
 	assert.True(t, <-disconnectedCh2)
 
-	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*60)
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancelWait()
 	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
 	assert.NoError(t, err)
