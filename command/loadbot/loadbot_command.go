@@ -70,13 +70,13 @@ func (l *LoadbotCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	l.FlagMap["max-pending"] = helper.FlagDescriptor{
-		Description: "The maximum number of pending transaction the loadbot can process",
+	l.FlagMap["count"] = helper.FlagDescriptor{
+		Description: "The number of transactions to send",
 		Arguments: []string{
-			"MAX_PENDING",
+			"COUNT",
 		},
 		ArgumentsOptional: false,
-		FlagOptional:      true,
+		FlagOptional:      false,
 	}
 
 	l.FlagMap["value"] = helper.FlagDescriptor{
@@ -112,21 +112,21 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags := flag.NewFlagSet(l.GetBaseCommand(), flag.ContinueOnError)
 
 	var tps uint64
-	var accounts helperFlags.ArrayFlags
+	var accountsRaw helperFlags.ArrayFlags
 	var gasLimit uint64
 	var gasPriceRaw string
 	var urls helperFlags.ArrayFlags
 	var chainID uint64
-	var maxPending uint64
+	var count uint64
 	var valueRaw string
 
 	flags.Uint64Var(&tps, "tps", 100, "")
-	flags.Var(&accounts, "account", "")
+	flags.Var(&accountsRaw, "account", "")
 	flags.Uint64Var(&gasLimit, "gasLimit", 1000000, "")
 	flags.StringVar(&gasPriceRaw, "gasPrice", "0x100000", "")
 	flags.Var(&urls, "url", "")
 	flags.Uint64Var(&chainID, "chain-id", helper.DefaultChainID, "")
-	flags.Uint64Var(&maxPending, "max-pending", 1000, "")
+	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&valueRaw, "value", "", "")
 
 	if err := flags.Parse(args); err != nil {
@@ -134,13 +134,13 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	// Parse accounts
+	// Parse accountsRaw
 	var addresses = []types.Address{}
-	if accounts == nil {
-		l.UI.Error(fmt.Sprintf("failed to parse accounts used by the loadbot"))
+	if accountsRaw == nil {
+		l.UI.Error(fmt.Sprintf("failed to parse accountsRaw used by the loadbot"))
 		return 1
 	}
-	for _, account := range accounts {
+	for _, account := range accountsRaw {
 		placeholder := types.Address{}
 		if err := placeholder.UnmarshalText([]byte(account)); err != nil {
 			l.UI.Error(fmt.Sprintf("Failed to decode account address: %v", err))
@@ -154,6 +154,45 @@ func (l *LoadbotCommand) Run(args []string) int {
 		l.UI.Error(fmt.Sprintf("please provide at least one node url to run the loabot"))
 		return 1
 	}
+
+	value, err := types.ParseUint256orHex(&valueRaw)
+	if err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
+		return 1
+	}
+	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
+	if err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
+		return 1
+	}
+
+	var accounts []types.Address
+	for _, account := range accountsRaw {
+		acc := types.Address{}
+		if err := acc.UnmarshalText([]byte(account)); err != nil {
+			l.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
+			return 1
+		}
+
+		accounts = append(accounts, acc)
+	}
+
+	metrics, err := Execute(&Configuration{
+		TPS:       tps,
+		Value:     value,
+		Gas:       gasLimit,
+		GasPrice:  gasPrice,
+		Accounts:  accounts,
+		RPCURLs:   urls,
+		ChainID:   chainID,
+		TxnToSend: count,
+	})
+	if err != nil {
+		l.UI.Error(fmt.Sprintf("failed to execute loadbot: %v", err))
+		return 1
+	}
+
+	l.UI.Info(fmt.Sprintf("Loadbot execution finished. Got following metrics :\n%+v", metrics))
 
 	return 0
 }
