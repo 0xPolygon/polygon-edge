@@ -50,7 +50,7 @@ jobs:
         name: Prepare artifact for Deployer
         uses: actions/upload-artifact@v2
         with:
-          name: polygon-sdk_${{ github.sha }}
+          name: polygon-sdk_${{ github.sha }}_${{ github.ref }}
           path: artifacts/
   notify-deployer:
     needs: test
@@ -60,5 +60,5 @@ jobs:
       -
         name: Notify Deployer
         run: |
-          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"polygon-sdk_$GITHUB_SHA"'" }}'
+          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"polygon-sdk_$GITHUB_SHA_$GITHUB_REF"'" }}'
 
