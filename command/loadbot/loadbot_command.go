@@ -87,6 +87,15 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	l.FlagMap["grpc"] = helper.FlagDescriptor{
+		Description: "The gRPC url used by the loadbot to verify post load transactions status",
+		Arguments: []string{
+			"GRPC_URL",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -119,6 +128,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var chainID uint64
 	var count uint64
 	var valueRaw string
+	var gRPC string
 
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.Var(&accountsRaw, "account", "")
@@ -128,6 +138,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.Uint64Var(&chainID, "chain-id", helper.DefaultChainID, "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&valueRaw, "value", "", "")
+	flags.StringVar(&gRPC, "grpc", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		l.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -186,13 +197,17 @@ func (l *LoadbotCommand) Run(args []string) int {
 		RPCURLs:   urls,
 		ChainID:   chainID,
 		TxnToSend: count,
+		GRPCUrl:   gRPC,
 	})
 	if err != nil {
 		l.UI.Error(fmt.Sprintf("failed to execute loadbot: %v", err))
 		return 1
 	}
 
-	l.UI.Info(fmt.Sprintf("Loadbot execution finished. Got following metrics :\n%+v", metrics))
+	l.UI.Info(fmt.Sprintf("Loadbot execution finished. Got following metrics :"))
+	l.UI.Info(fmt.Sprintf("Transactions submitted: %v", metrics.Total))
+	l.UI.Info(fmt.Sprintf("Transactions failed: %v", metrics.Failed))
+	l.UI.Info(fmt.Sprintf("Duration: %v", metrics.Duration))
 
 	return 0
 }

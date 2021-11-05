@@ -3,9 +3,13 @@ package loadbot
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
+	"google.golang.org/grpc"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 	"math/big"
 	"sync"
 	"time"
@@ -20,13 +24,15 @@ type Configuration struct {
 	RPCURLs   []string
 	ChainID   uint64
 	TxnToSend uint64 // The number of transactions to send
+	GRPCUrl   string
 }
 
 type Metrics struct {
-	m        sync.Mutex
-	Total    uint64        // The total number of transactions processed
-	Failed   uint64        // The number of failed transactions
-	Duration time.Duration // The execution time of the loadbot
+	m         sync.Mutex
+	Total     uint64        // The total number of transactions processed
+	Failed    uint64        // The number of failed transactions
+	Duration  time.Duration // The execution time of the loadbot
+	TxnHashes []web3.Hash
 }
 
 func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
@@ -108,13 +114,17 @@ func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction)
 				metrics.m.Lock()
 				metrics.Total += 1
 				metrics.m.Unlock()
-				_, err := client.Eth().SendTransaction(txn)
+				hash, err := client.Eth().SendTransaction(txn)
 
 				if err != nil {
 					metrics.m.Lock()
 					metrics.Failed += 1
 					metrics.m.Unlock()
 				}
+
+				metrics.m.Lock()
+				metrics.TxnHashes = append(metrics.TxnHashes, hash)
+				metrics.m.Unlock()
 
 			}(txns[transactionID])
 
@@ -133,6 +143,49 @@ func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction)
 	}
 }
 
+func waitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorClient) (*txpoolOp.TxnPoolStatusResp, error) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		res, _ := client.Status(subCtx, &empty.Empty{})
+		if res != nil && res.Length == 0 {
+			return res, false
+		}
+		fmt.Printf("TxPool not empty, %d transactions remaining..\n", res.Length)
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*txpoolOp.TxnPoolStatusResp), nil
+}
+
+func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
+	conn, err := grpc.Dial(url, grpc.WithInsecure())
+	if err != nil {
+		return fmt.Errorf("failed to connect to TxPool: %v", err)
+	}
+	gClient := txpoolOp.NewTxnPoolOperatorClient(conn)
+
+	_, err = waitUntilTxPoolEmpty(context.Background(), gClient)
+	if err != nil {
+		return fmt.Errorf("failed to wait until TxPool is empty: %v", err)
+	}
+
+	for _, hash := range m.TxnHashes {
+		transaction, err := jClient.Eth().GetTransactionByHash(hash)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve transaction: %v", err)
+		}
+
+		if transaction == nil {
+			m.Failed += 1
+		}
+	}
+	return nil
+}
+
 func Execute(configuration *Configuration) (*Metrics, error) {
 	clients, err := configuration.createClients()
 	if err != nil {
@@ -145,5 +198,10 @@ func Execute(configuration *Configuration) (*Metrics, error) {
 	}
 
 	metrics := configuration.run(clients, transactions)
+
+	err = metrics.verifyTxns(clients[0], configuration.GRPCUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify txns: %v", err)
+	}
 	return metrics, nil
 }
