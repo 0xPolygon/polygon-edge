@@ -11,7 +11,6 @@ import (
 )
 
 func TestSyncer(t *testing.T) {
-	t.Skip()
 	const (
 		numNonValidators = 2
 		desiredHeight    = 10
