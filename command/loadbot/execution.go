@@ -15,16 +15,18 @@ import (
 	"time"
 )
 
+// Configuration represents the loadbot run configuration.
+// It contains the required parameters to run the stress test.
 type Configuration struct {
-	TPS       uint64
-	Value     *big.Int
-	Gas       uint64
-	GasPrice  *big.Int
-	Accounts  []types.Address
-	RPCURLs   []string
+	TPS       uint64          // Number of transactions per second
+	Value     *big.Int        // The value sent in each transaction
+	Gas       uint64          // The transaction's gas
+	GasPrice  *big.Int        // The transaction's gas price
+	Accounts  []types.Address // All the accounts used by the bot to send transaction
+	RPCURLs   []string        // The JSON RPC endpoints, used to send transactions
 	ChainID   uint64
-	TxnToSend uint64 // The number of transactions to send
-	GRPCUrl   string
+	TxnToSend uint64 // The number of transaction to send
+	GRPCUrl   string // The gRPC url, used while verifying transactions to check if the TxPool is empty
 }
 
 type Metrics struct {
@@ -32,9 +34,11 @@ type Metrics struct {
 	Total     uint64        // The total number of transactions processed
 	Failed    uint64        // The number of failed transactions
 	Duration  time.Duration // The execution time of the loadbot
-	TxnHashes []web3.Hash
+	TxnHashes []web3.Hash   // The hashes of the transactions sent
 }
 
+// createClients will create JSON RPC clients using the provided addresses in the CLI.
+// Each one of these clients will send transaction(s), each one after another.
 func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 	var clients []*jsonrpc.Client
 
@@ -48,19 +52,27 @@ func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 	return clients, nil
 }
 
+// We create the transactions using createTransactionObjects before the loadbot send them.
 func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) {
 	var transactions []*web3.Transaction
 	var nonces = make(map[types.Address]uint64)
 	var numberOfAccounts = uint64(len(c.Accounts))
 
+	// Initialize accounts nonces at 0.
 	for _, account := range c.Accounts {
 		nonces[account] = 0
 	}
 
+	// Each loop create one transaction.
 	for i := uint64(0); i < c.TxnToSend; i++ {
+		// Get sender and receiver.
 		from := c.Accounts[i%numberOfAccounts]
 		to := c.Accounts[(i+1)%numberOfAccounts]
+
+		// Get sender nonce.
 		nonce := nonces[from]
+
+		// Create the transaction object.
 		txn := &web3.Transaction{
 			From:     web3.Address(from),
 			To:       (*web3.Address)(&to),
@@ -78,6 +90,8 @@ func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) 
 	return transactions, nil
 }
 
+// run is the main method of the loadbot.
+// The TPS is used to determine the rate at which every transaction is sent.
 func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction) *Metrics {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(c.TPS))
 	defer ticker.Stop()
@@ -161,6 +175,8 @@ func waitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 	return res.(*txpoolOp.TxnPoolStatusResp), nil
 }
 
+// verifyTxns checks whether a transaction has been properly written to the blockchain.
+// First, it waits for the TxPool to be empty.
 func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
 	conn, err := grpc.Dial(url, grpc.WithInsecure())
 	if err != nil {
@@ -186,6 +202,7 @@ func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
 	return nil
 }
 
+// Execute creates the JSON RPC clients, the transactions objects, send each one of them and verify the result.
 func Execute(configuration *Configuration) (*Metrics, error) {
 	clients, err := configuration.createClients()
 	if err != nil {
