@@ -3,11 +3,9 @@ package loadbot
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/txpool/proto"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"google.golang.org/grpc"
-	any "google.golang.org/protobuf/types/known/anypb"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 	"math/big"
 	"sync"
 	"time"
@@ -31,22 +29,22 @@ type Metrics struct {
 	Duration time.Duration // The execution time of the loadbot
 }
 
-func (c *Configuration) createConnections() ([]*grpc.ClientConn, error) {
-	var connections []*grpc.ClientConn
+func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
+	var clients []*jsonrpc.Client
 
 	for _, url := range c.RPCURLs {
-		conn, err := grpc.Dial(url, grpc.WithInsecure())
+		conn, err := jsonrpc.NewClient(fmt.Sprintf("http://%s", url))
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to server: %v", err)
 		}
-		connections = append(connections, conn)
+		clients = append(clients, conn)
 	}
-	return connections, nil
+	return clients, nil
 }
 
-func (c *Configuration) createTransactionObjects() ([]*proto.AddTxnReq, error) {
-	var transactions []*proto.AddTxnReq
-	var nonces map[types.Address]uint64 = make(map[types.Address]uint64)
+func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) {
+	var transactions []*web3.Transaction
+	var nonces = make(map[types.Address]uint64)
 	var numberOfAccounts = uint64(len(c.Accounts))
 
 	for _, account := range c.Accounts {
@@ -57,36 +55,29 @@ func (c *Configuration) createTransactionObjects() ([]*proto.AddTxnReq, error) {
 		from := c.Accounts[i%numberOfAccounts]
 		to := c.Accounts[(i+1)%numberOfAccounts]
 		nonce := nonces[from]
-		txn := &types.Transaction{
-			To:       &to,
+		txn := &web3.Transaction{
+			From:     web3.Address(from),
+			To:       (*web3.Address)(&to),
 			Gas:      c.Gas,
 			Value:    c.Value,
-			GasPrice: c.GasPrice,
+			GasPrice: c.GasPrice.Uint64(),
 			Nonce:    nonce,
 			V:        []byte{1}, // it is necessary to encode in rlp
 		}
 
-		msg := &proto.AddTxnReq{
-			Raw: &any.Any{
-				Value: txn.MarshalRLP(),
-			},
-			// from is not encoded in the rlp
-			From: from.String(),
-		}
-
-		transactions = append(transactions, msg)
+		transactions = append(transactions, txn)
 
 		nonces[from] += 1
 	}
 	return transactions, nil
 }
 
-func (c *Configuration) run(connections []*grpc.ClientConn, txns []*proto.AddTxnReq) *Metrics {
+func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction) *Metrics {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(c.TPS))
 	defer ticker.Stop()
 
-	connectionID := 0
-	numberOfConnection := len(connections)
+	clientID := 0
+	numberOfClients := len(clients)
 
 	transactionID := 0
 	numberOfTransactions := len(txns)
@@ -109,26 +100,26 @@ func (c *Configuration) run(connections []*grpc.ClientConn, txns []*proto.AddTxn
 	for {
 		select {
 		case <-ticker.C:
-			connection := connections[connectionID%numberOfConnection]
-			client := txpoolOp.NewTxnPoolOperatorClient(connection)
+			client := clients[clientID%numberOfClients]
 
 			wg.Add(1)
-			go func(req *proto.AddTxnReq) {
+			go func(txn *web3.Transaction) {
 				defer wg.Done()
 				metrics.m.Lock()
 				metrics.Total += 1
 				metrics.m.Unlock()
-				_, err := client.AddTxn(ctx, req)
+				_, err := client.Eth().SendTransaction(txn)
 
 				if err != nil {
 					metrics.m.Lock()
 					metrics.Failed += 1
 					metrics.m.Unlock()
 				}
+
 			}(txns[transactionID])
 
 			transactionID += 1
-			connectionID += 1
+			clientID += 1
 
 			if transactionID == numberOfTransactions {
 				wg.Wait()
@@ -143,7 +134,7 @@ func (c *Configuration) run(connections []*grpc.ClientConn, txns []*proto.AddTxn
 }
 
 func Execute(configuration *Configuration) (*Metrics, error) {
-	connections, err := configuration.createConnections()
+	clients, err := configuration.createClients()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC clients: %v", err)
 	}
@@ -153,6 +144,6 @@ func Execute(configuration *Configuration) (*Metrics, error) {
 		return nil, fmt.Errorf("failed to create transaction objects: %v", err)
 	}
 
-	metrics := configuration.run(connections, transactions)
+	metrics := configuration.run(clients, transactions)
 	return metrics, nil
 }
