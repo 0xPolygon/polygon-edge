@@ -250,6 +250,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--seal")
 	}
 
+	if len(t.Config.Locals) > 0 {
+		args = append(args, "--locals", strings.Join(t.Config.Locals, ","))
+	}
+
+	if t.Config.NoLocals {
+		args = append(args, "--nolocals")
+	}
+
+	if t.Config.PriceLimit != nil {
+		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
+	}
+
 	if t.Config.ShowsLog {
 		args = append(args, "--log-level", "debug")
 	}
