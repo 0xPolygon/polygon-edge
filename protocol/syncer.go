@@ -76,7 +76,7 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 		}
 	}
 	if indx != -1 {
-		s.enqueue = s.enqueue[indx+1:]
+		s.enqueue = s.enqueue[indx:]
 	}
 }
 
@@ -352,12 +352,12 @@ func (s *Syncer) Start() {
 					s.logger.Error("failed to open a stream", "err", err)
 					continue
 				}
-				if err := s.HandleNewPeer(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
+				if err := s.HandleUser(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
 					s.logger.Error("failed to handle user", "err", err)
 				}
 
 			case network.PeerEventDisconnected:
-				if err := s.DeletePeer(evnt.PeerID); err != nil {
+				if err := s.DeleteUser(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
 				}
 			}
@@ -392,8 +392,8 @@ func (s *Syncer) BestPeer() *syncPeer {
 	return bestPeer
 }
 
-// HandleNewPeer is a helper method that is used to handle new user connections within the Syncer
-func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
+// HandleUser is a helper method that is used to handle new user connections within the Syncer
+func (s *Syncer) HandleUser(peerID peer.ID, conn *grpc.ClientConn) error {
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
@@ -417,7 +417,7 @@ func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
 	return nil
 }
 
-func (s *Syncer) DeletePeer(peerID peer.ID) error {
+func (s *Syncer) DeleteUser(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
 		if err := p.(*syncPeer).conn.Close(); err != nil {
