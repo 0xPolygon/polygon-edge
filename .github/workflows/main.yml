@@ -45,7 +45,7 @@ jobs:
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test ./...
+        run: go test -timeout 20m ./...
       - 
         name: Extract branch name
         shell: bash
@@ -73,4 +73,3 @@ jobs:
           ARTIFACT_NAME: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
         run: |
           curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"$ARTIFACT_NAME"'" }}'
-
