@@ -146,7 +146,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.DecreaseAccountNonce(txn)
 		} else {
 			// Execute the state transition

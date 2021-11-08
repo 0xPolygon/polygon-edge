@@ -179,6 +179,10 @@ type mockBlockchain struct {
 	subscription *mockSubscription
 }
 
+func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
+	panic("implement me")
+}
+
 func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 	return &mockBlockchain{
 		blocks:       blockchain.HeadersToBlocks(headers),

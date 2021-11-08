@@ -397,7 +397,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			i.txpool.DecreaseAccountNonce(txn)
 		} else {
 			if err := transition.Write(txn); err != nil {
