@@ -78,7 +78,8 @@ type TxPool struct {
 
 	// Unsorted min heap of transactions per account.
 	// The heap is min nonce based
-	accountQueues map[types.Address]*txHeapWrapper
+	accountQueuesLock sync.Mutex
+	accountQueues     map[types.Address]*accountQueueWrapper
 
 	// Max price heap for all transactions that are valid
 	pendingQueue *txPriceHeap
@@ -135,7 +136,7 @@ func NewTxPool(
 		logger:        logger.Named("txpool"),
 		store:         store,
 		idlePeriod:    defaultIdlePeriod,
-		accountQueues: make(map[types.Address]*txHeapWrapper),
+		accountQueues: make(map[types.Address]*accountQueueWrapper),
 		pendingQueue:  newMaxTxPriceHeap(),
 		remoteTxns:    newMinTxPriceHeap(),
 		slots:         0,
@@ -163,13 +164,76 @@ func NewTxPool(
 	return txPool, nil
 }
 
+// accountQueueWrapper is the account based queue lock map implementation
+type accountQueueWrapper struct {
+	lock         sync.RWMutex // lock for accessing the accountQueue
+	writeLock    int32        // flag indicating whether a write lock is held
+	accountQueue *txHeapWrapper
+}
+
+// lockAccountQueue returns the corresponding account queue wrapper object, or creates it
+// if it doesn't exist in the account queue map
+func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQueueWrapper {
+	// Lock the global map
+	t.accountQueuesLock.Lock()
+
+	accountQueue, ok := t.accountQueues[address]
+	if !ok {
+		// Account queue is not initialized yet, initialize it
+		stateRoot := t.store.Header().StateRoot
+
+		// Initialize the account based transaction heap
+		txnsQueue := newTxHeapWrapper()
+		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
+
+		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
+		t.accountQueues[address] = accountQueue
+	}
+	// Unlock the global map, since work is finished
+	t.accountQueuesLock.Unlock()
+
+	// Grab the lock for the specific account queue
+	if writer {
+		accountQueue.lock.Lock()
+		atomic.StoreInt32(&accountQueue.writeLock, 1)
+	} else {
+		accountQueue.lock.RLock()
+		atomic.StoreInt32(&accountQueue.writeLock, 0)
+	}
+
+	return accountQueue
+}
+
+// unlock releases the account specific transaction queue lock.
+// Separated out into a function in case there needs to be additional teardown logic.
+// Code calling unlock shouldn't need to know the type of lock for the lock (writer / reader) to unlock it
+func (a *accountQueueWrapper) unlock() {
+	// Grab the previous lock type and reset it
+	if atomic.SwapInt32(&a.writeLock, 0) == 1 {
+		a.lock.Unlock()
+	} else {
+		a.lock.RUnlock()
+	}
+}
+
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	q, ok := t.accountQueues[addr]
+	mux := t.lockAccountQueue(addr, false)
+	defer mux.unlock()
+
+	wrapper, ok := t.accountQueues[addr]
 	if !ok {
 		return 0, false
 	}
-	return q.nextNonce, true
+	return wrapper.accountQueue.nextNonce, true
+}
+
+// NumAccountTxs Returns the number of transactions in the account specific queue
+func (t *TxPool) NumAccountTxs(address types.Address) int {
+	mux := t.lockAccountQueue(address, false)
+	defer mux.unlock()
+
+	return len(t.accountQueues[address].accountQueue.txs)
 }
 
 func (t *TxPool) AddSigner(s signer) {
@@ -252,9 +316,12 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 			return ErrTxPoolOverflow
 		}
 		for _, tx := range dropped {
-			if queue, ok := t.accountQueues[tx.From]; ok {
-				queue.Remove(tx.Hash)
+			mux := t.lockAccountQueue(tx.From, true)
+			if wrapper, ok := t.accountQueues[tx.From]; ok {
+				wrapper.accountQueue.Remove(tx.Hash)
 			}
+			mux.unlock()
+
 			t.pendingQueue.Delete(tx)
 			t.decreaseSlots(numSlots(tx))
 		}
@@ -262,16 +329,12 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
-	txnsQueue, ok := t.accountQueues[tx.From]
-	if !ok {
-		stateRoot := t.store.Header().StateRoot
+	mux := t.lockAccountQueue(tx.From, true)
+	defer mux.unlock()
 
-		// Initialize the account based transaction heap
-		txnsQueue = newTxHeapWrapper()
-		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, tx.From)
-		t.accountQueues[tx.From] = txnsQueue
-	}
-	txnsQueue.Add(tx)
+	wrapper := t.accountQueues[tx.From]
+	wrapper.accountQueue.Add(tx)
+
 	t.increaseSlots(numSlots(tx))
 	if !isLocal {
 		t.remoteTxns.Push(tx)
@@ -287,7 +350,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.locals.addAddr(tx.From)
 	}
 
-	for _, promoted := range txnsQueue.Promote() {
+	for _, promoted := range wrapper.accountQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
 		}
@@ -301,9 +364,12 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 // Since any discarded transaction should not affect the world state, the nextNonce should be reset to the value
 // it was set to before the transaction appeared.
 func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
-	if t.accountQueues[tx.From] != nil {
-		txnsQueue := t.accountQueues[tx.From]
-		txnsQueue.nextNonce -= 1
+	mux := t.lockAccountQueue(tx.From, true)
+	defer mux.unlock()
+
+	wrapper, ok := t.accountQueues[tx.From]
+	if ok {
+		wrapper.accountQueue.nextNonce -= 1
 	}
 }
 
@@ -322,12 +388,14 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
-		for _, tx := range queuedTxn.txs {
+		mux := t.lockAccountQueue(addr, false)
+		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
 			queuedTxs[addr][tx.Nonce] = tx
 		}
+		mux.unlock()
 	}
 
 	return pendingTxs, queuedTxs
