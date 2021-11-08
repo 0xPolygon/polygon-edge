@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -278,6 +279,117 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		toAccountBalance.String(),
 		"To address balance mismatch after gap transaction",
 	)
+}
+
+type testAccount struct {
+	key     *ecdsa.PrivateKey
+	address types.Address
+}
+
+func generateTestAccounts(numAccounts int, t *testing.T) []*testAccount {
+	testAccounts := make([]*testAccount, numAccounts)
+
+	for indx := 0; indx < numAccounts; indx++ {
+		testAccount := &testAccount{}
+		testAccount.key, testAccount.address = tests.GenerateKeyAndAddr(t)
+		testAccounts[indx] = testAccount
+	}
+
+	return testAccounts
+}
+
+func TestTxPool_StressAddition(t *testing.T) {
+	// Test scenario:
+	// Add a large number of txns to the txpool concurrently
+
+	// Predefined values
+	defaultBalance := framework.EthToWei(10000)
+
+	// Each account should add 40 transactions
+	numIterations := 200
+	numAccounts := 5
+
+	testAccounts := generateTestAccounts(numAccounts, t)
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetBlockLimit(20000000)
+		for _, testAccount := range testAccounts {
+			config.Premine(testAccount.address, defaultBalance)
+		}
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	// Required default values
+	signer := crypto.NewEIP155Signer(100)
+
+	// TxPool client
+	clt := srv.TxnPoolOperator()
+	toAddress := types.StringToAddress("1")
+	defaultValue := framework.EthToWeiPrecise(1, 15) // 0.001 ETH
+
+	generateTx := func(account *testAccount) *types.Transaction {
+		nextNonce, err := client.Eth().GetNonce(web3.Address(account.address), web3.Latest)
+		if err != nil {
+			t.Fatalf("Unable to get nonce")
+		}
+
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    nextNonce,
+			From:     account.address,
+			To:       &toAddress,
+			GasPrice: big.NewInt(10),
+			Gas:      framework.DefaultGasLimit,
+			Value:    defaultValue,
+			V:        []byte{1}, // it is necessary to encode in rlp
+		}, account.key)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		return signedTx
+	}
+
+	var wg sync.WaitGroup
+
+	// Add the transactions with the following nonce order
+	for i := 0; i < numAccounts; i++ {
+		// Start a concurrent loop
+		wg.Add(1)
+		go func(index int, clt txpoolOp.TxnPoolOperatorClient, testAccounts []*testAccount) {
+			defer wg.Done()
+
+			for innerIndex := 0; innerIndex < numIterations/numAccounts; innerIndex++ {
+				txHash, err := client.Eth().SendRawTransaction(generateTx(testAccounts[index]).MarshalRLP())
+				if err != nil {
+					t.Errorf("Unable to send txn, %v", err)
+				}
+
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer waitCancel()
+
+				_, err = srv.WaitForReceipt(waitCtx, txHash)
+				if err != nil {
+					t.Errorf("Unable to wait for receipt, %v", err)
+					return
+				}
+			}
+		}(i, clt, testAccounts)
+	}
+	wg.Wait()
+
+	// Make sure the transactions went through
+	for _, account := range testAccounts {
+		nonce, err := client.Eth().GetNonce(web3.Address(account.address), web3.Latest)
+		if err != nil {
+			t.Fatalf("Unable to fetch block")
+		}
+		assert.Equal(t, uint64(numIterations/numAccounts), nonce)
+	}
 }
 
 func TestPriceLimit(t *testing.T) {

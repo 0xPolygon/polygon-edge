@@ -292,7 +292,7 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		t.r.PostHook(t)
 	}
 
-	return result, nil
+	return result, err
 }
 
 // ContextPtr returns reference of context
@@ -355,7 +355,7 @@ func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApp
 	}
 }
 
-func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, *TransitionApplicationError) {
+func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
