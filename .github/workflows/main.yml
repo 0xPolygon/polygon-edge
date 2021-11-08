@@ -48,11 +48,13 @@ jobs:
         run: go test -timeout 20m ./...
       - 
         name: Extract branch name
+        if: github.event_name != 'pull_request'
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
       - 
         name: Prepare artifact for Deployer
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v2
         with:
           name: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
