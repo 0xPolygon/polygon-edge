@@ -239,11 +239,10 @@ func TestFindCommonAncestor(t *testing.T) {
 
 func TestWatchSyncWithPeer(t *testing.T) {
 	tests := []struct {
-		name         string
-		headers      []*types.Header
-		peerHeaders  []*types.Header
-		numNewBlocks int
-		// result
+		name           string
+		headers        []*types.Header
+		peerHeaders    []*types.Header
+		numNewBlocks   int
 		synced         bool
 		expectedHeight uint64
 	}{
@@ -284,7 +283,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			go func() {
 				syncer.WatchSyncWithPeer(peer, func(b *types.Block) bool {
 					// sync until latest block
-					return b.Header.Number < latestBlock.Header.Number
+					return b.Header.Number >= latestBlock.Header.Number
 				})
 				// wait until syncer updates status by latest block
 				WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)

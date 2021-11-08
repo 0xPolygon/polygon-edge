@@ -328,7 +328,7 @@ func (i *Ibft) runSyncState() {
 			i.syncer.Broadcast(b)
 			isValidator = i.isValidSnapshot()
 
-			return !isValidator
+			return isValidator
 		})
 
 		if isValidator {
@@ -390,6 +390,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		}
 
 		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			i.txpool.DecreaseAccountNonce(txn)
 		} else {
 			if err := transition.Write(txn); err != nil {

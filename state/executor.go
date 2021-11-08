@@ -330,7 +330,7 @@ var (
 	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
-	ErrBlockLimitExceeded    = fmt.Errorf("specified gas exceeds block gas limit")
+	ErrBlockLimitExceeded    = fmt.Errorf("transaction's gas limit exceeds block gas limit")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
