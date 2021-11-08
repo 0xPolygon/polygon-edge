@@ -121,6 +121,13 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
+	// calculate gas limit based on parent header
+	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return err
+	}
+	header.GasLimit = gasLimit
+
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
@@ -139,7 +146,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			d.txpool.DecreaseAccountNonce(txn)
 		} else {

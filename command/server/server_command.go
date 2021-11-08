@@ -45,6 +45,15 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["block-gas-target"] = helper.FlagDescriptor{
+		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
+		Arguments: []string{
+			"BLOCK_GAS_TARGET",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	c.flagMap["config"] = helper.FlagDescriptor{
 		Description: "Specifies the path to the CLI config. Supports .json and .hcl",
 		Arguments: []string{

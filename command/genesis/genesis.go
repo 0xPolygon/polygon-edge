@@ -108,8 +108,8 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
-		Description:       fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
-		Arguments:         []string{
+		Description: fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
+		Arguments: []string{
 			"BLOCK_GAS_LIMIT",
 		},
 		ArgumentsOptional: false,

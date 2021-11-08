@@ -32,6 +32,7 @@ type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlocks(blocks []*types.Block) error
+	CalculateGasLimit(number uint64) (uint64, error)
 }
 
 // Ibft represents the IBFT consensus mechanism object
@@ -356,6 +357,13 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 	}
 
+	// calculate gas limit based on parent header
+	gasLimit, err := i.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return nil, err
+	}
+	header.GasLimit = gasLimit
+
 	// try to pick a candidate
 	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
 		header.Miner = types.StringToAddress(candidate.Address)
@@ -389,7 +397,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			i.txpool.DecreaseAccountNonce(txn)
 		} else {

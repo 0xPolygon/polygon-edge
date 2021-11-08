@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"io"
 	"math/big"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
@@ -264,6 +265,11 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 	if t.Config.ShowsLog {
 		args = append(args, "--log-level", "debug")
+	}
+
+	// add block gas target
+	if t.Config.BlockGasTarget != 0 {
+		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
 	t.ReleaseReservedPorts()
