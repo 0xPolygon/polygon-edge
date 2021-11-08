@@ -328,7 +328,7 @@ func (i *Ibft) runSyncState() {
 			i.syncer.Broadcast(b)
 			isValidator = i.isValidSnapshot()
 
-			return !isValidator
+			return isValidator
 		})
 
 		if isValidator {
