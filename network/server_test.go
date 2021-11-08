@@ -356,13 +356,13 @@ func TestPeerReconnection(t *testing.T) {
 
 	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
 	//disconnect from the boot node
-	disconnectedCh1 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
+	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
 	srv1.Disconnect(bootNode.AddrInfo().ID, "bye")
 
-	assert.True(t, <-disconnectedCh1, "hello")
+	assert.True(t, <-disconnectedCh1, "Failed to recieved peer disconnected event")
 
 	//disconnect from the second node
-	disconnectedCh2 := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
+	disconnectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
 	assert.NoError(t, srv2.Close())
 	assert.True(t, <-disconnectedCh2)
 
