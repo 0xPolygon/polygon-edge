@@ -332,7 +332,7 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 	}
 
 	// Calculate the new total difficulty
-	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(newHeader.Difficulty))
+	newTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(newHeader.Difficulty))
 	if err := b.db.WriteTotalDifficulty(newHeader.Hash, newTD); err != nil {
 		return nil, err
 	}
