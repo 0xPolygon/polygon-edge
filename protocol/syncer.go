@@ -300,6 +300,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	if !ok {
 		// not supposed to happen
 		s.logger.Error("total difficulty not found", "block number", b.Number())
+		return
 	}
 
 	// broadcast the new block to all the peers
