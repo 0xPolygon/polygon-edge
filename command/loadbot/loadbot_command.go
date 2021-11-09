@@ -18,7 +18,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["tps"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Number of transactions executed per second by the loadbot"),
+		Description: "Number of transactions executed per second by the loadbot",
 		Arguments: []string{
 			"TPS",
 		},
@@ -26,7 +26,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["account"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the account the use while running stress tests"),
+		Description: "Sets the account the use while running stress tests",
 		Arguments: []string{
 			"ACCOUNT",
 		},
@@ -148,7 +148,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// Parse accountsRaw
 	var addresses = []types.Address{}
 	if accountsRaw == nil {
-		l.UI.Error(fmt.Sprintf("failed to parse accountsRaw used by the loadbot"))
+		l.UI.Error("failed to parse accountsRaw used by the loadbot")
 		return 1
 	}
 	for _, account := range accountsRaw {
@@ -162,7 +162,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Parse urls
 	if len(urls) == 0 {
-		l.UI.Error(fmt.Sprintf("please provide at least one node url to run the loabot"))
+		l.UI.Error("please provide at least one node url to run the loabot")
 		return 1
 	}
 
@@ -204,7 +204,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	l.UI.Info(fmt.Sprintf("Loadbot execution finished. Got following metrics :"))
+	l.UI.Info("Loadbot execution finished. Got following metrics :")
 	l.UI.Info(fmt.Sprintf("Transactions submitted: %v", metrics.Total))
 	l.UI.Info(fmt.Sprintf("Transactions failed: %v", metrics.Failed))
 	l.UI.Info(fmt.Sprintf("Duration: %v", metrics.Duration))
