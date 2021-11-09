@@ -1,0 +1,18 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Test & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-run main workflow
+        uses: lazartravica/polygon-sdk/.github/main.yml@main
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./polygon-sdk
+            LICENSE
