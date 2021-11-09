@@ -389,8 +389,6 @@ func (s *Syncer) BestPeer() *syncPeer {
 	}
 
 	curDiff := s.blockchain.CurrentTD()
-
-	println("BestPeer():", "(my TD)", curDiff.Uint64(), "-", bestTd.Uint64(), "(best peer TD)")
 	if bestTd.Cmp(curDiff) <= 0 {
 		return nil
 	}
