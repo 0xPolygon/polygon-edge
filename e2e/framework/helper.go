@@ -25,9 +25,13 @@ import (
 )
 
 func EthToWei(ethValue int64) *big.Int {
+	return EthToWeiPrecise(ethValue, 18)
+}
+
+func EthToWeiPrecise(ethValue int64, decimals int64) *big.Int {
 	return new(big.Int).Mul(
 		big.NewInt(ethValue),
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(decimals), nil))
 }
 
 // GetAccountBalance is a helper method for fetching the Balance field of an account
@@ -129,6 +133,26 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 		defer cancel()
 		res, _ := clt.Status(subCtx, &empty.Empty{})
 		if res != nil && res.Length >= requiredNum {
+			return res, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*txpoolProto.TxnPoolStatusResp), nil
+}
+
+// WaitUntilTxPoolEmpty waits until node has 0 transactions in txpool,
+// otherwise returns timeout
+func WaitUntilTxPoolEmpty(ctx context.Context, srv *TestServer) (*txpoolProto.TxnPoolStatusResp, error) {
+	clt := srv.TxnPoolOperator()
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		res, _ := clt.Status(subCtx, &empty.Empty{})
+		if res != nil && res.Length == 0 {
 			return res, false
 		}
 		return nil, true

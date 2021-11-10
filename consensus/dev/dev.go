@@ -140,11 +140,12 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		}
 
 		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			d.txpool.DecreaseAccountNonce(txn)
 		} else {
 			// Execute the state transition
 			if err := transition.Write(txn); err != nil {
-				if err.IsRecoverable {
+				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 					retFn()
 				} else {
 					d.txpool.DecreaseAccountNonce(txn)

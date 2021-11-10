@@ -95,7 +95,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				// Deploy contract
 				deployTx := &framework.PreparedTransaction{
 					From:     senderAddr,
-					GasPrice: big.NewInt(0),
+					GasPrice: big.NewInt(10),
 					Gas:      1000000,
 					Value:    big.NewInt(0),
 					Input:    framework.MethodSig("setA1"),
