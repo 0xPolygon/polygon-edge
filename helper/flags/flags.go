@@ -3,6 +3,7 @@ package flags
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/multiformats/go-multiaddr"
@@ -40,9 +41,14 @@ func (i *BootnodeFlags) Set(value string) error {
 func MultiAddrFromDns(addr string, port int) (multiaddr.Multiaddr, error) {
 	var version string
 	var domain string
+	match, err := regexp.MatchString("^/?(dns)(4|6)/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,6}(/?)$", addr)
+	if err != nil || !match {
+		return nil, errors.New("Invalid DNS address")
+	}
+
 	s := strings.Trim(addr, "/")
 	split := strings.Split(s, "/")
-	if len(split) <= 1 {
+	if len(split) != 2 {
 		return nil, errors.New("Invalid DNS address")
 	}
 	switch split[0] {
