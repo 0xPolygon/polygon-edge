@@ -50,12 +50,55 @@ func TestMultiAddrFromDns(t *testing.T) {
 			err:        true,
 			outcome:    "",
 		},
+		{
+			name:       "Invalid Host name starting with `-` ",
+			dnsAddress: "dns6/-example.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name starting with `/` ",
+			dnsAddress: "dns6//example.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name  with `/` ",
+			dnsAddress: "dns6/example/.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid Host name  with `-` ",
+			dnsAddress: "dns6/example-.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Missing DNS version",
+			dnsAddress: "example.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
+		{
+			name:       "Invalid DNS version",
+			dnsAddress: "/dns8/example.io",
+			port:       12345,
+			err:        true,
+			outcome:    "",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			multiAddr, err := MultiAddrFromDns(tt.dnsAddress, tt.port)
 			if !tt.err {
+				assert.NotNil(t, multiAddr, "Multi Address should not be nil")
 				assert.Equal(t, multiAddr.String(), tt.outcome)
 			} else {
 				assert.Error(t, err)
