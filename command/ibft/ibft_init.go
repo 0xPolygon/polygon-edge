@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/libp2p/go-libp2p-core/peer"
 
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/server"
@@ -93,22 +94,48 @@ func (p *IbftInit) Run(args []string) int {
 		}
 	}
 
+	// TODO branch for the type of secrets manager
+
+	// Local (FS) SecretsManager
 	if err := server.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
 
-	// try to write the ibft private key
-	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, consensusDir, ibft.IbftKeyName))
-	if err != nil {
-		p.UI.Error(err.Error())
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
+		Logger: nil,
+		Params: map[string]interface{}{
+			secrets.Path: dataDir,
+		},
+	})
+	if factoryErr != nil {
+		p.UI.Error(factoryErr.Error())
 		return 1
 	}
 
-	// try to create also a libp2p address
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(dataDir, libp2pDir))
-	if err != nil {
-		p.UI.Error(err.Error())
+	// Generate the IBFT validator private key
+	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
+	if keyErr != nil {
+		p.UI.Error(keyErr.Error())
+		return 1
+	}
+
+	// Write the validator private key to disk
+	if setErr := localSecretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
+		p.UI.Error(setErr.Error())
+		return 1
+	}
+
+	// Generate the libp2p private key
+	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
+	if keyErr != nil {
+		p.UI.Error(keyErr.Error())
+		return 1
+	}
+
+	// Write the networking private key to disk
+	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+		p.UI.Error(setErr.Error())
 		return 1
 	}
 
@@ -121,7 +148,7 @@ func (p *IbftInit) Run(args []string) int {
 	output := "\n[IBFT INIT]\n"
 
 	output += helper.FormatKV([]string{
-		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&key.PublicKey)),
+		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&validatorKey.PublicKey)),
 		fmt.Sprintf("Node ID|%s", nodeId.String()),
 	})
 

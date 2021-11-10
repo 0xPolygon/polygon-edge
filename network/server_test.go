@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func GenerateLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
+func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	t.Helper()
 
 	dir, err := ioutil.TempDir(os.TempDir(), "")
@@ -376,8 +376,8 @@ func TestPeerReconnection(t *testing.T) {
 func TestReconnectionWithNewIP(t *testing.T) {
 	natIP := "127.0.0.1"
 
-	_, dir0 := GenerateLibp2pKey(t)
-	_, dir1 := GenerateLibp2pKey(t)
+	_, dir0 := GenerateTestLibp2pKey(t)
+	_, dir1 := GenerateTestLibp2pKey(t)
 
 	defaultConfig := func(c *Config) {
 		c.NoDiscover = true
@@ -426,7 +426,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	//Create a temporary directory for storing the key file
-	key, directoryName := GenerateLibp2pKey(t)
+	key, directoryName := GenerateTestLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")

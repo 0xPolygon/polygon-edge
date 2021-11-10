@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/ibft"
 	"github.com/0xPolygon/polygon-sdk/command/monitor"
 	"github.com/0xPolygon/polygon-sdk/command/peers"
+	"github.com/0xPolygon/polygon-sdk/command/secretsManager"
 	"github.com/0xPolygon/polygon-sdk/command/server"
 	"github.com/0xPolygon/polygon-sdk/command/status"
 	"github.com/0xPolygon/polygon-sdk/command/txpool"
@@ -51,6 +52,9 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolCmd := txpool.TxPoolCommand{}
 	txPoolAddCmd := txpool.TxPoolAdd{Meta: meta}
 	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
+
+	smCmd := secretsManager.SecretManagerCommand{}
+	smGenerateCmd := secretsManager.SecretsManagerGenerate{Meta: meta}
 
 	return map[string]cli.CommandFactory{
 
@@ -125,6 +129,14 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &versionCmd, nil
+		},
+
+		// SECRETS MANAGER COMMANDS //
+		smCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &smCmd, nil
+		},
+		smGenerateCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &smGenerateCmd, nil
 		},
 	}
 }
