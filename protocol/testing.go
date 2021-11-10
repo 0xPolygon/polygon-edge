@@ -275,7 +275,6 @@ func (s *mockSubscription) AppendBlocks(blocks []*types.Block) {
 	for _, b := range blocks {
 		status := HeaderToStatus(b.Header)
 		s.eventCh <- &blockchain.Event{
-			// Difficulty: new(big.Int).SetUint64(b.Header.Difficulty),
 			Difficulty: status.Difficulty,
 			NewChain:   []*types.Header{b.Header},
 		}
