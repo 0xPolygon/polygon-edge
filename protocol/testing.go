@@ -115,7 +115,7 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 		network.MultiJoin(t, syncer.server, peerSyncers[idx].server)
 	}
 	WaitUntilPeerConnected(t, syncer, len(peerChains), 10*time.Second)
-	return
+	return syncer, peerSyncers
 }
 
 // GenerateNewBlocks returns new blocks from latest block of given chain
@@ -166,10 +166,14 @@ func GetCurrentStatus(b blockchainShim) *Status {
 
 // HeaderToStatus converts given header to Status
 func HeaderToStatus(h *types.Header) *Status {
+	var td uint64 = 0
+	for i := uint64(1); i <= h.Difficulty; i++ {
+		td = td + i
+	}
 	return &Status{
 		Hash:       h.Hash,
 		Number:     h.Number,
-		Difficulty: big.NewInt(0).SetUint64(h.Difficulty),
+		Difficulty: big.NewInt(0).SetUint64(td),
 	}
 }
 
@@ -207,13 +211,18 @@ func (b *mockBlockchain) CurrentTD() *big.Int {
 	if current == nil {
 		return nil
 	}
-	return new(big.Int).SetUint64(current.Difficulty)
+
+	td, _ := b.GetTD(current.Hash)
+	return td
 }
 
 func (b *mockBlockchain) GetTD(hash types.Hash) (*big.Int, bool) {
+	var td uint64 = 0
 	for _, b := range b.blocks {
+		td = td + b.Header.Difficulty
+
 		if b.Header.Hash == hash {
-			return new(big.Int).SetUint64(b.Header.Difficulty), true
+			return big.NewInt(0).SetUint64(td), true
 		}
 	}
 	return nil, false
@@ -264,8 +273,10 @@ func NewMockSubscription() *mockSubscription {
 
 func (s *mockSubscription) AppendBlocks(blocks []*types.Block) {
 	for _, b := range blocks {
+		status := HeaderToStatus(b.Header)
 		s.eventCh <- &blockchain.Event{
-			Difficulty: new(big.Int).SetUint64(b.Header.Difficulty),
+			// Difficulty: new(big.Int).SetUint64(b.Header.Difficulty),
+			Difficulty: status.Difficulty,
 			NewChain:   []*types.Header{b.Header},
 		}
 	}
