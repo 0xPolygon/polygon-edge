@@ -9,11 +9,15 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/hashicorp/go-hclog"
 )
 
 // LocalSecretsManager is a SecretsManager that
 // stores secrets locally on disk
 type LocalSecretsManager struct {
+	// Logger object
+	logger hclog.Logger
+
 	// Path to the base working directory
 	path string
 
@@ -30,6 +34,7 @@ func SecretsManagerFactory(
 ) (secrets.SecretsManager, error) {
 	// Set up the base object
 	localManager := &LocalSecretsManager{
+		logger:        config.Logger.Named(string(secrets.Local)),
 		secretPathMap: make(map[string]string),
 	}
 

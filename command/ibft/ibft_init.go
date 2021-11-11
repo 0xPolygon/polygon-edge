@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
@@ -107,7 +108,7 @@ func setupLocalSM(dataDir string) (secrets.SecretsManager, error) {
 	}
 
 	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: nil,
+		Logger: hclog.NewNullLogger(),
 		Params: map[string]interface{}{
 			secrets.Path: dataDir,
 		},

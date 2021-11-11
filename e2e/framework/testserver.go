@@ -19,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
@@ -155,7 +156,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	res := &InitIBFTResult{}
 
 	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: nil,
+		Logger: hclog.NewNullLogger(),
 		Params: map[string]interface{}{
 			secrets.Path: filepath.Join(cmd.Dir, t.Config.IBFTDir),
 		},
