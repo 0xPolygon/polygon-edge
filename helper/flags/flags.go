@@ -41,7 +41,7 @@ func (i *BootnodeFlags) Set(value string) error {
 func MultiAddrFromDns(addr string, port int) (multiaddr.Multiaddr, error) {
 	var version string
 	var domain string
-	match, err := regexp.MatchString("^/?(dns)(4|6)/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,6}(/?)$", addr)
+	match, err := regexp.MatchString("^/?(dns)(4|6)?/[^-|^/][A-Za-z0-9-]([^-|^/]?)+([\\-\\.]{1}[a-z0-9]+)*\\.[A-Za-z]{2,6}(/?)$", addr)
 	if err != nil || !match {
 		return nil, errors.New("Invalid DNS address")
 	}
