@@ -95,6 +95,11 @@ func (l *LocalSecretsManager) GetSecret(name string) (interface{}, error) {
 
 // SetSecret saves the local SecretsManager's secret to disk
 func (l *LocalSecretsManager) SetSecret(name string, value interface{}) error {
+	// If the data directory is not specified, skip write
+	if l.path == "" {
+		return nil
+	}
+
 	l.secretPathMapLock.Lock()
 	secretPath, ok := l.secretPathMap[name]
 	l.secretPathMapLock.Unlock()

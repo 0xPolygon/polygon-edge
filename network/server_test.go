@@ -9,7 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/local"
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -21,14 +25,36 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 
 	dir, err := ioutil.TempDir(os.TempDir(), "")
 	assert.NoError(t, err)
-	key, err := ReadLibp2pKey(dir)
-	assert.NoError(t, err)
+
+	// Instantiate the correct folder structure
+	setupErr := common.SetupDataDir(dir, []string{"libp2p"})
+	if setupErr != nil {
+		t.Fatalf("unable to generate libp2p folder structure, %v", setupErr)
+	}
+
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
+		Logger: hclog.NewNullLogger(),
+		Params: map[string]interface{}{
+			secrets.Path: dir,
+		},
+	})
+	assert.NoError(t, factoryErr)
+
+	libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
+	if keyErr != nil {
+		t.Fatalf("unable to generate libp2p key, %v", keyErr)
+	}
+
+	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+		t.Fatalf("unable to save libp2p key, %v", setErr)
+	}
+
 	t.Cleanup(func() {
 		// remove directory after test is done
 		assert.NoError(t, os.RemoveAll(dir))
 	})
 
-	return key, dir
+	return libp2pKey, dir
 }
 
 func TestConnLimit_Inbound(t *testing.T) {

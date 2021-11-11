@@ -90,14 +90,9 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 	var key crypto.PrivKey
 	if secretsManager.HasSecret(secrets.NetworkKey) {
 		// The key is present in the secrets manager, read it
-		networkingKeyEncoded, readErr := secretsManager.GetSecret(secrets.NetworkKey)
+		networkingKey, readErr := ReadLibp2pKeyNEW(secretsManager)
 		if readErr != nil {
 			return nil, fmt.Errorf("unable to read networking private key from SM, %v", readErr)
-		}
-
-		networkingKey, parseErr := ParseLibp2pKey(networkingKeyEncoded.([]byte))
-		if parseErr != nil {
-			return nil, fmt.Errorf("unable to parse networking private key from SM, %v", parseErr)
 		}
 
 		key = networkingKey

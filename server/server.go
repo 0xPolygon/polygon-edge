@@ -236,6 +236,13 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 // setupSecretsManager sets up the secrets manager
 func (s *Server) setupSecretsManager() error {
 	secretsManagerConfig := s.config.SecretsManager
+	if secretsManagerConfig == nil {
+		// No config provided, use default
+		secretsManagerConfig = &secrets.SecretsManagerConfig{
+			Type: secrets.Local,
+		}
+	}
+
 	secretsManagerType := secretsManagerConfig.Type
 
 	// Grab the factory method

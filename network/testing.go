@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,6 +29,18 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 	if callback != nil {
 		callback(cfg)
 	}
+
+	secretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
+		Logger: logger,
+		Params: map[string]interface{}{
+			secrets.Path: cfg.DataDir,
+		},
+	})
+
+	assert.NoError(t, factoryErr)
+
+	cfg.SecretsManager = secretsManager
+
 	srv, err := NewServer(logger, cfg)
 	assert.NoError(t, err)
 
