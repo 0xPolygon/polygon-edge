@@ -30,7 +30,7 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 			"DIRECTORY",
 		},
 		ArgumentsOptional: false,
-		FlagOptional:      false,
+		FlagOptional:      true,
 	}
 
 	i.FlagMap["type"] = helper.FlagDescriptor{

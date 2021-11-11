@@ -114,6 +114,13 @@ func (l *LocalSecretsManager) SetSecret(name string, value interface{}) error {
 	return nil
 }
 
+// HasSecret checks if the secret is present on disk
+func (l *LocalSecretsManager) HasSecret(name string) bool {
+	_, err := l.GetSecret(name)
+
+	return err == nil
+}
+
 // RemoveSecret removes the local SecretsManager's secret from disk
 func (l *LocalSecretsManager) RemoveSecret(name string) error {
 	l.secretPathMapLock.Lock()

@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -26,6 +27,8 @@ type Config struct {
 	NoLocals   bool
 	PriceLimit uint64
 	MaxSlots   uint64
+
+	SecretsManager *secrets.SecretsManagerConfig
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking

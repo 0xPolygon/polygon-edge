@@ -1,24 +1,30 @@
 package ibft
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/server"
 )
 
 // IbftInit is the command to query the snapshot
 type IbftInit struct {
 	helper.Meta
 }
+
+var (
+	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
+)
 
 func (i *IbftInit) DefineFlags() {
 	if i.FlagMap == nil {
@@ -33,6 +39,16 @@ func (i *IbftInit) DefineFlags() {
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
+	}
+
+	i.FlagMap["secrets-config"] = helper.FlagDescriptor{
+		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
+			"If omitted, the local FS secrets manager is used",
+		Arguments: []string{
+			"SECRETS_CONFIG",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 }
 
@@ -60,8 +76,14 @@ func (p *IbftInit) GetBaseCommand() string {
 // generateAlreadyInitializedError generates an output for when the IBFT directory
 // has already been initialized in the past
 func generateAlreadyInitializedError(directory string) string {
+	return fmt.Sprintf("Directory %s has previously initialized IBFT data\n", directory)
+}
+
+// constructInitError is a wrapper function for the error output to CLI
+func constructInitError(err string) string {
 	output := "\n[IBFT INIT ERROR]\n"
-	output += fmt.Sprintf("Directory %s has previously initialized IBFT data\n", directory)
+	output += err
+
 	return output
 }
 
@@ -70,11 +92,72 @@ var (
 	libp2pDir    = "libp2p"
 )
 
+// setupLocalSM is a helper method for boilerplate local secrets manager setup
+func setupLocalSM(dataDir string) (secrets.SecretsManager, error) {
+	// Check if the sub-directories exist / are already populated
+	for _, subDirectory := range []string{consensusDir, libp2pDir} {
+		if helper.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
+			return nil, errors.New(generateAlreadyInitializedError(dataDir))
+		}
+	}
+
+	// Set up the local directories
+	if err := common.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
+		return nil, err
+	}
+
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
+		Logger: nil,
+		Params: map[string]interface{}{
+			secrets.Path: dataDir,
+		},
+	})
+
+	return localSecretsManager, factoryErr
+}
+
+// setupHashicorpVault is a helper method for boilerplate hashicorp vault secrets manager setup
+func setupHashicorpVault(
+	secretsConfig *secrets.SecretsManagerConfig,
+) (secrets.SecretsManager, error) {
+	params := make(map[string]interface{})
+
+	// Check if the token is present
+	if secretsConfig.Token == "" {
+		return nil, ErrorInvalidSecretsConfig
+	}
+	params[secrets.Token] = secretsConfig.Token
+
+	// Check if the server URL is present
+	if secretsConfig.ServerURL == "" {
+		return nil, ErrorInvalidSecretsConfig
+	}
+	params[secrets.Server] = secretsConfig.ServerURL
+
+	// Check if the node name is present
+	if secretsConfig.Name == "" {
+		return nil, ErrorInvalidSecretsConfig
+	}
+	params[secrets.Name] = secretsConfig.Name
+
+	vaultSecretsManager, factoryErr := hashicorpvault.SecretsManagerFactory(
+		&secrets.SecretsManagerParams{
+			Logger: nil,
+			Params: params,
+		},
+	)
+
+	return vaultSecretsManager, factoryErr
+}
+
 // Run implements the cli.IbftInit interface
 func (p *IbftInit) Run(args []string) int {
 	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
 	var dataDir string
+	var configPath string
+
 	flags.StringVar(&dataDir, "data-dir", "", "")
+	flags.StringVar(&configPath, "secrets-config", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
@@ -86,31 +169,38 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range []string{consensusDir, libp2pDir} {
-		if helper.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			p.UI.Error(generateAlreadyInitializedError(dataDir))
+	var secretsManager secrets.SecretsManager
+	if configPath == "" {
+		// No secrets manager config specified,
+		// use the local secrets manager
+		localSecretsManager, setupErr := setupLocalSM(dataDir)
+		if setupErr != nil {
+			p.UI.Error(constructInitError(setupErr.Error()))
 			return 1
 		}
-	}
 
-	// TODO branch for the type of secrets manager
+		secretsManager = localSecretsManager
+	} else {
+		// Config file passed in
+		secretsConfig, readErr := secrets.ReadConfig(configPath)
+		if readErr != nil {
+			p.UI.Error(constructInitError(fmt.Sprintf("Unable to read config file, %v", readErr)))
+			return 1
+		}
 
-	// Local (FS) SecretsManager
-	if err := server.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
-		p.UI.Error(err.Error())
-		return 1
-	}
+		// Set up the corresponding secrets manager
+		switch secretsConfig.Type {
+		case secrets.HashicorpVault:
+			vaultSecretsManager, setupErr := setupHashicorpVault(secretsConfig)
+			if setupErr != nil {
+				p.UI.Error(constructInitError(setupErr.Error()))
+				return 1
+			}
 
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: nil,
-		Params: map[string]interface{}{
-			secrets.Path: dataDir,
-		},
-	})
-	if factoryErr != nil {
-		p.UI.Error(factoryErr.Error())
-		return 1
+			secretsManager = vaultSecretsManager
+		default:
+			p.UI.Error(constructInitError("Unknown secrets manager type"))
+		}
 	}
 
 	// Generate the IBFT validator private key
@@ -120,8 +210,8 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	// Write the validator private key to disk
-	if setErr := localSecretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
+	// Write the validator private key to the secrets manager storage
+	if setErr := secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
 		p.UI.Error(setErr.Error())
 		return 1
 	}
@@ -133,8 +223,8 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	// Write the networking private key to disk
-	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+	// Write the networking private key to the secrets manager storage
+	if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
 		p.UI.Error(setErr.Error())
 		return 1
 	}

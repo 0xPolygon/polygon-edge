@@ -24,13 +24,6 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 
 	logger := hclog.NewNullLogger()
 
-	/*
-		logger := hclog.New(&hclog.LoggerOptions{
-			Name:  "polygon",
-			Level: hclog.LevelFromString("debug"),
-		})
-	*/
-
 	if callback != nil {
 		callback(cfg)
 	}

@@ -16,6 +16,9 @@ const (
 
 	// Server is the address of the KMS
 	Server = "server"
+
+	// Name is the name of the current node
+	Name
 )
 
 // Define constant names for available secrets
@@ -66,6 +69,9 @@ type SecretsManager interface {
 
 	// SetSecret sets the secret to a provided value
 	SetSecret(name string, value interface{}) error
+
+	// HasSecret checks if the secret is present
+	HasSecret(name string) bool
 
 	// RemoveSecret removes the secret from storage
 	RemoveSecret(name string) error

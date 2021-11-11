@@ -5,13 +5,13 @@ import (
 	consensusDummy "github.com/0xPolygon/polygon-sdk/consensus/dummy"
 	consensusIBFT "github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 
 	"github.com/0xPolygon/polygon-sdk/consensus"
 )
 
 var consensusBackends = map[string]consensus.Factory{
-	// "ethash": consensusEthash.Factory,
 	"dev":   consensusDev.Factory,
 	"ibft":  consensusIBFT.Factory,
 	"dummy": consensusDummy.Factory,
@@ -19,7 +19,7 @@ var consensusBackends = map[string]consensus.Factory{
 
 // secretsManagerBackends defines the SecretManager factories for different
 // secret management solutions
-var secretsManagerBackends = map[string]secrets.SecretsManagerFactory{
-	"local": local.SecretsManagerFactory,
-	//"hashicorp-vault": {},
+var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
+	secrets.Local:          local.SecretsManagerFactory,
+	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
 }
