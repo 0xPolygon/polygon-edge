@@ -45,7 +45,7 @@ jobs:
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test -timeout 20m ./...
+        run: go test -timeout -race 20m ./...
       - 
         name: Extract branch name
         if: github.event_name != 'pull_request'
