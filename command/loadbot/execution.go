@@ -9,7 +9,6 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
-	empty "google.golang.org/protobuf/types/known/emptypb"
 	"math/big"
 	"sync"
 	"time"
@@ -151,24 +150,6 @@ func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction)
 	}
 }
 
-func waitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorClient) (*txpoolOp.TxnPoolStatusResp, error) {
-	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		res, _ := client.Status(subCtx, &empty.Empty{})
-		if res != nil && res.Length == 0 {
-			return res, false
-		}
-		fmt.Printf("TxPool not empty, %d transactions remaining..\n", res.Length)
-		return nil, true
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return res.(*txpoolOp.TxnPoolStatusResp), nil
-}
-
 // verifyTxns checks whether a transaction has been properly written to the blockchain
 // First, it waits for the TxPool to be empty
 func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
@@ -178,7 +159,7 @@ func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
 	}
 	gClient := txpoolOp.NewTxnPoolOperatorClient(conn)
 
-	_, err = waitUntilTxPoolEmpty(context.Background(), gClient)
+	_, err = tests.WaitUntilTxPoolEmpty(context.Background(), gClient)
 	if err != nil {
 		return fmt.Errorf("failed to wait until TxPool is empty: %v", err)
 	}
