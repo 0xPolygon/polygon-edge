@@ -275,7 +275,6 @@ func (s *Server) setupSecretsManager() error {
 		// Check if the node name is present
 		if s.config.SecretsManager.Name == "" {
 			return errors.New("missing node name from secrets config")
-
 		}
 		params[secrets.Name] = s.config.SecretsManager.Name
 	}

@@ -18,7 +18,7 @@ const (
 	Server = "server"
 
 	// Name is the name of the current node
-	Name
+	Name = "name"
 )
 
 // Define constant names for available secrets
@@ -43,8 +43,7 @@ const (
 )
 
 var (
-	ErrSecretNotFound    = errors.New("secret not found")
-	ErrSecretInvalidInit = errors.New("invalid secret initialization request")
+	ErrSecretNotFound = errors.New("secret not found")
 )
 
 type SecretsManagerType string

@@ -127,6 +127,11 @@ func (p *SecretsManagerGenerate) Run(args []string) int {
 		return 1
 	}
 
+	if name == "" {
+		p.UI.Error("required argument (name) not passed in")
+		return 1
+	}
+
 	if !secrets.SupportedServiceManager(secrets.SecretsManagerType(serviceType)) {
 		p.UI.Error("unsupported service manager type")
 		return 1
