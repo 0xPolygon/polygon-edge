@@ -43,7 +43,7 @@ func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 	var clients []*jsonrpc.Client
 
 	for _, url := range c.RPCURLs {
-		conn, err := jsonrpc.NewClient(fmt.Sprintf("http://%s", url))
+		conn, err := jsonrpc.NewClient(url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to server: %v", err)
 		}
@@ -57,11 +57,6 @@ func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) 
 	var transactions []*web3.Transaction
 	var nonces = make(map[types.Address]uint64)
 	var numberOfAccounts = uint64(len(c.Accounts))
-
-	// Initialize accounts nonces at 0.
-	for _, account := range c.Accounts {
-		nonces[account] = 0
-	}
 
 	// Each loop create one transaction.
 	for i := uint64(0); i < c.TxnToSend; i++ {

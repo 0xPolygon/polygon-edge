@@ -148,7 +148,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// Parse accountsRaw
 	var addresses = []types.Address{}
 	if accountsRaw == nil {
-		l.UI.Error("failed to parse accountsRaw used by the loadbot")
+		l.UI.Error("failed to parse accounts used by the loadbot")
 		return 1
 	}
 	for _, account := range accountsRaw {
@@ -162,7 +162,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Parse urls
 	if len(urls) == 0 {
-		l.UI.Error("please provide at least one node url to run the loabot")
+		l.UI.Error("please provide at least one node url to run the loadbot")
 		return 1
 	}
 
