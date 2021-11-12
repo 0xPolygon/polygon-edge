@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/0xPolygon/polygon-sdk/bridge"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/libp2p/go-libp2p-core/peer"
 
@@ -93,7 +94,7 @@ func (p *IbftInit) Run(args []string) int {
 		}
 	}
 
-	if err := server.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
+	if err := server.SetupDataDir(dataDir, []string{consensusDir, libp2pDir, "bridge_keystore"}); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}
@@ -101,6 +102,12 @@ func (p *IbftInit) Run(args []string) int {
 	// try to write the ibft private key
 	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(dataDir, consensusDir, ibft.IbftKeyName))
 	if err != nil {
+		p.UI.Error(err.Error())
+		return 1
+	}
+
+	// for bridge relayer
+	if err := bridge.SaveKey(filepath.Join(dataDir, "bridge_keystore"), key); err != nil {
 		p.UI.Error(err.Error())
 		return 1
 	}

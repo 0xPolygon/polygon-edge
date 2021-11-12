@@ -7,9 +7,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/bridge"
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
@@ -66,6 +69,8 @@ var dirPaths = []string{
 	"keystore",
 	"trie",
 	"libp2p",
+	"bridge_keystore",
+	"bridge_blockstore",
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -167,6 +172,53 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
+
+	// bridge
+	bridgeConfig, err := bridge.LoadConfig()
+	if err != nil {
+		return nil, err
+	}
+	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(config.DataDir, "consensus", ibft.IbftKeyName))
+	if err != nil {
+		return nil, err
+	}
+
+	chains := []bridge.Chain{
+		// own chain
+		{
+			Name:           config.Chain.Name,
+			ChainID:        config.Chain.Params.ChainID,
+			Endpoint:       fmt.Sprintf("http://%s", config.JSONRPCAddr.String()),
+			From:           crypto.PubKeyToAddress(&key.PublicKey).String(),
+			KeystorePath:   filepath.Join(config.DataDir, "bridge_keystore"),
+			BlockstorePath: filepath.Join(config.DataDir, "bridge_blockstore"),
+			Opts: map[string]string{
+				"bridge":       bridge.DefaultBridgeContractAddress.String(),
+				"erc20Handler": bridge.DefaultERC20HandlerContractAddress.String(),
+				"http":         "true",
+			},
+		},
+	}
+	for _, cfg := range bridgeConfig.Destinations {
+		chainID, _ := strconv.Atoi(cfg.ID)
+		chains = append(chains, bridge.Chain{
+			Name:           cfg.Name,
+			ChainID:        chainID,
+			Endpoint:       cfg.Endpoint,
+			From:           crypto.PubKeyToAddress(&key.PublicKey).String(),
+			KeystorePath:   filepath.Join(config.DataDir, "bridge_keystore"),
+			BlockstorePath: filepath.Join(config.DataDir, "bridge_blockstore"),
+			Opts:           cfg.Opts,
+		})
+	}
+
+	go func() {
+		// FIXME: chain must have some blocks advanced when relayer begins?
+		time.Sleep(30 * time.Second)
+		if err := bridge.RunBridge(chains); err != nil {
+			m.logger.Info("Failed to start bridge", "err", err)
+		}
+	}()
 
 	return m, nil
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/0xPolygon/polygon-sdk/bridge"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
@@ -226,6 +227,11 @@ func (c *GenesisCommand) Run(args []string) int {
 			},
 		},
 		Bootnodes: bootnodes,
+	}
+
+	if err = bridge.SetupPredeployedContract(cc.Genesis.Alloc, chainID); err != nil {
+		c.UI.Error(err.Error())
+		return 1
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
