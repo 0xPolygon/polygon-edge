@@ -61,7 +61,7 @@ func (l *LoadbotCommand) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	l.FlagMap["chain-id"] = helper.FlagDescriptor{
+	l.FlagMap["chainid"] = helper.FlagDescriptor{
 		Description: "The Chain ID used to sign the transactions",
 		Arguments: []string{
 			"CHAIN_ID",
@@ -135,7 +135,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.Uint64Var(&gasLimit, "gasLimit", 1000000, "")
 	flags.StringVar(&gasPriceRaw, "gasPrice", "0x100000", "")
 	flags.Var(&urls, "url", "")
-	flags.Uint64Var(&chainID, "chain-id", helper.DefaultChainID, "")
+	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&valueRaw, "value", "", "")
 	flags.StringVar(&gRPC, "grpc", "", "")
@@ -204,10 +204,16 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	l.UI.Info("Loadbot execution finished. Got following metrics :")
-	l.UI.Info(fmt.Sprintf("Transactions submitted: %v", metrics.Total))
-	l.UI.Info(fmt.Sprintf("Transactions failed: %v", metrics.Failed))
-	l.UI.Info(fmt.Sprintf("Duration: %v", metrics.Duration))
+	output := "\n[LOADBOT RUN]\n"
+
+	output += helper.FormatKV([]string{
+		fmt.Sprintf("Transactions submitted|%d", metrics.Total),
+		fmt.Sprintf("Transactions failed|%d", metrics.Failed),
+		fmt.Sprintf("Duration|%v", metrics.Duration),
+	})
+	output += "\n"
+
+	l.UI.Output(output)
 
 	return 0
 }

@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-// Configuration represents the loadbot run configuration.
-// It contains the required parameters to run the stress test.
+// Configuration represents the loadbot run configuration
+// It contains the required parameters to run the stress test
 type Configuration struct {
 	TPS       uint64          // Number of transactions per second
 	Value     *big.Int        // The value sent in each transaction
@@ -37,8 +37,8 @@ type Metrics struct {
 	TxnHashes []web3.Hash   // The hashes of the transactions sent
 }
 
-// createClients will create JSON RPC clients using the provided addresses in the CLI.
-// Each one of these clients will send transaction(s), each one after another.
+// createClients will create JSON RPC clients using the provided addresses in the CLI
+// Each one of these clients will send transaction(s), each one after another
 func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 	var clients []*jsonrpc.Client
 
@@ -52,7 +52,7 @@ func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 	return clients, nil
 }
 
-// We create the transactions using createTransactionObjects before the loadbot send them.
+// We create the transactions using createTransactionObjects before the loadbot send them
 func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) {
 	var transactions []*web3.Transaction
 	var nonces = make(map[types.Address]uint64)
@@ -85,8 +85,8 @@ func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) 
 	return transactions, nil
 }
 
-// run is the main method of the loadbot.
-// The TPS is used to determine the rate at which every transaction is sent.
+// run is the main method of the loadbot
+// The TPS is used to determine the rate at which every transaction is sent
 func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction) *Metrics {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(c.TPS))
 	defer ticker.Stop()
@@ -111,7 +111,6 @@ func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction)
 		metrics.Duration = time.Since(start)
 	}()
 
-	fmt.Println("Loadbot started !")
 	for {
 		select {
 		case <-ticker.C:
@@ -170,8 +169,8 @@ func waitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 	return res.(*txpoolOp.TxnPoolStatusResp), nil
 }
 
-// verifyTxns checks whether a transaction has been properly written to the blockchain.
-// First, it waits for the TxPool to be empty.
+// verifyTxns checks whether a transaction has been properly written to the blockchain
+// First, it waits for the TxPool to be empty
 func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
 	conn, err := grpc.Dial(url, grpc.WithInsecure())
 	if err != nil {
@@ -197,7 +196,7 @@ func (m *Metrics) verifyTxns(jClient *jsonrpc.Client, url string) error {
 	return nil
 }
 
-// Execute creates the JSON RPC clients, the transactions objects, send each one of them and verify the result.
+// Execute creates the JSON RPC clients, the transactions objects, send each one of them and verify the result
 func Execute(configuration *Configuration) (*Metrics, error) {
 	clients, err := configuration.createClients()
 	if err != nil {
