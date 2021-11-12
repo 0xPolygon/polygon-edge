@@ -1,22 +1,90 @@
+# github.com/ChainSafe/ChainBridge v1.1.5
+## explicit
+github.com/ChainSafe/ChainBridge/bindings/Bridge
+github.com/ChainSafe/ChainBridge/bindings/CentrifugeAsset
+github.com/ChainSafe/ChainBridge/bindings/ERC20Handler
+github.com/ChainSafe/ChainBridge/bindings/ERC20PresetMinterPauser
+github.com/ChainSafe/ChainBridge/bindings/ERC721Handler
+github.com/ChainSafe/ChainBridge/bindings/ERC721MinterBurnerPauser
+github.com/ChainSafe/ChainBridge/bindings/GenericHandler
+github.com/ChainSafe/ChainBridge/chains
+github.com/ChainSafe/ChainBridge/chains/ethereum
+github.com/ChainSafe/ChainBridge/connections/ethereum
+github.com/ChainSafe/ChainBridge/connections/ethereum/egs
+github.com/ChainSafe/ChainBridge/shared/ethereum
+# github.com/ChainSafe/chainbridge-utils v1.0.6
+## explicit
+github.com/ChainSafe/chainbridge-utils/blockstore
+github.com/ChainSafe/chainbridge-utils/core
+github.com/ChainSafe/chainbridge-utils/crypto
+github.com/ChainSafe/chainbridge-utils/crypto/secp256k1
+github.com/ChainSafe/chainbridge-utils/crypto/sr25519
+github.com/ChainSafe/chainbridge-utils/keystore
+github.com/ChainSafe/chainbridge-utils/metrics/types
+github.com/ChainSafe/chainbridge-utils/msg
+# github.com/ChainSafe/log15 v1.0.0
+github.com/ChainSafe/log15
+# github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6
+github.com/StackExchange/wmi
 # github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
 github.com/armon/go-radix
+# github.com/beorn7/perks v1.0.1
+github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy v0.1.0
 github.com/bgentry/speakeasy
 # github.com/btcsuite/btcd v0.21.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
+# github.com/centrifuge/go-substrate-rpc-client v2.0.0+incompatible
+github.com/centrifuge/go-substrate-rpc-client/hash
+github.com/centrifuge/go-substrate-rpc-client/scale
+github.com/centrifuge/go-substrate-rpc-client/signature
+github.com/centrifuge/go-substrate-rpc-client/types
+github.com/centrifuge/go-substrate-rpc-client/xxhash
+# github.com/cespare/xxhash/v2 v2.1.1
+github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
 github.com/davidlazar/go-crypto/salsa20
-# github.com/ethereum/go-ethereum v1.9.15
+# github.com/deckarep/golang-set v1.7.1
+github.com/deckarep/golang-set
+# github.com/ethereum/go-ethereum v1.10.8
 ## explicit
+github.com/ethereum/go-ethereum
+github.com/ethereum/go-ethereum/accounts
+github.com/ethereum/go-ethereum/accounts/abi
+github.com/ethereum/go-ethereum/accounts/abi/bind
+github.com/ethereum/go-ethereum/accounts/external
+github.com/ethereum/go-ethereum/accounts/keystore
+github.com/ethereum/go-ethereum/common
 github.com/ethereum/go-ethereum/common/hexutil
+github.com/ethereum/go-ethereum/common/math
+github.com/ethereum/go-ethereum/common/mclock
+github.com/ethereum/go-ethereum/core/types
+github.com/ethereum/go-ethereum/crypto
+github.com/ethereum/go-ethereum/crypto/secp256k1
+github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/include
+github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/src
+github.com/ethereum/go-ethereum/crypto/secp256k1/libsecp256k1/src/modules/recovery
+github.com/ethereum/go-ethereum/ethclient
+github.com/ethereum/go-ethereum/event
+github.com/ethereum/go-ethereum/log
+github.com/ethereum/go-ethereum/metrics
+github.com/ethereum/go-ethereum/p2p/netutil
+github.com/ethereum/go-ethereum/params
 github.com/ethereum/go-ethereum/rlp
+github.com/ethereum/go-ethereum/rpc
+github.com/ethereum/go-ethereum/signer/core/apitypes
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
 # github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6
 github.com/flynn/noise
+# github.com/go-ole/go-ole v1.2.1
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
+# github.com/go-stack/stack v1.8.0
+github.com/go-stack/stack
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.4.3
@@ -27,12 +95,12 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/empty
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/golang/snappy v0.0.1
+# github.com/golang/snappy v0.0.3
 github.com/golang/snappy
 # github.com/google/gopacket v1.1.18
 ## explicit
 github.com/google/gopacket/routing
-# github.com/google/uuid v1.1.4
+# github.com/google/uuid v1.1.5
 ## explicit
 github.com/google/uuid
 # github.com/gorilla/websocket v1.4.2
@@ -51,7 +119,7 @@ github.com/hashicorp/go-immutable-radix
 github.com/hashicorp/go-multierror
 # github.com/hashicorp/go-uuid v1.0.1
 ## explicit
-# github.com/hashicorp/golang-lru v0.5.4
+# github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 ## explicit
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
@@ -66,7 +134,7 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/huin/goupnp v1.0.0
+# github.com/huin/goupnp v1.0.2
 github.com/huin/goupnp
 github.com/huin/goupnp/dcps/internetgateway1
 github.com/huin/goupnp/dcps/internetgateway2
@@ -225,10 +293,12 @@ github.com/libp2p/go-tcp-transport
 github.com/libp2p/go-ws-transport
 # github.com/libp2p/go-yamux v1.4.0
 github.com/libp2p/go-yamux
-# github.com/mattn/go-colorable v0.1.4
+# github.com/mattn/go-colorable v0.1.8
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.10
+# github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v0.1.1
@@ -266,6 +336,8 @@ github.com/multiformats/go-varint
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
+# github.com/pierrec/xxHash v0.1.5
+github.com/pierrec/xxHash/xxHash64
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
@@ -275,9 +347,27 @@ github.com/posener/complete
 github.com/posener/complete/cmd
 github.com/posener/complete/cmd/install
 github.com/posener/complete/match
+# github.com/prometheus/client_golang v1.4.1
+github.com/prometheus/client_golang/prometheus
+github.com/prometheus/client_golang/prometheus/internal
+# github.com/prometheus/client_model v0.2.0
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.9.1
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/model
+# github.com/prometheus/procfs v0.0.10
+github.com/prometheus/procfs
+github.com/prometheus/procfs/internal/fs
+github.com/prometheus/procfs/internal/util
+# github.com/rjeczalik/notify v0.9.1
+github.com/rjeczalik/notify
 # github.com/ryanuber/columnize v2.1.2+incompatible
 ## explicit
 github.com/ryanuber/columnize
+# github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
+github.com/shirou/gopsutil/cpu
+github.com/shirou/gopsutil/internal/common
 # github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
@@ -285,7 +375,7 @@ github.com/spaolacci/murmur3
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
-# github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
+# github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 ## explicit
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache
@@ -299,6 +389,10 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
+# github.com/tklauser/go-sysconf v0.3.5
+github.com/tklauser/go-sysconf
+# github.com/tklauser/numcpus v0.2.2
+github.com/tklauser/numcpus
 # github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
 ## explicit
 github.com/umbracle/fastrlp
@@ -346,7 +440,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+# golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 ## explicit
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
@@ -354,15 +448,15 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/internal/subtle
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa
+golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
-# golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
 golang.org/x/net/bpf
-golang.org/x/net/html
-golang.org/x/net/html/atom
-golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -373,27 +467,17 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/ipv4
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+# golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+golang.org/x/sync/errgroup
+# golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912
 golang.org/x/sys/cpu
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.2
-golang.org/x/text/encoding
-golang.org/x/text/encoding/charmap
-golang.org/x/text/encoding/htmlindex
-golang.org/x/text/encoding/internal
-golang.org/x/text/encoding/internal/identifier
-golang.org/x/text/encoding/japanese
-golang.org/x/text/encoding/korean
-golang.org/x/text/encoding/simplifiedchinese
-golang.org/x/text/encoding/traditionalchinese
-golang.org/x/text/encoding/unicode
-golang.org/x/text/internal/language
-golang.org/x/text/internal/language/compact
-golang.org/x/text/internal/tag
-golang.org/x/text/internal/utf8internal
-golang.org/x/text/language
-golang.org/x/text/runes
+# golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+golang.org/x/term
+# golang.org/x/text v0.3.6
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
