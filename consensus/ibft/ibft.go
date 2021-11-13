@@ -227,7 +227,6 @@ func (i *Ibft) createKey() error {
 	return nil
 }
 
-// TODO remove this
 const IbftKeyName = "validator.key"
 
 // start starts the IBFT consensus state machine
