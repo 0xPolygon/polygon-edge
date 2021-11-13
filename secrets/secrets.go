@@ -64,10 +64,10 @@ type SecretsManager interface {
 	Setup() error
 
 	// GetSecret gets the secret by name
-	GetSecret(name string) (interface{}, error)
+	GetSecret(name string) ([]byte, error)
 
 	// SetSecret sets the secret to a provided value
-	SetSecret(name string, value interface{}) error
+	SetSecret(name string, value []byte) error
 
 	// HasSecret checks if the secret is present
 	HasSecret(name string) bool

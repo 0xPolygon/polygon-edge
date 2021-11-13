@@ -297,5 +297,5 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 		return nil, err
 	}
 
-	return bytesToPrivateKey(validatorKey.([]byte))
+	return bytesToPrivateKey(validatorKey)
 }

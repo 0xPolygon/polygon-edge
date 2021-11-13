@@ -143,7 +143,7 @@ func setupHashicorpVault(
 
 	vaultSecretsManager, factoryErr := hashicorpvault.SecretsManagerFactory(
 		&secrets.SecretsManagerParams{
-			Logger: nil,
+			Logger: hclog.NewNullLogger(),
 			Params: params,
 		},
 	)
@@ -165,7 +165,7 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	if dataDir == "" {
+	if dataDir == "" && configPath == "" {
 		p.UI.Error("required argument (data directory) not passed in")
 		return 1
 	}
@@ -201,6 +201,7 @@ func (p *IbftInit) Run(args []string) int {
 			secretsManager = vaultSecretsManager
 		default:
 			p.UI.Error(constructInitError("Unknown secrets manager type"))
+			return 1
 		}
 	}
 

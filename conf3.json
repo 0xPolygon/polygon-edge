@@ -1,0 +1,7 @@
+{
+ "token": "s.acxHTCPNigdjUHTaNDvKtAsH",
+ "server_url": "http://127.0.0.1:8200",
+ "type": "hashicorp-vault",
+ "name": "node-3",
+ "extra": null
+}

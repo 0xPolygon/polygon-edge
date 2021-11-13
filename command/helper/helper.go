@@ -16,6 +16,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
@@ -405,6 +406,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	var configFile string
+	var secretsConfigPath string
+
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
 	flags.StringVar(&configFile, "config", "", "")
@@ -424,6 +427,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
+	flags.StringVar(&secretsConfigPath, "secrets-config", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -439,6 +443,16 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {
 			return nil, err
 		}
+	}
+
+	if secretsConfigPath != "" {
+		// Config file passed in
+		secretsConfig, readErr := secrets.ReadConfig(secretsConfigPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read config file, %v", readErr)
+		}
+
+		config.SecretsManager = secretsConfig
 	}
 
 	if err := config.mergeConfigWith(cliConfig); err != nil {

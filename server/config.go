@@ -34,8 +34,9 @@ type Config struct {
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
 func DefaultConfig() *Config {
 	return &Config{
-		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
-		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
-		Network:     network.DefaultConfig(),
+		JSONRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
+		GRPCAddr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
+		Network:        network.DefaultConfig(),
+		SecretsManager: nil,
 	}
 }

@@ -95,10 +95,14 @@ func (v *VaultSecretsManager) constructSecretPath(name string) string {
 }
 
 // GetSecret fetches a secret from the Hashicorp Vault server
-func (v *VaultSecretsManager) GetSecret(name string) (interface{}, error) {
+func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 	secret, err := v.client.Logical().Read(v.constructSecretPath(name))
 	if err != nil {
 		return nil, fmt.Errorf("unable to read secret from Vault, %v", err)
+	}
+
+	if secret == nil {
+		return nil, secrets.ErrSecretNotFound
 	}
 
 	// KV-2 (versioned key-value storage) in Vault stores data in the following format:
@@ -107,7 +111,7 @@ func (v *VaultSecretsManager) GetSecret(name string) (interface{}, error) {
 	// 		key: value
 	// 	}
 	// }
-	data, ok := secret.Data["data"].(map[string]interface{})
+	data, ok := secret.Data["data"]
 	if !ok {
 		return nil, fmt.Errorf(
 			"unable to assert type for secret from Vault, %T %#v",
@@ -116,25 +120,36 @@ func (v *VaultSecretsManager) GetSecret(name string) (interface{}, error) {
 		)
 	}
 
-	value, ok := data[name]
+	// Check if the data is empty
+	if data == nil {
+		return nil, secrets.ErrSecretNotFound
+	}
+
+	// Grab the value
+	value, ok := data.(map[string]interface{})[name]
 	if !ok {
 		return nil, secrets.ErrSecretNotFound
 	}
 
-	return value, nil
+	return []byte(value.(string)), nil
 }
 
 // SetSecret saves a secret to the Hashicorp Vault server
-func (v *VaultSecretsManager) SetSecret(name string, value interface{}) error {
+// Secrets saved in Vault need to have a string value (Base64)
+func (v *VaultSecretsManager) SetSecret(name string, value []byte) error {
 	// Check if overwrite is possible
 	_, err := v.GetSecret(name)
-	if err == secrets.ErrSecretNotFound {
+	if err == nil {
+		// Secret is present
 		v.logger.Warn(fmt.Sprintf("Overwriting secret: %s", name))
+	} else if !errors.Is(err, secrets.ErrSecretNotFound) {
+		// An unrelated error occurred
+		return err
 	}
 
 	// Construct the data wrapper
-	data := make(map[string]interface{})
-	data[name] = value
+	data := make(map[string]string)
+	data[name] = string(value)
 
 	_, err = v.client.Logical().Write(v.constructSecretPath(name), map[string]interface{}{
 		"data": data,

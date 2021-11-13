@@ -76,7 +76,7 @@ func (l *LocalSecretsManager) Setup() error {
 }
 
 // GetSecret gets the local SecretsManager's secret from disk
-func (l *LocalSecretsManager) GetSecret(name string) (interface{}, error) {
+func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
 	l.secretPathMapLock.RLock()
 	secretPath, ok := l.secretPathMap[name]
 	l.secretPathMapLock.RUnlock()
@@ -99,7 +99,7 @@ func (l *LocalSecretsManager) GetSecret(name string) (interface{}, error) {
 }
 
 // SetSecret saves the local SecretsManager's secret to disk
-func (l *LocalSecretsManager) SetSecret(name string, value interface{}) error {
+func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	// If the data directory is not specified, skip write
 	if l.path == "" {
 		return nil
@@ -113,7 +113,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value interface{}) error {
 	}
 
 	// Write the secret to disk
-	if err := ioutil.WriteFile(secretPath, value.([]byte), 0600); err != nil {
+	if err := ioutil.WriteFile(secretPath, value, 0600); err != nil {
 		return fmt.Errorf(
 			"unable to write secret to disk (%s), %v",
 			secretPath,

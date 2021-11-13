@@ -137,7 +137,7 @@ func TestLocalSecretsManager_GetSetSecret(
 			t.Fatalf("unable to parse networking private key, %v", err)
 		}
 
-		buf, err := hex.DecodeString(string(secret.([]byte)))
+		buf, err := hex.DecodeString(string(secret))
 		if err != nil {
 			t.Fatalf("unable to parse networking private key, %v", err)
 		}
@@ -153,7 +153,7 @@ func TestLocalSecretsManager_GetSetSecret(
 	testTable := []struct {
 		name          string
 		secretName    string
-		secretValue   interface{}
+		secretValue   []byte
 		compareFunc   func(secrets.SecretsManager) bool
 		shouldSucceed bool
 	}{
@@ -174,7 +174,7 @@ func TestLocalSecretsManager_GetSetSecret(
 		{
 			"Unsupported secret storage",
 			"dummySecret",
-			123,
+			[]byte{1},
 			func(secrets.SecretsManager) bool {
 				return true
 			},

@@ -83,7 +83,7 @@ func ReadLibp2pKeyNEW(manager secrets.SecretsManager) (crypto.PrivKey, error) {
 		return nil, err
 	}
 
-	return ParseLibp2pKey(libp2pKey.([]byte))
+	return ParseLibp2pKey(libp2pKey)
 }
 
 func GenerateAndEncodeLibp2pKey() (crypto.PrivKey, []byte, error) {
