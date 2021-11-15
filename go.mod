@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
-	github.com/ethereum/go-ethereum v1.9.15
 	github.com/golang/protobuf v1.4.3
 	github.com/google/gopacket v1.1.18 // indirect
 	github.com/google/uuid v1.1.4
@@ -31,6 +30,7 @@ require (
 	github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
