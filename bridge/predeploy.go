@@ -440,9 +440,7 @@ func PredeloyERC20Contract(
 		big.NewInt(int64(len(name))*2).Bytes(),
 		32,
 	)
-	for idx, b := range name {
-		nameData[idx] = b
-	}
+	copy(nameData[:len(name)], name)
 	storageMap[types.BytesToHash(big.NewInt(4).Bytes())] = types.BytesToHash(nameData)
 
 	// slot 5, synbol(string)
@@ -451,9 +449,7 @@ func PredeloyERC20Contract(
 		big.NewInt(int64(len(symbol))*2).Bytes(),
 		32,
 	)
-	for idx, b := range symbol {
-		symbolData[idx] = b
-	}
+	copy(symbolData[:len(symbol)], symbol)
 	storageMap[types.BytesToHash(big.NewInt(5).Bytes())] = types.BytesToHash(symbolData)
 
 	// slot 6, decimals(uint8)

@@ -22,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/ChainSafe/chainbridge-utils/keystore"
 
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
@@ -215,6 +216,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	go func() {
 		// FIXME: chain must have some blocks advanced when relayer begins?
 		time.Sleep(30 * time.Second)
+		os.Setenv(keystore.EnvPassword, "password")
 		if err := bridge.RunBridge(chains); err != nil {
 			m.logger.Info("Failed to start bridge", "err", err)
 		}
