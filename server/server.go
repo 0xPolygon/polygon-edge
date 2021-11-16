@@ -1,8 +1,7 @@
-package minimal
+package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -14,8 +13,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
-	"github.com/0xPolygon/polygon-sdk/minimal/proto"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/txpool"
@@ -34,9 +33,10 @@ import (
 
 // Minimal is the central manager of the blockchain client
 type Server struct {
-	logger hclog.Logger
-	config *Config
-	state  state.State
+	logger       hclog.Logger
+	config       *Config
+	state        state.State
+	stateStorage itrie.Storage
 
 	consensus consensus.Consensus
 
@@ -102,6 +102,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	m.stateStorage = stateStorage
 
 	st := itrie.NewState(stateStorage)
 	m.state = st
@@ -128,7 +129,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
+		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.config.Locals, m.config.NoLocals, m.config.PriceLimit, m.config.MaxSlots, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +257,7 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	}
 	result, ok := snap.Get(key)
 	if !ok {
-		return nil, errors.New("given root and slot not found in storage")
+		return nil, jsonrpc.ErrStateNotFound
 	}
 	return result, nil
 }
@@ -271,6 +272,11 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 		return nil, err
 	}
 	return &account, nil
+}
+
+// GetForksInTime returns the active forks at the given block height
+func (j *jsonRPCHub) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	return j.Executor.GetForksInTime(blockNumber)
 }
 
 func (j *jsonRPCHub) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
@@ -386,6 +392,11 @@ func (s *Server) Close() {
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
+	}
+
+	// Close the state storage
+	if err := s.stateStorage.Close(); err != nil {
+		s.logger.Error("failed to close storage for trie", "err", err.Error())
 	}
 }
 

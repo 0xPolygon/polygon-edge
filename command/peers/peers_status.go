@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
 )
 
 // PeersStatus is the PeersStatus to start the sever

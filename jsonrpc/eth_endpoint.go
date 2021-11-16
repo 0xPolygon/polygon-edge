@@ -5,7 +5,9 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/fastrlp"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -18,26 +20,31 @@ func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
 }
 
-// GetBlockByNumber returns information about a block by block number
-func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
-	var num uint64
+func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 	switch number {
 	case LatestBlockNumber:
-		num = e.d.store.Header().Number
+		return e.d.store.Header().Number, nil
 
 	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
+		return 0, fmt.Errorf("fetching the earliest header is not supported")
 
 	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
+		return 0, fmt.Errorf("fetching the pending header is not supported")
 
 	default:
 		if number < 0 {
-			return nil, fmt.Errorf("invalid argument 0: block number larger than int64")
+			return 0, fmt.Errorf("invalid argument 0: block number larger than int64")
 		}
-		num = uint64(number)
+		return uint64(number), nil
 	}
+}
 
+// GetBlockByNumber returns information about a block by block number
+func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, error) {
+	num, err := GetNumericBlockNumber(number, e)
+	if err != nil {
+		return nil, err
+	}
 	block, ok := e.d.store.GetBlockByNumber(num, true)
 	if !ok {
 		return nil, nil
@@ -52,6 +59,18 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, nil
 	}
 	return toBlock(block, fullTx), nil
+}
+
+func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
+	num, err := GetNumericBlockNumber(number, e)
+	if err != nil {
+		return nil, err
+	}
+	block, ok := e.d.store.GetBlockByNumber(num, true)
+	if !ok {
+		return nil, nil
+	}
+	return len(block.Transactions), nil
 }
 
 // BlockNumber returns current block number
@@ -187,9 +206,14 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number BlockNumber) (interface{}, error) {
+func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
+
+	//Set the block number to latest
+	if number == nil {
+		number, _ = createBlockNumberPointer("latest")
+	}
 	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -197,14 +221,26 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number Block
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return argBytesPtr(types.ZeroHash[:]), nil
+		}
 		return nil, err
 	}
-	return argBytesPtr(result), nil
+	//Parse the RLP value
+	p := &fastrlp.Parser{}
+	v, err := p.Parse(result)
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	data, err := v.Bytes()
+	if err != nil {
+		return argBytesPtr(types.ZeroHash[:]), nil
+	}
+	return argBytesPtr(data), nil
 }
 
 // GasPrice returns the average gas price based on the last x blocks
 func (e *Eth) GasPrice() (interface{}, error) {
-
 	// Grab the average gas price and convert it to a hex value
 	avgGasPrice := hex.EncodeBig(e.d.store.GetAvgGasPrice())
 
@@ -212,13 +248,17 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
+
+	if number == nil {
+		number, _ = createBlockNumberPointer("latest")
+	}
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
 		return nil, err
 	}
 	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(number)
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -241,13 +281,14 @@ func (e *Eth) Call(arg *txnArgs, number BlockNumber) (interface{}, error) {
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
-func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
+func (e *Eth) EstimateGas(
+	arg *txnArgs,
+	rawNum *BlockNumber,
+) (interface{}, error) {
 	transaction, err := e.d.decodeTxn(arg)
 	if err != nil {
 		return nil, err
 	}
-
-	const standardGas uint64 = 21000
 
 	number := LatestBlockNumber
 	if rawNum != nil {
@@ -260,6 +301,15 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return nil, err
 	}
 
+	forksInTime := e.d.store.GetForksInTime(uint64(number))
+
+	var standardGas uint64
+	if transaction.IsContractCreation() && forksInTime.Homestead {
+		standardGas = state.TxGasContractCreation
+	} else {
+		standardGas = state.TxGas
+	}
+
 	var (
 		lowEnd  = standardGas
 		highEnd uint64
@@ -267,8 +317,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && uint64(transaction.Gas) >= standardGas {
-		highEnd = uint64(transaction.Gas)
+	if transaction.Gas != 0 && transaction.Gas >= standardGas {
+		highEnd = transaction.Gas
 	} else {
 		// If not, use the referenced block number
 		highEnd = header.GasLimit
@@ -279,7 +329,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// If the sender address is present, recalculate the ceiling to his balance
 	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
-
 		// Get the account balance
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
 		if err != nil {
@@ -290,7 +339,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		if transaction.Value != nil {
 			if valueInt.Cmp(available) >= 0 {
-				return 0, fmt.Errorf("insufficient funds for transfer")
+				return nil, fmt.Errorf("insufficient funds for execution")
 			}
 
 			available.Sub(available, valueInt)
@@ -366,7 +415,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
-	var result []*Log
+	result := make([]*Log, 0)
 	parseReceipts := func(header *types.Header) error {
 		receipts, err := e.d.store.GetReceiptsByHash(header.Hash)
 		if err != nil {
@@ -421,7 +470,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	if to < from {
 		return nil, fmt.Errorf("incorrect range")
 	}
-	for i := from; i < to; i++ {
+	for i := from; i <= to; i++ {
 		header, ok := e.d.store.GetHeaderByNumber(i)
 		if !ok {
 			break
@@ -438,8 +487,12 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 }
 
 // GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.d.getBlockHeaderImpl(number)
+func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
+
+	if number == nil {
+		number, _ = createBlockNumberPointer("latest")
+	}
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
@@ -454,17 +507,29 @@ func (e *Eth) GetBalance(address types.Address, number BlockNumber) (interface{}
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(address types.Address, number BlockNumber) (interface{}, error) {
-	nonce, err := e.d.getNextNonce(address, number)
+func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
+
+	if number == nil {
+		number, _ = createBlockNumberPointer("latest")
+	}
+	nonce, err := e.d.getNextNonce(address, *number)
 	if err != nil {
+		if err == ErrStateNotFound {
+			return argUintPtr(0), nil
+		}
 		return nil, err
 	}
 	return argUintPtr(nonce), nil
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address types.Address, number BlockNumber) (interface{}, error) {
-	header, err := e.d.getBlockHeaderImpl(number)
+func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
+
+	//Set the block number to latest
+	if number == nil {
+		number, _ = createBlockNumberPointer("latest")
+	}
+	header, err := e.d.getBlockHeaderImpl(*number)
 	if err != nil {
 		return nil, err
 	}
