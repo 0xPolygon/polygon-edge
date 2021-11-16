@@ -19,6 +19,9 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 		t.Fatal(err)
 	}
 	close := func() {
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.RemoveAll(path); err != nil {
 			t.Fatal(err)
 		}

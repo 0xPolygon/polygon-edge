@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/minimal/proto"
+	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

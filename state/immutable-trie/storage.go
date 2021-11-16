@@ -29,6 +29,8 @@ type Storage interface {
 	Batch() Batch
 	SetCode(hash types.Hash, code []byte)
 	GetCode(hash types.Hash) ([]byte, bool)
+
+	Close() error
 }
 
 // KVStorage is a k/v storage on memory using leveldb
@@ -78,6 +80,10 @@ func (kv *KVStorage) Get(k []byte) ([]byte, bool) {
 	return data, true
 }
 
+func (kv *KVStorage) Close() error {
+	return kv.db.Close()
+}
+
 func NewLevelDBStorage(path string, logger hclog.Logger) (Storage, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
@@ -125,6 +131,10 @@ func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
 
 func (m *memStorage) Batch() Batch {
 	return &memBatch{db: &m.db}
+}
+
+func (m *memStorage) Close() error {
+	return nil
 }
 
 func (m *memBatch) Put(p, v []byte) {

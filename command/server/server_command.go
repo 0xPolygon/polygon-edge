@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/minimal"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -45,6 +45,15 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.flagMap["block-gas-target"] = helper.FlagDescriptor{
+		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
+		Arguments: []string{
+			"BLOCK_GAS_TARGET",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	c.flagMap["config"] = helper.FlagDescriptor{
 		Description: "Specifies the path to the CLI config. Supports .json and .hcl",
 		Arguments: []string{
@@ -70,7 +79,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["grpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultGRPCPort),
+		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -78,7 +87,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", minimal.DefaultJSONRPCPort),
+		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultJSONRPCPort),
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -102,9 +111,17 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["nat"] = helper.FlagDescriptor{
-		Description: "Sets the the external IP address without the port, as it can be seen by peers",
+		Description: "Sets the external IP address without the port, as it can be seen by peers",
 		Arguments: []string{
 			"NAT_ADDRESS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["dns"] = helper.FlagDescriptor{
+		Description: "Sets the host DNS address",
+		Arguments: []string{
+			"DNS_ADDRESS",
 		},
 		FlagOptional: true,
 	}
@@ -121,6 +138,38 @@ func (c *ServerCommand) DefineFlags() {
 		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
 		Arguments: []string{
 			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["locals"] = helper.FlagDescriptor{
+		Description: "Sets comma separated accounts whose transactions are treated as locals",
+		Arguments: []string{
+			"LOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["nolocals"] = helper.FlagDescriptor{
+		Description: "Sets flag to disable price exemptions for locally submitted transactions",
+		Arguments: []string{
+			"NOLOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["price-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Arguments: []string{
+			"PRICE_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["max-slots"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets maximum slots in the pool. Default: %d", helper.DefaultConfig().TxPool.MaxSlots),
+		Arguments: []string{
+			"MAX_SLOTS",
 		},
 		FlagOptional: true,
 	}
@@ -184,7 +233,7 @@ func (c *ServerCommand) Run(args []string) int {
 		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
-	server, err := minimal.NewServer(logger, config)
+	server, err := server.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
 

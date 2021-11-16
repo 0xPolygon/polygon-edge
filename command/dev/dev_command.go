@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/minimal"
+	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )
@@ -48,12 +48,45 @@ func (d *DevCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	d.FlagMap["gas-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the gas limit of each block. Default: %d", helper.DefaultGasLimit),
+	d.FlagMap["locals"] = helper.FlagDescriptor{
+		Description: "Sets comma separated accounts whose transactions are treated as locals",
 		Arguments: []string{
-			"GAS_LIMIT",
+			"LOCALS",
 		},
 		FlagOptional: true,
+	}
+
+	d.FlagMap["nolocals"] = helper.FlagDescriptor{
+		Description: "Sets flag to disable price exemptions for locally submitted transactions",
+		Arguments: []string{
+			"NOLOCALS",
+		},
+		FlagOptional: true,
+	}
+
+	d.FlagMap["price-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Arguments: []string{
+			"PRICE_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
+	d.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
+		Description: "Sets the gas limit of each block. Default: 5000",
+		Arguments: []string{
+			"BLOCK_GAS_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
+	d.FlagMap["block-gas-target"] = helper.FlagDescriptor{
+		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
+		Arguments: []string{
+			"BLOCK_GAS_TARGET",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
 	}
 
 	d.FlagMap["chainid"] = helper.FlagDescriptor{
@@ -108,7 +141,7 @@ func (d *DevCommand) Run(args []string) int {
 		Level: hclog.LevelFromString(conf.LogLevel),
 	})
 
-	server, err := minimal.NewServer(logger, config)
+	server, err := server.NewServer(logger, config)
 	if err != nil {
 		d.UI.Error(err.Error())
 

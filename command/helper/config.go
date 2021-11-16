@@ -9,24 +9,28 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/minimal"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )
 
 // Config defines the server configuration params
 type Config struct {
-	Chain       string                 `json:"chain"`
-	DataDir     string                 `json:"data_dir"`
-	GRPCAddr    string                 `json:"rpc_addr"`
-	JSONRPCAddr string                 `json:"jsonrpc_addr"`
-	Network     *Network               `json:"network"`
-	Seal        bool                   `json:"seal"`
-	LogLevel    string                 `json:"log_level"`
-	Consensus   map[string]interface{} `json:"consensus"`
-	Dev         bool
-	DevInterval uint64
-	Join        string
+	Chain          string                 `json:"chain"`
+	DataDir        string                 `json:"data_dir"`
+	BlockGasTarget string                 `json:"block_gas_target"`
+	GRPCAddr       string                 `json:"rpc_addr"`
+	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
+	Network        *Network               `json:"network"`
+	Seal           bool                   `json:"seal"`
+	TxPool         *TxPool                `json:"tx_pool"`
+	LogLevel       string                 `json:"log_level"`
+	Consensus      map[string]interface{} `json:"consensus"`
+	Dev            bool
+	DevInterval    uint64
+	Join           string
 }
 
 // Network defines the network configuration params
@@ -34,28 +38,42 @@ type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
 	NatAddr    string `json:"nat_addr"`
+	Dns        string `json:"dns"`
 	MaxPeers   uint64 `json:"max_peers"`
+}
+
+// TxPool defines the TxPool configuration params
+type TxPool struct {
+	Locals     string `json:"locals"`
+	NoLocals   bool   `json:"no_locals"`
+	PriceLimit uint64 `json:"price_limit"`
+	MaxSlots   uint64 `json:"max_slots"`
 }
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:   "test",
-		DataDir: "./test-chain",
+		Chain:          "test",
+		DataDir:        "./test-chain",
+		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
 		},
-		Seal:      false,
+		Seal: false,
+		TxPool: &TxPool{
+			PriceLimit: 1,
+			MaxSlots:   4096,
+		},
 		LogLevel:  "INFO",
 		Consensus: map[string]interface{}{},
 	}
 }
 
 // BuildConfig Builds the config based on set parameters
-func (c *Config) BuildConfig() (*minimal.Config, error) {
-	// Grab the default Minimal server config
-	conf := minimal.DefaultConfig()
+func (c *Config) BuildConfig() (*server.Config, error) {
+	// Grab the default server config
+	conf := server.DefaultConfig()
 
 	// Decode the chain
 	cc, err := chain.Import(c.Chain)
@@ -93,10 +111,44 @@ func (c *Config) BuildConfig() (*minimal.Config, error) {
 			}
 		}
 
+		if c.Network.Dns != "" {
+
+			if conf.Network.Dns, err = helperFlags.MultiAddrFromDns(c.Network.Dns, conf.Network.Addr.Port); err != nil {
+				return nil, err
+			}
+		}
+
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
 
 		conf.Chain = cc
+	}
+
+	// TxPool
+	{
+		if c.TxPool.Locals != "" {
+			strAddrs := strings.Split(c.TxPool.Locals, ",")
+			conf.Locals = make([]types.Address, len(strAddrs))
+			for i, sAddr := range strAddrs {
+				conf.Locals[i] = types.StringToAddress(sAddr)
+			}
+		}
+		conf.NoLocals = c.TxPool.NoLocals
+		conf.PriceLimit = c.TxPool.PriceLimit
+		conf.MaxSlots = c.TxPool.MaxSlots
+	}
+
+	// Target gas limit
+	if c.BlockGasTarget != "" {
+		value, err := types.ParseUint256orHex(&c.BlockGasTarget)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse gas target %s, %v", c.BlockGasTarget, err)
+		}
+		if !value.IsUint64() {
+			return nil, fmt.Errorf("gas target is too large (>64b) %s", c.BlockGasTarget)
+		}
+
+		conf.Chain.Params.BlockGasTarget = value.Uint64()
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -151,6 +203,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.DevInterval = otherConfig.DevInterval
 	}
 
+	if otherConfig.BlockGasTarget != "" {
+		c.BlockGasTarget = otherConfig.BlockGasTarget
+	}
+
 	if otherConfig.Seal {
 		c.Seal = true
 	}
@@ -179,11 +235,30 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		if otherConfig.Network.NatAddr != "" {
 			c.Network.NatAddr = otherConfig.Network.NatAddr
 		}
+		if otherConfig.Network.Dns != "" {
+			c.Network.Dns = otherConfig.Network.Dns
+		}
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers
 		}
 		if otherConfig.Network.NoDiscover {
 			c.Network.NoDiscover = true
+		}
+	}
+
+	{
+		// TxPool
+		if otherConfig.TxPool.Locals != "" {
+			c.TxPool.Locals = otherConfig.TxPool.Locals
+		}
+		if otherConfig.TxPool.NoLocals {
+			c.TxPool.NoLocals = otherConfig.TxPool.NoLocals
+		}
+		if otherConfig.TxPool.PriceLimit != 0 {
+			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
+		}
+		if otherConfig.TxPool.MaxSlots != 0 {
+			c.TxPool.MaxSlots = otherConfig.TxPool.MaxSlots
 		}
 	}
 
