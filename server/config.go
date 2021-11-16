@@ -1,10 +1,11 @@
-package minimal
+package server
 
 import (
 	"net"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 const DefaultGRPCPort int = 9632
@@ -18,9 +19,13 @@ type Config struct {
 	GRPCAddr    *net.TCPAddr
 	LibP2PAddr  *net.TCPAddr
 
-	Network *network.Config
-	DataDir string
-	Seal    bool
+	Network    *network.Config
+	DataDir    string
+	Seal       bool
+	Locals     []types.Address
+	NoLocals   bool
+	PriceLimit uint64
+	MaxSlots   uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking

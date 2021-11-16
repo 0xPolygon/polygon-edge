@@ -353,6 +353,7 @@ func generateStakingAddresses(numAddresses int) []types.Address {
 // Expected result for tests: Staked: 1 ETH; Balance: ~119 ETH
 func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	// Predefined values
+	var blockGasLimit uint64 = 5000000000
 	stakingContractAddr := staking.AddrStakingContract
 	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 	defaultBalance := framework.EthToWei(100)
@@ -369,6 +370,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.Premine(senderAddr, defaultBalance)
+		config.SetBlockLimit(blockGasLimit)
 		// This call will add numDummyStakers + 1 staking address to the staking SC.
 		// This is done in order to pump the stakedAmount value on the staking SC
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyStakers), senderAddr))
@@ -490,6 +492,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 // Expected result for tests: Staked: 0 ETH; Balance: ~100 ETH
 func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	// Predefined values
+	var blockGasLimit uint64 = 5000000000
 	stakingContractAddr := staking.AddrStakingContract
 	defaultBalance := framework.EthToWei(100)
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
@@ -505,6 +508,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.Premine(senderAddr, defaultBalance)
+		config.SetBlockLimit(blockGasLimit)
 		config.SetDevStakingAddresses(generateStakingAddresses(numDummyStakers))
 	})
 	srv := srvs[0]

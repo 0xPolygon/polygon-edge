@@ -2,15 +2,25 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/contracts/abis"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 )
 
 func TestSignedTransaction(t *testing.T) {
@@ -167,13 +177,8 @@ func TestEthTransfer(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
-	for indx, testCase := range testTable {
+	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			// TODO @Vuksan Please remove this skip statement when JSON-RPC Error wrapping is added
-			if indx == 1 {
-				t.Skip()
-			}
-
 			// Fetch the balances before sending
 			balanceSender, err := rpcClient.Eth().GetBalance(
 				web3.Address(testCase.sender),
@@ -205,7 +210,12 @@ func TestEthTransfer(t *testing.T) {
 
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
-			assert.NoError(t, err)
+			if testCase.shouldSucceed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+
 			assert.IsTypef(t, web3.Hash{}, txnHash, "Return type mismatch")
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -264,4 +274,254 @@ func TestEthTransfer(t *testing.T) {
 				"Receiver balance incorrect")
 		})
 	}
+}
+
+// getCount is a helper function for the stress test SC
+func getCount(
+	from types.Address,
+	contractAddress web3.Address,
+	rpcClient *jsonrpc.Client,
+) (*big.Int, error) {
+	stressTestMethod, ok := abis.StressTestABI.Methods["getCount"]
+	if !ok {
+		return nil, errors.New("getCount method doesn't exist in StessTest contract ABI")
+	}
+
+	selector := stressTestMethod.ID()
+	response, err := rpcClient.Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(from),
+			To:       contractAddress,
+			Data:     selector,
+			GasPrice: 100000000,
+			Value:    big.NewInt(0),
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to call StressTest contract method, %v", err)
+	}
+
+	if response == "0x" {
+		response = "0x0"
+	}
+	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeErr)
+	}
+
+	return bigResponse, nil
+}
+
+// addStressTestTxns adds numTransactions that call the
+// passed in StressTest smart contract method
+func addStressTestTxns(
+	t *testing.T,
+	srv *framework.TestServer,
+	numTransactions int,
+	contractAddr types.Address,
+	senderKey *ecdsa.PrivateKey,
+) {
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+	signer := crypto.NewEIP155Signer(100)
+	currentNonce := 1 // 1 because the first transaction was deployment
+	clt := srv.TxnPoolOperator()
+
+	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
+	if !ok {
+		t.Fatalf("Unable to get setName method")
+	}
+
+	generateTx := func() *types.Transaction {
+		encodedInput, encodeErr := setNameMethod.Inputs.Encode(
+			map[string]interface{}{
+				"sName": fmt.Sprintf("Name #%d", currentNonce),
+			},
+		)
+		if encodeErr != nil {
+			t.Fatalf("Unable to encode inputs, %v", encodeErr)
+		}
+
+		signedTx, signErr := signer.SignTx(&types.Transaction{
+			Nonce:    uint64(currentNonce),
+			From:     types.ZeroAddress,
+			To:       &contractAddr,
+			GasPrice: bigGasPrice,
+			Gas:      framework.DefaultGasLimit,
+			Value:    big.NewInt(0),
+			V:        []byte{1}, // it is necessary to encode in rlp,
+			Input:    append(setNameMethod.ID(), encodedInput...),
+		}, senderKey)
+
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		currentNonce++
+
+		return signedTx
+	}
+
+	for i := 0; i < numTransactions; i++ {
+		var msg *txpoolOp.AddTxnReq
+		setNameTxn := generateTx()
+
+		msg = &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: setNameTxn.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		}
+
+		_, addErr := clt.AddTxn(context.Background(), msg)
+		if addErr != nil {
+			t.Fatalf("Unable to add txn #%d, %v", i, addErr)
+		}
+	}
+}
+
+// Test scenario (Dev mode):
+// Deploy the StressTest smart contract and send ~50 transactions
+// that modify it's state, and make sure that all
+// transactions were correctly executed
+func Test_TransactionDevLoop(t *testing.T) {
+	senderKey, sender := tests.GenerateKeyAndAddr(t)
+	defaultBalance := framework.EthToWei(100)
+	devInterval := 5 // s
+
+	// Set up the test server
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(devInterval)
+		config.Premine(sender, defaultBalance)
+		config.SetBlockLimit(20000000)
+	})
+	srv := srvs[0]
+	client := srv.JSONRPC()
+
+	// Deploy the stress test contract
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, countErr := getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, "0", count.String(), "Count doesn't match")
+
+	// Send ~50 transactions
+	numTransactions := 50
+
+	// Add stress test transactions
+	addStressTestTxns(
+		t,
+		srv,
+		numTransactions,
+		types.StringToAddress(contractAddr.String()),
+		senderKey,
+	)
+
+	// Set up the blockchain listener to catch the added block event
+	_ = waitForBlock(t, srv, 1, 0)
+
+	count, countErr = getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
+}
+
+// Test scenario (IBFT):
+// Deploy the StressTest smart contract and send ~50 transactions
+// that modify it's state, and make sure that all
+// transactions were correctly executed
+func Test_TransactionIBFTLoop(t *testing.T) {
+	senderKey, sender := tests.GenerateKeyAndAddr(t)
+	defaultBalance := framework.EthToWei(100)
+
+	// Set up the test server
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+		config.Premine(sender, defaultBalance)
+		config.SetSeal(true)
+		config.SetBlockLimit(20000000)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+	client := srv.JSONRPC()
+
+	// Deploy the stress test contract
+	deployCtx, deployCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer deployCancel()
+
+	buf, err := hex.DecodeString(stressTestBytecode)
+	if err != nil {
+		t.Fatalf("Unable to decode bytecode, %v", err)
+	}
+
+	deployTx := &framework.PreparedTransaction{
+		From:     sender,
+		GasPrice: big.NewInt(framework.DefaultGasPrice),
+		Gas:      framework.DefaultGasLimit,
+		Value:    big.NewInt(0),
+		Input:    buf,
+	}
+	receipt, err := srv.SendRawTx(deployCtx, deployTx, senderKey)
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+
+	contractAddr := receipt.ContractAddress
+	if err != nil {
+		t.Fatalf("Unable to send transaction, %v", err)
+	}
+
+	count, countErr := getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is 0 before running the test
+	assert.Equalf(t, "0", count.String(), "Count doesn't match")
+
+	// Send ~50 transactions
+	numTransactions := 50
+
+	// Add stress test transactions
+	addStressTestTxns(
+		t,
+		srv,
+		numTransactions,
+		types.StringToAddress(contractAddr.String()),
+		senderKey,
+	)
+
+	// Wait for an arbitrary period for these txns to get committed
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer waitCancel()
+
+	resp, err := framework.WaitUntilTxPoolEmpty(waitCtx, srv)
+	if err != nil {
+		t.Fatalf("Unable to get txpool status, %v", err)
+	}
+	assert.Equal(t, 0, int(resp.Length))
+
+	count, countErr = getCount(sender, contractAddr, client)
+	if countErr != nil {
+		t.Fatalf("Unable to call count method, %v", countErr)
+	}
+
+	// Check that the count is correct
+	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
 }

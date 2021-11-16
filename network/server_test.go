@@ -1,16 +1,35 @@
 package network
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
+
+func GenerateLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
+	t.Helper()
+
+	dir, err := ioutil.TempDir(os.TempDir(), "")
+	assert.NoError(t, err)
+	key, err := ReadLibp2pKey(dir)
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		// remove directory after test is done
+		assert.NoError(t, os.RemoveAll(dir))
+	})
+
+	return key, dir
+}
 
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
@@ -152,6 +171,95 @@ func TestEncodingPeerAddr(t *testing.T) {
 	assert.Equal(t, info, info2)
 }
 
+// constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs
+func constructMultiAddrs(addresses []string) ([]multiaddr.Multiaddr, error) {
+	returnAddrs := make([]multiaddr.Multiaddr, 0)
+
+	for _, addr := range addresses {
+		multiAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		returnAddrs = append(returnAddrs, multiAddr)
+	}
+
+	return returnAddrs, nil
+}
+
+func TestAddrInfoToString(t *testing.T) {
+	defaultPeerID := peer.ID("123")
+	defaultPort := 5000
+
+	// formatMultiaddr is a helper function for formatting an IP / port combination
+	formatMultiaddr := func(ipVersion string, address string, port int) string {
+		return fmt.Sprintf("/%s/%s/tcp/%d", ipVersion, address, port)
+	}
+
+	// formatExpectedOutput is a helper function for generating the expected output for AddrInfoToString
+	formatExpectedOutput := func(input string, peerID string) string {
+		return fmt.Sprintf("%s/p2p/%s", input, peerID)
+	}
+
+	testTable := []struct {
+		name      string
+		addresses []string
+		expected  string
+	}{
+		{
+			// A host address is explicitly specified
+			"Valid dial address found",
+			[]string{formatMultiaddr("ip4", "192.168.1.1", defaultPort)},
+			formatExpectedOutput(
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
+			// Multiple addresses that the host can listen on (0.0.0.0 special case)
+			"Ignore IPv4 loopback address",
+			[]string{
+				formatMultiaddr("ip4", "127.0.0.1", defaultPort),
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+			},
+			formatExpectedOutput(
+				formatMultiaddr("ip4", "192.168.1.1", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+		{
+			// Multiple addresses that the host can listen on (0.0.0.0 special case)
+			"Ignore IPv6 loopback addresses",
+			[]string{
+				formatMultiaddr("ip6", "0:0:0:0:0:0:0:1", defaultPort),
+				formatMultiaddr("ip6", "::1", defaultPort),
+				formatMultiaddr("ip6", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", defaultPort),
+			},
+			formatExpectedOutput(
+				formatMultiaddr("ip6", "2001:db8:85a3::8a2e:370:7334", defaultPort),
+				defaultPeerID.String(),
+			),
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Construct the multiaddrs
+			multiAddrs, constructErr := constructMultiAddrs(testCase.addresses)
+			if constructErr != nil {
+				t.Fatalf("Unable to construct multiaddrs, %v", constructErr)
+			}
+
+			dialAddress := AddrInfoToString(&peer.AddrInfo{
+				ID:    defaultPeerID,
+				Addrs: multiAddrs,
+			})
+
+			assert.Equal(t, testCase.expected, dialAddress)
+		})
+	}
+}
+
 func TestJoinWhenAlreadyConnected(t *testing.T) {
 	// if we try to join an already connected node, the watcher
 	// should finish as well
@@ -208,4 +316,150 @@ func TestNat(t *testing.T) {
 
 		assert.True(t, found)
 	})
+}
+
+func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		if _, ok := srv.peers[id]; !ok {
+			return nil, true
+		}
+		return true, false
+
+	})
+	if err != nil {
+		return false, err
+	}
+	return res.(bool), nil
+}
+
+// TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
+func TestPeerReconnection(t *testing.T) {
+	conf := func(c *Config) {
+		c.MaxPeers = 2
+		c.NoDiscover = false
+	}
+	//Create bootnode
+	bootNode := CreateServer(t, conf)
+
+	conf1 := func(c *Config) {
+		c.MaxPeers = 2
+		c.NoDiscover = false
+		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo())}
+	}
+
+	srv1 := CreateServer(t, conf1)
+	srv2 := CreateServer(t, conf1)
+
+	//connect with the boot node
+	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
+	assert.True(t, <-connectedCh)
+
+	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
+	//disconnect from the boot node
+	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
+	srv1.Disconnect(bootNode.AddrInfo().ID, "bye")
+
+	assert.True(t, <-disconnectedCh1, "Failed to recieved peer disconnected event")
+
+	//disconnect from the second node
+	disconnectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
+	assert.NoError(t, srv2.Close())
+	assert.True(t, <-disconnectedCh2)
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
+	defer cancelWait()
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
+	assert.NoError(t, err)
+	assert.True(t, reconnected)
+
+}
+func TestReconnectionWithNewIP(t *testing.T) {
+	natIP := "127.0.0.1"
+
+	_, dir0 := GenerateLibp2pKey(t)
+	_, dir1 := GenerateLibp2pKey(t)
+
+	defaultConfig := func(c *Config) {
+		c.NoDiscover = true
+	}
+
+	srv0 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir0
+	})
+	srv1 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir1
+	})
+	// same ID to but diffrent IP from srv1
+	srv2 := CreateServer(t, func(c *Config) {
+		defaultConfig(c)
+		c.DataDir = dir1
+		c.NatAddr = net.ParseIP(natIP)
+	})
+	t.Cleanup(func() {
+		srv0.Close()
+		srv1.Close()
+		srv2.Close()
+	})
+
+	// srv0 connects to srv1
+	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
+	assert.True(t, <-connectedCh)
+	assert.Len(t, srv0.peers, 1)
+	assert.Len(t, srv1.peers, 1)
+
+	// srv1 terminates
+	disconnectedCh := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	srv1.host.Close()
+	assert.True(t, <-disconnectedCh)
+
+	// srv0 connects to srv2
+	connectedCh = asyncWaitForEvent(srv2, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
+	assert.NoError(t, srv0.Join(srv2.AddrInfo(), DefaultJoinTimeout))
+	assert.True(t, <-connectedCh)
+	assert.Len(t, srv0.peers, 1)
+	assert.Len(t, srv2.peers, 1)
+}
+
+func TestSelfConnection_WithBootNodes(t *testing.T) {
+
+	//Create a temporary directory for storing the key file
+	key, directoryName := GenerateLibp2pKey(t)
+	peerId, err := peer.IDFromPrivateKey(key)
+	assert.NoError(t, err)
+	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		bootNodes    []string
+		expectedList []*peer.AddrInfo
+	}{
+		{
+			name:         "Should return an empty bootnodes list",
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()},
+			expectedList: []*peer.AddrInfo{},
+		},
+
+		{
+			name:         "Should return an non empty bootnodes list",
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			expectedList: []*peer.AddrInfo{peerAddressInfo},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conf := func(c *Config) {
+				c.NoDiscover = false
+				c.DataDir = directoryName
+				c.Chain.Bootnodes = tt.bootNodes
+			}
+			srv0 := CreateServer(t, conf)
+
+			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
+		})
+	}
 }

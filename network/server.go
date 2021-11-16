@@ -3,7 +3,9 @@ package network
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
+	"regexp"
 	"sync"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -23,13 +25,17 @@ import (
 
 const DefaultLibp2pPort int = 1478
 
+const MinimumPeerConnections int64 = 1
+
 type Config struct {
 	NoDiscover bool
 	Addr       *net.TCPAddr
 	NatAddr    net.IP
+	Dns        multiaddr.Multiaddr
 	DataDir    string
 	MaxPeers   uint64
-	Chain      *chain.Chain
+
+	Chain *chain.Chain
 }
 
 func DefaultConfig() *Config {
@@ -95,6 +101,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			if addr != nil {
 				addrs = []multiaddr.Multiaddr{addr}
 			}
+		} else if config.Dns != nil {
+			addrs = []multiaddr.Multiaddr{config.Dns}
 		}
 
 		return addrs
@@ -134,7 +142,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.identity.setup()
 
 	go srv.runDial()
-
+	go srv.checkPeerConnections()
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	if !config.NoDiscover {
@@ -148,6 +156,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			node, err := StringToAddrInfo(raw)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+			}
+			if node.ID == srv.host.ID() {
+				srv.logger.Info("Omitting bootnode with same ID as host", node.ID)
+				continue
 			}
 			// add the bootnode to the peerstore
 			srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
@@ -176,6 +188,27 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	})
 
 	return srv, nil
+}
+
+// checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.
+func (s *Server) checkPeerConnections() {
+	for {
+		select {
+		case <-time.After(30 * time.Second):
+		case <-s.closeCh:
+			return
+		}
+		if s.numPeers() < MinimumPeerConnections {
+			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
+				//TODO: dial peers from the peerstore
+			} else {
+				randomNode := s.getRandomBootNode()
+				s.dialQueue.add(randomNode, 10)
+			}
+
+		}
+	}
+
 }
 
 func (s *Server) runDial() {
@@ -237,11 +270,16 @@ func (s *Server) runDial() {
 	}
 }
 
-// PeerEventDialConnectedNode
 func (s *Server) numPeers() int64 {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
 	return int64(len(s.peers))
 }
+func (s *Server) getRandomBootNode() *peer.AddrInfo {
 
+	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
+
+}
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -298,6 +336,7 @@ func (s *Server) delPeer(id peer.ID) {
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
+	s.host.Network().ClosePeer(id)
 
 	s.emitEvent(&PeerEvent{
 		PeerID: id,
@@ -584,12 +623,41 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 	return addr1, nil
 }
 
+var (
+	// Regex used for matching loopback addresses (IPv4 and IPv6)
+	// This regex will match:
+	// /ip4/localhost/tcp/<port>
+	// /ip4/127.0.0.1/tcp/<port>
+	// /ip4/<any other loopback>/tcp/<port>
+	// /ip6/<any loopback>/tcp/<port>
+	loopbackRegex = regexp.MustCompile(
+		`^\/ip4\/127(?:\.[0-9]+){0,2}\.[0-9]+\/tcp\/\d+$|^\/ip4\/localhost\/tcp\/\d+$|^\/ip6\/(?:0*\:)*?:?0*1\/tcp\/\d+$`,
+	)
+)
+
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
 func AddrInfoToString(addr *peer.AddrInfo) string {
-	if len(addr.Addrs) != 1 {
-		panic("Not supported")
+	// Safety check
+	if len(addr.Addrs) == 0 {
+		panic("No dial addresses found")
 	}
-	return addr.Addrs[0].String() + "/p2p/" + addr.ID.String()
+
+	dialAddress := addr.Addrs[0].String()
+
+	// Try to see if a non loopback address is present in the list
+	if len(addr.Addrs) > 1 && loopbackRegex.MatchString(dialAddress) {
+		// Find an address that's not a loopback address
+		for _, address := range addr.Addrs {
+			if !loopbackRegex.MatchString(address.String()) {
+				// Not a loopback address, dial address found
+				dialAddress = address.String()
+				break
+			}
+		}
+	}
+
+	// Format output and return
+	return dialAddress + "/p2p/" + addr.ID.String()
 }
 
 type PeerConnectedEvent struct {

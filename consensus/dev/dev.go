@@ -117,9 +117,16 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	header := &types.Header{
 		ParentHash: parent.Hash,
 		Number:     num + 1,
-		GasLimit:   100000000, // placeholder for now
+		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
 		Timestamp:  uint64(time.Now().Unix()),
 	}
+
+	// calculate gas limit based on parent header
+	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return err
+	}
+	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
@@ -139,14 +146,23 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 			break
 		}
 
-		// Execute the state transition
-		if err := transition.Write(txn); err != nil {
-			retFn()
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			d.txpool.DecreaseAccountNonce(txn)
+		} else {
+			// Execute the state transition
+			if err := transition.Write(txn); err != nil {
+				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+					retFn()
+				} else {
+					d.txpool.DecreaseAccountNonce(txn)
+				}
 
-			break
+				break
+			}
+
+			txns = append(txns, txn)
 		}
-
-		txns = append(txns, txn)
 	}
 
 	// Commit the changes
