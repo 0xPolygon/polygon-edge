@@ -92,7 +92,7 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from SM, %v", readErr)
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %v", readErr)
 		}
 
 		key = networkingKey
@@ -100,12 +100,12 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is not present in the secrets manager, generate it
 		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
 		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for SM, %v", keyErr)
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %v", keyErr)
 		}
 
 		// Write the networking private key to disk
 		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to SM, %v", setErr)
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %v", setErr)
 		}
 
 		key = libp2pKey

@@ -200,7 +200,7 @@ func (i *Ibft) createKey() error {
 			// The validator key is present in the secrets manager, load it
 			validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
 			if readErr != nil {
-				return fmt.Errorf("unable to read validator key from SM, %v", readErr)
+				return fmt.Errorf("unable to read validator key from Secrets Manager, %v", readErr)
 			}
 
 			key = validatorKey
@@ -208,13 +208,13 @@ func (i *Ibft) createKey() error {
 			// The validator key is not present in the secrets manager, generate it
 			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
 			if genErr != nil {
-				return fmt.Errorf("unable to generate validator key for SM, %v", genErr)
+				return fmt.Errorf("unable to generate validator key for Secrets Manager, %v", genErr)
 			}
 
 			// Save the key to the secrets manager
 			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
 			if saveErr != nil {
-				return fmt.Errorf("unable to save validator key to SM, %v", saveErr)
+				return fmt.Errorf("unable to save validator key to Secrets Manager, %v", saveErr)
 			}
 
 			key = validatorKey
