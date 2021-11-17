@@ -1,4 +1,4 @@
-package secretsManager
+package secretsmanager
 
 import (
 	"flag"
