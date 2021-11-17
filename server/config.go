@@ -15,17 +15,17 @@ const DefaultJSONRPCPort int = 8545
 type Config struct {
 	Chain *chain.Chain
 
-	JSONRPCAddr *net.TCPAddr
-	GRPCAddr    *net.TCPAddr
-	LibP2PAddr  *net.TCPAddr
-
-	Network    *network.Config
-	DataDir    string
-	Seal       bool
-	Locals     []types.Address
-	NoLocals   bool
-	PriceLimit uint64
-	MaxSlots   uint64
+	JSONRPCAddr           *net.TCPAddr
+	GRPCAddr              *net.TCPAddr
+	LibP2PAddr            *net.TCPAddr
+	PrometheusListnerAddr *net.TCPAddr
+	Network               *network.Config
+	DataDir               string
+	Seal                  bool
+	Locals                []types.Address
+	NoLocals              bool
+	PriceLimit            uint64
+	MaxSlots              uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking

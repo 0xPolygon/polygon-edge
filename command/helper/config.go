@@ -23,6 +23,7 @@ type Config struct {
 	BlockGasTarget string                 `json:"block_gas_target"`
 	GRPCAddr       string                 `json:"rpc_addr"`
 	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
+	METRICSAddr    string                 `json:"metrics_addr"`
 	Network        *Network               `json:"network"`
 	Seal           bool                   `json:"seal"`
 	TxPool         *TxPool                `json:"tx_pool"`
@@ -95,6 +96,12 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	if c.JSONRPCAddr != "" {
 		// If an address was passed in, parse it
 		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
+			return nil, err
+		}
+	}
+	if c.METRICSAddr != "" {
+		// If an address was passed in, parse it
+		if conf.PrometheusListnerAddr, err = resolveAddr(c.METRICSAddr); err != nil {
 			return nil, err
 		}
 	}
@@ -217,6 +224,11 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.GRPCAddr != "" {
 		c.GRPCAddr = otherConfig.GRPCAddr
+	}
+
+	if otherConfig.METRICSAddr != "" {
+
+		c.METRICSAddr = otherConfig.METRICSAddr
 	}
 
 	if otherConfig.JSONRPCAddr != "" {

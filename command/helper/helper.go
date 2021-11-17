@@ -414,6 +414,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
+	flags.StringVar(&cliConfig.METRICSAddr, "metrics", "", "")
 	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
 	flags.StringVar(&cliConfig.Network.Dns, "dns", "", " the host DNS address which can be used by a remote peer for connection")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
@@ -429,7 +430,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
-
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)
