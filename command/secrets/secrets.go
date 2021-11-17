@@ -12,7 +12,7 @@ func (c *SecretsCommand) Help() string {
 }
 
 func (c *SecretsCommand) GetBaseCommand() string {
-	return "secrets-manager"
+	return "secrets"
 }
 
 // Synopsis implements the cli.Command interface

@@ -38,10 +38,10 @@ func (i *SecretsInit) DefineFlags() {
 			"DATA_DIRECTORY",
 		},
 		ArgumentsOptional: false,
-		FlagOptional:      false,
+		FlagOptional:      true,
 	}
 
-	i.FlagMap["secrets-config"] = helper.FlagDescriptor{
+	i.FlagMap["config"] = helper.FlagDescriptor{
 		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
@@ -127,7 +127,7 @@ func (p *SecretsInit) Run(args []string) int {
 	var configPath string
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
-	flags.StringVar(&configPath, "secrets-config", "", "")
+	flags.StringVar(&configPath, "config", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())

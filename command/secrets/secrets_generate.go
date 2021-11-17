@@ -61,9 +61,9 @@ func (s *SecretsGenerate) DefineFlags() {
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default %s", defaultNodeName),
+		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default: %s", defaultNodeName),
 		Arguments: []string{
-			"SERVER_URL",
+			"NODE_NAME",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
@@ -88,7 +88,7 @@ func (s *SecretsGenerate) Synopsis() string {
 }
 
 func (s *SecretsGenerate) GetBaseCommand() string {
-	return "secrets-manager generate"
+	return "secrets generate"
 }
 
 // Run implements the cli.SecretsManagerGenerate interface
