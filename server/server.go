@@ -66,10 +66,8 @@ type Server struct {
 
 var dirPaths = []string{
 	"blockchain",
-	//"consensus",
 	"keystore",
 	"trie",
-	//"libp2p",
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration

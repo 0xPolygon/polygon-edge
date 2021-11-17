@@ -7,9 +7,7 @@ import (
 
 func TestGrpcStream(t *testing.T) {
 	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, func(c *Config) {
-		// c.Chain.Extra.ChainID = 10
-	})
+	srv1 := CreateServer(t, nil)
 
 	// connect with 0 -> 1
 	MultiJoin(t, srv0, srv1)
