@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -858,7 +859,139 @@ func TestSizeLimit(t *testing.T) {
 			err = pool.addImpl(tt.input.origin, genTx(t, &tt.input))
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.len, pool.Length())
-			assert.Equal(t, tt.slots, pool.Watermark())
+			assert.Equal(t, tt.slots, pool.slotsOccupied())
+		})
+	}
+}
+
+func TestGaugeCheck(t *testing.T) {
+	type AddTx struct {
+		nonce    uint64
+		gasPrice *big.Int
+		slotSize uint64
+		origin   TxOrigin
+	}
+
+	genTx := func(t *testing.T, arg AddTx) *types.Transaction {
+		// base field should take 1 slot at least
+		size := txSlotSize * (arg.slotSize - 1)
+		if size <= 0 {
+			size = 1
+		}
+		input := make([]byte, size)
+		rand.Read(input)
+
+		tx := &types.Transaction{
+			From:     addr1,
+			Nonce:    arg.nonce,
+			Gas:      10000000,
+			GasPrice: arg.gasPrice,
+			Value:    big.NewInt(0),
+			Input:    input,
+		}
+
+		return tx
+	}
+
+	tests := []struct {
+		name         string
+		initialSlots uint64
+		maxSlots     uint64
+		incomingTxs  []AddTx
+	}{
+		{
+			name:         "accept incoming remote txs when gauge is near limit",
+			initialSlots: 17,
+			maxSlots:     20,
+			incomingTxs: []AddTx{
+				{
+					nonce:    17,
+					gasPrice: big.NewInt(10),
+					slotSize: 4,
+					origin:   OriginGossip,
+				},
+				{
+					nonce:    18,
+					gasPrice: big.NewInt(11),
+					slotSize: 3,
+					origin:   OriginGossip,
+				},
+				{
+					nonce:    19,
+					gasPrice: big.NewInt(12),
+					slotSize: 4,
+					origin:   OriginGossip,
+				},
+			},
+		},
+		{
+			name:         "accept incoming local txs when gauge is near limit",
+			initialSlots: 25,
+			maxSlots:     30,
+			incomingTxs: []AddTx{
+				{
+					nonce:    25,
+					gasPrice: big.NewInt(10),
+					slotSize: 4,
+					origin:   OriginAddTxn,
+				},
+				{
+					nonce:    26,
+					gasPrice: big.NewInt(10),
+					slotSize: 3,
+					origin:   OriginAddTxn,
+				},
+				{
+					nonce:    27,
+					gasPrice: big.NewInt(10),
+					slotSize: 4,
+					origin:   OriginAddTxn,
+				},
+				{
+					nonce:    28,
+					gasPrice: big.NewInt(10),
+					slotSize: 3,
+					origin:   OriginAddTxn,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlots, forks.At(0), &mockStore{}, nil, nil)
+			assert.NoError(t, err)
+			pool.EnableDev()
+			pool.AddSigner(&mockSigner{})
+
+			// fill pool with remote txs of slot size 1
+			for i := uint64(0); i < tt.initialSlots; i++ {
+				arg := AddTx{
+					nonce:    uint64(i),
+					gasPrice: big.NewInt(1),
+					slotSize: 1,
+					origin:   OriginGossip,
+				}
+				tx := genTx(t, arg)
+				assert.NoError(t, pool.addImpl(OriginGossip, tx))
+			}
+			assert.Equal(t, tt.initialSlots, pool.slotsOccupied())
+
+			// send incoming
+			var wg sync.WaitGroup
+			for _, incomingTx := range tt.incomingTxs {
+				wg.Add(1)
+				go func(incoming AddTx) {
+					defer wg.Done()
+					tx := genTx(t, incoming)
+					assert.NoError(t, pool.addImpl(incoming.origin, tx))
+				}(incomingTx)
+			}
+			wg.Wait()
+
+			// In whichever order the incoming txs came in
+			// they should not break the gauge limit invariant
+			assert.Equal(t, tt.maxSlots, pool.slotsOccupied())
 		})
 	}
 }

@@ -125,14 +125,8 @@ type TxPool struct {
 	// Min price heap for all remote transactions
 	remoteTxns *txPriceHeap
 
-	// Gauge for pool tx capacity
+	// Gauge for measuring pool capacity
 	gauge slotGauge
-
-	// Number of used slots
-	slots uint64
-
-	// Maximum number of transaction slots for all accounts
-	maxSlots uint64
 
 	// Networking stack
 	topic *network.Topic
@@ -181,8 +175,6 @@ func NewTxPool(
 		pendingQueue:  newMaxTxPriceHeap(),
 		remoteTxns:    newMinTxPriceHeap(),
 		gauge:         slotGauge{current: 0, limit: maxSlots},
-		slots:         0,
-		maxSlots:      maxSlots,
 		sealing:       sealing,
 		locals:        newLocalAccounts(locals),
 		noLocals:      noLocals,
@@ -363,11 +355,11 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
 
-	println("addImpl():", "wrapper len=", len(wrapper.accountQueue.txs))
 	if !isLocal {
 		t.remoteTxns.Push(tx)
 	}
 
+	// println("Remotes len=", t.remoteTxns.Length())
 	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
@@ -380,7 +372,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		}
 	}
 
-	println("addImpl(): promoted count=", t.pendingQueue.Length())
 	return nil
 }
 
@@ -506,7 +497,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 }
 
 // Returns the number of slots currently occupying the pool
-func (t *TxPool) Watermark() uint64 {
+func (t *TxPool) slotsOccupied() uint64 {
 	return t.gauge.height()
 }
 
@@ -601,6 +592,7 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 	}
 
 	// Put back if couldn't make required space
+	// println("remoteTxs len=", t.remoteTxns.Length(), ", remaining=", remaining)
 	if remaining > 0 && !force {
 		for _, tx := range dropped {
 			t.remoteTxns.Push(tx)
@@ -655,7 +647,7 @@ func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
 		t.gauge.current -= slots(tx)
 		// t.decreaseSlots(slots(tx))
 	}
-
+	// println("current=", current, "limit=", limit)
 	return nil
 }
 
