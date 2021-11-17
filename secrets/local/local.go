@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/hashicorp/go-hclog"
 )
@@ -30,16 +31,17 @@ type LocalSecretsManager struct {
 
 // SecretsManagerFactory implements the factory method
 func SecretsManagerFactory(
-	config *secrets.SecretsManagerParams,
+	_ *secrets.SecretsManagerConfig,
+	params *secrets.SecretsManagerParams,
 ) (secrets.SecretsManager, error) {
 	// Set up the base object
 	localManager := &LocalSecretsManager{
-		logger:        config.Logger.Named(string(secrets.Local)),
+		logger:        params.Logger.Named(string(secrets.Local)),
 		secretPathMap: make(map[string]string),
 	}
 
 	// Grab the path to the working directory
-	path, ok := config.Params[secrets.Path]
+	path, ok := params.Extra[secrets.Path]
 	if !ok {
 		return nil, errors.New("no path specified for local secrets manager")
 	}
@@ -56,6 +58,15 @@ func (l *LocalSecretsManager) Setup() error {
 	// The local SecretsManager initially handles only the
 	// validator and networking private keys
 	l.secretPathMapLock.Lock()
+	defer l.secretPathMapLock.Unlock()
+
+	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
+
+	// Set up the local directories
+	if err := common.SetupDataDir(l.path, subDirectories); err != nil {
+		return err
+	}
+
 	// baseDir/consensus/validator.key
 	l.secretPathMap[secrets.ValidatorKey] = filepath.Join(
 		l.path,
@@ -69,8 +80,6 @@ func (l *LocalSecretsManager) Setup() error {
 		secrets.NetworkFolderLocal,
 		secrets.NetworkKeyLocal,
 	)
-
-	l.secretPathMapLock.Unlock()
 
 	return nil
 }

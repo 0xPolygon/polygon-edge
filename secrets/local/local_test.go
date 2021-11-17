@@ -15,6 +15,17 @@ import (
 )
 
 func TestLocalSecretsManagerFactory(t *testing.T) {
+	// Set up the expected folder structure
+	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
+	if tempErr != nil {
+		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
+	}
+
+	// Set up a clean-up procedure
+	t.Cleanup(func() {
+		_ = os.RemoveAll(workingDirectory)
+	})
+
 	testTable := []struct {
 		name          string
 		config        *secrets.SecretsManagerParams
@@ -24,8 +35,8 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 			"Valid configuration with path info",
 			&secrets.SecretsManagerParams{
 				Logger: hclog.NewNullLogger(),
-				Params: map[string]interface{}{
-					secrets.Path: os.TempDir(),
+				Extra: map[string]interface{}{
+					secrets.Path: workingDirectory,
 				},
 			},
 			true,
@@ -34,7 +45,7 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 			"Invalid configuration without path info",
 			&secrets.SecretsManagerParams{
 				Logger: hclog.NewNullLogger(),
-				Params: map[string]interface{}{
+				Extra: map[string]interface{}{
 					"dummy": 123,
 				},
 			},
@@ -44,7 +55,7 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			localSecretsManager, factoryErr := SecretsManagerFactory(testCase.config)
+			localSecretsManager, factoryErr := SecretsManagerFactory(nil, testCase.config)
 			if testCase.shouldSucceed {
 				assert.NotNil(t, localSecretsManager)
 				assert.NoError(t, factoryErr)
@@ -78,12 +89,12 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 	// Set up an instance of the local secrets manager
 	baseConfig := &secrets.SecretsManagerParams{
 		Logger: hclog.NewNullLogger(),
-		Params: map[string]interface{}{
+		Extra: map[string]interface{}{
 			secrets.Path: workingDirectory,
 		},
 	}
 
-	manager, factoryErr := SecretsManagerFactory(baseConfig)
+	manager, factoryErr := SecretsManagerFactory(nil, baseConfig)
 	if factoryErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager, %v", factoryErr)
 	}

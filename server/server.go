@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -67,10 +66,10 @@ type Server struct {
 
 var dirPaths = []string{
 	"blockchain",
-	"consensus",
+	//"consensus",
 	"keystore",
 	"trie",
-	"libp2p",
+	//"libp2p",
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -244,6 +243,17 @@ func (s *Server) setupSecretsManager() error {
 	}
 
 	secretsManagerType := secretsManagerConfig.Type
+	secretsManagerParams := &secrets.SecretsManagerParams{
+		Logger: s.logger,
+	}
+
+	if secretsManagerType == secrets.Local {
+		// Only the base directory is required for
+		// the local secrets manager
+		secretsManagerParams.Extra = map[string]interface{}{
+			secrets.Path: s.config.DataDir,
+		}
+	}
 
 	// Grab the factory method
 	secretsManagerFactory, ok := secretsManagerBackends[secretsManagerType]
@@ -251,40 +261,10 @@ func (s *Server) setupSecretsManager() error {
 		return fmt.Errorf("secrets manager type '%s' not found", secretsManagerType)
 	}
 
-	// Initialize the params for setup
-	params := make(map[string]interface{})
-
-	switch secretsManagerType {
-	case secrets.Local:
-		// Only the base directory is required for
-		// the local secrets manager
-		params[secrets.Path] = s.config.DataDir
-	case secrets.HashicorpVault:
-		// Check if the token is present
-		if s.config.SecretsManager.Token == "" {
-			return errors.New("missing token from secrets config")
-		}
-		params[secrets.Token] = s.config.SecretsManager.Token
-
-		// Check if the server URL is present
-		if s.config.SecretsManager.ServerURL == "" {
-			return errors.New("missing server URL from secrets config")
-		}
-		params[secrets.Server] = s.config.SecretsManager.ServerURL
-
-		// Check if the node name is present
-		if s.config.SecretsManager.Name == "" {
-			return errors.New("missing node name from secrets config")
-		}
-		params[secrets.Name] = s.config.SecretsManager.Name
-	}
-
 	// Instantiate the secrets manager
 	secretsManager, factoryErr := secretsManagerFactory(
-		&secrets.SecretsManagerParams{
-			Logger: s.logger,
-			Params: params,
-		},
+		secretsManagerConfig,
+		secretsManagerParams,
 	)
 
 	if factoryErr != nil {

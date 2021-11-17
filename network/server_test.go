@@ -32,12 +32,14 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 		t.Fatalf("unable to generate libp2p folder structure, %v", setupErr)
 	}
 
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: hclog.NewNullLogger(),
-		Params: map[string]interface{}{
-			secrets.Path: dir,
-		},
-	})
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+			Extra: map[string]interface{}{
+				secrets.Path: dir,
+			},
+		})
 	assert.NoError(t, factoryErr)
 
 	libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()

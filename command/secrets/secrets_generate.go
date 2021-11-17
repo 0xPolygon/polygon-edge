@@ -1,4 +1,4 @@
-package secretsmanager
+package secrets
 
 import (
 	"flag"
@@ -8,8 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 )
 
-// SecretsManagerGenerate is the command to generate a secrets manager configuration
-type SecretsManagerGenerate struct {
+// SecretsGenerate is the command to generate a secrets manager configuration
+type SecretsGenerate struct {
 	helper.Meta
 }
 
@@ -18,13 +18,13 @@ const (
 	defaultConfigFileName = "./secretsManagerConfig.json"
 )
 
-func (i *SecretsManagerGenerate) DefineFlags() {
-	if i.FlagMap == nil {
+func (s *SecretsGenerate) DefineFlags() {
+	if s.FlagMap == nil {
 		// Flag map not initialized
-		i.FlagMap = make(map[string]helper.FlagDescriptor)
+		s.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
-	i.FlagMap["dir"] = helper.FlagDescriptor{
+	s.FlagMap["dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the directory for the secrets manager configuration file Default: %s", defaultConfigFileName),
 		Arguments: []string{
 			"DIRECTORY",
@@ -33,7 +33,7 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	i.FlagMap["type"] = helper.FlagDescriptor{
+	s.FlagMap["type"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the type of the secrets manager. Default: %s", secrets.HashicorpVault),
 		Arguments: []string{
 			"TYPE",
@@ -42,7 +42,7 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	i.FlagMap["token"] = helper.FlagDescriptor{
+	s.FlagMap["token"] = helper.FlagDescriptor{
 		Description: "Specifies the access token for the service",
 		Arguments: []string{
 			"TOKEN",
@@ -51,7 +51,7 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	i.FlagMap["server-url"] = helper.FlagDescriptor{
+	s.FlagMap["server-url"] = helper.FlagDescriptor{
 		Description: "Specifies the server URL for the service",
 		Arguments: []string{
 			"SERVER_URL",
@@ -60,7 +60,7 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	i.FlagMap["name"] = helper.FlagDescriptor{
+	s.FlagMap["name"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default %s", defaultNodeName),
 		Arguments: []string{
 			"SERVER_URL",
@@ -71,29 +71,29 @@ func (i *SecretsManagerGenerate) DefineFlags() {
 }
 
 // GetHelperText returns a simple description of the command
-func (p *SecretsManagerGenerate) GetHelperText() string {
+func (s *SecretsGenerate) GetHelperText() string {
 	return "Initializes the secrets manager configuration in the provided directory. Used for Hashicorp Vault"
 }
 
 // Help implements the cli.SecretsManagerGenerate interface
-func (p *SecretsManagerGenerate) Help() string {
-	p.DefineFlags()
+func (s *SecretsGenerate) Help() string {
+	s.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
+	return helper.GenerateHelp(s.Synopsis(), helper.GenerateUsage(s.GetBaseCommand(), s.FlagMap), s.FlagMap)
 }
 
 // Synopsis implements the cli.SecretsManagerGenerate interface
-func (p *SecretsManagerGenerate) Synopsis() string {
-	return p.GetHelperText()
+func (s *SecretsGenerate) Synopsis() string {
+	return s.GetHelperText()
 }
 
-func (p *SecretsManagerGenerate) GetBaseCommand() string {
+func (s *SecretsGenerate) GetBaseCommand() string {
 	return "secrets-manager generate"
 }
 
 // Run implements the cli.SecretsManagerGenerate interface
-func (p *SecretsManagerGenerate) Run(args []string) int {
-	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
+func (s *SecretsGenerate) Run(args []string) int {
+	flags := flag.NewFlagSet(s.GetBaseCommand(), flag.ContinueOnError)
 	var path string
 	var token string
 	var serverURL string
@@ -107,33 +107,33 @@ func (p *SecretsManagerGenerate) Run(args []string) int {
 	flags.StringVar(&name, "name", defaultNodeName, "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		s.UI.Error(err.Error())
 		return 1
 	}
 
 	// Safety checks
 	if path == "" {
-		p.UI.Error("required argument (path) not passed in")
+		s.UI.Error("required argument (path) not passed in")
 		return 1
 	}
 
 	if token == "" {
-		p.UI.Error("required argument (token) not passed in")
+		s.UI.Error("required argument (token) not passed in")
 		return 1
 	}
 
 	if serverURL == "" {
-		p.UI.Error("required argument (serverURL) not passed in")
+		s.UI.Error("required argument (serverURL) not passed in")
 		return 1
 	}
 
 	if name == "" {
-		p.UI.Error("required argument (name) not passed in")
+		s.UI.Error("required argument (name) not passed in")
 		return 1
 	}
 
 	if !secrets.SupportedServiceManager(secrets.SecretsManagerType(serviceType)) {
-		p.UI.Error("unsupported service manager type")
+		s.UI.Error("unsupported service manager type")
 		return 1
 	}
 
@@ -148,11 +148,11 @@ func (p *SecretsManagerGenerate) Run(args []string) int {
 
 	writeErr := config.WriteConfig(path)
 	if writeErr != nil {
-		p.UI.Error("unable to write configuration file")
+		s.UI.Error("unable to write configuration file")
 		return 1
 	}
 
-	output := "\n[SECRETS MANAGER GENERATE]\n"
+	output := "\n[SECRETS GENERATE]\n"
 
 	output += helper.FormatKV([]string{
 		fmt.Sprintf("Service Type|%s", serviceType),
@@ -164,7 +164,7 @@ func (p *SecretsManagerGenerate) Run(args []string) int {
 	output += "\n\nCONFIGURATION GENERATED"
 	output += "\n"
 
-	p.UI.Output(output)
+	s.UI.Output(output)
 
 	return 0
 }

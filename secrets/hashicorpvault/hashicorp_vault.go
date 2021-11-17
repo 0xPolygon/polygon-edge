@@ -33,33 +33,37 @@ type VaultSecretsManager struct {
 
 // SecretsManagerFactory implements the factory method
 func SecretsManagerFactory(
-	config *secrets.SecretsManagerParams,
+	config *secrets.SecretsManagerConfig,
+	params *secrets.SecretsManagerParams,
 ) (secrets.SecretsManager, error) {
 	// Set up the base object
 	vaultManager := &VaultSecretsManager{
-		logger: config.Logger.Named(string(secrets.HashicorpVault)),
+		logger: params.Logger.Named(string(secrets.HashicorpVault)),
+	}
+
+	// Check if the token is present
+	if config.Token == "" {
+		return nil, errors.New("no token specified for Vault secrets manager")
 	}
 
 	// Grab the token from the config
-	token, ok := config.Params[secrets.Token]
-	if !ok {
-		return nil, errors.New("no token specified for Vault secrets manager")
-	}
-	vaultManager.token = token.(string)
+	vaultManager.token = config.Token
 
-	// Grab the server URL from the config
-	serverURL, ok := config.Params[secrets.Server]
-	if !ok {
+	// Check if the server URL is present
+	if config.ServerURL == "" {
 		return nil, errors.New("no server URL specified for Vault secrets manager")
 	}
-	vaultManager.serverURL = serverURL.(string)
 
-	// Grab the node name from the config
-	name, ok := config.Params[secrets.Name]
-	if !ok {
+	// Grab the server URL from the config
+	vaultManager.serverURL = config.ServerURL
+
+	// Check if the node name is present
+	if config.Name == "" {
 		return nil, errors.New("no node name specified for Vault secrets manager")
 	}
-	vaultManager.name = name.(string)
+
+	// Grab the node name from the config
+	vaultManager.name = config.Name
 
 	// Set the base path to store the secrets in the KV-2 Vault storage
 	vaultManager.basePath = fmt.Sprintf("secret/data/%s", vaultManager.name)

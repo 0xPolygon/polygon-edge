@@ -1,4 +1,4 @@
-package ibft
+package secrets
 
 import (
 	"errors"
@@ -7,19 +7,18 @@ import (
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
-
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/network"
 )
 
-// IbftInit is the command to query the snapshot
-type IbftInit struct {
+// SecretsInit is the command to query the snapshot
+type SecretsInit struct {
 	helper.Meta
 }
 
@@ -27,14 +26,14 @@ var (
 	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
 )
 
-func (i *IbftInit) DefineFlags() {
+func (i *SecretsInit) DefineFlags() {
 	if i.FlagMap == nil {
 		// Flag map not initialized
 		i.FlagMap = make(map[string]helper.FlagDescriptor)
 	}
 
 	i.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: "Sets the directory for the Polygon SDK data",
+		Description: "Sets the directory for the Polygon SDK data if the local FS is used",
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -54,105 +53,75 @@ func (i *IbftInit) DefineFlags() {
 }
 
 // GetHelperText returns a simple description of the command
-func (p *IbftInit) GetHelperText() string {
-	return "Initializes IBFT for the Polygon SDK, in the specified directory"
+func (p *SecretsInit) GetHelperText() string {
+	return "Initializes private keys for the Polygon SDK (Validator + Networking) to the specified Secrets Manager"
 }
 
-// Help implements the cli.IbftInit interface
-func (p *IbftInit) Help() string {
+// Help implements the cli.SecretsInit interface
+func (p *SecretsInit) Help() string {
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
 
-// Synopsis implements the cli.IbftInit interface
-func (p *IbftInit) Synopsis() string {
+// Synopsis implements the cli.SecretsInit interface
+func (p *SecretsInit) Synopsis() string {
 	return p.GetHelperText()
 }
 
-func (p *IbftInit) GetBaseCommand() string {
-	return "ibft init"
-}
-
-// generateAlreadyInitializedError generates an output for when the IBFT directory
-// has already been initialized in the past
-func generateAlreadyInitializedError(directory string) string {
-	return fmt.Sprintf("Directory %s has previously initialized IBFT data\n", directory)
+func (p *SecretsInit) GetBaseCommand() string {
+	return "secrets init"
 }
 
 // constructInitError is a wrapper function for the error output to CLI
 func constructInitError(err string) string {
-	output := "\n[IBFT INIT ERROR]\n"
+	output := "\n[SECRETS INIT ERROR]\n"
 	output += err
 
 	return output
 }
 
-var (
-	consensusDir = "consensus"
-	libp2pDir    = "libp2p"
-)
+// generateAlreadyInitializedError generates an output for when the secrets directory
+// has already been initialized in the past
+func generateAlreadyInitializedError(directory string) string {
+	return fmt.Sprintf("Directory %s has previously initialized secrets data\n", directory)
+}
 
 // setupLocalSM is a helper method for boilerplate local secrets manager setup
 func setupLocalSM(dataDir string) (secrets.SecretsManager, error) {
+	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
+
 	// Check if the sub-directories exist / are already populated
-	for _, subDirectory := range []string{consensusDir, libp2pDir} {
-		if helper.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
+	for _, subDirectory := range subDirectories {
+		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
 			return nil, errors.New(generateAlreadyInitializedError(dataDir))
 		}
 	}
 
-	// Set up the local directories
-	if err := common.SetupDataDir(dataDir, []string{consensusDir, libp2pDir}); err != nil {
-		return nil, err
-	}
-
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: hclog.NewNullLogger(),
-		Params: map[string]interface{}{
-			secrets.Path: dataDir,
-		},
-	})
-
-	return localSecretsManager, factoryErr
+	return local.SecretsManagerFactory(
+		nil, // Local secrets manager doesn't require a config
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+			Extra: map[string]interface{}{
+				secrets.Path: dataDir,
+			},
+		})
 }
 
 // setupHashicorpVault is a helper method for boilerplate hashicorp vault secrets manager setup
 func setupHashicorpVault(
 	secretsConfig *secrets.SecretsManagerConfig,
 ) (secrets.SecretsManager, error) {
-	params := make(map[string]interface{})
-
-	// Check if the token is present
-	if secretsConfig.Token == "" {
-		return nil, ErrorInvalidSecretsConfig
-	}
-	params[secrets.Token] = secretsConfig.Token
-
-	// Check if the server URL is present
-	if secretsConfig.ServerURL == "" {
-		return nil, ErrorInvalidSecretsConfig
-	}
-	params[secrets.Server] = secretsConfig.ServerURL
-
-	// Check if the node name is present
-	if secretsConfig.Name == "" {
-		return nil, ErrorInvalidSecretsConfig
-	}
-	params[secrets.Name] = secretsConfig.Name
-
-	vaultSecretsManager, factoryErr := hashicorpvault.SecretsManagerFactory(
+	return hashicorpvault.SecretsManagerFactory(
+		secretsConfig,
 		&secrets.SecretsManagerParams{
 			Logger: hclog.NewNullLogger(),
-			Params: params,
 		},
 	)
-
-	return vaultSecretsManager, factoryErr
 }
 
-// Run implements the cli.IbftInit interface
-func (p *IbftInit) Run(args []string) int {
+// Run implements the cli.SecretsInit interface
+func (p *SecretsInit) Run(args []string) int {
 	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
 	var dataDir string
 	var configPath string
@@ -237,7 +206,7 @@ func (p *IbftInit) Run(args []string) int {
 		return 1
 	}
 
-	output := "\n[IBFT INIT]\n"
+	output := "\n[SECRETS INIT]\n"
 
 	output += helper.FormatKV([]string{
 		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&validatorKey.PublicKey)),

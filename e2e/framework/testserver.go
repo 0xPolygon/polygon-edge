@@ -22,7 +22,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
+	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
@@ -139,10 +139,10 @@ type InitIBFTResult struct {
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	ibftInitCmd := ibftCommand.IbftInit{}
+	secretsInitCmd := secretsCommand.SecretsInit{}
 	var args []string
 
-	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -155,12 +155,14 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 
 	res := &InitIBFTResult{}
 
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: hclog.NewNullLogger(),
-		Params: map[string]interface{}{
-			secrets.Path: filepath.Join(cmd.Dir, t.Config.IBFTDir),
-		},
-	})
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+			Extra: map[string]interface{}{
+				secrets.Path: filepath.Join(cmd.Dir, t.Config.IBFTDir),
+			},
+		})
 	if factoryErr != nil {
 		return nil, factoryErr
 	}

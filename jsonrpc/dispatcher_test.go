@@ -267,7 +267,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	var res []SuccessResponse
 	assert.NoError(t, expectBatchJSONResult(resp, &res))
 	assert.Len(t, res, 4)
-	jsonerr := &ErrorObject{Code: -32602, Message: "Invalid Params"}
+	jsonerr := &ErrorObject{Code: -32602, Message: "Invalid Extra"}
 	assert.Equal(t, res[0].Error, jsonerr)
 	assert.Nil(t, res[3].Error)
 }

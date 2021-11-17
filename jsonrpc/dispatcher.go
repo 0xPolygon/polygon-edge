@@ -289,7 +289,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	}
 	if fd.numParams() > 0 {
 		if err := json.Unmarshal(req.Params, &inputs); err != nil {
-			return nil, NewInvalidParamsError("Invalid Params")
+			return nil, NewInvalidParamsError("Invalid Extra")
 		}
 	}
 

@@ -528,19 +528,3 @@ func FormatKV(in []string) string {
 
 	return columnize.Format(in, columnConf)
 }
-
-// DirectoryExists checks if the directory at the specified path exists
-func DirectoryExists(directoryPath string) bool {
-	// Grab the absolute filepath
-	pathAbs, err := filepath.Abs(directoryPath)
-	if err != nil {
-		return false
-	}
-
-	// Check if the directory exists, and that it's actually a directory if there is a hit
-	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && !fileInfo.IsDir()) {
-		return false
-	}
-
-	return true
-}

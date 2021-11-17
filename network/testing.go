@@ -30,12 +30,15 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 		callback(cfg)
 	}
 
-	secretsManager, factoryErr := local.SecretsManagerFactory(&secrets.SecretsManagerParams{
-		Logger: logger,
-		Params: map[string]interface{}{
-			secrets.Path: cfg.DataDir,
+	secretsManager, factoryErr := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: logger,
+			Extra: map[string]interface{}{
+				secrets.Path: cfg.DataDir,
+			},
 		},
-	})
+	)
 
 	assert.NoError(t, factoryErr)
 
