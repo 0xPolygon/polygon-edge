@@ -359,7 +359,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.remoteTxns.Push(tx)
 	}
 
-	// println("Remotes len=", t.remoteTxns.Length())
 	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
@@ -592,7 +591,6 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 	}
 
 	// Put back if couldn't make required space
-	// println("remoteTxs len=", t.remoteTxns.Length(), ", remaining=", remaining)
 	if remaining > 0 && !force {
 		for _, tx := range dropped {
 			t.remoteTxns.Push(tx)
@@ -645,9 +643,8 @@ func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
 
 		t.pendingQueue.Delete(tx)
 		t.gauge.current -= slots(tx)
-		// t.decreaseSlots(slots(tx))
 	}
-	// println("current=", current, "limit=", limit)
+
 	return nil
 }
 
