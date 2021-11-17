@@ -40,6 +40,7 @@ func Factory(
 	executor *state.Executor,
 	srv *grpc.Server,
 	logger hclog.Logger,
+	metrics *consensus.Metrics,
 ) (consensus.Consensus, error) {
 	logger = logger.Named("dev")
 

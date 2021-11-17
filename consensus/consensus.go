@@ -55,4 +55,5 @@ type Factory func(
 	*state.Executor,
 	*grpc.Server,
 	hclog.Logger,
+	*Metrics,
 ) (Consensus, error)

@@ -23,7 +23,7 @@ type Dummy struct {
 	executor   *state.Executor
 }
 
-func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
+func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger, metrics *consensus.Metrics) (consensus.Consensus, error) {
 	logger = logger.Named("dummy")
 
 	d := &Dummy{
