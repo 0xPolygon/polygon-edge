@@ -140,27 +140,24 @@ func TestMultipleTransactions(t *testing.T) {
 		GasPrice: big.NewInt(1),
 		Value:    big.NewInt(0),
 	}
-	println(pool.NumAccountTxs(from1))
 	assert.NoError(t, pool.addImpl("", txn0))
-	println(pool.NumAccountTxs(from1))
 	assert.NoError(t, pool.addImpl("", txn0))
-	println(pool.NumAccountTxs(from1))
 
 	assert.Equal(t, pool.NumAccountTxs(from1), 1)
 	assert.Equal(t, pool.Length(), uint64(0))
 
-	// from2 := types.Address{0x2}
-	// txn1 := &types.Transaction{
-	// 	From:     from2,
-	// 	Gas:      validGasLimit,
-	// 	GasPrice: big.NewInt(1),
-	// 	Value:    big.NewInt(0),
-	// }
-	// assert.NoError(t, pool.addImpl("", txn1))
-	// assert.NoError(t, pool.addImpl("", txn1))
+	from2 := types.Address{0x2}
+	txn1 := &types.Transaction{
+		From:     from2,
+		Gas:      validGasLimit,
+		GasPrice: big.NewInt(1),
+		Value:    big.NewInt(0),
+	}
+	assert.NoError(t, pool.addImpl("", txn1))
+	assert.NoError(t, pool.addImpl("", txn1))
 
-	// assert.Equal(t, pool.NumAccountTxs(from2), 0)
-	// assert.Equal(t, pool.Length(), uint64(1))
+	assert.Equal(t, pool.NumAccountTxs(from2), 0)
+	assert.Equal(t, pool.Length(), uint64(1))
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
