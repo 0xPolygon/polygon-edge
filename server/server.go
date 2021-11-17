@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
@@ -58,6 +61,10 @@ type Server struct {
 
 	// transaction pool
 	txpool *txpool.TxPool
+
+	serverMetrics *serverMetrics
+
+	prometheusServer *http.Server
 }
 
 var dirPaths = []string{
@@ -82,6 +89,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	// Generate all the paths in the dataDir
 	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
+	}
+
+	if config.PrometheusListnerAddr != nil {
+		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, true)
+		m.prometheusServer = m.startPrometheusServer(config.PrometheusListnerAddr)
+	} else {
+		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
 	}
 
 	// start libp2p
@@ -129,7 +143,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.config.Locals, m.config.NoLocals, m.config.PriceLimit, m.config.MaxSlots, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network)
+		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.config.Locals, m.config.NoLocals, m.config.PriceLimit, m.config.MaxSlots, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network, m.serverMetrics.txpool)
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +242,7 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"))
+	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"), s.serverMetrics.consensus)
 	if err != nil {
 		return err
 	}
@@ -398,6 +412,12 @@ func (s *Server) Close() {
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())
 	}
+
+	if s.prometheusServer != nil {
+		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
+			s.logger.Error("Prometheus server shutdown error", err)
+		}
+	}
 }
 
 // Entry is a backend configuration entry
@@ -420,6 +440,27 @@ func SetupDataDir(dataDir string, paths []string) error {
 	}
 
 	return nil
+}
+
+func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
+	srv := &http.Server{
+		Addr: listenAddr.String(),
+		Handler: promhttp.InstrumentMetricHandler(
+			prometheus.DefaultRegisterer, promhttp.HandlerFor(
+				prometheus.DefaultGatherer,
+				promhttp.HandlerOpts{},
+			),
+		),
+	}
+
+	go func() {
+		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+		}
+	}()
+
+	return srv
 }
 
 // createDir creates a file system directory if it doesn't exist
