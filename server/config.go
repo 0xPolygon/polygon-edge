@@ -26,6 +26,7 @@ type Config struct {
 	NoLocals   bool
 	PriceLimit uint64
 	MaxSlots   uint64
+	SpeedUpMin uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking

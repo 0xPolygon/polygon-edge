@@ -189,6 +189,14 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	c.flagMap["speed-up"] = helper.FlagDescriptor{
+		Description: "Minimum amount of additional gas fee required to accelerate a same-nonce transaction",
+		Arguments: []string{
+			"SPEED_UP",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command

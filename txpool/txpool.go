@@ -112,6 +112,10 @@ type TxPool struct {
 	// priceLimit is a lower threshold for gas price
 	priceLimit uint64
 
+	// Minimum amount of additional gasPrice
+	// a speed up tx should have
+	speedUpMin uint64
+
 	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
@@ -127,6 +131,7 @@ func NewTxPool(
 	noLocals bool,
 	priceLimit uint64,
 	maxSlots uint64,
+	speedUpMin uint64,
 	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
@@ -145,6 +150,7 @@ func NewTxPool(
 		locals:        newLocalAccounts(locals),
 		noLocals:      noLocals,
 		priceLimit:    priceLimit,
+		speedUpMin:    speedUpMin,
 		forks:         forks,
 	}
 
@@ -304,6 +310,10 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
+	}
+
+	if oldTx, ok := t.isSpeedUp(tx); ok {
+		return t.speedUp(tx, oldTx)
 	}
 
 	if t.slots+numSlots(tx) > t.maxSlots {
@@ -589,6 +599,66 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 	atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
+func (t *TxPool) isSpeedUp(tx *types.Transaction) (*types.Transaction, bool) {
+	nextNonce, ok := t.GetNonce(tx.From)
+	if !ok {
+		println("No previous txs for this acc")
+		return nil, false
+	}
+
+	mux := t.lockAccountQueue(tx.From, false)
+	defer mux.unlock()
+
+	if nextNonce == tx.Nonce+1 {
+		// old tx was promoted to pending queue
+		oldTx := mux.accountQueue.lastPromoted
+		return oldTx, true
+	} else if nextNonce < tx.Nonce {
+		// old tx might be waiting on promotion (if it's there)
+		i := sort.Search(mux.accountQueue.txs.Len(), func(i int) bool {
+			return mux.accountQueue.txs[i].Nonce >= tx.Nonce
+		})
+
+		if i < mux.accountQueue.txs.Len() && mux.accountQueue.txs[i].Nonce == tx.Nonce {
+			// found it
+			return mux.accountQueue.txs[i], true
+		}
+	}
+
+	return nil, false
+}
+
+func (t *TxPool) speedUp(newTx, oldTx *types.Transaction) error {
+	// price check
+	threshold := big.NewInt(0).Add(
+		oldTx.GasPrice,
+		big.NewInt(0).SetUint64(t.speedUpMin))
+	if newTx.GasPrice.Cmp(threshold) < 0 {
+		return ErrUnderpriced
+	}
+
+	mux := t.lockAccountQueue(newTx.From, true)
+	defer mux.unlock()
+
+	if t.pendingQueue.Contains(oldTx) {
+		t.pendingQueue.Delete(oldTx)
+		t.decreaseSlots(numSlots(oldTx))
+
+		t.pendingQueue.Push(newTx)
+		t.increaseSlots(numSlots(newTx))
+
+		mux.accountQueue.lastPromoted = newTx
+	} else {
+		mux.accountQueue.Remove(oldTx.Hash)
+		t.decreaseSlots(numSlots(oldTx))
+
+		mux.accountQueue.Push(newTx)
+		t.increaseSlots(numSlots(newTx))
+	}
+
+	return nil
+}
+
 // txHeapWrapper is a wrapper object for account based transactions
 type txHeapWrapper struct {
 	// txs is the actual min heap (nonce ordered) for account transactions
@@ -597,6 +667,9 @@ type txHeapWrapper struct {
 	// nextNonce is a field indicating what should be the next
 	// valid nonce for the account transaction
 	nextNonce uint64
+
+	// last tx that was promoted from this acc to pending queue
+	lastPromoted *types.Transaction
 }
 
 // newTxHeapWrapper creates a new account based tx heap
@@ -671,6 +744,9 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	lastTxn := promote[len(promote)-1]
 	// Grab its nonce value and set it as the reference next nonce
 	t.nextNonce = lastTxn.Nonce + 1
+
+	// Save this tx in case of a imminent resubmit (speedUp)
+	t.lastPromoted = lastTxn
 
 	reinsertFunc()
 
