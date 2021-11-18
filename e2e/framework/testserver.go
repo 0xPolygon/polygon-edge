@@ -272,6 +272,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
+	if t.Config.SpeedUpMin != 0 {
+		args = append(args, "--speed-up", *types.EncodeUint64(t.Config.SpeedUpMin))
+	}
+
 	t.ReleaseReservedPorts()
 
 	// Start the server

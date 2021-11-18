@@ -39,6 +39,7 @@ type TestServerConfig struct {
 	BlockGasLimit  uint64        // Block gas limit
 	BlockGasTarget uint64        // Gas target for new blocks
 	ShowsLog       bool
+	SpeedUpMin     uint64
 }
 
 // CALLBACKS //
@@ -111,4 +112,9 @@ func (t *TestServerConfig) SetBlockLimit(limit uint64) {
 // SetShowsLog sets flag for logging
 func (t *TestServerConfig) SetShowsLog(f bool) {
 	t.ShowsLog = f
+}
+
+// SetSpeedUpMin sets the minimum additonal gas fee required to speed up a tx
+func (t *TestServerConfig) SetSpeedUpMin(amount uint64) {
+	t.SpeedUpMin = amount
 }

@@ -63,6 +63,74 @@ func TestSignedTransaction(t *testing.T) {
 	}
 }
 
+func TestSpeedUpTx(t *testing.T) {
+	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
+	_, receiverAddr := tests.GenerateKeyAndAddr(t)
+
+	var speedUpMin uint64 = 500
+	preminedAmount := framework.EthToWei(10)
+	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+		config.Premine(senderAddr, preminedAmount)
+		config.SetSeal(true)
+		config.SetSpeedUpMin(speedUpMin)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	srv := ibftManager.GetServer(0)
+	clt := srv.JSONRPC()
+
+	// check there is enough balance
+	balance, err := clt.Eth().GetBalance(web3.Address(senderAddr), web3.Latest)
+	assert.NoError(t, err)
+	assert.Equal(t, preminedAmount, balance)
+
+	// get the current nonce for acc
+	nextNonce, err := clt.Eth().GetNonce(web3.Address(senderAddr), web3.Latest)
+	assert.NoError(t, err)
+
+	// create and sign the tx
+	signer := crypto.NewEIP155Signer(100)
+	signedTx, err := signer.SignTx(&types.Transaction{
+		From:     senderAddr,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		To:       &receiverAddr,
+		Value:    big.NewInt(10000),
+		Nonce:    nextNonce,
+	}, senderKey)
+	assert.NoError(t, err)
+
+	// create the speed up tx
+	signedSpeedUpTx, err := signer.SignTx(&types.Transaction{
+		From:     senderAddr,
+		GasPrice: big.NewInt(0).SetUint64(10000 + speedUpMin + 1), // sufficiently higher gas price
+		Gas:      1000000,
+		To:       &receiverAddr,
+		Value:    big.NewInt(10000),
+		Nonce:    nextNonce, // same nonce as before
+	}, senderKey)
+	assert.NoError(t, err)
+
+	txHash, err := clt.Eth().SendRawTransaction(signedTx.MarshalRLP())
+	assert.NoError(t, err)
+	speedUpTxHash, err := clt.Eth().SendRawTransaction(signedSpeedUpTx.MarshalRLP())
+	assert.NoError(t, err)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	speedUpReceipt, err := srv.WaitForReceipt(ctx, speedUpTxHash)
+	assert.NoError(t, err)
+
+	receipt, err := clt.Eth().GetTransactionReceipt(txHash)
+	assert.NoError(t, err)
+
+	assert.Nil(t, receipt)
+	assert.NotNil(t, speedUpReceipt)
+}
+
 func TestPreminedBalance(t *testing.T) {
 	preminedAccounts := []struct {
 		address types.Address
