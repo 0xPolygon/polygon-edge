@@ -351,7 +351,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Miner:      types.Address{},
 		Nonce:      types.Nonce{},
 		MixHash:    IstanbulDigest,
-		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
+		Difficulty: 1,                   // we need to do this because blockchain needs difficulty to organize blocks and forks
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
@@ -901,7 +901,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 	}
 
 	// difficulty has to match number
-	if header.Difficulty != header.Number {
+	if header.Difficulty != 1 && header.Number != 0 {
 		return fmt.Errorf("wrong difficulty")
 	}
 

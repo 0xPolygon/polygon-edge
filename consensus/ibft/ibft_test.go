@@ -474,7 +474,7 @@ func (m *mockIbft) DummyBlock() *types.Block {
 	block := &types.Block{
 		Header: &types.Header{
 			Number:     num,
-			Difficulty: num,
+			Difficulty: 1,
 			ParentHash: parent.Hash,
 			ExtraData:  parent.ExtraData,
 			MixHash:    IstanbulDigest,
