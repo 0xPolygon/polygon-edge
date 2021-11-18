@@ -189,7 +189,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
-	c.flagMap["metrics"] = helper.FlagDescriptor{
+	c.flagMap["prometheus"] = helper.FlagDescriptor{
 		Description: "Sets the address and port for the prometheus instrumentation service (address:port)",
 		Arguments: []string{
 			"PROMETHEUS_ADDRESS",
