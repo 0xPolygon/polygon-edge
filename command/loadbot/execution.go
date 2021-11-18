@@ -2,7 +2,9 @@ package loadbot
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -10,6 +12,7 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"math/big"
+	"os"
 	"sync"
 	"time"
 )
@@ -52,10 +55,16 @@ func (c *Configuration) createClients() ([]*jsonrpc.Client, error) {
 }
 
 // We create the transactions using createTransactionObjects before the loadbot send them
-func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) {
-	var transactions []*web3.Transaction
+func (c *Configuration) createTransactionObjects() ([]*types.Transaction, error) {
+	var transactions []*types.Transaction
 	var nonces = make(map[types.Address]uint64)
 	var numberOfAccounts = uint64(len(c.Accounts))
+
+	signer := crypto.NewEIP155Signer(c.ChainID)
+	privateKeys, err := c.getPrivateKeys()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get private keys: %v", err)
+	}
 
 	// Each loop create one transaction.
 	for i := uint64(0); i < c.TxnToSend; i++ {
@@ -66,15 +75,21 @@ func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) 
 		// Get sender nonce.
 		nonce := nonces[from]
 
+		// Get proper private key
+		privateKey := privateKeys[from]
+
 		// Create the transaction object.
-		txn := &web3.Transaction{
-			From:     web3.Address(from),
-			To:       (*web3.Address)(&to),
+		txn, err := signer.SignTx(&types.Transaction{
+			From:     from,
+			To:       &to,
 			Gas:      c.Gas,
 			Value:    c.Value,
-			GasPrice: c.GasPrice.Uint64(),
+			GasPrice: c.GasPrice,
 			Nonce:    nonce,
 			V:        []byte{1}, // it is necessary to encode in rlp
+		}, privateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign transaction: %v", err)
 		}
 
 		transactions = append(transactions, txn)
@@ -84,9 +99,25 @@ func (c *Configuration) createTransactionObjects() ([]*web3.Transaction, error) 
 	return transactions, nil
 }
 
+// getPrivateKeys extract private keys from environment using the account addresses.
+func (c *Configuration) getPrivateKeys() (map[types.Address]*ecdsa.PrivateKey, error) {
+	var privateKeys = make(map[types.Address]*ecdsa.PrivateKey)
+
+	for _, account := range c.Accounts {
+		privateKey := os.Getenv("PSDK_" + account.String())
+
+		key, err := crypto.BytesToPrivateKey([]byte(privateKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract private key for account %s: %v", account.String(), err)
+		}
+		privateKeys[account] = key
+	}
+	return privateKeys, nil
+}
+
 // run is the main method of the loadbot
 // The TPS is used to determine the rate at which every transaction is sent
-func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction) *Metrics {
+func (c *Configuration) run(clients []*jsonrpc.Client, txns []*types.Transaction) *Metrics {
 	ticker := time.NewTicker(1 * time.Second / time.Duration(c.TPS))
 	defer ticker.Stop()
 
@@ -116,12 +147,12 @@ func (c *Configuration) run(clients []*jsonrpc.Client, txns []*web3.Transaction)
 			client := clients[clientID%numberOfClients]
 
 			wg.Add(1)
-			go func(txn *web3.Transaction) {
+			go func(txn *types.Transaction) {
 				defer wg.Done()
 				metrics.m.Lock()
 				metrics.Total += 1
 				metrics.m.Unlock()
-				hash, err := client.Eth().SendTransaction(txn)
+				hash, err := client.Eth().SendRawTransaction(txn.MarshalRLP())
 
 				if err != nil {
 					metrics.m.Lock()
