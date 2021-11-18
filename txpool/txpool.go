@@ -231,7 +231,7 @@ func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 		}
 	}
 
-	return accountTxs[highestNonce].Nonce + 1, true
+	return highestNonce + 1, true
 }
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
