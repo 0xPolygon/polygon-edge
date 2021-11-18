@@ -68,6 +68,77 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
+
+	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
+}
+
+// Define the type of the iBFT consensus
+
+type Type string
+
+const (
+	// PoA defines the Proof of Authority IBFT type,
+	// where the validator set is changed through voting / pre-set in genesis
+	PoA Type = "PoA"
+
+	// PoS defines the Proof of Stake IBFT type,
+	// where the validator set it changed through staking on the Staking SC
+	PoS Type = "PoS"
+)
+
+// Define constant hook names
+const (
+	// VerifyHeadersHook defines additional checks that need to happen
+	// when verifying the headers
+	VerifyHeadersHook = "VerifyHeadersHook"
+
+	// ProcessHeadersHook defines additional steps that need to happen
+	// when processing the headers
+	ProcessHeadersHook = "ProcessHeadersHook"
+
+	// InsertBlockHook defines the additional steps that need to happen
+	// when inserting a block into the chain
+	InsertBlockHook = "InsertBlockHook"
+
+	// BuildBlockHook defines the additional steps and checks that need to happen
+	// when building a block
+	BuildBlockHook = "BuildBlockHook"
+
+	// SyncStateHook defines the additional steps and checks that need to happen
+	// in the sync state
+	SyncStateHook = "SyncStateHook"
+
+	// AcceptStateHook defines the additional steps and checks that need to happen
+	// in the accept state
+	AcceptStateHook = "AcceptStateHook"
+
+	// AcceptStateLogHook defines what should be logged out as the status
+	// from AcceptState
+	AcceptStateLogHook = "AcceptStateLogHook"
+)
+
+type ConsensusMechanism interface {
+	// GetType returns the type of IBFT consensus mechanism (PoA / PoS)
+	GetType() Type
+
+	// GetHookMap returns the hooks registered with the specific consensus mechanism
+	GetHookMap() map[string]func(interface{}) error
+}
+
+// runHook runs a specified hook if it is present in the hook map
+func (i *Ibft) runHook(hookName string, hookParams interface{}) error {
+	// Grab the hook map
+	hookMap := i.mechanism.GetHookMap()
+
+	// Grab the actual hook if it's present
+	hook, ok := hookMap[hookName]
+	if !ok {
+		// hook not found, continue
+		return nil
+	}
+
+	// Run the hook
+	return hook(hookParams)
 }
 
 // Factory implements the base consensus Factory method
@@ -94,6 +165,7 @@ func Factory(
 		epochSize:    DefaultEpochSize,
 		syncNotifyCh: make(chan bool),
 		sealing:      sealing,
+		// TODO pass the consensus type from genesis config -> PSDK-182
 	}
 
 	// Istanbul requires a different header hash function
@@ -340,6 +412,7 @@ func (i *Ibft) runSyncState() {
 			i.setState(AcceptState)
 		}
 	}
+	// TODO: runHook(SyncStateHook())
 	if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
 		i.logger.Error("failed to bulk update validators", "err", err)
 	}
@@ -368,7 +441,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	header.GasLimit = gasLimit
 
-	// TODO MARK: Candidate pick
+	// TODO: GetType() check
 	// try to pick a candidate
 	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
 		header.Miner = types.StringToAddress(candidate.Address)
@@ -397,7 +470,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	txns := []*types.Transaction{}
 
-	// TODO MARK: Epoch selection
+	// TODO: runHook(BuildBlockHook()) -> does a check and wraps common logic for PoS
 	if !i.IsLastOfEpoch(header.Number) {
 		for {
 			txn, retFn := i.txpool.Pop()
@@ -480,7 +553,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	// TODO MARK: Votes print
+	// TODO: runHook(AcceptStateLogHook())
 	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
 	i.state.validators = snap.Set
@@ -573,6 +646,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errBlockVerificationFailed)
 				continue
 			}
+			// TODO: runHook(AcceptStateHook())
 			if i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
 				i.logger.Error("block verification failed, block at the end of epoch has transactions")
 				i.handleStateErr(errBlockVerificationFailed)
@@ -678,6 +752,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
+	// TODO runHookInsertBlockHook())
 	if i.IsLastOfEpoch(header.Number) {
 		if err := i.updateValidators(header.Number); err != nil {
 			return err
@@ -906,7 +981,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
-	// TODO MARK: Nonce voting
+	// TODO: runHook(VerifyHeadersHook)
 	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
 	// 		This is achieved by specifying the miner field to zeroes,
 	// 		because then the value in the Nonce will not be taken into consideration.

@@ -8,6 +8,10 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
+// TODO implement PoS specific methods
+
+// getNextValidators is a helper function for fetching the validator set
+// from the Staking SC
 func (i *Ibft) getNextValidators(header *types.Header) (ValidatorSet, error) {
 	transition, err := i.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
 	if err != nil {
@@ -52,6 +56,7 @@ func (i *Ibft) updateValidators(num uint64) error {
 	return nil
 }
 
+// batchUpdateValidators updates the validator set based on the passed in block range
 func (i *Ibft) batchUpdateValidators(from, to uint64) error {
 	for n := from; n <= to; n++ {
 		if i.IsLastOfEpoch(n) {
@@ -63,18 +68,21 @@ func (i *Ibft) batchUpdateValidators(from, to uint64) error {
 	return nil
 }
 
+// GetEpoch returns the current epoch
 func (i *Ibft) GetEpoch(number uint64) uint64 {
 	if number%i.epochSize == 0 {
 		return number / i.epochSize
-	} else {
-		return number/i.epochSize + 1
 	}
+
+	return number/i.epochSize + 1
 }
 
+// IsFirstOfEpoch checks if the block number is the first of the epoch
 func (i *Ibft) IsFirstOfEpoch(number uint64) bool {
 	return number%i.epochSize == 1
 }
 
+// IsLastOfEpoch checks if the block number is the last of the epoch
 func (i *Ibft) IsLastOfEpoch(number uint64) bool {
 	return number > 0 && number%i.epochSize == 0
 }

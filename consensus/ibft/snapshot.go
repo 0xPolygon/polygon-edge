@@ -172,6 +172,8 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return fmt.Errorf("unauthorized proposer")
 		}
 
+		// TODO: runHook(ProcessHeadersHook)
+
 		if number%i.epochSize == 0 {
 			// during a checkpoint block, we reset the votes
 			// and there cannot be any proposals
