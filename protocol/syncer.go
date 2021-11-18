@@ -24,7 +24,7 @@ import (
 
 const (
 	maxEnqueueSize = 50
-	popTimeout     = time.Second * 10
+	popTimeout     = 20 * time.Second
 )
 
 var (
@@ -515,7 +515,7 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 		}
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
-			s.logger.Error("failed to pop block", "err", err)
+			s.logger.Info("failed to pop block", "err", err)
 			break
 		}
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
