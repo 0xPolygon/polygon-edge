@@ -760,21 +760,6 @@ func (t *txHeapWrapper) Peek() *types.Transaction {
 
 // Push adds a transaction to the account based heap
 func (t *txHeapWrapper) Push(tx *types.Transaction) {
-	// Check if the current transaction has a higher or equal nonce
-	// than all the current transactions in the account based heap
-	i := sort.Search(len(t.txs), func(i int) bool {
-		return t.txs[0].Nonce >= tx.Nonce
-	})
-
-	// If sort.Search found something, it will return the index
-	// of the first found element for which func(i int) was true
-	if i < len(t.txs) && t.txs[i].Nonce == tx.Nonce {
-		// i is an index corresponding to an element in the
-		// account based heap, and the nonces match up, so this tx is discarded
-		return
-	}
-
-	// All checks have passed, add the tx to the account based heap
 	heap.Push(&t.txs, tx)
 }
 
