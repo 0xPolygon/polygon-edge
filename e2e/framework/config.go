@@ -38,7 +38,8 @@ type TestServerConfig struct {
 	DevInterval    int           // Dev consensus update interval [s]
 	BlockGasLimit  uint64        // Block gas limit
 	BlockGasTarget uint64        // Gas target for new blocks
-	ShowsLog       bool
+	ShowsLog       bool          // Flag indicating if the log should the outputted to the console
+	IsPos          bool          // Specifies the mechanism used for IBFT (PoA / PoS)
 }
 
 // CALLBACKS //
@@ -66,6 +67,11 @@ func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 // SetDevInterval sets the update interval for the dev consensus
 func (t *TestServerConfig) SetDevInterval(interval int) {
 	t.DevInterval = interval
+}
+
+// SetIBFTPoS sets the flag indicating the IBFT mechanism
+func (t *TestServerConfig) SetIBFTPoS(value bool) {
+	t.IsPos = value
 }
 
 // SetIBFTDirPrefix callback sets prefix of IBFT directories
