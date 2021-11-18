@@ -218,14 +218,20 @@ func (a *accountQueueWrapper) unlock() {
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	mux := t.lockAccountQueue(addr, false)
-	defer mux.unlock()
-
-	wrapper, ok := t.accountQueues[addr]
-	if !ok {
+	pendingTxs, _ := t.GetTxs(false)
+	accountTxs := pendingTxs[addr]
+	if len(accountTxs) == 0 {
 		return 0, false
 	}
-	return wrapper.accountQueue.nextNonce, true
+
+	highestNonce := uint64(0)
+	for k := range accountTxs {
+		if k > highestNonce {
+			highestNonce = k
+		}
+	}
+
+	return accountTxs[highestNonce].Nonce + 1, true
 }
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
@@ -373,8 +379,8 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 	}
 }
 
-// GetTxs gets both pending and queued transactions
-func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+// GetTxs gets pending and queued transactions
+func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
 
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	sortedPricedTxs := t.pendingQueue.index
@@ -383,6 +389,9 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
 		}
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
+	}
+	if !inclQueued {
+		return pendingTxs, nil
 	}
 
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)

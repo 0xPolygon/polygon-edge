@@ -205,7 +205,7 @@ func TestGetPendingAndQueuedTransactions(t *testing.T) {
 	}
 	assert.NoError(t, pool.addImpl("", txn3))
 
-	pendingTxs, queuedTxs := pool.GetTxs()
+	pendingTxs, queuedTxs := pool.GetTxs(true)
 
 	assert.Len(t, pendingTxs, 1)
 	assert.Len(t, queuedTxs, 3)
