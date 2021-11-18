@@ -14,6 +14,14 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
+var (
+	// Magic nonce number to vote on adding a new validator
+	nonceAuthVote = types.Nonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+
+	// Magic nonce number to vote on removing a validator.
+	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+)
+
 // setupSnapshot sets up the snapshot store for the IBFT object
 func (i *Ibft) setupSnapshot() error {
 	i.store = newSnapshotStore()
@@ -101,6 +109,7 @@ func (i *Ibft) addHeaderSnap(header *types.Header) error {
 	snap := &Snapshot{
 		Hash:   header.Hash.String(),
 		Number: header.Number,
+		Votes:  []*Vote{},
 		Set:    extra.Validators,
 	}
 
@@ -163,9 +172,12 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return fmt.Errorf("unauthorized proposer")
 		}
 
+		// TODO: runHook(ProcessHeadersHook)
+
 		if number%i.epochSize == 0 {
 			// during a checkpoint block, we reset the votes
 			// and there cannot be any proposals
+			snap.Votes = nil
 			saveSnap(h)
 
 			// remove in-memory snapshots from two epochs before this one
@@ -175,6 +187,77 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 				i.store.deleteLower(purgeBlock)
 			}
 			continue
+		}
+
+		// if we have a miner address, this might be a vote
+		if h.Miner == types.ZeroAddress {
+			continue
+		}
+
+		// the nonce selects the action
+		var authorize bool
+		if h.Nonce == nonceAuthVote {
+			authorize = true
+		} else if h.Nonce == nonceDropVote {
+			authorize = false
+		} else {
+			return fmt.Errorf("incorrect vote nonce")
+		}
+
+		// validate the vote
+		if authorize {
+			// we can only authorize if they are not on the validators list
+			if snap.Set.Includes(h.Miner) {
+				continue
+			}
+		} else {
+			// we can only remove if they are part of the validators list
+			if !snap.Set.Includes(h.Miner) {
+				continue
+			}
+		}
+
+		voteCount := snap.Count(func(v *Vote) bool {
+			return v.Validator == proposer && v.Address == h.Miner
+		})
+
+		if voteCount > 1 {
+			// there can only be one vote per validator per address
+			return fmt.Errorf("more than one proposal per validator per address found")
+		}
+		if voteCount == 0 {
+			// cast the new vote since there is no one yet
+			snap.Votes = append(snap.Votes, &Vote{
+				Validator: proposer,
+				Address:   h.Miner,
+				Authorize: authorize,
+			})
+		}
+
+		// check the tally for the proposed validator
+		tally := snap.Count(func(v *Vote) bool {
+			return v.Address == h.Miner
+		})
+
+		// If more than a half of all validators voted
+		if tally > snap.Set.Len()/2 {
+			if authorize {
+				// add the candidate to the validators list
+				snap.Set.Add(h.Miner)
+			} else {
+				// remove the candidate from the validators list
+				snap.Set.Del(h.Miner)
+
+				// remove any votes casted by the removed validator
+				snap.RemoveVotes(func(v *Vote) bool {
+					return v.Validator == h.Miner
+				})
+			}
+
+			// remove all the votes that promoted this validator
+			snap.RemoveVotes(func(v *Vote) bool {
+				return v.Address == h.Miner
+			})
 		}
 
 		if !snap.Equal(parentSnap) {
@@ -243,6 +326,9 @@ type Snapshot struct {
 	// block hash when the snapshot was created
 	Hash string
 
+	// votes casted in chronological order
+	Votes []*Vote
+
 	// current set of validators
 	Set ValidatorSet
 }
@@ -255,17 +341,51 @@ type snapshotMetadata struct {
 
 // Equal checks if two snapshots are equal
 func (s *Snapshot) Equal(ss *Snapshot) bool {
-	// we only check if Set is equal since Number and Hash
+	// we only check if Votes and Set are equal since Number and Hash
 	// are only meant to be used for indexing
+	if len(s.Votes) != len(ss.Votes) {
+		return false
+	}
+	for indx := range s.Votes {
+		if !s.Votes[indx].Equal(ss.Votes[indx]) {
+			return false
+		}
+	}
 
 	return s.Set.Equal(&ss.Set)
+}
+
+// Count returns the vote tally.
+// The count increases if the callback function returns true
+func (s *Snapshot) Count(h func(v *Vote) bool) (count int) {
+	for _, v := range s.Votes {
+		if h(v) {
+			count++
+		}
+	}
+	return
+}
+
+// RemoveVotes removes votes from the snapshot, based on the passed in callback
+func (s *Snapshot) RemoveVotes(h func(v *Vote) bool) {
+	for i := 0; i < len(s.Votes); i++ {
+		if h(s.Votes[i]) {
+			s.Votes = append(s.Votes[:i], s.Votes[i+1:]...)
+			i--
+		}
+	}
 }
 
 // Copy makes a copy of the snapshot
 func (s *Snapshot) Copy() *Snapshot {
 	// Do not need to copy Number and Hash
 	ss := &Snapshot{
-		Set: ValidatorSet{},
+		Votes: make([]*Vote, len(s.Votes)),
+		Set:   ValidatorSet{},
+	}
+
+	for indx, vote := range s.Votes {
+		ss.Votes[indx] = vote.Copy()
 	}
 
 	ss.Set = append(ss.Set, s.Set...)
@@ -277,8 +397,18 @@ func (s *Snapshot) Copy() *Snapshot {
 func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
 		Validators: []*proto.Snapshot_Validator{},
+		Votes:      []*proto.Snapshot_Vote{},
 		Number:     uint64(s.Number),
 		Hash:       s.Hash,
+	}
+
+	// add votes
+	for _, vote := range s.Votes {
+		resp.Votes = append(resp.Votes, &proto.Snapshot_Vote{
+			Validator: vote.Validator.String(),
+			Proposed:  vote.Address.String(),
+			Auth:      vote.Authorize,
+		})
 	}
 
 	// add addresses

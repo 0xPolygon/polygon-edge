@@ -37,7 +37,9 @@ func Commands() map[string]cli.CommandFactory {
 	versionCmd := version.VersionCommand{UI: ui}
 
 	ibftCmd := ibft.IbftCommand{}
+	ibftCandidatesCmd := ibft.IbftCandidates{Meta: meta}
 	ibftInitCmd := ibft.IbftInit{Meta: meta}
+	ibftProposeCmd := ibft.IbftPropose{Meta: meta}
 	ibftSnapshotCmd := ibft.IbftSnapshot{Meta: meta}
 	ibftStatusCmd := ibft.IbftStatus{Meta: meta}
 
@@ -90,6 +92,12 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		ibftSnapshotCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftSnapshotCmd, nil
+		},
+		ibftCandidatesCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftCandidatesCmd, nil
+		},
+		ibftProposeCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftProposeCmd, nil
 		},
 		ibftStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftStatusCmd, nil
