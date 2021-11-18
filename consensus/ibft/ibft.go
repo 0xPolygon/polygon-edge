@@ -368,6 +368,17 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	header.GasLimit = gasLimit
 
+	// TODO MARK: Candidate pick
+	// try to pick a candidate
+	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
+		header.Miner = types.StringToAddress(candidate.Address)
+		if candidate.Auth {
+			header.Nonce = nonceAuthVote
+		} else {
+			header.Nonce = nonceDropVote
+		}
+	}
+
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
 	headerTime := parentTime.Add(defaultBlockPeriod)
@@ -385,6 +396,8 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		return nil, err
 	}
 	txns := []*types.Transaction{}
+
+	// TODO MARK: Epoch selection
 	if !i.IsLastOfEpoch(header.Number) {
 		for {
 			txn, retFn := i.txpool.Pop()
@@ -467,7 +480,8 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	i.logger.Info("current snapshot", "validators", len(snap.Set))
+	// TODO MARK: Votes print
+	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
 	i.state.validators = snap.Set
 
@@ -890,6 +904,14 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 	// ensure the extra data is correctly formatted
 	if _, err := getIbftExtra(header); err != nil {
 		return err
+	}
+
+	// TODO MARK: Nonce voting
+	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
+	// 		This is achieved by specifying the miner field to zeroes,
+	// 		because then the value in the Nonce will not be taken into consideration.
+	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
+		return fmt.Errorf("invalid nonce")
 	}
 
 	if header.MixHash != IstanbulDigest {

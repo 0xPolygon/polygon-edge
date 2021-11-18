@@ -99,6 +99,21 @@ func printSnapshot(s *proto.Snapshot) (output string) {
 
 	output += "\n"
 
+	votes := make([]string, len(s.Votes)+1)
+	if len(s.Votes) == 0 {
+		votes[0] = "No votes found"
+	} else {
+		votes[0] = "PROPOSER|ADDRESS|VOTE TO ADD"
+		for i, d := range s.Votes {
+			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Validator, d.Proposed, d.Auth)
+		}
+	}
+
+	output += "\n[VOTES]\n"
+	output += helper.FormatList(votes)
+
+	output += "\n"
+
 	validators := make([]string, len(s.Validators)+1)
 	if len(s.Validators) == 0 {
 		validators[0] = "No validators found"
