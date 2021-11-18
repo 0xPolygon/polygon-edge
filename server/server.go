@@ -91,9 +91,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
-	if config.PrometheusListnerAddr != nil {
+	if config.Metrics.PrometheusAddr != nil {
 		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, true)
-		m.prometheusServer = m.startPrometheusServer(config.PrometheusListnerAddr)
+		m.prometheusServer = m.startPrometheusServer(config.Metrics.PrometheusAddr)
 	} else {
 		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
 	}
