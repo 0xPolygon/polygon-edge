@@ -860,3 +860,172 @@ func TestSizeLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestSpeedUpTx(t *testing.T) {
+
+	testTable := []struct {
+		name          string
+		speedUpAmount uint64
+		nonce         uint64
+		resendCount   int
+		origin        TxOrigin
+	}{
+		{
+			name:          "Speed up remote tx 5x",
+			speedUpAmount: 500,
+			nonce:         0,
+			resendCount:   5,
+			origin:        OriginGossip,
+		},
+		{
+			name:          "Speed up remote tx 10x",
+			speedUpAmount: 1000,
+			nonce:         3,
+			resendCount:   10,
+			origin:        OriginGossip,
+		},
+		{
+			name:          "Speed up local tx 5x",
+			speedUpAmount: 500,
+			nonce:         0,
+			resendCount:   5,
+			origin:        OriginAddTxn,
+		},
+		{
+			name:          "Speed up local tx 10x",
+			speedUpAmount: 1000,
+			nonce:         3,
+			resendCount:   10,
+			origin:        OriginAddTxn,
+		},
+	}
+
+	from := types.Address{0x1}
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, tt.speedUpAmount, forks.At(0), &mockStore{}, nil, nil)
+			assert.NoError(t, err)
+			pool.EnableDev()
+			pool.AddSigner(&mockSigner{})
+
+			// Add multiple same-nonce txs
+			// but with higher gas price each time
+			var highestBidder *big.Int
+			for i := 0; i < tt.resendCount; i++ {
+				tx := &types.Transaction{
+					From:     from,
+					Nonce:    tt.nonce,
+					Gas:      validGasLimit,
+					GasPrice: big.NewInt(0).SetUint64(10 + tt.speedUpAmount*uint64(i)),
+					Value:    big.NewInt(0),
+				}
+
+				assert.NoError(t, pool.addImpl(tt.origin, tx))
+				highestBidder = tx.GasPrice
+			}
+
+			var finalizedTx *types.Transaction
+			if tt.nonce == 0 {
+				// tx will get promoted as soon as its added,
+				// so we check the pending queue
+				assert.Equal(t, pool.NumAccountTxs(from), 0)
+				assert.Equal(t, pool.Length(), uint64(1))
+
+				finalizedTx, _ = pool.Pop()
+			} else {
+				// otherwise it will reside in the account queue
+				// waiting on promotion
+				assert.Equal(t, pool.NumAccountTxs(from), 1)
+				assert.Equal(t, pool.Length(), uint64(0))
+
+				finalizedTx = pool.accountQueues[from].accountQueue.Pop()
+			}
+
+			assert.NotNil(t, finalizedTx)
+			assert.Equal(t, finalizedTx.GasPrice.Uint64(), highestBidder.Uint64())
+		})
+	}
+}
+
+func TestRejectUnderpricedSpeedUp(t *testing.T) {
+	testTable := []struct {
+		name          string
+		speedUpAmount uint64
+		nonce         uint64
+		origin        TxOrigin
+	}{
+		{
+			name:          "Reject underpriced remote tx from account queue",
+			speedUpAmount: 50,
+			nonce:         10,
+			origin:        OriginGossip,
+		},
+		{
+			name:          "Reject underpriced remote tx from promoted queue",
+			speedUpAmount: 100,
+			nonce:         0,
+			origin:        OriginGossip,
+		},
+		{
+			name:          "Reject underpriced local tx from account queue",
+			speedUpAmount: 50,
+			nonce:         10,
+			origin:        OriginAddTxn,
+		},
+		{
+			name:          "Reject underpriced local tx from promoted queue",
+			speedUpAmount: 100,
+			nonce:         0,
+			origin:        OriginAddTxn,
+		},
+	}
+
+	from := types.Address{0x1}
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, tt.speedUpAmount, forks.At(0), &mockStore{}, nil, nil)
+			assert.NoError(t, err)
+			pool.EnableDev()
+			pool.AddSigner(&mockSigner{})
+
+			tx0 := &types.Transaction{
+				From:     from,
+				Nonce:    tt.nonce,
+				Gas:      validGasLimit,
+				GasPrice: big.NewInt(1),
+				Value:    big.NewInt(0),
+			}
+			assert.NoError(t, pool.addImpl(tt.origin, tx0))
+
+			tx1 := &types.Transaction{
+				From:     from,
+				Nonce:    tt.nonce,
+				Gas:      validGasLimit,
+				GasPrice: big.NewInt(1), // same gas price as previous
+				Value:    big.NewInt(0),
+			}
+			assert.ErrorIs(t, ErrUnderpriced, pool.addImpl(tt.origin, tx1))
+
+			tx2 := &types.Transaction{
+				From:     from,
+				Nonce:    tt.nonce,
+				Gas:      validGasLimit,
+				GasPrice: big.NewInt(0).SetUint64(1 + tt.speedUpAmount/2), // higher, but still insufficient
+				Value:    big.NewInt(0),
+			}
+			assert.ErrorIs(t, ErrUnderpriced, pool.addImpl(tt.origin, tx2))
+
+			if tt.nonce == 0 {
+				// tx will get promoted as soon as its added,
+				// so we check the pending queue
+				assert.Equal(t, pool.NumAccountTxs(from), 0)
+				assert.Equal(t, pool.Length(), uint64(1))
+			} else {
+				// otherwise it will reside in the account queue
+				// waiting on promotion
+				assert.Equal(t, pool.NumAccountTxs(from), 1)
+				assert.Equal(t, pool.Length(), uint64(0))
+			}
+		})
+	}
+}
