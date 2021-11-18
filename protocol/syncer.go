@@ -513,9 +513,14 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
+
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
-			s.logger.Info("failed to pop block", "err", err)
+			if errors.Is(err, ErrPopTimeout) {
+				s.logger.Debug(fmt.Sprintf("failed to pop block within %ds", popTimeout))
+			} else {
+				s.logger.Info("failed to pop block", "err", err)
+			}
 			break
 		}
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
