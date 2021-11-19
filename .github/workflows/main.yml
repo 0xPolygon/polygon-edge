@@ -3,7 +3,6 @@ on:
     branches:
       - develop
   pull_request:
-  workflow_call:
 
 jobs:
   lint:
@@ -76,3 +75,7 @@ jobs:
 #          COMMITER: ${{ github.actor }}
 #        run: |
 #          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "commiter":"'"$COMMITER"'","commit":"'"$GITHUB_SHA"'","branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"$ARTIFACT_NAME"'" }}'
+  release:
+    needs: notify-deployer
+    uses: lazartravica/polygon-sdk/.github/workflows/release.yml@develop
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')

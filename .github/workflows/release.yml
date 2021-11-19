@@ -1,13 +1,7 @@
 name: Release
 
 on:
-  push:
-    branches: [develop]
-    tags:
-      - 'v*.*.*'
-      # to be used by fork patch-releases ^^
-      - 'v*.*.*-*'
-
+  workflow_call:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
