@@ -40,7 +40,6 @@ jobs:
           		-e GITHUB_TOKEN \
           		-e DOCKER_USERNAME \
           		-e DOCKER_PASSWORD \
-#          		-e SLACK_WEBHOOK \
           		-v /var/run/docker.sock:/var/run/docker.sock \
           		-v `pwd`:/go/src/$(PACKAGE_NAME) \
           		-w /go/src/$(PACKAGE_NAME) \
@@ -52,6 +51,6 @@ jobs:
           GOLANG_CROSS_VERSION: v1.15.7
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
-#          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+#         TODO: Add `SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}` here and as the env var on the docker cli above
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_KEY }}
