@@ -13,10 +13,6 @@ github.com/btcsuite/btcd/btcec
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
 github.com/davidlazar/go-crypto/salsa20
-# github.com/ethereum/go-ethereum v1.9.15
-## explicit
-github.com/ethereum/go-ethereum/common/hexutil
-github.com/ethereum/go-ethereum/rlp
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
 # github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6
@@ -387,6 +383,7 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/sha3
 # golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+## explicit
 golang.org/x/net/bpf
 golang.org/x/net/html
 golang.org/x/net/html/atom
