@@ -901,7 +901,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 	}
 
 	// difficulty has to match number
-	if header.Difficulty != 1 && header.Number != 0 {
+	if header.Difficulty != 1 {
 		return fmt.Errorf("wrong difficulty")
 	}
 

@@ -17,7 +17,7 @@ var (
 	GenesisGasLimit uint64 = 4712388
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
-	GenesisDifficulty = big.NewInt(131072)
+	GenesisDifficulty = big.NewInt(1)
 )
 
 // Chain is the blockchain chain configuration
