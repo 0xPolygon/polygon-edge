@@ -49,7 +49,7 @@ jobs:
           make release
         env:
           PACKAGE_NAME: github.com/0xPolygon/polygon-sdk
-          GOLANG_CROSS_VERSION: v1.16
+          GOLANG_CROSS_VERSION: v1.17.2
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
 #         TODO: Add `SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}` here and as the env var on the docker cli above
