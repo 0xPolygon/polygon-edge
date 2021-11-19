@@ -398,7 +398,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewTransitionApplicationError(ErrNotEnoughFunds, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
