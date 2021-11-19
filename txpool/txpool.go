@@ -86,20 +86,10 @@ func (g *slotGauge) decrease(slots uint64) {
 }
 
 func (g *slotGauge) height() uint64 {
-	g.lock()
-	defer g.unlock()
+	g.Lock()
+	defer g.Unlock()
 
 	return g.current
-}
-
-// must come before unlock()
-func (g *slotGauge) lock() {
-	g.Lock()
-}
-
-// must come after lock()
-func (g *slotGauge) unlock() {
-	g.Unlock()
 }
 
 // TxPool is module that handles pending transactions.
@@ -616,8 +606,8 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 // Checks if the incoming tx would cause an overflow
 // and attempts to allocate space for it
 func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
-	t.gauge.lock()
-	defer t.gauge.unlock()
+	t.gauge.Lock()
+	defer t.gauge.Unlock()
 
 	if t.gauge.current+slots(tx) <= t.gauge.limit {
 		// no overflow
