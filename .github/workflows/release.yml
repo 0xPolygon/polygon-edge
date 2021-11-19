@@ -55,4 +55,4 @@ jobs:
 #         TODO: Add `SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}` here and as the env var on the docker cli above
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_KEY }}
-    if: git.branch == "develop"
+  if: git.branch == "develop"
