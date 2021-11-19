@@ -46,7 +46,6 @@ jobs:
           		-w /go/src/$(PACKAGE_NAME) \
           		ghcr.io/troian/golang-cross:${GOLANG_CROSS_VERSION} \
           		--rm-dist --skip-validate
-          make release
         env:
           PACKAGE_NAME: github.com/0xPolygon/polygon-sdk
           GOLANG_CROSS_VERSION: v1.17.2
