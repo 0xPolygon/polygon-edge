@@ -673,18 +673,49 @@ func TestPriceLimit(t *testing.T) {
 	}
 }
 
+type account struct {
+	key  *ecdsa.PrivateKey
+	addr types.Address
+}
+type addTx struct {
+	origin   TxOrigin
+	account  *account
+	nonce    uint64
+	gasPrice *big.Int
+	slot     uint64
+}
+
+func generateAddTx(arg addTx, signer crypto.TxSigner) *types.Transaction {
+	// base field should take 1 slot at least
+	size := txSlotSize * (arg.slot - 1)
+	if size <= 0 {
+		size = 1
+	}
+
+	input := make([]byte, size)
+	rand.Read(input)
+
+	tx := &types.Transaction{
+		Nonce:    arg.nonce,
+		GasPrice: arg.gasPrice,
+		Gas:      100000000,
+		To:       &addr1,
+		Value:    big.NewInt(0),
+		Input:    input,
+	}
+
+	if signer != nil && arg.account.key != nil {
+		signedTx, err := signer.SignTx(tx, arg.account.key)
+		if err != nil {
+			return nil
+		}
+		return signedTx
+	}
+
+	return tx
+}
+
 func TestSizeLimit(t *testing.T) {
-	type account struct {
-		key  *ecdsa.PrivateKey
-		addr types.Address
-	}
-	type addTx struct {
-		origin   TxOrigin
-		account  *account
-		nonce    uint64
-		gasPrice *big.Int
-		slot     uint64
-	}
 
 	signer := crypto.NewEIP155Signer(uint64(100))
 	numAccounts := 3
@@ -819,29 +850,6 @@ func TestSizeLimit(t *testing.T) {
 		},
 	}
 
-	genTx := func(t *testing.T, arg *addTx) *types.Transaction {
-		t.Helper()
-
-		// base field should take 1 slot at least
-		size := txSlotSize * (arg.slot - 1)
-		if size <= 0 {
-			size = 1
-		}
-		input := make([]byte, size)
-		rand.Read(input)
-
-		tx, err := signer.SignTx(&types.Transaction{
-			To:       &addr1,
-			Nonce:    arg.nonce,
-			Gas:      100000000,
-			GasPrice: arg.gasPrice,
-			Value:    big.NewInt(0),
-			Input:    input,
-		}, arg.account.key)
-		assert.NoError(t, err)
-		return tx
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlot, forks.At(0), &mockStore{}, nil, nil)
@@ -849,11 +857,12 @@ func TestSizeLimit(t *testing.T) {
 			pool.AddSigner(signer)
 
 			for _, arg := range tt.initialTxs {
-				tx := genTx(t, &arg)
+				tx := generateAddTx(arg, signer)
+				assert.NotNil(t, tx)
 				assert.NoError(t, pool.addImpl(arg.origin, tx))
 			}
 
-			err = pool.addImpl(tt.input.origin, genTx(t, &tt.input))
+			err = pool.addImpl(tt.input.origin, generateAddTx(tt.input, signer))
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.len, pool.Length())
 			assert.Equal(t, tt.slots, pool.slotsOccupied())
@@ -862,62 +871,35 @@ func TestSizeLimit(t *testing.T) {
 }
 
 func TestGaugeCheck(t *testing.T) {
-	type AddTx struct {
-		nonce    uint64
-		gasPrice *big.Int
-		slotSize uint64
-		origin   TxOrigin
-	}
-
-	genTx := func(t *testing.T, arg AddTx) *types.Transaction {
-		// base field should take 1 slot at least
-		size := txSlotSize * (arg.slotSize - 1)
-		if size <= 0 {
-			size = 1
-		}
-		input := make([]byte, size)
-		rand.Read(input)
-
-		tx := &types.Transaction{
-			From:     addr1,
-			Nonce:    arg.nonce,
-			Gas:      10000000,
-			GasPrice: arg.gasPrice,
-			Value:    big.NewInt(0),
-			Input:    input,
-		}
-
-		return tx
-	}
 
 	tests := []struct {
 		name         string
 		initialSlots uint64
 		maxSlots     uint64
-		incomingTxs  []AddTx
+		incomingTxs  []addTx
 	}{
 		{
 			name:         "accept incoming remote txs when gauge is near limit",
 			initialSlots: 17,
 			maxSlots:     20,
-			incomingTxs: []AddTx{
+			incomingTxs: []addTx{
 				{
 					nonce:    17,
-					gasPrice: big.NewInt(10),
-					slotSize: 4,
+					slot:     4,
 					origin:   OriginGossip,
+					gasPrice: big.NewInt(1),
 				},
 				{
 					nonce:    18,
-					gasPrice: big.NewInt(11),
-					slotSize: 3,
+					slot:     3,
 					origin:   OriginGossip,
+					gasPrice: big.NewInt(1),
 				},
 				{
 					nonce:    19,
-					gasPrice: big.NewInt(12),
-					slotSize: 4,
+					slot:     4,
 					origin:   OriginGossip,
+					gasPrice: big.NewInt(1),
 				},
 			},
 		},
@@ -925,30 +907,30 @@ func TestGaugeCheck(t *testing.T) {
 			name:         "accept incoming local txs when gauge is near limit",
 			initialSlots: 25,
 			maxSlots:     30,
-			incomingTxs: []AddTx{
+			incomingTxs: []addTx{
 				{
 					nonce:    25,
-					gasPrice: big.NewInt(10),
-					slotSize: 4,
+					slot:     4,
 					origin:   OriginAddTxn,
+					gasPrice: big.NewInt(1),
 				},
 				{
 					nonce:    26,
-					gasPrice: big.NewInt(10),
-					slotSize: 3,
+					slot:     3,
 					origin:   OriginAddTxn,
+					gasPrice: big.NewInt(1),
 				},
 				{
 					nonce:    27,
-					gasPrice: big.NewInt(10),
-					slotSize: 4,
+					slot:     4,
 					origin:   OriginAddTxn,
+					gasPrice: big.NewInt(1),
 				},
 				{
 					nonce:    28,
-					gasPrice: big.NewInt(10),
-					slotSize: 3,
+					slot:     3,
 					origin:   OriginAddTxn,
+					gasPrice: big.NewInt(1),
 				},
 			},
 		},
@@ -963,13 +945,14 @@ func TestGaugeCheck(t *testing.T) {
 
 			// fill pool with remote txs of slot size 1
 			for i := uint64(0); i < tt.initialSlots; i++ {
-				arg := AddTx{
+				arg := addTx{
 					nonce:    uint64(i),
-					gasPrice: big.NewInt(1),
-					slotSize: 1,
+					slot:     1,
 					origin:   OriginGossip,
+					gasPrice: big.NewInt(1),
 				}
-				tx := genTx(t, arg)
+				tx := generateAddTx(arg, nil)
+				assert.NotNil(t, tx)
 				assert.NoError(t, pool.addImpl(OriginGossip, tx))
 			}
 			assert.Equal(t, tt.initialSlots, pool.slotsOccupied())
@@ -978,9 +961,9 @@ func TestGaugeCheck(t *testing.T) {
 			var wg sync.WaitGroup
 			for _, incomingTx := range tt.incomingTxs {
 				wg.Add(1)
-				go func(incoming AddTx) {
+				go func(incoming addTx) {
 					defer wg.Done()
-					tx := genTx(t, incoming)
+					tx := generateAddTx(incoming, nil)
 					assert.NoError(t, pool.addImpl(incoming.origin, tx))
 				}(incomingTx)
 			}
