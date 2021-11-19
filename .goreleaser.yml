@@ -95,7 +95,7 @@ dockers:
       - linux-amd64
     build_flag_templates:
       - --platform=linux/amd64
-    skip_push: true
+    skip_push: true # TODO: change to false
 
   - image_templates:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
@@ -106,18 +106,20 @@ dockers:
       - linux-arm64
     build_flag_templates:
       - --platform=linux/arm64
-    skip_push: true
+    skip_push: true # TODO: change to false
 
 docker_manifests:
   - name_template: 0xpolygon/{{ .ProjectName }}:{{ .Version }}
     image_templates:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
+    skip_push: true # TODO: change to false
 
   - name_template: 0xpolygon/{{ .ProjectName }}:latest
     image_templates:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
+    skip_push: true # TODO: change to false
 
 announce:
   slack:
