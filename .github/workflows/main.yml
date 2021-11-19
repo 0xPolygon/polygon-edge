@@ -75,21 +75,3 @@ jobs:
 #          COMMITER: ${{ github.actor }}
 #        run: |
 #          curl -X POST ${{ secrets.DEPLOYER_API }} -H 'Accept: application/vnd.github.everest-preview+json' -u ${{ secrets.DEPLOYER_ACCESS_TOKEN }} --data '{"event_type": "new_artefact", "client_payload": { "commiter":"'"$COMMITER"'","commit":"'"$GITHUB_SHA"'","branch":"'"$GITHUB_REF"'","repository": "'"$GITHUB_REPOSITORY"'","artefact_name":"'"$ARTIFACT_NAME"'" }}'
-  release:
-    needs: test #TODO: change to `notify-deployer`
-    uses: lazartravica/polygon-sdk/.github/workflows/release.yml@develop
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')
-  test-a:
-    needs: test #TODO: change to `notify-deployer`
-    runs-on: ubuntu-latest
-    steps:
-      - name: TestA
-        run: echo "TEST-A"
-    if: startsWith(github.ref, 'refs/tags/')
-  test-b:
-    needs: test #TODO: change to `notify-deployer`
-    runs-on: ubuntu-latest
-    steps:
-      - name: TestA
-        run: echo "TEST-A"
-    if: true && startsWith(github.ref, 'refs/tags/')

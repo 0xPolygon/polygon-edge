@@ -1,7 +1,14 @@
 name: Release
 
 on:
-  workflow_call:
+  push:
+    branches-ignore:
+      - '**'
+    tags:
+      - 'v*.*.*'
+      # to be used by fork patch-releases ^^
+      - 'v*.*.*-*'
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -48,3 +55,4 @@ jobs:
 #         TODO: Add `SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}` here and as the env var on the docker cli above
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_KEY }}
+    if: git.branch == "develop"
