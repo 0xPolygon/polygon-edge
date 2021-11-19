@@ -594,13 +594,11 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 // increaseSlots increases number of taken slots
 func (t *TxPool) increaseSlots(slots uint64) {
 	t.gauge.increase(slots)
-	// atomic.AddUint64(&t.slots, slots)
 }
 
 // increaseSlots decreases number of taken slots
 func (t *TxPool) decreaseSlots(slots uint64) {
 	t.gauge.decrease(slots)
-	// atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
 // Checks if the incoming tx would cause an overflow
