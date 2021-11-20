@@ -41,11 +41,14 @@ jobs:
       - name: Go build
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
 
+      - name: Go build with race 
+        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk-race .
+      
       - name: Add artifacts directory to the path
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test -race -timeout 28m ./...
+        run: go test -timeout 28m ./polygon-sdk-race
       - 
         name: Extract branch name
         if: github.event_name != 'pull_request'
