@@ -283,7 +283,7 @@ func GenerateAndEncodePrivateKey() (*ecdsa.PrivateKey, []byte, error) {
 		return nil, nil, err
 	}
 
-	privateKey, err := bytesToPrivateKey(keyBuff)
+	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
 	}
@@ -297,5 +297,5 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 		return nil, err
 	}
 
-	return bytesToPrivateKey(validatorKey)
+	return BytesToPrivateKey(validatorKey)
 }
