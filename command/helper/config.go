@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -39,6 +40,7 @@ type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
 	NatAddr    string `json:"nat_addr"`
+	Dns        string `json:"dns"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
@@ -109,6 +111,13 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		if c.Network.NatAddr != "" {
 			if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
 				return nil, errors.New("Could not parse NAT IP address")
+			}
+		}
+
+		if c.Network.Dns != "" {
+
+			if conf.Network.Dns, err = helperFlags.MultiAddrFromDns(c.Network.Dns, conf.Network.Addr.Port); err != nil {
+				return nil, err
 			}
 		}
 
@@ -233,6 +242,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 		if otherConfig.Network.NatAddr != "" {
 			c.Network.NatAddr = otherConfig.Network.NatAddr
+		}
+		if otherConfig.Network.Dns != "" {
+			c.Network.Dns = otherConfig.Network.Dns
 		}
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers

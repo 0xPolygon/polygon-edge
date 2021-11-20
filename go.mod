@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
-	github.com/ethereum/go-ethereum v1.9.15
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gopacket v1.1.18 // indirect
 	github.com/google/uuid v1.1.4

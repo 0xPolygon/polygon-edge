@@ -93,25 +93,29 @@ func TestDeletePeer(t *testing.T) {
 
 func TestBroadcast(t *testing.T) {
 	tests := []struct {
-		name         string
-		chain        blockchainShim
-		peerChain    blockchainShim
-		numNewBlocks int
+		name          string
+		syncerHeaders []*types.Header
+		peerHeaders   []*types.Header
+		numNewBlocks  int
 	}{
 		{
-			name:         "syncer should receive new block in peer",
-			chain:        NewRandomChain(t, 5),
-			peerChain:    NewRandomChain(t, 10),
-			numNewBlocks: 5,
+			name:          "syncer should receive new block in peer",
+			syncerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 5, 0),
+			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			numNewBlocks:  5,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			syncer, peerSyncers := SetupSyncerNetwork(t, tt.chain, []blockchainShim{tt.peerChain})
+			chain, peerChain := NewMockBlockchain(tt.syncerHeaders), NewMockBlockchain(tt.peerHeaders)
+			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
 			newBlocks := GenerateNewBlocks(t, peerSyncer.blockchain, tt.numNewBlocks)
+
+			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+
 			for _, newBlock := range newBlocks {
 				peerSyncer.Broadcast(newBlock)
 			}
@@ -271,6 +275,9 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			peerSyncer := peerSyncers[0]
 
 			newBlocks := GenerateNewBlocks(t, peerChain, tt.numNewBlocks)
+
+			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+
 			for _, b := range newBlocks {
 				peerSyncer.Broadcast(b)
 			}

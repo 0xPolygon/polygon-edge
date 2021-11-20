@@ -33,6 +33,7 @@ type Config struct {
 	NoDiscover     bool
 	Addr           *net.TCPAddr
 	NatAddr        net.IP
+	Dns            multiaddr.Multiaddr
 	DataDir        string
 	MaxPeers       uint64
 	Chain          *chain.Chain
@@ -134,6 +135,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			if addr != nil {
 				addrs = []multiaddr.Multiaddr{addr}
 			}
+		} else if config.Dns != nil {
+			addrs = []multiaddr.Multiaddr{config.Dns}
 		}
 
 		return addrs

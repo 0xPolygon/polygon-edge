@@ -236,8 +236,8 @@ func generateKeyAndMarshal() ([]byte, error) {
 	return buf, nil
 }
 
-// bytesToPrivateKey reads the input byte array and constructs a private key if possible
-func bytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
+// BytesToPrivateKey reads the input byte array and constructs a private key if possible
+func BytesToPrivateKey(input []byte) (*ecdsa.PrivateKey, error) {
 	// The key file on disk should be encoded in Base64,
 	// so it must be decoded before it can be parsed by ParsePrivateKey
 	decoded, err := hex.DecodeString(string(input))
@@ -268,7 +268,7 @@ func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	privateKey, err := bytesToPrivateKey(keyBuff)
+	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
 	}

@@ -295,15 +295,20 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
-	// diff is number in ibft
-	diff := new(big.Int).SetUint64(b.Header.Difficulty)
+	// Get the chain difficulty associated with block
+	td, ok := s.blockchain.GetTD(b.Hash())
+	if !ok {
+		// not supposed to happen
+		s.logger.Error("total difficulty not found", "block number", b.Number())
+		return
+	}
 
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
 		Status: &proto.V1Status{
 			Hash:       b.Hash().String(),
 			Number:     b.Number(),
-			Difficulty: diff.String(),
+			Difficulty: td.String(),
 		},
 		Raw: &any.Any{
 			Value: b.MarshalRLP(),
@@ -385,7 +390,6 @@ func (s *Syncer) BestPeer() *syncPeer {
 	}
 
 	curDiff := s.blockchain.CurrentTD()
-
 	if bestTd.Cmp(curDiff) <= 0 {
 		return nil
 	}
