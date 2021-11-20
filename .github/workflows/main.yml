@@ -48,7 +48,8 @@ jobs:
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
       - name: Go test
-        run: go test -timeout 28m ./polygon-sdk-race
+        run: go test -timeout 28m ./...
+        run: ls
       - 
         name: Extract branch name
         if: github.event_name != 'pull_request'
