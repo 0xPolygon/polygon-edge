@@ -340,7 +340,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	mux := t.lockAccountQueue(tx.From, true)
 	defer mux.unlock()
 
-	t.increaseSlots(slotsRequired(tx))
+	t.gauge.increase(slotsRequired(tx))
 
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
@@ -422,13 +422,13 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 
 	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
-	t.decreaseSlots(slots)
+	t.gauge.decrease(slots)
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
 		}
-		t.increaseSlots(slots)
+		t.gauge.increase(slots)
 	}
 	return txn.tx, ret
 }
@@ -479,7 +479,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.decreaseSlots(slotsRequired(txn))
+		t.gauge.increase(slotsRequired(txn))
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
 	}
@@ -584,16 +584,6 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 	}
 
 	return dropped, true
-}
-
-// increaseSlots increases number of taken slots
-func (t *TxPool) increaseSlots(slots uint64) {
-	t.gauge.increase(slots)
-}
-
-// increaseSlots decreases number of taken slots
-func (t *TxPool) decreaseSlots(slots uint64) {
-	t.gauge.decrease(slots)
 }
 
 // Checks if the incoming tx would cause an overflow
