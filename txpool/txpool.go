@@ -485,11 +485,6 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	}
 }
 
-// Returns the number of slots currently occupying the pool
-func (t *TxPool) slotsOccupied() uint64 {
-	return t.gauge.slots()
-}
-
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 

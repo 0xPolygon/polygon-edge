@@ -865,7 +865,7 @@ func TestSizeLimit(t *testing.T) {
 			err = pool.addImpl(tt.input.origin, generateAddTx(tt.input, signer))
 			assert.Equal(t, tt.err, err)
 			assert.Equal(t, tt.len, pool.Length())
-			assert.Equal(t, tt.slots, pool.slotsOccupied())
+			assert.Equal(t, tt.slots, pool.gauge.slots())
 		})
 	}
 }
@@ -955,7 +955,7 @@ func TestGaugeCheck(t *testing.T) {
 				assert.NotNil(t, tx)
 				assert.NoError(t, pool.addImpl(OriginGossip, tx))
 			}
-			assert.Equal(t, tt.initialSlots, pool.slotsOccupied())
+			assert.Equal(t, tt.initialSlots, pool.gauge.slots())
 
 			// send incoming
 			var wg sync.WaitGroup
@@ -971,7 +971,7 @@ func TestGaugeCheck(t *testing.T) {
 
 			// In whichever order the incoming txs came in
 			// they should not break the gauge limit invariant
-			assert.Equal(t, tt.maxSlots, pool.slotsOccupied())
+			assert.Equal(t, tt.maxSlots, pool.gauge.slots())
 		})
 	}
 }
