@@ -71,6 +71,7 @@ type slotGauge struct {
 	limit  uint64
 }
 
+// Increases the height of the gauge by the specified slots amount
 func (g *slotGauge) increase(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
@@ -78,6 +79,7 @@ func (g *slotGauge) increase(slots uint64) {
 	g.height += slots
 }
 
+// Decreases the height of the gauge by the specified slots amount
 func (g *slotGauge) decrease(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
@@ -85,7 +87,8 @@ func (g *slotGauge) decrease(slots uint64) {
 	g.height -= slots
 }
 
-func (g *slotGauge) slots() uint64 {
+// Returns the current height of the gauge measured in slots
+func (g *slotGauge) getHeight() uint64 {
 	g.Lock()
 	defer g.Unlock()
 
