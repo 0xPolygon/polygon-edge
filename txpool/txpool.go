@@ -565,6 +565,7 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	return underpriced
 }
 
+// Attemps to allocate slots by discarding pending remote transactions
 func (t *TxPool) Discard(slots uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
 	for t.remoteTxns.Length() > 0 && slots > 0 {
@@ -599,6 +600,8 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 	atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
+// Checks if the incoming transaction is a resend
+// of a pending same-nonce transaction
 func (t *TxPool) isSpeedUp(tx *types.Transaction) (*types.Transaction, bool) {
 	nextNonce, ok := t.GetNonce(tx.From)
 	if !ok {
@@ -627,6 +630,7 @@ func (t *TxPool) isSpeedUp(tx *types.Transaction) (*types.Transaction, bool) {
 	return nil, false
 }
 
+// Overwrites the pending oldTx with newTx
 func (t *TxPool) speedUp(newTx, oldTx *types.Transaction) error {
 	// price check
 	threshold := big.NewInt(0).Add(
@@ -639,6 +643,7 @@ func (t *TxPool) speedUp(newTx, oldTx *types.Transaction) error {
 	mux := t.lockAccountQueue(newTx.From, true)
 	defer mux.unlock()
 
+	// Remove oldTx and insert newTx in its place
 	if t.pendingQueue.Contains(oldTx) {
 		t.pendingQueue.Delete(oldTx)
 		t.decreaseSlots(numSlots(oldTx))
@@ -667,7 +672,8 @@ type txHeapWrapper struct {
 	// valid nonce for the account transaction
 	nextNonce uint64
 
-	// last tx that was promoted from this acc to pending queue
+	// lastPromoted tracks the latest transaction promoted to pendingQueue
+	// in case the succeeding transaction is a speedUp
 	lastPromoted *types.Transaction
 }
 
