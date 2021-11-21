@@ -67,29 +67,29 @@ type signer interface {
 // Gauge for measuring pool capacity in slots
 type slotGauge struct {
 	sync.Mutex
-	current uint64
-	limit   uint64
+	height uint64
+	limit  uint64
 }
 
 func (g *slotGauge) increase(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
 
-	g.current += slots
+	g.height += slots
 }
 
 func (g *slotGauge) decrease(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
 
-	g.current -= slots
+	g.height -= slots
 }
 
-func (g *slotGauge) height() uint64 {
+func (g *slotGauge) slots() uint64 {
 	g.Lock()
 	defer g.Unlock()
 
-	return g.current
+	return g.height
 }
 
 // TxPool is module that handles pending transactions.
@@ -164,7 +164,7 @@ func NewTxPool(
 		accountQueues: make(map[types.Address]*accountQueueWrapper),
 		pendingQueue:  newMaxTxPriceHeap(),
 		remoteTxns:    newMinTxPriceHeap(),
-		gauge:         slotGauge{current: 0, limit: maxSlots},
+		gauge:         slotGauge{height: 0, limit: maxSlots},
 		sealing:       sealing,
 		locals:        newLocalAccounts(locals),
 		noLocals:      noLocals,
@@ -331,7 +331,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	}
 
 	// check for slot overflow and handle accordingly
-	if err := t.gaugeCheck(tx, isLocal); err != nil {
+	if err := t.processSlots(tx, isLocal); err != nil {
 		return err
 	}
 
@@ -340,7 +340,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	mux := t.lockAccountQueue(tx.From, true)
 	defer mux.unlock()
 
-	t.increaseSlots(slots(tx))
+	t.increaseSlots(slotsRequired(tx))
 
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
@@ -420,7 +420,7 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 
-	slots := slots(txn.tx)
+	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
 	t.decreaseSlots(slots)
 	ret := func() {
@@ -479,7 +479,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.decreaseSlots(slots(txn))
+		t.decreaseSlots(slotsRequired(txn))
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
 	}
@@ -487,7 +487,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 // Returns the number of slots currently occupying the pool
 func (t *TxPool) slotsOccupied() uint64 {
-	return t.gauge.height()
+	return t.gauge.slots()
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
@@ -572,7 +572,7 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 		tx := t.remoteTxns.Pop()
 		dropped = append(dropped, tx.tx)
 
-		txSlots := slots(tx.tx)
+		txSlots := slotsRequired(tx.tx)
 		if remaining >= txSlots {
 			remaining -= txSlots
 		} else {
@@ -603,11 +603,11 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 
 // Checks if the incoming tx would cause an overflow
 // and attempts to allocate space for it
-func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
+func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	t.gauge.Lock()
 	defer t.gauge.Unlock()
 
-	if t.gauge.current+slots(tx) <= t.gauge.limit {
+	if t.gauge.height+slotsRequired(tx) <= t.gauge.limit {
 		// no overflow
 		return nil
 	}
@@ -616,7 +616,7 @@ func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
 		return ErrUnderpriced
 	}
 
-	overflow := t.gauge.current + slots(tx) - t.gauge.limit
+	overflow := t.gauge.height + slotsRequired(tx) - t.gauge.limit
 	dropped, success := t.Discard(overflow, isLocal)
 	if !isLocal && !success {
 		return ErrTxPoolOverflow
@@ -630,7 +630,7 @@ func (t *TxPool) gaugeCheck(tx *types.Transaction, isLocal bool) error {
 		mux.unlock()
 
 		t.pendingQueue.Delete(tx)
-		t.gauge.current -= slots(tx)
+		t.gauge.height -= slotsRequired(tx)
 	}
 
 	return nil
@@ -1003,7 +1003,7 @@ func (a *localAccounts) addAddr(addr types.Address) {
 	a.accounts[addr] = true
 }
 
-// slots() calculates the number of slots for given transaction
-func slots(tx *types.Transaction) uint64 {
+// slotsRequired() calculates the number of slotsRequired for given transaction
+func slotsRequired(tx *types.Transaction) uint64 {
 	return (tx.Size() + txSlotSize - 1) / txSlotSize
 }
