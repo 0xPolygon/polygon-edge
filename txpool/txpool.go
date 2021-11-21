@@ -602,7 +602,6 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 func (t *TxPool) isSpeedUp(tx *types.Transaction) (*types.Transaction, bool) {
 	nextNonce, ok := t.GetNonce(tx.From)
 	if !ok {
-		println("No previous txs for this acc")
 		return nil, false
 	}
 
