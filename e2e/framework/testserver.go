@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"io"
 	"math/big"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/command/helper"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
@@ -38,7 +39,7 @@ type TestServerConfigCallback func(*TestServerConfig)
 
 const (
 	initialPort   = 12000
-	polygonSDKCmd = "polygon-sdk"
+	polygonSDKCmd = "polygon-sdk-race"
 )
 
 type TestServer struct {
