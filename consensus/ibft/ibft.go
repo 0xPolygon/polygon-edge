@@ -26,6 +26,7 @@ import (
 
 const (
 	DefaultEpochSize = 100000
+	BlockDifficulty  = 1
 )
 
 type blockchainInterface interface {
@@ -351,7 +352,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Miner:      types.Address{},
 		Nonce:      types.Nonce{},
 		MixHash:    IstanbulDigest,
-		Difficulty: 1,                   // we need to do this because blockchain needs difficulty to organize blocks and forks
+		Difficulty: BlockDifficulty,
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
