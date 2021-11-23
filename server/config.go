@@ -18,7 +18,7 @@ type Config struct {
 	JSONRPCAddr *net.TCPAddr
 	GRPCAddr    *net.TCPAddr
 	LibP2PAddr  *net.TCPAddr
-	Metrics     *Telemetry
+	Telemetry   *Telemetry
 	Network     *network.Config
 	DataDir     string
 	Seal        bool
@@ -34,11 +34,11 @@ func DefaultConfig() *Config {
 		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
 		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
 		Network:     network.DefaultConfig(),
-		Metrics:     &Telemetry{PrometheusAddr: nil},
+		Telemetry:   &Telemetry{PrometheusAddr: nil},
 	}
 }
 
-// Telemetry holds the config details for metric services.
+// Telemetry holds the config details for metric services
 type Telemetry struct {
 	PrometheusAddr *net.TCPAddr
 }

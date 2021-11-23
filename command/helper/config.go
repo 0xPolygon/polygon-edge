@@ -23,7 +23,7 @@ type Config struct {
 	BlockGasTarget string                 `json:"block_gas_target"`
 	GRPCAddr       string                 `json:"rpc_addr"`
 	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
-	Metrics        *Telemetry             `json:"telemetrics"`
+	Telemetry      *Telemetry             `json:"telemetrics"`
 	Network        *Network               `json:"network"`
 	Seal           bool                   `json:"seal"`
 	TxPool         *TxPool                `json:"tx_pool"`
@@ -34,7 +34,7 @@ type Config struct {
 	Join           string
 }
 
-// Tele
+// Telemetry holds the config details for metric services.
 type Telemetry struct {
 	PrometheusAddr string `json:"prometheus_addr"`
 }
@@ -66,8 +66,8 @@ func DefaultConfig() *Config {
 			NoDiscover: false,
 			MaxPeers:   20,
 		},
-		Metrics: &Telemetry{},
-		Seal:    false,
+		Telemetry: &Telemetry{},
+		Seal:      false,
 		TxPool: &TxPool{
 			PriceLimit: 1,
 			MaxSlots:   4096,
@@ -105,9 +105,9 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 			return nil, err
 		}
 	}
-	if c.Metrics.PrometheusAddr != "" {
+	if c.Telemetry.PrometheusAddr != "" {
 		// If an address was passed in, parse it
-		if conf.Metrics.PrometheusAddr, err = resolveAddr(c.Metrics.PrometheusAddr); err != nil {
+		if conf.Telemetry.PrometheusAddr, err = resolveAddr(c.Telemetry.PrometheusAddr); err != nil {
 			return nil, err
 		}
 	}
@@ -232,9 +232,8 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.GRPCAddr = otherConfig.GRPCAddr
 	}
 
-	if otherConfig.Metrics.PrometheusAddr != "" {
-
-		c.Metrics.PrometheusAddr = otherConfig.Metrics.PrometheusAddr
+	if otherConfig.Telemetry.PrometheusAddr != "" {
+		c.Telemetry.PrometheusAddr = otherConfig.Telemetry.PrometheusAddr
 	}
 
 	if otherConfig.JSONRPCAddr != "" {
