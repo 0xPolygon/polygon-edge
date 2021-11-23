@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/loadbot"
 	"github.com/0xPolygon/polygon-sdk/command/monitor"
 	"github.com/0xPolygon/polygon-sdk/command/peers"
+	"github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
 	"github.com/0xPolygon/polygon-sdk/command/status"
 	"github.com/0xPolygon/polygon-sdk/command/txpool"
@@ -39,7 +40,6 @@ func Commands() map[string]cli.CommandFactory {
 
 	ibftCmd := ibft.IbftCommand{}
 	ibftCandidatesCmd := ibft.IbftCandidates{Meta: meta}
-	ibftInitCmd := ibft.IbftInit{Meta: meta}
 	ibftProposeCmd := ibft.IbftPropose{Meta: meta}
 	ibftSnapshotCmd := ibft.IbftSnapshot{Meta: meta}
 	ibftStatusCmd := ibft.IbftStatus{Meta: meta}
@@ -54,6 +54,10 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
 
 	loadbotCmd := loadbot.LoadbotCommand{Meta: meta}
+
+	secretsManagerCmd := secrets.SecretsCommand{}
+	secretsGenerateCmd := secrets.SecretsGenerate{Meta: meta}
+	secretsInitCmd := secrets.SecretsInit{Meta: meta}
 
 	return map[string]cli.CommandFactory{
 
@@ -88,10 +92,6 @@ func Commands() map[string]cli.CommandFactory {
 
 		ibftCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftCmd, nil
-		},
-
-		ibftInitCmd.GetBaseCommand(): func() (cli.Command, error) {
-			return &ibftInitCmd, nil
 		},
 		ibftSnapshotCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftSnapshotCmd, nil
@@ -128,6 +128,17 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &versionCmd, nil
+		},
+
+		// SECRETS MANAGER COMMANDS //
+		secretsManagerCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &secretsManagerCmd, nil
+		},
+		secretsGenerateCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &secretsGenerateCmd, nil
+		},
+		secretsInitCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &secretsInitCmd, nil
 		},
 
 		// LOADBOT COMMANDS //

@@ -4,16 +4,16 @@ go 1.14
 
 require (
 	github.com/btcsuite/btcd v0.21.0-beta
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.2
 	github.com/google/gopacket v1.1.18 // indirect
 	github.com/google/uuid v1.1.4
 	github.com/gorilla/websocket v1.4.2
-	github.com/hashicorp/go-hclog v0.14.1
-	github.com/hashicorp/go-immutable-radix v1.3.0
-	github.com/hashicorp/go-multierror v1.1.0
-	github.com/hashicorp/go-uuid v1.0.1 // indirect
+	github.com/hashicorp/go-hclog v0.16.2
+	github.com/hashicorp/go-immutable-radix v1.3.1
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
+	github.com/hashicorp/vault/api v1.3.0
 	github.com/imdario/mergo v0.3.7
 	github.com/libp2p/go-libp2p v0.12.0
 	github.com/libp2p/go-libp2p-core v0.7.0
@@ -29,9 +29,8 @@ require (
 	github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 	github.com/umbracle/go-web3 v0.0.0-20210427125755-b411b4019e22
 	go.uber.org/zap v1.16.0 // indirect
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
-	google.golang.org/grpc v1.35.0
-	google.golang.org/protobuf v1.25.0
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	google.golang.org/grpc v1.41.0
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
