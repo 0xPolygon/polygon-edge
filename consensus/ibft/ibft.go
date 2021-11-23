@@ -122,7 +122,7 @@ type ConsensusMechanism interface {
 }
 
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism
-type ConsensusMechanismFactory func() (ConsensusMechanism, error)
+type ConsensusMechanismFactory func(ibft *Ibft) (ConsensusMechanism, error)
 
 var mechanismBackends = map[Type]ConsensusMechanismFactory{
 	PoA: PoAFactory,
@@ -175,7 +175,7 @@ func Factory(
 	// Initialize the mechanism
 	// TODO grab mechanism type from config after PR #222 is merged
 	mechanismFactory := mechanismBackends[PoS]
-	mechanism, factoryErr := mechanismFactory()
+	mechanism, factoryErr := mechanismFactory(p)
 	if factoryErr != nil {
 		return nil, factoryErr
 	}

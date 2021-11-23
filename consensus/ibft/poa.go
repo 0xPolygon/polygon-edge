@@ -20,9 +20,10 @@ type PoAMechanism struct {
 
 // PoAFactory initializes the required data
 // for the Proof of Authority mechanism
-func PoAFactory() (ConsensusMechanism, error) {
+func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
 	poa := &PoAMechanism{
 		mechanismType: PoA,
+		ibft:          ibft,
 	}
 
 	// Initialize the hook map

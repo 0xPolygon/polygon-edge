@@ -22,9 +22,10 @@ type PoSMechanism struct {
 
 // PoSFactory initializes the required data
 // for the Proof of Stake mechanism
-func PoSFactory() (ConsensusMechanism, error) {
+func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
 	pos := &PoSMechanism{
 		mechanismType: PoS,
+		ibft:          ibft,
 	}
 
 	// Initialize the hook map
@@ -83,12 +84,6 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the InsertBlockHook
 	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
-}
-
-// syncStateHookParams are the params used for the syncStateHook
-type syncStateHookParams struct {
-	oldLatestNumber uint64
-	headerNumber    uint64
 }
 
 // getNextValidators is a helper function for fetching the validator set
