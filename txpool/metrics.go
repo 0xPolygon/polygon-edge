@@ -7,10 +7,13 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
+// Metrics represents the txpool metrics
 type Metrics struct {
+	// Pending transactions
 	PendingTxs metrics.Gauge
 }
 
+// GetPrometheusMetrics return the txpool metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -28,6 +31,7 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 }
 
+// NilMetrics will return the non operational txpool metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
 		PendingTxs: discard.NewGauge(),

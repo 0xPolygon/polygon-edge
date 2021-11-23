@@ -654,6 +654,9 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 }
+
+// updateMetrics will update various metrics based on the given block
+// currently we capture No.of Txs and block interval metrics using this function
 func (i *Ibft) updateMetrics(block *types.Block) {
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
 	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)

@@ -7,17 +7,20 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
+// Metrics represents the consensus metrics
 type Metrics struct {
+	// No.of validators
 	Validators metrics.Gauge
-
+	// No.of rounds
 	Rounds metrics.Gauge
-
+	// No.of transactions in the block
 	NumTxs metrics.Gauge
 
 	//Time between current block and the previous block in seconds
 	BlockInterval metrics.Histogram
 }
 
+// GetPrometheusMetrics return the consensus metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -54,6 +57,7 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 }
 
+// NilMetrics will return the non operational metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
 		Validators:    discard.NewGauge(),
