@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
@@ -18,16 +19,17 @@ import (
 
 // Config defines the server configuration params
 type Config struct {
-	Chain          string                 `json:"chain"`
-	DataDir        string                 `json:"data_dir"`
-	BlockGasTarget string                 `json:"block_gas_target"`
-	GRPCAddr       string                 `json:"rpc_addr"`
-	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
-	Network        *Network               `json:"network"`
-	Seal           bool                   `json:"seal"`
-	TxPool         *TxPool                `json:"tx_pool"`
-	LogLevel       string                 `json:"log_level"`
-	Consensus      map[string]interface{} `json:"consensus"`
+	Chain          string                        `json:"chain"`
+	DataDir        string                        `json:"data_dir"`
+	BlockGasTarget string                        `json:"block_gas_target"`
+	GRPCAddr       string                        `json:"rpc_addr"`
+	JSONRPCAddr    string                        `json:"jsonrpc_addr"`
+	Network        *Network                      `json:"network"`
+	SecretsManager *secrets.SecretsManagerConfig `json:"secrets_manager"`
+	Seal           bool                          `json:"seal"`
+	TxPool         *TxPool                       `json:"tx_pool"`
+	LogLevel       string                        `json:"log_level"`
+	Consensus      map[string]interface{}        `json:"consensus"`
 	Dev            bool
 	DevInterval    uint64
 	Join           string
@@ -65,8 +67,9 @@ func DefaultConfig() *Config {
 			PriceLimit: 1,
 			MaxSlots:   4096,
 		},
-		LogLevel:  "INFO",
-		Consensus: map[string]interface{}{},
+		LogLevel:       "INFO",
+		Consensus:      map[string]interface{}{},
+		SecretsManager: nil,
 	}
 }
 
@@ -166,6 +169,11 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Chain.Params.Engine = map[string]interface{}{
 			"dev": engineConfig,
 		}
+	}
+
+	// Set the secrets manager config if it was passed in
+	if c.SecretsManager != nil {
+		conf.SecretsManager = c.SecretsManager
 	}
 
 	return conf, nil
