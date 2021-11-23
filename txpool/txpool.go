@@ -382,8 +382,6 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 // GetTxs gets pending and queued transactions
 func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
 	t.pendingQueue.lock.Lock()
-	defer t.pendingQueue.lock.Unlock()
-
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
@@ -392,6 +390,7 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 		}
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
 	}
+	t.pendingQueue.lock.Unlock()
 	if !inclQueued {
 		return pendingTxs, nil
 	}
