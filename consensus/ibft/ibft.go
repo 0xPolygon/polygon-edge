@@ -35,6 +35,13 @@ type blockchainInterface interface {
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
+type transactionPoolInterface interface {
+	ResetWithHeader(h *types.Header)
+	Pop() (*types.Transaction, func())
+	DecreaseAccountNonce(tx *types.Transaction)
+	Length() uint64
+}
+
 // Ibft represents the IBFT consensus mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
@@ -50,7 +57,7 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey // Private key for the validator
 	validatorKeyAddr types.Address
 
-	txpool *txpool.TxPool // Reference to the transaction pool
+	txpool transactionPoolInterface // Reference to the transaction pool
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	epochSize uint64
@@ -390,29 +397,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if err != nil {
 		return nil, err
 	}
-	txns := []*types.Transaction{}
-	for {
-		txn, retFn := i.txpool.Pop()
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.DecreaseAccountNonce(txn)
-		} else {
-			if err := transition.Write(txn); err != nil {
-				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-					retFn()
-				} else {
-					i.txpool.DecreaseAccountNonce(txn)
-				}
-				break
-			}
-			txns = append(txns, txn)
-		}
-	}
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	txns := i.writeTransactions(gasLimit, transition)
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -436,8 +421,50 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// is sealed after all the committed seals
 	block.Header.ComputeHash()
 
-	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
+	i.logger.Info("build block", "number", header.Number, "txPoolLength", len(txns))
 	return block, nil
+}
+
+type transitionInterface interface {
+	Write(txn *types.Transaction) error
+}
+
+func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := i.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			i.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if appErr, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				i.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	i.logger.Info("picked out txPoolLength from pool", "num", len(txns), "remaining", i.txpool.Length())
+	return txns
 }
 
 // runAcceptState runs the Accept state loop
