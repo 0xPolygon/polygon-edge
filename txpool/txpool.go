@@ -334,16 +334,19 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	}
 
 	// check for slot overflow and handle accordingly
+	t.gauge.Lock()
 	if err := t.processSlots(tx, isLocal); err != nil {
+		t.gauge.Unlock()
 		return err
 	}
+
+	t.gauge.height += slotsRequired(tx)
+	t.gauge.Unlock()
 
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
 	mux := t.lockAccountQueue(tx.From, true)
 	defer mux.unlock()
-
-	t.gauge.increase(slotsRequired(tx))
 
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
@@ -594,9 +597,6 @@ func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bo
 // Checks if the incoming tx would cause an overflow
 // and attempts to allocate space for it
 func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
-	t.gauge.Lock()
-	defer t.gauge.Unlock()
-
 	if t.gauge.height+slotsRequired(tx) <= t.gauge.limit {
 		// no overflow
 		return nil
