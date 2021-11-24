@@ -12,9 +12,11 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
@@ -65,14 +67,14 @@ type Server struct {
 	serverMetrics *serverMetrics
 
 	prometheusServer *http.Server
+	// secrets manager
+	secretsManager secrets.SecretsManager
 }
 
 var dirPaths = []string{
 	"blockchain",
-	"consensus",
 	"keystore",
 	"trie",
-	"libp2p",
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -87,7 +89,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := SetupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
@@ -96,6 +98,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	} else {
 		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
+  }
+	// Set up the secrets manager
+	if err := m.setupSecretsManager(); err != nil {
+		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
 	}
 
 	// start libp2p
@@ -103,6 +109,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		netConfig := config.Network
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
+		netConfig.SecretsManager = m.secretsManager
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -143,7 +150,19 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 		// start transaction pool
-		m.txpool, err = txpool.NewTxPool(logger, m.config.Seal, m.config.Locals, m.config.NoLocals, m.config.PriceLimit, m.config.MaxSlots, m.chain.Params.Forks.At(0), hub, m.grpcServer, m.network, m.serverMetrics.txpool)
+		m.txpool, err = txpool.NewTxPool(
+			logger,
+			m.config.Seal,
+			m.config.Locals,
+			m.config.NoLocals,
+			m.config.PriceLimit,
+			m.config.MaxSlots,
+			m.chain.Params.Forks.At(0),
+			hub,
+			m.grpcServer,
+			m.network,
+      m.serverMetrics.txpool
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -225,6 +244,50 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	return account.Balance, nil
 }
 
+// setupSecretsManager sets up the secrets manager
+func (s *Server) setupSecretsManager() error {
+	secretsManagerConfig := s.config.SecretsManager
+	if secretsManagerConfig == nil {
+		// No config provided, use default
+		secretsManagerConfig = &secrets.SecretsManagerConfig{
+			Type: secrets.Local,
+		}
+	}
+
+	secretsManagerType := secretsManagerConfig.Type
+	secretsManagerParams := &secrets.SecretsManagerParams{
+		Logger: s.logger,
+	}
+
+	if secretsManagerType == secrets.Local {
+		// Only the base directory is required for
+		// the local secrets manager
+		secretsManagerParams.Extra = map[string]interface{}{
+			secrets.Path: s.config.DataDir,
+		}
+	}
+
+	// Grab the factory method
+	secretsManagerFactory, ok := secretsManagerBackends[secretsManagerType]
+	if !ok {
+		return fmt.Errorf("secrets manager type '%s' not found", secretsManagerType)
+	}
+
+	// Instantiate the secrets manager
+	secretsManager, factoryErr := secretsManagerFactory(
+		secretsManagerConfig,
+		secretsManagerParams,
+	)
+
+	if factoryErr != nil {
+		return fmt.Errorf("unable to instantiate secrets manager, %v", factoryErr)
+	}
+
+	s.secretsManager = secretsManager
+
+	return nil
+}
+
 // setupConsensus sets up the consensus mechanism
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
@@ -242,7 +305,21 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-	consensus, err := engine(context.Background(), s.config.Seal, config, s.txpool, s.network, s.blockchain, s.executor, s.grpcServer, s.logger.Named("consensus"), s.serverMetrics.consensus)
+	consensus, err := engine(
+		&consensus.ConsensusParams{
+			Context:        context.Background(),
+			Seal:           s.config.Seal,
+			Config:         config,
+			Txpool:         s.txpool,
+			Network:        s.network,
+			Blockchain:     s.blockchain,
+			Executor:       s.executor,
+			Grpc:           s.grpcServer,
+			Logger:         s.logger.Named("consensus"),
+      Metrics: s.serverMetrics.consensus,
+			SecretsManager: s.secretsManager,
+		},
+	)
 	if err != nil {
 		return err
 	}

@@ -7,12 +7,10 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 )
 
 // Dev consensus protocol seals any new transaction immediately
@@ -31,29 +29,20 @@ type Dev struct {
 
 // Factory implements the base factory method
 func Factory(
-	ctx context.Context,
-	sealing bool,
-	config *consensus.Config,
-	txpool *txpool.TxPool,
-	network *network.Server,
-	blockchain *blockchain.Blockchain,
-	executor *state.Executor,
-	srv *grpc.Server,
-	logger hclog.Logger,
-	metrics *consensus.Metrics,
+	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	logger = logger.Named("dev")
+	logger := params.Logger.Named("dev")
 
 	d := &Dev{
 		logger:     logger,
 		notifyCh:   make(chan struct{}),
 		closeCh:    make(chan struct{}),
-		blockchain: blockchain,
-		executor:   executor,
-		txpool:     txpool,
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		txpool:     params.Txpool,
 	}
 
-	rawInterval, ok := config.Config["interval"]
+	rawInterval, ok := params.Config.Config["interval"]
 	if ok {
 		interval, ok := rawInterval.(uint64)
 		if !ok {
@@ -63,8 +52,8 @@ func Factory(
 	}
 
 	// enable dev mode so that we can accept non-signed txns
-	txpool.EnableDev()
-	txpool.NotifyCh = d.notifyCh
+	params.Txpool.EnableDev()
+	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }

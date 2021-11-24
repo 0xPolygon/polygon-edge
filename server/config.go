@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -26,6 +27,7 @@ type Config struct {
 	NoLocals    bool
 	PriceLimit  uint64
 	MaxSlots    uint64
+	SecretsManager *secrets.SecretsManagerConfig
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
@@ -35,6 +37,7 @@ func DefaultConfig() *Config {
 		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
 		Network:     network.DefaultConfig(),
 		Telemetry:   &Telemetry{PrometheusAddr: nil},
+		SecretsManager: nil,
 	}
 }
 
