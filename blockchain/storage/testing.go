@@ -126,10 +126,10 @@ func testDifficulty(t *testing.T, m MockStorage) {
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.WriteDiff(hash, cc.Diff); err != nil {
+		if err := s.WriteTotalDifficulty(hash, cc.Diff); err != nil {
 			t.Fatal(err)
 		}
-		diff, ok := s.ReadDiff(hash)
+		diff, ok := s.ReadTotalDifficulty(hash)
 		if !ok {
 			t.Fatal("not found")
 		}

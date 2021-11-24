@@ -464,12 +464,22 @@ type mockIbft struct {
 }
 
 func (m *mockIbft) DummyBlock() *types.Block {
-	parent, _ := m.blockchain.GetHeaderByNumber(0)
+	parent, ok := m.blockchain.GetHeaderByNumber(0)
+	assert.True(m.t, ok, "genesis block not found")
+
+	num := parent.Number + 1
+	gasLimit, err := m.CalculateGasLimit(num)
+	assert.NoError(m.t, err, "failed to calculate next gas limit")
+
 	block := &types.Block{
 		Header: &types.Header{
+			Number:     num,
+			Difficulty: num,
+			ParentHash: parent.Hash,
 			ExtraData:  parent.ExtraData,
 			MixHash:    IstanbulDigest,
 			Sha3Uncles: types.EmptyUncleHash,
+			GasLimit:   gasLimit,
 		},
 	}
 	return block
@@ -506,6 +516,10 @@ func (m *mockIbft) addMessage(msg *proto.MessageReq) {
 func (m *mockIbft) Gossip(msg *proto.MessageReq) error {
 	m.respMsg = append(m.respMsg, msg)
 	return nil
+}
+
+func (m *mockIbft) CalculateGasLimit(number uint64) (uint64, error) {
+	return m.blockchain.CalculateGasLimit(number)
 }
 
 func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {

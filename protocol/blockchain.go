@@ -21,4 +21,5 @@ type blockchainShim interface {
 
 	// advance chain methods
 	WriteBlocks(blocks []*types.Block) error
+	CalculateGasLimit(number uint64) (uint64, error)
 }

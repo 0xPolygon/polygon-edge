@@ -20,8 +20,8 @@ type Storage interface {
 	WriteForks(forks []types.Hash) error
 	ReadForks() ([]types.Hash, error)
 
-	WriteDiff(hash types.Hash, diff *big.Int) error
-	ReadDiff(hash types.Hash) (*big.Int, bool)
+	WriteTotalDifficulty(hash types.Hash, diff *big.Int) error
+	ReadTotalDifficulty(hash types.Hash) (*big.Int, bool)
 
 	WriteHeader(h *types.Header) error
 	ReadHeader(hash types.Hash) (*types.Header, error)

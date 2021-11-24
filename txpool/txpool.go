@@ -530,9 +530,6 @@ func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 		return ErrInsufficientFunds
 	}
 
-	// Make sure the transaction doesn't exceed the block limit
-	// TODO: Awaiting separate PR
-
 	// Make sure the transaction has more gas than the basic transaction fee
 	intrinsicGas, err := state.TransactionGasCost(tx, t.forks.Homestead, t.forks.Istanbul)
 	if err != nil {

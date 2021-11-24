@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -45,14 +46,20 @@ type Config struct {
 	Path string
 }
 
+type ConsensusParams struct {
+	Context        context.Context
+	Seal           bool
+	Config         *Config
+	Txpool         *txpool.TxPool
+	Network        *network.Server
+	Blockchain     *blockchain.Blockchain
+	Executor       *state.Executor
+	Grpc           *grpc.Server
+	Logger         hclog.Logger
+	SecretsManager secrets.SecretsManager
+}
+
 // Factory is the factory function to create a discovery backend
 type Factory func(
-	context.Context,
-	bool, *Config,
-	*txpool.TxPool,
-	*network.Server,
-	*blockchain.Blockchain,
-	*state.Executor,
-	*grpc.Server,
-	hclog.Logger,
+	*ConsensusParams,
 ) (Consensus, error)

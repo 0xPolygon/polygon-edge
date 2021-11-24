@@ -9,12 +9,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
@@ -370,6 +372,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
+	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -403,6 +406,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Usage = func() {}
 
 	var configFile string
+	var secretsConfigPath string
+
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
 	flags.StringVar(&configFile, "config", "", "")
@@ -413,6 +418,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
 	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
+	flags.StringVar(&cliConfig.Network.Dns, "dns", "", " the host DNS address which can be used by a remote peer for connection")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
@@ -421,6 +427,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
+	flags.StringVar(&secretsConfigPath, "secrets-config", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -436,6 +444,16 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {
 			return nil, err
 		}
+	}
+
+	if secretsConfigPath != "" {
+		// Config file passed in
+		secretsConfig, readErr := secrets.ReadConfig(secretsConfigPath)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read config file, %v", readErr)
+		}
+
+		config.SecretsManager = secretsConfig
 	}
 
 	if err := config.mergeConfigWith(cliConfig); err != nil {
@@ -510,20 +528,4 @@ func FormatKV(in []string) string {
 	columnConf.Glue = " = "
 
 	return columnize.Format(in, columnConf)
-}
-
-// DirectoryExists checks if the directory at the specified path exists
-func DirectoryExists(directoryPath string) bool {
-	// Grab the absolute filepath
-	pathAbs, err := filepath.Abs(directoryPath)
-	if err != nil {
-		return false
-	}
-
-	// Check if the directory exists, and that it's actually a directory if there is a hit
-	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && !fileInfo.IsDir()) {
-		return false
-	}
-
-	return true
 }
