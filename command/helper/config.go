@@ -19,18 +19,18 @@ import (
 
 // Config defines the server configuration params
 type Config struct {
-
-	Chain          string                 `json:"chain"`
-	DataDir        string                 `json:"data_dir"`
-	BlockGasTarget string                 `json:"block_gas_target"`
-	GRPCAddr       string                 `json:"rpc_addr"`
-	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
-	Telemetry      *Telemetry             `json:"telemetrics"`
-	Network        *Network               `json:"network"`
-	Seal           bool                   `json:"seal"`
-	TxPool         *TxPool                `json:"tx_pool"`
-	LogLevel       string                 `json:"log_level"`
-	Consensus      map[string]interface{} `json:"consensus"`
+	Chain          string                        `json:"chain"`
+	DataDir        string                        `json:"data_dir"`
+	BlockGasTarget string                        `json:"block_gas_target"`
+	GRPCAddr       string                        `json:"rpc_addr"`
+	JSONRPCAddr    string                        `json:"jsonrpc_addr"`
+	Telemetry      *Telemetry                    `json:"telemetrics"`
+	Network        *Network                      `json:"network"`
+	SecretsManager *secrets.SecretsManagerConfig `json:"secrets_manager"`
+	Seal           bool                          `json:"seal"`
+	TxPool         *TxPool                       `json:"tx_pool"`
+	LogLevel       string                        `json:"log_level"`
+	Consensus      map[string]interface{}        `json:"consensus"`
 	Dev            bool
 	DevInterval    uint64
 	Join           string
