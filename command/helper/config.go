@@ -24,7 +24,7 @@ type Config struct {
 	BlockGasTarget string                        `json:"block_gas_target"`
 	GRPCAddr       string                        `json:"rpc_addr"`
 	JSONRPCAddr    string                        `json:"jsonrpc_addr"`
-	Telemetry      *Telemetry                    `json:"telemetrics"`
+	Telemetry      *Telemetry                    `json:"telemetry"`
 	Network        *Network                      `json:"network"`
 	SecretsManager *secrets.SecretsManagerConfig `json:"secrets_manager"`
 	Seal           bool                          `json:"seal"`
