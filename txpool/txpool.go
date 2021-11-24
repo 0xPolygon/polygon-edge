@@ -826,8 +826,8 @@ func (t *txPriceHeap) Delete(tx *types.Transaction) *types.Transaction {
 
 	if item, ok := t.index[tx.Hash]; ok {
 		delete(t.index, tx.Hash)
-		removed := heap.Remove(t.heap, item.index).(*types.Transaction)
-		return removed
+		removed := heap.Remove(t.heap, item.index).(*pricedTx)
+		return removed.tx
 	}
 
 	return nil
