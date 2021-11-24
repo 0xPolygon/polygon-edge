@@ -98,7 +98,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	} else {
 		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
-  }
+	}
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
@@ -161,7 +161,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			hub,
 			m.grpcServer,
 			m.network,
-      m.serverMetrics.txpool
+			m.serverMetrics.txpool,
 		)
 		if err != nil {
 			return nil, err
@@ -316,7 +316,7 @@ func (s *Server) setupConsensus() error {
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
 			Logger:         s.logger.Named("consensus"),
-      Metrics: s.serverMetrics.consensus,
+			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 		},
 	)
