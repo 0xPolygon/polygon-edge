@@ -432,7 +432,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// is sealed after all the committed seals
 	block.Header.ComputeHash()
 
-	i.logger.Info("build block", "number", header.Number, "txPoolLength", len(txns))
+	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
 	return block, nil
 }
 
@@ -456,7 +456,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if err := transition.Write(txn); err != nil {
-			if appErr, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok && appErr.IsRecoverable {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
