@@ -145,6 +145,8 @@ type TxPool struct {
 
 	// Indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
+
+	metrics *Metrics
 }
 
 // NewTxPool creates a new pool for transactions
@@ -159,6 +161,7 @@ func NewTxPool(
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
+	metrics *Metrics,
 ) (*TxPool, error) {
 	txPool := &TxPool{
 		logger:        logger.Named("txpool"),
@@ -173,6 +176,7 @@ func NewTxPool(
 		noLocals:      noLocals,
 		priceLimit:    priceLimit,
 		forks:         forks,
+		metrics:       metrics,
 	}
 
 	if network != nil {
@@ -364,6 +368,8 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	for _, promoted := range wrapper.accountQueue.Promote() {
 		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
+		} else {
+			t.metrics.PendingTxs.Add(1)
 		}
 	}
 
@@ -426,6 +432,9 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 
+	//Update the pending transaction metric
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+
 	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
 	t.gauge.decrease(slots)
@@ -433,6 +442,8 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
+		} else {
+			t.metrics.PendingTxs.Add(1)
 		}
 		t.gauge.increase(slots)
 	}
@@ -489,6 +500,8 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
 	}
+	//update the metric
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
@@ -620,6 +633,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		t.gauge.height -= slotsRequired(tx)
 	}
 
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 	return nil
 }
 

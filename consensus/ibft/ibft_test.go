@@ -553,6 +553,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		operator:         &operator{},
 		state:            newState(),
 		epochSize:        DefaultEpochSize,
+		metrics:          consensus.NilMetrics(),
 	}
 
 	// by default set the state to (1, 0)
