@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
@@ -46,10 +47,12 @@ type Network struct {
 
 // TxPool defines the TxPool configuration params
 type TxPool struct {
-	Locals     string `json:"locals"`
-	NoLocals   bool   `json:"no_locals"`
-	PriceLimit uint64 `json:"price_limit"`
-	MaxSlots   uint64 `json:"max_slots"`
+	Locals              string `json:"locals"`
+	NoLocals            bool   `json:"no_locals"`
+	PriceLimit          uint64 `json:"price_limit"`
+	MaxSlots            uint64 `json:"max_slots"`
+	AccountPendingLimit uint64 `json:"account_pending_limit"`
+	Lifetime            string `json:"lifetime"`
 }
 
 // DefaultConfig returns the default server configuration
@@ -64,8 +67,10 @@ func DefaultConfig() *Config {
 		},
 		Seal: false,
 		TxPool: &TxPool{
-			PriceLimit: 1,
-			MaxSlots:   4096,
+			PriceLimit:          1,
+			MaxSlots:            4096,
+			AccountPendingLimit: 16,
+			Lifetime:            "3h0m0s",
 		},
 		LogLevel:       "INFO",
 		Consensus:      map[string]interface{}{},
@@ -131,14 +136,21 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	{
 		if c.TxPool.Locals != "" {
 			strAddrs := strings.Split(c.TxPool.Locals, ",")
-			conf.Locals = make([]types.Address, len(strAddrs))
+			conf.TxPool.Locals = make([]types.Address, len(strAddrs))
 			for i, sAddr := range strAddrs {
-				conf.Locals[i] = types.StringToAddress(sAddr)
+				conf.TxPool.Locals[i] = types.StringToAddress(sAddr)
 			}
 		}
-		conf.NoLocals = c.TxPool.NoLocals
-		conf.PriceLimit = c.TxPool.PriceLimit
-		conf.MaxSlots = c.TxPool.MaxSlots
+		conf.TxPool.NoLocals = c.TxPool.NoLocals
+		conf.TxPool.PriceLimit = c.TxPool.PriceLimit
+		conf.TxPool.MaxSlots = c.TxPool.MaxSlots
+		conf.TxPool.AccountPendingLimit = c.TxPool.AccountPendingLimit
+
+		lifetime, err := time.ParseDuration(c.TxPool.Lifetime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse lifetime %s, %v", c.TxPool.Lifetime, err)
+		}
+		conf.TxPool.Lifetime = lifetime
 	}
 
 	// Target gas limit
@@ -267,6 +279,12 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 		if otherConfig.TxPool.MaxSlots != 0 {
 			c.TxPool.MaxSlots = otherConfig.TxPool.MaxSlots
+		}
+		if otherConfig.TxPool.AccountPendingLimit != 0 {
+			c.TxPool.AccountPendingLimit = otherConfig.TxPool.AccountPendingLimit
+		}
+		if otherConfig.TxPool.Lifetime != "" {
+			c.TxPool.Lifetime = otherConfig.TxPool.Lifetime
 		}
 	}
 

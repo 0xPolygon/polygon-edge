@@ -18,6 +18,7 @@ import (
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -25,15 +26,17 @@ import (
 )
 
 const (
-	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "example"
-	DefaultChainID        = 100
-	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	DefaultConsensus      = "pow"
-	DefaultPriceLimit     = 1
-	DefaultMaxSlots       = 4096
-	GenesisGasUsed        = 458752  // 0x70000
-	GenesisGasLimit       = 5242880 // 0x500000
+	GenesisFileName            = "./genesis.json"
+	DefaultChainName           = "example"
+	DefaultChainID             = 100
+	DefaultPremineBalance      = "0x3635C9ADC5DEA00000" // 1000 ETH
+	DefaultConsensus           = "pow"
+	DefaultPriceLimit          = 1
+	DefaultMaxSlots            = 4096
+	DefaultAccountPendingLimit = txpool.DefaultAccountPendingLimit
+	DefaultLifetime            = txpool.DefaultLifetime
+	GenesisGasUsed             = 458752  // 0x70000
+	GenesisGasLimit            = 5242880 // 0x500000
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -369,6 +372,8 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
+	flags.Uint64Var(&cliConfig.TxPool.AccountPendingLimit, "account-pending-limit", DefaultAccountPendingLimit, "")
+	flags.StringVar(&cliConfig.TxPool.Lifetime, "lifetime", DefaultLifetime.String(), "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
@@ -425,6 +430,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
+	flags.Uint64Var(&cliConfig.TxPool.AccountPendingLimit, "account-pending-limit", DefaultAccountPendingLimit, "")
+	flags.StringVar(&cliConfig.TxPool.Lifetime, "lifetime", DefaultLifetime.String(), "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")

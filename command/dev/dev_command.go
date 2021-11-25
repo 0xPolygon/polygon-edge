@@ -72,6 +72,22 @@ func (d *DevCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	d.FlagMap["account-pending-limit"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets maximum number of transactions in pending queue per account. Default: %d", helper.DefaultConfig().TxPool.AccountPendingLimit),
+		Arguments: []string{
+			"ACCOUNT_PENDING_LIMIT",
+		},
+		FlagOptional: true,
+	}
+
+	d.FlagMap["lifetime"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Maximum amount of time non-executable transaction are queued. Default: %s", helper.DefaultConfig().TxPool.Lifetime),
+		Arguments: []string{
+			"LIFETIME",
+		},
+		FlagOptional: true,
+	}
+
 	d.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
 		Description: "Sets the gas limit of each block. Default: 5000",
 		Arguments: []string{

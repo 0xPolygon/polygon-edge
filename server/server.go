@@ -139,15 +139,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
-			m.config.Seal,
-			m.config.Locals,
-			m.config.NoLocals,
-			m.config.PriceLimit,
-			m.config.MaxSlots,
 			m.chain.Params.Forks.At(0),
 			hub,
 			m.grpcServer,
 			m.network,
+			m.config.TxPool,
 		)
 		if err != nil {
 			return nil, err
@@ -456,6 +452,11 @@ func (s *Server) Join(addr0 string, dur time.Duration) error {
 
 // Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() {
+	// Close the TxPool
+	if err := s.txpool.Close(); err != nil {
+		s.logger.Error("failed to close txpool", "err", err.Error())
+	}
+
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())

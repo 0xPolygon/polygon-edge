@@ -23,9 +23,35 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
-	txSlotSize        = 32 * 1024  // 32kB
-	txMaxSize         = 128 * 1024 //128Kb
+	cleanUpPeriod     = 1 * time.Minute
+	txSlotSize        = 32 * 1024      // 32kB
+	txMaxSize         = 4 * txSlotSize // 128Kb
+
+	DefaultAccountPendingLimit = 16
+	DefaultLifetime            = 3 * time.Hour
 )
+
+type Config struct {
+	Sealing             bool
+	Locals              []types.Address
+	NoLocals            bool
+	PriceLimit          uint64
+	MaxSlots            uint64
+	AccountPendingLimit uint64
+	Lifetime            time.Duration
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		Sealing:             true,
+		Locals:              []types.Address{},
+		NoLocals:            false,
+		PriceLimit:          1,
+		MaxSlots:            4096,
+		AccountPendingLimit: DefaultAccountPendingLimit,
+		Lifetime:            DefaultLifetime,
+	}
+}
 
 var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
@@ -87,6 +113,9 @@ type TxPool struct {
 	// Min price heap for all remote transactions
 	remoteTxns *txPriceHeap
 
+	// Collection of account gauges to save num transactions and timestamp
+	accountGauges *accountGauges
+
 	// Number of used slots
 	slots uint64
 
@@ -112,41 +141,51 @@ type TxPool struct {
 	// priceLimit is a lower threshold for gas price
 	priceLimit uint64
 
+	// accountPendingLimit is maximum number of transactions in pending queue per account
+	accountPendingLimit uint64
+
+	// lifetime is maximum amount of time transaction are queued
+	lifetime time.Duration
+
 	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
 	// Indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
+
+	// Close signal channel to close async task in TxPool
+	closeCh chan struct{}
 }
 
 // NewTxPool creates a new pool for transactions
 func NewTxPool(
 	logger hclog.Logger,
-	sealing bool,
-	locals []types.Address,
-	noLocals bool,
-	priceLimit uint64,
-	maxSlots uint64,
 	forks chain.ForksInTime,
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
+	config *Config,
 ) (*TxPool, error) {
 	txPool := &TxPool{
-		logger:        logger.Named("txpool"),
-		store:         store,
-		idlePeriod:    defaultIdlePeriod,
-		accountQueues: make(map[types.Address]*accountQueueWrapper),
-		pendingQueue:  newMaxTxPriceHeap(),
-		remoteTxns:    newMinTxPriceHeap(),
-		slots:         0,
-		maxSlots:      maxSlots,
-		sealing:       sealing,
-		locals:        newLocalAccounts(locals),
-		noLocals:      noLocals,
-		priceLimit:    priceLimit,
-		forks:         forks,
+		logger:              logger.Named("txpool"),
+		store:               store,
+		idlePeriod:          defaultIdlePeriod,
+		accountQueues:       make(map[types.Address]*accountQueueWrapper),
+		pendingQueue:        newMaxTxPriceHeap(),
+		remoteTxns:          newMinTxPriceHeap(),
+		accountGauges:       &accountGauges{},
+		slots:               0,
+		maxSlots:            config.MaxSlots,
+		sealing:             config.Sealing,
+		locals:              newLocalAccounts(config.Locals),
+		noLocals:            config.NoLocals,
+		priceLimit:          config.PriceLimit,
+		accountPendingLimit: config.AccountPendingLimit,
+		lifetime:            config.Lifetime,
+		forks:               forks,
+		closeCh:             make(chan struct{}, 1),
 	}
+	fmt.Printf("accountPendingLimit=%d, lifetime=%+v\n", txPool.accountPendingLimit, txPool.lifetime)
 
 	if network != nil {
 		// subscribe to the gossip protocol
@@ -161,6 +200,9 @@ func NewTxPool(
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
+
+	go txPool.runLoop()
+
 	return txPool, nil
 }
 
@@ -169,6 +211,28 @@ type accountQueueWrapper struct {
 	lock         sync.RWMutex // lock for accessing the accountQueue
 	writeLock    int32        // flag indicating whether a write lock is held
 	accountQueue *txHeapWrapper
+}
+
+func (t *TxPool) Close() error {
+	select {
+	case t.closeCh <- struct{}{}:
+	default:
+	}
+	return nil
+}
+
+func (t *TxPool) runLoop() {
+	cleanUpSignal := time.NewTicker(cleanUpPeriod)
+	defer cleanUpSignal.Stop()
+
+	for {
+		select {
+		case <-cleanUpSignal.C:
+			t.truncateAccountQueues()
+		case <-t.closeCh:
+			return
+		}
+	}
 }
 
 // lockAccountQueue returns the corresponding account queue wrapper object, or creates it
@@ -323,6 +387,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 			mux.unlock()
 
 			t.pendingQueue.Delete(tx)
+			t.accountGauges.get(tx.From).decreaseNumPending(1)
 			t.decreaseSlots(numSlots(tx))
 		}
 	}
@@ -345,17 +410,24 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		t.locals.addAddr(tx.From)
 	}
 
-	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
-	if isLocal && !t.locals.containsAddr(tx.From) {
-		t.locals.addAddr(tx.From)
-	}
+	t.promoteAccountTransactions(tx.From)
+	t.accountGauges.get(tx.From).setLastAdded(time.Now())
 
-	for _, promoted := range wrapper.accountQueue.Promote() {
-		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
+	return nil
+}
+
+func (t *TxPool) promoteAccountTransactions(addr types.Address) {
+	wrapper := t.accountQueues[addr]
+	accountGauge := t.accountGauges.get(addr)
+	numPromotable := accountGauge.getNumPromotable(t.accountPendingLimit)
+	for _, promoted := range wrapper.accountQueue.Promote(numPromotable) {
+		pushErr := t.pendingQueue.Push(promoted)
+		if pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
+		} else {
+			accountGauge.increaseNumPending(1)
 		}
 	}
-	return nil
 }
 
 // DecreaseAccountNonce resets the nonce attached to an account whenever a transaction produce an error which is not
@@ -417,12 +489,16 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	slots := numSlots(txn.tx)
 	// Subtracts tx slots
 	t.decreaseSlots(slots)
+	accountGauge := t.accountGauges.get(txn.from)
+	accountGauge.decreaseNumPending(1)
+
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
 		}
 		t.increaseSlots(slots)
+		accountGauge.increaseNumPending(1)
 	}
 	return txn.tx, ret
 }
@@ -471,11 +547,25 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		}
 	}
 
+	// accounts that can add more txns to pending queue
+	nominees := make(map[types.Address]bool)
+
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
 		t.decreaseSlots(numSlots(txn))
+		t.accountGauges.get(txn.From).decreaseNumPending(1)
+
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
+
+		nominees[txn.From] = true
+	}
+
+	// promote next transactions
+	for addr := range nominees {
+		accountLock := t.lockAccountQueue(addr, true)
+		t.promoteAccountTransactions(addr)
+		accountLock.unlock()
 	}
 }
 
@@ -589,6 +679,73 @@ func (t *TxPool) decreaseSlots(slots uint64) {
 	atomic.AddUint64(&t.slots, ^(slots - 1))
 }
 
+// truncateAccountQueues clean up transactions by inactive account
+func (t *TxPool) truncateAccountQueues() {
+	for addr := range t.accountQueues {
+		if !t.noLocals && t.locals.containsAddr(addr) {
+			continue
+		}
+		accountLock := t.lockAccountQueue(addr, true)
+		gauge := t.accountGauges.get(addr)
+		if time.Since(gauge.lastAdded) > t.lifetime {
+			poppedSlots := uint64(0)
+			for _, tx := range accountLock.accountQueue.txs {
+				poppedSlots += numSlots(tx)
+			}
+			accountLock.accountQueue.txs = accountLock.accountQueue.txs[:0]
+			t.decreaseSlots(poppedSlots)
+		}
+		accountLock.unlock()
+	}
+}
+
+type accountGauges struct {
+	sync.Map
+}
+
+func (g *accountGauges) get(addr types.Address) *accountGauge {
+	v, _ := g.LoadOrStore(addr, &accountGauge{numPending: 0, lastAdded: time.Now()})
+	return v.(*accountGauge)
+}
+
+// Gauge for measuring num transaction and last added for an account
+type accountGauge struct {
+	sync.RWMutex
+	numPending uint64    // number of transactions in pendingQueue
+	lastAdded  time.Time // timestamp on last added
+}
+
+func (g *accountGauge) getNumPromotable(maxPendingQueueSize uint64) uint64 {
+	g.RLock()
+	defer g.RUnlock()
+	if maxPendingQueueSize <= g.numPending {
+		return 0
+	}
+	return maxPendingQueueSize - g.numPending
+}
+
+func (g *accountGauge) increaseNumPending(num uint64) {
+	g.Lock()
+	defer g.Unlock()
+	g.numPending += num
+}
+
+func (g *accountGauge) decreaseNumPending(num uint64) {
+	g.Lock()
+	defer g.Unlock()
+	if g.numPending <= num {
+		g.numPending = 0
+	} else {
+		g.numPending -= num
+	}
+}
+
+func (g *accountGauge) setLastAdded(t time.Time) {
+	g.Lock()
+	defer g.Unlock()
+	g.lastAdded = t
+}
+
 // txHeapWrapper is a wrapper object for account based transactions
 type txHeapWrapper struct {
 	// txs is the actual min heap (nonce ordered) for account transactions
@@ -627,9 +784,14 @@ func (t *txHeapWrapper) pruneLowNonceTx() {
 }
 
 // Promote promotes all the new valid transactions
-func (t *txHeapWrapper) Promote() []*types.Transaction {
+func (t *txHeapWrapper) Promote(num uint64) []*types.Transaction {
 	// Remove elements lower than nonce
 	t.pruneLowNonceTx()
+
+	// Promote nothing
+	if num == 0 {
+		return nil
+	}
 
 	// Promote elements
 	tx := t.Peek()
@@ -651,6 +813,9 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	for {
 		promote = append(promote, tx)
 		t.Pop()
+		if num--; num == 0 {
+			break
+		}
 
 		var nextTx *types.Transaction
 		if nextTx = t.Peek(); nextTx == nil {
