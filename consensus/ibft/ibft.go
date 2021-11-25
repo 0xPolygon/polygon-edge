@@ -474,7 +474,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		retFunc()
 	}
 
-	i.logger.Info("picked out txPoolLength from pool", "num", len(txns), "remaining", i.txpool.Length())
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
 	return txns
 }
 
