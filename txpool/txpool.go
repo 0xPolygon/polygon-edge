@@ -485,7 +485,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.gauge.increase(slotsRequired(txn))
+		t.gauge.decrease(slotsRequired(txn))
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
 	}
