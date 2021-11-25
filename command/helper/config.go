@@ -71,7 +71,7 @@ func DefaultConfig() *Config {
 		Telemetry: &Telemetry{},
 		Seal:      false,
 		TxPool: &TxPool{
-			PriceLimit: 1,
+			PriceLimit: 0,
 			MaxSlots:   4096,
 		},
 		LogLevel:       "INFO",
