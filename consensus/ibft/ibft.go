@@ -1,26 +1,23 @@
 package ibft
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math"
-	"path/filepath"
 	"reflect"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -68,43 +65,42 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
+  
+	metrics *consensus.Metrics
+  
+	secretsManager secrets.SecretsManager
 }
 
 // Factory implements the base consensus Factory method
 func Factory(
-	ctx context.Context,
-	sealing bool,
-	config *consensus.Config,
-	txpool *txpool.TxPool,
-	network *network.Server,
-	blockchain *blockchain.Blockchain,
-	executor *state.Executor,
-	srv *grpc.Server,
-	logger hclog.Logger,
+	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
 	p := &Ibft{
-		logger:       logger.Named("ibft"),
-		config:       config,
-		blockchain:   blockchain,
-		executor:     executor,
-		closeCh:      make(chan struct{}),
-		txpool:       txpool,
-		state:        &currentState{},
-		network:      network,
-		epochSize:    DefaultEpochSize,
-		syncNotifyCh: make(chan bool),
-		sealing:      sealing,
+		logger:         params.Logger.Named("ibft"),
+		config:         params.Config,
+		blockchain:     params.Blockchain,
+		executor:       params.Executor,
+		closeCh:        make(chan struct{}),
+		txpool:         params.Txpool,
+		state:          &currentState{},
+		network:        params.Network,
+		epochSize:      DefaultEpochSize,
+		syncNotifyCh:   make(chan bool),
+		sealing:        params.Seal,
+    metrics:        params.Metrics,
+		secretsManager: params.SecretsManager,
 	}
 
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(logger, network, blockchain)
+	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 
 	// register the grpc operator
 	p.operator = &operator{ibft: p}
-	proto.RegisterIbftOperatorServer(srv, p.operator)
+	proto.RegisterIbftOperatorServer(params.Grpc, p.operator)
 
+	// Set up the node's validator key
 	if err := p.createKey(); err != nil {
 		return nil, err
 	}
@@ -194,22 +190,41 @@ func (i *Ibft) setupTransport() error {
 	return nil
 }
 
-// createKey sets the validator's private key, from the file path
+// createKey sets the validator's private key from the secrets manager
 func (i *Ibft) createKey() error {
-	// i.msgQueue = msgQueueImpl{}
 	i.msgQueue = newMsgQueue()
 	i.closeCh = make(chan struct{})
 	i.updateCh = make(chan struct{})
 
 	if i.validatorKey == nil {
-		// generate a validator private key
-		validatorKey, err := crypto.GenerateOrReadPrivateKey(filepath.Join(i.config.Path, IbftKeyName))
-		if err != nil {
-			return err
+		// Check if the validator key is initialized
+		var key *ecdsa.PrivateKey
+		if i.secretsManager.HasSecret(secrets.ValidatorKey) {
+			// The validator key is present in the secrets manager, load it
+			validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
+			if readErr != nil {
+				return fmt.Errorf("unable to read validator key from Secrets Manager, %v", readErr)
+			}
+
+			key = validatorKey
+		} else {
+			// The validator key is not present in the secrets manager, generate it
+			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
+			if genErr != nil {
+				return fmt.Errorf("unable to generate validator key for Secrets Manager, %v", genErr)
+			}
+
+			// Save the key to the secrets manager
+			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
+			if saveErr != nil {
+				return fmt.Errorf("unable to save validator key to Secrets Manager, %v", saveErr)
+			}
+
+			key = validatorKey
 		}
 
-		i.validatorKey = validatorKey
-		i.validatorKeyAddr = crypto.PubKeyToAddress(&validatorKey.PublicKey)
+		i.validatorKey = key
+		i.validatorKeyAddr = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
 	return nil
@@ -304,6 +319,9 @@ func (i *Ibft) runSyncState() {
 					Round:    0,
 					Sequence: header.Number + 1,
 				}
+				//Set the round metric
+				i.metrics.Rounds.Set(float64(i.state.view.Round))
+
 				i.setState(AcceptState)
 			} else {
 				time.Sleep(1 * time.Second)
@@ -475,6 +493,8 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
+	//Update the No.of validator metric
+	i.metrics.Validators.Set(float64(len(snap.Set)))
 	// reset round messages
 	i.state.resetRoundMsgs()
 
@@ -637,12 +657,31 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
+			// update metrics
+			i.updateMetrics(block)
+
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
 	}
 }
 
+// updateMetrics will update various metrics based on the given block
+// currently we capture No.of Txs and block interval metrics using this function
+func (i *Ibft) updateMetrics(block *types.Block) {
+	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
+	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
+	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+	//Update the block interval metric
+	if block.Number() > 1 {
+		i.metrics.BlockInterval.Observe(
+			headerTime.Sub(parentTime).Seconds(),
+		)
+	}
+	//Update the Number of transactions in the block metric
+	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
+
+}
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -702,8 +741,9 @@ func (i *Ibft) handleStateErr(err error) {
 func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round)
-		// set the new round
+		// set the new round and update the round metric
 		i.state.view.Round = round
+		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
 		// send the round change message

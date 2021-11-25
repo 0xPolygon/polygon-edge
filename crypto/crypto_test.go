@@ -211,7 +211,7 @@ func TestPrivateKeyRead(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			privateKey, err := bytesToPrivateKey([]byte(testCase.privateKeyHex))
+			privateKey, err := BytesToPrivateKey([]byte(testCase.privateKeyHex))
 			if err != nil && !testCase.shouldFail {
 				t.Fatalf("Unable to parse private key, %v", err)
 			}

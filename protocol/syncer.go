@@ -24,7 +24,7 @@ import (
 
 const (
 	maxEnqueueSize = 50
-	popTimeout     = time.Second * 10
+	popTimeout     = 10 * time.Second
 )
 
 var (
@@ -513,9 +513,10 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
+
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
-			s.logger.Error("failed to pop block", "err", err)
+			s.logSyncPeerPopBlockError(err, p)
 			break
 		}
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
@@ -525,6 +526,15 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 		if handler(b) {
 			break
 		}
+	}
+}
+
+func (s *Syncer) logSyncPeerPopBlockError(err error, peer *syncPeer) {
+	if errors.Is(err, ErrPopTimeout) {
+		msg := "failed to pop block within %ds from peer: id=%s, please check if all the validators are running"
+		s.logger.Warn(fmt.Sprintf(msg, int(popTimeout.Seconds()), peer.peer))
+	} else {
+		s.logger.Info("failed to pop block from peer", "id", peer.peer, "err", err)
 	}
 }
 

@@ -111,9 +111,17 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.flagMap["nat"] = helper.FlagDescriptor{
-		Description: "Sets the the external IP address without the port, as it can be seen by peers",
+		Description: "Sets the external IP address without the port, as it can be seen by peers",
 		Arguments: []string{
 			"NAT_ADDRESS",
+		},
+		FlagOptional: true,
+	}
+
+	c.flagMap["dns"] = helper.FlagDescriptor{
+		Description: "Sets the host DNS address",
+		Arguments: []string{
+			"DNS_ADDRESS",
 		},
 		FlagOptional: true,
 	}
@@ -181,6 +189,22 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+	c.flagMap["prometheus"] = helper.FlagDescriptor{
+		Description: "Sets the address and port for the prometheus instrumentation service (address:port)",
+		Arguments: []string{
+			"PROMETHEUS_ADDRESS",
+		},
+		FlagOptional: true,
+  }
+	c.flagMap["secrets-config"] = helper.FlagDescriptor{
+		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
+			"If omitted, the local FS secrets manager is used",
+		Arguments: []string{
+			"SECRETS_CONFIG",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+}
 }
 
 // GetHelperText returns a simple description of the command
