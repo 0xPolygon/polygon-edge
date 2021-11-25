@@ -39,7 +39,7 @@ type TestServerConfigCallback func(*TestServerConfig)
 
 const (
 	initialPort   = 12000
-	polygonSDKCmd = "polygon-sdk-race"
+	polygonSDKCmd = "polygon-sdk"
 )
 
 type TestServer struct {
