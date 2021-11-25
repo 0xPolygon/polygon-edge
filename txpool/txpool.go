@@ -580,22 +580,22 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	return underpriced
 }
 
-func (t *TxPool) Discard(remaining uint64, force bool) ([]*types.Transaction, bool) {
+func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
-	for t.remoteTxns.Length() > 0 && remaining > 0 {
+	for t.remoteTxns.Length() > 0 && slotsToRemove > 0 {
 		tx := t.remoteTxns.Pop()
 		dropped = append(dropped, tx.tx)
 
 		txSlots := slotsRequired(tx.tx)
-		if remaining >= txSlots {
-			remaining -= txSlots
+		if slotsToRemove >= txSlots {
+			slotsToRemove -= txSlots
 		} else {
-			remaining = 0
+			return dropped, false
 		}
 	}
 
 	// Put back if couldn't make required space
-	if remaining > 0 && !force {
+	if slotsToRemove > 0 && !force {
 		for _, tx := range dropped {
 			t.remoteTxns.Push(tx)
 		}
