@@ -80,6 +80,15 @@ func (d *DevCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	d.FlagMap["block-gas-target"] = helper.FlagDescriptor{
+		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
+		Arguments: []string{
+			"BLOCK_GAS_TARGET",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	d.FlagMap["chainid"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the ID of the chain. Default: %d", helper.DefaultChainID),
 		Arguments: []string{

@@ -24,7 +24,7 @@ import (
 
 const (
 	maxEnqueueSize = 50
-	popTimeout     = time.Second * 10
+	popTimeout     = 10 * time.Second
 )
 
 var (
@@ -295,15 +295,20 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 
 // Broadcast broadcasts a block to all peers
 func (s *Syncer) Broadcast(b *types.Block) {
-	// diff is number in ibft
-	diff := new(big.Int).SetUint64(b.Header.Difficulty)
+	// Get the chain difficulty associated with block
+	td, ok := s.blockchain.GetTD(b.Hash())
+	if !ok {
+		// not supposed to happen
+		s.logger.Error("total difficulty not found", "block number", b.Number())
+		return
+	}
 
 	// broadcast the new block to all the peers
 	req := &proto.NotifyReq{
 		Status: &proto.V1Status{
 			Hash:       b.Hash().String(),
 			Number:     b.Number(),
-			Difficulty: diff.String(),
+			Difficulty: td.String(),
 		},
 		Raw: &any.Any{
 			Value: b.MarshalRLP(),
@@ -385,7 +390,6 @@ func (s *Syncer) BestPeer() *syncPeer {
 	}
 
 	curDiff := s.blockchain.CurrentTD()
-
 	if bestTd.Cmp(curDiff) <= 0 {
 		return nil
 	}
@@ -509,9 +513,10 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
+
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
-			s.logger.Error("failed to pop block", "err", err)
+			s.logSyncPeerPopBlockError(err, p)
 			break
 		}
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
@@ -521,6 +526,15 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 		if handler(b) {
 			break
 		}
+	}
+}
+
+func (s *Syncer) logSyncPeerPopBlockError(err error, peer *syncPeer) {
+	if errors.Is(err, ErrPopTimeout) {
+		msg := "failed to pop block within %ds from peer: id=%s, please check if all the validators are running"
+		s.logger.Warn(fmt.Sprintf(msg, int(popTimeout.Seconds()), peer.peer))
+	} else {
+		s.logger.Info("failed to pop block from peer", "id", peer.peer, "err", err)
 	}
 }
 

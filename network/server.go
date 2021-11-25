@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -28,12 +30,14 @@ const DefaultLibp2pPort int = 1478
 const MinimumPeerConnections int64 = 1
 
 type Config struct {
-	NoDiscover bool
-	Addr       *net.TCPAddr
-	NatAddr    net.IP
-	DataDir    string
-	MaxPeers   uint64
-	Chain      *chain.Chain
+	NoDiscover     bool
+	Addr           *net.TCPAddr
+	NatAddr        net.IP
+	Dns            multiaddr.Multiaddr
+	DataDir        string
+	MaxPeers       uint64
+	Chain          *chain.Chain
+	SecretsManager secrets.SecretsManager
 }
 
 func DefaultConfig() *Config {
@@ -64,6 +68,9 @@ type Server struct {
 	protocols     map[string]Protocol
 	protocolsLock sync.Mutex
 
+	// Secrets manager
+	secretsManager secrets.SecretsManager
+
 	// pubsub
 	ps *pubsub.PubSub
 
@@ -79,10 +86,39 @@ type Peer struct {
 	Info peer.AddrInfo
 }
 
+// setupLibp2pKey is a helper method for setting up the networking private key
+func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
+	var key crypto.PrivKey
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		// The key is present in the secrets manager, read it
+		networkingKey, readErr := ReadLibp2pKey(secretsManager)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %v", readErr)
+		}
+
+		key = networkingKey
+	} else {
+		// The key is not present in the secrets manager, generate it
+		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %v", keyErr)
+		}
+
+		// Write the networking private key to disk
+		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %v", setErr)
+		}
+
+		key = libp2pKey
+	}
+
+	return key, nil
+}
+
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
-	key, err := ReadLibp2pKey(config.DataDir)
+	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +135,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			if addr != nil {
 				addrs = []multiaddr.Multiaddr{addr}
 			}
+		} else if config.Dns != nil {
+			addrs = []multiaddr.Multiaddr{config.Dns}
 		}
 
 		return addrs
@@ -131,6 +169,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
 		protocols:        map[string]Protocol{},
+		secretsManager:   config.SecretsManager,
 	}
 
 	// start identity

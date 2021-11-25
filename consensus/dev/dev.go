@@ -7,12 +7,10 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 )
 
 // Dev consensus protocol seals any new transaction immediately
@@ -31,28 +29,20 @@ type Dev struct {
 
 // Factory implements the base factory method
 func Factory(
-	ctx context.Context,
-	sealing bool,
-	config *consensus.Config,
-	txpool *txpool.TxPool,
-	network *network.Server,
-	blockchain *blockchain.Blockchain,
-	executor *state.Executor,
-	srv *grpc.Server,
-	logger hclog.Logger,
+	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	logger = logger.Named("dev")
+	logger := params.Logger.Named("dev")
 
 	d := &Dev{
 		logger:     logger,
 		notifyCh:   make(chan struct{}),
 		closeCh:    make(chan struct{}),
-		blockchain: blockchain,
-		executor:   executor,
-		txpool:     txpool,
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		txpool:     params.Txpool,
 	}
 
-	rawInterval, ok := config.Config["interval"]
+	rawInterval, ok := params.Config.Config["interval"]
 	if ok {
 		interval, ok := rawInterval.(uint64)
 		if !ok {
@@ -62,8 +52,8 @@ func Factory(
 	}
 
 	// enable dev mode so that we can accept non-signed txns
-	txpool.EnableDev()
-	txpool.NotifyCh = d.notifyCh
+	params.Txpool.EnableDev()
+	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -121,6 +111,13 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Timestamp:  uint64(time.Now().Unix()),
 	}
 
+	// calculate gas limit based on parent header
+	gasLimit, err := d.blockchain.CalculateGasLimit(header.Number)
+	if err != nil {
+		return err
+	}
+	header.GasLimit = gasLimit
+
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
@@ -139,7 +136,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(header.GasLimit) {
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			d.txpool.DecreaseAccountNonce(txn)
 		} else {

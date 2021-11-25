@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
@@ -17,18 +19,20 @@ import (
 
 // Config defines the server configuration params
 type Config struct {
-	Chain       string                 `json:"chain"`
-	DataDir     string                 `json:"data_dir"`
-	GRPCAddr    string                 `json:"rpc_addr"`
-	JSONRPCAddr string                 `json:"jsonrpc_addr"`
-	Network     *Network               `json:"network"`
-	Seal        bool                   `json:"seal"`
-	TxPool      *TxPool                `json:"tx_pool"`
-	LogLevel    string                 `json:"log_level"`
-	Consensus   map[string]interface{} `json:"consensus"`
-	Dev         bool
-	DevInterval uint64
-	Join        string
+	Chain          string                        `json:"chain"`
+	DataDir        string                        `json:"data_dir"`
+	BlockGasTarget string                        `json:"block_gas_target"`
+	GRPCAddr       string                        `json:"rpc_addr"`
+	JSONRPCAddr    string                        `json:"jsonrpc_addr"`
+	Network        *Network                      `json:"network"`
+	SecretsManager *secrets.SecretsManagerConfig `json:"secrets_manager"`
+	Seal           bool                          `json:"seal"`
+	TxPool         *TxPool                       `json:"tx_pool"`
+	LogLevel       string                        `json:"log_level"`
+	Consensus      map[string]interface{}        `json:"consensus"`
+	Dev            bool
+	DevInterval    uint64
+	Join           string
 }
 
 // Network defines the network configuration params
@@ -36,6 +40,7 @@ type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"addr"`
 	NatAddr    string `json:"nat_addr"`
+	Dns        string `json:"dns"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
@@ -50,8 +55,9 @@ type TxPool struct {
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Chain:   "test",
-		DataDir: "./test-chain",
+		Chain:          "test",
+		DataDir:        "./test-chain",
+		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover: false,
 			MaxPeers:   20,
@@ -61,8 +67,9 @@ func DefaultConfig() *Config {
 			PriceLimit: 1,
 			MaxSlots:   4096,
 		},
-		LogLevel:  "INFO",
-		Consensus: map[string]interface{}{},
+		LogLevel:       "INFO",
+		Consensus:      map[string]interface{}{},
+		SecretsManager: nil,
 	}
 }
 
@@ -107,6 +114,13 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 			}
 		}
 
+		if c.Network.Dns != "" {
+
+			if conf.Network.Dns, err = helperFlags.MultiAddrFromDns(c.Network.Dns, conf.Network.Addr.Port); err != nil {
+				return nil, err
+			}
+		}
+
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
 
@@ -127,6 +141,19 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.MaxSlots = c.TxPool.MaxSlots
 	}
 
+	// Target gas limit
+	if c.BlockGasTarget != "" {
+		value, err := types.ParseUint256orHex(&c.BlockGasTarget)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse gas target %s, %v", c.BlockGasTarget, err)
+		}
+		if !value.IsUint64() {
+			return nil, fmt.Errorf("gas target is too large (>64b) %s", c.BlockGasTarget)
+		}
+
+		conf.Chain.Params.BlockGasTarget = value.Uint64()
+	}
+
 	// if we are in dev mode, change the consensus protocol with 'dev'
 	// and disable discovery of other nodes
 	// TODO: Disable networking altogether.
@@ -142,6 +169,11 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Chain.Params.Engine = map[string]interface{}{
 			"dev": engineConfig,
 		}
+	}
+
+	// Set the secrets manager config if it was passed in
+	if c.SecretsManager != nil {
+		conf.SecretsManager = c.SecretsManager
 	}
 
 	return conf, nil
@@ -179,6 +211,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.DevInterval = otherConfig.DevInterval
 	}
 
+	if otherConfig.BlockGasTarget != "" {
+		c.BlockGasTarget = otherConfig.BlockGasTarget
+	}
+
 	if otherConfig.Seal {
 		c.Seal = true
 	}
@@ -206,6 +242,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		}
 		if otherConfig.Network.NatAddr != "" {
 			c.Network.NatAddr = otherConfig.Network.NatAddr
+		}
+		if otherConfig.Network.Dns != "" {
+			c.Network.Dns = otherConfig.Network.Dns
 		}
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers

@@ -143,13 +143,13 @@ func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
 
 // DIFFICULTY //
 
-// WriteDiff writes the difficulty
-func (s *KeyValueStorage) WriteDiff(hash types.Hash, diff *big.Int) error {
+// WriteTotalDifficulty writes the difficulty
+func (s *KeyValueStorage) WriteTotalDifficulty(hash types.Hash, diff *big.Int) error {
 	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 
-// ReadDiff reads the difficulty
-func (s *KeyValueStorage) ReadDiff(hash types.Hash) (*big.Int, bool) {
+// ReadTotalDifficulty reads the difficulty
+func (s *KeyValueStorage) ReadTotalDifficulty(hash types.Hash) (*big.Int, bool) {
 	v, ok := s.get(DIFFICULTY, hash.Bytes())
 	if !ok {
 		return nil, false
@@ -185,7 +185,7 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 	if err := s.WriteCanonicalHash(h.Number, h.Hash); err != nil {
 		return err
 	}
-	if err := s.WriteDiff(h.Hash, diff); err != nil {
+	if err := s.WriteTotalDifficulty(h.Hash, diff); err != nil {
 		return err
 	}
 	return nil

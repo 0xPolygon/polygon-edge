@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
 )
@@ -304,9 +305,9 @@ func (e *Eth) EstimateGas(
 
 	var standardGas uint64
 	if transaction.IsContractCreation() && forksInTime.Homestead {
-		standardGas = 53000
+		standardGas = state.TxGasContractCreation
 	} else {
-		standardGas = 21000
+		standardGas = state.TxGas
 	}
 
 	var (

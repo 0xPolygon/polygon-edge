@@ -6,9 +6,10 @@ import (
 
 // Params are all the set of params for the chain
 type Params struct {
-	Forks   *Forks                 `json:"forks"`
-	ChainID int                    `json:"chainID"`
-	Engine  map[string]interface{} `json:"engine"`
+	Forks          *Forks                 `json:"forks"`
+	ChainID        int                    `json:"chainID"`
+	Engine         map[string]interface{} `json:"engine"`
+	BlockGasTarget uint64                 `json:"blockGasTarget"`
 }
 
 func (p *Params) GetEngine() string {
