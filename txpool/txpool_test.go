@@ -941,7 +941,7 @@ func TestGaugeCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlots, forks.At(0), &mockStore{}, nil, nil)
+			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
 			assert.NoError(t, err)
 			pool.EnableDev()
 			pool.AddSigner(&mockSigner{})

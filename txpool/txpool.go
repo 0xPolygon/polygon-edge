@@ -432,11 +432,10 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 
-	slots := slotsRequired(txn.tx)
-
 	//Update the pending transaction metric
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 
+	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
 	t.gauge.decrease(slots)
 	ret := func() {
@@ -497,7 +496,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		if deletedTx := t.pendingQueue.Delete(txn); deletedTx != nil {		        
+		if deletedTx := t.pendingQueue.Delete(txn); deletedTx != nil {
 			t.gauge.decrease(slotsRequired(txn))
 			t.remoteTxns.Delete(txn)
 		}
