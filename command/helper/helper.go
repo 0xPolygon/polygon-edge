@@ -30,7 +30,7 @@ const (
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
-	DefaultPriceLimit     = 1
+	DefaultPriceLimit     = 1 // Interpreted as a neutral (default) value since 0 is not accepted
 	DefaultMaxSlots       = 4096
 	GenesisGasUsed        = 458752  // 0x70000
 	GenesisGasLimit       = 5242880 // 0x500000

@@ -701,3 +701,80 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	assert.NoError(t, err, "failed to retrieve most recent block number")
 	assert.Equal(t, blockNumber, uint64(2))
 }
+
+func TestTxPool_ZeroPriceDev(t *testing.T) {
+	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
+	_, receiverAddress := tests.GenerateKeyAndAddr(t)
+	// Test scenario:
+	// The sender account should send funds to the receiver account.
+	// Each transaction should have a
+
+	var zeroPriceLimit uint64 = 0
+	startingBalance := framework.EthToWei(100)
+
+	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.SetSeal(true)
+		config.SetDevInterval(5)
+		config.SetPriceLimit(&zeroPriceLimit)
+		config.SetNoLocals(true)
+		config.SetBlockLimit(20000000)
+		config.Premine(senderAddress, startingBalance)
+	})
+
+	server := servers[0]
+	client := server.JSONRPC()
+	operator := server.TxnPoolOperator()
+	ctx := context.Background()
+	var nonce uint64 = 0
+	var nonceMux sync.Mutex
+	var wg sync.WaitGroup
+
+	sendTx := func() {
+		nonceMux.Lock()
+		tx, err := signer.SignTx(&types.Transaction{
+			Nonce:    nonce,
+			GasPrice: big.NewInt(0),
+			Gas:      framework.DefaultGasLimit - 1,
+			To:       &receiverAddress,
+			Value:    oneEth,
+			V:        []byte{1},
+			From:     types.ZeroAddress,
+		}, senderKey)
+		assert.NoError(t, err, "failed to sign transaction")
+
+		_, err = operator.AddTxn(ctx, &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: tx.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		})
+		assert.NoError(t, err, "failed to add txn using operator")
+
+		nonce++
+		nonceMux.Unlock()
+
+		wg.Done()
+	}
+
+	numIterations := 100
+	numIterationsBig := big.NewInt(int64(numIterations))
+	for i := 0; i < numIterations; i++ {
+		wg.Add(1)
+		go sendTx()
+	}
+
+	wg.Wait()
+	_ = waitForBlock(t, server, 1, 0)
+
+	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
+	assert.NoError(t, err, "failed to retrieve receiver account balance")
+
+	sentFunds := big.NewInt(0).Mul(numIterationsBig, oneEth)
+	assert.Equal(t, sentFunds.String(), receiverBalance.String())
+
+	senderBalance, err := client.Eth().GetBalance(web3.Address(senderAddress), web3.Latest)
+	assert.NoError(t, err, "failed to retrieve sender account balance")
+
+	assert.Equal(t, big.NewInt(0).Sub(startingBalance, sentFunds).String(), senderBalance.String())
+}
