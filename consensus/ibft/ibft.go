@@ -440,6 +440,8 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
+// writeTransactions writes transactions from the txpool to the transition object
+// and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	txns := []*types.Transaction{}
 	returnTxnFuncs := []func(){}
@@ -470,6 +472,8 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		txns = append(txns, txn)
 	}
 
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
 	for _, retFunc := range returnTxnFuncs {
 		retFunc()
 	}
