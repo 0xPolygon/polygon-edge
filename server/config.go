@@ -19,24 +19,29 @@ type Config struct {
 	JSONRPCAddr *net.TCPAddr
 	GRPCAddr    *net.TCPAddr
 	LibP2PAddr  *net.TCPAddr
-
-	Network    *network.Config
-	DataDir    string
-	Seal       bool
-	Locals     []types.Address
-	NoLocals   bool
-	PriceLimit uint64
-	MaxSlots   uint64
-
+	Telemetry   *Telemetry
+	Network     *network.Config
+	DataDir     string
+	Seal        bool
+	Locals      []types.Address
+	NoLocals    bool
+	PriceLimit  uint64
+	MaxSlots    uint64
 	SecretsManager *secrets.SecretsManagerConfig
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
 func DefaultConfig() *Config {
 	return &Config{
-		JSONRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
-		GRPCAddr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
-		Network:        network.DefaultConfig(),
+		JSONRPCAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
+		GRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
+		Network:     network.DefaultConfig(),
+		Telemetry:   &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
 	}
+}
+
+// Telemetry holds the config details for metric services
+type Telemetry struct {
+	PrometheusAddr *net.TCPAddr
 }

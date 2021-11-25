@@ -65,7 +65,9 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
-
+  
+	metrics *consensus.Metrics
+  
 	secretsManager secrets.SecretsManager
 }
 
@@ -85,6 +87,7 @@ func Factory(
 		epochSize:      DefaultEpochSize,
 		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
+    metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 	}
 
@@ -316,6 +319,9 @@ func (i *Ibft) runSyncState() {
 					Round:    0,
 					Sequence: header.Number + 1,
 				}
+				//Set the round metric
+				i.metrics.Rounds.Set(float64(i.state.view.Round))
+
 				i.setState(AcceptState)
 			} else {
 				time.Sleep(1 * time.Second)
@@ -487,6 +493,8 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
+	//Update the No.of validator metric
+	i.metrics.Validators.Set(float64(len(snap.Set)))
 	// reset round messages
 	i.state.resetRoundMsgs()
 
@@ -649,12 +657,31 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
+			// update metrics
+			i.updateMetrics(block)
+
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
 	}
 }
 
+// updateMetrics will update various metrics based on the given block
+// currently we capture No.of Txs and block interval metrics using this function
+func (i *Ibft) updateMetrics(block *types.Block) {
+	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
+	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
+	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+	//Update the block interval metric
+	if block.Number() > 1 {
+		i.metrics.BlockInterval.Observe(
+			headerTime.Sub(parentTime).Seconds(),
+		)
+	}
+	//Update the Number of transactions in the block metric
+	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
+
+}
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -714,8 +741,9 @@ func (i *Ibft) handleStateErr(err error) {
 func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round)
-		// set the new round
+		// set the new round and update the round metric
 		i.state.view.Round = round
+		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
 		// send the round change message
