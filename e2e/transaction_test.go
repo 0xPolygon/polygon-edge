@@ -447,11 +447,15 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
 
+	// Send ~50 transactions
+	numTransactions := 50
+
 	// Set up the test server
 	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
 		config.Premine(sender, defaultBalance)
 		config.SetSeal(true)
 		config.SetBlockLimit(20000000)
+		config.SetAccountPendingLimit(uint64(numTransactions))
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -493,9 +497,6 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	// Check that the count is 0 before running the test
 	assert.Equalf(t, "0", count.String(), "Count doesn't match")
-
-	// Send ~50 transactions
-	numTransactions := 50
 
 	// Add stress test transactions
 	addStressTestTxns(
