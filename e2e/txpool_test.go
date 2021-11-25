@@ -707,7 +707,8 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 	// Test scenario:
 	// The sender account should send funds to the receiver account.
-	// Each transaction should have a
+	// Each transaction should have a gas price set do 0 and be treated
+	// as a non-local transaction
 
 	var zeroPriceLimit uint64 = 0
 	startingBalance := framework.EthToWei(100)
