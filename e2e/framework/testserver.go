@@ -20,7 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
