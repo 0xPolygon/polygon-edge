@@ -387,7 +387,8 @@ func addStressTestTxns(
 func Test_TransactionDevLoop(t *testing.T) {
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
-	devInterval := 5 // s
+	devInterval := 5      // s
+	numTransactions := 50 // Send ~50 transactions
 
 	// Set up the test server
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -396,6 +397,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 		config.SetDevInterval(devInterval)
 		config.Premine(sender, defaultBalance)
 		config.SetBlockLimit(20000000)
+		config.SetAccountPendingLimit(uint64(numTransactions))
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -415,9 +417,6 @@ func Test_TransactionDevLoop(t *testing.T) {
 
 	// Check that the count is 0 before running the test
 	assert.Equalf(t, "0", count.String(), "Count doesn't match")
-
-	// Send ~50 transactions
-	numTransactions := 50
 
 	// Add stress test transactions
 	addStressTestTxns(

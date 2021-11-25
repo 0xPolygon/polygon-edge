@@ -288,6 +288,14 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--price-limit", strconv.FormatUint(*t.Config.PriceLimit, 10))
 	}
 
+	if t.Config.AccountPendingLimit != nil {
+		args = append(args, "--account-pending-limit", strconv.FormatUint(*t.Config.AccountPendingLimit, 10))
+	}
+
+	if t.Config.Lifetime != nil {
+		args = append(args, "--lifetime", t.Config.Lifetime.String())
+	}
+
 	if t.Config.ShowsLog {
 		args = append(args, "--log-level", "debug")
 	}

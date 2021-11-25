@@ -2,6 +2,7 @@ package framework
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/types"
 )
@@ -21,24 +22,26 @@ type SrvAccount struct {
 
 // TestServerConfig for the test server
 type TestServerConfig struct {
-	ReservedPorts  []ReservedPort
-	JsonRPCPort    int           // The JSON RPC endpoint port
-	GRPCPort       int           // The GRPC endpoint port
-	LibP2PPort     int           // The Libp2p endpoint port
-	Seal           bool          // Flag indicating if blocks should be sealed
-	RootDir        string        // The root directory for test environment
-	IBFTDirPrefix  string        // The prefix of data directory for IBFT
-	IBFTDir        string        // The name of data directory for IBFT
-	PremineAccts   []*SrvAccount // Accounts with existing balances (genesis accounts)
-	Consensus      ConsensusType // Consensus Type
-	Bootnodes      []string      // Bootnode Addresses
-	Locals         []string      // Accounts whose transactions are treated as locals
-	NoLocals       bool          // Flag to disable price exemptions for locally transactions
-	PriceLimit     *uint64       // Minimum gas price limit to enforce for acceptance into the pool
-	DevInterval    int           // Dev consensus update interval [s]
-	BlockGasLimit  uint64        // Block gas limit
-	BlockGasTarget uint64        // Gas target for new blocks
-	ShowsLog       bool
+	ReservedPorts       []ReservedPort
+	JsonRPCPort         int            // The JSON RPC endpoint port
+	GRPCPort            int            // The GRPC endpoint port
+	LibP2PPort          int            // The Libp2p endpoint port
+	Seal                bool           // Flag indicating if blocks should be sealed
+	RootDir             string         // The root directory for test environment
+	IBFTDirPrefix       string         // The prefix of data directory for IBFT
+	IBFTDir             string         // The name of data directory for IBFT
+	PremineAccts        []*SrvAccount  // Accounts with existing balances (genesis accounts)
+	Consensus           ConsensusType  // Consensus Type
+	Bootnodes           []string       // Bootnode Addresses
+	Locals              []string       // Accounts whose transactions are treated as locals
+	NoLocals            bool           // Flag to disable price exemptions for locally transactions
+	PriceLimit          *uint64        // Minimum gas price limit to enforce for acceptance into the pool
+	AccountPendingLimit *uint64        // Maximum number of transactions in pending queue per account
+	Lifetime            *time.Duration // Maximum amount of time transactions are queued in account queue
+	DevInterval         int            // Dev consensus update interval [s]
+	BlockGasLimit       uint64         // Block gas limit
+	BlockGasTarget      uint64         // Gas target for new blocks
+	ShowsLog            bool
 }
 
 // CALLBACKS //
@@ -101,6 +104,16 @@ func (t *TestServerConfig) SetNoLocals(noLocals bool) {
 // SetLocals sets PriceLimit
 func (t *TestServerConfig) SetPriceLimit(priceLimit *uint64) {
 	t.PriceLimit = priceLimit
+}
+
+// SetAccountPendingLimit sets AccountPendingLimit
+func (t *TestServerConfig) SetAccountPendingLimit(accountLimit uint64) {
+	t.AccountPendingLimit = &accountLimit
+}
+
+// SetLifetime sets Lifetime
+func (t *TestServerConfig) SetLifetime(lifetime time.Duration) {
+	t.Lifetime = &lifetime
 }
 
 // SetBlockLimit sets the block gas limit
