@@ -23,7 +23,6 @@ import (
 
 const (
 	defaultIdlePeriod = 1 * time.Minute
-	defaultPriceLimit = 1
 	txSlotSize        = 32 * 1024  // 32kB
 	txMaxSize         = 128 * 1024 //128Kb
 )
@@ -524,9 +523,7 @@ func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
 	}
 
 	// Reject non-local transactions whose Gas Price is under priceLimit
-	if !isLocal &&
-		tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 &&
-		t.priceLimit != defaultPriceLimit {
+	if !isLocal && tx.GasPrice.Cmp(big.NewInt(int64(t.priceLimit))) < 0 {
 		return ErrUnderpriced
 	}
 

@@ -25,7 +25,8 @@ var forks = &chain.Forks{
 }
 
 const (
-	defaultMaxSlots uint64 = 4096
+	defaultPriceLimit uint64 = 1
+	defaultMaxSlots   uint64 = 4096
 )
 
 var (
