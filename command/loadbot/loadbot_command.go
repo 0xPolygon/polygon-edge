@@ -60,6 +60,16 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	l.FlagMap["grpc"] = helper.FlagDescriptor{
+		Description: "The gRPC endpoint used to verify TxPool. " +
+			"You must provide a gRPC endpoint for each one of the JSON-RPC you provided.",
+		Arguments: []string{
+			"GRPC_ADDRESS",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -89,6 +99,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var valueRaw string
 	var count uint64
 	var jsonrpcs helperFlags.ArrayFlags
+	var grpcs helperFlags.ArrayFlags
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
@@ -96,6 +107,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "-1", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.Var(&jsonrpcs, "jsonrpc", "")
+	flags.Var(&grpcs, "grpc", "")
 
 	var err error
 	// Parse cli arguments
@@ -120,11 +132,11 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	fmt.Println("TPS:", tps)
-	fmt.Println("Accounts count:", accountsCount)
-	fmt.Println("Value:", value)
-	fmt.Println("Count:", count)
-	fmt.Println("JSON-RPCs:", jsonrpcs)
+	// There must be at least one gRPC endpoint
+	if len(grpcs) == 0 {
+		l.UI.Error("No gRPC endpoint provided")
+		return 1
+	}
 
 	return 0
 }
