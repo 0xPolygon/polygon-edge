@@ -3,7 +3,7 @@ package loadbot
 import (
 	"crypto/rand"
 	"fmt"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	txPoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"math/big"
@@ -45,17 +45,21 @@ func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
 	return client, nil
 }
 
-func createGRpcClient(endpoint string) (*txpoolOp.TxnPoolOperatorClient, error) {
+func createGRpcClient(endpoint string) (*txPoolOp.TxnPoolOperatorClient, error) {
 	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC connection: %v", err)
 	}
 
-	client := txpoolOp.NewTxnPoolOperatorClient(conn)
+	client := txPoolOp.NewTxnPoolOperatorClient(conn)
 	return &client, nil
 }
 
 func execute() error {
+	// Get sender and receiver accounts
+	// Get nonce for the sender account
+	// If required, generate new value for the transaction
+	// Create the transaction object
 	return nil
 }
 
@@ -81,9 +85,18 @@ func Run(conf *Configuration) (error, *Metrics) {
 	for {
 		select {
 		case <-ticker.C:
-			err := execute()
-			if err != nil {
+			// Register new operation in the metrics
+			metrics.m.Lock()
+			metrics.TotalTransactionsSentCount += 1
+			metrics.m.Unlock()
 
+			err := execute()
+
+			// Register an error in the metrics
+			if err != nil {
+				metrics.m.Lock()
+				metrics.FailedTransactionsCount += 1
+				metrics.m.Unlock()
 			}
 			return nil, nil
 		}
