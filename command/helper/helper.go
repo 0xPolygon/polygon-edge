@@ -30,7 +30,6 @@ const (
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
-	DefaultPriceLimit     = 1
 	DefaultMaxSlots       = 4096
 	GenesisGasUsed        = 458752  // 0x70000
 	GenesisGasLimit       = 5242880 // 0x500000
@@ -367,7 +366,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Var(&premine, "premine", "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
-	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
+	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
@@ -425,7 +424,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
-	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
+	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")

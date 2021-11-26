@@ -338,14 +338,9 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	}
 
 	// check for slot overflow and handle accordingly
-	t.gauge.Lock()
 	if err := t.processSlots(tx, isLocal); err != nil {
-		t.gauge.Unlock()
 		return err
 	}
-
-	t.gauge.height += slotsRequired(tx)
-	t.gauge.Unlock()
 
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
@@ -613,20 +608,30 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 // Checks if the incoming tx would cause an overflow
 // and attempts to allocate space for it
 func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
-	if t.gauge.height+slotsRequired(tx) <= t.gauge.limit {
-		return nil // no overflow
+	t.gauge.Lock()
+	defer t.gauge.Unlock()
+
+	txSlots := slotsRequired(tx)
+	if t.gauge.height+txSlots <= t.gauge.limit {
+		// no overflow, just increase the height
+		t.gauge.height += txSlots
+		return nil
 	}
 
+	// reject remote tx with lower gasPrice
+	// than the min gasPrice tx currently present in remoteTxns
 	if !isLocal && t.Underpriced(tx) {
 		return ErrUnderpriced
 	}
 
-	overflow := t.gauge.height + slotsRequired(tx) - t.gauge.limit
+	// try to allocate space
+	overflow := t.gauge.height + txSlots - t.gauge.limit
 	dropped, success := t.Discard(overflow, isLocal)
 	if !isLocal && !success {
 		return ErrTxPoolOverflow
 	}
 
+	// clear dropped txs and readjust gauge
 	for _, tx := range dropped {
 		mux := t.lockAccountQueue(tx.From, true)
 		if wrapper, ok := t.accountQueues[tx.From]; ok {
@@ -637,6 +642,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		t.pendingQueue.Delete(tx)
 		t.gauge.height -= slotsRequired(tx)
 	}
+	t.gauge.height += txSlots
 
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 	return nil

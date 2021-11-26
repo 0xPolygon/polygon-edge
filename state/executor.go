@@ -355,6 +355,16 @@ func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApp
 	}
 }
 
+type GasLimitReachedTransitionApplicationError struct {
+	TransitionApplicationError
+}
+
+func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTransitionApplicationError {
+	return &GasLimitReachedTransitionApplicationError{
+		*NewTransitionApplicationError(err, true),
+	}
+}
+
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
@@ -380,7 +390,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// 3. the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
