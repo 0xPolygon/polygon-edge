@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"
 	"time"
@@ -81,4 +83,58 @@ func TestNewFilter_Block(t *testing.T) {
 	blocks, err := client.Eth().GetFilterChangesBlock(id)
 	assert.NoError(t, err)
 	assert.Len(t, blocks, 3)
+}
+
+func TestFilterValue(t *testing.T) {
+	_, addr := tests.GenerateKeyAndAddr(t)
+	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.Premine(addr, framework.EthToWei(10))
+		config.SetSeal(true)
+	})
+	srv := srvs[0]
+
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel1()
+	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := srv.JSONRPC()
+
+	// Encode event signature
+	hash := sha3.NewLegacyKeccak256()
+	decodeString := []byte("MyEvent(address,uint256)")
+	hash.Write(decodeString)
+
+	var buf []byte
+	buf = hash.Sum(nil)
+
+	// Convert to right format
+	var placeholder web3.Hash
+	copy(placeholder[:], buf)
+	var filterEventHashes []*web3.Hash
+	filterEventHashes = append(filterEventHashes, &placeholder)
+
+	var filterAddresses []web3.Address
+	filterAddresses = append(filterAddresses, contractAddr)
+
+	id, err := client.Eth().NewFilter(&web3.LogFilter{
+		Address: filterAddresses,
+		Topics: filterEventHashes,
+	})
+	assert.NoError(t, err)
+
+	numCalls := 1
+	for i := 0; i < numCalls; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		srv.TxnTo(ctx, contractAddr, "TriggerMyEvent")
+	}
+
+	res, err := client.Eth().GetFilterChanges(id)
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+	assert.Equal(t, "0x000000000000000000000000000000000000000000000000000000000000002a", hex.EncodeToHex(res[0].Data))
 }
