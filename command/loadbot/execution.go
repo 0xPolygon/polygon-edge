@@ -83,6 +83,19 @@ func createGRpcClient(endpoint string) (*txPoolOp.TxnPoolOperatorClient, error) 
 	return &client, nil
 }
 
+func createGRpcClients(endpoints []string) ([]*txPoolOp.TxnPoolOperatorClient, error) {
+	var clients []*txPoolOp.TxnPoolOperatorClient
+
+	for _, endpoint := range endpoints {
+		client, err := createGRpcClient(endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gRPC client: %v", err)
+		}
+		clients = append(clients, client)
+	}
+	return clients, nil
+}
+
 func generateAccounts(n uint64) ([]*Account, error) {
 	var accounts []*Account
 
@@ -179,21 +192,44 @@ func verifyPrefund(endpoint string, accounts []*Account) error {
 		return fmt.Errorf("failed to create JSON-RPC client: %v", err)
 	}
 
-	for _, account := range accounts {
-		balance, err := client.Eth().GetBalance(web3.Address(account.Address), -1)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve account's balance: %v", err)
-
-		}
-
-		required := framework.EthToWei(1000)
-
-		if balance.Cmp(required) == -1 {
-			return fmt.Errorf("account does not have been prefunded correctly")
-		}
+	block, err := client.Eth().GetBlockByNumber(-1, true)
+	if err != nil {
+		return fmt.Errorf("failed to get block before verifiying prefund: %v", err)
 	}
 
-	return nil
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+
+			newBlock, err := client.Eth().GetBlockByNumber(-1, true)
+			if err != nil {
+				return fmt.Errorf("failed to get block before verifiying prefund: %v", err)
+			}
+
+			if newBlock.Number < block.Number+5 {
+				continue
+			}
+			block = newBlock
+
+			for _, account := range accounts {
+				balance, err := client.Eth().GetBalance(web3.Address(account.Address), -1)
+				if err != nil {
+					return fmt.Errorf("failed to retrieve account's balance: %v", err)
+
+				}
+
+				required := framework.EthToWei(1000)
+
+				if balance.Cmp(required) == -1 {
+					return fmt.Errorf("account does not have been prefunded correctly")
+				}
+			}
+			return nil
+		}
+	}
 }
 
 func execute(client *jsonrpc.Client, sender Account, receiver Account, value int64) error {
@@ -238,20 +274,30 @@ func execute(client *jsonrpc.Client, sender Account, receiver Account, value int
 }
 
 func waitForAllTxPool(endpoints []string) {
+	// TODO: Handle error
+	clients, _ := createGRpcClients(endpoints)
 
+	for _, client := range clients {
+		// TODO: Handle error
+		status, _ := tests.WaitUntilTxPoolEmpty(context.Background(), *client)
+		for status.Length != 0 {
+			// TODO: Handle error
+			status, _ = tests.WaitUntilTxPoolEmpty(context.Background(), *client)
+		}
+	}
 }
 
-func Run(conf *Configuration) (*Metrics, error) {
+func shutdownAllClients(clients []*jsonrpc.Client) {
+	for _, client := range clients {
+		// TODO: Handle error
+		client.Close()
+	}
+}
+
+func Run(conf *Configuration, metrics *Metrics) error {
 	// Create the ticker
 	ticker := time.NewTicker(1 * time.Second / time.Duration(conf.TPS))
 	defer ticker.Stop()
-
-	// Create the metrics placeholder
-	metrics := Metrics{
-		Duration:                   0,
-		TotalTransactionsSentCount: 0,
-		FailedTransactionsCount:    0,
-	}
 
 	// Record execution time
 	start := time.Now()
@@ -262,31 +308,31 @@ func Run(conf *Configuration) (*Metrics, error) {
 	// Generate accounts
 	accounts, err := generateAccounts(conf.AccountsCount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create accounts: %v", err)
+		return fmt.Errorf("failed to create accounts: %v", err)
 	}
 
 	// Verify if the sponsor has enough funds
 	err = verifySponsorBalance(conf.JSONRPCs[0], &conf.Sponsor, conf.AccountsCount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify sponsor's balance: %v", err)
+		return fmt.Errorf("failed to verify sponsor's balance: %v", err)
 	}
 
 	// Prefund accounts if required
 	err = prefundAccounts(conf.JSONRPCs[0], accounts, &conf.Sponsor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prefund accounts: %v", err)
+		return fmt.Errorf("failed to prefund accounts: %v", err)
 	}
 
 	// Wait for prefund to finish
 	err = waitPrefundEnd(conf.GRPCs[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to wait for prefund process to end: %v", err)
+		return fmt.Errorf("failed to wait for prefund process to end: %v", err)
 	}
 
 	// Verify prefund
 	err = verifyPrefund(conf.JSONRPCs[0], accounts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify prefund: %v", err)
+		return fmt.Errorf("failed to verify prefund: %v", err)
 	}
 
 	// Create clients
@@ -294,7 +340,7 @@ func Run(conf *Configuration) (*Metrics, error) {
 	maxClientID := len(conf.JSONRPCs)
 	clients, err := createJsonRpcClients(conf.JSONRPCs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create JSON-RPC clients: %v", err)
+		return fmt.Errorf("failed to create JSON-RPC clients: %v", err)
 	}
 
 	// Accounts ID
@@ -302,7 +348,14 @@ func Run(conf *Configuration) (*Metrics, error) {
 	maxAccountID := len(accounts)
 
 	// Wait for all TxPool to be empty at the end
+	var wg sync.WaitGroup
+	defer func() {
+		wg.Wait()
+	}()
 	defer waitForAllTxPool(conf.GRPCs)
+
+	// Shutdown all clients
+	defer shutdownAllClients(clients)
 
 	// Loop and send a transaction at each tick
 	for {
@@ -311,6 +364,9 @@ func Run(conf *Configuration) (*Metrics, error) {
 			// Register new operation in the metrics
 			metrics.m.Lock()
 			metrics.TotalTransactionsSentCount += 1
+			if metrics.TotalTransactionsSentCount == conf.Count {
+				return nil
+			}
 			metrics.m.Unlock()
 
 			// Select client, sender and receiver
@@ -323,7 +379,9 @@ func Run(conf *Configuration) (*Metrics, error) {
 			accountID += 1
 
 			// Send the transaction
+			wg.Add(1)
 			go func(s Account, r Account) {
+				wg.Done()
 				err := execute(client, s, r, conf.Value)
 
 				// Register an error in the metrics
@@ -333,7 +391,6 @@ func Run(conf *Configuration) (*Metrics, error) {
 					metrics.m.Unlock()
 				}
 			}(*sender, *receiver)
-			return nil, nil
 		}
 	}
 }

@@ -187,13 +187,28 @@ func (l *LoadbotCommand) Run(args []string) int {
 		Sponsor:       sponsor,
 	}
 
-	m, err := Run(&configuration)
+	// Create the metrics placeholder
+	metrics := Metrics{
+		Duration:                   0,
+		TotalTransactionsSentCount: 0,
+		FailedTransactionsCount:    0,
+	}
+
+	err = Run(&configuration, &metrics)
 	if err != nil {
 		l.UI.Error(fmt.Sprintf("an error occured while running the loadbot: %v", err))
 		return 1
 	}
 
-	fmt.Println(m)
+	output := "\n[LOADBOT RUN]\n"
+	output += helper.FormatKV([]string{
+		fmt.Sprintf("Transactions submitted|%d", metrics.TotalTransactionsSentCount),
+		fmt.Sprintf("Transactions failed|%d", metrics.FailedTransactionsCount),
+		fmt.Sprintf("Duration|%v", metrics.Duration),
+	})
+	output += "\n"
+
+	l.UI.Output(output)
 
 	return 0
 }
