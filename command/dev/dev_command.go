@@ -81,7 +81,7 @@ func (d *DevCommand) DefineFlags() {
 	}
 
 	d.FlagMap["lifetime"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Maximum amount of time non-executable transaction are queued. Default: %s", helper.DefaultConfig().TxPool.Lifetime),
+		Description: fmt.Sprintf("Sets the maximum amount of time a non-executable transaction can wait in the queue. Default: %s", helper.DefaultConfig().TxPool.Lifetime),
 		Arguments: []string{
 			"LIFETIME",
 		},
