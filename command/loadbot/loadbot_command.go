@@ -138,5 +138,14 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
+	configuration := Configuration{
+		TPS:           tps,
+		AccountsCount: accountsCount,
+		Value:         value,
+		Count:         count,
+		JSONRPCs:      jsonrpcs,
+		GRPCs:         grpcs,
+	}
+
 	return 0
 }
