@@ -582,16 +582,20 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 
 func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
-	for t.remoteTxns.Length() > 0 && slotsToRemove > 0 {
-		tx := t.remoteTxns.Pop()
-		dropped = append(dropped, tx.tx)
-
-		txSlots := slotsRequired(tx.tx)
-		if slotsToRemove >= txSlots {
-			slotsToRemove -= txSlots
-		} else {
-			return dropped, false
+	for slotsToRemove > 0 {
+		if t.remoteTxns.Length() == 0 {
+			break
 		}
+
+		pricedTx := t.remoteTxns.Pop()
+		dropped = append(dropped, pricedTx.tx)
+
+		txSlots := slotsRequired(pricedTx.tx)
+		if slotsToRemove < txSlots {
+			return dropped, true
+		}
+
+		slotsToRemove -= txSlots
 	}
 
 	// Put back if couldn't make required space
