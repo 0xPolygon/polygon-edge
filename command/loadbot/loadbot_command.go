@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
+	"os"
 )
 
 type LoadbotCommand struct {
@@ -28,7 +30,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["accountsCount"] = helper.FlagDescriptor{
-		Description: "How many accounts must be used by the loadbot to send transactions. Default: 1000",
+		Description: "How many accounts must be used by the loadbot to send transactions. Default: 10",
 		Arguments: []string{
 			"ACCOUNTS_COUNT",
 		},
@@ -70,6 +72,15 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	l.FlagMap["sponsor"] = helper.FlagDescriptor{
+		Description: "The account used to prefund accounts",
+		Arguments: []string{
+			"SPONSOR_ADDRESS",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -100,14 +111,16 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var count uint64
 	var jsonrpcs helperFlags.ArrayFlags
 	var grpcs helperFlags.ArrayFlags
+	var sponsorRaw string
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
-	flags.Uint64Var(&accountsCount, "accountsCount", 1000, "")
+	flags.Uint64Var(&accountsCount, "accountsCount", 10, "")
 	flags.StringVar(&valueRaw, "value", "-1", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.Var(&jsonrpcs, "jsonrpc", "")
 	flags.Var(&grpcs, "grpc", "")
+	flags.StringVar(&sponsorRaw, "sponsor", "", "")
 
 	var err error
 	// Parse cli arguments
@@ -138,6 +151,32 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
+	// Convert the sponsor address in the correct data type
+	var sponsorAddress types.Address
+	if err = sponsorAddress.UnmarshalText([]byte(sponsorRaw)); err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to decode sponsorAddress address: %v", err))
+		return 1
+	}
+
+	// Get the sponsor's private key
+	sponsorPrivateKeyRaw := os.Getenv("PSDK_" + sponsorAddress.String())
+	if sponsorPrivateKeyRaw == "" {
+		l.UI.Error("The sponsor's private key is not in the environment variables, " +
+			"please set it before running the loadbot.")
+		return 1
+	}
+	sponsorPrivateKey, err := crypto.BytesToPrivateKey([]byte(sponsorPrivateKeyRaw))
+	if err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to get sponsor's private key from bytes: %v", err))
+		return 1
+	}
+
+	// Create the sponsor account
+	sponsor := Account{
+		Address:    sponsorAddress,
+		PrivateKey: *sponsorPrivateKey,
+	}
+
 	configuration := Configuration{
 		TPS:           tps,
 		AccountsCount: accountsCount,
@@ -145,9 +184,10 @@ func (l *LoadbotCommand) Run(args []string) int {
 		Count:         count,
 		JSONRPCs:      jsonrpcs,
 		GRPCs:         grpcs,
+		Sponsor:       sponsor,
 	}
 
-	err, m := Run(&configuration)
+	m, err := Run(&configuration)
 	if err != nil {
 		l.UI.Error(fmt.Sprintf("an error occured while running the loadbot: %v", err))
 		return 1

@@ -1,12 +1,16 @@
 package loadbot
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	txPoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"math/big"
@@ -21,6 +25,7 @@ type Configuration struct {
 	Count         uint64
 	JSONRPCs      []string
 	GRPCs         []string
+	Sponsor       Account
 }
 
 type Metrics struct {
@@ -82,6 +87,100 @@ func generateAccounts(n uint64) ([]*Account, error) {
 	return accounts, nil
 }
 
+func verifySponsorBalance(endpoint string, sponsor *Account, n uint64) error {
+	client, err := createJsonRpcClient(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to create JSON-RPC client: %v", err)
+	}
+
+	// Verify if the sponsor has enough funds
+	balance, err := client.Eth().GetBalance(web3.Address(sponsor.Address), -1)
+	if err != nil {
+		return fmt.Errorf("failed to get sponsor balance: %v", err)
+	}
+
+	required := big.NewInt(int64(n))
+	required = required.Mul(required, framework.EthToWei(1000))
+
+	if balance.Cmp(required) == -1 {
+		return fmt.Errorf("not enough balance to prefund accounts: %v", err)
+	}
+	return nil
+}
+
+// prefundAccounts uses the sponsor account to prefund each account with 1000 ETH.
+func prefundAccounts(endpoint string, accounts []*Account, sponsor *Account) error {
+	nonce := uint64(0)
+
+	signer := crypto.NewEIP155Signer(100)
+
+	client, err := createJsonRpcClient(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to create JSON-RPC client: %v", err)
+	}
+
+	for _, account := range accounts {
+		txn, err := signer.SignTx(&types.Transaction{
+			From:     sponsor.Address,
+			To:       &account.Address,
+			Gas:      1000000,
+			Value:    framework.EthToWei(1000),
+			GasPrice: big.NewInt(0x100000),
+			Nonce:    nonce,
+			V:        []byte{1}, // it is necessary to encode in rlp
+		}, &sponsor.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to sign transaction during prefund phase: %v", err)
+		}
+
+		_, err = client.Eth().SendRawTransaction(txn.MarshalRLP())
+		if err != nil {
+			return fmt.Errorf("failed to send transaction during prefund phase: %v", err)
+		}
+
+		nonce += 1
+	}
+	return nil
+}
+
+func waitPrefundEnd(txPoolEndpoint string) error {
+	fmt.Println("Waiting for TxPool to be empty to proceed to prefund verification")
+	conn, err := grpc.Dial(txPoolEndpoint, grpc.WithInsecure())
+	if err != nil {
+		return fmt.Errorf("failed to connect to TxPool: %v", err)
+	}
+
+	client := txPoolOp.NewTxnPoolOperatorClient(conn)
+	_, err = tests.WaitUntilTxPoolEmpty(context.Background(), client)
+	if err != nil {
+		return fmt.Errorf("error occured while waiting for TxPool to be empty")
+	}
+	return nil
+}
+
+func verifyPrefund(endpoint string, accounts []*Account) error {
+	client, err := createJsonRpcClient(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to create JSON-RPC client: %v", err)
+	}
+
+	for _, account := range accounts {
+		balance, err := client.Eth().GetBalance(web3.Address(account.Address), -1)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve account's balance: %v", err)
+
+		}
+
+		required := framework.EthToWei(1000)
+
+		if balance.Cmp(required) == -1 {
+			return fmt.Errorf("account does not have been prefunded correctly")
+		}
+	}
+
+	return nil
+}
+
 func execute() error {
 	// Get sender and receiver accounts
 	// Get nonce for the sender account
@@ -90,7 +189,7 @@ func execute() error {
 	return nil
 }
 
-func Run(conf *Configuration) (error, *Metrics) {
+func Run(conf *Configuration) (*Metrics, error) {
 	// Create the ticker
 	ticker := time.NewTicker(1 * time.Second / time.Duration(conf.TPS))
 	defer ticker.Stop()
@@ -107,6 +206,36 @@ func Run(conf *Configuration) (error, *Metrics) {
 	defer func() {
 		metrics.Duration = time.Since(start)
 	}()
+
+	// Generate accounts
+	accounts, err := generateAccounts(conf.AccountsCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create accounts: %v", err)
+	}
+
+	// Verify if the sponsor has enough funds
+	err = verifySponsorBalance(conf.JSONRPCs[0], &conf.Sponsor, conf.AccountsCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify sponsor's balance: %v", err)
+	}
+
+	// Prefund accounts if required
+	err = prefundAccounts(conf.JSONRPCs[0], accounts, &conf.Sponsor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prefund accounts: %v", err)
+	}
+
+	// Wait for prefund to finish
+	err = waitPrefundEnd(conf.GRPCs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for prefund process to end: %v", err)
+	}
+
+	// Verify prefund
+	err = verifyPrefund(conf.JSONRPCs[0], accounts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify prefund: %v", err)
+	}
 
 	// Loop and send a transaction at each tick
 	for {
