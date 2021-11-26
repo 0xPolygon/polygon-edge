@@ -53,7 +53,7 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolAddCmd := txpool.TxPoolAdd{Meta: meta}
 	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
 
-	loadbotCmd := loadbot.LoadbotCommand{Meta: meta}
+	loadbotCmd := loadbot.LoadbotCommand{UI: ui}
 
 	secretsManagerCmd := secrets.SecretsCommand{}
 	secretsGenerateCmd := secrets.SecretsGenerate{Meta: meta}
