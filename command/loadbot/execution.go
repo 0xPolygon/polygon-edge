@@ -58,6 +58,21 @@ func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
 	return client, nil
 }
 
+func createJsonRpcClients(endpoints []string) ([]*jsonrpc.Client, error) {
+	var clients []*jsonrpc.Client
+
+	for i := 0; i < len(endpoints); i++ {
+		client, err := jsonrpc.NewClient(endpoints[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to create JSON-RPC client: %v", err)
+		}
+
+		clients = append(clients, client)
+	}
+
+	return clients, nil
+}
+
 func createGRpcClient(endpoint string) (*txPoolOp.TxnPoolOperatorClient, error) {
 	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
 	if err != nil {
@@ -181,12 +196,49 @@ func verifyPrefund(endpoint string, accounts []*Account) error {
 	return nil
 }
 
-func execute() error {
-	// Get sender and receiver accounts
+func execute(client *jsonrpc.Client, sender Account, receiver Account, value int64) error {
 	// Get nonce for the sender account
+	nonce, err := client.Eth().GetNonce(web3.Address(sender.Address), -1)
+	if err != nil {
+		return fmt.Errorf("failed to get sender nonce: %v", err)
+	}
+
 	// If required, generate new value for the transaction
-	// Create the transaction object
+	txnValue := big.NewInt(value)
+	if value == -1 {
+		txnValue, err = generateRandomValue()
+		if err != nil {
+			return fmt.Errorf("failed to generate new transaction value: %v", err)
+		}
+	}
+
+	// Create and sign the transaction object
+	signer := crypto.NewEIP155Signer(100)
+
+	txn, err := signer.SignTx(&types.Transaction{
+		From:     sender.Address,
+		To:       &receiver.Address,
+		Gas:      1000000,
+		Value:    txnValue,
+		GasPrice: big.NewInt(0x100000),
+		Nonce:    nonce,
+		V:        []byte{1}, // it is necessary to encode in rlp
+	}, &sender.PrivateKey)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %v", err)
+	}
+
+	// Send the transaction object
+	_, err = client.Eth().SendRawTransaction(txn.MarshalRLP())
+	if err != nil {
+		return fmt.Errorf("failed to send raw transaction: %v", err)
+	}
 	return nil
+}
+
+func waitForAllTxPool(endpoints []string) {
+
 }
 
 func Run(conf *Configuration) (*Metrics, error) {
@@ -237,6 +289,21 @@ func Run(conf *Configuration) (*Metrics, error) {
 		return nil, fmt.Errorf("failed to verify prefund: %v", err)
 	}
 
+	// Create clients
+	clientID := 0
+	maxClientID := len(conf.JSONRPCs)
+	clients, err := createJsonRpcClients(conf.JSONRPCs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JSON-RPC clients: %v", err)
+	}
+
+	// Accounts ID
+	accountID := 0
+	maxAccountID := len(accounts)
+
+	// Wait for all TxPool to be empty at the end
+	defer waitForAllTxPool(conf.GRPCs)
+
 	// Loop and send a transaction at each tick
 	for {
 		select {
@@ -246,14 +313,26 @@ func Run(conf *Configuration) (*Metrics, error) {
 			metrics.TotalTransactionsSentCount += 1
 			metrics.m.Unlock()
 
-			err := execute()
+			// Select client, sender and receiver
+			client := clients[clientID%maxClientID]
+			sender := accounts[accountID%maxAccountID]
+			receiver := accounts[(accountID+1)%maxAccountID]
 
-			// Register an error in the metrics
-			if err != nil {
-				metrics.m.Lock()
-				metrics.FailedTransactionsCount += 1
-				metrics.m.Unlock()
-			}
+			// Update indices
+			clientID += 1
+			accountID += 1
+
+			// Send the transaction
+			go func(s Account, r Account) {
+				err := execute(client, s, r, conf.Value)
+
+				// Register an error in the metrics
+				if err != nil {
+					metrics.m.Lock()
+					metrics.FailedTransactionsCount += 1
+					metrics.m.Unlock()
+				}
+			}(*sender, *receiver)
 			return nil, nil
 		}
 	}
