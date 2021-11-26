@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 )
@@ -50,6 +51,15 @@ func (l *LoadbotCommand) DefineFlags() {
 		},
 		ArgumentsOptional: true,
 	}
+
+	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
+		Description: "The JSON-RPC endpoint used to send transactions. You can provide multiple endpoints.",
+		Arguments: []string{
+			"JSONRPC_ADDRESS",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -78,12 +88,14 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var accountsCount uint64
 	var valueRaw string
 	var count uint64
+	var jsonrpcs helperFlags.ArrayFlags
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.Uint64Var(&accountsCount, "accountsCount", 1000, "")
 	flags.StringVar(&valueRaw, "value", "-1", "")
 	flags.Uint64Var(&count, "count", 1000, "")
+	flags.Var(&jsonrpcs, "jsonrpc", "")
 
 	var err error
 	// Parse cli arguments
@@ -102,10 +114,17 @@ func (l *LoadbotCommand) Run(args []string) int {
 		}
 	}
 
+	// There must be at least one JSON-RPC endpoint
+	if len(jsonrpcs) == 0 {
+		l.UI.Error("No JSON-RPC endpoint provided")
+		return 1
+	}
+
 	fmt.Println("TPS:", tps)
 	fmt.Println("Accounts count:", accountsCount)
 	fmt.Println("Value:", value)
 	fmt.Println("Count:", count)
+	fmt.Println("JSON-RPCs:", jsonrpcs)
 
 	return 0
 }
