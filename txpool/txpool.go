@@ -185,7 +185,6 @@ func NewTxPool(
 		forks:               forks,
 		closeCh:             make(chan struct{}, 1),
 	}
-	fmt.Printf("accountPendingLimit=%d, lifetime=%+v\n", txPool.accountPendingLimit, txPool.lifetime)
 
 	if network != nil {
 		// subscribe to the gossip protocol
