@@ -7,6 +7,7 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"math/big"
+	"sync"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type Configuration struct {
 }
 
 type Metrics struct {
+	m                          sync.Mutex
 	Duration                   time.Duration
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
@@ -53,13 +55,36 @@ func createGRpcClient(endpoint string) (*txpoolOp.TxnPoolOperatorClient, error) 
 	return &client, nil
 }
 
+func execute() error {
+	return nil
+}
+
 func Run(conf *Configuration) (error, *Metrics) {
+	// Create the ticker
 	ticker := time.NewTicker(1 * time.Second / time.Duration(conf.TPS))
 	defer ticker.Stop()
 
+	// Create the metrics placeholder
+	metrics := Metrics{
+		Duration:                   0,
+		TotalTransactionsSentCount: 0,
+		FailedTransactionsCount:    0,
+	}
+
+	// Record execution time
+	start := time.Now()
+	defer func() {
+		metrics.Duration = time.Since(start)
+	}()
+
+	// Loop and send a transaction at each tick
 	for {
 		select {
 		case <-ticker.C:
+			err := execute()
+			if err != nil {
+
+			}
 			return nil, nil
 		}
 	}
