@@ -147,5 +147,13 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GRPCs:         grpcs,
 	}
 
+	err, m := Run(&configuration)
+	if err != nil {
+		l.UI.Error(fmt.Sprintf("an error occured while running the loadbot: %v", err))
+		return 1
+	}
+
+	fmt.Println(m)
+
 	return 0
 }
