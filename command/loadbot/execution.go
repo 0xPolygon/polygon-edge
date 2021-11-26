@@ -1,9 +1,12 @@
 package loadbot
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/crypto"
 	txPoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
 	"math/big"
@@ -25,6 +28,11 @@ type Metrics struct {
 	Duration                   time.Duration
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
+}
+
+type Account struct {
+	Address    types.Address
+	PrivateKey ecdsa.PrivateKey
 }
 
 // generateRandomValue creates a random value used in a transaction.
@@ -53,6 +61,25 @@ func createGRpcClient(endpoint string) (*txPoolOp.TxnPoolOperatorClient, error) 
 
 	client := txPoolOp.NewTxnPoolOperatorClient(conn)
 	return &client, nil
+}
+
+func generateAccounts(n uint64) ([]*Account, error) {
+	var accounts []*Account
+
+	for i := uint64(0); i < n; i++ {
+		privateKey, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ecdsa key pair: %v", err)
+		}
+
+		account := Account{
+			Address:    crypto.PubKeyToAddress(&privateKey.PublicKey),
+			PrivateKey: *privateKey,
+		}
+
+		accounts = append(accounts, &account)
+	}
+	return accounts, nil
 }
 
 func execute() error {
