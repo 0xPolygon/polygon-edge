@@ -19,7 +19,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["tps"] = helper.FlagDescriptor{
-		Description: "Number of transactions to send per second. Default: 1000",
+		Description: "Number of transactions to send per second. Default: 100",
 		Arguments: []string{
 			"TPS",
 		},
@@ -39,6 +39,14 @@ func (l *LoadbotCommand) DefineFlags() {
 			"a random value will be generated. Default: 100",
 		Arguments: []string{
 			"VALUE",
+		},
+		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["count"] = helper.FlagDescriptor{
+		Description: "The number of transactions to sent in total. Default: 1000",
+		Arguments: []string{
+			"COUNT",
 		},
 		ArgumentsOptional: true,
 	}
@@ -69,11 +77,13 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var tps uint64
 	var accountsCount uint64
 	var valueRaw string
+	var count uint64
 
 	// Map flags to placeholders
-	flags.Uint64Var(&tps, "tps", 1000, "")
+	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.Uint64Var(&accountsCount, "accountsCount", 1000, "")
 	flags.StringVar(&valueRaw, "value", "-1", "")
+	flags.Uint64Var(&count, "count", 1000, "")
 
 	var err error
 	// Parse cli arguments
@@ -95,6 +105,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	fmt.Println("TPS:", tps)
 	fmt.Println("Accounts count:", accountsCount)
 	fmt.Println("Value:", value)
+	fmt.Println("Count:", count)
 
 	return 0
 }
