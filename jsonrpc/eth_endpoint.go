@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -330,12 +331,21 @@ func (e *Eth) EstimateGas(
 	// If the sender address is present, recalculate the ceiling to his balance
 	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 		// Get the account balance
+
+		// If the account is not initialized yet in state,
+		// assume it's an empty account
+		accountBalance := big.NewInt(0)
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrStateNotFound) {
+			// An unrelated error occurred, return it
 			return nil, err
+		} else if err == nil {
+			// No error when fetching the account,
+			// read the balance from state
+			accountBalance = acc.Balance
 		}
 
-		available := new(big.Int).Set(acc.Balance)
+		available := new(big.Int).Set(accountBalance)
 
 		if transaction.Value != nil {
 			if valueInt.Cmp(available) >= 0 {
@@ -498,9 +508,11 @@ func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil {
+	if err != nil && errors.Is(err, ErrStateNotFound) {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil
+	} else if err != nil {
+		return nil, err
 	}
 
 	return argBigPtr(acc.Balance), nil
@@ -524,7 +536,6 @@ func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (i
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
-
 	//Set the block number to latest
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
@@ -534,12 +545,16 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 		return nil, err
 	}
 
+	emptySlice := []byte{}
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil {
+	if err != nil && errors.Is(err, ErrStateNotFound) {
+		// If the account doesn't exist / is not initialized yet,
+		// return the default value
 		return "0x", nil
+	} else if err != nil {
+		return argBytesPtr(emptySlice), err
 	}
 
-	emptySlice := []byte{}
 	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
 	if err != nil {
 		// TODO This is just a workaround. Figure out why CodeHash is populated for regular accounts
