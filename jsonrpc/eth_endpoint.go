@@ -129,6 +129,9 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 		}
 	}
 	// txn not found (this should not happen)
+	e.d.logger.Warn(
+		fmt.Sprintf("Transaction with hash [%s] not found", blockHash),
+	)
 	return nil, nil
 }
 
@@ -142,20 +145,26 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 	block, ok := e.d.store.GetBlockByHash(blockHash, true)
 	if !ok {
-		fmt.Println("CCCC")
 		// block not found
+		e.d.logger.Warn(
+			fmt.Sprintf("Block with hash [%s] not found", blockHash.String()),
+		)
 		return nil, nil
 	}
 
 	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
 	if err != nil {
-		fmt.Println("AAAA", err)
 		// block receipts not found
+		e.d.logger.Warn(
+			fmt.Sprintf("Receipts for block with hash [%s] not found", blockHash.String()),
+		)
 		return nil, nil
 	}
 	if len(receipts) == 0 {
-		// receitps not written yet on the db
-		fmt.Println("BBBB")
+		// Receipts not written yet on the db
+		e.d.logger.Warn(
+			fmt.Sprintf("No receipts found for block with hash [%s]", blockHash.String()),
+		)
 		return nil, nil
 	}
 	// find the transaction in the body
@@ -207,9 +216,12 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
-
-	//Set the block number to latest
+func (e *Eth) GetStorageAt(
+	address types.Address,
+	index types.Hash,
+	number *BlockNumber,
+) (interface{}, error) {
+	// Set the block number to latest
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -227,7 +239,7 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *Bloc
 		}
 		return nil, err
 	}
-	//Parse the RLP value
+	// Parse the RLP value
 	p := &fastrlp.Parser{}
 	v, err := p.Parse(result)
 	if err != nil {
@@ -249,8 +261,10 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) Call(
+	arg *txnArgs,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -405,7 +419,7 @@ func (e *Eth) EstimateGas(
 
 	// we stopped the binary search at the last gas limit
 	// at which the txn could not be executed
-	highEnd += 1
+	highEnd++
 
 	// Check the edge case if even the highest cap is not enough to complete the transaction
 	if highEnd == gasCap {
@@ -497,8 +511,10 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 }
 
 // GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) GetBalance(
+	address types.Address,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -519,8 +535,10 @@ func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) GetTransactionCount(
+	address types.Address,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -536,7 +554,7 @@ func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (i
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
-	//Set the block number to latest
+	// Set the block number to latest
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
