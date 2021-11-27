@@ -337,6 +337,11 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		return err
 	}
 
+	// Reject transactions with lower nonce than expected by the account queue
+	if nextNonce, ok := t.GetNonce(tx.From); ok && tx.Nonce < nextNonce {
+		return ErrNonceTooLow
+	}
+
 	// check for slot overflow and handle accordingly
 	if err := t.processSlots(tx, isLocal); err != nil {
 		return err
@@ -669,26 +674,8 @@ func (t *txHeapWrapper) Add(tx *types.Transaction) {
 	t.Push(tx)
 }
 
-// pruneLowNonceTx removes any transactions from the account tx queue
-// that have a lower nonce than the current account nonce in state
-func (t *txHeapWrapper) pruneLowNonceTx() {
-	for {
-		// Grab the min-nonce transaction from the heap
-		tx := t.Peek()
-		if tx == nil || tx.Nonce >= t.nextNonce {
-			break
-		}
-
-		// Drop it from the heap
-		t.Pop()
-	}
-}
-
 // Promote promotes all the new valid transactions
 func (t *txHeapWrapper) Promote() []*types.Transaction {
-	// Remove elements lower than nonce
-	t.pruneLowNonceTx()
-
 	// Promote elements
 	tx := t.Peek()
 	if tx == nil || tx.Nonce != t.nextNonce {
