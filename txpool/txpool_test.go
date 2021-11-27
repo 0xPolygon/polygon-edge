@@ -978,3 +978,50 @@ func TestGaugeCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestRejectLowNonceTx(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	assert.NoError(t, err)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
+
+	var (
+		numTx          uint64 = 10
+		txSlots        uint64 = 2
+		expectedHeight uint64 = numTx * txSlots
+	)
+
+	// send numTx from some acc
+	for i := uint64(0); i < numTx; i++ {
+		tx := generateAddTx(addTx{
+			nonce:    i,
+			slot:     txSlots,
+			gasPrice: big.NewInt(1),
+			account: &account{
+				addr: addr1,
+			},
+		}, nil)
+		assert.NoError(t, pool.addImpl(OriginGossip, tx))
+	}
+
+	assert.Equal(t, pool.pendingQueue.Length(), numTx)
+	assert.Equal(t, pool.gauge.getHeight(), expectedHeight)
+
+	// send 5 low nonce txs
+	for i := 0; i < 5; i++ {
+		tx := generateAddTx(addTx{
+			nonce:    3, // nextNonce == 10 at this point
+			slot:     1,
+			gasPrice: big.NewInt(1),
+			account: &account{
+				addr: addr1,
+			},
+		}, nil)
+		assert.ErrorIs(t, pool.addImpl(OriginGossip, tx), ErrNonceTooLow)
+	}
+
+	// low nonce txs were never accepted
+	assert.Equal(t, pool.pendingQueue.Length(), numTx)
+	// and neither were slots increased
+	assert.Equal(t, pool.gauge.getHeight(), expectedHeight)
+}
