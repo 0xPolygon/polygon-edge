@@ -157,7 +157,7 @@ func TestMultipleTransactions(t *testing.T) {
 		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
-	assert.NoError(t, pool.addImpl("", txn1))
+	assert.ErrorIs(t, ErrNonceTooLow, pool.addImpl("", txn1))
 
 	assert.Equal(t, pool.NumAccountTxs(from2), 0)
 	assert.Equal(t, pool.Length(), uint64(1))
