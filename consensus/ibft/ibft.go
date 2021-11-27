@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	any "google.golang.org/protobuf/types/known/anypb"
@@ -30,6 +29,13 @@ type blockchainInterface interface {
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlocks(blocks []*types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
+}
+
+type transactionPoolInterface interface {
+	ResetWithHeader(h *types.Header)
+	Pop() (*types.Transaction, func())
+	DecreaseAccountNonce(tx *types.Transaction)
+	Length() uint64
 }
 
 // Ibft represents the IBFT consensus mechanism object
@@ -47,7 +53,7 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey // Private key for the validator
 	validatorKeyAddr types.Address
 
-	txpool *txpool.TxPool // Reference to the transaction pool
+	txpool transactionPoolInterface // Reference to the transaction pool
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	epochSize uint64
@@ -65,7 +71,9 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
-
+  
+	metrics *consensus.Metrics
+  
 	secretsManager secrets.SecretsManager
 }
 
@@ -85,6 +93,7 @@ func Factory(
 		epochSize:      DefaultEpochSize,
 		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
+    metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 	}
 
@@ -316,6 +325,9 @@ func (i *Ibft) runSyncState() {
 					Round:    0,
 					Sequence: header.Number + 1,
 				}
+				//Set the round metric
+				i.metrics.Rounds.Set(float64(i.state.view.Round))
+
 				i.setState(AcceptState)
 			} else {
 				time.Sleep(1 * time.Second)
@@ -402,29 +414,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if err != nil {
 		return nil, err
 	}
-	txns := []*types.Transaction{}
-	for {
-		txn, retFn := i.txpool.Pop()
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.DecreaseAccountNonce(txn)
-		} else {
-			if err := transition.Write(txn); err != nil {
-				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-					retFn()
-				} else {
-					i.txpool.DecreaseAccountNonce(txn)
-				}
-				break
-			}
-			txns = append(txns, txn)
-		}
-	}
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	txns := i.writeTransactions(gasLimit, transition)
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -450,6 +440,52 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	i.logger.Info("build block", "number", header.Number, "txns", len(txns))
 	return block, nil
+}
+
+type transitionInterface interface {
+	Write(txn *types.Transaction) error
+}
+
+// writeTransactions writes transactions from the txpool to the transition object
+// and returns transactions that were included in the transition (new block)
+func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := i.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			i.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				i.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	return txns
 }
 
 // runAcceptState runs the Accept state loop
@@ -487,6 +523,8 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
+	//Update the No.of validator metric
+	i.metrics.Validators.Set(float64(len(snap.Set)))
 	// reset round messages
 	i.state.resetRoundMsgs()
 
@@ -649,12 +687,31 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
+			// update metrics
+			i.updateMetrics(block)
+
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
 	}
 }
 
+// updateMetrics will update various metrics based on the given block
+// currently we capture No.of Txs and block interval metrics using this function
+func (i *Ibft) updateMetrics(block *types.Block) {
+	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
+	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
+	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+	//Update the block interval metric
+	if block.Number() > 1 {
+		i.metrics.BlockInterval.Observe(
+			headerTime.Sub(parentTime).Seconds(),
+		)
+	}
+	//Update the Number of transactions in the block metric
+	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
+
+}
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -714,8 +771,9 @@ func (i *Ibft) handleStateErr(err error) {
 func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
 		i.logger.Debug("local round change", "round", round)
-		// set the new round
+		// set the new round and update the round metric
 		i.state.view.Round = round
+		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
 		// send the round change message
