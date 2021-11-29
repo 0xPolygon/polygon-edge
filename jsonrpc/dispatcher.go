@@ -449,7 +449,7 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 		return 0, err
 	}
 	acc, err := d.store.GetAccount(header.StateRoot, address)
-	if err != nil && errors.Is(err, ErrStateNotFound) {
+	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / isn't initialized,
 		// return a nonce value of 0
 		return 0, nil

@@ -234,7 +234,7 @@ func (e *Eth) GetStorageAt(
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
-		if err == ErrStateNotFound {
+		if errors.As(err, &ErrStateNotFound) {
 			return argBytesPtr(types.ZeroHash[:]), nil
 		}
 		return nil, err
@@ -350,7 +350,7 @@ func (e *Eth) EstimateGas(
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
-		if err != nil && !errors.Is(err, ErrStateNotFound) {
+		if err != nil && !errors.As(err, &ErrStateNotFound) {
 			// An unrelated error occurred, return it
 			return nil, err
 		} else if err == nil {
@@ -524,7 +524,7 @@ func (e *Eth) GetBalance(
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil && errors.Is(err, ErrStateNotFound) {
+	if errors.As(err, &ErrStateNotFound) {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil
 	} else if err != nil {
@@ -544,7 +544,7 @@ func (e *Eth) GetTransactionCount(
 	}
 	nonce, err := e.d.getNextNonce(address, *number)
 	if err != nil {
-		if err == ErrStateNotFound {
+		if errors.As(err, &ErrStateNotFound) {
 			return argUintPtr(0), nil
 		}
 		return nil, err
@@ -565,7 +565,7 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 
 	emptySlice := []byte{}
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil && errors.Is(err, ErrStateNotFound) {
+	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
 		// return the default value
 		return "0x", nil
