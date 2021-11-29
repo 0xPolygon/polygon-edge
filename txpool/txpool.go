@@ -214,7 +214,7 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 		stateRoot := t.store.Header().StateRoot
 
 		// Initialize the account based transaction heap
-		txnsQueue := newTxHeapWrapper()
+		txnsQueue := newTxHeapWrapper(t.logger.Named("account"))
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
 
 		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
@@ -665,12 +665,16 @@ type txHeapWrapper struct {
 	// nextNonce is a field indicating what should be the next
 	// valid nonce for the account transaction
 	nextNonce uint64
+
+	// Logger used for account-specific tx activity
+	logger hclog.Logger
 }
 
 // newTxHeapWrapper creates a new account based tx heap
-func newTxHeapWrapper() *txHeapWrapper {
+func newTxHeapWrapper(logger hclog.Logger) *txHeapWrapper {
 	return &txHeapWrapper{
-		txs: txHeap{},
+		logger: logger,
+		txs:    txHeap{},
 	}
 }
 
@@ -691,6 +695,12 @@ func (t *txHeapWrapper) pruneLowNonceTx() {
 
 		// Drop it from the heap
 		t.Pop()
+		t.logger.Debug(
+			fmt.Sprintf(
+				"Dropping txn [%s] from account heap due to low nonce",
+				tx.Hash.String(),
+			),
+		)
 	}
 }
 
@@ -703,6 +713,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	tx := t.Peek()
 	if tx == nil || tx.Nonce != t.nextNonce {
 		// Nothing to promote
+		t.logger.Debug("No txs to promote")
 		return nil
 	}
 
@@ -728,6 +739,13 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		if tx.Nonce+1 != nextTx.Nonce {
 			// Tx that have a higher nonce are shelved for later
 			// when they can actually be parsed
+			t.logger.Debug(
+				fmt.Sprintf(
+					"Shelving tx [%s] with higher nonce [%d] for later",
+					tx.Hash.String(),
+					tx.Nonce,
+				),
+			)
 			higherNonceTxs = append(higherNonceTxs, nextTx)
 			break
 		}
