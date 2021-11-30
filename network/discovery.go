@@ -89,7 +89,7 @@ func (d *discovery) setup() error {
 
 	d.routingTable.PeerAdded = func(p peer.ID) {
 		info := d.srv.host.Peerstore().PeerInfo(p)
-		d.srv.dialQueue.add(&info, 10)
+		d.srv.addToDialQueue(&info, 10)
 	}
 	d.routingTable.PeerRemoved = func(p peer.ID) {
 		d.srv.dialQueue.del(p)
