@@ -513,3 +513,75 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		})
 	}
 }
+
+func TestRunDial(t *testing.T) {
+	// setupServers returns server and list of peer's server
+	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+		servers := make([]*Server, len(maxPeers))
+		for idx := range servers {
+			servers[idx] = CreateServer(t, func(c *Config) {
+				c.MaxPeers = maxPeers[idx]
+				c.NoDiscover = true
+			})
+		}
+		return servers
+	}
+
+	connectToPeer := func(srv *Server, peer *peer.AddrInfo, timeout time.Duration) bool {
+		connectedCh := asyncWaitForEvent(srv, timeout, connectedPeerHandler(peer.ID))
+		srv.Join(peer, 0)
+		return <-connectedCh
+	}
+
+	closeServers := func(servers ...*Server) {
+		for _, s := range servers {
+			s.Close()
+		}
+	}
+
+	t.Run("should connect to all peers", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			if uint64(idx) < maxPeers[0] {
+				assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+			} else {
+				assert.Falsef(t, connected, "should fail to connect to peer %d[%s], but connected\n", idx, addr.ID)
+			}
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
+		maxPeers := []uint64{1, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		// close peer 1 so that the server fails to connect to peer 1
+		peers[0].Close()
+		connected := connectToPeer(srv, peers[0].AddrInfo(), 15*time.Second)
+		assert.False(t, connected)
+
+		connected = connectToPeer(srv, peers[1].AddrInfo(), 5*time.Second)
+		assert.True(t, connected)
+
+		closeServers(srv, peers[1])
+	})
+}
