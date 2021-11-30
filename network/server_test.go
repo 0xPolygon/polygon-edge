@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -159,23 +160,42 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
-	id := peer.ID("peer")
-
 	count := 10
+
+	events := []PeerEventType{
+		PeerConnected,
+		PeerFailedToConnect,
+		PeerDisconnected,
+		PeerAlreadyConnected,
+		PeerDialCompleted,
+		PeerAddedToDialQueue,
+	}
+
+	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
+		id := peer.ID(strconv.Itoa(i))
+		event := events[i%len(events)]
+		return id, event
+	}
 
 	t.Run("serial", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(id, PeerConnected)
-			sub.Get()
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
+
+			received := sub.Get()
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 
 	t.Run("parallel", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(id, PeerDisconnected)
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
 		}
 		for i := 0; i < count; i++ {
-			sub.Get()
+			received := sub.Get()
+			id, event := getIDAndEventType(i)
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 }
