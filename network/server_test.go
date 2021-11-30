@@ -155,14 +155,15 @@ func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 }
 
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
-	srv0 := CreateServer(t, nil)
+	srv0 := CreateServer(t, func(c *Config) {
+		c.NoDiscover = true
+	})
 	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
 	events := []PeerEventType{
-		// Skip PeerConnected because it causes adding peer to routing table
-		// PeerConnected,
+		PeerConnected,
 		PeerFailedToConnect,
 		PeerDisconnected,
 		PeerAlreadyConnected,
