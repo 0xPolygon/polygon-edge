@@ -18,7 +18,6 @@ import (
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
-	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -31,12 +30,11 @@ const (
 	DefaultChainID             = 100
 	DefaultPremineBalance      = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus           = "pow"
-	DefaultPriceLimit          = 1
 	DefaultMaxSlots            = 4096
-	DefaultAccountPendingLimit = txpool.DefaultAccountPendingLimit
-	DefaultLifetime            = txpool.DefaultLifetime
 	GenesisGasUsed             = 458752  // 0x70000
 	GenesisGasLimit            = 5242880 // 0x500000
+	DefaultAccountPendingLimit = 16
+	DefaultLifetime            = 3 * time.Hour
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -353,7 +351,8 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 			NoDiscover: true,
 			MaxPeers:   0,
 		},
-		TxPool: &TxPool{},
+		TxPool:    &TxPool{},
+		Telemetry: &Telemetry{},
 	}
 	cliConfig.Seal = true
 	cliConfig.Dev = true
@@ -370,7 +369,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Var(&premine, "premine", "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
-	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
+	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&cliConfig.TxPool.AccountPendingLimit, "account-pending-limit", DefaultAccountPendingLimit, "")
 	flags.StringVar(&cliConfig.TxPool.Lifetime, "lifetime", DefaultLifetime.String(), "")
@@ -403,8 +402,9 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	config := DefaultConfig()
 
 	cliConfig := &Config{
-		Network: &Network{},
-		TxPool:  &TxPool{},
+		Network:   &Network{},
+		TxPool:    &TxPool{},
+		Telemetry: &Telemetry{},
 	}
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
@@ -422,13 +422,14 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.JSONRPCAddr, "jsonrpc", "", "")
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
+	flags.StringVar(&cliConfig.Telemetry.PrometheusAddr, "prometheus", "", "")
 	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
 	flags.StringVar(&cliConfig.Network.Dns, "dns", "", " the host DNS address which can be used by a remote peer for connection")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
-	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", DefaultPriceLimit, "")
+	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&cliConfig.TxPool.AccountPendingLimit, "account-pending-limit", DefaultAccountPendingLimit, "")
 	flags.StringVar(&cliConfig.TxPool.Lifetime, "lifetime", DefaultLifetime.String(), "")
@@ -440,7 +441,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
-
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)

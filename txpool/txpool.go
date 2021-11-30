@@ -90,6 +90,37 @@ type signer interface {
 	Sender(tx *types.Transaction) (types.Address, error)
 }
 
+// Gauge for measuring pool capacity in slots
+type slotGauge struct {
+	sync.Mutex
+	height uint64
+	limit  uint64
+}
+
+// Increases the height of the gauge by the specified slots amount
+func (g *slotGauge) increase(slots uint64) {
+	g.Lock()
+	defer g.Unlock()
+
+	g.height += slots
+}
+
+// Decreases the height of the gauge by the specified slots amount
+func (g *slotGauge) decrease(slots uint64) {
+	g.Lock()
+	defer g.Unlock()
+
+	g.height -= slots
+}
+
+// Returns the current height of the gauge measured in slots
+func (g *slotGauge) getHeight() uint64 {
+	g.Lock()
+	defer g.Unlock()
+
+	return g.height
+}
+
 // TxPool is module that handles pending transactions.
 //
 // There are fundamentally 2 queues in the txpool module:
@@ -113,14 +144,17 @@ type TxPool struct {
 	// Min price heap for all remote transactions
 	remoteTxns *txPriceHeap
 
-	// Collection of account gauges to save num transactions and timestamp
-	accountGauges *accountGauges
-
 	// Number of used slots
 	slots uint64
 
 	// Maximum number of transaction slots for all accounts
 	maxSlots uint64
+
+	// Gauge for measuring pool capacity
+	gauge slotGauge
+
+	// Collection of account gauges to save num transactions and timestamp
+	accountGauges *accountGauges
 
 	// Networking stack
 	topic *network.Topic
@@ -150,11 +184,13 @@ type TxPool struct {
 	// Notification channel used so signal added transactions to the pool
 	NotifyCh chan struct{}
 
+	// Close signal channel to close async task in TxPool
+	closeCh chan struct{}
+
 	// Indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
 
-	// Close signal channel to close async task in TxPool
-	closeCh chan struct{}
+	metrics *Metrics
 }
 
 // NewTxPool creates a new pool for transactions
@@ -164,11 +200,13 @@ func NewTxPool(
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
+	metrics *Metrics,
 	config *Config,
 ) (*TxPool, error) {
 	txPool := &TxPool{
 		logger:              logger.Named("txpool"),
 		store:               store,
+		metrics:             metrics,
 		idlePeriod:          defaultIdlePeriod,
 		accountQueues:       make(map[types.Address]*accountQueueWrapper),
 		pendingQueue:        newMaxTxPriceHeap(),
@@ -246,7 +284,7 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 		stateRoot := t.store.Header().StateRoot
 
 		// Initialize the account based transaction heap
-		txnsQueue := newTxHeapWrapper()
+		txnsQueue := newTxHeapWrapper(t.logger.Named("account"))
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
 
 		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
@@ -281,14 +319,20 @@ func (a *accountQueueWrapper) unlock() {
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	mux := t.lockAccountQueue(addr, false)
-	defer mux.unlock()
-
-	wrapper, ok := t.accountQueues[addr]
-	if !ok {
+	pendingTxs, _ := t.GetTxs(false)
+	accountTxs := pendingTxs[addr]
+	if len(accountTxs) == 0 {
 		return 0, false
 	}
-	return wrapper.accountQueue.nextNonce, true
+
+	highestNonce := uint64(0)
+	for k := range accountTxs {
+		if k > highestNonce {
+			highestNonce = k
+		}
+	}
+
+	return highestNonce + 1, true
 }
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
@@ -369,26 +413,8 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		return err
 	}
 
-	if t.slots+numSlots(tx) > t.maxSlots {
-		if !isLocal && t.Underpriced(tx) {
-			return ErrUnderpriced
-		}
-
-		dropped, success := t.Discard(t.slots-t.maxSlots+numSlots(tx), isLocal)
-		if !isLocal && !success {
-			return ErrTxPoolOverflow
-		}
-		for _, tx := range dropped {
-			mux := t.lockAccountQueue(tx.From, true)
-			if wrapper, ok := t.accountQueues[tx.From]; ok {
-				wrapper.accountQueue.Remove(tx.Hash)
-			}
-			mux.unlock()
-
-			t.pendingQueue.Delete(tx)
-			t.accountGauges.get(tx.From).decreaseNumPending(1)
-			t.decreaseSlots(numSlots(tx))
-		}
+	if err := t.processSlots(tx, isLocal); err != nil {
+		return err
 	}
 
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
@@ -399,7 +425,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
 
-	t.increaseSlots(numSlots(tx))
 	if !isLocal {
 		t.remoteTxns.Push(tx)
 	}
@@ -408,10 +433,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
 	}
-
-	t.promoteAccountTransactions(tx.From)
-	t.accountGauges.get(tx.From).setLastAdded(time.Now())
-
 	return nil
 }
 
@@ -419,12 +440,14 @@ func (t *TxPool) promoteAccountTransactions(addr types.Address) {
 	wrapper := t.accountQueues[addr]
 	accountGauge := t.accountGauges.get(addr)
 	numPromotable := accountGauge.getNumPromotable(t.accountPendingLimit)
+
 	for _, promoted := range wrapper.accountQueue.Promote(numPromotable) {
-		pushErr := t.pendingQueue.Push(promoted)
-		if pushErr != nil {
+		// Move promotable txs to the pending queue
+		if pushErr := t.pendingQueue.Push(promoted); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", promoted.Hash.String(), pushErr))
 		} else {
 			accountGauge.increaseNumPending(1)
+			t.metrics.PendingTxs.Add(1)
 		}
 	}
 }
@@ -444,9 +467,9 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 	}
 }
 
-// GetTxs gets both pending and queued transactions
-func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
-
+// GetTxs gets pending and queued transactions
+func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+	t.pendingQueue.lock.Lock()
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
@@ -454,6 +477,10 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
 		}
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
+	}
+	t.pendingQueue.lock.Unlock()
+	if !inclQueued {
+		return pendingTxs, nil
 	}
 
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
@@ -485,19 +512,25 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		return nil, nil
 	}
 
-	slots := numSlots(txn.tx)
-	// Subtracts tx slots
-	t.decreaseSlots(slots)
+	//Update the pending transaction metric
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+
+	slots := slotsRequired(txn.tx)
 	accountGauge := t.accountGauges.get(txn.from)
 	accountGauge.decreaseNumPending(1)
+	// Subtracts tx slots
+	t.gauge.decrease(slots)
 
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
+		} else {
+			t.metrics.PendingTxs.Add(1)
 		}
-		t.increaseSlots(slots)
+
 		accountGauge.increaseNumPending(1)
+		t.gauge.increase(slots)
 	}
 	return txn.tx, ret
 }
@@ -551,9 +584,8 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.decreaseSlots(numSlots(txn))
+		t.gauge.decrease(slotsRequired(txn))
 		t.accountGauges.get(txn.From).decreaseNumPending(1)
-
 		t.pendingQueue.Delete(txn)
 		t.remoteTxns.Delete(txn)
 
@@ -566,6 +598,8 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		t.promoteAccountTransactions(addr)
 		accountLock.unlock()
 	}
+	//update the metric
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
@@ -644,38 +678,77 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	return underpriced
 }
 
-func (t *TxPool) Discard(slots uint64, force bool) ([]*types.Transaction, bool) {
+func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
-	for t.remoteTxns.Length() > 0 && slots > 0 {
-		tx := t.remoteTxns.Pop()
-		dropped = append(dropped, tx.tx)
-
-		txSlots := numSlots(tx.tx)
-		if slots >= txSlots {
-			slots -= txSlots
-		} else {
-			slots = 0
+	for slotsToRemove > 0 {
+		if t.remoteTxns.Length() == 0 {
+			break
 		}
+
+		pricedTx := t.remoteTxns.Pop()
+		dropped = append(dropped, pricedTx.tx)
+
+		txSlots := slotsRequired(pricedTx.tx)
+		if slotsToRemove < txSlots {
+			return dropped, true
+		}
+
+		slotsToRemove -= txSlots
 	}
 
 	// Put back if couldn't make required space
-	if slots > 0 && !force {
+	if slotsToRemove > 0 && !force {
 		for _, tx := range dropped {
 			t.remoteTxns.Push(tx)
 		}
 		return nil, false
 	}
+
 	return dropped, true
 }
 
-// increaseSlots increases number of taken slots
-func (t *TxPool) increaseSlots(slots uint64) {
-	atomic.AddUint64(&t.slots, slots)
-}
+// Checks if the incoming tx would cause an overflow
+// and attempts to allocate space for it
+func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
+	t.gauge.Lock()
+	defer t.gauge.Unlock()
 
-// increaseSlots decreases number of taken slots
-func (t *TxPool) decreaseSlots(slots uint64) {
-	atomic.AddUint64(&t.slots, ^(slots - 1))
+	txSlots := slotsRequired(tx)
+	if t.gauge.height+txSlots <= t.gauge.limit {
+		// no overflow, just increase the height
+		t.gauge.height += txSlots
+		return nil
+	}
+
+	// reject remote tx with lower gasPrice
+	// than the min gasPrice tx currently present in remoteTxns
+	if !isLocal && t.Underpriced(tx) {
+		return ErrUnderpriced
+	}
+
+	// try to allocate space
+	overflow := t.gauge.height + txSlots - t.gauge.limit
+	dropped, success := t.Discard(overflow, isLocal)
+	if !isLocal && !success {
+		return ErrTxPoolOverflow
+	}
+
+	// clear dropped txs and readjust gauge
+	for _, tx := range dropped {
+		mux := t.lockAccountQueue(tx.From, true)
+		if wrapper, ok := t.accountQueues[tx.From]; ok {
+			wrapper.accountQueue.Remove(tx.Hash)
+		}
+		mux.unlock()
+
+		t.accountGauges.get(tx.From).decreaseNumPending(1)
+		t.pendingQueue.Delete(tx)
+		t.gauge.height -= slotsRequired(tx)
+	}
+	t.gauge.height += txSlots
+
+	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+	return nil
 }
 
 // truncateAccountQueues clean up transactions by inactive account
@@ -689,10 +762,10 @@ func (t *TxPool) truncateAccountQueues() {
 		if time.Since(gauge.lastAdded) > t.lifetime {
 			poppedSlots := uint64(0)
 			for _, tx := range accountLock.accountQueue.txs {
-				poppedSlots += numSlots(tx)
+				poppedSlots += slotsRequired(tx)
 			}
 			accountLock.accountQueue.txs = accountLock.accountQueue.txs[:0]
-			t.decreaseSlots(poppedSlots)
+			t.gauge.height -= poppedSlots
 		}
 		accountLock.unlock()
 	}
@@ -753,12 +826,16 @@ type txHeapWrapper struct {
 	// nextNonce is a field indicating what should be the next
 	// valid nonce for the account transaction
 	nextNonce uint64
+
+	// Logger used for account-specific tx activity
+	logger hclog.Logger
 }
 
 // newTxHeapWrapper creates a new account based tx heap
-func newTxHeapWrapper() *txHeapWrapper {
+func newTxHeapWrapper(logger hclog.Logger) *txHeapWrapper {
 	return &txHeapWrapper{
-		txs: txHeap{},
+		logger: logger,
+		txs:    txHeap{},
 	}
 }
 
@@ -779,6 +856,12 @@ func (t *txHeapWrapper) pruneLowNonceTx() {
 
 		// Drop it from the heap
 		t.Pop()
+		t.logger.Debug(
+			fmt.Sprintf(
+				"Dropping txn [%s] from account heap due to low nonce",
+				tx.Hash.String(),
+			),
+		)
 	}
 }
 
@@ -796,6 +879,7 @@ func (t *txHeapWrapper) Promote(num uint64) []*types.Transaction {
 	tx := t.Peek()
 	if tx == nil || tx.Nonce != t.nextNonce {
 		// Nothing to promote
+		t.logger.Debug("No txs to promote")
 		return nil
 	}
 
@@ -824,6 +908,13 @@ func (t *txHeapWrapper) Promote(num uint64) []*types.Transaction {
 		if tx.Nonce+1 != nextTx.Nonce {
 			// Tx that have a higher nonce are shelved for later
 			// when they can actually be parsed
+			t.logger.Debug(
+				fmt.Sprintf(
+					"Shelving tx [%s] with higher nonce [%d] for later",
+					tx.Hash.String(),
+					tx.Nonce,
+				),
+			)
 			higherNonceTxs = append(higherNonceTxs, nextTx)
 			break
 		}
@@ -1120,7 +1211,7 @@ func (a *localAccounts) addAddr(addr types.Address) {
 	a.accounts[addr] = true
 }
 
-// numSlots calculates the number of slots for given transaction
-func numSlots(tx *types.Transaction) uint64 {
+// slotsRequired() calculates the number of slotsRequired for given transaction
+func slotsRequired(tx *types.Transaction) uint64 {
 	return (tx.Size() + txSlotSize - 1) / txSlotSize
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -20,6 +22,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
@@ -60,6 +64,9 @@ type Server struct {
 	// transaction pool
 	txpool *txpool.TxPool
 
+	serverMetrics *serverMetrics
+
+	prometheusServer *http.Server
 	// secrets manager
 	secretsManager secrets.SecretsManager
 }
@@ -86,6 +93,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %v", err)
 	}
 
+	if config.Telemetry.PrometheusAddr != nil {
+		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, true)
+		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
+	} else {
+		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
+	}
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
@@ -143,6 +156,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			hub,
 			m.grpcServer,
 			m.network,
+			m.serverMetrics.txpool,
 			m.config.TxPool,
 		)
 		if err != nil {
@@ -287,7 +301,6 @@ func (s *Server) setupConsensus() error {
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
-
 	consensus, err := engine(
 		&consensus.ConsensusParams{
 			Context:        context.Background(),
@@ -299,6 +312,7 @@ func (s *Server) setupConsensus() error {
 			Executor:       s.executor,
 			Grpc:           s.grpcServer,
 			Logger:         s.logger.Named("consensus"),
+			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
 		},
 	)
@@ -476,10 +490,69 @@ func (s *Server) Close() {
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())
 	}
+
+	if s.prometheusServer != nil {
+		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
+			s.logger.Error("Prometheus server shutdown error", err)
+		}
+	}
 }
 
 // Entry is a backend configuration entry
 type Entry struct {
 	Enabled bool
 	Config  map[string]interface{}
+}
+
+// SetupDataDir sets up the polygon-sdk data directory and sub-folders
+func SetupDataDir(dataDir string, paths []string) error {
+	if err := createDir(dataDir); err != nil {
+		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+	}
+
+	for _, path := range paths {
+		path := filepath.Join(dataDir, path)
+		if err := createDir(path); err != nil {
+			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
+	srv := &http.Server{
+		Addr: listenAddr.String(),
+		Handler: promhttp.InstrumentMetricHandler(
+			prometheus.DefaultRegisterer, promhttp.HandlerFor(
+				prometheus.DefaultGatherer,
+				promhttp.HandlerOpts{},
+			),
+		),
+	}
+
+	go func() {
+		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+		}
+	}()
+
+	return srv
+}
+
+// createDir creates a file system directory if it doesn't exist
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

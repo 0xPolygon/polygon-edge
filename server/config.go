@@ -14,17 +14,15 @@ const DefaultJSONRPCPort int = 8545
 
 // Config is used to parametrize the minimal client
 type Config struct {
-	Chain *chain.Chain
-
-	JSONRPCAddr *net.TCPAddr
-	GRPCAddr    *net.TCPAddr
-	LibP2PAddr  *net.TCPAddr
-
-	Network *network.Config
-	DataDir string
-	Seal    bool
-	TxPool  *txpool.Config
-
+	Chain          *chain.Chain
+	JSONRPCAddr    *net.TCPAddr
+	GRPCAddr       *net.TCPAddr
+	LibP2PAddr     *net.TCPAddr
+	DataDir        string
+	Seal           bool
+	Telemetry      *Telemetry
+	Network        *network.Config
+	TxPool         *txpool.Config
 	SecretsManager *secrets.SecretsManagerConfig
 }
 
@@ -35,6 +33,12 @@ func DefaultConfig() *Config {
 		GRPCAddr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
 		Network:        network.DefaultConfig(),
 		TxPool:         txpool.DefaultConfig(),
+		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
 	}
+}
+
+// Telemetry holds the config details for metric services
+type Telemetry struct {
+	PrometheusAddr *net.TCPAddr
 }
