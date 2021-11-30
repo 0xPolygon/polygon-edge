@@ -694,11 +694,11 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 type PeerEventType uint
 
 const (
-	PeerConnected = iota
-	PeerFailedToConnect
-	PeerDisconnected
-	PeerAlreadyConnected
-	PeerDialCompleted
+	PeerConnected        = iota // Emitted when a peer connected
+	PeerFailedToConnect         // Emitted when a peer failed to connect
+	PeerDisconnected            // Emitted when a peer disconnected from node
+	PeerAlreadyConnected        // Emitted when a peer already connected on dial
+	PeerDialCompleted           // Emitted when a peer completed dial
 )
 
 var peerEventToName = map[PeerEventType]string{
