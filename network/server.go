@@ -545,12 +545,12 @@ func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority uint64) {
 }
 
 func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
-	evnt := &PeerEvent{
+	evnt := PeerEvent{
 		PeerID: peerID,
 		Type:   typ,
 	}
 
-	if err := s.emitterPeerEvent.Emit(*evnt); err != nil {
+	if err := s.emitterPeerEvent.Emit(evnt); err != nil {
 		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
 	}
 }
