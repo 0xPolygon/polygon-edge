@@ -238,20 +238,19 @@ func (s *Server) checkPeerConnections() {
 				//TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.getRandomBootNode()
-				s.dialQueue.add(randomNode, 10)
+				s.addToDialQueue(randomNode, 10)
 			}
-
 		}
 	}
-
 }
 
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
+		// only concerned about PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, and PeerAddedToDialQueue
 		switch evnt.Type {
-		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted:
+		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
 		default:
 			return
 		}
@@ -428,7 +427,7 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 
 func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	s.logger.Info("Join request", "addr", addr.String())
-	s.dialQueue.add(addr, 1)
+	s.addToDialQueue(addr, 1)
 
 	if timeout == 0 {
 		return nil
@@ -461,8 +460,10 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 
 func (s *Server) runJoinWatcher() error {
 	return s.SubscribeFn(func(evnt *PeerEvent) {
-		// only concerned about 'PeerConnected' and 'PeerFailedToConnect'
-		if evnt.Type != PeerConnected && evnt.Type != PeerFailedToConnect && evnt.Type != PeerAlreadyConnected {
+		switch evnt.Type {
+		// only concerned about PeerConnected, PeerFailedToConnect, and PeerAlreadyConnected
+		case PeerConnected, PeerFailedToConnect, PeerAlreadyConnected:
+		default:
 			return
 		}
 
@@ -530,6 +531,11 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 		ID:    s.host.ID(),
 		Addrs: s.addrs,
 	}
+}
+
+func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority uint64) {
+	s.dialQueue.add(addr, priority)
+	s.emitEvent(addr.ID, PeerAddedToDialQueue)
 }
 
 func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
@@ -699,6 +705,7 @@ const (
 	PeerDisconnected                          // Emitted when a peer disconnected from node
 	PeerAlreadyConnected                      // Emitted when a peer already connected on dial
 	PeerDialCompleted                         // Emitted when a peer completed dial
+	PeerAddedToDialQueue                      // Emitted when a peer is added to dial queue
 )
 
 var peerEventToName = map[PeerEventType]string{
@@ -707,6 +714,7 @@ var peerEventToName = map[PeerEventType]string{
 	PeerDisconnected:     "PeerDisconnected",
 	PeerAlreadyConnected: "PeerAlreadyConnected",
 	PeerDialCompleted:    "PeerDialCompleted",
+	PeerAddedToDialQueue: "PeerAddedToDialQueue",
 }
 
 func (s PeerEventType) String() string {
