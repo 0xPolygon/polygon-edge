@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -181,6 +182,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	if !config.NoDiscover {
+
+		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < 2 {
+			return nil, errors.New("Minimum two bootnodes are required")
+		}
+
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
