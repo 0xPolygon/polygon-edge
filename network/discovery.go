@@ -105,7 +105,7 @@ func (d *discovery) setup() error {
 	err = d.srv.SubscribeFn(func(evnt *PeerEvent) {
 		peerID := evnt.PeerID
 		switch evnt.Type {
-		case PeerEventConnected:
+		case PeerConnected:
 			// add peer to the routing table and to our local peer
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
@@ -118,7 +118,7 @@ func (d *discovery) setup() error {
 				stream: nil,
 			})
 			d.peersLock.Unlock()
-		case PeerEventDisconnected:
+		case PeerDisconnected:
 			d.routingTable.RemovePeer(peerID)
 			d.peersLock.Lock()
 			d.peers.delete(peerID)

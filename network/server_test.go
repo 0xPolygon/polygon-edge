@@ -143,13 +143,13 @@ func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent
 
 func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventDisconnected && evnt.PeerID == p
+		return evnt.Type == PeerDisconnected && evnt.PeerID == p
 	}
 }
 
 func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventConnected && evnt.PeerID == p
+		return evnt.Type == PeerConnected && evnt.PeerID == p
 	}
 }
 
@@ -159,18 +159,20 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
+	id := peer.ID("peer")
+
 	count := 10
 
 	t.Run("serial", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
+			srv0.emitEvent(id, PeerConnected)
 			sub.Get()
 		}
 	})
 
 	t.Run("parallel", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
+			srv0.emitEvent(id, PeerDisconnected)
 		}
 		for i := 0; i < count; i++ {
 			sub.Get()

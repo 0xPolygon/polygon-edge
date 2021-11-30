@@ -251,7 +251,7 @@ func (s *Server) runDial() {
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
 		switch evnt.Type {
-		case PeerEventConnected, PeerEventConnectedFailed, PeerEventDisconnected, PeerEventDialCompleted:
+		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted:
 		default:
 			return
 		}
@@ -282,10 +282,7 @@ func (s *Server) runDial() {
 			if s.isConnected(tt.addr.ID) {
 				// the node is already connected, send an event to wake up
 				// any join watchers
-				s.emitEvent(&PeerEvent{
-					PeerID: tt.addr.ID,
-					Type:   PeerEventDialConnectedNode,
-				})
+				s.emitEvent(tt.addr.ID, PeerAlreadyConnected)
 			} else {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
@@ -358,10 +355,7 @@ func (s *Server) addPeer(id peer.ID) {
 	}
 	s.peers[id] = p
 
-	s.emitEvent(&PeerEvent{
-		PeerID: id,
-		Type:   PeerEventConnected,
-	})
+	s.emitEvent(id, PeerConnected)
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -373,10 +367,7 @@ func (s *Server) delPeer(id peer.ID) {
 	delete(s.peers, id)
 	s.host.Network().ClosePeer(id)
 
-	s.emitEvent(&PeerEvent{
-		PeerID: id,
-		Type:   PeerEventDisconnected,
-	})
+	s.emitEvent(id, PeerDisconnected)
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
@@ -470,8 +461,8 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 
 func (s *Server) runJoinWatcher() error {
 	return s.SubscribeFn(func(evnt *PeerEvent) {
-		// only concerned about 'PeerEventConnected' and 'PeerEventConnectedFailed'
-		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDialConnectedNode {
+		// only concerned about 'PeerConnected' and 'PeerFailedToConnect'
+		if evnt.Type != PeerConnected && evnt.Type != PeerFailedToConnect && evnt.Type != PeerAlreadyConnected {
 			return
 		}
 
@@ -541,7 +532,12 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 	}
 }
 
-func (s *Server) emitEvent(evnt *PeerEvent) {
+func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
+	evnt := &PeerEvent{
+		PeerID: peerID,
+		Type:   typ,
+	}
+
 	if err := s.emitterPeerEvent.Emit(*evnt); err != nil {
 		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
 	}
@@ -695,22 +691,31 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 	return dialAddress + "/p2p/" + addr.ID.String()
 }
 
-type PeerConnectedEvent struct {
-	Peer peer.ID
-	Err  error
-}
-
-type PeerDisconnectedEvent struct {
-	Peer peer.ID
-}
+type PeerEventType uint
 
 const (
-	PeerEventConnected         = "PeerConnected"
-	PeerEventConnectedFailed   = "PeerConnectedFailed"
-	PeerEventDisconnected      = "PeerDisconnected"
-	PeerEventDialConnectedNode = "PeerDialConnectedNode"
-	PeerEventDialCompleted     = "PeerDialCompleted"
+	PeerConnected = iota
+	PeerFailedToConnect
+	PeerDisconnected
+	PeerAlreadyConnected
+	PeerDialCompleted
 )
+
+var peerEventToName = map[PeerEventType]string{
+	PeerConnected:        "PeerConnected",
+	PeerFailedToConnect:  "PeerFailedToConnect",
+	PeerDisconnected:     "PeerDisconnected",
+	PeerAlreadyConnected: "PeerAlreadyConnected",
+	PeerDialCompleted:    "PeerDialCompleted",
+}
+
+func (s PeerEventType) String() string {
+	name, ok := peerEventToName[s]
+	if !ok {
+		return "unknown"
+	}
+	return name
+}
 
 type PeerEvent struct {
 	// PeerID is the id of the peer that triggered
@@ -718,9 +723,5 @@ type PeerEvent struct {
 	PeerID peer.ID
 
 	// Type is the type of the event
-	Type string
-
-	// Desc is used to include more contextual
-	// information for the event
-	Desc string
+	Type PeerEventType
 }
