@@ -29,6 +29,12 @@ const DefaultLibp2pPort int = 1478
 
 const MinimumPeerConnections int64 = 1
 
+// Priority for dial queue
+const (
+	PriorityRequestedDial uint64 = 1
+	PriorityRandomDial    uint64 = 10
+)
+
 type Config struct {
 	NoDiscover     bool
 	Addr           *net.TCPAddr
@@ -238,7 +244,7 @@ func (s *Server) checkPeerConnections() {
 				//TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.getRandomBootNode()
-				s.addToDialQueue(randomNode, 10)
+				s.addToDialQueue(randomNode, PriorityRandomDial)
 			}
 		}
 	}
@@ -427,7 +433,7 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 
 func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	s.logger.Info("Join request", "addr", addr.String())
-	s.addToDialQueue(addr, 1)
+	s.addToDialQueue(addr, PriorityRequestedDial)
 
 	if timeout == 0 {
 		return nil
