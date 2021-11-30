@@ -346,12 +346,14 @@ func TestNat(t *testing.T) {
 	})
 }
 
-func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
+func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		if _, ok := srv.peers[id]; !ok {
-			return nil, true
+		for _, v := range ids {
+			if _, ok := srv.peers[v]; ok {
+				return true, false
+			}
 		}
-		return true, false
+		return nil, true
 
 	})
 	if err != nil {
@@ -363,40 +365,51 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
 	conf := func(c *Config) {
-		c.MaxPeers = 2
+		c.MaxPeers = 3
 		c.NoDiscover = false
 	}
 	//Create bootnode
 	bootNode := CreateServer(t, conf)
-
+	bootNode2 := CreateServer(t, conf)
 	conf1 := func(c *Config) {
-		c.MaxPeers = 2
+		c.MaxPeers = 3
 		c.NoDiscover = false
-		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo())}
+		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo()), AddrInfoToString(bootNode2.AddrInfo())}
 	}
 
 	srv1 := CreateServer(t, conf1)
 	srv2 := CreateServer(t, conf1)
 
-	//connect with the boot node
-	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
-	assert.True(t, <-connectedCh)
+	//connect with the first boot node
+	connectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
+	assert.True(t, <-connectedCh1)
+
+	//connect with the second boot node
+	connectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode2.AddrInfo().ID))
+	assert.True(t, <-connectedCh2)
 
 	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
-	//disconnect from the boot node
-	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
-	srv1.Disconnect(bootNode.AddrInfo().ID, "bye")
 
-	assert.True(t, <-disconnectedCh1, "Failed to recieved peer disconnected event")
+	//disconnect from the first boot node
+	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
+	srv1.Disconnect(bootNode.AddrInfo().ID, "Bye")
 
-	//disconnect from the second node
-	disconnectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
+	assert.True(t, <-disconnectedCh1, "Failed to recieve peer disconnected event")
+
+	//disconnect from the second boot node
+	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode2.AddrInfo().ID))
+	srv1.Disconnect(bootNode2.AddrInfo().ID, "Bye")
+
+	assert.True(t, <-disconnectedCh2, "Failed to recieve peer disconnected event")
+
+	//disconnect from the third second node
+	disconnectedCh3 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
 	assert.NoError(t, srv2.Close())
-	assert.True(t, <-disconnectedCh2)
+	assert.True(t, <-disconnectedCh3)
 
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID(), bootNode2.host.ID())
 	assert.NoError(t, err)
 	assert.True(t, reconnected)
 
@@ -465,11 +478,6 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		bootNodes    []string
 		expectedList []*peer.AddrInfo
 	}{
-		{
-			name:         "Should return an empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()},
-			expectedList: []*peer.AddrInfo{},
-		},
 
 		{
 			name:         "Should return an non empty bootnodes list",
@@ -489,5 +497,45 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
 		})
+	}
+}
+
+func TestMinimumBootNodeCount(t *testing.T) {
+	tests := []struct {
+		name      string
+		bootNodes []string
+		isError   bool
+	}{
+		{
+			name:      "Server config with empty bootnodes",
+			bootNodes: []string{},
+			isError:   true,
+		},
+		{
+			name:      "Server config with less than two bootnodes",
+			bootNodes: []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			isError:   true,
+		},
+		{
+			name:      "Server config with more than two bootnodes",
+			bootNodes: []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW", "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmKGVgzogc2dWU1tpzNnYyJPLN81nzkpAsMCvh3hpt3sC2"},
+			isError:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			cfg := getTestConfig(func(c *Config) {
+				c.Chain.Bootnodes = tt.bootNodes
+			})
+
+			_, err := NewServer(hclog.NewNullLogger(), cfg)
+			if tt.isError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+
 	}
 }

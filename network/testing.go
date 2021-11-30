@@ -79,3 +79,33 @@ func MultiJoin(t *testing.T, srvs ...*Server) {
 		}
 	}
 }
+
+func getTestConfig(callback func(c *Config)) *Config {
+	cfg := DefaultConfig()
+	cfg.Addr.Port = int(atomic.AddUint64(&initialPort, 1))
+	cfg.Chain = &chain.Chain{
+		Params: &chain.Params{
+			ChainID: 1,
+		},
+	}
+
+	logger := hclog.NewNullLogger()
+
+	if callback != nil {
+		callback(cfg)
+	}
+
+	secretsManager, _ := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: logger,
+			Extra: map[string]interface{}{
+				secrets.Path: cfg.DataDir,
+			},
+		},
+	)
+
+	cfg.SecretsManager = secretsManager
+
+	return cfg
+}
