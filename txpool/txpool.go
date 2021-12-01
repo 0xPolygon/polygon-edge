@@ -211,6 +211,7 @@ func NewTxPool(
 		accountQueues:       make(map[types.Address]*accountQueueWrapper),
 		pendingQueue:        newMaxTxPriceHeap(),
 		remoteTxns:          newMinTxPriceHeap(),
+		gauge:               slotGauge{height: 0, limit: config.MaxSlots},
 		accountGauges:       &accountGauges{},
 		slots:               0,
 		maxSlots:            config.MaxSlots,
@@ -402,6 +403,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
+	fmt.Printf("addImpl %+v\n", tx)
 
 	// should treat as local in the following cases
 	// (1) noLocals is false and Tx is local transaction
@@ -424,7 +426,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
-
 	if !isLocal {
 		t.remoteTxns.Push(tx)
 	}
@@ -433,6 +434,8 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
 	}
+	t.promoteAccountTransactions(tx.From)
+
 	return nil
 }
 
