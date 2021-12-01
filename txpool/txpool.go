@@ -265,7 +265,7 @@ func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 	return highestNonce + 1, true
 }
 
-// GetCapacity returns the current state of the gauge
+// GetCapacity returns the current number of slots occupied and the max slot limit
 func (t *TxPool) GetCapacity() (uint64, uint64) {
 	return t.gauge.getHeight(), t.gauge.limit
 }

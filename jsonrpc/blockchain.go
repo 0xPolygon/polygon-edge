@@ -58,7 +58,7 @@ type blockchainInterface interface {
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) (uint64, bool)
 
-	// GetCapacity returs the current and max capacity of the pool
+	// GetCapacity returns the current and max capacity of the pool
 	GetCapacity() (uint64, uint64)
 
 	stateHelperInterface
