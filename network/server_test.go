@@ -369,36 +369,36 @@ func TestPeerReconnection(t *testing.T) {
 		c.NoDiscover = false
 	}
 	//Create bootnode
-	bootNode := CreateServer(t, conf)
-	bootNode2 := CreateServer(t, conf)
+	firstBootNode := CreateServer(t, conf)
+	secondBootNode := CreateServer(t, conf)
 	conf1 := func(c *Config) {
 		c.MaxPeers = 3
 		c.NoDiscover = false
-		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo()), AddrInfoToString(bootNode2.AddrInfo())}
+		c.Chain.Bootnodes = []string{AddrInfoToString(firstBootNode.AddrInfo()), AddrInfoToString(secondBootNode.AddrInfo())}
 	}
 
 	srv1 := CreateServer(t, conf1)
 	srv2 := CreateServer(t, conf1)
 
 	//connect with the first boot node
-	connectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
+	connectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(firstBootNode.AddrInfo().ID))
 	assert.True(t, <-connectedCh1)
 
 	//connect with the second boot node
-	connectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode2.AddrInfo().ID))
+	connectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(secondBootNode.AddrInfo().ID))
 	assert.True(t, <-connectedCh2)
 
 	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
 
 	//disconnect from the first boot node
-	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
-	srv1.Disconnect(bootNode.AddrInfo().ID, "Bye")
+	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(firstBootNode.AddrInfo().ID))
+	srv1.Disconnect(firstBootNode.AddrInfo().ID, "Bye")
 
 	assert.True(t, <-disconnectedCh1, "Failed to receive peer disconnected event")
 
 	//disconnect from the second boot node
-	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode2.AddrInfo().ID))
-	srv1.Disconnect(bootNode2.AddrInfo().ID, "Bye")
+	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(secondBootNode.AddrInfo().ID))
+	srv1.Disconnect(secondBootNode.AddrInfo().ID, "Bye")
 
 	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
 
@@ -409,7 +409,7 @@ func TestPeerReconnection(t *testing.T) {
 
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID(), bootNode2.host.ID())
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, firstBootNode.host.ID(), secondBootNode.host.ID())
 	assert.NoError(t, err)
 	assert.True(t, reconnected)
 
