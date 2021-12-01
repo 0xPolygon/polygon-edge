@@ -33,12 +33,12 @@ func init() {
 }
 
 // getPeer returns a peer with given ID in syncer's map
-func getPeer(syncer *Syncer, id peer.ID) *syncPeer {
+func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
 	rawPeer, ok := syncer.peers.Load(id)
 	if !ok {
 		return nil
 	}
-	return rawPeer.(*syncPeer)
+	return rawPeer.(*SyncPeer)
 }
 
 // CreateSyncer initialize syncer with server

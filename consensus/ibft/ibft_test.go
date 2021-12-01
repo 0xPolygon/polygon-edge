@@ -1,8 +1,10 @@
 package ibft
 
 import (
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
@@ -359,7 +361,6 @@ func TestTransition_RoundChangeState_Timeout(t *testing.T) {
 
 func TestTransition_RoundChangeState_WeakCertificate(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C", "D", "E", "F", "G"}, "A")
-
 	m.setState(RoundChangeState)
 
 	// send three roundChange messages which are enough to force a
@@ -567,12 +568,66 @@ func TestWriteTransactions(t *testing.T) {
 	}
 }
 
+func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *testing.T) {
+	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
+	m.setState(SyncState)
+	expectedNewBlockToSync := &types.Block{Header: &types.Header{Number: 1}}
+	mockSyncer := &mockSyncer{}
+	mockSyncer.receivedNewHeadFromPeer = expectedNewBlockToSync
+	m.syncer = mockSyncer
+	mockTxPool := &mockTxPool{}
+	m.txpool = mockTxPool
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	assert.True(t, mockTxPool.resetWithHeaderCalled)
+	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeaderParam)
+	assert.True(t, mockSyncer.broadcastCalled)
+	assert.Equal(t, expectedNewBlockToSync, mockSyncer.broadcastedBlock)
+}
+
+type mockSyncer struct {
+	receivedNewHeadFromPeer *types.Block
+	broadcastedBlock        *types.Block
+	broadcastCalled         bool
+}
+
+func (s *mockSyncer) Start() {}
+
+func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
+	return &protocol.SyncPeer{}
+}
+
+func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer) error {
+	return nil
+}
+
+func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool) {
+	handler(s.receivedNewHeadFromPeer)
+}
+
+func (s *mockSyncer) Broadcast(b *types.Block) {
+	s.broadcastCalled = true
+	s.broadcastedBlock = b
+}
+
 type mockTxPool struct {
-	transactions   []*types.Transaction
-	nonceDecreased map[*types.Transaction]bool
+	transactions          []*types.Transaction
+	nonceDecreased        map[*types.Transaction]bool
+	resetWithHeaderCalled bool
+	resetWithHeaderParam  *types.Header
 }
 
 func (p *mockTxPool) ResetWithHeader(h *types.Header) {
+	p.resetWithHeaderCalled = true
+	p.resetWithHeaderParam = h
 }
 
 func (p *mockTxPool) Pop() (*types.Transaction, func()) {
