@@ -18,8 +18,10 @@ type ContentResponse struct {
 }
 
 type InspectResponse struct {
-	Pending map[string]map[string]string `json:"pending"`
-	Queued  map[string]map[string]string `json:"queued"`
+	Pending         map[string]map[string]string `json:"pending"`
+	Queued          map[string]map[string]string `json:"queued"`
+	CurrentCapacity uint64                       `json:"currentCapacity"`
+	MaxCapacity     uint64                       `json:"maxCapacity"`
 }
 
 type StatusResponse struct {
@@ -107,9 +109,14 @@ func (t *Txpool) Inspect() (interface{}, error) {
 		}
 	}
 
+	// get capacity of the TxPool
+	current, max := t.d.store.GetCapacity()
+
 	resp := InspectResponse{
-		Pending: pendingRpcTxns,
-		Queued:  queuedRpcTxns,
+		Pending:         pendingRpcTxns,
+		Queued:          queuedRpcTxns,
+		CurrentCapacity: current,
+		MaxCapacity:     max,
 	}
 
 	return resp, nil

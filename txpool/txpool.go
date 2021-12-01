@@ -265,6 +265,11 @@ func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
 	return highestNonce + 1, true
 }
 
+// GetCapacity returns the current state of the gauge
+func (t *TxPool) GetCapacity() (uint64, uint64) {
+	return t.gauge.getHeight(), t.gauge.limit
+}
+
 // NumAccountTxs Returns the number of transactions in the account specific queue
 func (t *TxPool) NumAccountTxs(address types.Address) int {
 	mux := t.lockAccountQueue(address, false)

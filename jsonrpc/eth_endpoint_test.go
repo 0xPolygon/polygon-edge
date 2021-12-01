@@ -52,6 +52,10 @@ func (m *mockAccountStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 	panic("implement me")
 }
 
+func (m *mockAccountStore) GetCapacity() (uint64, uint64) {
+	panic("implement me")
+}
+
 func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount2{}
@@ -106,6 +110,10 @@ type mockBlockStore2 struct {
 }
 
 func (m *mockBlockStore2) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
+}
+
+func (m *mockBlockStore2) GetCapacity() (uint64, uint64) {
 	panic("implement me")
 }
 
