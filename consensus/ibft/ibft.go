@@ -1034,7 +1034,7 @@ func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
 		// someone closes the stopCh (i.e. timeout for round change)
 		select {
 		case <-timeoutCh:
-			i.logger.Info("unable to read new message form the message queue", "timeout expired", timeout)
+			i.logger.Info("unable to read new message from the message queue", "timeout expired", timeout)
 			return nil, true
 		case <-i.closeCh:
 			return nil, false
