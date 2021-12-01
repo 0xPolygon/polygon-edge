@@ -349,7 +349,8 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 			NoDiscover: true,
 			MaxPeers:   0,
 		},
-		TxPool: &TxPool{},
+		TxPool:    &TxPool{},
+		Telemetry: &Telemetry{},
 	}
 	cliConfig.Seal = true
 	cliConfig.Dev = true
