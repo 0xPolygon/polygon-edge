@@ -347,7 +347,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	if nextNonce, ok := t.GetNonce(tx.From); ok && tx.Nonce < nextNonce {
 		t.logger.Debug(
 			fmt.Sprintf(
-				"Dropping txn [%s] from account heap due to low nonce",
+				"Rejecting tx [%s] from account heap due to low nonce",
 				tx.Hash.String()),
 		)
 
