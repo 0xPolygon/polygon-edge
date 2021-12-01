@@ -721,6 +721,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 		config.SetNoLocals(true)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
+		config.SetAccountPendingLimit(100)
 	})
 
 	server := servers[0]
