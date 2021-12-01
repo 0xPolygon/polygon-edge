@@ -38,6 +38,14 @@ type transactionPoolInterface interface {
 	Length() uint64
 }
 
+type syncerInterface interface {
+	Start()
+	BestPeer() *protocol.SyncPeer
+	BulkSyncWithPeer(p *protocol.SyncPeer) error
+	WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool)
+	Broadcast(b *types.Block)
+}
+
 // Ibft represents the IBFT consensus mechanism object
 type Ibft struct {
 	sealing bool // Flag indicating if the node is a sealer
@@ -61,8 +69,8 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer       *protocol.Syncer // Reference to the sync protocol
-	syncNotifyCh chan bool        // Sync protocol notification channel
+	syncer       syncerInterface // Reference to the sync protocol
+	syncNotifyCh chan bool       // Sync protocol notification channel
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -71,9 +79,9 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
-  
+
 	metrics *consensus.Metrics
-  
+
 	secretsManager secrets.SecretsManager
 }
 
@@ -93,7 +101,7 @@ func Factory(
 		epochSize:      DefaultEpochSize,
 		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
-    metrics:        params.Metrics,
+		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 	}
 
@@ -351,6 +359,7 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			i.syncer.Broadcast(b)
+			i.txpool.ResetWithHeader(b.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
