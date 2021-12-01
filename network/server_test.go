@@ -570,16 +570,15 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
-		maxPeers := []uint64{1, 1, 1}
+		// peer1 can't connect to any peer
+		maxPeers := []uint64{1, 0, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
-		// close peer 1 so that the server fails to connect to peer 1
-		peers[0].Close()
 		connected := connectToPeer(srv, peers[0].AddrInfo(), 15*time.Second)
 		assert.False(t, connected)
 
-		connected = connectToPeer(srv, peers[1].AddrInfo(), 5*time.Second)
+		connected = connectToPeer(srv, peers[1].AddrInfo(), 15*time.Second)
 		assert.True(t, connected)
 
 		closeServers(srv, peers[1])
