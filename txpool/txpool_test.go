@@ -1226,7 +1226,15 @@ func TestGaugeCheck(t *testing.T) {
 }
 
 func TestRejectLowNonceTx(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(hclog.NewNullLogger(), forks.At(0), &mockStore{}, nil, nil, nilMetrics, &Config{
+		Sealing:             false,
+		Locals:              nil,
+		NoLocals:            false,
+		PriceLimit:          defaultPriceLimit,
+		MaxSlots:            defaultMaxSlots,
+		AccountPendingLimit: DefaultAccountPendingLimit,
+		Lifetime:            DefaultLifetime,
+	})
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
