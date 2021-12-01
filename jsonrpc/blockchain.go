@@ -56,7 +56,7 @@ type blockchainInterface interface {
 	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
 
 	// GetNonce returns the next nonce for this address
-	GetNonce(addr types.Address) (uint64, bool)
+	GetNonce(addr types.Address) uint64
 
 	stateHelperInterface
 }
@@ -64,8 +64,8 @@ type blockchainInterface interface {
 type nullBlockchainInterface struct {
 }
 
-func (b *nullBlockchainInterface) GetNonce(addr types.Address) (uint64, bool) {
-	return 0, false
+func (b *nullBlockchainInterface) GetNonce(addr types.Address) uint64 {
+	return 0
 }
 
 func (b *nullBlockchainInterface) Header() *types.Header {

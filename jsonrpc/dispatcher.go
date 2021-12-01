@@ -436,14 +436,18 @@ func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, erro
 	}
 }
 
+// getNextNonce returns the next nonce for the account for the specified block
 func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
 	if number == PendingBlockNumber {
-		res, ok := d.store.GetNonce(address)
-		if ok {
-			return res, nil
-		}
-		number = LatestBlockNumber
+		// Grab the latest pending nonce from the TxPool
+		//
+		// If the account is not initialized in the local TxPool,
+		// return the latest nonce from the world state
+		res := d.store.GetNonce(address)
+
+		return res, nil
 	}
+
 	header, err := d.getBlockHeaderImpl(number)
 	if err != nil {
 		return 0, err

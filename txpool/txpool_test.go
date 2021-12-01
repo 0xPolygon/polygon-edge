@@ -266,7 +266,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Value:    big.NewInt(0),
 	})
 
-	nonce, _ := pool.GetNonce(addr1)
+	nonce := pool.GetNonce(addr1)
 	assert.Equal(t, nonce, uint64(1))
 
 	// though txn0 is not being processed yet and the current nonce is 0
@@ -279,7 +279,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Value:    big.NewInt(0),
 	})
 
-	nonce, _ = pool.GetNonce(addr1)
+	nonce = pool.GetNonce(addr1)
 	assert.Equal(t, nonce, uint64(2))
 	assert.Equal(t, pool.Length(), uint64(2))
 }

@@ -648,8 +648,8 @@ func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (m *mockStoreTxn) GetNonce(addr types.Address) (uint64, bool) {
-	return 1, false
+func (m *mockStoreTxn) GetNonce(addr types.Address) uint64 {
+	return 1
 }
 func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
