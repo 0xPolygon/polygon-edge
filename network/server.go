@@ -30,6 +30,9 @@ const DefaultLibp2pPort int = 1478
 
 const MinimumPeerConnections int64 = 1
 
+// MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+const MinimumBootNodes int = 2
+
 type Config struct {
 	NoDiscover     bool
 	Addr           *net.TCPAddr
@@ -183,7 +186,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	if !config.NoDiscover {
 
-		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < 2 {
+		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < MinimumBootNodes {
 			return nil, errors.New("Minimum two bootnodes are required")
 		}
 
