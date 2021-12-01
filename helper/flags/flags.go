@@ -25,8 +25,8 @@ func (i *ArrayFlags) Set(value string) error {
 }
 
 type BootnodeFlags struct {
-	IsSet bool
-	Addrs []string
+	AreSet bool
+	Addrs  []string
 }
 
 func (i *BootnodeFlags) String() string {
@@ -34,7 +34,7 @@ func (i *BootnodeFlags) String() string {
 }
 
 func (i *BootnodeFlags) Set(value string) error {
-	i.IsSet = true
+	i.AreSet = true
 	if _, err := multiaddr.NewMultiaddr(value); err != nil {
 		return err
 	}

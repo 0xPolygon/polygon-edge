@@ -394,13 +394,13 @@ func TestPeerReconnection(t *testing.T) {
 	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
 	srv1.Disconnect(bootNode.AddrInfo().ID, "Bye")
 
-	assert.True(t, <-disconnectedCh1, "Failed to recieve peer disconnected event")
+	assert.True(t, <-disconnectedCh1, "Failed to receive peer disconnected event")
 
 	//disconnect from the second boot node
 	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(bootNode2.AddrInfo().ID))
 	srv1.Disconnect(bootNode2.AddrInfo().ID, "Bye")
 
-	assert.True(t, <-disconnectedCh2, "Failed to recieve peer disconnected event")
+	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
 
 	//disconnect from the third second node
 	disconnectedCh3 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
@@ -502,24 +502,24 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 func TestMinimumBootNodeCount(t *testing.T) {
 	tests := []struct {
-		name      string
-		bootNodes []string
-		isError   bool
+		name       string
+		bootNodes  []string
+		shouldFail bool
 	}{
 		{
-			name:      "Server config with empty bootnodes",
-			bootNodes: []string{},
-			isError:   true,
+			name:       "Server config with empty bootnodes",
+			bootNodes:  []string{},
+			shouldFail: true,
 		},
 		{
-			name:      "Server config with less than two bootnodes",
-			bootNodes: []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
-			isError:   true,
+			name:       "Server config with less than two bootnodes",
+			bootNodes:  []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			shouldFail: true,
 		},
 		{
-			name:      "Server config with more than two bootnodes",
-			bootNodes: []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW", "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmKGVgzogc2dWU1tpzNnYyJPLN81nzkpAsMCvh3hpt3sC2"},
-			isError:   false,
+			name:       "Server config with more than two bootnodes",
+			bootNodes:  []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW", "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmKGVgzogc2dWU1tpzNnYyJPLN81nzkpAsMCvh3hpt3sC2"},
+			shouldFail: false,
 		},
 	}
 	for _, tt := range tests {
@@ -530,7 +530,7 @@ func TestMinimumBootNodeCount(t *testing.T) {
 			})
 
 			_, err := NewServer(hclog.NewNullLogger(), cfg)
-			if tt.isError {
+			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
