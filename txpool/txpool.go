@@ -512,9 +512,10 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.gauge.decrease(slotsRequired(txn))
-		t.pendingQueue.Delete(txn)
-		t.remoteTxns.Delete(txn)
+		if ok := t.pendingQueue.Delete(txn); ok {
+			t.gauge.decrease(slotsRequired(txn))
+			t.remoteTxns.Delete(txn)
+		}
 	}
 	//update the metric
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
@@ -856,14 +857,19 @@ func (t *txPriceHeap) Length() uint64 {
 	return uint64(len(t.index))
 }
 
-func (t *txPriceHeap) Delete(tx *types.Transaction) {
+func (t *txPriceHeap) Delete(tx *types.Transaction) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if item, ok := t.index[tx.Hash]; ok {
-		heap.Remove(t.heap, item.index)
-		delete(t.index, tx.Hash)
+	item, ok := t.index[tx.Hash]
+	if !ok {
+		return false
 	}
+
+	delete(t.index, tx.Hash)
+	heap.Remove(t.heap, item.index)
+
+	return true
 }
 
 func (t *txPriceHeap) Push(tx *types.Transaction) error {
