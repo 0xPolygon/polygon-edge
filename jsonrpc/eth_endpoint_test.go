@@ -332,7 +332,6 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	}
 }
 
-
 func TestEth_Block_GetLogs(t *testing.T) {
 
 	// Topics we're searching for
@@ -461,16 +460,6 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 			blockNumber:   "latest",
 			succeeded:     true,
 			expectedNonce: argUintPtr(0),
-		},
-		{
-			name: "should return error for non-existing header",
-			initialNonces: map[types.Address]uint64{
-				addr0: 100,
-			},
-			target:        addr0,
-			blockNumber:   "100",
-			succeeded:     false,
-			expectedNonce: nil,
 		},
 		{
 			name: "should not return error for empty block parameter",

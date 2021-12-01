@@ -44,7 +44,7 @@ type blockchainInterface interface {
 	AddTx(tx *types.Transaction) error
 
 	// Gets tx pool transactions currently pending for inclusion and currently queued for validation
-	GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction)
+	GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
@@ -96,7 +96,7 @@ func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *nullBlockchainInterface) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
 	return nil, nil
 }
 
