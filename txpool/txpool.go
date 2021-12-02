@@ -217,7 +217,9 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 		txnsQueue := newTxHeapWrapper(t.logger.Named("account"))
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
 
-		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
+		accountQueue = &accountQueueWrapper{
+			accountQueue: txnsQueue,
+		}
 		t.accountQueues[address] = accountQueue
 	}
 	// Unlock the global map, since work is finished
@@ -247,22 +249,45 @@ func (a *accountQueueWrapper) unlock() {
 	}
 }
 
-// GetNonce returns the next nonce for the account, based on the txpool
-func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	pendingTxs, _ := t.GetTxs(false)
-	accountTxs := pendingTxs[addr]
-	if len(accountTxs) == 0 {
-		return 0, false
-	}
+// pruneAccountTx is a helper method for making sure the account specific queue
+// doesn't have any stale transactions with an invalid nonce [NOT Thread-safe]
+func (a *accountQueueWrapper) pruneAccountTx(
+	pruneCallback func(txn *types.Transaction), // Callback for additional prune logic
+) {
+	for {
+		// Check if the nonce is lower than what the TxPool is expecting
+		lowestNonceTx := a.accountQueue.txs.Peek()
 
-	highestNonce := uint64(0)
-	for k := range accountTxs {
-		if k > highestNonce {
-			highestNonce = k
+		if lowestNonceTx == nil || // There is nothing in the account specific queue
+			lowestNonceTx.Nonce >= a.accountQueue.nextNonce { // The lowest nonce tx is valid
+			// All good
+			break
 		}
-	}
 
-	return highestNonce + 1, true
+		// Remove the transaction
+		a.accountQueue.logger.Debug(
+			fmt.Sprintf(
+				"Dropping txn [%s] due to a low nonce [%d < %d]",
+				lowestNonceTx.Hash.String(),
+				lowestNonceTx.Nonce,
+				a.accountQueue.nextNonce,
+			),
+		)
+		a.accountQueue.txs.Pop()
+
+		pruneCallback(lowestNonceTx)
+	}
+}
+
+// GetNonce returns the next nonce for the account
+// -> Returns the value from the TxPool if the account is initialized in-memory
+// -> Returns the value from the world state otherwise
+func (t *TxPool) GetNonce(addr types.Address) uint64 {
+	// Grab the account queue lock
+	wrapper := t.lockAccountQueue(addr, true)
+	defer wrapper.unlock()
+
+	return wrapper.accountQueue.nextNonce
 }
 
 // GetCapacity returns the current number of slots occupied and the max slot limit
@@ -272,10 +297,10 @@ func (t *TxPool) GetCapacity() (uint64, uint64) {
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
 func (t *TxPool) NumAccountTxs(address types.Address) int {
-	mux := t.lockAccountQueue(address, false)
-	defer mux.unlock()
+	wrapper := t.lockAccountQueue(address, false)
+	defer wrapper.unlock()
 
-	return len(t.accountQueues[address].accountQueue.txs)
+	return len(wrapper.accountQueue.txs)
 }
 
 func (t *TxPool) AddSigner(s signer) {
@@ -349,7 +374,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	}
 
 	// Reject transactions with lower nonce than expected by the account queue
-	if nextNonce, ok := t.GetNonce(tx.From); ok && tx.Nonce < nextNonce {
+	if nextNonce := t.GetNonce(tx.From); tx.Nonce < nextNonce {
 		t.logger.Debug(
 			fmt.Sprintf(
 				"Rejecting tx [%s] from account heap due to low nonce",
@@ -366,14 +391,20 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	t.logger.Debug("add txn", "ctx", origin, "hash", tx.Hash, "from", tx.From)
 
-	mux := t.lockAccountQueue(tx.From, true)
-	defer mux.unlock()
+	wrapper := t.lockAccountQueue(tx.From, true)
+	defer wrapper.unlock()
 
-	wrapper := t.accountQueues[tx.From]
 	wrapper.accountQueue.Add(tx)
 
 	if !isLocal {
-		t.remoteTxns.Push(tx)
+		if pushErr := t.remoteTxns.Push(tx); pushErr != nil {
+			t.logger.Error(
+				fmt.Sprintf(
+					"Unable to push txn [%s] to the remote txns queue",
+					tx.Hash.String(),
+				),
+			)
+		}
 	}
 
 	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
@@ -399,12 +430,11 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 // Since any discarded transaction should not affect the world state, the nextNonce should be reset to the value
 // it was set to before the transaction appeared.
 func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
-	mux := t.lockAccountQueue(tx.From, true)
-	defer mux.unlock()
+	wrapper := t.lockAccountQueue(tx.From, true)
+	defer wrapper.unlock()
 
-	wrapper, ok := t.accountQueues[tx.From]
-	if ok {
-		wrapper.accountQueue.nextNonce -= 1
+	if wrapper.accountQueue.nextNonce > 0 {
+		wrapper.accountQueue.nextNonce--
 	}
 }
 
@@ -427,14 +457,14 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
-		mux := t.lockAccountQueue(addr, false)
+		wrapper := t.lockAccountQueue(addr, false)
 		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
 			queuedTxs[addr][tx.Nonce] = tx
 		}
-		mux.unlock()
+		wrapper.unlock()
 	}
 
 	return pendingTxs, queuedTxs
@@ -476,38 +506,128 @@ func (t *TxPool) ResetWithHeader(h *types.Header) {
 	evnt := &blockchain.Event{
 		NewChain: []*types.Header{h},
 	}
+
+	// Process the txns in the event to make sure the TxPool is up-to-date
 	t.ProcessEvent(evnt)
 }
 
-// ProcessEvent processes the blockchain event and resets the txpool accordingly
-func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
+// processEventWrapper holds metadata information related
+// to a new block insertion event that relate to a specific account
+type processEventWrapper struct {
+	stateNonce   uint64
+	transactions []*types.Transaction
+}
+
+// addTxn adds a transaction to the account's process event wrapper
+func (p *processEventWrapper) addTxn(txn *types.Transaction) {
+	p.transactions = append(p.transactions, txn)
+}
+
+// promotedTxnCleanup looks through the promoted queue for any invalid transactions
+// made by a specific account, and removes them
+func (t *TxPool) promotedTxnCleanup(
+	address types.Address, // The address to filter by
+	nextNonce uint64, // The valid nonce (reference for pruning)
+	cleanupCallback func(txn *types.Transaction), // Additional cleanup logic
+) {
+	// Prune out all the now possibly low-nonce transactions in the promoted queue
+	t.pendingQueue.lock.Lock()
+
+	// Find the txns that correspond to this account
+	droppedPendingTxs := 0
+	for _, pendingQueueTxn := range t.pendingQueue.index {
+		// Check if the txn in the promoted queue matches the search criteria
+		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
+			pendingQueueTxn.tx.Nonce < nextNonce { // The nonce on this promoted txn is invalid
+			// Transaction found, drop it from the pending queue
+			if dropped := t.pendingQueue.dropTx(pendingQueueTxn.tx); dropped {
+				// Update the log data
+				droppedPendingTxs++
+				t.logger.Debug(
+					fmt.Sprintf(
+						"Dropping promoted txn [%s]",
+						pendingQueueTxn.tx.Hash.String(),
+					),
+				)
+
+				cleanupCallback(pendingQueueTxn.tx)
+			}
+		}
+	}
+
+	t.pendingQueue.lock.Unlock()
+
+	// Print out the number of dropped pending txns
+	t.logger.Debug(
+		fmt.Sprintf(
+			"Dropped %d promoted txns for account [%s]",
+			droppedPendingTxs,
+			address.String(),
+		),
+	)
+}
+
+// extractTransactions Groups the transactions by account and queries the state
+// for the latest nonce data
+func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*processEventWrapper {
+	// Instantiate the account process event wrapper map.
+	// It is used for grouping transactions on an account basis
+	// and for storing next state nonce information for easy lookup
+	// Account address -> processEventWrapper
+	eventWrapperMap := make(map[types.Address]*processEventWrapper)
+
+	// Grab the latest state root now that the block has been inserted
+	stateRoot := t.store.Header().StateRoot
+
+	// Legacy reorg logic //
 	addTxns := map[types.Hash]*types.Transaction{}
 	for _, evnt := range evnt.OldChain {
 		// reinject these transactions on the pool
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn add", "hash", block.Hash())
-		} else {
-			for _, txn := range block.Transactions {
-				addTxns[txn.Hash] = txn
-			}
+			continue
+		}
+
+		for _, txn := range block.Transactions {
+			addTxns[txn.Hash] = txn
 		}
 	}
 
-	delTxns := map[types.Hash]*types.Transaction{}
+	// Keep track of all the transactions
 	for _, evnt := range evnt.NewChain {
-		// remove these transactions from the pool
+		// Grab the block that has just been written to state
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn del", "hash", block.Hash())
-		} else {
-			for _, txn := range block.Transactions {
-				delete(addTxns, txn.Hash)
-				delTxns[txn.Hash] = txn
+			continue
+		}
+		// Compile transactions that should be accounted for in the TxPool
+		for _, txn := range block.Transactions {
+			// Save the transaction
+			eventWrapper, wrapperFound := eventWrapperMap[txn.From]
+			if !wrapperFound {
+				// Initialize the wrapper
+				eventWrapper = &processEventWrapper{
+					// Grab the latest nonce from state
+					stateNonce: t.store.GetNonce(stateRoot, txn.From),
+					// Set up the transaction array
+					transactions: make([]*types.Transaction, 0),
+				}
+
+				eventWrapperMap[txn.From] = eventWrapper
 			}
+
+			// Add the transaction to the wrapper
+			eventWrapper.addTxn(txn)
+
+			// Legacy reorg logic //
+			// Update the addTxns in case of reorgs
+			delete(addTxns, txn.Hash)
 		}
 	}
 
+	// Legacy reorg logic //
 	// try to include again the transactions in the pendingQueue list
 	for _, txn := range addTxns {
 		if err := t.addImpl(OriginReorg, txn); err != nil {
@@ -515,21 +635,93 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		}
 	}
 
-	// remove the mined transactions from the pendingQueue list
-	for _, txn := range delTxns {
+	return eventWrapperMap
+}
+
+// ProcessEvent processes the blockchain event and updates the txpool accordingly
+func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
+	// Extract and group the transactions from the new block event
+	eventWrapperMap := t.extractTransactions(evnt)
+
+	// txDropCleanup is a helper method for updating the gauge size,
+	// as well as removing leftover remote txns
+	txnDropCleanup := func(txn *types.Transaction) {
+		t.gauge.decrease(slotsRequired(txn))
+		t.remoteTxns.Delete(txn)
+	}
+
+	// dropTxnCallback is a helper function for
+	// removing a transaction from the pending queue
+	// If the transaction is present in the pending queue,
+	// drop it, drop it from the remoteTxns as well, and decrease the slot
+	// it takes up
+	dropTxnCallback := func(txn *types.Transaction) {
 		if ok := t.pendingQueue.Delete(txn); ok {
-			t.gauge.decrease(slotsRequired(txn))
-			t.remoteTxns.Delete(txn)
+			t.logger.Debug(
+				fmt.Sprintf("Dropping txn [%s] from the promoted queue",
+					txn.Hash.String(),
+				),
+			)
+
+			txnDropCleanup(txn)
 		}
 	}
-	//update the metric
+
+	// Remove the txns from the block that were just committed to state
+	// from any queues in the TxPool
+	for address, accountEventWrapper := range eventWrapperMap {
+		// Grab the lock for the account specific queue
+		wrapper := t.lockAccountQueue(address, true)
+
+		stateNonce := accountEventWrapper.stateNonce
+
+		// Attempt to update the next account nonce in the TxPool
+		// with the one in state if it's greater.
+		// Check if the state nonce is greater than the nonce present in the txpool
+		// If so -> realign it to the state nonce
+		if stateNonce > wrapper.accountQueue.nextNonce {
+			t.logger.Debug(
+				fmt.Sprintf(
+					"World state nonce [%d] for account [%s] is > the TxPool nonce [%d]",
+					stateNonce,
+					address.String(),
+					wrapper.accountQueue.nextNonce,
+				),
+			)
+			wrapper.accountQueue.nextNonce = stateNonce
+		}
+
+		// Reassign for easier handling
+		accountNextNonce := wrapper.accountQueue.nextNonce
+
+		// For each transaction from this account realign the TxPool state
+		for _, txn := range accountEventWrapper.transactions {
+			// Initially drop any txns that are leftover in the TxPool promoted queue,
+			// but are submitted to the chain state
+			dropTxnCallback(txn)
+		}
+
+		// Since there have been state changes, the TxPool can still have hanging txns.
+		// Prune out all the now possibly low-nonce transactions in the account queue
+		wrapper.pruneAccountTx(txnDropCleanup)
+
+		// Release the lock for the specific account queue
+		wrapper.unlock()
+
+		// Make sure the promoted queue doesn't have leftover transactions
+		t.promotedTxnCleanup(address, accountNextNonce, txnDropCleanup)
+	}
+
+	// update the metrics
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 }
 
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
-func (t *TxPool) validateTx(tx *types.Transaction, isLocal bool) error {
-
-	//Check the transaction size to overcome DOS Attacks
+func (t *TxPool) validateTx(
+	tx *types.Transaction, // The transaction that should be validated
+	isLocal bool, // Flag indicating if the transaction is from a local account
+) error {
+	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
 		return ErrOversizedData
 	}
@@ -659,11 +851,9 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 
 	// clear dropped txs and readjust gauge
 	for _, tx := range dropped {
-		mux := t.lockAccountQueue(tx.From, true)
-		if wrapper, ok := t.accountQueues[tx.From]; ok {
-			wrapper.accountQueue.Remove(tx.Hash)
-		}
-		mux.unlock()
+		wrapper := t.lockAccountQueue(tx.From, true)
+		wrapper.accountQueue.Remove(tx.Hash)
+		wrapper.unlock()
 
 		t.pendingQueue.Delete(tx)
 		t.gauge.height -= slotsRequired(tx)
@@ -862,10 +1052,8 @@ func (t *txPriceHeap) Length() uint64 {
 	return uint64(len(t.index))
 }
 
-func (t *txPriceHeap) Delete(tx *types.Transaction) bool {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+// dropTx removes a transaction from the priced heap. [Thread-unsafe]
+func (t *txPriceHeap) dropTx(tx *types.Transaction) bool {
 	item, ok := t.index[tx.Hash]
 	if !ok {
 		return false
@@ -875,6 +1063,14 @@ func (t *txPriceHeap) Delete(tx *types.Transaction) bool {
 	heap.Remove(t.heap, item.index)
 
 	return true
+}
+
+// Delete removes a transaction from the priced heap. [Thread-safe]
+func (t *txPriceHeap) Delete(tx *types.Transaction) bool {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.dropTx(tx)
 }
 
 func (t *txPriceHeap) Push(tx *types.Transaction) error {

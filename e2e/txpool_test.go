@@ -369,7 +369,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 					t.Errorf("Unable to send txn, %v", err)
 				}
 
-				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*5)
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
 				defer waitCancel()
 
 				_, err = srv.WaitForReceipt(waitCtx, txHash)
