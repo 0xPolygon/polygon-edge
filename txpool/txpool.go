@@ -516,8 +516,8 @@ func (t *TxPool) ResetWithHeader(h *types.Header) {
 // processEventWrapper holds metadata information related
 // to a new block insertion event that relate to a specific account
 type processEventWrapper struct {
-	stateNextNonce uint64
-	transactions   []*types.Transaction
+	stateNonce   uint64
+	transactions []*types.Transaction
 }
 
 // addTxn adds a transaction to the account's process event wrapper
@@ -596,7 +596,7 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 					// Initialize the wrapper
 					eventWrapper = &processEventWrapper{
 						// Grab the latest nonce from state
-						stateNextNonce: t.store.GetNonce(stateRoot, txn.From),
+						stateNonce: t.store.GetNonce(stateRoot, txn.From),
 						// Set up the transaction array
 						transactions: make([]*types.Transaction, 0),
 					}
@@ -648,7 +648,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		// Grab the lock for the account specific queue
 		wrapper := t.lockAccountQueue(address, true)
 
-		stateNonce := accountEventWrapper.stateNextNonce
+		stateNonce := accountEventWrapper.stateNonce
 
 		// Attempt to update the next account nonce in the TxPool
 		// with the one in state if it's greater.
