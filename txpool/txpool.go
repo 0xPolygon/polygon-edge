@@ -143,12 +143,6 @@ type TxPool struct {
 	// Min price heap for all remote transactions
 	remoteTxns *txPriceHeap
 
-	// Number of used slots
-	slots uint64
-
-	// Maximum number of transaction slots for all accounts
-	maxSlots uint64
-
 	// Gauge for measuring pool capacity
 	gauge slotGauge
 
@@ -212,8 +206,6 @@ func NewTxPool(
 		remoteTxns:          newMinTxPriceHeap(),
 		gauge:               slotGauge{height: 0, limit: config.MaxSlots},
 		accountGauges:       &accountGauges{},
-		slots:               0,
-		maxSlots:            config.MaxSlots,
 		sealing:             config.Sealing,
 		locals:              newLocalAccounts(config.Locals),
 		noLocals:            config.NoLocals,
@@ -402,7 +394,6 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// Since this is a single point of inclusion for new transactions both
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
-	fmt.Printf("addImpl %+v\n", tx)
 
 	// should treat as local in the following cases
 	// (1) noLocals is false and Tx is local transaction
@@ -612,6 +603,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		t.promoteAccountTransactions(addr)
 		accountLock.unlock()
 	}
+
 	//update the metric
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 }
@@ -765,7 +757,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	return nil
 }
 
-// truncateAccountQueues clean up transactions by inactive account
+// truncateAccountQueues clean up the transactions in the account queue of inactive account
 func (t *TxPool) truncateAccountQueues() {
 	for addr := range t.accountQueues {
 		if !t.noLocals && t.locals.containsAddr(addr) {
@@ -774,12 +766,15 @@ func (t *TxPool) truncateAccountQueues() {
 		accountLock := t.lockAccountQueue(addr, true)
 		gauge := t.accountGauges.get(addr)
 		if time.Since(gauge.lastAdded) > t.lifetime {
+			// counts total slots of transactions in account queue
 			poppedSlots := uint64(0)
 			for _, tx := range accountLock.accountQueue.txs {
 				poppedSlots += slotsRequired(tx)
 			}
+
+			// remove all transactions from account queue
 			accountLock.accountQueue.txs = accountLock.accountQueue.txs[:0]
-			t.gauge.height -= poppedSlots
+			t.gauge.decrease(poppedSlots)
 		}
 		accountLock.unlock()
 	}
@@ -790,6 +785,7 @@ type accountGauges struct {
 }
 
 func (g *accountGauges) get(addr types.Address) *accountGauge {
+	// get value from map or set default value (2nd args) to map
 	v, _ := g.LoadOrStore(addr, &accountGauge{numPending: 0, lastAdded: time.Now()})
 	return v.(*accountGauge)
 }
