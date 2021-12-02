@@ -508,7 +508,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	)
 
 	// Wait for an arbitrary period for these txns to get committed
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*1)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 	defer waitCancel()
 
 	resp, err := tests.WaitUntilTxPoolEmpty(waitCtx, srv.TxnPoolOperator())
