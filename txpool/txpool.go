@@ -200,7 +200,6 @@ type accountQueueWrapper struct {
 	lock         sync.RWMutex // lock for accessing the accountQueue
 	writeLock    int32        // flag indicating whether a write lock is held
 	accountQueue *txHeapWrapper
-	address      types.Address
 }
 
 // lockAccountQueue returns the corresponding account queue wrapper object, or creates it
@@ -220,7 +219,6 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 
 		accountQueue = &accountQueueWrapper{
 			accountQueue: txnsQueue,
-			address:      address,
 		}
 		t.accountQueues[address] = accountQueue
 	}
@@ -262,12 +260,6 @@ func (a *accountQueueWrapper) pruneAccountTx(
 
 		if lowestNonceTx == nil || // There is nothing in the account specific queue
 			lowestNonceTx.Nonce >= a.accountQueue.nextNonce { // The lowest nonce tx is valid
-			a.accountQueue.logger.Debug(
-				fmt.Sprintf(
-					"All account-based txns for address [%s] are valid",
-					a.address.String(),
-				),
-			)
 			// All good
 			break
 		}
