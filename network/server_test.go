@@ -3,61 +3,17 @@ package network
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
-
-func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
-	t.Helper()
-
-	dir, err := ioutil.TempDir(os.TempDir(), "")
-	assert.NoError(t, err)
-
-	// Instantiate the correct folder structure
-	setupErr := common.SetupDataDir(dir, []string{"libp2p"})
-	if setupErr != nil {
-		t.Fatalf("unable to generate libp2p folder structure, %v", setupErr)
-	}
-
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(
-		nil,
-		&secrets.SecretsManagerParams{
-			Logger: hclog.NewNullLogger(),
-			Extra: map[string]interface{}{
-				secrets.Path: dir,
-			},
-		})
-	assert.NoError(t, factoryErr)
-
-	libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
-	if keyErr != nil {
-		t.Fatalf("unable to generate libp2p key, %v", keyErr)
-	}
-
-	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-		t.Fatalf("unable to save libp2p key, %v", setErr)
-	}
-
-	t.Cleanup(func() {
-		// remove directory after test is done
-		assert.NoError(t, os.RemoveAll(dir))
-	})
-
-	return libp2pKey, dir
-}
 
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
@@ -470,7 +426,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
-	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
+	testMultiAddr := GenerateTestMultiAddr(t).String()
+	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -481,7 +438,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 		{
 			name:         "Should return an non empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), testMultiAddr},
 			expectedList: []*peer.AddrInfo{peerAddressInfo},
 		},
 	}
@@ -513,12 +470,12 @@ func TestMinimumBootNodeCount(t *testing.T) {
 		},
 		{
 			name:       "Server config with less than two bootnodes",
-			bootNodes:  []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			bootNodes:  []string{GenerateTestMultiAddr(t).String()},
 			shouldFail: true,
 		},
 		{
 			name:       "Server config with more than two bootnodes",
-			bootNodes:  []string{"/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW", "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmKGVgzogc2dWU1tpzNnYyJPLN81nzkpAsMCvh3hpt3sC2"},
+			bootNodes:  []string{GenerateTestMultiAddr(t).String(), GenerateTestMultiAddr(t).String()},
 			shouldFail: false,
 		},
 	}
