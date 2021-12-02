@@ -437,7 +437,9 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 	wrapper := t.lockAccountQueue(tx.From, true)
 	defer wrapper.unlock()
 
-	wrapper.accountQueue.nextNonce -= 1
+	if wrapper.accountQueue.nextNonce > 0 {
+		wrapper.accountQueue.nextNonce--
+	}
 }
 
 // GetTxs gets pending and queued transactions
