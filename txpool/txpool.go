@@ -582,6 +582,21 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := t.store.Header().StateRoot
 
+	// Legacy reorg logic //
+	addTxns := map[types.Hash]*types.Transaction{}
+	for _, evnt := range evnt.OldChain {
+		// reinject these transactions on the pool
+		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
+		if !ok {
+			t.logger.Error("block not found on txn add", "hash", block.Hash())
+			continue
+		}
+
+		for _, txn := range block.Transactions {
+			addTxns[txn.Hash] = txn
+		}
+	}
+
 	// Keep track of all the transactions
 	for _, evnt := range evnt.NewChain {
 		// Grab the block that has just been written to state
@@ -608,6 +623,18 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 
 			// Add the transaction to the wrapper
 			eventWrapper.addTxn(txn)
+
+			// Legacy reorg logic //
+			// Update the addTxns in case of reorgs
+			delete(addTxns, txn.Hash)
+		}
+	}
+
+	// Legacy reorg logic //
+	// try to include again the transactions in the pendingQueue list
+	for _, txn := range addTxns {
+		if err := t.addImpl(OriginReorg, txn); err != nil {
+			t.logger.Error("failed to add txn", "err", err)
 		}
 	}
 
