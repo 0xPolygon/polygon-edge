@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"testing"
 	"time"
@@ -65,7 +64,6 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 		if res != nil && res.Length == 0 {
 			return res, false
 		}
-		fmt.Printf("TxPool not empty, %d transactions remaining..\n", res.Length)
 		return nil, true
 	})
 
