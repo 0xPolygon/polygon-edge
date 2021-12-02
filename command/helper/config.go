@@ -157,11 +157,18 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.TxPool.NoLocals = c.TxPool.NoLocals
 		conf.TxPool.PriceLimit = c.TxPool.PriceLimit
 		conf.TxPool.MaxSlots = c.TxPool.MaxSlots
+
+		if c.TxPool.AccountPendingLimit == 0 {
+			return nil, fmt.Errorf("can't set 0 to account pending limit")
+		}
 		conf.TxPool.AccountPendingLimit = c.TxPool.AccountPendingLimit
 
 		lifetime, err := time.ParseDuration(c.TxPool.Lifetime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse lifetime %s, %v", c.TxPool.Lifetime, err)
+		}
+		if lifetime <= 0 {
+			return nil, fmt.Errorf("can't set 0 or negative value to lifetime")
 		}
 		conf.TxPool.Lifetime = lifetime
 	}
