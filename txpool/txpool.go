@@ -400,8 +400,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	wrapper.accountQueue.Add(tx)
 
 	if !isLocal {
-		pushErr := t.remoteTxns.Push(tx)
-		if pushErr != nil {
+		if pushErr := t.remoteTxns.Push(tx); pushErr != nil {
 			t.logger.Error(
 				fmt.Sprintf(
 					"Unable to push txn [%s] to the remote txns queue",
@@ -589,26 +588,26 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn del", "hash", block.Hash())
-		} else {
-			// Compile transactions that should be accounted for in the TxPool
-			for _, txn := range block.Transactions {
-				// Save the transaction
-				eventWrapper, wrapperFound := eventWrapperMap[txn.From]
-				if !wrapperFound {
-					// Initialize the wrapper
-					eventWrapper = &processEventWrapper{
-						// Grab the latest nonce from state
-						stateNonce: t.store.GetNonce(stateRoot, txn.From),
-						// Set up the transaction array
-						transactions: make([]*types.Transaction, 0),
-					}
-
-					eventWrapperMap[txn.From] = eventWrapper
+			continue
+		}
+		// Compile transactions that should be accounted for in the TxPool
+		for _, txn := range block.Transactions {
+			// Save the transaction
+			eventWrapper, wrapperFound := eventWrapperMap[txn.From]
+			if !wrapperFound {
+				// Initialize the wrapper
+				eventWrapper = &processEventWrapper{
+					// Grab the latest nonce from state
+					stateNonce: t.store.GetNonce(stateRoot, txn.From),
+					// Set up the transaction array
+					transactions: make([]*types.Transaction, 0),
 				}
 
-				// Add the transaction to the wrapper
-				eventWrapper.addTxn(txn)
+				eventWrapperMap[txn.From] = eventWrapper
 			}
+
+			// Add the transaction to the wrapper
+			eventWrapper.addTxn(txn)
 		}
 	}
 
