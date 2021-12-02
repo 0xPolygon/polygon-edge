@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -448,9 +449,14 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 		return 0, err
 	}
 	acc, err := d.store.GetAccount(header.StateRoot, address)
-	if err != nil {
+	if errors.As(err, &ErrStateNotFound) {
+		// If the account doesn't exist / isn't initialized,
+		// return a nonce value of 0
+		return 0, nil
+	} else if err != nil {
 		return 0, err
 	}
+
 	return acc.Nonce, nil
 }
 

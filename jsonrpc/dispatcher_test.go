@@ -440,3 +440,65 @@ func TestDecodeTxn(t *testing.T) {
 		})
 	}
 }
+
+func TestDispatcher_GetNextNonce(t *testing.T) {
+	// Set up the mock accounts
+	accounts := []struct {
+		address types.Address
+		account *state.Account
+	}{
+		{
+			types.StringToAddress("123"),
+			&state.Account{
+				Nonce: 5,
+			},
+		},
+	}
+
+	// Set up the mock store
+	store := newMockStore()
+	for _, acc := range accounts {
+		store.SetAccount(acc.address, acc.account)
+	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+
+	testTable := []struct {
+		name          string
+		account       types.Address
+		number        BlockNumber
+		expectedNonce uint64
+	}{
+		{
+			"Valid latest nonce for touched account",
+			accounts[0].address,
+			LatestBlockNumber,
+			accounts[0].account.Nonce,
+		},
+		{
+			"Valid latest nonce for untouched account",
+			types.StringToAddress("456"),
+			LatestBlockNumber,
+			0,
+		},
+		{
+			"Valid pending nonce for untouched account",
+			types.StringToAddress("789"),
+			LatestBlockNumber,
+			0,
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Grab the nonce
+			nonce, err := dispatcher.getNextNonce(testCase.account, testCase.number)
+
+			// Assert errors
+			assert.NoError(t, err)
+
+			// Assert equality
+			assert.Equal(t, testCase.expectedNonce, nonce)
+		})
+	}
+}

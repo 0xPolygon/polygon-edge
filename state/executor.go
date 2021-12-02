@@ -403,12 +403,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	gasLeft := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
-		return nil, NewTransitionApplicationError(err, false)
+		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewTransitionApplicationError(ErrNotEnoughFunds, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)

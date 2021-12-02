@@ -214,7 +214,7 @@ func (t *TxPool) lockAccountQueue(address types.Address, writer bool) *accountQu
 		stateRoot := t.store.Header().StateRoot
 
 		// Initialize the account based transaction heap
-		txnsQueue := newTxHeapWrapper()
+		txnsQueue := newTxHeapWrapper(t.logger.Named("account"))
 		txnsQueue.nextNonce = t.store.GetNonce(stateRoot, address)
 
 		accountQueue = &accountQueueWrapper{accountQueue: txnsQueue}
@@ -249,14 +249,20 @@ func (a *accountQueueWrapper) unlock() {
 
 // GetNonce returns the next nonce for the account, based on the txpool
 func (t *TxPool) GetNonce(addr types.Address) (uint64, bool) {
-	mux := t.lockAccountQueue(addr, false)
-	defer mux.unlock()
-
-	wrapper, ok := t.accountQueues[addr]
-	if !ok {
+	pendingTxs, _ := t.GetTxs(false)
+	accountTxs := pendingTxs[addr]
+	if len(accountTxs) == 0 {
 		return 0, false
 	}
-	return wrapper.accountQueue.nextNonce, true
+
+	highestNonce := uint64(0)
+	for k := range accountTxs {
+		if k > highestNonce {
+			highestNonce = k
+		}
+	}
+
+	return highestNonce + 1, true
 }
 
 // NumAccountTxs Returns the number of transactions in the account specific queue
@@ -337,6 +343,17 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		return err
 	}
 
+	// Reject transactions with lower nonce than expected by the account queue
+	if nextNonce, ok := t.GetNonce(tx.From); ok && tx.Nonce < nextNonce {
+		t.logger.Debug(
+			fmt.Sprintf(
+				"Rejecting tx [%s] from account heap due to low nonce",
+				tx.Hash.String()),
+		)
+
+		return ErrNonceTooLow
+	}
+
 	// check for slot overflow and handle accordingly
 	if err := t.processSlots(tx, isLocal); err != nil {
 		return err
@@ -386,9 +403,9 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 	}
 }
 
-// GetTxs gets both pending and queued transactions
-func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
-
+// GetTxs gets pending and queued transactions
+func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+	t.pendingQueue.lock.Lock()
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
@@ -396,6 +413,10 @@ func (t *TxPool) GetTxs() (map[types.Address]map[uint64]*types.Transaction, map[
 			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
 		}
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
+	}
+	t.pendingQueue.lock.Unlock()
+	if !inclQueued {
+		return pendingTxs, nil
 	}
 
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
@@ -491,9 +512,10 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
-		t.gauge.decrease(slotsRequired(txn))
-		t.pendingQueue.Delete(txn)
-		t.remoteTxns.Delete(txn)
+		if ok := t.pendingQueue.Delete(txn); ok {
+			t.gauge.decrease(slotsRequired(txn))
+			t.remoteTxns.Delete(txn)
+		}
 	}
 	//update the metric
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
@@ -655,12 +677,16 @@ type txHeapWrapper struct {
 	// nextNonce is a field indicating what should be the next
 	// valid nonce for the account transaction
 	nextNonce uint64
+
+	// Logger used for account-specific tx activity
+	logger hclog.Logger
 }
 
 // newTxHeapWrapper creates a new account based tx heap
-func newTxHeapWrapper() *txHeapWrapper {
+func newTxHeapWrapper(logger hclog.Logger) *txHeapWrapper {
 	return &txHeapWrapper{
-		txs: txHeap{},
+		logger: logger,
+		txs:    txHeap{},
 	}
 }
 
@@ -669,30 +695,13 @@ func (t *txHeapWrapper) Add(tx *types.Transaction) {
 	t.Push(tx)
 }
 
-// pruneLowNonceTx removes any transactions from the account tx queue
-// that have a lower nonce than the current account nonce in state
-func (t *txHeapWrapper) pruneLowNonceTx() {
-	for {
-		// Grab the min-nonce transaction from the heap
-		tx := t.Peek()
-		if tx == nil || tx.Nonce >= t.nextNonce {
-			break
-		}
-
-		// Drop it from the heap
-		t.Pop()
-	}
-}
-
 // Promote promotes all the new valid transactions
 func (t *txHeapWrapper) Promote() []*types.Transaction {
-	// Remove elements lower than nonce
-	t.pruneLowNonceTx()
-
 	// Promote elements
 	tx := t.Peek()
 	if tx == nil || tx.Nonce != t.nextNonce {
 		// Nothing to promote
+		t.logger.Debug("No txs to promote")
 		return nil
 	}
 
@@ -718,6 +727,13 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 		if tx.Nonce+1 != nextTx.Nonce {
 			// Tx that have a higher nonce are shelved for later
 			// when they can actually be parsed
+			t.logger.Debug(
+				fmt.Sprintf(
+					"Shelving tx [%s] with higher nonce [%d] for later",
+					tx.Hash.String(),
+					tx.Nonce,
+				),
+			)
 			higherNonceTxs = append(higherNonceTxs, nextTx)
 			break
 		}
@@ -841,14 +857,19 @@ func (t *txPriceHeap) Length() uint64 {
 	return uint64(len(t.index))
 }
 
-func (t *txPriceHeap) Delete(tx *types.Transaction) {
+func (t *txPriceHeap) Delete(tx *types.Transaction) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if item, ok := t.index[tx.Hash]; ok {
-		heap.Remove(t.heap, item.index)
-		delete(t.index, tx.Hash)
+	item, ok := t.index[tx.Hash]
+	if !ok {
+		return false
 	}
+
+	delete(t.index, tx.Hash)
+	heap.Remove(t.heap, item.index)
+
+	return true
 }
 
 func (t *txPriceHeap) Push(tx *types.Transaction) error {
