@@ -37,6 +37,8 @@ func TestInspectEndpoint(t *testing.T) {
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Len(t, res.Pending, 0)
 	assert.Len(t, res.Queued, 0)
+	assert.Equal(t, res.CurrentCapacity, uint64(0))
+	assert.Equal(t, res.MaxCapacity, uint64(0))
 }
 
 func TestStatusEndpoint(t *testing.T) {
