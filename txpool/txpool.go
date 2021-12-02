@@ -475,6 +475,13 @@ func (t *TxPool) ResetWithHeader(h *types.Header) {
 
 // ProcessEvent processes the blockchain event and updates the txpool accordingly
 func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
+	// Create a nonce map for easy lookups after the state change
+	stateNonceMap := make(map[types.Address]uint64)
+
+	// Grab the latest state root now that the block has been inserted
+	stateRoot := t.store.Header().StateRoot
+
+	// Keep track of all the transactions
 	txnsInBlocks := map[types.Hash]*types.Transaction{}
 	for _, evnt := range evnt.NewChain {
 		// Grab the block that has just been written to state
@@ -484,7 +491,11 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		} else {
 			// Compile transactions that should be accounted for in the TxPool
 			for _, txn := range block.Transactions {
+				// Save the transaction
 				txnsInBlocks[txn.Hash] = txn
+
+				// Grab the latest nonce for this account
+				stateNonceMap[txn.From] = t.store.GetNonce(stateRoot, txn.From)
 			}
 		}
 	}
@@ -524,9 +535,8 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		// with the one in state if it's greater
 		wrapper := t.lockAccountQueue(txn.From, true)
 
-		// Grab the latest nonce from state
-		stateRoot := t.store.Header().StateRoot
-		stateNonce := t.store.GetNonce(stateRoot, txn.From)
+		// Grab the latest state nonce for the account
+		stateNonce := stateNonceMap[txn.From]
 
 		// Check if the state nonce is greater than the nonce present in the txpool
 		// If so -> realign it to the state nonce
