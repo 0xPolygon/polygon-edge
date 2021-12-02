@@ -495,7 +495,9 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 				txnsInBlocks[txn.Hash] = txn
 
 				// Grab the latest nonce for this account
-				stateNonceMap[txn.From] = t.store.GetNonce(stateRoot, txn.From)
+				if _, nonceFound := stateNonceMap[txn.From]; !nonceFound {
+					stateNonceMap[txn.From] = t.store.GetNonce(stateRoot, txn.From)
+				}
 			}
 		}
 	}
