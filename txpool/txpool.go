@@ -530,13 +530,13 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
 			return
-		} else {
-			t.metrics.PendingTxs.Add(1)
 		}
 
 		accountGauge.increaseNumPending(1)
 		t.gauge.increase(slots)
+		t.metrics.PendingTxs.Add(1)
 	}
+
 	return txn.tx, ret
 }
 
@@ -590,8 +590,8 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	// remove the mined transactions from the pendingQueue list
 	for _, txn := range delTxns {
 		if ok := t.pendingQueue.Delete(txn); ok {
-			t.gauge.decrease(slotsRequired(txn))
 			t.remoteTxns.Delete(txn)
+			t.gauge.decrease(slotsRequired(txn))
 			t.accountGauges.get(txn.From).decreaseNumPending(1)
 			nominees[txn.From] = true
 		}
@@ -747,13 +747,14 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		}
 		mux.unlock()
 
-		t.accountGauges.get(tx.From).decreaseNumPending(1)
 		t.pendingQueue.Delete(tx)
-		t.gauge.height -= slotsRequired(tx)
+		t.accountGauges.get(tx.From).decreaseNumPending(1)
+		t.gauge.decrease(slotsRequired(tx))
 	}
-	t.gauge.height += txSlots
 
+	t.gauge.increase(txSlots)
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+
 	return nil
 }
 
