@@ -22,13 +22,12 @@ import (
 )
 
 const (
-	defaultIdlePeriod = 1 * time.Minute
-	cleanUpPeriod     = 1 * time.Minute
-	txSlotSize        = 32 * 1024      // 32kB
-	txMaxSize         = 4 * txSlotSize // 128Kb
-
-	DefaultAccountPendingLimit = 16
-	DefaultLifetime            = 3 * time.Hour
+	defaultIdlePeriod          = 1 * time.Minute
+	cleanUpPeriod              = 1 * time.Minute
+	txSlotSize                 = 32 * 1024      // 32kB
+	txMaxSize                  = 4 * txSlotSize // 128Kb
+	defaultAccountPendingLimit = 16
+	defaultLifetime            = 3 * time.Hour
 )
 
 type Config struct {
@@ -48,8 +47,8 @@ func DefaultConfig() *Config {
 		NoLocals:            false,
 		PriceLimit:          1,
 		MaxSlots:            4096,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	}
 }
 

@@ -102,8 +102,8 @@ func TestAddingTransaction(t *testing.T) {
 				NoLocals:            false,
 				PriceLimit:          defaultPriceLimit,
 				MaxSlots:            defaultMaxSlots,
-				AccountPendingLimit: DefaultAccountPendingLimit,
-				Lifetime:            DefaultLifetime,
+				AccountPendingLimit: defaultAccountPendingLimit,
+				Lifetime:            defaultLifetime,
 			})
 
 			if err != nil {
@@ -145,8 +145,8 @@ func TestMultipleTransactions(t *testing.T) {
 		NoLocals:            true,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -189,8 +189,8 @@ func TestGetPendingAndQueuedTransactions(t *testing.T) {
 		NoLocals:            false,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -262,8 +262,8 @@ func TestBroadcast(t *testing.T) {
 			NoLocals:            true,
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            defaultMaxSlots,
-			AccountPendingLimit: DefaultAccountPendingLimit,
-			Lifetime:            DefaultLifetime,
+			AccountPendingLimit: defaultAccountPendingLimit,
+			Lifetime:            defaultLifetime,
 		})
 
 		assert.NoError(t, err)
@@ -297,8 +297,8 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		NoLocals:            true,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -347,8 +347,8 @@ func TestTxnQueue_Heap(t *testing.T) {
 			NoLocals:            false,
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            defaultMaxSlots,
-			AccountPendingLimit: DefaultAccountPendingLimit,
-			Lifetime:            DefaultLifetime,
+			AccountPendingLimit: defaultAccountPendingLimit,
+			Lifetime:            defaultLifetime,
 		})
 
 		assert.NoError(t, err)
@@ -430,8 +430,8 @@ func TestTxnQueue_Heap(t *testing.T) {
 			NoLocals:            true,
 			PriceLimit:          defaultPriceLimit,
 			MaxSlots:            defaultMaxSlots,
-			AccountPendingLimit: DefaultAccountPendingLimit,
-			Lifetime:            DefaultLifetime,
+			AccountPendingLimit: defaultAccountPendingLimit,
+			Lifetime:            defaultLifetime,
 		})
 
 		assert.NoError(t, err)
@@ -560,8 +560,8 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				NoLocals:            false,
 				PriceLimit:          defaultPriceLimit,
 				MaxSlots:            defaultMaxSlots,
-				AccountPendingLimit: DefaultAccountPendingLimit,
-				Lifetime:            DefaultLifetime,
+				AccountPendingLimit: defaultAccountPendingLimit,
+				Lifetime:            defaultLifetime,
 			})
 
 			assert.NoError(t, err)
@@ -589,8 +589,8 @@ func TestTx_MaxSize(t *testing.T) {
 		NoLocals:            false,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 
 	pool.EnableDev()
@@ -670,7 +670,7 @@ func TestAccountPendingLimit(t *testing.T) {
 		PriceLimit:          0,
 		MaxSlots:            defaultMaxSlots,
 		AccountPendingLimit: accountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -734,7 +734,7 @@ func Test_truncateAccountQueues(t *testing.T) {
 		PriceLimit:          0,
 		MaxSlots:            defaultMaxSlots,
 		AccountPendingLimit: accountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -770,8 +770,8 @@ func TestTxnOperatorAddNilRaw(t *testing.T) {
 		NoLocals:            true,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 
 	assert.NoError(t, err)
@@ -882,8 +882,8 @@ func TestPriceLimit(t *testing.T) {
 				NoLocals:            tt.noLocals,
 				PriceLimit:          tt.priceLimit,
 				MaxSlots:            defaultMaxSlots,
-				AccountPendingLimit: DefaultAccountPendingLimit,
-				Lifetime:            DefaultLifetime,
+				AccountPendingLimit: defaultAccountPendingLimit,
+				Lifetime:            defaultLifetime,
 			})
 
 			assert.NoError(t, err)
@@ -1089,8 +1089,8 @@ func TestSizeLimit(t *testing.T) {
 				NoLocals:            false,
 				PriceLimit:          defaultPriceLimit,
 				MaxSlots:            tt.maxSlot,
-				AccountPendingLimit: DefaultAccountPendingLimit,
-				Lifetime:            DefaultLifetime,
+				AccountPendingLimit: defaultAccountPendingLimit,
+				Lifetime:            defaultLifetime,
 			})
 
 			assert.NoError(t, err)
@@ -1184,8 +1184,8 @@ func TestGaugeCheck(t *testing.T) {
 				NoLocals:            false,
 				PriceLimit:          defaultPriceLimit,
 				MaxSlots:            tt.maxSlots,
-				AccountPendingLimit: DefaultAccountPendingLimit,
-				Lifetime:            DefaultLifetime,
+				AccountPendingLimit: defaultAccountPendingLimit,
+				Lifetime:            defaultLifetime,
 			})
 
 			assert.NoError(t, err)
@@ -1232,8 +1232,8 @@ func TestRejectLowNonceTx(t *testing.T) {
 		NoLocals:            false,
 		PriceLimit:          defaultPriceLimit,
 		MaxSlots:            defaultMaxSlots,
-		AccountPendingLimit: DefaultAccountPendingLimit,
-		Lifetime:            DefaultLifetime,
+		AccountPendingLimit: defaultAccountPendingLimit,
+		Lifetime:            defaultLifetime,
 	})
 	assert.NoError(t, err)
 	pool.EnableDev()
