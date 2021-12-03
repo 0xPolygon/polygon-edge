@@ -527,7 +527,7 @@ func (p *processEventWrapper) addTxn(txn *types.Transaction) {
 // made by a specific account, and removes them
 func (t *TxPool) promotedTxnCleanup(
 	address types.Address, // The address to filter by
-	nextNonce uint64, // The valid nonce (reference for pruning)
+	stateNonce uint64, // The valid nonce (reference for pruning)
 	cleanupCallback func(txn *types.Transaction), // Additional cleanup logic
 ) {
 	// Prune out all the now possibly low-nonce transactions in the promoted queue
@@ -538,7 +538,7 @@ func (t *TxPool) promotedTxnCleanup(
 	for _, pendingQueueTxn := range t.pendingQueue.index {
 		// Check if the txn in the promoted queue matches the search criteria
 		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
-			pendingQueueTxn.tx.Nonce < nextNonce { // The nonce on this promoted txn is invalid
+			pendingQueueTxn.tx.Nonce < stateNonce { // The nonce on this promoted txn is invalid
 			// Transaction found, drop it from the pending queue
 			if dropped := t.pendingQueue.dropTx(pendingQueueTxn.tx); dropped {
 				// Update the log data
@@ -650,23 +650,6 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		t.remoteTxns.Delete(txn)
 	}
 
-	// dropTxnCallback is a helper function for
-	// removing a transaction from the pending queue
-	// If the transaction is present in the pending queue,
-	// drop it, drop it from the remoteTxns as well, and decrease the slot
-	// it takes up
-	dropTxnCallback := func(txn *types.Transaction) {
-		if ok := t.pendingQueue.Delete(txn); ok {
-			t.logger.Debug(
-				fmt.Sprintf("Dropping txn [%s] from the promoted queue",
-					txn.Hash.String(),
-				),
-			)
-
-			txnDropCleanup(txn)
-		}
-	}
-
 	// Remove the txns from the block that were just committed to state
 	// from any queues in the TxPool
 	for address, accountEventWrapper := range eventWrapperMap {
@@ -691,16 +674,6 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 			wrapper.accountQueue.nextNonce = stateNonce
 		}
 
-		// Reassign for easier handling
-		accountNextNonce := wrapper.accountQueue.nextNonce
-
-		// For each transaction from this account realign the TxPool state
-		for _, txn := range accountEventWrapper.transactions {
-			// Initially drop any txns that are leftover in the TxPool promoted queue,
-			// but are submitted to the chain state
-			dropTxnCallback(txn)
-		}
-
 		// Since there have been state changes, the TxPool can still have hanging txns.
 		// Prune out all the now possibly low-nonce transactions in the account queue
 		wrapper.pruneAccountTx(txnDropCleanup)
@@ -709,7 +682,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 		wrapper.unlock()
 
 		// Make sure the promoted queue doesn't have leftover transactions
-		t.promotedTxnCleanup(address, accountNextNonce, txnDropCleanup)
+		t.promotedTxnCleanup(address, stateNonce, txnDropCleanup)
 	}
 
 	// update the metrics
