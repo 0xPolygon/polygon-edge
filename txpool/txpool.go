@@ -979,6 +979,7 @@ func (t *TxPool) truncateAccountQueues() {
 			poppedSlots := uint64(0)
 			for _, tx := range accountLock.accountQueue.txs {
 				poppedSlots += slotsRequired(tx)
+				t.remoteTxns.Delete(tx)
 			}
 
 			// remove all transactions from account queue
