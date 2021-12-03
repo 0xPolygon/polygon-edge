@@ -98,6 +98,50 @@ func (d *Dev) run() {
 	}
 }
 
+type transitionInterface interface {
+	Write(txn *types.Transaction) error
+}
+
+func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := d.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			d.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				d.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
+	return txns
+}
+
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
@@ -127,33 +171,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	txns := []*types.Transaction{}
-	for {
-		// Add transactions to the list until there are none left
-		txn, retFn := d.txpool.Pop()
-
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.DecreaseAccountNonce(txn)
-		} else {
-			// Execute the state transition
-			if err := transition.Write(txn); err != nil {
-				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-					retFn()
-				} else {
-					d.txpool.DecreaseAccountNonce(txn)
-				}
-
-				break
-			}
-
-			txns = append(txns, txn)
-		}
-	}
+	txns := d.writeTransactions(gasLimit, transition)
 
 	// Commit the changes
 	_, root := transition.Commit()
