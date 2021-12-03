@@ -312,7 +312,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Value:    big.NewInt(0),
 	})
 
-	nonce, _ := pool.GetNonce(addr1)
+	nonce := pool.GetNonce(addr1)
 	assert.Equal(t, nonce, uint64(1))
 
 	// though txn0 is not being processed yet and the current nonce is 0
@@ -325,7 +325,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 		Value:    big.NewInt(0),
 	})
 
-	nonce, _ = pool.GetNonce(addr1)
+	nonce = pool.GetNonce(addr1)
 	assert.Equal(t, nonce, uint64(2))
 	assert.Equal(t, pool.Length(), uint64(2))
 }
@@ -691,7 +691,7 @@ func TestAccountPendingLimit(t *testing.T) {
 
 	assert.Equal(t, uint64(len(accounts)*accountPendingLimit), pool.pendingQueue.Length())
 	for _, acc := range accounts {
-		nonce, _ := pool.GetNonce(acc.address)
+		nonce := pool.GetNonce(acc.address)
 		assert.Equal(t, acc.expectedNonce, nonce)
 
 		accountQueue := pool.accountQueues[acc.address]
