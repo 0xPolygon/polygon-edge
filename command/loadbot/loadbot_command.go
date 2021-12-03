@@ -4,11 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
-	"os"
 )
 
 type LoadbotCommand struct {
@@ -29,10 +26,18 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: true,
 	}
 
-	l.FlagMap["accountsCount"] = helper.FlagDescriptor{
-		Description: "How many accounts must be used by the loadbot to send transactions. Default: 10",
+	l.FlagMap["sender"] = helper.FlagDescriptor{
+		Description: "The account used to send the transactions.",
 		Arguments: []string{
-			"ACCOUNTS_COUNT",
+			"SENDER",
+		},
+		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["receiver"] = helper.FlagDescriptor{
+		Description: "The account used to receive the transactions.",
+		Arguments: []string{
+			"RECEIVER",
 		},
 		ArgumentsOptional: true,
 	}
@@ -55,7 +60,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: "The JSON-RPC endpoint used to send transactions. You can provide multiple endpoints.",
+		Description: "The JSON-RPC endpoint used to send transactions.",
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -64,19 +69,9 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["grpc"] = helper.FlagDescriptor{
-		Description: "The gRPC endpoint used to verify TxPool. " +
-			"You must provide a gRPC endpoint for each one of the JSON-RPC you provided.",
+		Description: "The gRPC endpoint used to verify TxPool.",
 		Arguments: []string{
 			"GRPC_ADDRESS",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
-	}
-
-	l.FlagMap["sponsor"] = helper.FlagDescriptor{
-		Description: "The account used to prefund accounts",
-		Arguments: []string{
-			"SPONSOR_ADDRESS",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
@@ -106,21 +101,21 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Placeholders for flags
 	var tps uint64
-	var accountsCount uint64
+	var senderRaw string
+	var receiverRaw string
 	var valueRaw string
 	var count uint64
-	var jsonrpcs helperFlags.ArrayFlags
-	var grpcs helperFlags.ArrayFlags
-	var sponsorRaw string
+	var jsonrpc string
+	var grpc string
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
-	flags.Uint64Var(&accountsCount, "accountsCount", 10, "")
-	flags.StringVar(&valueRaw, "value", "-1", "")
+	flags.StringVar(&senderRaw, "sender", "", "")
+	flags.StringVar(&receiverRaw, "receiver", "", "")
+	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
-	flags.Var(&jsonrpcs, "jsonrpc", "")
-	flags.Var(&grpcs, "grpc", "")
-	flags.StringVar(&sponsorRaw, "sponsor", "", "")
+	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
+	flags.StringVar(&grpc, "grpc", "", "")
 
 	var err error
 	// Parse cli arguments
@@ -129,62 +124,32 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	// Trying to parse value is a custom one is provided
-	var value int64 = -1
-	if valueRaw != "-1" {
-		value, err = types.ParseInt64orHex(&valueRaw)
-		if err != nil {
-			l.UI.Error(fmt.Sprintf("failed to parse value: %v", err))
-			return 1
-		}
-	}
-
-	// There must be at least one JSON-RPC endpoint
-	if len(jsonrpcs) == 0 {
-		l.UI.Error("No JSON-RPC endpoint provided")
+	sender := types.Address{}
+	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to decode sender address: %v", err))
 		return 1
 	}
 
-	// There must be at least one gRPC endpoint
-	if len(grpcs) == 0 {
-		l.UI.Error("No gRPC endpoint provided")
+	receiver := types.Address{}
+	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
+		l.UI.Error(fmt.Sprintf("Failed to decode receiver address: %v", err))
 		return 1
 	}
 
-	// Convert the sponsor address in the correct data type
-	var sponsorAddress types.Address
-	if err = sponsorAddress.UnmarshalText([]byte(sponsorRaw)); err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode sponsorAddress address: %v", err))
-		return 1
-	}
-
-	// Get the sponsor's private key
-	sponsorPrivateKeyRaw := os.Getenv("PSDK_" + sponsorAddress.String())
-	if sponsorPrivateKeyRaw == "" {
-		l.UI.Error("The sponsor's private key is not in the environment variables, " +
-			"please set it before running the loadbot.")
-		return 1
-	}
-	sponsorPrivateKey, err := crypto.BytesToPrivateKey([]byte(sponsorPrivateKeyRaw))
+	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to get sponsor's private key from bytes: %v", err))
+		l.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
 		return 1
-	}
-
-	// Create the sponsor account
-	sponsor := Account{
-		Address:    sponsorAddress,
-		PrivateKey: *sponsorPrivateKey,
 	}
 
 	configuration := Configuration{
-		TPS:           tps,
-		AccountsCount: accountsCount,
-		Value:         value,
-		Count:         count,
-		JSONRPCs:      jsonrpcs,
-		GRPCs:         grpcs,
-		Sponsor:       sponsor,
+		TPS:      tps,
+		Sender:   sender,
+		Receiver: receiver,
+		Count:    count,
+		Value:    value,
+		JSONRPC:  jsonrpc,
+		GRPC:     grpc,
 	}
 
 	// Create the metrics placeholder
