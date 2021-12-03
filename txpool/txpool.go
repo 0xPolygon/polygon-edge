@@ -100,7 +100,11 @@ type slotGauge struct {
 func (g *slotGauge) increase(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
+	g.unsafeIncrease(slots)
+}
 
+// Increases the height of the gauge, unsafe against concurrent access
+func (g *slotGauge) unsafeIncrease(slots uint64) {
 	g.height += slots
 }
 
@@ -108,8 +112,16 @@ func (g *slotGauge) increase(slots uint64) {
 func (g *slotGauge) decrease(slots uint64) {
 	g.Lock()
 	defer g.Unlock()
+	g.unsafeDecrease(slots)
+}
 
-	g.height -= slots
+// Decreases the height of the gauge, unsafe against concurrent access
+func (g *slotGauge) unsafeDecrease(slots uint64) {
+	if g.height >= slots {
+		g.height -= slots
+	} else {
+		g.height = 0
+	}
 }
 
 // Returns the current height of the gauge measured in slots
@@ -715,6 +727,7 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 
 // Checks if the incoming tx would cause an overflow
 // and attempts to allocate space for it
+// Note: Blocks access of gauge to all other processes
 func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	t.gauge.Lock()
 	defer t.gauge.Unlock()
@@ -747,12 +760,13 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		}
 		mux.unlock()
 
-		t.pendingQueue.Delete(tx)
-		t.accountGauges.get(tx.From).decreaseNumPending(1)
-		t.gauge.decrease(slotsRequired(tx))
+		if ok := t.pendingQueue.Delete(tx); ok {
+			t.accountGauges.get(tx.From).decreaseNumPending(1)
+			t.gauge.unsafeDecrease(slotsRequired(tx))
+		}
 	}
 
-	t.gauge.increase(txSlots)
+	t.gauge.unsafeIncrease(txSlots)
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
 
 	return nil
