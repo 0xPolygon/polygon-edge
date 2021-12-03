@@ -560,12 +560,14 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	}
 
 	// For each transaction hash, wait for it to get included into a block
-	for _, txHash := range txHashes {
+	for index, txHash := range txHashes {
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 
-		if receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash); receiptErr != nil ||
-			receipt == nil {
-			t.Fatalf("Unable to get receipt")
+		receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash)
+		if receipt == nil {
+			t.Fatalf("Unable to get receipt for hash index [%d]", index)
+		} else if receiptErr != nil {
+			t.Fatalf("Unable to get receipt for hash index [%d], %v", index, receiptErr)
 		}
 
 		waitCancel()
