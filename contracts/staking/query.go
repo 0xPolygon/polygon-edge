@@ -16,7 +16,7 @@ var (
 	AddrStakingContract = types.StringToAddress("1001")
 )
 
-func decodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
+func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		From:     from,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
-		Input:    selector[:],
+		Input:    selector,
 		GasPrice: big.NewInt(0),
 		Gas:      100000000,
 		Nonce:    t.GetNonce(from),
@@ -66,5 +66,5 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		return nil, res.Err
 	}
 
-	return decodeValidators(method, res.ReturnValue)
+	return DecodeValidators(method, res.ReturnValue)
 }

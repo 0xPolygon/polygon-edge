@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/contracts/abis"
+	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
@@ -48,6 +52,121 @@ func GetAccountBalance(
 	assert.NoError(t, err)
 
 	return accountBalance
+}
+
+// GetValidatorSet returns the validator set from the SC
+func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Address, error) {
+	validatorsMethod, ok := abis.StakingABI.Methods["validators"]
+	if !ok {
+		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
+	}
+
+	selector := validatorsMethod.ID()
+	response, err := rpcClient.Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(from),
+			To:       web3.Address(staking.AddrStakingContract),
+			Data:     selector,
+			GasPrice: 100000000,
+			Value:    big.NewInt(0),
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to call Staking contract method, %v", err)
+	}
+
+	byteResponse, decodeError := hex.DecodeHex(response)
+	if decodeError != nil {
+		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeError)
+	}
+
+	return staking.DecodeValidators(validatorsMethod, byteResponse)
+}
+
+// StakeAmount is a helper function for staking an amount on the Staking SC
+func StakeAmount(
+	from types.Address,
+	senderKey *ecdsa.PrivateKey,
+	amount *big.Int,
+	srv *TestServer,
+) error {
+	// Stake Balance
+	txn := &PreparedTransaction{
+		From:     from,
+		To:       &staking.AddrStakingContract,
+		GasPrice: big.NewInt(10000),
+		Gas:      1000000,
+		Value:    amount,
+		Input:    MethodSig("stake"),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := srv.SendRawTx(ctx, txn, senderKey)
+
+	if err != nil {
+		return fmt.Errorf("unable to call Staking contract method, %v", err)
+	}
+
+	return nil
+}
+
+// UnstakeAmount is a helper function for unstaking the entire amount on the Staking SC
+func UnstakeAmount(
+	from types.Address,
+	senderKey *ecdsa.PrivateKey,
+	srv *TestServer,
+) (*web3.Receipt, error) {
+	// Stake Balance
+	txn := &PreparedTransaction{
+		From:     from,
+		To:       &staking.AddrStakingContract,
+		GasPrice: big.NewInt(DefaultGasPrice),
+		Gas:      DefaultGasLimit,
+		Value:    big.NewInt(0),
+		Input:    MethodSig("unstake"),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to call Staking contract method, %v", err)
+	}
+
+	return receipt, nil
+}
+
+// GetStakedAmount is a helper function for getting the staked amount on the Staking SC
+func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, error) {
+	stakedAmountMethod, ok := abis.StakingABI.Methods["stakedAmount"]
+	if !ok {
+		return nil, errors.New("stakedAmount method doesn't exist in Staking contract ABI")
+	}
+
+	selector := stakedAmountMethod.ID()
+	response, err := rpcClient.Eth().Call(
+		&web3.CallMsg{
+			From:     web3.Address(from),
+			To:       web3.Address(staking.AddrStakingContract),
+			Data:     selector,
+			GasPrice: 100000000,
+			Value:    big.NewInt(0),
+		},
+		web3.Latest,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to call Staking contract method, %v", err)
+	}
+
+	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("Unable to decode hex response")
+	}
+
+	return bigResponse, nil
 }
 
 func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
