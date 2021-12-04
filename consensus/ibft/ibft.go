@@ -70,6 +70,20 @@ type Ibft struct {
 	forceTimeoutCh bool
 }
 
+// Define the type of the iBFT consensus
+
+type Type string
+
+const (
+	// PoA defines the Proof of Authority IBFT type,
+	// where the validator set is changed through voting / pre-set in genesis
+	PoA Type = "PoA"
+
+	// PoS defines the Proof of Stake IBFT type,
+	// where the validator set it changed through staking on the Staking SC
+	PoS Type = "PoS"
+)
+
 // Factory implements the base consensus Factory method
 func Factory(
 	ctx context.Context,
