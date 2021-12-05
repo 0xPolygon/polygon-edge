@@ -21,9 +21,9 @@ type transaction struct {
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`
 	Input       argBytes       `json:"input"`
-	V           argBytes       `json:"v"`
-	R           argBytes       `json:"r"`
-	S           argBytes       `json:"s"`
+	V           argBig         `json:"v"`
+	R           argBig         `json:"r"`
+	S           argBig         `json:"s"`
 	Hash        types.Hash     `json:"hash"`
 	From        types.Address  `json:"from"`
 	BlockHash   types.Hash     `json:"blockHash"`
@@ -43,16 +43,20 @@ func (h transactionHash) MarshalText() ([]byte, error) {
 }
 
 func toTransaction(t *types.Transaction, b *types.Block, txIndex int) *transaction {
+	v := new(big.Int).SetBytes(t.V)
+	r := new(big.Int).SetBytes(t.R)
+	s := new(big.Int).SetBytes(t.S)
+
 	return &transaction{
 		Nonce:       argUint64(t.Nonce),
 		GasPrice:    argBig(*t.GasPrice),
 		Gas:         argUint64(t.Gas),
 		To:          t.To,
 		Value:       argBig(*t.Value),
-		Input:       argBytes(t.Input),
-		V:           argBytes(t.V),
-		R:           argBytes(t.R),
-		S:           argBytes(t.S),
+		Input:       t.Input,
+		V:           argBig(*v),
+		R:           argBig(*r),
+		S:           argBig(*s),
 		Hash:        t.Hash,
 		From:        t.From,
 		BlockHash:   b.Hash(),
