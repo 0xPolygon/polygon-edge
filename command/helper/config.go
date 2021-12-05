@@ -14,24 +14,26 @@ import (
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/hcl"
+	"github.com/imdario/mergo"
 )
 
 // Config defines the server configuration params
 type Config struct {
-	Chain          string     `json:"chain_config"`
-	Secrets        string     `json:"secrets_config"`
-	DataDir        string     `json:"data_dir"`
-	BlockGasTarget string     `json:"block_gas_target"`
-	GRPCAddr       string     `json:"grpc_addr"`
-	JSONRPCAddr    string     `json:"jsonrpc_addr"`
-	Telemetry      *Telemetry `json:"telemetry"`
-	Network        *Network   `json:"network"`
-	Seal           bool       `json:"seal"`
-	TxPool         *TxPool    `json:"tx_pool"`
-	LogLevel       string     `json:"log_level"`
-	Dev            bool       `json:"dev_mode"`
-	DevInterval    uint64     `json:"dev_interval"`
-	Join           string     `json:"join_addr"`
+	Chain          string                 `json:"chain_config"`
+	Secrets        string                 `json:"secrets_config"`
+	DataDir        string                 `json:"data_dir"`
+	BlockGasTarget string                 `json:"block_gas_target"`
+	GRPCAddr       string                 `json:"grpc_addr"`
+	JSONRPCAddr    string                 `json:"jsonrpc_addr"`
+	Telemetry      *Telemetry             `json:"telemetry"`
+	Network        *Network               `json:"network"`
+	Seal           bool                   `json:"seal"`
+	TxPool         *TxPool                `json:"tx_pool"`
+	LogLevel       string                 `json:"log_level"`
+	Dev            bool                   `json:"dev_mode"`
+	DevInterval    uint64                 `json:"dev_interval"`
+	Join           string                 `json:"join_addr"`
+	Consensus      map[string]interface{} `json:"consensus"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -72,7 +74,8 @@ func DefaultConfig() *Config {
 			PriceLimit: 0,
 			MaxSlots:   4096,
 		},
-		LogLevel: "INFO",
+		Consensus: map[string]interface{}{},
+		LogLevel:  "INFO",
 	}
 }
 
@@ -292,6 +295,9 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.Secrets = otherConfig.Secrets
 	}
 
+	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
+		return err
+	}
 	return nil
 }
 
