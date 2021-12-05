@@ -193,7 +193,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
 			}
 			if node.ID == srv.host.ID() {
-				srv.logger.Info("Omitting bootnode with same ID as host", node.ID)
+				srv.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
 			}
 			// add the bootnode to the peerstore
