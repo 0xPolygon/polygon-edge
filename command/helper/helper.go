@@ -16,7 +16,6 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
@@ -445,16 +444,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {
 			return nil, err
 		}
-	}
-
-	if secretsConfigPath != "" {
-		// Config file passed in
-		secretsConfig, readErr := secrets.ReadConfig(secretsConfigPath)
-		if readErr != nil {
-			return nil, fmt.Errorf("unable to read config file, %v", readErr)
-		}
-
-		config.SecretsManager = secretsConfig
 	}
 
 	if err := config.mergeConfigWith(cliConfig); err != nil {
