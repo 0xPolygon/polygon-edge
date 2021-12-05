@@ -59,7 +59,7 @@ func (p *IbftStatus) Run(args []string) int {
 
 	var output = "\n[VALIDATOR STATUS]\n"
 	output += helper.FormatKV([]string{
-		fmt.Sprintf("Vaidator key|%s", resp.Key),
+		fmt.Sprintf("Validator key|%s", resp.Key),
 	})
 
 	output += "\n"
