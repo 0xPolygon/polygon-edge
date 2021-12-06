@@ -113,12 +113,8 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		Hash:     types.Hash{},
 		From:     types.Address{},
 	}
-	block := types.Block{
-		Transactions: []*types.Transaction{&txn},
-		Header:       &types.Header{},
-	}
 
-	jsonTx := toTransaction(&txn, &block, 0)
+	jsonTx := toTransaction(&txn, nil, nil, nil)
 
 	jsonV, _ := jsonTx.V.MarshalText()
 	jsonR, _ := jsonTx.V.MarshalText()

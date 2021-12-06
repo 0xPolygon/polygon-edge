@@ -111,28 +111,44 @@ func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
 	return transaction.Hash.String(), nil
 }
 
-// GetTransactionByHash returns a transaction by his hash
+// GetTransactionByHash returns a transaction by its hash.
+// If the transaction is still pending -> return the txn with some fields omitted
+// If the transaction is sealed into a block -> return the whole txn with all fields
 func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
-	blockHash, ok := e.d.store.ReadTxLookup(hash)
-	if !ok {
-		// txn not found
-		return nil, nil
-	}
-	block, ok := e.d.store.GetBlockByHash(blockHash, true)
-	if !ok {
-		// block receipts not found
-		return nil, nil
-	}
-	for idx, txn := range block.Transactions {
-		if txn.Hash == hash {
-			return toTransaction(txn, block, idx), nil
+	// Check the TxPool for the transaction if it's pending
+	pendingTx, pendingFound := e.d.store.GetPendingTx(hash)
+	if !pendingFound {
+		// Transaction not found in the txpool, check world state
+		blockHash, ok := e.d.store.ReadTxLookup(hash)
+		if !ok {
+			// Block not found in storage
+			return nil, nil
 		}
+		block, ok := e.d.store.GetBlockByHash(blockHash, true)
+		if !ok {
+			// Block receipts not found in storage
+			return nil, nil
+		}
+
+		// Find the transaction within the block
+		for idx, txn := range block.Transactions {
+			if txn.Hash == hash {
+				return toTransaction(
+					txn,
+					argUintPtr(block.Number()),
+					argHashPtr(block.Hash()),
+					&idx,
+				), nil
+			}
+		}
+
+		e.d.logger.Warn(
+			fmt.Sprintf("Transaction with hash [%s] not found", hash),
+		)
+		return nil, nil
 	}
-	// txn not found (this should not happen)
-	e.d.logger.Warn(
-		fmt.Sprintf("Transaction with hash [%s] not found", blockHash),
-	)
-	return nil, nil
+
+	return toPendingTransaction(pendingTx), nil
 }
 
 // GetTransactionReceipt returns a transaction receipt by his hash
