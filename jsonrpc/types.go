@@ -68,9 +68,6 @@ func toTransaction(
 		S:        argBig(*s),
 		Hash:     t.Hash,
 		From:     t.From,
-		//BlockHash:   blockHash,
-		//BlockNumber: argUint64(b.Number()),
-		//TxIndex:     argUint64(txIndex),
 	}
 
 	if blockNumber != nil {
