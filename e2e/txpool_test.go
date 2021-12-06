@@ -781,9 +781,6 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 }
 
 func TestTxPool_GetPendingTx(t *testing.T) {
-	// TODO remove skip after PR on go-web3 is merged:
-	// https://github.com/umbracle/go-web3/pull/119
-	t.SkipNow()
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 	// Test scenario:
@@ -795,8 +792,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetShowsLog(true) // TODO remove
-		config.SetDevInterval(10)
+		config.SetDevInterval(5)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
 	})
@@ -830,9 +826,9 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	assert.NotNil(t, txn)
 
 	// Make sure the specific fields are not filled yet
-	assert.Equal(t, nil, txn.TxnIndex)
-	assert.Equal(t, nil, txn.BlockNumber)
-	assert.Equal(t, nil, txn.BlockHash)
+	assert.Equal(t, uint64(0), txn.TxnIndex)
+	assert.Equal(t, uint64(0), txn.BlockNumber)
+	assert.Equal(t, types.ZeroHash, txn.BlockHash)
 
 	// Wait for the transaction to be included into a block
 	blockNum := waitForBlock(t, server, 1, 0)
@@ -848,7 +844,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	}
 	assert.NotNil(t, txn)
 
-	assert.Equal(t, 0, txn.TxnIndex)
+	assert.Equal(t, uint64(0), txn.TxnIndex)
 	assert.Equal(t, block.Number, txn.BlockNumber)
 	assert.Equal(t, block.Hash, txn.BlockHash)
 }

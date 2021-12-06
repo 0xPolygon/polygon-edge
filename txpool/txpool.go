@@ -716,6 +716,12 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 			wrapper.accountQueue.nextNonce = stateNonce
 		}
 
+		// Delete the transactions from the lookup map
+		for _, txn := range accountEventWrapper.transactions {
+			// Remove the txn from the lookup map
+			t.deleteTxFromLookup(txn.Hash)
+		}
+
 		// Since there have been state changes, the TxPool can still have hanging txns.
 		// Prune out all the now possibly low-nonce transactions in the account queue
 		wrapper.pruneAccountTx(txnDropCleanup)
