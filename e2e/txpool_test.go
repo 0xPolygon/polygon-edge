@@ -828,7 +828,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	// Make sure the specific fields are not filled yet
 	assert.Equal(t, uint64(0), txn.TxnIndex)
 	assert.Equal(t, uint64(0), txn.BlockNumber)
-	assert.Equal(t, types.ZeroHash, txn.BlockHash)
+	assert.Equal(t, web3.ZeroHash, txn.BlockHash)
 
 	// Wait for the transaction to be included into a block
 	blockNum := waitForBlock(t, server, 1, 0)

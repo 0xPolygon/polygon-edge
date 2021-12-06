@@ -3,6 +3,7 @@ package web3
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/valyala/fastjson"
 )
@@ -40,6 +41,10 @@ func (l *Log) MarshalJSON() ([]byte, error) {
 
 // MarshalJSON implements the marshal interface
 func (t *Block) MarshalJSON() ([]byte, error) {
+	if t.Difficulty == nil {
+		t.Difficulty = new(big.Int)
+	}
+
 	a := defaultArena.Get()
 
 	o := a.NewObject()
@@ -66,6 +71,15 @@ func (t *Block) MarshalJSON() ([]byte, error) {
 		o.Set("uncles", uncles)
 	}
 
+	// transactions
+	if len(t.TransactionsHashes) != 0 {
+		txns := a.NewArray()
+		for indx, txn := range t.TransactionsHashes {
+			txns.SetArrayItem(indx, a.NewString(txn.String()))
+		}
+		o.Set("transactions", txns)
+	}
+
 	res := o.MarshalTo(nil)
 	defaultArena.Put(a)
 	return res, nil
@@ -78,9 +92,6 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 	o := a.NewObject()
 	o.Set("hash", a.NewString(t.Hash.String()))
 	o.Set("from", a.NewString(t.From.String()))
-	if t.To != nil {
-		o.Set("to", a.NewString(t.To.String()))
-	}
 	if len(t.Input) != 0 {
 		o.Set("input", a.NewString("0x"+hex.EncodeToString(t.Input)))
 	}
@@ -93,14 +104,26 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		// we can remove this once we include support for custom nonces
 		o.Set("nonce", a.NewString(fmt.Sprintf("0x%x", t.Nonce)))
 	}
-
+	if t.To == nil {
+		o.Set("to", a.NewNull())
+	} else {
+		o.Set("to", a.NewString(t.To.String()))
+	}
 	o.Set("v", a.NewString("0x"+hex.EncodeToString(t.V)))
 	o.Set("r", a.NewString("0x"+hex.EncodeToString(t.R)))
 	o.Set("s", a.NewString("0x"+hex.EncodeToString(t.R)))
 
-	o.Set("blockHash", a.NewString(t.BlockHash.String()))
-	o.Set("blockNumber", a.NewString(fmt.Sprintf("0x%x", t.BlockNumber)))
-	o.Set("transactionIndex", a.NewString(fmt.Sprintf("0x%x", t.TxnIndex)))
+	if t.BlockHash == ZeroHash {
+		// The transaction is a pending transaction
+		o.Set("blockHash", a.NewNull())
+		o.Set("blockNumber", a.NewNull())
+		o.Set("transactionIndex", a.NewNull())
+	} else {
+		// The transaction has valid metadata fields, fill them
+		o.Set("blockHash", a.NewString(t.BlockHash.String()))
+		o.Set("blockNumber", a.NewString(fmt.Sprintf("0x%x", t.BlockNumber)))
+		o.Set("transactionIndex", a.NewString(fmt.Sprintf("0x%x", t.TxnIndex)))
+	}
 
 	res := o.MarshalTo(nil)
 	defaultArena.Put(a)
@@ -113,7 +136,9 @@ func (c *CallMsg) MarshalJSON() ([]byte, error) {
 
 	o := a.NewObject()
 	o.Set("from", a.NewString(c.From.String()))
-	o.Set("to", a.NewString(c.To.String()))
+	if c.To != nil {
+		o.Set("to", a.NewString(c.To.String()))
+	}
 	if len(c.Data) != 0 {
 		o.Set("data", a.NewString("0x"+hex.EncodeToString(c.Data)))
 	}

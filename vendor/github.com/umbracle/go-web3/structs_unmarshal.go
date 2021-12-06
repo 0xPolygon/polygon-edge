@@ -113,6 +113,13 @@ func (t *Transaction) UnmarshalJSON(buf []byte) error {
 	return t.unmarshalJSON(v)
 }
 
+// isKeySet is a helper function for checking if a key has any value != nil,
+// or if it's been set at all
+func isKeySet(v *fastjson.Value, key string) bool {
+	value := v.Get(key)
+	return value != nil && value.Type() != fastjson.TypeNull
+}
+
 func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 	var err error
 	if err := decodeHash(&t.Hash, v, "hash"); err != nil {
@@ -137,25 +144,49 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 		return err
 	}
 
-	if t.V, err = decodeBytes(t.V[:0], v, "v"); err != nil {
-		panic(err)
+	if !v.Exists("to") {
+		return fmt.Errorf("'to' not found")
 	}
-	if t.R, err = decodeBytes(t.R[:0], v, "r"); err != nil {
-		panic(err)
-	}
-	if t.S, err = decodeBytes(t.S[:0], v, "s"); err != nil {
-		panic(err)
+	if v.Get("to").String() != "null" {
+		var to Address
+		if err = decodeAddr(&to, v, "to"); err != nil {
+			return err
+		}
+		t.To = &to
 	}
 
-	if err = decodeHash(&t.BlockHash, v, "blockHash"); err != nil {
+	if t.V, err = decodeBytes(t.V[:0], v, "v"); err != nil {
 		return err
 	}
-	if t.BlockNumber, err = decodeUint(v, "blockNumber"); err != nil {
+	if t.R, err = decodeBytes(t.R[:0], v, "r"); err != nil {
 		return err
 	}
-	if t.TxnIndex, err = decodeUint(v, "transactionIndex"); err != nil {
+	if t.S, err = decodeBytes(t.S[:0], v, "s"); err != nil {
 		return err
 	}
+
+	// Check if the block hash field is set
+	// If it's not -> the transaction is a pending txn, so these fields should be omitted
+	// If it is -> the transaction is a sealed txn, so these fields should be included
+	if isKeySet(v, "blockHash") {
+		// The transaction is not a pending transaction, read data
+
+		// Grab the block hash
+		if err = decodeHash(&t.BlockHash, v, "blockHash"); err != nil {
+			return err
+		}
+
+		// Grab the block number
+		if t.BlockNumber, err = decodeUint(v, "blockNumber"); err != nil {
+			return err
+		}
+
+		// Grab the transaction index
+		if t.TxnIndex, err = decodeUint(v, "transactionIndex"); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -286,7 +317,7 @@ func decodeBigInt(b *big.Int, v *fastjson.Value, key string) (*big.Int, error) {
 	str = strings.Trim(str, "\"")
 
 	if !strings.HasPrefix(str, "0x") {
-		return nil, fmt.Errorf("field %s does not have 0x prefix", str)
+		return nil, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
 	if b == nil {
 		b = new(big.Int)
@@ -295,7 +326,7 @@ func decodeBigInt(b *big.Int, v *fastjson.Value, key string) (*big.Int, error) {
 	var ok bool
 	b, ok = b.SetString(str[2:], 16)
 	if !ok {
-		return nil, fmt.Errorf("failed to decode big int")
+		return nil, fmt.Errorf("field '%s' failed to decode big int: '%s'", key, str)
 	}
 	return b, nil
 }
@@ -309,7 +340,7 @@ func decodeBytes(dst []byte, v *fastjson.Value, key string, bits ...int) ([]byte
 	str = strings.Trim(str, "\"")
 
 	if !strings.HasPrefix(str, "0x") {
-		return nil, fmt.Errorf("field %s does not have 0x prefix", str)
+		return nil, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
 	str = str[2:]
 	if len(str)%2 != 0 {
@@ -320,7 +351,7 @@ func decodeBytes(dst []byte, v *fastjson.Value, key string, bits ...int) ([]byte
 		return nil, err
 	}
 	if len(bits) > 0 && bits[0] != len(buf) {
-		return nil, fmt.Errorf("field %s invalid length, expected %d but found %d", str, bits[0], len(buf))
+		return nil, fmt.Errorf("field '%s' invalid length, expected %d but found %d: %s", key, bits[0], len(buf), str)
 	}
 	dst = append(dst, buf...)
 	return dst, nil
@@ -335,7 +366,7 @@ func decodeUint(v *fastjson.Value, key string) (uint64, error) {
 	str = strings.Trim(str, "\"")
 
 	if !strings.HasPrefix(str, "0x") {
-		return 0, fmt.Errorf("field %s does not have 0x prefix", str)
+		return 0, fmt.Errorf("field '%s' does not have 0x prefix: '%s'", key, str)
 	}
 	return strconv.ParseUint(str[2:], 16, 64)
 }
@@ -345,6 +376,12 @@ func decodeHash(h *Hash, v *fastjson.Value, key string) error {
 	if len(b) == 0 {
 		return fmt.Errorf("field '%s' not found", key)
 	}
+
+	// Make sure the memory location is initialized
+	if h == nil {
+		h = &Hash{}
+	}
+
 	h.UnmarshalText(b)
 	return nil
 }

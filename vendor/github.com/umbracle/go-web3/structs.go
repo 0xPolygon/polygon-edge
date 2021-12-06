@@ -6,6 +6,14 @@ import (
 	"math/big"
 )
 
+var (
+	// ZeroAddress is an address of all zeros
+	ZeroAddress = Address{}
+
+	// ZeroHash is a hash of all zeros
+	ZeroHash = Hash{}
+)
+
 // Address is an Ethereum address
 type Address [20]byte
 
@@ -13,6 +21,17 @@ type Address [20]byte
 func HexToAddress(str string) Address {
 	a := Address{}
 	a.UnmarshalText([]byte(str))
+	return a
+}
+
+// BytesToAddress converts bytes to an address object
+func BytesToAddress(b []byte) Address {
+	var a Address
+
+	size := len(b)
+	min := min(size, 20)
+
+	copy(a[20-min:], b[len(b)-min:])
 	return a
 }
 
@@ -40,6 +59,17 @@ func HexToHash(str string) Hash {
 	return h
 }
 
+// BytesToHash converts bytes to a hash object
+func BytesToHash(b []byte) Hash {
+	var h Hash
+
+	size := len(b)
+	min := min(size, 32)
+
+	copy(h[32-min:], b[len(b)-min:])
+	return h
+}
+
 // UnmarshalText implements the unmarshal interface
 func (h *Hash) UnmarshalText(b []byte) error {
 	return unmarshalTextByte(h[:], b, 32)
@@ -52,6 +82,10 @@ func (h Hash) MarshalText() ([]byte, error) {
 
 func (h Hash) String() string {
 	return "0x" + hex.EncodeToString(h[:])
+}
+
+func (h Hash) Location() string {
+	return h.String()
 }
 
 type Block struct {
@@ -92,7 +126,7 @@ type Transaction struct {
 
 type CallMsg struct {
 	From     Address
-	To       Address
+	To       *Address
 	Data     []byte
 	GasPrice uint64
 	Value    *big.Int
@@ -153,6 +187,10 @@ const (
 	Pending              = -3
 )
 
+func (b BlockNumber) Location() string {
+	return b.String()
+}
+
 func (b BlockNumber) String() string {
 	switch b {
 	case Latest:
@@ -173,4 +211,21 @@ func EncodeBlock(block ...BlockNumber) BlockNumber {
 		return Latest
 	}
 	return block[0]
+}
+
+type BlockNumberOrHash interface {
+	Location() string
+}
+
+func (b *Block) Copy() *Block {
+	bb := new(Block)
+	*bb = *b
+	return bb
+}
+
+func min(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
 }
