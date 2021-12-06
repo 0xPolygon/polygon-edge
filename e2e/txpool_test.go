@@ -72,7 +72,7 @@ func generateTx(params generateTxReqParams) *types.Transaction {
 		GasPrice: params.gasPrice,
 		Gas:      1000000,
 		Value:    params.value,
-		V:        []byte{1}, // it is necessary to encode in rlp
+		V:        *big.NewInt(27), // it is necessary to encode in rlp
 	}, params.referenceKey)
 
 	if signErr != nil {
@@ -217,7 +217,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 			GasPrice: gasPrice,
 			Gas:      1000000,
 			Value:    oneEth,
-			V:        []byte{1}, // it is necessary to encode in rlp
+			V:        *big.NewInt(1), // it is necessary to encode in rlp
 		}, referenceKey)
 
 		if signErr != nil {
@@ -344,7 +344,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 			GasPrice: big.NewInt(10),
 			Gas:      framework.DefaultGasLimit,
 			Value:    defaultValue,
-			V:        []byte{1}, // it is necessary to encode in rlp
+			V:        *big.NewInt(27), // it is necessary to encode in rlp
 		}, account.key)
 
 		if signErr != nil {
@@ -572,7 +572,7 @@ func TestInvalidTransactionRecover(t *testing.T) {
 				Gas:      testCase.submittedGasLimit,
 				To:       &testCase.receiver,
 				Value:    testCase.value,
-				V:        []byte{1},
+				V:        *big.NewInt(1),
 				From:     testCase.sender,
 			}, senderKey)
 			assert.NoError(t, err, "failed to sign transaction")
@@ -673,7 +673,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 				Gas:      testCase.gas,
 				To:       &testCase.receiver,
 				Value:    testCase.value,
-				V:        []byte{1},
+				V:        *big.NewInt(27),
 				From:     testCase.sender,
 			}, testCase.senderKey)
 			assert.NoError(t, err, "failed to sign transaction")
@@ -739,7 +739,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 			Gas:      framework.DefaultGasLimit - 1,
 			To:       &receiverAddress,
 			Value:    oneEth,
-			V:        []byte{1},
+			V:        *big.NewInt(27),
 			From:     types.ZeroAddress,
 		}, senderKey)
 		assert.NoError(t, err, "failed to sign transaction")

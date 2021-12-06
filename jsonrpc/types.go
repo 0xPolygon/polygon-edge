@@ -52,9 +52,6 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
-	v := new(big.Int).SetBytes(t.V)
-	r := new(big.Int).SetBytes(t.R)
-	s := new(big.Int).SetBytes(t.S)
 
 	res := &transaction{
 		Nonce:    argUint64(t.Nonce),
@@ -63,9 +60,9 @@ func toTransaction(
 		To:       t.To,
 		Value:    argBig(*t.Value),
 		Input:    t.Input,
-		V:        argBig(*v),
-		R:        argBig(*r),
-		S:        argBig(*s),
+		V:        argBig(t.V),
+		R:        argBig(t.R),
+		S:        argBig(t.S),
 		Hash:     t.Hash,
 		From:     t.From,
 	}

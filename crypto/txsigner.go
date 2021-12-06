@@ -86,7 +86,8 @@ var (
 
 // Sender decodes the signature and returns the sender of the transaction
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	refV := big.NewInt(0).SetBytes(tx.V)
+	refV := big.NewInt(0).SetBytes(tx.V.Bytes())
+
 	refV.Sub(refV, big27)
 
 	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
@@ -118,9 +119,9 @@ func (f *FrontierSigner) SignTx(
 		return nil, err
 	}
 
-	tx.R = sig[:32]
-	tx.S = sig[32:64]
-	tx.V = f.CalculateV(sig[64])
+	tx.R = *new(big.Int).SetBytes(sig[:32])
+	tx.S = *new(big.Int).SetBytes(sig[32:64])
+	tx.V = *new(big.Int).SetBytes(f.CalculateV(sig[64]))
 
 	return tx, nil
 }
@@ -152,7 +153,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	protected := true
 
 	// Check if v value conforms to an earlier standard (before EIP155)
-	bigV := big.NewInt(0).SetBytes(tx.V)
+	bigV := big.NewInt(0).SetBytes(tx.V.Bytes())
 	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
 		protected = vv != 27 && vv != 28
 	}
@@ -196,9 +197,9 @@ func (e *EIP155Signer) SignTx(
 		return nil, err
 	}
 
-	tx.R = sig[:32]
-	tx.S = sig[32:64]
-	tx.V = e.CalculateV(sig[64])
+	tx.R = *new(big.Int).SetBytes(sig[:32])
+	tx.S = *new(big.Int).SetBytes(sig[32:64])
+	tx.V = *new(big.Int).SetBytes(e.CalculateV(sig[64]))
 
 	return tx, nil
 }
@@ -215,14 +216,15 @@ func (e *EIP155Signer) CalculateV(parity byte) []byte {
 }
 
 // encodeSignature generates a signature value based on the R, S and V value
-func encodeSignature(R, S []byte, V byte) ([]byte, error) {
-	if !ValidateSignatureValues(V, R, S) {
+func encodeSignature(R, S big.Int, V byte) ([]byte, error) {
+
+	if !ValidateSignatureValues(V, R.Bytes(), S.Bytes()) {
 		return nil, fmt.Errorf("invalid txn signature")
 	}
 
 	sig := make([]byte, 65)
-	copy(sig[32-len(R):32], R)
-	copy(sig[64-len(S):64], S)
+	copy(sig[32-len(R.Bytes()):32], R.Bytes())
+	copy(sig[64-len(S.Bytes()):64], S.Bytes())
 	sig[64] = V
 
 	return sig, nil

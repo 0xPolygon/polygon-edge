@@ -4,6 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
@@ -11,10 +16,6 @@ import (
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
-	"math/big"
-	"os"
-	"sync"
-	"time"
 )
 
 // Configuration represents the loadbot run configuration
@@ -86,7 +87,7 @@ func (c *Configuration) createTransactionObjects() ([]*types.Transaction, error)
 			Value:    c.Value,
 			GasPrice: c.GasPrice,
 			Nonce:    nonce,
-			V:        []byte{1}, // it is necessary to encode in rlp
+			V:        *big.NewInt(1), // it is necessary to encode in rlp
 		}, privateKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign transaction: %v", err)

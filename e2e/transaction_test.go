@@ -442,7 +442,7 @@ func generateStressTestTx(
 		GasPrice: bigGasPrice,
 		Gas:      framework.DefaultGasLimit,
 		Value:    big.NewInt(0),
-		V:        []byte{1}, // it is necessary to encode in rlp,
+		V:        *big.NewInt(1), // it is necessary to encode in rlp,
 		Input:    append(setNameMethod.ID(), encodedInput...),
 	}, senderKey)
 

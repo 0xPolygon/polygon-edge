@@ -689,7 +689,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 
 	txn := &types.Transaction{
 		From: addr0,
-		V:    []byte{1},
+		V:    *big.NewInt(1),
 	}
 	txn.ComputeHash()
 
