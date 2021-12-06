@@ -71,13 +71,10 @@ type discovery struct {
 	bootnodes []*peer.AddrInfo
 }
 
-func (d *discovery) setBootnodes(bootnodes []*peer.AddrInfo) {
-	d.bootnodes = bootnodes
-}
-
-func (d *discovery) setup() error {
+func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 	d.notifyCh = make(chan struct{}, 5)
 	d.peers = referencePeers{}
+	d.bootnodes = bootnodes
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
 
@@ -131,21 +128,41 @@ func (d *discovery) setup() error {
 
 	go d.run()
 
+	go d.setupTable()
+
+	return nil
+}
+
+func (d *discovery) addToTable(node *peer.AddrInfo) error {
+	// before we include peers on the routing table -> dial queue
+	// we have to add them to the peerstore so that they are
+	// available to all the libp2p services
+	d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
+	if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *discovery) setupTable() error {
+	for _, node := range d.bootnodes {
+		if err := d.addToTable(node); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (d *discovery) call(peerID peer.ID) error {
+	d.srv.logger.Debug("Quering a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
 	if err != nil {
 		return err
 	}
 
-	// before we include peers on the routing table -> dial queue
-	// we have to add them to the peerstore so that they are
-	// available to all the libp2p services
+	d.srv.logger.Debug("Found new near peers", "peer", len(nodes))
 	for _, node := range nodes {
-		d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
-		if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
+		if err := d.addToTable(node); err != nil {
 			return err
 		}
 	}
@@ -213,20 +230,10 @@ func (d *discovery) run() {
 }
 
 func (d *discovery) handleDiscovery() {
-	if d.routingTable.Size() == 0 {
-		// if there are no peers on the table try to include the bootnodes
-		for _, node := range d.bootnodes {
-			if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
-				d.srv.logger.Error("failed to add bootnode", "err", err)
-			}
-		}
-	} else {
-		// take a random peer and find peers
-		if len(d.peers) > 0 {
-			target := d.peers[rand.Intn(len(d.peers))]
-			if err := d.call(target.id); err != nil {
-				d.srv.logger.Error("failed to dial bootnode", "err", err)
-			}
+	if len(d.peers) > 0 {
+		target := d.peers[rand.Intn(len(d.peers))]
+		if err := d.call(target.id); err != nil {
+			d.srv.logger.Error("failed to query for near peers", "err", err)
 		}
 	}
 }

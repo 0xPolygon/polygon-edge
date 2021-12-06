@@ -18,7 +18,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -183,7 +182,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if !config.NoDiscover {
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
-		srv.discovery.setup()
 
 		// try to decode the bootnodes
 		bootnodes := []*peer.AddrInfo{}
@@ -196,12 +194,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 				srv.logger.Info("Omitting bootnode with same ID as host", node.ID)
 				continue
 			}
-			// add the bootnode to the peerstore
-			srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
 			bootnodes = append(bootnodes, node)
 		}
 
-		srv.discovery.setBootnodes(bootnodes)
+		srv.discovery.setup(bootnodes)
 	}
 
 	// start gossip protocol
