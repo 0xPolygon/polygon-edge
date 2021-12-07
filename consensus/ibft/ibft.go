@@ -87,6 +87,28 @@ const (
 	PoS Type = "PoS"
 )
 
+// mechanismTypes is the map used for easy string -> mechanism Type lookups
+var mechanismTypes = map[string]Type{
+	"PoA": PoA,
+	"PoS": PoS,
+}
+
+// String is a helper method for casting a Type to a string representation
+func (t Type) String() string {
+	return string(t)
+}
+
+// parseType converts a mechanism string representation to a Type
+func parseType(mechanism string) (Type, error) {
+	// Check if the cast is possible
+	castType, ok := mechanismTypes[mechanism]
+	if !ok {
+		return castType, fmt.Errorf("invalid IBFT mechanism type %s", mechanism)
+	}
+
+	return castType, nil
+}
+
 // Define constant hook names
 const (
 	// POA //
@@ -173,8 +195,13 @@ func Factory(
 	}
 
 	// Initialize the mechanism
-	// TODO grab mechanism type from config after PR #222 is merged
-	mechanismFactory := mechanismBackends[PoS]
+	mechanismType, parseErr := parseType(p.config.Config["type"].(string))
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	// Grab the mechanism factory and execute it
+	mechanismFactory := mechanismBackends[mechanismType]
 	mechanism, factoryErr := mechanismFactory(p)
 	if factoryErr != nil {
 		return nil, factoryErr
