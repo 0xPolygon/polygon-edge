@@ -111,7 +111,7 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 			Gas:      0,
 			GasPrice: big.NewInt(0),
 			Input:    header.Hash.Bytes(),
-			V:        *big.NewInt(27),
+			V:        big.NewInt(27),
 		}
 		t0.ComputeHash()
 

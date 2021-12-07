@@ -60,9 +60,9 @@ func toTransaction(
 		To:       t.To,
 		Value:    argBig(*t.Value),
 		Input:    t.Input,
-		V:        argBig(t.V),
-		R:        argBig(t.R),
-		S:        argBig(t.S),
+		V:        argBig(*t.V),
+		R:        argBig(*t.R),
+		S:        argBig(*t.S),
 		Hash:     t.Hash,
 		From:     t.From,
 	}

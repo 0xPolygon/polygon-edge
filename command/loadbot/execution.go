@@ -87,7 +87,7 @@ func (c *Configuration) createTransactionObjects() ([]*types.Transaction, error)
 			Value:    c.Value,
 			GasPrice: c.GasPrice,
 			Nonce:    nonce,
-			V:        *big.NewInt(1), // it is necessary to encode in rlp
+			V:        big.NewInt(1), // it is necessary to encode in rlp
 		}, privateKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign transaction: %v", err)

@@ -42,9 +42,9 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		To:       &addrTo,
 		Value:    big.NewInt(1),
 		Input:    []byte{1, 2},
-		V:        *big.NewInt(25),
-		S:        *big.NewInt(26),
-		R:        *big.NewInt(27),
+		V:        big.NewInt(25),
+		S:        big.NewInt(26),
+		R:        big.NewInt(27),
 	}
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()

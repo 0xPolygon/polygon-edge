@@ -89,7 +89,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 			Gas:      blockGasLimit,
 			To:       &receiverAddress,
 			Value:    framework.EthToWei(1),
-			V:        *big.NewInt(1),
+			V:        big.NewInt(1),
 			From:     senderAddress,
 		}, senderKey)
 		if err != nil {

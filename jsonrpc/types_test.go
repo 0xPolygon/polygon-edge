@@ -108,9 +108,9 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		To:       nil,
 		Value:    big.NewInt(0),
 		Input:    nil,
-		V:        *new(big.Int).SetBytes(v),
-		R:        *new(big.Int).SetBytes(r),
-		S:        *new(big.Int).SetBytes(s),
+		V:        new(big.Int).SetBytes(v),
+		R:        new(big.Int).SetBytes(r),
+		S:        new(big.Int).SetBytes(s),
 		Hash:     types.Hash{},
 		From:     types.Address{},
 	}
