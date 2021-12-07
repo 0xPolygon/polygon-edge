@@ -232,8 +232,8 @@ func (d *discovery) run() {
 }
 
 func (d *discovery) handleDiscovery() {
-	if len(d.peers) > 0 {
-		target := d.peers[rand.Intn(len(d.peers))]
+	if numPeers := len(d.peers); numPeers > 0 {
+		target := d.peers[rand.Intn(numPeers)]
 		if err := d.call(target.id); err != nil {
 			d.srv.logger.Error("failed to query for near peers", "err", err)
 		}
