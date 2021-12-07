@@ -115,19 +115,19 @@ func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
 // If the transaction is still pending -> return the txn with some fields omitted
 // If the transaction is sealed into a block -> return the whole txn with all fields
 func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
-	// Check the TxPool for the transaction if it's pending
-	pendingTx, pendingFound := e.d.store.GetPendingTx(hash)
-	if !pendingFound {
-		// Transaction not found in the txpool, check world state
+	// findSealedTx is a helper method for checking the world state
+	// for the transaction with the provided hash
+	findSealedTx := func() (*transaction, bool) {
+		// Check the chain state for the transaction
 		blockHash, ok := e.d.store.ReadTxLookup(hash)
 		if !ok {
 			// Block not found in storage
-			return nil, nil
+			return nil, false
 		}
 		block, ok := e.d.store.GetBlockByHash(blockHash, true)
 		if !ok {
 			// Block receipts not found in storage
-			return nil, nil
+			return nil, false
 		}
 
 		// Find the transaction within the block
@@ -138,17 +138,42 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 					argUintPtr(block.Number()),
 					argHashPtr(block.Hash()),
 					&idx,
-				), nil
+				), true
 			}
 		}
 
-		e.d.logger.Warn(
-			fmt.Sprintf("Transaction with hash [%s] not found", hash),
-		)
-		return nil, nil
+		return nil, false
 	}
 
-	return toPendingTransaction(pendingTx), nil
+	// findPendingTx is a helper method for checking the TxPool
+	// for the pending transaction with the provided hash
+	findPendingTx := func() (*transaction, bool) {
+		// Check the TxPool for the transaction if it's pending
+		pendingTx, pendingFound := e.d.store.GetPendingTx(hash)
+		if !pendingFound {
+			// Transaction not found in the TxPool
+			return nil, false
+		}
+
+		return toPendingTransaction(pendingTx), true
+	}
+
+	// 1. Check the chain state for the txn
+	if resultTxn, txnFound := findSealedTx(); txnFound {
+		return resultTxn, nil
+	}
+
+	// 2. Check the TxPool for the txn
+	if resultTxn, txnFound := findPendingTx(); txnFound {
+		return resultTxn, nil
+	}
+
+	// Transaction not found in state or TxPool
+	e.d.logger.Warn(
+		fmt.Sprintf("Transaction with hash [%s] not found", hash),
+	)
+
+	return nil, nil
 }
 
 // GetTransactionReceipt returns a transaction receipt by his hash
