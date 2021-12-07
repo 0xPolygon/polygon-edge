@@ -107,6 +107,13 @@ type Type struct {
 	t     reflect.Type
 }
 
+func NewTupleType(inputs []*TupleElem) *Type {
+	return &Type{
+		kind:  KindTuple,
+		tuple: inputs,
+	}
+}
+
 // ParseLog parses a log using this type
 func (t *Type) ParseLog(log *web3.Log) (map[string]interface{}, error) {
 	return ParseLog(t, log)
@@ -179,7 +186,7 @@ func parseType(arg *ArgumentStr) (string, error) {
 	}
 
 	if len(arg.Components) == 0 {
-		return "", fmt.Errorf("tuple type expects components but none found")
+		return "tuple()", nil
 	}
 
 	// parse the arg components from the tuple
@@ -268,6 +275,10 @@ func readType(l *lexer) (*Type, error) {
 
 			elem, err := readType(l)
 			if err != nil {
+				if l.current.typ == rparenToken && len(elems) == 0 {
+					// empty tuple 'tuple()'
+					break
+				}
 				return nil, fmt.Errorf("failed to decode type: %v", err)
 			}
 
@@ -440,7 +451,7 @@ func decodeSimpleType(str string) (*Type, error) {
 		return &Type{kind: KindBool, t: boolT, raw: "bool"}, nil
 
 	case "address":
-		return &Type{kind: KindAddress, t: addressT, raw: "address"}, nil
+		return &Type{kind: KindAddress, t: addressT, size: 20, raw: "address"}, nil
 
 	case "function":
 		return &Type{kind: KindFunction, size: 24, t: functionT, raw: "function"}, nil
