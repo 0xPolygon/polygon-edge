@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"fmt"
-	"math"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
@@ -298,5 +297,6 @@ func (v *ValidatorSet) MaxFaultyNodes() int {
 	// 4 = 3 * 1 + 1
 	// To tolerate 2 failures, IBFT requires 7 nodes
 	// 7 = 3 * 2 + 1
-	return int(math.Floor(float64(len(*v)-1) / 3))
+	// It should always take the floor of the result
+	return (len(*v) - 1) / 3
 }
