@@ -117,17 +117,17 @@ func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
 func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	// findSealedTx is a helper method for checking the world state
 	// for the transaction with the provided hash
-	findSealedTx := func() (*transaction, bool) {
+	findSealedTx := func() *transaction {
 		// Check the chain state for the transaction
 		blockHash, ok := e.d.store.ReadTxLookup(hash)
 		if !ok {
 			// Block not found in storage
-			return nil, false
+			return nil
 		}
 		block, ok := e.d.store.GetBlockByHash(blockHash, true)
 		if !ok {
 			// Block receipts not found in storage
-			return nil, false
+			return nil
 		}
 
 		// Find the transaction within the block
@@ -138,32 +138,32 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 					argUintPtr(block.Number()),
 					argHashPtr(block.Hash()),
 					&idx,
-				), true
+				)
 			}
 		}
 
-		return nil, false
+		return nil
 	}
 
 	// findPendingTx is a helper method for checking the TxPool
 	// for the pending transaction with the provided hash
-	findPendingTx := func() (*transaction, bool) {
+	findPendingTx := func() *transaction {
 		// Check the TxPool for the transaction if it's pending
 		if pendingTx, pendingFound := e.d.store.GetPendingTx(hash); pendingFound {
-			return toPendingTransaction(pendingTx), true
+			return toPendingTransaction(pendingTx)
 		}
 
 		// Transaction not found in the TxPool
-		return nil, false
+		return nil
 	}
 
 	// 1. Check the chain state for the txn
-	if resultTxn, txnFound := findSealedTx(); txnFound {
+	if resultTxn := findSealedTx(); resultTxn != nil {
 		return resultTxn, nil
 	}
 
 	// 2. Check the TxPool for the txn
-	if resultTxn, txnFound := findPendingTx(); txnFound {
+	if resultTxn := findPendingTx(); resultTxn != nil {
 		return resultTxn, nil
 	}
 
