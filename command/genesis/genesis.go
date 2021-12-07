@@ -17,6 +17,8 @@ import (
 	"github.com/mitchellh/cli"
 )
 
+const ibftConsensus = "ibft"
+
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
 	UI cli.Ui
@@ -115,6 +117,15 @@ func (c *GenesisCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["pos"] = helper.FlagDescriptor{
+		Description: "Sets the flag indicating that the client should use Proof of Stake IBFT. Defaults to " +
+			"Proof of Authority if flag is not provided or false",
+		Arguments: []string{
+			"IS_POS",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -149,6 +160,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var bootnodes = make(helperFlags.BootnodeFlags, 0)
 	var name string
 	var consensus string
+	var isPos bool
 
 	// ibft flags
 	var ibftValidators helperFlags.ArrayFlags
@@ -165,6 +177,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
+	flags.BoolVar(&isPos, "pos", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -183,18 +196,18 @@ func (c *GenesisCommand) Run(args []string) int {
 	// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
 	var validators []types.Address
 
-	if consensus == "ibft" {
-		if len(ibftValidators) != 0 {
+	if consensus == ibftConsensus {
+		switch {
+		case len(ibftValidators) != 0:
 			for _, val := range ibftValidators {
 				validators = append(validators, types.StringToAddress(val))
 			}
-		} else if ibftValidatorsPrefixPath != "" {
-			// read all folders with the ibftValidatorsPrefixPath and search for Istanbul addresses
+		case ibftValidatorsPrefixPath != "":
 			if validators, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
 				return 1
 			}
-		} else {
+		default:
 			c.UI.Error("cannot load validators for ibft")
 			return 1
 		}
@@ -210,6 +223,26 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
+	// constructEngineConfig is a helper method for
+	// parametrizing the consensus configuration, which
+	// can be retrieved at runtime from the consensus module
+	constructEngineConfig := func() map[string]interface{} {
+		if consensus != ibftConsensus {
+			// Dev consensus, return an empty map
+			return map[string]interface{}{}
+		}
+
+		if isPos {
+			return map[string]interface{}{
+				"type": ibft.PoS,
+			}
+		}
+
+		return map[string]interface{}{
+			"type": ibft.PoA,
+		}
+	}
+
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
@@ -223,15 +256,19 @@ func (c *GenesisCommand) Run(args []string) int {
 			ChainID: int(chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
-				consensus: map[string]interface{}{},
+				consensus: constructEngineConfig(),
 			},
 		},
 		Bootnodes: bootnodes,
 	}
 
-	if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
-		c.UI.Error(err.Error())
-		return 1
+	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
+	// deploy the Staking SC
+	if consensus == ibftConsensus && isPos {
+		if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
+			c.UI.Error(err.Error())
+			return 1
+		}
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {

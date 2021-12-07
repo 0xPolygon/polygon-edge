@@ -204,6 +204,11 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--consensus", "dummy")
 	}
 
+	// Make sure the correct mechanism is selected
+	if t.Config.IsPos {
+		args = append(args, "--pos")
+	}
+
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
 		t.Config.BlockGasLimit = helper.GenesisGasLimit
