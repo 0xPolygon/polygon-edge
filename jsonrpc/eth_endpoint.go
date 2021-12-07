@@ -149,13 +149,12 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	// for the pending transaction with the provided hash
 	findPendingTx := func() (*transaction, bool) {
 		// Check the TxPool for the transaction if it's pending
-		pendingTx, pendingFound := e.d.store.GetPendingTx(hash)
-		if !pendingFound {
-			// Transaction not found in the TxPool
-			return nil, false
+		if pendingTx, pendingFound := e.d.store.GetPendingTx(hash); pendingFound {
+			return toPendingTransaction(pendingTx), true
 		}
 
-		return toPendingTransaction(pendingTx), true
+		// Transaction not found in the TxPool
+		return nil, false
 	}
 
 	// 1. Check the chain state for the txn
