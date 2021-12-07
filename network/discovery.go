@@ -145,6 +145,8 @@ func (d *discovery) addToTable(node *peer.AddrInfo) error {
 }
 
 func (d *discovery) setupTable() error {
+	// Sleep until network setup is done
+	time.Sleep(5 * time.Second)
 	for _, node := range d.bootnodes {
 		if err := d.addToTable(node); err != nil {
 			return err
