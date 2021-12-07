@@ -9,50 +9,51 @@ import (
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
-// IbftCandidates is the command to query the snapshot
+// IbftCandidates is the command to get a current list of IBFT candidates
+// and their corresponding votes
 type IbftCandidates struct {
 	helper.Meta
 }
 
 // GetHelperText returns a simple description of the command
-func (p *IbftCandidates) GetHelperText() string {
+func (c *IbftCandidates) GetHelperText() string {
 	return "Queries the current set of proposed candidates, as well as candidates that have not been included yet"
 }
 
-func (p *IbftCandidates) GetBaseCommand() string {
+func (c *IbftCandidates) GetBaseCommand() string {
 	return "ibft candidates"
 }
 
 // Help implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Help() string {
-	p.Meta.DefineFlags()
+func (c *IbftCandidates) Help() string {
+	c.Meta.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Synopsis() string {
-	return p.GetHelperText()
+func (c *IbftCandidates) Synopsis() string {
+	return c.GetHelperText()
 }
 
 // Run implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+func (c *IbftCandidates) Run(args []string) int {
+	flags := c.FlagSet(c.GetBaseCommand())
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		c.UI.Error(err.Error())
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := c.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		c.UI.Error(err.Error())
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.UI.Error(err.Error())
+		c.UI.Error(err.Error())
 		return 1
 	}
 
@@ -68,7 +69,7 @@ func (p *IbftCandidates) Run(args []string) int {
 
 	output += "\n"
 
-	p.UI.Output(output)
+	c.UI.Output(output)
 
 	return 0
 }

@@ -146,20 +146,6 @@ func (i *Ibft) runHook(hookName string, hookParams interface{}) error {
 	return hook(hookParams)
 }
 
-// Define the type of the iBFT consensus
-
-type Type string
-
-const (
-	// PoA defines the Proof of Authority IBFT type,
-	// where the validator set is changed through voting / pre-set in genesis
-	PoA Type = "PoA"
-
-	// PoS defines the Proof of Stake IBFT type,
-	// where the validator set it changed through staking on the Staking SC
-	PoS Type = "PoS"
-)
-
 // Factory implements the base consensus Factory method
 func Factory(
 	ctx context.Context,
@@ -588,7 +574,6 @@ func (i *Ibft) runAcceptState() { // start new round
 	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
 	}
-	//i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
 
 	i.state.validators = snap.Set
 
