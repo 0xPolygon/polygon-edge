@@ -18,8 +18,10 @@ type ContentResponse struct {
 }
 
 type InspectResponse struct {
-	Pending map[string]map[string]string `json:"pending"`
-	Queued  map[string]map[string]string `json:"queued"`
+	Pending         map[string]map[string]string `json:"pending"`
+	Queued          map[string]map[string]string `json:"queued"`
+	CurrentCapacity uint64                       `json:"currentCapacity"`
+	MaxCapacity     uint64                       `json:"maxCapacity"`
 }
 
 type StatusResponse struct {
@@ -60,7 +62,7 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 // Create response for txpool_content request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content.
 func (t *Txpool) Content() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs()
+	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	pendingRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address] = make(map[uint64]*txpoolTransaction)
@@ -88,7 +90,7 @@ func (t *Txpool) Content() (interface{}, error) {
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
 func (t *Txpool) Inspect() (interface{}, error) {
 
-	pendingTxs, queuedTxs := t.d.store.GetTxs()
+	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	pendingRpcTxns := make(map[string]map[string]string)
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address.String()] = make(map[string]string)
@@ -107,9 +109,14 @@ func (t *Txpool) Inspect() (interface{}, error) {
 		}
 	}
 
+	// get capacity of the TxPool
+	current, max := t.d.store.GetCapacity()
+
 	resp := InspectResponse{
-		Pending: pendingRpcTxns,
-		Queued:  queuedRpcTxns,
+		Pending:         pendingRpcTxns,
+		Queued:          queuedRpcTxns,
+		CurrentCapacity: current,
+		MaxCapacity:     max,
 	}
 
 	return resp, nil
@@ -118,7 +125,7 @@ func (t *Txpool) Inspect() (interface{}, error) {
 // Create response for txpool_status request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status.
 func (t *Txpool) Status() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs()
+	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	var pendingCount int
 	for _, t := range pendingTxs {
 		pendingCount += len(t)

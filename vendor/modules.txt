@@ -1,7 +1,11 @@
+# github.com/VividCortex/gohistogram v1.0.0
+## explicit
 # github.com/armon/go-metrics v0.3.9
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
+# github.com/beorn7/perks v1.0.1
+github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy v0.1.0
 github.com/bgentry/speakeasy
 # github.com/btcsuite/btcd v0.21.0-beta
@@ -9,6 +13,8 @@ github.com/bgentry/speakeasy
 github.com/btcsuite/btcd/btcec
 # github.com/cenkalti/backoff/v3 v3.0.0
 github.com/cenkalti/backoff/v3
+# github.com/cespare/xxhash/v2 v2.1.1
+github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
@@ -17,6 +23,12 @@ github.com/davidlazar/go-crypto/salsa20
 github.com/fatih/color
 # github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6
 github.com/flynn/noise
+# github.com/go-kit/kit v0.9.0
+## explicit
+github.com/go-kit/kit/metrics
+github.com/go-kit/kit/metrics/discard
+github.com/go-kit/kit/metrics/internal/lv
+github.com/go-kit/kit/metrics/prometheus
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.5.2
@@ -273,6 +285,8 @@ github.com/libp2p/go-yamux
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v0.1.1
@@ -332,6 +346,21 @@ github.com/posener/complete
 github.com/posener/complete/cmd
 github.com/posener/complete/cmd/install
 github.com/posener/complete/match
+# github.com/prometheus/client_golang v1.4.0
+## explicit
+github.com/prometheus/client_golang/prometheus
+github.com/prometheus/client_golang/prometheus/internal
+github.com/prometheus/client_golang/prometheus/promhttp
+# github.com/prometheus/client_model v0.2.0
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.9.1
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/model
+# github.com/prometheus/procfs v0.0.8
+github.com/prometheus/procfs
+github.com/prometheus/procfs/internal/fs
+github.com/prometheus/procfs/internal/util
 # github.com/ryanuber/columnize v2.1.2+incompatible
 ## explicit
 github.com/ryanuber/columnize

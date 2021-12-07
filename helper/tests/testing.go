@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"testing"
 	"time"
@@ -59,13 +58,12 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorClient) (*txpoolOp.TxnPoolStatusResp,
 	error) {
 	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		subCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		res, _ := client.Status(subCtx, &empty.Empty{})
 		if res != nil && res.Length == 0 {
 			return res, false
 		}
-		fmt.Printf("TxPool not empty, %d transactions remaining..\n", res.Length)
 		return nil, true
 	})
 

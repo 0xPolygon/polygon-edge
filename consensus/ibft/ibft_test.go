@@ -1,7 +1,10 @@
 package ibft
 
 import (
+	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
@@ -358,7 +361,6 @@ func TestTransition_RoundChangeState_Timeout(t *testing.T) {
 
 func TestTransition_RoundChangeState_WeakCertificate(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C", "D", "E", "F", "G"}, "A")
-
 	m.setState(RoundChangeState)
 
 	// send three roundChange messages which are enough to force a
@@ -452,6 +454,232 @@ func TestTransition_RoundChangeState_MaxRound(t *testing.T) {
 		state:    RoundChangeState,
 		outgoing: 1,
 	})
+}
+
+func TestWriteTransactions(t *testing.T) {
+	type testCase struct {
+		description               string
+		txns                      []*types.Transaction
+		recoverableTxnsIndexes    []int
+		unrecoverableTxnsIndexes  []int
+		gasLimitReachedTxnIndex   int
+		expectedTxPoolLength      int
+		expectedIncludedTxnsCount int
+	}
+
+	setupMockTransition := func(test testCase, mockTxPool *mockTxPool) *mockTransition {
+		mockTransition := &mockTransition{}
+		for _, i := range test.recoverableTxnsIndexes {
+			mockTransition.recoverableTransactions = append(mockTransition.recoverableTransactions, mockTxPool.transactions[i])
+		}
+		for _, i := range test.unrecoverableTxnsIndexes {
+			mockTransition.unrecoverableTransactions = append(mockTransition.unrecoverableTransactions, mockTxPool.transactions[i])
+		}
+		if test.gasLimitReachedTxnIndex > 0 {
+			mockTransition.gasLimitReachedTransaction = mockTxPool.transactions[test.gasLimitReachedTxnIndex]
+		}
+		return mockTransition
+	}
+
+	testCases := []testCase{
+		{
+			"transaction whose gas exceeds block gas limit is discarded",
+			[]*types.Transaction{{Nonce: 1}},
+			nil,
+			nil,
+			-1,
+			0,
+			1,
+		},
+		{
+			"valid transaction is included in transition",
+			[]*types.Transaction{{Nonce: 1}},
+			nil,
+			nil,
+			-1,
+			0,
+			1,
+		},
+		{
+			"recoverable transaction is returned to pool and not included in transition",
+			[]*types.Transaction{{Nonce: 1}},
+			[]int{0},
+			nil,
+			-1,
+			1,
+			0,
+		},
+		{
+
+			"unrecoverable transaction is not returned to pool and not included in transition",
+			[]*types.Transaction{{Nonce: 1}},
+			nil,
+			[]int{0},
+			-1,
+			0,
+			0,
+		},
+		{
+			"only valid transactions are ever included in transition",
+			[]*types.Transaction{{Nonce: 1}, {Nonce: 2}, {Nonce: 3}, {Nonce: 4}, {Nonce: 5}},
+			[]int{0},
+			[]int{3, 4},
+			-1,
+			1,
+			2,
+		},
+		{
+			"write stops when next included transaction reaches block gas limit",
+			[]*types.Transaction{
+				{Nonce: 1},             // recoverable - returned to pool
+				{Nonce: 2},             // unrecoverable
+				{Nonce: 3},             // included
+				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
+				{Nonce: 5},             // included
+				{Nonce: 6},             // reaches gas limit - returned to pool
+				{Nonce: 7}}, // not considered - stays in pool
+			[]int{0},
+			[]int{1},
+			5,
+			3,
+			2,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.description, func(t *testing.T) {
+			m := newMockIbft(t, []string{"A", "B", "C"}, "A")
+			mockTxPool := &mockTxPool{}
+			mockTxPool.transactions = append(mockTxPool.transactions, test.txns...)
+			m.txpool = mockTxPool
+			mockTransition := setupMockTransition(test, mockTxPool)
+
+			included := m.writeTransactions(1000, mockTransition)
+
+			assert.Equal(t, test.expectedTxPoolLength, len(mockTxPool.transactions))
+			assert.Equal(t, test.expectedIncludedTxnsCount, len(included))
+			for _, recoverable := range mockTransition.recoverableTransactions {
+				assert.False(t, mockTxPool.nonceDecreased[recoverable])
+			}
+			for _, unrecoverable := range mockTransition.unrecoverableTransactions {
+				assert.True(t, mockTxPool.nonceDecreased[unrecoverable])
+			}
+		})
+	}
+}
+
+func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *testing.T) {
+	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
+	m.setState(SyncState)
+	expectedNewBlockToSync := &types.Block{Header: &types.Header{Number: 1}}
+	mockSyncer := &mockSyncer{}
+	mockSyncer.receivedNewHeadFromPeer = expectedNewBlockToSync
+	m.syncer = mockSyncer
+	mockTxPool := &mockTxPool{}
+	m.txpool = mockTxPool
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	assert.True(t, mockTxPool.resetWithHeaderCalled)
+	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeaderParam)
+	assert.True(t, mockSyncer.broadcastCalled)
+	assert.Equal(t, expectedNewBlockToSync, mockSyncer.broadcastedBlock)
+}
+
+type mockSyncer struct {
+	receivedNewHeadFromPeer *types.Block
+	broadcastedBlock        *types.Block
+	broadcastCalled         bool
+}
+
+func (s *mockSyncer) Start() {}
+
+func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
+	return &protocol.SyncPeer{}
+}
+
+func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer) error {
+	return nil
+}
+
+func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool) {
+	handler(s.receivedNewHeadFromPeer)
+}
+
+func (s *mockSyncer) Broadcast(b *types.Block) {
+	s.broadcastCalled = true
+	s.broadcastedBlock = b
+}
+
+type mockTxPool struct {
+	transactions          []*types.Transaction
+	nonceDecreased        map[*types.Transaction]bool
+	resetWithHeaderCalled bool
+	resetWithHeaderParam  *types.Header
+}
+
+func (p *mockTxPool) ResetWithHeader(h *types.Header) {
+	p.resetWithHeaderCalled = true
+	p.resetWithHeaderParam = h
+}
+
+func (p *mockTxPool) Pop() (*types.Transaction, func()) {
+	if len(p.transactions) == 0 {
+		return nil, nil
+	}
+
+	t := p.transactions[0]
+	p.transactions = p.transactions[1:]
+	return t, func() {
+		p.transactions = append(p.transactions, t)
+	}
+}
+
+func (p *mockTxPool) DecreaseAccountNonce(txn *types.Transaction) {
+	if p.nonceDecreased == nil {
+		p.nonceDecreased = make(map[*types.Transaction]bool)
+	}
+
+	p.nonceDecreased[txn] = true
+}
+
+func (p *mockTxPool) Length() uint64 {
+	return uint64(len(p.transactions))
+}
+
+type mockTransition struct {
+	transactionsWritten        []*types.Transaction
+	recoverableTransactions    []*types.Transaction
+	unrecoverableTransactions  []*types.Transaction
+	gasLimitReachedTransaction *types.Transaction
+}
+
+func (t *mockTransition) Write(txn *types.Transaction) error {
+	if txn == t.gasLimitReachedTransaction {
+		return state.NewGasLimitReachedTransitionApplicationError(nil)
+	}
+
+	for _, recoverable := range t.recoverableTransactions {
+		if txn == recoverable {
+			return state.NewTransitionApplicationError(nil, true)
+		}
+	}
+
+	for _, unrecoverable := range t.unrecoverableTransactions {
+		if txn == unrecoverable {
+			return state.NewTransitionApplicationError(nil, false)
+		}
+	}
+
+	t.transactionsWritten = append(t.transactionsWritten, txn)
+	return nil
 }
 
 type mockIbft struct {
@@ -553,6 +781,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		operator:         &operator{},
 		state:            newState(),
 		epochSize:        DefaultEpochSize,
+		metrics:          consensus.NilMetrics(),
 	}
 
 	// by default set the state to (1, 0)

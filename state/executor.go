@@ -355,6 +355,16 @@ func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApp
 	}
 }
 
+type GasLimitReachedTransitionApplicationError struct {
+	TransitionApplicationError
+}
+
+func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTransitionApplicationError {
+	return &GasLimitReachedTransitionApplicationError{
+		*NewTransitionApplicationError(err, true),
+	}
+}
+
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
@@ -380,25 +390,25 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// 3. the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
 	intrinsicGasCost, err := TransactionGasCost(msg, t.config.Homestead, t.config.Istanbul)
 	if err != nil {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewTransitionApplicationError(err, false)
 	}
 
 	// 5. the purchased gas is enough to cover intrinsic usage
 	gasLeft := msg.Gas - intrinsicGasCost
 	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, NewTransitionApplicationError(err, true)
+		return nil, NewTransitionApplicationError(ErrNotEnoughFunds, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)

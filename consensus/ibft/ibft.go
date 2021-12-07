@@ -3,7 +3,6 @@ package ibft
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	any "google.golang.org/protobuf/types/known/anypb"
@@ -30,6 +28,21 @@ type blockchainInterface interface {
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
 	WriteBlocks(blocks []*types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
+}
+
+type transactionPoolInterface interface {
+	ResetWithHeader(h *types.Header)
+	Pop() (*types.Transaction, func())
+	DecreaseAccountNonce(tx *types.Transaction)
+	Length() uint64
+}
+
+type syncerInterface interface {
+	Start()
+	BestPeer() *protocol.SyncPeer
+	BulkSyncWithPeer(p *protocol.SyncPeer) error
+	WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool)
+	Broadcast(b *types.Block)
 }
 
 // Ibft represents the IBFT consensus mechanism object
@@ -47,7 +60,7 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey // Private key for the validator
 	validatorKeyAddr types.Address
 
-	txpool *txpool.TxPool // Reference to the transaction pool
+	txpool transactionPoolInterface // Reference to the transaction pool
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	epochSize uint64
@@ -55,8 +68,8 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer       *protocol.Syncer // Reference to the sync protocol
-	syncNotifyCh chan bool        // Sync protocol notification channel
+	syncer       syncerInterface // Reference to the sync protocol
+	syncNotifyCh chan bool       // Sync protocol notification channel
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -65,6 +78,8 @@ type Ibft struct {
 
 	// aux test methods
 	forceTimeoutCh bool
+
+	metrics *consensus.Metrics
 
 	secretsManager secrets.SecretsManager
 }
@@ -85,6 +100,7 @@ func Factory(
 		epochSize:      DefaultEpochSize,
 		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
+		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 	}
 
@@ -255,7 +271,7 @@ func (i *Ibft) start() {
 func (i *Ibft) runCycle() {
 	// Log to the console
 	if i.state.view != nil {
-		i.logger.Debug("cycle", "state", i.getState(), "sequence", i.state.view.Sequence, "round", i.state.view.Round)
+		i.logger.Debug("cycle", "state", i.getState(), "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
 	}
 
 	// Based on the current state, execute the corresponding section
@@ -316,6 +332,9 @@ func (i *Ibft) runSyncState() {
 					Round:    0,
 					Sequence: header.Number + 1,
 				}
+				//Set the round metric
+				i.metrics.Rounds.Set(float64(i.state.view.Round))
+
 				i.setState(AcceptState)
 			} else {
 				time.Sleep(1 * time.Second)
@@ -339,6 +358,7 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			i.syncer.Broadcast(b)
+			i.txpool.ResetWithHeader(b.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
@@ -402,29 +422,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if err != nil {
 		return nil, err
 	}
-	txns := []*types.Transaction{}
-	for {
-		txn, retFn := i.txpool.Pop()
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.DecreaseAccountNonce(txn)
-		} else {
-			if err := transition.Write(txn); err != nil {
-				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-					retFn()
-				} else {
-					i.txpool.DecreaseAccountNonce(txn)
-				}
-				break
-			}
-			txns = append(txns, txn)
-		}
-	}
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	txns := i.writeTransactions(gasLimit, transition)
 
 	_, root := transition.Commit()
 	header.StateRoot = root
@@ -452,6 +450,52 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	return block, nil
 }
 
+type transitionInterface interface {
+	Write(txn *types.Transaction) error
+}
+
+// writeTransactions writes transactions from the txpool to the transition object
+// and returns transactions that were included in the transition (new block)
+func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := i.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			i.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				i.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	return txns
+}
+
 // runAcceptState runs the Accept state loop
 //
 // The Accept state always checks the snapshot, and the validator set. If the current node is not in the validators set,
@@ -459,7 +503,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 // If it turns out that the current node is the proposer, it builds a block, and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
 	logger := i.logger.Named("acceptState")
-	logger.Info("Accept state", "sequence", i.state.view.Sequence)
+	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
@@ -487,6 +531,8 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	i.state.validators = snap.Set
 
+	//Update the No.of validator metric
+	i.metrics.Validators.Set(float64(len(snap.Set)))
 	// reset round messages
 	i.state.resetRoundMsgs()
 
@@ -536,7 +582,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	// we are NOT a proposer for the block. Then, we have to wait
 	// for a pre-prepare message from the proposer
 
-	timeout := i.randomTimeout()
+	timeout := exponentialTimeout(i.state.view.Round)
 	for i.getState() == AcceptState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -601,7 +647,7 @@ func (i *Ibft) runValidateState() {
 		}
 	}
 
-	timeout := i.randomTimeout()
+	timeout := exponentialTimeout(i.state.view.Round)
 	for i.getState() == ValidateState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -649,12 +695,31 @@ func (i *Ibft) runValidateState() {
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
 		} else {
+			// update metrics
+			i.updateMetrics(block)
+
 			// move ahead to the next block
 			i.setState(AcceptState)
 		}
 	}
 }
 
+// updateMetrics will update various metrics based on the given block
+// currently we capture No.of Txs and block interval metrics using this function
+func (i *Ibft) updateMetrics(block *types.Block) {
+	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
+	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
+	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
+	//Update the block interval metric
+	if block.Number() > 1 {
+		i.metrics.BlockInterval.Observe(
+			headerTime.Sub(parentTime).Seconds(),
+		)
+	}
+	//Update the Number of transactions in the block metric
+	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
+
+}
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
 	for _, commit := range i.state.committed {
@@ -713,9 +778,10 @@ func (i *Ibft) handleStateErr(err error) {
 
 func (i *Ibft) runRoundChangeState() {
 	sendRoundChange := func(round uint64) {
-		i.logger.Debug("local round change", "round", round)
-		// set the new round
+		i.logger.Debug("local round change", "round", round+1)
+		// set the new round and update the round metric
 		i.state.view.Round = round
+		i.metrics.Rounds.Set(float64(round))
 		// clean the round
 		i.state.cleanRound(round)
 		// send the round change message
@@ -763,7 +829,7 @@ func (i *Ibft) runRoundChangeState() {
 	}
 
 	// create a timer for the round change
-	timeout := i.randomTimeout()
+	timeout := exponentialTimeout(i.state.view.Round)
 	for i.getState() == RoundChangeState {
 		msg, ok := i.getNextMessage(timeout)
 		if !ok {
@@ -774,7 +840,7 @@ func (i *Ibft) runRoundChangeState() {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
 			// update the timeout duration
-			timeout = i.randomTimeout()
+			timeout = exponentialTimeout(i.state.view.Round)
 			continue
 		}
 
@@ -789,7 +855,7 @@ func (i *Ibft) runRoundChangeState() {
 			// weak certificate, try to catch up if our round number is smaller
 			if i.state.view.Round < msg.View.Round {
 				// update timer
-				timeout = i.randomTimeout()
+				timeout = exponentialTimeout(i.state.view.Round)
 				sendRoundChange(msg.View.Round)
 			}
 		}
@@ -866,23 +932,13 @@ func (i *Ibft) isState(s IbftState) bool {
 
 // setState sets the IBFT state
 func (i *Ibft) setState(s IbftState) {
-	i.logger.Debug("state change", "new", s)
+	i.logger.Info("state change", "new", s)
 	i.state.setState(s)
 }
 
 // forceTimeout sets the forceTimeoutCh flag to true
 func (i *Ibft) forceTimeout() {
 	i.forceTimeoutCh = true
-}
-
-// randomTimeout calculates the timeout duration depending on the current round
-func (i *Ibft) randomTimeout() time.Duration {
-	timeout := time.Duration(10000) * time.Millisecond
-	round := i.state.view.Round
-	if round > 0 {
-		timeout += time.Duration(math.Pow(2, float64(round))) * time.Second
-	}
-	return timeout
 }
 
 // isSealing checks if the current node is sealing blocks
@@ -987,6 +1043,7 @@ func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
 		// someone closes the stopCh (i.e. timeout for round change)
 		select {
 		case <-timeoutCh:
+			i.logger.Info("unable to read new message from the message queue", "timeout expired", timeout)
 			return nil, true
 		case <-i.closeCh:
 			return nil, false
