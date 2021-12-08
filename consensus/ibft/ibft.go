@@ -3,6 +3,7 @@ package ibft
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"reflect"
 	"time"
 
