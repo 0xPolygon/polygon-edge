@@ -157,7 +157,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
-	var bootnodes = make(helperFlags.BootnodeFlags, 0)
+	var bootnodes = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
 	var name string
 	var consensus string
 	var isPos bool
@@ -223,6 +223,11 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
+	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
+		c.UI.Error("Minimum two bootnodes are required")
+		return 1
+	}
+
 	// constructEngineConfig is a helper method for
 	// parametrizing the consensus configuration, which
 	// can be retrieved at runtime from the consensus module
@@ -259,7 +264,7 @@ func (c *GenesisCommand) Run(args []string) int {
 				consensus: constructEngineConfig(),
 			},
 		},
-		Bootnodes: bootnodes,
+		Bootnodes: bootnodes.Addrs,
 	}
 
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,

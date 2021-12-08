@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -110,24 +111,67 @@ func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
 	return transaction.Hash.String(), nil
 }
 
-// GetTransactionByHash returns a transaction by his hash
+// GetTransactionByHash returns a transaction by its hash.
+// If the transaction is still pending -> return the txn with some fields omitted
+// If the transaction is sealed into a block -> return the whole txn with all fields
 func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
-	blockHash, ok := e.d.store.ReadTxLookup(hash)
-	if !ok {
-		// txn not found
-		return nil, nil
-	}
-	block, ok := e.d.store.GetBlockByHash(blockHash, true)
-	if !ok {
-		// block receipts not found
-		return nil, nil
-	}
-	for idx, txn := range block.Transactions {
-		if txn.Hash == hash {
-			return toTransaction(txn, block, idx), nil
+	// findSealedTx is a helper method for checking the world state
+	// for the transaction with the provided hash
+	findSealedTx := func() *transaction {
+		// Check the chain state for the transaction
+		blockHash, ok := e.d.store.ReadTxLookup(hash)
+		if !ok {
+			// Block not found in storage
+			return nil
 		}
+		block, ok := e.d.store.GetBlockByHash(blockHash, true)
+		if !ok {
+			// Block receipts not found in storage
+			return nil
+		}
+
+		// Find the transaction within the block
+		for idx, txn := range block.Transactions {
+			if txn.Hash == hash {
+				return toTransaction(
+					txn,
+					argUintPtr(block.Number()),
+					argHashPtr(block.Hash()),
+					&idx,
+				)
+			}
+		}
+
+		return nil
 	}
-	// txn not found (this should not happen)
+
+	// findPendingTx is a helper method for checking the TxPool
+	// for the pending transaction with the provided hash
+	findPendingTx := func() *transaction {
+		// Check the TxPool for the transaction if it's pending
+		if pendingTx, pendingFound := e.d.store.GetPendingTx(hash); pendingFound {
+			return toPendingTransaction(pendingTx)
+		}
+
+		// Transaction not found in the TxPool
+		return nil
+	}
+
+	// 1. Check the chain state for the txn
+	if resultTxn := findSealedTx(); resultTxn != nil {
+		return resultTxn, nil
+	}
+
+	// 2. Check the TxPool for the txn
+	if resultTxn := findPendingTx(); resultTxn != nil {
+		return resultTxn, nil
+	}
+
+	// Transaction not found in state or TxPool
+	e.d.logger.Warn(
+		fmt.Sprintf("Transaction with hash [%s] not found", hash),
+	)
+
 	return nil, nil
 }
 
@@ -141,20 +185,26 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 	block, ok := e.d.store.GetBlockByHash(blockHash, true)
 	if !ok {
-		fmt.Println("CCCC")
 		// block not found
+		e.d.logger.Warn(
+			fmt.Sprintf("Block with hash [%s] not found", blockHash.String()),
+		)
 		return nil, nil
 	}
 
 	receipts, err := e.d.store.GetReceiptsByHash(blockHash)
 	if err != nil {
-		fmt.Println("AAAA", err)
 		// block receipts not found
+		e.d.logger.Warn(
+			fmt.Sprintf("Receipts for block with hash [%s] not found", blockHash.String()),
+		)
 		return nil, nil
 	}
 	if len(receipts) == 0 {
-		// receitps not written yet on the db
-		fmt.Println("BBBB")
+		// Receipts not written yet on the db
+		e.d.logger.Warn(
+			fmt.Sprintf("No receipts found for block with hash [%s]", blockHash.String()),
+		)
 		return nil, nil
 	}
 	// find the transaction in the body
@@ -206,9 +256,12 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 }
 
 // GetStorageAt returns the contract storage at the index position
-func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *BlockNumber) (interface{}, error) {
-
-	//Set the block number to latest
+func (e *Eth) GetStorageAt(
+	address types.Address,
+	index types.Hash,
+	number *BlockNumber,
+) (interface{}, error) {
+	// Set the block number to latest
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -221,12 +274,12 @@ func (e *Eth) GetStorageAt(address types.Address, index types.Hash, number *Bloc
 	// Get the storage for the passed in location
 	result, err := e.d.store.GetStorage(header.StateRoot, address, index)
 	if err != nil {
-		if err == ErrStateNotFound {
+		if errors.As(err, &ErrStateNotFound) {
 			return argBytesPtr(types.ZeroHash[:]), nil
 		}
 		return nil, err
 	}
-	//Parse the RLP value
+	// Parse the RLP value
 	p := &fastrlp.Parser{}
 	v, err := p.Parse(result)
 	if err != nil {
@@ -248,8 +301,10 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) Call(
+	arg *txnArgs,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -330,12 +385,21 @@ func (e *Eth) EstimateGas(
 	// If the sender address is present, recalculate the ceiling to his balance
 	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 		// Get the account balance
+
+		// If the account is not initialized yet in state,
+		// assume it's an empty account
+		accountBalance := big.NewInt(0)
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
-		if err != nil {
+		if err != nil && !errors.As(err, &ErrStateNotFound) {
+			// An unrelated error occurred, return it
 			return nil, err
+		} else if err == nil {
+			// No error when fetching the account,
+			// read the balance from state
+			accountBalance = acc.Balance
 		}
 
-		available := new(big.Int).Set(acc.Balance)
+		available := new(big.Int).Set(accountBalance)
 
 		if transaction.Value != nil {
 			if valueInt.Cmp(available) >= 0 {
@@ -395,7 +459,7 @@ func (e *Eth) EstimateGas(
 
 	// we stopped the binary search at the last gas limit
 	// at which the txn could not be executed
-	highEnd += 1
+	highEnd++
 
 	// Check the edge case if even the highest cap is not enough to complete the transaction
 	if highEnd == gasCap {
@@ -487,8 +551,10 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 }
 
 // GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) GetBalance(
+	address types.Address,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -498,23 +564,27 @@ func (e *Eth) GetBalance(address types.Address, number *BlockNumber) (interface{
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil {
+	if errors.As(err, &ErrStateNotFound) {
 		// Account not found, return an empty account
 		return argUintPtr(0), nil
+	} else if err != nil {
+		return nil, err
 	}
 
 	return argBigPtr(acc.Balance), nil
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (interface{}, error) {
-
+func (e *Eth) GetTransactionCount(
+	address types.Address,
+	number *BlockNumber,
+) (interface{}, error) {
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
 	nonce, err := e.d.getNextNonce(address, *number)
 	if err != nil {
-		if err == ErrStateNotFound {
+		if errors.As(err, &ErrStateNotFound) {
 			return argUintPtr(0), nil
 		}
 		return nil, err
@@ -524,8 +594,7 @@ func (e *Eth) GetTransactionCount(address types.Address, number *BlockNumber) (i
 
 // GetCode returns account code at given block number
 func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
-
-	//Set the block number to latest
+	// Set the block number to latest
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
@@ -534,12 +603,16 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 		return nil, err
 	}
 
+	emptySlice := []byte{}
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
-	if err != nil {
+	if errors.As(err, &ErrStateNotFound) {
+		// If the account doesn't exist / is not initialized yet,
+		// return the default value
 		return "0x", nil
+	} else if err != nil {
+		return argBytesPtr(emptySlice), err
 	}
 
-	emptySlice := []byte{}
 	code, err := e.d.store.GetCode(types.BytesToHash(acc.CodeHash))
 	if err != nil {
 		// TODO This is just a workaround. Figure out why CodeHash is populated for regular accounts

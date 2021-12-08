@@ -7,9 +7,10 @@ import (
 
 // Request is a jsonrpc request
 type Request struct {
-	ID     uint64          `json:"id"`
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
+	JsonRPC string          `json:"jsonrpc"`
+	ID      uint64          `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
 }
 
 // Response is a jsonrpc response

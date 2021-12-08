@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"fmt"
-	"math"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
@@ -99,6 +98,10 @@ func (c *currentState) setState(s IbftState) {
 
 // NumValid returns the number of required messages
 func (c *currentState) NumValid() int {
+	// According to the IBFT spec, the number of valid messages
+	// needs to be 2F + 1
+	// The 1 missing from this equation is accounted for elsewhere
+	// (the current node tallying the messages will include its own message)
 	return 2 * c.validators.MaxFaultyNodes()
 }
 
@@ -187,16 +190,16 @@ func (c *currentState) addMessage(msg *proto.MessageReq) {
 		return
 	}
 
-	if msg.Type == proto.MessageReq_Commit {
+	switch {
+	case msg.Type == proto.MessageReq_Commit:
 		c.committed[addr] = msg
-	} else if msg.Type == proto.MessageReq_Prepare {
+	case msg.Type == proto.MessageReq_Prepare:
 		c.prepared[addr] = msg
-	} else if msg.Type == proto.MessageReq_RoundChange {
+	case msg.Type == proto.MessageReq_RoundChange:
 		view := msg.View
 		if _, ok := c.roundMessages[view.Round]; !ok {
 			c.roundMessages[view.Round] = map[types.Address]*proto.MessageReq{}
 		}
-
 		c.roundMessages[view.Round][addr] = msg
 	}
 }
@@ -282,8 +285,18 @@ func (v *ValidatorSet) Includes(addr types.Address) bool {
 	return v.Index(addr) != -1
 }
 
-// MaxFaultyNodes returns the maximum number of allowed faulty nodes, based on the current validator set
+// MaxFaultyNodes returns the maximum number of allowed faulty nodes (F), based on the current validator set
 func (v *ValidatorSet) MaxFaultyNodes() int {
-	// numberOfValidators / 3
-	return int(math.Ceil(float64(len(*v))/3)) - 1
+	// N -> number of nodes in IBFT
+	// F -> number of faulty nodes
+	//
+	// N = 3F + 1
+	// => F = (N - 1) / 3
+	//
+	// IBFT tolerates 1 failure with 4 nodes
+	// 4 = 3 * 1 + 1
+	// To tolerate 2 failures, IBFT requires 7 nodes
+	// 7 = 3 * 2 + 1
+	// It should always take the floor of the result
+	return (len(*v) - 1) / 3
 }

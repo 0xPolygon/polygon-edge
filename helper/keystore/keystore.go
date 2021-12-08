@@ -20,7 +20,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	var keyBuff []byte
 	if !os.IsNotExist(err) {
 		// Key exists
-		
+
 		keyBuff, err = ioutil.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read private key from disk (%s), %v", path, err)
@@ -42,4 +42,14 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	}
 
 	return keyBuff, nil
+}
+
+func CreatePrivateKey(create createFn) ([]byte, error) {
+	keyBuff, err := create()
+	if err != nil {
+		return nil, fmt.Errorf("unable to generate private key, %v", err)
+	}
+
+	// Encode it to a readable format (Base64) and return
+	return []byte(hex.EncodeToString(keyBuff)), nil
 }
