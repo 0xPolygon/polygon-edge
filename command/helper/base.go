@@ -25,7 +25,7 @@ type Base struct {
 	FlagMap map[string]FlagDescriptor
 }
 
-// DefineFlags defined the common command flags
+// DefineFlags initializes and defines the common command flags
 func (c *Base) DefineFlags(ds ...FlagDefiner) {
 	if c.FlagMap == nil {
 		// Flag map not initialized
