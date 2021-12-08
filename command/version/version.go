@@ -45,7 +45,7 @@ func (c *VersionCommand) Run(args []string) int {
 		return 1
 	}
 
-	c.Formatter.OutputResult(&VersionResult{Verstion: version.GetVersion()})
+	c.Formatter.OutputResult(&VersionResult{Verstion: version.Version})
 
 	return 0
 }
@@ -55,5 +55,5 @@ type VersionResult struct {
 }
 
 func (r *VersionResult) Output() string {
-	return r.Verstion
+	return version.GetVersion()
 }
