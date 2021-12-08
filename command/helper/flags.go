@@ -79,7 +79,7 @@ func (f *FormatterFlag) OutputError(e error) {
 		if err != nil {
 			f.UI.Error(err.Error())
 		} else {
-			f.UI.Info(string(bytes))
+			f.UI.Error(string(bytes))
 		}
 	} else {
 		f.UI.Error(e.Error())
