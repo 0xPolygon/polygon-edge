@@ -23,7 +23,6 @@ type CommandResult interface {
 type Base struct {
 	UI      cli.Ui
 	FlagMap map[string]FlagDescriptor
-	IsJSON  bool
 }
 
 // DefineFlags defined the common command flags
