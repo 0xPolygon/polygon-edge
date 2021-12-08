@@ -177,8 +177,8 @@ func (p *TxPoolAdd) Run(args []string) int {
 	res := &TxPoolAddResult{
 		From:     fromRaw,
 		To:       toRaw,
-		Value:    valueRaw,
-		GasPrice: gasPriceRaw,
+		Value:    *types.EncodeBigInt(value),
+		GasPrice: *types.EncodeBigInt(gasPrice),
 		GasLimit: gasLimit,
 	}
 	p.Formatter.OutputResult(res)
