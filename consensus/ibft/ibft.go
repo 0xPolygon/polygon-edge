@@ -102,6 +102,15 @@ const (
 func Factory(
 	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
+	var epochSize uint64
+	if definedEpochSize, ok := params.Config.Config["epochSize"]; !ok {
+		// No epoch size defined, use the default one
+		epochSize = DefaultEpochSize
+	} else {
+		// Epoch size is defined, use the passed in one
+		epochSize = uint64(definedEpochSize.(float64))
+	}
+
 	p := &Ibft{
 		logger:         params.Logger.Named("ibft"),
 		config:         params.Config,
@@ -111,7 +120,7 @@ func Factory(
 		txpool:         params.Txpool,
 		state:          &currentState{},
 		network:        params.Network,
-		epochSize:      DefaultEpochSize,
+		epochSize:      epochSize,
 		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
