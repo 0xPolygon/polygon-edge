@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -10,7 +9,7 @@ import (
 
 // SecretsGenerate is the command to generate a secrets manager configuration
 type SecretsGenerate struct {
-	helper.Meta
+	helper.Base
 }
 
 const (
@@ -19,10 +18,7 @@ const (
 )
 
 func (s *SecretsGenerate) DefineFlags() {
-	if s.FlagMap == nil {
-		// Flag map not initialized
-		s.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	s.Base.DefineFlags()
 
 	s.FlagMap["dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the directory for the secrets manager configuration file Default: %s", defaultConfigFileName),
@@ -93,7 +89,8 @@ func (s *SecretsGenerate) GetBaseCommand() string {
 
 // Run implements the cli.SecretsManagerGenerate interface
 func (s *SecretsGenerate) Run(args []string) int {
-	flags := flag.NewFlagSet(s.GetBaseCommand(), flag.ContinueOnError)
+	flags := s.Base.NewFlagSet(s.GetBaseCommand())
+
 	var path string
 	var token string
 	var serverURL string

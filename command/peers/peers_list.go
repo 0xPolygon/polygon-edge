@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +12,14 @@ import (
 
 // PeersList is the PeersList to start the sever
 type PeersList struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (p *PeersList) DefineFlags() {
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -25,7 +33,7 @@ func (p *PeersList) GetBaseCommand() string {
 
 // Help implements the cli.PeersList interface
 func (p *PeersList) Help() string {
-	p.Meta.DefineFlags()
+	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
@@ -37,47 +45,62 @@ func (p *PeersList) Synopsis() string {
 
 // Run implements the cli.PeersList interface
 func (p *PeersList) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	resp, err := clt.PeersList(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[PEERS LIST]\n"
-
-	if len(resp.Peers) == 0 {
-		output += "No peers found"
-	} else {
-		output += fmt.Sprintf("Number of peers: %d\n\n", len(resp.Peers))
-
-		output += formatPeers(resp.Peers)
-	}
-
-	output += "\n"
-
-	p.UI.Output(output)
+	res := NewPeersListResult(resp)
+	p.Formatter.OutputResult(res)
 
 	return 0
 }
 
-func formatPeers(peers []*proto.Peer) string {
-	var generatedRows []string
-	for i := 0; i < len(peers); i++ {
-		generatedRows = append(generatedRows, fmt.Sprintf("[%d]|%s", i, peers[i].Id))
-	}
+type PeersListResult struct {
+	Peers []string `json:"peers"`
+}
 
-	return helper.FormatKV(generatedRows)
+func NewPeersListResult(resp *proto.PeersListResponse) *PeersListResult {
+	peers := make([]string, len(resp.Peers))
+	for i, p := range resp.Peers {
+		peers[i] = p.Id
+	}
+	return &PeersListResult{
+		Peers: peers,
+	}
+}
+
+func (r *PeersListResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[PEERS LIST]\n")
+
+	if len(r.Peers) == 0 {
+		buffer.WriteString("No peers found")
+	} else {
+		buffer.WriteString(fmt.Sprintf("Number of peers: %d\n\n", len(r.Peers)))
+
+		rows := make([]string, len(r.Peers))
+		for i, p := range r.Peers {
+			rows[i] = fmt.Sprintf("[%d]|%s", i, p)
+		}
+		buffer.WriteString(helper.FormatKV(rows))
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

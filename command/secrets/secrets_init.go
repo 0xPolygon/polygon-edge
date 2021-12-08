@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"path/filepath"
 
@@ -19,20 +18,17 @@ import (
 
 // SecretsInit is the command to query the snapshot
 type SecretsInit struct {
-	helper.Meta
+	helper.Base
 }
 
 var (
 	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
 )
 
-func (i *SecretsInit) DefineFlags() {
-	if i.FlagMap == nil {
-		// Flag map not initialized
-		i.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+func (p *SecretsInit) DefineFlags() {
+	p.Base.DefineFlags()
 
-	i.FlagMap["data-dir"] = helper.FlagDescriptor{
+	p.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: "Sets the directory for the Polygon SDK data if the local FS is used",
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -41,7 +37,7 @@ func (i *SecretsInit) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	i.FlagMap["config"] = helper.FlagDescriptor{
+	p.FlagMap["config"] = helper.FlagDescriptor{
 		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
@@ -122,7 +118,8 @@ func setupHashicorpVault(
 
 // Run implements the cli.SecretsInit interface
 func (p *SecretsInit) Run(args []string) int {
-	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
+	flags := p.Base.NewFlagSet(p.GetBaseCommand())
+
 	var dataDir string
 	var configPath string
 

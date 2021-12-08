@@ -3,13 +3,17 @@ package version
 import (
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/version"
-	"github.com/mitchellh/cli"
 )
 
 // VersionCommand is the command to show the version of the agent
 type VersionCommand struct {
-	UI cli.Ui
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+}
+
+// DefineFlags defines the command flags
+func (c *VersionCommand) DefineFlags() {
+	c.Base.DefineFlags(c.Formatter)
 }
 
 // GetHelperText returns a simple description of the command
@@ -23,6 +27,8 @@ func (c *VersionCommand) GetBaseCommand() string {
 
 // Help implements the cli.Command interface
 func (c *VersionCommand) Help() string {
+	c.DefineFlags()
+
 	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
@@ -33,7 +39,21 @@ func (c *VersionCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *VersionCommand) Run(args []string) int {
-	c.UI.Output(version.GetVersion())
+	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter)
+	if err := flags.Parse(args); err != nil {
+		c.Formatter.OutputError(err)
+		return 1
+	}
+
+	c.Formatter.OutputResult(&VersionResult{Verstion: version.GetVersion()})
 
 	return 0
+}
+
+type VersionResult struct {
+	Verstion string `json:"version"`
+}
+
+func (r *VersionResult) Output() string {
+	return r.Verstion
 }

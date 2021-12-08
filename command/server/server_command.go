@@ -7,29 +7,23 @@ import (
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
 )
 
 // ServerCommand is the command to start the sever
 type ServerCommand struct {
-	UI cli.Ui
-
-	flagMap map[string]helper.FlagDescriptor
+	helper.Base
 }
 
 // DefineFlags defines the command flags
 func (c *ServerCommand) DefineFlags() {
-	if c.flagMap == nil {
-		// Flag map not initialized
-		c.flagMap = make(map[string]helper.FlagDescriptor)
-	}
+	c.Base.DefineFlags()
 
-	if len(c.flagMap) > 0 {
+	if len(c.FlagMap) > 0 {
 		// No need to redefine the flags again
 		return
 	}
 
-	c.flagMap["log-level"] = helper.FlagDescriptor{
+	c.FlagMap["log-level"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", helper.DefaultConfig().LogLevel),
 		Arguments: []string{
 			"LOG_LEVEL",
@@ -37,7 +31,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["seal"] = helper.FlagDescriptor{
+	c.FlagMap["seal"] = helper.FlagDescriptor{
 		Description: "Sets the flag indicating that the client should seal blocks. Default: false",
 		Arguments: []string{
 			"SHOULD_SEAL",
@@ -45,7 +39,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["block-gas-target"] = helper.FlagDescriptor{
+	c.FlagMap["block-gas-target"] = helper.FlagDescriptor{
 		Description: "Sets the target block gas limit for the chain. If omitted, the value of the parent block is used",
 		Arguments: []string{
 			"BLOCK_GAS_TARGET",
@@ -54,7 +48,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	c.flagMap["config"] = helper.FlagDescriptor{
+	c.FlagMap["config"] = helper.FlagDescriptor{
 		Description: "Specifies the path to the CLI config. Supports .json and .hcl",
 		Arguments: []string{
 			"CLI_CONFIG_PATH",
@@ -62,7 +56,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["chain"] = helper.FlagDescriptor{
+	c.FlagMap["chain"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", helper.DefaultConfig().Chain),
 		Arguments: []string{
 			"GENESIS_FILE",
@@ -70,7 +64,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["data-dir"] = helper.FlagDescriptor{
+	c.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", helper.DefaultConfig().DataDir),
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -78,7 +72,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["grpc"] = helper.FlagDescriptor{
+	c.FlagMap["grpc"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
 		Arguments: []string{
 			"GRPC_ADDRESS",
@@ -86,7 +80,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["jsonrpc"] = helper.FlagDescriptor{
+	c.FlagMap["jsonrpc"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultJSONRPCPort),
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
@@ -94,7 +88,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["libp2p"] = helper.FlagDescriptor{
+	c.FlagMap["libp2p"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d", network.DefaultLibp2pPort),
 		Arguments: []string{
 			"LIBP2P_ADDRESS",
@@ -102,7 +96,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["join"] = helper.FlagDescriptor{
+	c.FlagMap["join"] = helper.FlagDescriptor{
 		Description: "Specifies the address of the peer that should be joined",
 		Arguments: []string{
 			"JOIN_ADDRESS",
@@ -110,7 +104,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["nat"] = helper.FlagDescriptor{
+	c.FlagMap["nat"] = helper.FlagDescriptor{
 		Description: "Sets the external IP address without the port, as it can be seen by peers",
 		Arguments: []string{
 			"NAT_ADDRESS",
@@ -118,7 +112,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["dns"] = helper.FlagDescriptor{
+	c.FlagMap["dns"] = helper.FlagDescriptor{
 		Description: "Sets the host DNS address",
 		Arguments: []string{
 			"DNS_ADDRESS",
@@ -126,7 +120,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["no-discover"] = helper.FlagDescriptor{
+	c.FlagMap["no-discover"] = helper.FlagDescriptor{
 		Description: "Prevents the client from discovering other peers. Default: false",
 		Arguments: []string{
 			"NO_DISCOVER",
@@ -134,7 +128,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["max-peers"] = helper.FlagDescriptor{
+	c.FlagMap["max-peers"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
 		Arguments: []string{
 			"PEER_COUNT",
@@ -142,7 +136,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["locals"] = helper.FlagDescriptor{
+	c.FlagMap["locals"] = helper.FlagDescriptor{
 		Description: "Sets comma separated accounts whose transactions are treated as locals",
 		Arguments: []string{
 			"LOCALS",
@@ -150,7 +144,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["nolocals"] = helper.FlagDescriptor{
+	c.FlagMap["nolocals"] = helper.FlagDescriptor{
 		Description: "Sets flag to disable price exemptions for locally submitted transactions",
 		Arguments: []string{
 			"NOLOCALS",
@@ -158,7 +152,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["price-limit"] = helper.FlagDescriptor{
+	c.FlagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
 		Arguments: []string{
 			"PRICE_LIMIT",
@@ -166,7 +160,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["max-slots"] = helper.FlagDescriptor{
+	c.FlagMap["max-slots"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets maximum slots in the pool. Default: %d", helper.DefaultConfig().TxPool.MaxSlots),
 		Arguments: []string{
 			"MAX_SLOTS",
@@ -174,7 +168,7 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["dev"] = helper.FlagDescriptor{
+	c.FlagMap["dev"] = helper.FlagDescriptor{
 		Description: "Sets the client to dev mode. Default: false",
 		Arguments: []string{
 			"DEV_MODE",
@@ -182,21 +176,23 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.flagMap["dev-interval"] = helper.FlagDescriptor{
+	c.FlagMap["dev-interval"] = helper.FlagDescriptor{
 		Description: "Sets the client's dev notification interval. Default: 0",
 		Arguments: []string{
 			"DEV_INTERVAL",
 		},
 		FlagOptional: true,
 	}
-	c.flagMap["prometheus"] = helper.FlagDescriptor{
+
+	c.FlagMap["prometheus"] = helper.FlagDescriptor{
 		Description: "Sets the address and port for the prometheus instrumentation service (address:port)",
 		Arguments: []string{
 			"PROMETHEUS_ADDRESS",
 		},
 		FlagOptional: true,
-  }
-	c.flagMap["secrets-config"] = helper.FlagDescriptor{
+	}
+
+	c.FlagMap["secrets-config"] = helper.FlagDescriptor{
 		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
@@ -204,7 +200,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      true,
-}
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -220,7 +216,7 @@ func (c *ServerCommand) GetBaseCommand() string {
 func (c *ServerCommand) Help() string {
 	c.DefineFlags()
 
-	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.flagMap), c.flagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.Command interface

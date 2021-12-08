@@ -17,11 +17,9 @@ import (
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -466,46 +464,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 type HelpGenerator interface {
 	DefineFlags()
-}
-
-// Meta is a helper utility for the commands
-type Meta struct {
-	UI   cli.Ui
-	Addr string
-
-	FlagMap map[string]FlagDescriptor
-}
-
-// DefineFlags sets global flags used by several commands
-func (m *Meta) DefineFlags() {
-	m.FlagMap = make(map[string]FlagDescriptor)
-
-	m.FlagMap["grpc-address"] = FlagDescriptor{
-		Description: fmt.Sprintf("Address of the gRPC API. Default: %s:%d", "127.0.0.1", server.DefaultGRPCPort),
-		Arguments: []string{
-			"GRPC_ADDRESS",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
-}
-
-// FlagSet adds some default commands to handle grpc connections with the server
-func (m *Meta) FlagSet(n string) *flag.FlagSet {
-	f := flag.NewFlagSet(n, flag.ContinueOnError)
-	f.StringVar(&m.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
-
-	return f
-}
-
-// Conn returns a grpc connection
-func (m *Meta) Conn() (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial(m.Addr, grpc.WithInsecure())
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to server: %v", err)
-	}
-
-	return conn, nil
 }
 
 // OUTPUT FORMATTING //

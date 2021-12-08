@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -13,15 +14,14 @@ import (
 
 // TxPoolAdd is the command to query the snapshot
 type TxPoolAdd struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
 }
 
 // DefineFlags defines the command flags
 func (p *TxPoolAdd) DefineFlags() {
-	if p.FlagMap == nil {
-		// Flag map not initialized
-		p.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 
 	p.FlagMap["from"] = helper.FlagDescriptor{
 		Description: "The sender address",
@@ -85,7 +85,6 @@ func (p *TxPoolAdd) GetBaseCommand() string {
 
 // Help implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Help() string {
-	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
@@ -98,7 +97,7 @@ func (p *TxPoolAdd) Synopsis() string {
 
 // Run implements the cli.TxPoolAdd interface
 func (p *TxPoolAdd) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	// Address types
 	var fromRaw, toRaw string
@@ -126,28 +125,28 @@ func (p *TxPoolAdd) Run(args []string) int {
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("Failed to decode from address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("Failed to decode from address: %v", err))
 		return 1
 	}
 	to := types.Address{}
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("Failed to decode to address: %v", err))
 		return 1
 	}
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %v", err))
 		return 1
 	}
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 	if err != nil {
-		p.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("Failed to decode to gasPrice: %v", err))
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -171,24 +170,43 @@ func (p *TxPoolAdd) Run(args []string) int {
 	}
 
 	if _, err := clt.AddTxn(context.Background(), msg); err != nil {
-		p.UI.Error(fmt.Sprintf("Failed to add transaction: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("Failed to add transaction: %v", err))
 		return 1
 	}
 
-	output := "\n[ADD TRANSACTION]\n"
-	output += "Successfully added transaction:\n"
-
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("FROM|%s", fromRaw),
-		fmt.Sprintf("TO|%s", toRaw),
-		fmt.Sprintf("VALUE|%s", valueRaw),
-		fmt.Sprintf("GAS PRICE|%s", gasPriceRaw),
-		fmt.Sprintf("GAS LIMIT|%d", gasLimit),
-	})
-
-	output += "\n"
-
-	p.UI.Info(output)
+	res := &TxPoolAddResult{
+		From:     fromRaw,
+		To:       toRaw,
+		Value:    valueRaw,
+		GasPrice: gasPriceRaw,
+		GasLimit: gasLimit,
+	}
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type TxPoolAddResult struct {
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Value    string `json:"value"`
+	GasPrice string `json:"gas_price"`
+	GasLimit uint64 `json:"gas_limit"`
+}
+
+func (r *TxPoolAddResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[ADD TRANSACTION]\n")
+	buffer.WriteString("Successfully added transaction:\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("FROM|%s", r.From),
+		fmt.Sprintf("TO|%s", r.To),
+		fmt.Sprintf("VALUE|%s", r.Value),
+		fmt.Sprintf("GAS PRICE|%s", r.GasPrice),
+		fmt.Sprintf("GAS LIMIT|%d", r.GasLimit),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }
