@@ -140,7 +140,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
-	var bootnodes = make(helperFlags.BootnodeFlags, 0)
+	var bootnodes = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
 	var name string
 	var consensus string
 
@@ -203,6 +203,11 @@ func (c *GenesisCommand) Run(args []string) int {
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
+	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
+		c.UI.Error("Minimum two bootnodes are required")
+		return 1
+	}
+
 	cc := &chain.Chain{
 		Name: name,
 		Genesis: &chain.Genesis{
@@ -219,7 +224,7 @@ func (c *GenesisCommand) Run(args []string) int {
 				consensus: map[string]interface{}{},
 			},
 		},
-		Bootnodes: bootnodes,
+		Bootnodes: bootnodes.Addrs,
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {

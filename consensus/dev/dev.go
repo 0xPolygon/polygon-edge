@@ -193,6 +193,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	d.txpool.ResetWithHeader(block.Header)
+
 	return nil
 }
 

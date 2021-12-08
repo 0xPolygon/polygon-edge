@@ -292,7 +292,7 @@ func getCount(
 	response, err := rpcClient.Eth().Call(
 		&web3.CallMsg{
 			From:     web3.Address(from),
-			To:       contractAddress,
+			To:       &contractAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
