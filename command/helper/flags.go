@@ -70,7 +70,17 @@ func (f *FormatterFlag) FlagSet(fs *flag.FlagSet) {
 // OutputError is helper function to print output with different format
 func (f *FormatterFlag) OutputError(e error) {
 	if f.IsJSON {
-		f.UI.Error(fmt.Sprintf("{\"error\":\"%s\"}", e.Error()))
+		// marshal for escaped error
+		errRes := struct {
+			Err string `json:"error"`
+		}{Err: e.Error()}
+
+		bytes, err := json.Marshal(errRes)
+		if err != nil {
+			f.UI.Error(err.Error())
+		} else {
+			f.UI.Info(string(bytes))
+		}
 	} else {
 		f.UI.Error(e.Error())
 	}
