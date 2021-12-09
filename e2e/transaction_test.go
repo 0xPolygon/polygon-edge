@@ -220,7 +220,7 @@ func TestEthTransfer(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			receipt, err := tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), txnHash)
 
 			if testCase.shouldSucceed {
 				assert.NoError(t, err)

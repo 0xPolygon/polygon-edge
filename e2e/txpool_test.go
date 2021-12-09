@@ -372,7 +372,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
 				defer waitCancel()
 
-				_, err = srv.WaitForReceipt(waitCtx, txHash)
+				_, err = tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash)
 				if err != nil {
 					t.Errorf("Unable to wait for receipt, %v", err)
 					return

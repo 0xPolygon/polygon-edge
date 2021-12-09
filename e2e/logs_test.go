@@ -73,7 +73,7 @@ func TestNewFilter_Block(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, err = srv.WaitForReceipt(ctx, hash)
+		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
 		assert.NoError(t, err)
 	}
 
