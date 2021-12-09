@@ -3,14 +3,15 @@ package loadbot
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/umbracle/go-web3"
-	"github.com/umbracle/go-web3/jsonrpc"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 )
 
 type Configuration struct {
@@ -24,7 +25,6 @@ type Configuration struct {
 }
 
 type Metrics struct {
-	m                          sync.Mutex
 	Duration                   time.Duration
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
@@ -36,14 +36,14 @@ type Account struct {
 }
 
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
-	nonce, err := client.Eth().GetNonce(web3.Address(address), -1)
+	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
 	}
 	return nonce, nil
 }
 
-func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce *uint64) error {
+func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) error {
 	signer := crypto.NewEIP155Signer(100)
 
 	txn, err := signer.SignTx(&types.Transaction{
@@ -52,7 +52,7 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 		Gas:      1000000,
 		Value:    value,
 		GasPrice: big.NewInt(0x100000),
-		Nonce:    *nonce,
+		Nonce:    nonce,
 		V:        []byte{1}, // it is necessary to encode in rlp
 	}, sender.PrivateKey)
 
@@ -64,7 +64,6 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 	if err != nil {
 		return fmt.Errorf("failed to send raw transaction: %v", err)
 	}
-	atomic.AddUint64(nonce, 1)
 	return nil
 }
 
@@ -79,11 +78,6 @@ func Run(conf *Configuration, metrics *Metrics) error {
 		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
 	}
 
-	err = shutdownClient(client)
-	if err != nil {
-		return fmt.Errorf("failed to shutdown JSON-RPC client: %v", err)
-	}
-
 	nonce, err := getInitialSenderNonce(client, sender.Address)
 	if err != nil {
 		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
@@ -96,21 +90,21 @@ func Run(conf *Configuration, metrics *Metrics) error {
 	defer wg.Wait()
 
 	for i := uint64(0); i < conf.Count; i++ {
-		select {
-		case <-ticker.C:
-			metrics.TotalTransactionsSentCount += 1
+		<-ticker.C
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				err := executeTxn(client, *sender, conf.Receiver, conf.Value, &nonce)
-				if err != nil {
-					metrics.m.Lock()
-					metrics.FailedTransactionsCount += 1
-					metrics.m.Unlock()
-				}
-			}()
-		}
+		metrics.TotalTransactionsSentCount += 1
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// take nonce first
+			newNextNonce := atomic.AddUint64(&nonce, 1)
+			err := executeTxn(client, *sender, conf.Receiver, conf.Value, newNextNonce-1)
+			if err != nil {
+				atomic.AddUint64(&metrics.FailedTransactionsCount, 1)
+			}
+		}()
 	}
 
 	err = waitForTxPool(conf.GRPC)
