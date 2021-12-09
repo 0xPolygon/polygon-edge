@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
-	txPoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3/jsonrpc"
-	"google.golang.org/grpc"
 )
 
 func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
@@ -18,16 +16,6 @@ func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
 		return nil, fmt.Errorf("failed to create new JSON RPC client: %v", err)
 	}
 	return client, nil
-}
-
-func createGRpcClient(endpoint string) (*txPoolOp.TxnPoolOperatorClient, error) {
-	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gRPC connection: %v", err)
-	}
-
-	client := txPoolOp.NewTxnPoolOperatorClient(conn)
-	return &client, nil
 }
 
 func extractSenderAccount(address types.Address) (*Account, error) {

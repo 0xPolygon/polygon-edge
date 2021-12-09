@@ -79,6 +79,7 @@ func Run(conf *Configuration, metrics *Metrics) error {
 	if err != nil {
 		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
 	}
+	defer shutdownClient(client)
 
 	nonce, err := getInitialSenderNonce(client, sender.Address)
 	if err != nil {
