@@ -19,6 +19,15 @@ func (c *Client) Eth() *Eth {
 	return c.endpoints.e
 }
 
+// GetCode returns the code of a contract
+func (e *Eth) GetCode(addr web3.Address, block web3.BlockNumberOrHash) (string, error) {
+	var res string
+	if err := e.c.Call("eth_getCode", &res, addr, block.Location()); err != nil {
+		return "", err
+	}
+	return res, nil
+}
+
 // Accounts returns a list of addresses owned by client.
 func (e *Eth) Accounts() ([]web3.Address, error) {
 	var out []web3.Address
@@ -26,6 +35,13 @@ func (e *Eth) Accounts() ([]web3.Address, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// GetStorageAt returns the value from a storage position at a given address.
+func (e *Eth) GetStorageAt(addr web3.Address, slot web3.Hash, block web3.BlockNumberOrHash) (web3.Hash, error) {
+	var hash web3.Hash
+	err := e.c.Call("eth_getStorageAt", &hash, addr, slot, block.Location())
+	return hash, err
 }
 
 // BlockNumber returns the number of most recent block.
@@ -134,18 +150,18 @@ func (e *Eth) GetTransactionReceipt(hash web3.Hash) (*web3.Receipt, error) {
 }
 
 // GetNonce returns the nonce of the account
-func (e *Eth) GetNonce(addr web3.Address, blockNumber web3.BlockNumber) (uint64, error) {
+func (e *Eth) GetNonce(addr web3.Address, blockNumber web3.BlockNumberOrHash) (uint64, error) {
 	var nonce string
-	if err := e.c.Call("eth_getTransactionCount", &nonce, addr, blockNumber.String()); err != nil {
+	if err := e.c.Call("eth_getTransactionCount", &nonce, addr, blockNumber.Location()); err != nil {
 		return 0, err
 	}
 	return parseUint64orHex(nonce)
 }
 
 // GetBalance returns the balance of the account of given address.
-func (e *Eth) GetBalance(addr web3.Address, blockNumber web3.BlockNumber) (*big.Int, error) {
+func (e *Eth) GetBalance(addr web3.Address, blockNumber web3.BlockNumberOrHash) (*big.Int, error) {
 	var out string
-	if err := e.c.Call("eth_getBalance", &out, addr, blockNumber.String()); err != nil {
+	if err := e.c.Call("eth_getBalance", &out, addr, blockNumber.Location()); err != nil {
 		return nil, err
 	}
 	b, ok := new(big.Int).SetString(out[2:], 16)

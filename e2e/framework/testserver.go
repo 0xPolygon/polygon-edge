@@ -16,18 +16,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	ibftCommand "github.com/0xPolygon/polygon-sdk/command/ibft"
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -137,10 +138,10 @@ type InitIBFTResult struct {
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	ibftInitCmd := ibftCommand.IbftInit{}
+	secretsInitCmd := secretsCommand.SecretsInit{}
 	var args []string
 
-	commandSlice := strings.Split(ibftInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -152,16 +153,39 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	res := &InitIBFTResult{}
-	// Read the private key
-	key, err := crypto.GenerateOrReadPrivateKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "consensus", ibft.IbftKeyName))
-	if err != nil {
-		return nil, err
+
+	localSecretsManager, factoryErr := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+			Extra: map[string]interface{}{
+				secrets.Path: filepath.Join(cmd.Dir, t.Config.IBFTDir),
+			},
+		})
+	if factoryErr != nil {
+		return nil, factoryErr
 	}
 
-	// Read the Libp2p key
-	libp2pKey, err := network.ReadLibp2pKey(filepath.Join(cmd.Dir, t.Config.IBFTDir, "libp2p"))
-	if err != nil {
-		return nil, err
+	// Generate the IBFT validator private key
+	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
+	if keyErr != nil {
+		return nil, keyErr
+	}
+
+	// Write the validator private key to the secrets manager storage
+	if setErr := localSecretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
+		return nil, setErr
+	}
+
+	// Generate the libp2p private key
+	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
+	if keyErr != nil {
+		return nil, keyErr
+	}
+
+	// Write the networking private key to the secrets manager storage
+	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+		return nil, setErr
 	}
 
 	// Get the node ID from the private key
@@ -170,7 +194,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 		return nil, err
 	}
 
-	res.Address = crypto.PubKeyToAddress(&key.PublicKey).String()
+	res.Address = crypto.PubKeyToAddress(&validatorKey.PublicKey).String()
 	res.NodeID = nodeId.String()
 
 	return res, nil
@@ -198,10 +222,24 @@ func (t *TestServer) GenerateGenesis() error {
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}
+
+		if t.Config.EpochSize != 0 {
+			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
+		}
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
+
+		// Set up any initial staker addresses for the predeployed Staking SC
+		for _, stakerAddress := range t.Config.DevStakers {
+			args = append(args, "--ibft-validator", stakerAddress.String())
+		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
+	}
+
+	// Make sure the correct mechanism is selected
+	if t.Config.IsPos {
+		args = append(args, "--pos")
 	}
 
 	// add block gas limit

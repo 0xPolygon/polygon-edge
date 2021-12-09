@@ -7,12 +7,10 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 )
 
 // Dev consensus protocol seals any new transaction immediately
@@ -31,28 +29,20 @@ type Dev struct {
 
 // Factory implements the base factory method
 func Factory(
-	ctx context.Context,
-	sealing bool,
-	config *consensus.Config,
-	txpool *txpool.TxPool,
-	network *network.Server,
-	blockchain *blockchain.Blockchain,
-	executor *state.Executor,
-	srv *grpc.Server,
-	logger hclog.Logger,
+	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
-	logger = logger.Named("dev")
+	logger := params.Logger.Named("dev")
 
 	d := &Dev{
 		logger:     logger,
 		notifyCh:   make(chan struct{}),
 		closeCh:    make(chan struct{}),
-		blockchain: blockchain,
-		executor:   executor,
-		txpool:     txpool,
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		txpool:     params.Txpool,
 	}
 
-	rawInterval, ok := config.Config["interval"]
+	rawInterval, ok := params.Config.Config["interval"]
 	if ok {
 		interval, ok := rawInterval.(uint64)
 		if !ok {
@@ -62,8 +52,8 @@ func Factory(
 	}
 
 	// enable dev mode so that we can accept non-signed txns
-	txpool.EnableDev()
-	txpool.NotifyCh = d.notifyCh
+	params.Txpool.EnableDev()
+	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -108,6 +98,50 @@ func (d *Dev) run() {
 	}
 }
 
+type transitionInterface interface {
+	Write(txn *types.Transaction) error
+}
+
+func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := d.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			d.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				d.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
+	return txns
+}
+
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
@@ -137,33 +171,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	txns := []*types.Transaction{}
-	for {
-		// Add transactions to the list until there are none left
-		txn, retFn := d.txpool.Pop()
-
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.DecreaseAccountNonce(txn)
-		} else {
-			// Execute the state transition
-			if err := transition.Write(txn); err != nil {
-				if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-					retFn()
-				} else {
-					d.txpool.DecreaseAccountNonce(txn)
-				}
-
-				break
-			}
-
-			txns = append(txns, txn)
-		}
-	}
+	txns := d.writeTransactions(gasLimit, transition)
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -184,6 +192,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
 		return err
 	}
+
+	// after the block has been written we reset the txpool so that
+	// the old transactions are removed
+	d.txpool.ResetWithHeader(block.Header)
 
 	return nil
 }

@@ -24,7 +24,7 @@ import (
 
 const (
 	maxEnqueueSize = 50
-	popTimeout     = time.Second * 10
+	popTimeout     = 10 * time.Second
 )
 
 var (
@@ -36,8 +36,8 @@ var (
 	ErrConnectionClosed       = errors.New("connection closed")
 )
 
-// syncPeer is a representation of the peer the node is syncing with
-type syncPeer struct {
+// SyncPeer is a representation of the peer the node is syncing with
+type SyncPeer struct {
 	peer   peer.ID
 	conn   *grpc.ClientConn
 	client proto.V1Client
@@ -51,7 +51,7 @@ type syncPeer struct {
 }
 
 // Number returns the latest peer block height
-func (s *syncPeer) Number() uint64 {
+func (s *SyncPeer) Number() uint64 {
 	s.statusLock.RLock()
 	defer s.statusLock.RUnlock()
 
@@ -59,13 +59,13 @@ func (s *syncPeer) Number() uint64 {
 }
 
 // IsClosed returns whether peer's connectivity has been closed
-func (s *syncPeer) IsClosed() bool {
+func (s *SyncPeer) IsClosed() bool {
 	return s.conn.GetState() == connectivity.Shutdown
 }
 
 // purgeBlocks purges the cache of broadcasted blocks the node has written so far
-// from the syncPeer
-func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
+// from the SyncPeer
+func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
@@ -81,7 +81,7 @@ func (s *syncPeer) purgeBlocks(lastSeen types.Hash) {
 }
 
 // popBlock pops a block from the block queue [BLOCKING]
-func (s *syncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
+func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
 	for {
 
@@ -109,7 +109,7 @@ func (s *syncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 }
 
 // appendBlock adds a new block to the block queue
-func (s *syncPeer) appendBlock(b *types.Block) {
+func (s *SyncPeer) appendBlock(b *types.Block) {
 	s.enqueueLock.Lock()
 	defer s.enqueueLock.Unlock()
 
@@ -126,7 +126,7 @@ func (s *syncPeer) appendBlock(b *types.Block) {
 	}
 }
 
-func (s *syncPeer) updateStatus(status *Status) {
+func (s *SyncPeer) updateStatus(status *Status) {
 	s.statusLock.Lock()
 	defer s.statusLock.Unlock()
 
@@ -195,7 +195,7 @@ type Syncer struct {
 	logger     hclog.Logger
 	blockchain blockchainShim
 
-	peers sync.Map // Maps peer.ID -> syncPeer
+	peers sync.Map // Maps peer.ID -> SyncPeer
 
 	serviceV1 *serviceV1
 	stopCh    chan struct{}
@@ -272,7 +272,7 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 
 	peer, ok := s.peers.Load(peerID)
 	if ok {
-		peer.(*syncPeer).appendBlock(b)
+		peer.(*SyncPeer).appendBlock(b)
 	}
 }
 
@@ -289,7 +289,7 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 	)
 
 	if peer, ok := s.peers.Load(peerID); ok {
-		peer.(*syncPeer).updateStatus(status)
+		peer.(*SyncPeer).updateStatus(status)
 	}
 }
 
@@ -316,7 +316,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	}
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
-		if _, err := peer.(*syncPeer).client.Notify(context.Background(), req); err != nil {
+		if _, err := peer.(*SyncPeer).client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
 		}
 
@@ -372,14 +372,14 @@ func (s *Syncer) Start() {
 }
 
 // BestPeer returns the best peer by difficulty (if any)
-func (s *Syncer) BestPeer() *syncPeer {
-	var bestPeer *syncPeer
+func (s *Syncer) BestPeer() *SyncPeer {
+	var bestPeer *SyncPeer
 	var bestTd *big.Int
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
-		status := peer.(*syncPeer).status
+		status := peer.(*SyncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = peer.(*syncPeer), status.Difficulty
+			bestPeer, bestTd = peer.(*SyncPeer), status.Difficulty
 		}
 
 		return true
@@ -411,7 +411,7 @@ func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
 		return err
 	}
 
-	s.peers.Store(peerID, &syncPeer{
+	s.peers.Store(peerID, &SyncPeer{
 		peer:      peerID,
 		conn:      conn,
 		client:    clt,
@@ -425,10 +425,10 @@ func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
 func (s *Syncer) DeletePeer(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
-		if err := p.(*syncPeer).conn.Close(); err != nil {
+		if err := p.(*SyncPeer).conn.Close(); err != nil {
 			return err
 		}
-		close(p.(*syncPeer).enqueueCh)
+		close(p.(*SyncPeer).enqueueCh)
 	}
 
 	return nil
@@ -502,7 +502,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	return header, fork, nil
 }
 
-func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) bool) {
+func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
 	// purge from the cache of broadcasted blocks all the ones we have written so far
 	header := s.blockchain.Header()
 	p.purgeBlocks(header.Hash)
@@ -513,9 +513,10 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
 			break
 		}
+
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
-			s.logger.Error("failed to pop block", "err", err)
+			s.logSyncPeerPopBlockError(err, p)
 			break
 		}
 		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
@@ -528,7 +529,16 @@ func (s *Syncer) WatchSyncWithPeer(p *syncPeer, handler func(b *types.Block) boo
 	}
 }
 
-func (s *Syncer) BulkSyncWithPeer(p *syncPeer) error {
+func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
+	if errors.Is(err, ErrPopTimeout) {
+		msg := "failed to pop block within %ds from peer: id=%s, please check if all the validators are running"
+		s.logger.Warn(fmt.Sprintf(msg, int(popTimeout.Seconds()), peer.peer))
+	} else {
+		s.logger.Info("failed to pop block from peer", "id", peer.peer, "err", err)
+	}
+}
+
+func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
 	if err != nil {
