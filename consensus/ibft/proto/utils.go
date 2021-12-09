@@ -36,6 +36,11 @@ func (m *MessageReq) Copy() *MessageReq {
 	return proto.Clone(m).(*MessageReq)
 }
 
+// Copy makes a copy of the candidate and returns it
+func (c *Candidate) Copy() *Candidate {
+	return proto.Clone(c).(*Candidate)
+}
+
 // Copy makes a copy of the view and returns it
 func (v *View) Copy() *View {
 	return proto.Clone(v).(*View)
