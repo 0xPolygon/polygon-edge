@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -10,8 +11,10 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -27,15 +30,18 @@ const DefaultLibp2pPort int = 1478
 
 const MinimumPeerConnections int64 = 1
 
-type Config struct {
-	NoDiscover bool
-	Addr       *net.TCPAddr
-	NatAddr    net.IP
-	Dns        multiaddr.Multiaddr
-	DataDir    string
-	MaxPeers   uint64
+// MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+const MinimumBootNodes int = 2
 
-	Chain *chain.Chain
+type Config struct {
+	NoDiscover     bool
+	Addr           *net.TCPAddr
+	NatAddr        net.IP
+	Dns            multiaddr.Multiaddr
+	DataDir        string
+	MaxPeers       uint64
+	Chain          *chain.Chain
+	SecretsManager secrets.SecretsManager
 }
 
 func DefaultConfig() *Config {
@@ -66,6 +72,9 @@ type Server struct {
 	protocols     map[string]Protocol
 	protocolsLock sync.Mutex
 
+	// Secrets manager
+	secretsManager secrets.SecretsManager
+
 	// pubsub
 	ps *pubsub.PubSub
 
@@ -81,10 +90,39 @@ type Peer struct {
 	Info peer.AddrInfo
 }
 
+// setupLibp2pKey is a helper method for setting up the networking private key
+func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
+	var key crypto.PrivKey
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		// The key is present in the secrets manager, read it
+		networkingKey, readErr := ReadLibp2pKey(secretsManager)
+		if readErr != nil {
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %v", readErr)
+		}
+
+		key = networkingKey
+	} else {
+		// The key is not present in the secrets manager, generate it
+		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
+		if keyErr != nil {
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %v", keyErr)
+		}
+
+		// Write the networking private key to disk
+		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %v", setErr)
+		}
+
+		key = libp2pKey
+	}
+
+	return key, nil
+}
+
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
-	key, err := ReadLibp2pKey(config.DataDir)
+	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +173,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
 		protocols:        map[string]Protocol{},
+		secretsManager:   config.SecretsManager,
 	}
 
 	// start identity
@@ -146,6 +185,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	if !config.NoDiscover {
+
+		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < MinimumBootNodes {
+			return nil, errors.New("Minimum two bootnodes are required")
+		}
+
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
@@ -158,7 +202,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
 			}
 			if node.ID == srv.host.ID() {
-				srv.logger.Info("Omitting bootnode with same ID as host", node.ID)
+				srv.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
 			}
 			// add the bootnode to the peerstore

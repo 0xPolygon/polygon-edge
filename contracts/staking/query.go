@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/contracts/abis"
-	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
@@ -16,7 +16,7 @@ var (
 	AddrStakingContract = types.StringToAddress("1001")
 )
 
-func decodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
+func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,12 @@ func decodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, 
 	return addresses, nil
 }
 
-func QueryValidators(t *state.Transition, from types.Address) ([]types.Address, error) {
+type TxQueryHandler interface {
+	Apply(*types.Transaction) (*runtime.ExecutionResult, error)
+	GetNonce(types.Address) uint64
+}
+
+func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, error) {
 	method, ok := abis.StakingABI.Methods["validators"]
 	if !ok {
 		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
@@ -49,7 +54,7 @@ func QueryValidators(t *state.Transition, from types.Address) ([]types.Address, 
 		From:     from,
 		To:       &AddrStakingContract,
 		Value:    big.NewInt(0),
-		Input:    selector[:],
+		Input:    selector,
 		GasPrice: big.NewInt(0),
 		Gas:      100000000,
 		Nonce:    t.GetNonce(from),
@@ -61,5 +66,5 @@ func QueryValidators(t *state.Transition, from types.Address) ([]types.Address, 
 		return nil, res.Err
 	}
 
-	return decodeValidators(method, res.ReturnValue)
+	return DecodeValidators(method, res.ReturnValue)
 }

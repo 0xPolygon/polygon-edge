@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"math/big"
 	"reflect"
 	"strings"
@@ -91,4 +92,34 @@ func TestDecode_TxnArgs(t *testing.T) {
 			t.Fatal("bad")
 		}
 	}
+}
+
+func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
+	hexWithLeading0 := "0x0ba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
+	hexWithoutLeading0 := "0xba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
+	v, _ := hex.DecodeHex(hexWithLeading0)
+	r, _ := hex.DecodeHex(hexWithLeading0)
+	s, _ := hex.DecodeHex(hexWithLeading0)
+	txn := types.Transaction{
+		Nonce:    0,
+		GasPrice: big.NewInt(0),
+		Gas:      0,
+		To:       nil,
+		Value:    big.NewInt(0),
+		Input:    nil,
+		V:        v,
+		R:        r,
+		S:        s,
+		Hash:     types.Hash{},
+		From:     types.Address{},
+	}
+
+	jsonTx := toTransaction(&txn, nil, nil, nil)
+
+	jsonV, _ := jsonTx.V.MarshalText()
+	jsonR, _ := jsonTx.V.MarshalText()
+	jsonS, _ := jsonTx.V.MarshalText()
+	assert.Equal(t, hexWithoutLeading0, string(jsonV))
+	assert.Equal(t, hexWithoutLeading0, string(jsonR))
+	assert.Equal(t, hexWithoutLeading0, string(jsonS))
 }

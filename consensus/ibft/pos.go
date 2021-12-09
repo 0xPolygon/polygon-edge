@@ -103,10 +103,9 @@ func (i *Ibft) updateValidators(num uint64) error {
 		return errors.New("header not found")
 	}
 
-	validators, _ := i.getNextValidators(header)
-	// ignore for now if it returns error or nothing
-	if len(validators) == 0 {
-		return nil
+	validators, err := i.getNextValidators(header)
+	if err != nil {
+		return err
 	}
 
 	snap, err := i.getSnapshot(header.Number)

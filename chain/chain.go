@@ -25,7 +25,7 @@ type Chain struct {
 	Name      string   `json:"name"`
 	Genesis   *Genesis `json:"genesis"`
 	Params    *Params  `json:"params"`
-	Bootnodes []string `json:"bootnodes"`
+	Bootnodes []string `json:"bootnodes,omitempty"`
 }
 
 // Genesis specifies the header fields, state of a genesis block

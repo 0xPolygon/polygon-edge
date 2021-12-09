@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
@@ -49,4 +51,24 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 	}()
 	res := <-resCh
 	return res.data, res.err
+}
+
+// WaitUntilTxPoolEmpty waits until node has 0 transactions in txpool,
+// otherwise returns timeout
+func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorClient) (*txpoolOp.TxnPoolStatusResp,
+	error) {
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		subCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		res, _ := client.Status(subCtx, &empty.Empty{})
+		if res != nil && res.Length == 0 {
+			return res, false
+		}
+		return nil, true
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return res.(*txpoolOp.TxnPoolStatusResp), nil
 }

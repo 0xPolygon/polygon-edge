@@ -1,16 +1,12 @@
 package dummy
 
 import (
-	"context"
-
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 )
 
 type Dummy struct {
@@ -23,20 +19,20 @@ type Dummy struct {
 	executor   *state.Executor
 }
 
-func Factory(ctx context.Context, sealing bool, config *consensus.Config, txpool *txpool.TxPool, network *network.Server, blockchain *blockchain.Blockchain, executor *state.Executor, srv *grpc.Server, logger hclog.Logger) (consensus.Consensus, error) {
-	logger = logger.Named("dummy")
+func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
+	logger := params.Logger.Named("dummy")
 
 	d := &Dummy{
-		sealing:    sealing,
+		sealing:    params.Seal,
 		logger:     logger,
 		notifyCh:   make(chan struct{}),
 		closeCh:    make(chan struct{}),
-		blockchain: blockchain,
-		executor:   executor,
-		txpool:     txpool,
+		blockchain: params.Blockchain,
+		executor:   params.Executor,
+		txpool:     params.Txpool,
 	}
 
-	txpool.NotifyCh = d.notifyCh
+	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }

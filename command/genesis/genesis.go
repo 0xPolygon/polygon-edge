@@ -17,7 +17,10 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-const ibftConsensus = "ibft"
+const (
+	ibftConsensus = "ibft"
+	devConsensus  = "dev"
+)
 
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
@@ -109,6 +112,15 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
+	c.FlagMap["epoch-size"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the epoch size for the chain. Default %d", ibft.DefaultEpochSize),
+		Arguments: []string{
+			"EPOCH_SIZE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	c.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
 		Arguments: []string{
@@ -157,7 +169,8 @@ func (c *GenesisCommand) Run(args []string) int {
 	var baseDir string
 	var premine helperFlags.ArrayFlags
 	var chainID uint64
-	var bootnodes = make(helperFlags.BootnodeFlags, 0)
+	var epochSize uint64
+	var bootnodes = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
 	var name string
 	var consensus string
 	var isPos bool
@@ -176,6 +189,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
+	flags.Uint64Var(&epochSize, "epoch-size", ibft.DefaultEpochSize, "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
 	flags.BoolVar(&isPos, "pos", false, "")
 
@@ -197,6 +211,14 @@ func (c *GenesisCommand) Run(args []string) int {
 	var validators []types.Address
 
 	if consensus == ibftConsensus {
+		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
+		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
+		// Check is placed here to avoid additional parsing if epochSize < 2
+		if epochSize < 2 {
+			c.UI.Error("Epoch size must be greater than 1")
+			return 1
+		}
+
 		switch {
 		case len(ibftValidators) != 0:
 			for _, val := range ibftValidators {
@@ -221,6 +243,20 @@ func (c *GenesisCommand) Run(args []string) int {
 
 		extraData = make([]byte, ibft.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
+	}
+
+	// Check if any addresses should be prestaked in the dev consensus
+	if consensus == devConsensus {
+		if len(ibftValidators) != 0 {
+			for _, val := range ibftValidators {
+				validators = append(validators, types.StringToAddress(val))
+			}
+		}
+	}
+
+	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
+		c.UI.Error("Minimum two bootnodes are required")
+		return 1
 	}
 
 	// constructEngineConfig is a helper method for
@@ -259,16 +295,27 @@ func (c *GenesisCommand) Run(args []string) int {
 				consensus: constructEngineConfig(),
 			},
 		},
-		Bootnodes: bootnodes,
+		Bootnodes: bootnodes.Addrs,
 	}
 
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
-	if consensus == ibftConsensus && isPos {
+	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
 		if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
 			c.UI.Error(err.Error())
 			return 1
 		}
+
+		// Set the epoch size if the consensus is IBFT
+		cc.Params.Engine[consensus] = helper.MergeMaps(
+			// Epoch parameter
+			map[string]interface{}{
+				"epochSize": epochSize,
+			},
+
+			// Existing consensus configuration
+			cc.Params.Engine[consensus].(map[string]interface{}),
+		)
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
