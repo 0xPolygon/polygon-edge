@@ -1,6 +1,7 @@
 package loadbot
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
@@ -43,7 +45,7 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	return nonce, nil
 }
 
-func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) error {
+func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) (web3.Hash, error) {
 	signer := crypto.NewEIP155Signer(100)
 
 	txn, err := signer.SignTx(&types.Transaction{
@@ -57,14 +59,14 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 	}, sender.PrivateKey)
 
 	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %v", err)
 	}
 
-	_, err = client.Eth().SendRawTransaction(txn.MarshalRLP())
+	hash, err := client.Eth().SendRawTransaction(txn.MarshalRLP())
 	if err != nil {
-		return fmt.Errorf("failed to send raw transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %v", err)
 	}
-	return nil
+	return hash, nil
 }
 
 func Run(conf *Configuration, metrics *Metrics) error {
@@ -87,7 +89,6 @@ func Run(conf *Configuration, metrics *Metrics) error {
 	defer ticker.Stop()
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	for i := uint64(0); i < conf.Count; i++ {
 		<-ticker.C
@@ -100,16 +101,21 @@ func Run(conf *Configuration, metrics *Metrics) error {
 
 			// take nonce first
 			newNextNonce := atomic.AddUint64(&nonce, 1)
-			err := executeTxn(client, *sender, conf.Receiver, conf.Value, newNextNonce-1)
+			txHash, err := executeTxn(client, *sender, conf.Receiver, conf.Value, newNextNonce-1)
 			if err != nil {
 				atomic.AddUint64(&metrics.FailedTransactionsCount, 1)
+				return
+			}
+
+			// TODO: add timeout
+			_, err = tests.WaitForReceipt(context.TODO(), client.Eth(), txHash)
+			if err != nil {
+				atomic.AddUint64(&metrics.FailedTransactionsCount, 1)
+				return
 			}
 		}()
 	}
 
-	err = waitForTxPool(conf.GRPC)
-	if err != nil {
-		return fmt.Errorf("an error has occured while waiting for TxPool: %v", err)
-	}
+	wg.Wait()
 	return nil
 }
