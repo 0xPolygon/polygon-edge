@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -291,7 +292,7 @@ func getCount(
 	response, err := rpcClient.Eth().Call(
 		&web3.CallMsg{
 			From:     web3.Address(from),
-			To:       contractAddress,
+			To:       &contractAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
@@ -322,49 +323,18 @@ func addStressTestTxns(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) {
-	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-	signer := crypto.NewEIP155Signer(100)
 	currentNonce := 1 // 1 because the first transaction was deployment
 	clt := srv.TxnPoolOperator()
 
-	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
-	if !ok {
-		t.Fatalf("Unable to get setName method")
-	}
-
-	generateTx := func() *types.Transaction {
-		encodedInput, encodeErr := setNameMethod.Inputs.Encode(
-			map[string]interface{}{
-				"sName": fmt.Sprintf("Name #%d", currentNonce),
-			},
-		)
-		if encodeErr != nil {
-			t.Fatalf("Unable to encode inputs, %v", encodeErr)
-		}
-
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &contractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    big.NewInt(0),
-			V:        []byte{1}, // it is necessary to encode in rlp,
-			Input:    append(setNameMethod.ID(), encodedInput...),
-		}, senderKey)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
-		}
-
-		currentNonce++
-
-		return signedTx
-	}
-
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
-		setNameTxn := generateTx()
+		setNameTxn := generateStressTestTx(
+			t,
+			uint64(currentNonce),
+			contractAddr,
+			senderKey,
+		)
+		currentNonce++
 
 		msg = &txpoolOp.AddTxnReq{
 			Raw: &any.Any{
@@ -440,6 +410,79 @@ func Test_TransactionDevLoop(t *testing.T) {
 	assert.Equalf(t, strconv.Itoa(numTransactions), count.String(), "Count doesn't match")
 }
 
+// generateStressTestTx generates a transaction for the
+// IBFT_Loop and Dev_Loop stress tests
+func generateStressTestTx(
+	t *testing.T,
+	currentNonce uint64,
+	contractAddr types.Address,
+	senderKey *ecdsa.PrivateKey,
+) *types.Transaction {
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+	signer := crypto.NewEIP155Signer(100)
+
+	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
+	if !ok {
+		t.Fatalf("Unable to get setName method")
+	}
+
+	encodedInput, encodeErr := setNameMethod.Inputs.Encode(
+		map[string]interface{}{
+			"sName": fmt.Sprintf("Name #%d", currentNonce),
+		},
+	)
+	if encodeErr != nil {
+		t.Fatalf("Unable to encode inputs, %v", encodeErr)
+	}
+
+	signedTx, signErr := signer.SignTx(&types.Transaction{
+		Nonce:    currentNonce,
+		From:     types.ZeroAddress,
+		To:       &contractAddr,
+		GasPrice: bigGasPrice,
+		Gas:      framework.DefaultGasLimit,
+		Value:    big.NewInt(0),
+		V:        []byte{1}, // it is necessary to encode in rlp,
+		Input:    append(setNameMethod.ID(), encodedInput...),
+	}, senderKey)
+
+	if signErr != nil {
+		t.Fatalf("Unable to sign transaction, %v", signErr)
+	}
+
+	return signedTx
+}
+
+// addStressTxnsWithHashes adds numTransactions that call the
+// passed in StressTest smart contract method, but saves their transaction
+// hashes
+func addStressTxnsWithHashes(
+	t *testing.T,
+	srv *framework.TestServer,
+	numTransactions int,
+	contractAddr types.Address,
+	senderKey *ecdsa.PrivateKey,
+) []web3.Hash {
+	currentNonce := 1 // 1 because the first transaction was deployment
+
+	txHashes := make([]web3.Hash, 0)
+	for i := 0; i < numTransactions; i++ {
+		setNameTxn := generateStressTestTx(
+			t,
+			uint64(currentNonce),
+			contractAddr,
+			senderKey,
+		)
+		currentNonce++
+
+		if txHash, err := srv.JSONRPC().Eth().SendRawTransaction(setNameTxn.MarshalRLP()); err == nil {
+			txHashes = append(txHashes, txHash)
+		}
+	}
+
+	return txHashes
+}
+
 // Test scenario (IBFT):
 // Deploy the StressTest smart contract and send ~50 transactions
 // that modify it's state, and make sure that all
@@ -497,21 +540,45 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	// Send ~50 transactions
 	numTransactions := 50
+	var wg sync.WaitGroup
+	wg.Add(numTransactions)
 
 	// Add stress test transactions
-	addStressTestTxns(
+	txHashes := addStressTxnsWithHashes(
 		t,
 		srv,
 		numTransactions,
 		types.StringToAddress(contractAddr.String()),
 		senderKey,
 	)
+	if len(txHashes) != numTransactions {
+		t.Fatalf(
+			"Invalid number of txns sent [sent %d, expected %d]",
+			len(txHashes),
+			numTransactions,
+		)
+	}
 
-	// Wait for an arbitrary period for these txns to get committed
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer waitCancel()
+	// For each transaction hash, wait for it to get included into a block
+	for index, txHash := range txHashes {
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 
-	resp, err := tests.WaitUntilTxPoolEmpty(waitCtx, srv.TxnPoolOperator())
+		receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash)
+		if receipt == nil {
+			t.Fatalf("Unable to get receipt for hash index [%d]", index)
+		} else if receiptErr != nil {
+			t.Fatalf("Unable to get receipt for hash index [%d], %v", index, receiptErr)
+		}
+
+		waitCancel()
+		wg.Done()
+	}
+
+	wg.Wait()
+
+	statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer statusCancel()
+	resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
 	if err != nil {
 		t.Fatalf("Unable to get txpool status, %v", err)
 	}

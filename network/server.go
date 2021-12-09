@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -27,7 +28,10 @@ import (
 
 const DefaultLibp2pPort int = 1478
 
-const MinimumPeerConnections int64 = 1
+const (
+	MinimumPeerConnections int64 = 1
+	MinimumBootNodes       int   = 2 // MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+)
 
 // Priority for dial queue
 const (
@@ -187,6 +191,11 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
 
 	if !config.NoDiscover {
+
+		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < MinimumBootNodes {
+			return nil, errors.New("Minimum two bootnodes are required")
+		}
+
 		// start discovery
 		srv.discovery = &discovery{srv: srv}
 		srv.discovery.setup()
@@ -199,7 +208,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
 			}
 			if node.ID == srv.host.ID() {
-				srv.logger.Info("Omitting bootnode with same ID as host", node.ID)
+				srv.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
 			}
 			// add the bootnode to the peerstore
