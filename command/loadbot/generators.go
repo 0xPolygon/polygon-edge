@@ -2,12 +2,14 @@ package loadbot
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	txPoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3/jsonrpc"
 	"google.golang.org/grpc"
-	"os"
 )
 
 func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
@@ -35,7 +37,7 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 	}
 
 	privateKeyRaw := os.Getenv("PSDK_" + address.String())
-	privateKeyRaw = privateKeyRaw[2:]
+	privateKeyRaw = strings.TrimPrefix(privateKeyRaw, "0x")
 	privateKey, err := crypto.BytesToPrivateKey([]byte(privateKeyRaw))
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract ECDSA private key from bytes: %v", err)
