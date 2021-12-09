@@ -102,6 +102,16 @@ const (
 
 type BlockNumber int64
 
+type BlockNumberOrHash struct {
+	BlockNumber      BlockNumber
+	BlockHash        types.Hash
+	RequireCanonical bool
+}
+
+func (h *BlockNumberOrHash) Extract() {
+
+}
+
 func stringToBlockNumber(str string) (BlockNumber, error) {
 	if str == "" {
 		return 0, fmt.Errorf("value is empty")

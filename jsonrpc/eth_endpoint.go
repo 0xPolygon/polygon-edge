@@ -571,14 +571,31 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 // GetBalance returns the account's balance at the referenced block
 func (e *Eth) GetBalance(
 	address types.Address,
-	number *BlockNumber,
+	filter *BlockNumberOrHash,
 ) (interface{}, error) {
-	if number == nil {
+	var number *BlockNumber
+	var blockHash string
+	var header *types.Header
+	var err error
+
+	if filter == nil {
 		number, _ = createBlockNumberPointer("latest")
+	} else {
+		number = &filter.BlockNumber
 	}
-	header, err := e.d.getBlockHeaderImpl(*number)
-	if err != nil {
-		return nil, err
+
+	if filter != nil && filter.BlockHash != types.ZeroHash {
+		block, ok := e.d.store.GetBlockByHash(filter.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", blockHash)
+		}
+
+		header = block.Header
+	} else {
+		header, err = e.d.getBlockHeaderImpl(*number)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)

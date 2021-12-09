@@ -446,12 +446,12 @@ func TestEth_State_GetBalance(t *testing.T) {
 	if err != nil {
 		assert.Error(t, err)
 	}
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, blockNumber)
+	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, &BlockNumberOrHash{BlockNumber: *blockNumber})
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, blockNumber)
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, &BlockNumberOrHash{BlockNumber: *blockNumber})
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
 
