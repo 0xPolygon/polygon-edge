@@ -439,7 +439,8 @@ func (i *Ibft) isValidSnapshot() bool {
 //
 // It fetches fresh data from the blockchain. Checks if the current node is a validator and resolves any pending blocks
 func (i *Ibft) runSyncState() {
-	oldLatestNumber := i.blockchain.Header().Number
+	// TODO remove
+	// oldLatestNumber := i.blockchain.Header().Number
 	for i.isState(SyncState) {
 		// try to sync with some target peer
 		p := i.syncer.BestPeer()
@@ -494,11 +495,12 @@ func (i *Ibft) runSyncState() {
 		}
 	}
 
-	if i.mechanism.GetType() == PoS {
-		if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
-			i.logger.Error("failed to bulk update validators", "err", err)
-		}
-	}
+	// TODO remove
+	//if i.mechanism.GetType() == PoS {
+	//	if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
+	//		i.logger.Error("failed to bulk update validators", "err", err)
+	//	}
+	//}
 }
 
 var defaultBlockPeriod = 2 * time.Second
