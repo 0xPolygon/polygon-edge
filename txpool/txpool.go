@@ -370,6 +370,10 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
 
+	if _, isAvailable := t.GetPendingTx(tx.Hash); isAvailable {
+		t.logger.Info("Discarding already known transaction", "hash", tx.Hash)
+		return ErrAlreadyKnown
+	}
 	// should treat as local in the following cases
 	// (1) noLocals is false and Tx is local transaction
 	// (2) from in tx is in locals addresses
