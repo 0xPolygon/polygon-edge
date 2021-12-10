@@ -39,11 +39,10 @@ type Metrics struct {
 type Loadbot struct {
 	cfg     *Configuration
 	metrics *Metrics
-	done    chan struct{}
 }
 
 func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
-	return &Loadbot{cfg: cfg, metrics: metrics, done: make(chan struct{})}
+	return &Loadbot{cfg: cfg, metrics: metrics}
 }
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
@@ -128,6 +127,5 @@ func (l *Loadbot) Run() error {
 	}
 
 	wg.Wait()
-	l.done <- struct{}{}
 	return nil
 }
