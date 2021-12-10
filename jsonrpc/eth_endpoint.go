@@ -568,34 +568,33 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	return result, nil
 }
 
-// GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(
-	address types.Address,
-	filter *BlockNumberOrHash,
-) (interface{}, error) {
-	var number *BlockNumber
-	var blockHash string
+// GetBalance returns the account's balance at the referenced block.
+func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}, error) {
+	var bnh BlockNumberOrHash
 	var header *types.Header
 	var err error
 
 	if filter == nil {
-		number, _ = createBlockNumberPointer("latest")
+		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
 	} else {
-		number = &filter.BlockNumber
+		err = bnh.Unmarshal(&filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode filter: %v", err)
+		}
 	}
 
-	if filter != nil && filter.BlockHash != types.ZeroHash {
-		block, ok := e.d.store.GetBlockByHash(filter.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", blockHash)
-		}
-
-		header = block.Header
-	} else {
-		header, err = e.d.getBlockHeaderImpl(*number)
+	if bnh.BlockNumber != nil {
+		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header = block.Header
 	}
 
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)

@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -103,13 +104,61 @@ const (
 type BlockNumber int64
 
 type BlockNumberOrHash struct {
-	BlockNumber      BlockNumber
-	BlockHash        types.Hash
-	RequireCanonical bool
+	BlockNumber *BlockNumber `json:"blockNumber,omitempty"`
+	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
 }
 
-func (h *BlockNumberOrHash) Extract() {
+func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
+	var placeholder BlockNumberOrHash
 
+	data, err := json.Marshal(*input)
+	if err != nil {
+		return fmt.Errorf("failed to serialize input: %v", err)
+	}
+
+	err = json.Unmarshal(data, &placeholder)
+	if err != nil {
+		var keyword string
+		err = json.Unmarshal(data, &keyword)
+		if err == nil {
+			// Try to extract keyword
+			switch keyword {
+			case "pending":
+				n := PendingBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			case "latest":
+				n := LatestBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			case "earliest":
+				n := EarliestBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			default:
+				// Try to extract hex number
+				s, ok := (*input).(string)
+				if !ok {
+					return fmt.Errorf("input cannot be converted to string")
+				}
+				number, err := strconv.ParseInt(s[2:], 16, 64)
+				if err != nil {
+					return fmt.Errorf("failed to convert hex string to int64: %v", err)
+				}
+				bnh.BlockNumber = (*BlockNumber)(&number)
+				return nil
+			}
+		}
+	}
+
+	// Try to extract object
+	bnh.BlockNumber = placeholder.BlockNumber
+	bnh.BlockHash = placeholder.BlockHash
+	return nil
+}
+
+func (bnh *BlockNumberOrHash) GetNumber() BlockNumber {
+	return *bnh.BlockNumber
 }
 
 func stringToBlockNumber(str string) (BlockNumber, error) {
