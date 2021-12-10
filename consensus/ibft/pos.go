@@ -8,7 +8,83 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
-// TODO implement PoS specific methods
+// PoSMechanism defines specific hooks for the Proof of Stake IBFT mechanism
+type PoSMechanism struct {
+	// Reference to the main IBFT implementation
+	ibft *Ibft
+
+	// hookMap is the collection of registered hooks
+	hookMap map[string]func(interface{}) error
+
+	// Used for easy lookups
+	mechanismType Type
+}
+
+// PoSFactory initializes the required data
+// for the Proof of Stake mechanism
+func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
+	pos := &PoSMechanism{
+		mechanismType: PoS,
+		ibft:          ibft,
+	}
+
+	// Initialize the hook map
+	pos.initializeHookMap()
+
+	return pos, nil
+}
+
+// GetType implements the ConsensusMechanism interface method
+func (pos *PoSMechanism) GetType() Type {
+	return pos.mechanismType
+}
+
+// GetHookMap implements the ConsensusMechanism interface method
+func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
+	return pos.hookMap
+}
+
+// acceptStateLogHook logs the current snapshot
+func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
+	// Cast the param to a *Snapshot
+	snap := snapParam.(*Snapshot)
+
+	// Log the info message
+	pos.ibft.logger.Info(
+		"current snapshot",
+		"validators",
+		len(snap.Set),
+	)
+
+	return nil
+}
+
+// insertBlockHook checks if the block is the last block of the epoch,
+// in order to update the validator set
+func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
+	headerNumber := numberParam.(uint64)
+
+	if pos.ibft.IsLastOfEpoch(headerNumber) {
+		if err := pos.ibft.updateValidators(headerNumber); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// initializeHookMap registers the hooks that the PoS mechanism
+// should have
+func (pos *PoSMechanism) initializeHookMap() {
+	// Create the hook map
+	pos.hookMap = make(map[string]func(interface{}) error)
+
+	// Register the AcceptStateLogHook
+	pos.hookMap[AcceptStateLogHook] = pos.acceptStateLogHook
+
+	// Register the InsertBlockHook
+	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
+}
 
 // getNextValidators is a helper function for fetching the validator set
 // from the Staking SC

@@ -281,6 +281,21 @@ func FillPremineMap(
 	return nil
 }
 
+// MergeMaps is a helper method for merging multiple maps
+func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
+	// Create a resulting map
+	mergedMap := make(map[string]interface{})
+
+	// For each map, iterate over the keys and save the values
+	// into the resulting map
+	for _, m := range maps {
+		for key, value := range m {
+			mergedMap[key] = value
+		}
+	}
+	return mergedMap
+}
+
 // WriteGenesisToDisk writes the passed in configuration to a genesis.json file at the specified path
 func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	data, err := json.MarshalIndent(chain, "", "    ")

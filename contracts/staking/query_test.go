@@ -168,7 +168,7 @@ func TestQueryValidators(t *testing.T) {
 					Value:    big.NewInt(0),
 					Input:    method.ID(),
 					GasPrice: big.NewInt(0),
-					Gas:      100000000,
+					Gas:      queryGasLimit,
 					Nonce:    10,
 				},
 			},

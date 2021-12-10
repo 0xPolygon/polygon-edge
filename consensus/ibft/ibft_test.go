@@ -784,6 +784,8 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		metrics:          consensus.NilMetrics(),
 	}
 
+	initIbftMechanism(PoA, ibft)
+
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)
 

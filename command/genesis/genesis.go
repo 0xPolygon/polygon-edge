@@ -307,9 +307,15 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 
 		// Set the epoch size if the consensus is IBFT
-		cc.Params.Engine[consensus] = map[string]interface{}{
-			"epochSize": epochSize,
-		}
+		cc.Params.Engine[consensus] = helper.MergeMaps(
+			// Epoch parameter
+			map[string]interface{}{
+				"epochSize": epochSize,
+			},
+
+			// Existing consensus configuration
+			cc.Params.Engine[consensus].(map[string]interface{}),
+		)
 	}
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {

@@ -101,8 +101,32 @@ const (
 	PoS Type = "PoS"
 )
 
+// mechanismTypes is the map used for easy string -> mechanism Type lookups
+var mechanismTypes = map[string]Type{
+	"PoA": PoA,
+	"PoS": PoS,
+}
+
+// String is a helper method for casting a Type to a string representation
+func (t Type) String() string {
+	return string(t)
+}
+
+// parseType converts a mechanism string representation to a Type
+func parseType(mechanism string) (Type, error) {
+	// Check if the cast is possible
+	castType, ok := mechanismTypes[mechanism]
+	if !ok {
+		return castType, fmt.Errorf("invalid IBFT mechanism type %s", mechanism)
+	}
+
+	return castType, nil
+}
+
 // Define constant hook names
 const (
+	// POA //
+
 	// VerifyHeadersHook defines additional checks that need to happen
 	// when verifying the headers
 	VerifyHeadersHook = "VerifyHeadersHook"
@@ -115,17 +139,7 @@ const (
 	// when inserting a block into the chain
 	InsertBlockHook = "InsertBlockHook"
 
-	// BuildBlockHook defines the additional steps and checks that need to happen
-	// when building a block
-	BuildBlockHook = "BuildBlockHook"
-
-	// SyncStateHook defines the additional steps and checks that need to happen
-	// in the sync state
-	SyncStateHook = "SyncStateHook"
-
-	// AcceptStateHook defines the additional steps and checks that need to happen
-	// in the accept state
-	AcceptStateHook = "AcceptStateHook"
+	// POA + POS //
 
 	// AcceptStateLogHook defines what should be logged out as the status
 	// from AcceptState
@@ -138,6 +152,17 @@ type ConsensusMechanism interface {
 
 	// GetHookMap returns the hooks registered with the specific consensus mechanism
 	GetHookMap() map[string]func(interface{}) error
+
+	// initializeHookMap initializes the hook map
+	initializeHookMap()
+}
+
+// ConsensusMechanismFactory is the factory function to create a consensus mechanism
+type ConsensusMechanismFactory func(ibft *Ibft) (ConsensusMechanism, error)
+
+var mechanismBackends = map[Type]ConsensusMechanismFactory{
+	PoA: PoAFactory,
+	PoS: PoSFactory,
 }
 
 // runHook runs a specified hook if it is present in the hook map
@@ -184,8 +209,21 @@ func Factory(
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
-		// TODO pass the consensus type from genesis config -> PSDK-182
 	}
+
+	// Initialize the mechanism
+	mechanismType, parseErr := parseType(p.config.Config["type"].(string))
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	// Grab the mechanism factory and execute it
+	mechanismFactory := mechanismBackends[mechanismType]
+	mechanism, factoryErr := mechanismFactory(p)
+	if factoryErr != nil {
+		return nil, factoryErr
+	}
+	p.mechanism = mechanism
 
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
@@ -401,8 +439,16 @@ func (i *Ibft) isValidSnapshot() bool {
 //
 // It fetches fresh data from the blockchain. Checks if the current node is a validator and resolves any pending blocks
 func (i *Ibft) runSyncState() {
-	oldLatestNumber := i.blockchain.Header().Number
+	updateValidatorsCallback := func(oldLatestNumber uint64) {
+		if i.mechanism.GetType() == PoS {
+			if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
+				i.logger.Error("failed to bulk update validators", "err", err)
+			}
+		}
+	}
+
 	for i.isState(SyncState) {
+		oldLatestNumber := i.blockchain.Header().Number
 		// try to sync with some target peer
 		p := i.syncer.BestPeer()
 		if p == nil {
@@ -431,6 +477,8 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		updateValidatorsCallback(oldLatestNumber)
+
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
@@ -448,16 +496,14 @@ func (i *Ibft) runSyncState() {
 			return isValidator
 		})
 
+		updateValidatorsCallback(oldLatestNumber)
+
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
 			// and we are a validator of that chain so we need to change to AcceptState
 			// so that we can start to do some stuff there
 			i.setState(AcceptState)
 		}
-	}
-	// TODO: runHook(SyncStateHook())
-	if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
-		i.logger.Error("failed to bulk update validators", "err", err)
 	}
 }
 
@@ -484,14 +530,15 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	header.GasLimit = gasLimit
 
-	// TODO: GetType() check
-	// try to pick a candidate
-	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
-		header.Miner = types.StringToAddress(candidate.Address)
-		if candidate.Auth {
-			header.Nonce = nonceAuthVote
-		} else {
-			header.Nonce = nonceDropVote
+	if i.mechanism.GetType() == PoA {
+		// try to pick a candidate
+		if candidate := i.operator.getNextCandidate(snap); candidate != nil {
+			header.Miner = types.StringToAddress(candidate.Address)
+			if candidate.Auth {
+				header.Nonce = nonceAuthVote
+			} else {
+				header.Nonce = nonceDropVote
+			}
 		}
 	}
 
@@ -511,10 +558,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if err != nil {
 		return nil, err
 	}
+	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
+	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 	txns := []*types.Transaction{}
-
-	// TODO: runHook(BuildBlockHook()) -> does a check and wraps common logic for PoS
-	if !i.IsLastOfEpoch(header.Number) {
+	if (i.mechanism.GetType() == PoS && !i.IsLastOfEpoch(header.Number)) ||
+		i.mechanism.GetType() == PoA {
 		txns = i.writeTransactions(gasLimit, transition)
 	}
 	_, root := transition.Commit()
@@ -620,8 +668,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	// TODO: runHook(AcceptStateLogHook())
-	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
+	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
+	}
 
 	i.state.validators = snap.Set
 
@@ -715,8 +764,8 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errBlockVerificationFailed)
 				continue
 			}
-			// TODO: runHook(AcceptStateHook())
-			if i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
+
+			if i.mechanism.GetType() == PoS && i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
 				i.logger.Error("block verification failed, block at the end of epoch has transactions")
 				i.handleStateErr(errBlockVerificationFailed)
 				continue
@@ -840,11 +889,8 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	// TODO runHookInsertBlockHook())
-	if i.IsLastOfEpoch(header.Number) {
-		if err := i.updateValidators(header.Number); err != nil {
-			return err
-		}
+	if hookErr := i.runHook(InsertBlockHook, header.Number); hookErr != nil {
+		return hookErr
 	}
 
 	i.logger.Info(
@@ -1060,12 +1106,8 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
-	// TODO: runHook(VerifyHeadersHook)
-	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
-	// 		This is achieved by specifying the miner field to zeroes,
-	// 		because then the value in the Nonce will not be taken into consideration.
-	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
-		return fmt.Errorf("invalid nonce")
+	if hookErr := i.runHook(VerifyHeadersHook, header.Nonce); hookErr != nil {
+		return hookErr
 	}
 
 	if header.MixHash != IstanbulDigest {

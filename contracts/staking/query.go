@@ -14,6 +14,9 @@ import (
 var (
 	// staking contract address
 	AddrStakingContract = types.StringToAddress("1001")
+
+	// Gas limit used when querying the validator set
+	queryGasLimit uint64 = 100000
 )
 
 func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
@@ -56,7 +59,7 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		Value:    big.NewInt(0),
 		Input:    selector,
 		GasPrice: big.NewInt(0),
-		Gas:      100000000,
+		Gas:      queryGasLimit,
 		Nonce:    t.GetNonce(from),
 	})
 	if err != nil {
