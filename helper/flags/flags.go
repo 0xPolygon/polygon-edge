@@ -24,17 +24,21 @@ func (i *ArrayFlags) Set(value string) error {
 	return nil
 }
 
-type BootnodeFlags []string
+type BootnodeFlags struct {
+	AreSet bool
+	Addrs  []string
+}
 
 func (i *BootnodeFlags) String() string {
-	return formatArrayForOutput(*i)
+	return formatArrayForOutput(i.Addrs)
 }
 
 func (i *BootnodeFlags) Set(value string) error {
+	i.AreSet = true
 	if _, err := multiaddr.NewMultiaddr(value); err != nil {
 		return err
 	}
-	*i = append(*i, value)
+	i.Addrs = append(i.Addrs, value)
 	return nil
 }
 
