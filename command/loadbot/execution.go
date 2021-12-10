@@ -16,6 +16,10 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
+type Account struct {
+	Address    types.Address
+	PrivateKey *ecdsa.PrivateKey
+}
 type Configuration struct {
 	TPS      uint64
 	Sender   types.Address
@@ -32,11 +36,15 @@ type Metrics struct {
 	FailedTransactionsCount    uint64
 }
 
-type Account struct {
-	Address    types.Address
-	PrivateKey *ecdsa.PrivateKey
+type Loadbot struct {
+	cfg     *Configuration
+	metrics *Metrics
+	done    chan struct{}
 }
 
+func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
+	return &Loadbot{cfg: cfg, metrics: metrics, done: make(chan struct{})}
+}
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
@@ -69,13 +77,13 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 	return hash, nil
 }
 
-func Run(conf *Configuration, metrics *Metrics) error {
-	sender, err := extractSenderAccount(conf.Sender)
+func (l *Loadbot) Run() error {
+	sender, err := extractSenderAccount(l.cfg.Sender)
 	if err != nil {
 		return fmt.Errorf("failed to extract sender account: %v", err)
 	}
 
-	client, err := createJsonRpcClient(conf.JSONRPC)
+	client, err := createJsonRpcClient(l.cfg.JSONRPC)
 	if err != nil {
 		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
 	}
@@ -86,15 +94,15 @@ func Run(conf *Configuration, metrics *Metrics) error {
 		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
 	}
 
-	ticker := time.NewTicker(1 * time.Second / time.Duration(conf.TPS))
+	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
 	var wg sync.WaitGroup
 
-	for i := uint64(0); i < conf.Count; i++ {
+	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
-		metrics.TotalTransactionsSentCount += 1
+		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
 		go func() {
@@ -102,21 +110,24 @@ func Run(conf *Configuration, metrics *Metrics) error {
 
 			// take nonce first
 			newNextNonce := atomic.AddUint64(&nonce, 1)
-			txHash, err := executeTxn(client, *sender, conf.Receiver, conf.Value, newNextNonce-1)
+			txHash, err := executeTxn(client, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
 			if err != nil {
-				atomic.AddUint64(&metrics.FailedTransactionsCount, 1)
+				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
 			}
 
-			// TODO: add timeout
-			_, err = tests.WaitForReceipt(context.TODO(), client.Eth(), txHash)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			_, err = tests.WaitForReceipt(ctx, client.Eth(), txHash)
 			if err != nil {
-				atomic.AddUint64(&metrics.FailedTransactionsCount, 1)
+				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
 			}
 		}()
 	}
 
 	wg.Wait()
+	l.done <- struct{}{}
 	return nil
 }
