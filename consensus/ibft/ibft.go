@@ -439,9 +439,16 @@ func (i *Ibft) isValidSnapshot() bool {
 //
 // It fetches fresh data from the blockchain. Checks if the current node is a validator and resolves any pending blocks
 func (i *Ibft) runSyncState() {
-	// TODO remove
-	// oldLatestNumber := i.blockchain.Header().Number
+	updateValidatorsCallback := func(oldLatestNumber uint64) {
+		if i.mechanism.GetType() == PoS {
+			if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
+				i.logger.Error("failed to bulk update validators", "err", err)
+			}
+		}
+	}
+
 	for i.isState(SyncState) {
+		oldLatestNumber := i.blockchain.Header().Number
 		// try to sync with some target peer
 		p := i.syncer.BestPeer()
 		if p == nil {
@@ -470,6 +477,8 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		updateValidatorsCallback(oldLatestNumber)
+
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
 		if i.isValidSnapshot() {
@@ -487,6 +496,8 @@ func (i *Ibft) runSyncState() {
 			return isValidator
 		})
 
+		updateValidatorsCallback(oldLatestNumber)
+
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
 			// and we are a validator of that chain so we need to change to AcceptState
@@ -494,13 +505,6 @@ func (i *Ibft) runSyncState() {
 			i.setState(AcceptState)
 		}
 	}
-
-	// TODO remove
-	//if i.mechanism.GetType() == PoS {
-	//	if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
-	//		i.logger.Error("failed to bulk update validators", "err", err)
-	//	}
-	//}
 }
 
 var defaultBlockPeriod = 2 * time.Second

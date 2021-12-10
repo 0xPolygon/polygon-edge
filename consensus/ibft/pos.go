@@ -73,22 +73,6 @@ func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
 	return nil
 }
 
-// processHeadersHook checks if the block is an epoch block, and
-// updates the validator set in the local snapshot accordingly
-func (pos *PoSMechanism) processHeadersHook(hookParam interface{}) error {
-	// Cast the params to processHeadersHookParams
-	params := hookParam.(*processHeadersHookParams)
-	number := params.header.Number
-
-	if pos.ibft.IsLastOfEpoch(number) {
-		if err := pos.ibft.updateValidators(number); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // initializeHookMap registers the hooks that the PoS mechanism
 // should have
 func (pos *PoSMechanism) initializeHookMap() {
@@ -100,9 +84,6 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the InsertBlockHook
 	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
-
-	// Register the ProcessHeadersHook
-	pos.hookMap[ProcessHeadersHook] = pos.processHeadersHook
 }
 
 // getNextValidators is a helper function for fetching the validator set
