@@ -271,7 +271,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    big.NewInt(0),
-			V:        []byte{1}, // it is necessary to encode in rlp,
+			V:        big.NewInt(1), // it is necessary to encode in rlp,
 			Input:    framework.MethodSig("unstake"),
 		}, senderKey)
 
@@ -409,7 +409,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    value,
-			V:        []byte{1}, // it is necessary to encode in rlp
+			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
 		}, senderKey)
 
@@ -539,7 +539,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			GasPrice: bigGasPrice,
 			Gas:      framework.DefaultGasLimit,
 			Value:    value,
-			V:        []byte{1}, // it is necessary to encode in rlp
+			V:        big.NewInt(1), // it is necessary to encode in rlp
 			Input:    framework.MethodSig(methodName),
 		}, senderKey)
 
