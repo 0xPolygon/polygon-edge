@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -99,37 +100,58 @@ func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent
 
 func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventDisconnected && evnt.PeerID == p
+		return evnt.Type == PeerDisconnected && evnt.PeerID == p
 	}
 }
 
 func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventConnected && evnt.PeerID == p
+		return evnt.Type == PeerConnected && evnt.PeerID == p
 	}
 }
 
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-
+	srv0 := CreateServer(t, func(c *Config) {
+		c.NoDiscover = true
+	})
 	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
+	events := []PeerEventType{
+		PeerConnected,
+		PeerFailedToConnect,
+		PeerDisconnected,
+		PeerAlreadyConnected,
+		PeerDialCompleted,
+		PeerAddedToDialQueue,
+	}
+
+	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
+		id := peer.ID(strconv.Itoa(i))
+		event := events[i%len(events)]
+		return id, event
+	}
 
 	t.Run("serial", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
-			sub.Get()
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
+
+			received := sub.Get()
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 
 	t.Run("parallel", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
 		}
 		for i := 0; i < count; i++ {
-			sub.Get()
+			received := sub.Get()
+			id, event := getIDAndEventType(i)
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 }
@@ -455,6 +477,77 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
 		})
 	}
+}
+
+func TestRunDial(t *testing.T) {
+	// setupServers returns server and list of peer's server
+	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+		servers := make([]*Server, len(maxPeers))
+		for idx := range servers {
+			servers[idx] = CreateServer(t, func(c *Config) {
+				c.MaxPeers = maxPeers[idx]
+				c.NoDiscover = true
+			})
+		}
+		return servers
+	}
+
+	connectToPeer := func(srv *Server, peer *peer.AddrInfo, timeout time.Duration) bool {
+		connectedCh := asyncWaitForEvent(srv, timeout, connectedPeerHandler(peer.ID))
+		srv.Join(peer, 0)
+		return <-connectedCh
+	}
+
+	closeServers := func(servers ...*Server) {
+		for _, s := range servers {
+			s.Close()
+		}
+	}
+
+	t.Run("should connect to all peers", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			if uint64(idx) < maxPeers[0] {
+				assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+			} else {
+				assert.Falsef(t, connected, "should fail to connect to peer %d[%s], but connected\n", idx, addr.ID)
+			}
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
+		// peer1 can't connect to any peer
+		maxPeers := []uint64{1, 0, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		connected := connectToPeer(srv, peers[0].AddrInfo(), 15*time.Second)
+		assert.False(t, connected)
+
+		connected = connectToPeer(srv, peers[1].AddrInfo(), 15*time.Second)
+		assert.True(t, connected)
+
+		closeServers(srv, peers[1])
+	})
 }
 
 func TestMinimumBootNodeCount(t *testing.T) {

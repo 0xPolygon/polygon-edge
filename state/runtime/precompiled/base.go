@@ -2,6 +2,7 @@ package precompiled
 
 import (
 	"crypto/sha256"
+	"math/big"
 
 	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
 
@@ -28,7 +29,9 @@ func (e *ecrecover) run(input []byte) ([]byte, error) {
 		}
 	}
 	v := input[63] - 27
-	if !crypto.ValidateSignatureValues(v, input[64:96], input[96:128]) {
+	r := big.NewInt(0).SetBytes(input[64:96])
+	s := big.NewInt(0).SetBytes(input[96:128])
+	if !crypto.ValidateSignatureValues(v, r, s) {
 		return nil, nil
 	}
 
