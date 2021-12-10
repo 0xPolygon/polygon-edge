@@ -3,6 +3,8 @@ package loadbot
 import (
 	"flag"
 	"fmt"
+	"net/url"
+
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
@@ -124,15 +126,20 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	sender := types.Address{}
+	var sender types.Address
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
 		l.UI.Error(fmt.Sprintf("Failed to decode sender address: %v", err))
 		return 1
 	}
 
-	receiver := types.Address{}
+	var receiver types.Address
 	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
 		l.UI.Error(fmt.Sprintf("Failed to decode receiver address: %v", err))
+		return 1
+	}
+
+	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
+		l.UI.Error(fmt.Sprintf(" Invalid JSON-RPC url : %v", err))
 		return 1
 	}
 
@@ -142,7 +149,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	configuration := Configuration{
+	configuration := &Configuration{
 		TPS:      tps,
 		Sender:   sender,
 		Receiver: receiver,
@@ -153,14 +160,17 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	// Create the metrics placeholder
-	metrics := Metrics{
+	metrics := &Metrics{
 		Duration:                   0,
 		TotalTransactionsSentCount: 0,
 		FailedTransactionsCount:    0,
 	}
 
-	err = Run(&configuration, &metrics)
-	if err != nil {
+	// create a loadbot instance
+	loadBot := NewLoadBot(configuration, metrics)
+
+	// run the loadbot
+	if err := loadBot.Run(); err != nil {
 		l.UI.Error(fmt.Sprintf("an error occured while running the loadbot: %v", err))
 		return 1
 	}
