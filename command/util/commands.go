@@ -58,7 +58,7 @@ func Commands() map[string]cli.CommandFactory {
 
 	secretsManagerCmd := secrets.SecretsCommand{}
 	secretsGenerateCmd := secrets.SecretsGenerate{Base: base}
-	secretsInitCmd := secrets.SecretsInit{Base: base}
+	secretsInitCmd := secrets.SecretsInit{Base: base, Formatter: formatter}
 
 	return map[string]cli.CommandFactory{
 
