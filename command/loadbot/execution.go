@@ -27,7 +27,6 @@ type Configuration struct {
 	Value    *big.Int
 	Count    uint64
 	JSONRPC  string
-	GRPC     string
 }
 
 type Metrics struct {
