@@ -442,18 +442,12 @@ func TestEth_State_GetBalance(t *testing.T) {
 	acct0.Balance(100)
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumber, err := createBlockNumberPointer("latest")
-	if err != nil {
-		assert.Error(t, err)
-	}
-	param := BlockNumberOrHash{BlockNumber: blockNumber}
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, &param)
+	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, "latest")
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
 
 	// address not found
-	param = BlockNumberOrHash{BlockNumber: blockNumber}
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, &param)
+	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, "latest")
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argUintPtr(0))
 

@@ -108,6 +108,13 @@ type BlockNumberOrHash struct {
 	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
 }
 
+// Unmarshal will try to extract the filter's data.
+// Here are the possible input formats :
+//
+// 1 - "latest", "pending" or "earliest"	- self-explaining keywords
+// 2 - "0x2"								- block number #2 (EIP-1898 backward compatible)
+// 3 - {blockNumber:	"0x2"}				- EIP-1898 compliant block number #2
+// 4 - {blockHash:		"0xe0e..."}			- EIP-1898 compliant block hash 0xe0e...
 func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
 	var placeholder BlockNumberOrHash
 
@@ -149,16 +156,18 @@ func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
 				return nil
 			}
 		}
+		return fmt.Errorf("invalid block number provided")
 	}
 
 	// Try to extract object
 	bnh.BlockNumber = placeholder.BlockNumber
 	bnh.BlockHash = placeholder.BlockHash
-	return nil
-}
 
-func (bnh *BlockNumberOrHash) GetNumber() BlockNumber {
-	return *bnh.BlockNumber
+	if bnh.BlockNumber != nil && bnh.BlockHash != nil {
+		return fmt.Errorf("cannot get account balance using both block number hash")
+	}
+
+	return nil
 }
 
 func stringToBlockNumber(str string) (BlockNumber, error) {

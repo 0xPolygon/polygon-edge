@@ -574,6 +574,7 @@ func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}
 	var header *types.Header
 	var err error
 
+	// If filter has not been submitted, use the latest block
 	if filter == nil {
 		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
 	} else {
@@ -583,20 +584,23 @@ func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}
 		}
 	}
 
-	if bnh.BlockNumber != nil {
-		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
-		if err != nil {
-			return nil, err
-		}
-	} else {
+	// From now on, the filter is the block number or the block hash
+	// Use one of them to retrieve the desired block we'll get the account balance from
+	if bnh.BlockHash != nil {
 		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
 		if !ok {
 			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
 		}
 
 		header = block.Header
+	} else {
+		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	// Extract the account balance
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
 	if errors.As(err, &ErrStateNotFound) {
 		// Account not found, return an empty account
