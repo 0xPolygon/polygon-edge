@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"github.com/hashicorp/go-hclog"
 	"reflect"
@@ -135,15 +136,28 @@ const (
 	// when processing the headers
 	ProcessHeadersHook = "ProcessHeadersHook"
 
-	// InsertBlockHook defines the additional steps that need to happen
+	// InsertBlockHook defines additional steps that need to happen
 	// when inserting a block into the chain
 	InsertBlockHook = "InsertBlockHook"
+
+	// CandidateVoteHook defines additional steps that need to happen
+	// when building a block (candidate voting)
+	CandidateVoteHook = "CandidateVoteHook"
 
 	// POA + POS //
 
 	// AcceptStateLogHook defines what should be logged out as the status
 	// from AcceptState
 	AcceptStateLogHook = "AcceptStateLogHook"
+
+	// POS //
+
+	// SyncStateHook defines the additional snapshot update logic
+	// for PoS systems
+	SyncStateHook = "SyncStateHook"
+
+	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
+	VerifyBlockHook = "VerifyBlockHook"
 )
 
 type ConsensusMechanism interface {
@@ -152,6 +166,10 @@ type ConsensusMechanism interface {
 
 	// GetHookMap returns the hooks registered with the specific consensus mechanism
 	GetHookMap() map[string]func(interface{}) error
+
+	// ShouldWriteTransactions returns whether transactions should be written to a block
+	// from the TxPool
+	ShouldWriteTransactions(blockNumber uint64) bool
 
 	// initializeHookMap initializes the hook map
 	initializeHookMap()
@@ -439,11 +457,11 @@ func (i *Ibft) isValidSnapshot() bool {
 //
 // It fetches fresh data from the blockchain. Checks if the current node is a validator and resolves any pending blocks
 func (i *Ibft) runSyncState() {
-	updateValidatorsCallback := func(oldLatestNumber uint64) {
-		if i.mechanism.GetType() == PoS {
-			if err := i.batchUpdateValidators(oldLatestNumber+1, i.blockchain.Header().Number); err != nil {
-				i.logger.Error("failed to bulk update validators", "err", err)
-			}
+	// updateSnapshotCallback keeps the snapshot store in sync with the updated
+	// chain data, by calling the SyncStateHook
+	updateSnapshotCallback := func(oldLatestNumber uint64) {
+		if hookErr := i.runHook(SyncStateHook, oldLatestNumber); hookErr != nil {
+			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", SyncStateHook, hookErr))
 		}
 	}
 
@@ -477,7 +495,7 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		updateValidatorsCallback(oldLatestNumber)
+		updateSnapshotCallback(oldLatestNumber)
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
@@ -496,7 +514,7 @@ func (i *Ibft) runSyncState() {
 			return isValidator
 		})
 
-		updateValidatorsCallback(oldLatestNumber)
+		updateSnapshotCallback(oldLatestNumber)
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of
@@ -530,16 +548,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	header.GasLimit = gasLimit
 
-	if i.mechanism.GetType() == PoA {
-		// try to pick a candidate
-		if candidate := i.operator.getNextCandidate(snap); candidate != nil {
-			header.Miner = types.StringToAddress(candidate.Address)
-			if candidate.Auth {
-				header.Nonce = nonceAuthVote
-			} else {
-				header.Nonce = nonceDropVote
-			}
-		}
+	if hookErr := i.runHook(CandidateVoteHook, &candidateVoteHookParams{
+		header: header,
+		snap:   snap,
+	}); hookErr != nil {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
 	// set the timestamp
@@ -561,8 +574,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
 	// If the mechanism is PoA -> always build a regular block, regardless of epoch
 	txns := []*types.Transaction{}
-	if (i.mechanism.GetType() == PoS && !i.IsLastOfEpoch(header.Number)) ||
-		i.mechanism.GetType() == PoA {
+	if i.mechanism.ShouldWriteTransactions(header.Number) {
 		txns = i.writeTransactions(gasLimit, transition)
 	}
 	_, root := transition.Commit()
@@ -758,16 +770,21 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errIncorrectBlockLocked)
 			}
 		} else {
-			// since its a new block, we have to verify it first
+			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
 				continue
 			}
 
-			if i.mechanism.GetType() == PoS && i.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
-				i.logger.Error("block verification failed, block at the end of epoch has transactions")
-				i.handleStateErr(errBlockVerificationFailed)
+			if hookErr := i.runHook(VerifyBlockHook, block); hookErr != nil {
+				if errors.As(hookErr, &errBlockVerificationFailed) {
+					i.logger.Error("block verification failed, block at the end of epoch has transactions")
+					i.handleStateErr(errBlockVerificationFailed)
+				} else {
+					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
+				}
+
 				continue
 			}
 

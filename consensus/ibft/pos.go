@@ -73,6 +73,28 @@ func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
 	return nil
 }
 
+// syncStateHook keeps the snapshot store up to date for a range of synced blocks
+func (pos *PoSMechanism) syncStateHook(referenceNumber interface{}) error {
+	oldLatestNumber := referenceNumber.(uint64)
+
+	// For the block range, update the snapshot store accordingly if an epoch occurred in the range
+	if err := pos.ibft.batchUpdateValidators(oldLatestNumber+1, pos.ibft.blockchain.Header().Number); err != nil {
+		pos.ibft.logger.Error("failed to bulk update validators", "err", err)
+	}
+
+	return nil
+}
+
+// verifyBlockHook checks if the block is an epoch block and if it has any transactions
+func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
+	block := blockParam.(*types.Block)
+	if pos.ibft.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
+		return errBlockVerificationFailed
+	}
+
+	return nil
+}
+
 // initializeHookMap registers the hooks that the PoS mechanism
 // should have
 func (pos *PoSMechanism) initializeHookMap() {
@@ -84,6 +106,18 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the InsertBlockHook
 	pos.hookMap[InsertBlockHook] = pos.insertBlockHook
+
+	// Register the SyncStateHook
+	pos.hookMap[SyncStateHook] = pos.syncStateHook
+
+	// Register the VerifyBlockHook
+	pos.hookMap[VerifyBlockHook] = pos.verifyBlockHook
+}
+
+// ShouldWriteTransactions indicates if transactions should be written to a block
+func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
+	// Epoch blocks should be empty
+	return !pos.ibft.IsLastOfEpoch(blockNumber)
 }
 
 // getNextValidators is a helper function for fetching the validator set

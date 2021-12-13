@@ -170,6 +170,31 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 	return nil
 }
 
+// candidateVoteHookParams are the params passed into the candidateVoteHook
+type candidateVoteHookParams struct {
+	header *types.Header
+	snap   *Snapshot
+}
+
+// candidateVoteHook checks if any candidate is up for voting by the operator
+// and casts a vote in the Nonce field of the block being built
+func (poa *PoAMechanism) candidateVoteHook(hookParams interface{}) error {
+	// Cast the params to candidateVoteHookParams
+	params := hookParams.(*candidateVoteHookParams)
+
+	// try to pick a candidate
+	if candidate := poa.ibft.operator.getNextCandidate(params.snap); candidate != nil {
+		params.header.Miner = types.StringToAddress(candidate.Address)
+		if candidate.Auth {
+			params.header.Nonce = nonceAuthVote
+		} else {
+			params.header.Nonce = nonceDropVote
+		}
+	}
+
+	return nil
+}
+
 // initializeHookMap registers the hooks that the PoA mechanism
 // should have
 func (poa *PoAMechanism) initializeHookMap() {
@@ -184,6 +209,16 @@ func (poa *PoAMechanism) initializeHookMap() {
 
 	// Register the ProcessHeadersHook
 	poa.hookMap[ProcessHeadersHook] = poa.processHeadersHook
+
+	// Register the CandidateVoteHook
+	poa.hookMap[CandidateVoteHook] = poa.candidateVoteHook
+}
+
+// ShouldWriteTransactions indicates if transactions should be written to a block
+func (poa *PoAMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
+	// The PoA mechanism doesn't have special cases where transactions
+	// shouldn't be written to a block
+	return true
 }
 
 // GetType implements the ConsensusMechanism interface method
