@@ -563,7 +563,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	for index, txHash := range txHashes {
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 
-		receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash)
+		receipt, receiptErr := tests.WaitForReceipt(waitCtx, client.Eth(), txHash)
 		if receipt == nil {
 			t.Fatalf("Unable to get receipt for hash index [%d]", index)
 		} else if receiptErr != nil {

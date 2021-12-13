@@ -42,7 +42,7 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	if err != nil {
 		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
 	}
-	return nonce
+	return nonce, nil
 }
 
 func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) (web3.Hash, error) {
