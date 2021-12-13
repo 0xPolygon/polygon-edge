@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	stakingHelper "github.com/0xPolygon/polygon-sdk/helper/staking"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -35,7 +35,7 @@ func foundInValidatorSet(validatorSet []types.Address, searchValidator types.Add
 
 // getBigDefaultStakedBalance returns the default staked balance as a *big.Int
 func getBigDefaultStakedBalance(t *testing.T) *big.Int {
-	val := helper.DefaultStakedBalance
+	val := stakingHelper.DefaultStakedBalance
 	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
 	if err != nil {
 		t.Fatalf("unable to parse DefaultStakedBalance, %v", err)

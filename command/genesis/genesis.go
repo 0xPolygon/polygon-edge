@@ -3,6 +3,7 @@ package genesis
 import (
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -301,7 +302,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		if err = helper.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
+		if err = staking.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
 			c.UI.Error(err.Error())
 			return 1
 		}

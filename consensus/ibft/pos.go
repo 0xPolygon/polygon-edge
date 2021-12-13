@@ -3,7 +3,6 @@ package ibft
 import (
 	"errors"
 	"fmt"
-
 	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
