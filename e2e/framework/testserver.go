@@ -405,6 +405,31 @@ func (t *TestServer) SendRawTx(ctx context.Context, tx *PreparedTransaction, sig
 	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), txHash)
 }
 
+func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.Receipt, error) {
+	client := t.JSONRPC()
+
+	type result struct {
+		receipt *web3.Receipt
+		err     error
+	}
+
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		receipt, err := client.Eth().GetTransactionReceipt(hash)
+		if err != nil && err.Error() != "not found" {
+			return result{receipt, err}, false
+		}
+		if receipt != nil {
+			return result{receipt, nil}, false
+		}
+		return nil, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	data := res.(result)
+	return data.receipt, data.err
+}
+
 func (t *TestServer) WaitForReady(ctx context.Context) error {
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		num, err := t.GetLatestBlockHeight()
