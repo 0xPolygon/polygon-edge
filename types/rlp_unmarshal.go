@@ -313,16 +313,19 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	// V
-	if t.V, err = elems[6].GetBytes(t.V[:0]); err != nil {
+	t.V = new(big.Int)
+	if err = elems[6].GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
-	if t.R, err = elems[7].GetBytes(t.R[:0]); err != nil {
+	t.R = new(big.Int)
+	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
 	// S
-	if t.S, err = elems[8].GetBytes(t.S[:0]); err != nil {
+	t.S = new(big.Int)
+	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
 	return nil

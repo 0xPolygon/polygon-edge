@@ -89,7 +89,7 @@ func (d *discovery) setup() error {
 
 	d.routingTable.PeerAdded = func(p peer.ID) {
 		info := d.srv.host.Peerstore().PeerInfo(p)
-		d.srv.dialQueue.add(&info, 10)
+		d.srv.addToDialQueue(&info, PriorityRandomDial)
 	}
 	d.routingTable.PeerRemoved = func(p peer.ID) {
 		d.srv.dialQueue.del(p)
@@ -105,7 +105,7 @@ func (d *discovery) setup() error {
 	err = d.srv.SubscribeFn(func(evnt *PeerEvent) {
 		peerID := evnt.PeerID
 		switch evnt.Type {
-		case PeerEventConnected:
+		case PeerConnected:
 			// add peer to the routing table and to our local peer
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
@@ -118,7 +118,7 @@ func (d *discovery) setup() error {
 				stream: nil,
 			})
 			d.peersLock.Unlock()
-		case PeerEventDisconnected:
+		case PeerDisconnected:
 			d.routingTable.RemovePeer(peerID)
 			d.peersLock.Lock()
 			d.peers.delete(peerID)

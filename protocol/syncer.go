@@ -352,7 +352,7 @@ func (s *Syncer) Start() {
 			}
 
 			switch evnt.Type {
-			case network.PeerEventConnected:
+			case network.PeerConnected:
 				stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
 				if err != nil {
 					s.logger.Error("failed to open a stream", "err", err)
@@ -362,7 +362,7 @@ func (s *Syncer) Start() {
 					s.logger.Error("failed to handle user", "err", err)
 				}
 
-			case network.PeerEventDisconnected:
+			case network.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
 				}

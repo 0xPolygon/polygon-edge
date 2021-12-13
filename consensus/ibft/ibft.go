@@ -839,7 +839,7 @@ func (i *Ibft) runRoundChangeState() {
 		if msg == nil {
 			i.logger.Debug("round change timeout")
 			checkTimeout()
-			//update the timeout duration
+			// update the timeout duration
 			timeout = exponentialTimeout(i.state.view.Round)
 			continue
 		}
@@ -848,7 +848,7 @@ func (i *Ibft) runRoundChangeState() {
 		num := i.state.AddRoundMessage(msg)
 
 		if num == i.state.NumValid() {
-			// start a new round inmediatly
+			// start a new round immediately
 			i.state.view.Round = msg.View.Round
 			i.setState(AcceptState)
 		} else if num == i.state.validators.MaxFaultyNodes()+1 {

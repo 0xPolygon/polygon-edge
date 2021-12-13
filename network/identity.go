@@ -84,10 +84,7 @@ func (i *identity) setup() {
 				defer func() {
 					if i.isPending(peerID) {
 						i.delPending(peerID)
-						i.srv.emitEvent(&PeerEvent{
-							PeerID: peerID,
-							Type:   PeerEventDialCompleted,
-						})
+						i.srv.emitEvent(peerID, PeerDialCompleted)
 					}
 				}()
 

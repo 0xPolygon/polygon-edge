@@ -42,19 +42,26 @@ func trimLeftZeros(b []byte) []byte {
 }
 
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s []byte) bool {
+func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 	// TODO: ECDSA malleability
+
+	if r == nil || s == nil {
+		return false
+	}
+
 	if v > 1 {
 		return false
 	}
 
-	r = trimLeftZeros(r)
-	if bytes.Compare(r, secp256k1N) >= 0 || bytes.Compare(r, one) < 0 {
+	rr := r.Bytes()
+	rr = trimLeftZeros(rr)
+	if bytes.Compare(rr, secp256k1N) >= 0 || bytes.Compare(rr, one) < 0 {
 		return false
 	}
 
-	s = trimLeftZeros(s)
-	if bytes.Compare(s, secp256k1N) >= 0 || bytes.Compare(s, one) < 0 {
+	ss := s.Bytes()
+	ss = trimLeftZeros(ss)
+	if bytes.Compare(ss, secp256k1N) >= 0 || bytes.Compare(ss, one) < 0 {
 		return false
 	}
 	return true

@@ -21,14 +21,14 @@ type transaction struct {
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`
 	Input       argBytes       `json:"input"`
-	V           argBytes       `json:"v"`
-	R           argBytes       `json:"r"`
-	S           argBytes       `json:"s"`
+	V           argBig         `json:"v"`
+	R           argBig         `json:"r"`
+	S           argBig         `json:"s"`
 	Hash        types.Hash     `json:"hash"`
 	From        types.Address  `json:"from"`
-	BlockHash   types.Hash     `json:"blockHash"`
-	BlockNumber argUint64      `json:"blockNumber"`
-	TxIndex     argUint64      `json:"transactionIndex"`
+	BlockHash   *types.Hash    `json:"blockHash"`
+	BlockNumber *argUint64     `json:"blockNumber"`
+	TxIndex     *argUint64     `json:"transactionIndex"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }
@@ -42,23 +42,44 @@ func (h transactionHash) MarshalText() ([]byte, error) {
 	return []byte(types.Hash(h).String()), nil
 }
 
-func toTransaction(t *types.Transaction, b *types.Block, txIndex int) *transaction {
-	return &transaction{
-		Nonce:       argUint64(t.Nonce),
-		GasPrice:    argBig(*t.GasPrice),
-		Gas:         argUint64(t.Gas),
-		To:          t.To,
-		Value:       argBig(*t.Value),
-		Input:       argBytes(t.Input),
-		V:           argBytes(t.V),
-		R:           argBytes(t.R),
-		S:           argBytes(t.S),
-		Hash:        t.Hash,
-		From:        t.From,
-		BlockHash:   b.Hash(),
-		BlockNumber: argUint64(b.Number()),
-		TxIndex:     argUint64(txIndex),
+func toPendingTransaction(t *types.Transaction) *transaction {
+	return toTransaction(t, nil, nil, nil)
+}
+
+func toTransaction(
+	t *types.Transaction,
+	blockNumber *argUint64,
+	blockHash *types.Hash,
+	txIndex *int,
+) *transaction {
+
+	res := &transaction{
+		Nonce:    argUint64(t.Nonce),
+		GasPrice: argBig(*t.GasPrice),
+		Gas:      argUint64(t.Gas),
+		To:       t.To,
+		Value:    argBig(*t.Value),
+		Input:    t.Input,
+		V:        argBig(*t.V),
+		R:        argBig(*t.R),
+		S:        argBig(*t.S),
+		Hash:     t.Hash,
+		From:     t.From,
 	}
+
+	if blockNumber != nil {
+		res.BlockNumber = blockNumber
+	}
+
+	if blockHash != nil {
+		res.BlockHash = blockHash
+	}
+
+	if txIndex != nil {
+		res.TxIndex = argUintPtr(uint64(*txIndex))
+	}
+
+	return res
 }
 
 type block struct {
@@ -110,9 +131,20 @@ func toBlock(b *types.Block, fullTx bool) *block {
 	}
 	for idx, txn := range b.Transactions {
 		if fullTx {
-			res.Transactions = append(res.Transactions, toTransaction(txn, b, idx))
+			res.Transactions = append(
+				res.Transactions,
+				toTransaction(
+					txn,
+					argUintPtr(b.Number()),
+					argHashPtr(b.Hash()),
+					&idx,
+				),
+			)
 		} else {
-			res.Transactions = append(res.Transactions, transactionHash(txn.Hash))
+			res.Transactions = append(
+				res.Transactions,
+				transactionHash(txn.Hash),
+			)
 		}
 	}
 	for _, uncle := range b.Uncles {
@@ -174,6 +206,10 @@ func (a argBig) MarshalText() ([]byte, error) {
 
 func argAddrPtr(a types.Address) *types.Address {
 	return &a
+}
+
+func argHashPtr(h types.Hash) *types.Hash {
+	return &h
 }
 
 type argUint64 uint64
