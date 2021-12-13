@@ -148,6 +148,9 @@ func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
 				if !ok {
 					return fmt.Errorf("input cannot be converted to string")
 				}
+				if len(s) < 3 {
+					return fmt.Errorf("invalid hexadecimal number provided for block number")
+				}
 				number, err := strconv.ParseInt(s[2:], 16, 64)
 				if err != nil {
 					return fmt.Errorf("failed to convert hex string to int64: %v", err)
