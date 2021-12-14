@@ -66,7 +66,7 @@ func DefaultConfig() *Config {
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover: false,
-			MaxPeers:   20,
+			MaxPeers:   30,
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,
