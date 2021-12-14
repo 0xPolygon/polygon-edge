@@ -279,16 +279,13 @@ func FillPremineMap(
 
 // MergeMaps is a helper method for merging multiple maps
 func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
-	// Create a resulting map
 	mergedMap := make(map[string]interface{})
-
-	// For each map, iterate over the keys and save the values
-	// into the resulting map
 	for _, m := range maps {
 		for key, value := range m {
 			mergedMap[key] = value
 		}
 	}
+
 	return mergedMap
 }
 
