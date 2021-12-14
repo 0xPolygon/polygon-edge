@@ -1,21 +1,23 @@
 package loadbot
 
 import (
-	"flag"
+	"bytes"
+	"errors"
 	"fmt"
+	"time"
+
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type LoadbotCommand struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
 }
 
 func (l *LoadbotCommand) DefineFlags() {
-	if l.FlagMap == nil {
-		l.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	l.Base.DefineFlags(l.Formatter)
 
 	l.FlagMap["tps"] = helper.FlagDescriptor{
 		Description: "Number of transactions executed per second by the loadbot",
@@ -111,14 +113,13 @@ func (l *LoadbotCommand) Synopsis() string {
 }
 
 func (l *LoadbotCommand) Help() string {
-	l.Meta.DefineFlags()
 	l.DefineFlags()
 
 	return helper.GenerateHelp(l.Synopsis(), helper.GenerateUsage(l.GetBaseCommand(), l.FlagMap), l.FlagMap)
 }
 
 func (l *LoadbotCommand) Run(args []string) int {
-	flags := flag.NewFlagSet(l.GetBaseCommand(), flag.ContinueOnError)
+	flags := l.Base.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
 	var tps uint64
 	var accountsRaw helperFlags.ArrayFlags
@@ -141,20 +142,20 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&gRPC, "grpc", "", "")
 
 	if err := flags.Parse(args); err != nil {
-		l.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to parse args: %v", err))
 		return 1
 	}
 
 	// Parse accountsRaw
 	var addresses = []types.Address{}
 	if accountsRaw == nil {
-		l.UI.Error("failed to parse accounts used by the loadbot")
+		l.Formatter.OutputError(errors.New("failed to parse accounts used by the loadbot"))
 		return 1
 	}
 	for _, account := range accountsRaw {
 		placeholder := types.Address{}
 		if err := placeholder.UnmarshalText([]byte(account)); err != nil {
-			l.UI.Error(fmt.Sprintf("Failed to decode account address: %v", err))
+			l.Formatter.OutputError(fmt.Errorf("Failed to decode account address: %v", err))
 			return 1
 		}
 		addresses = append(addresses, placeholder)
@@ -162,18 +163,18 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Parse urls
 	if len(urls) == 0 {
-		l.UI.Error("please provide at least one node url to run the loadbot")
+		l.Formatter.OutputError(errors.New("please provide at least one node url to run the loadbot"))
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %v", err))
 		return 1
 	}
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode to gasPrice: %v", err))
 		return 1
 	}
 
@@ -181,7 +182,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	for _, account := range accountsRaw {
 		acc := types.Address{}
 		if err := acc.UnmarshalText([]byte(account)); err != nil {
-			l.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
+			l.Formatter.OutputError(fmt.Errorf("Failed to decode to address: %v", err))
 			return 1
 		}
 
@@ -200,20 +201,36 @@ func (l *LoadbotCommand) Run(args []string) int {
 		GRPCUrl:   gRPC,
 	})
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("failed to execute loadbot: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to execute loadbot: %v", err))
 		return 1
 	}
 
-	output := "\n[LOADBOT RUN]\n"
-
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Transactions submitted|%d", metrics.Total),
-		fmt.Sprintf("Transactions failed|%d", metrics.Failed),
-		fmt.Sprintf("Duration|%v", metrics.Duration),
-	})
-	output += "\n"
-
-	l.UI.Output(output)
+	res := &LoadbotResult{
+		Total:    metrics.Total,
+		Failed:   metrics.Failed,
+		Duration: metrics.Duration,
+	}
+	l.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type LoadbotResult struct {
+	Total    uint64        `json:"total"`
+	Failed   uint64        `json:"failed"`
+	Duration time.Duration `json:"duration"`
+}
+
+func (r *LoadbotResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[LOADBOT RUN]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Transactions submitted|%d", r.Total),
+		fmt.Sprintf("Transactions failed|%d", r.Failed),
+		fmt.Sprintf("Duration|%v", r.Duration),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

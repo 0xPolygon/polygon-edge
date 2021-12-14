@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +12,14 @@ import (
 
 // TxPoolStatus is the command to query the snapshot
 type TxPoolStatus struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (p *TxPoolStatus) DefineFlags() {
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -25,7 +33,7 @@ func (p *TxPoolStatus) GetBaseCommand() string {
 
 // Help implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Help() string {
-	p.Meta.DefineFlags()
+	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
@@ -37,39 +45,48 @@ func (p *TxPoolStatus) Synopsis() string {
 
 // Run implements the cli.TxPoolStatus interface
 func (p *TxPoolStatus) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
-
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
-
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := txpoolOp.NewTxnPoolOperatorClient(conn)
-	fmt.Println(clt)
 
 	resp, err := clt.Status(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[TXPOOL STATUS]\n"
-
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Number of transactions in pool:|%d", resp.Length),
-	})
-
-	output += "\n"
-
-	p.UI.Output(output)
+	res := &TxPoolStatusResult{
+		Txs: resp.Length,
+	}
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type TxPoolStatusResult struct {
+	Txs uint64 `json:"txs"`
+}
+
+func (r *TxPoolStatusResult) Output() string {
+	var buffer bytes.Buffer
+
+	// current number & hash
+	buffer.WriteString("\n[TXPOOL STATUS]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Number of transactions in pool:|%d", r.Txs),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

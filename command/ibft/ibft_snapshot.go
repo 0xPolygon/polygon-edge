@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,15 +12,14 @@ import (
 
 // IbftSnapshot is the command to query the snapshot
 type IbftSnapshot struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
 }
 
 // DefineFlags defines the command flags
 func (p *IbftSnapshot) DefineFlags() {
-	if p.FlagMap == nil {
-		// Flag map not initialized
-		p.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 
 	p.FlagMap["number"] = helper.FlagDescriptor{
 		Description: "The block height (number) for the snapshot",
@@ -42,7 +42,6 @@ func (p *IbftSnapshot) GetBaseCommand() string {
 
 // Help implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Help() string {
-	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
@@ -55,20 +54,20 @@ func (p *IbftSnapshot) Synopsis() string {
 
 // Run implements the cli.IbftSnapshot interface
 func (p *IbftSnapshot) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	// query a specific snapshot
 	var number int64
 	flags.Int64Var(&number, "number", -1, "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -82,52 +81,87 @@ func (p *IbftSnapshot) Run(args []string) int {
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.GetSnapshot(context.Background(), req)
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	p.UI.Output(printSnapshot(resp))
+	res := NewIBFTSnapshotResult(resp)
+	p.Formatter.OutputResult(res)
+
 	return 0
 }
 
-func printSnapshot(s *proto.Snapshot) (output string) {
-	output += "\n[IBFT SNAPSHOT]\n"
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Block|%d", s.Number),
-		fmt.Sprintf("Hash|%s", s.Hash),
-	})
+type IBFTSnapshotVote struct {
+	Proposer string `json:"proposer"`
+	Address  string `json:"address"`
+	Vote     Vote   `json:"vote"`
+}
 
-	output += "\n"
+type IBFTSnapshotResult struct {
+	Number     uint64             `json:"number"`
+	Hash       string             `json:"hash"`
+	Votes      []IBFTSnapshotVote `json:"votes"`
+	Validators []string           `json:"validators"`
+}
 
-	votes := make([]string, len(s.Votes)+1)
-	if len(s.Votes) == 0 {
+func NewIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
+	res := &IBFTSnapshotResult{
+		Number:     resp.Number,
+		Hash:       resp.Hash,
+		Votes:      make([]IBFTSnapshotVote, len(resp.Votes)),
+		Validators: make([]string, len(resp.Validators)),
+	}
+	for i, v := range resp.Votes {
+		res.Votes[i].Proposer = v.Validator
+		res.Votes[i].Address = v.Proposed
+		res.Votes[i].Vote = voteToString(v.Auth)
+	}
+	for i, v := range resp.Validators {
+		res.Validators[i] = v.Address
+	}
+	return res
+}
+
+func (r *IBFTSnapshotResult) Output() string {
+	var buffer bytes.Buffer
+
+	// current number & hash
+	buffer.WriteString("\n[IBFT SNAPSHOT]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Block|%d", r.Number),
+		fmt.Sprintf("Hash|%s", r.Hash),
+	}))
+	buffer.WriteString("\n")
+
+	// votes
+	numVotes := len(r.Votes)
+	votes := make([]string, numVotes+1)
+	if numVotes == 0 {
 		votes[0] = "No votes found"
 	} else {
 		votes[0] = "PROPOSER|ADDRESS|VOTE TO ADD"
-		for i, d := range s.Votes {
-			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Validator, d.Proposed, d.Auth)
+		for i, d := range r.Votes {
+			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Proposer, d.Address, d.Vote == VoteAdd)
 		}
 	}
+	buffer.WriteString("\n[VOTES]\n")
+	buffer.WriteString(helper.FormatList(votes))
+	buffer.WriteString("\n")
 
-	output += "\n[VOTES]\n"
-	output += helper.FormatList(votes)
-
-	output += "\n"
-
-	validators := make([]string, len(s.Validators)+1)
-	if len(s.Validators) == 0 {
+	// validators
+	numValidators := len(r.Validators)
+	validators := make([]string, numValidators+1)
+	if numValidators == 0 {
 		validators[0] = "No validators found"
 	} else {
 		validators[0] = "ADDRESS"
-		for i, d := range s.Validators {
-			validators[i+1] = d.Address
+		for i, d := range r.Validators {
+			validators[i+1] = d
 		}
 	}
+	buffer.WriteString("\n[VALIDATORS]\n")
+	buffer.WriteString(helper.FormatList(validators))
+	buffer.WriteString("\n")
 
-	output += "\n"
-
-	output += "\n[VALIDATORS]\n"
-	output += helper.FormatList(validators)
-
-	return output
+	return buffer.String()
 }

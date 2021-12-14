@@ -25,39 +25,40 @@ func Commands() map[string]cli.CommandFactory {
 		Writer:      os.Stdout,
 		ErrorWriter: os.Stderr,
 	}
+	base := helper.Base{UI: ui}
 
-	meta := helper.Meta{
-		UI: ui,
-	}
+	// subset of flags
+	grpc := &helper.GRPCFlag{}
+	formatter := &helper.FormatterFlag{UI: ui}
 
 	// Grab a reference to the commands
-	serverCmd := server.ServerCommand{UI: ui}
-	devCmd := dev.DevCommand{UI: ui}
-	genesisCmd := genesis.GenesisCommand{UI: ui}
-	monitorCmd := monitor.MonitorCommand{Meta: meta}
-	statusCmd := status.StatusCommand{Meta: meta}
-	versionCmd := version.VersionCommand{UI: ui}
+	serverCmd := server.ServerCommand{Base: base}
+	devCmd := dev.DevCommand{Base: base}
+	genesisCmd := genesis.GenesisCommand{Base: base}
+	monitorCmd := monitor.MonitorCommand{Base: base, Formatter: formatter, GRPC: grpc}
+	statusCmd := status.StatusCommand{Base: base, Formatter: formatter, GRPC: grpc}
+	versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
 
 	ibftCmd := ibft.IbftCommand{}
-	ibftCandidatesCmd := ibft.IbftCandidates{Meta: meta}
-	ibftProposeCmd := ibft.IbftPropose{Meta: meta}
-	ibftSnapshotCmd := ibft.IbftSnapshot{Meta: meta}
-	ibftStatusCmd := ibft.IbftStatus{Meta: meta}
+	ibftCandidatesCmd := ibft.IbftCandidates{Base: base, Formatter: formatter, GRPC: grpc}
+	ibftProposeCmd := ibft.IbftPropose{Base: base, Formatter: formatter, GRPC: grpc}
+	ibftSnapshotCmd := ibft.IbftSnapshot{Base: base, Formatter: formatter, GRPC: grpc}
+	ibftStatusCmd := ibft.IbftStatus{Base: base, Formatter: formatter, GRPC: grpc}
 
 	peersCmd := peers.PeersCommand{}
-	peersAddCmd := peers.PeersAdd{Meta: meta}
-	peersListCmd := peers.PeersList{Meta: meta}
-	peersStatusCmd := peers.PeersStatus{Meta: meta}
+	peersAddCmd := peers.PeersAdd{Base: base, Formatter: formatter, GRPC: grpc}
+	peersListCmd := peers.PeersList{Base: base, Formatter: formatter, GRPC: grpc}
+	peersStatusCmd := peers.PeersStatus{Base: base, Formatter: formatter, GRPC: grpc}
 
 	txPoolCmd := txpool.TxPoolCommand{}
-	txPoolAddCmd := txpool.TxPoolAdd{Meta: meta}
-	txPoolStatusCmd := txpool.TxPoolStatus{Meta: meta}
+	txPoolAddCmd := txpool.TxPoolAdd{Base: base, Formatter: formatter, GRPC: grpc}
+	txPoolStatusCmd := txpool.TxPoolStatus{Base: base, Formatter: formatter, GRPC: grpc}
 
-	loadbotCmd := loadbot.LoadbotCommand{Meta: meta}
+	loadbotCmd := loadbot.LoadbotCommand{Base: base, Formatter: formatter}
 
 	secretsManagerCmd := secrets.SecretsCommand{}
-	secretsGenerateCmd := secrets.SecretsGenerate{Meta: meta}
-	secretsInitCmd := secrets.SecretsInit{Meta: meta}
+	secretsGenerateCmd := secrets.SecretsGenerate{Base: base}
+	secretsInitCmd := secrets.SecretsInit{Base: base, Formatter: formatter}
 
 	return map[string]cli.CommandFactory{
 

@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,7 +16,14 @@ import (
 
 // MonitorCommand is the command to Monitor to the blockchain events
 type MonitorCommand struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (m *MonitorCommand) DefineFlags() {
+	m.Base.DefineFlags(m.Formatter, m.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -29,7 +37,7 @@ func (m *MonitorCommand) GetBaseCommand() string {
 
 // Help implements the cli.Command interface
 func (m *MonitorCommand) Help() string {
-	m.Meta.DefineFlags()
+	m.DefineFlags()
 
 	return helper.GenerateHelp(m.Synopsis(), helper.GenerateUsage(m.GetBaseCommand(), m.FlagMap), m.FlagMap)
 }
@@ -41,15 +49,15 @@ func (m *MonitorCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (m *MonitorCommand) Run(args []string) int {
-	flags := m.FlagSet(m.GetBaseCommand())
+	flags := m.Base.NewFlagSet(m.GetBaseCommand(), m.Formatter, m.GRPC)
 	if err := flags.Parse(args); err != nil {
-		m.UI.Error(err.Error())
+		m.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := m.Conn()
+	conn, err := m.GRPC.Conn()
 	if err != nil {
-		m.UI.Error(err.Error())
+		m.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -58,7 +66,7 @@ func (m *MonitorCommand) Run(args []string) int {
 
 	stream, err := clt.Subscribe(ctx, &empty.Empty{})
 	if err != nil {
-		m.UI.Error(err.Error())
+		m.Formatter.OutputError(err)
 		cancelFn()
 		return 1
 	}
@@ -71,25 +79,11 @@ func (m *MonitorCommand) Run(args []string) int {
 				break
 			}
 			if err != nil {
-				m.UI.Error(fmt.Sprintf("Failed to read event: %v", err))
+				m.Formatter.OutputError(fmt.Errorf("failed to read event: %w", err))
 				break
 			}
-
-			m.UI.Info("\n[BLOCK EVENT]\n")
-			for _, add := range evnt.Added {
-				m.UI.Info(helper.FormatKV([]string{
-					fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
-					fmt.Sprintf("Block Number|%d", add.Number),
-					fmt.Sprintf("Block Hash|%s", add.Hash),
-				}))
-			}
-			for _, del := range evnt.Removed {
-				m.UI.Info(helper.FormatKV([]string{
-					fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
-					fmt.Sprintf("Block Number|%d", del.Number),
-					fmt.Sprintf("Block Hash|%s", del.Hash),
-				}))
-			}
+			res := NewBlockEventResult(evnt)
+			m.Formatter.OutputResult(res)
 		}
 		doneCh <- struct{}{}
 	}()
@@ -105,4 +99,66 @@ func (m *MonitorCommand) Run(args []string) int {
 	cancelFn()
 
 	return 0
+}
+
+const (
+	eventAdded   = "added"
+	eventRemoved = "removed"
+)
+
+type BlockchainEvent struct {
+	Type   string `json:"type"`
+	Number int64  `json:"number"`
+	Hash   string `json:"hash"`
+}
+
+type BlockChainEvents struct {
+	Added   []BlockchainEvent `json:"added"`
+	Removed []BlockchainEvent `json:"removed"`
+}
+
+type BlockEventResult struct {
+	Events BlockChainEvents `json:"events"`
+}
+
+func NewBlockEventResult(e *proto.BlockchainEvent) *BlockEventResult {
+	res := &BlockEventResult{
+		Events: BlockChainEvents{
+			Added:   make([]BlockchainEvent, len(e.Added)),
+			Removed: make([]BlockchainEvent, len(e.Removed)),
+		},
+	}
+	for i, add := range e.Added {
+		res.Events.Added[i].Type = eventAdded
+		res.Events.Added[i].Number = add.Number
+		res.Events.Added[i].Hash = add.Hash
+	}
+	for i, rem := range e.Removed {
+		res.Events.Removed[i].Type = eventRemoved
+		res.Events.Removed[i].Number = rem.Number
+		res.Events.Removed[i].Hash = rem.Hash
+	}
+	return res
+}
+
+func (r *BlockEventResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[BLOCK EVENT]\n")
+	for _, add := range r.Events.Added {
+		buffer.WriteString(helper.FormatKV([]string{
+			fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
+			fmt.Sprintf("Block Number|%d", add.Number),
+			fmt.Sprintf("Block Hash|%s", add.Hash),
+		}))
+	}
+	for _, rem := range r.Events.Removed {
+		buffer.WriteString(helper.FormatKV([]string{
+			fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
+			fmt.Sprintf("Block Number|%d", rem.Number),
+			fmt.Sprintf("Block Hash|%s", rem.Hash),
+		}))
+	}
+
+	return buffer.String()
 }

@@ -1,7 +1,9 @@
 package ibft
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -12,15 +14,14 @@ import (
 
 // IbftPropose is the command to query the snapshot
 type IbftPropose struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
 }
 
 // DefineFlags defines the command flags
 func (p *IbftPropose) DefineFlags() {
-	if p.FlagMap == nil {
-		// Flag map not initialized
-		p.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 
 	p.FlagMap["addr"] = helper.FlagDescriptor{
 		Description: "Address of the account to be voted for",
@@ -54,7 +55,6 @@ func (p *IbftPropose) GetBaseCommand() string {
 
 // Help implements the cli.IbftPropose interface
 func (p *IbftPropose) Help() string {
-	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
@@ -73,7 +73,7 @@ var (
 
 // Run implements the cli.IbftPropose interface
 func (p *IbftPropose) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	var vote string
 	var ethAddress string
@@ -82,34 +82,34 @@ func (p *IbftPropose) Run(args []string) int {
 	flags.StringVar(&ethAddress, "addr", "", "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	if vote == "" {
-		p.UI.Error("Vote value not specified")
+		p.Formatter.OutputError(errors.New("Vote value not specified"))
 		return 1
 	}
 
 	if vote != positive && vote != negative {
-		p.UI.Error(fmt.Sprintf("Invalid vote value (should be '%s' or '%s')", positive, negative))
+		p.Formatter.OutputError(fmt.Errorf("Invalid vote value (should be '%s' or '%s')", positive, negative))
 		return 1
 	}
 
 	if ethAddress == "" {
-		p.UI.Error("Account address not specified")
+		p.Formatter.OutputError(errors.New("Account address not specified"))
 		return 1
 	}
 
 	var addr types.Address
 	if err := addr.UnmarshalText([]byte(ethAddress)); err != nil {
-		p.UI.Error("Failed to decode address")
+		p.Formatter.OutputError(errors.New("Failed to decode address"))
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -121,19 +121,42 @@ func (p *IbftPropose) Run(args []string) int {
 
 	_, err = clt.Propose(context.Background(), req)
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[IBFT PROPOSE]\n"
-
-	if vote == positive {
-		output += fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set\n", ethAddress)
-	} else {
-		output += fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set\n", ethAddress)
+	res := &IBFTProposeResult{
+		Address: addr.String(),
+		Vote:    vote,
 	}
-
-	p.UI.Info(output)
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type IBFTProposeResult struct {
+	Address string `json:"-"`
+	Vote    string `json:"-"`
+}
+
+func (r *IBFTProposeResult) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`{"message": "%s"}`, r.Message())), nil
+}
+
+func (r *IBFTProposeResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[IBFT PROPOSE]\n")
+	buffer.WriteString(r.Message())
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
+
+func (r *IBFTProposeResult) Message() string {
+	if r.Vote == positive {
+		return fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", r.Address)
+	} else {
+		return fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", r.Address)
+	}
 }
