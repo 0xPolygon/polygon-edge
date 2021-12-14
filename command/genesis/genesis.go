@@ -23,6 +23,19 @@ const (
 	devConsensus  = "dev"
 )
 
+// Define initial consensus engine configuration values
+var (
+	initialPoSMap = map[string]interface{}{
+		"type": ibft.PoS,
+	}
+
+	initialPoAMap = map[string]interface{}{
+		"type": ibft.PoA,
+	}
+
+	initialEmptyMap = map[string]interface{}{}
+)
+
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
 	UI cli.Ui
@@ -248,10 +261,8 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	// Check if any addresses should be prestaked in the dev consensus
 	if consensus == devConsensus {
-		if len(ibftValidators) != 0 {
-			for _, val := range ibftValidators {
-				validators = append(validators, types.StringToAddress(val))
-			}
+		for _, val := range ibftValidators {
+			validators = append(validators, types.StringToAddress(val))
 		}
 	}
 
@@ -266,18 +277,14 @@ func (c *GenesisCommand) Run(args []string) int {
 	constructEngineConfig := func() map[string]interface{} {
 		if consensus != ibftConsensus {
 			// Dev consensus, return an empty map
-			return map[string]interface{}{}
+			return initialEmptyMap
 		}
 
 		if isPos {
-			return map[string]interface{}{
-				"type": ibft.PoS,
-			}
+			return initialPoSMap
 		}
 
-		return map[string]interface{}{
-			"type": ibft.PoA,
-		}
+		return initialPoAMap
 	}
 
 	cc := &chain.Chain{
