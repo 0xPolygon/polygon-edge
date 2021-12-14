@@ -75,7 +75,7 @@ func (p *SecretsInit) GetBaseCommand() string {
 // generateAlreadyInitializedError generates an output for when the secrets directory
 // has already been initialized in the past
 func generateAlreadyInitializedError(directory string) string {
-	return fmt.Sprintf("Directory %s has previously initialized secrets data\n", directory)
+	return fmt.Sprintf("Directory %s has previously initialized secrets data", directory)
 }
 
 // setupLocalSM is a helper method for boilerplate local secrets manager setup
