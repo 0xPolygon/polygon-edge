@@ -1,24 +1,21 @@
 package loadbot
 
 import (
-	"flag"
+	"bytes"
 	"fmt"
 	"net/url"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/mitchellh/cli"
 )
 
 type LoadbotCommand struct {
-	UI      cli.Ui
-	FlagMap map[string]helper.FlagDescriptor
+	helper.Base
+	Formatter *helper.FormatterFlag
 }
 
 func (l *LoadbotCommand) DefineFlags() {
-	if l.FlagMap == nil {
-		l.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	l.Base.DefineFlags(l.Formatter)
 
 	l.FlagMap["tps"] = helper.FlagDescriptor{
 		Description: "Number of transactions to send per second. Default: 100",
@@ -69,15 +66,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
-
-	l.FlagMap["grpc"] = helper.FlagDescriptor{
-		Description: "The gRPC endpoint used to verify TxPool.",
-		Arguments: []string{
-			"GRPC_ADDRESS",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
-	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -99,7 +87,7 @@ func (l *LoadbotCommand) Help() string {
 }
 
 func (l *LoadbotCommand) Run(args []string) int {
-	flags := flag.NewFlagSet(l.GetBaseCommand(), flag.ExitOnError)
+	flags := l.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
 	// Placeholders for flags
 	var tps uint64
@@ -120,30 +108,30 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var err error
 	// Parse cli arguments
 	if err = flags.Parse(args); err != nil {
-		l.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to parse args: %w", err))
 		return 1
 	}
 
 	var sender types.Address
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode sender address: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode sender address: %w", err))
 		return 1
 	}
 
 	var receiver types.Address
 	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode receiver address: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode receiver address: %w", err))
 		return 1
 	}
 
 	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
-		l.UI.Error(fmt.Sprintf(" Invalid JSON-RPC url : %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Invalid JSON-RPC url : %w", err))
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %w", err))
 		return 1
 	}
 
@@ -158,7 +146,6 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Create the metrics placeholder
 	metrics := &Metrics{
-		Duration:                   0,
 		TotalTransactionsSentCount: 0,
 		FailedTransactionsCount:    0,
 	}
@@ -168,19 +155,33 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// run the loadbot
 	if err := loadBot.Run(); err != nil {
-		l.UI.Error(fmt.Sprintf("an error occured while running the loadbot: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("an error occured while running the loadbot: %w", err))
 		return 1
 	}
 
-	output := "\n[LOADBOT RUN]\n"
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Transactions submitted|%d", metrics.TotalTransactionsSentCount),
-		fmt.Sprintf("Transactions failed|%d", metrics.FailedTransactionsCount),
-		fmt.Sprintf("Duration|%v", metrics.Duration),
-	})
-	output += "\n"
-
-	l.UI.Output(output)
+	res := &LoadbotResult{
+		Total:  metrics.TotalTransactionsSentCount,
+		Failed: metrics.FailedTransactionsCount,
+	}
+	l.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type LoadbotResult struct {
+	Total  uint64 `json:"total"`
+	Failed uint64 `json:"failed"`
+}
+
+func (r *LoadbotResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[LOADBOT RUN]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Transactions submitted|%d", r.Total),
+		fmt.Sprintf("Transactions failed|%d", r.Failed),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

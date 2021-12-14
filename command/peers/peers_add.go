@@ -1,7 +1,9 @@
 package peers
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -11,14 +13,13 @@ import (
 
 // PeersAdd is the PeersAdd to start the sever
 type PeersAdd struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
 }
 
 func (p *PeersAdd) DefineFlags() {
-	if p.FlagMap == nil {
-		// Flag map not initialized
-		p.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 
 	p.FlagMap["addr"] = helper.FlagDescriptor{
 		Description: "Peer's libp2p address in the multiaddr format",
@@ -41,7 +42,6 @@ func (p *PeersAdd) GetBaseCommand() string {
 
 // Help implements the cli.PeersAdd interface
 func (p *PeersAdd) Help() string {
-	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
@@ -54,25 +54,25 @@ func (p *PeersAdd) Synopsis() string {
 
 // Run implements the cli.PeersAdd interface
 func (p *PeersAdd) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
 	flags.Var(&passedInAddresses, "addr", "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	if len(passedInAddresses) < 1 {
-		p.UI.Error("At least 1 peer address is required")
+		p.Formatter.OutputError(errors.New("At least 1 peer address is required"))
 		return 1
 	}
 
 	// Connect to the gRPC layer
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -92,25 +92,43 @@ func (p *PeersAdd) Run(args []string) int {
 		addedPeers = append(addedPeers, address)
 	}
 
-	var output = "\n[PEERS ADDED]\n"
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Peers listed|%d", len(passedInAddresses)), // The number of peers the user wanted to add
-		fmt.Sprintf("Peers added|%d", peersAdded),              // The number of peers that have been added
-	})
-
-	if len(addedPeers) > 0 {
-		output += "\n\n[LIST OF ADDED PEERS]\n"
-		output += helper.FormatList(addedPeers)
+	res := &PeersAddResult{
+		NumRequested: len(passedInAddresses),
+		NumAdded:     peersAdded,
+		Peers:        addedPeers,
+		Errors:       visibleErrors,
 	}
-
-	if len(visibleErrors) > 0 {
-		output += "\n\n[ERRORS]\n"
-		output += helper.FormatList(visibleErrors)
-	}
-
-	output += "\n"
-
-	p.UI.Info(output)
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type PeersAddResult struct {
+	NumRequested int      `json:"num_requested"`
+	NumAdded     int      `json:"num_added"`
+	Peers        []string `json:"peers"`
+	Errors       []string `json:"errors"`
+}
+
+func (r *PeersAddResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[PEERS ADDED]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Peers listed|%d", r.NumRequested), // The number of peers the user wanted to add
+		fmt.Sprintf("Peers added|%d", r.NumAdded),      // The number of peers that have been added
+	}))
+
+	if len(r.Peers) > 0 {
+		buffer.WriteString("\n\n[LIST OF ADDED PEERS]\n")
+		buffer.WriteString(helper.FormatList(r.Peers))
+	}
+
+	if len(r.Errors) > 0 {
+		buffer.WriteString("\n\n[ERRORS]\n")
+		buffer.WriteString(helper.FormatList(r.Errors))
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

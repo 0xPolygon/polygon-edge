@@ -30,7 +30,6 @@ type Configuration struct {
 }
 
 type Metrics struct {
-	Duration                   time.Duration
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
 }
