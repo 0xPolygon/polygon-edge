@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/gorilla/websocket"
@@ -125,7 +126,7 @@ func TestWS_Response(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_, err = srv.WaitForReceipt(ctx, hash)
+		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
 		assert.NoError(t, err)
 
 		requestID := 2

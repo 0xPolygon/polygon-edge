@@ -221,7 +221,7 @@ func TestEthTransfer(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			receipt, err := tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), txnHash)
 
 			if testCase.shouldSucceed {
 				assert.NoError(t, err)
@@ -563,7 +563,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	for index, txHash := range txHashes {
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 
-		receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash)
+		receipt, receiptErr := tests.WaitForReceipt(waitCtx, client.Eth(), txHash)
 		if receipt == nil {
 			t.Fatalf("Unable to get receipt for hash index [%d]", index)
 		} else if receiptErr != nil {
