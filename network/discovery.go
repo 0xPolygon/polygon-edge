@@ -200,6 +200,11 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	return addrInfo, nil
 }
 
+func (d *discovery) peersCount() int {
+	d.peersLock.Lock()
+	defer d.peersLock.Unlock()
+	return len(d.peers)
+}
 func (d *discovery) run() {
 	for {
 		select {
@@ -222,8 +227,8 @@ func (d *discovery) handleDiscovery() {
 		}
 	} else {
 		// take a random peer and find peers
-		if len(d.peers) > 0 {
-			target := d.peers[rand.Intn(len(d.peers))]
+		if d.peersCount() > 0 {
+			target := d.peers[rand.Intn(d.peersCount())]
 			if err := d.call(target.id); err != nil {
 				d.srv.logger.Error("failed to dial bootnode", "err", err)
 			}
