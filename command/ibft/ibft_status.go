@@ -82,7 +82,7 @@ func (r *IBFTStatusResult) Output() string {
 
 	buffer.WriteString("\n[VALIDATOR STATUS]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Vaidator key|%s", r.ValidatorKey),
+		fmt.Sprintf("Validator key|%s", r.ValidatorKey),
 	}))
 	buffer.WriteString("\n")
 

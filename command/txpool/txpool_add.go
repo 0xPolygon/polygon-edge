@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
@@ -158,7 +159,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 		Value:    value,
 		GasPrice: gasPrice,
 		Nonce:    nonce,
-		V:        []byte{1}, // it is necessary to encode in rlp
+		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}
 
 	msg := &proto.AddTxnReq{
