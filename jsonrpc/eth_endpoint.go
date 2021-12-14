@@ -330,7 +330,7 @@ func (e *Eth) Call(
 	}
 
 	if result.Failed() {
-		return nil, fmt.Errorf("unable to execute call")
+		return nil, fmt.Errorf("unable to execute call: %s", result.Err.Error())
 	}
 	return argBytesPtr(result.ReturnValue), nil
 }
