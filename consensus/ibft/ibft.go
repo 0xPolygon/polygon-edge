@@ -184,7 +184,6 @@ var mechanismBackends = map[Type]ConsensusMechanismFactory{
 }
 
 // runHook runs a specified hook if it is present in the hook map
-// nolint:unused
 func (i *Ibft) runHook(hookName string, hookParams interface{}) error {
 	// Grab the hook map
 	hookMap := i.mechanism.GetHookMap()
