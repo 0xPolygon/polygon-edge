@@ -27,7 +27,6 @@ func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
 		ibft:          ibft,
 	}
 
-	// Initialize the hook map
 	pos.initializeHookMap()
 
 	return pos, nil

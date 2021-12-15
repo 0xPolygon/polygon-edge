@@ -26,7 +26,6 @@ func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
 		ibft:          ibft,
 	}
 
-	// Initialize the hook map
 	poa.initializeHookMap()
 
 	return poa, nil
