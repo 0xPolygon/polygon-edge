@@ -88,7 +88,7 @@ type Ibft struct {
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 }
 
-// Define the type of the iBFT consensus
+// Define the type of the IBFT consensus
 
 type Type string
 
