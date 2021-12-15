@@ -512,7 +512,7 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
-			// The snapshot store is updated for PoA inside the ProcessHeadersHook
+			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
 			updateSnapshotCallback(oldLatestNumber)
 			oldLatestNumber = i.blockchain.Header().Number
 
