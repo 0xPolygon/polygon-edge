@@ -462,7 +462,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 		name          string
 		initialNonces map[types.Address]uint64
 		target        types.Address
-		blockNumber   string
+		blockNumber   interface{}
 		succeeded     bool
 		expectedNonce *argUint64
 	}{
@@ -492,7 +492,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				addr0: 100,
 			},
 			target:        addr0,
-			blockNumber:   "",
+			blockNumber:   nil,
 			succeeded:     true,
 			expectedNonce: argUintPtr(100),
 		},
@@ -507,8 +507,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 				account.Nonce(nonce)
 			}
 			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-			blockNumber, _ := createBlockNumberPointer(tt.blockNumber)
-			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, blockNumber)
+			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, tt.blockNumber)
 			if tt.succeeded {
 				assert.NoError(t, err)
 				assert.NotNil(t, nonce)

@@ -84,3 +84,77 @@ func Test_GetBalance(t *testing.T) {
 	err = client.Call("eth_getBalance", &out, address, "abc")
 	assert.Error(t, err)
 }
+
+func Test_GetTransactionCount(t *testing.T) {
+	// Test account
+	_, address := tests.GenerateKeyAndAddr(t)
+
+	// Network
+	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+		config.SetConsensus(framework.ConsensusDev)
+		config.Premine(address, framework.EthToWei(1))
+	})
+
+	// Client
+	srv := servers[0]
+	client := srv.JSONRPC()
+
+	expected := uint64(0)
+
+	// Using web3
+	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	var out string
+
+	// Using custom number
+	err = client.Call("eth_getTransactionCount", &out, address, "0x0")
+	assert.NoError(t, err)
+	nonce, err = types.ParseUint64orHex(&out)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	// Using implicit latest #1
+	err = client.Call("eth_getTransactionCount", &out, address)
+	assert.NoError(t, err)
+	nonce, err = types.ParseUint64orHex(&out)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	// Using implicit latest #2
+	err = client.Call("eth_getTransactionCount", &out, address, nil)
+	assert.NoError(t, err)
+	nonce, err = types.ParseUint64orHex(&out)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	// Using number as an object
+	n := jsonrpc.BlockNumber(0)
+	params := jsonrpc.BlockNumberOrHash{
+		BlockNumber: &n,
+	}
+	err = client.Call("eth_getTransactionCount", &out, address, params)
+	assert.NoError(t, err)
+	nonce, err = types.ParseUint64orHex(&out)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	// Using block hash as an object
+	block, err := client.Eth().GetBlockByNumber(web3.Latest, false)
+	assert.NoError(t, err)
+
+	params = jsonrpc.BlockNumberOrHash{
+		BlockNumber: nil,
+		BlockHash:   (*types.Hash)(&block.Hash),
+	}
+	err = client.Call("eth_getTransactionCount", &out, address, params)
+	assert.NoError(t, err)
+	nonce, err = types.ParseUint64orHex(&out)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, nonce)
+
+	// Using invalid number
+	err = client.Call("eth_getTransactionCount", &out, address, "abc")
+	assert.Error(t, err)
+}

@@ -3,12 +3,11 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
+	"math/big"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -615,18 +614,48 @@ func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}
 // GetTransactionCount returns account nonce
 func (e *Eth) GetTransactionCount(
 	address types.Address,
-	number *BlockNumber,
+	filter interface{},
 ) (interface{}, error) {
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
-	}
-	nonce, err := e.d.getNextNonce(address, *number)
-	if err != nil {
-		if errors.As(err, &ErrStateNotFound) {
-			return argUintPtr(0), nil
+	var bnh BlockNumberOrHash
+	var nonce uint64
+	var err error
+
+	// If filter has not been submitted, use the latest block
+	if filter == nil {
+		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
+	} else {
+		err = bnh.Unmarshal(&filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode filter: %v", err)
 		}
-		return nil, err
 	}
+
+	// From now on, the filter is the block number or the block hash
+	// Use one of them to retrieve the desired block we'll get the nonce from
+	if bnh.BlockHash != nil {
+		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header := block.Header
+		nonce, err = e.d.getNextNonce(address, BlockNumber(header.Number))
+		if err != nil {
+			if errors.As(err, &ErrStateNotFound) {
+				return argUintPtr(0), nil
+			}
+			return nil, err
+		}
+	} else {
+		nonce, err = e.d.getNextNonce(address, *bnh.BlockNumber)
+		if err != nil {
+			if errors.As(err, &ErrStateNotFound) {
+				return argUintPtr(0), nil
+			}
+			return nil, err
+		}
+	}
+
 	return argUintPtr(nonce), nil
 }
 
