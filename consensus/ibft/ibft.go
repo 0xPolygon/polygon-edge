@@ -466,10 +466,10 @@ func (i *Ibft) runSyncState() {
 
 	for i.isState(SyncState) {
 		oldLatestNumber := i.blockchain.Header().Number
-		// try to sync with some target peer
+		// try to sync with the best-suited peer
 		p := i.syncer.BestPeer()
 		if p == nil {
-			// if we do not have any peers and we have been a validator
+			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
 			if i.isValidSnapshot() {
@@ -494,7 +494,12 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
+		// Sync the snapshot state after bulk syncing
 		updateSnapshotCallback(oldLatestNumber)
+
+		// Update the latest saved header number ahead of
+		// the peer block-per-block sync
+		oldLatestNumber = i.blockchain.Header().Number
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead
@@ -506,14 +511,17 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
+			// After each written block, update the snapshot store for PoS.
+			// The snapshot store is updated for PoA inside the ProcessHeadersHook
+			updateSnapshotCallback(oldLatestNumber)
+			oldLatestNumber = i.blockchain.Header().Number
+
 			i.syncer.Broadcast(b)
 			i.txpool.ResetWithHeader(b.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
 		})
-
-		updateSnapshotCallback(oldLatestNumber)
 
 		if isValidator {
 			// at this point, we are in sync with the latest chain we know of

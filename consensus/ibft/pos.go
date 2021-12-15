@@ -76,7 +76,10 @@ func (pos *PoSMechanism) syncStateHook(referenceNumber interface{}) error {
 	oldLatestNumber := referenceNumber.(uint64)
 
 	// For the block range, update the snapshot store accordingly if an epoch occurred in the range
-	if err := pos.ibft.batchUpdateValidators(oldLatestNumber+1, pos.ibft.blockchain.Header().Number); err != nil {
+	if err := pos.ibft.batchUpdateValidators(
+		oldLatestNumber+1,
+		pos.ibft.blockchain.Header().Number,
+	); err != nil {
 		pos.ibft.logger.Error("failed to bulk update validators", "err", err)
 	}
 
