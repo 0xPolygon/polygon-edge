@@ -1,8 +1,6 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
 	"time"
 
@@ -10,6 +8,9 @@ import (
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -537,7 +538,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}}, // not considered - stays in pool
+				{Nonce: 7}},            // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -630,28 +631,8 @@ func (p *mockTxPool) ResetWithHeader(h *types.Header) {
 	p.resetWithHeaderParam = h
 }
 
-func (p *mockTxPool) Pop() (*types.Transaction, func()) {
-	if len(p.transactions) == 0 {
-		return nil, nil
-	}
-
-	t := p.transactions[0]
-	p.transactions = p.transactions[1:]
-	return t, func() {
-		p.transactions = append(p.transactions, t)
-	}
-}
-
-func (p *mockTxPool) DecreaseAccountNonce(txn *types.Transaction) {
-	if p.nonceDecreased == nil {
-		p.nonceDecreased = make(map[*types.Transaction]bool)
-	}
-
-	p.nonceDecreased[txn] = true
-}
-
-func (p *mockTxPool) Length() uint64 {
-	return uint64(len(p.transactions))
+func (p *mockTxPool) WriteTransactions(write txpool.WriteTxCallback) ([]*types.Transaction, int) {
+	return nil, 0
 }
 
 type mockTransition struct {

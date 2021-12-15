@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	any "google.golang.org/protobuf/types/known/anypb"
@@ -31,10 +32,8 @@ type blockchainInterface interface {
 }
 
 type transactionPoolInterface interface {
+	WriteTransactions(write txpool.WriteTxCallback) ([]*types.Transaction, int)
 	ResetWithHeader(h *types.Header)
-	Pop() (*types.Transaction, func())
-	DecreaseAccountNonce(tx *types.Transaction)
-	Length() uint64
 }
 
 type syncerInterface interface {
@@ -457,43 +456,27 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	txns := []*types.Transaction{}
-	returnTxnFuncs := []func(){}
-	for {
-		txn, retTxnFn := i.txpool.Pop()
-		if txn == nil {
-			break
-		}
-
-		if txn.ExceedsBlockGasLimit(gasLimit) {
+	successful, remaining := i.txpool.WriteTransactions(func(tx *types.Transaction) txpool.WriteTxStatus {
+		if tx.ExceedsBlockGasLimit(gasLimit) {
 			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.DecreaseAccountNonce(txn)
-			continue
+			return txpool.Unrecoverable
 		}
 
-		if err := transition.Write(txn); err != nil {
+		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
-				break
+				return txpool.Abort
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				return txpool.Recoverable
 			} else {
-				i.txpool.DecreaseAccountNonce(txn)
+				return txpool.Unrecoverable
 			}
-			continue
 		}
 
-		txns = append(txns, txn)
-	}
+		return txpool.Ok
+	})
 
-	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
-	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
-	for _, retFunc := range returnTxnFuncs {
-		retFunc()
-	}
-
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
-	return txns
+	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", remaining)
+	return nil
 }
 
 // runAcceptState runs the Accept state loop
