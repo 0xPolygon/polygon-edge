@@ -530,19 +530,15 @@ func TestEth_State_GetCode(t *testing.T) {
 	acct0.Code(code0)
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumber, err := createBlockNumberPointer("latest")
-	if err != nil {
-		assert.Error(t, err)
-	}
 
 	t.Run("Initialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, blockNumber)
+		code, err := dispatcher.endpoints.Eth.GetCode(acct0.address, "latest")
 		assert.NoError(t, err)
 		assert.Equal(t, code, argBytesPtr(code0))
 	})
 
 	t.Run("Uninitialized address", func(t *testing.T) {
-		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, blockNumber)
+		code, err := dispatcher.endpoints.Eth.GetCode(uninitializedAddress, "latest")
 		assert.NoError(t, err)
 		assert.Equal(t, code, "0x")
 	})

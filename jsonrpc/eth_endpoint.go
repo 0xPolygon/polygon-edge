@@ -660,14 +660,35 @@ func (e *Eth) GetTransactionCount(
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
-	// Set the block number to latest
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+func (e *Eth) GetCode(address types.Address, filter interface{}) (interface{}, error) {
+	var bnh BlockNumberOrHash
+	var header *types.Header
+	var err error
+
+	// If filter has not been submitted, use the latest block
+	if filter == nil {
+		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
+	} else {
+		err = bnh.Unmarshal(&filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode filter: %v", err)
+		}
 	}
-	header, err := e.d.getBlockHeaderImpl(*number)
-	if err != nil {
-		return nil, err
+
+	// From now on, the filter is the block number or the block hash
+	// Use one of them to retrieve the desired block we'll get the account balance from
+	if bnh.BlockHash != nil {
+		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header = block.Header
+	} else {
+		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	emptySlice := []byte{}
