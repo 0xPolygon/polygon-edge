@@ -1,6 +1,7 @@
 package status
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +12,14 @@ import (
 
 // StatusCommand is the command to show the version of the agent
 type StatusCommand struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (c *StatusCommand) DefineFlags() {
+	c.Base.DefineFlags(c.Formatter, c.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -25,7 +33,7 @@ func (c *StatusCommand) GetBaseCommand() string {
 
 // Help implements the cli.Command interface
 func (c *StatusCommand) Help() string {
-	c.Meta.DefineFlags()
+	c.DefineFlags()
 
 	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
@@ -37,37 +45,54 @@ func (c *StatusCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *StatusCommand) Run(args []string) int {
-
-	flags := c.FlagSet(c.GetBaseCommand())
+	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 	if err := flags.Parse(args); err != nil {
-		c.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := c.Conn()
+	conn, err := c.GRPC.Conn()
 	if err != nil {
-		c.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	status, err := clt.GetStatus(context.Background(), &emptypb.Empty{})
 	if err != nil {
-		c.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[CLIENT STATUS]\n"
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Network (Chain ID)|%d", status.Network),
-		fmt.Sprintf("Current Block Number (base 10)|%d", status.Current.Number),
-		fmt.Sprintf("Current Block Hash|%s", status.Current.Hash),
-		fmt.Sprintf("Libp2p Address|%s", status.P2PAddr),
-	})
+	res := &StatusResult{
+		ChainID:            status.Network,
+		CurrentBlockNumber: status.Current.Number,
+		CurrentBlockHash:   status.Current.Hash,
+		LibP2PAddress:      status.P2PAddr,
+	}
 
-	output += "\n"
-
-	c.UI.Info(output)
+	c.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type StatusResult struct {
+	ChainID            int64  `json:"chain_id"`
+	CurrentBlockNumber int64  `json:"current_block_number"`
+	CurrentBlockHash   string `json:"current_block_hash"`
+	LibP2PAddress      string `json:"libp2p_address"`
+}
+
+func (r *StatusResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[CLIENT STATUS]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Network (Chain ID)|%d", r.ChainID),
+		fmt.Sprintf("Current Block Number (base 10)|%d", r.CurrentBlockNumber),
+		fmt.Sprintf("Current Block Hash|%s", r.CurrentBlockHash),
+		fmt.Sprintf("Libp2p Address|%s", r.LibP2PAddress),
+	}))
+
+	return buffer.String()
 }

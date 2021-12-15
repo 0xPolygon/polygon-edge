@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -10,14 +11,13 @@ import (
 
 // PeersStatus is the PeersStatus to start the sever
 type PeersStatus struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
 }
 
 func (p *PeersStatus) DefineFlags() {
-	if p.FlagMap == nil {
-		// Flag map not initialized
-		p.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 
 	p.FlagMap["peer-id"] = helper.FlagDescriptor{
 		Description: "Libp2p node ID of a specific peer within p2p network",
@@ -39,7 +39,6 @@ func (p *PeersStatus) GetBaseCommand() string {
 
 // Help implements the cli.PeersStatus interface
 func (p *PeersStatus) Help() string {
-	p.Meta.DefineFlags()
 	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
@@ -52,13 +51,13 @@ func (p *PeersStatus) Synopsis() string {
 
 // Run implements the cli.PeersStatus interface
 func (p *PeersStatus) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	var nodeId string
 	flags.StringVar(&nodeId, "peer-id", "", "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
@@ -67,34 +66,45 @@ func (p *PeersStatus) Run(args []string) int {
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeId})
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	var output = "\n[PEER STATUS]\n"
-	output += formatPeerStatus(resp)
-
-	output += "\n"
-
-	p.UI.Info(output)
+	res := &PeersStatusResult{
+		ID:        resp.Id,
+		Protocols: resp.Protocols,
+		Addresses: resp.Addrs,
+	}
+	p.Formatter.OutputResult(res)
 
 	return 0
 }
 
-// formatPeerStatus formats the peer status response for a single peer
-func formatPeerStatus(peer *proto.Peer) string {
-	return helper.FormatKV([]string{
-		fmt.Sprintf("ID|%s", peer.Id),
-		fmt.Sprintf("Protocols|%s", peer.Protocols),
-		fmt.Sprintf("Addresses|%s", peer.Addrs),
-	})
+type PeersStatusResult struct {
+	ID        string   `json:"id"`
+	Protocols []string `json:"protocols"`
+	Addresses []string `json:"addresses"`
+}
+
+func (r *PeersStatusResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[PEER STATUS]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("ID|%s", r.ID),
+		fmt.Sprintf("Protocols|%s", r.Protocols),
+		fmt.Sprintf("Addresses|%s", r.Addresses),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

@@ -1,97 +1,67 @@
 package loadbot
 
 import (
-	"flag"
+	"bytes"
 	"fmt"
+	"net/url"
+
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
 type LoadbotCommand struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
 }
 
 func (l *LoadbotCommand) DefineFlags() {
-	if l.FlagMap == nil {
-		l.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	l.Base.DefineFlags(l.Formatter)
 
 	l.FlagMap["tps"] = helper.FlagDescriptor{
-		Description: "Number of transactions executed per second by the loadbot",
+		Description: "Number of transactions to send per second. Default: 100",
 		Arguments: []string{
 			"TPS",
 		},
-		FlagOptional: true,
+		ArgumentsOptional: true,
 	}
 
-	l.FlagMap["account"] = helper.FlagDescriptor{
-		Description: "Sets the account the use while running stress tests",
+	l.FlagMap["sender"] = helper.FlagDescriptor{
+		Description: "The account used to send the transactions.",
 		Arguments: []string{
-			"ACCOUNT",
+			"SENDER",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
+		ArgumentsOptional: true,
 	}
 
-	l.FlagMap["gasLimit"] = helper.FlagDescriptor{
-		Description: "The specified gas limit",
+	l.FlagMap["receiver"] = helper.FlagDescriptor{
+		Description: "The account used to receive the transactions.",
 		Arguments: []string{
-			"LIMIT",
+			"RECEIVER",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
-
-	l.FlagMap["gasPrice"] = helper.FlagDescriptor{
-		Description: "The gas price",
-		Arguments: []string{
-			"GASPRICE",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
-
-	l.FlagMap["url"] = helper.FlagDescriptor{
-		Description: "The URL used to make the transaction submission",
-		Arguments: []string{
-			"URL",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
-	}
-
-	l.FlagMap["chainid"] = helper.FlagDescriptor{
-		Description: "The Chain ID used to sign the transactions",
-		Arguments: []string{
-			"CHAIN_ID",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
-
-	l.FlagMap["count"] = helper.FlagDescriptor{
-		Description: "The number of transactions to send",
-		Arguments: []string{
-			"COUNT",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
+		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["value"] = helper.FlagDescriptor{
-		Description: "The value sent during the transaction by the loadbot",
+		Description: "The value sent in each transaction in wei. If negative, " +
+			"a random value will be generated. Default: 100",
 		Arguments: []string{
 			"VALUE",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
+		ArgumentsOptional: true,
 	}
 
-	l.FlagMap["grpc"] = helper.FlagDescriptor{
-		Description: "The gRPC url used by the loadbot to verify post load transactions status",
+	l.FlagMap["count"] = helper.FlagDescriptor{
+		Description: "The number of transactions to sent in total. Default: 1000",
 		Arguments: []string{
-			"GRPC_URL",
+			"COUNT",
+		},
+		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
+		Description: "The JSON-RPC endpoint used to send transactions.",
+		Arguments: []string{
+			"JSONRPC_ADDRESS",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
@@ -99,7 +69,7 @@ func (l *LoadbotCommand) DefineFlags() {
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
-	return "Runs the loadbot with the given properties (TPS, accounts...)"
+	return "Runs the loadbot to stress test the network"
 }
 
 func (l *LoadbotCommand) GetBaseCommand() string {
@@ -111,109 +81,107 @@ func (l *LoadbotCommand) Synopsis() string {
 }
 
 func (l *LoadbotCommand) Help() string {
-	l.Meta.DefineFlags()
 	l.DefineFlags()
 
 	return helper.GenerateHelp(l.Synopsis(), helper.GenerateUsage(l.GetBaseCommand(), l.FlagMap), l.FlagMap)
 }
 
 func (l *LoadbotCommand) Run(args []string) int {
-	flags := flag.NewFlagSet(l.GetBaseCommand(), flag.ContinueOnError)
+	flags := l.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
+	// Placeholders for flags
 	var tps uint64
-	var accountsRaw helperFlags.ArrayFlags
-	var gasLimit uint64
-	var gasPriceRaw string
-	var urls helperFlags.ArrayFlags
-	var chainID uint64
-	var count uint64
+	var senderRaw string
+	var receiverRaw string
 	var valueRaw string
-	var gRPC string
+	var count uint64
+	var jsonrpc string
 
+	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
-	flags.Var(&accountsRaw, "account", "")
-	flags.Uint64Var(&gasLimit, "gasLimit", 1000000, "")
-	flags.StringVar(&gasPriceRaw, "gasPrice", "0x100000", "")
-	flags.Var(&urls, "url", "")
-	flags.Uint64Var(&chainID, "chainid", helper.DefaultChainID, "")
+	flags.StringVar(&senderRaw, "sender", "", "")
+	flags.StringVar(&receiverRaw, "receiver", "", "")
+	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
-	flags.StringVar(&valueRaw, "value", "", "")
-	flags.StringVar(&gRPC, "grpc", "", "")
+	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
 
-	if err := flags.Parse(args); err != nil {
-		l.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+	var err error
+	// Parse cli arguments
+	if err = flags.Parse(args); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("Failed to parse args: %w", err))
 		return 1
 	}
 
-	// Parse accountsRaw
-	var addresses = []types.Address{}
-	if accountsRaw == nil {
-		l.UI.Error("failed to parse accounts used by the loadbot")
+	var sender types.Address
+	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode sender address: %w", err))
 		return 1
 	}
-	for _, account := range accountsRaw {
-		placeholder := types.Address{}
-		if err := placeholder.UnmarshalText([]byte(account)); err != nil {
-			l.UI.Error(fmt.Sprintf("Failed to decode account address: %v", err))
-			return 1
-		}
-		addresses = append(addresses, placeholder)
+
+	var receiver types.Address
+	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode receiver address: %w", err))
+		return 1
 	}
 
-	// Parse urls
-	if len(urls) == 0 {
-		l.UI.Error("please provide at least one node url to run the loadbot")
+	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("Invalid JSON-RPC url : %w", err))
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode to value: %v", err))
-		return 1
-	}
-	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
-	if err != nil {
-		l.UI.Error(fmt.Sprintf("Failed to decode to gasPrice: %v", err))
+		l.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %w", err))
 		return 1
 	}
 
-	var accounts []types.Address
-	for _, account := range accountsRaw {
-		acc := types.Address{}
-		if err := acc.UnmarshalText([]byte(account)); err != nil {
-			l.UI.Error(fmt.Sprintf("Failed to decode to address: %v", err))
-			return 1
-		}
-
-		accounts = append(accounts, acc)
+	configuration := &Configuration{
+		TPS:      tps,
+		Sender:   sender,
+		Receiver: receiver,
+		Count:    count,
+		Value:    value,
+		JSONRPC:  jsonrpc,
 	}
 
-	metrics, err := Execute(&Configuration{
-		TPS:       tps,
-		Value:     value,
-		Gas:       gasLimit,
-		GasPrice:  gasPrice,
-		Accounts:  accounts,
-		RPCURLs:   urls,
-		ChainID:   chainID,
-		TxnToSend: count,
-		GRPCUrl:   gRPC,
-	})
-	if err != nil {
-		l.UI.Error(fmt.Sprintf("failed to execute loadbot: %v", err))
+	// Create the metrics placeholder
+	metrics := &Metrics{
+		TotalTransactionsSentCount: 0,
+		FailedTransactionsCount:    0,
+	}
+
+	// create a loadbot instance
+	loadBot := NewLoadBot(configuration, metrics)
+
+	// run the loadbot
+	if err := loadBot.Run(); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("an error occured while running the loadbot: %w", err))
 		return 1
 	}
 
-	output := "\n[LOADBOT RUN]\n"
-
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Transactions submitted|%d", metrics.Total),
-		fmt.Sprintf("Transactions failed|%d", metrics.Failed),
-		fmt.Sprintf("Duration|%v", metrics.Duration),
-	})
-	output += "\n"
-
-	l.UI.Output(output)
+	res := &LoadbotResult{
+		Total:  metrics.TotalTransactionsSentCount,
+		Failed: metrics.FailedTransactionsCount,
+	}
+	l.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type LoadbotResult struct {
+	Total  uint64 `json:"total"`
+	Failed uint64 `json:"failed"`
+}
+
+func (r *LoadbotResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[LOADBOT RUN]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Transactions submitted|%d", r.Total),
+		fmt.Sprintf("Transactions failed|%d", r.Failed),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

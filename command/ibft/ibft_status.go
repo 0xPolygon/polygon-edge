@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +12,14 @@ import (
 
 // IbftStatus is the command to query the snapshot
 type IbftStatus struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (p *IbftStatus) DefineFlags() {
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -25,7 +33,7 @@ func (p *IbftStatus) GetBaseCommand() string {
 
 // Help implements the cli.IbftStatus interface
 func (p *IbftStatus) Help() string {
-	p.Meta.DefineFlags()
+	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
@@ -37,34 +45,46 @@ func (p *IbftStatus) Synopsis() string {
 
 // Run implements the cli.IbftStatus interface
 func (p *IbftStatus) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Status(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	var output = "\n[VALIDATOR STATUS]\n"
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Vaidator key|%s", resp.Key),
-	})
-
-	output += "\n"
-
-	p.UI.Output(output)
+	res := &IBFTStatusResult{
+		ValidatorKey: resp.Key,
+	}
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type IBFTStatusResult struct {
+	ValidatorKey string `json:"validator_key"`
+}
+
+func (r *IBFTStatusResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[VALIDATOR STATUS]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Validator key|%s", r.ValidatorKey),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

@@ -1,8 +1,8 @@
 package secrets
 
 import (
+	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"path/filepath"
 
@@ -13,26 +13,25 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // SecretsInit is the command to query the snapshot
 type SecretsInit struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
 }
 
 var (
 	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
 )
 
-func (i *SecretsInit) DefineFlags() {
-	if i.FlagMap == nil {
-		// Flag map not initialized
-		i.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+func (p *SecretsInit) DefineFlags() {
+	p.Base.DefineFlags(p.Formatter)
 
-	i.FlagMap["data-dir"] = helper.FlagDescriptor{
+	p.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: "Sets the directory for the Polygon SDK data if the local FS is used",
 		Arguments: []string{
 			"DATA_DIRECTORY",
@@ -41,7 +40,7 @@ func (i *SecretsInit) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	i.FlagMap["config"] = helper.FlagDescriptor{
+	p.FlagMap["config"] = helper.FlagDescriptor{
 		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
@@ -73,18 +72,10 @@ func (p *SecretsInit) GetBaseCommand() string {
 	return "secrets init"
 }
 
-// constructInitError is a wrapper function for the error output to CLI
-func constructInitError(err string) string {
-	output := "\n[SECRETS INIT ERROR]\n"
-	output += err
-
-	return output
-}
-
 // generateAlreadyInitializedError generates an output for when the secrets directory
 // has already been initialized in the past
 func generateAlreadyInitializedError(directory string) string {
-	return fmt.Sprintf("Directory %s has previously initialized secrets data\n", directory)
+	return fmt.Sprintf("Directory %s has previously initialized secrets data", directory)
 }
 
 // setupLocalSM is a helper method for boilerplate local secrets manager setup
@@ -122,7 +113,8 @@ func setupHashicorpVault(
 
 // Run implements the cli.SecretsInit interface
 func (p *SecretsInit) Run(args []string) int {
-	flags := flag.NewFlagSet(p.GetBaseCommand(), flag.ContinueOnError)
+	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter)
+
 	var dataDir string
 	var configPath string
 
@@ -130,12 +122,12 @@ func (p *SecretsInit) Run(args []string) int {
 	flags.StringVar(&configPath, "config", "", "")
 
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	if dataDir == "" && configPath == "" {
-		p.UI.Error("required argument (data directory) not passed in")
+		p.Formatter.OutputError(errors.New("required argument (data directory) not passed in"))
 		return 1
 	}
 
@@ -145,7 +137,7 @@ func (p *SecretsInit) Run(args []string) int {
 		// use the local secrets manager
 		localSecretsManager, setupErr := setupLocalSM(dataDir)
 		if setupErr != nil {
-			p.UI.Error(constructInitError(setupErr.Error()))
+			p.Formatter.OutputError(setupErr)
 			return 1
 		}
 
@@ -154,7 +146,7 @@ func (p *SecretsInit) Run(args []string) int {
 		// Config file passed in
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			p.UI.Error(constructInitError(fmt.Sprintf("Unable to read config file, %v", readErr)))
+			p.Formatter.OutputError(fmt.Errorf("Unable to read config file, %v", readErr))
 			return 1
 		}
 
@@ -163,13 +155,13 @@ func (p *SecretsInit) Run(args []string) int {
 		case secrets.HashicorpVault:
 			vaultSecretsManager, setupErr := setupHashicorpVault(secretsConfig)
 			if setupErr != nil {
-				p.UI.Error(constructInitError(setupErr.Error()))
+				p.Formatter.OutputError(setupErr)
 				return 1
 			}
 
 			secretsManager = vaultSecretsManager
 		default:
-			p.UI.Error(constructInitError("Unknown secrets manager type"))
+			p.Formatter.OutputError(errors.New("Unknown secrets manager type"))
 			return 1
 		}
 	}
@@ -177,45 +169,58 @@ func (p *SecretsInit) Run(args []string) int {
 	// Generate the IBFT validator private key
 	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
 	if keyErr != nil {
-		p.UI.Error(keyErr.Error())
+		p.Formatter.OutputError(keyErr)
 		return 1
 	}
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
-		p.UI.Error(setErr.Error())
+		p.Formatter.OutputError(setErr)
 		return 1
 	}
 
 	// Generate the libp2p private key
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
-		p.UI.Error(keyErr.Error())
+		p.Formatter.OutputError(keyErr)
 		return 1
 	}
 
 	// Write the networking private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-		p.UI.Error(setErr.Error())
+		p.Formatter.OutputError(setErr)
 		return 1
 	}
 
 	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[SECRETS INIT]\n"
-
-	output += helper.FormatKV([]string{
-		fmt.Sprintf("Public key (address)|%s", crypto.PubKeyToAddress(&validatorKey.PublicKey)),
-		fmt.Sprintf("Node ID|%s", nodeId.String()),
-	})
-
-	output += "\n"
-
-	p.UI.Output(output)
+	res := &SecretsInitResult{
+		Address: crypto.PubKeyToAddress(&validatorKey.PublicKey),
+		NodeID:  nodeId.String(),
+	}
+	p.Formatter.OutputResult(res)
 
 	return 0
+}
+
+type SecretsInitResult struct {
+	Address types.Address `json:"address"`
+	NodeID  string        `json:"node_id"`
+}
+
+func (r *SecretsInitResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[SECRETS INIT]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Public key (address)|%s", r.Address),
+		fmt.Sprintf("Node ID|%s", r.NodeID),
+	}))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

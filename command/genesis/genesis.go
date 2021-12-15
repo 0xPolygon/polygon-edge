@@ -1,7 +1,6 @@
 package genesis
 
 import (
-	"flag"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
@@ -15,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/mitchellh/cli"
 )
 
 const (
@@ -38,16 +36,12 @@ var (
 
 // GenesisCommand is the command to show the version of the agent
 type GenesisCommand struct {
-	UI cli.Ui
-	helper.Meta
+	helper.Base
 }
 
 // DefineFlags defines the command flags
 func (c *GenesisCommand) DefineFlags() {
-	if c.FlagMap == nil {
-		// Flag map not initialized
-		c.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	c.Base.DefineFlags()
 
 	if len(c.FlagMap) > 0 {
 		// No need to redefine the flags again
@@ -177,7 +171,7 @@ func (c *GenesisCommand) Synopsis() string {
 
 // Run implements the cli.Command interface
 func (c *GenesisCommand) Run(args []string) int {
-	flags := flag.NewFlagSet(c.GetBaseCommand(), flag.ContinueOnError)
+	flags := c.NewFlagSet(c.GetBaseCommand())
 	flags.Usage = func() {}
 
 	var baseDir string

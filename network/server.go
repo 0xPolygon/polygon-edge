@@ -280,12 +280,11 @@ func (s *Server) runDial() {
 	}
 
 	for {
-		slots := s.numOpenSlots()
 
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.
-		for i := int64(0); i < slots; i++ {
+		for i := int64(0); i < s.numOpenSlots(); i++ {
 			tt := s.dialQueue.pop()
 			if tt == nil {
 				// dial closed
