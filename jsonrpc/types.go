@@ -288,7 +288,7 @@ type txnArgs struct {
 }
 
 type progression struct {
-	startingBlock string `json:"startingBlock"`
-	currentBlock  string `json:"currentBlock"`
-	highestBlock  string `json:"highestBlock"`
+	StartingBlock string `json:"startingBlock"`
+	CurrentBlock  string `json:"currentBlock"`
+	HighestBlock  string `json:"highestBlock"`
 }

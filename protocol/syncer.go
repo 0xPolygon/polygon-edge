@@ -312,6 +312,7 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		server:     server,
 		syncProgression: &progressionWrapper{
 			progression: nil,
+			stopCh:      make(chan struct{}),
 		},
 	}
 

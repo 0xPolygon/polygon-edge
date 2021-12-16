@@ -416,7 +416,7 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (res
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
-	return j.GetSyncProgression()
+	return j.Consensus.GetSyncProgression()
 }
 
 // SETUP //
