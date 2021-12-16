@@ -3,7 +3,9 @@ package common
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 )
 
 // Min returns the strictly lower number
@@ -70,4 +72,12 @@ func createDir(path string) error {
 	}
 
 	return nil
+}
+
+// GetTerminationSignalCh returns a channel to emit signals by ctrl + c
+func GetTerminationSignalCh() <-chan os.Signal {
+	// wait for the user to quit with ctrl-c
+	signalCh := make(chan os.Signal, 4)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	return signalCh
 }

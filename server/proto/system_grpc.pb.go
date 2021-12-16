@@ -12,7 +12,6 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // SystemClient is the client API for System service.
@@ -29,6 +28,8 @@ type SystemClient interface {
 	PeersStatus(ctx context.Context, in *PeersStatusRequest, opts ...grpc.CallOption) (*Peer, error)
 	// Subscribe subscribes to blockchain events
 	Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error)
+	// Export returns blockchain data
+	Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (System_ExportClient, error)
 }
 
 type systemClient struct {
@@ -76,7 +77,7 @@ func (c *systemClient) PeersStatus(ctx context.Context, in *PeersStatusRequest, 
 }
 
 func (c *systemClient) Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &System_ServiceDesc.Streams[0], "/v1.System/Subscribe", opts...)
+	stream, err := c.cc.NewStream(ctx, &_System_serviceDesc.Streams[0], "/v1.System/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +108,38 @@ func (x *systemSubscribeClient) Recv() (*BlockchainEvent, error) {
 	return m, nil
 }
 
+func (c *systemClient) Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (System_ExportClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_System_serviceDesc.Streams[1], "/v1.System/Export", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &systemExportClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type System_ExportClient interface {
+	Recv() (*ExportEvent, error)
+	grpc.ClientStream
+}
+
+type systemExportClient struct {
+	grpc.ClientStream
+}
+
+func (x *systemExportClient) Recv() (*ExportEvent, error) {
+	m := new(ExportEvent)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // SystemServer is the server API for System service.
 // All implementations must embed UnimplementedSystemServer
 // for forward compatibility
@@ -121,6 +154,8 @@ type SystemServer interface {
 	PeersStatus(context.Context, *PeersStatusRequest) (*Peer, error)
 	// Subscribe subscribes to blockchain events
 	Subscribe(*empty.Empty, System_SubscribeServer) error
+	// Export returns blockchain data
+	Export(*ExportRequest, System_ExportServer) error
 	mustEmbedUnimplementedSystemServer()
 }
 
@@ -143,6 +178,9 @@ func (UnimplementedSystemServer) PeersStatus(context.Context, *PeersStatusReques
 func (UnimplementedSystemServer) Subscribe(*empty.Empty, System_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
+func (UnimplementedSystemServer) Export(*ExportRequest, System_ExportServer) error {
+	return status.Errorf(codes.Unimplemented, "method Export not implemented")
+}
 func (UnimplementedSystemServer) mustEmbedUnimplementedSystemServer() {}
 
 // UnsafeSystemServer may be embedded to opt out of forward compatibility for this service.
@@ -153,7 +191,7 @@ type UnsafeSystemServer interface {
 }
 
 func RegisterSystemServer(s grpc.ServiceRegistrar, srv SystemServer) {
-	s.RegisterService(&System_ServiceDesc, srv)
+	s.RegisterService(&_System_serviceDesc, srv)
 }
 
 func _System_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -249,10 +287,28 @@ func (x *systemSubscribeServer) Send(m *BlockchainEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-// System_ServiceDesc is the grpc.ServiceDesc for System service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var System_ServiceDesc = grpc.ServiceDesc{
+func _System_Export_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SystemServer).Export(m, &systemExportServer{stream})
+}
+
+type System_ExportServer interface {
+	Send(*ExportEvent) error
+	grpc.ServerStream
+}
+
+type systemExportServer struct {
+	grpc.ServerStream
+}
+
+func (x *systemExportServer) Send(m *ExportEvent) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+var _System_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.System",
 	HandlerType: (*SystemServer)(nil),
 	Methods: []grpc.MethodDesc{
@@ -279,6 +335,11 @@ var System_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _System_Subscribe_Handler,
 			ServerStreams: true,
 		},
+		{
+			StreamName:    "Export",
+			Handler:       _System_Export_Handler,
+			ServerStreams: true,
+		},
 	},
-	Metadata: "minimal/proto/system.proto",
+	Metadata: "server/proto/system.proto",
 }

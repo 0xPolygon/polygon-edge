@@ -3,6 +3,7 @@ package util
 import (
 	"os"
 
+	"github.com/0xPolygon/polygon-sdk/command/backup"
 	"github.com/0xPolygon/polygon-sdk/command/dev"
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -38,6 +39,7 @@ func Commands() map[string]cli.CommandFactory {
 	monitorCmd := monitor.MonitorCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	statusCmd := status.StatusCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
+	backupCmd := backup.BackupCommand{Base: base, Formatter: formatter, GRPC: grpc}
 
 	ibftCmd := ibft.IbftCommand{}
 	ibftCandidatesCmd := ibft.IbftCandidates{Base: base, Formatter: formatter, GRPC: grpc}
@@ -129,6 +131,9 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &versionCmd, nil
+		},
+		backupCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &backupCmd, nil
 		},
 
 		// SECRETS MANAGER COMMANDS //

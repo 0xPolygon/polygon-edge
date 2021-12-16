@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package v1;
 
-option go_package = "/minimal/proto";
+option go_package = "/server/proto";
 
 import "google/protobuf/empty.proto";
 
@@ -21,6 +21,9 @@ service System {
 
     // Subscribe subscribes to blockchain events
     rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
+
+    // Export returns blockchain data
+    rpc Export(ExportRequest) returns (stream ExportEvent);
 }
 
 message BlockchainEvent {
@@ -35,13 +38,13 @@ message BlockchainEvent {
 
 message ServerStatus {
     int64 network = 1;
-    
+
     string genesis = 2;
 
     Block current = 3;
 
     string p2pAddr = 4;
-    
+
     message Block {
         int64 number = 1;
         string hash = 2;
@@ -65,4 +68,17 @@ message PeersStatusRequest {
 
 message PeersListResponse {
     repeated Peer peers = 1;
+}
+
+message ExportRequest {
+    uint64 from = 1;
+    uint64 to = 2;
+}
+
+message ExportEvent {
+    // null when zero
+    uint64 from = 1;
+    // null when zero
+    uint64 to = 2;
+    bytes data = 3;
 }
