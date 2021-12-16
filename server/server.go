@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -334,6 +335,7 @@ type jsonRPCHub struct {
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
+	consensus.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
@@ -413,6 +415,10 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (res
 	return
 }
 
+func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
+	return j.GetSyncProgression()
+}
+
 // SETUP //
 
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
@@ -422,6 +428,7 @@ func (s *Server) setupJSONRPC() error {
 		Blockchain: s.blockchain,
 		TxPool:     s.txpool,
 		Executor:   s.executor,
+		Consensus:  s.consensus,
 	}
 
 	conf := &jsonrpc.Config{

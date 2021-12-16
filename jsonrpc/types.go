@@ -286,3 +286,9 @@ type txnArgs struct {
 	Data     *argBytes
 	Nonce    *argUint64
 }
+
+type progression struct {
+	startingBlock string `json:"startingBlock"`
+	currentBlock  string `json:"currentBlock"`
+	highestBlock  string `json:"highestBlock"`
+}
