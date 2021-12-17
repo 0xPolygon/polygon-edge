@@ -205,7 +205,7 @@ type progressionWrapper struct {
 // startProgression initializes the progression tracking
 func (pw *progressionWrapper) startProgression(
 	startingBlock uint64,
-	eventCh chan *blockchain.Event,
+	subscription blockchain.Subscription,
 ) {
 	pw.lock.Lock()
 	defer pw.lock.Unlock()
@@ -214,12 +214,13 @@ func (pw *progressionWrapper) startProgression(
 		StartingBlock: startingBlock,
 	}
 
-	go pw.runUpdateLoop(eventCh)
+	go pw.runUpdateLoop(subscription)
 }
 
 // runUpdateLoop starts the blockchain event monitoring loop and
 // updates the currently written block in the batch sync
-func (pw *progressionWrapper) runUpdateLoop(eventCh chan *blockchain.Event) {
+func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription) {
+	eventCh := subscription.GetEventCh()
 	for {
 		select {
 		case event := <-eventCh:
@@ -233,6 +234,7 @@ func (pw *progressionWrapper) runUpdateLoop(eventCh chan *blockchain.Event) {
 
 			pw.updateCurrentProgression(event.NewChain[0].Number)
 		case <-pw.stopCh:
+			subscription.Close()
 			return
 		}
 	}
@@ -659,8 +661,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 	var lastTarget uint64
 
 	// Create a blockchain subscription for the sync progression and start tracking
-	eventCh := s.blockchain.SubscribeEvents().GetEventCh()
-	s.syncProgression.startProgression(startBlock.Number, eventCh)
+	s.syncProgression.startProgression(startBlock.Number, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
 	defer s.syncProgression.stopProgression()
