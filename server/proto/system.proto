@@ -76,7 +76,6 @@ message ExportRequest {
 }
 
 message ExportEvent {
-    // null when zero
     uint64 from = 1;
     // null when zero
     uint64 to = 2;

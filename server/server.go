@@ -197,6 +197,16 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	if err := m.consensus.Initialize(); err != nil {
+		return nil, err
+	}
+
+	if config.Import != nil {
+		if err := m.blockchain.ImportChain(*config.Import); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}

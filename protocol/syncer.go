@@ -338,6 +338,11 @@ func (s *Syncer) Start() {
 
 	s.server.Register(syncerV1, grpcStream)
 
+	if err := s.InitializePeers(); err != nil {
+		s.logger.Error("failed to initialize", "err", err)
+		return
+	}
+
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
@@ -369,6 +374,22 @@ func (s *Syncer) Start() {
 			}
 		}
 	}()
+}
+
+func (s *Syncer) InitializePeers() error {
+	fmt.Printf("\n\ninitialize peers !!! %+v\n\n", s.server.Peers())
+
+	for _, peer := range s.server.Peers() {
+		stream, err := s.server.NewStream(syncerV1, peer.Info.ID)
+		if err != nil {
+			s.logger.Error("failed to open a stream", "err", err)
+			continue
+		}
+		if err := s.HandleNewPeer(peer.Info.ID, libp2pGrpc.WrapClient(stream)); err != nil {
+			s.logger.Error("failed to handle user", "err", err)
+		}
+	}
+	return nil
 }
 
 // BestPeer returns the best peer by difficulty (if any)

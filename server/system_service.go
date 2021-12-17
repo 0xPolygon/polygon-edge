@@ -149,10 +149,10 @@ func (s *systemService) PeersList(
 }
 
 func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_ExportServer) error {
-	var from uint64 = 1
+	var from uint64 = 0
 	var to *uint64
 
-	if req.From != 0 {
+	if req.From != from {
 		from = req.From
 	}
 	if req.To != 0 {

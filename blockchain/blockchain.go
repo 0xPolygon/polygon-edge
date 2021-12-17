@@ -1,8 +1,11 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -1043,4 +1046,129 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 // Close closes the DB connection
 func (b *Blockchain) Close() error {
 	return b.db.Close()
+}
+
+func (b *Blockchain) ImportChain(filePath string) error {
+	begin := b.Header()
+
+	fp, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+
+	blockStream := newBlockStream(fp)
+	for {
+		block, err := blockStream.nextBlock()
+		if err != nil {
+			return err
+		}
+		if block == nil {
+			break
+		}
+
+		currentHeader, ok := b.GetHeaderByNumber(block.Number())
+		if !ok || currentHeader.Hash != block.Hash() {
+			if err := b.WriteBlocks([]*types.Block{block}); err != nil {
+				return err
+			}
+		}
+	}
+
+	end := b.Header()
+
+	b.logger.Debug("Imported chain from local successfully", "file", filePath, "from", begin.Number, "to", end.Number)
+
+	return nil
+}
+
+type blockStream struct {
+	input  io.Reader
+	buffer []byte
+}
+
+func newBlockStream(input io.Reader) *blockStream {
+	return &blockStream{
+		input:  input,
+		buffer: make([]byte, 0, 1024), // impossible to estimate block size but minimum block size is about 900 bytes
+	}
+}
+
+// nextBlock takes bytes from input and return block
+func (b *blockStream) nextBlock() (*types.Block, error) {
+	prefix, err := b.loadRLPPrefix()
+	if errors.Is(io.EOF, err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	payloadSize, payloadSizeSize, err := b.loadPrefixSize(1, prefix)
+	if err != nil {
+		return nil, err
+	}
+	if err = b.loadPayload(1+payloadSizeSize, payloadSize); err != nil {
+		return nil, err
+	}
+
+	return b.parseBlock(1 + payloadSizeSize + payloadSize)
+}
+
+// loadRLPPrefix loads first byte of RLP encoded data from input
+func (b *blockStream) loadRLPPrefix() (byte, error) {
+	buf := b.buffer[:1]
+	if _, err := b.input.Read(buf); err != nil {
+		return 0, err
+	}
+	return buf[0], nil
+}
+
+// loadPrefixSize loads array's size from input
+// block should be array in RLP encoded because block has 3 fields on the top: Header, Transactions, Uncles
+func (b *blockStream) loadPrefixSize(offset int64, prefix byte) (int64, int64, error) {
+	switch {
+	case prefix >= 0xc0 && prefix <= 0xf7:
+		// an array whose size is less than 56
+		return int64(prefix - 0xc0), 0, nil
+	case prefix >= 0xf8:
+		// an array whose size is greater than or equal to 56
+		// size of the data representing the size of payload
+		payloadSizeSize := int64(prefix - 0xf7)
+
+		b.reserveCap(offset + payloadSizeSize)
+		payloadSizeBytes := b.buffer[offset : offset+payloadSizeSize]
+		_, err := b.input.Read(payloadSizeBytes)
+		if err != nil {
+			return 0, 0, err
+		}
+		payloadSize := new(big.Int).SetBytes(payloadSizeBytes).Int64()
+		return payloadSize, payloadSizeSize, nil
+	}
+	return 0, 0, errors.New("expected arrray but got bytes")
+}
+
+// loadPayload loads payload data from stream and store to buffer
+func (b *blockStream) loadPayload(offset int64, size int64) error {
+	b.reserveCap(offset + size)
+	buf := b.buffer[offset : offset+size]
+	if _, err := b.input.Read(buf); err != nil {
+		return err
+	}
+	return nil
+}
+
+// parseBlock parses RLP encoded block in buffer
+func (b *blockStream) parseBlock(size int64) (*types.Block, error) {
+	data := b.buffer[:size]
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(data); err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+// reserveCap makes sure the internal buffer has given size
+func (b *blockStream) reserveCap(size int64) {
+	if size > int64(cap(b.buffer)) {
+		b.buffer = append(b.buffer[:cap(b.buffer)], make([]byte, size)...)
+	}
 }

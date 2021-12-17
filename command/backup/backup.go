@@ -26,7 +26,7 @@ func (c *BackupCommand) DefineFlags() {
 
 	// TODO: description
 	c.FlagMap["out"] = helper.FlagDescriptor{
-		Description: "",
+		Description: "Filepath the path to save the backup",
 		Arguments: []string{
 			"OUT",
 		},
@@ -34,7 +34,7 @@ func (c *BackupCommand) DefineFlags() {
 	}
 
 	c.FlagMap["from"] = helper.FlagDescriptor{
-		Description: "",
+		Description: "Begining height of chain to save data",
 		Arguments: []string{
 			"FROM",
 		},
@@ -42,7 +42,7 @@ func (c *BackupCommand) DefineFlags() {
 	}
 
 	c.FlagMap["to"] = helper.FlagDescriptor{
-		Description: "",
+		Description: "End height of the chain in data",
 		Arguments: []string{
 			"TO",
 		},
@@ -52,9 +52,7 @@ func (c *BackupCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *BackupCommand) GetHelperText() string {
-	// TODO: Text
-	return ""
-	// return "Starts logging block add / remove events on the blockchain"
+	return "Fetch blockchain data from node and save to a file"
 }
 
 func (c *BackupCommand) GetBaseCommand() string {
@@ -78,9 +76,8 @@ func (c *BackupCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 
 	var out, rawFrom, rawTo string
-	// TODO: explain
 	flags.StringVar(&out, "out", "", "")
-	flags.StringVar(&rawFrom, "from", "1", "")
+	flags.StringVar(&rawFrom, "from", "0", "")
 	flags.StringVar(&rawTo, "to", "", "")
 
 	if err := flags.Parse(args); err != nil {
@@ -99,9 +96,6 @@ func (c *BackupCommand) Run(args []string) int {
 
 	if from, err = types.ParseUint64orHex(&rawFrom); err != nil {
 		c.Formatter.OutputError(fmt.Errorf("Failed to decode from: %w", err))
-		return 1
-	} else if from == 0 {
-		c.Formatter.OutputError(errors.New("from must be greater than 0"))
 		return 1
 	}
 
@@ -128,7 +122,7 @@ func (c *BackupCommand) Run(args []string) int {
 }
 
 func (c *BackupCommand) fetchAndSaveBackup(outPath string, from, to uint64) (*BackupResult, error) {
-	// always create new file, throw error if the file exist
+	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return nil, err
@@ -151,7 +145,7 @@ func (c *BackupCommand) fetchAndSaveBackup(outPath string, from, to uint64) (*Ba
 		return nil, err
 	}
 
-	resCh, errCh := handleExportStream(stream, fs)
+	resCh, errCh := processExportStream(stream, fs)
 
 	var res *BackupResult
 	select {
@@ -167,7 +161,7 @@ func (c *BackupCommand) fetchAndSaveBackup(outPath string, from, to uint64) (*Ba
 	return res, err
 }
 
-func handleExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan *BackupResult, <-chan error) {
+func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan *BackupResult, <-chan error) {
 	resCh := make(chan *BackupResult, 1)
 	errCh := make(chan error, 1)
 

@@ -424,6 +424,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.StringVar(&cliConfig.Import, "import", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

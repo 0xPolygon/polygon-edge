@@ -24,6 +24,9 @@ type Consensus interface {
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
+	// Initialize initializes some setting before starting the consensus
+	Initialize() error
+
 	// Start starts the consensus
 	Start() error
 
@@ -56,7 +59,7 @@ type ConsensusParams struct {
 	Executor       *state.Executor
 	Grpc           *grpc.Server
 	Logger         hclog.Logger
-  Metrics        *Metrics
+	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
 }
 

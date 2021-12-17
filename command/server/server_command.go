@@ -201,6 +201,15 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["import"] = helper.FlagDescriptor{
+		Description: "Sets the blockchain data to import before starting the server",
+		Arguments: []string{
+			"IMPORT",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -236,7 +245,6 @@ func (c *ServerCommand) Run(args []string) int {
 	config, err := conf.BuildConfig()
 	if err != nil {
 		c.UI.Error(err.Error())
-
 		return 1
 	}
 
@@ -248,7 +256,6 @@ func (c *ServerCommand) Run(args []string) int {
 	server, err := server.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
-
 		return 1
 	}
 
