@@ -144,7 +144,7 @@ func TestMultipleTransactions(t *testing.T) {
 		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn0))
-	assert.NoError(t, pool.addImpl("", txn0))
+	assert.Error(t, pool.addImpl("", txn0))
 
 	assert.Equal(t, pool.NumAccountTxs(from1), 1)
 	assert.Equal(t, pool.Length(), uint64(0))
@@ -157,7 +157,7 @@ func TestMultipleTransactions(t *testing.T) {
 		Value:    big.NewInt(0),
 	}
 	assert.NoError(t, pool.addImpl("", txn1))
-	assert.ErrorIs(t, ErrNonceTooLow, pool.addImpl("", txn1))
+	assert.ErrorIs(t, ErrAlreadyKnown, pool.addImpl("", txn1))
 
 	assert.Equal(t, pool.NumAccountTxs(from2), 0)
 	assert.Equal(t, pool.Length(), uint64(1))
@@ -396,10 +396,10 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 }
 
-func generateTx(from types.Address, value, gasPrice *big.Int, input []byte) *types.Transaction {
+func generateTx(from types.Address, nonce uint64, value, gasPrice *big.Int, input []byte) *types.Transaction {
 	return &types.Transaction{
 		From:     from,
-		Nonce:    0,
+		Nonce:    nonce,
 		Gas:      validGasLimit,
 		GasPrice: gasPrice,
 		Value:    value,
@@ -499,7 +499,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			pool.AddSigner(poolSigner)
 
 			refAddress := testCase.refAddress
-			txn := generateTx(refAddress, testCase.txValue, testCase.gasPrice, nil)
+			txn := generateTx(refAddress, 0, testCase.txValue, testCase.gasPrice, nil)
 
 			assert.ErrorIs(t, pool.addImpl("", txn), testCase.expectedError)
 
@@ -513,8 +513,6 @@ func TestTx_MaxSize(t *testing.T) {
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
 	assert.NoError(t, err)
-	pool.EnableDev()
-	pool.AddSigner(&mockSigner{})
 
 	tests := []struct {
 		name    string
@@ -541,7 +539,7 @@ func TestTx_MaxSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			data := make([]byte, tt.size)
 			rand.Read(data)
-			txn := generateTx(tt.address, big.NewInt(0), big.NewInt(1), data)
+			txn := generateTx(tt.address, 0, big.NewInt(0), big.NewInt(1), data)
 			err := pool.addImpl("", txn)
 			if tt.succeed {
 				assert.NoError(t, err)
@@ -1024,4 +1022,92 @@ func TestRejectLowNonceTx(t *testing.T) {
 	assert.Equal(t, pool.pendingQueue.Length(), numTx)
 	// and neither were slots increased
 	assert.Equal(t, pool.gauge.getHeight(), expectedHeight)
+}
+
+func TestRejectExsistingTxn(t *testing.T) {
+	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	assert.NoError(t, err)
+	pool.EnableDev()
+	pool.AddSigner(&mockSigner{})
+	acc := &account{
+		addr: addr1,
+	}
+	tests := []struct {
+		name       string
+		txs        []addTx
+		shouldFail bool
+	}{
+		{
+			name:       "Adding duplicate non-gossiped transaction",
+			shouldFail: true,
+			txs: []addTx{
+				{
+					origin:   OriginAddTxn,
+					account:  acc,
+					nonce:    uint64(0),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+				{
+					origin:   OriginAddTxn,
+					account:  acc,
+					nonce:    uint64(0),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+			},
+		},
+		{
+			name:       "Adding gossiped transaction while local transaction already exsists",
+			shouldFail: true,
+			txs: []addTx{
+				{
+					origin:   OriginAddTxn,
+					account:  acc,
+					nonce:    uint64(1),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+				{
+					origin:   OriginGossip,
+					account:  acc,
+					nonce:    uint64(1),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+			},
+		},
+		{
+			name:       "Adding duplicate gossiped transaction",
+			shouldFail: true,
+			txs: []addTx{
+				{
+					origin:   OriginGossip,
+					account:  acc,
+					nonce:    uint64(2),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+				{
+					origin:   OriginGossip,
+					account:  acc,
+					nonce:    uint64(2),
+					gasPrice: big.NewInt(1),
+					slot:     1,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			OriginalTx := generateTx(tt.txs[0].account.addr, tt.txs[0].nonce, big.NewInt(0), tt.txs[0].gasPrice, nil)
+			DuplicateTx := generateTx(tt.txs[1].account.addr, tt.txs[1].nonce, big.NewInt(0), tt.txs[1].gasPrice, nil)
+			assert.NoError(t, pool.AddTx(OriginalTx))
+			if tt.shouldFail {
+				assert.EqualError(t, pool.AddTx(DuplicateTx), "already known")
+			}
+
+		})
+	}
 }

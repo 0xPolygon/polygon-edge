@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/go-web3"
+	"github.com/umbracle/go-web3/jsonrpc"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -71,4 +73,28 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 		return nil, err
 	}
 	return res.(*txpoolOp.TxnPoolStatusResp), nil
+}
+
+// WaitForReceipt waits transaction receipt
+func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*web3.Receipt, error) {
+	type result struct {
+		receipt *web3.Receipt
+		err     error
+	}
+
+	res, err := RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		receipt, err := client.GetTransactionReceipt(hash)
+		if err != nil && err.Error() != "not found" {
+			return result{receipt, err}, false
+		}
+		if receipt != nil {
+			return result{receipt, nil}, false
+		}
+		return nil, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	data := res.(result)
+	return data.receipt, data.err
 }

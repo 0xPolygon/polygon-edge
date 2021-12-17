@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +12,14 @@ import (
 
 // IbftCandidates is the command to query the snapshot
 type IbftCandidates struct {
-	helper.Meta
+	helper.Base
+	Formatter *helper.FormatterFlag
+	GRPC      *helper.GRPCFlag
+}
+
+// DefineFlags defines the command flags
+func (p *IbftCandidates) DefineFlags() {
+	p.Base.DefineFlags(p.Formatter, p.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
@@ -25,7 +33,7 @@ func (p *IbftCandidates) GetBaseCommand() string {
 
 // Help implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Help() string {
-	p.Meta.DefineFlags()
+	p.DefineFlags()
 
 	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
 }
@@ -37,58 +45,73 @@ func (p *IbftCandidates) Synopsis() string {
 
 // Run implements the cli.IbftCandidates interface
 func (p *IbftCandidates) Run(args []string) int {
-	flags := p.FlagSet(p.GetBaseCommand())
+	flags := p.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 	if err := flags.Parse(args); err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.Conn()
+	conn, err := p.GRPC.Conn()
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.UI.Error(err.Error())
+		p.Formatter.OutputError(err)
 		return 1
 	}
 
-	output := "\n[IBFT CANDIDATES]\n"
-
-	if len(resp.Candidates) == 0 {
-		output += "No candidates found"
-	} else {
-		output += fmt.Sprintf("Number of candidates: %d\n\n", len(resp.Candidates))
-
-		output += formatCandidates(resp.Candidates)
-	}
-
-	output += "\n"
-
-	p.UI.Output(output)
+	res := NewIBFTCandidatesResult(resp)
+	p.Formatter.OutputResult(res)
 
 	return 0
 }
 
-func formatCandidates(candidates []*ibftOp.Candidate) string {
-	var generatedCandidates []string
+type IBFTCandidate struct {
+	Address string `json:"address"`
+	Vote    Vote   `json:"vote"`
+}
+
+type IBFTCandidatesResult struct {
+	Candidates []IBFTCandidate `json:"candidates"`
+}
+
+func NewIBFTCandidatesResult(resp *ibftOp.CandidatesResp) *IBFTCandidatesResult {
+	res := &IBFTCandidatesResult{
+		Candidates: make([]IBFTCandidate, len(resp.Candidates)),
+	}
+	for i, c := range resp.Candidates {
+		res.Candidates[i].Address = c.Address
+		res.Candidates[i].Vote = voteToString(c.Auth)
+	}
+	return res
+}
+
+func (r *IBFTCandidatesResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[IBFT CANDIDATES]\n")
+	if num := len(r.Candidates); num == 0 {
+		buffer.WriteString("No candidates found")
+	} else {
+		buffer.WriteString(fmt.Sprintf("Number of candidates: %d\n\n", num))
+		buffer.WriteString(formatCandidates(r.Candidates))
+	}
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
+
+func formatCandidates(candidates []IBFTCandidate) string {
+	generatedCandidates := make([]string, 0, len(candidates)+1)
 
 	generatedCandidates = append(generatedCandidates, "Address|Vote")
-
 	for _, c := range candidates {
-		generatedCandidates = append(generatedCandidates, fmt.Sprintf("%s|%s", c.Address, voteToString(c.Auth)))
+		generatedCandidates = append(generatedCandidates, fmt.Sprintf("%s|%s", c.Address, c.Vote))
 	}
 
 	return helper.FormatKV(generatedCandidates)
-}
-
-func voteToString(vote bool) string {
-	if vote {
-		return "ADD"
-	}
-
-	return "REMOVE"
 }

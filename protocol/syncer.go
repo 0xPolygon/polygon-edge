@@ -356,23 +356,25 @@ func (s *Syncer) handlePeerEvent() {
 		return
 	}
 
-	for {
-		evnt, ok := <-updateCh
-		if !ok {
-			return
-		}
+	go func() {
+		for {
+			evnt, ok := <-updateCh
+			if !ok {
+				return
+			}
 
-		switch evnt.Type {
-		case network.PeerEventConnected, network.PeerEventDialConnectedNode:
-			if err := s.AddPeer(evnt.PeerID); err != nil {
-				s.logger.Error("failed to add peer", "err", err)
-			}
-		case network.PeerEventDisconnected:
-			if err := s.DeletePeer(evnt.PeerID); err != nil {
-				s.logger.Error("failed to delete user", "err", err)
+			switch evnt.Type {
+			case network.PeerConnected, network.PeerDialCompleted:
+				if err := s.AddPeer(evnt.PeerID); err != nil {
+					s.logger.Error("failed to add peer", "err", err)
+				}
+			case network.PeerDisconnected:
+				if err := s.DeletePeer(evnt.PeerID); err != nil {
+					s.logger.Error("failed to delete user", "err", err)
+				}
 			}
 		}
-	}
+	}()
 }
 
 // BestPeer returns the best peer by difficulty (if any)

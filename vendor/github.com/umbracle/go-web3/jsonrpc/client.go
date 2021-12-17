@@ -14,6 +14,7 @@ type endpoints struct {
 	w *Web3
 	e *Eth
 	n *Net
+	d *Debug
 }
 
 // NewClient creates a new client
@@ -22,6 +23,7 @@ func NewClient(addr string) (*Client, error) {
 	c.endpoints.w = &Web3{c}
 	c.endpoints.e = &Eth{c}
 	c.endpoints.n = &Net{c}
+	c.endpoints.d = &Debug{c}
 
 	t, err := transport.NewTransport(addr)
 	if err != nil {

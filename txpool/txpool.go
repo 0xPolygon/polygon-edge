@@ -118,6 +118,12 @@ type TxPool struct {
 	// Min price heap for all remote transactions
 	remoteTxns *txPriceHeap
 
+	// Lookup map that keeps track of txns present in the pool
+	txnLookupMap map[types.Hash]*types.Transaction
+
+	// Lock for the txn lookup map
+	txnLookupMapLock sync.RWMutex
+
 	// Gauge for measuring pool capacity
 	gauge slotGauge
 
@@ -170,6 +176,7 @@ func NewTxPool(
 		accountQueues: make(map[types.Address]*accountQueueWrapper),
 		pendingQueue:  newMaxTxPriceHeap(),
 		remoteTxns:    newMinTxPriceHeap(),
+		txnLookupMap:  make(map[types.Hash]*types.Transaction),
 		gauge:         slotGauge{height: 0, limit: maxSlots},
 		sealing:       sealing,
 		locals:        newLocalAccounts(locals),
@@ -363,6 +370,10 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// to the promoted queue and pending queue we use this point to calculate the hash
 	tx.ComputeHash()
 
+	if _, isAvailable := t.GetPendingTx(tx.Hash); isAvailable {
+		t.logger.Info("Discarding already known transaction", "hash", tx.Hash)
+		return ErrAlreadyKnown
+	}
 	// should treat as local in the following cases
 	// (1) noLocals is false and Tx is local transaction
 	// (2) from in tx is in locals addresses
@@ -420,6 +431,9 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 			t.metrics.PendingTxs.Add(1)
 		}
 	}
+
+	// Add the transaction to the lookup map
+	t.addTxToLookup(tx)
 
 	return nil
 }
@@ -499,6 +513,41 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		t.gauge.increase(slots)
 	}
 	return txn.tx, ret
+}
+
+// GetPendingTx returns the transaction by hash in the TxPool (pending txn) [Thread-safe]
+func (t *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
+	t.txnLookupMapLock.RLock()
+	defer t.txnLookupMapLock.RUnlock()
+
+	txn, ok := t.txnLookupMap[txHash]
+	return txn, ok
+}
+
+// addTxToLookup adds a transaction to the lookup map [Thread-safe]
+func (t *TxPool) addTxToLookup(tx *types.Transaction) {
+	t.txnLookupMapLock.Lock()
+	defer t.txnLookupMapLock.Unlock()
+
+	t.txnLookupMap[tx.Hash] = tx
+}
+
+// deleteTxFromLookup removes a transaction from the lookup map [Thread-safe]
+func (t *TxPool) deleteTxFromLookup(txHash types.Hash) {
+	t.txnLookupMapLock.Lock()
+	defer t.txnLookupMapLock.Unlock()
+
+	delete(t.txnLookupMap, txHash)
+}
+
+// batchDeleteTxFromLookup removes a batch of transactions from the lookup map [Thread-safe]
+func (t *TxPool) batchDeleteTxFromLookup(txns []*types.Transaction) {
+	t.txnLookupMapLock.Lock()
+	defer t.txnLookupMapLock.Unlock()
+
+	for _, txn := range txns {
+		delete(t.txnLookupMap, txn.Hash)
+	}
 }
 
 // ResetWithHeader does basic txpool housekeeping after a block write
@@ -646,8 +695,15 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 	// txDropCleanup is a helper method for updating the gauge size,
 	// as well as removing leftover remote txns
 	txnDropCleanup := func(txn *types.Transaction) {
+		// Decrease the slots taken up by this txn
 		t.gauge.decrease(slotsRequired(txn))
+
+		// Remove the txn from the remote txn queue,
+		// if it's present
 		t.remoteTxns.Delete(txn)
+
+		// Remove the txn from the lookup map
+		t.deleteTxFromLookup(txn.Hash)
 	}
 
 	// Remove the txns from the block that were just committed to state
@@ -673,6 +729,9 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 			)
 			wrapper.accountQueue.nextNonce = stateNonce
 		}
+
+		// Delete the transactions from the lookup map
+		t.batchDeleteTxFromLookup(accountEventWrapper.transactions)
 
 		// Since there have been state changes, the TxPool can still have hanging txns.
 		// Prune out all the now possibly low-nonce transactions in the account queue

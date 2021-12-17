@@ -3,12 +3,13 @@ package jsonrpc
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
@@ -107,22 +108,18 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		To:       nil,
 		Value:    big.NewInt(0),
 		Input:    nil,
-		V:        v,
-		R:        r,
-		S:        s,
+		V:        new(big.Int).SetBytes(v),
+		R:        new(big.Int).SetBytes(r),
+		S:        new(big.Int).SetBytes(s),
 		Hash:     types.Hash{},
 		From:     types.Address{},
 	}
-	block := types.Block{
-		Transactions: []*types.Transaction{&txn},
-		Header:       &types.Header{},
-	}
 
-	jsonTx := toTransaction(&txn, &block, 0)
+	jsonTx := toTransaction(&txn, nil, nil, nil)
 
 	jsonV, _ := jsonTx.V.MarshalText()
-	jsonR, _ := jsonTx.V.MarshalText()
-	jsonS, _ := jsonTx.V.MarshalText()
+	jsonR, _ := jsonTx.R.MarshalText()
+	jsonS, _ := jsonTx.S.MarshalText()
 	assert.Equal(t, hexWithoutLeading0, string(jsonV))
 	assert.Equal(t, hexWithoutLeading0, string(jsonR))
 	assert.Equal(t, hexWithoutLeading0, string(jsonS))

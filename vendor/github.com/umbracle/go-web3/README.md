@@ -3,7 +3,7 @@
 
 ## JsonRPC
 
-```
+```golang
 package main
 
 import (
@@ -45,19 +45,19 @@ To use the library import:
 
 Declare basic objects:
 
-```
+```golang
 typ, err := abi.NewType("uint256")
 ```
 
 or 
 
-```
+```golang
 typ = abi.MustNewType("uint256")
 ```
 
 and use it to encode/decode the data:
 
-```
+```golang
 num := big.NewInt(1)
 
 encoded, err := typ.Encode(num)
@@ -76,7 +76,7 @@ fmt.Println(num.Cmp(num2) == 0) // num == num2
 
 You can also codify structs as Solidity tuples:
 
-```
+```golang
 import (
 	"fmt"
     
@@ -124,7 +124,7 @@ func main() {
 
 As for now the library only provides primitive abstractions to send signed abstractions. The intended goal is to abstract the next steps inside the contract package.
 
-```
+```golang
 // Generate a random wallet
 key, _ := wallet.GenerateKey()
 
@@ -151,7 +151,7 @@ hash, _ := c.Eth().SendRawTransaction(data)
 
 Resolve names on the Ethereum Name Service registrar.
 
-```
+```golang
 import (
     "fmt"
 
@@ -175,6 +175,43 @@ func main() {
 	}
 
     fmt.Println(addr)
+}
+```
+
+## Block tracker
+
+```golang
+import (
+    "fmt"
+
+    web3 "github.com/umbracle/go-web3"
+    "github.com/umbracle/go-web3/jsonrpc"
+    "github.com/umbracle/go-web3/contract/builtin/ens"
+)
+
+func main() {
+	client, err := jsonrpc.NewClient("https://mainnet.infura.io")
+    if err != nil {
+        panic(err)
+    }
+
+	tracker = blocktracker.NewBlockTracker(client, WithBlockMaxBacklog(1000))
+	if err := tracker.Init(); err != nil {
+		panic(err)
+	}
+	go tracker.Start()
+
+	sub := tracker.Subscribe()
+	go func() {
+		for {
+			select {
+			case evnt := <-sub:
+				fmt.Println(evnt)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
 }
 ```
 

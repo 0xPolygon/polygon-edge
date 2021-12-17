@@ -21,18 +21,26 @@ type PubSubTransport interface {
 }
 
 const (
-	wsPrefix = "ws://"
+	wsPrefix  = "ws://"
 	wssPrefix = "wss://"
 )
 
 // NewTransport creates a new transport object
 func NewTransport(url string) (Transport, error) {
 	if strings.HasPrefix(url, wsPrefix) || strings.HasPrefix(url, wssPrefix) {
-		return newWebsocket(url)
+		t, err := newWebsocket(url)
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
 	}
-	if _, err := os.Stat(url); !os.IsNotExist(err) {
+	if _, err := os.Stat(url); err == nil {
 		// path exists, it could be an ipc path
-		return newIPC(url)
+		t, err := newIPC(url)
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
 	}
 	return newHTTP(url), nil
 }

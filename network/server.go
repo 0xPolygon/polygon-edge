@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -26,7 +27,16 @@ import (
 
 const DefaultLibp2pPort int = 1478
 
-const MinimumPeerConnections int64 = 1
+const (
+	MinimumPeerConnections int64 = 1
+	MinimumBootNodes       int   = 2 // MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+)
+
+// Priority for dial queue
+const (
+	PriorityRequestedDial uint64 = 1
+	PriorityRandomDial    uint64 = 10
+)
 
 type Config struct {
 	NoDiscover     bool
@@ -193,6 +203,10 @@ func (s *Server) Start() error {
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
+		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+			return errors.New("Minimum two bootnodes are required")
+		}
+
 		// start discovery
 		s.discovery = &discovery{srv: s}
 
@@ -204,7 +218,7 @@ func (s *Server) Start() error {
 				return fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
 			}
 			if node.ID == s.host.ID() {
-				s.logger.Info("Omitting bootnode with same ID as host", node.ID)
+				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
 			}
 			bootnodes = append(bootnodes, node)
@@ -240,20 +254,19 @@ func (s *Server) checkPeerConnections() {
 				//TODO: dial peers from the peerstore
 			} else {
 				randomNode := s.getRandomBootNode()
-				s.dialQueue.add(randomNode, 10)
+				s.addToDialQueue(randomNode, PriorityRandomDial)
 			}
-
 		}
 	}
-
 }
 
 func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
+		// only concerned about PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, and PeerAddedToDialQueue
 		switch evnt.Type {
-		case PeerEventConnected, PeerEventConnectedFailed, PeerEventDisconnected, PeerEventDialCompleted:
+		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
 		default:
 			return
 		}
@@ -268,12 +281,11 @@ func (s *Server) runDial() {
 	}
 
 	for {
-		slots := s.numOpenSlots()
 
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.
-		for i := int64(0); i < slots; i++ {
+		for i := int64(0); i < s.numOpenSlots(); i++ {
 			tt := s.dialQueue.pop()
 			if tt == nil {
 				// dial closed
@@ -284,10 +296,7 @@ func (s *Server) runDial() {
 			if s.isConnected(tt.addr.ID) {
 				// the node is already connected, send an event to wake up
 				// any join watchers
-				s.emitEvent(&PeerEvent{
-					PeerID: tt.addr.ID,
-					Type:   PeerEventDialConnectedNode,
-				})
+				s.emitEvent(tt.addr.ID, PeerAlreadyConnected)
 			} else {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
@@ -360,10 +369,7 @@ func (s *Server) addPeer(id peer.ID) {
 	}
 	s.peers[id] = p
 
-	s.emitEvent(&PeerEvent{
-		PeerID: id,
-		Type:   PeerEventConnected,
-	})
+	s.emitEvent(id, PeerConnected)
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -375,10 +381,7 @@ func (s *Server) delPeer(id peer.ID) {
 	delete(s.peers, id)
 	s.host.Network().ClosePeer(id)
 
-	s.emitEvent(&PeerEvent{
-		PeerID: id,
-		Type:   PeerEventDisconnected,
-	})
+	s.emitEvent(id, PeerDisconnected)
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
@@ -439,7 +442,7 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 
 func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	s.logger.Info("Join request", "addr", addr.String())
-	s.dialQueue.add(addr, 1)
+	s.addToDialQueue(addr, PriorityRequestedDial)
 
 	if timeout == 0 {
 		return nil
@@ -472,8 +475,10 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 
 func (s *Server) runJoinWatcher() error {
 	return s.SubscribeFn(func(evnt *PeerEvent) {
-		// only concerned about 'PeerEventConnected' and 'PeerEventConnectedFailed'
-		if evnt.Type != PeerEventConnected && evnt.Type != PeerEventConnectedFailed && evnt.Type != PeerEventDialConnectedNode {
+		switch evnt.Type {
+		// only concerned about PeerConnected, PeerFailedToConnect, and PeerAlreadyConnected
+		case PeerConnected, PeerFailedToConnect, PeerAlreadyConnected:
+		default:
 			return
 		}
 
@@ -543,8 +548,18 @@ func (s *Server) AddrInfo() *peer.AddrInfo {
 	}
 }
 
-func (s *Server) emitEvent(evnt *PeerEvent) {
-	if err := s.emitterPeerEvent.Emit(*evnt); err != nil {
+func (s *Server) addToDialQueue(addr *peer.AddrInfo, priority uint64) {
+	s.dialQueue.add(addr, priority)
+	s.emitEvent(addr.ID, PeerAddedToDialQueue)
+}
+
+func (s *Server) emitEvent(peerID peer.ID, typ PeerEventType) {
+	evnt := PeerEvent{
+		PeerID: peerID,
+		Type:   typ,
+	}
+
+	if err := s.emitterPeerEvent.Emit(evnt); err != nil {
 		s.logger.Info("failed to emit event", "peer", evnt.PeerID, "type", evnt.Type, "err", err)
 	}
 }
@@ -697,22 +712,33 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 	return dialAddress + "/p2p/" + addr.ID.String()
 }
 
-type PeerConnectedEvent struct {
-	Peer peer.ID
-	Err  error
-}
-
-type PeerDisconnectedEvent struct {
-	Peer peer.ID
-}
+type PeerEventType uint
 
 const (
-	PeerEventConnected         = "PeerConnected"
-	PeerEventConnectedFailed   = "PeerConnectedFailed"
-	PeerEventDisconnected      = "PeerDisconnected"
-	PeerEventDialConnectedNode = "PeerDialConnectedNode"
-	PeerEventDialCompleted     = "PeerDialCompleted"
+	PeerConnected        PeerEventType = iota // Emitted when a peer connected
+	PeerFailedToConnect                       // Emitted when a peer failed to connect
+	PeerDisconnected                          // Emitted when a peer disconnected from node
+	PeerAlreadyConnected                      // Emitted when a peer already connected on dial
+	PeerDialCompleted                         // Emitted when a peer completed dial
+	PeerAddedToDialQueue                      // Emitted when a peer is added to dial queue
 )
+
+var peerEventToName = map[PeerEventType]string{
+	PeerConnected:        "PeerConnected",
+	PeerFailedToConnect:  "PeerFailedToConnect",
+	PeerDisconnected:     "PeerDisconnected",
+	PeerAlreadyConnected: "PeerAlreadyConnected",
+	PeerDialCompleted:    "PeerDialCompleted",
+	PeerAddedToDialQueue: "PeerAddedToDialQueue",
+}
+
+func (s PeerEventType) String() string {
+	name, ok := peerEventToName[s]
+	if !ok {
+		return "unknown"
+	}
+	return name
+}
 
 type PeerEvent struct {
 	// PeerID is the id of the peer that triggered
@@ -720,9 +746,5 @@ type PeerEvent struct {
 	PeerID peer.ID
 
 	// Type is the type of the event
-	Type string
-
-	// Desc is used to include more contextual
-	// information for the event
-	Desc string
+	Type PeerEventType
 }

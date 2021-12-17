@@ -221,7 +221,7 @@ func TestEthTransfer(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			receipt, err := srv.WaitForReceipt(ctx, txnHash)
+			receipt, err := tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), txnHash)
 
 			if testCase.shouldSucceed {
 				assert.NoError(t, err)
@@ -292,7 +292,7 @@ func getCount(
 	response, err := rpcClient.Eth().Call(
 		&web3.CallMsg{
 			From:     web3.Address(from),
-			To:       contractAddress,
+			To:       &contractAddress,
 			Data:     selector,
 			GasPrice: 100000000,
 			Value:    big.NewInt(0),
@@ -442,7 +442,7 @@ func generateStressTestTx(
 		GasPrice: bigGasPrice,
 		Gas:      framework.DefaultGasLimit,
 		Value:    big.NewInt(0),
-		V:        []byte{1}, // it is necessary to encode in rlp,
+		V:        big.NewInt(1), // it is necessary to encode in rlp,
 		Input:    append(setNameMethod.ID(), encodedInput...),
 	}, senderKey)
 
@@ -563,7 +563,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	for index, txHash := range txHashes {
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Minute*3)
 
-		receipt, receiptErr := srv.WaitForReceipt(waitCtx, txHash)
+		receipt, receiptErr := tests.WaitForReceipt(waitCtx, client.Eth(), txHash)
 		if receipt == nil {
 			t.Fatalf("Unable to get receipt for hash index [%d]", index)
 		} else if receiptErr != nil {
