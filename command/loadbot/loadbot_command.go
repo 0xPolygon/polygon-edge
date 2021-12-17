@@ -96,6 +96,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var valueRaw string
 	var count uint64
 	var jsonrpc string
+	var maxConns int
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
@@ -104,6 +105,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
+	flags.IntVar(&maxConns, "maxconns", 0, "")
 
 	var err error
 	// Parse cli arguments
@@ -142,6 +144,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		Count:    count,
 		Value:    value,
 		JSONRPC:  jsonrpc,
+		MaxConns: maxConns,
 	}
 
 	// Create the metrics placeholder

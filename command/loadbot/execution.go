@@ -27,6 +27,7 @@ type Configuration struct {
 	Value    *big.Int
 	Count    uint64
 	JSONRPC  string
+	MaxConns int
 }
 
 type Metrics struct {
@@ -80,7 +81,7 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("failed to extract sender account: %v", err)
 	}
 
-	client, err := createJsonRpcClient(l.cfg.JSONRPC)
+	client, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
 		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
 	}
