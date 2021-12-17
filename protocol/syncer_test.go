@@ -108,7 +108,7 @@ func TestBroadcast(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, peerChain := NewMockBlockchain(tt.syncerHeaders, 2), NewMockBlockchain(tt.peerHeaders, 2)
+			chain, peerChain := NewMockBlockchain(tt.syncerHeaders), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
@@ -242,9 +242,6 @@ func TestFindCommonAncestor(t *testing.T) {
 }
 
 func TestWatchSyncWithPeer(t *testing.T) {
-	// TODO remove
-	t.SkipNow()
-
 	tests := []struct {
 		name           string
 		headers        []*types.Header
@@ -273,7 +270,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, peerChain := NewMockBlockchain(tt.headers, 2), NewMockBlockchain(tt.peerHeaders, 2)
+			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
@@ -316,9 +313,6 @@ func TestWatchSyncWithPeer(t *testing.T) {
 }
 
 func TestBulkSyncWithPeer(t *testing.T) {
-	// TODO remove
-	t.SkipNow()
-
 	tests := []struct {
 		name        string
 		headers     []*types.Header
@@ -345,7 +339,7 @@ func TestBulkSyncWithPeer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, peerChain := NewMockBlockchain(tt.headers, 2), NewMockBlockchain(tt.peerHeaders, 2)
+			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
@@ -370,7 +364,7 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	targetChainSize := 1000
 
 	existingChain := blockchain.NewTestHeaderChainWithSeed(nil, initialChainSize, 0)
-	syncerChain := NewMockBlockchain(existingChain, 0)
+	syncerChain := NewMockBlockchain(existingChain)
 	syncer := CreateSyncer(t, syncerChain, nil)
 
 	syncHeaders := blockchain.NewTestHeaderChainWithSeed(nil, targetChainSize, 0)

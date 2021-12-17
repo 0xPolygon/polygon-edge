@@ -196,23 +196,21 @@ func HeaderToStatus(h *types.Header) *Status {
 type mockBlockchain struct {
 	blocks        []*types.Block
 	subscriptions []*mockSubscription
-	channelSize   int
 }
 
 func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 	panic("implement me")
 }
 
-func NewMockBlockchain(headers []*types.Header, channelSize int) *mockBlockchain {
+func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 	return &mockBlockchain{
 		blocks:        blockchain.HeadersToBlocks(headers),
 		subscriptions: make([]*mockSubscription, 0),
-		channelSize:   channelSize,
 	}
 }
 
 func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
-	subscription := NewMockSubscription(b.channelSize)
+	subscription := NewMockSubscription()
 	b.subscriptions = append(b.subscriptions, subscription)
 	return subscription
 }
@@ -286,9 +284,9 @@ type mockSubscription struct {
 	eventCh chan *blockchain.Event
 }
 
-func NewMockSubscription(channelSize int) *mockSubscription {
+func NewMockSubscription() *mockSubscription {
 	return &mockSubscription{
-		eventCh: make(chan *blockchain.Event, channelSize),
+		eventCh: make(chan *blockchain.Event),
 	}
 }
 
