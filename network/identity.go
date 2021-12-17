@@ -57,7 +57,9 @@ func (i *identity) setup() {
 	grpc.Serve()
 
 	i.srv.Register(identityProtoV1, grpc)
+}
 
+func (i *identity) start() error {
 	// register callback messages to notify from new peers
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
@@ -97,6 +99,7 @@ func (i *identity) setup() {
 			}()
 		},
 	})
+	return nil
 }
 
 func (i *identity) getStatus() *proto.Status {

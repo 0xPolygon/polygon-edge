@@ -335,11 +335,10 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-
 	s.server.Register(syncerV1, grpcStream)
 
-	go s.handlePeerEvent()
 	s.setupPeers()
+	go s.handlePeerEvent()
 }
 
 // setupPeers adds connected peers as syncer peers
@@ -364,7 +363,7 @@ func (s *Syncer) handlePeerEvent() {
 		}
 
 		switch evnt.Type {
-		case network.PeerEventConnected:
+		case network.PeerEventConnected, network.PeerEventDialConnectedNode:
 			if err := s.AddPeer(evnt.PeerID); err != nil {
 				s.logger.Error("failed to add peer", "err", err)
 			}
@@ -383,6 +382,7 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		status := peer.(*SyncPeer).status
+		fmt.Printf("status %+v\n", status)
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
 			bestPeer, bestTd = peer.(*SyncPeer), status.Difficulty
 		}
@@ -404,6 +404,11 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 // AddPeer establishes new connection with the given peer
 func (s *Syncer) AddPeer(peerID peer.ID) error {
+	if _, ok := s.peers.Load(peerID); ok {
+		// already connected
+		return nil
+	}
+
 	stream, err := s.server.NewStream(syncerV1, peerID)
 	if err != nil {
 		return fmt.Errorf("failed to open a stream, err %w", err)
