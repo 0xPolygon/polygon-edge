@@ -579,7 +579,8 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				c.Chain.Bootnodes = tt.bootNodes
 			})
 
-			_, err := NewServer(hclog.NewNullLogger(), cfg)
+			srv, err := NewServer(hclog.NewNullLogger(), cfg)
+			assert.NoError(t, srv.Start())
 			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
