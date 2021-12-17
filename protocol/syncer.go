@@ -377,8 +377,6 @@ func (s *Syncer) Start() {
 }
 
 func (s *Syncer) InitializePeers() error {
-	fmt.Printf("\n\ninitialize peers !!! %+v\n\n", s.server.Peers())
-
 	for _, peer := range s.server.Peers() {
 		stream, err := s.server.NewStream(syncerV1, peer.Info.ID)
 		if err != nil {
