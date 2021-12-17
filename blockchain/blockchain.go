@@ -1081,6 +1081,7 @@ func (b *Blockchain) ImportChain(filePath string) error {
 	return nil
 }
 
+// blockStream parse RLP-encoded block from stream and consumed the used bytes
 type blockStream struct {
 	input  io.Reader
 	buffer []byte
@@ -1093,7 +1094,7 @@ func newBlockStream(input io.Reader) *blockStream {
 	}
 }
 
-// nextBlock takes bytes from input and return block
+// nextBlock takes some bytes from input, returns parsed block, and consumes used bytes
 func (b *blockStream) nextBlock() (*types.Block, error) {
 	prefix, err := b.loadRLPPrefix()
 	if errors.Is(io.EOF, err) {
@@ -1123,7 +1124,7 @@ func (b *blockStream) loadRLPPrefix() (byte, error) {
 }
 
 // loadPrefixSize loads array's size from input
-// block should be array in RLP encoded because block has 3 fields on the top: Header, Transactions, Uncles
+// basically block should be array in RLP encoded value because block has 3 fields on the top: Header, Transactions, Uncles
 func (b *blockStream) loadPrefixSize(offset int64, prefix byte) (int64, int64, error) {
 	switch {
 	case prefix >= 0xc0 && prefix <= 0xf7:
