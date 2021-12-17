@@ -220,8 +220,8 @@ func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan 
 }
 
 type BackupResult struct {
-	From uint64 `json:"uint64"`
-	To   uint64 `json:"uint64"`
+	From uint64 `json:"from"`
+	To   uint64 `json:"to"`
 	Out  string `json:"out"`
 }
 
