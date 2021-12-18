@@ -89,7 +89,7 @@ func (d *discovery) setup() error {
 
 	d.routingTable.PeerAdded = func(p peer.ID) {
 		info := d.srv.host.Peerstore().PeerInfo(p)
-		d.srv.dialQueue.add(&info, 10)
+		d.srv.addToDialQueue(&info, PriorityRandomDial)
 	}
 	d.routingTable.PeerRemoved = func(p peer.ID) {
 		d.srv.dialQueue.del(p)
@@ -105,7 +105,7 @@ func (d *discovery) setup() error {
 	err = d.srv.SubscribeFn(func(evnt *PeerEvent) {
 		peerID := evnt.PeerID
 		switch evnt.Type {
-		case PeerEventConnected:
+		case PeerConnected:
 			// add peer to the routing table and to our local peer
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
@@ -118,7 +118,7 @@ func (d *discovery) setup() error {
 				stream: nil,
 			})
 			d.peersLock.Unlock()
-		case PeerEventDisconnected:
+		case PeerDisconnected:
 			d.routingTable.RemovePeer(peerID)
 			d.peersLock.Lock()
 			d.peers.delete(peerID)
@@ -200,6 +200,11 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	return addrInfo, nil
 }
 
+func (d *discovery) peersCount() int {
+	d.peersLock.Lock()
+	defer d.peersLock.Unlock()
+	return len(d.peers)
+}
 func (d *discovery) run() {
 	for {
 		select {
@@ -222,8 +227,8 @@ func (d *discovery) handleDiscovery() {
 		}
 	} else {
 		// take a random peer and find peers
-		if len(d.peers) > 0 {
-			target := d.peers[rand.Intn(len(d.peers))]
+		if d.peersCount() > 0 {
+			target := d.peers[rand.Intn(d.peersCount())]
 			if err := d.call(target.id); err != nil {
 				d.srv.logger.Error("failed to dial bootnode", "err", err)
 			}

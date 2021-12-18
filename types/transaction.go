@@ -14,9 +14,9 @@ type Transaction struct {
 	To       *Address
 	Value    *big.Int
 	Input    []byte
-	V        []byte
-	R        []byte
-	S        []byte
+	V        *big.Int
+	R        *big.Int
+	S        *big.Int
 	Hash     Hash
 	From     Address
 
@@ -51,10 +51,15 @@ func (t *Transaction) Copy() *Transaction {
 	tt.Value = new(big.Int)
 	tt.Value.Set(t.Value)
 
-	tt.R = make([]byte, len(t.R))
-	copy(tt.R[:], t.R[:])
-	tt.S = make([]byte, len(t.S))
-	copy(tt.S[:], t.S[:])
+	if t.R != nil {
+		tt.R = new(big.Int)
+		tt.R = big.NewInt(0).SetBits(t.R.Bits())
+	}
+
+	if t.S != nil {
+		tt.S = new(big.Int)
+		tt.S = big.NewInt(0).SetBits(t.S.Bits())
+	}
 
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])

@@ -247,6 +247,10 @@ func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
 	m.accounts[addr] = account
 }
 
+func (m *mockStore) GetCapacity() (uint64, uint64) {
+	return 0, 0
+}
+
 func newMockStore() *mockStore {
 	return &mockStore{
 		header:       &types.Header{Number: 0},

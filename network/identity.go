@@ -64,19 +64,16 @@ func (i *identity) setup() {
 			peerID := conn.RemotePeer()
 			i.srv.logger.Trace("Conn", "peer", peerID, "direction", conn.Stat().Direction)
 
-			// limit by MaxPeers on incomming requests since we already limit
-			// the outgoing requests
-			if conn.Stat().Direction == network.DirInbound {
-				if i.isPending(peerID) {
-					// handshake has already started
-					return
-				}
-				if i.srv.numOpenSlots() == 0 {
-					i.srv.Disconnect(peerID, "no available slots")
-					return
-				}
+			// limit by MaxPeers on incomming/outgoing requests
+			if i.isPending(peerID) {
+				// handshake has already started
+				return
 			}
 
+			if i.srv.numOpenSlots() == 0 {
+				i.srv.Disconnect(peerID, "no available slots")
+				return
+			}
 			// pending of handshake
 			i.setPending(peerID)
 
@@ -84,10 +81,7 @@ func (i *identity) setup() {
 				defer func() {
 					if i.isPending(peerID) {
 						i.delPending(peerID)
-						i.srv.emitEvent(&PeerEvent{
-							PeerID: peerID,
-							Type:   PeerEventDialCompleted,
-						})
+						i.srv.emitEvent(peerID, PeerDialCompleted)
 					}
 				}()
 

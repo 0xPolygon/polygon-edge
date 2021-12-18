@@ -52,6 +52,10 @@ func (m *mockAccountStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 	panic("implement me")
 }
 
+func (m *mockAccountStore) GetCapacity() (uint64, uint64) {
+	panic("implement me")
+}
+
 func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount2{}
@@ -106,6 +110,10 @@ type mockBlockStore2 struct {
 }
 
 func (m *mockBlockStore2) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	panic("implement me")
+}
+
+func (m *mockBlockStore2) GetCapacity() (uint64, uint64) {
 	panic("implement me")
 }
 
@@ -486,16 +494,6 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 			expectedNonce: argUintPtr(0),
 		},
 		{
-			name: "should return error for non-existing header",
-			initialNonces: map[types.Address]uint64{
-				addr0: 100,
-			},
-			target:        addr0,
-			blockNumber:   "100",
-			succeeded:     false,
-			expectedNonce: nil,
-		},
-		{
 			name: "should not return error for empty block parameter",
 			initialNonces: map[types.Address]uint64{
 				addr0: 100,
@@ -682,8 +680,8 @@ func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (m *mockStoreTxn) GetNonce(addr types.Address) (uint64, bool) {
-	return 1, false
+func (m *mockStoreTxn) GetNonce(addr types.Address) uint64 {
+	return 1
 }
 func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
@@ -715,7 +713,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 
 	txn := &types.Transaction{
 		From: addr0,
-		V:    []byte{1},
+		V:    big.NewInt(1),
 	}
 	txn.ComputeHash()
 

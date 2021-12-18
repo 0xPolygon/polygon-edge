@@ -3,61 +3,18 @@ package network
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 )
-
-func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
-	t.Helper()
-
-	dir, err := ioutil.TempDir(os.TempDir(), "")
-	assert.NoError(t, err)
-
-	// Instantiate the correct folder structure
-	setupErr := common.SetupDataDir(dir, []string{"libp2p"})
-	if setupErr != nil {
-		t.Fatalf("unable to generate libp2p folder structure, %v", setupErr)
-	}
-
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(
-		nil,
-		&secrets.SecretsManagerParams{
-			Logger: hclog.NewNullLogger(),
-			Extra: map[string]interface{}{
-				secrets.Path: dir,
-			},
-		})
-	assert.NoError(t, factoryErr)
-
-	libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
-	if keyErr != nil {
-		t.Fatalf("unable to generate libp2p key, %v", keyErr)
-	}
-
-	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-		t.Fatalf("unable to save libp2p key, %v", setErr)
-	}
-
-	t.Cleanup(func() {
-		// remove directory after test is done
-		assert.NoError(t, os.RemoveAll(dir))
-	})
-
-	return libp2pKey, dir
-}
 
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
@@ -143,37 +100,58 @@ func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent
 
 func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventDisconnected && evnt.PeerID == p
+		return evnt.Type == PeerDisconnected && evnt.PeerID == p
 	}
 }
 
 func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerEventConnected && evnt.PeerID == p
+		return evnt.Type == PeerConnected && evnt.PeerID == p
 	}
 }
 
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-
+	srv0 := CreateServer(t, func(c *Config) {
+		c.NoDiscover = true
+	})
 	sub, err := srv0.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
+	events := []PeerEventType{
+		PeerConnected,
+		PeerFailedToConnect,
+		PeerDisconnected,
+		PeerAlreadyConnected,
+		PeerDialCompleted,
+		PeerAddedToDialQueue,
+	}
+
+	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
+		id := peer.ID(strconv.Itoa(i))
+		event := events[i%len(events)]
+		return id, event
+	}
 
 	t.Run("serial", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
-			sub.Get()
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
+
+			received := sub.Get()
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 
 	t.Run("parallel", func(t *testing.T) {
 		for i := 0; i < count; i++ {
-			srv0.emitEvent(&PeerEvent{})
+			id, event := getIDAndEventType(i)
+			srv0.emitEvent(id, event)
 		}
 		for i := 0; i < count; i++ {
-			sub.Get()
+			received := sub.Get()
+			id, event := getIDAndEventType(i)
+			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 }
@@ -346,12 +324,14 @@ func TestNat(t *testing.T) {
 	})
 }
 
-func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool, error) {
+func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		if _, ok := srv.peers[id]; !ok {
-			return nil, true
+		for _, v := range ids {
+			if _, ok := srv.peers[v]; ok {
+				return true, false
+			}
 		}
-		return true, false
+		return nil, true
 
 	})
 	if err != nil {
@@ -363,40 +343,51 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, id peer.ID) (bool
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
 	conf := func(c *Config) {
-		c.MaxPeers = 2
+		c.MaxPeers = 3
 		c.NoDiscover = false
 	}
 	//Create bootnode
-	bootNode := CreateServer(t, conf)
-
+	firstBootNode := CreateServer(t, conf)
+	secondBootNode := CreateServer(t, conf)
 	conf1 := func(c *Config) {
-		c.MaxPeers = 2
+		c.MaxPeers = 3
 		c.NoDiscover = false
-		c.Chain.Bootnodes = []string{AddrInfoToString(bootNode.AddrInfo())}
+		c.Chain.Bootnodes = []string{AddrInfoToString(firstBootNode.AddrInfo()), AddrInfoToString(secondBootNode.AddrInfo())}
 	}
 
 	srv1 := CreateServer(t, conf1)
 	srv2 := CreateServer(t, conf1)
 
-	//connect with the boot node
-	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(bootNode.AddrInfo().ID))
-	assert.True(t, <-connectedCh)
+	//connect with the first boot node
+	connectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(firstBootNode.AddrInfo().ID))
+	assert.True(t, <-connectedCh1)
+
+	//connect with the second boot node
+	connectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(secondBootNode.AddrInfo().ID))
+	assert.True(t, <-connectedCh2)
 
 	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
-	//disconnect from the boot node
-	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(bootNode.AddrInfo().ID))
-	srv1.Disconnect(bootNode.AddrInfo().ID, "bye")
 
-	assert.True(t, <-disconnectedCh1, "Failed to recieved peer disconnected event")
+	//disconnect from the first boot node
+	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(firstBootNode.AddrInfo().ID))
+	srv1.Disconnect(firstBootNode.AddrInfo().ID, "Bye")
 
-	//disconnect from the second node
-	disconnectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
+	assert.True(t, <-disconnectedCh1, "Failed to receive peer disconnected event")
+
+	//disconnect from the second boot node
+	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(secondBootNode.AddrInfo().ID))
+	srv1.Disconnect(secondBootNode.AddrInfo().ID, "Bye")
+
+	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
+
+	//disconnect from the third  node
+	disconnectedCh3 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
 	assert.NoError(t, srv2.Close())
-	assert.True(t, <-disconnectedCh2)
+	assert.True(t, <-disconnectedCh3)
 
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, bootNode.host.ID())
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, firstBootNode.host.ID(), secondBootNode.host.ID())
 	assert.NoError(t, err)
 	assert.True(t, reconnected)
 
@@ -457,7 +448,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
-	peerAddressInfo, err := StringToAddrInfo("/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW")
+	testMultiAddr := GenerateTestMultiAddr(t).String()
+	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -465,15 +457,10 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		bootNodes    []string
 		expectedList []*peer.AddrInfo
 	}{
-		{
-			name:         "Should return an empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty()},
-			expectedList: []*peer.AddrInfo{},
-		},
 
 		{
 			name:         "Should return an non empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAmJxxH1tScDX2rLGSU9exnuvZKNM9SoK3v315azp68DLPW"},
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), testMultiAddr},
 			expectedList: []*peer.AddrInfo{peerAddressInfo},
 		},
 	}
@@ -489,5 +476,116 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
 		})
+	}
+}
+
+func TestRunDial(t *testing.T) {
+	// setupServers returns server and list of peer's server
+	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+		servers := make([]*Server, len(maxPeers))
+		for idx := range servers {
+			servers[idx] = CreateServer(t, func(c *Config) {
+				c.MaxPeers = maxPeers[idx]
+				c.NoDiscover = true
+			})
+		}
+		return servers
+	}
+
+	connectToPeer := func(srv *Server, peer *peer.AddrInfo, timeout time.Duration) bool {
+		connectedCh := asyncWaitForEvent(srv, timeout, connectedPeerHandler(peer.ID))
+		srv.Join(peer, 0)
+		return <-connectedCh
+	}
+
+	closeServers := func(servers ...*Server) {
+		for _, s := range servers {
+			s.Close()
+		}
+	}
+
+	t.Run("should connect to all peers", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
+		maxPeers := []uint64{2, 1, 1, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		for idx, p := range peers {
+			addr := p.AddrInfo()
+			connected := connectToPeer(srv, addr, 5*time.Second)
+			if uint64(idx) < maxPeers[0] {
+				assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+			} else {
+				assert.Falsef(t, connected, "should fail to connect to peer %d[%s], but connected\n", idx, addr.ID)
+			}
+		}
+		closeServers(servers...)
+	})
+
+	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
+		// peer1 can't connect to any peer
+		maxPeers := []uint64{1, 0, 1}
+		servers := setupServers(t, maxPeers)
+		srv, peers := servers[0], servers[1:]
+
+		connected := connectToPeer(srv, peers[0].AddrInfo(), 15*time.Second)
+		assert.False(t, connected)
+
+		connected = connectToPeer(srv, peers[1].AddrInfo(), 15*time.Second)
+		assert.True(t, connected)
+
+		closeServers(srv, peers[1])
+	})
+}
+
+func TestMinimumBootNodeCount(t *testing.T) {
+	tests := []struct {
+		name       string
+		bootNodes  []string
+		shouldFail bool
+	}{
+		{
+			name:       "Server config with empty bootnodes",
+			bootNodes:  []string{},
+			shouldFail: true,
+		},
+		{
+			name:       "Server config with less than two bootnodes",
+			bootNodes:  []string{GenerateTestMultiAddr(t).String()},
+			shouldFail: true,
+		},
+		{
+			name:       "Server config with more than two bootnodes",
+			bootNodes:  []string{GenerateTestMultiAddr(t).String(), GenerateTestMultiAddr(t).String()},
+			shouldFail: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			cfg := getTestConfig(func(c *Config) {
+				c.Chain.Bootnodes = tt.bootNodes
+			})
+
+			_, err := NewServer(hclog.NewNullLogger(), cfg)
+			if tt.shouldFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+
 	}
 }

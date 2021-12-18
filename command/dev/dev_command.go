@@ -6,22 +6,16 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/server"
 	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
 )
 
 // DevCommand is the command to show the version of the agent
 type DevCommand struct {
-	UI cli.Ui
-
-	helper.Meta
+	helper.Base
 }
 
 // DefineFlags defines the command flags
 func (d *DevCommand) DefineFlags() {
-	if d.FlagMap == nil {
-		// Flag map not initialized
-		d.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	d.Base.DefineFlags()
 
 	d.FlagMap["log-level"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", helper.DefaultConfig().LogLevel),

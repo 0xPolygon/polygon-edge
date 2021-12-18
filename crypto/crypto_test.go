@@ -112,19 +112,18 @@ func TestCreate2(t *testing.T) {
 }
 
 func TestValidateSignatureValues(t *testing.T) {
-	one := big.NewInt(1).Bytes()
-	zero := big.NewInt(0).Bytes()
-
+	one := big.NewInt(1)
+	zero := big.NewInt(0)
 	secp256k1N, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
 
-	limit := secp256k1N.Bytes()
-	limitMinus1 := new(big.Int).Sub(secp256k1N, big1).Bytes()
+	limit := secp256k1N
+	limitMinus1 := new(big.Int).Sub(secp256k1N, big1)
 
 	cases := []struct {
 		homestead bool
 		v         byte
-		r         []byte
-		s         []byte
+		r         *big.Int
+		s         *big.Int
 		res       bool
 	}{
 		// correct v, r, s
@@ -157,12 +156,6 @@ func TestValidateSignatureValues(t *testing.T) {
 		found := ValidateSignatureValues(c.v, c.r, c.s)
 		assert.Equal(t, found, c.res)
 	}
-}
-
-func TestVV(t *testing.T) {
-
-	ValidateSignatureValues(0, []byte{0x0, 0x1, 0x2, 0x3}, []byte{0x1, 0x2, 0x3})
-
 }
 
 func getAddressFromKey(key crypto.PrivateKey, t *testing.T) types.Address {

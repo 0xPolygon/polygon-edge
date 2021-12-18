@@ -172,9 +172,9 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(t.Input))
 
 	// signature values
-	vv.Set(arena.NewCopyBytes(t.V))
-	vv.Set(arena.NewCopyBytes(t.R))
-	vv.Set(arena.NewCopyBytes(t.S))
+	vv.Set(arena.NewBigInt(t.V))
+	vv.Set(arena.NewBigInt(t.R))
+	vv.Set(arena.NewBigInt(t.S))
 
 	return vv
 }
