@@ -12,6 +12,7 @@ type SecretsManagerConfig struct {
 	ServerURL string                 `json:"server_url"` // The URL of the running server
 	Type      SecretsManagerType     `json:"type"`       // The type of SecretsManager
 	Name      string                 `json:"name"`       // The name of the current node
+	Namespace string                 `json:"namespace"`  // The namespace of the service
 	Extra     map[string]interface{} `json:"extra"`      // Any kind of arbitrary data
 }
 
