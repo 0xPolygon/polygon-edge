@@ -53,6 +53,7 @@ func Factory(
 
 	// enable dev mode so that we can accept non-signed txns
 	params.Txpool.EnableDev()
+	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -102,14 +103,43 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	successful, remaining := d.txpool.WriteTransactions(
-		func(t *types.Transaction) txpool.WriteTxStatus {
-			return txpool.Ok
-		},
-	)
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := d.txpool.Pop()
+		if txn == nil {
+			break
+		}
 
-	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", remaining)
-	return nil
+		if txn.ExceedsBlockGasLimit(gasLimit) {
+			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
+			d.txpool.DecreaseAccountNonce(txn)
+			continue
+		}
+
+		if err := transition.Write(txn); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else {
+				d.txpool.DecreaseAccountNonce(txn)
+			}
+			continue
+		}
+
+		txns = append(txns, txn)
+	}
+
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
+	return txns
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,

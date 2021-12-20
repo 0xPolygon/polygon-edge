@@ -32,6 +32,8 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 		txpool:     params.Txpool,
 	}
 
+	params.Txpool.NotifyCh = d.notifyCh
+
 	return d, nil
 }
 

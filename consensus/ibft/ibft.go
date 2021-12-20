@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	any "google.golang.org/protobuf/types/known/anypb"
@@ -32,8 +31,10 @@ type blockchainInterface interface {
 }
 
 type transactionPoolInterface interface {
-	WriteTransactions(write txpool.WriteTxCallback) ([]*types.Transaction, int)
 	ResetWithHeader(h *types.Header)
+	Pop() (*types.Transaction, func())
+	DecreaseAccountNonce(tx *types.Transaction)
+	Length() uint64
 }
 
 type syncerInterface interface {
@@ -456,27 +457,43 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	successful, remaining := i.txpool.WriteTransactions(func(tx *types.Transaction) txpool.WriteTxStatus {
-		if tx.ExceedsBlockGasLimit(gasLimit) {
+	txns := []*types.Transaction{}
+	returnTxnFuncs := []func(){}
+	for {
+		txn, retTxnFn := i.txpool.Pop()
+		if txn == nil {
+			break
+		}
+
+		if txn.ExceedsBlockGasLimit(gasLimit) {
 			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			return txpool.Unrecoverable
+			i.txpool.DecreaseAccountNonce(txn)
+			continue
 		}
 
-		if err := transition.Write(tx); err != nil {
+		if err := transition.Write(txn); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				return txpool.Abort
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				return txpool.Recoverable
+				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 			} else {
-				return txpool.Unrecoverable
+				i.txpool.DecreaseAccountNonce(txn)
 			}
+			continue
 		}
 
-		return txpool.Ok
-	})
+		txns = append(txns, txn)
+	}
 
-	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", remaining)
-	return nil
+	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
+	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
+	for _, retFunc := range returnTxnFuncs {
+		retFunc()
+	}
+
+	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
+	return txns
 }
 
 // runAcceptState runs the Accept state loop
