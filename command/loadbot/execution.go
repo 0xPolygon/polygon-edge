@@ -16,6 +16,13 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
+const (
+	maxReceiptWait = 5 * time.Minute
+
+	defaultFastestTurnAround = time.Hour * 24
+	defaultSlowestTurnAround = time.Duration(0)
+)
+
 type Account struct {
 	Address    types.Address
 	PrivateKey *ecdsa.PrivateKey
@@ -29,9 +36,83 @@ type Configuration struct {
 	JSONRPC  string
 }
 
+type ExecDuration struct {
+	// turnAroundMap maps the transaction hash -> turn around time for passing transactions
+	turnAroundMap map[web3.Hash]time.Duration
+
+	// Arrival Time - Time at which the transaction is added
+	// Completion Time -Time at which the transaction is sealed
+	// Turn around time - Completion Time – Arrival Time
+
+	// AverageTurnAround is the average turn around time for all passing transactions
+	AverageTurnAround time.Duration
+
+	// FastestTurnAround is the fastest turn around time recorded for a transaction
+	FastestTurnAround time.Duration
+
+	// SlowestTurnAround is the slowest turn around time recorded for a transaction
+	SlowestTurnAround time.Duration
+
+	// TotalExecTime is the total execution time for a single loadbot run
+	TotalExecTime time.Duration
+}
+
+// calcTurnAroundMetrics updates the turn around metrics based on the turnAroundMap
+func (ed *ExecDuration) calcTurnAroundMetrics() {
+	// Set the initial values
+	fastestTurnAround := defaultFastestTurnAround
+	slowestTurnAround := defaultSlowestTurnAround
+	totalPassing := len(ed.turnAroundMap)
+	var zeroTime time.Time  // Zero time
+	var totalTime time.Time // Zero time used for tracking
+
+	if totalPassing == 0 {
+		// No data to show, use zero data
+		zeroDuration := time.Duration(0)
+		ed.SlowestTurnAround = zeroDuration
+		ed.FastestTurnAround = zeroDuration
+		ed.AverageTurnAround = zeroDuration
+
+		return
+	}
+
+	for _, turnAroundTime := range ed.turnAroundMap {
+		if turnAroundTime < fastestTurnAround {
+			fastestTurnAround = turnAroundTime
+		}
+
+		if turnAroundTime > slowestTurnAround {
+			slowestTurnAround = turnAroundTime
+		}
+
+		totalTime = totalTime.Add(turnAroundTime)
+	}
+
+	averageDuration := (totalTime.Sub(zeroTime)) / time.Duration(totalPassing)
+
+	ed.SlowestTurnAround = slowestTurnAround
+	ed.FastestTurnAround = fastestTurnAround
+	ed.AverageTurnAround = averageDuration
+}
+
+// reportExecTime reports the turn around time for a transaction
+// for a single loadbot run
+func (ed *ExecDuration) reportTurnAroundTime(
+	txHash web3.Hash,
+	turnAroundTime time.Duration,
+) {
+	ed.turnAroundMap[txHash] = turnAroundTime
+}
+
+// setTotalExecTime sets the total execution time for a single loadbot run
+func (ed *ExecDuration) setTotalExecTime(totalTime time.Duration) {
+	ed.TotalExecTime = totalTime
+}
+
 type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
+	TransactionDuration        ExecDuration
 }
 
 type Loadbot struct {
@@ -42,6 +123,7 @@ type Loadbot struct {
 func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
 	return &Loadbot{cfg: cfg, metrics: metrics}
 }
+
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
@@ -99,6 +181,7 @@ func (l *Loadbot) Run() error {
 
 	var wg sync.WaitGroup
 
+	startTime := time.Now()
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
@@ -110,6 +193,11 @@ func (l *Loadbot) Run() error {
 
 			// take nonce first
 			newNextNonce := atomic.AddUint64(&nonce, 1)
+
+			// Start the performance timer
+			start := time.Now()
+
+			// Execute the transaction
 			txHash, err := executeTxn(client, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
@@ -124,9 +212,22 @@ func (l *Loadbot) Run() error {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
 			}
+
+			// Stop the performance timer
+			end := time.Now()
+			l.metrics.TransactionDuration.reportTurnAroundTime(
+				txHash,
+				end.Sub(start),
+			)
 		}()
 	}
 
 	wg.Wait()
+	endTime := time.Now()
+
+	// Calculate the turn around metrics now that the loadbot is done
+	l.metrics.TransactionDuration.calcTurnAroundMetrics()
+	l.metrics.TransactionDuration.TotalExecTime = endTime.Sub(startTime)
+
 	return nil
 }

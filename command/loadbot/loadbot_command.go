@@ -3,16 +3,22 @@ package loadbot
 import (
 	"bytes"
 	"fmt"
-	"net/url"
-
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
+	"net/url"
+	"time"
 )
 
 type LoadbotCommand struct {
 	helper.Base
 	Formatter *helper.FormatterFlag
 }
+
+const (
+	durationPrecision = 5
+)
 
 func (l *LoadbotCommand) DefineFlags() {
 	l.Base.DefineFlags(l.Formatter)
@@ -148,6 +154,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 	metrics := &Metrics{
 		TotalTransactionsSentCount: 0,
 		FailedTransactionsCount:    0,
+		TransactionDuration: ExecDuration{
+			turnAroundMap: make(map[web3.Hash]time.Duration),
+		},
 	}
 
 	// create a loadbot instance
@@ -163,6 +172,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		Total:  metrics.TotalTransactionsSentCount,
 		Failed: metrics.FailedTransactionsCount,
 	}
+	res.extractDurations(metrics)
+
 	l.Formatter.OutputResult(res)
 
 	return 0
@@ -171,6 +182,33 @@ func (l *LoadbotCommand) Run(args []string) int {
 type LoadbotResult struct {
 	Total  uint64 `json:"total"`
 	Failed uint64 `json:"failed"`
+
+	FastestTurnAround float64 `json:"fastestTurnAround"`
+	SlowestTurnAround float64 `json:"slowestTurnAround"`
+	AverageTurnAround float64 `json:"averageTurnAround"`
+	TotalExecTime     float64 `json:"totalExecTime"`
+}
+
+func (lr *LoadbotResult) extractDurations(metrics *Metrics) {
+	lr.FastestTurnAround = common.ToFixedFloat(
+		metrics.TransactionDuration.FastestTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.SlowestTurnAround = common.ToFixedFloat(
+		metrics.TransactionDuration.SlowestTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.AverageTurnAround = common.ToFixedFloat(
+		metrics.TransactionDuration.AverageTurnAround.Seconds(),
+		durationPrecision,
+	)
+
+	lr.TotalExecTime = common.ToFixedFloat(
+		metrics.TransactionDuration.TotalExecTime.Seconds(),
+		durationPrecision,
+	)
 }
 
 func (r *LoadbotResult) Output() string {
@@ -180,6 +218,10 @@ func (r *LoadbotResult) Output() string {
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Transactions submitted|%d", r.Total),
 		fmt.Sprintf("Transactions failed|%d", r.Failed),
+		fmt.Sprintf("Average transaction turn around|%fs", r.AverageTurnAround),
+		fmt.Sprintf("Fastest transaction turn around|%fs", r.FastestTurnAround),
+		fmt.Sprintf("Slowest transaction turn around|%fs", r.SlowestTurnAround),
+		fmt.Sprintf("Total loadbot execution time|%fs", r.TotalExecTime),
 	}))
 	buffer.WriteString("\n")
 
