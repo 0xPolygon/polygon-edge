@@ -335,9 +335,21 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-
 	s.server.Register(syncerV1, grpcStream)
 
+	s.setupPeers()
+	go s.handlePeerEvent()
+}
+
+// setupPeers adds connected peers as syncer peers
+func (s *Syncer) setupPeers() {
+	for _, p := range s.server.Peers() {
+		s.AddPeer(p.Info.ID)
+	}
+}
+
+// handlePeerEvent subscribes network event and adds/deletes peer from syncer
+func (s *Syncer) handlePeerEvent() {
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
@@ -352,16 +364,10 @@ func (s *Syncer) Start() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected:
-				stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
-				if err != nil {
-					s.logger.Error("failed to open a stream", "err", err)
-					continue
+			case network.PeerConnected, network.PeerDialCompleted:
+				if err := s.AddPeer(evnt.PeerID); err != nil {
+					s.logger.Error("failed to add peer", "err", err)
 				}
-				if err := s.HandleNewPeer(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
-					s.logger.Error("failed to handle user", "err", err)
-				}
-
 			case network.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
@@ -397,8 +403,19 @@ func (s *Syncer) BestPeer() *SyncPeer {
 	return bestPeer
 }
 
-// HandleNewPeer is a helper method that is used to handle new user connections within the Syncer
-func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
+// AddPeer establishes new connection with the given peer
+func (s *Syncer) AddPeer(peerID peer.ID) error {
+	if _, ok := s.peers.Load(peerID); ok {
+		// already connected
+		return nil
+	}
+
+	stream, err := s.server.NewStream(syncerV1, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to open a stream, err %w", err)
+	}
+	conn := libp2pGrpc.WrapClient(stream)
+
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
@@ -422,6 +439,7 @@ func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
 	return nil
 }
 
+// DeletePeer deletes a peer from syncer
 func (s *Syncer) DeletePeer(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
@@ -502,6 +520,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	return header, fork, nil
 }
 
+// WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
 	// purge from the cache of broadcasted blocks all the ones we have written so far
 	header := s.blockchain.Header()
@@ -538,6 +557,7 @@ func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
 	}
 }
 
+// BulkSyncWithPeer finds common ancestor with a peer and syncs block until latest block
 func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*types.Block)) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
