@@ -19,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	noise "github.com/libp2p/go-libp2p-noise"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -186,39 +185,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	srv.identity = &identity{srv: srv}
 	srv.identity.setup()
 
-	go srv.runDial()
-	go srv.checkPeerConnections()
-	logger.Info("LibP2P server running", "addr", AddrInfoToString(srv.AddrInfo()))
-
-	if !config.NoDiscover {
-
-		if config.Chain.Bootnodes != nil && len(config.Chain.Bootnodes) < MinimumBootNodes {
-			return nil, errors.New("Minimum two bootnodes are required")
-		}
-
-		// start discovery
-		srv.discovery = &discovery{srv: srv}
-		srv.discovery.setup()
-
-		// try to decode the bootnodes
-		bootnodes := []*peer.AddrInfo{}
-		for _, raw := range config.Chain.Bootnodes {
-			node, err := StringToAddrInfo(raw)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
-			}
-			if node.ID == srv.host.ID() {
-				srv.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
-				continue
-			}
-			// add the bootnode to the peerstore
-			srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
-			bootnodes = append(bootnodes, node)
-		}
-
-		srv.discovery.setBootnodes(bootnodes)
-	}
-
 	// start gossip protocol
 	ps, err := pubsub.NewGossipSub(context.Background(), host)
 	if err != nil {
@@ -226,18 +192,53 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 	srv.ps = ps
 
-	go srv.runJoinWatcher()
+	return srv, nil
+}
+
+func (s *Server) Start() error {
+	s.identity.start()
+
+	go s.runDial()
+	go s.checkPeerConnections()
+	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
+
+	if !s.config.NoDiscover {
+		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+			return errors.New("Minimum two bootnodes are required")
+		}
+
+		// start discovery
+		s.discovery = &discovery{srv: s}
+
+		// try to decode the bootnodes
+		bootnodes := []*peer.AddrInfo{}
+		for _, raw := range s.config.Chain.Bootnodes {
+			node, err := StringToAddrInfo(raw)
+			if err != nil {
+				return fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+			}
+			if node.ID == s.host.ID() {
+				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
+				continue
+			}
+			bootnodes = append(bootnodes, node)
+		}
+
+		s.discovery.setup(bootnodes)
+	}
+
+	go s.runJoinWatcher()
 
 	// watch for disconnected peers
-	host.Network().Notify(&network.NotifyBundle{
+	s.host.Network().Notify(&network.NotifyBundle{
 		DisconnectedF: func(net network.Network, conn network.Conn) {
 			go func() {
-				srv.delPeer(conn.RemotePeer())
+				s.delPeer(conn.RemotePeer())
 			}()
 		},
 	})
 
-	return srv, nil
+	return nil
 }
 
 // checkPeerCount will attempt to make new connections if the active peer count is lesser than the specified limit.

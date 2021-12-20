@@ -29,6 +29,9 @@ type VaultSecretsManager struct {
 
 	// The HTTP client used for interacting with the Vault server
 	client *vault.Client
+
+	// The namespace under which the secrets are stored 
+	namespace string
 }
 
 // SecretsManagerFactory implements the factory method
@@ -65,6 +68,9 @@ func SecretsManagerFactory(
 	// Grab the node name from the config
 	vaultManager.name = config.Name
 
+	// Grab the namespace from the config
+	vaultManager.namespace = config.Namespace
+
 	// Set the base path to store the secrets in the KV-2 Vault storage
 	vaultManager.basePath = fmt.Sprintf("secret/data/%s", vaultManager.name)
 
@@ -87,6 +93,9 @@ func (v *VaultSecretsManager) Setup() error {
 
 	// Set the access token
 	client.SetToken(v.token)
+
+	// Set the namespace 
+	client.SetNamespace(v.namespace)
 
 	v.client = client
 
