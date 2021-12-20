@@ -384,7 +384,6 @@ func (s *Syncer) BestPeer() *SyncPeer {
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		status := peer.(*SyncPeer).status
-		fmt.Printf("status %+v\n", status)
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
 			bestPeer, bestTd = peer.(*SyncPeer), status.Difficulty
 		}

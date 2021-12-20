@@ -144,13 +144,12 @@ func (d *discovery) addToTable(node *peer.AddrInfo) error {
 	return nil
 }
 
-func (d *discovery) setupTable() error {
+func (d *discovery) setupTable() {
 	for _, node := range d.bootnodes {
 		if err := d.addToTable(node); err != nil {
-			return err
+			d.srv.logger.Error("Failed to add new peer to routing table", "peer", node.ID, "err", err)
 		}
 	}
-	return nil
 }
 
 func (d *discovery) call(peerID peer.ID) error {
