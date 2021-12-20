@@ -24,6 +24,8 @@ type identity struct {
 	pendingSize int64
 
 	srv *Server
+
+	initialized uint32
 }
 
 func (i *identity) numPending() int64 {
@@ -59,24 +61,28 @@ func (i *identity) setup() {
 	i.srv.Register(identityProtoV1, grpc)
 
 	// register callback messages to notify from new peers
+	// need to start our handshake protocol immediately but don't want to connect to any peer until initialized
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
 			peerID := conn.RemotePeer()
 			i.srv.logger.Trace("Conn", "peer", peerID, "direction", conn.Stat().Direction)
 
-			// limit by MaxPeers on incomming requests since we already limit
-			// the outgoing requests
-			if conn.Stat().Direction == network.DirInbound {
-				if i.isPending(peerID) {
-					// handshake has already started
-					return
-				}
-				if i.srv.numOpenSlots() == 0 {
-					i.srv.Disconnect(peerID, "no available slots")
-					return
-				}
+			initialized := atomic.LoadUint32(&i.initialized)
+			if initialized == 0 {
+				i.srv.Disconnect(peerID, "not ready")
+				return
 			}
 
+			// limit by MaxPeers on incomming/outgoing requests
+			if i.isPending(peerID) {
+				// handshake has already started
+				return
+			}
+
+			if i.srv.numOpenSlots() == 0 {
+				i.srv.Disconnect(peerID, "no available slots")
+				return
+			}
 			// pending of handshake
 			i.setPending(peerID)
 
@@ -94,6 +100,11 @@ func (i *identity) setup() {
 			}()
 		},
 	})
+}
+
+func (i *identity) start() error {
+	atomic.StoreUint32(&i.initialized, 1)
+	return nil
 }
 
 func (i *identity) getStatus() *proto.Status {

@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -10,19 +9,17 @@ import (
 
 // SecretsGenerate is the command to generate a secrets manager configuration
 type SecretsGenerate struct {
-	helper.Meta
+	helper.Base
 }
 
 const (
 	defaultNodeName       = "polygon-sdk-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
+	defaultNamespace = "admin"
 )
 
 func (s *SecretsGenerate) DefineFlags() {
-	if s.FlagMap == nil {
-		// Flag map not initialized
-		s.FlagMap = make(map[string]helper.FlagDescriptor)
-	}
+	s.Base.DefineFlags()
 
 	s.FlagMap["dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the directory for the secrets manager configuration file Default: %s", defaultConfigFileName),
@@ -60,6 +57,15 @@ func (s *SecretsGenerate) DefineFlags() {
 		FlagOptional:      false,
 	}
 
+	s.FlagMap["namespace"] = helper.FlagDescriptor{
+		Description: "Specifics the namespace for the service",
+		Arguments: []string{
+			"NAMESPACE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional: false,
+	}
+
 	s.FlagMap["name"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default: %s", defaultNodeName),
 		Arguments: []string{
@@ -93,18 +99,21 @@ func (s *SecretsGenerate) GetBaseCommand() string {
 
 // Run implements the cli.SecretsManagerGenerate interface
 func (s *SecretsGenerate) Run(args []string) int {
-	flags := flag.NewFlagSet(s.GetBaseCommand(), flag.ContinueOnError)
+	flags := s.Base.NewFlagSet(s.GetBaseCommand())
+
 	var path string
 	var token string
 	var serverURL string
 	var serviceType string
 	var name string
+	var namespace string
 
 	flags.StringVar(&path, "dir", defaultConfigFileName, "")
 	flags.StringVar(&token, "token", "", "")
 	flags.StringVar(&serverURL, "server-url", "", "")
 	flags.StringVar(&serviceType, "type", string(secrets.HashicorpVault), "")
 	flags.StringVar(&name, "name", defaultNodeName, "")
+	flags.StringVar(&namespace, "namespace", defaultNamespace, "")
 
 	if err := flags.Parse(args); err != nil {
 		s.UI.Error(err.Error())
@@ -143,6 +152,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		ServerURL: serverURL,
 		Type:      secrets.SecretsManagerType(serviceType),
 		Name:      name,
+		Namespace: namespace,
 		Extra:     nil,
 	}
 
@@ -159,6 +169,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		fmt.Sprintf("Server URL|%s", serverURL),
 		fmt.Sprintf("Access Token|%s", token),
 		fmt.Sprintf("Node Name|%s", name),
+		fmt.Sprintf("Namespace|%s", namespace),
 	})
 
 	output += "\n\nCONFIGURATION GENERATED"

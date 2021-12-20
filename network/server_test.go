@@ -380,7 +380,7 @@ func TestPeerReconnection(t *testing.T) {
 
 	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
 
-	//disconnect from the third second node
+	//disconnect from the third  node
 	disconnectedCh3 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
 	assert.NoError(t, srv2.Close())
 	assert.True(t, <-disconnectedCh3)
@@ -579,7 +579,8 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				c.Chain.Bootnodes = tt.bootNodes
 			})
 
-			_, err := NewServer(hclog.NewNullLogger(), cfg)
+			srv, _ := NewServer(hclog.NewNullLogger(), cfg)
+			err := srv.Start()
 			if tt.shouldFail {
 				assert.Error(t, err)
 			} else {
