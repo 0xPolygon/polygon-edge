@@ -258,6 +258,29 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 // from the associated account queue to the promoted queue.
 // Can only be invoked by handleAddRequest
 func (p *TxPool) handlePromoteRequest(req promoteRequest) {
+	addr := req.account
+
+	p.LockPromoted(true)
+	defer p.UnlockPromoted()
+
+	queue := p.lockAccountQueue(addr, true)
+	defer p.unlockAccountQueue(addr)
+
+	// fetch next expected nonce for this account
+	nextNonce, _ := p.nextNonces.load(addr)
+
+	// pop promotable txs
+	promotables, newNonce := queue.promote(nextNonce)
+
+	// push to promotables
+	p.promoted.push(promotables...)
+
+	// only update the nonce map if the new nonce
+	// is higher than the one previously stored.
+	// otherwise it means we just promoted a previously recovered tx
+	if newNonce > nextNonce {
+		p.nextNonces.store(addr, newNonce)
+	}
 }
 
 // handleResetRequest is called within ResetWithHeader
