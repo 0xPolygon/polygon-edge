@@ -538,7 +538,7 @@ func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
 	}
 }
 
-func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
+func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*types.Block)) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
 	if err != nil {
@@ -584,12 +584,14 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 				if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
 					return fmt.Errorf("failed to write bulk sync blocks: %v", err)
 				}
+
+				newBlocksHandler(slot.blocks)
 			}
 
 			// try to get the next block
 			startBlock = sk.LastHeader()
 
-			if startBlock.Number >= uint64(target) {
+			if startBlock.Number >= target {
 				break
 			}
 		}

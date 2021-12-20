@@ -568,7 +568,7 @@ func TestWriteTransactions(t *testing.T) {
 	}
 }
 
-func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *testing.T) {
+func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
 	m.setState(SyncState)
 	expectedNewBlockToSync := &types.Block{Header: &types.Header{Number: 1}}
@@ -588,12 +588,42 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *test
 	m.runSyncState()
 
 	assert.True(t, mockTxPool.resetWithHeaderCalled)
-	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeaderParam)
+	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeadersParam[0])
 	assert.True(t, mockSyncer.broadcastCalled)
 	assert.Equal(t, expectedNewBlockToSync, mockSyncer.broadcastedBlock)
 }
 
+func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
+	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
+	m.setState(SyncState)
+	expectedNewBlocksToSync := []*types.Block{
+		{Header: &types.Header{Number: 1}},
+		{Header: &types.Header{Number: 2}},
+		{Header: &types.Header{Number: 3}},
+	}
+	mockSyncer := &mockSyncer{}
+	mockSyncer.bulkSyncBocksFromPeer = expectedNewBlocksToSync
+	m.syncer = mockSyncer
+	mockTxPool := &mockTxPool{}
+	m.txpool = mockTxPool
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	assert.True(t, mockTxPool.resetWithHeaderCalled)
+	for i, expected := range expectedNewBlocksToSync {
+		assert.Equal(t, expected.Header, mockTxPool.resetWithHeadersParam[i])
+	}
+}
+
 type mockSyncer struct {
+	bulkSyncBocksFromPeer   []*types.Block
 	receivedNewHeadFromPeer *types.Block
 	broadcastedBlock        *types.Block
 	broadcastCalled         bool
@@ -605,12 +635,15 @@ func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
 	return &protocol.SyncPeer{}
 }
 
-func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer) error {
+func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(blocks []*types.Block)) error {
+	handler(s.bulkSyncBocksFromPeer)
 	return nil
 }
 
 func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool) {
-	handler(s.receivedNewHeadFromPeer)
+	if s.receivedNewHeadFromPeer != nil {
+		handler(s.receivedNewHeadFromPeer)
+	}
 }
 
 func (s *mockSyncer) Broadcast(b *types.Block) {
@@ -622,12 +655,12 @@ type mockTxPool struct {
 	transactions          []*types.Transaction
 	nonceDecreased        map[*types.Transaction]bool
 	resetWithHeaderCalled bool
-	resetWithHeaderParam  *types.Header
+	resetWithHeadersParam []*types.Header
 }
 
-func (p *mockTxPool) ResetWithHeader(h *types.Header) {
+func (p *mockTxPool) ResetWithHeaders(headers ...*types.Header) {
 	p.resetWithHeaderCalled = true
-	p.resetWithHeaderParam = h
+	p.resetWithHeadersParam = headers
 }
 
 func (p *mockTxPool) Pop() (*types.Transaction, func()) {

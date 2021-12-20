@@ -317,22 +317,25 @@ func TestBulkSyncWithPeer(t *testing.T) {
 		headers     []*types.Header
 		peerHeaders []*types.Header
 		// result
-		synced bool
-		err    error
+		shouldSync    bool
+		syncFromBlock int
+		err           error
 	}{
 		{
-			name:        "should sync until peer's latest block",
-			headers:     blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			synced:      true,
-			err:         nil,
+			name:          "should sync until peer's latest block",
+			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 30, 0),
+			shouldSync:    true,
+			syncFromBlock: 10,
+			err:           nil,
 		},
 		{
-			name:        "should sync until peer's latest block",
-			headers:     blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			peerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			synced:      false,
-			err:         errors.New("fork not found"),
+			name:          "shouldn't sync if peer's latest block is behind",
+			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
+			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			shouldSync:    false,
+			syncFromBlock: 0,
+			err:           errors.New("fork not found"),
 		},
 	}
 
@@ -341,17 +344,27 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
+			var handledNewBlocks []*types.Block
+			newBlocksHandler := func(blocks []*types.Block) {
+				handledNewBlocks = append(handledNewBlocks, blocks...)
+			}
 
 			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
 			assert.NotNil(t, peer)
 
-			err := syncer.BulkSyncWithPeer(peer)
+			err := syncer.BulkSyncWithPeer(peer, newBlocksHandler)
 			assert.Equal(t, tt.err, err)
 			WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)
 
-			expectedStatus := HeaderToStatus(tt.headers[len(tt.headers)-1])
-			if tt.synced {
+			var expectedStatus *Status
+			if tt.shouldSync {
 				expectedStatus = HeaderToStatus(tt.peerHeaders[len(tt.peerHeaders)-1])
+				assert.Equal(t, handledNewBlocks, peerChain.blocks[tt.syncFromBlock:], "not all blocks are handled")
+				assert.Equal(t, peerChain.blocks, chain.blocks, "chain is not synced")
+			} else {
+				expectedStatus = HeaderToStatus(tt.headers[len(tt.headers)-1])
+				assert.NotEqual(t, handledNewBlocks, peerChain.blocks[tt.syncFromBlock:])
+				assert.NotEqual(t, peerChain.blocks, chain.blocks)
 			}
 			assert.Equal(t, expectedStatus, syncer.status)
 		})
