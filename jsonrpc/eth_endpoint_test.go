@@ -400,15 +400,12 @@ func TestEth_Block_GetLogs(t *testing.T) {
 			Transactions: []*types.Transaction{
 				{
 					Value: big.NewInt(10),
-					V:     []byte{1},
 				},
 				{
 					Value: big.NewInt(11),
-					V:     []byte{2},
 				},
 				{
 					Value: big.NewInt(12),
-					V:     []byte{3},
 				},
 			},
 		})
