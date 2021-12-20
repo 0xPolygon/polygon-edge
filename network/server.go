@@ -47,6 +47,7 @@ type Config struct {
 	MaxPeers       uint64
 	Chain          *chain.Chain
 	SecretsManager secrets.SecretsManager
+	Metrics        *Metrics
 }
 
 func DefaultConfig() *Config {
@@ -68,6 +69,8 @@ type Server struct {
 
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
+
+	metrics *Metrics
 
 	dialQueue *dialQueue
 
@@ -174,6 +177,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		host:             host,
 		addrs:            host.Addrs(),
 		peers:            map[peer.ID]*Peer{},
+		metrics:          config.Metrics,
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -370,6 +374,7 @@ func (s *Server) addPeer(id peer.ID) {
 	s.peers[id] = p
 
 	s.emitEvent(id, PeerConnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -382,6 +387,7 @@ func (s *Server) delPeer(id peer.ID) {
 	s.host.Network().ClosePeer(id)
 
 	s.emitEvent(id, PeerDisconnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {

@@ -110,6 +110,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 		netConfig.SecretsManager = m.secretsManager
+		netConfig.Metrics = m.serverMetrics.network
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
