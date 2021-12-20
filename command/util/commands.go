@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/loadbot"
 	"github.com/0xPolygon/polygon-sdk/command/monitor"
 	"github.com/0xPolygon/polygon-sdk/command/peers"
+	"github.com/0xPolygon/polygon-sdk/command/restore"
 	"github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
 	"github.com/0xPolygon/polygon-sdk/command/status"
@@ -40,6 +41,7 @@ func Commands() map[string]cli.CommandFactory {
 	statusCmd := status.StatusCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
 	backupCmd := backup.BackupCommand{Base: base, Formatter: formatter, GRPC: grpc}
+	restoreCmd := restore.RestoreCommand{Base: base, Formatter: formatter}
 
 	ibftCmd := ibft.IbftCommand{}
 	ibftCandidatesCmd := ibft.IbftCandidates{Base: base, Formatter: formatter, GRPC: grpc}
@@ -134,6 +136,9 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		backupCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &backupCmd, nil
+		},
+		restoreCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &restoreCmd, nil
 		},
 
 		// SECRETS MANAGER COMMANDS //

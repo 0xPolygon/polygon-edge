@@ -2,15 +2,10 @@ package backup
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -24,11 +19,10 @@ type BackupCommand struct {
 func (c *BackupCommand) DefineFlags() {
 	c.Base.DefineFlags(c.Formatter, c.GRPC)
 
-	// TODO: description
-	c.FlagMap["out"] = helper.FlagDescriptor{
+	c.FlagMap["data"] = helper.FlagDescriptor{
 		Description: "Filepath the path to save the backup",
 		Arguments: []string{
-			"OUT",
+			"BACKUP_FILE",
 		},
 		ArgumentsOptional: false,
 	}
@@ -52,7 +46,7 @@ func (c *BackupCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *BackupCommand) GetHelperText() string {
-	return "Fetch blockchain data from node and save to a file"
+	return "Create blockchain backup data by fetching from running node"
 }
 
 func (c *BackupCommand) GetBaseCommand() string {
@@ -111,7 +105,13 @@ func (c *BackupCommand) Run(args []string) int {
 		to = parsedTo
 	}
 
-	res, err := c.fetchAndSaveBackup(out, from, to)
+	conn, err := c.GRPC.Conn()
+	if err != nil {
+		c.Formatter.OutputError(err)
+		return 1
+	}
+
+	res, err := fetchAndSaveBackup(conn, from, to, out)
 	if err != nil {
 		c.Formatter.OutputError(err)
 		return 1
@@ -119,104 +119,6 @@ func (c *BackupCommand) Run(args []string) int {
 	c.Formatter.OutputResult(res)
 
 	return 0
-}
-
-func (c *BackupCommand) fetchAndSaveBackup(outPath string, from, to uint64) (*BackupResult, error) {
-	// always create new file, throw error if the file exists
-	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := c.GRPC.Conn()
-	if err != nil {
-		return nil, err
-	}
-
-	clt := proto.NewSystemClient(conn)
-	ctx, cancelFn := context.WithCancel(context.Background())
-	defer cancelFn()
-
-	stream, err := clt.Export(ctx, &proto.ExportRequest{
-		From: from,
-		To:   to,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	resCh, errCh := processExportStream(stream, fs)
-
-	var res *BackupResult
-	select {
-	case res = <-resCh:
-	case err = <-errCh:
-	}
-
-	fs.Close()
-	if err != nil {
-		os.Remove(outPath)
-	}
-
-	return res, err
-}
-
-func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan *BackupResult, <-chan error) {
-	resCh := make(chan *BackupResult, 1)
-	errCh := make(chan error, 1)
-
-	signalCh := common.GetTerminationSignalCh()
-
-	go func() {
-		defer close(resCh)
-		defer close(errCh)
-
-		var from, to *uint64
-		returnResult := func() {
-			if from == nil || to == nil {
-				errCh <- errors.New("couldn't fetch any block")
-			} else {
-				resCh <- &BackupResult{
-					From: *from,
-					To:   *to,
-					Out:  fs.Name(),
-				}
-			}
-		}
-
-		for {
-			evnt, err := stream.Recv()
-			if err == io.EOF {
-				returnResult()
-				return
-			}
-			if err != nil {
-				errCh <- err
-				return
-			}
-
-			// write data
-			if _, err := fs.Write(evnt.Data); err != nil {
-				errCh <- err
-			}
-
-			// update result
-			if from == nil {
-				from = &evnt.From
-			}
-			to = &evnt.To
-
-			// finish in the middle if received termination signal
-			select {
-			case <-signalCh:
-				returnResult()
-				return
-			default:
-			}
-		}
-	}()
-
-	return resCh, errCh
 }
 
 type BackupResult struct {
@@ -229,7 +131,7 @@ func (r *BackupResult) Output() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[BACKUP]\n")
-	buffer.WriteString("Successfully saved backup:\n")
+	buffer.WriteString("Exported backup file successfully:\n")
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("File|%s", r.Out),
 		fmt.Sprintf("From|%d", r.From),
