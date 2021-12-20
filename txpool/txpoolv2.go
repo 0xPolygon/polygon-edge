@@ -287,6 +287,16 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 // and aligns the pool's state for all accounts by pruning
 // stale transactions from all queues in the pool.
 func (p *TxPool) handleResetRequest(req resetRequest) {
+	p.LockPromoted(true)
+	defer p.UnlockPromoted()
+
+	newNonces := req.newNonces
+
+	pruned := p.prunePromoted(newNonces)
+	p.logger.Debug("pruned", pruned, "transactions from promoted queue.")
+
+	pruned = p.pruneEnqueued(newNonces)
+	p.logger.Debug("pruned", pruned, "transactions from all enqueued.")
 }
 
 func (p *TxPool) AddSigner(s signer) {
@@ -349,6 +359,9 @@ func (p *TxPool) RollbackNonce(tx *types.Transaction) {
 // its own state with the new one so it can correctly process
 // further incoming transactions.
 func (p *TxPool) ResetWithHeader(h *types.Header) {
+	// ... todo
+
+	p.handleResetRequest(resetRequest{})
 }
 
 // validateTx ensures that the transaction conforms
