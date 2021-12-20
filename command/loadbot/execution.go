@@ -39,7 +39,8 @@ type Configuration struct {
 
 type ExecDuration struct {
 	// turnAroundMap maps the transaction hash -> turn around time for passing transactions
-	turnAroundMap map[web3.Hash]time.Duration
+	turnAroundMap     sync.Map
+	turnAroundMapSize uint64
 
 	// Arrival Time - Time at which the transaction is added
 	// Completion Time -Time at which the transaction is sealed
@@ -63,7 +64,7 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	// Set the initial values
 	fastestTurnAround := defaultFastestTurnAround
 	slowestTurnAround := defaultSlowestTurnAround
-	totalPassing := len(ed.turnAroundMap)
+	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
 	var zeroTime time.Time  // Zero time
 	var totalTime time.Time // Zero time used for tracking
 
@@ -77,7 +78,8 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 		return
 	}
 
-	for _, turnAroundTime := range ed.turnAroundMap {
+	ed.turnAroundMap.Range(func(_, value interface{}) bool {
+		turnAroundTime := value.(time.Duration)
 		if turnAroundTime < fastestTurnAround {
 			fastestTurnAround = turnAroundTime
 		}
@@ -87,7 +89,9 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 		}
 
 		totalTime = totalTime.Add(turnAroundTime)
-	}
+
+		return true
+	})
 
 	averageDuration := (totalTime.Sub(zeroTime)) / time.Duration(totalPassing)
 
@@ -102,7 +106,8 @@ func (ed *ExecDuration) reportTurnAroundTime(
 	txHash web3.Hash,
 	turnAroundTime time.Duration,
 ) {
-	ed.turnAroundMap[txHash] = turnAroundTime
+	ed.turnAroundMap.Store(txHash, turnAroundTime)
+	atomic.AddUint64(&ed.turnAroundMapSize, 1)
 }
 
 // setTotalExecTime sets the total execution time for a single loadbot run

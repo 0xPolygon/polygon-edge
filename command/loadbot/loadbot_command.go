@@ -6,9 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/umbracle/go-web3"
 	"net/url"
-	"time"
 )
 
 type LoadbotCommand struct {
@@ -154,9 +152,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	metrics := &Metrics{
 		TotalTransactionsSentCount: 0,
 		FailedTransactionsCount:    0,
-		TransactionDuration: ExecDuration{
-			turnAroundMap: make(map[web3.Hash]time.Duration),
-		},
+		TransactionDuration:        ExecDuration{},
 	}
 
 	// create a loadbot instance

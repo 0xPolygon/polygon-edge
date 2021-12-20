@@ -1,0 +1,9 @@
+
+[LOADBOT RUN]
+Transactions submitted          = 3000
+Transactions failed             = 0
+Average transaction turn around = 10.566350s
+Fastest transaction turn around = 3.002400s
+Slowest transaction turn around = 18.038170s
+Total loadbot execution time    = 33.031790s
+
