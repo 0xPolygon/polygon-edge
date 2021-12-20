@@ -9,6 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func fetchAndSaveBackup(conn *grpc.ClientConn, from, to uint64, outPath string) (*BackupResult, error) {
@@ -18,10 +20,15 @@ func fetchAndSaveBackup(conn *grpc.ClientConn, from, to uint64, outPath string) 
 		return nil, err
 	}
 
-	clt := proto.NewSystemClient(conn)
+	signalCh := common.GetTerminationSignalCh()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn()
+	go func() {
+		<-signalCh
+		cancelFn()
+	}()
 
+	clt := proto.NewSystemClient(conn)
 	stream, err := clt.Export(ctx, &proto.ExportRequest{
 		From: from,
 		To:   to,
@@ -30,70 +37,45 @@ func fetchAndSaveBackup(conn *grpc.ClientConn, from, to uint64, outPath string) 
 		return nil, err
 	}
 
-	res := <-processExportStream(stream, fs)
+	resFrom, resTo, err := processExportStream(stream, fs)
 
 	fs.Close()
-	if res.err != nil {
+	if err != nil {
 		os.Remove(outPath)
 		return nil, err
 	}
 
-	return &BackupResult{From: *res.from, To: *res.to, Out: fs.Name()}, nil
+	return &BackupResult{From: *resFrom, To: *resTo, Out: fs.Name()}, nil
 }
 
-type processExportStreamResult struct {
-	from *uint64
-	to   *uint64
-	err  error
-}
+func processExportStream(stream proto.System_ExportClient, writer io.Writer) (*uint64, *uint64, error) {
+	var from, to *uint64
+	getResult := func() (*uint64, *uint64, error) {
+		if from == nil || to == nil {
+			return nil, nil, errors.New("couldn't get any blocks")
+		} else {
+			return from, to, nil
+		}
+	}
 
-func processExportStream(stream proto.System_ExportClient, writer io.Writer) <-chan processExportStreamResult {
-	resCh := make(chan processExportStreamResult, 1)
-	signalCh := common.GetTerminationSignalCh()
-
-	go func() {
-		defer close(resCh)
-
-		var from, to *uint64
-		returnResult := func() {
-			if from == nil || to == nil {
-				resCh <- processExportStreamResult{nil, nil, errors.New("couldn't fetch any block")}
-			} else {
-				resCh <- processExportStreamResult{from, to, nil}
-			}
+	for {
+		evnt, err := stream.Recv()
+		if err == io.EOF || status.Code(err) == codes.Canceled {
+			return getResult()
+		}
+		if err != nil {
+			return nil, nil, err
 		}
 
-		for {
-			evnt, err := stream.Recv()
-			if err == io.EOF {
-				returnResult()
-				return
-			}
-			if err != nil {
-				resCh <- processExportStreamResult{nil, nil, err}
-				return
-			}
-
-			// write data
-			if _, err := writer.Write(evnt.Data); err != nil {
-				resCh <- processExportStreamResult{nil, nil, err}
-			}
-
-			// update result
-			if from == nil {
-				from = &evnt.From
-			}
-			to = &evnt.To
-
-			// finish in the middle if received termination signal
-			select {
-			case <-signalCh:
-				returnResult()
-				return
-			default:
-			}
+		// write data
+		if _, err := writer.Write(evnt.Data); err != nil {
+			return nil, nil, err
 		}
-	}()
 
-	return resCh
+		// update result
+		if from == nil {
+			from = &evnt.From
+		}
+		to = &evnt.To
+	}
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -140,29 +139,25 @@ func Test_processExportStream(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buffer bytes.Buffer
-			select {
-			case res := <-processExportStream(tt.mockSystemExportClient, &buffer):
-				assert.Equal(t, tt.err, res.err)
-				if res.err != nil {
-					return
-				}
+			from, to, err := processExportStream(tt.mockSystemExportClient, &buffer)
 
-				assert.Equal(t, tt.from, *res.from)
-				assert.Equal(t, tt.to, *res.to)
-
-				// create expected data
-				expectedData := make([]byte, 0)
-				for _, rv := range tt.mockSystemExportClient.recvs {
-					if rv.err != nil {
-						break
-					}
-					expectedData = append(expectedData, rv.event.Data...)
-				}
-				assert.Equal(t, expectedData, buffer.Bytes())
-			case <-time.After(5 * time.Second):
-				t.Fatal(errors.New("timeout"))
+			assert.Equal(t, tt.err, err)
+			if err != nil {
+				return
 			}
 
+			assert.Equal(t, tt.from, *from)
+			assert.Equal(t, tt.to, *to)
+
+			// create expected data
+			expectedData := make([]byte, 0)
+			for _, rv := range tt.mockSystemExportClient.recvs {
+				if rv.err != nil {
+					break
+				}
+				expectedData = append(expectedData, rv.event.Data...)
+			}
+			assert.Equal(t, expectedData, buffer.Bytes())
 		})
 	}
 }
