@@ -196,6 +196,18 @@ func NewTxPool(
 }
 
 func (p *TxPool) Start() {
+	go func() {
+		for {
+			select {
+			case req := <-p.addReqCh:
+				go p.handleAddRequest(req)
+			case req := <-p.promoteReqCh:
+				go p.handlePromoteRequest(req)
+			case req := <-p.resetReqCh:
+				go p.handleResetRequest(req)
+			}
+		}
+	}()
 }
 
 // handleAddRequest is invoked when a new transaction is received
