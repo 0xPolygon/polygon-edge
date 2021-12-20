@@ -34,7 +34,6 @@ type Config struct {
 	DevInterval    uint64                 `json:"dev_interval"`
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
-	Import         string                 `json:"import"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -175,10 +174,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		conf.Chain.Params.BlockGasTarget = value.Uint64()
 	}
 
-	if c.Import != "" {
-		conf.Import = &c.Import
-	}
-
 	// if we are in dev mode, change the consensus protocol with 'dev'
 	// and disable discovery of other nodes
 	// TODO: Disable networking altogether.
@@ -298,10 +293,6 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	// Read the secrets config file location
 	if otherConfig.Secrets != "" {
 		c.Secrets = otherConfig.Secrets
-	}
-
-	if otherConfig.Import != "" {
-		c.Import = otherConfig.Import
 	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {

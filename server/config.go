@@ -28,7 +28,6 @@ type Config struct {
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
-	Import         *string
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
@@ -39,7 +38,6 @@ func DefaultConfig() *Config {
 		Network:        network.DefaultConfig(),
 		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
-		Import:         nil,
 	}
 }
 

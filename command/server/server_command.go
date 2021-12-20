@@ -201,15 +201,6 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
-
-	c.FlagMap["import"] = helper.FlagDescriptor{
-		Description: "Sets the blockchain data to import before starting the server",
-		Arguments: []string{
-			"IMPORT",
-		},
-		ArgumentsOptional: false,
-		FlagOptional:      true,
-	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -246,6 +237,7 @@ func (c *ServerCommand) Run(args []string) int {
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
+
 	}
 
 	logger := hclog.New(&hclog.LoggerOptions{
@@ -257,6 +249,7 @@ func (c *ServerCommand) Run(args []string) int {
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
+
 	}
 
 	if conf.Join != "" {
