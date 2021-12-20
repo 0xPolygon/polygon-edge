@@ -58,6 +58,7 @@ func Factory(
 	return d, nil
 }
 
+// Initialize initializes the consensus
 func (d *Dev) Initialize() error {
 	return nil
 }

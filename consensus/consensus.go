@@ -24,10 +24,10 @@ type Consensus interface {
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
-	// Initialize initializes some setting before starting the consensus
+	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error
 
-	// Start starts the consensus
+	// Start starts the consensus and servers
 	Start() error
 
 	// Close closes the connection

@@ -37,6 +37,7 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 	return d, nil
 }
 
+// Initialize initializes the consensus
 func (d *Dummy) Initialize() error {
 	return nil
 }
