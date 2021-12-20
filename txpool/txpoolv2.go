@@ -336,7 +336,16 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 // Pop() removes the highest priced transaction from the promoted queue.
 // Assumes the lock is held.
 func (p *TxPool) Pop() *types.Transaction {
-	return nil
+	tx := p.promoted.pop()
+	if tx == nil {
+		return nil
+	}
+
+	// update state
+	p.gauge.decrease(slotsRequired(tx))
+	p.index.remove(tx)
+
+	return tx
 }
 
 // Recover is called within ibft for all transactions
@@ -344,6 +353,7 @@ func (p *TxPool) Pop() *types.Transaction {
 // at the given time. Issues an addRequest to the pool
 // indicating a transaction is returning to it.
 func (p *TxPool) Recover(tx *types.Transaction) {
+	p.addReqCh <- addRequest{tx: tx, returnee: true}
 }
 
 // Rollback is called within ibft for any transactions
@@ -352,6 +362,12 @@ func (p *TxPool) Recover(tx *types.Transaction) {
 // must not be processed before the unrecoverable one
 // is re-sent again.
 func (p *TxPool) RollbackNonce(tx *types.Transaction) {
+	if nextNonce, ok := p.nextNonces.load(tx.From); ok && nextNonce < tx.Nonce {
+		// already did rollback
+		return
+	}
+
+	p.nextNonces.store(tx.From, tx.Nonce)
 }
 
 // ResetWithHeader is called from within ibft when the node
