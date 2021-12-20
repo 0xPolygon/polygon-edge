@@ -123,6 +123,6 @@ docker_manifests:
 
 announce:
   slack:
-    enabled: false
+    enabled: true
     # The name of the channel that the user selected as a destination for webhook messages.
-    channel: '#code-releases'
+    channel: "{{ .Env.SLACK_CHANNEL }}"
