@@ -15,6 +15,7 @@ type SecretsGenerate struct {
 const (
 	defaultNodeName       = "polygon-sdk-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
+	defaultNamespace = "admin"
 )
 
 func (s *SecretsGenerate) DefineFlags() {
@@ -54,6 +55,15 @@ func (s *SecretsGenerate) DefineFlags() {
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
+	}
+
+	s.FlagMap["namespace"] = helper.FlagDescriptor{
+		Description: "Specifics the namespace for the service",
+		Arguments: []string{
+			"NAMESPACE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional: false,
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{
@@ -96,12 +106,14 @@ func (s *SecretsGenerate) Run(args []string) int {
 	var serverURL string
 	var serviceType string
 	var name string
+	var namespace string
 
 	flags.StringVar(&path, "dir", defaultConfigFileName, "")
 	flags.StringVar(&token, "token", "", "")
 	flags.StringVar(&serverURL, "server-url", "", "")
 	flags.StringVar(&serviceType, "type", string(secrets.HashicorpVault), "")
 	flags.StringVar(&name, "name", defaultNodeName, "")
+	flags.StringVar(&namespace, "namespace", defaultNamespace, "")
 
 	if err := flags.Parse(args); err != nil {
 		s.UI.Error(err.Error())
@@ -140,6 +152,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		ServerURL: serverURL,
 		Type:      secrets.SecretsManagerType(serviceType),
 		Name:      name,
+		Namespace: namespace,
 		Extra:     nil,
 	}
 
@@ -156,6 +169,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		fmt.Sprintf("Server URL|%s", serverURL),
 		fmt.Sprintf("Access Token|%s", token),
 		fmt.Sprintf("Node Name|%s", name),
+		fmt.Sprintf("Namespace|%s", namespace),
 	})
 
 	output += "\n\nCONFIGURATION GENERATED"
