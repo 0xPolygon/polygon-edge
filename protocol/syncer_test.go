@@ -528,7 +528,7 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	// Start the syncers
 	for _, syncer := range syncers {
-		go syncer.Start()
+		syncer.Start()
 	}
 
 	network.MultiJoin(
