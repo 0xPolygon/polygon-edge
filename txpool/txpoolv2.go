@@ -1,7 +1,9 @@
 package txpool
 
 import (
+	"container/heap"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -47,39 +49,6 @@ type store interface {
 
 type signer interface {
 	Sender(tx *types.Transaction) (types.Address, error)
-}
-
-// Gauge for measuring pool capacity in slots
-type slotGauge struct {
-	height uint64
-	max    uint64
-}
-
-// slotsRequired calculates the number of slots required for given transaction(s)
-func slotsRequired(txs ...*types.Transaction) uint64 {
-	slots := uint64(0)
-	for _, tx := range txs {
-		slots += func(tx *types.Transaction) uint64 {
-			return (tx.Size() + txSlotSize - 1) / txSlotSize
-		}(tx)
-	}
-
-	return slots
-}
-
-// Returns the current height of the gauge
-func (g *slotGauge) read() uint64 {
-	return atomic.LoadUint64(&g.height)
-}
-
-// Increases the height of the gauge by the specified slots amount
-func (g *slotGauge) increase(slots uint64) {
-	atomic.AddUint64(&g.height, slots)
-}
-
-// Decreases the height of the gauge by the specified slots amount
-func (g *slotGauge) decrease(slots uint64) {
-	atomic.AddUint64(&g.height, ^(slots - 1))
 }
 
 type Config struct {
@@ -293,24 +262,6 @@ func (p *TxPool) RollbackNonce(tx *types.Transaction) {
 func (p *TxPool) ResetWithHeader(h *types.Header) {
 }
 
-func (p *TxPool) LockPromoted(write bool) {
-}
-
-func (p *TxPool) UnlockPromoted() {
-}
-
-// prunePromoted cleans out any transactions from the promoted queue
-// considered stale by the given nonceMap.
-func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
-	return 0
-}
-
-// pruneEnqueued cleans out any transactions from the accouunt queues
-// considered stale by the given nonceMap.
-func (p *TxPool) pruneEnqueued(nonceMap map[types.Address]uint64) uint64 {
-	return 0
-}
-
 // validateTx ensures that the transaction conforms
 // to specific constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
@@ -360,20 +311,155 @@ func (t *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 
 /* end of QUERY methods */
 
+// prunePromoted cleans out any transactions from the promoted queue
+// considered stale by the given nonceMap.
+func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
+	var pruned transactions // removed txs
+	var valid transactions  // valid txs
+
+	for {
+		next := p.promoted.peek()
+		if next == nil {
+			break
+		}
+
+		tx := p.promoted.pop()
+		_, ok := p.nextNonces.load(tx.From)
+		if !ok {
+			// pool knows nothing of this address
+			// so there can't be anything to reset
+			valid = append(valid, tx)
+			continue
+		}
+
+		if tx.Nonce > nonceMap[tx.From] {
+			valid = append(valid, tx)
+		} else {
+			pruned = append(pruned, tx)
+		}
+	}
+
+	// remove from index
+	p.index.remove(pruned...)
+
+	// free up slots
+	p.gauge.decrease(slotsRequired(pruned...))
+
+	// reinsert valid txs
+	p.promoted.push(valid...)
+
+	return uint64(len(pruned))
+}
+
+// pruneEnqueued cleans out any transactions from the accouunt queues
+// considered stale by the given nonceMap.
+func (p *TxPool) pruneEnqueued(nonceMap map[types.Address]uint64) uint64 {
+	var wg sync.WaitGroup
+	var totalPruned uint64
+
+	for addr, nonce := range nonceMap {
+		if _, ok := p.nextNonces.load(addr); !ok {
+			// pool knows nothing of this address
+			// so there can't be anything to reset
+			continue
+		}
+
+		wg.Add(1)
+		go func(addr types.Address, nonce uint64) {
+			defer wg.Done()
+			queue := p.lockAccountQueue(addr, true)
+			defer p.unlockAccountQueue(addr)
+
+			// pruneLowNonce account
+			pruned := queue.pruneLowNonce(nonce)
+
+			atomic.AddUint64(&totalPruned, uint64(len(pruned)))
+
+			p.logger.Debug(
+				fmt.Sprintf(
+					"pruned %d stale transactions from account queue. (addr: %s)",
+					len(pruned),
+					addr.String(),
+				),
+			)
+
+			// free up slots
+			p.gauge.decrease(slotsRequired(pruned...))
+
+			// remove from index
+			p.index.remove(pruned...)
+
+			// update next nonce
+			p.nextNonces.store(addr, nonce)
+
+		}(addr, nonce)
+		wg.Wait()
+	}
+
+	return totalPruned
+}
+
 // createAccountOnce is used when discovering an address
 // of a received transaction for the first time.
 // This function ensures that the account queue and its corresponding lock
 // are  created safely and only once.
 func (p *TxPool) createAccountOnce(newAddr types.Address) {
+	q, _ := p.enqueued.LoadOrStore(newAddr, &accountQueue{})
+	queue := q.(*accountQueue)
+
+	// run only once per queue creation
+	queue.initFunc.Do(func() {
+		heap.Init(&queue.txs)
+
+		// update nonce map
+		stateRoot := p.store.Header().StateRoot
+		nextNonce := p.store.GetNonce(stateRoot, newAddr)
+		p.nextNonces.store(newAddr, nextNonce)
+	})
 }
 
 // lockAccountQueue locks the account queue of the given address
 func (p *TxPool) lockAccountQueue(addr types.Address, write bool) *accountQueue {
-	return nil
+	queue := p.enqueued.from(addr)
+	if write {
+		queue.Lock()
+		atomic.StoreUint32(&queue.wLock, 1)
+	} else {
+		queue.RLock()
+		atomic.StoreUint32(&queue.wLock, 0)
+	}
+
+	return queue
 }
 
 // unlockAccountQueue unlock the account queue of the given address
 func (p *TxPool) unlockAccountQueue(addr types.Address) {
+	// Grab the previous lock type and reset it
+	queue := p.enqueued.from(addr)
+	if atomic.SwapUint32(&queue.wLock, 0) == 1 {
+		queue.Unlock()
+	} else {
+		queue.RUnlock()
+	}
+}
+
+func (p *TxPool) LockPromoted(write bool) {
+	if write {
+		p.promoted.Lock()
+		atomic.StoreUint32(&p.promoted.wLock, 1)
+	} else {
+		p.promoted.RLock()
+		atomic.StoreUint32(&p.promoted.wLock, 0)
+	}
+}
+
+func (p *TxPool) UnlockPromoted() {
+	// Grab the previous lock type and reset it
+	if atomic.SwapUint32(&p.promoted.wLock, 0) == 1 {
+		p.promoted.Unlock()
+	} else {
+		p.promoted.RUnlock()
+	}
 }
 
 // status represents a transaction's pending state.
@@ -398,13 +484,44 @@ type lookupMap struct {
 }
 
 func (m *lookupMap) add(status status, txs ...*types.Transaction) {
+	m.Lock()
+	defer m.Unlock()
+
+	switch status {
+	case enqueued:
+		for _, tx := range txs {
+			m.all[tx.Hash] = statusTx{tx, false}
+		}
+	case promoted:
+		for _, tx := range txs {
+			m.all[tx.Hash] = statusTx{tx, true}
+		}
+	}
 }
 
 func (m *lookupMap) remove(txs ...*types.Transaction) {
+	m.Lock()
+	defer m.Unlock()
+
+	for _, tx := range txs {
+		if _, ok := m.all[tx.Hash]; !ok {
+			// log err
+			continue
+		}
+		delete(m.all, tx.Hash)
+	}
 }
 
 func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
-	return nil, false
+	m.RLock()
+	defer m.RUnlock()
+
+	stx, ok := m.all[hash]
+	if !ok {
+		return nil, false
+	}
+
+	return stx.tx, true
 }
 
 // Map of expected nonces for all (known) accounts
@@ -413,10 +530,16 @@ type nonceMap struct {
 }
 
 func (m *nonceMap) load(addr types.Address) (uint64, bool) {
-	return 0, false
+	nonce, ok := m.Load(addr)
+	if !ok {
+		return 0, false
+	}
+
+	return nonce.(uint64), ok
 }
 
 func (m *nonceMap) store(addr types.Address, nonce uint64) {
+	m.Store(addr, nonce)
 }
 
 // Thread safe map of all account queue registered by the pool
@@ -426,10 +549,15 @@ type accountsMap struct {
 
 // from returns the account queue of the gives address
 func (m *accountsMap) from(addr types.Address) *accountQueue {
-	return nil
+	queue, ok := m.Load(addr)
+	if !ok {
+		return nil
+	}
+
+	return queue.(*accountQueue)
 }
 
-// TODO
+/* account queue impl */
 type accountQueue struct {
 	sync.RWMutex
 	initFunc sync.Once
@@ -439,27 +567,73 @@ type accountQueue struct {
 }
 
 func (q *accountQueue) push(txs ...*types.Transaction) {
+	for _, tx := range txs {
+		heap.Push(&q.txs, tx)
+	}
 }
 
 func (q *accountQueue) pop() *types.Transaction {
-	return nil
+	if q.length() == 0 {
+		return nil
+	}
+
+	return heap.Pop(&q.txs).(*types.Transaction)
 }
 
 func (q *accountQueue) peek() *types.Transaction {
-	return nil
+	if q.length() == 0 {
+		return nil
+	}
+
+	return q.txs[0]
 }
 
 func (q *accountQueue) length() uint64 {
-	return 0
+	return uint64(len(q.txs))
 }
 
 func (q *accountQueue) promote(nonce uint64) (transactions, uint64) {
-	return nil, 0
+	tx := q.peek()
+
+	if tx == nil ||
+		tx.Nonce > nonce {
+		return nil, 0
+	}
+
+	var promotables transactions
+	nextNonce := tx.Nonce
+	for {
+		tx := q.peek()
+		if tx == nil ||
+			tx.Nonce != nextNonce {
+			break
+		}
+
+		tx = q.pop() // safe to pop
+
+		promotables = append(promotables, tx)
+		nextNonce += 1
+	}
+
+	return promotables, nextNonce
 }
 
 func (q *accountQueue) pruneLowNonce(nonce uint64) transactions {
-	return nil
+	var pruned transactions
+	for {
+		if next := q.peek(); next == nil ||
+			next.Nonce > nonce {
+			break
+		}
+
+		tx := q.pop()
+		pruned = append(pruned, tx)
+	}
+
+	return pruned
 }
+
+/* promoted queue impl */
 
 type promotedQueue struct {
 	sync.RWMutex
@@ -469,22 +643,72 @@ type promotedQueue struct {
 }
 
 func newPromotedQueue(logger hclog.Logger) *promotedQueue {
-	return nil
+	q := &promotedQueue{
+		txs:    maxPriceQueue{},
+		logger: logger,
+	}
+
+	heap.Init(&q.txs)
+	return q
 }
 
 func (q *promotedQueue) push(txs ...*types.Transaction) {
+	for _, tx := range txs {
+		heap.Push(&q.txs, tx)
+	}
 }
 
 func (q *promotedQueue) peek() *types.Transaction {
-	return nil
+	if q.length() == 0 {
+		return nil
+	}
+
+	return q.txs[0]
 }
 
 func (q *promotedQueue) pop() *types.Transaction {
-	return nil
+	if q.length() == 0 {
+		return nil
+	}
+
+	return heap.Pop(&q.txs).(*types.Transaction)
 }
 
 func (q *promotedQueue) length() uint64 {
-	return 0
+	return uint64(len(q.txs))
+}
+
+// Gauge for measuring pool capacity in slots
+type slotGauge struct {
+	height uint64
+	max    uint64
+}
+
+// slotsRequired calculates the number of slots required for given transaction(s)
+func slotsRequired(txs ...*types.Transaction) uint64 {
+	slots := uint64(0)
+	for _, tx := range txs {
+		slots += func(tx *types.Transaction) uint64 {
+			return (tx.Size() + txSlotSize - 1) / txSlotSize
+		}(tx)
+	}
+
+	return slots
+}
+
+// Returns the current height of the gauge
+func (g *slotGauge) read() uint64 {
+	return atomic.LoadUint64(&g.height)
+}
+
+// Increases the height of the gauge by the specified slots amount
+func (g *slotGauge) increase(slots uint64) {
+	atomic.AddUint64(&g.height, slots)
+}
+
+// Decreases the height of the gauge by the specified slots amount
+func (g *slotGauge) decrease(slots uint64) {
+	atomic.AddUint64(&g.height, ^(slots - 1))
 }
 
 /* queue implementations */
@@ -494,47 +718,71 @@ type transactions []*types.Transaction
 type minNonceQueue transactions
 
 func (q *minNonceQueue) Peek() *types.Transaction {
-	return nil
+	if len(*q) == 0 {
+		return nil
+	}
+
+	return (*q)[0]
 }
 
 func (q *minNonceQueue) Len() int {
-	return 0
+	return len(*q)
 }
 
 func (q *minNonceQueue) Swap(i, j int) {
+	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
 }
 
 func (q *minNonceQueue) Less(i, j int) bool {
-	return false
+	return (*q)[i].Nonce < (*q)[j].Nonce
 }
 
 func (q *minNonceQueue) Push(x interface{}) {
+	(*q) = append((*q), x.(*types.Transaction))
 }
 
 func (q *minNonceQueue) Pop() interface{} {
-	return nil
+	old := *q
+	n := len(old)
+	x := old[n-1]
+	*q = old[0 : n-1]
+	return x
 }
 
 type maxPriceQueue transactions
 
 func (q *maxPriceQueue) Peek() *types.Transaction {
-	return nil
+	if len(*q) == 0 {
+		return nil
+	}
+
+	return (*q)[0]
 }
 
 func (q *maxPriceQueue) Len() int {
-	return 0
+	return len(*q)
 }
 
 func (q *maxPriceQueue) Swap(i, j int) {
+	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
 }
 
 func (q *maxPriceQueue) Less(i, j int) bool {
-	return false
+	if (*q)[i].From == (*q)[j].From {
+		return (*q)[i].Nonce < (*q)[j].Nonce
+	}
+
+	return (*q)[i].GasPrice.Uint64() > (*q)[j].GasPrice.Uint64()
 }
 
 func (q *maxPriceQueue) Push(x interface{}) {
+	(*q) = append((*q), x.(*types.Transaction))
 }
 
 func (q *maxPriceQueue) Pop() interface{} {
-	return nil
+	old := *q
+	n := len(old)
+	x := old[n-1]
+	*q = old[0 : n-1]
+	return x
 }
