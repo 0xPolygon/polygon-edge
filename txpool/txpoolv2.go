@@ -197,7 +197,10 @@ func NewTxPool(
 	return pool, nil
 }
 
-func (p *TxPool) Start() {
+// Start runs the pool's main loop in the background.
+// On each request received, the appropriate handler
+// is invoked in a separate goroutine.
+func (p *TxPool) Start() error {
 	go func() {
 		for {
 			select {
@@ -210,6 +213,8 @@ func (p *TxPool) Start() {
 			}
 		}
 	}()
+
+	return nil
 }
 
 // handleAddRequest is invoked when a new transaction is received

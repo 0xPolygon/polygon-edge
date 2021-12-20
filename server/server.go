@@ -152,16 +152,15 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
-			m.config.Seal,
-			m.config.Locals,
-			m.config.NoLocals,
-			m.config.PriceLimit,
-			m.config.MaxSlots,
 			m.chain.Params.Forks.At(0),
 			hub,
 			m.grpcServer,
 			m.network,
 			m.serverMetrics.txpool,
+			&txpool.Config{
+				Sealing:  m.config.Seal,
+				MaxSlots: m.config.MaxSlots,
+			},
 		)
 		if err != nil {
 			return nil, err
@@ -202,6 +201,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	if err := m.network.Start(); err != nil {
+		return nil, err
+	}
+
+	if err := m.txpool.Start(); err != nil {
 		return nil, err
 	}
 
