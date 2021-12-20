@@ -11,8 +11,10 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )
@@ -217,6 +219,39 @@ func (p *TxPool) Start() {
 // A transaction handled within this request can either be
 // dropped or enqueued, eventually signaling promotion in the former case.
 func (p *TxPool) handleAddRequest(req addRequest) {
+	tx := req.tx
+	addr := req.tx.From
+
+	queue := p.lockAccountQueue(addr, true)
+	defer p.unlockAccountQueue(addr)
+
+	// fetch store from nonce map
+	nextNonce, _ := p.nextNonces.load(addr)
+	if tx.Nonce < nextNonce && !req.returnee {
+		// reject new txs with nonce
+		// lower than expected
+		return
+	}
+
+	// enqueue tx
+	queue.push(tx)
+
+	// atomically increase gauge
+	p.gauge.increase(slotsRequired(tx))
+
+	// update lookup
+	p.index.add(enqueued, tx)
+
+	if tx.Nonce > nextNonce {
+		// don't signal promotion
+		// for high nonce tx
+		return
+	}
+
+	// account queue is ready for promotion:
+	// 	1. New tx is matching nonce expected
+	// 	2. We are promoting a recovered tx
+	p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
 }
 
 // handlePromoteRequest handles moving promtable transactions
@@ -243,6 +278,25 @@ func (p *TxPool) EnableDev() {
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it if networking is enabled
 func (p *TxPool) AddTx(tx *types.Transaction) error {
+	if err := p.addTx(tx); err != nil {
+		p.logger.Error("failed to add tx", "err", err)
+		return err
+	}
+
+	// broadcast the transaction only if network is enabled
+	// and we are not in dev mode
+	if p.topic != nil && !p.dev {
+		txn := &proto.Txn{
+			Raw: &any.Any{
+				Value: tx.MarshalRLP(),
+			},
+		}
+
+		if err := p.topic.Publish(txn); err != nil {
+			p.logger.Error("failed to topic tx", "err", err)
+		}
+	}
+
 	return nil
 }
 
@@ -277,6 +331,60 @@ func (p *TxPool) ResetWithHeader(h *types.Header) {
 // validateTx ensures that the transaction conforms
 // to specific constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
+	// Check the transaction size to overcome DOS Attacks
+	if uint64(len(tx.MarshalRLP())) > txMaxSize {
+		return ErrOversizedData
+	}
+
+	// Check if the transaction has a strictly positive value
+	if tx.Value.Sign() < 0 {
+		return ErrNegativeValue
+	}
+
+	if !p.dev && tx.From != types.ZeroAddress {
+		// Only if we are in dev mode we can accept
+		// a transaction without validation
+		return ErrNonEncryptedTx
+	}
+
+	// Check if the transaction is signed properly
+	if tx.From == types.ZeroAddress {
+		from, signerErr := p.signer.Sender(tx)
+		if signerErr != nil {
+			return ErrInvalidSender
+		}
+
+		tx.From = from
+	}
+
+	// Grab the state root for the latest block
+	stateRoot := p.store.Header().StateRoot
+
+	// Check nonce ordering
+	if p.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+		return ErrNonceTooLow
+	}
+
+	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From)
+	if balanceErr != nil {
+		return ErrInvalidAccountState
+	}
+
+	// Check if the sender has enough funds to execute the transaction
+	if accountBalance.Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
+	}
+
+	// Make sure the transaction has more gas than the basic transaction fee
+	intrinsicGas, err := state.TransactionGasCost(tx, p.forks.Homestead, p.forks.Istanbul)
+	if err != nil {
+		return err
+	}
+
+	if tx.Gas < intrinsicGas {
+		return ErrIntrinsicGas
+	}
+
 	return nil
 }
 
@@ -285,11 +393,48 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 // addTx() is successful an account queue is created
 // for this address (only once) and an addRequest is sent.
 func (p *TxPool) addTx(tx *types.Transaction) error {
+	// validate recieved transaction
+	if err := p.validateTx(tx); err != nil {
+		return err
+	}
+
+	// check for overflow
+	if p.gauge.read()+slotsRequired(tx) > p.gauge.max {
+		return ErrTxPoolOverflow
+	}
+
+	tx.ComputeHash()
+
+	// check if already known
+	if _, ok := p.index.load(tx.Hash); ok {
+		return ErrAlreadyKnown
+	}
+
+	// initialize account queue for this address once
+	p.createAccountOnce(tx.From)
+
+	// send request [BLOCKING]
+	p.addReqCh <- addRequest{tx: tx, returnee: false}
+
 	return nil
 }
 
 // handleGossipTxn handles receiving gossiped transactions
 func (p *TxPool) handleGossipTxn(obj interface{}) {
+	if !p.sealing {
+		return
+	}
+
+	raw := obj.(*proto.Txn)
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
+		p.logger.Error("failed to decode broadcasted tx", "err", err)
+		return
+	}
+
+	if err := p.addTx(tx); err != nil {
+		p.logger.Error("failed to add broadcasted txn", "err", err)
+	}
 }
 
 /* QUERY methods (to be revised) */
