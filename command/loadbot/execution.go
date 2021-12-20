@@ -18,6 +18,7 @@ import (
 
 const (
 	maxReceiptWait = 5 * time.Minute
+	minReceiptWait = 30 * time.Second
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
@@ -120,6 +121,22 @@ type Loadbot struct {
 	metrics *Metrics
 }
 
+// calcMaxTimeout calculates the max timeout for transactions receipts
+// based on the transaction count and tps params
+func (l *Loadbot) calcMaxTimeout(count, tps uint64) time.Duration {
+	waitTime := minReceiptWait
+	// The receipt timeout should be at max maxReceiptWait
+	// or minReceiptWait + tps / count * 100
+	// This way the wait time scales linearly for more stressful situations
+	waitFactor := time.Duration(float64(tps)/float64(count)*100) * time.Second
+
+	if waitTime+waitFactor > maxReceiptWait {
+		return maxReceiptWait
+	}
+
+	return waitTime + waitFactor
+}
+
 func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
 	return &Loadbot{cfg: cfg, metrics: metrics}
 }
@@ -181,6 +198,8 @@ func (l *Loadbot) Run() error {
 
 	var wg sync.WaitGroup
 
+	receiptTimeout := l.calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+
 	startTime := time.Now()
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
@@ -204,7 +223,7 @@ func (l *Loadbot) Run() error {
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 			defer cancel()
 
 			_, err = tests.WaitForReceipt(ctx, client.Eth(), txHash)
