@@ -154,7 +154,7 @@ func (d *discovery) setupTable() error {
 }
 
 func (d *discovery) call(peerID peer.ID) error {
-	d.srv.logger.Debug("Quering a peer for near peers", "peer", peerID)
+	d.srv.logger.Debug("Querying a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
 	if err != nil {
 		return err
