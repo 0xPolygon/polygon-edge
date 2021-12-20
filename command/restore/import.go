@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
@@ -17,27 +16,23 @@ var (
 	chunkSize = 10
 )
 
-func ImportChain(bc *blockchain.Blockchain, filePath string) (uint64, uint64, error) {
+type blockchainInterface interface {
+	Genesis() types.Hash
+	GetHashByNumber(uint64) types.Hash
+	WriteBlocks([]*types.Block) error
+}
+
+func ImportChain(chain blockchainInterface, filePath string) (uint64, uint64, error) {
 	fp, err := os.Open(filePath)
 	if err != nil {
 		return 0, 0, err
 	}
 	blockStream := newBlockStream(fp)
-
-	// check genesis hash
-	genesis, err := blockStream.nextBlock()
-	if err != nil {
-		return 0, 0, err
-	}
-	if genesis.Hash() != bc.Genesis() {
-		return 0, 0, fmt.Errorf("the hash of genesis block (%s) in %s does not match blockchain genesis (%s)", genesis.Hash(), filePath, bc.Genesis())
-	}
-
-	return importBlocks(bc, blockStream)
+	return importBlocks(chain, blockStream)
 }
 
 // import blocks scans all blocks from stream and write them to chain
-func importBlocks(bc *blockchain.Blockchain, blockStream *blockStream) (uint64, uint64, error) {
+func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, uint64, error) {
 	type result struct {
 		from uint64
 		to   uint64
@@ -49,8 +44,7 @@ func importBlocks(bc *blockchain.Blockchain, blockStream *blockStream) (uint64, 
 	go func() {
 		defer close(resCh)
 
-		// find common ancestor
-		block, err := consumeCommonBlocks(bc, blockStream, shutdownCh)
+		block, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
 		if err != nil {
 			resCh <- result{0, 0, err}
 			return
@@ -82,7 +76,7 @@ func importBlocks(bc *blockchain.Blockchain, blockStream *blockStream) (uint64, 
 			if len(blocks) == 0 {
 				break
 			}
-			if err := bc.WriteBlocks(blocks); err != nil {
+			if err := chain.WriteBlocks(blocks); err != nil {
 				resCh <- result{0, 0, err}
 				return
 			}
@@ -104,7 +98,7 @@ func importBlocks(bc *blockchain.Blockchain, blockStream *blockStream) (uint64, 
 
 // consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
 // returns the first block to be written into chain
-func consumeCommonBlocks(blockchain *blockchain.Blockchain, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, error) {
+func consumeCommonBlocks(chain blockchainInterface, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, error) {
 	for {
 		block, err := blockStream.nextBlock()
 		if err != nil {
@@ -113,7 +107,13 @@ func consumeCommonBlocks(blockchain *blockchain.Blockchain, blockStream *blockSt
 		if block == nil {
 			return nil, nil
 		}
-		if hash := blockchain.GetHashByNumber(block.Number()); hash != block.Hash() {
+		if block.Number() == 0 {
+			if block.Hash() != chain.Genesis() {
+				return nil, fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", block.Hash(), chain.Genesis())
+			}
+			continue
+		}
+		if hash := chain.GetHashByNumber(block.Number()); hash != block.Hash() {
 			return block, nil
 		}
 

@@ -30,42 +30,36 @@ func fetchAndSaveBackup(conn *grpc.ClientConn, from, to uint64, outPath string) 
 		return nil, err
 	}
 
-	resCh, errCh := processExportStream(stream, fs)
-
-	var res *BackupResult
-	select {
-	case res = <-resCh:
-	case err = <-errCh:
-	}
+	res := <-processExportStream(stream, fs)
 
 	fs.Close()
-	if err != nil {
+	if res.err != nil {
 		os.Remove(outPath)
+		return nil, err
 	}
 
-	return res, err
+	return &BackupResult{From: *res.from, To: *res.to, Out: fs.Name()}, nil
 }
 
-func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan *BackupResult, <-chan error) {
-	resCh := make(chan *BackupResult, 1)
-	errCh := make(chan error, 1)
+type processExportStreamResult struct {
+	from *uint64
+	to   *uint64
+	err  error
+}
 
+func processExportStream(stream proto.System_ExportClient, writer io.Writer) <-chan processExportStreamResult {
+	resCh := make(chan processExportStreamResult, 1)
 	signalCh := common.GetTerminationSignalCh()
 
 	go func() {
 		defer close(resCh)
-		defer close(errCh)
 
 		var from, to *uint64
 		returnResult := func() {
 			if from == nil || to == nil {
-				errCh <- errors.New("couldn't fetch any block")
+				resCh <- processExportStreamResult{nil, nil, errors.New("couldn't fetch any block")}
 			} else {
-				resCh <- &BackupResult{
-					From: *from,
-					To:   *to,
-					Out:  fs.Name(),
-				}
+				resCh <- processExportStreamResult{from, to, nil}
 			}
 		}
 
@@ -76,13 +70,13 @@ func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan 
 				return
 			}
 			if err != nil {
-				errCh <- err
+				resCh <- processExportStreamResult{nil, nil, err}
 				return
 			}
 
 			// write data
-			if _, err := fs.Write(evnt.Data); err != nil {
-				errCh <- err
+			if _, err := writer.Write(evnt.Data); err != nil {
+				resCh <- processExportStreamResult{nil, nil, err}
 			}
 
 			// update result
@@ -101,5 +95,5 @@ func processExportStream(stream proto.System_ExportClient, fs *os.File) (<-chan 
 		}
 	}()
 
-	return resCh, errCh
+	return resCh
 }

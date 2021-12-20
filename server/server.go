@@ -208,6 +208,10 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	if err := m.network.Start(); err != nil {
+		return nil, err
+	}
+
 	return m, nil
 }
 

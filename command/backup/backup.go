@@ -20,7 +20,7 @@ func (c *BackupCommand) DefineFlags() {
 	c.Base.DefineFlags(c.Formatter, c.GRPC)
 
 	c.FlagMap["data"] = helper.FlagDescriptor{
-		Description: "Filepath the path to save the backup",
+		Description: "The path of backup data to save",
 		Arguments: []string{
 			"BACKUP_FILE",
 		},
@@ -28,7 +28,7 @@ func (c *BackupCommand) DefineFlags() {
 	}
 
 	c.FlagMap["from"] = helper.FlagDescriptor{
-		Description: "Begining height of chain to save data",
+		Description: "Begining height of chain in backup",
 		Arguments: []string{
 			"FROM",
 		},
@@ -36,7 +36,7 @@ func (c *BackupCommand) DefineFlags() {
 	}
 
 	c.FlagMap["to"] = helper.FlagDescriptor{
-		Description: "End height of the chain in data",
+		Description: "End height of the chain in backup",
 		Arguments: []string{
 			"TO",
 		},
@@ -84,7 +84,7 @@ func (c *BackupCommand) Run(args []string) int {
 	var err error
 
 	if out == "" {
-		c.Formatter.OutputError(errors.New("out is required"))
+		c.Formatter.OutputError(errors.New("the path of backup file is required"))
 		return 1
 	}
 

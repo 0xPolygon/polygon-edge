@@ -54,6 +54,7 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 
 	srv, err := NewServer(logger, cfg)
 	assert.NoError(t, err)
+	assert.NoError(t, srv.Start())
 
 	return srv
 }
