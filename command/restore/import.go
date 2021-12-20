@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -16,45 +17,112 @@ var (
 	chunkSize = 10
 )
 
-func ImportChain(bc *blockchain.Blockchain, filePath string) error {
+func ImportChain(bc *blockchain.Blockchain, filePath string) (uint64, uint64, error) {
 	fp, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
-
 	blockStream := newBlockStream(fp)
 
+	// check genesis hash
 	genesis, err := blockStream.nextBlock()
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if genesis.Hash() != bc.Genesis() {
-		return fmt.Errorf("the hash of genesis block (%s) in %s does not match blockchain genesis (%s)", genesis.Hash(), filePath, bc.Genesis())
+		return 0, 0, fmt.Errorf("the hash of genesis block (%s) in %s does not match blockchain genesis (%s)", genesis.Hash(), filePath, bc.Genesis())
 	}
 
-	blocks := make([]*types.Block, chunkSize)
-	for {
-		blocks = blocks[:0]
-		for i := 0; i < chunkSize; i++ {
-			block, err := blockStream.nextBlock()
-			if err != nil {
-				return err
+	return importBlocks(bc, blockStream)
+}
+
+// import blocks scans all blocks from stream and write them to chain
+func importBlocks(bc *blockchain.Blockchain, blockStream *blockStream) (uint64, uint64, error) {
+	type result struct {
+		from uint64
+		to   uint64
+		err  error
+	}
+
+	resCh := make(chan result, 1)
+	shutdownCh := common.GetTerminationSignalCh()
+	go func() {
+		defer close(resCh)
+
+		// find common ancestor
+		block, err := consumeCommonBlocks(bc, blockStream, shutdownCh)
+		if err != nil {
+			resCh <- result{0, 0, err}
+			return
+		}
+		if block == nil {
+			// all blocks are scanned, but no block to import was found
+			resCh <- result{0, 0, nil}
+			return
+		}
+
+		blocks := make([]*types.Block, 0, chunkSize)
+		blocks = append(blocks, block)
+		var lastBlockNumber uint64
+	processLoop:
+		for {
+			for len(blocks) < chunkSize {
+				block, err := blockStream.nextBlock()
+				if err != nil {
+					resCh <- result{0, 0, err}
+					return
+				}
+				if block == nil {
+					break
+				}
+				blocks = append(blocks, block)
 			}
-			if block == nil {
+
+			// no blocks to be written any more
+			if len(blocks) == 0 {
 				break
 			}
-			blocks = append(blocks, block)
+			if err := bc.WriteBlocks(blocks); err != nil {
+				resCh <- result{0, 0, err}
+				return
+			}
+			lastBlockNumber = blocks[len(blocks)-1].Number()
+			blocks = blocks[:0]
+
+			select {
+			case <-shutdownCh:
+				break processLoop
+			default:
+			}
+		}
+		resCh <- result{block.Number(), lastBlockNumber, err}
+	}()
+	res := <-resCh
+
+	return res.from, res.to, res.err
+}
+
+// consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
+// returns the first block to be written into chain
+func consumeCommonBlocks(blockchain *blockchain.Blockchain, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, error) {
+	for {
+		block, err := blockStream.nextBlock()
+		if err != nil {
+			return nil, err
+		}
+		if block == nil {
+			return nil, nil
+		}
+		if hash := blockchain.GetHashByNumber(block.Number()); hash != block.Hash() {
+			return block, nil
 		}
 
-		if len(blocks) == 0 {
-			break
-		}
-		if err := bc.WriteBlocks(blocks); err != nil {
-			return err
+		select {
+		case <-shutdownCh:
+			return nil, nil
+		default:
 		}
 	}
-
-	return nil
 }
 
 // blockStream parse RLP-encoded block from stream and consumed the used bytes

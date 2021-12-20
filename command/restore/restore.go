@@ -93,15 +93,17 @@ func (c *RestoreCommand) Run(args []string) int {
 		return 1
 	}
 
-	if err := ImportChain(blockchain, backupFile); err != nil {
+	from, to, err := ImportChain(blockchain, backupFile)
+	if err != nil {
 		c.Formatter.OutputError(err)
 		return 1
 	}
 
 	res := &RestoreResult{
 		File: backupFile,
-		From: 1,
-		To:   blockchain.Header().Number,
+		Num:  to - from + 1,
+		From: from,
+		To:   to,
 	}
 	c.Formatter.OutputResult(res)
 
@@ -167,20 +169,26 @@ func (c *RestoreCommand) initializeBlockchain(genesisFilePath, dataDirPath strin
 
 type RestoreResult struct {
 	File string `json:"file"`
-	From uint64 `json:"from"`
-	To   uint64 `json:"to"`
+	Num  uint64 `json:"num"`
+	From uint64 `json:"from,omitempty"`
+	To   uint64 `json:"to,omitempty"`
 }
 
 func (r *RestoreResult) Output() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[RESTORE]\n")
-	buffer.WriteString("Imported blockchain data successfully\n")
-	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("File|%s", r.File),
-		fmt.Sprintf("From|%d", r.From),
-		fmt.Sprintf("To|%d", r.To),
-	}))
+	if r.From != 0 && r.To != 0 {
+		buffer.WriteString("Imported blockchain data successfully\n")
+		buffer.WriteString(helper.FormatKV([]string{
+			fmt.Sprintf("File|%s", r.File),
+			fmt.Sprintf("Number|%d", r.Num),
+			fmt.Sprintf("From|%d", r.From),
+			fmt.Sprintf("To|%d", r.To),
+		}))
+	} else {
+		buffer.WriteString("No blocks are imported\n")
+	}
 
 	return buffer.String()
 }
