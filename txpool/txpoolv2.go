@@ -708,7 +708,8 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) {
 
 	// run only once per queue creation
 	queue.initFunc.Do(func() {
-		heap.Init(&queue.txs)
+		queue.txs = newMinNonceQueue()
+		queue.logger = p.logger.Named("account")
 
 		// update nonce map
 		stateRoot := p.store.Header().StateRoot
@@ -894,11 +895,11 @@ func (q *accountQueue) peek() *types.Transaction {
 		return nil
 	}
 
-	return q.txs[0]
+	return q.txs.txs[0]
 }
 
 func (q *accountQueue) length() uint64 {
-	return uint64(len(q.txs))
+	return uint64(q.txs.Len())
 }
 
 func (q *accountQueue) promote(nonce uint64) (transactions, uint64) {
@@ -947,23 +948,22 @@ func (q *accountQueue) pruneLowNonce(nonce uint64) transactions {
 type promotedQueue struct {
 	sync.RWMutex
 	logger hclog.Logger
-	txs    maxPriceQueue
+	queue  maxPriceQueue
 	wLock  uint32
 }
 
 func newPromotedQueue(logger hclog.Logger) *promotedQueue {
 	q := &promotedQueue{
-		txs:    maxPriceQueue{},
+		queue:  newMaxPriceQueue(),
 		logger: logger,
 	}
 
-	heap.Init(&q.txs)
 	return q
 }
 
 func (q *promotedQueue) push(txs ...*types.Transaction) {
 	for _, tx := range txs {
-		heap.Push(&q.txs, tx)
+		heap.Push(&q.queue, tx)
 	}
 }
 
@@ -972,7 +972,7 @@ func (q *promotedQueue) peek() *types.Transaction {
 		return nil
 	}
 
-	return q.txs[0]
+	return q.queue.txs[0]
 }
 
 func (q *promotedQueue) pop() *types.Transaction {
@@ -980,11 +980,11 @@ func (q *promotedQueue) pop() *types.Transaction {
 		return nil
 	}
 
-	return heap.Pop(&q.txs).(*types.Transaction)
+	return heap.Pop(&q.queue).(*types.Transaction)
 }
 
 func (q *promotedQueue) length() uint64 {
-	return uint64(len(q.txs))
+	return uint64(q.queue.Len())
 }
 
 // Gauge for measuring pool capacity in slots
@@ -1018,80 +1018,4 @@ func (g *slotGauge) increase(slots uint64) {
 // Decreases the height of the gauge by the specified slots amount
 func (g *slotGauge) decrease(slots uint64) {
 	atomic.AddUint64(&g.height, ^(slots - 1))
-}
-
-/* queue implementations */
-
-type transactions []*types.Transaction
-
-type minNonceQueue transactions
-
-func (q *minNonceQueue) Peek() *types.Transaction {
-	if len(*q) == 0 {
-		return nil
-	}
-
-	return (*q)[0]
-}
-
-func (q *minNonceQueue) Len() int {
-	return len(*q)
-}
-
-func (q *minNonceQueue) Swap(i, j int) {
-	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
-}
-
-func (q *minNonceQueue) Less(i, j int) bool {
-	return (*q)[i].Nonce < (*q)[j].Nonce
-}
-
-func (q *minNonceQueue) Push(x interface{}) {
-	(*q) = append((*q), x.(*types.Transaction))
-}
-
-func (q *minNonceQueue) Pop() interface{} {
-	old := *q
-	n := len(old)
-	x := old[n-1]
-	*q = old[0 : n-1]
-	return x
-}
-
-type maxPriceQueue transactions
-
-func (q *maxPriceQueue) Peek() *types.Transaction {
-	if len(*q) == 0 {
-		return nil
-	}
-
-	return (*q)[0]
-}
-
-func (q *maxPriceQueue) Len() int {
-	return len(*q)
-}
-
-func (q *maxPriceQueue) Swap(i, j int) {
-	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
-}
-
-func (q *maxPriceQueue) Less(i, j int) bool {
-	if (*q)[i].From == (*q)[j].From {
-		return (*q)[i].Nonce < (*q)[j].Nonce
-	}
-
-	return (*q)[i].GasPrice.Uint64() > (*q)[j].GasPrice.Uint64()
-}
-
-func (q *maxPriceQueue) Push(x interface{}) {
-	(*q) = append((*q), x.(*types.Transaction))
-}
-
-func (q *maxPriceQueue) Pop() interface{} {
-	old := *q
-	n := len(old)
-	x := old[n-1]
-	*q = old[0 : n-1]
-	return x
 }
