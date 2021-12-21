@@ -59,6 +59,11 @@ func Factory(
 	return d, nil
 }
 
+// Initialize initializes the consensus
+func (d *Dev) Initialize() error {
+	return nil
+}
+
 // Start starts the consensus mechanism
 func (d *Dev) Start() error {
 	go d.run()

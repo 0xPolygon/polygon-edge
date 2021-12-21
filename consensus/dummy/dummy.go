@@ -38,6 +38,11 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 	return d, nil
 }
 
+// Initialize initializes the consensus
+func (d *Dummy) Initialize() error {
+	return nil
+}
+
 func (d *Dummy) Start() error {
 	go d.run()
 	return nil

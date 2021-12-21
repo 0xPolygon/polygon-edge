@@ -2,8 +2,9 @@ package consensus
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"log"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -28,7 +29,10 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *protocol.Progression
 
-	// Start starts the consensus
+	// Initialize initializes the consensus (e.g. setup data)
+	Initialize() error
+
+	// Start starts the consensus and servers
 	Start() error
 
 	// Close closes the connection

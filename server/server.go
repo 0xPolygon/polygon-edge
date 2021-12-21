@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/archive"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
@@ -100,6 +101,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	} else {
 		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
 	}
+
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
@@ -188,17 +190,30 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup grpc server
+	// initialize data in consensus layer
+	if err := m.consensus.Initialize(); err != nil {
+		return nil, err
+	}
+
+	// restore archive data before starting
+	if config.RestoreFile != nil {
+		if err := archive.RestoreChain(m.blockchain, *config.RestoreFile); err != nil {
+			return nil, err
+		}
+	}
+
+	// start consensus
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
+
+	// setup and start grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
 	}
 
-	// setup jsonrpc
+	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
-		return nil, err
-	}
-
-	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
 

@@ -5,11 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -89,8 +87,7 @@ func (m *MonitorCommand) Run(args []string) int {
 	}()
 
 	// wait for the user to quit with ctrl-c
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	signalCh := common.GetTerminationSignalCh()
 
 	select {
 	case <-signalCh:
