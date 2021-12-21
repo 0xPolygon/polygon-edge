@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -310,10 +311,10 @@ func (p *TxPool) handleResetRequest(req resetRequest) {
 	newNonces := req.newNonces
 
 	pruned := p.prunePromoted(newNonces)
-	p.logger.Debug("pruned", pruned, "transactions from promoted queue.")
+	p.logger.Debug(fmt.Sprintf("pruned %d promoted transactions", pruned))
 
 	pruned = p.pruneEnqueued(newNonces)
-	p.logger.Debug("pruned", pruned, "transactions from all enqueued.")
+	p.logger.Debug(fmt.Sprintf("pruned %d enqueued transactions", pruned))
 }
 
 func (p *TxPool) AddSigner(s signer) {
@@ -392,9 +393,89 @@ func (p *TxPool) RollbackNonce(tx *types.Transaction) {
 // its own state with the new one so it can correctly process
 // further incoming transactions.
 func (p *TxPool) ResetWithHeader(h *types.Header) {
-	// ... todo
+	e := &blockchain.Event{
+		NewChain: []*types.Header{h},
+	}
 
-	p.handleResetRequest(resetRequest{})
+	// process the txs in the event to make sure the pool is up-to-date
+	p.processEvent(e)
+}
+
+func (p *TxPool) processEvent(event *blockchain.Event) {
+	// transactions collected from OldChain
+	oldTransactions := make(map[types.Hash]*types.Transaction)
+
+	// Legacy reorg logic //
+	for _, header := range event.OldChain {
+		// transactios to be returned to the pool
+		block, ok := p.store.GetBlockByHash(header.Hash, true)
+		if !ok {
+			continue
+		}
+
+		for _, tx := range block.Transactions {
+			// skip unknown accounts
+			if _, known := p.nextNonces.load(tx.From); !known {
+				continue
+			}
+
+			oldTransactions[tx.Hash] = tx
+		}
+	}
+
+	// Grab the latest state root now that the block has been inserted
+	stateRoot := p.store.Header().StateRoot
+
+	// discover latest nonces for known accounts
+	newNonces := make(map[types.Address]uint64)
+	for _, event := range event.NewChain {
+		block, ok := p.store.GetBlockByHash(event.Hash, true)
+		if !ok {
+			continue
+		}
+
+		// determine latest nonces for all known accounts
+		for _, tx := range block.Transactions {
+			addr := tx.From
+
+			// skip unknown accounts
+			if _, known := p.nextNonces.load(addr); !known {
+				continue
+			}
+
+			// skip already processed accounts
+			if _, processed := newNonces[addr]; processed {
+				continue
+			}
+
+			// fetch latest nonce from the state
+			latestNonce := p.store.GetNonce(stateRoot, addr)
+
+			if latestNonce == 0 {
+				// account doesn't exist
+				continue
+			}
+
+			// update the result map
+			newNonces[addr] = latestNonce
+
+			// Legacy reorg logic //
+			// Update the addTxns in case of reorgs
+			delete(oldTransactions, tx.Hash)
+		}
+	}
+
+	if len(newNonces) == 0 {
+		return
+	}
+
+	// increment to next expected nonce
+	for _, nonce := range newNonces {
+		nonce += 1
+	}
+
+	// Signal reset request
+	p.resetReqCh <- resetRequest{newNonces: newNonces}
 }
 
 // validateTx ensures that the transaction conforms
@@ -550,14 +631,6 @@ func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
 		}
 
 		tx := p.promoted.pop()
-		_, ok := p.nextNonces.load(tx.From)
-		if !ok {
-			// pool knows nothing of this address
-			// so there can't be anything to reset
-			valid = append(valid, tx)
-			continue
-		}
-
 		if tx.Nonce > nonceMap[tx.From] {
 			valid = append(valid, tx)
 		} else {
