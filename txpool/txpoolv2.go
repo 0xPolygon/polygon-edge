@@ -174,7 +174,7 @@ func NewTxPool(
 		metrics:    metrics,
 		enqueued:   accountsMap{},
 		promoted:   newPromotedQueue(logger.Named("promoted")),
-		index:      lookupMap{all: make(map[types.Hash]statusTx)},
+		index:      lookupMap{all: make(map[types.Hash]*statusTx)},
 		gauge:      slotGauge{height: 0, max: config.MaxSlots},
 		sealing:    config.Sealing,
 	}
@@ -612,8 +612,13 @@ func (p *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 }
 
 // GetPendingTx returns the transaction by hash in the TxPool (pending txn) [Thread-safe]
-func (t *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
-	return nil, false
+func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
+	statusTx, ok := p.index.load(txHash)
+	if !ok {
+		return nil, false
+	}
+
+	return statusTx.tx, true
 }
 
 /* end of QUERY methods */
@@ -779,9 +784,10 @@ type statusTx struct {
 // Lookup map used to find transactions present in the pool
 type lookupMap struct {
 	sync.RWMutex
-	all map[types.Hash]statusTx
+	all map[types.Hash]*statusTx
 }
 
+// add adds the given transaction to the lookup map
 func (m *lookupMap) add(status status, txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -789,15 +795,22 @@ func (m *lookupMap) add(status status, txs ...*types.Transaction) {
 	switch status {
 	case enqueued:
 		for _, tx := range txs {
-			m.all[tx.Hash] = statusTx{tx, false}
+			m.all[tx.Hash] = &statusTx{
+				tx:       tx,
+				promoted: false,
+			}
 		}
 	case promoted:
 		for _, tx := range txs {
-			m.all[tx.Hash] = statusTx{tx, true}
+			m.all[tx.Hash] = &statusTx{
+				tx:       tx,
+				promoted: true,
+			}
 		}
 	}
 }
 
+// remove clears the lookup map of given txs
 func (m *lookupMap) remove(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -811,16 +824,18 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 	}
 }
 
-func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
+// load acquires the read lock on the lookup map and returns the requested
+// transaction (wrapped in a status object), if it exists
+func (m *lookupMap) load(hash types.Hash) (*statusTx, bool) {
 	m.RLock()
 	defer m.RUnlock()
 
-	stx, ok := m.all[hash]
+	statusTx, ok := m.all[hash]
 	if !ok {
 		return nil, false
 	}
 
-	return stx.tx, true
+	return statusTx, true
 }
 
 // Map of expected nonces for all (known) accounts
