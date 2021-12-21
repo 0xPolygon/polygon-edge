@@ -12,6 +12,7 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // TxnPoolOperatorClient is the client API for TxnPoolOperator service.
@@ -53,7 +54,7 @@ func (c *txnPoolOperatorClient) AddTxn(ctx context.Context, in *AddTxnReq, opts 
 }
 
 func (c *txnPoolOperatorClient) Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_TxnPoolOperator_serviceDesc.Streams[0], "/v1.TxnPoolOperator/Subscribe", opts...)
+	stream, err := c.cc.NewStream(ctx, &TxnPoolOperator_ServiceDesc.Streams[0], "/v1.TxnPoolOperator/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ type UnsafeTxnPoolOperatorServer interface {
 }
 
 func RegisterTxnPoolOperatorServer(s grpc.ServiceRegistrar, srv TxnPoolOperatorServer) {
-	s.RegisterService(&_TxnPoolOperator_serviceDesc, srv)
+	s.RegisterService(&TxnPoolOperator_ServiceDesc, srv)
 }
 
 func _TxnPoolOperator_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -180,7 +181,10 @@ func (x *txnPoolOperatorSubscribeServer) Send(m *TxPoolEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-var _TxnPoolOperator_serviceDesc = grpc.ServiceDesc{
+// TxnPoolOperator_ServiceDesc is the grpc.ServiceDesc for TxnPoolOperator service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var TxnPoolOperator_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.TxnPoolOperator",
 	HandlerType: (*TxnPoolOperatorServer)(nil),
 	Methods: []grpc.MethodDesc{
