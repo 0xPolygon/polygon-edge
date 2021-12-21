@@ -97,7 +97,6 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var count uint64
 	var jsonrpc string
 	var maxConns int
-	defaultMaxConns := int(2 * tps)
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
@@ -105,6 +104,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
+
+	defaultMaxConns := int(2 * tps)
 	flags.IntVar(&maxConns, "maxconns", defaultMaxConns, "")
 
 	var err error
