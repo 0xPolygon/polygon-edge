@@ -104,9 +104,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
-
-	defaultMaxConns := int(2 * tps)
-	flags.IntVar(&maxConns, "maxconns", defaultMaxConns, "")
+	flags.IntVar(&maxConns, "maxconns", 0, "")
 
 	var err error
 	// Parse cli arguments
@@ -114,7 +112,10 @@ func (l *LoadbotCommand) Run(args []string) int {
 		l.Formatter.OutputError(fmt.Errorf("Failed to parse args: %w", err))
 		return 1
 	}
-
+	// maxConns is set to 2*tps if not specified by the user.
+	if maxConns == 0 {
+		maxConns = int(2 * tps)
+	}
 	var sender types.Address
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("Failed to decode sender address: %w", err))
