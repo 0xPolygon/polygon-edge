@@ -22,6 +22,10 @@ import (
 
 var initialPort = uint64(2000)
 
+var (
+	nilMetrics = NilMetrics()
+)
+
 func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 	// create the server
 	cfg := DefaultConfig()
@@ -51,6 +55,7 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 	assert.NoError(t, factoryErr)
 
 	cfg.SecretsManager = secretsManager
+	cfg.Metrics = nilMetrics
 
 	srv, err := NewServer(logger, cfg)
 	assert.NoError(t, err)
@@ -115,6 +120,7 @@ func getTestConfig(callback func(c *Config)) *Config {
 	)
 
 	cfg.SecretsManager = secretsManager
+	cfg.Metrics = nilMetrics
 
 	return cfg
 }
