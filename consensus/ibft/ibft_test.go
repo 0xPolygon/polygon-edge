@@ -1,8 +1,6 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
 	"time"
 
@@ -10,6 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -537,7 +537,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}}, // not considered - stays in pool
+				{Nonce: 7}},            // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -625,33 +625,38 @@ type mockTxPool struct {
 	resetWithHeaderParam  *types.Header
 }
 
-func (p *mockTxPool) ResetWithHeader(h *types.Header) {
-	p.resetWithHeaderCalled = true
-	p.resetWithHeaderParam = h
+func (p *mockTxPool) LockPromoted(write bool) {
 }
 
-func (p *mockTxPool) Pop() (*types.Transaction, func()) {
+func (p *mockTxPool) UnlockPromoted() {
+}
+
+func (p *mockTxPool) Recover(tx *types.Transaction) {
+	p.transactions = append(p.transactions, tx)
+}
+
+func (p *mockTxPool) Pop() *types.Transaction {
 	if len(p.transactions) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	t := p.transactions[0]
+	tx := p.transactions[0]
 	p.transactions = p.transactions[1:]
-	return t, func() {
-		p.transactions = append(p.transactions, t)
-	}
+
+	return tx
 }
 
-func (p *mockTxPool) DecreaseAccountNonce(txn *types.Transaction) {
+func (p *mockTxPool) RollbackNonce(tx *types.Transaction) {
 	if p.nonceDecreased == nil {
 		p.nonceDecreased = make(map[*types.Transaction]bool)
 	}
 
-	p.nonceDecreased[txn] = true
+	p.nonceDecreased[tx] = true
 }
 
-func (p *mockTxPool) Length() uint64 {
-	return uint64(len(p.transactions))
+func (p *mockTxPool) ResetWithHeader(h *types.Header) {
+	p.resetWithHeaderCalled = true
+	p.resetWithHeaderParam = h
 }
 
 type mockTransition struct {
