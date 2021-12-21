@@ -29,7 +29,7 @@ const (
 
 var (
 	ErrLoadLocalGenesisFailed = errors.New("failed to read local genesis")
-	ErrMismatchGenesis        = errors.New("genesis does not match?")
+	ErrMismatchGenesis        = errors.New("genesis does not match")
 	ErrCommonAncestorNotFound = errors.New("header is nil")
 	ErrForkNotFound           = errors.New("fork not found")
 	ErrPopTimeout             = errors.New("timeout")
@@ -190,6 +190,103 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	return s, nil
 }
 
+type progressionWrapper struct {
+	// progression is a reference to the ongoing batch sync.
+	// Nil if no batch sync is currently in progress
+	progression *Progression
+
+	// stopCh is the channel for receiving stop signals
+	// in progression tracking
+	stopCh chan struct{}
+
+	lock sync.RWMutex
+}
+
+// startProgression initializes the progression tracking
+func (pw *progressionWrapper) startProgression(
+	startingBlock uint64,
+	subscription blockchain.Subscription,
+) {
+	pw.lock.Lock()
+	defer pw.lock.Unlock()
+
+	pw.progression = &Progression{
+		StartingBlock: startingBlock,
+	}
+
+	go pw.runUpdateLoop(subscription)
+}
+
+// runUpdateLoop starts the blockchain event monitoring loop and
+// updates the currently written block in the batch sync
+func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription) {
+	eventCh := subscription.GetEventCh()
+	for {
+		select {
+		case event := <-eventCh:
+			if event.Type == blockchain.EventFork {
+				continue
+			}
+
+			if len(event.NewChain) == 0 {
+				continue
+			}
+
+			pw.updateCurrentProgression(event.NewChain[0].Number)
+		case <-pw.stopCh:
+			subscription.Close()
+			return
+		}
+	}
+}
+
+// stopProgression stops the progression tracking
+func (pw *progressionWrapper) stopProgression() {
+	pw.lock.Lock()
+	defer pw.lock.Unlock()
+
+	pw.stopCh <- struct{}{}
+	pw.progression = nil
+}
+
+// updateCurrentProgression sets the currently written block in the bulk sync
+func (pw *progressionWrapper) updateCurrentProgression(currentBlock uint64) {
+	pw.lock.Lock()
+	defer pw.lock.Unlock()
+
+	pw.progression.CurrentBlock = currentBlock
+}
+
+// updateHighestProgression sets the highest-known target block in the bulk sync
+func (pw *progressionWrapper) updateHighestProgression(highestBlock uint64) {
+	pw.lock.Lock()
+	defer pw.lock.Unlock()
+
+	pw.progression.HighestBlock = highestBlock
+}
+
+// getProgression returns the latest sync progression
+func (pw *progressionWrapper) getProgression() *Progression {
+	pw.lock.RLock()
+	defer pw.lock.RUnlock()
+
+	return pw.progression
+}
+
+// Progression defines the status of the sync
+// progression of the node
+type Progression struct {
+	// StartingBlock is the initial block that the node is starting
+	// the sync from. It is reset after every sync batch
+	StartingBlock uint64
+
+	// CurrentBlock is the last written block from the sync batch
+	CurrentBlock uint64
+
+	// HighestBlock is the target block in the sync batch
+	HighestBlock uint64
+}
+
 // Syncer is a sync protocol
 type Syncer struct {
 	logger     hclog.Logger
@@ -204,6 +301,8 @@ type Syncer struct {
 	statusLock sync.Mutex
 
 	server *network.Server
+
+	syncProgression *progressionWrapper
 }
 
 // NewSyncer creates a new Syncer instance
@@ -213,23 +312,22 @@ func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchai
 		stopCh:     make(chan struct{}),
 		blockchain: blockchain,
 		server:     server,
+		syncProgression: &progressionWrapper{
+			progression: nil,
+			stopCh:      make(chan struct{}),
+		},
 	}
 
 	return s
 }
 
+// GetSyncProgression returns the latest sync progression, if any
+func (s *Syncer) GetSyncProgression() *Progression {
+	return s.syncProgression.getProgression()
+}
+
 // syncCurrentStatus taps into the blockchain event steam and updates the Syncer.status field
 func (s *Syncer) syncCurrentStatus() {
-	// Get the current status of the syncer
-	currentHeader := s.blockchain.Header()
-	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
-
-	s.status = &Status{
-		Hash:       currentHeader.Hash,
-		Number:     currentHeader.Number,
-		Difficulty: diff,
-	}
-
 	sub := s.blockchain.SubscribeEvents()
 	eventCh := sub.GetEventCh()
 
@@ -328,6 +426,16 @@ func (s *Syncer) Broadcast(b *types.Block) {
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
 
+	// Get the current status of the syncer
+	currentHeader := s.blockchain.Header()
+	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
+
+	s.status = &Status{
+		Hash:       currentHeader.Hash,
+		Number:     currentHeader.Number,
+		Difficulty: diff,
+	}
+
 	// Run the blockchain event listener loop
 	go s.syncCurrentStatus()
 
@@ -335,9 +443,21 @@ func (s *Syncer) Start() {
 	grpcStream := libp2pGrpc.NewGrpcStream()
 	proto.RegisterV1Server(grpcStream.GrpcServer(), s.serviceV1)
 	grpcStream.Serve()
-
 	s.server.Register(syncerV1, grpcStream)
 
+	s.setupPeers()
+	go s.handlePeerEvent()
+}
+
+// setupPeers adds connected peers as syncer peers
+func (s *Syncer) setupPeers() {
+	for _, p := range s.server.Peers() {
+		s.AddPeer(p.Info.ID)
+	}
+}
+
+// handlePeerEvent subscribes network event and adds/deletes peer from syncer
+func (s *Syncer) handlePeerEvent() {
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
@@ -352,16 +472,10 @@ func (s *Syncer) Start() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected:
-				stream, err := s.server.NewStream(syncerV1, evnt.PeerID)
-				if err != nil {
-					s.logger.Error("failed to open a stream", "err", err)
-					continue
+			case network.PeerConnected, network.PeerDialCompleted:
+				if err := s.AddPeer(evnt.PeerID); err != nil {
+					s.logger.Error("failed to add peer", "err", err)
 				}
-				if err := s.HandleNewPeer(evnt.PeerID, libp2pGrpc.WrapClient(stream)); err != nil {
-					s.logger.Error("failed to handle user", "err", err)
-				}
-
 			case network.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
@@ -397,8 +511,19 @@ func (s *Syncer) BestPeer() *SyncPeer {
 	return bestPeer
 }
 
-// HandleNewPeer is a helper method that is used to handle new user connections within the Syncer
-func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
+// AddPeer establishes new connection with the given peer
+func (s *Syncer) AddPeer(peerID peer.ID) error {
+	if _, ok := s.peers.Load(peerID); ok {
+		// already connected
+		return nil
+	}
+
+	stream, err := s.server.NewStream(syncerV1, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to open a stream, err %w", err)
+	}
+	conn := libp2pGrpc.WrapClient(stream)
+
 	// watch for changes of the other node first
 	clt := proto.NewV1Client(conn)
 
@@ -422,6 +547,7 @@ func (s *Syncer) HandleNewPeer(peerID peer.ID, conn *grpc.ClientConn) error {
 	return nil
 }
 
+// DeletePeer deletes a peer from syncer
 func (s *Syncer) DeletePeer(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
@@ -502,6 +628,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	return header, fork, nil
 }
 
+// WatchSyncWithPeer subscribes and adds peer's latest block
 func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) bool) {
 	// purge from the cache of broadcasted blocks all the ones we have written so far
 	header := s.blockchain.Header()
@@ -538,6 +665,7 @@ func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
 	}
 }
 
+// BulkSyncWithPeer finds common ancestor with a peer and syncs block until latest block
 func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
@@ -552,10 +680,17 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 
 	var lastTarget uint64
 
+	// Create a blockchain subscription for the sync progression and start tracking
+	s.syncProgression.startProgression(startBlock.Number, s.blockchain.SubscribeEvents())
+
+	// Stop monitoring the sync progression upon exit
+	defer s.syncProgression.stopProgression()
+
 	// sync up to the current known header
 	for {
 		// update target
 		target := p.status.Number
+		s.syncProgression.updateHighestProgression(target)
 		if target == lastTarget {
 			// there are no more changes to pull for now
 			break
@@ -596,6 +731,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer) error {
 
 		lastTarget = target
 	}
+
 	return nil
 }
 

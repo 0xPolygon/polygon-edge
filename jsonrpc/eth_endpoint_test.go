@@ -342,6 +342,8 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 
 func TestEth_Block_GetLogs(t *testing.T) {
 
+	blockHash := types.StringToHash("1")
+
 	// Topics we're searching for
 	topic1 := types.StringToHash("4")
 	topic2 := types.StringToHash("5")
@@ -368,6 +370,12 @@ func TestEth_Block_GetLogs(t *testing.T) {
 				Topics:    topics,
 			},
 			false, 1},
+		{"Found matching logs, BlockHash present",
+			&LogFilter{
+				BlockHash: &blockHash,
+				Topics:    topics,
+			},
+			false, 1},
 		{"No logs found", &LogFilter{
 			fromBlock: 4,
 			toBlock:   5,
@@ -383,11 +391,22 @@ func TestEth_Block_GetLogs(t *testing.T) {
 	// setup test
 	store := &mockBlockStore2{}
 	store.topics = []types.Hash{topic1, topic2, topic3}
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		store.add(&types.Block{
 			Header: &types.Header{
 				Number: uint64(i),
 				Hash:   types.StringToHash(strconv.Itoa(i)),
+			},
+			Transactions: []*types.Transaction{
+				{
+					Value: big.NewInt(10),
+				},
+				{
+					Value: big.NewInt(11),
+				},
+				{
+					Value: big.NewInt(12),
+				},
 			},
 		})
 	}
@@ -404,6 +423,8 @@ func TestEth_Block_GetLogs(t *testing.T) {
 				t.Fatalf("Error: %v", logError)
 			} else if !testCase.shouldFail {
 				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
+			} else {
+				assert.Nil(t, foundLogs, "Expected first return param to be nil")
 			}
 		})
 	}
