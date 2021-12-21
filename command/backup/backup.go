@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-sdk/archive"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 type BackupCommand struct {
@@ -79,8 +81,8 @@ func (c *BackupCommand) Run(args []string) int {
 		return 1
 	}
 
-	var from uint64
-	var to uint64
+	var targetFrom uint64
+	var targetTo *uint64
 	var err error
 
 	if out == "" {
@@ -88,7 +90,7 @@ func (c *BackupCommand) Run(args []string) int {
 		return 1
 	}
 
-	if from, err = types.ParseUint64orHex(&rawFrom); err != nil {
+	if targetFrom, err = types.ParseUint64orHex(&rawFrom); err != nil {
 		c.Formatter.OutputError(fmt.Errorf("Failed to decode from: %w", err))
 		return 1
 	}
@@ -98,11 +100,11 @@ func (c *BackupCommand) Run(args []string) int {
 		if parsedTo, err = types.ParseUint64orHex(&rawTo); err != nil {
 			c.Formatter.OutputError(fmt.Errorf("Failed to decode to: %w", err))
 			return 1
-		} else if from > parsedTo {
+		} else if targetFrom > parsedTo {
 			c.Formatter.OutputError(errors.New("to must be greater than or equal to from"))
 			return 1
 		}
-		to = parsedTo
+		targetTo = &parsedTo
 	}
 
 	conn, err := c.GRPC.Conn()
@@ -111,10 +113,21 @@ func (c *BackupCommand) Run(args []string) int {
 		return 1
 	}
 
-	res, err := fetchAndSaveBackup(conn, from, to, out)
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "backup",
+		Level: hclog.LevelFromString("INFO"),
+	})
+
+	from, to, err := archive.CreateBackup(conn, logger, targetFrom, targetTo, out)
 	if err != nil {
 		c.Formatter.OutputError(err)
 		return 1
+	}
+
+	res := &BackupResult{
+		From: from,
+		To:   to,
+		Out:  out,
 	}
 	c.Formatter.OutputResult(res)
 

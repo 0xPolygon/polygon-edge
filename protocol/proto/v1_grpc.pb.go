@@ -12,7 +12,6 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // V1Client is the client API for V1 service.
@@ -106,7 +105,7 @@ type UnsafeV1Server interface {
 }
 
 func RegisterV1Server(s grpc.ServiceRegistrar, srv V1Server) {
-	s.RegisterService(&V1_ServiceDesc, srv)
+	s.RegisterService(&_V1_serviceDesc, srv)
 }
 
 func _V1_GetCurrent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -181,10 +180,7 @@ func _V1_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
-// V1_ServiceDesc is the grpc.ServiceDesc for V1 service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var V1_ServiceDesc = grpc.ServiceDesc{
+var _V1_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.V1",
 	HandlerType: (*V1Server)(nil),
 	Methods: []grpc.MethodDesc{

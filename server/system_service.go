@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -148,6 +149,20 @@ func (s *systemService) PeersList(
 	return resp, nil
 }
 
+// BlockByNumberRequest implements the BlockByNumberRequest operator service
+func (s *systemService) BlockByNumberRequest(
+	ctx context.Context,
+	req *proto.BlockByNumberRequest,
+) (*proto.BlockResponse, error) {
+	block, ok := s.s.blockchain.GetBlockByNumber(req.Number, true)
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return &proto.BlockResponse{
+		Data: block.MarshalRLP(),
+	}, nil
+}
+
 func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_ExportServer) error {
 	var from uint64 = 0
 	var to *uint64
@@ -171,7 +186,7 @@ func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_Exp
 		}
 	}
 
-	writer := newBlockStreamWriter(stream, defaultMaxGRPCPayloadSize)
+	writer := newBlockStreamWriter(stream, s.s.blockchain, defaultMaxGRPCPayloadSize)
 	i := from
 	for canLoop(i) {
 		block, ok := s.s.blockchain.GetBlockByNumber(i, true)
@@ -196,15 +211,17 @@ const (
 
 type blockStreamWriter struct {
 	buf         bytes.Buffer
+	blockchain  *blockchain.Blockchain
 	stream      proto.System_ExportServer
 	maxPayload  uint64
 	pendingFrom *uint64 // first block height in buffer
 	pendingTo   *uint64 // last block height in buffer
 }
 
-func newBlockStreamWriter(stream proto.System_ExportServer, maxPayload uint64) *blockStreamWriter {
+func newBlockStreamWriter(stream proto.System_ExportServer, blockchain *blockchain.Blockchain, maxPayload uint64) *blockStreamWriter {
 	return &blockStreamWriter{
 		buf:        *bytes.NewBuffer(make([]byte, 0, maxPayload)),
+		blockchain: blockchain,
 		stream:     stream,
 		maxPayload: maxPayload,
 	}
@@ -240,9 +257,10 @@ func (w *blockStreamWriter) flush() error {
 		return errors.New("pendingFrom or pendingTo is nil")
 	}
 	w.stream.Send(&proto.ExportEvent{
-		From: *w.pendingFrom,
-		To:   *w.pendingTo,
-		Data: w.buf.Bytes(),
+		From:   *w.pendingFrom,
+		To:     *w.pendingTo,
+		Latest: w.blockchain.Header().Number,
+		Data:   w.buf.Bytes(),
 	})
 	w.reset()
 	return nil

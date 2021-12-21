@@ -1,14 +1,18 @@
-package backup
+package archive
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"testing"
 
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type recvData struct {
@@ -54,6 +58,97 @@ var (
 func init() {
 	for _, b := range blocks {
 		b.Header.ComputeHash()
+	}
+}
+
+type systemClientMock struct {
+	proto.SystemClient
+	status       *proto.ServerStatus
+	errForStatus error
+	block        *proto.BlockResponse
+	errForBlock  error
+}
+
+func (m *systemClientMock) GetStatus(context.Context, *emptypb.Empty, ...grpc.CallOption) (*proto.ServerStatus, error) {
+	return m.status, m.errForStatus
+}
+
+func (m *systemClientMock) BlockByNumber(context.Context, *proto.BlockByNumberRequest, ...grpc.CallOption) (*proto.BlockResponse, error) {
+	return m.block, m.errForBlock
+}
+
+func Test_determineTo(t *testing.T) {
+	toPtr := func(x uint64) *uint64 {
+		return &x
+	}
+
+	tests := []struct {
+		name string
+		// input
+		targetTo *uint64
+		// mock
+		systemClientMock proto.SystemClient
+		// result
+		resTo     uint64
+		resToHash types.Hash
+		err       error
+	}{
+		{
+			name:     "should return expected 'to'",
+			targetTo: toPtr(2),
+			systemClientMock: &systemClientMock{
+				status: &proto.ServerStatus{
+					Current: &proto.ServerStatus_Block{
+						// greater than targetTo
+						Number: 10,
+					},
+				},
+				block: &proto.BlockResponse{
+					Data: blocks[1].MarshalRLP(),
+				},
+			},
+			resTo:     2,
+			resToHash: blocks[1].Hash(),
+			err:       nil,
+		},
+		{
+			name:     "should return latest if target to is greater than the latest in node",
+			targetTo: toPtr(2),
+			systemClientMock: &systemClientMock{
+				status: &proto.ServerStatus{
+					Current: &proto.ServerStatus_Block{
+						// less than targetTo
+						Number: 1,
+						Hash:   blocks[1].Hash().String(),
+					},
+				},
+			},
+			resTo:     1,
+			resToHash: blocks[1].Hash(),
+			err:       nil,
+		},
+		{
+			name:     "should fail if GetStatus failed",
+			targetTo: toPtr(2),
+			systemClientMock: &systemClientMock{
+				status:       nil,
+				errForStatus: errors.New("fake error"),
+			},
+			resTo:     0,
+			resToHash: types.Hash{},
+			err:       errors.New("fake error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resTo, resToHash, err := determineTo(context.Background(), tt.systemClientMock, tt.targetTo)
+			assert.Equal(t, tt.err, err)
+			if tt.err == nil {
+				assert.Equal(t, tt.resTo, resTo)
+				assert.Equal(t, tt.resToHash, resToHash)
+			}
+		})
 	}
 }
 
@@ -139,7 +234,7 @@ func Test_processExportStream(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buffer bytes.Buffer
-			from, to, err := processExportStream(tt.mockSystemExportClient, &buffer)
+			from, to, err := processExportStream(tt.mockSystemExportClient, hclog.NewNullLogger(), &buffer, 0, 0)
 
 			assert.Equal(t, tt.err, err)
 			if err != nil {

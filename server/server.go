@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/0xPolygon/polygon-sdk/archive"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
@@ -191,6 +192,13 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	// initialize data in consensus layer
 	if err := m.consensus.Initialize(); err != nil {
 		return nil, err
+	}
+
+	// restore archive data before starting
+	if config.RestoreFile != nil {
+		if err := archive.RestoreChain(m.blockchain, *config.RestoreFile); err != nil {
+			return nil, err
+		}
 	}
 
 	// start consensus

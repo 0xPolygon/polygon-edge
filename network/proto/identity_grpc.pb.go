@@ -12,7 +12,6 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // IdentityClient is the client API for Identity service.
@@ -78,7 +77,7 @@ type UnsafeIdentityServer interface {
 }
 
 func RegisterIdentityServer(s grpc.ServiceRegistrar, srv IdentityServer) {
-	s.RegisterService(&Identity_ServiceDesc, srv)
+	s.RegisterService(&_Identity_serviceDesc, srv)
 }
 
 func _Identity_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -117,10 +116,7 @@ func _Identity_Bye_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-// Identity_ServiceDesc is the grpc.ServiceDesc for Identity service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var Identity_ServiceDesc = grpc.ServiceDesc{
+var _Identity_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.Identity",
 	HandlerType: (*IdentityServer)(nil),
 	Methods: []grpc.MethodDesc{

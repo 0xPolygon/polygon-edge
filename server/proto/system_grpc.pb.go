@@ -29,6 +29,8 @@ type SystemClient interface {
 	// Subscribe subscribes to blockchain events
 	Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (System_SubscribeClient, error)
 	// Export returns blockchain data
+	BlockByNumber(ctx context.Context, in *BlockByNumberRequest, opts ...grpc.CallOption) (*BlockResponse, error)
+	// Export returns blockchain data
 	Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (System_ExportClient, error)
 }
 
@@ -108,6 +110,15 @@ func (x *systemSubscribeClient) Recv() (*BlockchainEvent, error) {
 	return m, nil
 }
 
+func (c *systemClient) BlockByNumber(ctx context.Context, in *BlockByNumberRequest, opts ...grpc.CallOption) (*BlockResponse, error) {
+	out := new(BlockResponse)
+	err := c.cc.Invoke(ctx, "/v1.System/BlockByNumber", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *systemClient) Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (System_ExportClient, error) {
 	stream, err := c.cc.NewStream(ctx, &_System_serviceDesc.Streams[1], "/v1.System/Export", opts...)
 	if err != nil {
@@ -155,6 +166,8 @@ type SystemServer interface {
 	// Subscribe subscribes to blockchain events
 	Subscribe(*empty.Empty, System_SubscribeServer) error
 	// Export returns blockchain data
+	BlockByNumber(context.Context, *BlockByNumberRequest) (*BlockResponse, error)
+	// Export returns blockchain data
 	Export(*ExportRequest, System_ExportServer) error
 	mustEmbedUnimplementedSystemServer()
 }
@@ -177,6 +190,9 @@ func (UnimplementedSystemServer) PeersStatus(context.Context, *PeersStatusReques
 }
 func (UnimplementedSystemServer) Subscribe(*empty.Empty, System_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
+}
+func (UnimplementedSystemServer) BlockByNumber(context.Context, *BlockByNumberRequest) (*BlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BlockByNumber not implemented")
 }
 func (UnimplementedSystemServer) Export(*ExportRequest, System_ExportServer) error {
 	return status.Errorf(codes.Unimplemented, "method Export not implemented")
@@ -287,6 +303,24 @@ func (x *systemSubscribeServer) Send(m *BlockchainEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _System_BlockByNumber_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockByNumberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SystemServer).BlockByNumber(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.System/BlockByNumber",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SystemServer).BlockByNumber(ctx, req.(*BlockByNumberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _System_Export_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ExportRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -327,6 +361,10 @@ var _System_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PeersStatus",
 			Handler:    _System_PeersStatus_Handler,
+		},
+		{
+			MethodName: "BlockByNumber",
+			Handler:    _System_BlockByNumber_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

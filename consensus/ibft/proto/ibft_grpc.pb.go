@@ -12,7 +12,6 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // IbftClient is the client API for Ibft service.
@@ -78,7 +77,7 @@ type UnsafeIbftServer interface {
 }
 
 func RegisterIbftServer(s grpc.ServiceRegistrar, srv IbftServer) {
-	s.RegisterService(&Ibft_ServiceDesc, srv)
+	s.RegisterService(&_Ibft_serviceDesc, srv)
 }
 
 func _Ibft_Handshake_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -117,10 +116,7 @@ func _Ibft_Message_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-// Ibft_ServiceDesc is the grpc.ServiceDesc for Ibft service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var Ibft_ServiceDesc = grpc.ServiceDesc{
+var _Ibft_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1.Ibft",
 	HandlerType: (*IbftServer)(nil),
 	Methods: []grpc.MethodDesc{

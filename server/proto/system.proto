@@ -23,6 +23,9 @@ service System {
     rpc Subscribe(google.protobuf.Empty) returns (stream BlockchainEvent);
 
     // Export returns blockchain data
+    rpc BlockByNumber(BlockByNumberRequest) returns (BlockResponse);
+
+    // Export returns blockchain data
     rpc Export(ExportRequest) returns (stream ExportEvent);
 }
 
@@ -70,6 +73,14 @@ message PeersListResponse {
     repeated Peer peers = 1;
 }
 
+message BlockByNumberRequest {
+    uint64 number = 1;
+}
+
+message BlockResponse {
+    bytes data = 1;
+}
+
 message ExportRequest {
     uint64 from = 1;
     uint64 to = 2;
@@ -79,5 +90,6 @@ message ExportEvent {
     uint64 from = 1;
     // null when zero
     uint64 to = 2;
-    bytes data = 3;
+    uint64 latest = 3;
+    bytes data = 4;
 }

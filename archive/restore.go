@@ -1,4 +1,4 @@
-package restore
+package archive
 
 import (
 	"errors"
@@ -13,87 +13,91 @@ import (
 
 var (
 	// Size of blocks to pass to WriteBlocks
-	chunkSize = 10
+	chunkSize = 50
 )
 
 type blockchainInterface interface {
 	Genesis() types.Hash
+	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
 	WriteBlocks([]*types.Block) error
 }
 
-func ImportChain(chain blockchainInterface, filePath string) (uint64, uint64, error) {
+func RestoreChain(chain blockchainInterface, filePath string) error {
 	fp, err := os.Open(filePath)
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
 	blockStream := newBlockStream(fp)
-	return importBlocks(chain, blockStream)
+
+	if _, _, err = importBlocks(chain, blockStream); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // import blocks scans all blocks from stream and write them to chain
 func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, uint64, error) {
-	type result struct {
-		from uint64
-		to   uint64
-		err  error
+	shutdownCh := common.GetTerminationSignalCh()
+
+	metadata, err := blockStream.getMetadata()
+	if err != nil {
+		return 0, 0, err
+	}
+	if metadata == nil {
+		return 0, 0, errors.New("expected metadata in archive but didn't exist")
 	}
 
-	resCh := make(chan result, 1)
-	shutdownCh := common.GetTerminationSignalCh()
-	go func() {
-		defer close(resCh)
+	// check node has the block in backup data already
+	latestBlock, ok := chain.GetBlockByNumber(metadata.Latest, false)
+	if ok && latestBlock.Hash() == metadata.LatestHash {
+		return 0, metadata.Latest, nil
+	}
 
-		block, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
-		if err != nil {
-			resCh <- result{0, 0, err}
-			return
-		}
-		if block == nil {
-			// all blocks are scanned, but no block to import was found
-			resCh <- result{0, 0, nil}
-			return
-		}
+	// skip existing blocks
+	firstBlock, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
+	if err != nil {
+		return 0, 0, err
+	}
+	if firstBlock == nil {
+		return 0, 0, nil
+	}
 
-		blocks := make([]*types.Block, 0, chunkSize)
-		blocks = append(blocks, block)
-		var lastBlockNumber uint64
-	processLoop:
-		for {
-			for len(blocks) < chunkSize {
-				block, err := blockStream.nextBlock()
-				if err != nil {
-					resCh <- result{0, 0, err}
-					return
-				}
-				if block == nil {
-					break
-				}
-				blocks = append(blocks, block)
+	blocks := make([]*types.Block, 0, chunkSize)
+	blocks = append(blocks, firstBlock)
+	var lastBlockNumber uint64
+processLoop:
+	for {
+		for len(blocks) < chunkSize {
+			block, err := blockStream.nextBlock()
+			if err != nil {
+				return 0, 0, err
 			}
-
-			// no blocks to be written any more
-			if len(blocks) == 0 {
+			if block == nil {
 				break
 			}
-			if err := chain.WriteBlocks(blocks); err != nil {
-				resCh <- result{0, 0, err}
-				return
-			}
-			lastBlockNumber = blocks[len(blocks)-1].Number()
-			blocks = blocks[:0]
-
-			select {
-			case <-shutdownCh:
-				break processLoop
-			default:
-			}
+			blocks = append(blocks, block)
 		}
-		resCh <- result{block.Number(), lastBlockNumber, err}
-	}()
-	res := <-resCh
 
-	return res.from, res.to, res.err
+		// no blocks to be written any more
+		if len(blocks) == 0 {
+			break
+		}
+		if err := chain.WriteBlocks(blocks); err != nil {
+			return firstBlock.Number(), lastBlockNumber, err
+		}
+		lastBlockNumber = blocks[len(blocks)-1].Number()
+		blocks = blocks[:0]
+
+		select {
+		case <-shutdownCh:
+			break processLoop
+		default:
+		}
+	}
+
+	return firstBlock.Number(), lastBlockNumber, nil
 }
 
 // consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
@@ -138,24 +142,46 @@ func newBlockStream(input io.Reader) *blockStream {
 	}
 }
 
-// nextBlock takes some bytes from input, returns parsed block, and consumes used bytes
-func (b *blockStream) nextBlock() (*types.Block, error) {
-	prefix, err := b.loadRLPPrefix()
-	if errors.Is(io.EOF, err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	payloadSize, payloadSizeSize, err := b.loadPrefixSize(1, prefix)
+// getMetadata consumes some bytes from input and returns parsed Metadata
+func (b *blockStream) getMetadata() (*Metadata, error) {
+	size, err := b.loadRLPArray()
 	if err != nil {
 		return nil, err
 	}
-	if err = b.loadPayload(1+payloadSizeSize, payloadSize); err != nil {
+	if size == 0 {
+		return nil, nil
+	}
+	return b.parseMetadata(size)
+}
+
+// nextBlock consumes some bytes from input and returns parsed block
+func (b *blockStream) nextBlock() (*types.Block, error) {
+	size, err := b.loadRLPArray()
+	if err != nil {
 		return nil, err
 	}
+	if size == 0 {
+		return nil, nil
+	}
+	return b.parseBlock(size)
+}
 
-	return b.parseBlock(1 + payloadSizeSize + payloadSize)
+// loadRLPArray loads RLP encoded array from input to buffer
+func (b *blockStream) loadRLPArray() (uint64, error) {
+	prefix, err := b.loadRLPPrefix()
+	if errors.Is(io.EOF, err) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	payloadSize, payloadSizeSize, err := b.loadPrefixSize(1, prefix)
+	if err != nil {
+		return 0, err
+	}
+	if err = b.loadPayload(1+payloadSizeSize, payloadSize); err != nil {
+		return 0, err
+	}
+	return 1 + payloadSizeSize + payloadSize, nil
 }
 
 // loadRLPPrefix loads first byte of RLP encoded data from input
@@ -169,30 +195,34 @@ func (b *blockStream) loadRLPPrefix() (byte, error) {
 
 // loadPrefixSize loads array's size from input
 // basically block should be array in RLP encoded value because block has 3 fields on the top: Header, Transactions, Uncles
-func (b *blockStream) loadPrefixSize(offset int64, prefix byte) (int64, int64, error) {
+func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64, error) {
 	switch {
 	case prefix >= 0xc0 && prefix <= 0xf7:
 		// an array whose size is less than 56
-		return int64(prefix - 0xc0), 0, nil
+		return uint64(prefix - 0xc0), 0, nil
 	case prefix >= 0xf8:
 		// an array whose size is greater than or equal to 56
 		// size of the data representing the size of payload
-		payloadSizeSize := int64(prefix - 0xf7)
+		payloadSizeSize := uint64(prefix - 0xf7)
 
 		b.reserveCap(offset + payloadSizeSize)
 		payloadSizeBytes := b.buffer[offset : offset+payloadSizeSize]
-		_, err := b.input.Read(payloadSizeBytes)
+		n, err := b.input.Read(payloadSizeBytes)
 		if err != nil {
 			return 0, 0, err
 		}
+		if uint64(n) < payloadSizeSize {
+			// couldn't load required amount of bytes
+			return 0, 0, io.EOF
+		}
 		payloadSize := new(big.Int).SetBytes(payloadSizeBytes).Int64()
-		return payloadSize, payloadSizeSize, nil
+		return uint64(payloadSize), uint64(payloadSizeSize), nil
 	}
 	return 0, 0, errors.New("expected arrray but got bytes")
 }
 
 // loadPayload loads payload data from stream and store to buffer
-func (b *blockStream) loadPayload(offset int64, size int64) error {
+func (b *blockStream) loadPayload(offset uint64, size uint64) error {
 	b.reserveCap(offset + size)
 	buf := b.buffer[offset : offset+size]
 	if _, err := b.input.Read(buf); err != nil {
@@ -201,8 +231,18 @@ func (b *blockStream) loadPayload(offset int64, size int64) error {
 	return nil
 }
 
-// parseBlock parses RLP encoded block in buffer
-func (b *blockStream) parseBlock(size int64) (*types.Block, error) {
+// parseMetadata parses RLP encoded Metadata in buffer
+func (b *blockStream) parseMetadata(size uint64) (*Metadata, error) {
+	data := b.buffer[:size]
+	metadata := &Metadata{}
+	if err := metadata.UnmarshalRLP(data); err != nil {
+		return nil, err
+	}
+	return metadata, nil
+}
+
+// parseBlock parses RLP encoded Block in buffer
+func (b *blockStream) parseBlock(size uint64) (*types.Block, error) {
 	data := b.buffer[:size]
 	block := &types.Block{}
 	if err := block.UnmarshalRLP(data); err != nil {
@@ -212,8 +252,10 @@ func (b *blockStream) parseBlock(size int64) (*types.Block, error) {
 }
 
 // reserveCap makes sure the internal buffer has given size
-func (b *blockStream) reserveCap(size int64) {
-	if size > int64(cap(b.buffer)) {
-		b.buffer = append(b.buffer[:cap(b.buffer)], make([]byte, size)...)
+func (b *blockStream) reserveCap(size uint64) {
+	if diff := int64(size) - int64(cap(b.buffer)); diff > 0 {
+		b.buffer = append(b.buffer[:cap(b.buffer)], make([]byte, diff)...)
+	} else {
+		b.buffer = b.buffer[:size]
 	}
 }
