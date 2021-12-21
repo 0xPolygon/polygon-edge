@@ -37,10 +37,21 @@ type Configuration struct {
 	JSONRPC  string
 }
 
+type metadata struct {
+	// turn around time for the transaction
+	turnAroundTime time.Duration
+
+	// block where it was sealed
+	blockNumber uint64
+}
+
 type ExecDuration struct {
 	// turnAroundMap maps the transaction hash -> turn around time for passing transactions
 	turnAroundMap     sync.Map
 	turnAroundMapSize uint64
+
+	// blockTransactions maps how many transactions went into a block
+	blockTransactions map[uint64]uint64
 
 	// Arrival Time - Time at which the transaction is added
 	// Completion Time -Time at which the transaction is sealed
@@ -79,7 +90,10 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	}
 
 	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		turnAroundTime := value.(time.Duration)
+		data := value.(*metadata)
+		turnAroundTime := data.turnAroundTime
+
+		// Update the duration metrics
 		if turnAroundTime < fastestTurnAround {
 			fastestTurnAround = turnAroundTime
 		}
@@ -89,6 +103,8 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 		}
 
 		totalTime = totalTime.Add(turnAroundTime)
+
+		ed.blockTransactions[data.blockNumber]++
 
 		return true
 	})
@@ -104,9 +120,9 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 // for a single loadbot run
 func (ed *ExecDuration) reportTurnAroundTime(
 	txHash web3.Hash,
-	turnAroundTime time.Duration,
+	data *metadata,
 ) {
-	ed.turnAroundMap.Store(txHash, turnAroundTime)
+	ed.turnAroundMap.Store(txHash, data)
 	atomic.AddUint64(&ed.turnAroundMapSize, 1)
 }
 
@@ -231,7 +247,7 @@ func (l *Loadbot) Run() error {
 			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 			defer cancel()
 
-			_, err = tests.WaitForReceipt(ctx, client.Eth(), txHash)
+			receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
@@ -241,7 +257,10 @@ func (l *Loadbot) Run() error {
 			end := time.Now()
 			l.metrics.TransactionDuration.reportTurnAroundTime(
 				txHash,
-				end.Sub(start),
+				&metadata{
+					turnAroundTime: end.Sub(start),
+					blockNumber:    receipt.BlockNumber,
+				},
 			)
 		}()
 	}
