@@ -104,7 +104,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
-	flags.IntVar(&maxConns, "maxconns", 0, "")
+	flags.IntVar(&maxConns, "max-conns", 0, "")
 
 	var err error
 	// Parse cli arguments
