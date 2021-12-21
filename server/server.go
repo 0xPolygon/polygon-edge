@@ -176,7 +176,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	{
 		// Setup consensus
-		if m.consensus, err = SetupConsensus(config, m.txpool, m.network, m.blockchain, m.executor, m.grpcServer, m.secretsManager, m.logger, m.serverMetrics.consensus); err != nil {
+		if err := m.setupConsensus(); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
@@ -307,51 +307,44 @@ func (s *Server) setupSecretsManager() error {
 	return nil
 }
 
-// SetupConsensus sets up the consensus mechanism
-func SetupConsensus(config *Config,
-	txPool *txpool.TxPool,
-	network *network.Server,
-	bc *blockchain.Blockchain,
-	executor *state.Executor,
-	grpcSrv *grpc.Server,
-	secretsManager secrets.SecretsManager,
-	logger hclog.Logger,
-	metrics *consensus.Metrics,
-) (consensus.Consensus, error) {
-	engineName := config.Chain.Params.GetEngine()
+// setupConsensus sets up the consensus mechanism
+func (s *Server) setupConsensus() error {
+	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[engineName]
 	if !ok {
-		return nil, fmt.Errorf("consensus engine '%s' not found", engineName)
+		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
 
-	engineConfig, ok := config.Chain.Params.Engine[engineName].(map[string]interface{})
+	engineConfig, ok := s.config.Chain.Params.Engine[engineName].(map[string]interface{})
 	if !ok {
 		engineConfig = map[string]interface{}{}
 	}
-	consensusConfig := &consensus.Config{
-		Params: config.Chain.Params,
+	config := &consensus.Config{
+		Params: s.config.Chain.Params,
 		Config: engineConfig,
-		Path:   filepath.Join(config.DataDir, "consensus"),
+		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
 	consensus, err := engine(
 		&consensus.ConsensusParams{
 			Context:        context.Background(),
-			Seal:           config.Seal,
-			Config:         consensusConfig,
-			Txpool:         txPool,
-			Network:        network,
-			Blockchain:     bc,
-			Executor:       executor,
-			Grpc:           grpcSrv,
-			Logger:         logger.Named("consensus"),
-			Metrics:        metrics,
-			SecretsManager: secretsManager,
+			Seal:           s.config.Seal,
+			Config:         config,
+			Txpool:         s.txpool,
+			Network:        s.network,
+			Blockchain:     s.blockchain,
+			Executor:       s.executor,
+			Grpc:           s.grpcServer,
+			Logger:         s.logger.Named("consensus"),
+			Metrics:        s.serverMetrics.consensus,
+			SecretsManager: s.secretsManager,
 		},
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return consensus, err
+	s.consensus = consensus
+
+	return nil
 }
 
 type jsonRPCHub struct {
