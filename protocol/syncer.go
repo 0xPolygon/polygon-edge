@@ -328,16 +328,6 @@ func (s *Syncer) GetSyncProgression() *Progression {
 
 // syncCurrentStatus taps into the blockchain event steam and updates the Syncer.status field
 func (s *Syncer) syncCurrentStatus() {
-	// Get the current status of the syncer
-	currentHeader := s.blockchain.Header()
-	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
-
-	s.status = &Status{
-		Hash:       currentHeader.Hash,
-		Number:     currentHeader.Number,
-		Difficulty: diff,
-	}
-
 	sub := s.blockchain.SubscribeEvents()
 	eventCh := sub.GetEventCh()
 
@@ -435,6 +425,16 @@ func (s *Syncer) Broadcast(b *types.Block) {
 // Start starts the syncer protocol
 func (s *Syncer) Start() {
 	s.serviceV1 = &serviceV1{syncer: s, logger: hclog.NewNullLogger(), store: s.blockchain}
+
+	// Get the current status of the syncer
+	currentHeader := s.blockchain.Header()
+	diff, _ := s.blockchain.GetTD(currentHeader.Hash)
+
+	s.status = &Status{
+		Hash:       currentHeader.Hash,
+		Number:     currentHeader.Number,
+		Difficulty: diff,
+	}
 
 	// Run the blockchain event listener loop
 	go s.syncCurrentStatus()
