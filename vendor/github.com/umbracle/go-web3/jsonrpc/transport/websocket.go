@@ -251,6 +251,10 @@ func (s *stream) Subscribe(method string, callback func(b []byte)) (func() error
 	return cancel, nil
 }
 
+// SetMaxConnsPerHost implements the transport interface
+func (s *stream) SetMaxConnsPerHost(count int) {
+}
+
 type websocketCodec struct {
 	conn *websocket.Conn
 }

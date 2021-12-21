@@ -42,3 +42,8 @@ func (c *Client) Close() error {
 func (c *Client) Call(method string, out interface{}, params ...interface{}) error {
 	return c.transport.Call(method, out, params...)
 }
+
+// SetMaxConnsLimit sets the maximum number of connections that can be established with a host
+func (c *Client) SetMaxConnsLimit(count int) {
+	c.transport.SetMaxConnsPerHost(count)
+}

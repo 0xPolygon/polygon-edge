@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"log"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -23,6 +24,9 @@ type Consensus interface {
 
 	// GetBlockCreator retrieves the block creator (or signer) given the block header
 	GetBlockCreator(header *types.Header) (types.Address, error)
+
+	// GetSyncProgression retrieves the current sync progression, if any
+	GetSyncProgression() *protocol.Progression
 
 	// Start starts the consensus
 	Start() error
@@ -56,7 +60,7 @@ type ConsensusParams struct {
 	Executor       *state.Executor
 	Grpc           *grpc.Server
 	Logger         hclog.Logger
-  Metrics        *Metrics
+	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
 }
 
