@@ -7,7 +7,9 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -17,20 +19,21 @@ var (
 )
 
 type blockchainInterface interface {
+	SubscribeEvents() blockchain.Subscription
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
 	WriteBlocks([]*types.Block) error
 }
 
-func RestoreChain(chain blockchainInterface, filePath string) error {
+func RestoreChain(chain blockchainInterface, filePath string, progression *progress.ProgressionWrapper) error {
 	fp, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
 	blockStream := newBlockStream(fp)
 
-	if _, _, err = importBlocks(chain, blockStream); err != nil {
+	if _, _, err = importBlocks(chain, blockStream, progression); err != nil {
 		return err
 	}
 
@@ -38,7 +41,7 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 }
 
 // import blocks scans all blocks from stream and write them to chain
-func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, uint64, error) {
+func importBlocks(chain blockchainInterface, blockStream *blockStream, progression *progress.ProgressionWrapper) (uint64, uint64, error) {
 	shutdownCh := common.GetTerminationSignalCh()
 
 	metadata, err := blockStream.getMetadata()
@@ -63,6 +66,13 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, 
 	if firstBlock == nil {
 		return 0, 0, nil
 	}
+
+	// Create a blockchain subscription for the sync progression and start tracking
+	progression.StartProgression(firstBlock.Number(), chain.SubscribeEvents())
+	// Set the goal
+	progression.UpdateHighestProgression(metadata.Latest)
+	// Stop monitoring the sync progression upon exit
+	defer progression.StopProgression()
 
 	blocks := make([]*types.Block, 0, chunkSize)
 	blocks = append(blocks, firstBlock)

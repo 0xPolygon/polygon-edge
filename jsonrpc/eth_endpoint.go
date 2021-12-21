@@ -25,6 +25,7 @@ func (e *Eth) Syncing() (interface{}, error) {
 	if syncProgression := e.d.store.GetSyncProgression(); syncProgression != nil {
 		// Node is bulk syncing, return the status
 		return progression{
+			Type:          string(syncProgression.SyncType),
 			StartingBlock: hex.EncodeUint64(syncProgression.StartingBlock),
 			CurrentBlock:  hex.EncodeUint64(syncProgression.CurrentBlock),
 			HighestBlock:  hex.EncodeUint64(syncProgression.HighestBlock),

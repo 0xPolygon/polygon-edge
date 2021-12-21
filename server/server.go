@@ -69,8 +69,12 @@ type Server struct {
 	serverMetrics *serverMetrics
 
 	prometheusServer *http.Server
+
 	// secrets manager
 	secretsManager secrets.SecretsManager
+
+	// restore
+	restoreProgression *progress.ProgressionWrapper
 }
 
 var dirPaths = []string{
@@ -82,10 +86,11 @@ var dirPaths = []string{
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger:     logger,
-		config:     config,
-		chain:      config.Chain,
-		grpcServer: grpc.NewServer(),
+		logger:             logger,
+		config:             config,
+		chain:              config.Chain,
+		grpcServer:         grpc.NewServer(),
+		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -226,7 +231,7 @@ func (s *Server) restoreChain() error {
 	if s.config.RestoreFile == nil {
 		return nil
 	}
-	if err := archive.RestoreChain(s.blockchain, *s.config.RestoreFile); err != nil {
+	if err := archive.RestoreChain(s.blockchain, *s.config.RestoreFile, s.restoreProgression); err != nil {
 		return err
 	}
 	return nil
@@ -357,7 +362,8 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
-	state state.State
+	state              state.State
+	restoreProgression *progress.ProgressionWrapper
 
 	*blockchain.Blockchain
 	*txpool.TxPool
@@ -443,8 +449,15 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (res
 }
 
 func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
-	// TODO
-	return j.Consensus.GetSyncProgression()
+	// restore progression
+	if restoreProg := j.restoreProgression.GetProgression(); restoreProg != nil {
+		return restoreProg
+	}
+	// consensus sync progression
+	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
+		return consensusSyncProg
+	}
+	return nil
 }
 
 // SETUP //
@@ -452,11 +465,12 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
-		state:      s.state,
-		Blockchain: s.blockchain,
-		TxPool:     s.txpool,
-		Executor:   s.executor,
-		Consensus:  s.consensus,
+		state:              s.state,
+		restoreProgression: s.restoreProgression,
+		Blockchain:         s.blockchain,
+		TxPool:             s.txpool,
+		Executor:           s.executor,
+		Consensus:          s.consensus,
 	}
 
 	conf := &jsonrpc.Config{

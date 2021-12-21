@@ -6,9 +6,19 @@ import (
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 )
 
+type ChainSyncType string
+
+const (
+	ChainSyncRestore ChainSyncType = "restore"
+	ChainSyncBulk    ChainSyncType = "bulk-sync"
+)
+
 // Progression defines the status of the sync
 // progression of the node
 type Progression struct {
+	// SyncType is indicating the sync method
+	SyncType ChainSyncType
+
 	// StartingBlock is the initial block that the node is starting
 	// the sync from. It is reset after every sync batch
 	StartingBlock uint64
@@ -30,12 +40,15 @@ type ProgressionWrapper struct {
 	stopCh chan struct{}
 
 	lock sync.RWMutex
+
+	syncType ChainSyncType
 }
 
-func NewProgressionWrapper() *ProgressionWrapper {
+func NewProgressionWrapper(syncType ChainSyncType) *ProgressionWrapper {
 	return &ProgressionWrapper{
 		progression: nil,
 		stopCh:      make(chan struct{}),
+		syncType:    syncType,
 	}
 }
 
@@ -48,6 +61,7 @@ func (pw *ProgressionWrapper) StartProgression(
 	defer pw.lock.Unlock()
 
 	pw.progression = &Progression{
+		SyncType:      pw.syncType,
 		StartingBlock: startingBlock,
 	}
 
