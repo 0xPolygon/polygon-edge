@@ -46,13 +46,13 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, 
 		return 0, 0, err
 	}
 	if metadata == nil {
-		return 0, 0, errors.New("expected metadata in archive but didn't exist")
+		return 0, 0, errors.New("expected metadata in archive but doesn't exist")
 	}
 
-	// check node has the block in backup data already
+	// check whether the local chain has the latest block already
 	latestBlock, ok := chain.GetBlockByNumber(metadata.Latest, false)
 	if ok && latestBlock.Hash() == metadata.LatestHash {
-		return 0, metadata.Latest, nil
+		return 0, 0, nil
 	}
 
 	// skip existing blocks
@@ -88,6 +88,7 @@ processLoop:
 			return firstBlock.Number(), lastBlockNumber, err
 		}
 		lastBlockNumber = blocks[len(blocks)-1].Number()
+		// clear slice but keep capacity
 		blocks = blocks[:0]
 
 		select {

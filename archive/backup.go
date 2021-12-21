@@ -67,11 +67,12 @@ func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) 
 	}
 
 	if targetTo != nil && *targetTo < uint64(status.Current.Number) {
-		// check the existence of the block when you have target to
+		// check the existence of the block when you have targetTo
 		resp, err := clt.BlockByNumber(ctx, &proto.BlockByNumberRequest{Number: *targetTo})
 		if err == nil {
 			block := types.Block{}
 			if err := block.UnmarshalRLP(resp.Data); err == nil {
+				// can use targetTo only if the node has the block at the specific height
 				return block.Number(), block.Hash(), nil
 			}
 		}
