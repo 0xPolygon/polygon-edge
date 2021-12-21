@@ -631,10 +631,10 @@ func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
 		}
 
 		tx := p.promoted.pop()
-		if tx.Nonce > nonceMap[tx.From] {
-			valid = append(valid, tx)
-		} else {
+		if tx.Nonce < nonceMap[tx.From] {
 			pruned = append(pruned, tx)
+		} else {
+			valid = append(valid, tx)
 		}
 	}
 
