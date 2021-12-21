@@ -144,6 +144,10 @@ type TxPool struct {
 	// Flag indicating if the current node is running in dev mode (used for testing)
 	dev bool
 
+	// Channel used by the dev consensus to be notified
+	// anytime an account queue is promoted
+	DevNotifyCh chan struct{}
+
 	// Prometheus API
 	metrics *Metrics
 
@@ -279,6 +283,14 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// push to promotables
 	p.promoted.push(promotables...)
+
+	if p.dev {
+		// notify the dev consensus
+		select {
+		case p.DevNotifyCh <- struct{}{}:
+		default:
+		}
+	}
 
 	// only update the nonce map if the new nonce
 	// is higher than the one previously stored.

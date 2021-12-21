@@ -53,7 +53,7 @@ func Factory(
 
 	// enable dev mode so that we can accept non-signed txns
 	params.Txpool.EnableDev()
-	params.Txpool.NotifyCh = d.notifyCh
+	params.Txpool.DevNotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -103,43 +103,46 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	txns := []*types.Transaction{}
-	returnTxnFuncs := []func(){}
+	d.txpool.LockPromoted(true)
+	defer d.txpool.UnlockPromoted()
+
+	var successful, recoverables []*types.Transaction
 	for {
-		txn, retTxnFn := d.txpool.Pop()
-		if txn == nil {
+		tx := d.txpool.Pop()
+		if tx == nil {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(gasLimit) {
+		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.DecreaseAccountNonce(txn)
+			d.txpool.RollbackNonce(tx) // unrecoverable tx
 			continue
 		}
 
-		if err := transition.Write(txn); err != nil {
+		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				recoverables = append(recoverables, tx)
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+				recoverables = append(recoverables, tx)
 			} else {
-				d.txpool.DecreaseAccountNonce(txn)
+				// unrecoverable tx
+				d.txpool.RollbackNonce(tx)
 			}
+
 			continue
 		}
 
-		txns = append(txns, txn)
+		successful = append(successful, tx)
 	}
 
-	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
-	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
-	for _, retFunc := range returnTxnFuncs {
-		retFunc()
+	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", len(recoverables))
+
+	for _, tx := range recoverables {
+		d.txpool.Recover(tx)
 	}
 
-	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
-	return txns
+	return successful
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
