@@ -98,6 +98,21 @@ func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Dura
 	assert.NoError(t, err)
 }
 
+// WaitUntilProgressionUpdated waits until the syncer's progression current block reaches a target
+func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Duration, target uint64) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		return nil, syncer.syncProgression.getProgression().CurrentBlock < target
+	})
+	assert.NoError(t, err)
+}
+
 // NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	seed := rand.Intn(maxSeed)
@@ -179,8 +194,8 @@ func HeaderToStatus(h *types.Header) *Status {
 
 // mockBlockchain is a mock of blockhain for syncer tests
 type mockBlockchain struct {
-	blocks       []*types.Block
-	subscription *mockSubscription
+	blocks        []*types.Block
+	subscriptions []*mockSubscription
 }
 
 func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
@@ -189,13 +204,15 @@ func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 
 func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 	return &mockBlockchain{
-		blocks:       blockchain.HeadersToBlocks(headers),
-		subscription: NewMockSubscription(),
+		blocks:        blockchain.HeadersToBlocks(headers),
+		subscriptions: make([]*mockSubscription, 0),
 	}
 }
 
 func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
-	return b.subscription
+	subscription := NewMockSubscription()
+	b.subscriptions = append(b.subscriptions, subscription)
+	return subscription
 }
 
 func (b *mockBlockchain) Header() *types.Header {
@@ -256,7 +273,9 @@ func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 
 func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
 	b.blocks = append(b.blocks, blocks...)
-	b.subscription.AppendBlocks(blocks)
+	for _, subscription := range b.subscriptions {
+		subscription.AppendBlocks(blocks)
+	}
 	return nil
 }
 
@@ -267,7 +286,7 @@ type mockSubscription struct {
 
 func NewMockSubscription() *mockSubscription {
 	return &mockSubscription{
-		eventCh: make(chan *blockchain.Event, 2), // make with 2 capacities in order to check subsequent event easily
+		eventCh: make(chan *blockchain.Event),
 	}
 }
 

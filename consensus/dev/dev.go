@@ -3,6 +3,7 @@ package dev
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -214,6 +215,10 @@ func (d *Dev) VerifyHeader(parent *types.Header, header *types.Header) error {
 
 func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
+}
+
+func (d *Dev) GetSyncProgression() *protocol.Progression {
+	return nil
 }
 
 func (d *Dev) Prepare(header *types.Header) error {
