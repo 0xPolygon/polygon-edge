@@ -374,7 +374,7 @@ func (s *Server) addPeer(id peer.ID) {
 	s.peers[id] = p
 
 	s.emitEvent(id, PeerConnected)
-	s.metrics.Peers.Set(float64(len(s.peers)))
+	s.metrics.Peers.Set(float64(s.numPeers()))
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -387,7 +387,7 @@ func (s *Server) delPeer(id peer.ID) {
 	s.host.Network().ClosePeer(id)
 
 	s.emitEvent(id, PeerDisconnected)
-	s.metrics.Peers.Set(float64(len(s.peers)))
+	s.metrics.Peers.Set(float64(s.numPeers()))
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
