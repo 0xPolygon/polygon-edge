@@ -414,11 +414,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 
 		for _, tx := range block.Transactions {
-			// skip unknown accounts
-			if _, known := p.nextNonces.load(tx.From); !known {
-				continue
-			}
-
 			oldTransactions[tx.Hash] = tx
 		}
 	}
@@ -437,11 +432,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		// determine latest nonces for all known accounts
 		for _, tx := range block.Transactions {
 			addr := tx.From
-
-			// skip unknown accounts
-			if _, known := p.nextNonces.load(addr); !known {
-				continue
-			}
 
 			// skip already processed accounts
 			if _, processed := newNonces[addr]; processed {
@@ -636,11 +626,16 @@ func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
 		}
 
 		tx := p.promoted.pop()
-		if tx.Nonce > nonceMap[tx.From] {
+
+		// skip if there is no new nonce
+		// or the popped tx has higher than new
+		nonce, ok := nonceMap[tx.From]
+		if !ok || tx.Nonce > nonce {
 			valid = append(valid, tx)
-		} else {
-			pruned = append(pruned, tx)
+			continue
 		}
+
+		pruned = append(pruned, tx)
 	}
 
 	// remove from index
