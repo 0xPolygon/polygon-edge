@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"sync"
@@ -392,127 +391,6 @@ func TestTxPool_StressAddition(t *testing.T) {
 	}
 }
 
-func TestPriceLimit(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	testCases := []struct {
-		name             string
-		numNodes         int
-		locals           []string
-		noLocals         bool
-		priceLimit       uint64
-		gasPrice         int64
-		err              error // JSON-RPC error
-		numReceivedNodes int64
-	}{
-		{
-			name:             "tx should propagate",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         false,
-			priceLimit:       10,
-			gasPrice:         100,
-			err:              nil,
-			numReceivedNodes: 3,
-		},
-		{
-			name:             "tx should be rejected due to low gas price",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         true,
-			priceLimit:       10,
-			gasPrice:         5,
-			err:              errors.New("{\"code\":-32600,\"message\":\"transaction underpriced\"}"),
-			numReceivedNodes: 0,
-		},
-		{
-			name:             "tx should not propagate",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         false,
-			priceLimit:       10,
-			gasPrice:         0,
-			err:              nil,
-			numReceivedNodes: 1, // only first node receive
-		},
-		{
-			name:             "tx should propagate because sender address is treated as local transaction",
-			numNodes:         3,
-			locals:           []string{senderAddr.String()},
-			noLocals:         true,
-			priceLimit:       10,
-			gasPrice:         0,
-			err:              nil,
-			numReceivedNodes: 3,
-		},
-	}
-
-	defaultConfig := func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDummy)
-		config.Premine(senderAddr, framework.EthToWei(10))
-		config.SetSeal(true)
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			srvs := framework.NewTestServers(t, tt.numNodes, func(config *framework.TestServerConfig) {
-				defaultConfig(config)
-				config.SetLocals(tt.locals)
-				config.SetNoLocals(tt.noLocals)
-				config.SetPriceLimit(&tt.priceLimit)
-			})
-			framework.MultiJoinSerial(t, srvs)
-
-			// wait until gossip protocol build mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
-			time.Sleep(time.Second * 2)
-
-			tx, err := signer.SignTx(&types.Transaction{
-				Nonce:    0,
-				From:     senderAddr,
-				To:       &receiverAddr,
-				Value:    framework.EthToWei(1),
-				Gas:      1000000,
-				GasPrice: big.NewInt(tt.gasPrice),
-				Input:    []byte{},
-			}, senderKey)
-			assert.NoError(t, err, "failed to sign transaction")
-
-			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
-			if tt.err != nil {
-				assert.Equal(t, tt.err.Error(), err.Error())
-			} else {
-				assert.NoError(t, err, "failed to send transaction")
-			}
-
-			for i, srv := range srvs {
-				srv := srv
-				shouldHaveTxPool := false
-				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
-				if i < int(tt.numReceivedNodes) {
-					shouldHaveTxPool = true
-					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
-				}
-
-				t.Run(subTestName, func(t *testing.T) {
-					t.Parallel()
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-					defer cancel()
-					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
-
-					if shouldHaveTxPool {
-						assert.NoError(t, err)
-						assert.Equal(t, uint64(1), res.Length)
-					} else {
-						assert.ErrorIs(t, err, tests.ErrTimeout)
-					}
-				})
-			}
-		})
-	}
-}
-
 func TestInvalidTransactionRecover(t *testing.T) {
 	// Test scenario :
 	//
@@ -780,71 +658,73 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	assert.Equal(t, big.NewInt(0).Sub(startingBalance, sentFunds).String(), senderBalance.String())
 }
 
-func TestTxPool_GetPendingTx(t *testing.T) {
-	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
-	_, receiverAddress := tests.GenerateKeyAndAddr(t)
-	// Test scenario:
-	// The sender account should send multiple transactions to the receiving address
-	// and get correct responses when querying the transaction through JSON-RPC
+// TODO
 
-	startingBalance := framework.EthToWei(100)
+// func TestTxPool_GetPendingTx(t *testing.T) {
+// 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
+// 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
+// 	// Test scenario:
+// 	// The sender account should send multiple transactions to the receiving address
+// 	// and get correct responses when querying the transaction through JSON-RPC
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.SetDevInterval(5)
-		config.SetBlockLimit(20000000)
-		config.Premine(senderAddress, startingBalance)
-	})
+// 	startingBalance := framework.EthToWei(100)
 
-	server := servers[0]
-	client := server.JSONRPC()
+// 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+// 		config.SetConsensus(framework.ConsensusDev)
+// 		config.SetSeal(true)
+// 		config.SetDevInterval(5)
+// 		config.SetBlockLimit(20000000)
+// 		config.Premine(senderAddress, startingBalance)
+// 	})
 
-	// Construct the transaction
-	signedTx, err := signer.SignTx(&types.Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(0),
-		Gas:      framework.DefaultGasLimit - 1,
-		To:       &receiverAddress,
-		Value:    oneEth,
-		V:        big.NewInt(1),
-		From:     types.ZeroAddress,
-	}, senderKey)
-	assert.NoError(t, err, "failed to sign transaction")
+// 	server := servers[0]
+// 	client := server.JSONRPC()
 
-	// Add the transaction
-	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
-	if err != nil {
-		t.Fatalf("Unable to send transaction, %v", err)
-	}
+// 	// Construct the transaction
+// 	signedTx, err := signer.SignTx(&types.Transaction{
+// 		Nonce:    0,
+// 		GasPrice: big.NewInt(0),
+// 		Gas:      framework.DefaultGasLimit - 1,
+// 		To:       &receiverAddress,
+// 		Value:    oneEth,
+// 		V:        big.NewInt(1),
+// 		From:     types.ZeroAddress,
+// 	}, senderKey)
+// 	assert.NoError(t, err, "failed to sign transaction")
 
-	// Grab the pending transaction from the pool
-	txn, getErr := client.Eth().GetTransactionByHash(txHash)
-	if getErr != nil {
-		t.Fatalf("Unable to get transaction by hash, %v", getErr)
-	}
-	assert.NotNil(t, txn)
+// 	// Add the transaction
+// 	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+// 	if err != nil {
+// 		t.Fatalf("Unable to send transaction, %v", err)
+// 	}
 
-	// Make sure the specific fields are not filled yet
-	assert.Equal(t, uint64(0), txn.TxnIndex)
-	assert.Equal(t, uint64(0), txn.BlockNumber)
-	assert.Equal(t, web3.ZeroHash, txn.BlockHash)
+// 	// Grab the pending transaction from the pool
+// 	txn, getErr := client.Eth().GetTransactionByHash(txHash)
+// 	if getErr != nil {
+// 		t.Fatalf("Unable to get transaction by hash, %v", getErr)
+// 	}
+// 	assert.NotNil(t, txn)
 
-	// Wait for the transaction to be included into a block
-	blockNum := waitForBlock(t, server, 1, 0)
+// 	// Make sure the specific fields are not filled yet
+// 	assert.Equal(t, uint64(0), txn.TxnIndex)
+// 	assert.Equal(t, uint64(0), txn.BlockNumber)
+// 	assert.Equal(t, web3.ZeroHash, txn.BlockHash)
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block, %v", blockErr)
-	}
+// 	// Wait for the transaction to be included into a block
+// 	blockNum := waitForBlock(t, server, 1, 0)
 
-	txn, getErr = client.Eth().GetTransactionByHash(txHash)
-	if getErr != nil {
-		t.Fatalf("Unable to get transaction by hash, %v", getErr)
-	}
-	assert.NotNil(t, txn)
+// 	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
+// 	if blockErr != nil {
+// 		t.Fatalf("Unable to fetch block, %v", blockErr)
+// 	}
 
-	assert.Equal(t, uint64(0), txn.TxnIndex)
-	assert.Equal(t, block.Number, txn.BlockNumber)
-	assert.Equal(t, block.Hash, txn.BlockHash)
-}
+// 	txn, getErr = client.Eth().GetTransactionByHash(txHash)
+// 	if getErr != nil {
+// 		t.Fatalf("Unable to get transaction by hash, %v", getErr)
+// 	}
+// 	assert.NotNil(t, txn)
+
+// 	assert.Equal(t, uint64(0), txn.TxnIndex)
+// 	assert.Equal(t, block.Number, txn.BlockNumber)
+// 	assert.Equal(t, block.Hash, txn.BlockHash)
+// }
