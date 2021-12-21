@@ -126,11 +126,6 @@ func (ed *ExecDuration) reportTurnAroundTime(
 	atomic.AddUint64(&ed.turnAroundMapSize, 1)
 }
 
-// setTotalExecTime sets the total execution time for a single loadbot run
-func (ed *ExecDuration) setTotalExecTime(totalTime time.Duration) {
-	ed.TotalExecTime = totalTime
-}
-
 type Metrics struct {
 	TotalTransactionsSentCount uint64
 	FailedTransactionsCount    uint64
@@ -144,7 +139,7 @@ type Loadbot struct {
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
 // based on the transaction count and tps params
-func (l *Loadbot) calcMaxTimeout(count, tps uint64) time.Duration {
+func calcMaxTimeout(count, tps uint64) time.Duration {
 	waitTime := minReceiptWait
 	// The receipt timeout should be at max maxReceiptWait
 	// or minReceiptWait + tps / count * 100
@@ -219,7 +214,7 @@ func (l *Loadbot) Run() error {
 
 	var wg sync.WaitGroup
 
-	receiptTimeout := l.calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
+	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 
 	startTime := time.Now()
 	for i := uint64(0); i < l.cfg.Count; i++ {
