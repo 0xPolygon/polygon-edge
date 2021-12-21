@@ -3,11 +3,11 @@ package dev
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/txpool"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -217,7 +217,7 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dev) GetSyncProgression() *protocol.Progression {
+func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

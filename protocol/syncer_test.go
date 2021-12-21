@@ -370,22 +370,22 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncHeaders := blockchain.NewTestHeaderChainWithSeed(nil, targetChainSize, 0)
 	syncBlocks := blockchain.HeadersToBlocks(syncHeaders)
 
-	syncer.syncProgression.startProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
+	syncer.syncProgression.StartProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
 	if syncer.GetSyncProgression() == nil {
 		t.Fatalf("Unable to start progression")
 	}
-	assert.Equal(t, uint64(initialChainSize), syncer.syncProgression.getProgression().StartingBlock)
+	assert.Equal(t, uint64(initialChainSize), syncer.syncProgression.GetProgression().StartingBlock)
 
-	syncer.syncProgression.updateHighestProgression(uint64(targetChainSize))
-	assert.Equal(t, uint64(targetChainSize), syncer.syncProgression.getProgression().HighestBlock)
+	syncer.syncProgression.UpdateHighestProgression(uint64(targetChainSize))
+	assert.Equal(t, uint64(targetChainSize), syncer.syncProgression.GetProgression().HighestBlock)
 
 	writeErr := syncerChain.WriteBlocks(syncBlocks[initialChainSize+1:])
 	assert.NoError(t, writeErr)
 
 	WaitUntilProgressionUpdated(t, syncer, 15*time.Second, uint64(targetChainSize-1))
-	assert.Equal(t, uint64(targetChainSize-1), syncer.syncProgression.getProgression().CurrentBlock)
+	assert.Equal(t, uint64(targetChainSize-1), syncer.syncProgression.GetProgression().CurrentBlock)
 
-	syncer.syncProgression.stopProgression()
+	syncer.syncProgression.StopProgression()
 }
 
 type mockBlockStore struct {

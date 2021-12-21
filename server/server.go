@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/secrets"
@@ -195,11 +195,14 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup and start jsonrpc server
+	if err := m.setupJSONRPC(); err != nil {
+		return nil, err
+	}
+
 	// restore archive data before starting
-	if config.RestoreFile != nil {
-		if err := archive.RestoreChain(m.blockchain, *config.RestoreFile); err != nil {
-			return nil, err
-		}
+	if err := m.restoreChain(); err != nil {
+		return nil, err
 	}
 
 	// start consensus
@@ -212,16 +215,21 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup and start jsonrpc server
-	if err := m.setupJSONRPC(); err != nil {
-		return nil, err
-	}
-
 	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
 
 	return m, nil
+}
+
+func (s *Server) restoreChain() error {
+	if s.config.RestoreFile == nil {
+		return nil
+	}
+	if err := archive.RestoreChain(s.blockchain, *s.config.RestoreFile); err != nil {
+		return err
+	}
+	return nil
 }
 
 type txpoolHub struct {
@@ -434,7 +442,8 @@ func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (res
 	return
 }
 
-func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
+func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
+	// TODO
 	return j.Consensus.GetSyncProgression()
 }
 

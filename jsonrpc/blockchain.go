@@ -1,11 +1,11 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -60,7 +60,7 @@ type blockchainInterface interface {
 	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
@@ -150,6 +150,6 @@ func (b *nullBlockchainInterface) GetPendingTx(txHash types.Hash) (*types.Transa
 	return nil, false
 }
 
-func (b *nullBlockchainInterface) GetSyncProgression() *protocol.Progression {
+func (b *nullBlockchainInterface) GetSyncProgression() *progress.Progression {
 	return nil
 }

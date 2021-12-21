@@ -4,10 +4,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -27,7 +26,7 @@ type Consensus interface {
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 
 	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error

@@ -1,15 +1,17 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/state"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -613,7 +615,7 @@ func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *typ
 	handler(s.receivedNewHeadFromPeer)
 }
 
-func (s *mockSyncer) GetSyncProgression() *protocol.Progression {
+func (s *mockSyncer) GetSyncProgression() *progress.Progression {
 	return nil
 }
 
