@@ -1000,30 +1000,30 @@ func TestRecoverySingleAccount(t *testing.T) {
 				slots:    9,
 			},
 		},
-		// {
-		// 	name: "all recovered are enqueued",
-		// 	promoted: transactions{
-		// 		newDummyTx(addr1, 0, 1),
-		// 		newDummyTx(addr1, 1, 2),
-		// 		newDummyTx(addr1, 2, 1),
-		// 		newDummyTx(addr1, 3, 3),
-		// 		newDummyTx(addr1, 4, 2),
-		// 	},
-		// 	isRecoverable: map[uint64]bool{
-		// 		0: false,
-		// 		1: true,
-		// 		2: true,
-		// 		3: true,
-		// 		4: true,
-		// 	},
-		// 	expected: result{
-		// 		enqueued: map[types.Address]uint64{
-		// 			addr1: 4,
-		// 		},
-		// 		promoted: 0,
-		// 		slots:    8,
-		// 	},
-		// },
+		{
+			name: "all recovered are enqueued",
+			promoted: transactions{
+				newDummyTx(addr1, 0, 1),
+				newDummyTx(addr1, 1, 2),
+				newDummyTx(addr1, 2, 1),
+				newDummyTx(addr1, 3, 3),
+				newDummyTx(addr1, 4, 2),
+			},
+			isRecoverable: map[uint64]bool{
+				0: false,
+				1: true,
+				2: true,
+				3: true,
+				4: true,
+			},
+			expected: result{
+				enqueued: map[types.Address]uint64{
+					addr1: 4,
+				},
+				promoted: 0,
+				slots:    8,
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1043,32 +1043,32 @@ func TestRecoverySingleAccount(t *testing.T) {
 				assert.Equal(t, uint64(5), pool.promoted.length())
 			}
 
-			// // ibft.writeTransactions()
-			// func() {
-			// 	pool.LockPromoted(true)
-			// 	defer pool.UnlockPromoted()
+			// ibft.writeTransactions()
+			func() {
+				pool.LockPromoted(true)
+				defer pool.UnlockPromoted()
 
-			// 	for {
-			// 		tx := pool.Pop()
-			// 		if tx == nil {
-			// 			break
-			// 		}
+				for {
+					tx := pool.Pop()
+					if tx == nil {
+						break
+					}
 
-			// 		switch tc.isRecoverable[tx.Nonce] {
-			// 		case true:
-			// 			pool.Recover(tx)
-			// 		case false:
-			// 			pool.RollbackNonce(tx)
-			// 		}
-			// 	}
-			// }()
+					switch tc.isRecoverable[tx.Nonce] {
+					case true:
+						pool.Recover(tx)
+					case false:
+						pool.RollbackNonce(tx)
+					}
+				}
+			}()
 
-			// // pool was handling recoveries in the background...
-			// waitUntilDone(done)
+			// pool was handling recoveries in the background...
+			waitUntilDone(done)
 
-			// assert.Equal(t, tc.expected.slots, pool.gauge.read())
-			// assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
-			// assert.Equal(t, tc.expected.promoted, pool.promoted.length())
+			assert.Equal(t, tc.expected.slots, pool.gauge.read())
+			assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
+			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
 		})
 	}
 }
