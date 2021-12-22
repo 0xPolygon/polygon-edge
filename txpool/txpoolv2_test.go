@@ -106,7 +106,7 @@ func newDummyTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 		From:     addr,
 		Nonce:    nonce,
 		Value:    big.NewInt(1),
-		GasPrice: big.NewInt(1),
+		GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),
 		Gas:      100000000,
 		Input:    input,
 	}
