@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// CreateBackup creates an archive file of blockchain by getting data from a peer via gRPC
 func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64, targetTo *uint64, outPath string) (uint64, uint64, error) {
 	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
@@ -61,6 +62,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 	}
 
 	writeMetadata(fs, logger, to, toHash)
+	// read blocks from gRPC stream and append to the file
 	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
 
 	if err = fs.Close(); err != nil {
@@ -75,6 +77,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 	return *resFrom, *resTo, nil
 }
 
+// determineTo returns the proper 'to' which is the height of the block the peer has
 func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) (uint64, types.Hash, error) {
 	status, err := clt.GetStatus(ctx, &emptypb.Empty{})
 	if err != nil {
@@ -96,6 +99,7 @@ func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) 
 	return uint64(status.Current.Number), types.StringToHash(status.Current.Hash), nil
 }
 
+// writeMetadata writes the latest block height and the block hash to the writer
 func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash types.Hash) error {
 	metadata := Metadata{
 		Latest:     to,
@@ -109,15 +113,15 @@ func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash type
 	return err
 }
 
+// processExportStream writing blocks while reading from gRPC stream
 func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, writer io.Writer, targetFrom, targetTo uint64) (*uint64, *uint64, error) {
 	var from, to *uint64
 
 	getResult := func() (*uint64, *uint64, error) {
 		if from == nil || to == nil {
 			return nil, nil, errors.New("couldn't get any blocks")
-		} else {
-			return from, to, nil
 		}
+		return from, to, nil
 	}
 
 	var total uint64
