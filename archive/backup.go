@@ -24,6 +24,14 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 		return 0, 0, err
 	}
 
+	closeAndDelete := func(fs *os.File) error {
+		err := fs.Close()
+		if err != nil {
+			return err
+		}
+		return os.Remove(outPath)
+	}
+
 	signalCh := common.GetTerminationSignalCh()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	defer cancelFn()
@@ -37,6 +45,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 
 	to, toHash, err := determineTo(ctx, clt, targetTo)
 	if err != nil {
+		closeAndDelete(fs)
 		return 0, 0, err
 	}
 
@@ -45,15 +54,16 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 		To:   to,
 	})
 	if err != nil {
+		closeAndDelete(fs)
 		return 0, 0, err
 	}
 
 	writeMetadata(fs, logger, to, toHash)
 	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
 
-	fs.Close()
+	err = fs.Close()
 	if err != nil {
-		os.Remove(outPath)
+		closeAndDelete(fs)
 		return 0, 0, err
 	}
 
@@ -87,6 +97,9 @@ func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash type
 		LatestHash: toHash,
 	}
 	_, err := writer.Write(metadata.MarshalRLP())
+	if err != nil {
+		return err
+	}
 	logger.Info("Wrote metadata to backup", "latest", to, "hash", toHash)
 	return err
 }
