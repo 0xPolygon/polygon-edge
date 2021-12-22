@@ -614,7 +614,7 @@ func (t *TxPool) promotedTxnCleanup(
 	t.logger.Debug(
 		fmt.Sprintf(
 			"Dropped %d promoted txns for account [%s]",
-			droppedPendingTxs,
+			len(droppedPendingTxs),
 			address.String(),
 		),
 	)
