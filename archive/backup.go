@@ -69,6 +69,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 		if removeErr := os.Remove(outPath); removeErr != nil {
 			logger.Error("error happened when removing file", "err", removeErr)
 		}
+
 		return 0, 0, err
 	}
 
