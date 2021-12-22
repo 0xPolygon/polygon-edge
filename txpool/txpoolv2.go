@@ -363,11 +363,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		return
 	}
 
-	// increment to next expected nonce
-	for _, nonce := range newNonces {
-		nonce += 1
-	}
-
 	// Signal reset request
 	p.resetReqCh <- resetRequest{newNonces: newNonces}
 }
