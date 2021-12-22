@@ -265,7 +265,7 @@ func TestAddHandler(t *testing.T) {
 			pool.handleAddRequest(<-pool.addReqCh)
 		}
 
-		assert.Equal(t, uint64(10), pool.enqueued.from(addr).length())
+		assert.Equal(t, uint64(10), pool.accounts.from(addr).length())
 	})
 
 	t.Run("reject low nonce txs", func(t *testing.T) {
@@ -278,7 +278,7 @@ func TestAddHandler(t *testing.T) {
 
 		{ // set up prestate
 			pool.createAccountOnce(addr)
-			assert.Equal(t, uint64(0), pool.enqueued.from(addr).length())
+			assert.Equal(t, uint64(0), pool.accounts.from(addr).length())
 
 			pool.nextNonces.store(addr, 20)
 			nextNonce, ok := pool.nextNonces.load(addr)
@@ -292,7 +292,7 @@ func TestAddHandler(t *testing.T) {
 			pool.handleAddRequest(<-pool.addReqCh)
 		}
 
-		assert.Equal(t, uint64(0), pool.enqueued.from(addr).length())
+		assert.Equal(t, uint64(0), pool.accounts.from(addr).length())
 	})
 
 	t.Run("signal promotion", func(t *testing.T) {
@@ -308,7 +308,7 @@ func TestAddHandler(t *testing.T) {
 		go pool.handleAddRequest(<-pool.addReqCh)
 		req := <-pool.promoteReqCh
 
-		assert.Equal(t, uint64(1), pool.enqueued.from(addr).length())
+		assert.Equal(t, uint64(1), pool.accounts.from(addr).length())
 		assert.Equal(t, addr, req.account)
 		assert.Equal(t, uint64(0), pool.promoted.length()) // promotions are done in handlePromoteReqest()
 	})
@@ -323,7 +323,7 @@ func TestAddHandler(t *testing.T) {
 
 		{ // set up prestate
 			pool.createAccountOnce(addr)
-			assert.Equal(t, uint64(0), pool.enqueued.from(addr).length())
+			assert.Equal(t, uint64(0), pool.accounts.from(addr).length())
 
 			pool.nextNonces.store(addr, 5)
 			nextNonce, ok := pool.nextNonces.load(addr)
@@ -339,9 +339,9 @@ func TestAddHandler(t *testing.T) {
 
 		req := <-pool.promoteReqCh
 		assert.Equal(t, addr, req.account)
-		assert.Equal(t, uint64(1), pool.enqueued.from(addr).length())
+		assert.Equal(t, uint64(1), pool.accounts.from(addr).length())
 
-		tx := pool.enqueued.from(addr).peek()
+		tx := pool.accounts.from(addr).queue.Peek()
 		assert.Equal(t, uint64(3), tx.Nonce)
 	})
 }
@@ -367,12 +367,12 @@ func TestPromoteHandler(t *testing.T) {
 		go pool.handleAddRequest(<-pool.addReqCh)
 		promReq := <-pool.promoteReqCh
 
-		assert.Equal(t, uint64(1), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(1), pool.accounts.from(addr1).length())
 
 		// 2. promote
 		pool.handlePromoteRequest(promReq)
 
-		assert.Equal(t, uint64(0), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(0), pool.accounts.from(addr1).length())
 		assert.Equal(t, uint64(1), pool.promoted.length())
 	})
 
@@ -393,12 +393,12 @@ func TestPromoteHandler(t *testing.T) {
 			pool.handleAddRequest(addRequests[i])
 		}
 
-		assert.Equal(t, uint64(9), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(9), pool.accounts.from(addr1).length())
 
 		go pool.handleAddRequest(addRequests[0])
 		pool.handlePromoteRequest(<-pool.promoteReqCh)
 
-		assert.Equal(t, uint64(0), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(0), pool.accounts.from(addr1).length())
 		assert.Equal(t, uint64(10), pool.promoted.length())
 	})
 
@@ -418,16 +418,16 @@ func TestPromoteHandler(t *testing.T) {
 		// 1st tx triggers 1st promotion
 		go pool.handleAddRequest(addRequests[0])
 		promReq := <-pool.promoteReqCh
-		assert.Equal(t, uint64(1), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(1), pool.accounts.from(addr1).length())
 
 		// enqueue 2nd and 3rd txs
 		pool.handleAddRequest(addRequests[1])
 		pool.handleAddRequest(addRequests[2])
-		assert.Equal(t, uint64(3), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(3), pool.accounts.from(addr1).length())
 
 		// // 1st promotion occurs
 		pool.handlePromoteRequest(promReq)
-		assert.Equal(t, uint64(0), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(0), pool.accounts.from(addr1).length())
 		assert.Equal(t, uint64(3), pool.promoted.length())
 
 		// send last 3
@@ -440,17 +440,17 @@ func TestPromoteHandler(t *testing.T) {
 		go pool.handleAddRequest(addRequests[3])
 		promReq = <-pool.promoteReqCh
 
-		assert.Equal(t, uint64(1), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(1), pool.accounts.from(addr1).length())
 
 		// enqueue last 2
 		pool.handleAddRequest(addRequests[4])
 		pool.handleAddRequest(addRequests[5])
 
-		assert.Equal(t, uint64(3), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(3), pool.accounts.from(addr1).length())
 
 		// 2nd promotion occurs
 		pool.handlePromoteRequest(promReq)
-		assert.Equal(t, uint64(0), pool.enqueued.from(addr1).length())
+		assert.Equal(t, uint64(0), pool.accounts.from(addr1).length())
 		assert.Equal(t, uint64(6), pool.promoted.length())
 	})
 
@@ -536,7 +536,7 @@ func TestResetHandlerEnqueued(t *testing.T) {
 					go pool.addTx(newDummyTx(addr, nonce, 1))
 					pool.handleAddRequest(<-pool.addReqCh)
 				}
-				assert.Equal(t, uint64(len(tc.enqueued)), pool.enqueued.from(addr).length())
+				assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr).length())
 			}
 
 			// align account queue with reset event
@@ -546,7 +546,7 @@ func TestResetHandlerEnqueued(t *testing.T) {
 				},
 			})
 
-			assert.Equal(t, tc.expectedEnqueued, pool.enqueued.from(addr).length())
+			assert.Equal(t, tc.expectedEnqueued, pool.accounts.from(addr).length())
 		})
 	}
 }
@@ -907,7 +907,7 @@ func TestResetWithHeader(t *testing.T) {
 			assert.Equal(t, tc.expected.slots, pool.gauge.read())
 			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
 			for addr, count := range tc.expected.enqueued {
-				assert.Equal(t, count, pool.enqueued.from(addr).length())
+				assert.Equal(t, count, pool.accounts.from(addr).length())
 			}
 		})
 	}
@@ -1013,7 +1013,7 @@ func TestRecoverySingleAccount(t *testing.T) {
 			waitUntilDone(done)
 
 			assert.Equal(t, tc.expected.slots, pool.gauge.read())
-			assert.Equal(t, tc.expected.enqueued[addr1], pool.enqueued.from(addr1).length())
+			assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
 			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
 		})
 	}
@@ -1176,7 +1176,7 @@ func TestRecoveryMultipleAccounts(t *testing.T) {
 			assert.Equal(t, tc.expected.slots, pool.gauge.read())
 			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
 			for addr := range tc.nextNonces {
-				assert.Equal(t, tc.expected.enqueued[addr], pool.enqueued.from(addr).length())
+				assert.Equal(t, tc.expected.enqueued[addr], pool.accounts.from(addr).length())
 			}
 		})
 	}
