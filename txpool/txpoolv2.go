@@ -668,7 +668,12 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) {
 // -> Returns the value from the TxPool if the account is initialized in-memory
 // -> Returns the value from the world state otherwise
 func (p *TxPool) GetNonce(addr types.Address) uint64 {
-	return 0
+	nonce, ok := p.nextNonces.load(addr)
+	if !ok {
+		return 0
+	}
+
+	return nonce
 }
 
 // GetCapacity returns the current number of slots occupied and the max slot limit
@@ -964,8 +969,8 @@ func (q *promotedQueue) prune(nonceMap map[types.Address]uint64) (valid, pruned 
 		}
 
 		tx := q.pop()
-
 		nonce := nonceMap[tx.From]
+
 		// prune stale
 		if tx.Nonce < nonce {
 			pruned = append(pruned, tx)
