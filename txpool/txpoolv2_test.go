@@ -496,59 +496,118 @@ func TestPromoteHandler(t *testing.T) {
 
 // account queue (enqueued)
 func TestResetHandlerEnqueued(t *testing.T) {
-	testCases := []struct {
-		name             string
-		enqueued         []uint64 // nonces
-		newNonce         uint64
-		expectedEnqueued uint64
-	}{
-		{
-			name:             "prune some enqueued transactions",
-			enqueued:         []uint64{3, 4, 5},
-			newNonce:         4,
-			expectedEnqueued: 1,
-		},
-		{
-			name:             "prune all enqueued transactions",
-			enqueued:         []uint64{2, 5, 6, 8},
-			newNonce:         10,
-			expectedEnqueued: 0,
-		},
-		{
-			name:             "no enqueued transactions to prune",
-			enqueued:         []uint64{9, 10, 12},
-			newNonce:         7,
-			expectedEnqueued: 3,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.AddSigner(&mockSigner{})
-			pool.EnableDev()
-
-			addr := types.Address{0x1}
-
-			{ // setup prestate
-				for _, nonce := range tc.enqueued {
-					go pool.addTx(newDummyTx(addr, nonce, 1))
-					pool.handleAddRequest(<-pool.addReqCh)
-				}
-				assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr).length())
-			}
-
-			// align account queue with reset event
-			pool.handleResetRequest(resetRequest{
-				newNonces: map[types.Address]uint64{
-					addr: tc.newNonce,
+	t.Run("reset causes promotion", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			enqueued []uint64 // nonces
+			newNonce uint64
+			expected result
+		}{
+			{
+				name:     "prune some enqueued transactions",
+				enqueued: []uint64{3, 4, 5},
+				newNonce: 4,
+				expected: result{
+					enqueued: map[types.Address]uint64{
+						addr1: 0,
+					},
+					promoted: 2,
 				},
-			})
+			},
+		}
 
-			assert.Equal(t, tc.expectedEnqueued, pool.accounts.from(addr).length())
-		})
-	}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				pool, err := newTestPool()
+				assert.NoError(t, err)
+				pool.AddSigner(&mockSigner{})
+				pool.EnableDev()
+
+				{ // setup prestate
+					for _, nonce := range tc.enqueued {
+						go pool.addTx(newDummyTx(addr1, nonce, 1))
+						pool.handleAddRequest(<-pool.addReqCh)
+					}
+					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
+				}
+
+				// align account queue with reset event
+				go pool.handleResetRequest(resetRequest{
+					newNonces: map[types.Address]uint64{
+						addr1: tc.newNonce,
+					},
+				})
+
+				// this will signal a promotion for addr1
+				req := <-pool.promoteReqCh
+				pool.handlePromoteRequest(req)
+
+				assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
+				assert.Equal(t, tc.expected.promoted, pool.promoted.length())
+			})
+		}
+
+	})
+
+	t.Run("reset causes no promotion", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			enqueued []uint64 // nonces
+			newNonce uint64
+			expected result
+		}{
+			{
+				name:     "prune all enqueued transactions",
+				enqueued: []uint64{2, 5, 6, 8},
+				newNonce: 10,
+				expected: result{
+					enqueued: map[types.Address]uint64{
+						addr1: 0,
+					},
+					promoted: 0,
+				},
+			},
+			{
+				name:     "no enqueued transactions to prune",
+				enqueued: []uint64{9, 10, 12},
+				newNonce: 7,
+				expected: result{
+					enqueued: map[types.Address]uint64{
+						addr1: 3,
+					},
+					promoted: 0,
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				pool, err := newTestPool()
+				assert.NoError(t, err)
+				pool.AddSigner(&mockSigner{})
+				pool.EnableDev()
+
+				{ // setup prestate
+					for _, nonce := range tc.enqueued {
+						go pool.addTx(newDummyTx(addr1, nonce, 1))
+						pool.handleAddRequest(<-pool.addReqCh)
+					}
+					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
+				}
+
+				// align account queue with reset event
+				pool.handleResetRequest(resetRequest{
+					newNonces: map[types.Address]uint64{
+						addr1: tc.newNonce,
+					},
+				})
+
+				assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
+				assert.Equal(t, tc.expected.promoted, pool.promoted.length())
+			})
+		}
+
+	})
 }
 
 // promoted
@@ -563,7 +622,7 @@ func TestResetHandlerPromoted(t *testing.T) {
 			name:             "prune some promoted transactions",
 			promoted:         []uint64{0, 1, 2, 3, 4},
 			newNonce:         1,
-			expectedPromoted: 3,
+			expectedPromoted: 4,
 		},
 		{
 			name:             "prune all promoted transactions",
@@ -749,13 +808,6 @@ type result struct {
 }
 
 func TestResetWithHeader(t *testing.T) {
-
-	// 4 accounts
-	addr1 := types.Address{0x1}
-	addr2 := types.Address{0x2}
-	addr3 := types.Address{0x3}
-	addr4 := types.Address{0x4}
-
 	testCases := []struct {
 		name      string
 		all       map[types.Address]transactions
@@ -794,8 +846,8 @@ func TestResetWithHeader(t *testing.T) {
 					addr2: 0,
 					addr3: 0,
 				},
-				promoted: 4,
-				slots:    4,
+				promoted: 7,
+				slots:    3 + 1 + 3,
 			},
 		},
 		{
@@ -821,43 +873,44 @@ func TestResetWithHeader(t *testing.T) {
 			newNonces: map[types.Address]uint64{
 				addr1: 3,
 				addr2: 5,
-				addr3: 4,
+				addr3: 8,
 			},
 			expected: result{
 				enqueued: map[types.Address]uint64{
-					addr1: 2,
-					addr2: 2,
-					addr3: 3,
+					addr1: 0,
+					addr2: 0,
+					addr3: 0,
 				},
-				promoted: 0,
-				slots:    7,
+				promoted: 3 + 3 + 2,
+				slots:    3 + 3 + 2,
 			},
 		},
 		{
 			name: "reset all queues",
 			all: map[types.Address]transactions{
 				addr1: {
-					newDummyTx(addr1, 3, 3),
-					newDummyTx(addr1, 4, 3),
-					newDummyTx(addr1, 5, 3),
+					newDummyTx(addr1, 3, 3), // dropped
+					newDummyTx(addr1, 4, 3), // dropped
+					newDummyTx(addr1, 5, 1),
+					newDummyTx(addr1, 6, 2),
 				},
 				addr2: {
-					newDummyTx(addr2, 1, 2),
+					newDummyTx(addr2, 1, 2), // dropped
 					newDummyTx(addr2, 5, 1),
 					newDummyTx(addr2, 6, 1),
 					newDummyTx(addr2, 7, 2),
 				},
 				addr3: {
-					newDummyTx(addr3, 0, 1),
-					newDummyTx(addr3, 1, 2),
-					newDummyTx(addr3, 2, 1),
-					newDummyTx(addr3, 4, 3),
+					newDummyTx(addr3, 0, 1), // dropped
+					newDummyTx(addr3, 1, 2), // dropped
+					newDummyTx(addr3, 2, 1), // dropped
+					newDummyTx(addr3, 4, 3), // dropped
 					newDummyTx(addr3, 7, 1),
 					newDummyTx(addr3, 9, 2),
 				},
 				addr4: {
-					newDummyTx(addr4, 0, 1),
-					newDummyTx(addr4, 1, 1),
+					newDummyTx(addr4, 0, 1), // dropped
+					newDummyTx(addr4, 1, 1), // dropped
 					newDummyTx(addr4, 2, 2),
 					newDummyTx(addr4, 3, 1),
 				},
@@ -869,14 +922,14 @@ func TestResetWithHeader(t *testing.T) {
 				addr4: 2,
 			},
 			expected: result{
-				promoted: 1,
+				promoted: 2 + 0 + 1 + 2,
 				enqueued: map[types.Address]uint64{
 					addr1: 0,
 					addr2: 3,
 					addr3: 1,
 					addr4: 0,
 				},
-				slots: 0 + 4 + 2 + 1,
+				slots: 3 + 4 + 3 + 3,
 			},
 		},
 	}
@@ -902,13 +955,14 @@ func TestResetWithHeader(t *testing.T) {
 
 			// ResetWitHeader would invoke this handler when a node
 			// is building/discovering a new block
-			pool.handleResetRequest(resetRequest{tc.newNonces})
+			pool.resetReqCh <- resetRequest{tc.newNonces}
+			waitUntilDone(done)
 
-			assert.Equal(t, tc.expected.slots, pool.gauge.read())
-			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
 			for addr, count := range tc.expected.enqueued {
 				assert.Equal(t, count, pool.accounts.from(addr).length())
 			}
+			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
+			assert.Equal(t, tc.expected.slots, pool.gauge.read())
 		})
 	}
 
