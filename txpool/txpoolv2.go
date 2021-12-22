@@ -670,7 +670,10 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) {
 func (p *TxPool) GetNonce(addr types.Address) uint64 {
 	nonce, ok := p.nextNonces.load(addr)
 	if !ok {
-		return 0
+		stateRoot := p.store.Header().StateRoot
+		stateNonce := p.store.GetNonce(stateRoot, addr)
+
+		return stateNonce
 	}
 
 	return nonce
