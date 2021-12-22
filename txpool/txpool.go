@@ -325,7 +325,7 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
 		if err := t.addImpl(OriginGossip, txn); err != nil {
-			if !errors.As(err, &ErrAlreadyKnown) {
+			if !errors.Is(err, ErrAlreadyKnown) {
 				t.logger.Error("failed to add broadcasted txn", "err", err)
 			}
 		}
