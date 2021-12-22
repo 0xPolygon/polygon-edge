@@ -26,11 +26,11 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 
 	closeAndRemove := func(fs *os.File) {
 		if err := fs.Close(); err != nil {
-			logger.Error("error happened when closing file", "err", err)
+			logger.Error("an error occurred while closing file", "err", err)
 			return
 		}
 		if err = os.Remove(outPath); err != nil {
-			logger.Error("error happened when removing file", "err", err)
+			logger.Error("an error occurred while removing file", "err", err)
 		}
 		return
 	}
@@ -65,9 +65,9 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
 
 	if err = fs.Close(); err != nil {
-		logger.Error("error happened when closing file", "err", err)
+		logger.Error("an error occurred while closing file", "err", err)
 		if removeErr := os.Remove(outPath); removeErr != nil {
-			logger.Error("error happened when removing file", "err", removeErr)
+			logger.Error("an error occurred while removing file", "err", removeErr)
 		}
 
 		return 0, 0, err
