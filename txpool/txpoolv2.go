@@ -326,8 +326,8 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
 
-	// discover latest nonces for known accounts
-	newNonces := make(map[types.Address]uint64)
+	// discover latest (next) nonces for all transactions in the new block
+	stateNonces := make(map[types.Address]uint64)
 	for _, event := range event.NewChain {
 		block, ok := p.store.GetBlockByHash(event.Hash, true)
 		if !ok {
@@ -339,19 +339,15 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 			addr := tx.From
 
 			// skip already processed accounts
-			if _, processed := newNonces[addr]; processed {
+			if _, processed := stateNonces[addr]; processed {
 				continue
 			}
 
 			// fetch latest nonce from the state
 			latestNonce := p.store.GetNonce(stateRoot, addr)
-			if latestNonce == 0 {
-				// account doesn't exist
-				continue
-			}
 
 			// update the result map
-			newNonces[addr] = latestNonce
+			stateNonces[addr] = latestNonce
 
 			// Legacy reorg logic //
 			// Update the addTxns in case of reorgs
@@ -359,12 +355,12 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 	}
 
-	if len(newNonces) == 0 {
+	if len(stateNonces) == 0 {
 		return
 	}
 
 	// Signal reset request
-	p.resetReqCh <- resetRequest{newNonces: newNonces}
+	p.resetReqCh <- resetRequest{newNonces: stateNonces}
 }
 
 // validateTx ensures that the transaction conforms
@@ -590,20 +586,26 @@ func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) uint64 {
 
 // pruneAccounts cleans out any transactions from the accouunt queues
 // considered stale by the given nonceMap.
-func (p *TxPool) pruneAccounts(nonceMap map[types.Address]uint64) {
+func (p *TxPool) pruneAccounts(stateNonces map[types.Address]uint64) {
 	var wg sync.WaitGroup
-	for addr, nonce := range nonceMap {
-		if _, ok := p.nextNonces.load(addr); !ok {
-			// pool knows nothing of this address
-			// so there can't be anything to reset
+	for addr, nonce := range stateNonces {
+		mapNonce, ok := p.nextNonces.load(addr)
+		if !ok {
+			// unknown addr -> no account to prune
+			continue
+		}
+
+		if nonce <= mapNonce {
+			// only the promoted queue needed
+			// to be pruned for this addr
 			continue
 		}
 
 		wg.Add(1)
 		go func(addr types.Address, nonce uint64) {
 			defer wg.Done()
-			p.pruneAccount(addr, nonce)
-
+			_, _ = p.pruneAccount(addr, nonce)
+			// debug log
 		}(addr, nonce)
 	}
 
@@ -612,8 +614,9 @@ func (p *TxPool) pruneAccounts(nonceMap map[types.Address]uint64) {
 }
 
 // pruneAccount clears all transactions with nonce lower than given
-// and updates the pool's state
-func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) {
+// and updates the nonce map. If when done pruning, the next transaction
+// has nonce that matches the newdly expected, a promotion is signaled.
+func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) (numPruned, numRemaining uint64) {
 	account := p.lockAccount(addr, true)
 	defer p.unlockAccount(addr)
 
@@ -625,16 +628,18 @@ func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) {
 	// remove from index
 	p.index.remove(pruned...)
 
+	if tx := account.first(); tx != nil &&
+		tx.Nonce == nonce {
+		// first tx matches next expected nonce -> signal promotion
+		p.promoteReqCh <- promoteRequest{addr}
+	}
+
 	// update next nonce
 	p.nextNonces.store(addr, nonce)
 
-	p.logger.Debug(
-		fmt.Sprintf(
-			"pruned %d stale transactions from account queue. (addr: %s)",
-			len(pruned),
-			addr.String(),
-		),
-	)
+	numPruned = uint64(len(pruned))
+	numRemaining = account.length()
+	return
 }
 
 // createAccountOnce is used when discovering an address
@@ -842,6 +847,12 @@ func (a *account) length() uint64 {
 	return uint64(a.queue.Len())
 }
 
+// first peeks at the first transaction
+// in the account queue, if any
+func (a *account) first() *types.Transaction {
+	return a.queue.Peek()
+}
+
 func (a *account) promote(nonce uint64) (transactions, uint64) {
 	tx := a.queue.Peek()
 	if tx == nil ||
@@ -869,8 +880,9 @@ func (a *account) promote(nonce uint64) (transactions, uint64) {
 func (a *account) prune(nonce uint64) transactions {
 	var pruned transactions
 	for {
-		if next := a.queue.Peek(); next == nil ||
-			next.Nonce > nonce {
+		next := a.queue.Peek()
+		if next == nil ||
+			next.Nonce >= nonce {
 			break
 		}
 
@@ -953,15 +965,14 @@ func (q *promotedQueue) prune(nonceMap map[types.Address]uint64) (valid, pruned 
 
 		tx := q.pop()
 
-		// skip if there is no new nonce or
-		// the popped tx has nonce higher than new
-		nonce, ok := nonceMap[tx.From]
-		if !ok || tx.Nonce > nonce {
-			valid = append(valid, tx)
+		nonce := nonceMap[tx.From]
+		// prune stale
+		if tx.Nonce < nonce {
+			pruned = append(pruned, tx)
 			continue
 		}
 
-		pruned = append(pruned, tx)
+		valid = append(valid, tx)
 	}
 
 	return
