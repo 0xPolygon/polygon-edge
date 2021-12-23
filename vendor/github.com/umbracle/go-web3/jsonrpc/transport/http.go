@@ -73,3 +73,8 @@ func (h *HTTP) Call(method string, out interface{}, params ...interface{}) error
 	}
 	return nil
 }
+
+// SetMaxConnsPerHost sets the maximum number of connections that can be established with a host
+func (h *HTTP) SetMaxConnsPerHost(count int) {
+	h.client.MaxConnsPerHost = count
+}
