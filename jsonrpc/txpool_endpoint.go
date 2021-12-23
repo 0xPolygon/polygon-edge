@@ -63,18 +63,30 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content.
 func (t *Txpool) Content() (interface{}, error) {
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+
+	// collect pending
 	pendingRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for address, nonces := range pendingTxs {
-		pendingRpcTxns[address] = make(map[uint64]*txpoolTransaction)
-		for nonce, tx := range nonces {
-			pendingRpcTxns[address][nonce] = toTxPoolTransaction(tx)
+	for addr, txs := range pendingTxs {
+		pendingRpcTxns[addr] = map[uint64]*txpoolTransaction{}
+
+		for _, tx := range txs {
+			nonce := tx.Nonce
+			rpcTx := toTxPoolTransaction(tx)
+
+			pendingRpcTxns[addr][nonce] = rpcTx
 		}
 	}
+
+	// collect enqueued
 	queuedRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for address, nonces := range queuedTxs {
-		queuedRpcTxns[address] = make(map[uint64]*txpoolTransaction)
-		for nonce, tx := range nonces {
-			queuedRpcTxns[address][nonce] = toTxPoolTransaction(tx)
+	for addr, txs := range queuedTxs {
+
+		queuedRpcTxns = make(map[types.Address]map[uint64]*txpoolTransaction)
+		for _, tx := range txs {
+			nonce := tx.Nonce
+			rpcTx := toTxPoolTransaction(tx)
+
+			queuedRpcTxns[addr][nonce] = rpcTx
 		}
 	}
 
@@ -89,23 +101,31 @@ func (t *Txpool) Content() (interface{}, error) {
 // Create response for txpool_inspect request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
 func (t *Txpool) Inspect() (interface{}, error) {
-
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+
+	// collect pending
 	pendingRpcTxns := make(map[string]map[string]string)
-	for address, nonces := range pendingTxs {
-		pendingRpcTxns[address.String()] = make(map[string]string)
-		for nonce, tx := range nonces {
+	for addr, txs := range pendingTxs {
+		pendingRpcTxns[addr.String()] = make(map[string]string)
+
+		for _, tx := range txs {
 			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
-			pendingRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
+			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+
+			pendingRpcTxns[addr.String()][nonceStr] = msg
 		}
 	}
 
+	// collect enqueued
 	queuedRpcTxns := make(map[string]map[string]string)
-	for address, nonces := range queuedTxs {
-		queuedRpcTxns[address.String()] = make(map[string]string)
-		for nonce, tx := range nonces {
+	for addr, txs := range queuedTxs {
+		queuedRpcTxns[addr.String()] = make(map[string]string)
+
+		for _, tx := range txs {
 			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
-			queuedRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
+			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+
+			queuedRpcTxns[addr.String()][nonceStr] = msg
 		}
 	}
 
