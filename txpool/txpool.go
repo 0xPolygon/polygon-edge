@@ -583,34 +583,38 @@ func (t *TxPool) promotedTxnCleanup(
 	t.pendingQueue.lock.Lock()
 
 	// Find the txns that correspond to this account
-	droppedPendingTxs := 0
+	droppedPendingTxs := make([]*types.Transaction, 0)
 	for _, pendingQueueTxn := range t.pendingQueue.index {
 		// Check if the txn in the promoted queue matches the search criteria
 		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
 			pendingQueueTxn.tx.Nonce < stateNonce { // The nonce on this promoted txn is invalid
 			// Transaction found, drop it from the pending queue
 			if dropped := t.pendingQueue.dropTx(pendingQueueTxn.tx); dropped {
-				// Update the log data
-				droppedPendingTxs++
-				t.logger.Debug(
-					fmt.Sprintf(
-						"Dropping promoted txn [%s]",
-						pendingQueueTxn.tx.Hash.String(),
-					),
-				)
-
-				cleanupCallback(pendingQueueTxn.tx)
+				// Save the transaction as dropped
+				droppedPendingTxs = append(droppedPendingTxs, pendingQueueTxn.tx)
 			}
 		}
 	}
 
 	t.pendingQueue.lock.Unlock()
 
+	for _, droppedPendingTx := range droppedPendingTxs {
+		// Update the log
+		t.logger.Debug(
+			fmt.Sprintf(
+				"Dropping promoted txn [%s]",
+				droppedPendingTx.Hash.String(),
+			),
+		)
+
+		cleanupCallback(droppedPendingTx)
+	}
+
 	// Print out the number of dropped pending txns
 	t.logger.Debug(
 		fmt.Sprintf(
 			"Dropped %d promoted txns for account [%s]",
-			droppedPendingTxs,
+			len(droppedPendingTxs),
 			address.String(),
 		),
 	)
