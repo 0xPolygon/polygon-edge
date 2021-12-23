@@ -535,6 +535,9 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	// push to promotables
 	p.promoted.push(promotables...)
 
+	// update index map (enqueued -> promoted)
+	p.index.add(promoted, promotables...)
+
 	if p.dev {
 		// notify the dev consensus
 		select {
