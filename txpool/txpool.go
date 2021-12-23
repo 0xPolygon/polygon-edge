@@ -688,11 +688,6 @@ func (p *TxPool) GetCapacity() (uint64, uint64) {
 	return p.gauge.read(), p.gauge.max
 }
 
-// GetTxs gets pending and queued transactions
-func (p *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
-	return nil, nil
-}
-
 // GetPendingTx returns the transaction by hash in the TxPool (pending txn) [Thread-safe]
 func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	statusTx, ok := p.index.load(txHash)
@@ -701,6 +696,61 @@ func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	}
 
 	return statusTx.tx, true
+}
+
+// GetTxs gets pending and queued transactions
+func (p *TxPool) GetTxs(inclQueued bool) (promoted, enqueued map[types.Address][]*types.Transaction) {
+	// this will stop all handlers, so the function
+	// can safely retrieve info from all queues
+	p.LockPromoted(false)
+	defer p.UnlockPromoted()
+
+	// collect promoted
+	promoted = p.parsePromoted()
+	if !inclQueued {
+		return promoted, nil
+	}
+
+	// collect enqueued
+	enqueued = p.parseEnqueued()
+
+	return
+}
+
+func (p *TxPool) parsePromoted() (parsed map[types.Address][]*types.Transaction) {
+	promoted := make(map[types.Address]*minNonceQueue)
+	for _, tx := range p.promoted.queue.txs {
+		if _, ok := promoted[tx.From]; !ok {
+			ptr := new(minNonceQueue)
+			(*ptr) = newMinNonceQueue()
+			promoted[tx.From] = ptr
+		}
+
+		promoted[tx.From].Push(tx)
+	}
+
+	parsed = make(map[types.Address][]*types.Transaction)
+	for addr, queue := range promoted {
+		parsed[addr] = queue.txs
+	}
+
+	return
+}
+
+func (p *TxPool) parseEnqueued() (parsed map[types.Address][]*types.Transaction) {
+	parsed = make(map[types.Address][]*types.Transaction)
+	p.accounts.Range(func(key, value interface{}) bool {
+		addr := key.(types.Address)
+
+		account := p.lockAccount(addr, false)
+		defer p.unlockAccount(addr)
+
+		parsed[addr] = account.queue.txs
+
+		return true
+	})
+
+	return
 }
 
 /* end of QUERY methods */
