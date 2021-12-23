@@ -266,7 +266,6 @@ func (p *TxPool) Pop() *types.Transaction {
 
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
-	p.index.remove(tx)
 
 	return tx
 }
@@ -333,6 +332,8 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		if !ok {
 			continue
 		}
+
+		p.index.remove(block.Transactions...)
 
 		// determine latest nonces for all known accounts
 		for _, tx := range block.Transactions {
@@ -760,7 +761,6 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 
 	for _, tx := range txs {
 		if _, ok := m.all[tx.Hash]; !ok {
-			// log err
 			continue
 		}
 		delete(m.all, tx.Hash)
