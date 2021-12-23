@@ -174,7 +174,7 @@ func NewTxPool(
 		metrics:    metrics,
 		accounts:   accountMap{},
 		promoted:   newPromotedQueue(logger.Named("promoted")),
-		index:      lookupMap{all: make(map[types.Hash]*statusTx)},
+		index:      lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:      slotGauge{height: 0, max: config.MaxSlots},
 		sealing:    config.Sealing,
 	}
@@ -501,7 +501,7 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 	p.gauge.increase(slotsRequired(tx))
 
 	// update lookup
-	p.index.add(enqueued, tx)
+	p.index.add(tx)
 
 	if tx.Nonce > nextNonce {
 		// don't signal promotion
@@ -535,9 +535,6 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// push to promotables
 	p.promoted.push(promotables...)
-
-	// update index map (enqueued -> promoted)
-	p.index.add(promoted, promotables...)
 
 	if p.dev {
 		// notify the dev consensus
@@ -690,12 +687,12 @@ func (p *TxPool) GetCapacity() (uint64, uint64) {
 
 // GetPendingTx returns the transaction by hash in the TxPool (pending txn) [Thread-safe]
 func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
-	statusTx, ok := p.index.load(txHash)
+	tx, ok := p.index.load(txHash)
 	if !ok {
 		return nil, false
 	}
 
-	return statusTx.tx, true
+	return tx, true
 }
 
 // GetTxs gets pending and queued transactions
@@ -755,47 +752,19 @@ func (p *TxPool) parseEnqueued() (parsed map[types.Address][]*types.Transaction)
 
 /* end of QUERY methods */
 
-// status represents a transaction's pending state.
-type status int
-
-const (
-	enqueued status = iota
-	promoted
-)
-
-// Transaction wrapper object inidcating the status of a transaction
-// currently present in the pool. Used by lookUpMap.
-type statusTx struct {
-	tx       *types.Transaction
-	promoted bool
-}
-
 // Lookup map used to find transactions present in the pool
 type lookupMap struct {
 	sync.RWMutex
-	all map[types.Hash]*statusTx
+	all map[types.Hash]*types.Transaction
 }
 
 // add adds the given transaction to the lookup map
-func (m *lookupMap) add(status status, txs ...*types.Transaction) {
+func (m *lookupMap) add(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
 
-	switch status {
-	case enqueued:
-		for _, tx := range txs {
-			m.all[tx.Hash] = &statusTx{
-				tx:       tx,
-				promoted: false,
-			}
-		}
-	case promoted:
-		for _, tx := range txs {
-			m.all[tx.Hash] = &statusTx{
-				tx:       tx,
-				promoted: true,
-			}
-		}
+	for _, tx := range txs {
+		m.all[tx.Hash] = tx
 	}
 }
 
@@ -805,25 +774,22 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 	defer m.Unlock()
 
 	for _, tx := range txs {
-		if _, ok := m.all[tx.Hash]; !ok {
-			continue
-		}
 		delete(m.all, tx.Hash)
 	}
 }
 
 // load acquires the read lock on the lookup map and returns the requested
 // transaction (wrapped in a status object), if it exists
-func (m *lookupMap) load(hash types.Hash) (*statusTx, bool) {
+func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
 	m.RLock()
 	defer m.RUnlock()
 
-	statusTx, ok := m.all[hash]
+	tx, ok := m.all[hash]
 	if !ok {
 		return nil, false
 	}
 
-	return statusTx, true
+	return tx, true
 }
 
 // Map of expected nonces for all (known) accounts
