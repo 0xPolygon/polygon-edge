@@ -685,12 +685,7 @@ func (p *TxPool) GetNonce(addr types.Address) uint64 {
 
 // GetCapacity returns the current number of slots occupied and the max slot limit
 func (p *TxPool) GetCapacity() (uint64, uint64) {
-	return 0, 0
-}
-
-// NumAccountTxs Returns the number of transactions in the account specific queue
-func (p *TxPool) NumAccountTxs(address types.Address) int {
-	return 0
+	return p.gauge.read(), p.gauge.max
 }
 
 // GetTxs gets pending and queued transactions
