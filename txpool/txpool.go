@@ -296,9 +296,9 @@ func (p *TxPool) RollbackNonce(tx *types.Transaction) {
 // has received a new block from a peer. The pool needs to align
 // its own state with the new one so it can correctly process
 // further incoming transactions.
-func (p *TxPool) ResetWithHeader(h *types.Header) {
+func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
 	e := &blockchain.Event{
-		NewChain: []*types.Header{h},
+		NewChain: headers,
 	}
 
 	// process the txs in the event to make sure the pool is up-to-date

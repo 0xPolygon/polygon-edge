@@ -34,7 +34,7 @@ type txPoolInterface interface {
 	LockPromoted(write bool)
 	UnlockPromoted()
 	Pop() *types.Transaction
-	ResetWithHeader(h *types.Header)
+	ResetWithHeaders(headers ...*types.Header)
 	Recover(tx *types.Transaction)
 	RollbackNonce(tx *types.Transaction)
 }
@@ -42,8 +42,9 @@ type txPoolInterface interface {
 type syncerInterface interface {
 	Start()
 	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool)
+	BulkSyncWithPeer(p *protocol.SyncPeer, newBlocksHandler func(blocks []*types.Block)) error
+	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
+	GetSyncProgression() *protocol.Progression
 	Broadcast(b *types.Block)
 }
 
@@ -70,8 +71,7 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer       syncerInterface // Reference to the sync protocol
-	syncNotifyCh chan bool       // Sync protocol notification channel
+	syncer syncerInterface // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -100,7 +100,6 @@ func Factory(
 		state:          &currentState{},
 		network:        params.Network,
 		epochSize:      DefaultEpochSize,
-		syncNotifyCh:   make(chan bool),
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
@@ -144,6 +143,11 @@ func (i *Ibft) Start() error {
 	go i.start()
 
 	return nil
+}
+
+// GetSyncProgression gets the latest sync progression, if any
+func (i *Ibft) GetSyncProgression() *protocol.Progression {
+	return i.syncer.GetSyncProgression()
 }
 
 type transport interface {
@@ -344,7 +348,14 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
+		if err := i.syncer.BulkSyncWithPeer(p, func(newBlocks []*types.Block) {
+			newHeaders := []*types.Header{}
+			for _, block := range newBlocks {
+				newHeaders = append(newHeaders, block.Header)
+			}
+
+			i.txpool.ResetWithHeaders(newHeaders...)
+		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 			continue
 		}
@@ -360,7 +371,7 @@ func (i *Ibft) runSyncState() {
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			i.syncer.Broadcast(b)
-			i.txpool.ResetWithHeader(b.Header)
+			i.txpool.ResetWithHeaders(b.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
@@ -765,7 +776,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	i.txpool.ResetWithHeader(block.Header)
+	i.txpool.ResetWithHeaders(block.Header)
 
 	return nil
 }

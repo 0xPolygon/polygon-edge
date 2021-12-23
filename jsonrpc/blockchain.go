@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -57,6 +58,9 @@ type blockchainInterface interface {
 
 	// ApplyTxn applies a transaction object to the blockchain
 	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
+
+	// GetSyncProgression retrieves the current sync progression, if any
+	GetSyncProgression() *protocol.Progression
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
@@ -144,4 +148,8 @@ func (b *nullBlockchainInterface) GetCapacity() (uint64, uint64) {
 
 func (b *nullBlockchainInterface) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	return nil, false
+}
+
+func (b *nullBlockchainInterface) GetSyncProgression() *protocol.Progression {
+	return nil
 }
