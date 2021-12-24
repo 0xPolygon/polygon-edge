@@ -251,9 +251,14 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 
 	defer log.EventBegin(ctx, "swarmDialAttemptSync", p).Done()
 
-	// check if we already have an open connection first
 	conn := s.bestConnToPeer(p)
-	if conn != nil {
+	forceDirect, _ := network.GetForceDirectDial(ctx)
+	if forceDirect {
+		if isDirectConn(conn) {
+			return conn, nil
+		}
+	} else if conn != nil {
+		// check if we already have an open connection first
 		return conn, nil
 	}
 
@@ -287,8 +292,13 @@ func (s *Swarm) doDial(ctx context.Context, p peer.ID) (*Conn, error) {
 	// Short circuit.
 	// By the time we take the dial lock, we may already *have* a connection
 	// to the peer.
+	forceDirect, _ := network.GetForceDirectDial(ctx)
 	c := s.bestConnToPeer(p)
-	if c != nil {
+	if forceDirect {
+		if isDirectConn(c) {
+			return c, nil
+		}
+	} else if c != nil {
 		return c, nil
 	}
 
@@ -301,12 +311,17 @@ func (s *Swarm) doDial(ctx context.Context, p peer.ID) (*Conn, error) {
 	conn, err := s.dial(ctx, p)
 	if err != nil {
 		conn = s.bestConnToPeer(p)
-		if conn != nil {
+		if forceDirect {
+			if isDirectConn(conn) {
+				log.Debugf("ignoring dial error because we already have a direct connection: %s", err)
+				return conn, nil
+			}
+		} else if conn != nil {
 			// Hm? What error?
 			// Could have canceled the dial because we received a
 			// connection or some other random reason.
 			// Just ignore the error and return the connection.
-			log.Debugf("ignoring dial error because we have a connection: %s", err)
+			log.Debugf("ignoring dial error because we already have a connection: %s", err)
 			return conn, nil
 		}
 
@@ -321,8 +336,53 @@ func (s *Swarm) canDial(addr ma.Multiaddr) bool {
 	return t != nil && t.CanDial(addr)
 }
 
+func (s *Swarm) nonProxyAddr(addr ma.Multiaddr) bool {
+	t := s.TransportForDialing(addr)
+	return !t.Proxy()
+}
+
+// ranks addresses in descending order of preference for dialing
+// Private UDP > Public UDP > Private TCP > Public TCP > UDP Relay server > TCP Relay server
+func (s *Swarm) rankAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {
+	var localUdpAddrs []ma.Multiaddr // private udp
+	var relayUdpAddrs []ma.Multiaddr // relay udp
+	var othersUdp []ma.Multiaddr     // public udp
+
+	var localFdAddrs []ma.Multiaddr // private fd consuming
+	var relayFdAddrs []ma.Multiaddr //  relay fd consuming
+	var othersFd []ma.Multiaddr     // public fd consuming
+
+	for _, a := range addrs {
+		if _, err := a.ValueForProtocol(ma.P_CIRCUIT); err == nil {
+			if s.IsFdConsumingAddr(a) {
+				relayFdAddrs = append(relayFdAddrs, a)
+				continue
+			}
+			relayUdpAddrs = append(relayUdpAddrs, a)
+		} else if manet.IsPrivateAddr(a) {
+			if s.IsFdConsumingAddr(a) {
+				localFdAddrs = append(localFdAddrs, a)
+				continue
+			}
+			localUdpAddrs = append(localUdpAddrs, a)
+		} else {
+			if s.IsFdConsumingAddr(a) {
+				othersFd = append(othersFd, a)
+				continue
+			}
+			othersUdp = append(othersUdp, a)
+		}
+	}
+
+	relays := append(relayUdpAddrs, relayFdAddrs...)
+	fds := append(localFdAddrs, othersFd...)
+
+	return append(append(append(localUdpAddrs, othersUdp...), fds...), relays...)
+}
+
 // dial is the actual swarm's dial logic, gated by Dial.
 func (s *Swarm) dial(ctx context.Context, p peer.ID) (*Conn, error) {
+	forceDirect, _ := network.GetForceDirectDial(ctx)
 	var logdial = lgbl.Dial("swarm", s.LocalPeer(), p, nil, nil)
 	if p == s.local {
 		log.Event(ctx, "swarmDialDoDialSelf", logdial)
@@ -344,63 +404,28 @@ func (s *Swarm) dial(ctx context.Context, p peer.ID) (*Conn, error) {
 		return nil, &DialError{Peer: p, Cause: ErrNoAddresses}
 	}
 	goodAddrs := s.filterKnownUndialables(p, peerAddrs)
+	if forceDirect {
+		goodAddrs = addrutil.FilterAddrs(goodAddrs, s.nonProxyAddr)
+	}
 	if len(goodAddrs) == 0 {
 		return nil, &DialError{Peer: p, Cause: ErrNoGoodAddresses}
 	}
 
-	/////// Check backoff andnRank addresses
-	var nonBackoff bool
-	for _, a := range goodAddrs {
-		// skip addresses in back-off
-		if !s.backf.Backoff(p, a) {
-			nonBackoff = true
-		}
-	}
-	if !nonBackoff {
-		return nil, ErrDialBackoff
-	}
-
-	// ranks addresses in descending order of preference for dialing
-	// Private UDP > Public UDP > Private TCP > Public TCP > UDP Relay server > TCP Relay server
-	rankAddrsFnc := func(addrs []ma.Multiaddr) []ma.Multiaddr {
-		var localUdpAddrs []ma.Multiaddr // private udp
-		var relayUdpAddrs []ma.Multiaddr // relay udp
-		var othersUdp []ma.Multiaddr     // public udp
-
-		var localFdAddrs []ma.Multiaddr // private fd consuming
-		var relayFdAddrs []ma.Multiaddr //  relay fd consuming
-		var othersFd []ma.Multiaddr     // public fd consuming
-
-		for _, a := range addrs {
-			if _, err := a.ValueForProtocol(ma.P_CIRCUIT); err == nil {
-				if s.IsFdConsumingAddr(a) {
-					relayFdAddrs = append(relayFdAddrs, a)
-					continue
-				}
-				relayUdpAddrs = append(relayUdpAddrs, a)
-			} else if manet.IsPrivateAddr(a) {
-				if s.IsFdConsumingAddr(a) {
-					localFdAddrs = append(localFdAddrs, a)
-					continue
-				}
-				localUdpAddrs = append(localUdpAddrs, a)
-			} else {
-				if s.IsFdConsumingAddr(a) {
-					othersFd = append(othersFd, a)
-					continue
-				}
-				othersUdp = append(othersUdp, a)
+	if !forceDirect {
+		/////// Check backoff andnRank addresses
+		var nonBackoff bool
+		for _, a := range goodAddrs {
+			// skip addresses in back-off
+			if !s.backf.Backoff(p, a) {
+				nonBackoff = true
 			}
 		}
-
-		relays := append(relayUdpAddrs, relayFdAddrs...)
-		fds := append(localFdAddrs, othersFd...)
-
-		return append(append(append(localUdpAddrs, othersUdp...), fds...), relays...)
+		if !nonBackoff {
+			return nil, ErrDialBackoff
+		}
 	}
 
-	connC, dialErr := s.dialAddrs(ctx, p, rankAddrsFnc(goodAddrs))
-
+	connC, dialErr := s.dialAddrs(ctx, p, s.rankAddrs(goodAddrs))
 	if dialErr != nil {
 		logdial["error"] = dialErr.Cause.Error()
 		switch dialErr.Cause {
@@ -440,7 +465,7 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Mul
 	for _, addr := range lisAddrs {
 		protos := addr.Protocols()
 		// we're only sure about filtering out /ip4 and /ip6 addresses, so far
-		if len(protos) == 2 && (protos[0].Code == ma.P_IP4 || protos[0].Code == ma.P_IP6) {
+		if protos[0].Code == ma.P_IP4 || protos[0].Code == ma.P_IP6 {
 			ourAddrs = append(ourAddrs, addr)
 		}
 	}

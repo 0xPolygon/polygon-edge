@@ -96,13 +96,13 @@ func (ad *activeDial) start(ctx context.Context) {
 	ad.cancel()
 }
 
-func (ds *DialSync) getActiveDial(p peer.ID) *activeDial {
+func (ds *DialSync) getActiveDial(ctx context.Context, p peer.ID) *activeDial {
 	ds.dialsLk.Lock()
 	defer ds.dialsLk.Unlock()
 
 	actd, ok := ds.dials[p]
 	if !ok {
-		adctx, cancel := context.WithCancel(context.Background())
+		adctx, cancel := context.WithCancel(ctx)
 		actd = &activeDial{
 			id:     p,
 			cancel: cancel,
@@ -123,7 +123,7 @@ func (ds *DialSync) getActiveDial(p peer.ID) *activeDial {
 // DialLock initiates a dial to the given peer if there are none in progress
 // then waits for the dial to that peer to complete.
 func (ds *DialSync) DialLock(ctx context.Context, p peer.ID) (*Conn, error) {
-	return ds.getActiveDial(p).wait(ctx)
+	return ds.getActiveDial(ctx, p).wait(ctx)
 }
 
 // CancelDial cancels all in-progress dials to the given peer.

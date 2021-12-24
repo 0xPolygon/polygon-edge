@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -14,6 +15,16 @@ const (
 	defaultValidateConcurrency = 1024
 	defaultValidateThrottle    = 8192
 )
+
+// ValidationError is an error that may be signalled from message publication when the message
+// fails validation
+type ValidationError struct {
+	Reason string
+}
+
+func (e ValidationError) Error() string {
+	return e.Reason
+}
 
 // Validator is a function that validates a message with a binary decision: accept or reject.
 type Validator func(context.Context, peer.ID, *Message) bool
@@ -56,6 +67,8 @@ type validation struct {
 
 	tracer *pubsubTracer
 
+	// mx protects the validator map
+	mx sync.Mutex
 	// topicVals tracks per topic validators
 	topicVals map[string]*topicVal
 
@@ -123,6 +136,9 @@ func (v *validation) Start(p *PubSub) {
 
 // AddValidator adds a new validator
 func (v *validation) AddValidator(req *addValReq) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	topic := req.topic
 
 	_, ok := v.topicVals[topic]
@@ -180,6 +196,9 @@ func (v *validation) AddValidator(req *addValReq) {
 
 // RemoveValidator removes an existing validator
 func (v *validation) RemoveValidator(req *rmValReq) {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	topic := req.topic
 
 	_, ok := v.topicVals[topic]
@@ -189,6 +208,21 @@ func (v *validation) RemoveValidator(req *rmValReq) {
 	} else {
 		req.resp <- fmt.Errorf("No validator for topic %s", topic)
 	}
+}
+
+// PushLocal synchronously pushes a locally published message and performs applicable
+// validations.
+// Returns an error if validation fails
+func (v *validation) PushLocal(msg *Message) error {
+	v.p.tracer.PublishMessage(msg)
+
+	err := v.p.checkSigningPolicy(msg)
+	if err != nil {
+		return err
+	}
+
+	vals := v.getValidators(msg)
+	return v.validate(vals, msg.ReceivedFrom, msg, true)
 }
 
 // Push pushes a message into the validation pipeline.
@@ -201,7 +235,7 @@ func (v *validation) Push(src peer.ID, msg *Message) bool {
 		case v.validateQ <- &validateReq{vals, src, msg}:
 		default:
 			log.Debugf("message validation throttled: queue full; dropping message from %s", src)
-			v.tracer.RejectMessage(msg, rejectValidationQueueFull)
+			v.tracer.RejectMessage(msg, RejectValidationQueueFull)
 		}
 		return false
 	}
@@ -211,6 +245,9 @@ func (v *validation) Push(src peer.ID, msg *Message) bool {
 
 // getValidators returns all validators that apply to a given message
 func (v *validation) getValidators(msg *Message) []*topicVal {
+	v.mx.Lock()
+	defer v.mx.Unlock()
+
 	topic := msg.GetTopic()
 
 	val, ok := v.topicVals[topic]
@@ -226,7 +263,7 @@ func (v *validation) validateWorker() {
 	for {
 		select {
 		case req := <-v.validateQ:
-			v.validate(req.vals, req.src, req.msg)
+			v.validate(req.vals, req.src, req.msg, false)
 		case <-v.p.ctx.Done():
 			return
 		}
@@ -234,16 +271,14 @@ func (v *validation) validateWorker() {
 }
 
 // validate performs validation and only sends the message if all validators succeed
-// signature validation is performed synchronously, while user validators are invoked
-// asynchronously, throttled by the global validation throttle.
-func (v *validation) validate(vals []*topicVal, src peer.ID, msg *Message) {
+func (v *validation) validate(vals []*topicVal, src peer.ID, msg *Message, synchronous bool) error {
 	// If signature verification is enabled, but signing is disabled,
 	// the Signature is required to be nil upon receiving the message in PubSub.pushMsg.
 	if msg.Signature != nil {
 		if !v.validateSignature(msg) {
 			log.Debugf("message signature validation failed; dropping message from %s", src)
-			v.tracer.RejectMessage(msg, rejectInvalidSignature)
-			return
+			v.tracer.RejectMessage(msg, RejectInvalidSignature)
+			return ValidationError{Reason: RejectInvalidSignature}
 		}
 	}
 
@@ -252,14 +287,14 @@ func (v *validation) validate(vals []*topicVal, src peer.ID, msg *Message) {
 	id := v.p.msgID(msg.Message)
 	if !v.p.markSeen(id) {
 		v.tracer.DuplicateMessage(msg)
-		return
+		return nil
 	} else {
 		v.tracer.ValidateMessage(msg)
 	}
 
 	var inline, async []*topicVal
 	for _, val := range vals {
-		if val.validateInline {
+		if val.validateInline || synchronous {
 			inline = append(inline, val)
 		} else {
 			async = append(async, val)
@@ -282,8 +317,8 @@ loop:
 
 	if result == ValidationReject {
 		log.Debugf("message validation failed; dropping message from %s", src)
-		v.tracer.RejectMessage(msg, rejectValidationFailed)
-		return
+		v.tracer.RejectMessage(msg, RejectValidationFailed)
+		return ValidationError{Reason: RejectValidationFailed}
 	}
 
 	// apply async validators
@@ -296,18 +331,23 @@ loop:
 			}()
 		default:
 			log.Debugf("message validation throttled; dropping message from %s", src)
-			v.tracer.RejectMessage(msg, rejectValidationThrottled)
+			v.tracer.RejectMessage(msg, RejectValidationThrottled)
 		}
-		return
+		return nil
 	}
 
 	if result == ValidationIgnore {
-		v.tracer.RejectMessage(msg, rejectValidationIgnored)
-		return
+		v.tracer.RejectMessage(msg, RejectValidationIgnored)
+		return ValidationError{Reason: RejectValidationIgnored}
 	}
 
 	// no async validators, accepted message, send it!
-	v.p.sendMsg <- msg
+	select {
+	case v.p.sendMsg <- msg:
+		return nil
+	case <-v.p.ctx.Done():
+		return v.p.ctx.Err()
+	}
 }
 
 func (v *validation) validateSignature(msg *Message) bool {
@@ -332,15 +372,15 @@ func (v *validation) doValidateTopic(vals []*topicVal, src peer.ID, msg *Message
 		v.p.sendMsg <- msg
 	case ValidationReject:
 		log.Debugf("message validation failed; dropping message from %s", src)
-		v.tracer.RejectMessage(msg, rejectValidationFailed)
+		v.tracer.RejectMessage(msg, RejectValidationFailed)
 		return
 	case ValidationIgnore:
 		log.Debugf("message validation punted; ignoring message from %s", src)
-		v.tracer.RejectMessage(msg, rejectValidationIgnored)
+		v.tracer.RejectMessage(msg, RejectValidationIgnored)
 		return
 	case validationThrottled:
 		log.Debugf("message validation throttled; ignoring message from %s", src)
-		v.tracer.RejectMessage(msg, rejectValidationThrottled)
+		v.tracer.RejectMessage(msg, RejectValidationThrottled)
 
 	default:
 		// BUG: this would be an internal programming error, so a panic seems appropiate.

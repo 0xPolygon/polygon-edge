@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -175,8 +176,14 @@ func (c *Conn) Stat() network.Stat {
 }
 
 // NewStream returns a new Stream from this connection
-func (c *Conn) NewStream() (network.Stream, error) {
-	ts, err := c.conn.OpenStream()
+func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
+	if c.Stat().Transient {
+		if useTransient, _ := network.GetUseTransient(ctx); !useTransient {
+			return nil, network.ErrTransientConn
+		}
+	}
+
+	ts, err := c.conn.OpenStream(ctx)
 
 	if err != nil {
 		return nil, err

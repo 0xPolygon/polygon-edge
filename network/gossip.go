@@ -9,6 +9,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	bufferSize = 512 // buffer size of gossip queue
+)
+
 type Topic struct {
 	logger hclog.Logger
 
@@ -31,7 +35,7 @@ func (t *Topic) Publish(obj proto.Message) error {
 }
 
 func (t *Topic) Subscribe(handler func(obj interface{})) error {
-	sub, err := t.topic.Subscribe()
+	sub, err := t.topic.Subscribe(pubsub.WithBufferSize(bufferSize))
 	if err != nil {
 		return err
 	}
@@ -54,13 +58,14 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 			t.logger.Error("failed to get topic", "err", err)
 			continue
 		}
-
-		obj := t.createObj()
-		if err := proto.Unmarshal(msg.Data, obj); err != nil {
-			t.logger.Error("failed to unmarshal topic", "err", err)
-			continue
-		}
-		handler(obj)
+		go func() {
+			obj := t.createObj()
+			if err := proto.Unmarshal(msg.Data, obj); err != nil {
+				t.logger.Error("failed to unmarshal topic", "err", err)
+				return
+			}
+			handler(obj)
+		}()
 	}
 }
 
