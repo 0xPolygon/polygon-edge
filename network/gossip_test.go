@@ -3,11 +3,11 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	testproto "github.com/0xPolygon/polygon-sdk/network/proto/test"
-	"github.com/stretchr/testify/assert"
+	testproto "github.com/0xPolygon/polygon-sdk/network/proto"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -29,38 +29,66 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 
 }
 
-func TestGossip(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+func TestSimpleGossip(t *testing.T) {
+	numServers := 2
+	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
+	servers, createErr := createServers(numServers, []*CreateServerParams{nil, nil})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	MultiJoin(t, srv0, srv1)
+	MultiJoin(t, servers[0], servers[1])
+	time.Sleep(time.Second * 2) // TODO add mesh comment
 
-	topicName := "topic/0.1"
+	topicName := "msg-pub-sub"
+	serverTopics := make([]*Topic, numServers)
 
-	topic0, err := srv0.NewTopic(topicName, &testproto.AReq{})
-	assert.NoError(t, err)
+	messageCh := make(chan *testproto.GenericMessage)
+	for i := 0; i < numServers; i++ {
+		topic, topicErr := servers[i].NewTopic(topicName, &testproto.GenericMessage{})
+		if topicErr != nil {
+			t.Fatalf("Unable to create topic, %v", topicErr)
+		}
 
-	topic1, err := srv1.NewTopic(topicName, &testproto.AReq{})
-	assert.NoError(t, err)
+		serverTopics[i] = topic
 
-	// subscribe in topic1
-	msgCh := make(chan *testproto.AReq)
-	topic1.Subscribe(func(obj interface{}) {
-		msgCh <- obj.(*testproto.AReq)
-	})
+		if subscribeErr := topic.Subscribe(func(obj interface{}) {
+			if i != 0 {
+				// Everyone should relay they got the message apart from the publisher
+				messageCh <- obj.(*testproto.GenericMessage)
+			}
+		}); subscribeErr != nil {
+			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
+		}
+	}
+	publisher := servers[0]
+	publisherTopic := serverTopics[0]
 
-	// wait until build mesh
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	WaitForSubscribers(ctx, srv0, topicName, 1)
+	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)); waitErr != nil {
+		t.Fatalf("Unable to wait for subscribers, %v", waitErr)
+	}
 
-	// publish in topic0
-	assert.NoError(t, topic0.Publish(&testproto.AReq{Msg: "a"}))
+	if publishErr := publisherTopic.Publish(
+		&testproto.GenericMessage{
+			Message: sentMessage,
+		}); publishErr != nil {
+		t.Fatalf("Unable to publish message, %v", publishErr)
+	}
 
-	select {
-	case msg := <-msgCh:
-		assert.Equal(t, msg.Msg, "a")
-	case <-time.After(5 * time.Second):
-		t.Fatal("timeout")
+	messagesGossiped := 0
+	for {
+		select {
+		case <-time.After(time.Second * 5):
+			t.Fatalf("Gossip messages not received before timeout")
+		case message := <-messageCh:
+			if message.Message == sentMessage {
+				messagesGossiped++
+				if messagesGossiped == len(servers)-1 {
+					break
+				}
+			}
+		}
 	}
 }

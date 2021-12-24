@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"io/ioutil"
-	"math/rand"
 	"os"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,9 +19,90 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var initialPort = uint64(2000)
+func createServers(
+	count int,
+	params []*CreateServerParams,
+) ([]*Server, error) {
+	servers := make([]*Server, count)
 
-func CreateServer(t *testing.T, callback func(c *Config)) *Server {
+	for i := 0; i < count; i++ {
+		server, createErr := CreateServer(params[i])
+		if createErr != nil {
+			return nil, createErr
+		}
+
+		servers = append(servers, server)
+	}
+
+	return servers, nil
+}
+
+type CreateServerParams struct {
+	ConfigCallback func(c *Config)      // Additional logic that needs to be executed on the configuration
+	ServerCallback func(server *Server) // Additional logic that needs to be executed on the server before starting
+	Logger         hclog.Logger
+}
+
+var (
+	emptyParams = &CreateServerParams{}
+)
+
+func CreateServer(params *CreateServerParams) (*Server, error) {
+	cfg := DefaultConfig()
+	port, portErr := tests.GetFreePort()
+	if portErr != nil {
+		return nil, fmt.Errorf("unable to fetch free port, %v", portErr)
+	}
+	cfg.Addr.Port = port
+	cfg.Chain = &chain.Chain{
+		Params: &chain.Params{
+			ChainID: 1,
+		},
+	}
+
+	if params == nil {
+		params = emptyParams
+	}
+
+	if params.ConfigCallback != nil {
+		params.ConfigCallback(cfg)
+	}
+
+	if params.Logger == nil {
+		params.Logger = hclog.NewNullLogger()
+	}
+
+	secretsManager, factoryErr := local.SecretsManagerFactory(
+		nil,
+		&secrets.SecretsManagerParams{
+			Logger: params.Logger,
+			Extra: map[string]interface{}{
+				secrets.Path: cfg.DataDir,
+			},
+		},
+	)
+	if factoryErr != nil {
+		return nil, factoryErr
+	}
+
+	cfg.SecretsManager = secretsManager
+
+	server, err := NewServer(params.Logger, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.ServerCallback != nil {
+		params.ServerCallback(server)
+	}
+
+	startErr := server.Start()
+
+	return server, startErr
+}
+
+// TODO remove
+func CreateServerLEGACY(t *testing.T, callback func(c *Config)) *Server {
 	// create the server
 	cfg := DefaultConfig()
 	port, portErr := tests.GetFreePort()
@@ -64,78 +143,59 @@ func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 	return srv
 }
 
-func MultiJoinSerial(t *testing.T, srvs []*Server) {
-	dials := []*Server{}
-	for i := 0; i < len(srvs)-1; i++ {
-		srv, dst := srvs[i], srvs[i+1]
-		dials = append(dials, srv, dst)
+func MultiJoinSerial(t *testing.T, servers []*Server) {
+	dials := make([]*Server, len(servers))
+	for i := 0; i < len(servers)-1; i++ {
+		src, dst := servers[i], servers[i+1]
+		dials = append(dials, src, dst)
 	}
+
 	MultiJoin(t, dials...)
 }
 
-func MultiJoin(t *testing.T, srvs ...*Server) {
-	if len(srvs)%2 != 0 {
-		t.Fatal("not an even number")
+func MultiJoin(t *testing.T, servers ...*Server) {
+	numServers := len(servers)
+
+	if numServers%2 != 0 {
+		t.Fatal("uneven number of servers passed in")
 	}
 
 	doneCh := make(chan error)
-	for i := 0; i < len(srvs); i += 2 {
+	for i := 0; i < numServers; i += 2 {
 		go func(i int) {
-			src, dst := srvs[i], srvs[i+1]
+			src, dst := servers[i], servers[i+1]
 			doneCh <- src.Join(dst.AddrInfo(), 10*time.Second)
 		}(i)
 	}
 
-	for i := 0; i < len(srvs)/2; i++ {
+	for i := 0; i < numServers/2; i++ {
 		err := <-doneCh
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("Unable to complete join procedure, %v", err)
 		}
 	}
 }
 
-func getTestConfig(callback func(c *Config)) *Config {
-	cfg := DefaultConfig()
-	cfg.Addr.Port = int(atomic.AddUint64(&initialPort, 1))
-	cfg.Chain = &chain.Chain{
-		Params: &chain.Params{
-			ChainID: 1,
-		},
-	}
-
-	logger := hclog.NewNullLogger()
-
-	if callback != nil {
-		callback(cfg)
-	}
-
-	secretsManager, _ := local.SecretsManagerFactory(
-		nil,
-		&secrets.SecretsManagerParams{
-			Logger: logger,
-			Extra: map[string]interface{}{
-				secrets.Path: cfg.DataDir,
-			},
-		},
-	)
-
-	cfg.SecretsManager = secretsManager
-
-	return cfg
-}
 func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
 	libp2pKey, _, keyErr := GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
 		t.Fatalf("unable to generate libp2p key, %v", keyErr)
 	}
+
 	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
 	assert.NoError(t, err)
-	rand.Seed(time.Now().Unix())
-	randomPort := rand.Intn(10) + 10010
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", randomPort, nodeId))
+
+	port, portErr := tests.GetFreePort()
+	if portErr != nil {
+		t.Fatalf("Unable to fetch free port, %v", portErr)
+	}
+
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeId))
 	assert.NoError(t, err)
+
 	return addr
 }
+
 func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	t.Helper()
 
@@ -169,7 +229,7 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 
 	t.Cleanup(func() {
 		// remove directory after test is done
-		assert.NoError(t, os.RemoveAll(dir))
+		_ = os.RemoveAll(dir)
 	})
 
 	return libp2pKey, dir

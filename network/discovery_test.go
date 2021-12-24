@@ -16,48 +16,56 @@ func discoveryConfig(c *Config) {
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	// when two nodes connect, they populate their kademlia routing tables
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	servers, createErr := createServers(2, []*CreateServerParams{nil, nil})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	MultiJoin(t, srv0, srv1)
-	time.Sleep(1 * time.Second)
+	MultiJoin(t, servers[1], servers[2])
+	time.Sleep(time.Second * 2) // TODO add mesh comment
 
-	assert.Equal(t, srv0.discovery.routingTable.Size(), 1)
-	assert.Equal(t, srv1.discovery.routingTable.Size(), 1)
+	assert.Equal(t, servers[1].discovery.routingTable.Size(), 1)
+	assert.Equal(t, servers[2].discovery.routingTable.Size(), 1)
 }
 
 func TestDiscovery_ProtocolFindPeers(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	servers, createErr := createServers(2, []*CreateServerParams{nil, nil})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	MultiJoin(t, srv0, srv1)
-	time.Sleep(1 * time.Second)
+	MultiJoin(t, servers[0], servers[1])
+	time.Sleep(time.Second * 2) // TODO add mesh comment
 
 	// find peers should not include our identity
-	resp, err := srv0.discovery.findPeersCall(srv1.AddrInfo().ID)
+	resp, err := servers[0].discovery.findPeersCall(servers[1].AddrInfo().ID)
 	assert.NoError(t, err)
 	assert.Empty(t, resp)
 }
 
 func TestDiscovery_PeerAdded(t *testing.T) {
-	srv0 := CreateServer(t, discoveryConfig)
-	srv1 := CreateServer(t, discoveryConfig)
-	srv2 := CreateServer(t, discoveryConfig)
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: discoveryConfig,
+	}
+	servers, createErr := createServers(3, []*CreateServerParams{defaultConfig, defaultConfig, defaultConfig})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
 	// server0 should connect to server2 by discovery
-	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
+	connectedCh := asyncWaitForEvent(servers[0], 15*time.Second, connectedPeerHandler(servers[2].AddrInfo().ID))
 
 	// serial join, srv0 -> srv1 -> srv2
 	MultiJoin(t,
-		srv0, srv1,
-		srv1, srv2,
+		servers[0], servers[1],
+		servers[1], servers[2],
 	)
 
 	// wait until server0 connects to server2
 	assert.True(t, <-connectedCh)
-	assert.Len(t, srv0.host.Peerstore().Peers(), 3)
-	assert.Len(t, srv1.host.Peerstore().Peers(), 3)
-	assert.Len(t, srv2.host.Peerstore().Peers(), 3)
+	assert.Len(t, servers[0].host.Peerstore().Peers(), 3)
+	assert.Len(t, servers[1].host.Peerstore().Peers(), 3)
+	assert.Len(t, servers[2].host.Peerstore().Peers(), 3)
 
 	// TODO: We should put MaxPeers to 0 or 1 so that we do not
 	// mix data and we only test how the peers are being populated
@@ -74,8 +82,11 @@ func TestDiscovery_FullNetwork(t *testing.T) {
 	nodes := 20
 	servers := []*Server{}
 	for i := 0; i < nodes; i++ {
-		srv := CreateServer(t, discoveryConfig)
-		servers = append(servers, srv)
+		server, createErr := CreateServer(&CreateServerParams{ConfigCallback: discoveryConfig})
+		if createErr != nil {
+			t.Fatalf("Unable to create server, %v", createErr)
+		}
+		servers = append(servers, server)
 	}
 
 	// link nodes in serial
