@@ -19,6 +19,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func waitForMesh() {
+	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+	waitForMeshCustom(time.Second * 2)
+}
+
+func waitForMeshCustom(duration time.Duration) {
+	time.Sleep(duration)
+}
+
 func createServers(
 	count int,
 	params []*CreateServerParams,
@@ -99,48 +108,6 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	startErr := server.Start()
 
 	return server, startErr
-}
-
-// TODO remove
-func CreateServerLEGACY(t *testing.T, callback func(c *Config)) *Server {
-	// create the server
-	cfg := DefaultConfig()
-	port, portErr := tests.GetFreePort()
-	if portErr != nil {
-		t.Fatalf("Unable to fetch free port, %v", portErr)
-	}
-	cfg.Addr.Port = port
-	cfg.Chain = &chain.Chain{
-		Params: &chain.Params{
-			ChainID: 1,
-		},
-	}
-
-	logger := hclog.NewNullLogger()
-
-	if callback != nil {
-		callback(cfg)
-	}
-
-	secretsManager, factoryErr := local.SecretsManagerFactory(
-		nil,
-		&secrets.SecretsManagerParams{
-			Logger: logger,
-			Extra: map[string]interface{}{
-				secrets.Path: cfg.DataDir,
-			},
-		},
-	)
-
-	assert.NoError(t, factoryErr)
-
-	cfg.SecretsManager = secretsManager
-
-	srv, err := NewServer(logger, cfg)
-	assert.NoError(t, err)
-	assert.NoError(t, srv.Start())
-
-	return srv
 }
 
 func MultiJoinSerial(t *testing.T, servers []*Server) {

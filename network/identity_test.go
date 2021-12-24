@@ -61,7 +61,7 @@ func TestIdentityHandshake(t *testing.T) {
 
 			// Server 0 -> Server 1
 			joinErr := servers[0].Join(servers[1].AddrInfo(), 5*time.Second)
-			time.Sleep(time.Second * 2) // TODO add mesh comment
+			waitForMesh()
 
 			if shouldSucceed && joinErr != nil {
 				t.Fatalf("Unable to join peer, %v", joinErr)

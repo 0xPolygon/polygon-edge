@@ -34,17 +34,9 @@ func TestSimpleGossip(t *testing.T) {
 	numServers := 2
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
 	servers, createErr := createServers(numServers, []*CreateServerParams{nil, nil})
-
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
-
-	MultiJoin(t, servers[0], servers[1])
-	time.Sleep(time.Second * 2) // TODO add mesh comment
-
-	topicName := "msg-pub-sub"
-	serverTopics := make([]*Topic, numServers)
-
 	messageCh := make(chan *testproto.GenericMessage)
 	t.Cleanup(func() {
 		close(messageCh)
@@ -53,6 +45,11 @@ func TestSimpleGossip(t *testing.T) {
 			assert.NoError(t, server.Close())
 		}
 	})
+
+	MultiJoin(t, servers[0], servers[1])
+
+	topicName := "msg-pub-sub"
+	serverTopics := make([]*Topic, numServers)
 
 	for i := 0; i < numServers; i++ {
 		topic, topicErr := servers[i].NewTopic(topicName, &testproto.GenericMessage{})
@@ -63,10 +60,8 @@ func TestSimpleGossip(t *testing.T) {
 		serverTopics[i] = topic
 
 		if subscribeErr := topic.Subscribe(func(obj interface{}) {
-			if i != 0 {
-				// Everyone should relay they got the message apart from the publisher
-				messageCh <- obj.(*testproto.GenericMessage)
-			}
+			// Everyone should relay they got the message apart from the publisher
+			messageCh <- obj.(*testproto.GenericMessage)
 		}); subscribeErr != nil {
 			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
 		}
@@ -90,12 +85,12 @@ func TestSimpleGossip(t *testing.T) {
 	messagesGossiped := 0
 	for {
 		select {
-		case <-time.After(time.Second * 50):
+		case <-time.After(time.Second * 10):
 			t.Fatalf("Gossip messages not received before timeout")
 		case message := <-messageCh:
 			if message.Message == sentMessage {
 				messagesGossiped++
-				if messagesGossiped == len(servers)-1 {
+				if messagesGossiped == len(servers) {
 					return
 				}
 			}

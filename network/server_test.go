@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"net"
 	"strconv"
 	"testing"
@@ -28,6 +29,11 @@ func TestConnLimit_Inbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
+	})
 
 	// One slot left, it can connect 0->1
 	assert.NoError(t, servers[0].Join(servers[1].AddrInfo(), 5*time.Second))
@@ -56,6 +62,11 @@ func TestConnLimit_Outbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
+	})
 
 	// One slot left, it can connect 0->1
 	assert.NoError(t, servers[0].Join(servers[1].AddrInfo(), 5*time.Second))
@@ -82,6 +93,11 @@ func TestPeersLifecycle(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
+	})
 
 	// 0 -> 1 (connect)
 	connectedCh := asyncWaitForEvent(servers[1], 5*time.Second, connectedPeerHandler(servers[0].AddrInfo().ID))
@@ -126,6 +142,9 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create server, %v", createErr)
 	}
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
 
 	sub, err := server.Subscribe()
 	assert.NoError(t, err)
@@ -286,6 +305,11 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
+	})
 
 	assert.NoError(t, servers[0].Join(servers[1].AddrInfo(), DefaultJoinTimeout))
 	assert.NoError(t, servers[1].Join(servers[0].AddrInfo(), DefaultJoinTimeout))
@@ -353,19 +377,38 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
-	bootnodeConfig := &CreateServerParams{
+	bootnodeConfig1 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
 		},
+		Logger: hclog.New(&hclog.LoggerOptions{
+			Name:  "bootnode-1",
+			Level: hclog.LevelFromString("DEBUG"),
+		}),
 	}
-	//Create bootnodes
-	bootnodes, createErr := createServers(2, []*CreateServerParams{bootnodeConfig, bootnodeConfig})
+	bootnodeConfig2 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 3
+			c.NoDiscover = false
+		},
+		Logger: hclog.New(&hclog.LoggerOptions{
+			Name:  "bootnode-2",
+			Level: hclog.LevelFromString("DEBUG"),
+		}),
+	}
+	// Create bootnodes
+	bootnodes, createErr := createServers(2, []*CreateServerParams{bootnodeConfig1, bootnodeConfig2})
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for _, bootnode := range bootnodes {
+			assert.NoError(t, bootnode.Close())
+		}
+	})
 
-	defaultConfig := &CreateServerParams{
+	defaultConfig1 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
@@ -374,47 +417,86 @@ func TestPeerReconnection(t *testing.T) {
 				AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
 		},
+		Logger: hclog.New(&hclog.LoggerOptions{
+			Name:  "server-1",
+			Level: hclog.LevelFromString("DEBUG"),
+		}),
+	}
+	defaultConfig2 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 3
+			c.NoDiscover = false
+			c.Chain.Bootnodes = []string{
+				AddrInfoToString(bootnodes[0].AddrInfo()),
+				AddrInfoToString(bootnodes[1].AddrInfo()),
+			}
+		},
+		Logger: hclog.New(&hclog.LoggerOptions{
+			Name:  "server-2",
+			Level: hclog.LevelFromString("DEBUG"),
+		}),
 	}
 
-	servers, createErr := createServers(2, []*CreateServerParams{defaultConfig, defaultConfig})
+	servers, createErr := createServers(2, []*CreateServerParams{defaultConfig1, defaultConfig2})
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+	t.Cleanup(func() {
+		for indx, server := range servers {
+			if indx != 1 {
+				// servers[1] is closed within the test
+				assert.NoError(t, server.Close())
+			}
+		}
+	})
 
-	//connect with the first boot node
-	connectedCh1 := asyncWaitForEvent(servers[0], 10*time.Second, connectedPeerHandler(bootnodes[0].AddrInfo().ID))
-	assert.True(t, <-connectedCh1)
+	disconnectFromBootnode := func(server *Server, peerID peer.ID) {
+		disconnectedCh := asyncWaitForEvent(servers[0], DefaultJoinTimeout, disconnectedPeerHandler(peerID))
+		server.Disconnect(peerID, "Bye")
 
-	//connect with the second boot node
-	connectedCh2 := asyncWaitForEvent(servers[0], 10*time.Second, connectedPeerHandler(bootnodes[1].AddrInfo().ID))
-	assert.True(t, <-connectedCh2)
+		assert.True(t, <-disconnectedCh, "Failed to receive peer disconnected event")
+	}
 
+	closePeerServer := func(server *Server, peer *Server) {
+		disconnectedCh := asyncWaitForEvent(server, DefaultJoinTimeout, disconnectedPeerHandler(peer.AddrInfo().ID))
+		assert.NoError(t, peer.Close())
+		assert.True(t, <-disconnectedCh)
+	}
+
+	connectToBootnode := func(server *Server, peerID peer.ID) {
+		connectedCh := asyncWaitForEvent(server, DefaultJoinTimeout, connectedPeerHandler(peerID))
+
+		assert.True(t, <-connectedCh)
+	}
+
+	// connect with the first boot node
+	connectToBootnode(servers[0], bootnodes[0].AddrInfo().ID)
+
+	// connect with the second boot node
+	connectToBootnode(servers[0], bootnodes[1].AddrInfo().ID)
+
+	// Connect with the second server
 	assert.NoError(t, servers[0].Join(servers[1].AddrInfo(), 5*time.Second))
 
-	//disconnect from the first boot node
-	disconnectedCh1 := asyncWaitForEvent(servers[0], 15*time.Second, disconnectedPeerHandler(bootnodes[0].AddrInfo().ID))
-	servers[0].Disconnect(bootnodes[0].AddrInfo().ID, "Bye")
+	// disconnect from the first boot node
+	disconnectFromBootnode(servers[0], bootnodes[0].AddrInfo().ID)
 
-	assert.True(t, <-disconnectedCh1, "Failed to receive peer disconnected event")
+	// disconnect from the second boot node
+	disconnectFromBootnode(servers[0], bootnodes[1].AddrInfo().ID)
 
-	//disconnect from the second boot node
-	disconnectedCh2 := asyncWaitForEvent(servers[0], 15*time.Second, disconnectedPeerHandler(bootnodes[1].AddrInfo().ID))
-	servers[0].Disconnect(bootnodes[1].AddrInfo().ID, "Bye")
+	// disconnect from the other server
+	closePeerServer(servers[0], servers[1])
 
-	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
-
-	//disconnect from the third  node
-	disconnectedCh3 := asyncWaitForEvent(servers[0], 15*time.Second, disconnectedPeerHandler(servers[1].AddrInfo().ID))
-	assert.NoError(t, servers[1].Close())
-	assert.True(t, <-disconnectedCh3)
-
-	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), DefaultJoinTimeout*3)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, servers[0], bootnodes[0].host.ID(), bootnodes[1].host.ID())
-	assert.NoError(t, err)
-	assert.True(t, reconnected)
 
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, servers[0], bootnodes[0].host.ID(), bootnodes[1].host.ID())
+	if err != nil {
+		t.Fatalf("Unable to wait for peer connect, %v", err)
+	}
+	assert.True(t, reconnected)
 }
+
 func TestReconnectionWithNewIP(t *testing.T) {
 	natIP := "127.0.0.1"
 
@@ -443,6 +525,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 				ConfigCallback: func(c *Config) {
 					defaultConfig(c)
 					c.DataDir = dir1
+					// same ID to but different IP from servers[1]
 					c.NatAddr = net.ParseIP(natIP)
 				},
 			},
@@ -451,13 +534,10 @@ func TestReconnectionWithNewIP(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
-
-	// same ID to but diffrent IP from servers[1]
-
 	t.Cleanup(func() {
-		_ = servers[0].Close()
-		_ = servers[1].Close()
-		_ = servers[2].Close()
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
 	})
 
 	// servers[0] connects to servers[1]
@@ -469,7 +549,9 @@ func TestReconnectionWithNewIP(t *testing.T) {
 
 	// servers[1] terminates
 	disconnectedCh := asyncWaitForEvent(servers[0], 10*time.Second, disconnectedPeerHandler(servers[1].AddrInfo().ID))
-	servers[1].host.Close()
+	if err := servers[1].host.Close(); err != nil {
+		t.Fatalf("Unable to close peer server, %v", err)
+	}
 	assert.True(t, <-disconnectedCh)
 
 	// servers[0] connects to servers[2]
@@ -481,8 +563,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 }
 
 func TestSelfConnection_WithBootNodes(t *testing.T) {
-
-	//Create a temporary directory for storing the key file
+	// Create a temporary directory for storing the key file
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
