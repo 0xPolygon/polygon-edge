@@ -33,6 +33,7 @@ func TestSimpleGossip(t *testing.T) {
 	numServers := 2
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
 	servers, createErr := createServers(numServers, []*CreateServerParams{nil, nil})
+
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
@@ -66,7 +67,7 @@ func TestSimpleGossip(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)); waitErr != nil {
+	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)-1); waitErr != nil {
 		t.Fatalf("Unable to wait for subscribers, %v", waitErr)
 	}
 
@@ -80,13 +81,13 @@ func TestSimpleGossip(t *testing.T) {
 	messagesGossiped := 0
 	for {
 		select {
-		case <-time.After(time.Second * 5):
+		case <-time.After(time.Second * 50):
 			t.Fatalf("Gossip messages not received before timeout")
 		case message := <-messageCh:
 			if message.Message == sentMessage {
 				messagesGossiped++
 				if messagesGossiped == len(servers)-1 {
-					break
+					return
 				}
 			}
 		}

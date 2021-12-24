@@ -31,7 +31,7 @@ func createServers(
 			return nil, createErr
 		}
 
-		servers = append(servers, server)
+		servers[i] = server
 	}
 
 	return servers, nil
