@@ -1,6 +1,7 @@
 package noise
 
 import (
+	"bufio"
 	"context"
 	"net"
 	"sync"
@@ -22,7 +23,10 @@ type secureSession struct {
 
 	readLock  sync.Mutex
 	writeLock sync.Mutex
-	insecure  net.Conn
+
+	insecureConn   net.Conn
+	insecureReader *bufio.Reader // to cushion io read syscalls
+	// we don't buffer writes to avoid introducing latency; optimisation possible. // TODO revisit
 
 	qseek int     // queued bytes seek value.
 	qbuf  []byte  // queued bytes buffer.
@@ -32,15 +36,16 @@ type secureSession struct {
 	dec *noise.CipherState
 }
 
-// newSecureSession creates a Noise session over the given insecure Conn, using
+// newSecureSession creates a Noise session over the given insecureConn Conn, using
 // the libp2p identity keypair from the given Transport.
 func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, remote peer.ID, initiator bool) (*secureSession, error) {
 	s := &secureSession{
-		insecure:  insecure,
-		initiator: initiator,
-		localID:   tpt.localID,
-		localKey:  tpt.privateKey,
-		remoteID:  remote,
+		insecureConn:   insecure,
+		insecureReader: bufio.NewReader(insecure),
+		initiator:      initiator,
+		localID:        tpt.localID,
+		localKey:       tpt.privateKey,
+		remoteID:       remote,
 	}
 
 	// the go-routine we create to run the handshake will
@@ -53,7 +58,7 @@ func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, re
 	select {
 	case err := <-respCh:
 		if err != nil {
-			_ = s.insecure.Close()
+			_ = s.insecureConn.Close()
 		}
 		return s, err
 
@@ -61,14 +66,14 @@ func newSecureSession(tpt *Transport, ctx context.Context, insecure net.Conn, re
 		// If the context has been cancelled, we close the underlying connection.
 		// We then wait for the handshake to return because of the first error it encounters
 		// so we don't return without cleaning up the go-routine.
-		_ = s.insecure.Close()
+		_ = s.insecureConn.Close()
 		<-respCh
 		return nil, ctx.Err()
 	}
 }
 
 func (s *secureSession) LocalAddr() net.Addr {
-	return s.insecure.LocalAddr()
+	return s.insecureConn.LocalAddr()
 }
 
 func (s *secureSession) LocalPeer() peer.ID {
@@ -84,7 +89,7 @@ func (s *secureSession) LocalPublicKey() crypto.PubKey {
 }
 
 func (s *secureSession) RemoteAddr() net.Addr {
-	return s.insecure.RemoteAddr()
+	return s.insecureConn.RemoteAddr()
 }
 
 func (s *secureSession) RemotePeer() peer.ID {
@@ -96,17 +101,17 @@ func (s *secureSession) RemotePublicKey() crypto.PubKey {
 }
 
 func (s *secureSession) SetDeadline(t time.Time) error {
-	return s.insecure.SetDeadline(t)
+	return s.insecureConn.SetDeadline(t)
 }
 
 func (s *secureSession) SetReadDeadline(t time.Time) error {
-	return s.insecure.SetReadDeadline(t)
+	return s.insecureConn.SetReadDeadline(t)
 }
 
 func (s *secureSession) SetWriteDeadline(t time.Time) error {
-	return s.insecure.SetWriteDeadline(t)
+	return s.insecureConn.SetWriteDeadline(t)
 }
 
 func (s *secureSession) Close() error {
-	return s.insecure.Close()
+	return s.insecureConn.Close()
 }

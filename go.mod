@@ -7,7 +7,6 @@ require (
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/go-kit/kit v0.9.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/gopacket v1.1.18 // indirect
 	github.com/google/uuid v1.1.4
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-hclog v0.16.2
@@ -17,10 +16,10 @@ require (
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.3.0
 	github.com/imdario/mergo v0.3.7
-	github.com/libp2p/go-libp2p v0.12.0
+	github.com/libp2p/go-libp2p v0.14.0
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-noise v0.1.1
+	github.com/libp2p/go-libp2p-noise v0.2.0
 	github.com/libp2p/go-libp2p-pubsub v0.5.0
 	github.com/mitchellh/cli v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1

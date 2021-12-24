@@ -17,11 +17,11 @@ github.com/cenkalti/backoff/v3
 github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
-# github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018
+# github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c
 github.com/davidlazar/go-crypto/salsa20
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
-# github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6
+# github.com/flynn/noise v1.0.0
 github.com/flynn/noise
 # github.com/go-kit/kit v0.9.0
 ## explicit
@@ -29,7 +29,7 @@ github.com/go-kit/kit/metrics
 github.com/go-kit/kit/metrics/discard
 github.com/go-kit/kit/metrics/internal/lv
 github.com/go-kit/kit/metrics/prometheus
-# github.com/gogo/protobuf v1.3.1
+# github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.5.2
 ## explicit
@@ -45,8 +45,7 @@ github.com/golang/snappy
 # github.com/google/gofuzz v1.2.0
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
-# github.com/google/gopacket v1.1.18
-## explicit
+# github.com/google/gopacket v1.1.19
 github.com/google/gopacket/routing
 # github.com/google/uuid v1.1.4
 ## explicit
@@ -145,7 +144,7 @@ github.com/ipfs/go-log
 github.com/ipfs/go-log/tracer
 github.com/ipfs/go-log/tracer/wire
 github.com/ipfs/go-log/writer
-# github.com/ipfs/go-log/v2 v2.1.1
+# github.com/ipfs/go-log/v2 v2.1.3
 github.com/ipfs/go-log/v2
 # github.com/jackpal/go-nat-pmp v1.0.2
 github.com/jackpal/go-nat-pmp
@@ -176,7 +175,7 @@ github.com/libp2p/go-conn-security-multistream
 github.com/libp2p/go-eventbus
 # github.com/libp2p/go-flow-metrics v0.0.3
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.12.0
+# github.com/libp2p/go-libp2p v0.14.0
 ## explicit
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
@@ -188,7 +187,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/identify/pb
 github.com/libp2p/go-libp2p/p2p/protocol/ping
 # github.com/libp2p/go-libp2p-asn-util v0.0.0-20200825225859-85005c6cf052
 github.com/libp2p/go-libp2p-asn-util
-# github.com/libp2p/go-libp2p-autonat v0.4.0
+# github.com/libp2p/go-libp2p-autonat v0.4.2
 github.com/libp2p/go-libp2p-autonat
 github.com/libp2p/go-libp2p-autonat/pb
 # github.com/libp2p/go-libp2p-blankhost v0.2.0
@@ -229,17 +228,15 @@ github.com/libp2p/go-libp2p-discovery
 github.com/libp2p/go-libp2p-kbucket
 github.com/libp2p/go-libp2p-kbucket/keyspace
 github.com/libp2p/go-libp2p-kbucket/peerdiversity
-# github.com/libp2p/go-libp2p-loggables v0.1.0
-github.com/libp2p/go-libp2p-loggables
 # github.com/libp2p/go-libp2p-mplex v0.4.1
 github.com/libp2p/go-libp2p-mplex
 # github.com/libp2p/go-libp2p-nat v0.0.6
 github.com/libp2p/go-libp2p-nat
-# github.com/libp2p/go-libp2p-noise v0.1.1
+# github.com/libp2p/go-libp2p-noise v0.2.0
 ## explicit
 github.com/libp2p/go-libp2p-noise
 github.com/libp2p/go-libp2p-noise/pb
-# github.com/libp2p/go-libp2p-peerstore v0.2.6
+# github.com/libp2p/go-libp2p-peerstore v0.2.7
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
 github.com/libp2p/go-libp2p-peerstore/pstoremem
@@ -249,14 +246,16 @@ github.com/libp2p/go-libp2p-pnet
 ## explicit
 github.com/libp2p/go-libp2p-pubsub
 github.com/libp2p/go-libp2p-pubsub/pb
-# github.com/libp2p/go-libp2p-swarm v0.4.3
+# github.com/libp2p/go-libp2p-swarm v0.5.0
 github.com/libp2p/go-libp2p-swarm
 # github.com/libp2p/go-libp2p-tls v0.1.3
 github.com/libp2p/go-libp2p-tls
 # github.com/libp2p/go-libp2p-transport-upgrader v0.4.2
 github.com/libp2p/go-libp2p-transport-upgrader
-# github.com/libp2p/go-libp2p-yamux v0.5.0
+# github.com/libp2p/go-libp2p-yamux v0.5.3
 github.com/libp2p/go-libp2p-yamux
+# github.com/libp2p/go-maddr-filter v0.1.0
+github.com/libp2p/go-maddr-filter
 # github.com/libp2p/go-mplex v0.3.0
 github.com/libp2p/go-mplex
 # github.com/libp2p/go-msgio v0.0.6
@@ -264,7 +263,7 @@ github.com/libp2p/go-msgio
 github.com/libp2p/go-msgio/protoio
 # github.com/libp2p/go-nat v0.0.5
 github.com/libp2p/go-nat
-# github.com/libp2p/go-netroute v0.1.3
+# github.com/libp2p/go-netroute v0.1.6
 github.com/libp2p/go-netroute
 # github.com/libp2p/go-openssl v0.0.7
 github.com/libp2p/go-openssl
@@ -273,23 +272,25 @@ github.com/libp2p/go-openssl/utils
 github.com/libp2p/go-reuseport
 # github.com/libp2p/go-reuseport-transport v0.0.4
 github.com/libp2p/go-reuseport-transport
-# github.com/libp2p/go-sockaddr v0.0.2
+# github.com/libp2p/go-sockaddr v0.1.1
 github.com/libp2p/go-sockaddr
 github.com/libp2p/go-sockaddr/net
 # github.com/libp2p/go-stream-muxer-multistream v0.3.0
 github.com/libp2p/go-stream-muxer-multistream
 # github.com/libp2p/go-tcp-transport v0.2.1
 github.com/libp2p/go-tcp-transport
-# github.com/libp2p/go-ws-transport v0.3.1
+# github.com/libp2p/go-ws-transport v0.4.0
 github.com/libp2p/go-ws-transport
-# github.com/libp2p/go-yamux v1.4.1
-github.com/libp2p/go-yamux
+# github.com/libp2p/go-yamux/v2 v2.1.1
+github.com/libp2p/go-yamux/v2
 # github.com/mattn/go-colorable v0.1.6
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/miekg/dns v1.1.41
+github.com/miekg/dns
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v0.1.1
@@ -317,7 +318,7 @@ github.com/multiformats/go-base36
 ## explicit
 github.com/multiformats/go-multiaddr
 github.com/multiformats/go-multiaddr/net
-# github.com/multiformats/go-multiaddr-dns v0.2.0
+# github.com/multiformats/go-multiaddr-dns v0.3.1
 github.com/multiformats/go-multiaddr-dns
 # github.com/multiformats/go-multiaddr-fmt v0.1.0
 github.com/multiformats/go-multiaddr-fmt
@@ -327,7 +328,7 @@ github.com/multiformats/go-multiaddr-net
 github.com/multiformats/go-multibase
 # github.com/multiformats/go-multihash v0.0.14
 github.com/multiformats/go-multihash
-# github.com/multiformats/go-multistream v0.2.1
+# github.com/multiformats/go-multistream v0.2.2
 github.com/multiformats/go-multistream
 # github.com/multiformats/go-varint v0.0.6
 github.com/multiformats/go-varint
@@ -417,7 +418,7 @@ github.com/valyala/fastjson/fastfloat
 github.com/whyrusleeping/multiaddr-filter
 # github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee
 github.com/whyrusleeping/timecache
-# go.opencensus.io v0.22.4
+# go.opencensus.io v0.23.0
 go.opencensus.io/internal/tagencoding
 go.opencensus.io/metric/metricdata
 go.opencensus.io/metric/metricproducer
@@ -428,7 +429,7 @@ go.opencensus.io/stats/view
 go.opencensus.io/tag
 # go.uber.org/atomic v1.9.0
 go.uber.org/atomic
-# go.uber.org/multierr v1.5.0
+# go.uber.org/multierr v1.6.0
 go.uber.org/multierr
 # go.uber.org/zap v1.16.0
 ## explicit
@@ -471,6 +472,7 @@ golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/internal/timeseries
 golang.org/x/net/ipv4
+golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
 # golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e

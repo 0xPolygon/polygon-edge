@@ -76,6 +76,8 @@ func SelectOneOf(protos []string, rwc io.ReadWriteCloser) (string, error) {
 	return selectProtosOrFail(protos[1:], rwc)
 }
 
+const simOpenProtocol = "/libp2p/simultaneous-connect"
+
 // Performs protocol negotiation with the simultaneous open extension; the returned boolean
 // indicator will be true if we should act as a server.
 func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
@@ -86,7 +88,7 @@ func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (string, b
 	werrCh := make(chan error, 1)
 	go func() {
 		var buf bytes.Buffer
-		if err := delitmWriteAll(&buf, []byte(ProtocolID), []byte("iamclient"), []byte(protos[0])); err != nil {
+		if err := delitmWriteAll(&buf, []byte(ProtocolID), []byte(simOpenProtocol), []byte(protos[0])); err != nil {
 			werrCh <- err
 			return
 		}
@@ -110,19 +112,16 @@ func SelectWithSimopenOrFail(protos []string, rwc io.ReadWriteCloser) (string, b
 	}
 
 	switch tok {
-	case "iamclient":
+	case simOpenProtocol:
 		// simultaneous open
 		return simOpen(protos, rwc)
-
 	case "na":
 		// client open
 		proto, err := clientOpen(protos, rwc)
 		if err != nil {
 			return "", false, err
 		}
-
 		return proto, false, nil
-
 	default:
 		return "", false, errors.New("unexpected response: " + tok)
 	}
@@ -202,7 +201,7 @@ func simOpen(protos []string, rwc io.ReadWriteCloser) (string, bool, error) {
 	var iamserver bool
 
 	if peerNonce == myNonce {
-		return "", false, errors.New("failed client selection; identical nonces!")
+		return "", false, errors.New("failed client selection; identical nonces")
 	}
 	iamserver = peerNonce > myNonce
 

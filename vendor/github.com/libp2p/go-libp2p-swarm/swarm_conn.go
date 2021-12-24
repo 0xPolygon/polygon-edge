@@ -25,7 +25,7 @@ var ErrConnClosed = errors.New("connection closed")
 // Conn is the connection type used by swarm. In general, you won't use this
 // type directly.
 type Conn struct {
-	id    uint32
+	id    uint64
 	conn  transport.CapableConn
 	swarm *Swarm
 
@@ -209,7 +209,7 @@ func (c *Conn) addStream(ts mux.MuxedStream, dir network.Direction) (*Stream, er
 		stream: ts,
 		conn:   c,
 		stat:   stat,
-		id:     atomic.AddUint32(&c.swarm.nextStreamID, 1),
+		id:     atomic.AddUint64(&c.swarm.nextStreamID, 1),
 	}
 	c.streams.m[s] = struct{}{}
 
