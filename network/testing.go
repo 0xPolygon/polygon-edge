@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -25,7 +26,11 @@ var initialPort = uint64(2000)
 func CreateServer(t *testing.T, callback func(c *Config)) *Server {
 	// create the server
 	cfg := DefaultConfig()
-	cfg.Addr.Port = int(atomic.AddUint64(&initialPort, 1))
+	port, portErr := tests.GetFreePort()
+	if portErr != nil {
+		t.Fatalf("Unable to fetch free port, %v", portErr)
+	}
+	cfg.Addr.Port = port
 	cfg.Chain = &chain.Chain{
 		Params: &chain.Params{
 			ChainID: 1,
