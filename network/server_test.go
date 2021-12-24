@@ -633,9 +633,6 @@ func TestMinimumBootNodeCount(t *testing.T) {
 			} else {
 				assert.NoError(t, createErr)
 			}
-			if createErr != nil {
-				t.Fatalf("Unable to create server, %v", createErr)
-			}
 		})
 
 	}

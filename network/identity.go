@@ -2,7 +2,7 @@ package network
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -16,6 +16,12 @@ import (
 )
 
 var identityProtoV1 = "/id/0.1"
+
+var (
+	ErrInvalidChainID   = errors.New("Invalid chain ID")
+	ErrNotReady         = errors.New("Not ready")
+	ErrNoAvailableSlots = errors.New("No available Slots")
+)
 
 type identity struct {
 	proto.UnimplementedIdentityServer
@@ -69,18 +75,18 @@ func (i *identity) setup() {
 
 			initialized := atomic.LoadUint32(&i.initialized)
 			if initialized == 0 {
-				i.srv.Disconnect(peerID, "not ready")
+				i.srv.Disconnect(peerID, ErrNotReady.Error())
 				return
 			}
 
-			// limit by MaxPeers on incomming/outgoing requests
+			// limit by MaxPeers on incoming / outgoing requests
 			if i.isPending(peerID) {
 				// handshake has already started
 				return
 			}
 
 			if i.srv.numOpenSlots() == 0 {
-				i.srv.Disconnect(peerID, "no available slots")
+				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
 				return
 			}
 			// pending of handshake
@@ -129,7 +135,7 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 
 	// validation
 	if status.Chain != resp.Chain {
-		return fmt.Errorf("incorrect chain id")
+		return ErrInvalidChainID
 	}
 
 	i.srv.addPeer(peerID)

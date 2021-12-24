@@ -196,7 +196,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 }
 
 func (s *Server) Start() error {
-	s.identity.start()
+	if identityStartErr := s.identity.start(); identityStartErr != nil {
+		return identityStartErr
+	}
 
 	go s.runDial()
 	go s.checkPeerConnections()
@@ -379,15 +381,21 @@ func (s *Server) delPeer(id peer.ID) {
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
-	s.host.Network().ClosePeer(id)
+	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
+		s.logger.Error(
+			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
+		)
+	}
 
 	s.emitEvent(id, PeerDisconnected)
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
-		// send some close message
-		s.host.Network().ClosePeer(peer)
+		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
+		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
+			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
+		}
 	}
 }
 

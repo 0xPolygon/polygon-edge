@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
@@ -45,6 +46,14 @@ func TestSimpleGossip(t *testing.T) {
 	serverTopics := make([]*Topic, numServers)
 
 	messageCh := make(chan *testproto.GenericMessage)
+	t.Cleanup(func() {
+		close(messageCh)
+
+		for _, server := range servers {
+			assert.NoError(t, server.Close())
+		}
+	})
+
 	for i := 0; i < numServers; i++ {
 		topic, topicErr := servers[i].NewTopic(topicName, &testproto.GenericMessage{})
 		if topicErr != nil {

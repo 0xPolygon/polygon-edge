@@ -21,11 +21,11 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 
-	MultiJoin(t, servers[1], servers[2])
+	MultiJoin(t, servers[0], servers[1])
 	time.Sleep(time.Second * 2) // TODO add mesh comment
 
+	assert.Equal(t, servers[0].discovery.routingTable.Size(), 1)
 	assert.Equal(t, servers[1].discovery.routingTable.Size(), 1)
-	assert.Equal(t, servers[2].discovery.routingTable.Size(), 1)
 }
 
 func TestDiscovery_ProtocolFindPeers(t *testing.T) {

@@ -46,37 +46,37 @@ func TestIdentityHandshake(t *testing.T) {
 				t.Fatalf("Unable to create servers, %v", createErr)
 			}
 
-			// Server 0 -> Server 1
-			MultiJoin(t, servers[0], servers[1])
-			time.Sleep(time.Second * 2)
+			t.Cleanup(func() {
+				for _, server := range servers {
+					assert.NoError(t, server.Close())
+				}
+			})
 
-			subscription, subscribeErr := servers[1].Subscribe()
-			if subscribeErr != nil {
-				t.Fatalf("Unable to subscribe to events, %v", subscribeErr)
-			}
 			chainIDs := []int{
 				servers[0].config.Chain.Params.ChainID,
 				servers[1].config.Chain.Params.ChainID,
 			}
 
-			for {
-				select {
-				case <-time.After(time.Second * 5):
-					subscription.Close()
-					t.Fatal("Unable to receive event from peer")
-				case event := <-subscription.ch:
-					if chainIDs[0] == chainIDs[1] {
-						// The event should've been a successful connection
-						assert.Equal(t, event.Type, PeerConnected)
-						assert.Equal(t, servers[0].numPeers(), int64(len(servers)-1))
-						assert.Equal(t, servers[1].numPeers(), int64(len(servers)-1))
-					} else {
-						assert.Equal(t, event.Type, PeerDisconnected)
-						assert.Equal(t, servers[0].numPeers(), int64(0))
-						assert.Equal(t, servers[1].numPeers(), int64(0))
-					}
-				}
+			shouldSucceed := chainIDs[0] == chainIDs[1]
+
+			// Server 0 -> Server 1
+			joinErr := servers[0].Join(servers[1].AddrInfo(), 5*time.Second)
+			time.Sleep(time.Second * 2) // TODO add mesh comment
+
+			if shouldSucceed && joinErr != nil {
+				t.Fatalf("Unable to join peer, %v", joinErr)
 			}
+
+			if shouldSucceed {
+				// Peer has been successfully added
+				assert.Equal(t, servers[0].numPeers(), int64(len(servers)-1))
+				assert.Equal(t, servers[1].numPeers(), int64(len(servers)-1))
+			} else {
+				// No peer has been added
+				assert.Equal(t, servers[0].numPeers(), int64(0))
+				assert.Equal(t, servers[1].numPeers(), int64(0))
+			}
+
 		})
 	}
 
