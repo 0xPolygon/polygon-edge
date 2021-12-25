@@ -111,53 +111,6 @@ func TestConnLimit_Outbound(t *testing.T) {
 	}
 }
 
-func TestPeersLifecycle(t *testing.T) {
-	defaultConfig := &CreateServerParams{
-		ConfigCallback: func(c *Config) {
-			c.NoDiscover = true
-		},
-	}
-
-	servers, createErr := createServers(3, map[int]*CreateServerParams{
-		0: defaultConfig,
-		1: defaultConfig,
-		2: defaultConfig,
-	})
-	if createErr != nil {
-		t.Fatalf("Unable to create servers, %v", createErr)
-	}
-	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
-	})
-
-	// Server 0 should connect to Server 1
-	connectedCh := asyncWaitForEvent(servers[1], DefaultBufferTimeout, connectedPeerHandler(servers[0].AddrInfo().ID))
-	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
-		t.Fatalf("Unable to join servers, %v", joinErr)
-	}
-	// Server 1 should broadcast a PeerConnected event
-	if !(<-connectedCh) {
-		t.Fatal("Server 1 could not broadcast a PeerConnected event")
-	}
-
-	// Server 1 and Server 0 should disconnect from each other
-	disconnectChs := []<-chan bool{
-		0: asyncWaitForEvent(servers[0], DefaultBufferTimeout, disconnectedPeerHandler(servers[1].AddrInfo().ID)),
-		1: asyncWaitForEvent(servers[1], DefaultBufferTimeout, disconnectedPeerHandler(servers[0].AddrInfo().ID)),
-	}
-	servers[1].Disconnect(servers[0].AddrInfo().ID, "bye")
-
-	// Both Server 1 and Server 0 should emit a disconnect event
-	if !(<-disconnectChs[0]) {
-		t.Fatal("Server 0 did not emit a disconnect event")
-	}
-	if !(<-disconnectChs[1]) {
-		t.Fatal("Server 1 did not emit a disconnect event")
-	}
-}
-
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 		c.NoDiscover = true
