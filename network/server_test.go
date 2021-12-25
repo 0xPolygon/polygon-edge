@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -200,35 +199,13 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	})
 
 	t.Run("Async event emit and read", func(t *testing.T) {
-		eventsSent := make([]int, 0)
-		var eventsSentLock sync.Mutex
-
-		markSentEvent := func(eventIndex int) {
-			eventsSentLock.Lock()
-			defer eventsSentLock.Unlock()
-
-			eventsSent = append(eventsSent, eventIndex)
-		}
-
-		var wg sync.WaitGroup
 		for i := 0; i < count; i++ {
-			wg.Add(1)
-			go func(indx int) {
-				defer wg.Done()
-
-				id, event := getIDAndEventType(indx)
-				server.emitEvent(id, event)
-				markSentEvent(indx)
-			}(i)
+			id, event := getIDAndEventType(i)
+			server.emitEvent(id, event)
 		}
-
-		wg.Wait()
-		eventsSentLock.Lock()
-		defer eventsSentLock.Unlock()
-
-		for _, eventIndex := range eventsSent {
+		for i := 0; i < count; i++ {
 			received := sub.Get()
-			id, event := getIDAndEventType(eventIndex)
+			id, event := getIDAndEventType(i)
 			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
