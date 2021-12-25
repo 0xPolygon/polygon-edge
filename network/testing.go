@@ -21,15 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func waitForMesh() {
-	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
-	waitForMeshCustom(time.Second * 2)
-}
-
-func waitForMeshCustom(duration time.Duration) {
-	time.Sleep(duration)
-}
-
 // JoinAndWait is a helper method for joining a destination server
 // and waiting for the connection to be successful (destination node is a peer of source)
 func JoinAndWait(
