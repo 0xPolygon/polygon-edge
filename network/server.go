@@ -303,7 +303,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
@@ -546,7 +546,7 @@ func (s *Server) Register(id string, p Protocol) {
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {
 	s.host.SetStreamHandler(protocol.ID(id), func(stream network.Stream) {
 		peerID := stream.Conn().RemotePeer()
-		s.logger.Trace("open stream", "protocol", id, "peer", peerID)
+		s.logger.Debug("open stream", "protocol", id, "peer", peerID)
 
 		handle(stream)
 	})

@@ -71,7 +71,7 @@ func (i *identity) setup() {
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
 			peerID := conn.RemotePeer()
-			i.srv.logger.Trace("Conn", "peer", peerID, "direction", conn.Stat().Direction)
+			i.srv.logger.Debug("Conn", "peer", peerID, "direction", conn.Stat().Direction)
 
 			initialized := atomic.LoadUint32(&i.initialized)
 			if initialized == 0 {
