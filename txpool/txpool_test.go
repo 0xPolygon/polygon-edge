@@ -221,9 +221,6 @@ func TestBroadcast(t *testing.T) {
 	// safely encrypt in RLP and broadcast it
 	key0, addr0 := tests.GenerateKeyAndAddr(t)
 
-	fmt.Println("-- addr")
-	fmt.Println(addr0)
-
 	signer := &crypto.FrontierSigner{}
 
 	createPool := func() (*TxPool, *network.Server) {
@@ -261,7 +258,6 @@ func TestBroadcast(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, pool1.AddTx(txn1))
-	fmt.Println(pool1.Length())
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {

@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"fmt"
 	"net"
 	"testing"
 
@@ -18,5 +17,4 @@ func TestHTTPServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(srv)
 }
