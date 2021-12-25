@@ -133,9 +133,16 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 	peerSyncers = make([]*Syncer, len(peerChains))
 	for idx, peerChain := range peerChains {
 		peerSyncers[idx] = CreateSyncer(t, peerChain, nil)
-		network.MultiJoin(t, syncer.server, peerSyncers[idx].server)
+
+		if joinErr := network.JoinAndWait(
+			syncer.server,
+			peerSyncers[idx].server,
+			network.DefaultBufferTimeout,
+			network.DefaultJoinTimeout,
+		); joinErr != nil {
+			t.Fatalf("Unable to join servers, %v", joinErr)
+		}
 	}
-	WaitUntilPeerConnected(t, syncer, len(peerChains), 10*time.Second)
 	return syncer, peerSyncers
 }
 

@@ -503,7 +503,12 @@ func createNetworkServers(count int, t *testing.T, conf func(c *network.Config))
 	networkServers := make([]*network.Server, count)
 
 	for indx := 0; indx < count; indx++ {
-		networkServers[indx] = network.CreateServer(t, conf)
+		server, createErr := network.CreateServer(&network.CreateServerParams{ConfigCallback: conf})
+		if createErr != nil {
+			t.Fatalf("Unable to create network servers, %v", createErr)
+		}
+
+		networkServers[indx] = server
 	}
 
 	return networkServers
@@ -550,6 +555,11 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 }
 
 func TestSyncer_PeerDisconnected(t *testing.T) {
+	// TODO remove the test skip after https://github.com/0xPolygon/polygon-sdk/pull/312 is merged
+	// The linked PR updates the libp2p package, which solves a bug present with libp2p v0.12.0 in this test
+	// https://github.com/libp2p/go-libp2p-noise/issues/70
+	t.SkipNow()
+
 	conf := func(c *network.Config) {
 		c.MaxPeers = 4
 		c.NoDiscover = true
@@ -574,15 +584,10 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 		syncer.Start()
 	}
 
-	network.MultiJoin(
-		t,
-		servers[0],
-		servers[1],
-		servers[0],
-		servers[2],
-		servers[1],
-		servers[2],
-	)
+	joinErrors := network.MeshJoin(servers...)
+	if len(joinErrors) != 0 {
+		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
+	}
 
 	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*10)

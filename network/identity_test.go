@@ -26,22 +26,23 @@ func TestIdentityHandshake(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			servers, createErr := createServers(2, []*CreateServerParams{
-				{
+			params := map[int]*CreateServerParams{
+				0: {
 					ConfigCallback: func(c *Config) {
 						c.Chain.Params = &chain.Params{
 							ChainID: defaultChainID,
 						}
 					},
 				},
-				{
+				1: {
 					ConfigCallback: func(c *Config) {
 						c.Chain.Params = &chain.Params{
 							ChainID: testCase.chainId,
 						}
 					},
 				},
-			})
+			}
+			servers, createErr := createServers(2, params)
 			if createErr != nil {
 				t.Fatalf("Unable to create servers, %v", createErr)
 			}
@@ -60,9 +61,14 @@ func TestIdentityHandshake(t *testing.T) {
 			shouldSucceed := chainIDs[0] == chainIDs[1]
 
 			// Server 0 -> Server 1
-			joinErr := servers[0].Join(servers[1].AddrInfo(), 5*time.Second)
-			waitForMesh()
+			joinTimeout := DefaultJoinTimeout
+			connectTimeout := DefaultBufferTimeout
+			if !shouldSucceed {
+				connectTimeout = time.Second * 5
+				joinTimeout = time.Second * 5
+			}
 
+			joinErr := JoinAndWait(servers[0], servers[1], connectTimeout, joinTimeout)
 			if shouldSucceed && joinErr != nil {
 				t.Fatalf("Unable to join peer, %v", joinErr)
 			}

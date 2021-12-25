@@ -1,10 +1,12 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,14 +30,134 @@ func waitForMeshCustom(duration time.Duration) {
 	time.Sleep(duration)
 }
 
+// JoinAndWait is a helper method for joining a destination server
+// and waiting for the connection to be successful (destination node is a peer of source)
+func JoinAndWait(
+	source,
+	destination *Server,
+	connectTimeout time.Duration,
+	joinTimeout time.Duration,
+) error {
+	if joinTimeout == 0 {
+		joinTimeout = DefaultJoinTimeout
+	}
+
+	if connectTimeout < joinTimeout {
+		// In case the connect timeout is smaller than the join timeout, align them
+		connectTimeout = joinTimeout
+	}
+
+	// The join routine should be separate
+	go func() {
+		if joinErr := source.Join(destination.AddrInfo(), joinTimeout); joinErr != nil {
+			source.logger.Error(fmt.Sprintf("Unable to join peer, %v", joinErr))
+		}
+	}()
+
+	connectCtx, cancelFn := context.WithTimeout(context.Background(), connectTimeout)
+	defer cancelFn()
+	// Wait for the peer to be connected
+	_, connectErr := WaitUntilPeerConnectsTo(connectCtx, source, destination.AddrInfo().ID)
+
+	return connectErr
+}
+
+func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
+	peersConnected := 0
+	targetPeers := len(ids)
+
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		for _, v := range ids {
+			if srv.hasPeer(v) {
+				peersConnected++
+			}
+
+			if peersConnected == targetPeers {
+				return true, false
+			}
+		}
+		return nil, true
+
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return res.(bool), nil
+}
+
+func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
+	peersDisconnected := 0
+	targetPeers := len(ids)
+
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		for _, v := range ids {
+			if !srv.hasPeer(v) {
+				peersDisconnected++
+			}
+
+			if peersDisconnected == targetPeers {
+				return true, false
+			}
+		}
+		return nil, true
+
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return res.(bool), nil
+}
+
+func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent) bool) <-chan bool {
+	resCh := make(chan bool, 1)
+	go func(ch chan<- bool) {
+		ch <- s.waitForEvent(timeout, handler)
+		close(ch)
+	}(resCh)
+	return resCh
+}
+
+func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
+	return func(evnt *PeerEvent) bool {
+		return evnt.Type == PeerDisconnected && evnt.PeerID == p
+	}
+}
+
+func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
+	return func(evnt *PeerEvent) bool {
+		return evnt.Type == PeerConnected && evnt.PeerID == p
+	}
+}
+
+// constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs
+func constructMultiAddrs(addresses []string) ([]multiaddr.Multiaddr, error) {
+	returnAddrs := make([]multiaddr.Multiaddr, 0)
+
+	for _, addr := range addresses {
+		multiAddr, err := multiaddr.NewMultiaddr(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		returnAddrs = append(returnAddrs, multiAddr)
+	}
+
+	return returnAddrs, nil
+}
+
 func createServers(
 	count int,
-	params []*CreateServerParams,
+	paramsMap map[int]*CreateServerParams,
 ) ([]*Server, error) {
 	servers := make([]*Server, count)
+	if paramsMap == nil {
+		paramsMap = map[int]*CreateServerParams{}
+	}
 
 	for i := 0; i < count; i++ {
-		server, createErr := CreateServer(params[i])
+		server, createErr := CreateServer(paramsMap[i])
 		if createErr != nil {
 			return nil, createErr
 		}
@@ -110,37 +232,47 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	return server, startErr
 }
 
-func MultiJoinSerial(t *testing.T, servers []*Server) {
-	dials := make([]*Server, len(servers))
-	for i := 0; i < len(servers)-1; i++ {
-		src, dst := servers[i], servers[i+1]
-		dials = append(dials, src, dst)
+// MeshJoin is a helper method for joining all the passed in servers into a mesh
+func MeshJoin(servers ...*Server) []error {
+	if len(servers) < 2 {
+		return nil
 	}
 
-	MultiJoin(t, dials...)
-}
+	// Join errors are used to gather all errors that happen
+	// inside the go routines, so they can be handled when they finish
+	joinErrors := make([]error, 0)
+	var joinErrorsLock sync.Mutex
 
-func MultiJoin(t *testing.T, servers ...*Server) {
+	appendJoinError := func(joinErr error) {
+		joinErrorsLock.Lock()
+		joinErrors = append(joinErrors, joinErr)
+		joinErrorsLock.Unlock()
+	}
+
 	numServers := len(servers)
+	var wg sync.WaitGroup
+	for indx := 0; indx < numServers; indx++ {
+		for innerIndx := 0; innerIndx < numServers; innerIndx++ {
+			if innerIndx != indx {
+				wg.Add(1)
+				go func(src, dest int) {
+					defer wg.Done()
 
-	if numServers%2 != 0 {
-		t.Fatal("uneven number of servers passed in")
-	}
-
-	doneCh := make(chan error)
-	for i := 0; i < numServers; i += 2 {
-		go func(i int) {
-			src, dst := servers[i], servers[i+1]
-			doneCh <- src.Join(dst.AddrInfo(), 10*time.Second)
-		}(i)
-	}
-
-	for i := 0; i < numServers/2; i++ {
-		err := <-doneCh
-		if err != nil {
-			t.Fatalf("Unable to complete join procedure, %v", err)
+					if joinErr := JoinAndWait(
+						servers[src],
+						servers[dest],
+						DefaultBufferTimeout,
+						DefaultJoinTimeout,
+					); joinErr != nil {
+						appendJoinError(fmt.Errorf("unable to join peers, %v", joinErr))
+					}
+				}(indx, innerIndx)
+			}
 		}
 	}
+
+	wg.Wait()
+	return joinErrors
 }
 
 func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {

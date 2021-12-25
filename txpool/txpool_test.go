@@ -227,7 +227,11 @@ func TestBroadcast(t *testing.T) {
 	signer := &crypto.FrontierSigner{}
 
 	createPool := func() (*TxPool, *network.Server) {
-		server := network.CreateServer(t, nil)
+		server, createErr := network.CreateServer(nil)
+		if createErr != nil {
+			t.Fatalf("Unable to create server, %v", createErr)
+		}
+
 		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server, nilMetrics)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
@@ -237,7 +241,14 @@ func TestBroadcast(t *testing.T) {
 	pool1, network1 := createPool()
 	_, network2 := createPool()
 
-	network.MultiJoin(t, network1, network2)
+	if joinErr := network.JoinAndWait(
+		network1,
+		network2,
+		network.DefaultBufferTimeout,
+		network.DefaultJoinTimeout,
+	); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
 	// broadcast txn1 from pool1
 	txn1 := &types.Transaction{

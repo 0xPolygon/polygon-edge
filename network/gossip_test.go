@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	testproto "github.com/0xPolygon/polygon-sdk/network/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
-
-	testproto "github.com/0xPolygon/polygon-sdk/network/proto"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -31,9 +30,14 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 }
 
 func TestSimpleGossip(t *testing.T) {
+	// TODO remove the test skip after https://github.com/0xPolygon/polygon-sdk/pull/312 is merged
+	// The linked PR updates the libp2p package, which solves a bug present with libp2p v0.12.0 in this test
+	// https://github.com/libp2p/go-libp2p-noise/issues/70
+	t.SkipNow()
+
 	numServers := 2
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
-	servers, createErr := createServers(numServers, []*CreateServerParams{nil, nil})
+	servers, createErr := createServers(numServers, nil)
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
@@ -46,7 +50,10 @@ func TestSimpleGossip(t *testing.T) {
 		}
 	})
 
-	MultiJoin(t, servers[0], servers[1])
+	joinErrors := MeshJoin(servers...)
+	if len(joinErrors) != 0 {
+		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
+	}
 
 	topicName := "msg-pub-sub"
 	serverTopics := make([]*Topic, numServers)

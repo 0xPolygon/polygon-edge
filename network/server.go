@@ -339,6 +339,16 @@ func (s *Server) Peers() []*Peer {
 	return peers
 }
 
+// hasPeer checks if the peer is present in the peers list [Thread-safe]
+func (s *Server) hasPeer(peerID peer.ID) bool {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	_, ok := s.peers[peerID]
+
+	return ok
+}
+
 func (s *Server) numOpenSlots() int64 {
 	n := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
 	if n < 0 {
@@ -435,7 +445,10 @@ func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEven
 	}
 }
 
-var DefaultJoinTimeout = 10 * time.Second
+var (
+	DefaultJoinTimeout   = 10 * time.Second
+	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
+)
 
 func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 	addr0, err := multiaddr.NewMultiaddr(addr)
