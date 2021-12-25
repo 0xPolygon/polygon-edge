@@ -401,6 +401,7 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncer.syncProgression.stopProgression()
 }
 
+// nolint:unused
 type mockBlockStore struct {
 	blocks       []*types.Block
 	subscription *blockchain.MockSubscription
