@@ -516,8 +516,6 @@ func (s *Server) runJoinWatcher() error {
 }
 
 func (s *Server) Close() error {
-	// TODO remove
-	s.logger.Debug("Closing server")
 	err := s.host.Close()
 	s.dialQueue.Close()
 	close(s.closeCh)

@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-hclog"
 	"net"
 	"strconv"
 	"sync"
@@ -405,20 +404,12 @@ func TestPeerReconnection(t *testing.T) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{
-			Name:  "bootnode-1",
-			Level: hclog.LevelFromString("DEBUG"),
-		}),
 	}
 	bootnodeConfig2 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{
-			Name:  "bootnode-2",
-			Level: hclog.LevelFromString("DEBUG"),
-		}),
 	}
 	// Create bootnodes
 	bootnodes, createErr := createServers(2, map[int]*CreateServerParams{0: bootnodeConfig1, 1: bootnodeConfig2})
@@ -440,10 +431,6 @@ func TestPeerReconnection(t *testing.T) {
 				AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{
-			Name:  "server-1",
-			Level: hclog.LevelFromString("DEBUG"),
-		}),
 	}
 	defaultConfig2 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
@@ -454,10 +441,6 @@ func TestPeerReconnection(t *testing.T) {
 				AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
 		},
-		Logger: hclog.New(&hclog.LoggerOptions{
-			Name:  "server-2",
-			Level: hclog.LevelFromString("DEBUG"),
-		}),
 	}
 
 	servers, createErr := createServers(2, map[int]*CreateServerParams{0: defaultConfig1, 1: defaultConfig2})
@@ -744,8 +727,6 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				ConfigCallback: func(c *Config) {
 					c.Chain.Bootnodes = tt.bootNodes
 				},
-				ServerCallback: nil,
-				Logger:         nil,
 			})
 
 			if tt.shouldFail {
