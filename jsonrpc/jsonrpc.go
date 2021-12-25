@@ -199,16 +199,16 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if req.Method == "GET" {
-		w.Write([]byte("PolygonSDK JSON-RPC"))
+		_, _ = w.Write([]byte("PolygonSDK JSON-RPC"))
 		return
 	}
 	if req.Method != "POST" {
-		w.Write([]byte("method " + req.Method + " not allowed"))
+		_, _ = w.Write([]byte("method " + req.Method + " not allowed"))
 		return
 	}
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 		return
 	}
 
@@ -218,9 +218,9 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	resp, err := j.dispatcher.Handle(data)
 
 	if err != nil {
-		w.Write([]byte(err.Error()))
+		_, _ = w.Write([]byte(err.Error()))
 	} else {
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	}
 	j.logger.Debug("handle", "response", string(resp))
 

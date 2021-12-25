@@ -188,7 +188,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if req.Method == "eth_subscribe" {
 		filterID, err := d.handleSubscribe(req, conn)
 		if err != nil {
-			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			_, _ = NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 		resp, err := formatFilterResponse(req.ID, filterID)
 		if err != nil {

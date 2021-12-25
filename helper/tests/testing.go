@@ -107,10 +107,7 @@ func GetFreePort() (port int, err error) {
 		var l *net.TCPListener
 		if l, err = net.ListenTCP("tcp", addr); err == nil {
 			defer func(l *net.TCPListener) {
-				err := l.Close()
-				if err != nil {
-
-				}
+				_ = l.Close()
 			}(l)
 			return l.Addr().(*net.TCPAddr).Port, nil
 		}

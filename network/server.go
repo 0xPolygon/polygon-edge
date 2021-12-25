@@ -226,10 +226,16 @@ func (s *Server) Start() error {
 			bootnodes = append(bootnodes, node)
 		}
 
-		s.discovery.setup(bootnodes)
+		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
+			return fmt.Errorf("unable to setup discovery, %v", setupErr)
+		}
 	}
 
-	go s.runJoinWatcher()
+	go func() {
+		if err := s.runJoinWatcher(); err != nil {
+			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
+		}
+	}()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{

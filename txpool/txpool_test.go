@@ -266,7 +266,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
 
-	pool.addImpl("", &types.Transaction{
+	_ = pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
@@ -278,7 +278,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 
 	// though txn0 is not being processed yet and the current nonce is 0
 	// we need to consider that txn0 is on the pendingQueue pool so this one is promoted too
-	pool.addImpl("", &types.Transaction{
+	_ = pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Nonce:    1,
 		Gas:      validGasLimit,
@@ -545,7 +545,10 @@ func TestTx_MaxSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := make([]byte, tt.size)
-			rand.Read(data)
+			if _, readErr := rand.Read(data); readErr != nil {
+				t.Fatalf("Unable to read data, %v", readErr)
+			}
+
 			txn := generateTx(tt.address, 0, big.NewInt(0), big.NewInt(1), data)
 			err := pool.addImpl("", txn)
 			if tt.succeed {
@@ -701,7 +704,9 @@ func generateAddTx(arg addTx, signer crypto.TxSigner) *types.Transaction {
 	}
 
 	input := make([]byte, size)
-	rand.Read(input)
+	if _, readErr := rand.Read(input); readErr != nil {
+		return nil
+	}
 
 	tx := &types.Transaction{
 		Nonce:    arg.nonce,
