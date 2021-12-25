@@ -110,12 +110,6 @@ func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent
 	return resCh
 }
 
-func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
-	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerDisconnected && evnt.PeerID == p
-	}
-}
-
 func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	return func(evnt *PeerEvent) bool {
 		return evnt.Type == PeerConnected && evnt.PeerID == p
