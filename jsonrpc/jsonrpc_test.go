@@ -13,7 +13,7 @@ func TestHTTPServer(t *testing.T) {
 		Store: store,
 		Addr:  &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8545},
 	}
-	srv, err := NewJSONRPC(hclog.NewNullLogger(), config)
+	_, err := NewJSONRPC(hclog.NewNullLogger(), config)
 	if err != nil {
 		t.Fatal(err)
 	}

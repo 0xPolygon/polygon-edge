@@ -555,8 +555,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	if err := b.writeBody(block); err != nil {
 		t.Fatal(err)
 	}
-
-	body, ok := b.readBody(block.Hash())
 }
 
 func TestCalculateGasLimit(t *testing.T) {

@@ -219,7 +219,7 @@ func TestGetPendingAndQueuedTransactions(t *testing.T) {
 func TestBroadcast(t *testing.T) {
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it
-	key0, addr0 := tests.GenerateKeyAndAddr(t)
+	key0, _ := tests.GenerateKeyAndAddr(t)
 
 	signer := &crypto.FrontierSigner{}
 
