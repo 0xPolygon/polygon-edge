@@ -101,21 +101,6 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 	return res.(bool), nil
 }
 
-func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent) bool) <-chan bool {
-	resCh := make(chan bool, 1)
-	go func(ch chan<- bool) {
-		ch <- s.waitForEvent(timeout, handler)
-		close(ch)
-	}(resCh)
-	return resCh
-}
-
-func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
-	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerConnected && evnt.PeerID == p
-	}
-}
-
 // constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs
 func constructMultiAddrs(addresses []string) ([]multiaddr.Multiaddr, error) {
 	returnAddrs := make([]multiaddr.Multiaddr, 0)

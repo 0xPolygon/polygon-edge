@@ -104,11 +104,21 @@ func TestConnLimit_Outbound(t *testing.T) {
 	}
 
 	// Disconnect Server 0 from Server 1
-	// Now Server 0 is trying to connect to Server 2 since there are slots left
-	connectedCh := asyncWaitForEvent(servers[0], smallTimeout, connectedPeerHandler(servers[2].AddrInfo().ID))
 	servers[0].Disconnect(servers[1].host.ID(), "bye")
-	if !(<-connectedCh) {
-		t.Fatal("Server 0 could not connect to server 2")
+
+	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+	defer disconnectFn()
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], servers[1].AddrInfo().ID); disconnectErr != nil {
+		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+	}
+
+	// Now Server 0 is trying to connect to Server 2 since there are slots left
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), DefaultJoinTimeout*2)
+	defer cancelWait()
+
+	_, err := WaitUntilPeerConnectsTo(waitCtx, servers[0], servers[2].host.ID())
+	if err != nil {
+		t.Fatalf("Unable to wait for peer connect, %v", err)
 	}
 }
 
@@ -617,14 +627,13 @@ func TestRunDial(t *testing.T) {
 		srv, peers := servers[0], servers[1:]
 
 		for idx, p := range peers {
-			smallTimeout := time.Second * 5
-
 			if uint64(idx) < maxPeers[0] {
 				// Connection should be successful
 				joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout)
 				assert.NoError(t, joinErr)
 			} else {
 				// Connection should fail
+				smallTimeout := time.Second * 5
 				joinErr := JoinAndWait(srv, p, smallTimeout, smallTimeout)
 				assert.Error(t, joinErr)
 			}
