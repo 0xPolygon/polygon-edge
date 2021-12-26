@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -74,6 +75,18 @@ func TestIdentityHandshake(t *testing.T) {
 			}
 
 			if shouldSucceed {
+				// Wait until Server 1 also has a connection to Server 0 before asserting
+				connectCtx, connectFn := context.WithTimeout(context.Background(), connectTimeout)
+				defer connectFn()
+
+				if _, connectErr := WaitUntilPeerConnectsTo(
+					connectCtx,
+					servers[1],
+					servers[0].AddrInfo().ID,
+				); connectErr != nil {
+					t.Fatalf("Unable to wait for connection between Server 1 to Server 0, %v", connectErr)
+				}
+
 				// Peer has been successfully added
 				assert.Equal(t, servers[0].numPeers(), int64(len(servers)-1))
 				assert.Equal(t, servers[1].numPeers(), int64(len(servers)-1))

@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"net"
 	"strconv"
 	"testing"
@@ -508,6 +509,19 @@ func TestReconnectionWithNewIP(t *testing.T) {
 	if joinErr := JoinAndWait(servers[0], servers[2], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
 		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
+
+	// Wait until Server 2 also has a connection to Server 0 before asserting
+	connectCtx, connectFn := context.WithTimeout(context.Background(), DefaultBufferTimeout)
+	defer connectFn()
+
+	if _, connectErr := WaitUntilPeerConnectsTo(
+		connectCtx,
+		servers[2],
+		servers[0].AddrInfo().ID,
+	); connectErr != nil {
+		t.Fatalf("Unable to wait for connection between Server 2 and Server 0, %v", connectErr)
+	}
+
 	assert.Equal(t, int64(1), servers[0].numPeers())
 	assert.Equal(t, int64(1), servers[2].numPeers())
 }
@@ -555,10 +569,19 @@ func TestRunDial(t *testing.T) {
 	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
-			server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
-				c.MaxPeers = maxPeers[idx]
-				c.NoDiscover = true
-			}})
+			logger := hclog.New(&hclog.LoggerOptions{
+				Name:  fmt.Sprintf("server-%d", idx),
+				Level: hclog.LevelFromString("DEBUG"),
+			})
+
+			server, createErr := CreateServer(
+				&CreateServerParams{
+					ConfigCallback: func(c *Config) {
+						c.MaxPeers = maxPeers[idx]
+						c.NoDiscover = true
+					},
+					Logger: logger,
+				})
 			if createErr != nil {
 				t.Fatalf("Unable to create servers, %v", createErr)
 			}
@@ -571,7 +594,7 @@ func TestRunDial(t *testing.T) {
 
 	closeServers := func(servers ...*Server) {
 		for _, s := range servers {
-			_ = s.Close()
+			assert.NoError(t, s.Close())
 		}
 	}
 
