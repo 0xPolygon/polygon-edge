@@ -416,41 +416,6 @@ func (s *Server) Disconnect(peer peer.ID, reason string) {
 	}
 }
 
-func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEvent) bool) bool {
-	// TODO: Try to replace joinwatcher with this
-	sub, _ := s.Subscribe()
-
-	doneCh := make(chan struct{})
-	closed := false
-	go func() {
-		loop := true
-		for loop {
-			select {
-			case evnt := <-sub.GetCh():
-				if handler(evnt) {
-					loop = false
-				}
-
-			case <-s.closeCh:
-				closed = true
-				loop = false
-			}
-		}
-		sub.Close()
-		doneCh <- struct{}{}
-	}()
-	if closed {
-		return false
-	}
-
-	select {
-	case <-doneCh:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
 var (
 	DefaultJoinTimeout   = 20 * time.Second // Anything below 15s is prone to false timeouts, as seen from empirical test data
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
