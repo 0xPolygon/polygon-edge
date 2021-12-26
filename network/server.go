@@ -452,7 +452,7 @@ func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEven
 }
 
 var (
-	DefaultJoinTimeout   = 10 * time.Second
+	DefaultJoinTimeout   = 20 * time.Second // Anything below 15s is prone to false timeouts, as seen from empirical test data
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 
