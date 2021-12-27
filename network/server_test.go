@@ -33,9 +33,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	// One slot left, Server 0 can connect to Server 1
@@ -86,9 +84,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	// One slot left, Server 0 can connect to Server 1
@@ -277,9 +273,7 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	// Server 0 should connect to Server 1
@@ -358,9 +352,7 @@ func TestPeerReconnection(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, bootnode := range bootnodes {
-			assert.NoError(t, bootnode.Close())
-		}
+		closeTestServers(t, bootnodes)
 	})
 
 	defaultConfig1 := &CreateServerParams{
@@ -492,9 +484,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	// Server 0 should connect to Server 1

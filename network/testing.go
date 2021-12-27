@@ -303,3 +303,9 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 
 	return libp2pKey, dir
 }
+
+func closeTestServers(t *testing.T, servers []*Server) {
+	for _, server := range servers {
+		assert.NoError(t, server.Close())
+	}
+}

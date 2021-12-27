@@ -49,9 +49,7 @@ func TestIdentityHandshake(t *testing.T) {
 			}
 
 			t.Cleanup(func() {
-				for _, server := range servers {
-					assert.NoError(t, server.Close())
-				}
+				closeTestServers(t, servers)
 			})
 
 			chainIDs := []int{

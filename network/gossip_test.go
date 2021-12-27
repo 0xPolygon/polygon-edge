@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	testproto "github.com/0xPolygon/polygon-sdk/network/proto"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
@@ -44,10 +43,7 @@ func TestSimpleGossip(t *testing.T) {
 	messageCh := make(chan *testproto.GenericMessage)
 	t.Cleanup(func() {
 		close(messageCh)
-
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	joinErrors := MeshJoin(servers...)

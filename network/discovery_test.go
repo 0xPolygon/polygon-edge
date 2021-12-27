@@ -21,9 +21,7 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout)
@@ -41,9 +39,7 @@ func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout)
@@ -72,9 +68,7 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		for _, server := range servers {
-			assert.NoError(t, server.Close())
-		}
+		closeTestServers(t, servers)
 	})
 
 	// Server 0 -> Server 1
