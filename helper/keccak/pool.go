@@ -32,7 +32,8 @@ func (p *Pool) Put(k *Keccak) {
 // Keccak256 hashes a src with keccak-256
 func Keccak256(dst, src []byte) []byte {
 	h := DefaultKeccakPool.Get()
-	_, _ = h.Write(src)
+	//nolint
+	h.Write(src)
 	dst = h.Sum(dst)
 	DefaultKeccakPool.Put(h)
 	return dst
