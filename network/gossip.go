@@ -10,7 +10,10 @@ import (
 )
 
 const (
-	bufferSize = 512 // buffer size of gossip queue
+	// bufferSize is the size of the queue in go-libp2p-pubsub
+	// we should have enough capacity of the queue
+	// because there is possibility of that node lose gossip messages when the queue is full
+	bufferSize = 512
 )
 
 type Topic struct {
