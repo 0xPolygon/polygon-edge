@@ -52,12 +52,12 @@ func getIndexWithOffset(keccakHash []byte, offset int64) []byte {
 	return bigKeccak.Bytes()
 }
 
-// GetStorageIndexes is a helper function for getting the correct indexes
+// getStorageIndexes is a helper function for getting the correct indexes
 // of the storage slots which need to be modified during bootstrap.
 //
 // It is SC dependant, and based on the SC located at:
 // https://github.com/0xPolygon/staking-contracts/
-func GetStorageIndexes(address types.Address, index int64) *StorageIndexes {
+func getStorageIndexes(address types.Address, index int64) *StorageIndexes {
 	storageIndexes := StorageIndexes{}
 
 	// Get the indexes for the mappings
@@ -140,7 +140,7 @@ func PredeployStakingSC(
 		stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)
 
 		// Get the storage indexes
-		storageIndexes := GetStorageIndexes(validator, int64(indx))
+		storageIndexes := getStorageIndexes(validator, int64(indx))
 
 		// Set the value for the validators array
 		storageMap[types.BytesToHash(storageIndexes.ValidatorsIndex)] = types.BytesToHash(
