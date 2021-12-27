@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	filter "github.com/libp2p/go-maddr-filter"
 	ma "github.com/multiformats/go-multiaddr"
 	mamask "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -30,6 +31,6 @@ func init() {
 		if err != nil {
 			panic("error in lowTimeoutFilters init: " + err.Error())
 		}
-		lowTimeoutFilters.AddDialFilter(f)
+		lowTimeoutFilters.AddFilter(*f, filter.ActionDeny)
 	}
 }

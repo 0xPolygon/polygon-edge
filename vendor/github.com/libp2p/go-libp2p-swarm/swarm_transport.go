@@ -20,7 +20,10 @@ func (s *Swarm) TransportForDialing(a ma.Multiaddr) transport.Transport {
 	s.transports.RLock()
 	defer s.transports.RUnlock()
 	if len(s.transports.m) == 0 {
-		log.Error("you have no transports configured")
+		// make sure we're not just shutting down.
+		if s.transports.m != nil {
+			log.Error("you have no transports configured")
+		}
 		return nil
 	}
 
@@ -48,7 +51,10 @@ func (s *Swarm) TransportForListening(a ma.Multiaddr) transport.Transport {
 	s.transports.RLock()
 	defer s.transports.RUnlock()
 	if len(s.transports.m) == 0 {
-		log.Error("you have no transports configured")
+		// make sure we're not just shutting down.
+		if s.transports.m != nil {
+			log.Error("you have no transports configured")
+		}
 		return nil
 	}
 
@@ -77,6 +83,9 @@ func (s *Swarm) AddTransport(t transport.Transport) error {
 
 	s.transports.Lock()
 	defer s.transports.Unlock()
+	if s.transports.m == nil {
+		return ErrSwarmClosed
+	}
 	var registered []string
 	for _, p := range protocols {
 		if _, ok := s.transports.m[p]; ok {
