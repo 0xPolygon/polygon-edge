@@ -333,8 +333,8 @@ func TestAddHandler(t *testing.T) {
 
 		// send returnee (a previously promoted tx that is being recovered)
 		go pool.handleAddRequest(addRequest{
-			tx:       newDummyTx(addr, 3, 1),
-			returnee: true,
+			tx:      newDummyTx(addr, 3, 1),
+			demoted: true,
 		})
 
 		req := <-pool.promoteReqCh
@@ -474,8 +474,8 @@ func TestPromoteHandler(t *testing.T) {
 
 		// send recovered tx
 		go pool.handleAddRequest(addRequest{
-			tx:       newDummyTx(addr, 4, 1),
-			returnee: true,
+			tx:      newDummyTx(addr, 4, 1),
+			demoted: true,
 		})
 
 		// promote recovered
@@ -968,65 +968,89 @@ func TestResetWithHeader(t *testing.T) {
 
 }
 
+type status int
+
+const (
+	// depending on the value of next nonce
+	// recoverables (returnees) can end up
+	// either in enqueued or in promoted
+	recoverable status = iota
+
+	// rollback nonce for this account (see recoverable)
+	unrecoverable
+
+	// all good, no need to affect the pool in any way
+	ok
+)
+
+type statusTx struct {
+	tx     *types.Transaction
+	status status
+}
+
 func TestRecoverySingleAccount(t *testing.T) {
-	addr1 := types.Address{0x1}
 	testCases := []struct {
-		name          string
-		promoted      transactions
-		isRecoverable map[uint64]bool
-		expected      result
+		name         string
+		transactions []statusTx
+		expected     result
 	}{
-		{
-			name: "all recovered are promoted again",
-			promoted: transactions{
-				newDummyTx(addr1, 0, 1),
-				newDummyTx(addr1, 1, 2),
-				newDummyTx(addr1, 2, 1),
-				newDummyTx(addr1, 3, 3),
-				newDummyTx(addr1, 4, 2),
+		{ /*
+				If tx execution fails for some account,
+				subsequent transctions will be regarded as recoverable
+				due to higher nonce, ending up back in enqueued
+			*/
+			name: "all recovered in enqueued",
+			transactions: []statusTx{
+				{newDummyTx(addr1, 0, 1), unrecoverable},
+				{newDummyTx(addr1, 1, 1), recoverable},
+				{newDummyTx(addr1, 2, 1), recoverable},
+				{newDummyTx(addr1, 3, 1), recoverable},
+				{newDummyTx(addr1, 4, 1), recoverable},
+				{newDummyTx(addr1, 5, 1), recoverable},
 			},
-			isRecoverable: map[uint64]bool{
-				0: true,
-				1: true,
-				2: true,
-				3: true,
-				4: true,
+			expected: result{
+				enqueued: map[types.Address]uint64{
+					addr1: 5,
+				},
+				promoted: 0,
+				slots:    5,
+			},
+		},
+		{
+			name: "all recovered in promoted",
+			transactions: []statusTx{
+				{newDummyTx(addr1, 0, 1), ok},
+				{newDummyTx(addr1, 1, 1), recoverable},
+				{newDummyTx(addr1, 2, 1), recoverable},
+				{newDummyTx(addr1, 3, 1), recoverable},
+				{newDummyTx(addr1, 4, 1), recoverable},
+				{newDummyTx(addr1, 5, 1), recoverable},
 			},
 			expected: result{
 				enqueued: map[types.Address]uint64{
 					addr1: 0,
 				},
 				promoted: 5,
-				slots:    9,
-			},
-		},
-		{
-			name: "all recovered are enqueued",
-			promoted: transactions{
-				newDummyTx(addr1, 0, 1),
-				newDummyTx(addr1, 1, 2),
-				newDummyTx(addr1, 2, 1),
-				newDummyTx(addr1, 3, 3),
-				newDummyTx(addr1, 4, 2),
-			},
-			isRecoverable: map[uint64]bool{
-				0: false,
-				1: true,
-				2: true,
-				3: true,
-				4: true,
-			},
-			expected: result{
-				enqueued: map[types.Address]uint64{
-					addr1: 4,
-				},
-				promoted: 0,
-				slots:    8,
+				slots:    5,
 			},
 		},
 	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// helper callback for transition errors
+			status := func(tx *types.Transaction) status {
+				var status status
+				for _, sTx := range tc.transactions {
+					if tx.Nonce == sTx.tx.Nonce {
+						status = sTx.status
+					}
+				}
+
+				return status
+			}
+
+			// create pool
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.AddSigner(&mockSigner{})
@@ -1036,94 +1060,99 @@ func TestRecoverySingleAccount(t *testing.T) {
 
 			// setup initial state
 			{
-				for _, tx := range tc.promoted {
-					go pool.addTx(tx)
+				for _, sTx := range tc.transactions {
+					go pool.addTx(sTx.tx)
 				}
 				waitUntilDone(done)
-				assert.Equal(t, uint64(5), pool.promoted.length())
 			}
 
-			// ibft.writeTransactions()
+			// mock ibft.writeTransactions()
 			func() {
 				pool.LockPromoted(true)
-				defer pool.UnlockPromoted()
-
 				for {
-					tx := pool.Pop()
+					tx := pool.Peek()
 					if tx == nil {
 						break
 					}
 
-					switch tc.isRecoverable[tx.Nonce] {
-					case true:
-						pool.Recover(tx)
-					case false:
-						pool.RollbackNonce(tx)
+					switch status(tx) {
+					case recoverable:
+						pool.Demote()
+					case unrecoverable:
+						pool.Drop()
+					case ok:
+						pool.Pop()
 					}
 				}
+				pool.UnlockPromoted()
 			}()
 
-			// pool was handling recoveries in the background...
+			// pool was handling requests
 			waitUntilDone(done)
 
+			// // assert
 			assert.Equal(t, tc.expected.slots, pool.gauge.read())
-			assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
 			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
+			assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
 		})
 	}
+
 }
 
 func TestRecoveryMultipleAccounts(t *testing.T) {
-	type status int
-	const (
-		// depending on the value of next nonce
-		// recoverables (returnees) can end up
-		// either in enqueued or in promoted
-		recoverable status = iota
-
-		// rollback nonce for this account (see recoverable)
-		unrecoverable
-
-		// all good, no need to affect the pool in any way
-		ok
-	)
-
-	// 4 accounts
-	addr1 := types.Address{0x1}
-	addr2 := types.Address{0x2}
-	addr3 := types.Address{0x3}
-	addr4 := types.Address{0x4}
-
 	testCases := []struct {
-		name       string
-		nextNonces map[types.Address]uint64
-		promoted   transactions
-		status     []status
-		expected   result
+		name         string
+		transactions map[types.Address][]statusTx
+		expected     result
 	}{
 		{
+			name: "all recovered in enqueued",
+			transactions: map[types.Address][]statusTx{
+				addr1: {
+					{newDummyTx(addr1, 0, 1), ok},
+				},
+				addr2: {
+					{newDummyTx(addr2, 0, 1), ok},
+					{newDummyTx(addr2, 1, 1), unrecoverable},
+					{newDummyTx(addr2, 2, 1), recoverable},
+					{newDummyTx(addr2, 3, 1), recoverable},
+				},
+				addr3: {
+					{newDummyTx(addr3, 0, 1), unrecoverable},
+					{newDummyTx(addr3, 1, 1), recoverable},
+				},
+				addr4: {
+					{newDummyTx(addr4, 0, 1), ok},
+					{newDummyTx(addr4, 1, 1), ok},
+					{newDummyTx(addr4, 2, 1), unrecoverable},
+				},
+			},
+			expected: result{
+				enqueued: map[types.Address]uint64{
+					addr1: 0,
+					addr2: 2,
+					addr3: 1,
+					addr4: 0,
+				},
+				promoted: 0,
+				slots:    3,
+			},
+		},
+		{
 			name: "all recovered in promoted",
-			nextNonces: map[types.Address]uint64{
-				addr1: 3,
-				addr2: 1,
-				addr3: 2,
-				addr4: 0,
-			},
-			promoted: transactions{
-				0: newDummyTx(addr1, 0, 1),
-				1: newDummyTx(addr2, 0, 2),
-				2: newDummyTx(addr1, 1, 1),
-				3: newDummyTx(addr3, 0, 2),
-				4: newDummyTx(addr3, 1, 2),
-				5: newDummyTx(addr1, 2, 1),
-			},
-			status: []status{
-				0: recoverable,
-				1: ok,
-				2: recoverable,
-				3: ok,
-				4: recoverable,
-				5: recoverable,
+			transactions: map[types.Address][]statusTx{
+				addr1: {
+					{newDummyTx(addr1, 0, 1), ok},
+					{newDummyTx(addr1, 1, 1), recoverable},
+					{newDummyTx(addr1, 2, 1), recoverable},
+				},
+				addr2: {
+					{newDummyTx(addr2, 0, 1), ok},
+				},
+				addr3: {
+					{newDummyTx(addr3, 0, 1), recoverable},
+					{newDummyTx(addr3, 1, 1), recoverable},
+				},
 			},
 			expected: result{
 				enqueued: map[types.Address]uint64{
@@ -1133,56 +1162,28 @@ func TestRecoveryMultipleAccounts(t *testing.T) {
 					addr4: 0,
 				},
 				promoted: 4,
-				slots:    5,
-			},
-		},
-		{
-			name: "all recovered in enqueued",
-			nextNonces: map[types.Address]uint64{
-				addr1: 1,
-				addr2: 4,
-				addr3: 2,
-				addr4: 3,
-			},
-			promoted: transactions{
-				0: newDummyTx(addr1, 0, 1),
-				1: newDummyTx(addr2, 0, 2),
-				2: newDummyTx(addr2, 1, 1),
-				3: newDummyTx(addr2, 2, 2),
-				4: newDummyTx(addr3, 0, 2),
-				5: newDummyTx(addr3, 1, 1),
-				6: newDummyTx(addr4, 0, 1),
-				7: newDummyTx(addr4, 1, 3),
-				8: newDummyTx(addr2, 3, 1),
-				9: newDummyTx(addr4, 2, 2),
-			},
-			status: []status{
-				0: ok,
-				1: unrecoverable, // rollback addr2
-				2: recoverable,
-				3: recoverable,
-				4: unrecoverable, // rollback addr2
-				5: recoverable,
-				6: ok,
-				7: ok,
-				8: recoverable,
-				9: ok,
-			},
-			expected: result{
-				enqueued: map[types.Address]uint64{
-					addr1: 0,
-					addr2: 3,
-					addr3: 1,
-					addr4: 0,
-				},
-				promoted: 0,
-				slots:    5,
+				slots:    4,
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// helper callback for transition errors
+			status := func(tx *types.Transaction) status {
+				txs := tc.transactions[tx.From]
+
+				var status status
+				for _, sTx := range txs {
+					if tx.Nonce == sTx.tx.Nonce {
+						status = sTx.status
+					}
+				}
+
+				return status
+			}
+
+			// create pool
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.AddSigner(&mockSigner{})
@@ -1192,44 +1193,42 @@ func TestRecoveryMultipleAccounts(t *testing.T) {
 
 			// setup initial state
 			{
-				for addr, nonce := range tc.nextNonces {
-					pool.createAccountOnce(addr)
-					pool.nextNonces.store(addr, nonce)
+				for _, txs := range tc.transactions {
+					for _, sTx := range txs {
+						go pool.addTx(sTx.tx)
+					}
 				}
+				waitUntilDone(done)
 			}
 
 			// mock ibft.writeTransactions()
 			func() {
-
-				var recoverables transactions
-
-				for i, tx := range tc.promoted {
-					switch tc.status[i] {
-					case recoverable:
-						recoverables = append(recoverables, tx)
-					case unrecoverable:
-						pool.RollbackNonce(tx)
-					case ok:
-						// do nothing
+				pool.LockPromoted(true)
+				for {
+					tx := pool.Peek()
+					if tx == nil {
+						break
 					}
 
-					// "pop" the tx
-					tc.promoted = tc.promoted[1:]
+					switch status(tx) {
+					case recoverable:
+						pool.Demote()
+					case unrecoverable:
+						pool.Drop()
+					case ok:
+						pool.Pop()
+					}
 				}
-
-				for _, tx := range recoverables {
-					pool.Recover(tx)
-				}
-
+				pool.UnlockPromoted()
 			}()
 
 			// pool was handling requests
 			waitUntilDone(done)
 
-			// assert
+			// // assert
 			assert.Equal(t, tc.expected.slots, pool.gauge.read())
 			assert.Equal(t, tc.expected.promoted, pool.promoted.length())
-			for addr := range tc.nextNonces {
+			for addr := range tc.transactions {
 				assert.Equal(t, tc.expected.enqueued[addr], pool.accounts.from(addr).length())
 			}
 		})
