@@ -493,7 +493,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 // Test scenario:
 // User has 0 ETH staked and a balance of 100 ETH
 // Stake 2 ETH -> Unstake
-// Expected result for tests: Staked: 0 ETH; Balance: ~100 ETH
+// Expected result for tests: Staked: 0 ETH; Balance: ~100 ETH; not a staker
 func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	// Predefined values
 	var blockGasLimit uint64 = 5000000000
