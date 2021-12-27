@@ -50,11 +50,28 @@ func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
+	header, ok := pos.ibft.blockchain.GetHeaderByNumber(snap.Number)
+	if !ok {
+		return errors.New("header not found")
+	}
+
+	transition, err := pos.ibft.executor.BeginTxn(header.StateRoot, header, types.ZeroAddress)
+	if err != nil {
+		return fmt.Errorf("unable to begin transition, %v", err)
+	}
+
+	stakedAmount, queryErr := staking.QueryStakedAmount(transition, pos.ibft.validatorKeyAddr)
+	if queryErr != nil {
+		return fmt.Errorf("unable to query validator stakes, %v", queryErr)
+	}
+
 	// Log the info message
 	pos.ibft.logger.Info(
 		"current snapshot",
 		"validators",
 		len(snap.Set),
+		"total staked amount",
+		stakedAmount.String(),
 	)
 
 	return nil
