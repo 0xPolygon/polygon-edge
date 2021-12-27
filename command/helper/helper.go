@@ -275,7 +275,9 @@ func FillPremineMap(
 	return nil
 }
 
-// MergeMaps is a helper method for merging multiple maps
+// MergeMaps is a helper method for merging multiple maps.
+// If two or more maps have the same keys, the map that is passed in later
+// will have its key value override the previous same key values
 func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
 	mergedMap := make(map[string]interface{})
 	for _, m := range maps {
