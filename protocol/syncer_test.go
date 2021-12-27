@@ -247,7 +247,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 		headers        []*types.Header
 		peerHeaders    []*types.Header
 		numNewBlocks   int
-		synced         bool
+		shouldSync     bool
 		expectedHeight uint64
 	}{
 		{
@@ -255,7 +255,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   15,
-			synced:         true,
+			shouldSync:     true,
 			expectedHeight: 15,
 		},
 		{
@@ -263,7 +263,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   9,
-			synced:         false,
+			shouldSync:     false,
 			expectedHeight: 9,
 		},
 	}
@@ -298,13 +298,11 @@ func TestWatchSyncWithPeer(t *testing.T) {
 				return b.Header.Number >= latestBlock.Header.Number
 			})
 
-			if tt.synced {
-				assert.True(t, tt.synced, "syncer shouldn't sync any block with peer, but did")
+			if tt.shouldSync {
 				assert.Equal(t, HeaderToStatus(latestBlock.Header), syncer.status)
-				assert.Equal(t, tt.expectedHeight, syncer.status.Number)
-			} else {
-				assert.False(t, tt.synced, "syncer should sync blocks with peer, but didn't")
 			}
+
+			assert.Equal(t, tt.expectedHeight, syncer.status.Number)
 		})
 	}
 }
