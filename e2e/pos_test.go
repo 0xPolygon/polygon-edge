@@ -228,6 +228,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
 
 	devInterval := 5 // s
+	numDummyValidators := 5
 
 	// Set up the test server
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -235,7 +236,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(devInterval)
 		config.Premine(senderAddr, defaultBalance)
-		config.SetDevStakingAddresses([]types.Address{senderAddr})
+		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyValidators), senderAddr))
 		config.SetIBFTPoS(true)
 	})
 	srv := srvs[0]
@@ -250,7 +251,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	}
 
 	assert.Equalf(t,
-		bigDefaultStakedBalance.String(),
+		big.NewInt(0).Mul(bigDefaultStakedBalance, big.NewInt(int64(numDummyValidators+1))).String(),
 		actualStakingSCBalance.String(),
 		"Staked address balance mismatch before unstake exploit",
 	)
@@ -284,7 +285,6 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		return signedTx
 	}
 
-	zeroEth := framework.EthToWei(0)
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 		unstakeTxn := generateTx()
@@ -332,7 +332,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	)
 
 	assert.Equalf(t,
-		zeroEth.String(),
+		big.NewInt(0).Mul(bigDefaultStakedBalance, big.NewInt(int64(numDummyValidators))).String(),
 		actualStakingSCBalance.String(),
 		"Staked address balance mismatch after unstake exploit",
 	)
