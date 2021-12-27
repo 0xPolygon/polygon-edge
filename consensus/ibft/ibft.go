@@ -26,6 +26,7 @@ const (
 
 var (
 	ErrInvalidHookParam = errors.New("invalid hook param")
+	ErrMissingHook      = errors.New("missing hook")
 )
 
 type blockchainInterface interface {
@@ -196,7 +197,7 @@ func (i *Ibft) runHook(hookName string, hookParams interface{}) error {
 	hook, ok := hookMap[hookName]
 	if !ok {
 		// hook not found, continue
-		return nil
+		return ErrMissingHook
 	}
 
 	// Run the hook
@@ -463,7 +464,7 @@ func (i *Ibft) runSyncState() {
 	// updateSnapshotCallback keeps the snapshot store in sync with the updated
 	// chain data, by calling the SyncStateHook
 	updateSnapshotCallback := func(oldLatestNumber uint64) {
-		if hookErr := i.runHook(SyncStateHook, oldLatestNumber); hookErr != nil {
+		if hookErr := i.runHook(SyncStateHook, oldLatestNumber); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", SyncStateHook, hookErr))
 		}
 	}
@@ -562,7 +563,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if hookErr := i.runHook(CandidateVoteHook, &candidateVoteHookParams{
 		header: header,
 		snap:   snap,
-	}); hookErr != nil {
+	}); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
@@ -691,7 +692,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil {
+	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
 	}
 
@@ -788,7 +789,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
-			if hookErr := i.runHook(VerifyBlockHook, block); hookErr != nil {
+			if hookErr := i.runHook(VerifyBlockHook, block); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
@@ -917,7 +918,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number); hookErr != nil {
+	if hookErr := i.runHook(InsertBlockHook, header.Number); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 		return hookErr
 	}
 
@@ -1134,7 +1135,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
-	if hookErr := i.runHook(VerifyHeadersHook, header.Nonce); hookErr != nil {
+	if hookErr := i.runHook(VerifyHeadersHook, header.Nonce); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
 		return hookErr
 	}
 
