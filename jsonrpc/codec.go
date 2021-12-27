@@ -152,7 +152,6 @@ func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
 					return fmt.Errorf("invalid hexadecimal number provided for block number")
 				}
 				number, err := strconv.ParseInt(s[2:], 16, 64)
-				fmt.Println(number, err)
 				if err != nil {
 					return fmt.Errorf("failed to convert hex string to int64: %v", err)
 				}
@@ -168,7 +167,9 @@ func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
 	bnh.BlockHash = placeholder.BlockHash
 
 	if bnh.BlockNumber != nil && bnh.BlockHash != nil {
-		return fmt.Errorf("cannot get account balance using both block number hash")
+		return fmt.Errorf("cannot use both block number and block hash as filters")
+	} else if bnh.BlockNumber == nil && bnh.BlockHash == nil {
+		return fmt.Errorf("block number and block hash are empty, please provide one of them")
 	}
 
 	return nil

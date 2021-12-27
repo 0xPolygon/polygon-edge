@@ -682,7 +682,7 @@ func (e *Eth) GetTransactionCount(
 		header := block.Header
 		nonce, err = e.d.getNextNonce(address, BlockNumber(header.Number))
 		if err != nil {
-			if errors.As(err, &ErrStateNotFound) {
+			if errors.Is(err, ErrStateNotFound) {
 				return argUintPtr(0), nil
 			}
 			return nil, err
