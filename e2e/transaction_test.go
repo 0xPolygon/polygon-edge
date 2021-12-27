@@ -243,6 +243,7 @@ func TestEthTransfer(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
+			expectedReceiverBalance := previousReceiverBalance
 			if testCase.shouldSucceed {
 				fee := new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
@@ -253,9 +254,7 @@ func TestEthTransfer(t *testing.T) {
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
 				)
-			}
-			expectedReceiverBalance := previousReceiverBalance
-			if testCase.shouldSucceed {
+
 				expectedReceiverBalance = previousReceiverBalance.Add(
 					previousReceiverBalance,
 					testCase.amount,
