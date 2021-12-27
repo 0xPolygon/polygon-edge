@@ -510,7 +510,6 @@ func TestWriteTransactions(t *testing.T) {
 			0,
 		},
 		{
-
 			"unrecoverable transaction is not returned to pool and not included in transition",
 			[]*types.Transaction{{Nonce: 1}},
 			nil,
@@ -556,7 +555,7 @@ func TestWriteTransactions(t *testing.T) {
 
 			included := m.writeTransactions(1000, mockTransition)
 
-			assert.Equal(t, test.expectedTxPoolLength, len(mockTxPool.transactions))
+			assert.Equal(t, test.expectedTxPoolLength, len(mockTxPool.demoted)+len(mockTxPool.transactions))
 			assert.Equal(t, test.expectedIncludedTxnsCount, len(included))
 			for _, recoverable := range mockTransition.recoverableTransactions {
 				assert.False(t, mockTxPool.nonceDecreased[recoverable])
@@ -657,6 +656,7 @@ func (s *mockSyncer) Broadcast(b *types.Block) {
 
 type mockTxPool struct {
 	transactions          []*types.Transaction
+	demoted               []*types.Transaction
 	nonceDecreased        map[*types.Transaction]bool
 	resetWithHeaderCalled bool
 	resetWithHeadersParam []*types.Header
@@ -683,10 +683,26 @@ func (p *mockTxPool) Pop() *types.Transaction {
 	return tx
 }
 
-func (p *mockTxPool) RollbackNonce(tx *types.Transaction) {
+func (p *mockTxPool) Peek() *types.Transaction {
+	if len(p.transactions) == 0 {
+		return nil
+	}
+
+	return p.transactions[0]
+}
+
+func (p *mockTxPool) Demote() {
+	tx := p.Pop()
+	p.demoted = append(p.demoted, tx)
+}
+
+func (p *mockTxPool) Drop() {
 	if p.nonceDecreased == nil {
 		p.nonceDecreased = make(map[*types.Transaction]bool)
 	}
+
+	tx := p.transactions[0]
+	p.transactions = p.transactions[1:]
 
 	p.nonceDecreased[tx] = true
 }
