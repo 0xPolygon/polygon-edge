@@ -70,7 +70,7 @@ type addRequest struct {
 
 	// flag indicating the tx is returning
 	// to the pool as a recovered one
-	returnee bool
+	demoted bool
 }
 
 // promoteRequest is sent from handleAddRequest
@@ -256,13 +256,14 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
+func (p *TxPool) Peek() *types.Transaction {
+	return p.promoted.peek()
+}
+
 // Pop() removes the highest priced transaction from the promoted queue.
 // Assumes the lock is held.
 func (p *TxPool) Pop() *types.Transaction {
 	tx := p.promoted.pop()
-	if tx == nil {
-		return nil
-	}
 
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
@@ -270,26 +271,29 @@ func (p *TxPool) Pop() *types.Transaction {
 	return tx
 }
 
-// Recover is called within ibft for all transactions
-// that are valid but couldn't be written to the state
-// at the given time. Issues an addRequest to the pool
-// indicating a transaction is returning to it.
-func (p *TxPool) Recover(tx *types.Transaction) {
-	p.addReqCh <- addRequest{tx: tx, returnee: true}
-}
-
 // Rollback is called within ibft for any transactions
 // deemed unrecoverable during writing to the state.
 // This call ensures that any subsequent transactions
 // must not be processed before the unrecoverable one
-// is re-sent again.
-func (p *TxPool) RollbackNonce(tx *types.Transaction) {
-	if nextNonce, ok := p.nextNonces.load(tx.From); ok && nextNonce < tx.Nonce {
-		// already did rollback
-		return
-	}
+// is re-sent again for that account.
+func (p *TxPool) Drop() {
+	tx := p.Pop()
 
+	// remove from index
+	p.index.remove(tx)
+
+	// rollback nonce
 	p.nextNonces.store(tx.From, tx.Nonce)
+}
+
+// Recover is called within ibft for all transactions
+// that are valid but couldn't be written to the state
+// at the given time. Issues an addRequest to the pool
+// indicating a transaction is returning to it.
+func (p *TxPool) Demote() {
+	tx := p.promoted.pop()
+
+	p.addReqCh <- addRequest{tx: tx, demoted: true}
 }
 
 // ResetWithHeader is called from within ibft when the node
@@ -450,7 +454,7 @@ func (p *TxPool) addTx(tx *types.Transaction) error {
 	p.createAccountOnce(tx.From)
 
 	// send request [BLOCKING]
-	p.addReqCh <- addRequest{tx: tx, returnee: false}
+	p.addReqCh <- addRequest{tx: tx, demoted: false}
 
 	return nil
 }
@@ -488,7 +492,7 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 
 	// fetch store from nonce map
 	nextNonce, _ := p.nextNonces.load(addr)
-	if tx.Nonce < nextNonce && !req.returnee {
+	if tx.Nonce < nextNonce && !req.demoted {
 		// reject new txs with nonce
 		// lower than expected
 		return
@@ -497,11 +501,13 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 	// enqueue tx
 	account.enqueue(tx)
 
-	// atomically increase gauge
-	p.gauge.increase(slotsRequired(tx))
-
 	// update lookup
 	p.index.add(tx)
+
+	if !req.demoted {
+		// atomically increase gauge
+		p.gauge.increase(slotsRequired(tx))
+	}
 
 	if tx.Nonce > nextNonce {
 		// don't signal promotion
