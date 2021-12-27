@@ -33,10 +33,11 @@ type blockchainInterface interface {
 type txPoolInterface interface {
 	LockPromoted(write bool)
 	UnlockPromoted()
+	Peek() *types.Transaction
 	Pop() *types.Transaction
+	Drop()
+	Demote()
 	ResetWithHeaders(headers ...*types.Header)
-	Recover(tx *types.Transaction)
-	RollbackNonce(tx *types.Transaction)
 }
 
 type syncerInterface interface {
@@ -470,44 +471,43 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	i.txpool.LockPromoted(true)
-	defer i.txpool.UnlockPromoted()
+	var successful []*types.Transaction
 
-	var successful, recoverables []*types.Transaction
+	i.txpool.LockPromoted(true)
 	for {
-		tx := i.txpool.Pop()
+		tx := i.txpool.Peek()
 		if tx == nil {
 			break
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.RollbackNonce(tx) // unrecoverable tx
+			i.txpool.Drop()
+			// i.txpool.RollbackNonce(tx) // unrecoverable tx
 			continue
 		}
 
 		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				recoverables = append(recoverables, tx)
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				recoverables = append(recoverables, tx)
+				i.txpool.Demote()
 			} else {
 				// unrecoverable tx
-				i.txpool.RollbackNonce(tx)
+				i.txpool.Drop()
 			}
 
 			continue
 		}
 
+		// no errors, pop the tx from the pool
+		tx = i.txpool.Pop()
 		successful = append(successful, tx)
 	}
 
-	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", len(recoverables))
+	i.txpool.UnlockPromoted()
 
-	for _, tx := range recoverables {
-		i.txpool.Recover(tx)
-	}
+	i.logger.Info("picked out txns from pool", "num", len(successful))
 
 	return successful
 }

@@ -3,8 +3,9 @@ package dev
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
@@ -109,39 +110,35 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 
 	var successful, recoverables []*types.Transaction
 	for {
-		tx := d.txpool.Pop()
+		tx := d.txpool.Peek()
 		if tx == nil {
 			break
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.RollbackNonce(tx) // unrecoverable tx
+			d.txpool.Drop() // unrecoverable tx
 			continue
 		}
 
 		if err := transition.Write(tx); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				recoverables = append(recoverables, tx)
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				recoverables = append(recoverables, tx)
+				d.txpool.Demote()
 			} else {
 				// unrecoverable tx
-				d.txpool.RollbackNonce(tx)
+				d.txpool.Drop()
 			}
 
 			continue
 		}
 
+		tx = d.txpool.Pop()
 		successful = append(successful, tx)
 	}
 
 	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", len(recoverables))
-
-	for _, tx := range recoverables {
-		d.txpool.Recover(tx)
-	}
 
 	return successful
 }
