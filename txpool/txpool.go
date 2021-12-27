@@ -84,13 +84,6 @@ type promoteRequest struct {
 	account types.Address
 }
 
-// resetRequest is handled when Ibft
-// calls ResetWithHeader to align the state
-// of the pool with the new block.
-type resetRequest struct {
-	newNonces map[types.Address]uint64
-}
-
 // TxPool is a module that handles pending transactions.
 // There are fundamentally 2 queues any transaction
 // needs to go through:
