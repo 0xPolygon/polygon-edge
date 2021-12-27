@@ -24,6 +24,10 @@ const (
 	DefaultEpochSize = 100000
 )
 
+var (
+	ErrInvalidHookParam = errors.New("invalid hook param")
+)
+
 type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)

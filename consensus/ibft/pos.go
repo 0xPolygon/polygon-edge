@@ -45,7 +45,10 @@ func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
 // acceptStateLogHook logs the current snapshot
 func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 	// Cast the param to a *Snapshot
-	snap := snapParam.(*Snapshot)
+	snap, ok := snapParam.(*Snapshot)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	// Log the info message
 	pos.ibft.logger.Info(
@@ -60,7 +63,10 @@ func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 // insertBlockHook checks if the block is the last block of the epoch,
 // in order to update the validator set
 func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
-	headerNumber := numberParam.(uint64)
+	headerNumber, ok := numberParam.(uint64)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	if pos.ibft.IsLastOfEpoch(headerNumber) {
 		if err := pos.ibft.updateValidators(headerNumber); err != nil {
@@ -73,7 +79,10 @@ func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
 
 // syncStateHook keeps the snapshot store up to date for a range of synced blocks
 func (pos *PoSMechanism) syncStateHook(referenceNumber interface{}) error {
-	oldLatestNumber := referenceNumber.(uint64)
+	oldLatestNumber, ok := referenceNumber.(uint64)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	// For the block range, update the snapshot store accordingly if an epoch occurred in the range
 	if err := pos.ibft.batchUpdateValidators(
@@ -88,7 +97,11 @@ func (pos *PoSMechanism) syncStateHook(referenceNumber interface{}) error {
 
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
 func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
-	block := blockParam.(*types.Block)
+	block, ok := blockParam.(*types.Block)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
 	if pos.ibft.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
 		return errBlockVerificationFailed
 	}

@@ -34,7 +34,10 @@ func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
 // acceptStateLogHook logs the current snapshot with the number of votes
 func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
 	// Cast the param to a *Snapshot
-	snap := snapParam.(*Snapshot)
+	snap, ok := snapParam.(*Snapshot)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	// Log the info message
 	poa.ibft.logger.Info(
@@ -51,7 +54,10 @@ func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
 // verifyHeadersHook verifies that the header nonce conforms to the IBFT PoA proposal format
 func (poa *PoAMechanism) verifyHeadersHook(nonceParam interface{}) error {
 	// Cast the param to the nonce
-	nonce := nonceParam.(types.Nonce)
+	nonce, ok := nonceParam.(types.Nonce)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	// Check the nonce format
 	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
@@ -76,7 +82,11 @@ type processHeadersHookParams struct {
 // processHeadersHook does the required logic for PoA header processing
 func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 	// Cast the params to processHeadersHookParams
-	params := hookParam.(*processHeadersHookParams)
+	params, ok := hookParam.(*processHeadersHookParams)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
 	number := params.header.Number
 
 	if number%poa.ibft.epochSize == 0 {
@@ -179,7 +189,10 @@ type candidateVoteHookParams struct {
 // and casts a vote in the Nonce field of the block being built
 func (poa *PoAMechanism) candidateVoteHook(hookParams interface{}) error {
 	// Cast the params to candidateVoteHookParams
-	params := hookParams.(*candidateVoteHookParams)
+	params, ok := hookParams.(*candidateVoteHookParams)
+	if !ok {
+		return ErrInvalidHookParam
+	}
 
 	// try to pick a candidate
 	if candidate := poa.ibft.operator.getNextCandidate(params.snap); candidate != nil {
