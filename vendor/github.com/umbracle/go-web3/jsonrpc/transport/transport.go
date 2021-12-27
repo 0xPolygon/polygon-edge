@@ -10,6 +10,9 @@ type Transport interface {
 	// Call makes a jsonrpc request
 	Call(method string, out interface{}, params ...interface{}) error
 
+	// SetMaxConnsPerHost sets the maximum number of connections that can be established with a host
+	SetMaxConnsPerHost(count int)
+
 	// Close closes the transport connection if necessary
 	Close() error
 }

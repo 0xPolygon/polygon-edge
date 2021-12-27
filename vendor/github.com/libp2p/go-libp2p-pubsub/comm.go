@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-msgio/protoio"
 
 	"github.com/gogo/protobuf/proto"
-	ms "github.com/multiformats/go-multistream"
 )
 
 // get the initial RPC containing all of our subscriptions to send to new peers
@@ -88,22 +87,29 @@ func (p *PubSub) handleNewStream(s network.Stream) {
 	}
 }
 
+func (p *PubSub) notifyPeerDead(pid peer.ID) {
+	p.peerDeadPrioLk.RLock()
+	p.peerDeadMx.Lock()
+	p.peerDeadPend[pid] = struct{}{}
+	p.peerDeadMx.Unlock()
+	p.peerDeadPrioLk.RUnlock()
+
+	select {
+	case p.peerDead <- struct{}{}:
+	default:
+	}
+}
+
 func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing <-chan *RPC) {
 	s, err := p.host.NewStream(p.ctx, pid, p.rt.Protocols()...)
 	if err != nil {
 		log.Debug("opening new stream to peer: ", err, pid)
 
-		var ch chan peer.ID
-		if err == ms.ErrNotSupported {
-			ch = p.newPeerError
-		} else {
-			ch = p.peerDead
-		}
-
 		select {
-		case ch <- pid:
+		case p.newPeerError <- pid:
 		case <-ctx.Done():
 		}
+
 		return
 	}
 
@@ -116,18 +122,17 @@ func (p *PubSub) handleNewPeer(ctx context.Context, pid peer.ID, outgoing <-chan
 }
 
 func (p *PubSub) handlePeerEOF(ctx context.Context, s network.Stream) {
+	pid := s.Conn().RemotePeer()
 	r := protoio.NewDelimitedReader(s, p.maxMessageSize)
 	rpc := new(RPC)
 	for {
 		err := r.ReadMsg(&rpc.RPC)
 		if err != nil {
-			select {
-			case p.peerDead <- s.Conn().RemotePeer():
-			case <-ctx.Done():
-			}
+			p.notifyPeerDead(pid)
 			return
 		}
-		log.Debugf("unexpected message from %s", s.Conn().RemotePeer())
+
+		log.Debugf("unexpected message from %s", pid)
 	}
 }
 

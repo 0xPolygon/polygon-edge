@@ -65,9 +65,6 @@ type PubSub struct {
 	// incoming messages from other peers
 	incoming chan *RPC
 
-	// messages we are publishing out to our peers
-	publish chan *Message
-
 	// addSub is a control channel for us to add and remove subscriptions
 	addSub chan *addSubReq
 
@@ -92,8 +89,11 @@ type PubSub struct {
 	// removeTopic is a topic cancellation channel
 	rmTopic chan *rmTopicReq
 
-	// a notification channel for new peer connections
-	newPeers chan peer.ID
+	// a notification channel for new peer connections accumulated
+	newPeers       chan struct{}
+	newPeersPrioLk sync.RWMutex
+	newPeersMx     sync.Mutex
+	newPeersPend   map[peer.ID]struct{}
 
 	// a notification channel for new outoging peer streams
 	newPeerStream chan network.Stream
@@ -102,7 +102,10 @@ type PubSub struct {
 	newPeerError chan peer.ID
 
 	// a notification channel for when our peers die
-	peerDead chan peer.ID
+	peerDead       chan struct{}
+	peerDeadPrioLk sync.RWMutex
+	peerDeadMx     sync.Mutex
+	peerDeadPend   map[peer.ID]struct{}
 
 	// The set of topics we are subscribed to
 	mySubs map[string]map[*Subscription]struct{}
@@ -192,12 +195,12 @@ type PubSubRouter interface {
 type AcceptStatus int
 
 const (
-	// AcceptAll signals to accept the incoming RPC for full processing
+	// AcceptNone signals to drop the incoming RPC
 	AcceptNone AcceptStatus = iota
 	// AcceptControl signals to accept the incoming RPC only for control message processing by
 	// the router. Included payload messages will _not_ be pushed to the validation queue.
 	AcceptControl
-	// AcceptNone signals to drop the incoming RPC
+	// AcceptAll signals to accept the incoming RPC for full processing
 	AcceptAll
 )
 
@@ -234,11 +237,12 @@ func NewPubSub(ctx context.Context, h host.Host, rt PubSubRouter, opts ...Option
 		signKey:               nil,
 		signPolicy:            StrictSign,
 		incoming:              make(chan *RPC, 32),
-		publish:               make(chan *Message),
-		newPeers:              make(chan peer.ID),
+		newPeers:              make(chan struct{}, 1),
+		newPeersPend:          make(map[peer.ID]struct{}),
 		newPeerStream:         make(chan network.Stream),
 		newPeerError:          make(chan peer.ID),
-		peerDead:              make(chan peer.ID),
+		peerDead:              make(chan struct{}, 1),
+		peerDeadPend:          make(map[peer.ID]struct{}),
 		cancelCh:              make(chan *Subscription),
 		getPeers:              make(chan *listPeerReq),
 		addSub:                make(chan *addSubReq),
@@ -430,13 +434,14 @@ func WithEventTracer(tracer EventTracer) Option {
 	}
 }
 
-// withInternalTracer adds an internal event tracer to the pubsub system
-func withInternalTracer(tracer internalTracer) Option {
+// WithRawTracer adds a raw tracer to the pubsub system.
+// Multiple tracers can be added using multiple invocations of the option.
+func WithRawTracer(tracer RawTracer) Option {
 	return func(p *PubSub) error {
 		if p.tracer != nil {
-			p.tracer.internal = append(p.tracer.internal, tracer)
+			p.tracer.raw = append(p.tracer.raw, tracer)
 		} else {
-			p.tracer = &pubsubTracer{internal: []internalTracer{tracer}, pid: p.host.ID(), msgID: p.msgID}
+			p.tracer = &pubsubTracer{raw: []RawTracer{tracer}, pid: p.host.ID(), msgID: p.msgID}
 		}
 		return nil
 	}
@@ -483,21 +488,8 @@ func (p *PubSub) processLoop(ctx context.Context) {
 
 	for {
 		select {
-		case pid := <-p.newPeers:
-			if _, ok := p.peers[pid]; ok {
-				log.Debug("already have connection to peer: ", pid)
-				continue
-			}
-
-			if p.blacklist.Contains(pid) {
-				log.Warn("ignoring connection from blacklisted peer: ", pid)
-				continue
-			}
-
-			messages := make(chan *RPC, p.peerOutboundQueueSize)
-			messages <- p.getHelloPacket()
-			go p.handleNewPeer(ctx, pid, messages)
-			p.peers[pid] = messages
+		case <-p.newPeers:
+			p.handlePendingPeers()
 
 		case s := <-p.newPeerStream:
 			pid := s.Conn().RemotePeer()
@@ -521,34 +513,8 @@ func (p *PubSub) processLoop(ctx context.Context) {
 		case pid := <-p.newPeerError:
 			delete(p.peers, pid)
 
-		case pid := <-p.peerDead:
-			ch, ok := p.peers[pid]
-			if !ok {
-				continue
-			}
-
-			close(ch)
-
-			if p.host.Network().Connectedness(pid) == network.Connected {
-				// still connected, must be a duplicate connection being closed.
-				// we respawn the writer as we need to ensure there is a stream active
-				log.Warn("peer declared dead but still connected; respawning writer: ", pid)
-				messages := make(chan *RPC, p.peerOutboundQueueSize)
-				messages <- p.getHelloPacket()
-				go p.handleNewPeer(ctx, pid, messages)
-				p.peers[pid] = messages
-				continue
-			}
-
-			delete(p.peers, pid)
-			for t, tmap := range p.topics {
-				if _, ok := tmap[pid]; ok {
-					delete(tmap, pid)
-					p.notifyLeave(t, pid)
-				}
-			}
-
-			p.rt.RemovePeer(pid)
+		case <-p.peerDead:
+			p.handleDeadPeers()
 
 		case treq := <-p.getTopics:
 			var out []string
@@ -588,10 +554,6 @@ func (p *PubSub) processLoop(ctx context.Context) {
 		case rpc := <-p.incoming:
 			p.handleIncomingRPC(rpc)
 
-		case msg := <-p.publish:
-			p.tracer.PublishMessage(msg)
-			p.pushMsg(msg)
-
 		case msg := <-p.sendMsg:
 			p.publishMessage(msg)
 
@@ -625,6 +587,83 @@ func (p *PubSub) processLoop(ctx context.Context) {
 			log.Info("pubsub processloop shutting down")
 			return
 		}
+	}
+}
+
+func (p *PubSub) handlePendingPeers() {
+	p.newPeersPrioLk.Lock()
+
+	if len(p.newPeersPend) == 0 {
+		p.newPeersPrioLk.Unlock()
+		return
+	}
+
+	newPeers := p.newPeersPend
+	p.newPeersPend = make(map[peer.ID]struct{})
+	p.newPeersPrioLk.Unlock()
+
+	for pid := range newPeers {
+		if p.host.Network().Connectedness(pid) != network.Connected {
+			continue
+		}
+
+		if _, ok := p.peers[pid]; ok {
+			log.Debug("already have connection to peer: ", pid)
+			continue
+		}
+
+		if p.blacklist.Contains(pid) {
+			log.Warn("ignoring connection from blacklisted peer: ", pid)
+			continue
+		}
+
+		messages := make(chan *RPC, p.peerOutboundQueueSize)
+		messages <- p.getHelloPacket()
+		go p.handleNewPeer(p.ctx, pid, messages)
+		p.peers[pid] = messages
+	}
+}
+
+func (p *PubSub) handleDeadPeers() {
+	p.peerDeadPrioLk.Lock()
+
+	if len(p.peerDeadPend) == 0 {
+		p.peerDeadPrioLk.Unlock()
+		return
+	}
+
+	deadPeers := p.peerDeadPend
+	p.peerDeadPend = make(map[peer.ID]struct{})
+	p.peerDeadPrioLk.Unlock()
+
+	for pid := range deadPeers {
+		ch, ok := p.peers[pid]
+		if !ok {
+			continue
+		}
+
+		close(ch)
+
+		if p.host.Network().Connectedness(pid) == network.Connected {
+			// still connected, must be a duplicate connection being closed.
+			// we respawn the writer as we need to ensure there is a stream active
+			log.Debugf("peer declared dead but still connected; respawning writer: %s", pid)
+			messages := make(chan *RPC, p.peerOutboundQueueSize)
+			messages <- p.getHelloPacket()
+			go p.handleNewPeer(p.ctx, pid, messages)
+			p.peers[pid] = messages
+			continue
+		}
+
+		delete(p.peers, pid)
+		for t, tmap := range p.topics {
+			if _, ok := tmap[pid]; ok {
+				delete(tmap, pid)
+				p.notifyLeave(t, pid)
+			}
+		}
+
+		p.rt.RemovePeer(pid)
 	}
 }
 
@@ -849,6 +888,7 @@ func (p *PubSub) notifySubs(msg *Message) {
 		select {
 		case f.ch <- msg:
 		default:
+			p.tracer.UndeliverableMessage(msg)
 			log.Infof("Can't deliver message to subscription for topic %s; subscriber too slow", topic)
 		}
 	}
@@ -987,53 +1027,28 @@ func (p *PubSub) pushMsg(msg *Message) {
 	// reject messages from blacklisted peers
 	if p.blacklist.Contains(src) {
 		log.Debugf("dropping message from blacklisted peer %s", src)
-		p.tracer.RejectMessage(msg, rejectBlacklstedPeer)
+		p.tracer.RejectMessage(msg, RejectBlacklstedPeer)
 		return
 	}
 
 	// even if they are forwarded by good peers
 	if p.blacklist.Contains(msg.GetFrom()) {
 		log.Debugf("dropping message from blacklisted source %s", src)
-		p.tracer.RejectMessage(msg, rejectBlacklistedSource)
+		p.tracer.RejectMessage(msg, RejectBlacklistedSource)
 		return
 	}
 
-	// reject unsigned messages when strict before we even process the id
-	if p.signPolicy.mustVerify() {
-		if p.signPolicy.mustSign() {
-			if msg.Signature == nil {
-				log.Debugf("dropping unsigned message from %s", src)
-				p.tracer.RejectMessage(msg, rejectMissingSignature)
-				return
-			}
-			// Actual signature verification happens in the validation pipeline,
-			// after checking if the message was already seen or not,
-			// to avoid unnecessary signature verification processing-cost.
-		} else {
-			if msg.Signature != nil {
-				log.Debugf("dropping message with unexpected signature from %s", src)
-				p.tracer.RejectMessage(msg, rejectUnexpectedSignature)
-				return
-			}
-			// If we are expecting signed messages, and not authoring messages,
-			// then do no accept seq numbers, from data, or key data.
-			// The default msgID function still relies on Seqno and From,
-			// but is not used if we are not authoring messages ourselves.
-			if p.signID == "" {
-				if msg.Seqno != nil || msg.From != nil || msg.Key != nil {
-					log.Debugf("dropping message with unexpected auth info from %s", src)
-					p.tracer.RejectMessage(msg, rejectUnexpectedAuthInfo)
-					return
-				}
-			}
-		}
+	err := p.checkSigningPolicy(msg)
+	if err != nil {
+		log.Debugf("dropping message from %s: %s", src, err)
+		return
 	}
 
 	// reject messages claiming to be from ourselves but not locally published
 	self := p.host.ID()
 	if peer.ID(msg.GetFrom()) == self && src != self {
 		log.Debugf("dropping message claiming to be from self but forwarded from %s", src)
-		p.tracer.RejectMessage(msg, rejectSelfOrigin)
+		p.tracer.RejectMessage(msg, RejectSelfOrigin)
 		return
 	}
 
@@ -1051,6 +1066,38 @@ func (p *PubSub) pushMsg(msg *Message) {
 	if p.markSeen(id) {
 		p.publishMessage(msg)
 	}
+}
+
+func (p *PubSub) checkSigningPolicy(msg *Message) error {
+	// reject unsigned messages when strict before we even process the id
+	if p.signPolicy.mustVerify() {
+		if p.signPolicy.mustSign() {
+			if msg.Signature == nil {
+				p.tracer.RejectMessage(msg, RejectMissingSignature)
+				return ValidationError{Reason: RejectMissingSignature}
+			}
+			// Actual signature verification happens in the validation pipeline,
+			// after checking if the message was already seen or not,
+			// to avoid unnecessary signature verification processing-cost.
+		} else {
+			if msg.Signature != nil {
+				p.tracer.RejectMessage(msg, RejectUnexpectedSignature)
+				return ValidationError{Reason: RejectUnexpectedSignature}
+			}
+			// If we are expecting signed messages, and not authoring messages,
+			// then do no accept seq numbers, from data, or key data.
+			// The default msgID function still relies on Seqno and From,
+			// but is not used if we are not authoring messages ourselves.
+			if p.signID == "" {
+				if msg.Seqno != nil || msg.From != nil || msg.Key != nil {
+					p.tracer.RejectMessage(msg, RejectUnexpectedAuthInfo)
+					return ValidationError{Reason: RejectUnexpectedAuthInfo}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (p *PubSub) publishMessage(msg *Message) {
@@ -1136,35 +1183,28 @@ type addSubReq struct {
 type SubOpt func(sub *Subscription) error
 
 // Subscribe returns a new Subscription for the given topic.
-// Note that subscription is not an instanteneous operation. It may take some time
+// Note that subscription is not an instantaneous operation. It may take some time
 // before the subscription is processed by the pubsub main loop and propagated to our peers.
 //
 // Deprecated: use pubsub.Join() and topic.Subscribe() instead
 func (p *PubSub) Subscribe(topic string, opts ...SubOpt) (*Subscription, error) {
-	td := pb.TopicDescriptor{Name: &topic}
-
-	return p.SubscribeByTopicDescriptor(&td, opts...)
-}
-
-// SubscribeByTopicDescriptor lets you subscribe a topic using a pb.TopicDescriptor.
-//
-// Deprecated: use pubsub.Join() and topic.Subscribe() instead
-func (p *PubSub) SubscribeByTopicDescriptor(td *pb.TopicDescriptor, opts ...SubOpt) (*Subscription, error) {
-	if td.GetAuth().GetMode() != pb.TopicDescriptor_AuthOpts_NONE {
-		return nil, fmt.Errorf("auth mode not yet supported")
-	}
-
-	if td.GetEnc().GetMode() != pb.TopicDescriptor_EncOpts_NONE {
-		return nil, fmt.Errorf("encryption mode not yet supported")
-	}
-
 	// ignore whether the topic was newly created or not, since either way we have a valid topic to work with
-	topic, _, err := p.tryJoin(td.GetName())
+	topicHandle, _, err := p.tryJoin(topic)
 	if err != nil {
 		return nil, err
 	}
 
-	return topic.Subscribe(opts...)
+	return topicHandle.Subscribe(opts...)
+}
+
+// WithBufferSize is a Subscribe option to customize the size of the subscribe output buffer.
+// The default length is 32 but it can be configured to avoid dropping messages if the consumer is not reading fast
+// enough.
+func WithBufferSize(size int) SubOpt {
+	return func(sub *Subscription) error {
+		sub.ch = make(chan *Message, size)
+		return nil
+	}
 }
 
 type topicReq struct {
