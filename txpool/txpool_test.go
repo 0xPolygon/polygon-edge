@@ -200,8 +200,6 @@ func TestAddTxErrors(t *testing.T) {
 	}
 }
 
-/* handleAddRequest tests */
-
 func TestAddHandler(t *testing.T) {
 	t.Run("enqueue higher nonce txs", func(t *testing.T) {
 		pool, err := newTestPool()
@@ -442,8 +440,6 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(7), nextNonce)
 	})
 }
-
-/* handePromoteRequest cases (single account) */
 
 // account queue (enqueued)
 func TestResetHandlerEnqueued(t *testing.T) {
