@@ -217,11 +217,6 @@ func (i *Ibft) GetEpoch(number uint64) uint64 {
 	return number/i.epochSize + 1
 }
 
-// IsFirstOfEpoch checks if the block number is the first of the epoch
-func (i *Ibft) IsFirstOfEpoch(number uint64) bool {
-	return number%i.epochSize == 1
-}
-
 // IsLastOfEpoch checks if the block number is the last of the epoch
 func (i *Ibft) IsLastOfEpoch(number uint64) bool {
 	return number > 0 && number%i.epochSize == 0

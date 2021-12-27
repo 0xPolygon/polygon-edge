@@ -91,8 +91,7 @@ func TestIsFirstOfEpoch(t *testing.T) {
 			ibft := &Ibft{
 				epochSize: TestEpochSize,
 			}
-			res := ibft.IsFirstOfEpoch(tt.num)
-			assert.Equal(t, tt.isFirst, res)
+			assert.Equal(t, tt.isFirst, tt.num%ibft.epochSize == 1)
 		})
 	}
 }
