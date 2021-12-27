@@ -3896,10 +3896,7 @@ func (m *TraceEvent) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4017,10 +4014,7 @@ func (m *TraceEvent_PublishMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4205,10 +4199,7 @@ func (m *TraceEvent_RejectMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4360,10 +4351,7 @@ func (m *TraceEvent_DuplicateMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4515,10 +4503,7 @@ func (m *TraceEvent_DeliverMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4636,10 +4621,7 @@ func (m *TraceEvent_AddPeer) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4724,10 +4706,7 @@ func (m *TraceEvent_RemovePeer) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4848,10 +4827,7 @@ func (m *TraceEvent_RecvRPC) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -4972,10 +4948,7 @@ func (m *TraceEvent_SendRPC) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5096,10 +5069,7 @@ func (m *TraceEvent_DropRPC) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5183,10 +5153,7 @@ func (m *TraceEvent_Join) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5270,10 +5237,7 @@ func (m *TraceEvent_Leave) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5391,10 +5355,7 @@ func (m *TraceEvent_Graft) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5512,10 +5473,7 @@ func (m *TraceEvent_Prune) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5670,10 +5628,7 @@ func (m *TraceEvent_RPCMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5791,10 +5746,7 @@ func (m *TraceEvent_MessageMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -5899,10 +5851,7 @@ func (m *TraceEvent_SubMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6089,10 +6038,7 @@ func (m *TraceEvent_ControlMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6208,10 +6154,7 @@ func (m *TraceEvent_ControlIHaveMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6294,10 +6237,7 @@ func (m *TraceEvent_ControlIWantMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6381,10 +6321,7 @@ func (m *TraceEvent_ControlGraftMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6500,10 +6437,7 @@ func (m *TraceEvent_ControlPruneMeta) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {
@@ -6588,10 +6522,7 @@ func (m *TraceEventBatch) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthTrace
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthTrace
 			}
 			if (iNdEx + skippy) > l {

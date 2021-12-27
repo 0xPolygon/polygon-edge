@@ -9,7 +9,7 @@ import (
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // WsProtocol is the multiaddr protocol definition for this transport.

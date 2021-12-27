@@ -131,8 +131,8 @@ func (nmgr *natManager) sync() {
 // new mappings.
 func (nmgr *natManager) doSync() {
 	ports := map[string]map[int]bool{
-		"tcp": map[int]bool{},
-		"udp": map[int]bool{},
+		"tcp": {},
+		"udp": {},
 	}
 	for _, maddr := range nmgr.net.ListenAddresses() {
 		// Strip the IP

@@ -110,6 +110,10 @@ If you experience any issues migrating from gx to gomod, please [join the discus
 
 `go test ./...` will run all tests in the repo.
 
+### Releasing
+
+Please start a release by opening a new [Libp2p Release](https://github.com/libp2p/go-libp2p/issues/new?assignees=&labels=kind/tracking&template=release.md) issue.
+
 ### Packages
 
 > This table is generated using the module [`package-table`](https://github.com/ipfs-shipyard/package-table) with `package-table --data=package-list.json`.

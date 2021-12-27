@@ -17,30 +17,34 @@ func sockaddrToAny(sa windows.Sockaddr) (*windows.RawSockaddrAny, Socklen, error
 		if sa.Port < 0 || sa.Port > 0xFFFF {
 			return nil, 0, syscall.EINVAL
 		}
-		var raw windows.RawSockaddrInet4
-		raw.Family = windows.AF_INET
-		p := (*[2]byte)(unsafe.Pointer(&raw.Port))
+
+		raw := new(windows.RawSockaddrAny)
+		raw.Addr.Family = windows.AF_INET
+		raw4 := (*windows.RawSockaddrInet4)(unsafe.Pointer(raw))
+		p := (*[2]byte)(unsafe.Pointer(&raw4.Port))
 		p[0] = byte(sa.Port >> 8)
 		p[1] = byte(sa.Port)
 		for i := 0; i < len(sa.Addr); i++ {
-			raw.Addr[i] = sa.Addr[i]
+			raw4.Addr[i] = sa.Addr[i]
 		}
-		return (*windows.RawSockaddrAny)(unsafe.Pointer(&raw)), Socklen(unsafe.Sizeof(raw)), nil
+		return raw, Socklen(unsafe.Sizeof(*raw4)), nil
 
 	case *windows.SockaddrInet6:
 		if sa.Port < 0 || sa.Port > 0xFFFF {
 			return nil, 0, syscall.EINVAL
 		}
-		var raw windows.RawSockaddrInet6
-		raw.Family = windows.AF_INET6
-		p := (*[2]byte)(unsafe.Pointer(&raw.Port))
+
+		raw := new(windows.RawSockaddrAny)
+		raw.Addr.Family = windows.AF_INET6
+		raw6 := (*windows.RawSockaddrInet6)(unsafe.Pointer(raw))
+		p := (*[2]byte)(unsafe.Pointer(&raw6.Port))
 		p[0] = byte(sa.Port >> 8)
 		p[1] = byte(sa.Port)
-		raw.Scope_id = sa.ZoneId
+		raw6.Scope_id = sa.ZoneId
 		for i := 0; i < len(sa.Addr); i++ {
-			raw.Addr[i] = sa.Addr[i]
+			raw6.Addr[i] = sa.Addr[i]
 		}
-		return (*windows.RawSockaddrAny)(unsafe.Pointer(&raw)), Socklen(unsafe.Sizeof(raw)), nil
+		return raw, Socklen(unsafe.Sizeof(*raw6)), nil
 
 	case *windows.SockaddrUnix:
 		return nil, 0, syscall.EWINDOWS

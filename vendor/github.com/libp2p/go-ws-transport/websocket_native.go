@@ -11,7 +11,7 @@ import (
 	ws "github.com/gorilla/websocket"
 	"github.com/libp2p/go-libp2p-core/transport"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // Default gorilla upgrader
