@@ -303,10 +303,14 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		if err = staking.PredeployStakingSC(cc.Genesis.Alloc, validators); err != nil {
-			c.UI.Error(err.Error())
+		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
+		if predeployErr != nil {
+			c.UI.Error(predeployErr.Error())
 			return 1
 		}
+
+		// Add the account to the premine map so the executor can apply it to state
+		cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
 
 		// Set the epoch size if the consensus is IBFT
 		cc.Params.Engine[consensus] = helper.MergeMaps(

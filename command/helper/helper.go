@@ -343,12 +343,14 @@ func generateDevGenesis(params devGenesisParams) error {
 		Bootnodes: []string{},
 	}
 
-	if err := staking.PredeployStakingSC(
-		cc.Genesis.Alloc,
+	stakingAccount, err := staking.PredeployStakingSC(
 		[]types.Address{},
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
+
+	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
 
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err

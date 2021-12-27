@@ -10,6 +10,10 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
+var (
+	StakingSCAddress = types.StringToAddress("1001")
+)
+
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,
 // or trims the array if it exceeds the passed in size
 func PadLeftOrTrim(bb []byte, size int) []byte {
@@ -114,9 +118,8 @@ const (
 // PredeployStakingSC is a helper method for setting up the staking smart contract account,
 // using the passed in validators as prestaked validators
 func PredeployStakingSC(
-	premineMap map[types.Address]*chain.GenesisAccount,
 	validators []types.Address,
-) error {
+) (*chain.GenesisAccount, error) {
 	// Set the code for the staking smart contract
 	// Code retrieved from https://github.com/0xPolygon/staking-contracts
 	scHex, _ := hex.DecodeHex(StakingSCBytecode)
@@ -128,7 +131,7 @@ func PredeployStakingSC(
 	val := DefaultStakedBalance
 	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
 	if err != nil {
-		return fmt.Errorf("unable to generate DefaultStatkedBalance, %v", err)
+		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %v", err)
 	}
 
 	// Generate the empty account storage map
@@ -169,8 +172,5 @@ func PredeployStakingSC(
 	// Set the Staking SC balance to numValidators * defaultStakedBalance
 	stakingAccount.Balance = stakedAmount
 
-	// Add the account to the premine map so the executor can apply it to state
-	premineMap[types.StringToAddress("1001")] = stakingAccount
-
-	return nil
+	return stakingAccount, nil
 }
