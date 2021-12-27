@@ -170,12 +170,14 @@ func (p *TxPoolAdd) Run(args []string) int {
 		From: from.String(),
 	}
 
-	if _, err := clt.AddTxn(context.Background(), msg); err != nil {
+	resp, err := clt.AddTxn(context.Background(), msg)
+	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("Failed to add transaction: %v", err))
 		return 1
 	}
 
 	res := &TxPoolAddResult{
+		Hash:     resp.TxHash,
 		From:     fromRaw,
 		To:       toRaw,
 		Value:    *types.EncodeBigInt(value),
@@ -188,6 +190,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 }
 
 type TxPoolAddResult struct {
+	Hash     string `json:"hash"`
 	From     string `json:"from"`
 	To       string `json:"to"`
 	Value    string `json:"value"`
