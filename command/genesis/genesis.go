@@ -219,14 +219,6 @@ func (c *GenesisCommand) Run(args []string) int {
 	var validators []types.Address
 
 	if consensus == ibftConsensus {
-		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
-		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
-		// Check is placed here to avoid additional parsing if epochSize < 2
-		if epochSize < 2 {
-			c.UI.Error("Epoch size must be greater than 1")
-			return 1
-		}
-
 		switch {
 		case len(ibftValidators) != 0:
 			for _, val := range ibftValidators {
@@ -306,6 +298,14 @@ func (c *GenesisCommand) Run(args []string) int {
 		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
+			return 1
+		}
+
+		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
+		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
+		// Check is placed here to avoid additional parsing if epochSize < 2
+		if epochSize < 2 && consensus == ibftConsensus {
+			c.UI.Error("Epoch size must be greater than 1")
 			return 1
 		}
 
