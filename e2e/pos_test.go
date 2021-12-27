@@ -552,33 +552,29 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		return signedTx
 	}
 
-	oneEth := framework.EthToWei(1)
 	zeroEth := framework.EthToWei(0)
-	for i := 0; i < 2; i++ {
-		var msg *txpoolOp.AddTxnReq
-		if i%2 == 0 {
-			stakeTxn := generateTx(oneEth, "stake")
-			msg = &txpoolOp.AddTxnReq{
-				Raw: &any.Any{
-					Value: stakeTxn.MarshalRLP(),
-				},
-				From: types.ZeroAddress.String(),
-			}
-		} else {
-			unstakeTxn := generateTx(zeroEth, "unstake")
-			msg = &txpoolOp.AddTxnReq{
-				Raw: &any.Any{
-					Value: unstakeTxn.MarshalRLP(),
-				},
-				From: types.ZeroAddress.String(),
-			}
+	// addTxn is a helper method for generating and adding a transaction
+	// through the operator command
+	addTxn := func(value *big.Int, methodName string) {
+		txn := generateTx(value, methodName)
+		txnMsg := &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: txn.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
 		}
 
-		_, addErr := txpoolClient.AddTxn(context.Background(), msg)
+		_, addErr := txpoolClient.AddTxn(context.Background(), txnMsg)
 		if addErr != nil {
 			t.Fatalf("Unable to add txn, %v", addErr)
 		}
 	}
+
+	// Stake transaction
+	addTxn(oneEth, "stake")
+
+	// Unstake transaction
+	addTxn(zeroEth, "unstake")
 
 	// Set up the blockchain listener to catch the added block event
 	blockNum := waitForBlock(t, srv, 1, 0)
