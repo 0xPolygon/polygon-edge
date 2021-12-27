@@ -136,7 +136,6 @@ type TxPool struct {
 	// does dispatching/handling requests.
 	addReqCh     chan addRequest
 	promoteReqCh chan promoteRequest
-	resetReqCh   chan resetRequest
 
 	// Flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
@@ -197,7 +196,6 @@ func NewTxPool(
 	// initialise channels
 	pool.addReqCh = make(chan addRequest)
 	pool.promoteReqCh = make(chan promoteRequest)
-	pool.resetReqCh = make(chan resetRequest)
 
 	return pool, nil
 }
@@ -213,8 +211,6 @@ func (p *TxPool) Start() error {
 				go p.handleAddRequest(req)
 			case req := <-p.promoteReqCh:
 				go p.handlePromoteRequest(req)
-			case req := <-p.resetReqCh:
-				go p.handleResetRequest(req)
 			}
 		}
 	}()
@@ -365,7 +361,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	}
 
 	// Signal reset request
-	p.resetReqCh <- resetRequest{newNonces: stateNonces}
+	p.resetAllAccounts(stateNonces)
 }
 
 // validateTx ensures that the transaction conforms
@@ -558,19 +554,17 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	}
 }
 
-// handleResetRequest is called within ResetWithHeader
+// resetAllAccounts is called within ResetWithHeader
 // and aligns the pool's state for all accounts by pruning
 // stale transactions from all queues in the pool.
-func (p *TxPool) handleResetRequest(req resetRequest) {
+func (p *TxPool) resetAllAccounts(stateNonces map[types.Address]uint64) {
 	p.LockPromoted(true)
 	defer p.UnlockPromoted()
 
-	newNonces := req.newNonces
-
-	pruned := p.prunePromoted(newNonces)
+	pruned := p.prunePromoted(stateNonces)
 	p.logger.Debug(fmt.Sprintf("pruned %d promoted transactions", pruned))
 
-	p.pruneAccounts(newNonces)
+	p.pruneAccounts(stateNonces)
 }
 
 // prunePromoted cleans out any transactions from the promoted queue
