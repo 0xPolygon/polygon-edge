@@ -79,6 +79,12 @@ func newTestPool() (*TxPool, error) {
 	)
 }
 
+type result struct {
+	enqueued map[types.Address]uint64
+	promoted uint64
+	slots    uint64
+}
+
 func TestAddTxErrors(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -479,10 +485,8 @@ func TestResetHandlerEnqueued(t *testing.T) {
 				}
 
 				// align account queue with reset event
-				go pool.handleResetRequest(resetRequest{
-					newNonces: map[types.Address]uint64{
-						addr1: tc.newNonce,
-					},
+				go pool.resetAllAccounts(map[types.Address]uint64{
+					addr1: tc.newNonce,
 				})
 
 				// this will signal a promotion for addr1
@@ -542,11 +546,8 @@ func TestResetHandlerEnqueued(t *testing.T) {
 					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
 				}
 
-				// align account queue with reset event
-				pool.handleResetRequest(resetRequest{
-					newNonces: map[types.Address]uint64{
-						addr1: tc.newNonce,
-					},
+				pool.resetAllAccounts(map[types.Address]uint64{
+					addr1: tc.newNonce,
 				})
 
 				assert.Equal(t, tc.expected.enqueued[addr1], pool.accounts.from(addr1).length())
@@ -617,10 +618,8 @@ func TestResetHandlerPromoted(t *testing.T) {
 			}
 
 			// align promoted queue with reset event
-			pool.handleResetRequest(resetRequest{
-				newNonces: map[types.Address]uint64{
-					addr: tc.newNonce,
-				},
+			pool.resetAllAccounts(map[types.Address]uint64{
+				addr1: tc.newNonce,
 			})
 
 			assert.Equal(t, tc.expectedPromoted, pool.promoted.length())
@@ -657,11 +656,6 @@ func (p *TxPool) startTestMode() <-chan struct{} {
 			case req := <-p.promoteReqCh:
 				go func() {
 					p.handlePromoteRequest(req)
-					done <- struct{}{}
-				}()
-			case req := <-p.resetReqCh:
-				go func() {
-					p.handleResetRequest(req)
 					done <- struct{}{}
 				}()
 			}
@@ -746,12 +740,6 @@ func TestAddTx1000(t *testing.T) {
 		assert.Equal(t, uint64(3000), pool.gauge.read())
 		assert.Equal(t, uint64(1000), pool.promoted.length())
 	})
-}
-
-type result struct {
-	enqueued map[types.Address]uint64
-	promoted uint64
-	slots    uint64
 }
 
 func TestResetWithHeader(t *testing.T) {
@@ -902,7 +890,7 @@ func TestResetWithHeader(t *testing.T) {
 
 			// ResetWitHeader would invoke this handler when a node
 			// is building/discovering a new block
-			pool.resetReqCh <- resetRequest{tc.newNonces}
+			pool.resetAllAccounts(tc.newNonces)
 			waitUntilDone(done)
 
 			for addr, count := range tc.expected.enqueued {
