@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -12,6 +13,10 @@ var (
 
 	// Magic nonce number to vote on removing a validator.
 	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+)
+
+var (
+	ErrInvalidNonce = errors.New("Invalid nonce specified")
 )
 
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism
@@ -67,12 +72,12 @@ func (poa *PoAMechanism) verifyHeadersHook(nonceParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	// Check the nonce format
-	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
-	// 		This is achieved by specifying the miner field to zeroes,
-	// 		because then the value in the Nonce will not be taken into consideration.
+	// Check the nonce format.
+	// The nonce field must have either an AUTH or DROP vote value.
+	// Block nonce values are not taken into account when the Miner field is set to zeroes, indicating
+	// no vote casting is taking place within a block
 	if nonce != nonceDropVote && nonce != nonceAuthVote {
-		return fmt.Errorf("invalid nonce")
+		return ErrInvalidNonce
 	}
 
 	return nil
