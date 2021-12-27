@@ -6,6 +6,14 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
+var (
+	// Magic nonce number to vote on adding a new validator
+	nonceAuthVote = types.Nonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+
+	// Magic nonce number to vote on removing a validator.
+	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+)
+
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism
 type PoAMechanism struct {
 	// Reference to the main IBFT implementation
