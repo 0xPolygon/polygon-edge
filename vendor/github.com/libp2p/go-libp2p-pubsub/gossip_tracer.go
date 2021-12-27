@@ -17,6 +17,8 @@ type gossipTracer struct {
 
 	msgID MsgIdFunction
 
+	followUpTime time.Duration
+
 	// promises for messages by message ID; for each message tracked, we track the promise
 	// expiration time for each peer.
 	promises map[string]map[peer.ID]time.Time
@@ -39,6 +41,7 @@ func (gt *gossipTracer) Start(gs *GossipSubRouter) {
 	}
 
 	gt.msgID = gs.p.msgID
+	gt.followUpTime = gs.params.IWantFollowupTime
 }
 
 // track a promise to deliver a message from a list of msgIDs we are requesting
@@ -61,7 +64,7 @@ func (gt *gossipTracer) AddPromise(p peer.ID, msgIDs []string) {
 
 	_, ok = promises[p]
 	if !ok {
-		promises[p] = time.Now().Add(GossipSubIWantFollowupTime)
+		promises[p] = time.Now().Add(gt.followUpTime)
 		peerPromises, ok := gt.peerPromises[p]
 		if !ok {
 			peerPromises = make(map[string]struct{})
@@ -111,7 +114,7 @@ func (gt *gossipTracer) GetBrokenPromises() map[peer.ID]int {
 	return res
 }
 
-var _ internalTracer = (*gossipTracer)(nil)
+var _ RawTracer = (*gossipTracer)(nil)
 
 func (gt *gossipTracer) fulfillPromise(msg *Message) {
 	mid := gt.msgID(msg.Message)
@@ -133,9 +136,9 @@ func (gt *gossipTracer) RejectMessage(msg *Message, reason string) {
 	// We do take exception and apply promise penalty regardless in the following cases, where
 	// the peer delivered an obviously invalid message.
 	switch reason {
-	case rejectMissingSignature:
+	case RejectMissingSignature:
 		return
-	case rejectInvalidSignature:
+	case RejectInvalidSignature:
 		return
 	}
 
@@ -156,6 +159,10 @@ func (gt *gossipTracer) Leave(topic string)                   {}
 func (gt *gossipTracer) Graft(p peer.ID, topic string)        {}
 func (gt *gossipTracer) Prune(p peer.ID, topic string)        {}
 func (gt *gossipTracer) DuplicateMessage(msg *Message)        {}
+func (gt *gossipTracer) RecvRPC(rpc *RPC)                     {}
+func (gt *gossipTracer) SendRPC(rpc *RPC, p peer.ID)          {}
+func (gt *gossipTracer) DropRPC(rpc *RPC, p peer.ID)          {}
+func (gt *gossipTracer) UndeliverableMessage(msg *Message)    {}
 
 func (gt *gossipTracer) ThrottlePeer(p peer.ID) {
 	gt.Lock()

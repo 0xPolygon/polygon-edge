@@ -30,7 +30,7 @@ type DHFunc interface {
 
 	// DH performs a Diffie-Hellman calculation between the provided private and
 	// public keys and returns the result.
-	DH(privkey, pubkey []byte) []byte
+	DH(privkey, pubkey []byte) ([]byte, error)
 
 	// DHLen is the number of bytes returned by DH.
 	DHLen() int
@@ -105,23 +105,22 @@ var DH25519 DHFunc = dh25519{}
 type dh25519 struct{}
 
 func (dh25519) GenerateKeypair(rng io.Reader) (DHKey, error) {
-	var pubkey, privkey [32]byte
+	privkey := make([]byte, 32)
 	if rng == nil {
 		rng = rand.Reader
 	}
-	if _, err := io.ReadFull(rng, privkey[:]); err != nil {
+	if _, err := io.ReadFull(rng, privkey); err != nil {
 		return DHKey{}, err
 	}
-	curve25519.ScalarBaseMult(&pubkey, &privkey)
-	return DHKey{Private: privkey[:], Public: pubkey[:]}, nil
+	pubkey, err := curve25519.X25519(privkey, curve25519.Basepoint)
+	if err != nil {
+		return DHKey{}, err
+	}
+	return DHKey{Private: privkey, Public: pubkey}, nil
 }
 
-func (dh25519) DH(privkey, pubkey []byte) []byte {
-	var dst, in, base [32]byte
-	copy(in[:], privkey)
-	copy(base[:], pubkey)
-	curve25519.ScalarMult(&dst, &in, &base)
-	return dst[:]
+func (dh25519) DH(privkey, pubkey []byte) ([]byte, error) {
+	return curve25519.X25519(privkey, pubkey)
 }
 
 func (dh25519) DHLen() int     { return 32 }

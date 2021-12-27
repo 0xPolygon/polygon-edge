@@ -10,11 +10,12 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
-func createJsonRpcClient(endpoint string) (*jsonrpc.Client, error) {
+func createJsonRpcClient(endpoint string, maxConns int) (*jsonrpc.Client, error) {
 	client, err := jsonrpc.NewClient(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new JSON RPC client: %v", err)
 	}
+	client.SetMaxConnsLimit(maxConns)
 	return client, nil
 }
 
