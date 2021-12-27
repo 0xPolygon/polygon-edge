@@ -18,7 +18,7 @@ import (
 )
 
 // initIbftMechanism initializes the IBFT mechanism for unit tests
-func initIbftMechanism(mechanismType Type, ibft *Ibft) {
+func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 	mechanismFactory := mechanismBackends[mechanismType]
 	mechanism, _ := mechanismFactory(ibft)
 	ibft.mechanism = mechanism

@@ -36,7 +36,7 @@ type TestServerConfig struct {
 	PremineAccts            []*SrvAccount   // Accounts with existing balances (genesis accounts)
 	GenesisValidatorBalance *big.Int        // Genesis balance for the validators
 	DevStakers              []types.Address // List of initial staking addresses for the staking SC with dev consensus
-	Consensus               ConsensusType   // Consensus Type
+	Consensus               ConsensusType   // Consensus MechanismType
 	Bootnodes               []string        // Bootnode Addresses
 	Locals                  []string        // Accounts whose transactions are treated as locals
 	NoLocals                bool            // Flag to disable price exemptions for locally transactions

@@ -15,7 +15,7 @@ type PoAMechanism struct {
 	hookMap map[string]func(interface{}) error
 
 	// Used for easy lookups
-	mechanismType Type
+	mechanismType MechanismType
 }
 
 // PoAFactory initializes the required data
@@ -221,7 +221,7 @@ func (poa *PoAMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 }
 
 // GetType implements the ConsensusMechanism interface method
-func (poa *PoAMechanism) GetType() Type {
+func (poa *PoAMechanism) GetType() MechanismType {
 	return poa.mechanismType
 }
 

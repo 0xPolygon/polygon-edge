@@ -16,7 +16,7 @@ type PoSMechanism struct {
 	hookMap map[string]func(interface{}) error
 
 	// Used for easy lookups
-	mechanismType Type
+	mechanismType MechanismType
 }
 
 // PoSFactory initializes the required data
@@ -33,7 +33,7 @@ func PoSFactory(ibft *Ibft) (ConsensusMechanism, error) {
 }
 
 // GetType implements the ConsensusMechanism interface method
-func (pos *PoSMechanism) GetType() Type {
+func (pos *PoSMechanism) GetType() MechanismType {
 	return pos.mechanismType
 }
 

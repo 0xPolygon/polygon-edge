@@ -90,31 +90,31 @@ type Ibft struct {
 
 // Define the type of the IBFT consensus
 
-type Type string
+type MechanismType string
 
 const (
 	// PoA defines the Proof of Authority IBFT type,
 	// where the validator set is changed through voting / pre-set in genesis
-	PoA Type = "PoA"
+	PoA MechanismType = "PoA"
 
 	// PoS defines the Proof of Stake IBFT type,
 	// where the validator set it changed through staking on the Staking SC
-	PoS Type = "PoS"
+	PoS MechanismType = "PoS"
 )
 
-// mechanismTypes is the map used for easy string -> mechanism Type lookups
-var mechanismTypes = map[string]Type{
+// mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
+var mechanismTypes = map[string]MechanismType{
 	"PoA": PoA,
 	"PoS": PoS,
 }
 
-// String is a helper method for casting a Type to a string representation
-func (t Type) String() string {
+// String is a helper method for casting a MechanismType to a string representation
+func (t MechanismType) String() string {
 	return string(t)
 }
 
-// parseType converts a mechanism string representation to a Type
-func parseType(mechanism string) (Type, error) {
+// parseType converts a mechanism string representation to a MechanismType
+func parseType(mechanism string) (MechanismType, error) {
 	// Check if the cast is possible
 	castType, ok := mechanismTypes[mechanism]
 	if !ok {
@@ -162,7 +162,7 @@ const (
 
 type ConsensusMechanism interface {
 	// GetType returns the type of IBFT consensus mechanism (PoA / PoS)
-	GetType() Type
+	GetType() MechanismType
 
 	// GetHookMap returns the hooks registered with the specific consensus mechanism
 	GetHookMap() map[string]func(interface{}) error
@@ -178,7 +178,7 @@ type ConsensusMechanism interface {
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism
 type ConsensusMechanismFactory func(ibft *Ibft) (ConsensusMechanism, error)
 
-var mechanismBackends = map[Type]ConsensusMechanismFactory{
+var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{
 	PoA: PoAFactory,
 	PoS: PoSFactory,
 }
