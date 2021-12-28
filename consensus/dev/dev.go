@@ -55,7 +55,6 @@ func Factory(
 
 	// enable dev mode so that we can accept non-signed txns
 	params.Txpool.EnableDev()
-	params.Txpool.DevNotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -68,15 +67,14 @@ func (d *Dev) Start() error {
 }
 
 func (d *Dev) nextNotify() chan struct{} {
-	if d.interval != 0 {
-		ch := make(chan struct{})
-		go func() {
-			<-time.After(time.Duration(d.interval) * time.Second)
-			ch <- struct{}{}
-		}()
-
-		return ch
+	if d.interval == 0 {
+		d.interval = 1
 	}
+
+	go func() {
+		<-time.After(time.Duration(d.interval) * time.Second)
+		d.notifyCh <- struct{}{}
+	}()
 
 	return d.notifyCh
 }
@@ -108,7 +106,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 	d.txpool.LockPromoted(true)
 	defer d.txpool.UnlockPromoted()
 
-	var successful, recoverables []*types.Transaction
+	var successful []*types.Transaction
 	for {
 		tx := d.txpool.Peek()
 		if tx == nil {
@@ -127,8 +125,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 				d.txpool.Demote()
 			} else {
-				// unrecoverable tx
-				d.txpool.Drop()
+				d.txpool.Drop() // unrecoverable tx
 			}
 
 			continue
@@ -138,7 +135,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		successful = append(successful, tx)
 	}
 
-	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", len(recoverables))
+	d.logger.Info("picked out txns from pool", "num", len(successful))
 
 	return successful
 }
