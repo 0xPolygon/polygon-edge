@@ -204,6 +204,7 @@ func (r *TxPoolAddResult) Output() string {
 	buffer.WriteString("\n[ADD TRANSACTION]\n")
 	buffer.WriteString("Successfully added transaction:\n")
 	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("HASH|%s", r.Hash),
 		fmt.Sprintf("FROM|%s", r.From),
 		fmt.Sprintf("TO|%s", r.To),
 		fmt.Sprintf("VALUE|%s", r.Value),
