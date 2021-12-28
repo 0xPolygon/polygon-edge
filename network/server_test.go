@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-hclog"
 	"net"
 	"strconv"
 	"testing"
@@ -569,18 +568,12 @@ func TestRunDial(t *testing.T) {
 	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
-			logger := hclog.New(&hclog.LoggerOptions{
-				Name:  fmt.Sprintf("server-%d", idx),
-				Level: hclog.LevelFromString("DEBUG"),
-			})
-
 			server, createErr := CreateServer(
 				&CreateServerParams{
 					ConfigCallback: func(c *Config) {
 						c.MaxPeers = maxPeers[idx]
 						c.NoDiscover = true
 					},
-					Logger: logger,
 				})
 			if createErr != nil {
 				t.Fatalf("Unable to create servers, %v", createErr)
