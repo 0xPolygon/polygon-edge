@@ -25,60 +25,58 @@ jobs:
           version: v1.39
           args: --disable staticcheck --disable errcheck
           skip-go-installation: true
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.15.x
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
-
-
-      - name: Go build with race 
-        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
-      
-      - name: Add race artifacts directory to the path
-        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
-
-      - name: Go test
-        run: go test -timeout 28m ./...
-
-      - name: Go build without race
-        run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
-
-      - name: Replace artificats 
-        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
-
-      - 
-        name: Extract branch name
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
-        id: extract_branch
-      - 
-        name: Prepare artifact for Deployer
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v2
-        with:
-          name: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
-          path: artifacts/
+  #  test:
+  #    runs-on: ubuntu-latest
+  #    steps:
+  #      - name: Install Go
+  #        uses: actions/setup-go@v2
+  #        with:
+  #          go-version: 1.15.x
+  #
+  #      - name: Checkout code
+  #        uses: actions/checkout@v2
+  #        with:
+  #          submodules: recursive
+  #
+  #
+  #      - name: Go build with race
+  #        run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
+  #
+  #      - name: Add race artifacts directory to the path
+  #        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
+  #
+  #      - name: Go test
+  #        run: go test -timeout 28m ./...
+  #
+  #      - name: Go build without race
+  #        run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
+  #
+  #      - name: Replace artificats
+  #        run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
+  #
+  #      -
+  #        name: Extract branch name
+  #        if: github.event_name != 'pull_request'
+  #        shell: bash
+  #        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+  #        id: extract_branch
+  #      -
+  #        name: Prepare artifact for Deployer
+  #        if: github.event_name != 'pull_request'
+  #        uses: actions/upload-artifact@v2
+  #        with:
+  #          name: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
+  #          path: artifacts/
   notify-deployer:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
-      - 
-        name: Extract branch name
+      - name: Extract branch name
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
-      -
-        name: Notify Deployer
+      - name: Notify Deployer
         env:
           ARTIFACT_NAME: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
           COMMITER: ${{ github.actor }}
