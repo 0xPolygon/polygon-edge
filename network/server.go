@@ -302,6 +302,7 @@ func (s *Server) runDial() {
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
 					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
 				}
 			}
 		}
@@ -321,11 +322,11 @@ func (s *Server) numPeers() int64 {
 	defer s.peersLock.Unlock()
 	return int64(len(s.peers))
 }
+
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-
 	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
-
 }
+
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
