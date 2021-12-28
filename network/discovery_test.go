@@ -70,13 +70,19 @@ func TestRoutingTable_Connected(t *testing.T) {
 	srv0 := CreateServer(t, discoveryConfig)
 	srv1 := CreateServer(t, discoveryConfig)
 
+	peerAddedCh := make(chan peer.ID, 1)
+	srv1.discovery.routingTable.PeerAdded = func(id peer.ID) {
+		peerAddedCh <- id
+	}
+
 	// server0 should connect to server2 by discovery
 	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv1.AddrInfo().ID))
-
 	srv0.discovery.addToTable(srv1.AddrInfo())
-
-	// wait until server0 connects to server2
 	assert.True(t, <-connectedCh)
+
+	// wait until peer is added into table
+	<-peerAddedCh
+
 	assert.Equal(t, 1, srv0.discovery.routingTable.Size())
 	assert.Contains(t, srv0.discovery.routingTable.ListPeers(), srv1.AddrInfo().ID)
 
@@ -89,7 +95,7 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	srv1 := CreateServer(t, discoveryConfig)
 
 	peerRemovedCh := make(chan peer.ID, 1)
-	srv0.discovery.routingTable.PeerRemoved = func(id peer.ID) {
+	srv1.discovery.routingTable.PeerRemoved = func(id peer.ID) {
 		peerRemovedCh <- id
 	}
 
@@ -101,7 +107,7 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	srv1.Disconnect(srv0.AddrInfo().ID, "test")
 	assert.True(t, <-disconnectedCh)
 
-	// wait until PeerRemoved is called
+	// wait until PeerRemoved are called
 	<-peerRemovedCh
 
 	// wait until server0 connects to server2
@@ -116,11 +122,17 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	// stop server1 before connecting
 	srv1.Close()
 
+	peerRemovedCh := make(chan peer.ID, 1)
+	srv0.discovery.routingTable.PeerRemoved = func(id peer.ID) {
+		peerRemovedCh <- id
+	}
+
 	srv0.discovery.addToTable(srv1.AddrInfo())
 
 	failedConnectionCh := asyncWaitForEvent(srv0, 15*time.Second, failedToConnectToPeerHandler(srv1.AddrInfo().ID))
 	assert.True(t, <-failedConnectionCh)
 
+	<-peerRemovedCh
 	assert.Equal(t, 0, srv0.discovery.routingTable.Size())
 }
 
