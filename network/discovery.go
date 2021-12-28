@@ -33,13 +33,6 @@ type referencePeers struct {
 	peers []*referencePeer
 }
 
-func (ps *referencePeers) len() int {
-	ps.mux.RLock()
-	defer ps.mux.RUnlock()
-
-	return len(ps.peers)
-}
-
 func (ps *referencePeers) find(id peer.ID) *referencePeer {
 	ps.mux.RLock()
 	defer ps.mux.RUnlock()
