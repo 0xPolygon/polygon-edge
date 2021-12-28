@@ -86,7 +86,7 @@ This repository falls under the libp2p [Code of Conduct](https://github.com/libp
 
 ## License
 
-MIT
+MIT/Apache-2.0
 
 ---
 

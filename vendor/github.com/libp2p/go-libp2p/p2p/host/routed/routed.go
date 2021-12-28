@@ -13,9 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
-	logging "github.com/ipfs/go-log"
-	circuit "github.com/libp2p/go-libp2p-circuit"
-	lgbl "github.com/libp2p/go-libp2p-loggables"
+	logging "github.com/ipfs/go-log/v2"
 
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -73,7 +71,7 @@ func (rh *RoutedHost) Connect(ctx context.Context, pi peer.AddrInfo) error {
 	// we need to make sure the relay's addr itself is in the peerstore or else
 	// we wont be able to dial it.
 	for _, addr := range addrs {
-		_, err := addr.ValueForProtocol(circuit.P_CIRCUIT)
+		_, err := addr.ValueForProtocol(ma.P_CIRCUIT)
 		if err != nil {
 			// not a relay address
 			continue
@@ -119,19 +117,15 @@ func (rh *RoutedHost) findPeerAddrs(ctx context.Context, id peer.ID) ([]ma.Multi
 
 	if pi.ID != id {
 		err = fmt.Errorf("routing failure: provided addrs for different peer")
-		logRoutingErrDifferentPeers(ctx, id, pi.ID, err)
+		log.Errorw("got wrong peer",
+			"error", err,
+			"wantedPeer", id,
+			"gotPeer", pi.ID,
+		)
 		return nil, err
 	}
 
 	return pi.Addrs, nil
-}
-
-func logRoutingErrDifferentPeers(ctx context.Context, wanted, got peer.ID, err error) {
-	lm := make(lgbl.DeferredMap)
-	lm["error"] = err
-	lm["wantedPeer"] = func() interface{} { return wanted.Pretty() }
-	lm["gotPeer"] = func() interface{} { return got.Pretty() }
-	log.Event(ctx, "routingError", lm)
 }
 
 func (rh *RoutedHost) ID() peer.ID {
