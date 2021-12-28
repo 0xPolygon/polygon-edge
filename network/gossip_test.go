@@ -29,11 +29,6 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 }
 
 func TestSimpleGossip(t *testing.T) {
-	// TODO remove the test skip after https://github.com/0xPolygon/polygon-sdk/pull/312 is merged
-	// The linked PR updates the libp2p package, which solves a bug present with libp2p v0.12.0 in this test
-	// https://github.com/libp2p/go-libp2p-noise/issues/70
-	t.SkipNow()
-
 	numServers := 2
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
 	servers, createErr := createServers(numServers, nil)

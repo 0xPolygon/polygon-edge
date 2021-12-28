@@ -562,11 +562,6 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 }
 
 func TestSyncer_PeerDisconnected(t *testing.T) {
-	// TODO remove the test skip after https://github.com/0xPolygon/polygon-sdk/pull/312 is merged
-	// The linked PR updates the libp2p package, which solves a bug present with libp2p v0.12.0 in this test
-	// https://github.com/libp2p/go-libp2p-noise/issues/70
-	t.SkipNow()
-
 	conf := func(c *network.Config) {
 		c.MaxPeers = 4
 		c.NoDiscover = true
