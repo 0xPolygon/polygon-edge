@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,6 +64,64 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 	// mix data and we only test how the peers are being populated
 	// In theory, even if they are connected only to one peer, all of them
 	// should end up with the same idea of the network.
+}
+
+func TestRoutingTable_Connected(t *testing.T) {
+	srv0 := CreateServer(t, discoveryConfig)
+	srv1 := CreateServer(t, discoveryConfig)
+
+	// server0 should connect to server2 by discovery
+	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv1.AddrInfo().ID))
+
+	srv0.discovery.addToTable(srv1.AddrInfo())
+
+	// wait until server0 connects to server2
+	assert.True(t, <-connectedCh)
+	assert.Equal(t, 1, srv0.discovery.routingTable.Size())
+	assert.Contains(t, srv0.discovery.routingTable.ListPeers(), srv1.AddrInfo().ID)
+
+	assert.Equal(t, 1, srv1.discovery.routingTable.Size())
+	assert.Contains(t, srv1.discovery.routingTable.ListPeers(), srv0.AddrInfo().ID)
+}
+
+func TestRoutingTable_Disconnected(t *testing.T) {
+	srv0 := CreateServer(t, discoveryConfig)
+	srv1 := CreateServer(t, discoveryConfig)
+
+	peerRemovedCh := make(chan peer.ID, 1)
+	srv0.discovery.routingTable.PeerRemoved = func(id peer.ID) {
+		peerRemovedCh <- id
+	}
+
+	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv1.AddrInfo().ID))
+	srv0.discovery.addToTable(srv1.AddrInfo())
+	assert.True(t, <-connectedCh)
+
+	disconnectedCh := asyncWaitForEvent(srv0, 15*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
+	srv1.Disconnect(srv0.AddrInfo().ID, "test")
+	assert.True(t, <-disconnectedCh)
+
+	// wait until PeerRemoved is called
+	<-peerRemovedCh
+
+	// wait until server0 connects to server2
+	assert.Equal(t, 0, srv0.discovery.routingTable.Size())
+	assert.Equal(t, 0, srv1.discovery.routingTable.Size())
+}
+
+func TestRoutingTable_ConnectionFailure(t *testing.T) {
+	srv0 := CreateServer(t, discoveryConfig)
+	srv1 := CreateServer(t, discoveryConfig)
+
+	// stop server1 before connecting
+	srv1.Close()
+
+	srv0.discovery.addToTable(srv1.AddrInfo())
+
+	failedConnectionCh := asyncWaitForEvent(srv0, 15*time.Second, failedToConnectToPeerHandler(srv1.AddrInfo().ID))
+	assert.True(t, <-failedConnectionCh)
+
+	assert.Equal(t, 0, srv0.discovery.routingTable.Size())
 }
 
 func TestDiscovery_FullNetwork(t *testing.T) {

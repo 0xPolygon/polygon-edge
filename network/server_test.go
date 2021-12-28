@@ -110,6 +110,12 @@ func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
 	}
 }
 
+func failedToConnectToPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
+	return func(evnt *PeerEvent) bool {
+		return evnt.Type == PeerFailedToConnect && evnt.PeerID == p
+	}
+}
+
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	srv0 := CreateServer(t, func(c *Config) {
 		c.NoDiscover = true
