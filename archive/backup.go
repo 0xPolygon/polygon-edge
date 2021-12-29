@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// CreateBackup fetches blockchain data with the specific range via gRPC and save this data as binary archive to given path
 func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64, targetTo *uint64, outPath string) (uint64, uint64, error) {
 	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
@@ -24,13 +25,22 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 		return 0, 0, err
 	}
 
-	closeAndRemove := func(fs *os.File) {
+	closeFile := func() error {
 		if err := fs.Close(); err != nil {
 			logger.Error("an error occurred while closing file", "err", err)
-			return
+			return err
 		}
+		return nil
+	}
+	removeFile := func() {
 		if err = os.Remove(outPath); err != nil {
 			logger.Error("an error occurred while removing file", "err", err)
+		}
+	}
+	// clean up function for the file when error occurs in the middle of function
+	closeAndRemoveFile := func() {
+		if err := closeFile(); err == nil {
+			removeFile()
 		}
 	}
 
@@ -47,7 +57,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 
 	to, toHash, err := determineTo(ctx, clt, targetTo)
 	if err != nil {
-		closeAndRemove(fs)
+		closeAndRemoveFile()
 		return 0, 0, err
 	}
 
@@ -56,19 +66,15 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 		To:   to,
 	})
 	if err != nil {
-		closeAndRemove(fs)
+		closeAndRemoveFile()
 		return 0, 0, err
 	}
 
 	writeMetadata(fs, logger, to, toHash)
 	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
 
-	if err = fs.Close(); err != nil {
-		logger.Error("an error occurred while closing file", "err", err)
-		if removeErr := os.Remove(outPath); removeErr != nil {
-			logger.Error("an error occurred while removing file", "err", removeErr)
-		}
-
+	if err := closeFile(); err != nil {
+		removeFile()
 		return 0, 0, err
 	}
 

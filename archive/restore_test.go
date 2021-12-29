@@ -122,7 +122,7 @@ func Test_loadPrefixSize(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer([]byte{})),
 			prefix:      0xc5,
 			size:        5,
-			consumed:    0,
+			consumed:    1,
 			err:         nil,
 		},
 		{
@@ -130,7 +130,7 @@ func Test_loadPrefixSize(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer([]byte{0x1, 0x00})),
 			prefix:      0xf9, // 2 bytes
 			size:        0x100,
-			consumed:    2,
+			consumed:    3,
 			err:         nil,
 		},
 		{
@@ -153,10 +153,10 @@ func Test_loadPrefixSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			size, consumed, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
+			headerSize, payloadSize, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
 			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.size, size)
-			assert.Equal(t, tt.consumed, consumed)
+			assert.Equal(t, tt.size, headerSize)
+			assert.Equal(t, tt.consumed, payloadSize)
 		})
 	}
 }

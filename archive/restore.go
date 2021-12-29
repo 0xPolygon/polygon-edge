@@ -23,6 +23,7 @@ type blockchainInterface interface {
 	WriteBlocks([]*types.Block) error
 }
 
+// RestoreChain loads blockchain archive from file and write blocks to the chain
 func RestoreChain(chain blockchainInterface, filePath string) error {
 	fp, err := os.Open(filePath)
 	if err != nil {
@@ -30,7 +31,7 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 	}
 	blockStream := newBlockStream(fp)
 
-	if _, _, err = importBlocks(chain, blockStream); err != nil {
+	if err = importBlocks(chain, blockStream); err != nil {
 		return err
 	}
 
@@ -38,41 +39,40 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 }
 
 // import blocks scans all blocks from stream and write them to chain
-func importBlocks(chain blockchainInterface, blockStream *blockStream) (uint64, uint64, error) {
+func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	shutdownCh := common.GetTerminationSignalCh()
 
 	metadata, err := blockStream.getMetadata()
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
 	if metadata == nil {
-		return 0, 0, errors.New("expected metadata in archive but doesn't exist")
+		return errors.New("expected metadata in archive but doesn't exist")
 	}
 
 	// check whether the local chain has the latest block already
 	latestBlock, ok := chain.GetBlockByNumber(metadata.Latest, false)
 	if ok && latestBlock.Hash() == metadata.LatestHash {
-		return 0, 0, nil
+		return nil
 	}
 
 	// skip existing blocks
 	firstBlock, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
 	if err != nil {
-		return 0, 0, err
+		return err
 	}
 	if firstBlock == nil {
-		return 0, 0, nil
+		return nil
 	}
 
 	blocks := make([]*types.Block, 0, chunkSize)
 	blocks = append(blocks, firstBlock)
-	var lastBlockNumber uint64
 processLoop:
 	for {
 		for len(blocks) < chunkSize {
 			block, err := blockStream.nextBlock()
 			if err != nil {
-				return 0, 0, err
+				return err
 			}
 			if block == nil {
 				break
@@ -85,9 +85,8 @@ processLoop:
 			break
 		}
 		if err := chain.WriteBlocks(blocks); err != nil {
-			return firstBlock.Number(), lastBlockNumber, err
+			return err
 		}
-		lastBlockNumber = blocks[len(blocks)-1].Number()
 		// clear slice but keep capacity
 		blocks = blocks[:0]
 
@@ -98,7 +97,7 @@ processLoop:
 		}
 	}
 
-	return firstBlock.Number(), lastBlockNumber, nil
+	return nil
 }
 
 // consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
@@ -175,14 +174,14 @@ func (b *blockStream) loadRLPArray() (uint64, error) {
 	} else if err != nil {
 		return 0, err
 	}
-	payloadSize, payloadSizeSize, err := b.loadPrefixSize(1, prefix)
+	headerSize, payloadSize, err := b.loadPrefixSize(1, prefix)
 	if err != nil {
 		return 0, err
 	}
-	if err = b.loadPayload(1+payloadSizeSize, payloadSize); err != nil {
+	if err = b.loadPayload(headerSize, payloadSize); err != nil {
 		return 0, err
 	}
-	return 1 + payloadSizeSize + payloadSize, nil
+	return headerSize + payloadSize, nil
 }
 
 // loadRLPPrefix loads first byte of RLP encoded data from input
@@ -194,13 +193,13 @@ func (b *blockStream) loadRLPPrefix() (byte, error) {
 	return buf[0], nil
 }
 
-// loadPrefixSize loads array's size from input
+// loadPrefixSize loads array's size from input and return RLP header size and payload size
 // basically block should be array in RLP encoded value because block has 3 fields on the top: Header, Transactions, Uncles
 func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64, error) {
 	switch {
 	case prefix >= 0xc0 && prefix <= 0xf7:
 		// an array whose size is less than 56
-		return uint64(prefix - 0xc0), 0, nil
+		return 1, uint64(prefix - 0xc0), nil
 	case prefix >= 0xf8:
 		// an array whose size is greater than or equal to 56
 		// size of the data representing the size of payload
@@ -217,9 +216,9 @@ func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64
 			return 0, 0, io.EOF
 		}
 		payloadSize := new(big.Int).SetBytes(payloadSizeBytes).Int64()
-		return uint64(payloadSize), uint64(payloadSizeSize), nil
+		return uint64(payloadSizeSize + 1), uint64(payloadSize), nil
 	}
-	return 0, 0, errors.New("expected arrray but got bytes")
+	return 0, 0, errors.New("expected array but got bytes")
 }
 
 // loadPayload loads payload data from stream and store to buffer

@@ -21,10 +21,10 @@ type BackupCommand struct {
 func (c *BackupCommand) DefineFlags() {
 	c.Base.DefineFlags(c.Formatter, c.GRPC)
 
-	c.FlagMap["data"] = helper.FlagDescriptor{
+	c.FlagMap["out"] = helper.FlagDescriptor{
 		Description: "The path of backup data to save",
 		Arguments: []string{
-			"BACKUP_FILE",
+			"OUT",
 		},
 		ArgumentsOptional: false,
 	}
