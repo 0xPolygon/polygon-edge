@@ -499,6 +499,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
 		config.SetBlockLimit(2.5 * 21000)
+		config.SetDevInterval(2)
 		config.Premine(senderAddress, framework.EthToWei(100))
 	})
 
@@ -525,7 +526,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		hashes = append(hashes, txHash)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 
 	// wait for the last tx to be included in a block
