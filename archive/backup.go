@@ -18,7 +18,7 @@ import (
 )
 
 // CreateBackup fetches blockchain data with the specific range via gRPC and save this data as binary archive to given path
-func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64, targetTo *uint64, outPath string) (uint64, uint64, error) {
+func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *uint64, outPath string) (uint64, uint64, error) {
 	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
@@ -55,23 +55,23 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 
 	clt := proto.NewSystemClient(conn)
 
-	to, toHash, err := determineTo(ctx, clt, targetTo)
+	reqTo, reqToHash, err := determineTo(ctx, clt, to)
 	if err != nil {
 		closeAndRemoveFile()
 		return 0, 0, err
 	}
 
 	stream, err := clt.Export(ctx, &proto.ExportRequest{
-		From: targetFrom,
-		To:   to,
+		From: from,
+		To:   reqTo,
 	})
 	if err != nil {
 		closeAndRemoveFile()
 		return 0, 0, err
 	}
 
-	writeMetadata(fs, logger, to, toHash)
-	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
+	writeMetadata(fs, logger, reqTo, reqToHash)
+	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
 
 	if err := closeFile(); err != nil {
 		removeFile()
@@ -81,16 +81,16 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 	return *resFrom, *resTo, nil
 }
 
-func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) (uint64, types.Hash, error) {
+func determineTo(ctx context.Context, clt proto.SystemClient, to *uint64) (uint64, types.Hash, error) {
 	status, err := clt.GetStatus(ctx, &emptypb.Empty{})
 	if err != nil {
 		return 0, types.Hash{}, err
 	}
 
-	if targetTo != nil && *targetTo < uint64(status.Current.Number) {
+	if to != nil && *to < uint64(status.Current.Number) {
 		// check the existence of the block when you have targetTo
-		resp, err := clt.BlockByNumber(ctx, &proto.BlockByNumberRequest{Number: *targetTo})
-		if err == nil {
+		resp, err := clt.BlockByNumber(ctx, &proto.BlockByNumberRequest{Number: *to})
+		if err == nil && resp != nil {
 			block := types.Block{}
 			if err := block.UnmarshalRLP(resp.Data); err == nil {
 				// can use targetTo only if the node has the block at the specific height
