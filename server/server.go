@@ -3,13 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/archive"
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -467,7 +468,7 @@ func (s *Server) setupJSONRPC() error {
 
 // setupGRPC sets up the grpc server and listens on tcp
 func (s *Server) setupGRPC() error {
-	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
+	proto.RegisterSystemServer(s.grpcServer, &systemService{server: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
 	if err != nil {
