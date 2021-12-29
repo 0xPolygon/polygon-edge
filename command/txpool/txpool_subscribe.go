@@ -59,7 +59,7 @@ func (t *TxPoolSubscribeCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
-	t.FlagMap["dropped"] = helper.FlagDescriptor{
+	t.FlagMap["demoted"] = helper.FlagDescriptor{
 		Description: "Subscribes for demoted tx events in the TxPool",
 		Arguments: []string{
 			"LISTEN_DEMOTED",
