@@ -642,20 +642,20 @@ func TestResetHandlerPromoted(t *testing.T) {
 // Starts the pool's event loop and returns a channel
 // that receives a notification every time a request
 // is handled.
-func (p *TxPool) startTestMode() <-chan struct{} {
+func (t *TxPool) startTestMode() <-chan struct{} {
 	done := make(chan struct{})
 
 	go func() {
 		for {
 			select {
-			case req := <-p.addReqCh:
+			case req := <-t.addReqCh:
 				go func() {
-					p.handleAddRequest(req)
+					t.handleAddRequest(req)
 					done <- struct{}{}
 				}()
-			case req := <-p.promoteReqCh:
+			case req := <-t.promoteReqCh:
 				go func() {
-					p.handlePromoteRequest(req)
+					t.handlePromoteRequest(req)
 					done <- struct{}{}
 				}()
 			}
