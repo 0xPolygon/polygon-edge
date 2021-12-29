@@ -447,7 +447,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// check if already known
 	if _, ok := p.index.load(tx.Hash); ok {
-		return ErrAlreadyKnown
+		if origin == gossip {
+			// silently drop same tx that is gossiped back
+			p.logger.Debug("addTx - dropping known gossiped transaction", "hash", tx.Hash.String())
+			return nil
+		} else {
+			return ErrAlreadyKnown
+		}
 	}
 
 	// initialize account queue for this address once
