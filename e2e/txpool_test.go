@@ -644,7 +644,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(1)
+		config.SetDevInterval(3)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
 	})
