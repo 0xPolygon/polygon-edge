@@ -42,6 +42,14 @@ var (
 	ErrOversizedData = errors.New("oversized data")
 )
 
+type txOrigin int
+
+const (
+	local  txOrigin = iota // json-RPC/gRPC endpoints
+	gossip                 // gossip protocol
+	reorg                  // legacy code
+)
+
 // store interface defines State helper methods the Txpool should have access to
 type store interface {
 	Header() *types.Header
@@ -219,7 +227,7 @@ func (p *TxPool) EnableDev() {
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it if networking is enabled.
 func (p *TxPool) AddTx(tx *types.Transaction) error {
-	if err := p.addTx(tx); err != nil {
+	if err := p.addTx(local, tx); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
 		return err
 	}
@@ -242,8 +250,7 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 }
 
 // Returns the first transaction from the promoted queue
-// without removing it.
-// Assumes the lock is held.
+// without removing it. Assumes the lock is held.
 func (p *TxPool) Peek() *types.Transaction {
 	return p.promoted.peek()
 }
@@ -348,6 +355,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 	}
 
+	// Legacy reorg logic //
+	for _, tx := range oldTransactions {
+		p.addTx(reorg, tx)
+	}
+
 	if len(stateNonces) == 0 {
 		return
 	}
@@ -420,7 +432,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 // for any newly received transaction. If the call to
 // addTx is successful an account is created
 // for this address (only once) and an addRequest is signaled.
-func (p *TxPool) addTx(tx *types.Transaction) error {
+func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// validate recieved transaction
 	if err := p.validateTx(tx); err != nil {
 		return err
@@ -461,7 +473,7 @@ func (p *TxPool) handleGossipTx(obj interface{}) {
 		return
 	}
 
-	if err := p.addTx(tx); err != nil {
+	if err := p.addTx(gossip, tx); err != nil {
 		p.logger.Error("failed to add broadcasted txn", "err", err)
 	}
 }
