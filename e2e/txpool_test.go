@@ -514,15 +514,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
 		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
-		tx, err := client.Eth().GetTransactionByHash(txHash)
-		assert.NoError(t, err)
-
-		// dev move is not up yet
-		// the txs are in the pool
-		assert.Equal(t, uint64(0), tx.TxnIndex)
-		assert.Equal(t, uint64(0), tx.BlockNumber)
-		assert.Equal(t, web3.ZeroHash, tx.BlockHash)
-
+		// save for later querying
 		hashes = append(hashes, txHash)
 	}
 
