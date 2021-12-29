@@ -15,8 +15,6 @@ type eventSubscription struct {
 
 	// outputCh is the update channel for the subscriber
 	outputCh chan *proto.TxPoolEvent
-
-	pendingMessages uint64
 }
 
 // eventSupported checks if the event is supported by the subscription

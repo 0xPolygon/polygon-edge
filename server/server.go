@@ -499,6 +499,10 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close consensus", "err", err.Error())
 	}
 
+	if err := s.txpool.Close(); err != nil {
+		s.logger.Error("failed to close the txpool", "err", err.Error())
+	}
+
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())

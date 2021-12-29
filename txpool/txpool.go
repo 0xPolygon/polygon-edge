@@ -1131,3 +1131,12 @@ func (g *slotGauge) increase(slots uint64) {
 func (g *slotGauge) decrease(slots uint64) {
 	atomic.AddUint64(&g.height, ^(slots - 1))
 }
+
+func (p *TxPool) Close() error {
+	// Close the event manager
+	p.eventManager.close()
+
+	// TODO add additional teardown logic if needed @dbrajovic
+
+	return nil
+}
