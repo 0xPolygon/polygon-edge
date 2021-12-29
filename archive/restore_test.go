@@ -3,7 +3,9 @@ package archive
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -16,6 +18,101 @@ var (
 		LatestHash: types.StringToHash("10"),
 	}
 )
+
+type mockChain struct {
+	genesis   *types.Block
+	blocks    []*types.Block
+	newBlocks []*types.Block
+}
+
+func (m *mockChain) Genesis() types.Hash {
+	return m.genesis.Hash()
+}
+
+func (m *mockChain) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
+	for _, b := range m.blocks {
+		if b.Number() == num {
+			return b, true
+		}
+	}
+	return nil, false
+}
+
+func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
+	b, ok := m.GetBlockByNumber(num, false)
+	if !ok {
+		return types.Hash{}
+	}
+	return b.Hash()
+}
+
+func (m *mockChain) WriteBlocks(blocks []*types.Block) error {
+	m.newBlocks = append(m.newBlocks, blocks...)
+	return nil
+}
+
+func Test_consumeCommonBlocks(t *testing.T) {
+	newTestArchiveStream := func(blocks ...*types.Block) io.Reader {
+		var buf bytes.Buffer
+		for _, b := range blocks {
+			buf.Write(b.MarshalRLP())
+		}
+		return &buf
+	}
+
+	tests := []struct {
+		name        string
+		blockStream *blockStream
+		chain       blockchainInterface
+		resultBlock *types.Block
+		err         error
+	}{
+		{
+			name:        "should consume common blocks",
+			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1], blocks[2])),
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{blocks[0], blocks[1]},
+			},
+			resultBlock: blocks[2],
+			err:         nil,
+		},
+		{
+			name:        "should consume all blocks",
+			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1])),
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{blocks[0], blocks[1]},
+			},
+			resultBlock: nil,
+			err:         nil,
+		},
+		{
+			name:        "should return error in case of genesis mismatch",
+			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1])),
+			chain: &mockChain{
+				genesis: &types.Block{
+					Header: &types.Header{
+						Hash:   types.StringToHash("wrong genesis"),
+						Number: 0,
+					},
+				},
+				blocks: []*types.Block{blocks[0], blocks[1]},
+			},
+			resultBlock: nil,
+			err:         fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			osSignal := make(<-chan os.Signal)
+			resultBlock, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
+			assert.Equal(t, tt.resultBlock, resultBlock)
+			assert.Equal(t, tt.err, err)
+		})
+	}
+}
 
 func Test_parseBlock(t *testing.T) {
 	tests := []struct {

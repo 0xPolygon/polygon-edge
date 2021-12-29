@@ -36,6 +36,12 @@ func (m *mockSystemExportClient) Recv() (*proto.ExportEvent, error) {
 }
 
 var (
+	genesis = &types.Block{
+		Header: &types.Header{
+			Hash:   types.StringToHash("genesis"),
+			Number: 0,
+		},
+	}
 	blocks = []*types.Block{
 		{
 			Header: &types.Header{
@@ -56,6 +62,7 @@ var (
 )
 
 func init() {
+	genesis.Header.ComputeHash()
 	for _, b := range blocks {
 		b.Header.ComputeHash()
 	}
