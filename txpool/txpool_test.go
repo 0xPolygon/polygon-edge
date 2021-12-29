@@ -485,7 +485,7 @@ func TestResetHandlerEnqueued(t *testing.T) {
 				}
 
 				// align account queue with reset event
-				go pool.resetAllQueues(map[types.Address]uint64{
+				go pool.resetQueues(map[types.Address]uint64{
 					addr1: tc.newNonce,
 				})
 
@@ -546,7 +546,7 @@ func TestResetHandlerEnqueued(t *testing.T) {
 					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
 				}
 
-				pool.resetAllQueues(map[types.Address]uint64{
+				pool.resetQueues(map[types.Address]uint64{
 					addr1: tc.newNonce,
 				})
 
@@ -618,7 +618,7 @@ func TestResetHandlerPromoted(t *testing.T) {
 			}
 
 			// align promoted queue with reset event
-			pool.resetAllQueues(map[types.Address]uint64{
+			pool.resetQueues(map[types.Address]uint64{
 				addr1: tc.newNonce,
 			})
 
@@ -890,7 +890,7 @@ func TestResetWithHeader(t *testing.T) {
 
 			// ResetWitHeader would invoke this handler when a node
 			// is building/discovering a new block
-			pool.resetAllQueues(tc.newNonces)
+			pool.resetQueues(tc.newNonces)
 			waitUntilDone(done)
 
 			for addr, count := range tc.expected.enqueued {
