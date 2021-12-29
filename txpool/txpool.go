@@ -69,7 +69,7 @@ type addRequest struct {
 	// isLocal bool
 
 	// flag indicating the tx is returning
-	// to the pool as a recovered one
+	// to the pool as a recovered one (see Demote)
 	demoted bool
 }
 
@@ -77,9 +77,8 @@ type addRequest struct {
 // to signal that some account queue is ready
 // for promotion.
 //
-// Occurs when a previously added transaction
-// has does not have higher nonce than expected
-// (indicated by nonceMap).
+// Occurs when a transactopn with nonce expected
+// is received or a demoted one is re-entering the pool.
 type promoteRequest struct {
 	account types.Address
 }
@@ -87,7 +86,7 @@ type promoteRequest struct {
 // TxPool is a module that handles pending transactions.
 // There are fundamentally 2 queues any transaction
 // needs to go through:
-// - 1. Account queue (enqueued account transactions)
+// - 1. Account queue (enqueued transactions for specific address)
 // - 2. Promoted queue (global pending transactions)
 //
 // The main difference between these queues is that
@@ -96,8 +95,8 @@ type promoteRequest struct {
 // the received transaction's nonce is expected for this account
 // queue and can be moved to the promoted queue.
 //
-// The promoted queue acts as a sink to transactions
-// promoted from any account queue sorted by max gasPrice
+// The promoted queue acts as a sink for transactions
+// promoted from any account queue, sorted by max gasPrice
 // where they wait to be inserted in the next block.
 type TxPool struct {
 	logger     hclog.Logger
@@ -107,7 +106,7 @@ type TxPool struct {
 	idlePeriod time.Duration
 
 	// map of all account queues (accounts transactions)
-	accounts accountMap
+	accounts accountsMap
 
 	// promoted transactions
 	promoted *promotedQueue
@@ -144,7 +143,7 @@ type TxPool struct {
 	proto.UnimplementedTxnPoolOperatorServer
 }
 
-/// NewTxPool creates a new pool for transactions
+/// NewTxPool creates a new pool for incoming transactions.
 func NewTxPool(
 	logger hclog.Logger,
 	forks chain.ForksInTime,
@@ -160,7 +159,7 @@ func NewTxPool(
 		store:      store,
 		idlePeriod: defaultIdlePeriod,
 		metrics:    metrics,
-		accounts:   accountMap{},
+		accounts:   accountsMap{},
 		promoted:   newPromotedQueue(logger.Named("promoted")),
 		index:      lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:      slotGauge{height: 0, max: config.MaxSlots},
@@ -174,7 +173,7 @@ func NewTxPool(
 			return nil, err
 		}
 
-		topic.Subscribe(pool.handleGossipTxn)
+		topic.Subscribe(pool.handleGossipTx)
 		pool.topic = topic
 	}
 
@@ -211,13 +210,14 @@ func (p *TxPool) AddSigner(s signer) {
 	p.signer = s
 }
 
-// EnableDev enables dev mode for the txpool
+// Enables dev mode so the pool can accept non-ecnrypted transactions.
+// Used in testing.
 func (p *TxPool) EnableDev() {
 	p.dev = true
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
-// and broadcasts it if networking is enabled
+// and broadcasts it if networking is enabled.
 func (p *TxPool) AddTx(tx *types.Transaction) error {
 	if err := p.addTx(tx); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
@@ -227,13 +227,13 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 	// broadcast the transaction only if network is enabled
 	// and we are not in dev mode
 	if p.topic != nil && !p.dev {
-		txn := &proto.Txn{
+		tx := &proto.Txn{
 			Raw: &any.Any{
 				Value: tx.MarshalRLP(),
 			},
 		}
 
-		if err := p.topic.Publish(txn); err != nil {
+		if err := p.topic.Publish(tx); err != nil {
 			p.logger.Error("failed to topic tx", "err", err)
 		}
 	}
@@ -241,11 +241,14 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
+// Returns the first transaction from the promoted queue
+// without removing it.
+// Assumes the lock is held.
 func (p *TxPool) Peek() *types.Transaction {
 	return p.promoted.peek()
 }
 
-// Pop() removes the highest priced transaction from the promoted queue.
+// Removes and returns the first transaction from the promoted queue.
 // Assumes the lock is held.
 func (p *TxPool) Pop() *types.Transaction {
 	tx := p.promoted.pop()
@@ -256,7 +259,7 @@ func (p *TxPool) Pop() *types.Transaction {
 	return tx
 }
 
-// Rollback is called within ibft for any transactions
+// Drop is called within ibft for any transaction
 // deemed unrecoverable during writing to the state.
 // This call ensures that any subsequent transactions
 // must not be processed before the unrecoverable one
@@ -271,9 +274,9 @@ func (p *TxPool) Drop() {
 	p.nextNonces.store(tx.From, tx.Nonce)
 }
 
-// Recover is called within ibft for all transactions
+// Demote is called within ibft for all transactions
 // that are valid but couldn't be written to the state
-// at the given time. Issues an addRequest to the pool
+// at the given time (recoverable). Issues an addRequest to the pool
 // indicating a transaction is returning to it.
 func (p *TxPool) Demote() {
 	tx := p.promoted.pop()
@@ -281,7 +284,7 @@ func (p *TxPool) Demote() {
 	p.addReqCh <- addRequest{tx: tx, demoted: true}
 }
 
-// ResetWithHeader is called from within ibft when the node
+// ResetWithHeaders is called from within ibft when the node
 // has received a new block from a peer. The pool needs to align
 // its own state with the new one so it can correctly process
 // further incoming transactions.
@@ -314,7 +317,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
 
-	// discover latest (next) nonces for all transactions in the new block
+	// discover latest (next) nonces for all transactions in the NewChain
 	stateNonces := make(map[types.Address]uint64)
 	for _, event := range event.NewChain {
 		block, ok := p.store.GetBlockByHash(event.Hash, true)
@@ -349,8 +352,8 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		return
 	}
 
-	// Signal reset request
-	p.resetAllAccounts(stateNonces)
+	// reset with the new state
+	p.resetQueues(stateNonces)
 }
 
 // validateTx ensures that the transaction conforms
@@ -414,9 +417,9 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 }
 
 // addTx is the main entry point to the pool
-// for all received transactions. If the call to
-// addTx() is successful an account queue is created
-// for this address (only once) and an addRequest is sent.
+// for any newly received transaction. If the call to
+// addTx is successful an account is created
+// for this address (only once) and an addRequest is signaled.
 func (p *TxPool) addTx(tx *types.Transaction) error {
 	// validate recieved transaction
 	if err := p.validateTx(tx); err != nil {
@@ -444,8 +447,9 @@ func (p *TxPool) addTx(tx *types.Transaction) error {
 	return nil
 }
 
-// handleGossipTxn handles receiving gossiped transactions
-func (p *TxPool) handleGossipTxn(obj interface{}) {
+// handleGossipTx handles receiving transactions
+// gossiped by the network.
+func (p *TxPool) handleGossipTx(obj interface{}) {
 	if !p.sealing {
 		return
 	}
@@ -463,11 +467,11 @@ func (p *TxPool) handleGossipTxn(obj interface{}) {
 }
 
 // handleAddRequest is invoked when a new transaction is received
-// (result of a successful addTx() call) or a recovered transaction
+// (result of a successful addTx() call) or a demoted transaction
 // is re-entering the pool.
 //
 // A transaction handled within this request can either be
-// dropped or enqueued, eventually signaling promotion in the former case.
+// dropped or enqueued, eventually signaling promotion in the latter case.
 func (p *TxPool) handleAddRequest(req addRequest) {
 	tx := req.tx
 	addr := req.tx.From
@@ -489,8 +493,8 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 	// update lookup
 	p.index.add(tx)
 
+	// demoted transactions never decrease the gauge
 	if !req.demoted {
-		// atomically increase gauge
 		p.gauge.increase(slotsRequired(tx))
 	}
 
@@ -502,13 +506,13 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 
 	// account queue is ready for promotion:
 	// 	1. New tx is matching nonce expected
-	// 	2. We are promoting a recovered tx
+	// 	2. We are promoting a demoted tx
 	p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
 }
 
 // handlePromoteRequest handles moving promtable transactions
 // from the associated account queue to the promoted queue.
-// Can only be invoked by handleAddRequest
+// Can only be invoked by handleAddRequest.
 func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	addr := req.account
 
@@ -535,16 +539,19 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	}
 }
 
-// resetAllAccounts is called within ResetWithHeader
-// and aligns the pool's state for all accounts by pruning
-// stale transactions from all queues in the pool.
-func (p *TxPool) resetAllAccounts(stateNonces map[types.Address]uint64) {
+// resetQueues is called within ResetWithHeader
+// to align the pool's state with the state from the new header.
+// Removes any stale transctions from the account queues based on
+// the new state.
+func (p *TxPool) resetQueues(stateNonces map[types.Address]uint64) {
 	p.LockPromoted(true)
 	defer p.UnlockPromoted()
 
+	// prune promoted txs
 	pruned := p.prunePromoted(stateNonces)
 	p.logger.Debug(fmt.Sprintf("pruned %d promoted transactions", pruned))
 
+	// prune accounts (enqueued txs)
 	p.pruneAccounts(stateNonces)
 }
 
@@ -586,8 +593,13 @@ func (p *TxPool) pruneAccounts(stateNonces map[types.Address]uint64) {
 		wg.Add(1)
 		go func(addr types.Address, nonce uint64) {
 			defer wg.Done()
-			_, _ = p.pruneAccount(addr, nonce)
-			// debug log
+			pruned, remaining := p.pruneAccount(addr, nonce)
+			p.logger.Debug(fmt.Sprintf(
+				"pruned %v enqueued transactions, remaining=%v",
+				pruned,
+				remaining,
+			))
+
 		}(addr, nonce)
 	}
 
@@ -595,13 +607,14 @@ func (p *TxPool) pruneAccounts(stateNonces map[types.Address]uint64) {
 	wg.Wait()
 }
 
-// pruneAccount clears all transactions with nonce lower than given
+// pruneAccount removes all transactions with nonce lower than given
 // and updates the nonce map. If when done pruning, the next transaction
-// has nonce that matches the newdly expected, a promotion is signaled.
+// has nonce that matches the newly updated, a promotion is signaled.
 func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) (numPruned, numRemaining uint64) {
 	account := p.lockAccount(addr, true)
 	defer p.unlockAccount(addr)
 
+	// prune enqueued
 	pruned := account.prune(nonce)
 
 	// free up slots
@@ -610,6 +623,7 @@ func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) (numPruned, numR
 	// remove from index
 	p.index.remove(pruned...)
 
+	// check if account is promotable after pruning
 	if tx := account.first(); tx != nil &&
 		tx.Nonce == nonce {
 		// first tx matches next expected nonce -> signal promotion
@@ -621,21 +635,22 @@ func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) (numPruned, numR
 
 	numPruned = uint64(len(pruned))
 	numRemaining = account.length()
+
 	return
 }
 
 // createAccountOnce is used when discovering an address
 // of a received transaction for the first time.
-// This function ensures that the account queue and its corresponding lock
-// are  created safely and only once.
+// This function ensures that the account queue (and its corresponding lock)
+// is created atomically and only once.
 func (p *TxPool) createAccountOnce(newAddr types.Address) {
 	a, _ := p.accounts.LoadOrStore(newAddr, &account{})
-	account := a.(*account)
+	newAccount := a.(*account)
 
 	// run only once per queue creation
-	account.initFunc.Do(func() {
-		account.queue = newMinNonceQueue()
-		account.logger = p.logger.Named("account")
+	newAccount.initFunc.Do(func() {
+		newAccount.queue = newMinNonceQueue()
+		newAccount.logger = p.logger.Named("account")
 
 		// update nonce map
 		stateRoot := p.store.Header().StateRoot
@@ -644,7 +659,7 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) {
 	})
 }
 
-/* QUERY methods (to be revised) */
+/* QUERY methods */
 
 // GetNonce returns the next nonce for the account
 // -> Returns the value from the TxPool if the account is initialized in-memory
@@ -661,7 +676,8 @@ func (p *TxPool) GetNonce(addr types.Address) uint64 {
 	return nonce
 }
 
-// GetCapacity returns the current number of slots occupied and the max slot limit
+// GetCapacity returns the current number of slots
+// occupied in the pool as well as the max limit
 func (p *TxPool) GetCapacity() (uint64, uint64) {
 	return p.gauge.read(), p.gauge.max
 }
@@ -678,8 +694,8 @@ func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 
 // GetTxs gets pending and queued transactions
 func (p *TxPool) GetTxs(inclQueued bool) (promoted, enqueued map[types.Address][]*types.Transaction) {
-	// this will stop all handlers, so the function
-	// can safely retrieve info from all queues
+	// lock the promoted queue to prevent
+	// promotion handlers from mutating it
 	p.LockPromoted(false)
 	defer p.UnlockPromoted()
 
@@ -695,6 +711,8 @@ func (p *TxPool) GetTxs(inclQueued bool) (promoted, enqueued map[types.Address][
 	return
 }
 
+// parsePromoted parses the promoted queue into a map collection of
+// {k: address} -> {v: transactions} where transactions are sorted by nonce.
 func (p *TxPool) parsePromoted() (parsed map[types.Address][]*types.Transaction) {
 	promoted := make(map[types.Address]*minNonceQueue)
 	for _, tx := range p.promoted.queue.txs {
@@ -715,6 +733,8 @@ func (p *TxPool) parsePromoted() (parsed map[types.Address][]*types.Transaction)
 	return
 }
 
+// parseEnqueued parses all account queues into a map collection of
+// {k: address} -> {v: transactions} where transactions are sorted by nonce.
 func (p *TxPool) parseEnqueued() (parsed map[types.Address][]*types.Transaction) {
 	parsed = make(map[types.Address][]*types.Transaction)
 	p.accounts.Range(func(key, value interface{}) bool {
@@ -739,7 +759,7 @@ type lookupMap struct {
 	all map[types.Hash]*types.Transaction
 }
 
-// add adds the given transaction to the lookup map
+// Adds the given transaction to the map. [thread-safe]
 func (m *lookupMap) add(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -749,7 +769,7 @@ func (m *lookupMap) add(txs ...*types.Transaction) {
 	}
 }
 
-// remove clears the lookup map of given txs
+// Removes the given transactions from the map. [thread-safe]
 func (m *lookupMap) remove(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -759,8 +779,7 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 	}
 }
 
-// load acquires the read lock on the lookup map and returns the requested
-// transaction (wrapped in a status object), if it exists
+// Returns the transaction associated with the given hash. [thread-safe]
 func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
 	m.RLock()
 	defer m.RUnlock()
@@ -773,7 +792,7 @@ func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
 	return tx, true
 }
 
-// Map of expected nonces for all (known) accounts
+// Map of expected nonces for all accounts (known by the pool).
 type nonceMap struct {
 	sync.Map
 }
@@ -791,13 +810,13 @@ func (m *nonceMap) store(addr types.Address, nonce uint64) {
 	m.Store(addr, nonce)
 }
 
-// Thread safe map of all account queue registered by the pool
-type accountMap struct {
+// Thread safe map of all accounts registered by the pool.
+type accountsMap struct {
 	sync.Map
 }
 
-// from returns the account queue of the gives address
-func (m *accountMap) from(addr types.Address) *account {
+// Returns the account associated with the given address.
+func (m *accountsMap) from(addr types.Address) *account {
 	a, ok := m.Load(addr)
 	if !ok {
 		return nil
@@ -806,7 +825,7 @@ func (m *accountMap) from(addr types.Address) *account {
 	return a.(*account)
 }
 
-// lockAccount locks the account queue of the given address
+// Locks the account queue of the given address.
 func (p *TxPool) lockAccount(addr types.Address, write bool) *account {
 	account := p.accounts.from(addr)
 	if write {
@@ -822,7 +841,6 @@ func (p *TxPool) lockAccount(addr types.Address, write bool) *account {
 
 // unlockAccount unlock the account queue of the given address
 func (p *TxPool) unlockAccount(addr types.Address) {
-	// Grab the previous lock type and reset it
 	account := p.accounts.from(addr)
 	if atomic.SwapUint32(&account.wLock, 0) == 1 {
 		account.Unlock()
@@ -832,6 +850,15 @@ func (p *TxPool) unlockAccount(addr types.Address) {
 }
 
 /* account (queue) impl */
+
+// account is a thread-safe wrapper object
+// around an account queue (enqueued transactions).
+//
+// Accounts are only ever initalized once and stored
+// atomically in the accountsMap.
+//
+// All methods assume the approriate lock is held
+// and at the right time (context).
 type account struct {
 	sync.RWMutex
 	initFunc sync.Once
@@ -840,22 +867,28 @@ type account struct {
 	queue    minNonceQueue
 }
 
+// Pushes the transactions onto to the account queue.
 func (a *account) enqueue(txs ...*types.Transaction) {
 	for _, tx := range txs {
 		heap.Push(&a.queue, tx)
 	}
 }
 
+// Returns the number of enqueued transactions for this account.
 func (a *account) length() uint64 {
 	return uint64(a.queue.Len())
 }
 
-// first peeks at the first transaction
-// in the account queue, if any
+// Returns the first enqueued transaction, if present.
 func (a *account) first() *types.Transaction {
 	return a.queue.Peek()
 }
 
+// Promote tries to pop transactions from the account queue
+// that can be considered promotable.
+// Promotable transactions are all sequential in the order of nonce
+// and the first one has to have nonce not greater than the one passed in
+// as argument.
 func (a *account) promote(nonce uint64) (transactions, uint64) {
 	tx := a.queue.Peek()
 	if tx == nil ||
@@ -880,6 +913,7 @@ func (a *account) promote(nonce uint64) (transactions, uint64) {
 	return promotables, nextNonce
 }
 
+// Removes all transactions with nonce lower than given.
 func (a *account) prune(nonce uint64) transactions {
 	var pruned transactions
 	for {
@@ -896,8 +930,8 @@ func (a *account) prune(nonce uint64) transactions {
 	return pruned
 }
 
-/* promoted queue impl */
-
+// Locks the promoted queue in read/write mode
+// depending on the write flag.
 func (p *TxPool) LockPromoted(write bool) {
 	if write {
 		p.promoted.Lock()
@@ -908,6 +942,7 @@ func (p *TxPool) LockPromoted(write bool) {
 	}
 }
 
+// Unlocks the promoted queue.
 func (p *TxPool) UnlockPromoted() {
 	// Grab the previous lock type and reset it
 	if atomic.SwapUint32(&p.promoted.wLock, 0) == 1 {
@@ -917,6 +952,7 @@ func (p *TxPool) UnlockPromoted() {
 	}
 }
 
+/* promoted queue impl */
 type promotedQueue struct {
 	sync.RWMutex
 	logger hclog.Logger
@@ -924,6 +960,7 @@ type promotedQueue struct {
 	wLock  uint32
 }
 
+// Creates and returns a new promoted (max price) queue.
 func newPromotedQueue(logger hclog.Logger) *promotedQueue {
 	q := &promotedQueue{
 		queue:  newMaxPriceQueue(),
@@ -933,12 +970,16 @@ func newPromotedQueue(logger hclog.Logger) *promotedQueue {
 	return q
 }
 
+/* all methods assume the appropriate lock is held. */
+
+// Pushes the given transactions onto the queue.
 func (q *promotedQueue) push(txs ...*types.Transaction) {
 	for _, tx := range txs {
 		heap.Push(&q.queue, tx)
 	}
 }
 
+// Returns the first transaction from the queue without removing it.
 func (q *promotedQueue) peek() *types.Transaction {
 	if q.length() == 0 {
 		return nil
@@ -947,6 +988,7 @@ func (q *promotedQueue) peek() *types.Transaction {
 	return q.queue.txs[0]
 }
 
+// Removes the first transactions from the queue and returns it.
 func (q *promotedQueue) pop() *types.Transaction {
 	if q.length() == 0 {
 		return nil
@@ -955,12 +997,20 @@ func (q *promotedQueue) pop() *types.Transaction {
 	return heap.Pop(&q.queue).(*types.Transaction)
 }
 
+// Returns the number of transactions in the queue.
 func (q *promotedQueue) length() uint64 {
 	return uint64(q.queue.Len())
 }
 
+// Returns valid and pruned transactions after filtering the queue.
+// Only PrunePromoted calls this method.
+//
+// Valid - transactions not considered stale.
+//
+// Pruned - transactions considered as stale by the nonceMao.
 func (q *promotedQueue) prune(nonceMap map[types.Address]uint64) (valid, pruned transactions) {
 	for {
+
 		next := q.peek()
 		if next == nil {
 			break
@@ -983,11 +1033,11 @@ func (q *promotedQueue) prune(nonceMap map[types.Address]uint64) (valid, pruned 
 
 // Gauge for measuring pool capacity in slots
 type slotGauge struct {
-	height uint64
-	max    uint64
+	height uint64 // amount of slots currently occupying the pool
+	max    uint64 // max limit
 }
 
-// slotsRequired calculates the number of slots required for given transaction(s)
+// Calculates the number of slots required for given transaction(s).
 func slotsRequired(txs ...*types.Transaction) uint64 {
 	slots := uint64(0)
 	for _, tx := range txs {
@@ -999,17 +1049,17 @@ func slotsRequired(txs ...*types.Transaction) uint64 {
 	return slots
 }
 
-// Returns the current height of the gauge
+// Returns the current height of the gauge.
 func (g *slotGauge) read() uint64 {
 	return atomic.LoadUint64(&g.height)
 }
 
-// Increases the height of the gauge by the specified slots amount
+// Increases the height of the gauge by the specified slots amount.
 func (g *slotGauge) increase(slots uint64) {
 	atomic.AddUint64(&g.height, slots)
 }
 
-// Decreases the height of the gauge by the specified slots amount
+// Decreases the height of the gauge by the specified slots amount.
 func (g *slotGauge) decrease(slots uint64) {
 	atomic.AddUint64(&g.height, ^(slots - 1))
 }
