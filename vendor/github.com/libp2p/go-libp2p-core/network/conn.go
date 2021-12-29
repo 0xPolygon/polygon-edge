@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"io"
 
 	ic "github.com/libp2p/go-libp2p-core/crypto"
@@ -18,19 +19,17 @@ type Conn interface {
 
 	ConnSecurity
 	ConnMultiaddrs
+	ConnStat
 
 	// ID returns an identifier that uniquely identifies this Conn within this
 	// host, during this run. Connection IDs may repeat across restarts.
 	ID() string
 
 	// NewStream constructs a new Stream over this conn.
-	NewStream() (Stream, error)
+	NewStream(context.Context) (Stream, error)
 
 	// GetStreams returns all open streams over this conn.
 	GetStreams() []Stream
-
-	// Stat stores metadata pertaining to this conn.
-	Stat() Stat
 }
 
 // ConnSecurity is the interface that one can mix into a connection interface to
@@ -59,4 +58,10 @@ type ConnMultiaddrs interface {
 	// RemoteMultiaddr returns the remote Multiaddr associated
 	// with this connection
 	RemoteMultiaddr() ma.Multiaddr
+}
+
+// ConnStat is an interface mixin for connection types that provide connection statistics.
+type ConnStat interface {
+	// Stat stores metadata pertaining to this conn.
+	Stat() Stat
 }

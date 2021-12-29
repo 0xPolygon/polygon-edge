@@ -25,7 +25,7 @@ type expiringAddr struct {
 }
 
 func (e *expiringAddr) ExpiredBy(t time.Time) bool {
-	return t.After(e.Expires)
+	return !t.Before(e.Expires)
 }
 
 type peerRecordState struct {
@@ -315,9 +315,15 @@ func (mab *memoryAddrBook) UpdateAddrs(p peer.ID, oldTTL time.Duration, newTTL t
 	defer s.Unlock()
 	exp := time.Now().Add(newTTL)
 	amap, found := s.addrs[p]
-	if found {
-		for k, a := range amap {
-			if oldTTL == a.TTL {
+	if !found {
+		return
+	}
+
+	for k, a := range amap {
+		if oldTTL == a.TTL {
+			if newTTL == 0 {
+				delete(amap, k)
+			} else {
 				a.TTL = newTTL
 				a.Expires = exp
 				amap[k] = a

@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -24,6 +25,15 @@ func Max(a, b uint64) uint64 {
 	}
 
 	return b
+}
+
+func roundFloat(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func ToFixedFloat(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+	return float64(roundFloat(num*output)) / output
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories

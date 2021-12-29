@@ -8,7 +8,7 @@ import (
 	"time"
 
 	u "github.com/ipfs/go-ipfs-util"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -146,7 +146,7 @@ func ping(s network.Stream) (time.Duration, error) {
 	}
 
 	if !bytes.Equal(buf, rbuf) {
-		return 0, errors.New("ping packet was incorrect!")
+		return 0, errors.New("ping packet was incorrect")
 	}
 
 	return time.Since(before), nil

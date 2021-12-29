@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -16,10 +17,21 @@ func (p *PubSubNotif) ClosedStream(n network.Network, s network.Stream) {
 }
 
 func (p *PubSubNotif) Connected(n network.Network, c network.Conn) {
+	// ignore transient connections
+	if c.Stat().Transient {
+		return
+	}
+
 	go func() {
+		p.newPeersPrioLk.RLock()
+		p.newPeersMx.Lock()
+		p.newPeersPend[c.RemotePeer()] = struct{}{}
+		p.newPeersMx.Unlock()
+		p.newPeersPrioLk.RUnlock()
+
 		select {
-		case p.newPeers <- c.RemotePeer():
-		case <-p.ctx.Done():
+		case p.newPeers <- struct{}{}:
+		default:
 		}
 	}()
 }
@@ -34,10 +46,30 @@ func (p *PubSubNotif) ListenClose(n network.Network, _ ma.Multiaddr) {
 }
 
 func (p *PubSubNotif) Initialize() {
-	for _, pr := range p.host.Network().Peers() {
-		select {
-		case p.newPeers <- pr:
-		case <-p.ctx.Done():
+	isTransient := func(pid peer.ID) bool {
+		for _, c := range p.host.Network().ConnsToPeer(pid) {
+			if !c.Stat().Transient {
+				return false
+			}
 		}
+
+		return true
+	}
+
+	p.newPeersPrioLk.RLock()
+	p.newPeersMx.Lock()
+	for _, pid := range p.host.Network().Peers() {
+		if isTransient(pid) {
+			continue
+		}
+
+		p.newPeersPend[pid] = struct{}{}
+	}
+	p.newPeersMx.Unlock()
+	p.newPeersPrioLk.RUnlock()
+
+	select {
+	case p.newPeers <- struct{}{}:
+	default:
 	}
 }

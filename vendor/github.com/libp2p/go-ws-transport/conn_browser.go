@@ -272,17 +272,17 @@ func arrayBufferToBytes(buffer js.Value) []byte {
 
 func errorEventToError(val js.Value) error {
 	var typ string
-	if gotType := val.Get("type"); gotType != js.Undefined() {
+	if gotType := val.Get("type"); !gotType.Equal(js.Undefined()) {
 		typ = gotType.String()
 	} else {
 		typ = val.Type().String()
 	}
 	var reason string
-	if gotReason := val.Get("reason"); gotReason != js.Undefined() && gotReason.String() != "" {
+	if gotReason := val.Get("reason"); !gotReason.Equal(js.Undefined()) && gotReason.String() != "" {
 		reason = gotReason.String()
 	} else {
 		code := val.Get("code")
-		if code != js.Undefined() {
+		if !code.Equal(js.Undefined()) {
 			switch code := code.Int(); code {
 			case 1006:
 				reason = "code 1006: connection unexpectedly closed"

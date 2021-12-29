@@ -1,6 +1,8 @@
 package peerstream_multiplex
 
 import (
+	"context"
+
 	"github.com/libp2p/go-libp2p-core/mux"
 	mp "github.com/libp2p/go-mplex"
 )
@@ -16,8 +18,8 @@ func (c *conn) IsClosed() bool {
 }
 
 // OpenStream creates a new stream.
-func (c *conn) OpenStream() (mux.MuxedStream, error) {
-	s, err := c.mplex().NewStream()
+func (c *conn) OpenStream(ctx context.Context) (mux.MuxedStream, error) {
+	s, err := c.mplex().NewStream(ctx)
 	if err != nil {
 		return nil, err
 	}

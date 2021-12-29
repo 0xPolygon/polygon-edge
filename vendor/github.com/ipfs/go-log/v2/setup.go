@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -29,6 +30,10 @@ const (
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
+	envLoggingURL = "GOLOG_URL" // url that will be processed by sink in the zap
+
+	envLoggingOutput = "GOLOG_OUTPUT" // possible values: stdout|stderr|file combine multiple values with '+'
+	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
 )
 
 type LogFormat int
@@ -54,6 +59,12 @@ type Config struct {
 
 	// File is a path to a file that logs will be written to.
 	File string
+
+	// URL with schema supported by zap. Use zap.RegisterSink
+	URL string
+
+	// Labels is a set of key-values to apply to all loggers
+	Labels map[string]string
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -105,6 +116,9 @@ func SetupLogging(cfg Config) {
 			outputPaths = append(outputPaths, path)
 		}
 	}
+	if len(cfg.URL) > 0 {
+		outputPaths = append(outputPaths, cfg.URL)
+	}
 
 	ws, _, err := zap.Open(outputPaths...)
 	if err != nil {
@@ -112,6 +126,11 @@ func SetupLogging(cfg Config) {
 	}
 
 	newPrimaryCore := newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
+
+	for k, v := range cfg.Labels {
+		newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(k, v)})
+	}
+
 	if primaryCore != nil {
 		loggerCore.ReplaceCore(primaryCore, newPrimaryCore)
 	} else {
@@ -211,7 +230,10 @@ func getLogger(name string) *zap.SugaredLogger {
 	if !ok {
 		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
 		log = zap.New(loggerCore).
-			WithOptions(zap.IncreaseLevel(levels[name])).
+			WithOptions(
+				zap.IncreaseLevel(levels[name]),
+				zap.AddCaller(),
+			).
 			Named(name).
 			Sugar()
 
@@ -227,6 +249,7 @@ func configFromEnv() Config {
 		Format: ColorizedOutput,
 		Stderr: true,
 		Level:  LevelError,
+		Labels: map[string]string{},
 	}
 
 	format := os.Getenv(envLoggingFmt)
@@ -258,6 +281,35 @@ func configFromEnv() Config {
 	// https://github.com/ipfs/go-log/issues/83
 	if cfg.File != "" {
 		cfg.Stderr = false
+	}
+
+	cfg.URL = os.Getenv(envLoggingURL)
+	output := os.Getenv(envLoggingOutput)
+	outputOptions := strings.Split(output, "+")
+	for _, opt := range outputOptions {
+		switch opt {
+		case "stdout":
+			cfg.Stdout = true
+		case "stderr":
+			cfg.Stderr = true
+		case "file":
+			if cfg.File == "" {
+				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
+			}
+		case "url":
+			if cfg.URL == "" {
+				fmt.Fprint(os.Stderr, "please specify a GOLOG_URL value to write to")
+			}
+		}
+	}
+
+	labels := os.Getenv(envLoggingLabels)
+	if labels != "" {
+		labelKVs := strings.Split(labels, ",")
+		for _, label := range labelKVs {
+			kv := strings.Split(label, "=")
+			cfg.Labels[kv[0]] = kv[1]
+		}
 	}
 
 	return cfg

@@ -130,7 +130,7 @@ func (t *Topic) sendNotification(evt PeerEvent) {
 }
 
 // Subscribe returns a new Subscription for the topic.
-// Note that subscription is not an instanteneous operation. It may take some time
+// Note that subscription is not an instantaneous operation. It may take some time
 // before the subscription is processed by the pubsub main loop and propagated to our peers.
 func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 	t.mux.RLock()
@@ -141,7 +141,6 @@ func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 
 	sub := &Subscription{
 		topic: t.topic,
-		ch:    make(chan *Message, 32),
 		ctx:   t.p.ctx,
 	}
 
@@ -150,6 +149,11 @@ func (t *Topic) Subscribe(opts ...SubOpt) (*Subscription, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if sub.ch == nil {
+		// apply the default size
+		sub.ch = make(chan *Message, 32)
 	}
 
 	out := make(chan *Subscription, 1)
@@ -241,13 +245,7 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 		t.p.disc.Bootstrap(ctx, t.topic, pub.ready)
 	}
 
-	select {
-	case t.p.publish <- &Message{m, t.p.host.ID(), nil}:
-	case <-t.p.ctx.Done():
-		return t.p.ctx.Err()
-	}
-
-	return nil
+	return t.p.val.PushLocal(&Message{m, t.p.host.ID(), nil})
 }
 
 // WithReadiness returns a publishing option for only publishing when the router is ready.

@@ -99,7 +99,7 @@ var HandshakeXX = HandshakePattern{
 }
 
 var HandshakeXXfallback = HandshakePattern{
-	Name: "XXfallback",
+	Name:                 "XXfallback",
 	ResponderPreMessages: []MessagePattern{MessagePatternE},
 	Messages: [][]MessagePattern{
 		{MessagePatternE, MessagePatternDHEE, MessagePatternS, MessagePatternDHSE},

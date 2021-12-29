@@ -39,7 +39,6 @@ var errTimeout = timeout{}
 var errStreamClosed = errors.New("stream closed")
 
 var (
-	NewStreamTimeout   = time.Minute
 	ResetStreamTimeout = 2 * time.Minute
 
 	WriteCoalesceDelay = 100 * time.Microsecond
@@ -291,12 +290,12 @@ func (mp *Multiplex) nextChanID() uint64 {
 }
 
 // NewStream creates a new stream.
-func (mp *Multiplex) NewStream() (*Stream, error) {
-	return mp.NewNamedStream("")
+func (mp *Multiplex) NewStream(ctx context.Context) (*Stream, error) {
+	return mp.NewNamedStream(ctx, "")
 }
 
 // NewNamedStream creates a new named stream.
-func (mp *Multiplex) NewNamedStream(name string) (*Stream, error) {
+func (mp *Multiplex) NewNamedStream(ctx context.Context, name string) (*Stream, error) {
 	mp.chLock.Lock()
 
 	// We could call IsClosed but this is faster (given that we already have
@@ -319,11 +318,11 @@ func (mp *Multiplex) NewNamedStream(name string) (*Stream, error) {
 	mp.channels[s.id] = s
 	mp.chLock.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), NewStreamTimeout)
-	defer cancel()
-
 	err := mp.sendMsg(ctx.Done(), nil, header, []byte(name))
 	if err != nil {
+		if err == errTimeout {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 
