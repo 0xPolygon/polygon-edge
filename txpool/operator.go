@@ -19,7 +19,7 @@ func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolSt
 }
 
 // AddTxn adds a local transaction to the pool
-func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*empty.Empty, error) {
+func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
 	if raw.Raw == nil {
 		return nil, fmt.Errorf("transaction's field raw is empty")
 	}
@@ -41,7 +41,9 @@ func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*empty.Empty
 		return nil, err
 	}
 
-	return &empty.Empty{}, nil
+	return &proto.AddTxnResp{
+		TxHash: txn.Hash.String(),
+	}, nil
 }
 
 // Subscribe implements the operator endpoint. It subscribes to new events in the tx pool
