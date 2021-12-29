@@ -223,7 +223,7 @@ func MeshJoin(servers ...*Server) []error {
 	var wg sync.WaitGroup
 	for indx := 0; indx < numServers; indx++ {
 		for innerIndx := 0; innerIndx < numServers; innerIndx++ {
-			if innerIndx != indx {
+			if innerIndx > indx {
 				wg.Add(1)
 				go func(src, dest int) {
 					defer wg.Done()

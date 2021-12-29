@@ -29,7 +29,7 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 }
 
 func TestSimpleGossip(t *testing.T) {
-	numServers := 2
+	numServers := 10
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
 	servers, createErr := createServers(numServers, nil)
 	if createErr != nil {
@@ -58,7 +58,7 @@ func TestSimpleGossip(t *testing.T) {
 		serverTopics[i] = topic
 
 		if subscribeErr := topic.Subscribe(func(obj interface{}) {
-			// Everyone should relay they got the message apart from the publisher
+			// Everyone should relay they got the message
 			messageCh <- obj.(*testproto.GenericMessage)
 		}); subscribeErr != nil {
 			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
@@ -67,7 +67,7 @@ func TestSimpleGossip(t *testing.T) {
 	publisher := servers[0]
 	publisherTopic := serverTopics[0]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)-1); waitErr != nil {
 		t.Fatalf("Unable to wait for subscribers, %v", waitErr)
@@ -83,7 +83,7 @@ func TestSimpleGossip(t *testing.T) {
 	messagesGossiped := 0
 	for {
 		select {
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 15):
 			t.Fatalf("Gossip messages not received before timeout")
 		case message := <-messageCh:
 			if message.Message == sentMessage {
