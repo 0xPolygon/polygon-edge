@@ -155,8 +155,8 @@ func Test_loadPrefixSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			headerSize, payloadSize, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
 			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.size, headerSize)
-			assert.Equal(t, tt.consumed, payloadSize)
+			assert.Equal(t, tt.consumed, headerSize)
+			assert.Equal(t, tt.size, payloadSize)
 		})
 	}
 }
@@ -264,7 +264,6 @@ func Test_reserveCap(t *testing.T) {
 		blockstream  *blockStream
 		expectedSize uint64
 		newLen       int
-		newCap       int
 	}{
 		{
 			name: "should expand and change size",
@@ -273,7 +272,6 @@ func Test_reserveCap(t *testing.T) {
 			},
 			expectedSize: 20,
 			newLen:       20,
-			newCap:       32,
 		},
 		{
 			name: "should change size",
@@ -282,7 +280,6 @@ func Test_reserveCap(t *testing.T) {
 			},
 			expectedSize: 20,
 			newLen:       20,
-			newCap:       30,
 		},
 	}
 
@@ -290,7 +287,7 @@ func Test_reserveCap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.blockstream.reserveCap(tt.expectedSize)
 			assert.Equal(t, tt.newLen, len(tt.blockstream.buffer))
-			assert.Equal(t, tt.newCap, cap(tt.blockstream.buffer))
+			assert.Greater(t, cap(tt.blockstream.buffer), tt.newLen)
 		})
 	}
 }
