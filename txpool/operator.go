@@ -22,7 +22,7 @@ func (p *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolSt
 }
 
 // AddTxn adds a local transaction to the pool
-func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
+func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
 	if raw.Raw == nil {
 		return nil, fmt.Errorf("transaction's field raw is empty")
 	}
