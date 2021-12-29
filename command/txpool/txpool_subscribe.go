@@ -58,6 +58,15 @@ func (t *TxPoolSubscribeCommand) DefineFlags() {
 		ArgumentsOptional: true,
 		FlagOptional:      true,
 	}
+
+	t.FlagMap["dropped"] = helper.FlagDescriptor{
+		Description: "Subscribes for demoted tx events in the TxPool",
+		Arguments: []string{
+			"LISTEN_DEMOTED",
+		},
+		ArgumentsOptional: true,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -89,11 +98,13 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	var promoted bool
 	var enqueued bool
 	var dropped bool
+	var demoted bool
 
 	flags.BoolVar(&added, "added", false, "")
 	flags.BoolVar(&promoted, "enqueued", false, "")
 	flags.BoolVar(&enqueued, "enqueued", false, "")
 	flags.BoolVar(&dropped, "dropped", false, "")
+	flags.BoolVar(&demoted, "demoted", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		t.Formatter.OutputError(err)
@@ -117,6 +128,10 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 		eventTypes = append(eventTypes, txpoolProto.EventType_DROPPED)
 	}
 
+	if demoted {
+		eventTypes = append(eventTypes, txpoolProto.EventType_DEMOTED)
+	}
+
 	if len(eventTypes) == 0 {
 		// Any kind of event subscription is default
 		eventTypes = append(
@@ -125,6 +140,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 			txpoolProto.EventType_PROMOTED,
 			txpoolProto.EventType_ENQUEUED,
 			txpoolProto.EventType_DROPPED,
+			txpoolProto.EventType_DEMOTED,
 		)
 	}
 

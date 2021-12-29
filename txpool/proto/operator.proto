@@ -48,6 +48,9 @@ enum EventType {
 
   // For dropped transactions
   DROPPED = 3;
+
+  // For demoted transactions
+  DEMOTED = 4;
 }
 
 message TxPoolEvent {

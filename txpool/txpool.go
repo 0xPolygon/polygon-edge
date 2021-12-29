@@ -148,7 +148,7 @@ type TxPool struct {
 	metrics *Metrics
 
 	// Event manager for txpool events
-	eventManager eventManager
+	eventManager *eventManager
 
 	// Indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
@@ -176,6 +176,9 @@ func NewTxPool(
 		gauge:      slotGauge{height: 0, max: config.MaxSlots},
 		sealing:    config.Sealing,
 	}
+
+	// Attach the event manager
+	pool.eventManager = newEventManager(pool.logger)
 
 	if network != nil {
 		// subscribe to the gossip protocol
@@ -282,6 +285,10 @@ func (t *TxPool) Drop() {
 
 	// rollback nonce
 	t.nextNonces.store(tx.From, tx.Nonce)
+	go t.eventManager.fireEvent(&proto.TxPoolEvent{
+		Type:   proto.EventType_DROPPED,
+		TxHash: tx.Hash.String(),
+	})
 }
 
 // Demote is called within ibft for all transactions
@@ -292,6 +299,10 @@ func (t *TxPool) Demote() {
 	tx := t.promoted.pop()
 
 	t.addReqCh <- addRequest{tx: tx, demoted: true}
+	go t.eventManager.fireEvent(&proto.TxPoolEvent{
+		Type:   proto.EventType_DEMOTED,
+		TxHash: tx.Hash.String(),
+	})
 }
 
 // ResetWithHeaders is called from within ibft when the node
@@ -461,6 +472,10 @@ func (t *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// initialize account queue for this address once
 	t.createAccountOnce(tx.From)
+	go t.eventManager.fireEvent(&proto.TxPoolEvent{
+		Type:   proto.EventType_ADDED,
+		TxHash: tx.Hash.String(),
+	})
 
 	// send request [BLOCKING]
 	t.addReqCh <- addRequest{tx: tx, demoted: false}
@@ -510,6 +525,10 @@ func (t *TxPool) handleAddRequest(req addRequest) {
 
 	// enqueue tx
 	account.enqueue(tx)
+	go t.eventManager.fireEvent(&proto.TxPoolEvent{
+		Type:   proto.EventType_ADDED,
+		TxHash: tx.Hash.String(),
+	})
 
 	// update lookup
 	t.index.add(tx)
@@ -551,6 +570,12 @@ func (t *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// push to promotables
 	t.promoted.push(promotables...)
+	for _, promotable := range promotables {
+		go t.eventManager.fireEvent(&proto.TxPoolEvent{
+			Type:   proto.EventType_PROMOTED,
+			TxHash: promotable.Hash.String(),
+		})
+	}
 
 	// only update the nonce map if the new nonce
 	// is higher than the one previously stored.
