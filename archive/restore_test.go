@@ -20,9 +20,8 @@ var (
 )
 
 type mockChain struct {
-	genesis   *types.Block
-	blocks    []*types.Block
-	newBlocks []*types.Block
+	genesis *types.Block
+	blocks  []*types.Block
 }
 
 func (m *mockChain) Genesis() types.Hash {
@@ -47,7 +46,6 @@ func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
 }
 
 func (m *mockChain) WriteBlocks(blocks []*types.Block) error {
-	m.newBlocks = append(m.newBlocks, blocks...)
 	return nil
 }
 
