@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/crypto"
@@ -12,6 +13,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test if the custom block gas limit is properly set
@@ -107,10 +109,16 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	framework.WaitUntilBlockMined(ctx, srv, 1)
+
 	block, err = client.Eth().GetBlockByNumber(1, true)
 	if err != nil {
 		t.Fatalf("failed to retreive block %d: %v", 1, err)
 	}
+
+	assert.NotNil(t, block)
 
 	if block.GasLimit != blockGasLimit {
 		t.Fatalf("invalid block gas limit, expected [%d] but got [%d]", blockGasLimit, block.GasLimit)

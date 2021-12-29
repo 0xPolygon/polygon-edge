@@ -259,16 +259,13 @@ func (t *TestServer) Start(ctx context.Context) error {
 	case ConsensusIBFT:
 		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
 	case ConsensusDev:
-		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
-	case ConsensusDummy:
 		args = append(args, "--data-dir", t.Config.RootDir)
-	}
-
-	if t.Config.Consensus == ConsensusDev {
 		args = append(args, "--dev")
 		if t.Config.DevInterval != 0 {
 			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
 		}
+	case ConsensusDummy:
+		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
 	if t.Config.Seal {
