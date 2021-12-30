@@ -810,6 +810,9 @@ func (p *TxPool) parsePromoted() (
 	parsed map[types.Address][]*types.Transaction,
 ) {
 	promoted := make(map[types.Address]*minNonceQueue)
+
+	// push onto a temporary queue
+	// so txs can be sorted
 	for _, tx := range p.promoted.queue.txs {
 		if _, ok := promoted[tx.From]; !ok {
 			ptr := new(minNonceQueue)
@@ -834,6 +837,9 @@ func (p *TxPool) parseEnqueued() (
 	parsed map[types.Address][]*types.Transaction,
 ) {
 	parsed = make(map[types.Address][]*types.Transaction)
+
+	// range across all accounts
+	// and collect enqueued txs
 	p.accounts.Range(func(key, value interface{}) bool {
 		addr := key.(types.Address)
 
@@ -1051,6 +1057,7 @@ func (p *TxPool) UnlockPromoted() {
 }
 
 /* promoted queue impl */
+
 type promotedQueue struct {
 	sync.RWMutex
 	queue maxPriceQueue
