@@ -355,9 +355,10 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// discover latest (next) nonces for all transactions in the NewChain
 	stateNonces := make(map[types.Address]uint64)
-	for _, event := range event.NewChain {
-		block, ok := p.store.GetBlockByHash(event.Hash, true)
+	for _, header := range event.NewChain {
+		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
+			p.logger.Error("could not find block in store", "hash", header.Hash.String())
 			continue
 		}
 
