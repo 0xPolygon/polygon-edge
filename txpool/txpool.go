@@ -528,8 +528,8 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 	tx := req.tx
 	addr := req.tx.From
 
-	account := p.lockAccount(addr, true)
-	defer p.unlockAccount(addr)
+	account := p.accounts.lock(addr, true)
+	defer p.accounts.unlock(addr)
 
 	// fetch expected nonce
 	nextNonce, _ := p.nextNonces.load(addr)
@@ -583,8 +583,8 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.LockPromoted(true)
 	defer p.UnlockPromoted()
 
-	account := p.lockAccount(addr, true)
-	defer p.unlockAccount(addr)
+	account := p.accounts.lock(addr, true)
+	defer p.accounts.unlock(addr)
 
 	if account.length() == 0 {
 		// nothing to promote
@@ -697,8 +697,8 @@ func (p *TxPool) pruneAccounts(stateNonces map[types.Address]uint64) {
 // and updates the nonce map. If when done pruning, the next transaction
 // has nonce that matches the newly updated, a promotion is signaled.
 func (p *TxPool) pruneAccount(addr types.Address, nonce uint64) {
-	account := p.lockAccount(addr, true)
-	defer p.unlockAccount(addr)
+	account := p.accounts.lock(addr, true)
+	defer p.accounts.unlock(addr)
 
 	// update next nonce
 	p.nextNonces.store(addr, nonce)
@@ -837,8 +837,8 @@ func (p *TxPool) parseEnqueued() (
 	p.accounts.Range(func(key, value interface{}) bool {
 		addr := key.(types.Address)
 
-		account := p.lockAccount(addr, false)
-		defer p.unlockAccount(addr)
+		account := p.accounts.lock(addr, false)
+		defer p.accounts.unlock(addr)
 
 		parsed[addr] = account.queue.txs
 
@@ -922,9 +922,10 @@ func (m *accountsMap) from(addr types.Address) *account {
 	return a.(*account)
 }
 
-// Locks the account queue of the given address.
-func (p *TxPool) lockAccount(addr types.Address, write bool) *account {
-	account := p.accounts.from(addr)
+// Locks and returns the account associated with addr.
+// Write flag sets the lock mode.
+func (m *accountsMap) lock(addr types.Address, write bool) *account {
+	account := m.from(addr)
 	if write {
 		account.Lock()
 		atomic.StoreUint32(&account.wLock, 1)
@@ -936,9 +937,9 @@ func (p *TxPool) lockAccount(addr types.Address, write bool) *account {
 	return account
 }
 
-// unlockAccount unlock the account queue of the given address
-func (p *TxPool) unlockAccount(addr types.Address) {
-	account := p.accounts.from(addr)
+// Unlocks the account associated with addr.
+func (m *accountsMap) unlock(addr types.Address) {
+	account := m.from(addr)
 	if atomic.SwapUint32(&account.wLock, 0) == 1 {
 		account.Unlock()
 	} else {
@@ -982,6 +983,7 @@ func (a *account) first() *types.Transaction {
 
 // Promote tries to pop transactions from the account queue
 // that can be considered promotable.
+//
 // Promotable transactions are all sequential in the order of nonce
 // and the first one has to have nonce not greater than the one passed in
 // as argument.
