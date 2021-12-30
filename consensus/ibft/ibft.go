@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	ErrInvalidHookParam = errors.New("invalid hook param")
-	ErrMissingHook      = errors.New("missing hook")
+	ErrInvalidHookParam = errors.New("invalid IBFT hook param passed in")
+	ErrMissingHook      = errors.New("missing IBFT hook from mechanism")
 )
 
 type blockchainInterface interface {
