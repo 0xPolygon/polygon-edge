@@ -150,7 +150,7 @@ func (s *systemService) PeersList(
 }
 
 // BlockByNumberRequest implements the BlockByNumberRequest operator service
-func (s *systemService) BlockByNumberRequest(
+func (s *systemService) BlockByNumber(
 	ctx context.Context,
 	req *proto.BlockByNumberRequest,
 ) (*proto.BlockResponse, error) {
