@@ -2,7 +2,6 @@ package staking
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/contracts/abis"
@@ -20,27 +19,16 @@ var (
 	queryGasLimit uint64 = 100000
 )
 
-func extractResponse(method *abi.Method, returnValue []byte) (map[string]interface{}, error) {
+func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
 	decodedResults, err := method.Outputs.Decode(returnValue)
 	if err != nil {
 		return nil, err
 	}
-
 	results, ok := decodedResults.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("failed type assertion from decodedResults to map")
 	}
-
-	return results, nil
-}
-
-func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, error) {
-	extractedMap, extractErr := extractResponse(method, returnValue)
-	if extractErr != nil {
-		return nil, fmt.Errorf("unable to extract results, %v", extractErr)
-	}
-
-	web3Addresses, ok := extractedMap["0"].([]web3.Address)
+	web3Addresses, ok := results["0"].([]web3.Address)
 	if !ok {
 		return nil, errors.New("failed type assertion from results[0] to []web3.Address")
 	}
@@ -82,40 +70,4 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 	}
 
 	return DecodeValidators(method, res.ReturnValue)
-}
-
-func QueryStakedAmount(t TxQueryHandler, from types.Address) (*big.Int, error) {
-	method, ok := abis.StakingABI.Methods["stakedAmount"]
-	if !ok {
-		return nil, errors.New("stakedAmount method doesn't exist in Staking contract ABI")
-	}
-
-	selector := method.ID()
-	res, err := t.Apply(&types.Transaction{
-		From:     types.ZeroAddress,
-		To:       &AddrStakingContract,
-		Value:    big.NewInt(0),
-		Input:    selector,
-		GasPrice: big.NewInt(0),
-		Gas:      queryGasLimit,
-		Nonce:    t.GetNonce(from),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if res.Failed() {
-		return nil, res.Err
-	}
-
-	extractedMap, extractErr := extractResponse(method, res.ReturnValue)
-	if extractErr != nil {
-		return nil, fmt.Errorf("unable to extract results, %v", extractErr)
-	}
-
-	validatorStake, ok := extractedMap["0"].(*big.Int)
-	if !ok {
-		return nil, errors.New("failed type assertion from results[0] to *big.Int")
-	}
-
-	return validatorStake, nil
 }
