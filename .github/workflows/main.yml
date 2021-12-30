@@ -37,8 +37,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: recursive
-
-
+      -
+        name: Clear test cache
+        run: go clean -testcache
+        
       - name: Go build with race 
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
       
