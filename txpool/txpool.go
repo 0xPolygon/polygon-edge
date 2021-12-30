@@ -263,6 +263,9 @@ func (p *TxPool) Pop() *types.Transaction {
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
 
+	// update metrics
+	p.metrics.PendingTxs.Set(float64(p.promoted.length()))
+
 	return tx
 }
 
@@ -277,6 +280,9 @@ func (p *TxPool) Drop() {
 
 	// remove from index
 	p.index.remove(tx)
+
+	// update metrics
+	p.metrics.PendingTxs.Set(float64(p.promoted.length()))
 
 	// rollback nonce
 	p.nextNonces.store(tx.From, tx.Nonce)
@@ -293,6 +299,9 @@ func (p *TxPool) Drop() {
 func (p *TxPool) Demote() {
 	tx := p.promoted.pop()
 	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
+
+	// update metrics
+	p.metrics.PendingTxs.Set(float64(p.promoted.length()))
 
 	// signal add request [BLOCKING]
 	p.addReqCh <- addRequest{tx: tx, demoted: true}
@@ -568,6 +577,10 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// push to promotables
 	p.promoted.push(promotables...)
+
+	// update metrics
+	p.metrics.PendingTxs.Set(float64(p.promoted.length()))
+
 	p.logger.Debug("promote account",
 		"promoted", len(promotables),
 		"remaining", account.length(),
@@ -616,6 +629,9 @@ func (p *TxPool) prunePromoted(nonceMap map[types.Address]uint64) {
 
 	// free up slots
 	p.gauge.decrease(slotsRequired(pruned...))
+
+	// update metrics
+	p.metrics.PendingTxs.Set(float64(p.promoted.length()))
 
 	p.logger.Debug("pruned promoted queue", "num", len(pruned))
 }
