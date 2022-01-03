@@ -290,7 +290,7 @@ func (p *TxPool) Drop() {
 		"nonce", tx.Nonce,
 		"addr", tx.From.String(),
 	)
-	go p.eventManager.fireEvent(&proto.TxPoolEvent{
+	p.eventManager.fireEvent(&proto.TxPoolEvent{
 		Type:   proto.EventType_DROPPED,
 		TxHash: tx.Hash.String(),
 	})
@@ -306,7 +306,7 @@ func (p *TxPool) Demote() {
 
 	// signal add request [BLOCKING]
 	p.addReqCh <- addRequest{tx: tx, demoted: true}
-	go p.eventManager.fireEvent(&proto.TxPoolEvent{
+	p.eventManager.fireEvent(&proto.TxPoolEvent{
 		Type:   proto.EventType_DEMOTED,
 		TxHash: tx.Hash.String(),
 	})
@@ -481,7 +481,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// initialize account queue for this address once
 	p.createAccountOnce(tx.From)
-	go p.eventManager.fireEvent(&proto.TxPoolEvent{
+	p.eventManager.fireEvent(&proto.TxPoolEvent{
 		Type:   proto.EventType_ADDED,
 		TxHash: tx.Hash.String(),
 	})
@@ -539,7 +539,7 @@ func (p *TxPool) handleAddRequest(req addRequest) {
 		"length", account.length(),
 		"addr", addr.String(),
 	)
-	go p.eventManager.fireEvent(&proto.TxPoolEvent{
+	p.eventManager.fireEvent(&proto.TxPoolEvent{
 		Type:   proto.EventType_ADDED,
 		TxHash: tx.Hash.String(),
 	})
@@ -596,7 +596,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 		"addr", addr.String(),
 	)
 	for _, promotable := range promotables {
-		go p.eventManager.fireEvent(&proto.TxPoolEvent{
+		p.eventManager.fireEvent(&proto.TxPoolEvent{
 			Type:   proto.EventType_PROMOTED,
 			TxHash: promotable.Hash.String(),
 		})

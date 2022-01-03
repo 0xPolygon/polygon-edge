@@ -71,12 +71,14 @@ func (em *eventManager) close() {
 
 // fireEvent is a helper method for alerting listeners of a new TxPool event
 func (em *eventManager) fireEvent(event *proto.TxPoolEvent) {
-	em.subscriptionsLock.RLock()
-	defer em.subscriptionsLock.RUnlock()
+	go func() {
+		em.subscriptionsLock.RLock()
+		defer em.subscriptionsLock.RUnlock()
 
-	for _, subscription := range em.subscriptions {
-		go func(eventSubscription *eventSubscription) {
-			eventSubscription.processCh <- event
-		}(subscription)
-	}
+		for _, subscription := range em.subscriptions {
+			go func(eventSubscription *eventSubscription) {
+				eventSubscription.processCh <- event
+			}(subscription)
+		}
+	}()
 }
