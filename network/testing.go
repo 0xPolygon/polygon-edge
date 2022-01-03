@@ -40,9 +40,7 @@ func JoinAndWait(
 
 	// The join routine should be separate
 	go func() {
-		if joinErr := source.Join(destination.AddrInfo(), joinTimeout); joinErr != nil {
-			source.logger.Error(fmt.Sprintf("Unable to join peer, %v", joinErr))
-		}
+		_ = source.Join(destination.AddrInfo(), joinTimeout)
 	}()
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), connectTimeout)
