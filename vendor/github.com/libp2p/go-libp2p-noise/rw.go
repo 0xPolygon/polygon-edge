@@ -129,9 +129,9 @@ func (s *secureSession) Write(data []byte) (int, error) {
 	return written, nil
 }
 
-// readNextInsecureMsgLen reads the length of the next message on the insecure channel.
+// readNextInsecureMsgLen reads the length of the next message on the insecureConn channel.
 func (s *secureSession) readNextInsecureMsgLen() (int, error) {
-	_, err := io.ReadFull(s.insecure, s.rlen[:])
+	_, err := io.ReadFull(s.insecureReader, s.rlen[:])
 	if err != nil {
 		return 0, err
 	}
@@ -140,17 +140,17 @@ func (s *secureSession) readNextInsecureMsgLen() (int, error) {
 }
 
 // readNextMsgInsecure tries to read exactly len(buf) bytes into buf from
-// the insecure channel and returns the error, if any.
+// the insecureConn channel and returns the error, if any.
 // Ideally, for reading a message, you'd first want to call `readNextInsecureMsgLen`
-// to determine the size of the next message to be read from the insecure channel and then call
+// to determine the size of the next message to be read from the insecureConn channel and then call
 // this function with a buffer of exactly that size.
 func (s *secureSession) readNextMsgInsecure(buf []byte) error {
-	_, err := io.ReadFull(s.insecure, buf)
+	_, err := io.ReadFull(s.insecureReader, buf)
 	return err
 }
 
-// writeMsgInsecure writes to the insecure conn.
+// writeMsgInsecure writes to the insecureConn conn.
 // data will be prefixed with its length in bytes, written as a 16-bit uint in network order.
 func (s *secureSession) writeMsgInsecure(data []byte) (int, error) {
-	return s.insecure.Write(data)
+	return s.insecureConn.Write(data)
 }

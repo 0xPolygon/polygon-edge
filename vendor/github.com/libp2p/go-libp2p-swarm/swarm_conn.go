@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -24,7 +25,7 @@ var ErrConnClosed = errors.New("connection closed")
 // Conn is the connection type used by swarm. In general, you won't use this
 // type directly.
 type Conn struct {
-	id    uint32
+	id    uint64
 	conn  transport.CapableConn
 	swarm *Swarm
 
@@ -175,8 +176,14 @@ func (c *Conn) Stat() network.Stat {
 }
 
 // NewStream returns a new Stream from this connection
-func (c *Conn) NewStream() (network.Stream, error) {
-	ts, err := c.conn.OpenStream()
+func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
+	if c.Stat().Transient {
+		if useTransient, _ := network.GetUseTransient(ctx); !useTransient {
+			return nil, network.ErrTransientConn
+		}
+	}
+
+	ts, err := c.conn.OpenStream(ctx)
 
 	if err != nil {
 		return nil, err
@@ -202,7 +209,7 @@ func (c *Conn) addStream(ts mux.MuxedStream, dir network.Direction) (*Stream, er
 		stream: ts,
 		conn:   c,
 		stat:   stat,
-		id:     atomic.AddUint32(&c.swarm.nextStreamID, 1),
+		id:     atomic.AddUint64(&c.swarm.nextStreamID, 1),
 	}
 	c.streams.m[s] = struct{}{}
 

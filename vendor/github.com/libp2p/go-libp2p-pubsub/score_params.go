@@ -3,6 +3,7 @@ package pubsub
 import (
 	"fmt"
 	"math"
+	"net"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -31,20 +32,20 @@ type PeerScoreThresholds struct {
 }
 
 func (p *PeerScoreThresholds) validate() error {
-	if p.GossipThreshold > 0 {
-		return fmt.Errorf("invalid gossip threshold; it must be <= 0")
+	if p.GossipThreshold > 0 || isInvalidNumber(p.GossipThreshold) {
+		return fmt.Errorf("invalid gossip threshold; it must be <= 0 and a valid number")
 	}
-	if p.PublishThreshold > 0 || p.PublishThreshold > p.GossipThreshold {
-		return fmt.Errorf("invalid publish threshold; it must be <= 0 and <= gossip threshold")
+	if p.PublishThreshold > 0 || p.PublishThreshold > p.GossipThreshold || isInvalidNumber(p.PublishThreshold) {
+		return fmt.Errorf("invalid publish threshold; it must be <= 0 and <= gossip threshold and a valid number")
 	}
-	if p.GraylistThreshold > 0 || p.GraylistThreshold > p.PublishThreshold {
-		return fmt.Errorf("invalid graylist threshold; it must be <= 0 and <= publish threshold")
+	if p.GraylistThreshold > 0 || p.GraylistThreshold > p.PublishThreshold || isInvalidNumber(p.GraylistThreshold) {
+		return fmt.Errorf("invalid graylist threshold; it must be <= 0 and <= publish threshold and a valid number")
 	}
-	if p.AcceptPXThreshold < 0 {
-		return fmt.Errorf("invalid accept PX threshold; it must be >= 0")
+	if p.AcceptPXThreshold < 0 || isInvalidNumber(p.AcceptPXThreshold) {
+		return fmt.Errorf("invalid accept PX threshold; it must be >= 0 and a valid number")
 	}
-	if p.OpportunisticGraftThreshold < 0 {
-		return fmt.Errorf("invalid opportunistic grafting threshold; it must be >= 0")
+	if p.OpportunisticGraftThreshold < 0 || isInvalidNumber(p.OpportunisticGraftThreshold) {
+		return fmt.Errorf("invalid opportunistic grafting threshold; it must be >= 0 and a valid number")
 	}
 	return nil
 }
@@ -71,7 +72,7 @@ type PeerScoreParams struct {
 	//       thus disabling the IP colocation penalty.
 	IPColocationFactorWeight    float64
 	IPColocationFactorThreshold int
-	IPColocationFactorWhitelist map[string]struct{}
+	IPColocationFactorWhitelist []*net.IPNet
 
 	// P7: behavioural pattern penalties.
 	// This parameter has an associated counter which tracks misbehaviour as detected by the
@@ -156,8 +157,8 @@ func (p *PeerScoreParams) validate() error {
 	}
 
 	// check that the topic score is 0 or something positive
-	if p.TopicScoreCap < 0 {
-		return fmt.Errorf("invalid topic score cap; must be positive (or 0 for no cap)")
+	if p.TopicScoreCap < 0 || isInvalidNumber(p.TopicScoreCap) {
+		return fmt.Errorf("invalid topic score cap; must be positive (or 0 for no cap) and a valid number")
 	}
 
 	// check that we have an app specific score; the weight can be anything (but expected positive)
@@ -166,29 +167,29 @@ func (p *PeerScoreParams) validate() error {
 	}
 
 	// check the IP colocation factor
-	if p.IPColocationFactorWeight > 0 {
-		return fmt.Errorf("invalid IPColocationFactorWeight; must be negative (or 0 to disable)")
+	if p.IPColocationFactorWeight > 0 || isInvalidNumber(p.IPColocationFactorWeight) {
+		return fmt.Errorf("invalid IPColocationFactorWeight; must be negative (or 0 to disable) and a valid number")
 	}
 	if p.IPColocationFactorWeight != 0 && p.IPColocationFactorThreshold < 1 {
 		return fmt.Errorf("invalid IPColocationFactorThreshold; must be at least 1")
 	}
 
 	// check the behaviour penalty
-	if p.BehaviourPenaltyWeight > 0 {
-		return fmt.Errorf("invalid BehaviourPenaltyWeight; must be negative (or 0 to disable)")
+	if p.BehaviourPenaltyWeight > 0 || isInvalidNumber(p.BehaviourPenaltyWeight) {
+		return fmt.Errorf("invalid BehaviourPenaltyWeight; must be negative (or 0 to disable) and a valid number")
 	}
-	if p.BehaviourPenaltyWeight != 0 && (p.BehaviourPenaltyDecay <= 0 || p.BehaviourPenaltyDecay >= 1) {
+	if p.BehaviourPenaltyWeight != 0 && (p.BehaviourPenaltyDecay <= 0 || p.BehaviourPenaltyDecay >= 1 || isInvalidNumber(p.BehaviourPenaltyDecay)) {
 		return fmt.Errorf("invalid BehaviourPenaltyDecay; must be between 0 and 1")
 	}
-	if p.BehaviourPenaltyThreshold < 0 {
-		return fmt.Errorf("invalid BehaviourPenaltyThreshold; must be >= 0")
+	if p.BehaviourPenaltyThreshold < 0 || isInvalidNumber(p.BehaviourPenaltyThreshold) {
+		return fmt.Errorf("invalid BehaviourPenaltyThreshold; must be >= 0 and a valid number")
 	}
 
 	// check the decay parameters
 	if p.DecayInterval < time.Second {
 		return fmt.Errorf("invalid DecayInterval; must be at least 1s")
 	}
-	if p.DecayToZero <= 0 || p.DecayToZero >= 1 {
+	if p.DecayToZero <= 0 || p.DecayToZero >= 1 || isInvalidNumber(p.DecayToZero) {
 		return fmt.Errorf("invalid DecayToZero; must be between 0 and 1")
 	}
 
@@ -198,47 +199,47 @@ func (p *PeerScoreParams) validate() error {
 
 func (p *TopicScoreParams) validate() error {
 	// make sure we have a sane topic weight
-	if p.TopicWeight < 0 {
-		return fmt.Errorf("invalid topic weight; must be >= 0")
+	if p.TopicWeight < 0 || isInvalidNumber(p.TopicWeight) {
+		return fmt.Errorf("invalid topic weight; must be >= 0 and a valid number")
 	}
 
 	// check P1
 	if p.TimeInMeshQuantum == 0 {
 		return fmt.Errorf("invalid TimeInMeshQuantum; must be non zero")
 	}
-	if p.TimeInMeshWeight < 0 {
-		return fmt.Errorf("invalid TimeInMeshWeight; must be positive (or 0 to disable)")
+	if p.TimeInMeshWeight < 0 || isInvalidNumber(p.TimeInMeshWeight) {
+		return fmt.Errorf("invalid TimeInMeshWeight; must be positive (or 0 to disable) and a valid number")
 	}
 	if p.TimeInMeshWeight != 0 && p.TimeInMeshQuantum <= 0 {
 		return fmt.Errorf("invalid TimeInMeshQuantum; must be positive")
 	}
-	if p.TimeInMeshWeight != 0 && p.TimeInMeshCap <= 0 {
-		return fmt.Errorf("invalid TimeInMeshCap; must be positive")
+	if p.TimeInMeshWeight != 0 && (p.TimeInMeshCap <= 0 || isInvalidNumber(p.TimeInMeshCap)) {
+		return fmt.Errorf("invalid TimeInMeshCap; must be positive and a valid number")
 	}
 
 	// check P2
-	if p.FirstMessageDeliveriesWeight < 0 {
-		return fmt.Errorf("invallid FirstMessageDeliveriesWeight; must be positive (or 0 to disable)")
+	if p.FirstMessageDeliveriesWeight < 0 || isInvalidNumber(p.FirstMessageDeliveriesWeight) {
+		return fmt.Errorf("invallid FirstMessageDeliveriesWeight; must be positive (or 0 to disable) and a valid number")
 	}
-	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesDecay <= 0 || p.FirstMessageDeliveriesDecay >= 1) {
+	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesDecay <= 0 || p.FirstMessageDeliveriesDecay >= 1 || isInvalidNumber(p.FirstMessageDeliveriesDecay)) {
 		return fmt.Errorf("invalid FirstMessageDeliveriesDecay; must be between 0 and 1")
 	}
-	if p.FirstMessageDeliveriesWeight != 0 && p.FirstMessageDeliveriesCap <= 0 {
-		return fmt.Errorf("invalid FirstMessageDeliveriesCap; must be positive")
+	if p.FirstMessageDeliveriesWeight != 0 && (p.FirstMessageDeliveriesCap <= 0 || isInvalidNumber(p.FirstMessageDeliveriesCap)) {
+		return fmt.Errorf("invalid FirstMessageDeliveriesCap; must be positive and a valid number")
 	}
 
 	// check P3
-	if p.MeshMessageDeliveriesWeight > 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesWeight; must be negative (or 0 to disable)")
+	if p.MeshMessageDeliveriesWeight > 0 || isInvalidNumber(p.MeshMessageDeliveriesWeight) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesWeight; must be negative (or 0 to disable) and a valid number")
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesDecay <= 0 || p.MeshMessageDeliveriesDecay >= 1) {
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesDecay <= 0 || p.MeshMessageDeliveriesDecay >= 1 || isInvalidNumber(p.MeshMessageDeliveriesDecay)) {
 		return fmt.Errorf("invalid MeshMessageDeliveriesDecay; must be between 0 and 1")
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && p.MeshMessageDeliveriesCap <= 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesCap; must be positive")
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesCap <= 0 || isInvalidNumber(p.MeshMessageDeliveriesCap)) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesCap; must be positive and a valid number")
 	}
-	if p.MeshMessageDeliveriesWeight != 0 && p.MeshMessageDeliveriesThreshold <= 0 {
-		return fmt.Errorf("invalid MeshMessageDeliveriesThreshold; must be positive")
+	if p.MeshMessageDeliveriesWeight != 0 && (p.MeshMessageDeliveriesThreshold <= 0 || isInvalidNumber(p.MeshMessageDeliveriesThreshold)) {
+		return fmt.Errorf("invalid MeshMessageDeliveriesThreshold; must be positive and a valid number")
 	}
 	if p.MeshMessageDeliveriesWindow < 0 {
 		return fmt.Errorf("invalid MeshMessageDeliveriesWindow; must be non-negative")
@@ -248,18 +249,18 @@ func (p *TopicScoreParams) validate() error {
 	}
 
 	// check P3b
-	if p.MeshFailurePenaltyWeight > 0 {
-		return fmt.Errorf("invalid MeshFailurePenaltyWeight; must be negative (or 0 to disable)")
+	if p.MeshFailurePenaltyWeight > 0 || isInvalidNumber(p.MeshFailurePenaltyWeight) {
+		return fmt.Errorf("invalid MeshFailurePenaltyWeight; must be negative (or 0 to disable) and a valid number")
 	}
-	if p.MeshFailurePenaltyWeight != 0 && (p.MeshFailurePenaltyDecay <= 0 || p.MeshFailurePenaltyDecay >= 1) {
+	if p.MeshFailurePenaltyWeight != 0 && (isInvalidNumber(p.MeshFailurePenaltyDecay) || p.MeshFailurePenaltyDecay <= 0 || p.MeshFailurePenaltyDecay >= 1) {
 		return fmt.Errorf("invalid MeshFailurePenaltyDecay; must be between 0 and 1")
 	}
 
 	// check P4
-	if p.InvalidMessageDeliveriesWeight > 0 {
-		return fmt.Errorf("invalid InvalidMessageDeliveriesWeight; must be negative (or 0 to disable)")
+	if p.InvalidMessageDeliveriesWeight > 0 || isInvalidNumber(p.InvalidMessageDeliveriesWeight) {
+		return fmt.Errorf("invalid InvalidMessageDeliveriesWeight; must be negative (or 0 to disable) and a valid number")
 	}
-	if p.InvalidMessageDeliveriesDecay <= 0 || p.InvalidMessageDeliveriesDecay >= 1 {
+	if p.InvalidMessageDeliveriesDecay <= 0 || p.InvalidMessageDeliveriesDecay >= 1 || isInvalidNumber(p.InvalidMessageDeliveriesDecay) {
 		return fmt.Errorf("invalid InvalidMessageDeliveriesDecay; must be between 0 and 1")
 	}
 
@@ -283,4 +284,10 @@ func ScoreParameterDecayWithBase(decay time.Duration, base time.Duration, decayT
 	// so factor^n = decayToZero => factor = decayToZero^(1/n)
 	ticks := float64(decay / base)
 	return math.Pow(decayToZero, 1/ticks)
+}
+
+// checks whether the provided floating-point number is `Not a Number`
+// or an infinite number.
+func isInvalidNumber(num float64) bool {
+	return math.IsNaN(num) || math.IsInf(num, 0)
 }

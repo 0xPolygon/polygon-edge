@@ -29,8 +29,9 @@ import (
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	ma "github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 var log = logging.Logger("p2p-config")
@@ -84,6 +85,8 @@ type Config struct {
 	NATManager  NATManagerC
 	Peerstore   peerstore.Peerstore
 	Reporter    metrics.Reporter
+
+	MultiaddrResolver *madns.Resolver
 
 	DisablePing bool
 
@@ -143,7 +146,7 @@ func (cfg *Config) addTransports(ctx context.Context, h host.Host) (err error) {
 	if cfg.Insecure {
 		upgrader.Secure = makeInsecureTransport(h.ID(), cfg.PeerKey)
 	} else {
-		upgrader.Secure, err = makeSecurityTransport(h, cfg.SecurityTransports)
+		upgrader.Secure, err = makeSecurityMuxer(h, cfg.SecurityTransports)
 		if err != nil {
 			return err
 		}
@@ -186,11 +189,12 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	}
 
 	h, err := bhost.NewHost(ctx, swrm, &bhost.HostOpts{
-		ConnManager:  cfg.ConnManager,
-		AddrsFactory: cfg.AddrsFactory,
-		NATManager:   cfg.NATManager,
-		EnablePing:   !cfg.DisablePing,
-		UserAgent:    cfg.UserAgent,
+		ConnManager:       cfg.ConnManager,
+		AddrsFactory:      cfg.AddrsFactory,
+		NATManager:        cfg.NATManager,
+		EnablePing:        !cfg.DisablePing,
+		UserAgent:         cfg.UserAgent,
+		MultiaddrResolver: cfg.MultiaddrResolver,
 	})
 
 	if err != nil {
@@ -335,10 +339,12 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		autonatOpts = append(autonatOpts, autonat.WithReachability(*cfg.AutoNATConfig.ForceReachability))
 	}
 
-	if h.AutoNat, err = autonat.New(ctx, h, autonatOpts...); err != nil {
+	autonat, err := autonat.New(ctx, h, autonatOpts...)
+	if err != nil {
 		h.Close()
 		return nil, fmt.Errorf("cannot enable autorelay; autonat failed to start: %v", err)
 	}
+	h.SetAutoNat(autonat)
 
 	// start the host background tasks
 	h.Start()

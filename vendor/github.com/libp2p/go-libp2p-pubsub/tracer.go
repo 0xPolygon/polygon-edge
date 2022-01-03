@@ -25,17 +25,17 @@ var MinTraceBatchSize = 16
 
 // rejection reasons
 const (
-	rejectBlacklstedPeer      = "blacklisted peer"
-	rejectBlacklistedSource   = "blacklisted source"
-	rejectMissingSignature    = "missing signature"
-	rejectUnexpectedSignature = "unexpected signature"
-	rejectUnexpectedAuthInfo  = "unexpected auth info"
-	rejectInvalidSignature    = "invalid signature"
-	rejectValidationQueueFull = "validation queue full"
-	rejectValidationThrottled = "validation throttled"
-	rejectValidationFailed    = "validation failed"
-	rejectValidationIgnored   = "validation ignored"
-	rejectSelfOrigin          = "self originated message"
+	RejectBlacklstedPeer      = "blacklisted peer"
+	RejectBlacklistedSource   = "blacklisted source"
+	RejectMissingSignature    = "missing signature"
+	RejectUnexpectedSignature = "unexpected signature"
+	RejectUnexpectedAuthInfo  = "unexpected auth info"
+	RejectInvalidSignature    = "invalid signature"
+	RejectValidationQueueFull = "validation queue full"
+	RejectValidationThrottled = "validation throttled"
+	RejectValidationFailed    = "validation failed"
+	RejectValidationIgnored   = "validation ignored"
+	RejectSelfOrigin          = "self originated message"
 )
 
 type basicTracer struct {

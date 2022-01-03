@@ -29,7 +29,7 @@ var AcceptQueueLength = 16
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
 	PSK       ipnet.PSK
-	Secure    sec.SecureTransport
+	Secure    sec.SecureMuxer
 	Muxer     mux.Multiplexer
 	ConnGater connmgr.ConnectionGater
 }
@@ -66,6 +66,11 @@ func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, ma
 }
 
 func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID, dir network.Direction) (transport.CapableConn, error) {
+	var stat network.Stat
+	if cs, ok := maconn.(network.ConnStat); ok {
+		stat = cs.Stat()
+	}
+
 	var conn net.Conn = maconn
 	if u.PSK != nil {
 		pconn, err := pnet.NewProtectedConn(u.PSK, conn)
@@ -80,7 +85,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
 
-	sconn, err := u.setupSecurity(ctx, conn, p)
+	sconn, server, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
@@ -96,7 +101,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 			sconn.RemotePeer().Pretty(), maconn.RemoteMultiaddr(), dir)
 	}
 
-	smconn, err := u.setupMuxer(ctx, sconn, p)
+	smconn, err := u.setupMuxer(ctx, sconn, server)
 	if err != nil {
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %s", err)
@@ -107,18 +112,19 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		ConnMultiaddrs: maconn,
 		ConnSecurity:   sconn,
 		transport:      t,
+		stat:           stat,
 	}
 	return tc, nil
 }
 
-func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (sec.SecureConn, error) {
+func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (sec.SecureConn, bool, error) {
 	if p == "" {
 		return u.Secure.SecureInbound(ctx, conn)
 	}
 	return u.Secure.SecureOutbound(ctx, conn, p)
 }
 
-func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p peer.ID) (mux.MuxedConn, error) {
+func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (mux.MuxedConn, error) {
 	// TODO: The muxer should take a context.
 	done := make(chan struct{})
 
@@ -126,7 +132,7 @@ func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p peer.ID) (mu
 	var err error
 	go func() {
 		defer close(done)
-		smconn, err = u.Muxer.NewConn(conn, p == "")
+		smconn, err = u.Muxer.NewConn(conn, server)
 	}()
 
 	select {

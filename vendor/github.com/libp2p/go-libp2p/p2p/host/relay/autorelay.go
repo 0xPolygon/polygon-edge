@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 
 	circuit "github.com/libp2p/go-libp2p-circuit"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	basic "github.com/libp2p/go-libp2p/p2p/host/basic"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -247,7 +247,15 @@ func (ar *AutoRelay) discoverRelays(ctx context.Context) ([]peer.AddrInfo, error
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return discovery.FindPeers(ctx, ar.discover, RelayRendezvous, discovery.Limit(1000))
+	var ret []peer.AddrInfo
+	ch, err := ar.discover.FindPeers(ctx, RelayRendezvous, discovery.Limit(1000))
+	if err != nil {
+		return nil, err
+	}
+	for p := range ch {
+		ret = append(ret, p)
+	}
+	return ret, nil
 }
 
 func (ar *AutoRelay) selectRelays(ctx context.Context, pis []peer.AddrInfo) []peer.AddrInfo {

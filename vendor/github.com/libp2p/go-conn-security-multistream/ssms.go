@@ -20,7 +20,7 @@ type SSMuxer struct {
 	OrderPreference []string
 }
 
-var _ sec.SecureTransport = (*SSMuxer)(nil)
+var _ sec.SecureMuxer = (*SSMuxer)(nil)
 
 // AddTransport adds a stream security transport to this multistream muxer.
 //
@@ -38,51 +38,70 @@ func (sm *SSMuxer) AddTransport(path string, transport sec.SecureTransport) {
 
 // SecureInbound secures an inbound connection using this multistream
 // multiplexed stream security transport.
-func (sm *SSMuxer) SecureInbound(ctx context.Context, insecure net.Conn) (sec.SecureConn, error) {
-	tpt, err := sm.selectProto(ctx, insecure, true)
+func (sm *SSMuxer) SecureInbound(ctx context.Context, insecure net.Conn) (sec.SecureConn, bool, error) {
+	tpt, _, err := sm.selectProto(ctx, insecure, true)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return tpt.SecureInbound(ctx, insecure)
+	sconn, err := tpt.SecureInbound(ctx, insecure)
+	return sconn, true, err
 }
 
 // SecureOutbound secures an outbound connection using this multistream
 // multiplexed stream security transport.
-func (sm *SSMuxer) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
-	tpt, err := sm.selectProto(ctx, insecure, false)
+func (sm *SSMuxer) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, bool, error) {
+	tpt, server, err := sm.selectProto(ctx, insecure, false)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return tpt.SecureOutbound(ctx, insecure, p)
+
+	var sconn sec.SecureConn
+	if server {
+		sconn, err = tpt.SecureInbound(ctx, insecure)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to secure inbound connection: %s", err)
+		}
+		// ensure the correct peer connected to us
+		if sconn.RemotePeer() != p {
+			sconn.Close()
+			return nil, false, fmt.Errorf("Unexpected peer")
+		}
+	} else {
+		sconn, err = tpt.SecureOutbound(ctx, insecure, p)
+	}
+
+	return sconn, server, err
 }
 
-func (sm *SSMuxer) selectProto(ctx context.Context, insecure net.Conn, server bool) (sec.SecureTransport, error) {
+func (sm *SSMuxer) selectProto(ctx context.Context, insecure net.Conn, server bool) (sec.SecureTransport, bool, error) {
 	var proto string
 	var err error
+	var iamserver bool
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		if server {
+			iamserver = true
 			proto, _, err = sm.mux.Negotiate(insecure)
 		} else {
-			proto, err = mss.SelectOneOf(sm.OrderPreference, insecure)
+			proto, iamserver, err = mss.SelectWithSimopenOrFail(sm.OrderPreference, insecure)
 		}
 	}()
 
 	select {
 	case <-done:
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if tpt, ok := sm.tpts[proto]; ok {
-			return tpt, nil
+			return tpt, iamserver, nil
 		}
-		return nil, fmt.Errorf("selected unknown security transport")
+		return nil, false, fmt.Errorf("selected unknown security transport")
 	case <-ctx.Done():
 		// We *must* do this. We have outstanding work on the connection
 		// and it's no longer safe to use.
 		insecure.Close()
 		<-done // wait to stop using the connection.
-		return nil, ctx.Err()
+		return nil, false, ctx.Err()
 	}
 }

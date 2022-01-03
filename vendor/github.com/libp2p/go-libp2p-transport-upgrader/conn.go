@@ -13,6 +13,7 @@ type transportConn struct {
 	network.ConnMultiaddrs
 	network.ConnSecurity
 	transport transport.Transport
+	stat      network.Stat
 }
 
 func (t *transportConn) Transport() transport.Transport {
@@ -32,4 +33,8 @@ func (t *transportConn) String() string {
 		t.RemoteMultiaddr(),
 		t.RemotePeer(),
 	)
+}
+
+func (t *transportConn) Stat() network.Stat {
+	return t.stat
 }
