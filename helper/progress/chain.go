@@ -83,7 +83,8 @@ func (pw *ProgressionWrapper) RunUpdateLoop(subscription blockchain.Subscription
 				continue
 			}
 
-			pw.UpdateCurrentProgression(event.NewChain[0].Number)
+			lastBlock := event.NewChain[len(event.NewChain)-1]
+			pw.UpdateCurrentProgression(lastBlock.Number)
 		case <-pw.stopCh:
 			subscription.Close()
 			return
