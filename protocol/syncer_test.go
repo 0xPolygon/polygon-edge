@@ -247,7 +247,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 		headers        []*types.Header
 		peerHeaders    []*types.Header
 		numNewBlocks   int
-		synced         bool
+		shouldSync     bool
 		expectedHeight uint64
 	}{
 		{
@@ -255,7 +255,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   15,
-			synced:         true,
+			shouldSync:     true,
 			expectedHeight: 15,
 		},
 		{
@@ -263,7 +263,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   9,
-			synced:         false,
+			shouldSync:     false,
 			expectedHeight: 9,
 		},
 	}
@@ -287,27 +287,22 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			assert.NotNil(t, peer)
 
 			latestBlock := newBlocks[len(newBlocks)-1]
-			doneCh := make(chan struct{}, 1)
-			go func() {
-				syncer.WatchSyncWithPeer(peer, func(b *types.Block) bool {
-					// sync until latest block
-					return b.Header.Number >= latestBlock.Header.Number
-				})
-				// wait until syncer updates status by latest block
-				WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)
-				doneCh <- struct{}{}
-			}()
+			startSyncTime := time.Now()
+			endSyncTime := startSyncTime.Add(time.Second * 5)
+			syncer.WatchSyncWithPeer(peer, func(b *types.Block) bool {
+				if time.Now().After(endSyncTime) {
+					// Timeout
+					return true
+				}
+				// sync until latest block
+				return b.Header.Number >= latestBlock.Header.Number
+			})
 
-			select {
-			case <-doneCh:
-				assert.True(t, tt.synced, "syncer shouldn't sync any block with peer, but did")
+			if tt.shouldSync {
 				assert.Equal(t, HeaderToStatus(latestBlock.Header), syncer.status)
-				assert.Equal(t, tt.expectedHeight, syncer.status.Number)
-				break
-			case <-time.After(time.Second * 10):
-				assert.False(t, tt.synced, "syncer should sync blocks with peer, but didn't")
-				break
 			}
+
+			assert.Equal(t, tt.expectedHeight, syncer.status.Number)
 		})
 	}
 }
