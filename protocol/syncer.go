@@ -242,10 +242,11 @@ func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription
 
 // stopProgression stops the progression tracking
 func (pw *progressionWrapper) stopProgression() {
+	pw.stopCh <- struct{}{}
+
 	pw.lock.Lock()
 	defer pw.lock.Unlock()
 
-	pw.stopCh <- struct{}{}
 	pw.progression = nil
 }
 
@@ -646,7 +647,7 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			s.logSyncPeerPopBlockError(err, p)
 			break
 		}
-		if err := s.blockchain.WriteBlocks([]*types.Block{b}); err != nil {
+		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
 			break
 		}
@@ -666,7 +667,7 @@ func (s *Syncer) logSyncPeerPopBlockError(err error, peer *SyncPeer) {
 }
 
 // BulkSyncWithPeer finds common ancestor with a peer and syncs block until latest block
-func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*types.Block)) error {
+func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types.Block)) error {
 	// find the common ancestor
 	ancestor, fork, err := s.findCommonAncestor(p.client, p.status)
 	if err != nil {
@@ -717,11 +718,11 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*t
 			// sync the data
 			for _, slot := range sk.slots {
 				for _, block := range slot.blocks {
-					if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+					if err := s.blockchain.WriteBlock(block); err != nil {
 						return fmt.Errorf("failed to write bulk sync blocks: %v", err)
 					}
 
-					newBlocksHandler([]*types.Block{block})
+					newBlockHandler(block)
 				}
 			}
 
