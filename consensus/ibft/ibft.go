@@ -504,18 +504,15 @@ func (i *Ibft) runSyncState() {
 				newHeaders = append(newHeaders, block.Header)
 			}
 
+			// Sync the snapshot state after bulk syncing
+			updateSnapshotCallback(oldLatestNumber)
+			oldLatestNumber = i.blockchain.Header().Number
+
 			i.txpool.ResetWithHeaders(newHeaders...)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 			continue
 		}
-
-		// Sync the snapshot state after bulk syncing
-		updateSnapshotCallback(oldLatestNumber)
-
-		// Update the latest saved header number ahead of
-		// the peer block-per-block sync
-		oldLatestNumber = i.blockchain.Header().Number
 
 		// if we are a validator we do not even want to wait here
 		// we can just move ahead

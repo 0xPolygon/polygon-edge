@@ -716,11 +716,13 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*t
 
 			// sync the data
 			for _, slot := range sk.slots {
-				if err := s.blockchain.WriteBlocks(slot.blocks); err != nil {
-					return fmt.Errorf("failed to write bulk sync blocks: %v", err)
-				}
+				for _, block := range slot.blocks {
+					if err := s.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+						return fmt.Errorf("failed to write bulk sync blocks: %v", err)
+					}
 
-				newBlocksHandler(slot.blocks)
+					newBlocksHandler(slot.blocks)
+				}
 			}
 
 			// try to get the next block
