@@ -537,7 +537,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}},            // not considered - stays in pool
+				{Nonce: 7}}, // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -617,9 +617,10 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 	m.runSyncState()
 
 	assert.True(t, mockTxPool.resetWithHeaderCalled)
-	for i, expected := range expectedNewBlocksToSync {
-		assert.Equal(t, expected.Header, mockTxPool.resetWithHeadersParam[i])
-	}
+	assert.Equal(t,
+		expectedNewBlocksToSync[len(expectedNewBlocksToSync)-1].Header,
+		mockTxPool.resetWithHeadersParam[0],
+	)
 }
 
 type mockSyncer struct {
