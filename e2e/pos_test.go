@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"context"
+	"fmt"
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"math/big"
 	"strconv"
 	"testing"
@@ -612,4 +614,172 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	)
 
 	validateValidatorSet(senderAddr, client, t, false, numDummyStakers)
+}
+
+func getSnapshot(
+	client ibftOp.IbftOperatorClient,
+	blockNum uint64,
+	ctx context.Context,
+) (*ibftOp.Snapshot, error) {
+	snapshot, snapshotErr := client.GetSnapshot(ctx, &ibftOp.SnapshotReq{
+		Latest: false,
+		Number: blockNum,
+	})
+
+	return snapshot, snapshotErr
+}
+
+func getNearestNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
+	if epochSize > blockNum {
+		return epochSize
+	}
+
+	nearest := blockNum + epochSize/2
+	nearest = nearest - (nearest % epochSize)
+
+	if nearest < blockNum {
+		nearest += epochSize
+	}
+
+	return nearest
+}
+
+func TestSnapshotUpdating(t *testing.T) {
+	fountainKey, fountainAddr := tests.GenerateKeyAndAddr(t)
+
+	defaultBalance := framework.EthToWei(1000)
+	stakeAmount := framework.EthToWei(5)
+	epochSize := uint64(5)
+
+	numGenesisValidators := IBFTMinNodes
+	numNonValidators := 2
+	totalServers := numGenesisValidators + numNonValidators
+
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		totalServers,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.SetSeal(i < numGenesisValidators)
+
+			if i < numGenesisValidators {
+				// Only IBFTMinNodes should be validators
+				config.PremineValidatorBalance(defaultBalance)
+			} else {
+				// Other nodes should not be in the validator set
+				dirPrefix := "psdk-non-validator-"
+				config.SetIBFTDirPrefix(dirPrefix)
+				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
+			}
+			config.SetEpochSize(epochSize)
+			config.Premine(fountainAddr, defaultBalance)
+			config.SetIBFTPoS(true)
+		})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ibftManager.StartServers(ctx)
+
+	// Make sure the non-validator has funds before staking
+	firstNonValidator := ibftManager.GetServer(IBFTMinNodes)
+	firstNonValidatorKey, err := firstNonValidator.Config.PrivateKey()
+	assert.NoError(t, err)
+
+	firstNonValidatorAddr := crypto.PubKeyToAddress(&firstNonValidatorKey.PublicKey)
+	client := firstNonValidator.JSONRPC()
+
+	sendCtx, sendWaitFn := context.WithTimeout(context.Background(), time.Second*30)
+	defer sendWaitFn()
+
+	receipt, transferErr := ibftManager.GetServer(0).SendRawTx(
+		sendCtx,
+		&framework.PreparedTransaction{
+			From:     fountainAddr,
+			To:       &firstNonValidatorAddr,
+			GasPrice: big.NewInt(10000),
+			Gas:      1000000,
+			Value:    framework.EthToWei(300),
+		}, fountainKey)
+	if transferErr != nil {
+		t.Fatalf("Unable to transfer funds, %v", transferErr)
+	}
+
+	// Now that the non-validator has funds, they can stake
+	stakeError := framework.StakeAmount(
+		firstNonValidatorAddr,
+		firstNonValidatorKey,
+		stakeAmount,
+		firstNonValidator,
+	)
+
+	if stakeError != nil {
+		t.Fatalf("Unable to stake amount, %v", stakeError)
+	}
+
+	// Check validator set on the Staking Smart Contract
+	validateValidatorSet(firstNonValidatorAddr, client, t, true, numGenesisValidators+1)
+
+	// Find the nearest next epoch block
+	nextEpoch := getNearestNextEpochBlock(receipt.BlockNumber, epochSize) + epochSize
+
+	waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
+	defer waitCancelFn()
+	_, waitErr := framework.WaitUntilBlockMined(waitCtx, ibftManager.GetServer(0), nextEpoch)
+	if waitErr != nil {
+		t.Fatalf("Unable to wait for block, %v", waitErr)
+	}
+
+	// Grab all the operators
+	serverOperators := make([]ibftOp.IbftOperatorClient, totalServers)
+	for i := 0; i < totalServers; i++ {
+		serverOperators[i] = ibftManager.GetServer(i).IBFTOperator()
+	}
+
+	// isValidatorInSnapshot checks if a certain reference address
+	// is among the validators for the specific snapshot
+	isValidatorInSnapshot := func(
+		client ibftOp.IbftOperatorClient,
+		blockNumber uint64,
+		referenceAddr types.Address,
+	) bool {
+		snapshotCtx, ctxCancelFn := context.WithTimeout(context.Background(), time.Second*5)
+		snapshot, snapshotErr := getSnapshot(client, blockNumber, snapshotCtx)
+		if snapshotErr != nil {
+			t.Fatalf("Unable to fetch snapshot, %v", snapshotErr)
+		}
+		ctxCancelFn()
+
+		for _, validator := range snapshot.Validators {
+			if validator.Address == referenceAddr.String() {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	// Make sure every node in the network has good snapshot upkeep
+	for i := 0; i < totalServers; i++ {
+		// Check the snapshot before the node became a validator
+		assert.Falsef(
+			t,
+			isValidatorInSnapshot(serverOperators[i], nextEpoch-1, firstNonValidatorAddr),
+			fmt.Sprintf(
+				"Validator [%s] is in the snapshot validator list for block %d",
+				firstNonValidatorAddr,
+				nextEpoch-1,
+			),
+		)
+
+		// Check the snapshot after the node became a validator
+		assert.Truef(
+			t,
+			isValidatorInSnapshot(serverOperators[i], nextEpoch+1, firstNonValidatorAddr),
+			fmt.Sprintf(
+				"Validator [%s] is not in the snapshot validator list for block %d",
+				firstNonValidatorAddr,
+				nextEpoch+1,
+			),
+		)
+	}
 }
