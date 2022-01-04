@@ -721,7 +721,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlocksHandler func(blocks []*t
 						return fmt.Errorf("failed to write bulk sync blocks: %v", err)
 					}
 
-					newBlocksHandler(slot.blocks)
+					newBlocksHandler([]*types.Block{block})
 				}
 			}
 
