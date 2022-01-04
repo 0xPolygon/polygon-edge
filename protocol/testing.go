@@ -24,7 +24,7 @@ const (
 
 var (
 	defaultNetworkConfig = func(c *network.Config) {
-		c.NoDiscover = true
+		c.NoDiscover = false
 	}
 )
 
