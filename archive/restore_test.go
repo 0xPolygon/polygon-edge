@@ -62,8 +62,9 @@ func Test_consumeCommonBlocks(t *testing.T) {
 		name        string
 		blockStream *blockStream
 		chain       blockchainInterface
-		resultBlock *types.Block
-		err         error
+		// result
+		block *types.Block
+		err   error
 	}{
 		{
 			name:        "should consume common blocks",
@@ -72,8 +73,8 @@ func Test_consumeCommonBlocks(t *testing.T) {
 				genesis: genesis,
 				blocks:  []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: blocks[2],
-			err:         nil,
+			block: blocks[2],
+			err:   nil,
 		},
 		{
 			name:        "should consume all blocks",
@@ -82,8 +83,8 @@ func Test_consumeCommonBlocks(t *testing.T) {
 				genesis: genesis,
 				blocks:  []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: nil,
-			err:         nil,
+			block: nil,
+			err:   nil,
 		},
 		{
 			name:        "should return error in case of genesis mismatch",
@@ -97,17 +98,22 @@ func Test_consumeCommonBlocks(t *testing.T) {
 				},
 				blocks: []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: nil,
-			err:         fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
+			block: nil,
+			err:   fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			osSignal := make(<-chan os.Signal)
-			resultBlock, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
-			assert.Equal(t, tt.resultBlock, resultBlock)
+			resultBlock, blockSize, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
+
+			assert.Equal(t, tt.block, resultBlock)
 			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
 		})
 	}
 }
@@ -136,9 +142,14 @@ func Test_parseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			block, err := tt.blockstream.nextBlock()
-			assert.Equal(t, tt.err, err)
+			block, blockSize, err := tt.blockstream.nextBlock()
+
 			assert.Equal(t, tt.block, block)
+			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
 		})
 	}
 }
