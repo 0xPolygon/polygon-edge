@@ -587,8 +587,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		)
 	}
 
-	parent = block.Header
-
 	// Checks are passed, write the chain
 	header := block.Header
 
