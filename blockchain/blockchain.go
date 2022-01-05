@@ -633,7 +633,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	b.logger.Info("new block", logArgs...)
-	b.logger.Info("new head", "hash", b.Header().Hash, "number", b.Header().Number)
 
 	return nil
 }
