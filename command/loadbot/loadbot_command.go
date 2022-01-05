@@ -2,6 +2,7 @@ package loadbot
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
@@ -80,6 +81,24 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	l.FlagMap["mode"] = helper.FlagDescriptor{
+		Description: "The mode of operation [0, 1]. Default: 0",
+		Arguments: []string{
+			"MODE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
+
+	l.FlagMap["chain-id"] = helper.FlagDescriptor{
+		Description: "The network chain ID. Default: 100",
+		Arguments: []string{
+			"CHAIN_ID",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -105,6 +124,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Placeholders for flags
 	var tps uint64
+	var mode uint64
+	var chainID uint64
 	var senderRaw string
 	var receiverRaw string
 	var valueRaw string
@@ -114,6 +135,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var maxConns int
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
+	flags.Uint64Var(&mode, "mode", 0, "")
+	flags.Uint64Var(&chainID, "chain-id", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
 	flags.StringVar(&receiverRaw, "receiver", "", "")
 	flags.StringVar(&valueRaw, "value", "0x100", "")
@@ -128,6 +151,12 @@ func (l *LoadbotCommand) Run(args []string) int {
 		l.Formatter.OutputError(fmt.Errorf("Failed to parse args: %w", err))
 		return 1
 	}
+
+	if mode > 1 {
+		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
+		return 1
+	}
+
 	// maxConns is set to 2*tps if not specified by the user.
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
@@ -161,13 +190,15 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 
 	configuration := &Configuration{
-		TPS:      tps,
-		Sender:   sender,
-		Receiver: receiver,
-		Count:    count,
-		Value:    value,
-		JSONRPC:  jsonrpc,
-		MaxConns: maxConns,
+		TPS:           tps,
+		Sender:        sender,
+		Receiver:      receiver,
+		Count:         count,
+		Value:         value,
+		JSONRPC:       jsonrpc,
+		MaxConns:      maxConns,
+		GeneratorMode: mode,
+		ChainID:       chainID,
 	}
 
 	// Create the metrics placeholder

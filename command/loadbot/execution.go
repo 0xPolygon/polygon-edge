@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"math/big"
@@ -11,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
@@ -31,14 +31,16 @@ type Account struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 type Configuration struct {
-	TPS      uint64
-	Sender   types.Address
-	Receiver types.Address
-	Value    *big.Int
-	Count    uint64
-	JSONRPC  string
-	GRPC     string
-	MaxConns int
+	TPS           uint64
+	Sender        types.Address
+	Receiver      types.Address
+	Value         *big.Int
+	Count         uint64
+	JSONRPC       string
+	GRPC          string
+	MaxConns      int
+	GeneratorMode uint64
+	ChainID       uint64
 }
 
 type metadata struct {
@@ -137,8 +139,9 @@ type Metrics struct {
 }
 
 type Loadbot struct {
-	cfg     *Configuration
-	metrics *Metrics
+	cfg       *Configuration
+	metrics   *Metrics
+	generator generator.TransactionGenerator
 }
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
@@ -158,7 +161,10 @@ func calcMaxTimeout(count, tps uint64) time.Duration {
 }
 
 func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
-	return &Loadbot{cfg: cfg, metrics: metrics}
+	return &Loadbot{
+		cfg:     cfg,
+		metrics: metrics,
+	}
 }
 
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
@@ -169,27 +175,12 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	return nonce, nil
 }
 
-func executeTxn(
+func (l *Loadbot) executeTxn(
 	client txpoolOp.TxnPoolOperatorClient,
-	sender Account,
-	receiver types.Address,
-	value *big.Int,
-	nonce uint64,
 ) (web3.Hash, error) {
-	signer := crypto.NewEIP155Signer(100)
-
-	txn, err := signer.SignTx(&types.Transaction{
-		From:     sender.Address,
-		To:       &receiver,
-		Gas:      1000000,
-		Value:    value,
-		GasPrice: big.NewInt(0x100000),
-		Nonce:    nonce,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, sender.PrivateKey)
-
+	txn, err := l.generator.GenerateTransaction()
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %v", err)
+		return web3.Hash{}, err
 	}
 
 	addReq := &txpoolOp.AddTxnReq{
@@ -232,6 +223,24 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
 	}
 
+	// Set up the transaction generator
+	generatorParams := &generator.GeneratorParams{
+		Nonce:         nonce,
+		ChainID:       l.cfg.ChainID,
+		SenderAddress: sender.Address,
+		SenderKey:     sender.PrivateKey,
+		Value:         l.cfg.Value,
+	}
+
+	switch l.cfg.GeneratorMode {
+	case 0:
+		txnGenerator, genErr := generator.NewTransferGenerator(generatorParams)
+		if genErr != nil {
+			return fmt.Errorf("unable to start generator, %v", genErr)
+		}
+		l.generator = txnGenerator
+	}
+
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
 
@@ -246,18 +255,23 @@ func (l *Loadbot) Run() error {
 		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
-		go func() {
+		go func(index uint64) {
 			defer wg.Done()
-
-			// take nonce first
-			newNextNonce := atomic.AddUint64(&nonce, 1)
 
 			// Start the performance timer
 			start := time.Now()
 
 			// Execute the transaction
-			txHash, err := executeTxn(grpcClient, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
+			txHash, err := l.executeTxn(grpcClient)
 			if err != nil {
+				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+					Index:  index,
+					TxHash: txHash.String(),
+					Error: &generator.TxnError{
+						Error:     err,
+						ErrorType: generator.AddErrorType,
+					},
+				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
 			}
@@ -267,6 +281,14 @@ func (l *Loadbot) Run() error {
 
 			receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
 			if err != nil {
+				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+					Index:  index,
+					TxHash: txHash.String(),
+					Error: &generator.TxnError{
+						Error:     err,
+						ErrorType: generator.ReceiptErrorType,
+					},
+				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
 				return
 			}
@@ -280,7 +302,7 @@ func (l *Loadbot) Run() error {
 					blockNumber:    receipt.BlockNumber,
 				},
 			)
-		}()
+		}(i)
 	}
 
 	wg.Wait()
