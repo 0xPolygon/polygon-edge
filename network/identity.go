@@ -20,35 +20,52 @@ var identityProtoV1 = "/id/0.1"
 type identity struct {
 	proto.UnimplementedIdentityServer
 
-	pending     sync.Map
-	pendingSize int64
+	pending sync.Map
+
+	pendingInboundCount int64
+
+	pendingOutboundCount int64
 
 	srv *Server
 
 	initialized uint32
 }
 
-func (i *identity) numPending() int64 {
-	return atomic.LoadInt64(&i.pendingSize)
+func (i *identity) pendingInboundConns() int64 {
+
+	return atomic.LoadInt64(&i.pendingInboundCount)
+}
+
+func (i *identity) pendingOutboundConns() int64 {
+
+	return atomic.LoadInt64(&i.pendingOutboundCount)
 }
 
 func (i *identity) isPending(id peer.ID) bool {
-	val, ok := i.pending.Load(id)
+	_, ok := i.pending.Load(id)
 	if !ok {
 		return false
 	}
-	return val.(bool)
+	return ok
 }
 
 func (i *identity) delPending(id peer.ID) {
-	if _, loaded := i.pending.LoadAndDelete(id); loaded {
-		atomic.AddInt64(&i.pendingSize, -1)
+	if value, loaded := i.pending.LoadAndDelete(id); loaded {
+		if value.(network.Direction) == network.DirInbound {
+			atomic.AddInt64(&i.pendingInboundCount, -1)
+		} else if value.(network.Direction) == network.DirOutbound {
+			atomic.AddInt64(&i.pendingOutboundCount, -1)
+		}
 	}
 }
 
-func (i *identity) setPending(id peer.ID) {
-	if _, loaded := i.pending.LoadOrStore(id, true); !loaded {
-		atomic.AddInt64(&i.pendingSize, 1)
+func (i *identity) setPending(id peer.ID, direction network.Direction) {
+	if _, loaded := i.pending.LoadOrStore(id, direction); !loaded {
+		if direction == network.DirInbound {
+			atomic.AddInt64(&i.pendingInboundCount, 1)
+		} else if direction == network.DirOutbound {
+			atomic.AddInt64(&i.pendingOutboundCount, 1)
+		}
 	}
 }
 
@@ -79,12 +96,17 @@ func (i *identity) setup() {
 				return
 			}
 
-			if i.srv.numOpenSlots() == 0 {
+			if conn.Stat().Direction == network.DirOutbound && i.srv.numOpenSlots() == 0 {
+				i.srv.Disconnect(peerID, "no available slots")
+				return
+			}
+
+			if conn.Stat().Direction == network.DirInbound && i.srv.inboundConns() >= i.srv.maxInboundConns() {
 				i.srv.Disconnect(peerID, "no available slots")
 				return
 			}
 			// pending of handshake
-			i.setPending(peerID)
+			i.setPending(peerID, conn.Stat().Direction)
 
 			go func() {
 				defer func() {
@@ -94,7 +116,7 @@ func (i *identity) setup() {
 					}
 				}()
 
-				if err := i.handleConnected(peerID); err != nil {
+				if err := i.handleConnected(peerID, conn.Stat().Direction); err != nil {
 					i.srv.Disconnect(peerID, err.Error())
 				}
 			}()
@@ -113,7 +135,7 @@ func (i *identity) getStatus() *proto.Status {
 	}
 }
 
-func (i *identity) handleConnected(peerID peer.ID) error {
+func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) error {
 	// we initiated the connection, now we perform the handshake
 	conn, err := i.srv.NewProtoStream(identityProtoV1, peerID)
 	if err != nil {
@@ -132,7 +154,7 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 		return fmt.Errorf("incorrect chain id")
 	}
 
-	i.srv.addPeer(peerID)
+	i.srv.addPeer(peerID, direction)
 	return nil
 }
 

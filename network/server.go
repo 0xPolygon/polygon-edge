@@ -8,6 +8,7 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -39,21 +40,23 @@ const (
 )
 
 type Config struct {
-	NoDiscover     bool
-	Addr           *net.TCPAddr
-	NatAddr        net.IP
-	Dns            multiaddr.Multiaddr
-	DataDir        string
-	MaxPeers       uint64
-	Chain          *chain.Chain
-	SecretsManager secrets.SecretsManager
+	NoDiscover       bool
+	Addr             *net.TCPAddr
+	NatAddr          net.IP
+	Dns              multiaddr.Multiaddr
+	DataDir          string
+	MaxInboundPeers  uint64
+	MaxOutboundPeers uint64
+	Chain            *chain.Chain
+	SecretsManager   secrets.SecretsManager
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		NoDiscover: false,
-		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxPeers:   10,
+		NoDiscover:       false,
+		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
+		MaxOutboundPeers: 10,
+		MaxInboundPeers:  40,
 	}
 }
 
@@ -87,12 +90,16 @@ type Server struct {
 	joinWatchersLock sync.Mutex
 
 	emitterPeerEvent event.Emitter
+
+	inboundConnCount int64
 }
 
 type Peer struct {
 	srv *Server
 
 	Info peer.AddrInfo
+
+	connDirection network.Direction
 }
 
 // setupLibp2pKey is a helper method for setting up the networking private key
@@ -338,11 +345,39 @@ func (s *Server) Peers() []*Peer {
 }
 
 func (s *Server) numOpenSlots() int64 {
-	n := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
+
+	n := s.maxOutboundConns() - s.outboundConns()
 	if n < 0 {
 		n = 0
 	}
 	return n
+}
+
+func (s *Server) inboundConns() int64 {
+
+	count := atomic.LoadInt64(&s.inboundConnCount)
+	if count < 0 {
+		count = 0
+	}
+
+	return count + s.identity.pendingInboundConns()
+}
+
+func (s *Server) outboundConns() int64 {
+
+	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
+
+}
+
+func (s *Server) maxInboundConns() int64 {
+
+	return int64(s.config.MaxInboundPeers)
+
+}
+
+func (s *Server) maxOutboundConns() int64 {
+	return int64(s.config.MaxOutboundPeers)
+
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
@@ -357,17 +392,20 @@ func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
 	return s.host.Peerstore().PeerInfo(peerID)
 }
 
-func (s *Server) addPeer(id peer.ID) {
+func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 	s.logger.Info("Peer connected", "id", id.String())
-
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
 	p := &Peer{
-		srv:  s,
-		Info: s.host.Peerstore().PeerInfo(id),
+		srv:           s,
+		Info:          s.host.Peerstore().PeerInfo(id),
+		connDirection: direction,
 	}
 	s.peers[id] = p
+	if direction == network.DirInbound {
+		atomic.AddInt64(&s.inboundConnCount, 1)
+	}
 
 	s.emitEvent(id, PeerConnected)
 }
@@ -377,8 +415,13 @@ func (s *Server) delPeer(id peer.ID) {
 
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
-
-	delete(s.peers, id)
+	peer, ok := s.peers[id]
+	if ok {
+		if peer.connDirection == network.DirInbound {
+			atomic.AddInt64(&s.inboundConnCount, -1)
+		}
+		delete(s.peers, id)
+	}
 	s.host.Network().ClosePeer(id)
 
 	s.emitEvent(id, PeerDisconnected)
