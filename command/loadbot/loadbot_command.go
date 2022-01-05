@@ -64,9 +64,18 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: "The JSON-RPC endpoint used to send transactions.",
+		Description: "The JSON-RPC endpoint used to query transactions.",
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
+
+	l.FlagMap["grpc"] = helper.FlagDescriptor{
+		Description: "The GRPC endpoint used to send transactions.",
+		Arguments: []string{
+			"GRPC_ADDRESS",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
@@ -101,6 +110,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var valueRaw string
 	var count uint64
 	var jsonrpc string
+	var grpc string
 	var maxConns int
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
@@ -109,6 +119,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
+	flags.StringVar(&grpc, "grpc", "", "")
 	flags.IntVar(&maxConns, "max-conns", 0, "")
 
 	var err error
@@ -135,6 +146,11 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("Invalid JSON-RPC url : %w", err))
+		return 1
+	}
+
+	if _, err := url.ParseRequestURI(grpc); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("Invalid GRPC url : %w", err))
 		return 1
 	}
 
