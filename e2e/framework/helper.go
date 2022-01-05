@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -382,4 +383,35 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		srvs = append(srvs, srv)
 	}
 	return srvs
+}
+
+func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
+	waitErrors := make([]error, 0)
+	var waitErrorsLock sync.Mutex
+	appendWaitErr := func(waitErr error) {
+		waitErrorsLock.Lock()
+		defer waitErrorsLock.Unlock()
+
+		waitErrors = append(waitErrors, waitErr)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < len(servers); i++ {
+		wg.Add(1)
+		go func(indx int) {
+			waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
+			defer func() {
+				waitCancelFn()
+				wg.Done()
+			}()
+
+			_, waitErr := WaitUntilBlockMined(waitCtx, servers[indx], desiredHeight)
+			if waitErr != nil {
+				appendWaitErr(fmt.Errorf("unable to wait for block, %v", waitErr))
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	return waitErrors
 }

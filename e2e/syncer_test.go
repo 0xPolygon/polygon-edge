@@ -2,44 +2,45 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
-func TestSyncer(t *testing.T) {
+func TestClusterBlockSync(t *testing.T) {
 	const (
 		numNonValidators = 2
 		desiredHeight    = 10
 	)
 
 	// Start IBFT cluster (4 Validator + 2 Non-Validator)
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes+numNonValidators, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.SetSeal(i < IBFTMinNodes)
-	})
-	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Minute)
-	t.Cleanup(func() {
-		cancel1()
-	})
-	ibftManager.StartServers(ctx1)
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes+numNonValidators,
+		IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
+			if i >= IBFTMinNodes {
+				// Other nodes should not be in the validator set
+				dirPrefix := "psdk-non-validator-"
+				config.SetIBFTDirPrefix(dirPrefix)
+				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
+			}
+			config.SetSeal(i < IBFTMinNodes)
+		})
 
-	// Wait until some blocks are mined
-	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Minute)
-	t.Cleanup(func() {
-		cancel2()
-	})
-	_, err := framework.WaitUntilBlockMined(ctx2, ibftManager.GetServer(0), desiredHeight)
-	assert.NoError(t, err)
+	startContext, startCancelFn := context.WithTimeout(context.Background(), time.Minute)
+	defer startCancelFn()
+	ibftManager.StartServers(startContext)
 
-	// Get latest block height
-	latestBlockHeight, err := ibftManager.GetServer(0).GetLatestBlockHeight()
-	assert.NoError(t, err)
+	servers := make([]*framework.TestServer, 0)
+	for i := 0; i < IBFTMinNodes+numNonValidators; i++ {
+		servers = append(servers, ibftManager.GetServer(i))
+	}
+	// All nodes should have mined the same block eventually
+	waitErrors := framework.WaitForServersToSeal(servers, desiredHeight)
 
-	// Test if non-validator has latest block
-	nonValidatorBlock, err := ibftManager.GetServer(IBFTMinNodes+numNonValidators-1).JSONRPC().Eth().GetBlockByNumber(web3.BlockNumber(latestBlockHeight), false)
-	assert.NoError(t, err)
-	assert.NotNil(t, nonValidatorBlock)
+	if len(waitErrors) != 0 {
+		t.Fatalf("Unable to wait for all nodes to seal blocks, %v", waitErrors)
+	}
 }
