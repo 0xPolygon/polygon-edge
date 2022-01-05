@@ -19,7 +19,7 @@ import (
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
 	conf := func(c *Config) {
-		c.MaxPeers = 1
+		c.MaxInboundPeers = 1
 		c.NoDiscover = true
 	}
 
@@ -45,7 +45,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 func TestConnLimit_Outbound(t *testing.T) {
 	// we should not try to make connections if we are already connected to max peers
 	conf := func(c *Config) {
-		c.MaxPeers = 1
+		c.MaxOutboundPeers = 1
 		c.NoDiscover = true
 	}
 
@@ -343,14 +343,16 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
 	conf := func(c *Config) {
-		c.MaxPeers = 3
+		c.MaxInboundPeers = 3
+		c.MaxOutboundPeers = 3
 		c.NoDiscover = false
 	}
 	//Create bootnode
 	firstBootNode := CreateServer(t, conf)
 	secondBootNode := CreateServer(t, conf)
 	conf1 := func(c *Config) {
-		c.MaxPeers = 3
+		c.MaxInboundPeers = 3
+		c.MaxOutboundPeers = 3
 		c.NoDiscover = false
 		c.Chain.Bootnodes = []string{AddrInfoToString(firstBootNode.AddrInfo()), AddrInfoToString(secondBootNode.AddrInfo())}
 	}
@@ -485,7 +487,8 @@ func TestRunDial(t *testing.T) {
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
 			servers[idx] = CreateServer(t, func(c *Config) {
-				c.MaxPeers = maxPeers[idx]
+				c.MaxInboundPeers = maxPeers[idx]
+				c.MaxOutboundPeers = maxPeers[idx]
 				c.NoDiscover = true
 			})
 		}
