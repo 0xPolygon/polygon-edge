@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"net/url"
@@ -99,6 +100,15 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	l.FlagMap["detailed"] = helper.FlagDescriptor{
+		Description: "Flag indicating if the error logs should be shown. Default: false",
+		Arguments: []string{
+			"DETAILED",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      false,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -133,9 +143,11 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var jsonrpc string
 	var grpc string
 	var maxConns int
+	var detailed bool
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.Uint64Var(&mode, "mode", 0, "")
+	flags.BoolVar(&detailed, "detailed", false, "")
 	flags.Uint64Var(&chainID, "chain-id", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
 	flags.StringVar(&receiverRaw, "receiver", "", "")
@@ -227,6 +239,10 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 	res.extractExecutionData(metrics)
 
+	if detailed {
+		res.extractDetailedErrors(loadBot.generator)
+	}
+
 	l.Formatter.OutputResult(res)
 
 	return 0
@@ -252,10 +268,17 @@ type TxnBlockData struct {
 	BlockTransactionsMap map[uint64]uint64 `json:"blockTransactionsMap"`
 }
 
+type TxnDetailedErrorData struct {
+	// DetailedErrorMap groups transaction errors by error type, with each transaction hash
+	// mapping to its specific error
+	DetailedErrorMap map[generator.TxnErrorType][]*generator.FailedTxnInfo `json:"detailedErrorMap"`
+}
+
 type LoadbotResult struct {
-	CountData      TxnCountData      `json:"countData"`
-	TurnAroundData TxnTurnAroundData `json:"turnAroundData"`
-	BlockData      TxnBlockData      `json:"blockData"`
+	CountData         TxnCountData         `json:"countData"`
+	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
+	BlockData         TxnBlockData         `json:"blockData"`
+	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
@@ -282,6 +305,26 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	lr.BlockData = TxnBlockData{
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
+	}
+}
+
+func (lr *LoadbotResult) extractDetailedErrors(gen generator.TransactionGenerator) {
+	transactionErrors := gen.GetTransactionErrors()
+	if len(transactionErrors) == 0 {
+		return
+	}
+
+	errMap := make(map[generator.TxnErrorType][]*generator.FailedTxnInfo)
+
+	for _, txnError := range transactionErrors {
+		errArray, ok := errMap[txnError.Error.ErrorType]
+		if !ok {
+			errArray = make([]*generator.FailedTxnInfo, 0)
+		}
+
+		errArray = append(errArray, txnError)
+
+		errMap[txnError.Error.ErrorType] = errArray
 	}
 }
 
@@ -327,6 +370,46 @@ func (lr *LoadbotResult) Output() string {
 		}
 
 		buffer.WriteString(helper.FormatKV(formattedStrings))
+	}
+
+	// Write out the error logs if detailed view
+	// is requested
+	if len(lr.DetailedErrorData.DetailedErrorMap) != 0 {
+		buffer.WriteString("\n\n[DETAILED ERRORS]\n")
+
+		addToBuffer := func(detailedError *generator.FailedTxnInfo) {
+			if detailedError.TxHash != "" {
+				buffer.WriteString(fmt.Sprintf("\n[%s]\n", detailedError.TxHash))
+			} else {
+				buffer.WriteString("\n[Tx Hash Unavailable]\n")
+			}
+
+			formattedStrings := make([]string, 0)
+			formattedStrings = append(formattedStrings,
+				fmt.Sprintf("Index|%d", detailedError.Index),
+				fmt.Sprintf("Error|%s", detailedError.Error),
+			)
+
+			buffer.WriteString(helper.FormatKV(formattedStrings))
+		}
+
+		receiptErrors, ok := lr.DetailedErrorData.DetailedErrorMap[generator.ReceiptErrorType]
+		if ok {
+			buffer.WriteString("[RECEIPT ERRORS]\n")
+
+			for _, receiptError := range receiptErrors {
+				addToBuffer(receiptError)
+			}
+		}
+
+		addErrors, ok := lr.DetailedErrorData.DetailedErrorMap[generator.AddErrorType]
+		if ok {
+			buffer.WriteString("[ADD ERRORS]\n")
+
+			for _, addError := range addErrors {
+				addToBuffer(addError)
+			}
+		}
 	}
 
 	buffer.WriteString("\n")
