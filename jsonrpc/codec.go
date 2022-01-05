@@ -108,6 +108,13 @@ type BlockNumberOrHash struct {
 	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
 }
 
+// UnmarshalJSON will try to extract the filter's data.
+// Here are the possible input formats :
+//
+// 1 - "latest", "pending" or "earliest"	- self-explaining keywords
+// 2 - "0x2"								- block number #2 (EIP-1898 backward compatible)
+// 3 - {blockNumber:	"0x2"}				- EIP-1898 compliant block number #2
+// 4 - {blockHash:		"0xe0e..."}			- EIP-1898 compliant block hash 0xe0e...
 func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 	type bnhCopy BlockNumberOrHash
 	var placeholder bnhCopy
@@ -137,73 +144,6 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 					return fmt.Errorf("invalid hexadecimal number provided for block number")
 				}
 				number, err := strconv.ParseInt(keyword[2:], 16, 64)
-				if err != nil {
-					return fmt.Errorf("failed to convert hex string to int64: %v", err)
-				}
-				bnh.BlockNumber = (*BlockNumber)(&number)
-				return nil
-			}
-		}
-		return fmt.Errorf("invalid block number provided")
-	}
-
-	// Try to extract object
-	bnh.BlockNumber = placeholder.BlockNumber
-	bnh.BlockHash = placeholder.BlockHash
-
-	if bnh.BlockNumber != nil && bnh.BlockHash != nil {
-		return fmt.Errorf("cannot use both block number and block hash as filters")
-	} else if bnh.BlockNumber == nil && bnh.BlockHash == nil {
-		return fmt.Errorf("block number and block hash are empty, please provide one of them")
-	}
-
-	return nil
-}
-
-// Unmarshal will try to extract the filter's data.
-// Here are the possible input formats :
-//
-// 1 - "latest", "pending" or "earliest"	- self-explaining keywords
-// 2 - "0x2"								- block number #2 (EIP-1898 backward compatible)
-// 3 - {blockNumber:	"0x2"}				- EIP-1898 compliant block number #2
-// 4 - {blockHash:		"0xe0e..."}			- EIP-1898 compliant block hash 0xe0e...
-func (bnh *BlockNumberOrHash) Unmarshal(input *interface{}) error {
-	var placeholder BlockNumberOrHash
-
-	data, err := json.Marshal(*input)
-	if err != nil {
-		return fmt.Errorf("failed to serialize input: %v", err)
-	}
-
-	err = json.Unmarshal(data, &placeholder)
-	if err != nil {
-		var keyword string
-		err = json.Unmarshal(data, &keyword)
-		if err == nil {
-			// Try to extract keyword
-			switch keyword {
-			case "pending":
-				n := PendingBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			case "latest":
-				n := LatestBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			case "earliest":
-				n := EarliestBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			default:
-				// Try to extract hex number
-				s, ok := (*input).(string)
-				if !ok {
-					return fmt.Errorf("input cannot be converted to string")
-				}
-				if len(s) < 3 || !strings.HasPrefix(s, "0x") {
-					return fmt.Errorf("invalid hexadecimal number provided for block number")
-				}
-				number, err := strconv.ParseInt(s[2:], 16, 64)
 				if err != nil {
 					return fmt.Errorf("failed to convert hex string to int64: %v", err)
 				}
