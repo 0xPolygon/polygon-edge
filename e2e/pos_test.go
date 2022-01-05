@@ -645,7 +645,7 @@ func getNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
 }
 
 func TestSnapshotUpdating(t *testing.T) {
-	fountainKey, fountainAddr := tests.GenerateKeyAndAddr(t)
+	faucetKey, faucetAddr := tests.GenerateKeyAndAddr(t)
 
 	defaultBalance := framework.EthToWei(1000)
 	stakeAmount := framework.EthToWei(5)
@@ -672,7 +672,7 @@ func TestSnapshotUpdating(t *testing.T) {
 				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 			}
 			config.SetEpochSize(epochSize)
-			config.Premine(fountainAddr, defaultBalance)
+			config.Premine(faucetAddr, defaultBalance)
 			config.SetIBFTPoS(true)
 		})
 
@@ -694,12 +694,12 @@ func TestSnapshotUpdating(t *testing.T) {
 	receipt, transferErr := ibftManager.GetServer(0).SendRawTx(
 		sendCtx,
 		&framework.PreparedTransaction{
-			From:     fountainAddr,
+			From:     faucetAddr,
 			To:       &firstNonValidatorAddr,
 			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    framework.EthToWei(300),
-		}, fountainKey)
+		}, faucetKey)
 	if transferErr != nil {
 		t.Fatalf("Unable to transfer funds, %v", transferErr)
 	}
