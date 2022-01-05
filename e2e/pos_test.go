@@ -6,6 +6,7 @@ import (
 	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -672,6 +673,7 @@ func TestSnapshotUpdating(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	ibftManager.StartServers(ctx)
+	firstValidator := ibftManager.GetServer(0)
 
 	// Make sure the non-validator has funds before staking
 	firstNonValidator := ibftManager.GetServer(IBFTMinNodes)
@@ -679,12 +681,11 @@ func TestSnapshotUpdating(t *testing.T) {
 	assert.NoError(t, err)
 
 	firstNonValidatorAddr := crypto.PubKeyToAddress(&firstNonValidatorKey.PublicKey)
-	client := firstNonValidator.JSONRPC()
 
 	sendCtx, sendWaitFn := context.WithTimeout(context.Background(), time.Second*30)
 	defer sendWaitFn()
 
-	receipt, transferErr := ibftManager.GetServer(0).SendRawTx(
+	receipt, transferErr := firstValidator.SendRawTx(
 		sendCtx,
 		&framework.PreparedTransaction{
 			From:     faucetAddr,
@@ -702,7 +703,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		firstNonValidatorAddr,
 		firstNonValidatorKey,
 		stakeAmount,
-		ibftManager.GetServer(0),
+		firstValidator,
 	)
 
 	if stakeError != nil {
@@ -710,16 +711,46 @@ func TestSnapshotUpdating(t *testing.T) {
 	}
 
 	// Check validator set on the Staking Smart Contract
-	validateValidatorSet(firstNonValidatorAddr, client, t, true, numGenesisValidators+1)
+	validateValidatorSet(
+		firstNonValidatorAddr,
+		firstValidator.JSONRPC(),
+		t,
+		true,
+		numGenesisValidators+1,
+	)
 
 	// Find the nearest next epoch block
 	nextEpoch := getNextEpochBlock(receipt.BlockNumber, epochSize) + epochSize
 
-	waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
-	defer waitCancelFn()
-	_, waitErr := framework.WaitUntilBlockMined(waitCtx, ibftManager.GetServer(0), nextEpoch)
-	if waitErr != nil {
-		t.Fatalf("Unable to wait for block, %v", waitErr)
+	waitErrors := make([]error, 0)
+	var waitErrorsLock sync.Mutex
+	appendWaitErr := func(waitErr error) {
+		waitErrorsLock.Lock()
+		defer waitErrorsLock.Unlock()
+
+		waitErrors = append(waitErrors, waitErr)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < totalServers; i++ {
+		wg.Add(1)
+		go func(indx int) {
+			waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
+			defer func() {
+				waitCancelFn()
+				wg.Done()
+			}()
+
+			_, waitErr := framework.WaitUntilBlockMined(waitCtx, ibftManager.GetServer(indx), nextEpoch)
+			if waitErr != nil {
+				appendWaitErr(fmt.Errorf("unable to wait for block, %v", waitErr))
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	if len(waitErrors) != 0 {
+		t.Fatalf("Unable to wait for all nodes to seal blocks, %v", waitErrors)
 	}
 
 	// Grab all the operators
