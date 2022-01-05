@@ -579,9 +579,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		)
 	}
 
-	// TODO, the wrapper around transactions
 	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
-
 		return fmt.Errorf(
 			"transaction root hash mismatch: have %s, want %s",
 			hash,
