@@ -343,8 +343,9 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	cliConfig := &Config{
 		Network: &Network{
-			NoDiscover: true,
-			MaxPeers:   0,
+			NoDiscover:       true,
+			MaxOutboundPeers: 0,
+			MaxInboundPeers:  0,
 		},
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
@@ -418,7 +419,8 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
 	flags.StringVar(&cliConfig.Network.Dns, "dns", "", " the host DNS address which can be used by a remote peer for connection")
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
-	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.Uint64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", 0, "maximum number of inbound peers")
+	flags.Uint64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", 0, "maximum number of outbound peers")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")

@@ -128,14 +128,20 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.FlagMap["max-peers"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
+	c.FlagMap["max-inbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's maximum number of inbound peers allowded. Default: %d", helper.DefaultConfig().Network.MaxInboundPeers),
 		Arguments: []string{
 			"PEER_COUNT",
 		},
 		FlagOptional: true,
 	}
-
+	c.FlagMap["max-outbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's maximum number of outbound peers allowded. Default: %d", helper.DefaultConfig().Network.MaxOutboundPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
 	c.FlagMap["locals"] = helper.FlagDescriptor{
 		Description: "Sets comma separated accounts whose transactions are treated as locals",
 		Arguments: []string{

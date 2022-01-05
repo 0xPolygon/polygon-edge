@@ -43,11 +43,12 @@ type Telemetry struct {
 
 // Network defines the network configuration params
 type Network struct {
-	NoDiscover bool   `json:"no_discover"`
-	Addr       string `json:"libp2p_addr"`
-	NatAddr    string `json:"nat_addr"`
-	Dns        string `json:"dns_addr"`
-	MaxPeers   uint64 `json:"max_peers"`
+	NoDiscover       bool   `json:"no_discover"`
+	Addr             string `json:"libp2p_addr"`
+	NatAddr          string `json:"nat_addr"`
+	Dns              string `json:"dns_addr"`
+	MaxOutboundPeers uint64 `json:"max_outbound_peers"`
+	MaxInboundPeers  uint64 `json:"max_inbound_peers"`
 }
 
 // TxPool defines the TxPool configuration params
@@ -65,8 +66,9 @@ func DefaultConfig() *Config {
 		DataDir:        "./test-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
-			NoDiscover: false,
-			MaxPeers:   50,
+			NoDiscover:       false,
+			MaxOutboundPeers: 10,
+			MaxInboundPeers:  40,
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,
@@ -142,7 +144,8 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		}
 
 		conf.Network.NoDiscover = c.Network.NoDiscover
-		conf.Network.MaxPeers = c.Network.MaxPeers
+		conf.Network.MaxInboundPeers = c.Network.MaxInboundPeers
+		conf.Network.MaxOutboundPeers = c.Network.MaxOutboundPeers
 
 		conf.Chain = cc
 	}
@@ -267,8 +270,11 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		if otherConfig.Network.Dns != "" {
 			c.Network.Dns = otherConfig.Network.Dns
 		}
-		if otherConfig.Network.MaxPeers != 0 {
-			c.Network.MaxPeers = otherConfig.Network.MaxPeers
+		if otherConfig.Network.MaxInboundPeers != 0 {
+			c.Network.MaxInboundPeers = otherConfig.Network.MaxInboundPeers
+		}
+		if otherConfig.Network.MaxOutboundPeers != 0 {
+			c.Network.MaxOutboundPeers = otherConfig.Network.MaxOutboundPeers
 		}
 		if otherConfig.Network.NoDiscover {
 			c.Network.NoDiscover = true
