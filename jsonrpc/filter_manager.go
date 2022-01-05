@@ -263,17 +263,23 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 
 	// process old chain
 	for _, i := range evnt.OldChain {
-		processBlock(i, true)
+		if processErr := processBlock(i, true); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+		}
 	}
 	// process new chain
 	for _, i := range evnt.NewChain {
-		processBlock(i, false)
+		if processErr := processBlock(i, false); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+		}
 	}
 
 	// flush all the websocket values
-	for _, f := range f.filters {
-		if f.isWS() {
-			f.flush()
+	for _, filter := range f.filters {
+		if filter.isWS() {
+			if flushErr := filter.flush(); flushErr != nil {
+				f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
+			}
 		}
 	}
 	return nil

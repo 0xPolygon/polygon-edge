@@ -207,8 +207,6 @@ func TestEthTransfer(t *testing.T) {
 				Value:    testCase.amount,
 			}
 
-			fee := big.NewInt(0)
-
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
 			if testCase.shouldSucceed {
@@ -245,8 +243,9 @@ func TestEthTransfer(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
+			expectedReceiverBalance := previousReceiverBalance
 			if testCase.shouldSucceed {
-				fee = new(big.Int).Mul(
+				fee := new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
 					big.NewInt(int64(txnObject.GasPrice)),
 				)
@@ -255,9 +254,7 @@ func TestEthTransfer(t *testing.T) {
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
 				)
-			}
-			expectedReceiverBalance := previousReceiverBalance
-			if testCase.shouldSucceed {
+
 				expectedReceiverBalance = previousReceiverBalance.Add(
 					previousReceiverBalance,
 					testCase.amount,
