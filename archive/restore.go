@@ -31,11 +31,7 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 	}
 	blockStream := newBlockStream(fp)
 
-	if err = importBlocks(chain, blockStream); err != nil {
-		return err
-	}
-
-	return nil
+	return importBlocks(chain, blockStream)
 }
 
 // import blocks scans all blocks from stream and write them to chain
@@ -68,40 +64,45 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	blocks := make([]*types.Block, 0)
 	nextBlock := firstBlock         // the first block in the next chunk
 	nextBlockSize := firstBlockSize // the size of nextBlock
-processLoop:
 	for {
-		blocks = append(blocks[:0], nextBlock)
+		blocks = append(blocks, nextBlock)
 		blocksSize := nextBlockSize
 
 		for blocksSize < chunkSize {
-			block, size, err := blockStream.nextBlock()
+			nextBlock, nextBlockSize, err = blockStream.nextBlock()
 			if err != nil {
 				return err
 			}
-			if block == nil {
+			if nextBlock == nil {
 				break
 			}
-			if blocksSize+size > chunkSize {
-				nextBlock = block
-				nextBlockSize = size
+			// blocks will have a block at least
+			if len(blocks) > 0 && blocksSize+nextBlockSize > chunkSize {
 				break
 			}
-
-			blocks = append(blocks, block)
-			blocksSize += size
+			blocks = append(blocks, nextBlock)
+			blocksSize += nextBlockSize
 		}
 
 		// no blocks to be written any more
 		if len(blocks) == 0 {
 			break
 		}
+
 		if err := chain.WriteBlocks(blocks); err != nil {
 			return err
 		}
 
+		// no blocks to be written in the next loop
+		if nextBlock == nil {
+			break
+		}
+		// clear slice but keep the capacity
+		blocks = blocks[:0]
+
 		select {
 		case <-shutdownCh:
-			break processLoop
+			return nil
 		default:
 		}
 	}
