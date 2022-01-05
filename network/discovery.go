@@ -164,7 +164,7 @@ func (d *discovery) setupTable() {
 	}
 }
 
-func (d *discovery) call(peerID peer.ID) error {
+func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 	d.srv.logger.Debug("Querying a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
 	if err != nil {
@@ -240,8 +240,8 @@ func (d *discovery) run() {
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
 	if target := d.peers.getRandomPeer(); target != nil {
-		if err := d.call(target.id); err != nil {
-			d.srv.logger.Error("failed to dial bootnode", "err", err)
+		if err := d.attemptToFindPeers(target.id); err != nil {
+			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
 		}
 	}
 }

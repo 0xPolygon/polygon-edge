@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -711,11 +710,6 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 						})
 					}
 					if !resSnap.Equal(snap) {
-						fmt.Println("-- wrong result --")
-						fmt.Println(resSnap.Set)
-						fmt.Println(snap.Set)
-						fmt.Println(resSnap.Votes)
-						fmt.Println(snap.Votes)
 						t.Fatal("bad")
 					}
 				}

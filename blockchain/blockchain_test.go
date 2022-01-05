@@ -510,8 +510,6 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			if td, _ := b.GetChainTD(); cc.TD != td.Uint64() {
-				fmt.Println(td)
-				fmt.Println(cc.TD)
 				t.Fatal("bad")
 			}
 		})
@@ -557,10 +555,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	if err := b.writeBody(block); err != nil {
 		t.Fatal(err)
 	}
-
-	body, ok := b.readBody(block.Hash())
-	fmt.Println(body)
-	fmt.Println(ok)
 }
 
 func TestCalculateGasLimit(t *testing.T) {
