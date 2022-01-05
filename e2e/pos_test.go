@@ -634,14 +634,7 @@ func getNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
 		return epochSize
 	}
 
-	nearest := blockNum + epochSize/2
-	nearest = nearest - (nearest % epochSize)
-
-	if nearest < blockNum {
-		nearest += epochSize
-	}
-
-	return nearest
+	return epochSize*(blockNum/epochSize) + epochSize
 }
 
 func TestSnapshotUpdating(t *testing.T) {
