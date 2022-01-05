@@ -702,7 +702,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		firstNonValidatorAddr,
 		firstNonValidatorKey,
 		stakeAmount,
-		firstNonValidator,
+		ibftManager.GetServer(0),
 	)
 
 	if stakeError != nil {
