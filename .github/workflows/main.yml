@@ -24,6 +24,7 @@ jobs:
         with:
           version: v1.39
           skip-go-installation: true
+          args: --timeout 5m0s
   test:
     runs-on: ubuntu-latest
     steps:
