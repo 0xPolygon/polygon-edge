@@ -537,7 +537,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}}, // not considered - stays in pool
+				{Nonce: 7}},            // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
