@@ -32,7 +32,7 @@ var (
 type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
-	WriteBlocks(blocks []*types.Block) error
+	WriteBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
@@ -46,7 +46,7 @@ type transactionPoolInterface interface {
 type syncerInterface interface {
 	Start()
 	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer, newBlocksHandler func(blocks []*types.Block)) error
+	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
 	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
 	GetSyncProgression() *protocol.Progression
 	Broadcast(b *types.Block)
@@ -498,17 +498,12 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p, func(newBlocks []*types.Block) {
-			newHeaders := []*types.Header{}
-			for _, block := range newBlocks {
-				newHeaders = append(newHeaders, block.Header)
-			}
-
+		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
 			// Sync the snapshot state after bulk syncing
 			updateSnapshotCallback(oldLatestNumber)
 			oldLatestNumber = i.blockchain.Header().Number
 
-			i.txpool.ResetWithHeaders(newHeaders...)
+			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 			continue
@@ -922,7 +917,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash()
 
-	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
 

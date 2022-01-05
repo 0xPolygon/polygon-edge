@@ -519,43 +519,29 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	return nil
 }
 
-// WriteBlocks writes a batch of blocks
-func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
-	// Check the size
-	size := len(blocks)
-	if size == 0 {
-		return fmt.Errorf("the passed in block array is empty")
+// WriteBlock writes a single block
+func (b *Blockchain) WriteBlock(block *types.Block) error {
+	// Check the param
+	if block == nil {
+		return fmt.Errorf("the passed in block is empty")
 	}
 
 	// Log the information
-	if size == 1 {
-		b.logger.Info(
-			"write block",
-			"num",
-			blocks[0].Number(),
-			"parent",
-			blocks[0].ParentHash(),
-		)
-	} else {
-		b.logger.Info(
-			"write blocks",
-			"num",
-			size,
-			"from",
-			blocks[0].Number(),
-			"to",
-			blocks[size-1].Number(),
-			"parent",
-			blocks[0].ParentHash())
-	}
+	b.logger.Info(
+		"write block",
+		"num",
+		block.Number(),
+		"parent",
+		block.ParentHash(),
+	)
 
-	parent, ok := b.readHeader(blocks[0].ParentHash())
+	parent, ok := b.readHeader(block.ParentHash())
 	if !ok {
 		return fmt.Errorf(
 			"parent of %s (%d) not found: %s",
-			blocks[0].Hash().String(),
-			blocks[0].Number(),
-			blocks[0].ParentHash(),
+			block.Hash().String(),
+			block.Number(),
+			block.ParentHash(),
 		)
 	}
 
@@ -564,95 +550,87 @@ func (b *Blockchain) WriteBlocks(blocks []*types.Block) error {
 	}
 
 	// Validate the chain
-	for i, block := range blocks {
-		// Check the parent numbers
-		if block.Number()-1 != parent.Number {
-			return fmt.Errorf(
-				"number sequence not correct at %d, %d and %d",
-				i,
-				block.Number(),
-				parent.Number,
-			)
-		}
-
-		// Check the parent hash
-		if block.ParentHash() != parent.Hash {
-			return fmt.Errorf("parent hash not correct")
-		}
-
-		// Verify the header
-		if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
-			return fmt.Errorf("failed to verify the header: %v", err)
-		}
-
-		// Verify body data
-		if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-
-			return fmt.Errorf(
-				"uncle root hash mismatch: have %s, want %s",
-				hash,
-				block.Header.Sha3Uncles,
-			)
-		}
-
-		// TODO, the wrapper around transactions
-		if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
-
-			return fmt.Errorf(
-				"transaction root hash mismatch: have %s, want %s",
-				hash,
-				block.Header.TxRoot,
-			)
-		}
-
-		parent = block.Header
+	// Check the parent numbers
+	if block.Number()-1 != parent.Number {
+		return fmt.Errorf(
+			"number sequence not correct at %d and %d",
+			block.Number(),
+			parent.Number,
+		)
 	}
+
+	// Check the parent hash
+	if block.ParentHash() != parent.Hash {
+		return fmt.Errorf("parent hash not correct")
+	}
+
+	// Verify the header
+	if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
+		return fmt.Errorf("failed to verify the header: %v", err)
+	}
+
+	// Verify body data
+	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
+
+		return fmt.Errorf(
+			"uncle root hash mismatch: have %s, want %s",
+			hash,
+			block.Header.Sha3Uncles,
+		)
+	}
+
+	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+		return fmt.Errorf(
+			"transaction root hash mismatch: have %s, want %s",
+			hash,
+			block.Header.TxRoot,
+		)
+	}
+
+	parent = block.Header
 
 	// Checks are passed, write the chain
-	for indx, block := range blocks {
-		header := block.Header
+	header := block.Header
 
-		// Process and validate the block
-		res, err := b.processBlock(blocks[indx])
-		if err != nil {
-			return err
-		}
-
-		if err := b.writeBody(block); err != nil {
-			return err
-		}
-
-		// Write the header to the chain
-		evnt := &Event{}
-		if err := b.writeHeaderImpl(evnt, header); err != nil {
-			return err
-		}
-
-		// write the receipts, do it only after the header has been written.
-		// Otherwise, a client might ask for a header once the receipt is valid
-		// but before it is written into the storage
-		if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
-			return err
-		}
-
-		b.dispatchEvent(evnt)
-
-		// Update the average gas price
-		b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
-
-		logArgs := []interface{}{
-			"number", header.Number,
-			"hash", header.Hash,
-			"txns", len(block.Transactions),
-		}
-		if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
-			diff := header.Timestamp - prevHeader.Timestamp
-			logArgs = append(logArgs, "generation_time_in_sec", diff)
-		}
-		b.logger.Info("new block", logArgs...)
+	// Process and validate the block
+	res, err := b.processBlock(block)
+	if err != nil {
+		return err
 	}
 
-	b.logger.Info("new head", "hash", b.Header().Hash, "number", b.Header().Number)
+	if err := b.writeBody(block); err != nil {
+		return err
+	}
+
+	// Write the header to the chain
+	evnt := &Event{}
+	if err := b.writeHeaderImpl(evnt, header); err != nil {
+		return err
+	}
+
+	// write the receipts, do it only after the header has been written.
+	// Otherwise, a client might ask for a header once the receipt is valid
+	// but before it is written into the storage
+	if err := b.db.WriteReceipts(block.Hash(), res.Receipts); err != nil {
+		return err
+	}
+
+	b.dispatchEvent(evnt)
+
+	// Update the average gas price
+	b.UpdateGasPriceAvg(new(big.Int).SetUint64(header.GasUsed))
+
+	logArgs := []interface{}{
+		"number", header.Number,
+		"hash", header.Hash,
+		"txns", len(block.Transactions),
+	}
+	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
+		diff := header.Timestamp - prevHeader.Timestamp
+		logArgs = append(logArgs, "generation_time_in_sec", diff)
+	}
+
+	b.logger.Info("new block", logArgs...)
 
 	return nil
 }
@@ -804,18 +782,6 @@ func (b *Blockchain) GetHashByNumber(blockNumber uint64) types.Hash {
 	}
 
 	return block.Hash()
-}
-
-// WriteBlock writes a block of data
-func (b *Blockchain) WriteBlock(block *types.Block) error {
-	evnt := &Event{}
-	if err := b.writeHeaderImpl(evnt, block.Header); err != nil {
-		return err
-	}
-
-	b.dispatchEvent(evnt)
-
-	return nil
 }
 
 // dispatchEvent pushes a new event to the stream

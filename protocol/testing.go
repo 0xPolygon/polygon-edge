@@ -271,11 +271,22 @@ func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	return nil, false
 }
 
-func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
-	b.blocks = append(b.blocks, blocks...)
+func (b *mockBlockchain) WriteBlock(block *types.Block) error {
+	b.blocks = append(b.blocks, block)
 	for _, subscription := range b.subscriptions {
-		subscription.AppendBlocks(blocks)
+		subscription.AppendBlock(block)
 	}
+
+	return nil
+}
+
+func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
+	for _, block := range blocks {
+		if writeErr := b.WriteBlock(block); writeErr != nil {
+			return writeErr
+		}
+	}
+
 	return nil
 }
 
@@ -290,13 +301,11 @@ func NewMockSubscription() *mockSubscription {
 	}
 }
 
-func (s *mockSubscription) AppendBlocks(blocks []*types.Block) {
-	for _, b := range blocks {
-		status := HeaderToStatus(b.Header)
-		s.eventCh <- &blockchain.Event{
-			Difficulty: status.Difficulty,
-			NewChain:   []*types.Header{b.Header},
-		}
+func (s *mockSubscription) AppendBlock(block *types.Block) {
+	status := HeaderToStatus(block.Header)
+	s.eventCh <- &blockchain.Event{
+		Difficulty: status.Difficulty,
+		NewChain:   []*types.Header{block.Header},
 	}
 }
 
