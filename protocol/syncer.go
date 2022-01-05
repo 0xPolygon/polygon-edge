@@ -472,7 +472,7 @@ func (s *Syncer) handlePeerEvent() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected, network.PeerDialCompleted:
+			case network.PeerConnected:
 				if err := s.AddPeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to add peer", "err", err)
 				}
