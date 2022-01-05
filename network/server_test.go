@@ -117,12 +117,6 @@ func TestConnLimit_Outbound(t *testing.T) {
 	}
 }
 
-func failedToConnectToPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
-	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerFailedToConnect && evnt.PeerID == p
-	}
-}
-
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 		c.NoDiscover = true

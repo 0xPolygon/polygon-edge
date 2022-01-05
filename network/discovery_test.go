@@ -213,7 +213,9 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	})
 
 	// close before dialing
-	servers[1].Close()
+	if err := servers[1].Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr == nil {
 		t.Fatalf("should failed to connect to server[1], but connected")
