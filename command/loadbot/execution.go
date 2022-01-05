@@ -230,16 +230,22 @@ func (l *Loadbot) Run() error {
 		SenderAddress: sender.Address,
 		SenderKey:     sender.PrivateKey,
 		Value:         l.cfg.Value,
+		EstimatedGas:  1000000, // TODO add gas estimation
 	}
 
+	var txnGenerator generator.TransactionGenerator
+	var genErr error = nil
 	switch l.cfg.GeneratorMode {
 	case 0:
-		txnGenerator, genErr := generator.NewTransferGenerator(generatorParams)
-		if genErr != nil {
-			return fmt.Errorf("unable to start generator, %v", genErr)
-		}
-		l.generator = txnGenerator
+		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
+	case 1:
+		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	}
+
+	if genErr != nil {
+		return fmt.Errorf("unable to start generator, %v", genErr)
+	}
+	l.generator = txnGenerator
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()

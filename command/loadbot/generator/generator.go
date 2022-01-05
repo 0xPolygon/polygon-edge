@@ -36,5 +36,5 @@ type GeneratorParams struct {
 	SenderAddress types.Address
 	SenderKey     *ecdsa.PrivateKey
 	Value         *big.Int
-	EstimatedGas  uint64
+	EstimatedGas  int64
 }

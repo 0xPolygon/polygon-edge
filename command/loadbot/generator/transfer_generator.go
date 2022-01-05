@@ -49,9 +49,9 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	txn, err := tg.signer.SignTx(&types.Transaction{
 		From:     tg.params.SenderAddress,
 		To:       &tg.receiverAddress,
-		Gas:      tg.params.EstimatedGas + 10000,
+		Gas:      1000000,
 		Value:    tg.params.Value,
-		GasPrice: big.NewInt(0x100000),
+		GasPrice: big.NewInt(tg.params.EstimatedGas),
 		Nonce:    newNextNonce - 1,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, tg.params.SenderKey)
