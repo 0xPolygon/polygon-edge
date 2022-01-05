@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package = "/network/proto";
+
+service TestService {
+  rpc SayHello(GenericMessage) returns (GenericMessage);
+  rpc GetChattyServer(ChattyRequest) returns (stream GenericMessage);
+  rpc GetChattyClient(stream GenericMessage) returns (GenericMessage);
+  rpc GetChattyBidi(stream GenericMessage) returns (stream GenericMessage);
+}
+
+message GenericMessage {
+  string message = 1;
+}
+
+message ChattyRequest {
+  string message = 1;
+  int32 count = 2;
+}

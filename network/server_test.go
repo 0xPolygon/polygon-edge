@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -18,103 +16,120 @@ import (
 
 func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
-	conf := func(c *Config) {
-		c.MaxInboundPeers = 1
-		c.NoDiscover = true
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxInboundPeers = 1
+			c.NoDiscover = true
+		},
 	}
 
-	srv0 := CreateServer(t, conf)
-	srv1 := CreateServer(t, conf)
-	srv2 := CreateServer(t, conf)
+	servers, createErr := createServers(3, map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+		2: defaultConfig,
+	})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
 
-	// One slot left, it can connect 0->1
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 5*time.Second))
+	// One slot left, Server 0 can connect to Server 1
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
-	// srv2 tries to connect to srv0 but srv0 is already connected
-	// to max peers
-	assert.Error(t, srv2.Join(srv1.AddrInfo(), 5*time.Second))
+	// Server 2 tries to connect to Server 0
+	// but Server 0 is already connected to max peers
+	smallTimeout := time.Second * 5
+	if joinErr := JoinAndWait(servers[2], servers[0], smallTimeout, smallTimeout); joinErr == nil {
+		t.Fatal("Peer join should've failed")
+	}
 
-	disconnectedCh := asyncWaitForEvent(srv1, 5*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
-	srv0.Disconnect(srv1.host.ID(), "bye")
-	assert.True(t, <-disconnectedCh)
+	// Disconnect Server 1 from Server 0 so Server 0 will have free slots
+	servers[0].Disconnect(servers[1].host.ID(), "bye")
+	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+	defer disconnectFn()
 
-	// try to connect again
-	assert.NoError(t, srv2.Join(srv1.AddrInfo(), 5*time.Second))
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(
+		disconnectCtx,
+		servers[0],
+		servers[1].AddrInfo().ID,
+	); disconnectErr != nil {
+		t.Fatalf("Unable to disconnect from peer, %v", disconnectErr)
+	}
+
+	// Attempt a connection between Server 2 and Server 0 again
+	if joinErr := JoinAndWait(servers[2], servers[0], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 }
 
 func TestConnLimit_Outbound(t *testing.T) {
 	// we should not try to make connections if we are already connected to max peers
-	conf := func(c *Config) {
-		c.MaxOutboundPeers = 1
-		c.NoDiscover = true
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 1
+			c.NoDiscover = true
+		},
 	}
 
-	srv0 := CreateServer(t, conf)
-	srv1 := CreateServer(t, conf)
-	srv2 := CreateServer(t, conf)
-
-	// One slot left, it can connect 0->1
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 5*time.Second))
-
-	// No slots left (timeout)
-	err := srv0.Join(srv2.AddrInfo(), 5*time.Second)
-	assert.Error(t, err)
-
-	// Disconnect 0 and 1 (sync)
-	// Now srv0 is trying to connect to srv2 since there are slots left
-	connectedCh := asyncWaitForEvent(srv0, 5*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
-	srv0.Disconnect(srv1.host.ID(), "bye")
-	assert.True(t, <-connectedCh)
-}
-
-func TestPeersLifecycle(t *testing.T) {
-	conf := func(c *Config) {
-		c.NoDiscover = true
+	servers, createErr := createServers(3, map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+		2: defaultConfig,
+	})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
 	}
-	srv0 := CreateServer(t, conf)
-	srv1 := CreateServer(t, conf)
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
 
-	// 0 -> 1 (connect)
-	connectedCh := asyncWaitForEvent(srv1, 5*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), 0))
-	// 1 should receive the connected event as well
-	assert.True(t, <-connectedCh)
-
-	// 1 -> 0 (disconnect)
-	disconnectedCh0 := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
-	disconnectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, disconnectedPeerHandler(srv0.AddrInfo().ID))
-	srv1.Disconnect(srv0.AddrInfo().ID, "bye")
-	// both 0 and 1 should receive a disconnect event
-	assert.True(t, <-disconnectedCh0)
-	assert.True(t, <-disconnectedCh1)
-}
-
-func asyncWaitForEvent(s *Server, timeout time.Duration, handler func(*PeerEvent) bool) <-chan bool {
-	resCh := make(chan bool, 1)
-	go func(ch chan<- bool) {
-		ch <- s.waitForEvent(timeout, handler)
-		close(ch)
-	}(resCh)
-	return resCh
-}
-
-func disconnectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
-	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerDisconnected && evnt.PeerID == p
+	// One slot left, Server 0 can connect to Server 1
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
-}
 
-func connectedPeerHandler(p peer.ID) func(evnt *PeerEvent) bool {
-	return func(evnt *PeerEvent) bool {
-		return evnt.Type == PeerConnected && evnt.PeerID == p
+	// Attempt to connect Server 0 to Server 2, but it should fail since
+	// Server 0 already has 1 peer (Server 1)
+	smallTimeout := time.Second * 5
+	if joinErr := JoinAndWait(servers[0], servers[2], smallTimeout, smallTimeout); joinErr == nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
+
+	// Disconnect Server 0 from Server 1
+	servers[0].Disconnect(servers[1].host.ID(), "bye")
+
+	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+	defer disconnectFn()
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], servers[1].AddrInfo().ID); disconnectErr != nil {
+		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+	}
+
+	// Now Server 0 is trying to connect to Server 2 since there are slots left
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), DefaultJoinTimeout*2)
+	defer cancelWait()
+
+	_, err := WaitUntilPeerConnectsTo(waitCtx, servers[0], servers[2].host.ID())
+	if err != nil {
+		t.Fatalf("Unable to wait for peer connect, %v", err)
 	}
 }
 
 func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
-	srv0 := CreateServer(t, func(c *Config) {
+	server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 		c.NoDiscover = true
+	}})
+	if createErr != nil {
+		t.Fatalf("Unable to create server, %v", createErr)
+	}
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
 	})
-	sub, err := srv0.Subscribe()
+
+	sub, err := server.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
@@ -133,20 +148,20 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 		return id, event
 	}
 
-	t.Run("serial", func(t *testing.T) {
+	t.Run("Serial event emit and read", func(t *testing.T) {
 		for i := 0; i < count; i++ {
 			id, event := getIDAndEventType(i)
-			srv0.emitEvent(id, event)
+			server.emitEvent(id, event)
 
 			received := sub.Get()
 			assert.Equal(t, &PeerEvent{id, event}, received)
 		}
 	})
 
-	t.Run("parallel", func(t *testing.T) {
+	t.Run("Async event emit and read", func(t *testing.T) {
 		for i := 0; i < count; i++ {
 			id, event := getIDAndEventType(i)
-			srv0.emitEvent(id, event)
+			server.emitEvent(id, event)
 		}
 		for i := 0; i < count; i++ {
 			received := sub.Get()
@@ -175,22 +190,6 @@ func TestEncodingPeerAddr(t *testing.T) {
 	info2, err := StringToAddrInfo(str)
 	assert.NoError(t, err)
 	assert.Equal(t, info, info2)
-}
-
-// constructMultiAddrs is a helper function for converting raw IPs to mutliaddrs
-func constructMultiAddrs(addresses []string) ([]multiaddr.Multiaddr, error) {
-	returnAddrs := make([]multiaddr.Multiaddr, 0)
-
-	for _, addr := range addresses {
-		multiAddr, err := multiaddr.NewMultiaddr(addr)
-		if err != nil {
-			return nil, err
-		}
-
-		returnAddrs = append(returnAddrs, multiAddr)
-	}
-
-	return returnAddrs, nil
 }
 
 func TestAddrInfoToString(t *testing.T) {
@@ -269,11 +268,24 @@ func TestAddrInfoToString(t *testing.T) {
 func TestJoinWhenAlreadyConnected(t *testing.T) {
 	// if we try to join an already connected node, the watcher
 	// should finish as well
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	servers, createErr := createServers(2, nil)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
 
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
-	assert.NoError(t, srv1.Join(srv0.AddrInfo(), DefaultJoinTimeout))
+	// Server 0 should connect to Server 1
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
+
+	// Server 1 should attempt to connect to Server 0, but shouldn't error out
+	// if since it's already connected
+	if joinErr := JoinAndWait(servers[1], servers[0], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 }
 
 func TestNat(t *testing.T) {
@@ -281,119 +293,163 @@ func TestNat(t *testing.T) {
 	testPort := 1500 // important to be less than 2000 because of other tests and more than 1024 because of OS security
 	testMultiAddrString := fmt.Sprintf("/ip4/%s/tcp/%d", testIP, testPort)
 
-	srv := CreateServer(t, func(c *Config) {
+	server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 		c.NatAddr = net.ParseIP(testIP)
 		c.Addr.Port = testPort
-	})
-	defer srv.Close()
-
-	t.Run("there should be multiple listening addresses", func(t *testing.T) {
-		listenAddresses := srv.host.Network().ListenAddresses()
-
-		assert.Greater(t, len(listenAddresses), 1)
-	})
-
-	t.Run("there should only be a single registered server address", func(t *testing.T) {
-		addrInfo := srv.AddrInfo()
-		registeredAddresses := addrInfo.Addrs
-
-		assert.Equal(t, len(registeredAddresses), 1)
-	})
-
-	t.Run("NAT IP should not be found in listen addresses", func(t *testing.T) {
-		listenAddresses := srv.host.Network().ListenAddresses()
-
-		for _, addr := range listenAddresses {
-			assert.NotEqual(t, addr.String(), testMultiAddrString)
-		}
-	})
-
-	t.Run("NAT IP should be found in registered server addresses", func(t *testing.T) {
-		addrInfo := srv.AddrInfo()
-		registeredAddresses := addrInfo.Addrs
-
-		found := false
-		for _, addr := range registeredAddresses {
-			if addr.String() == testMultiAddrString {
-				found = true
-				break
-			}
-		}
-
-		assert.True(t, found)
-	})
-}
-
-func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
-	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		for _, v := range ids {
-			if _, ok := srv.peers[v]; ok {
-				return true, false
-			}
-		}
-		return nil, true
-
-	})
-	if err != nil {
-		return false, err
+	}})
+	if createErr != nil {
+		t.Fatalf("Unable to create server, %v", createErr)
 	}
-	return res.(bool), nil
+
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
+
+	// There should be multiple listening addresses
+	listenAddresses := server.host.Network().ListenAddresses()
+	assert.Greater(t, len(listenAddresses), 1)
+
+	// NAT IP should not be found in listen addresses
+	for _, addr := range listenAddresses {
+		assert.NotEqual(t, addr.String(), testMultiAddrString)
+	}
+
+	// There should only be a singly registered server address
+	addrInfo := server.AddrInfo()
+	registeredAddresses := addrInfo.Addrs
+
+	assert.Equal(t, 1, len(registeredAddresses))
+
+	// NAT IP should be found in registered server addresses
+	found := false
+	for _, addr := range registeredAddresses {
+		if addr.String() == testMultiAddrString {
+			found = true
+			break
+		}
+	}
+
+	assert.True(t, found)
 }
 
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
-	conf := func(c *Config) {
-		c.MaxInboundPeers = 3
-		c.MaxOutboundPeers = 3
-		c.NoDiscover = false
+
+  //Create bootnode config
+	bootnodeConfig1 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxInboundPeers = 3
+		  c.MaxOutboundPeers = 3
+			c.NoDiscover = false
+		},
 	}
-	//Create bootnode
-	firstBootNode := CreateServer(t, conf)
-	secondBootNode := CreateServer(t, conf)
-	conf1 := func(c *Config) {
-		c.MaxInboundPeers = 3
-		c.MaxOutboundPeers = 3
-		c.NoDiscover = false
-		c.Chain.Bootnodes = []string{AddrInfoToString(firstBootNode.AddrInfo()), AddrInfoToString(secondBootNode.AddrInfo())}
+	bootnodeConfig2 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxInboundPeers = 3
+		  c.MaxOutboundPeers = 3
+			c.NoDiscover = false
+		},
+	}
+	// Create bootnodes
+	bootnodes, createErr := createServers(2, map[int]*CreateServerParams{0: bootnodeConfig1, 1: bootnodeConfig2})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+	t.Cleanup(func() {
+		closeTestServers(t, bootnodes)
+	})
+
+	defaultConfig1 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 3
+			c.NoDiscover = false
+			c.Chain.Bootnodes = []string{
+				AddrInfoToString(bootnodes[0].AddrInfo()),
+				AddrInfoToString(bootnodes[1].AddrInfo()),
+			}
+		},
+	}
+	defaultConfig2 := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 3
+			c.NoDiscover = false
+			c.Chain.Bootnodes = []string{
+				AddrInfoToString(bootnodes[0].AddrInfo()),
+				AddrInfoToString(bootnodes[1].AddrInfo()),
+			}
+		},
 	}
 
-	srv1 := CreateServer(t, conf1)
-	srv2 := CreateServer(t, conf1)
+	servers, createErr := createServers(2, map[int]*CreateServerParams{0: defaultConfig1, 1: defaultConfig2})
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+	t.Cleanup(func() {
+		for indx, server := range servers {
+			if indx != 1 {
+				// servers[1] is closed within the test
+				assert.NoError(t, server.Close())
+			}
+		}
+	})
 
-	//connect with the first boot node
-	connectedCh1 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(firstBootNode.AddrInfo().ID))
-	assert.True(t, <-connectedCh1)
+	disconnectFromPeer := func(server *Server, peerID peer.ID) {
+		server.Disconnect(peerID, "Bye")
 
-	//connect with the second boot node
-	connectedCh2 := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(secondBootNode.AddrInfo().ID))
-	assert.True(t, <-connectedCh2)
+		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+		defer disconnectFn()
+		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
+			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+		}
+	}
 
-	assert.NoError(t, srv1.Join(srv2.AddrInfo(), 5*time.Second))
+	closePeerServer := func(server *Server, peer *Server) {
+		peerID := peer.AddrInfo().ID
+		if closeErr := peer.Close(); closeErr != nil {
+			t.Fatalf("Unable to close server, %v", closeErr)
+		}
 
-	//disconnect from the first boot node
-	disconnectedCh1 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(firstBootNode.AddrInfo().ID))
-	srv1.Disconnect(firstBootNode.AddrInfo().ID, "Bye")
+		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+		defer disconnectFn()
+		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
+			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+		}
+	}
 
-	assert.True(t, <-disconnectedCh1, "Failed to receive peer disconnected event")
+	// connect with the first boot node
+	if joinErr := JoinAndWait(servers[0], bootnodes[0], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
-	//disconnect from the second boot node
-	disconnectedCh2 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(secondBootNode.AddrInfo().ID))
-	srv1.Disconnect(secondBootNode.AddrInfo().ID, "Bye")
+	// connect with the second boot node
+	if joinErr := JoinAndWait(servers[0], bootnodes[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
-	assert.True(t, <-disconnectedCh2, "Failed to receive peer disconnected event")
+	// Connect with the second server
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
-	//disconnect from the third  node
-	disconnectedCh3 := asyncWaitForEvent(srv1, 15*time.Second, disconnectedPeerHandler(srv2.AddrInfo().ID))
-	assert.NoError(t, srv2.Close())
-	assert.True(t, <-disconnectedCh3)
+	// disconnect from the first boot node
+	disconnectFromPeer(servers[0], bootnodes[0].AddrInfo().ID)
 
-	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*100)
+	// disconnect from the second boot node
+	disconnectFromPeer(servers[0], bootnodes[1].AddrInfo().ID)
+
+	// disconnect from the other server
+	closePeerServer(servers[0], servers[1])
+
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), DefaultJoinTimeout*3)
 	defer cancelWait()
-	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, srv1, firstBootNode.host.ID(), secondBootNode.host.ID())
-	assert.NoError(t, err)
-	assert.True(t, reconnected)
 
+	reconnected, err := WaitUntilPeerConnectsTo(waitCtx, servers[0], bootnodes[0].host.ID(), bootnodes[1].host.ID())
+	if err != nil {
+		t.Fatalf("Unable to wait for peer connect, %v", err)
+	}
+	assert.True(t, reconnected)
 }
+
 func TestReconnectionWithNewIP(t *testing.T) {
 	natIP := "127.0.0.1"
 
@@ -404,49 +460,78 @@ func TestReconnectionWithNewIP(t *testing.T) {
 		c.NoDiscover = true
 	}
 
-	srv0 := CreateServer(t, func(c *Config) {
-		defaultConfig(c)
-		c.DataDir = dir0
-	})
-	srv1 := CreateServer(t, func(c *Config) {
-		defaultConfig(c)
-		c.DataDir = dir1
-	})
-	// same ID to but diffrent IP from srv1
-	srv2 := CreateServer(t, func(c *Config) {
-		defaultConfig(c)
-		c.DataDir = dir1
-		c.NatAddr = net.ParseIP(natIP)
-	})
+	servers, createErr := createServers(3,
+		map[int]*CreateServerParams{
+			0: {
+				ConfigCallback: func(c *Config) {
+					defaultConfig(c)
+					c.DataDir = dir0
+				},
+			},
+			1: {
+				ConfigCallback: func(c *Config) {
+					defaultConfig(c)
+					c.DataDir = dir1
+				},
+			},
+			2: {
+				ConfigCallback: func(c *Config) {
+					defaultConfig(c)
+					c.DataDir = dir1
+					// same ID to but different IP from servers[1]
+					c.NatAddr = net.ParseIP(natIP)
+				},
+			},
+		},
+	)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 	t.Cleanup(func() {
-		srv0.Close()
-		srv1.Close()
-		srv2.Close()
+		closeTestServers(t, servers)
 	})
 
-	// srv0 connects to srv1
-	connectedCh := asyncWaitForEvent(srv1, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
-	assert.NoError(t, srv0.Join(srv1.AddrInfo(), DefaultJoinTimeout))
-	assert.True(t, <-connectedCh)
-	assert.Len(t, srv0.peers, 1)
-	assert.Len(t, srv1.peers, 1)
+	// Server 0 should connect to Server 1
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
-	// srv1 terminates
-	disconnectedCh := asyncWaitForEvent(srv0, 10*time.Second, disconnectedPeerHandler(srv1.AddrInfo().ID))
-	srv1.host.Close()
-	assert.True(t, <-disconnectedCh)
+	// Server 1 terminates, so Server 0 should disconnect from it
+	peerID := servers[1].AddrInfo().ID
+	if err := servers[1].host.Close(); err != nil {
+		t.Fatalf("Unable to close peer server, %v", err)
+	}
 
-	// srv0 connects to srv2
-	connectedCh = asyncWaitForEvent(srv2, 10*time.Second, connectedPeerHandler(srv0.AddrInfo().ID))
-	assert.NoError(t, srv0.Join(srv2.AddrInfo(), DefaultJoinTimeout))
-	assert.True(t, <-connectedCh)
-	assert.Len(t, srv0.peers, 1)
-	assert.Len(t, srv2.peers, 1)
+	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
+	defer disconnectFn()
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], peerID); disconnectErr != nil {
+		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
+	}
+
+	// servers[0] connects to servers[2]
+	// Server 0 should connect to Server 2 (that has the NAT address set)
+	if joinErr := JoinAndWait(servers[0], servers[2], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
+
+	// Wait until Server 2 also has a connection to Server 0 before asserting
+	connectCtx, connectFn := context.WithTimeout(context.Background(), DefaultBufferTimeout)
+	defer connectFn()
+
+	if _, connectErr := WaitUntilPeerConnectsTo(
+		connectCtx,
+		servers[2],
+		servers[0].AddrInfo().ID,
+	); connectErr != nil {
+		t.Fatalf("Unable to wait for connection between Server 2 and Server 0, %v", connectErr)
+	}
+
+	assert.Equal(t, int64(1), servers[0].numPeers())
+	assert.Equal(t, int64(1), servers[2].numPeers())
 }
 
 func TestSelfConnection_WithBootNodes(t *testing.T) {
-
-	//Create a temporary directory for storing the key file
+	// Create a temporary directory for storing the key file
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerId, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
@@ -454,7 +539,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
 	assert.NoError(t, err)
 
-	tests := []struct {
+	testTable := []struct {
 		name         string
 		bootNodes    []string
 		expectedList []*peer.AddrInfo
@@ -467,16 +552,18 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			conf := func(c *Config) {
+			server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
 				c.NoDiscover = false
 				c.DataDir = directoryName
 				c.Chain.Bootnodes = tt.bootNodes
+			}})
+			if createErr != nil {
+				t.Fatalf("Unable to create server, %v", createErr)
 			}
-			srv0 := CreateServer(t, conf)
 
-			assert.Equal(t, srv0.discovery.bootnodes, tt.expectedList)
+			assert.Equal(t, tt.expectedList, server.discovery.bootnodes)
 		})
 	}
 }
@@ -486,24 +573,27 @@ func TestRunDial(t *testing.T) {
 	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
-			servers[idx] = CreateServer(t, func(c *Config) {
-				c.MaxInboundPeers = maxPeers[idx]
-				c.MaxOutboundPeers = maxPeers[idx]
-				c.NoDiscover = true
-			})
-		}
-		return servers
-	}
+			server, createErr := CreateServer(
+				&CreateServerParams{
+					ConfigCallback: func(c *Config) {
+						c.MaxInboundPeers = maxPeers[idx]
+			    	c.MaxOutboundPeers = maxPeers[idx]
+						c.NoDiscover = true
+					},
+				})
+			if createErr != nil {
+				t.Fatalf("Unable to create servers, %v", createErr)
+			}
 
-	connectToPeer := func(srv *Server, peer *peer.AddrInfo, timeout time.Duration) bool {
-		connectedCh := asyncWaitForEvent(srv, timeout, connectedPeerHandler(peer.ID))
-		srv.Join(peer, 0)
-		return <-connectedCh
+			servers[idx] = server
+		}
+
+		return servers
 	}
 
 	closeServers := func(servers ...*Server) {
 		for _, s := range servers {
-			s.Close()
+			assert.NoError(t, s.Close())
 		}
 	}
 
@@ -512,10 +602,10 @@ func TestRunDial(t *testing.T) {
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
-		for idx, p := range peers {
-			addr := p.AddrInfo()
-			connected := connectToPeer(srv, addr, 5*time.Second)
-			assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+		for _, p := range peers {
+			if joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+				t.Fatalf("Unable to join peer, %v", joinErr)
+			}
 		}
 		closeServers(servers...)
 	})
@@ -526,28 +616,35 @@ func TestRunDial(t *testing.T) {
 		srv, peers := servers[0], servers[1:]
 
 		for idx, p := range peers {
-			addr := p.AddrInfo()
-			connected := connectToPeer(srv, addr, 5*time.Second)
 			if uint64(idx) < maxPeers[0] {
-				assert.Truef(t, connected, "should connect to peer %d[%s], but didn't\n", idx, addr.ID)
+				// Connection should be successful
+				joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout)
+				assert.NoError(t, joinErr)
 			} else {
-				assert.Falsef(t, connected, "should fail to connect to peer %d[%s], but connected\n", idx, addr.ID)
+				// Connection should fail
+				smallTimeout := time.Second * 5
+				joinErr := JoinAndWait(srv, p, smallTimeout, smallTimeout)
+				assert.Error(t, joinErr)
 			}
 		}
 		closeServers(servers...)
 	})
 
 	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
-		// peer1 can't connect to any peer
 		maxPeers := []uint64{1, 0, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
-		connected := connectToPeer(srv, peers[0].AddrInfo(), 15*time.Second)
-		assert.False(t, connected)
+		// Server 1 can't connect to any peers, so this join should fail
+		smallTimeout := time.Second * 5
+		if joinErr := JoinAndWait(srv, peers[0], smallTimeout, smallTimeout); joinErr == nil {
+			t.Fatalf("Shouldn't be able to join peer, %v", joinErr)
+		}
 
-		connected = connectToPeer(srv, peers[1].AddrInfo(), 15*time.Second)
-		assert.True(t, connected)
+		// Server 0 and Server 2 should connect
+		if joinErr := JoinAndWait(srv, peers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+			t.Fatalf("Couldn't join peer, %v", joinErr)
+		}
 
 		closeServers(srv, peers[1])
 	})
@@ -577,17 +674,16 @@ func TestMinimumBootNodeCount(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			cfg := getTestConfig(func(c *Config) {
-				c.Chain.Bootnodes = tt.bootNodes
+			_, createErr := CreateServer(&CreateServerParams{
+				ConfigCallback: func(c *Config) {
+					c.Chain.Bootnodes = tt.bootNodes
+				},
 			})
 
-			srv, _ := NewServer(hclog.NewNullLogger(), cfg)
-			err := srv.Start()
 			if tt.shouldFail {
-				assert.Error(t, err)
+				assert.Error(t, createErr)
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, createErr)
 			}
 		})
 
