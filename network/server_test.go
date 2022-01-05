@@ -70,7 +70,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 	// we should not try to make connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
@@ -335,18 +335,18 @@ func TestNat(t *testing.T) {
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
 
-  //Create bootnode config
+	//Create bootnode config
 	bootnodeConfig1 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 3
-		  c.MaxOutboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 		},
 	}
 	bootnodeConfig2 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 3
-		  c.MaxOutboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 		},
 	}
@@ -361,7 +361,8 @@ func TestPeerReconnection(t *testing.T) {
 
 	defaultConfig1 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
+			c.MaxInboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 			c.Chain.Bootnodes = []string{
 				AddrInfoToString(bootnodes[0].AddrInfo()),
@@ -371,7 +372,8 @@ func TestPeerReconnection(t *testing.T) {
 	}
 	defaultConfig2 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
+			c.MaxInboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 			c.Chain.Bootnodes = []string{
 				AddrInfoToString(bootnodes[0].AddrInfo()),
@@ -577,7 +579,7 @@ func TestRunDial(t *testing.T) {
 				&CreateServerParams{
 					ConfigCallback: func(c *Config) {
 						c.MaxInboundPeers = maxPeers[idx]
-			    	c.MaxOutboundPeers = maxPeers[idx]
+						c.MaxOutboundPeers = maxPeers[idx]
 						c.NoDiscover = true
 					},
 				})
