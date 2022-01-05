@@ -629,7 +629,7 @@ func getSnapshot(
 	return snapshot, snapshotErr
 }
 
-func getNearestNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
+func getNextEpochBlock(blockNum uint64, epochSize uint64) uint64 {
 	if epochSize > blockNum {
 		return epochSize
 	}
@@ -720,7 +720,7 @@ func TestSnapshotUpdating(t *testing.T) {
 	validateValidatorSet(firstNonValidatorAddr, client, t, true, numGenesisValidators+1)
 
 	// Find the nearest next epoch block
-	nextEpoch := getNearestNextEpochBlock(receipt.BlockNumber, epochSize) + epochSize
+	nextEpoch := getNextEpochBlock(receipt.BlockNumber, epochSize) + epochSize
 
 	waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer waitCancelFn()
