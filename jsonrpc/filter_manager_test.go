@@ -69,7 +69,9 @@ func TestFilterLog(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 }
 
 func TestFilterBlock(t *testing.T) {
@@ -110,7 +112,9 @@ func TestFilterBlock(t *testing.T) {
 	// we need to wait for the manager to process the data
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 
 	// emit one more event, it should not return the
 	// first three hashes
@@ -126,7 +130,9 @@ func TestFilterBlock(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 }
 
 func TestFilterTimeout(t *testing.T) {

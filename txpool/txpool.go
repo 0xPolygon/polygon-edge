@@ -192,7 +192,10 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
-		topic.Subscribe(txPool.handleGossipTxn)
+		if subscribeErr := topic.Subscribe(txPool.handleGossipTxn); subscribeErr != nil {
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+		}
+
 		txPool.topic = topic
 	}
 
@@ -577,8 +580,8 @@ func (p *processEventWrapper) addTxn(txn *types.Transaction) {
 // promotedTxnCleanup looks through the promoted queue for any invalid transactions
 // made by a specific account, and removes them
 func (t *TxPool) promotedTxnCleanup(
-	address types.Address,                        // The address to filter by
-	stateNonce uint64,                            // The valid nonce (reference for pruning)
+	address types.Address, // The address to filter by
+	stateNonce uint64, // The valid nonce (reference for pruning)
 	cleanupCallback func(txn *types.Transaction), // Additional cleanup logic
 ) {
 	// Prune out all the now possibly low-nonce transactions in the promoted queue
@@ -757,7 +760,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(
 	tx *types.Transaction, // The transaction that should be validated
-	isLocal bool,          // Flag indicating if the transaction is from a local account
+	isLocal bool, // Flag indicating if the transaction is from a local account
 ) error {
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
@@ -828,7 +831,10 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	}
 	// tx.GasPrice < lowestTx.Price
 	underpriced := tx.GasPrice.Cmp(lowestTx.price) < 0
-	t.remoteTxns.Push(lowestTx.tx)
+	if pushErr := t.remoteTxns.Push(lowestTx.tx); pushErr != nil {
+		t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
+	}
+
 	return underpriced
 }
 
@@ -853,7 +859,9 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 	// Put back if couldn't make required space
 	if slotsToRemove > 0 && !force {
 		for _, tx := range dropped {
-			t.remoteTxns.Push(tx)
+			if pushErr := t.remoteTxns.Push(tx); pushErr != nil {
+				t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
+			}
 		}
 		return nil, false
 	}

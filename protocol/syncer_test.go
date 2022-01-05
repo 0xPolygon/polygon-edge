@@ -400,6 +400,7 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncer.syncProgression.stopProgression()
 }
 
+// nolint:unused
 type mockBlockStore struct {
 	blocks       []*types.Block
 	subscription *blockchain.MockSubscription
@@ -410,6 +411,7 @@ func (m *mockBlockStore) CalculateGasLimit(number uint64) (uint64, error) {
 	panic("implement me")
 }
 
+// nolint:unused
 func newMockBlockStore() *mockBlockStore {
 	bs := &mockBlockStore{
 		blocks:       make([]*types.Block, 0),
@@ -487,6 +489,8 @@ func (m *mockBlockStore) CurrentTD() *big.Int {
 func (m *mockBlockStore) GetTD(hash types.Hash) (*big.Int, bool) {
 	return m.td, false
 }
+
+// nolint:unused
 func createGenesisBlock() []*types.Block {
 	blocks := make([]*types.Block, 0)
 	genesis := &types.Header{Difficulty: 1, Number: 0}
@@ -498,6 +502,7 @@ func createGenesisBlock() []*types.Block {
 	return blocks
 }
 
+// nolint:unused
 func createBlockStores(count int) (bStore []*mockBlockStore) {
 	bStore = make([]*mockBlockStore, count)
 	for i := 0; i < count; i++ {
@@ -507,11 +512,17 @@ func createBlockStores(count int) (bStore []*mockBlockStore) {
 }
 
 // createNetworkServers is a helper function for generating network servers
+// nolint:unused
 func createNetworkServers(count int, t *testing.T, conf func(c *network.Config)) []*network.Server {
 	networkServers := make([]*network.Server, count)
 
 	for indx := 0; indx < count; indx++ {
-		networkServers[indx] = network.CreateServer(t, conf)
+		server, createErr := network.CreateServer(&network.CreateServerParams{ConfigCallback: conf})
+		if createErr != nil {
+			t.Fatalf("Unable to create network servers, %v", createErr)
+		}
+
+		networkServers[indx] = server
 	}
 
 	return networkServers
@@ -519,6 +530,7 @@ func createNetworkServers(count int, t *testing.T, conf func(c *network.Config))
 
 // createSyncers is a helper function for generating syncers. Servers and BlockStores should be at least the length
 // of count
+// nolint:unused
 func createSyncers(count int, servers []*network.Server, blockStores []*mockBlockStore) []*Syncer {
 	syncers := make([]*Syncer, count)
 
@@ -582,15 +594,10 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 		syncer.Start()
 	}
 
-	network.MultiJoin(
-		t,
-		servers[0],
-		servers[1],
-		servers[0],
-		servers[2],
-		servers[1],
-		servers[2],
-	)
+	joinErrors := network.MeshJoin(servers...)
+	if len(joinErrors) != 0 {
+		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
+	}
 
 	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*10)
