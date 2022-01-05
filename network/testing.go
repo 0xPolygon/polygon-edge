@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"

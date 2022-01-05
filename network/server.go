@@ -309,7 +309,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
 					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
 				}
 			}
