@@ -20,6 +20,26 @@ func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
 }
 
+func (e *Eth) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {
+	var header *types.Header
+	var err error
+
+	if bnh.BlockNumber != nil {
+		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the header of block %d: %v", *bnh.BlockNumber, err)
+		}
+	} else if bnh.BlockHash != nil {
+		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header = block.Header
+	}
+	return header, nil
+}
+
 func (e *Eth) Syncing() (interface{}, error) {
 	if syncProgression := e.d.store.GetSyncProgression(); syncProgression != nil {
 		// Node is bulk syncing, return the status
@@ -272,36 +292,19 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 func (e *Eth) GetStorageAt(
 	address types.Address,
 	index types.Hash,
-	filter interface{},
+	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	var bnh BlockNumberOrHash
 	var header *types.Header
 	var err error
 
-	// If filter has not been submitted, use the latest block
-	if filter == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
-	} else {
-		err = bnh.Unmarshal(&filter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode filter: %v", err)
-		}
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	// From now on, the filter is the block number or the block hash
-	// Use one of them to retrieve the desired block we'll get the account balance from
-	if bnh.BlockHash != nil {
-		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	} else {
-		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
-		if err != nil {
-			return nil, err
-		}
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	// Get the storage for the passed in location
@@ -336,36 +339,19 @@ func (e *Eth) GasPrice() (interface{}, error) {
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(
 	arg *txnArgs,
-	filter interface{},
+	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	var bnh BlockNumberOrHash
 	var header *types.Header
 	var err error
 
-	// If filter has not been submitted, use the latest block
-	if filter == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
-	} else {
-		err = bnh.Unmarshal(&filter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode filter: %v", err)
-		}
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	// From now on, the filter is the block number or the block hash
-	// Use one of them to retrieve the desired block we'll get the account balance from
-	if bnh.BlockHash != nil {
-		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	} else {
-		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
-		if err != nil {
-			return nil, err
-		}
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	transaction, err := e.d.decodeTxn(arg)
@@ -609,35 +595,18 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 }
 
 // GetBalance returns the account's balance at the referenced block.
-func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}, error) {
-	var bnh BlockNumberOrHash
+func (e *Eth) GetBalance(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
 	var header *types.Header
 	var err error
 
-	// If filter has not been submitted, use the latest block
-	if filter == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
-	} else {
-		err = bnh.Unmarshal(&filter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode filter: %v", err)
-		}
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	// From now on, the filter is the block number or the block hash
-	// Use one of them to retrieve the desired block we'll get the account balance from
-	if bnh.BlockHash != nil {
-		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	} else {
-		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
-		if err != nil {
-			return nil, err
-		}
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	// Extract the account balance
@@ -648,88 +617,54 @@ func (e *Eth) GetBalance(address types.Address, filter interface{}) (interface{}
 	} else if err != nil {
 		return nil, err
 	}
-
 	return argBigPtr(acc.Balance), nil
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(
-	address types.Address,
-	filter interface{},
-) (interface{}, error) {
-	var bnh BlockNumberOrHash
-	var nonce uint64
+func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
+	var blockNumber BlockNumber
+	var header *types.Header
 	var err error
 
-	// If filter has not been submitted, use the latest block
-	if filter == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
-	} else {
-		err = bnh.Unmarshal(&filter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode filter: %v", err)
-		}
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	// From now on, the filter is the block number or the block hash
-	// Use one of them to retrieve the desired block we'll get the nonce from
-	if bnh.BlockHash != nil {
-		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+	if filter.BlockNumber == nil {
+		header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get header from block hash or block number")
 		}
 
-		header := block.Header
-		nonce, err = e.d.getNextNonce(address, BlockNumber(header.Number))
-		if err != nil {
-			if errors.Is(err, ErrStateNotFound) {
-				return argUintPtr(0), nil
-			}
-			return nil, err
-		}
+		blockNumber = BlockNumber(header.Number)
 	} else {
-		nonce, err = e.d.getNextNonce(address, *bnh.BlockNumber)
-		if err != nil {
-			if errors.As(err, &ErrStateNotFound) {
-				return argUintPtr(0), nil
-			}
-			return nil, err
-		}
+		blockNumber = *filter.BlockNumber
 	}
 
+	nonce, err := e.d.getNextNonce(address, blockNumber)
+	if err != nil {
+		if errors.As(err, &ErrStateNotFound) {
+			return argUintPtr(0), nil
+		}
+		return nil, err
+	}
 	return argUintPtr(nonce), nil
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address types.Address, filter interface{}) (interface{}, error) {
-	var bnh BlockNumberOrHash
+func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
 	var header *types.Header
 	var err error
 
-	// If filter has not been submitted, use the latest block
-	if filter == nil {
-		bnh.BlockNumber, _ = createBlockNumberPointer("latest")
-	} else {
-		err = bnh.Unmarshal(&filter)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode filter: %v", err)
-		}
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	// From now on, the filter is the block number or the block hash
-	// Use one of them to retrieve the desired block we'll get the account balance from
-	if bnh.BlockHash != nil {
-		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
-		if !ok {
-			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
-		}
-
-		header = block.Header
-	} else {
-		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
-		if err != nil {
-			return nil, err
-		}
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	emptySlice := []byte{}

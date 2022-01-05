@@ -108,6 +108,58 @@ type BlockNumberOrHash struct {
 	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
 }
 
+func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
+	type bnhCopy BlockNumberOrHash
+	var placeholder bnhCopy
+
+	err := json.Unmarshal(data, &placeholder)
+	if err != nil {
+		var keyword string
+		err = json.Unmarshal(data, &keyword)
+		if err == nil {
+			// Try to extract keyword
+			switch keyword {
+			case "pending":
+				n := PendingBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			case "latest":
+				n := LatestBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			case "earliest":
+				n := EarliestBlockNumber
+				bnh.BlockNumber = &n
+				return nil
+			default:
+				// Try to extract hex number
+				if len(keyword) < 3 || !strings.HasPrefix(keyword, "0x") {
+					return fmt.Errorf("invalid hexadecimal number provided for block number")
+				}
+				number, err := strconv.ParseInt(keyword[2:], 16, 64)
+				if err != nil {
+					return fmt.Errorf("failed to convert hex string to int64: %v", err)
+				}
+				bnh.BlockNumber = (*BlockNumber)(&number)
+				return nil
+			}
+		}
+		return fmt.Errorf("invalid block number provided")
+	}
+
+	// Try to extract object
+	bnh.BlockNumber = placeholder.BlockNumber
+	bnh.BlockHash = placeholder.BlockHash
+
+	if bnh.BlockNumber != nil && bnh.BlockHash != nil {
+		return fmt.Errorf("cannot use both block number and block hash as filters")
+	} else if bnh.BlockNumber == nil && bnh.BlockHash == nil {
+		return fmt.Errorf("block number and block hash are empty, please provide one of them")
+	}
+
+	return nil
+}
+
 // Unmarshal will try to extract the filter's data.
 // Here are the possible input formats :
 //
