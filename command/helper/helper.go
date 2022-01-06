@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -271,6 +272,20 @@ func FillPremineMap(
 	return nil
 }
 
+// MergeMaps is a helper method for merging multiple maps.
+// If two or more maps have the same keys, the map that is passed in later
+// will have its key value override the previous same key values
+func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
+	mergedMap := make(map[string]interface{})
+	for _, m := range maps {
+		for key, value := range m {
+			mergedMap[key] = value
+		}
+	}
+
+	return mergedMap
+}
+
 // WriteGenesisToDisk writes the passed in configuration to a genesis.json file at the specified path
 func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	data, err := json.MarshalIndent(chain, "", "    ")
@@ -326,6 +341,15 @@ func generateDevGenesis(params devGenesisParams) error {
 		},
 		Bootnodes: []string{},
 	}
+
+	stakingAccount, err := staking.PredeployStakingSC(
+		[]types.Address{},
+	)
+	if err != nil {
+		return err
+	}
+
+	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
 
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err

@@ -219,15 +219,16 @@ func TestGetPendingAndQueuedTransactions(t *testing.T) {
 func TestBroadcast(t *testing.T) {
 	// we need a fully encrypted txn with (r, s, v) values so that we can
 	// safely encrypt in RLP and broadcast it
-	key0, addr0 := tests.GenerateKeyAndAddr(t)
-
-	fmt.Println("-- addr")
-	fmt.Println(addr0)
+	key0, _ := tests.GenerateKeyAndAddr(t)
 
 	signer := &crypto.FrontierSigner{}
 
 	createPool := func() (*TxPool, *network.Server) {
-		server := network.CreateServer(t, nil)
+		server, createErr := network.CreateServer(nil)
+		if createErr != nil {
+			t.Fatalf("Unable to create server, %v", createErr)
+		}
+
 		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server, nilMetrics)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
@@ -237,7 +238,14 @@ func TestBroadcast(t *testing.T) {
 	pool1, network1 := createPool()
 	_, network2 := createPool()
 
-	network.MultiJoin(t, network1, network2)
+	if joinErr := network.JoinAndWait(
+		network1,
+		network2,
+		network.DefaultBufferTimeout,
+		network.DefaultJoinTimeout,
+	); joinErr != nil {
+		t.Fatalf("Unable to join servers, %v", joinErr)
+	}
 
 	// broadcast txn1 from pool1
 	txn1 := &types.Transaction{
@@ -250,7 +258,6 @@ func TestBroadcast(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, pool1.AddTx(txn1))
-	fmt.Println(pool1.Length())
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
@@ -259,7 +266,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
 
-	pool.addImpl("", &types.Transaction{
+	_ = pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Gas:      validGasLimit,
 		GasPrice: big.NewInt(1),
@@ -271,7 +278,7 @@ func TestTxnQueue_Promotion(t *testing.T) {
 
 	// though txn0 is not being processed yet and the current nonce is 0
 	// we need to consider that txn0 is on the pendingQueue pool so this one is promoted too
-	pool.addImpl("", &types.Transaction{
+	_ = pool.addImpl("", &types.Transaction{
 		From:     addr1,
 		Nonce:    1,
 		Gas:      validGasLimit,
@@ -538,7 +545,10 @@ func TestTx_MaxSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			data := make([]byte, tt.size)
-			rand.Read(data)
+			if _, readErr := rand.Read(data); readErr != nil {
+				t.Fatalf("Unable to read data, %v", readErr)
+			}
+
 			txn := generateTx(tt.address, 0, big.NewInt(0), big.NewInt(1), data)
 			err := pool.addImpl("", txn)
 			if tt.succeed {
@@ -694,7 +704,9 @@ func generateAddTx(arg addTx, signer crypto.TxSigner) *types.Transaction {
 	}
 
 	input := make([]byte, size)
-	rand.Read(input)
+	if _, readErr := rand.Read(input); readErr != nil {
+		return nil
+	}
 
 	tx := &types.Transaction{
 		Nonce:    arg.nonce,
