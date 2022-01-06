@@ -37,18 +37,12 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			"should return an error for invalid block number #1",
-			`"12345"`,
-			true,
-			BlockNumberOrHash{},
-		},
-		{
-			"should return an error for invalid block number #3",
 			`{"blockNumber": "abc"}`,
 			true,
 			BlockNumberOrHash{},
 		},
 		{
-			"should return an error for invalid block number #4",
+			"should return an error for invalid block number #2",
 			`{"blockNumber": ""}`,
 			true,
 			BlockNumberOrHash{},

@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -121,37 +120,11 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 
 	err := json.Unmarshal(data, &placeholder)
 	if err != nil {
-		var keyword string
-		err = json.Unmarshal(data, &keyword)
-		if err == nil {
-			// Try to extract keyword
-			switch keyword {
-			case "pending":
-				n := PendingBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			case "latest":
-				n := LatestBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			case "earliest":
-				n := EarliestBlockNumber
-				bnh.BlockNumber = &n
-				return nil
-			default:
-				// Try to extract hex number
-				if len(keyword) < 3 || !strings.HasPrefix(keyword, "0x") {
-					return fmt.Errorf("invalid hexadecimal number provided for block number")
-				}
-				number, err := strconv.ParseInt(keyword[2:], 16, 64)
-				if err != nil {
-					return fmt.Errorf("failed to convert hex string to int64: %v", err)
-				}
-				bnh.BlockNumber = (*BlockNumber)(&number)
-				return nil
-			}
+		number, err := stringToBlockNumber(string(data))
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("invalid block number provided")
+		placeholder.BlockNumber = &number
 	}
 
 	// Try to extract object
