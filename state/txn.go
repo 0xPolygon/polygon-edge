@@ -305,7 +305,11 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 }
 
 // SetState change the state of an address
-func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
+func (txn *Txn) SetState(
+	addr types.Address,
+	key,
+	value types.Hash,
+) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Txn == nil {
 			object.Txn = iradix.New().Txn()
