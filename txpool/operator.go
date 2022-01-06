@@ -56,24 +56,25 @@ func (p *TxPool) Subscribe(
 ) error {
 	subscription := p.eventManager.subscribe(request.Types)
 
-	teardown := func() error {
+	cancel := func() {
 		p.eventManager.cancelSubscription(subscription.subscriptionID)
-
-		return nil
 	}
 
 	for {
 		select {
 		case event, more := <-subscription.subscriptionChannel:
 			if !more {
+				// Subscription is closed from some other place
 				return nil
 			}
 
 			if sendErr := stream.Send(event); sendErr != nil {
-				return teardown()
+				cancel()
+				return nil
 			}
 		case <-stream.Context().Done():
-			return teardown()
+			cancel()
+			return nil
 		}
 	}
 }
