@@ -89,17 +89,17 @@ func TestEventSubscription_RunLoop(t *testing.T) {
 		{
 			"All supported events processed",
 			shuffleTxPoolEvents(supportedEvents, 10, 0),
-			10 - 0,
+			10,
 		},
 		{
 			"All unsupported events not processed",
 			shuffleTxPoolEvents(supportedEvents, 10, 10),
-			10 - 10,
+			0,
 		},
 		{
 			"Mixed events processed",
 			shuffleTxPoolEvents(supportedEvents, 10, 6),
-			10 - 6,
+			4,
 		},
 	}
 
