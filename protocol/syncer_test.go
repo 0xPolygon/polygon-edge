@@ -114,7 +114,9 @@ func TestBroadcast(t *testing.T) {
 
 			newBlocks := GenerateNewBlocks(t, peerSyncer.blockchain, tt.numNewBlocks)
 
-			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
+			}
 
 			for _, newBlock := range newBlocks {
 				peerSyncer.Broadcast(newBlock)
@@ -277,7 +279,9 @@ func TestWatchSyncWithPeer(t *testing.T) {
 
 			newBlocks := GenerateNewBlocks(t, peerChain, tt.numNewBlocks)
 
-			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
+			}
 
 			for _, b := range newBlocks {
 				peerSyncer.Broadcast(b)
@@ -341,8 +345,8 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 			var handledNewBlocks []*types.Block
-			newBlocksHandler := func(blocks []*types.Block) {
-				handledNewBlocks = append(handledNewBlocks, blocks...)
+			newBlocksHandler := func(block *types.Block) {
+				handledNewBlocks = append(handledNewBlocks, block)
 			}
 
 			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
@@ -460,12 +464,21 @@ func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 	}
 	return nil, true
 }
-func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
 
-	for _, b := range blocks {
-		m.td.Add(m.td, big.NewInt(int64(b.Header.Difficulty)))
-		m.blocks = append(m.blocks, b)
+func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
+	for _, block := range blocks {
+		if writeErr := m.WriteBlock(block); writeErr != nil {
+			return writeErr
+		}
 	}
+
+	return nil
+}
+
+func (m *mockBlockStore) WriteBlock(block *types.Block) error {
+	m.td.Add(m.td, big.NewInt(int64(block.Header.Difficulty)))
+	m.blocks = append(m.blocks, block)
+
 	return nil
 }
 
