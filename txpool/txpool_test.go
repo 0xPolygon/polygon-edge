@@ -229,18 +229,11 @@ func TestAddHandler(t *testing.T) {
 		pool.AddSigner(&mockSigner{})
 		pool.EnableDev()
 
-<<<<<<< HEAD
 		addr := types.Address{0x1}
 
 		{ // set up prestate
 			pool.createAccountOnce(addr)
 			assert.Equal(t, uint64(0), pool.accounts.from(addr).length())
-=======
-func TestBroadcast(t *testing.T) {
-	// we need a fully encrypted txn with (r, s, v) values so that we can
-	// safely encrypt in RLP and broadcast it
-	key0, _ := tests.GenerateKeyAndAddr(t)
->>>>>>> develop
 
 			pool.nextNonces.store(addr, 20)
 			nextNonce, ok := pool.nextNonces.load(addr)
@@ -254,42 +247,21 @@ func TestBroadcast(t *testing.T) {
 			pool.handleAddRequest(<-pool.addReqCh)
 		}
 
-<<<<<<< HEAD
 		assert.Equal(t, uint64(0), pool.accounts.from(addr).length())
 	})
 
 	t.Run("signal promotion", func(t *testing.T) {
 		pool, err := newTestPool()
-=======
-	createPool := func() (*TxPool, *network.Server) {
-		server, createErr := network.CreateServer(nil)
-		if createErr != nil {
-			t.Fatalf("Unable to create server, %v", createErr)
-		}
-
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server, nilMetrics)
->>>>>>> develop
 		assert.NoError(t, err)
 		pool.AddSigner(&mockSigner{})
 		pool.EnableDev()
 
 		addr := types.Address{0x1}
 
-<<<<<<< HEAD
 		// send tx
 		go pool.addTx(local, newDummyTx(addr, 0, 1)) // fresh account
 		go pool.handleAddRequest(<-pool.addReqCh)
 		req := <-pool.promoteReqCh
-=======
-	if joinErr := network.JoinAndWait(
-		network1,
-		network2,
-		network.DefaultBufferTimeout,
-		network.DefaultJoinTimeout,
-	); joinErr != nil {
-		t.Fatalf("Unable to join servers, %v", joinErr)
-	}
->>>>>>> develop
 
 		assert.Equal(t, uint64(1), pool.accounts.from(addr).length())
 		assert.Equal(t, addr, req.account)
@@ -302,7 +274,6 @@ func TestBroadcast(t *testing.T) {
 		pool.AddSigner(&mockSigner{})
 		pool.EnableDev()
 
-<<<<<<< HEAD
 		addr := types.Address{0x1}
 
 		{ // set up prestate
@@ -314,36 +285,6 @@ func TestBroadcast(t *testing.T) {
 			assert.True(t, ok)
 			assert.Equal(t, uint64(5), nextNonce)
 		}
-=======
-	assert.NoError(t, pool1.AddTx(txn1))
-}
-
-func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
-	assert.NoError(t, err)
-	pool.EnableDev()
-	pool.AddSigner(&mockSigner{})
-
-	_ = pool.addImpl("", &types.Transaction{
-		From:     addr1,
-		Gas:      validGasLimit,
-		GasPrice: big.NewInt(1),
-		Value:    big.NewInt(0),
-	})
-
-	nonce := pool.GetNonce(addr1)
-	assert.Equal(t, nonce, uint64(1))
-
-	// though txn0 is not being processed yet and the current nonce is 0
-	// we need to consider that txn0 is on the pendingQueue pool so this one is promoted too
-	_ = pool.addImpl("", &types.Transaction{
-		From:     addr1,
-		Nonce:    1,
-		Gas:      validGasLimit,
-		GasPrice: big.NewInt(1),
-		Value:    big.NewInt(0),
-	})
->>>>>>> develop
 
 		// send returnee (a previously promoted tx that is being recovered)
 		go pool.handleAddRequest(addRequest{
@@ -590,22 +531,9 @@ func TestResetHandlerEnqueued(t *testing.T) {
 			},
 		}
 
-<<<<<<< HEAD
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pool, err := newTestPool()
-=======
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			data := make([]byte, tt.size)
-			if _, readErr := rand.Read(data); readErr != nil {
-				t.Fatalf("Unable to read data, %v", readErr)
-			}
-
-			txn := generateTx(tt.address, 0, big.NewInt(0), big.NewInt(1), data)
-			err := pool.addImpl("", txn)
-			if tt.succeed {
->>>>>>> develop
 				assert.NoError(t, err)
 				pool.AddSigner(&mockSigner{})
 				pool.EnableDev()
@@ -750,19 +678,12 @@ func waitUntilDone(done <-chan struct{}) {
 	}
 }
 
-<<<<<<< HEAD
 func TestAddTx100(t *testing.T) {
 	t.Run("send 100 transactions", func(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.AddSigner(&mockSigner{})
 		pool.EnableDev()
-=======
-	input := make([]byte, size)
-	if _, readErr := rand.Read(input); readErr != nil {
-		return nil
-	}
->>>>>>> develop
 
 		// start the main loop
 		done := pool.startTestMode()
