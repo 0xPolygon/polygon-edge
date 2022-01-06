@@ -3,6 +3,7 @@ package txpool
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -192,8 +193,10 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
+		if subscribeErr := topic.Subscribe(pool.handleGossipTx); subscribeErr != nil {
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+		}
 
-		topic.Subscribe(pool.handleGossipTx)
 		pool.topic = topic
 	}
 
