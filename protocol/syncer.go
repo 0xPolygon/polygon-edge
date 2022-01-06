@@ -452,7 +452,9 @@ func (s *Syncer) Start() {
 // setupPeers adds connected peers as syncer peers
 func (s *Syncer) setupPeers() {
 	for _, p := range s.server.Peers() {
-		s.AddPeer(p.Info.ID)
+		if addErr := s.AddPeer(p.Info.ID); addErr != nil {
+			s.logger.Error(fmt.Sprintf("Error when adding peer [%s], %v", p.Info.ID, addErr))
+		}
 	}
 }
 
