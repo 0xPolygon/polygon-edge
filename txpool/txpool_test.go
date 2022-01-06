@@ -52,7 +52,10 @@ func newDummyTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 	}
 
 	input := make([]byte, size)
-	rand.Read(input)
+	if _, err := rand.Read(input); err != nil {
+		return nil
+	}
+
 	return &types.Transaction{
 		From:     addr,
 		Nonce:    nonce,
@@ -187,14 +190,18 @@ func TestAddTxErrors(t *testing.T) {
 			case ErrNonEncryptedTx:
 				pool.dev = false
 			case ErrAlreadyKnown:
-				go pool.addTx(local, tc.tx)
+				go func() {
+					err := pool.addTx(local, tc.tx)
+					assert.NoError(t, err)
+				}()
 				go pool.handleAddRequest(<-pool.addReqCh)
 				<-pool.promoteReqCh
 			case ErrInvalidAccountState:
 				pool.store = faultyMockStore{}
 			case ErrOversizedData:
 				data := make([]byte, 989898)
-				rand.Read(data)
+				_, err := rand.Read(data)
+				assert.NoError(t, err)
 				tc.tx.Input = data
 			}
 
@@ -216,7 +223,11 @@ func TestAddHandler(t *testing.T) {
 		addr := types.Address{0x1}
 
 		for i := uint64(10); i < 20; i++ {
-			go pool.addTx(local, newDummyTx(addr, i, 1))
+			go func() {
+				err := pool.addTx(local, newDummyTx(addr, i, 1))
+				assert.NoError(t, err)
+			}()
+
 			pool.handleAddRequest(<-pool.addReqCh)
 		}
 
@@ -243,7 +254,10 @@ func TestAddHandler(t *testing.T) {
 
 		// send txs
 		for i := uint64(0); i < 10; i++ {
-			go pool.addTx(local, newDummyTx(addr, i, 1))
+			go func() {
+				err := pool.addTx(local, newDummyTx(addr, i, 1))
+				assert.NoError(t, err)
+			}()
 			pool.handleAddRequest(<-pool.addReqCh)
 		}
 
@@ -259,7 +273,10 @@ func TestAddHandler(t *testing.T) {
 		addr := types.Address{0x1}
 
 		// send tx
-		go pool.addTx(local, newDummyTx(addr, 0, 1)) // fresh account
+		go func() {
+			err := pool.addTx(local, newDummyTx(addr, 0, 1)) // fresh account
+			assert.NoError(t, err)
+		}()
 		go pool.handleAddRequest(<-pool.addReqCh)
 		req := <-pool.promoteReqCh
 
@@ -318,7 +335,10 @@ func TestPromoteHandler(t *testing.T) {
 		}
 
 		// 1. add
-		go pool.addTx(local, dummyTx)
+		go func() {
+			err := pool.addTx(local, dummyTx)
+			assert.NoError(t, err)
+		}()
 		go pool.handleAddRequest(<-pool.addReqCh)
 		promReq := <-pool.promoteReqCh
 
@@ -338,8 +358,11 @@ func TestPromoteHandler(t *testing.T) {
 		pool.EnableDev()
 
 		var addRequests []addRequest
-		for i := uint64(0); i < 10; i++ {
-			go pool.addTx(local, newDummyTx(addr1, i, 1))
+		for nonce := uint64(0); nonce < 10; nonce++ {
+			go func(nonce uint64) {
+				err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+				assert.NoError(t, err)
+			}(nonce)
 			addRequests = append(addRequests, <-pool.addReqCh)
 		}
 
@@ -365,8 +388,12 @@ func TestPromoteHandler(t *testing.T) {
 
 		// send first 3
 		var addRequests []addRequest
-		for i := uint64(0); i < 3; i++ {
-			go pool.addTx(local, newDummyTx(addr1, i, 1))
+		for nonce := uint64(0); nonce < 3; nonce++ {
+			go func(nonce uint64) {
+				err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+				assert.NoError(t, err)
+			}(nonce)
+
 			addRequests = append(addRequests, <-pool.addReqCh)
 		}
 
@@ -386,8 +413,12 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(3), pool.promoted.length())
 
 		// send last 3
-		for i := uint64(3); i < 6; i++ {
-			go pool.addTx(local, newDummyTx(addr1, i, 1))
+		for nonce := uint64(3); nonce < 6; nonce++ {
+			go func(nonce uint64) {
+				err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+				assert.NoError(t, err)
+
+			}(nonce)
 			addRequests = append(addRequests, <-pool.addReqCh)
 		}
 
@@ -478,7 +509,11 @@ func TestResetHandlerEnqueued(t *testing.T) {
 
 				{ // setup prestate
 					for _, nonce := range tc.enqueued {
-						go pool.addTx(local, newDummyTx(addr1, nonce, 1))
+						go func(nonce uint64) {
+							err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+							assert.NoError(t, err)
+						}(nonce)
+
 						pool.handleAddRequest(<-pool.addReqCh)
 					}
 					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
@@ -540,7 +575,11 @@ func TestResetHandlerEnqueued(t *testing.T) {
 
 				{ // setup prestate
 					for _, nonce := range tc.enqueued {
-						go pool.addTx(local, newDummyTx(addr1, nonce, 1))
+						go func(nonce uint64) {
+							err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+							assert.NoError(t, err)
+						}(nonce)
+
 						pool.handleAddRequest(<-pool.addReqCh)
 					}
 					assert.Equal(t, uint64(len(tc.enqueued)), pool.accounts.from(addr1).length())
@@ -601,14 +640,21 @@ func TestResetHandlerPromoted(t *testing.T) {
 				initialPromoted := uint64(len(tc.promoted))
 
 				// save the first promotion for later
-				go pool.addTx(local, newDummyTx(addr, tc.promoted[0], 1))
+				go func() {
+					err := pool.addTx(local, newDummyTx(addr, tc.promoted[0], 1))
+					assert.NoError(t, err)
+				}()
 				go pool.handleAddRequest(<-pool.addReqCh)
 				prom := <-pool.promoteReqCh
 
 				// enqueue remaining txs
 				tc.promoted = tc.promoted[1:]
 				for _, nonce := range tc.promoted {
-					go pool.addTx(local, newDummyTx(addr, nonce, 1))
+					go func(nonce uint64) {
+						err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+						assert.NoError(t, err)
+					}(nonce)
+
 					pool.handleAddRequest(<-pool.addReqCh)
 				}
 
@@ -689,8 +735,11 @@ func TestAddTx100(t *testing.T) {
 		done := pool.startTestMode()
 
 		addr := types.Address{0x1}
-		for i := uint64(0); i < 100; i++ {
-			go pool.addTx(local, newDummyTx(addr, i, 1))
+		for nonce := uint64(0); nonce < 100; nonce++ {
+			go func(nonce uint64) {
+				err := pool.addTx(local, newDummyTx(addr, nonce, 1))
+				assert.NoError(t, err)
+			}(nonce)
 		}
 
 		waitUntilDone(done)
@@ -728,10 +777,13 @@ func TestAddTx1000(t *testing.T) {
 
 		// send 1000
 		for _, addr := range accounts {
-			for i := uint64(0); i < 100; i++ {
-				tx, err := signer.SignTx(newDummyTx(addr, i, 3), key)
+			for nonce := uint64(0); nonce < 100; nonce++ {
+				tx, err := signer.SignTx(newDummyTx(addr, nonce, 3), key)
 				assert.NoError(t, err)
-				go pool.addTx(local, tx)
+				go func(nonce uint64) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(nonce)
 			}
 		}
 
@@ -882,7 +934,11 @@ func TestResetWithHeader(t *testing.T) {
 			{ // setup initial state
 				for _, txs := range tc.all {
 					for _, tx := range txs {
-						go pool.addTx(local, tx)
+						go func(tx *types.Transaction) {
+							err := pool.addTx(local, tx)
+							assert.NoError(t, err)
+						}(tx)
+
 					}
 				}
 				waitUntilDone(done)
@@ -995,7 +1051,10 @@ func TestRecoverySingleAccount(t *testing.T) {
 			// setup initial state
 			{
 				for _, sTx := range tc.transactions {
-					go pool.addTx(local, sTx.tx)
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(sTx.tx)
 				}
 				waitUntilDone(done)
 			}
@@ -1129,7 +1188,10 @@ func TestRecoveryMultipleAccounts(t *testing.T) {
 			{
 				for _, txs := range tc.transactions {
 					for _, sTx := range txs {
-						go pool.addTx(local, sTx.tx)
+						go func(tx *types.Transaction) {
+							err := pool.addTx(local, tx)
+							assert.NoError(t, err)
+						}(sTx.tx)
 					}
 				}
 				waitUntilDone(done)
