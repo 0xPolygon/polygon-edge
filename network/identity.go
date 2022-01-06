@@ -49,9 +49,6 @@ func (i *identity) pendingOutboundConns() int64 {
 
 func (i *identity) isPending(id peer.ID) bool {
 	_, ok := i.pending.Load(id)
-	if !ok {
-		return false
-	}
 	return ok
 }
 
