@@ -101,7 +101,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	var demoted bool
 
 	flags.BoolVar(&added, "added", false, "")
-	flags.BoolVar(&promoted, "enqueued", false, "")
+	flags.BoolVar(&promoted, "promoted", false, "")
 	flags.BoolVar(&enqueued, "enqueued", false, "")
 	flags.BoolVar(&dropped, "dropped", false, "")
 	flags.BoolVar(&demoted, "demoted", false, "")
