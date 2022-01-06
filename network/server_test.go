@@ -19,7 +19,6 @@ func TestConnLimit_Inbound(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
-			//c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
