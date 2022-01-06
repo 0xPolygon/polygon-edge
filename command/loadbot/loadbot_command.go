@@ -8,6 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
+	"net"
 	"net/url"
 	"sort"
 )
@@ -190,7 +192,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	if _, err := url.ParseRequestURI(grpc); err != nil {
+	if _, err := net.ResolveTCPAddr("tcp", grpc); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("Invalid GRPC url : %w", err))
 		return 1
 	}
@@ -208,6 +210,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		Count:         count,
 		Value:         value,
 		JSONRPC:       jsonrpc,
+		GRPC:          grpc,
 		MaxConns:      maxConns,
 		GeneratorMode: mode,
 		ChainID:       chainID,
@@ -326,6 +329,8 @@ func (lr *LoadbotResult) extractDetailedErrors(gen generator.TransactionGenerato
 
 		errMap[txnError.Error.ErrorType] = errArray
 	}
+
+	lr.DetailedErrorData.DetailedErrorMap = errMap
 }
 
 func (lr *LoadbotResult) Output() string {
@@ -378,16 +383,16 @@ func (lr *LoadbotResult) Output() string {
 		buffer.WriteString("\n\n[DETAILED ERRORS]\n")
 
 		addToBuffer := func(detailedError *generator.FailedTxnInfo) {
-			if detailedError.TxHash != "" {
-				buffer.WriteString(fmt.Sprintf("\n[%s]\n", detailedError.TxHash))
+			if detailedError.TxHash != web3.ZeroHash.String() {
+				buffer.WriteString(fmt.Sprintf("\n\n[%s]\n", detailedError.TxHash))
 			} else {
-				buffer.WriteString("\n[Tx Hash Unavailable]\n")
+				buffer.WriteString("\n\n[Tx Hash Unavailable]\n")
 			}
 
 			formattedStrings := make([]string, 0)
 			formattedStrings = append(formattedStrings,
 				fmt.Sprintf("Index|%d", detailedError.Index),
-				fmt.Sprintf("Error|%s", detailedError.Error),
+				fmt.Sprintf("Error|%s", detailedError.Error.Error.Error()),
 			)
 
 			buffer.WriteString(helper.FormatKV(formattedStrings))
