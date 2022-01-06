@@ -20,6 +20,6 @@ type blockchainShim interface {
 	GetHeaderByNumber(n uint64) (*types.Header, bool)
 
 	// advance chain methods
-	WriteBlocks(blocks []*types.Block) error
+	WriteBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }

@@ -16,6 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// initIbftMechanism initializes the IBFT mechanism for unit tests
+func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
+	mechanismFactory := mechanismBackends[mechanismType]
+	mechanism, _ := mechanismFactory(ibft)
+	ibft.mechanism = mechanism
+}
+
 func getTempDir(t *testing.T) string {
 	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
 	assert.NoError(t, err)
@@ -368,6 +375,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 				logger: hclog.NewNullLogger(),
 			}
 
+			initIbftMechanism(PoA, ibft)
+
 			// Write Hash to snapshots
 			updateHashesInSnapshots(t, blockchain, c.savedSnapshots)
 			updateHashesInSnapshots(t, blockchain, c.expectedResult.Snapshots)
@@ -680,6 +689,8 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}
+			initIbftMechanism(PoA, ibft)
+
 			assert.NoError(t, ibft.setupSnapshot())
 			for indx, header := range headers {
 				if err := ibft.processHeaders([]*types.Header{header}); err != nil {
@@ -729,6 +740,9 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 				blockchain: blockchain.TestBlockchain(t, genesis),
 				config:     &consensus.Config{},
 			}
+
+			initIbftMechanism(PoA, ibft1)
+
 			assert.NoError(t, ibft1.setupSnapshot())
 			if err := ibft1.processHeaders(headers); err != nil {
 				t.Fatal(err)
@@ -761,6 +775,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 		config:     &consensus.Config{},
 	}
 	assert.NoError(t, ibft1.setupSnapshot())
+	initIbftMechanism(PoA, ibft1)
 
 	// write a header that creates a snapshot
 	headers := []*types.Header{}
