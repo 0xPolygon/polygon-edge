@@ -86,7 +86,7 @@ func (em *eventManager) fireEvent(event *proto.TxPoolEvent) {
 		defer em.subscriptionsLock.RUnlock()
 
 		for _, subscription := range em.subscriptions {
-			subscription.pushEvent(event)
+			go subscription.pushEvent(event)
 		}
 	}()
 }

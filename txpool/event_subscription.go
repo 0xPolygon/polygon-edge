@@ -34,15 +34,13 @@ func (es *eventSubscription) close() {
 	close(es.outputCh)
 }
 
-// pushEvent sends the event off for processing by the subscription [BLOCKING]
+// pushEvent sends the event off for processing by the subscription. [BLOCKING]
 func (es *eventSubscription) pushEvent(event *proto.TxPoolEvent) {
-	go func() {
-		if es.eventSupported(event.Type) {
-			select {
-			case es.outputCh <- event: // Pass the event to the output
-			case <-es.doneCh: // Break if a close signal has been received
-				return
-			}
+	if es.eventSupported(event.Type) {
+		select {
+		case es.outputCh <- event: // Pass the event to the output
+		case <-es.doneCh: // Break if a close signal has been received
+			return
 		}
-	}()
+	}
 }

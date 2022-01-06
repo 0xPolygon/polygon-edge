@@ -1,10 +1,14 @@
 package txpool
 
 import (
+	"context"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -103,33 +107,41 @@ func TestEventSubscription_RunLoop(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			subscription := &eventSubscription{
 				eventTypes: supportedEvents,
-				outputCh:   make(chan *proto.TxPoolEvent),
+				outputCh:   make(chan *proto.TxPoolEvent, len(testCase.events)),
 				doneCh:     make(chan struct{}),
 			}
 
-			// Fire off the events
-			for _, event := range testCase.events {
-				subscription.pushEvent(event)
-			}
-
-			// Wait for the listener to process them
-			processed := 0
-			completed := false
-
-			for !completed {
-				select {
-				case <-time.After(time.Second * 5):
-					completed = true
-				case <-subscription.outputCh:
+			// Set the event listener
+			processed := int64(0)
+			go func() {
+				for range subscription.outputCh {
 					processed++
-					if processed == testCase.expectedProcessed {
-						completed = true
-					}
 				}
+			}()
+
+			// Fire off the events
+			var wg sync.WaitGroup
+			for _, event := range testCase.events {
+				wg.Add(1)
+				go func(event *proto.TxPoolEvent) {
+					defer wg.Done()
+
+					subscription.pushEvent(event)
+				}(event)
 			}
 
-			assert.Equal(t, testCase.expectedProcessed, processed)
+			wg.Wait()
+			eventWaitCtx, eventWaitFn := context.WithTimeout(context.Background(), time.Second*5)
+			defer eventWaitFn()
+			if _, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
+				return nil, atomic.LoadInt64(&processed) < int64(testCase.expectedProcessed)
+			}); err != nil {
+				t.Fatalf("Unable to wait for events to be processed, %v", err)
+			}
+
 			subscription.close()
+
+			assert.Equal(t, int64(testCase.expectedProcessed), processed)
 		})
 	}
 }
