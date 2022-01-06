@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,14 +13,6 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
-)
-
-var (
-	// Magic nonce number to vote on adding a new validator
-	nonceAuthVote = types.Nonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-
-	// Magic nonce number to vote on removing a validator.
-	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 )
 
 // setupSnapshot sets up the snapshot store for the IBFT object
@@ -160,8 +153,6 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 
 	for _, h := range headers {
-		number := h.Number
-
 		proposer, err := ecrecoverFromHeader(h)
 		if err != nil {
 			return err
@@ -172,90 +163,16 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return fmt.Errorf("unauthorized proposer")
 		}
 
-		if number%i.epochSize == 0 {
-			// during a checkpoint block, we reset the votes
-			// and there cannot be any proposals
-			snap.Votes = nil
-			saveSnap(h)
-
-			// remove in-memory snapshots from two epochs before this one
-			epoch := int(number/i.epochSize) - 2
-			if epoch > 0 {
-				purgeBlock := uint64(epoch) * i.epochSize
-				i.store.deleteLower(purgeBlock)
-			}
-			continue
-		}
-
-		// if we have a miner address, this might be a vote
-		if h.Miner == types.ZeroAddress {
-			continue
-		}
-
-		// the nonce selects the action
-		var authorize bool
-		if h.Nonce == nonceAuthVote {
-			authorize = true
-		} else if h.Nonce == nonceDropVote {
-			authorize = false
-		} else {
-			return fmt.Errorf("incorrect vote nonce")
-		}
-
-		// validate the vote
-		if authorize {
-			// we can only authorize if they are not on the validators list
-			if snap.Set.Includes(h.Miner) {
-				continue
-			}
-		} else {
-			// we can only remove if they are part of the validators list
-			if !snap.Set.Includes(h.Miner) {
-				continue
-			}
-		}
-
-		voteCount := snap.Count(func(v *Vote) bool {
-			return v.Validator == proposer && v.Address == h.Miner
-		})
-
-		if voteCount > 1 {
-			// there can only be one vote per validator per address
-			return fmt.Errorf("more than one proposal per validator per address found")
-		}
-		if voteCount == 0 {
-			// cast the new vote since there is no one yet
-			snap.Votes = append(snap.Votes, &Vote{
-				Validator: proposer,
-				Address:   h.Miner,
-				Authorize: authorize,
-			})
-		}
-
-		// check the tally for the proposed validator
-		tally := snap.Count(func(v *Vote) bool {
-			return v.Address == h.Miner
-		})
-
-		// If more than a half of all validators voted
-		if tally > snap.Set.Len()/2 {
-			if authorize {
-				// add the candidate to the validators list
-				snap.Set.Add(h.Miner)
-			} else {
-				// remove the candidate from the validators list
-				snap.Set.Del(h.Miner)
-
-				// remove any votes casted by the removed validator
-				snap.RemoveVotes(func(v *Vote) bool {
-					return v.Validator == h.Miner
-				})
-			}
-
-			// remove all the votes that promoted this validator
-			snap.RemoveVotes(func(v *Vote) bool {
-				return v.Address == h.Miner
-			})
+		if hookErr := i.runHook(
+			ProcessHeadersHook,
+			&processHeadersHookParams{
+				header:     h,
+				snap:       snap,
+				parentSnap: parentSnap,
+				proposer:   proposer,
+				saveSnap:   saveSnap,
+			}); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+			return hookErr
 		}
 
 		if !snap.Equal(parentSnap) {
@@ -541,6 +458,18 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	// append and sort the list
 	s.list = append(s.list, snap)
 	sort.Sort(&s.list)
+}
+
+func (s *snapshotStore) replace(snap *Snapshot) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for i, sn := range s.list {
+		if sn.Number == snap.Number {
+			s.list[i] = snap
+			return
+		}
+	}
 }
 
 // snapshotSortedList defines the sorted snapshot list

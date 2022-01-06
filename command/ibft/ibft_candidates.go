@@ -10,7 +10,8 @@ import (
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
-// IbftCandidates is the command to query the snapshot
+// IbftCandidates is the command to get a current list of IBFT candidates
+// and their corresponding votes
 type IbftCandidates struct {
 	helper.Base
 	Formatter *helper.FormatterFlag
@@ -18,54 +19,54 @@ type IbftCandidates struct {
 }
 
 // DefineFlags defines the command flags
-func (p *IbftCandidates) DefineFlags() {
-	p.Base.DefineFlags(p.Formatter, p.GRPC)
+func (c *IbftCandidates) DefineFlags() {
+	c.Base.DefineFlags(c.Formatter, c.GRPC)
 }
 
 // GetHelperText returns a simple description of the command
-func (p *IbftCandidates) GetHelperText() string {
+func (c *IbftCandidates) GetHelperText() string {
 	return "Queries the current set of proposed candidates, as well as candidates that have not been included yet"
 }
 
-func (p *IbftCandidates) GetBaseCommand() string {
+func (c *IbftCandidates) GetBaseCommand() string {
 	return "ibft candidates"
 }
 
 // Help implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Help() string {
-	p.DefineFlags()
+func (c *IbftCandidates) Help() string {
+	c.DefineFlags()
 
-	return helper.GenerateHelp(p.Synopsis(), helper.GenerateUsage(p.GetBaseCommand(), p.FlagMap), p.FlagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Synopsis() string {
-	return p.GetHelperText()
+func (c *IbftCandidates) Synopsis() string {
+	return c.GetHelperText()
 }
 
 // Run implements the cli.IbftCandidates interface
-func (p *IbftCandidates) Run(args []string) int {
-	flags := p.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
+func (c *IbftCandidates) Run(args []string) int {
+	flags := c.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 	if err := flags.Parse(args); err != nil {
-		p.Formatter.OutputError(err)
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
-	conn, err := p.GRPC.Conn()
+	conn, err := c.GRPC.Conn()
 	if err != nil {
-		p.Formatter.OutputError(err)
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
 	if err != nil {
-		p.Formatter.OutputError(err)
+		c.Formatter.OutputError(err)
 		return 1
 	}
 
 	res := NewIBFTCandidatesResult(resp)
-	p.Formatter.OutputResult(res)
+	c.Formatter.OutputResult(res)
 
 	return 0
 }
