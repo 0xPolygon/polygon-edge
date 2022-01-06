@@ -70,7 +70,9 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *u
 		return 0, 0, err
 	}
 
-	writeMetadata(fs, logger, reqTo, reqToHash)
+	if err := writeMetadata(fs, logger, reqTo, reqToHash); err != nil {
+		return 0, 0, err
+	}
 	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
 
 	if err := closeFile(); err != nil {

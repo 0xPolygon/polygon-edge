@@ -257,12 +257,15 @@ func (w *blockStreamWriter) flush() error {
 		// should not reach
 		return errors.New("pendingFrom or pendingTo is nil")
 	}
-	w.stream.Send(&proto.ExportEvent{
+	err := w.stream.Send(&proto.ExportEvent{
 		From:   *w.pendingFrom,
 		To:     *w.pendingTo,
 		Latest: w.blockchain.Header().Number,
 		Data:   w.buf.Bytes(),
 	})
+	if err != nil {
+		return err
+	}
 	w.reset()
 	return nil
 }

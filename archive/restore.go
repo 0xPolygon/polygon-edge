@@ -13,7 +13,7 @@ import (
 
 var (
 	// Size of blocks to pass to WriteBlocks
-	chunkSize = 50
+	chunkSize = uint64(10 * 1024 * 1024) // 10MB
 )
 
 type blockchainInterface interface {
@@ -31,11 +31,7 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 	}
 	blockStream := newBlockStream(fp)
 
-	if err = importBlocks(chain, blockStream); err != nil {
-		return err
-	}
-
-	return nil
+	return importBlocks(chain, blockStream)
 }
 
 // import blocks scans all blocks from stream and write them to chain
@@ -57,7 +53,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	}
 
 	// skip existing blocks
-	firstBlock, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
+	firstBlock, firstBlockSize, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
 	if err != nil {
 		return err
 	}
@@ -65,34 +61,48 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 		return nil
 	}
 
-	blocks := make([]*types.Block, 0, chunkSize)
-	blocks = append(blocks, firstBlock)
-processLoop:
+	blocks := make([]*types.Block, 0)
+	nextBlock := firstBlock         // the first block in the next chunk
+	nextBlockSize := firstBlockSize // the size of nextBlock
 	for {
-		for len(blocks) < chunkSize {
-			block, err := blockStream.nextBlock()
+		blocks = append(blocks, nextBlock)
+		blocksSize := nextBlockSize
+
+		for blocksSize < chunkSize {
+			nextBlock, nextBlockSize, err = blockStream.nextBlock()
 			if err != nil {
 				return err
 			}
-			if block == nil {
+			if nextBlock == nil {
 				break
 			}
-			blocks = append(blocks, block)
+			// blocks will have a block at least
+			if len(blocks) > 0 && blocksSize+nextBlockSize > chunkSize {
+				break
+			}
+			blocks = append(blocks, nextBlock)
+			blocksSize += nextBlockSize
 		}
 
 		// no blocks to be written any more
 		if len(blocks) == 0 {
 			break
 		}
+
 		if err := chain.WriteBlocks(blocks); err != nil {
 			return err
 		}
-		// clear slice but keep capacity
+
+		// no blocks to be written in the next loop
+		if nextBlock == nil {
+			break
+		}
+		// clear slice but keep the capacity
 		blocks = blocks[:0]
 
 		select {
 		case <-shutdownCh:
-			break processLoop
+			return nil
 		default:
 		}
 	}
@@ -102,28 +112,28 @@ processLoop:
 
 // consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
 // returns the first block to be written into chain
-func consumeCommonBlocks(chain blockchainInterface, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, error) {
+func consumeCommonBlocks(chain blockchainInterface, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, uint64, error) {
 	for {
-		block, err := blockStream.nextBlock()
+		block, size, err := blockStream.nextBlock()
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if block == nil {
-			return nil, nil
+			return nil, 0, nil
 		}
 		if block.Number() == 0 {
 			if block.Hash() != chain.Genesis() {
-				return nil, fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", block.Hash(), chain.Genesis())
+				return nil, 0, fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", block.Hash(), chain.Genesis())
 			}
 			continue
 		}
 		if hash := chain.GetHashByNumber(block.Number()); hash != block.Hash() {
-			return block, nil
+			return block, size, nil
 		}
 
 		select {
 		case <-shutdownCh:
-			return nil, nil
+			return nil, 0, nil
 		default:
 		}
 	}
@@ -155,15 +165,19 @@ func (b *blockStream) getMetadata() (*Metadata, error) {
 }
 
 // nextBlock consumes some bytes from input and returns parsed block
-func (b *blockStream) nextBlock() (*types.Block, error) {
+func (b *blockStream) nextBlock() (*types.Block, uint64, error) {
 	size, err := b.loadRLPArray()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if size == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
-	return b.parseBlock(size)
+	block, err := b.parseBlock(size)
+	if err != nil {
+		return nil, 0, err
+	}
+	return block, size, nil
 }
 
 // loadRLPArray loads RLP encoded array from input to buffer

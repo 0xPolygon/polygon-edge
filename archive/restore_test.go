@@ -46,48 +46,106 @@ func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
 }
 
 func (m *mockChain) WriteBlocks(blocks []*types.Block) error {
+	m.blocks = append(m.blocks, blocks...)
 	return nil
 }
 
+func getLatestBlockFromMockChain(m *mockChain) *types.Block {
+	if l := len(m.blocks); l != 0 {
+		return m.blocks[l-1]
+	}
+	return nil
+}
+
+func Test_importBlocks(t *testing.T) {
+	newTestBlockStream := func(metadata *Metadata, blocks ...*types.Block) *blockStream {
+		var buf bytes.Buffer
+		buf.Write(metadata.MarshalRLP())
+		for _, b := range blocks {
+			buf.Write(b.MarshalRLP())
+		}
+		return newBlockStream(&buf)
+	}
+
+	tests := []struct {
+		name          string
+		metadata      *Metadata
+		archiveBlocks []*types.Block
+		chain         *mockChain
+		// result
+		err         error
+		latestBlock *types.Block
+	}{
+		{
+			name: "should write all blocks",
+			metadata: &Metadata{
+				Latest:     blocks[2].Number(),
+				LatestHash: blocks[2].Hash(),
+			},
+			archiveBlocks: []*types.Block{
+				genesis, blocks[0], blocks[1], blocks[2],
+			},
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{},
+			},
+			err:         nil,
+			latestBlock: blocks[2],
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blockStream := newTestBlockStream(tt.metadata, tt.archiveBlocks...)
+			err := importBlocks(tt.chain, blockStream)
+
+			assert.Equal(t, tt.err, err)
+			latestBlock := getLatestBlockFromMockChain(tt.chain)
+			assert.Equal(t, tt.latestBlock, latestBlock)
+		})
+	}
+}
+
 func Test_consumeCommonBlocks(t *testing.T) {
-	newTestArchiveStream := func(blocks ...*types.Block) io.Reader {
+	newTestArchiveStream := func(blocks ...*types.Block) *blockStream {
 		var buf bytes.Buffer
 		for _, b := range blocks {
 			buf.Write(b.MarshalRLP())
 		}
-		return &buf
+		return newBlockStream(&buf)
 	}
 
 	tests := []struct {
 		name        string
 		blockStream *blockStream
 		chain       blockchainInterface
-		resultBlock *types.Block
-		err         error
+		// result
+		block *types.Block
+		err   error
 	}{
 		{
 			name:        "should consume common blocks",
-			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1], blocks[2])),
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1], blocks[2]),
 			chain: &mockChain{
 				genesis: genesis,
 				blocks:  []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: blocks[2],
-			err:         nil,
+			block: blocks[2],
+			err:   nil,
 		},
 		{
 			name:        "should consume all blocks",
-			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1])),
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1]),
 			chain: &mockChain{
 				genesis: genesis,
 				blocks:  []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: nil,
-			err:         nil,
+			block: nil,
+			err:   nil,
 		},
 		{
 			name:        "should return error in case of genesis mismatch",
-			blockStream: newBlockStream(newTestArchiveStream(genesis, blocks[0], blocks[1])),
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1]),
 			chain: &mockChain{
 				genesis: &types.Block{
 					Header: &types.Header{
@@ -97,17 +155,22 @@ func Test_consumeCommonBlocks(t *testing.T) {
 				},
 				blocks: []*types.Block{blocks[0], blocks[1]},
 			},
-			resultBlock: nil,
-			err:         fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
+			block: nil,
+			err:   fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			osSignal := make(<-chan os.Signal)
-			resultBlock, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
-			assert.Equal(t, tt.resultBlock, resultBlock)
+			resultBlock, blockSize, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
+
+			assert.Equal(t, tt.block, resultBlock)
 			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
 		})
 	}
 }
@@ -136,9 +199,14 @@ func Test_parseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			block, err := tt.blockstream.nextBlock()
-			assert.Equal(t, tt.err, err)
+			block, blockSize, err := tt.blockstream.nextBlock()
+
 			assert.Equal(t, tt.block, block)
+			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
 		})
 	}
 }
