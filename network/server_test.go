@@ -19,6 +19,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 1
+			//c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
@@ -40,14 +41,14 @@ func TestConnLimit_Inbound(t *testing.T) {
 		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
 
-	// Server 2 tries to connect to Server 0
-	// but Server 0 is already connected to max peers
+	// Server 2 tries to connect to Server 1
+	// but Server 1 is already connected to max inbound peers
 	smallTimeout := time.Second * 5
-	if joinErr := JoinAndWait(servers[2], servers[0], smallTimeout, smallTimeout); joinErr == nil {
-		t.Fatal("Peer join should've failed")
+	if joinErr := JoinAndWait(servers[2], servers[1], smallTimeout, smallTimeout); joinErr == nil {
+		t.Fatal("Peer join should've failed", joinErr)
 	}
 
-	// Disconnect Server 1 from Server 0 so Server 0 will have free slots
+	// Disconnect Server 0 from Server 1 so Server 1 will have free slots
 	servers[0].Disconnect(servers[1].host.ID(), "bye")
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
@@ -60,8 +61,8 @@ func TestConnLimit_Inbound(t *testing.T) {
 		t.Fatalf("Unable to disconnect from peer, %v", disconnectErr)
 	}
 
-	// Attempt a connection between Server 2 and Server 0 again
-	if joinErr := JoinAndWait(servers[2], servers[0], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+	// Attempt a connection between Server 2 and Server 1 again
+	if joinErr := JoinAndWait(servers[2], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
 		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
 }
