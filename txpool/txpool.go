@@ -404,7 +404,9 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// Legacy reorg logic //
 	for _, tx := range oldTransactions {
-		p.addTx(reorg, tx)
+		if err := p.addTx(reorg, tx); err != nil {
+			p.logger.Error("addTx err", err)
+		}
 	}
 
 	if len(stateNonces) == 0 {

@@ -111,7 +111,8 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	framework.WaitUntilBlockMined(ctx, srv, 1)
+	_, err = framework.WaitUntilBlockMined(ctx, srv, 1)
+	assert.NoError(t, err)
 
 	block, err = client.Eth().GetBlockByNumber(1, true)
 	if err != nil {
