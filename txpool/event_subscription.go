@@ -4,7 +4,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 )
 
-type subscriptionID string
+type subscriptionID int32
 
 type eventSubscription struct {
 	// eventTypes is the list of subscribed event types

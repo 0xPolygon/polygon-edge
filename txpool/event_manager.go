@@ -34,7 +34,7 @@ func (em *eventManager) subscribe(eventTypes []proto.EventType) *subscribeResult
 	em.subscriptionsLock.Lock()
 	defer em.subscriptionsLock.Unlock()
 
-	id := uuid.New().String()
+	id := uuid.New().ID()
 	subscription := &eventSubscription{
 		eventTypes: eventTypes,
 		outputCh:   make(chan *proto.TxPoolEvent),
@@ -42,7 +42,7 @@ func (em *eventManager) subscribe(eventTypes []proto.EventType) *subscribeResult
 	}
 
 	em.subscriptions[subscriptionID(id)] = subscription
-	em.logger.Info(fmt.Sprintf("Added new subscription %s", id))
+	em.logger.Info(fmt.Sprintf("Added new subscription %d", id))
 	atomic.AddInt64(&em.numSubscriptions, 1)
 
 	return &subscribeResult{
@@ -59,7 +59,7 @@ func (em *eventManager) cancelSubscription(id subscriptionID) {
 	if subscription, ok := em.subscriptions[id]; ok {
 		subscription.close()
 		atomic.AddInt64(&em.numSubscriptions, -1)
-		em.logger.Info(fmt.Sprintf("Canceled subscription %s", id))
+		em.logger.Info(fmt.Sprintf("Canceled subscription %d", id))
 	}
 }
 

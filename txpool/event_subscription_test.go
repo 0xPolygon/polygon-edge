@@ -73,7 +73,7 @@ func shuffleTxPoolEvents(
 	return events
 }
 
-func TestEventSubscription_RunLoop(t *testing.T) {
+func TestEventSubscription_ProcessedEvents(t *testing.T) {
 	// Set up the default values
 	supportedEvents := []proto.EventType{
 		proto.EventType_ADDED,
