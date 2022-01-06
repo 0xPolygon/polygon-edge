@@ -6,18 +6,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-hclog"
 	"sync"
+	"sync/atomic"
 )
 
 type eventManager struct {
 	subscriptions     map[subscriptionID]*eventSubscription
 	subscriptionsLock sync.RWMutex
+	numSubscriptions  int64
 	logger            hclog.Logger
 }
 
 func newEventManager(logger hclog.Logger) *eventManager {
 	return &eventManager{
-		logger:        logger.Named("event-manager"),
-		subscriptions: make(map[subscriptionID]*eventSubscription),
+		logger:           logger.Named("event-manager"),
+		subscriptions:    make(map[subscriptionID]*eventSubscription),
+		numSubscriptions: 0,
 	}
 }
 
@@ -34,13 +37,13 @@ func (em *eventManager) subscribe(eventTypes []proto.EventType) *subscribeResult
 	id := uuid.New().String()
 	subscription := &eventSubscription{
 		eventTypes: eventTypes,
-		processCh:  make(chan *proto.TxPoolEvent),
 		outputCh:   make(chan *proto.TxPoolEvent),
+		doneCh:     make(chan struct{}),
 	}
 
 	em.subscriptions[subscriptionID(id)] = subscription
 	em.logger.Info(fmt.Sprintf("Added new subscription %s", id))
-	go subscription.runLoop()
+	atomic.AddInt64(&em.numSubscriptions, 1)
 
 	return &subscribeResult{
 		subscriptionID:      subscriptionID(id),
@@ -55,6 +58,7 @@ func (em *eventManager) cancelSubscription(id subscriptionID) {
 
 	if subscription, ok := em.subscriptions[id]; ok {
 		subscription.close()
+		atomic.AddInt64(&em.numSubscriptions, -1)
 		em.logger.Info(fmt.Sprintf("Canceled subscription %s", id))
 	}
 }
@@ -72,13 +76,17 @@ func (em *eventManager) close() {
 // fireEvent is a helper method for alerting listeners of a new TxPool event
 func (em *eventManager) fireEvent(event *proto.TxPoolEvent) {
 	go func() {
+		if atomic.LoadInt64(&em.numSubscriptions) < 1 {
+			// No reason to lock the subscriptions map
+			// if no subscriptions exist
+			return
+		}
+
 		em.subscriptionsLock.RLock()
 		defer em.subscriptionsLock.RUnlock()
 
 		for _, subscription := range em.subscriptions {
-			go func(eventSubscription *eventSubscription) {
-				eventSubscription.processCh <- event
-			}(subscription)
+			subscription.pushEvent(event)
 		}
 	}()
 }

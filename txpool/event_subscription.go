@@ -10,11 +10,11 @@ type eventSubscription struct {
 	// eventTypes is the list of subscribed event types
 	eventTypes []proto.EventType
 
-	// processCh is the intermediary channel between the eventManager and the event subscriber
-	processCh chan *proto.TxPoolEvent
-
 	// outputCh is the update channel for the subscriber
 	outputCh chan *proto.TxPoolEvent
+
+	// doneCh indicating that the subscription is terminated
+	doneCh chan struct{}
 }
 
 // eventSupported checks if the event is supported by the subscription
@@ -30,17 +30,19 @@ func (es *eventSubscription) eventSupported(eventType proto.EventType) bool {
 
 // close stops the event subscription
 func (es *eventSubscription) close() {
-	close(es.processCh)
+	close(es.doneCh)
+	close(es.outputCh)
 }
 
-// runLoop is the main subscription loop that does event processing
-// and listener notification
-func (es *eventSubscription) runLoop() {
-	for event := range es.processCh {
+// pushEvent sends the event off for processing by the subscription [BLOCKING]
+func (es *eventSubscription) pushEvent(event *proto.TxPoolEvent) {
+	go func() {
 		if es.eventSupported(event.Type) {
-			es.outputCh <- event
+			select {
+			case es.outputCh <- event: // Pass the event to the output
+			case <-es.doneCh: // Break if a close signal has been received
+				return
+			}
 		}
-	}
-
-	close(es.outputCh)
+	}()
 }
