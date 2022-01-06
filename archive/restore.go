@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	// Size of blocks to pass to WriteBlocks
+	// Size of blocks to pass to WriteBlock
 	chunkSize = uint64(10 * 1024 * 1024) // 10MB
 )
 
@@ -20,7 +20,7 @@ type blockchainInterface interface {
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
-	WriteBlocks([]*types.Block) error
+	WriteBlock(*types.Block) error
 }
 
 // RestoreChain loads blockchain archive from file and write blocks to the chain
@@ -89,8 +89,10 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 			break
 		}
 
-		if err := chain.WriteBlocks(blocks); err != nil {
-			return err
+		for _, b := range blocks {
+			if err := chain.WriteBlock(b); err != nil {
+				return err
+			}
 		}
 
 		// no blocks to be written in the next loop

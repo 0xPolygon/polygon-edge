@@ -45,8 +45,8 @@ func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
 	return b.Hash()
 }
 
-func (m *mockChain) WriteBlocks(blocks []*types.Block) error {
-	m.blocks = append(m.blocks, blocks...)
+func (m *mockChain) WriteBlock(block *types.Block) error {
+	m.blocks = append(m.blocks, block)
 	return nil
 }
 
