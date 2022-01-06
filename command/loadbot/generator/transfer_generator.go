@@ -12,7 +12,6 @@ import (
 type TransferGenerator struct {
 	failedTxns     []*FailedTxnInfo
 	failedTxnsLock sync.RWMutex
-	nonceLock      sync.Mutex
 
 	params          *GeneratorParams
 	signer          *crypto.EIP155Signer
