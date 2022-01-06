@@ -8,8 +8,10 @@ import (
 
 type TransactionGenerator interface {
 	GenerateTransaction() (*types.Transaction, error)
+	GetExampleTransaction() (*types.Transaction, error)
 	GetTransactionErrors() []*FailedTxnInfo
 	MarkFailedTxn(failedTxn *FailedTxnInfo)
+	SetGasEstimate(gasEstimate uint64)
 }
 
 type TxnErrorType string
@@ -36,5 +38,5 @@ type GeneratorParams struct {
 	SenderAddress types.Address
 	SenderKey     *ecdsa.PrivateKey
 	Value         *big.Int
-	EstimatedGas  int64
+	GasPrice      *big.Int
 }

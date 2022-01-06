@@ -24,6 +24,8 @@ const (
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
+
+	defaultGasLimit = 5242880 // 0x500000
 )
 
 type Account struct {
@@ -175,6 +177,32 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	return nonce, nil
 }
 
+func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
+	gasPrice, err := client.Eth().GasPrice()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+	}
+	return gasPrice, nil
+}
+
+func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
+	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
+		From:     web3.Address(txn.From),
+		To:       (*web3.Address)(txn.To),
+		Data:     txn.Input,
+		GasPrice: txn.GasPrice.Uint64(),
+		Value:    txn.Value,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to query gas estimate: %v", err)
+	}
+	if gasEstimate == 0 {
+		gasEstimate = defaultGasLimit
+	}
+
+	return gasEstimate, nil
+}
+
 func (l *Loadbot) executeTxn(
 	client txpoolOp.TxnPoolOperatorClient,
 ) (web3.Hash, error) {
@@ -220,7 +248,12 @@ func (l *Loadbot) Run() error {
 
 	nonce, err := getInitialSenderNonce(jsonClient, sender.Address)
 	if err != nil {
-		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
+		return fmt.Errorf("unable to get initial sender nonce: %v", err)
+	}
+
+	gasPrice, err := getAverageGasPrice(jsonClient)
+	if err != nil {
+		return fmt.Errorf("unable to get average gas price: %v", err)
 	}
 
 	// Set up the transaction generator
@@ -229,8 +262,8 @@ func (l *Loadbot) Run() error {
 		ChainID:       l.cfg.ChainID,
 		SenderAddress: sender.Address,
 		SenderKey:     sender.PrivateKey,
+		GasPrice:      big.NewInt(0).SetUint64(gasPrice),
 		Value:         l.cfg.Value,
-		EstimatedGas:  1000000, // TODO add gas estimation
 	}
 
 	var txnGenerator generator.TransactionGenerator
@@ -246,6 +279,17 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("unable to start generator, %v", genErr)
 	}
 	l.generator = txnGenerator
+
+	// Get the gas estimate
+	exampleTxn, err := l.generator.GetExampleTransaction()
+	if err != nil {
+		return fmt.Errorf("unable to get example transaction, %v", err)
+	}
+	gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
+	if estimateErr != nil {
+		return fmt.Errorf("unable to get gas estimate, %v", err)
+	}
+	l.generator.SetGasEstimate(gasEstimate)
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()

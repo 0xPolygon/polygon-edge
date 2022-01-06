@@ -19,8 +19,27 @@ type DeployGenerator struct {
 	failedTxnsLock sync.RWMutex
 	nonceLock      sync.Mutex
 
-	params *GeneratorParams
-	signer *crypto.EIP155Signer
+	params       *GeneratorParams
+	signer       *crypto.EIP155Signer
+	estimatedGas uint64
+
+	contractBytecode []byte
+}
+
+func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
+	return dg.signer.SignTx(&types.Transaction{
+		From:     dg.params.SenderAddress,
+		Gas:      dg.estimatedGas,
+		Value:    big.NewInt(0),
+		GasPrice: dg.params.GasPrice,
+		Nonce:    dg.params.Nonce,
+		Input:    dg.contractBytecode,
+		V:        big.NewInt(1), // it is necessary to encode in rlp
+	}, dg.params.SenderKey)
+}
+
+func (dg *DeployGenerator) SetGasEstimate(gasEstimate uint64) {
+	dg.estimatedGas = gasEstimate
 }
 
 func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
@@ -30,24 +49,25 @@ func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
 		signer:     crypto.NewEIP155Signer(params.ChainID),
 	}
 
+	buf, err := hex.DecodeString(contractBytecode)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode bytecode, %v", err)
+	}
+	deployGenerator.contractBytecode = buf
+
 	return deployGenerator, nil
 }
 
 func (dg *DeployGenerator) GenerateTransaction() (*types.Transaction, error) {
 	newNextNonce := atomic.AddUint64(&dg.params.Nonce, 1)
 
-	buf, err := hex.DecodeString(contractBytecode)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode bytecode, %v", err)
-	}
-
 	txn, err := dg.signer.SignTx(&types.Transaction{
 		From:     dg.params.SenderAddress,
-		Gas:      1000000,
+		Gas:      dg.estimatedGas,
 		Value:    big.NewInt(0),
-		GasPrice: big.NewInt(dg.params.EstimatedGas),
+		GasPrice: dg.params.GasPrice,
 		Nonce:    newNextNonce - 1,
-		Input:    buf,
+		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, dg.params.SenderKey)
 

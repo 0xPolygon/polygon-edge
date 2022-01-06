@@ -17,6 +17,7 @@ type TransferGenerator struct {
 	params          *GeneratorParams
 	signer          *crypto.EIP155Signer
 	receiverAddress types.Address
+	estimatedGas    uint64
 }
 
 func NewTransferGenerator(params *GeneratorParams) (*TransferGenerator, error) {
@@ -31,6 +32,16 @@ func NewTransferGenerator(params *GeneratorParams) (*TransferGenerator, error) {
 	}
 
 	return transferGenerator, nil
+}
+
+func (tg *TransferGenerator) GetExampleTransaction() (*types.Transaction, error) {
+	return tg.signer.SignTx(&types.Transaction{
+		From:     tg.params.SenderAddress,
+		To:       &tg.receiverAddress,
+		Value:    tg.params.Value,
+		GasPrice: tg.params.GasPrice,
+		V:        big.NewInt(1), // it is necessary to encode in rlp
+	}, tg.params.SenderKey)
 }
 
 func (tg *TransferGenerator) generateReceiver() error {
@@ -49,9 +60,9 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	txn, err := tg.signer.SignTx(&types.Transaction{
 		From:     tg.params.SenderAddress,
 		To:       &tg.receiverAddress,
-		Gas:      1000000,
+		Gas:      tg.estimatedGas,
 		Value:    tg.params.Value,
-		GasPrice: big.NewInt(tg.params.EstimatedGas),
+		GasPrice: tg.params.GasPrice,
 		Nonce:    newNextNonce - 1,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, tg.params.SenderKey)
@@ -75,4 +86,8 @@ func (tg *TransferGenerator) MarkFailedTxn(failedTxn *FailedTxnInfo) {
 	defer tg.failedTxnsLock.Unlock()
 
 	tg.failedTxns = append(tg.failedTxns, failedTxn)
+}
+
+func (tg *TransferGenerator) SetGasEstimate(gasEstimate uint64) {
+	tg.estimatedGas = gasEstimate
 }
