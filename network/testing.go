@@ -226,6 +226,7 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	}
 
 	cfg.SecretsManager = secretsManager
+	cfg.Metrics = NilMetrics()
 
 	server, err := NewServer(params.Logger, cfg)
 	if err != nil {
