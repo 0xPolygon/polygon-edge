@@ -27,10 +27,8 @@ type identifySnapshot struct {
 }
 
 type peerHandler struct {
-	ids     *IDService
-	started bool
+	ids *IDService
 
-	ctx    context.Context
 	cancel context.CancelFunc
 
 	pid peer.ID

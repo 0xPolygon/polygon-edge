@@ -153,7 +153,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				t:             t,
 			})
 
-			_, addErr := clt.AddTxn(context.Background(), addReq)
+			addResponse, addErr := clt.AddTxn(context.Background(), addReq)
 
 			if errors.Is(testCase.expectedError, txpool.ErrNonceTooLow) {
 				if addErr != nil {
@@ -161,7 +161,17 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				}
 
 				// Wait for the state transition to be executed
-				_ = waitForBlock(t, srv, 1, 0)
+				receiptCtx, waitCancelFn := context.WithTimeout(
+					context.Background(),
+					time.Duration(devInterval*2)*time.Second,
+				)
+				defer waitCancelFn()
+
+				convertedHash := types.StringToHash(addResponse.TxHash)
+				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), web3.Hash(convertedHash))
+				if receiptErr != nil {
+					t.Fatalf("Unable to get receipt, %v", receiptErr)
+				}
 
 				// Add the transaction with lower nonce value than what is
 				// currently in the world state

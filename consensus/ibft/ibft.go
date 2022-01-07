@@ -2,7 +2,9 @@ package ibft
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"reflect"
 	"time"
 
@@ -15,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/hashicorp/go-hclog"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -23,15 +24,20 @@ const (
 	DefaultEpochSize = 100000
 )
 
+var (
+	ErrInvalidHookParam = errors.New("invalid IBFT hook param passed in")
+	ErrMissingHook      = errors.New("missing IBFT hook from mechanism")
+)
+
 type blockchainInterface interface {
 	Header() *types.Header
 	GetHeaderByNumber(i uint64) (*types.Header, bool)
-	WriteBlocks(blocks []*types.Block) error
+	WriteBlock(block *types.Block) error
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
 type transactionPoolInterface interface {
-	ResetWithHeader(h *types.Header)
+	ResetWithHeaders(headers ...*types.Header)
 	Pop() (*types.Transaction, func())
 	DecreaseAccountNonce(tx *types.Transaction)
 	Length() uint64
@@ -40,8 +46,9 @@ type transactionPoolInterface interface {
 type syncerInterface interface {
 	Start()
 	BestPeer() *protocol.SyncPeer
-	BulkSyncWithPeer(p *protocol.SyncPeer) error
-	WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool)
+	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
+	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
+	GetSyncProgression() *protocol.Progression
 	Broadcast(b *types.Block)
 }
 
@@ -68,8 +75,7 @@ type Ibft struct {
 	msgQueue *msgQueue     // Structure containing different message queues
 	updateCh chan struct{} // Update channel
 
-	syncer       syncerInterface // Reference to the sync protocol
-	syncNotifyCh chan bool       // Sync protocol notification channel
+	syncer syncerInterface // Reference to the sync protocol
 
 	network   *network.Server // Reference to the networking layer
 	transport transport       // Reference to the transport protocol
@@ -82,12 +88,135 @@ type Ibft struct {
 	metrics *consensus.Metrics
 
 	secretsManager secrets.SecretsManager
+
+	// nolint:unused
+	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
+}
+
+// Define the type of the IBFT consensus
+
+type MechanismType string
+
+const (
+	// PoA defines the Proof of Authority IBFT type,
+	// where the validator set is changed through voting / pre-set in genesis
+	PoA MechanismType = "PoA"
+
+	// PoS defines the Proof of Stake IBFT type,
+	// where the validator set it changed through staking on the Staking SC
+	PoS MechanismType = "PoS"
+)
+
+// mechanismTypes is the map used for easy string -> mechanism MechanismType lookups
+var mechanismTypes = map[string]MechanismType{
+	"PoA": PoA,
+	"PoS": PoS,
+}
+
+// String is a helper method for casting a MechanismType to a string representation
+func (t MechanismType) String() string {
+	return string(t)
+}
+
+// parseType converts a mechanism string representation to a MechanismType
+func parseType(mechanism string) (MechanismType, error) {
+	// Check if the cast is possible
+	castType, ok := mechanismTypes[mechanism]
+	if !ok {
+		return castType, fmt.Errorf("invalid IBFT mechanism type %s", mechanism)
+	}
+
+	return castType, nil
+}
+
+// Define constant hook names
+const (
+	// POA //
+
+	// VerifyHeadersHook defines additional checks that need to happen
+	// when verifying the headers
+	VerifyHeadersHook = "VerifyHeadersHook"
+
+	// ProcessHeadersHook defines additional steps that need to happen
+	// when processing the headers
+	ProcessHeadersHook = "ProcessHeadersHook"
+
+	// InsertBlockHook defines additional steps that need to happen
+	// when inserting a block into the chain
+	InsertBlockHook = "InsertBlockHook"
+
+	// CandidateVoteHook defines additional steps that need to happen
+	// when building a block (candidate voting)
+	CandidateVoteHook = "CandidateVoteHook"
+
+	// POA + POS //
+
+	// AcceptStateLogHook defines what should be logged out as the status
+	// from AcceptState
+	AcceptStateLogHook = "AcceptStateLogHook"
+
+	// POS //
+
+	// SyncStateHook defines the additional snapshot update logic
+	// for PoS systems
+	SyncStateHook = "SyncStateHook"
+
+	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
+	VerifyBlockHook = "VerifyBlockHook"
+)
+
+type ConsensusMechanism interface {
+	// GetType returns the type of IBFT consensus mechanism (PoA / PoS)
+	GetType() MechanismType
+
+	// GetHookMap returns the hooks registered with the specific consensus mechanism
+	GetHookMap() map[string]func(interface{}) error
+
+	// ShouldWriteTransactions returns whether transactions should be written to a block
+	// from the TxPool
+	ShouldWriteTransactions(blockNumber uint64) bool
+
+	// initializeHookMap initializes the hook map
+	initializeHookMap()
+}
+
+// ConsensusMechanismFactory is the factory function to create a consensus mechanism
+type ConsensusMechanismFactory func(ibft *Ibft) (ConsensusMechanism, error)
+
+var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{
+	PoA: PoAFactory,
+	PoS: PoSFactory,
+}
+
+// runHook runs a specified hook if it is present in the hook map
+func (i *Ibft) runHook(hookName string, hookParams interface{}) error {
+	// Grab the hook map
+	hookMap := i.mechanism.GetHookMap()
+
+	// Grab the actual hook if it's present
+	hook, ok := hookMap[hookName]
+	if !ok {
+		// hook not found, continue
+		return ErrMissingHook
+	}
+
+	// Run the hook
+	return hook(hookParams)
 }
 
 // Factory implements the base consensus Factory method
 func Factory(
 	params *consensus.ConsensusParams,
 ) (consensus.Consensus, error) {
+	var epochSize uint64
+	if definedEpochSize, ok := params.Config.Config["epochSize"]; !ok {
+		// No epoch size defined, use the default one
+		epochSize = DefaultEpochSize
+	} else {
+		// Epoch size is defined, use the passed in one
+		epochSize = uint64(definedEpochSize.(float64))
+	}
+
 	p := &Ibft{
 		logger:         params.Logger.Named("ibft"),
 		config:         params.Config,
@@ -97,12 +226,25 @@ func Factory(
 		txpool:         params.Txpool,
 		state:          &currentState{},
 		network:        params.Network,
-		epochSize:      DefaultEpochSize,
-		syncNotifyCh:   make(chan bool),
+		epochSize:      epochSize,
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
 	}
+
+	// Initialize the mechanism
+	mechanismType, parseErr := parseType(p.config.Config["type"].(string))
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	// Grab the mechanism factory and execute it
+	mechanismFactory := mechanismBackends[mechanismType]
+	mechanism, factoryErr := mechanismFactory(p)
+	if factoryErr != nil {
+		return nil, factoryErr
+	}
+	p.mechanism = mechanism
 
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
@@ -142,6 +284,11 @@ func (i *Ibft) Start() error {
 	go i.start()
 
 	return nil
+}
+
+// GetSyncProgression gets the latest sync progression, if any
+func (i *Ibft) GetSyncProgression() *protocol.Progression {
+	return i.syncer.GetSyncProgression()
 }
 
 type transport interface {
@@ -318,11 +465,20 @@ func (i *Ibft) isValidSnapshot() bool {
 //
 // It fetches fresh data from the blockchain. Checks if the current node is a validator and resolves any pending blocks
 func (i *Ibft) runSyncState() {
+	// updateSnapshotCallback keeps the snapshot store in sync with the updated
+	// chain data, by calling the SyncStateHook
+	updateSnapshotCallback := func(oldLatestNumber uint64) {
+		if hookErr := i.runHook(SyncStateHook, oldLatestNumber); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", SyncStateHook, hookErr))
+		}
+	}
+
 	for i.isState(SyncState) {
-		// try to sync with some target peer
+		oldLatestNumber := i.blockchain.Header().Number
+		// try to sync with the best-suited peer
 		p := i.syncer.BestPeer()
 		if p == nil {
-			// if we do not have any peers and we have been a validator
+			// if we do not have any peers, and we have been a validator
 			// we can start now. In case we start on another fork this will be
 			// reverted later
 			if i.isValidSnapshot() {
@@ -342,7 +498,13 @@ func (i *Ibft) runSyncState() {
 			continue
 		}
 
-		if err := i.syncer.BulkSyncWithPeer(p); err != nil {
+		if err := i.syncer.BulkSyncWithPeer(p, func(newBlock *types.Block) {
+			// Sync the snapshot state after bulk syncing
+			updateSnapshotCallback(oldLatestNumber)
+			oldLatestNumber = i.blockchain.Header().Number
+
+			i.txpool.ResetWithHeaders(newBlock.Header)
+		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
 			continue
 		}
@@ -357,8 +519,13 @@ func (i *Ibft) runSyncState() {
 		// start watch mode
 		var isValidator bool
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
+			// After each written block, update the snapshot store for PoS.
+			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
+			updateSnapshotCallback(oldLatestNumber)
+			oldLatestNumber = i.blockchain.Header().Number
+
 			i.syncer.Broadcast(b)
-			i.txpool.ResetWithHeader(b.Header)
+			i.txpool.ResetWithHeaders(b.Header)
 			isValidator = i.isValidSnapshot()
 
 			return isValidator
@@ -396,14 +563,11 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 	header.GasLimit = gasLimit
 
-	// try to pick a candidate
-	if candidate := i.operator.getNextCandidate(snap); candidate != nil {
-		header.Miner = types.StringToAddress(candidate.Address)
-		if candidate.Auth {
-			header.Nonce = nonceAuthVote
-		} else {
-			header.Nonce = nonceDropVote
-		}
+	if hookErr := i.runHook(CandidateVoteHook, &candidateVoteHookParams{
+		header: header,
+		snap:   snap,
+	}); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
 	// set the timestamp
@@ -422,8 +586,12 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	if err != nil {
 		return nil, err
 	}
-	txns := i.writeTransactions(gasLimit, transition)
-
+	// If the mechanism is PoS -> build a regular block if it's not an end-of-epoch block
+	// If the mechanism is PoA -> always build a regular block, regardless of epoch
+	txns := []*types.Transaction{}
+	if i.mechanism.ShouldWriteTransactions(header.Number) {
+		txns = i.writeTransactions(gasLimit, transition)
+	}
 	_, root := transition.Commit()
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
@@ -527,7 +695,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	i.logger.Info("current snapshot", "validators", len(snap.Set), "votes", len(snap.Votes))
+	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
+	}
 
 	i.state.validators = snap.Set
 
@@ -615,17 +785,28 @@ func (i *Ibft) runAcceptState() { // start new round
 				i.handleStateErr(errIncorrectBlockLocked)
 			}
 		} else {
-			// since its a new block, we have to verify it first
+			// since it's a new block, we have to verify it first
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-			} else {
-				i.state.block = block
-
-				// send prepare message and wait for validations
-				i.sendPrepareMsg()
-				i.setState(ValidateState)
+				continue
 			}
+
+			if hookErr := i.runHook(VerifyBlockHook, block); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+				if errors.As(hookErr, &errBlockVerificationFailed) {
+					i.logger.Error("block verification failed, block at the end of epoch has transactions")
+					i.handleStateErr(errBlockVerificationFailed)
+				} else {
+					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
+				}
+
+				continue
+			}
+
+			i.state.block = block
+			// send prepare message and wait for validations
+			i.sendPrepareMsg()
+			i.setState(ValidateState)
 		}
 	}
 }
@@ -736,8 +917,12 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 	block.Header = header
 	block.Header.ComputeHash()
 
-	if err := i.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+	if err := i.blockchain.WriteBlock(block); err != nil {
 		return err
+	}
+
+	if hookErr := i.runHook(InsertBlockHook, header.Number); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		return hookErr
 	}
 
 	i.logger.Info(
@@ -760,7 +945,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	i.txpool.ResetWithHeader(block.Header)
+	i.txpool.ResetWithHeaders(block.Header)
 
 	return nil
 }
@@ -953,11 +1138,8 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
-	// Because you must specify either AUTH or DROP vote, it is confusing how to have a block without any votes.
-	// 		This is achieved by specifying the miner field to zeroes,
-	// 		because then the value in the Nonce will not be taken into consideration.
-	if header.Nonce != nonceDropVote && header.Nonce != nonceAuthVote {
-		return fmt.Errorf("invalid nonce")
+	if hookErr := i.runHook(VerifyHeadersHook, header.Nonce); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		return hookErr
 	}
 
 	if header.MixHash != IstanbulDigest {

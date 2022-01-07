@@ -61,7 +61,7 @@ func (t *Transport) LocalPrivateKey() ci.PrivKey {
 	return t.key
 }
 
-// SecureInbound *pretends to secure* an outbound connection to the given peer.
+// SecureInbound *pretends to secure* an inbound connection to the given peer.
 // It sends the local peer's ID and public key, and receives the same from the remote peer.
 // No validation is performed as to the authenticity or ownership of the provided public key,
 // and the key exchange provides no security.

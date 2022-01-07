@@ -200,7 +200,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 }
 
 func (s *Server) Start() error {
-	s.identity.start()
+	if identityStartErr := s.identity.start(); identityStartErr != nil {
+		return identityStartErr
+	}
 
 	go s.runDial()
 	go s.checkPeerConnections()
@@ -228,10 +230,16 @@ func (s *Server) Start() error {
 			bootnodes = append(bootnodes, node)
 		}
 
-		s.discovery.setup(bootnodes)
+		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
+			return fmt.Errorf("unable to setup discovery, %v", setupErr)
+		}
 	}
 
-	go s.runJoinWatcher()
+	go func() {
+		if err := s.runJoinWatcher(); err != nil {
+			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
+		}
+	}()
 
 	// watch for disconnected peers
 	s.host.Network().Notify(&network.NotifyBundle{
@@ -249,7 +257,7 @@ func (s *Server) Start() error {
 func (s *Server) checkPeerConnections() {
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(10 * time.Second):
 		case <-s.closeCh:
 			return
 		}
@@ -305,7 +313,7 @@ func (s *Server) runDial() {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
-					s.logger.Trace("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
 				}
 			}
 		}
@@ -326,10 +334,9 @@ func (s *Server) numPeers() int64 {
 	return int64(len(s.peers))
 }
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-
 	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
-
 }
+
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -338,7 +345,18 @@ func (s *Server) Peers() []*Peer {
 	for _, p := range s.peers {
 		peers = append(peers, p)
 	}
+
 	return peers
+}
+
+// hasPeer checks if the peer is present in the peers list [Thread-safe]
+func (s *Server) hasPeer(peerID peer.ID) bool {
+	s.peersLock.Lock()
+	defer s.peersLock.Unlock()
+
+	_, ok := s.peers[peerID]
+
+	return ok
 }
 
 func (s *Server) numOpenSlots() int64 {
@@ -346,6 +364,7 @@ func (s *Server) numOpenSlots() int64 {
 	if n < 0 {
 		n = 0
 	}
+
 	return n
 }
 
@@ -384,7 +403,11 @@ func (s *Server) delPeer(id peer.ID) {
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
-	s.host.Network().ClosePeer(id)
+	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
+		s.logger.Error(
+			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
+		)
+	}
 
 	s.emitEvent(id, PeerDisconnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
@@ -392,47 +415,17 @@ func (s *Server) delPeer(id peer.ID) {
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
-		// send some close message
-		s.host.Network().ClosePeer(peer)
-	}
-}
-
-func (s *Server) waitForEvent(timeout time.Duration, handler func(evnt *PeerEvent) bool) bool {
-	// TODO: Try to replace joinwatcher with this
-	sub, _ := s.Subscribe()
-
-	doneCh := make(chan struct{})
-	closed := false
-	go func() {
-		loop := true
-		for loop {
-			select {
-			case evnt := <-sub.GetCh():
-				if handler(evnt) {
-					loop = false
-				}
-
-			case <-s.closeCh:
-				closed = true
-				loop = false
-			}
+		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
+		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
+			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
 		}
-		sub.Close()
-		doneCh <- struct{}{}
-	}()
-	if closed {
-		return false
-	}
-
-	select {
-	case <-doneCh:
-		return true
-	case <-time.After(timeout):
-		return false
 	}
 }
 
-var DefaultJoinTimeout = 10 * time.Second
+var (
+	DefaultJoinTimeout   = 40 * time.Second // Anything below 35s is prone to false timeouts, as seen from empirical test data
+	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
+)
 
 func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 	addr0, err := multiaddr.NewMultiaddr(addr)
@@ -541,7 +534,7 @@ func (s *Server) Register(id string, p Protocol) {
 func (s *Server) wrapStream(id string, handle func(network.Stream)) {
 	s.host.SetStreamHandler(protocol.ID(id), func(stream network.Stream) {
 		peerID := stream.Conn().RemotePeer()
-		s.logger.Trace("open stream", "protocol", id, "peer", peerID)
+		s.logger.Debug("open stream", "protocol", id, "peer", peerID)
 
 		handle(stream)
 	})

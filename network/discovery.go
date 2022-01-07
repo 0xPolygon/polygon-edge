@@ -51,7 +51,7 @@ func (ps *referencePeers) delete(id peer.ID) *referencePeer {
 	}
 	if idx != -1 {
 		deletePeer := (*ps)[idx]
-		(*ps) = append((*ps)[:idx], (*ps)[idx+1:]...)
+		*ps = append((*ps)[:idx], (*ps)[idx+1:]...)
 		return deletePeer
 	}
 	return nil
@@ -152,7 +152,7 @@ func (d *discovery) setupTable() {
 	}
 }
 
-func (d *discovery) call(peerID peer.ID) error {
+func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 	d.srv.logger.Debug("Querying a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
 	if err != nil {
@@ -237,8 +237,8 @@ func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
 	if d.peersCount() > 0 {
 		target := d.peers[rand.Intn(d.peersCount())]
-		if err := d.call(target.id); err != nil {
-			d.srv.logger.Error("failed to dial bootnode", "err", err)
+		if err := d.attemptToFindPeers(target.id); err != nil {
+			d.srv.logger.Error("failed to find peers", "err", err)
 		}
 	}
 }

@@ -192,7 +192,10 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
-		topic.Subscribe(txPool.handleGossipTxn)
+		if subscribeErr := topic.Subscribe(txPool.handleGossipTxn); subscribeErr != nil {
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+		}
+
 		txPool.topic = topic
 	}
 
@@ -325,7 +328,9 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
 		if err := t.addImpl(OriginGossip, txn); err != nil {
-			t.logger.Error("failed to add broadcasted txn", "err", err)
+			if !errors.Is(err, ErrAlreadyKnown) {
+				t.logger.Error("failed to add broadcasted txn", "err", err)
+			}
 		}
 	}
 }
@@ -551,9 +556,9 @@ func (t *TxPool) batchDeleteTxFromLookup(txns []*types.Transaction) {
 }
 
 // ResetWithHeader does basic txpool housekeeping after a block write
-func (t *TxPool) ResetWithHeader(h *types.Header) {
+func (t *TxPool) ResetWithHeaders(headers ...*types.Header) {
 	evnt := &blockchain.Event{
-		NewChain: []*types.Header{h},
+		NewChain: headers,
 	}
 
 	// Process the txns in the event to make sure the TxPool is up-to-date
@@ -583,34 +588,38 @@ func (t *TxPool) promotedTxnCleanup(
 	t.pendingQueue.lock.Lock()
 
 	// Find the txns that correspond to this account
-	droppedPendingTxs := 0
+	droppedPendingTxs := make([]*types.Transaction, 0)
 	for _, pendingQueueTxn := range t.pendingQueue.index {
 		// Check if the txn in the promoted queue matches the search criteria
 		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
 			pendingQueueTxn.tx.Nonce < stateNonce { // The nonce on this promoted txn is invalid
 			// Transaction found, drop it from the pending queue
 			if dropped := t.pendingQueue.dropTx(pendingQueueTxn.tx); dropped {
-				// Update the log data
-				droppedPendingTxs++
-				t.logger.Debug(
-					fmt.Sprintf(
-						"Dropping promoted txn [%s]",
-						pendingQueueTxn.tx.Hash.String(),
-					),
-				)
-
-				cleanupCallback(pendingQueueTxn.tx)
+				// Save the transaction as dropped
+				droppedPendingTxs = append(droppedPendingTxs, pendingQueueTxn.tx)
 			}
 		}
 	}
 
 	t.pendingQueue.lock.Unlock()
 
+	for _, droppedPendingTx := range droppedPendingTxs {
+		// Update the log
+		t.logger.Debug(
+			fmt.Sprintf(
+				"Dropping promoted txn [%s]",
+				droppedPendingTx.Hash.String(),
+			),
+		)
+
+		cleanupCallback(droppedPendingTx)
+	}
+
 	// Print out the number of dropped pending txns
 	t.logger.Debug(
 		fmt.Sprintf(
 			"Dropped %d promoted txns for account [%s]",
-			droppedPendingTxs,
+			len(droppedPendingTxs),
 			address.String(),
 		),
 	)
@@ -822,7 +831,10 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	}
 	// tx.GasPrice < lowestTx.Price
 	underpriced := tx.GasPrice.Cmp(lowestTx.price) < 0
-	t.remoteTxns.Push(lowestTx.tx)
+	if pushErr := t.remoteTxns.Push(lowestTx.tx); pushErr != nil {
+		t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
+	}
+
 	return underpriced
 }
 
@@ -847,7 +859,9 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 	// Put back if couldn't make required space
 	if slotsToRemove > 0 && !force {
 		for _, tx := range dropped {
-			t.remoteTxns.Push(tx)
+			if pushErr := t.remoteTxns.Push(tx); pushErr != nil {
+				t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
+			}
 		}
 		return nil, false
 	}

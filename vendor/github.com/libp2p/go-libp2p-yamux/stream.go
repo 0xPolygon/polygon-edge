@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/mux"
-	"github.com/libp2p/go-yamux"
+	"github.com/libp2p/go-yamux/v2"
 )
 
 // stream implements mux.MuxedStream over yamux.Stream.

@@ -537,7 +537,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}}, // not considered - stays in pool
+				{Nonce: 7}},            // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -568,7 +568,7 @@ func TestWriteTransactions(t *testing.T) {
 	}
 }
 
-func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *testing.T) {
+func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
 	m.setState(SyncState)
 	expectedNewBlockToSync := &types.Block{Header: &types.Header{Number: 1}}
@@ -588,12 +588,43 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeader(t *test
 	m.runSyncState()
 
 	assert.True(t, mockTxPool.resetWithHeaderCalled)
-	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeaderParam)
+	assert.Equal(t, expectedNewBlockToSync.Header, mockTxPool.resetWithHeadersParam[0])
 	assert.True(t, mockSyncer.broadcastCalled)
 	assert.Equal(t, expectedNewBlockToSync, mockSyncer.broadcastedBlock)
 }
 
+func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
+	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
+	m.setState(SyncState)
+	expectedNewBlocksToSync := []*types.Block{
+		{Header: &types.Header{Number: 1}},
+		{Header: &types.Header{Number: 2}},
+		{Header: &types.Header{Number: 3}},
+	}
+	mockSyncer := &mockSyncer{}
+	mockSyncer.bulkSyncBlocksFromPeer = expectedNewBlocksToSync
+	m.syncer = mockSyncer
+	mockTxPool := &mockTxPool{}
+	m.txpool = mockTxPool
+
+	// we need to change state from Sync in order to break from the loop inside runSyncState
+	stateChangeDelay := time.After(100 * time.Millisecond)
+	go func() {
+		<-stateChangeDelay
+		m.setState(AcceptState)
+	}()
+
+	m.runSyncState()
+
+	assert.True(t, mockTxPool.resetWithHeaderCalled)
+	assert.Equal(t,
+		expectedNewBlocksToSync[len(expectedNewBlocksToSync)-1].Header,
+		mockTxPool.resetWithHeadersParam[0],
+	)
+}
+
 type mockSyncer struct {
+	bulkSyncBlocksFromPeer  []*types.Block
 	receivedNewHeadFromPeer *types.Block
 	broadcastedBlock        *types.Block
 	broadcastCalled         bool
@@ -605,12 +636,21 @@ func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
 	return &protocol.SyncPeer{}
 }
 
-func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer) error {
+func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *types.Block)) error {
+	for _, block := range s.bulkSyncBlocksFromPeer {
+		handler(block)
+	}
 	return nil
 }
 
 func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *types.Block) bool) {
-	handler(s.receivedNewHeadFromPeer)
+	if s.receivedNewHeadFromPeer != nil {
+		handler(s.receivedNewHeadFromPeer)
+	}
+}
+
+func (s *mockSyncer) GetSyncProgression() *protocol.Progression {
+	return nil
 }
 
 func (s *mockSyncer) Broadcast(b *types.Block) {
@@ -622,12 +662,12 @@ type mockTxPool struct {
 	transactions          []*types.Transaction
 	nonceDecreased        map[*types.Transaction]bool
 	resetWithHeaderCalled bool
-	resetWithHeaderParam  *types.Header
+	resetWithHeadersParam []*types.Header
 }
 
-func (p *mockTxPool) ResetWithHeader(h *types.Header) {
+func (p *mockTxPool) ResetWithHeaders(headers ...*types.Header) {
 	p.resetWithHeaderCalled = true
-	p.resetWithHeaderParam = h
+	p.resetWithHeadersParam = headers
 }
 
 func (p *mockTxPool) Pop() (*types.Transaction, func()) {
@@ -721,7 +761,7 @@ func (m *mockIbft) GetHeaderByNumber(i uint64) (*types.Header, bool) {
 	return m.blockchain.GetHeaderByNumber(i)
 }
 
-func (m *mockIbft) WriteBlocks(blocks []*types.Block) error {
+func (m *mockIbft) WriteBlock(block *types.Block) error {
 	return nil
 }
 
@@ -783,6 +823,8 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		epochSize:        DefaultEpochSize,
 		metrics:          consensus.NilMetrics(),
 	}
+
+	initIbftMechanism(PoA, ibft)
 
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)

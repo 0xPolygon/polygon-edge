@@ -114,7 +114,9 @@ func TestBroadcast(t *testing.T) {
 
 			newBlocks := GenerateNewBlocks(t, peerSyncer.blockchain, tt.numNewBlocks)
 
-			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
+			}
 
 			for _, newBlock := range newBlocks {
 				peerSyncer.Broadcast(newBlock)
@@ -247,7 +249,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 		headers        []*types.Header
 		peerHeaders    []*types.Header
 		numNewBlocks   int
-		synced         bool
+		shouldSync     bool
 		expectedHeight uint64
 	}{
 		{
@@ -255,7 +257,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   15,
-			synced:         true,
+			shouldSync:     true,
 			expectedHeight: 15,
 		},
 		{
@@ -263,7 +265,7 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			headers:        blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
 			peerHeaders:    blockchain.NewTestHeaderChainWithSeed(nil, 1, 0),
 			numNewBlocks:   9,
-			synced:         false,
+			shouldSync:     false,
 			expectedHeight: 9,
 		},
 	}
@@ -271,12 +273,15 @@ func TestWatchSyncWithPeer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
+
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
 			newBlocks := GenerateNewBlocks(t, peerChain, tt.numNewBlocks)
 
-			assert.NoError(t, peerSyncer.blockchain.WriteBlocks(newBlocks))
+			for _, newBlock := range newBlocks {
+				assert.NoError(t, peerSyncer.blockchain.WriteBlock(newBlock))
+			}
 
 			for _, b := range newBlocks {
 				peerSyncer.Broadcast(b)
@@ -286,27 +291,22 @@ func TestWatchSyncWithPeer(t *testing.T) {
 			assert.NotNil(t, peer)
 
 			latestBlock := newBlocks[len(newBlocks)-1]
-			doneCh := make(chan struct{}, 1)
-			go func() {
-				syncer.WatchSyncWithPeer(peer, func(b *types.Block) bool {
-					// sync until latest block
-					return b.Header.Number >= latestBlock.Header.Number
-				})
-				// wait until syncer updates status by latest block
-				WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)
-				doneCh <- struct{}{}
-			}()
+			startSyncTime := time.Now()
+			endSyncTime := startSyncTime.Add(time.Second * 5)
+			syncer.WatchSyncWithPeer(peer, func(b *types.Block) bool {
+				if time.Now().After(endSyncTime) {
+					// Timeout
+					return true
+				}
+				// sync until latest block
+				return b.Header.Number >= latestBlock.Header.Number
+			})
 
-			select {
-			case <-doneCh:
-				assert.True(t, tt.synced, "syncer shouldn't sync any block with peer, but did")
+			if tt.shouldSync {
 				assert.Equal(t, HeaderToStatus(latestBlock.Header), syncer.status)
-				assert.Equal(t, tt.expectedHeight, syncer.status.Number)
-				break
-			case <-time.After(time.Second * 10):
-				assert.False(t, tt.synced, "syncer should sync blocks with peer, but didn't")
-				break
 			}
+
+			assert.Equal(t, tt.expectedHeight, syncer.status.Number)
 		})
 	}
 }
@@ -317,22 +317,25 @@ func TestBulkSyncWithPeer(t *testing.T) {
 		headers     []*types.Header
 		peerHeaders []*types.Header
 		// result
-		synced bool
-		err    error
+		shouldSync    bool
+		syncFromBlock int
+		err           error
 	}{
 		{
-			name:        "should sync until peer's latest block",
-			headers:     blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			peerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			synced:      true,
-			err:         nil,
+			name:          "should sync until peer's latest block",
+			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 30, 0),
+			shouldSync:    true,
+			syncFromBlock: 10,
+			err:           nil,
 		},
 		{
-			name:        "should sync until peer's latest block",
-			headers:     blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
-			peerHeaders: blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
-			synced:      false,
-			err:         errors.New("fork not found"),
+			name:          "shouldn't sync if peer's latest block is behind",
+			headers:       blockchain.NewTestHeaderChainWithSeed(nil, 20, 0),
+			peerHeaders:   blockchain.NewTestHeaderChainWithSeed(nil, 10, 0),
+			shouldSync:    false,
+			syncFromBlock: 0,
+			err:           errors.New("fork not found"),
 		},
 	}
 
@@ -341,23 +344,63 @@ func TestBulkSyncWithPeer(t *testing.T) {
 			chain, peerChain := NewMockBlockchain(tt.headers), NewMockBlockchain(tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
+			var handledNewBlocks []*types.Block
+			newBlocksHandler := func(block *types.Block) {
+				handledNewBlocks = append(handledNewBlocks, block)
+			}
 
 			peer := getPeer(syncer, peerSyncer.server.AddrInfo().ID)
 			assert.NotNil(t, peer)
 
-			err := syncer.BulkSyncWithPeer(peer)
+			err := syncer.BulkSyncWithPeer(peer, newBlocksHandler)
 			assert.Equal(t, tt.err, err)
 			WaitUntilProcessedAllEvents(t, syncer, 10*time.Second)
 
-			expectedStatus := HeaderToStatus(tt.headers[len(tt.headers)-1])
-			if tt.synced {
+			var expectedStatus *Status
+			if tt.shouldSync {
 				expectedStatus = HeaderToStatus(tt.peerHeaders[len(tt.peerHeaders)-1])
+				assert.Equal(t, handledNewBlocks, peerChain.blocks[tt.syncFromBlock:], "not all blocks are handled")
+				assert.Equal(t, peerChain.blocks, chain.blocks, "chain is not synced")
+			} else {
+				expectedStatus = HeaderToStatus(tt.headers[len(tt.headers)-1])
+				assert.NotEqual(t, handledNewBlocks, peerChain.blocks[tt.syncFromBlock:])
+				assert.NotEqual(t, peerChain.blocks, chain.blocks)
 			}
 			assert.Equal(t, expectedStatus, syncer.status)
 		})
 	}
 }
 
+func TestSyncer_GetSyncProgression(t *testing.T) {
+	initialChainSize := 10
+	targetChainSize := 1000
+
+	existingChain := blockchain.NewTestHeaderChainWithSeed(nil, initialChainSize, 0)
+	syncerChain := NewMockBlockchain(existingChain)
+	syncer := CreateSyncer(t, syncerChain, nil)
+
+	syncHeaders := blockchain.NewTestHeaderChainWithSeed(nil, targetChainSize, 0)
+	syncBlocks := blockchain.HeadersToBlocks(syncHeaders)
+
+	syncer.syncProgression.startProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
+	if syncer.GetSyncProgression() == nil {
+		t.Fatalf("Unable to start progression")
+	}
+	assert.Equal(t, uint64(initialChainSize), syncer.syncProgression.getProgression().StartingBlock)
+
+	syncer.syncProgression.updateHighestProgression(uint64(targetChainSize))
+	assert.Equal(t, uint64(targetChainSize), syncer.syncProgression.getProgression().HighestBlock)
+
+	writeErr := syncerChain.WriteBlocks(syncBlocks[initialChainSize+1:])
+	assert.NoError(t, writeErr)
+
+	WaitUntilProgressionUpdated(t, syncer, 15*time.Second, uint64(targetChainSize-1))
+	assert.Equal(t, uint64(targetChainSize-1), syncer.syncProgression.getProgression().CurrentBlock)
+
+	syncer.syncProgression.stopProgression()
+}
+
+// nolint:unused
 type mockBlockStore struct {
 	blocks       []*types.Block
 	subscription *blockchain.MockSubscription
@@ -368,6 +411,7 @@ func (m *mockBlockStore) CalculateGasLimit(number uint64) (uint64, error) {
 	panic("implement me")
 }
 
+// nolint:unused
 func newMockBlockStore() *mockBlockStore {
 	bs := &mockBlockStore{
 		blocks:       make([]*types.Block, 0),
@@ -420,12 +464,21 @@ func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 	}
 	return nil, true
 }
-func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
 
-	for _, b := range blocks {
-		m.td.Add(m.td, big.NewInt(int64(b.Header.Difficulty)))
-		m.blocks = append(m.blocks, b)
+func (m *mockBlockStore) WriteBlocks(blocks []*types.Block) error {
+	for _, block := range blocks {
+		if writeErr := m.WriteBlock(block); writeErr != nil {
+			return writeErr
+		}
 	}
+
+	return nil
+}
+
+func (m *mockBlockStore) WriteBlock(block *types.Block) error {
+	m.td.Add(m.td, big.NewInt(int64(block.Header.Difficulty)))
+	m.blocks = append(m.blocks, block)
+
 	return nil
 }
 
@@ -436,6 +489,8 @@ func (m *mockBlockStore) CurrentTD() *big.Int {
 func (m *mockBlockStore) GetTD(hash types.Hash) (*big.Int, bool) {
 	return m.td, false
 }
+
+// nolint:unused
 func createGenesisBlock() []*types.Block {
 	blocks := make([]*types.Block, 0)
 	genesis := &types.Header{Difficulty: 1, Number: 0}
@@ -447,6 +502,7 @@ func createGenesisBlock() []*types.Block {
 	return blocks
 }
 
+// nolint:unused
 func createBlockStores(count int) (bStore []*mockBlockStore) {
 	bStore = make([]*mockBlockStore, count)
 	for i := 0; i < count; i++ {
@@ -456,11 +512,17 @@ func createBlockStores(count int) (bStore []*mockBlockStore) {
 }
 
 // createNetworkServers is a helper function for generating network servers
+// nolint:unused
 func createNetworkServers(count int, t *testing.T, conf func(c *network.Config)) []*network.Server {
 	networkServers := make([]*network.Server, count)
 
 	for indx := 0; indx < count; indx++ {
-		networkServers[indx] = network.CreateServer(t, conf)
+		server, createErr := network.CreateServer(&network.CreateServerParams{ConfigCallback: conf})
+		if createErr != nil {
+			t.Fatalf("Unable to create network servers, %v", createErr)
+		}
+
+		networkServers[indx] = server
 	}
 
 	return networkServers
@@ -468,6 +530,7 @@ func createNetworkServers(count int, t *testing.T, conf func(c *network.Config))
 
 // createSyncers is a helper function for generating syncers. Servers and BlockStores should be at least the length
 // of count
+// nolint:unused
 func createSyncers(count int, servers []*network.Server, blockStores []*mockBlockStore) []*Syncer {
 	syncers := make([]*Syncer, count)
 
@@ -531,15 +594,10 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 		syncer.Start()
 	}
 
-	network.MultiJoin(
-		t,
-		servers[0],
-		servers[1],
-		servers[0],
-		servers[2],
-		servers[1],
-		servers[2],
-	)
+	joinErrors := network.MeshJoin(servers...)
+	if len(joinErrors) != 0 {
+		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
+	}
 
 	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*10)

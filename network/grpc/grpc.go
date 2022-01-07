@@ -60,7 +60,9 @@ func (g *GrpcStream) Client(stream network.Stream) interface{} {
 }
 
 func (g *GrpcStream) Serve() {
-	go g.grpcServer.Serve(g)
+	go func() {
+		_ = g.grpcServer.Serve(g)
+	}()
 }
 
 func (g *GrpcStream) Handler() func(network.Stream) {

@@ -12,7 +12,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
-// IbftPropose is the command to query the snapshot
+// IbftPropose is the command to propose a candidate and
+// cast a vote for addition / removal from the validator set
 type IbftPropose struct {
 	helper.Base
 	Formatter *helper.FormatterFlag

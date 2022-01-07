@@ -26,7 +26,7 @@ import (
 	msmux "github.com/multiformats/go-multistream"
 
 	"github.com/gogo/protobuf/proto"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 )
 
 var log = logging.Logger("net/identify")
@@ -45,6 +45,9 @@ const LibP2PVersion = "ipfs/0.1.0"
 //
 // Deprecated: Set this with the UserAgent option.
 var ClientVersion = "github.com/libp2p/go-libp2p"
+
+// StreamReadTimeout is the read timeout on all incoming Identify family streams.
+var StreamReadTimeout = 60 * time.Second
 
 var (
 	legacyIDSize = 2 * 1024 // 2k Bytes
@@ -116,7 +119,7 @@ type IDService struct {
 
 // NewIDService constructs a new *IDService and activates it by
 // attaching its stream handler to the given host.Host.
-func NewIDService(h host.Host, opts ...Option) *IDService {
+func NewIDService(h host.Host, opts ...Option) (*IDService, error) {
 	var cfg config
 	for _, opt := range opts {
 		opt(&cfg)
@@ -132,10 +135,9 @@ func NewIDService(h host.Host, opts ...Option) *IDService {
 		Host:      h,
 		UserAgent: userAgent,
 
-		ctx:           hostCtx,
-		ctxCancel:     cancel,
-		conns:         make(map[network.Conn]chan struct{}),
-		observedAddrs: NewObservedAddrManager(hostCtx, h),
+		ctx:       hostCtx,
+		ctxCancel: cancel,
+		conns:     make(map[network.Conn]chan struct{}),
 
 		disableSignedPeerRecord: cfg.disableSignedPeerRecord,
 
@@ -145,6 +147,12 @@ func NewIDService(h host.Host, opts ...Option) *IDService {
 
 	// handle local protocol handler updates, and push deltas to peers.
 	var err error
+
+	observedAddrs, err := NewObservedAddrManager(hostCtx, h)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create observed address manager: %s", err)
+	}
+	s.observedAddrs = observedAddrs
 
 	s.refCount.Add(1)
 	go s.loop()
@@ -168,7 +176,7 @@ func NewIDService(h host.Host, opts ...Option) *IDService {
 	h.SetStreamHandler(IDPush, s.pushHandler)
 
 	h.Network().Notify((*netNotifiee)(s))
-	return s
+	return s, nil
 }
 
 func (ids *IDService) loop() {
@@ -349,7 +357,7 @@ func (ids *IDService) identifyConn(c network.Conn, signal chan struct{}) {
 		}
 	}()
 
-	s, err = c.NewStream()
+	s, err = c.NewStream(network.WithUseTransient(context.TODO(), "identify"))
 	if err != nil {
 		log.Debugw("error opening identify stream", "error", err)
 		// the connection is probably already closed if we hit this.
@@ -365,11 +373,15 @@ func (ids *IDService) identifyConn(c network.Conn, signal chan struct{}) {
 
 	// ok give the response to our handler.
 	if err = msmux.SelectProtoOrFail(ID, s); err != nil {
-		log.Event(context.TODO(), "IdentifyOpenFailed", c.RemotePeer(), logging.Metadata{"error": err})
+		log.Infow("failed negotiate identify protocol with peer",
+			"peer", c.RemotePeer(),
+			"error", err,
+		)
 		s.Reset()
 		return
 	}
-	ids.handleIdentifyResponse(s)
+
+	err = ids.handleIdentifyResponse(s)
 }
 
 func (ids *IDService) sendIdentifyResp(s network.Stream) {
@@ -408,16 +420,18 @@ func (ids *IDService) sendIdentifyResp(s network.Stream) {
 	log.Debugf("%s sent message to %s %s", ID, c.RemotePeer(), c.RemoteMultiaddr())
 }
 
-func (ids *IDService) handleIdentifyResponse(s network.Stream) {
+func (ids *IDService) handleIdentifyResponse(s network.Stream) error {
+	_ = s.SetReadDeadline(time.Now().Add(StreamReadTimeout))
+
 	c := s.Conn()
 
 	r := protoio.NewDelimitedReader(s, signedIDSize)
 	mes := &pb.Identify{}
 
 	if err := readAllIDMessages(r, mes); err != nil {
-		log.Warning("error reading identify message: ", err)
+		log.Warn("error reading identify message: ", err)
 		s.Reset()
-		return
+		return err
 	}
 
 	defer s.Close()
@@ -425,6 +439,8 @@ func (ids *IDService) handleIdentifyResponse(s network.Stream) {
 	log.Debugf("%s received message from %s %s", s.Protocol(), c.RemotePeer(), c.RemoteMultiaddr())
 
 	ids.consumeMessage(mes, c)
+
+	return nil
 }
 
 func readAllIDMessages(r protoio.Reader, finalMsg proto.Message) error {
@@ -640,7 +656,7 @@ func (ids *IDService) consumeReceivedPubKey(c network.Conn, kb []byte) {
 
 	newKey, err := ic.UnmarshalPublicKey(kb)
 	if err != nil {
-		log.Warningf("%s cannot unmarshal key from remote peer: %s, %s", lp, rp, err)
+		log.Warnf("%s cannot unmarshal key from remote peer: %s, %s", lp, rp, err)
 		return
 	}
 

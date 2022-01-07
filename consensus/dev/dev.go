@@ -3,6 +3,7 @@ package dev
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
@@ -189,13 +190,13 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	})
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+	if err := d.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
 
 	// after the block has been written we reset the txpool so that
 	// the old transactions are removed
-	d.txpool.ResetWithHeader(block.Header)
+	d.txpool.ResetWithHeaders(block.Header)
 
 	return nil
 }
@@ -209,6 +210,10 @@ func (d *Dev) VerifyHeader(parent *types.Header, header *types.Header) error {
 
 func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
+}
+
+func (d *Dev) GetSyncProgression() *protocol.Progression {
+	return nil
 }
 
 func (d *Dev) Prepare(header *types.Header) error {

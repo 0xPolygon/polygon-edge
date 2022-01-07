@@ -49,7 +49,7 @@ func (b *KVBatch) Put(k, v []byte) {
 }
 
 func (b *KVBatch) Write() {
-	b.db.Write(b.batch, nil)
+	_ = b.db.Write(b.batch, nil)
 }
 
 func (kv *KVStorage) SetCode(hash types.Hash, code []byte) {
@@ -65,7 +65,7 @@ func (kv *KVStorage) Batch() Batch {
 }
 
 func (kv *KVStorage) Put(k, v []byte) {
-	kv.db.Put(k, v, nil)
+	_ = kv.db.Put(k, v, nil)
 }
 
 func (kv *KVStorage) Get(k []byte) ([]byte, bool) {

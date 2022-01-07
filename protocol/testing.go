@@ -48,7 +48,13 @@ func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *ne
 		serverCfg = &defaultNetworkConfig
 	}
 
-	srv := network.CreateServer(t, *serverCfg)
+	srv, createErr := network.CreateServer(&network.CreateServerParams{
+		ConfigCallback: *serverCfg,
+	})
+	if createErr != nil {
+		t.Fatalf("Unable to create networking server, %v", createErr)
+	}
+
 	syncer := NewSyncer(hclog.NewNullLogger(), srv, blockchain)
 	syncer.Start()
 
@@ -98,6 +104,21 @@ func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Dura
 	assert.NoError(t, err)
 }
 
+// WaitUntilProgressionUpdated waits until the syncer's progression current block reaches a target
+func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Duration, target uint64) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		return nil, syncer.syncProgression.getProgression().CurrentBlock < target
+	})
+	assert.NoError(t, err)
+}
+
 // NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	seed := rand.Intn(maxSeed)
@@ -112,9 +133,16 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 	peerSyncers = make([]*Syncer, len(peerChains))
 	for idx, peerChain := range peerChains {
 		peerSyncers[idx] = CreateSyncer(t, peerChain, nil)
-		network.MultiJoin(t, syncer.server, peerSyncers[idx].server)
+
+		if joinErr := network.JoinAndWait(
+			syncer.server,
+			peerSyncers[idx].server,
+			network.DefaultBufferTimeout,
+			network.DefaultJoinTimeout,
+		); joinErr != nil {
+			t.Fatalf("Unable to join servers, %v", joinErr)
+		}
 	}
-	WaitUntilPeerConnected(t, syncer, len(peerChains), 10*time.Second)
 	return syncer, peerSyncers
 }
 
@@ -179,8 +207,8 @@ func HeaderToStatus(h *types.Header) *Status {
 
 // mockBlockchain is a mock of blockhain for syncer tests
 type mockBlockchain struct {
-	blocks       []*types.Block
-	subscription *mockSubscription
+	blocks        []*types.Block
+	subscriptions []*mockSubscription
 }
 
 func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
@@ -189,13 +217,15 @@ func (b *mockBlockchain) CalculateGasLimit(number uint64) (uint64, error) {
 
 func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 	return &mockBlockchain{
-		blocks:       blockchain.HeadersToBlocks(headers),
-		subscription: NewMockSubscription(),
+		blocks:        blockchain.HeadersToBlocks(headers),
+		subscriptions: make([]*mockSubscription, 0),
 	}
 }
 
 func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
-	return b.subscription
+	subscription := NewMockSubscription()
+	b.subscriptions = append(b.subscriptions, subscription)
+	return subscription
 }
 
 func (b *mockBlockchain) Header() *types.Header {
@@ -254,9 +284,22 @@ func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	return nil, false
 }
 
+func (b *mockBlockchain) WriteBlock(block *types.Block) error {
+	b.blocks = append(b.blocks, block)
+	for _, subscription := range b.subscriptions {
+		subscription.AppendBlock(block)
+	}
+
+	return nil
+}
+
 func (b *mockBlockchain) WriteBlocks(blocks []*types.Block) error {
-	b.blocks = append(b.blocks, blocks...)
-	b.subscription.AppendBlocks(blocks)
+	for _, block := range blocks {
+		if writeErr := b.WriteBlock(block); writeErr != nil {
+			return writeErr
+		}
+	}
+
 	return nil
 }
 
@@ -267,17 +310,15 @@ type mockSubscription struct {
 
 func NewMockSubscription() *mockSubscription {
 	return &mockSubscription{
-		eventCh: make(chan *blockchain.Event, 2), // make with 2 capacities in order to check subsequent event easily
+		eventCh: make(chan *blockchain.Event),
 	}
 }
 
-func (s *mockSubscription) AppendBlocks(blocks []*types.Block) {
-	for _, b := range blocks {
-		status := HeaderToStatus(b.Header)
-		s.eventCh <- &blockchain.Event{
-			Difficulty: status.Difficulty,
-			NewChain:   []*types.Header{b.Header},
-		}
+func (s *mockSubscription) AppendBlock(block *types.Block) {
+	status := HeaderToStatus(block.Header)
+	s.eventCh <- &blockchain.Event{
+		Difficulty: status.Difficulty,
+		NewChain:   []*types.Header{block.Header},
 	}
 }
 

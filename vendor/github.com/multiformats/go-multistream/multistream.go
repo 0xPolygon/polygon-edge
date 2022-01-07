@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 
 	"io"
 	"sync"
@@ -79,6 +80,16 @@ func delimWriteBuffered(w io.Writer, mes []byte) error {
 	}
 
 	return bw.Flush()
+}
+
+func delitmWriteAll(w io.Writer, messages ...[]byte) error {
+	for _, mes := range messages {
+		if err := delimWrite(w, mes); err != nil {
+			return fmt.Errorf("failed to write messages %s, err: %v	", string(mes), err)
+		}
+	}
+
+	return nil
 }
 
 func delimWrite(w io.Writer, mes []byte) error {

@@ -14,7 +14,7 @@ env:
 install:
   # Manually download and install Go 1.13 instead of using gimme.
   # It looks like gimme Go causes some errors on go-test for Wasm.
-  - wget -O go.tar.gz https://dl.google.com/go/go1.13.4.linux-amd64.tar.gz
+  - wget -O go.tar.gz https://dl.google.com/go/go1.15.3.linux-amd64.tar.gz
   - tar -C ~ -xzf go.tar.gz
   - rm go.tar.gz
   - export GOROOT=~/go
