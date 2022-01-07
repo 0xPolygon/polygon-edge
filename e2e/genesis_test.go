@@ -10,9 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,6 +64,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetBlockLimit(blockGasLimit)
+		// config.SetDevInterval(3)
 		config.Premine(senderAddress, framework.EthToWei(100))
 		config.SetBlockGasTarget(blockGasLimit)
 	})
@@ -85,7 +84,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	signer := crypto.NewEIP155Signer(100)
 
 	for i := 0; i < 20; i++ {
-		tx, err := signer.SignTx(&types.Transaction{
+		signedTx, err := signer.SignTx(&types.Transaction{
 			Nonce:    uint64(i),
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      blockGasLimit,
@@ -98,27 +97,17 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 			t.Fatalf("failed to sign txn: %v", err)
 		}
 
-		_, err = srv.TxnPoolOperator().AddTxn(context.Background(), &txpoolOp.AddTxnReq{
-			Raw: &any.Any{
-				Value: tx.MarshalRLP(),
-			},
-			From: types.ZeroAddress.String(),
-		})
-		if err != nil {
-			t.Fatalf("failed to add txn: %v", err)
-		}
+		_, err = srv.JSONRPC().Eth().SendRawTransaction(signedTx.MarshalRLP())
+		assert.NoError(t, err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = framework.WaitUntilBlockMined(ctx, srv, 1)
 	assert.NoError(t, err)
 
 	block, err = client.Eth().GetBlockByNumber(1, true)
-	if err != nil {
-		t.Fatalf("failed to retreive block %d: %v", 1, err)
-	}
-
+	assert.NoError(t, err, "failed to retreive block %d: %v", 1, err)
 	assert.NotNil(t, block)
 
 	if block.GasLimit != blockGasLimit {
