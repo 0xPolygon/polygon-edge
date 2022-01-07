@@ -23,7 +23,34 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
-          args: --timeout=3m
+          args:
+            --timeout=3m
+            -E whitespace
+            -E wsl
+            -E wastedassign
+            -E unconvert
+            -E tparallel
+            -E thelper
+            -E stylecheck
+            -E prealloc
+            -E predeclared
+            -E nolintlint
+            -E nlreturn
+            -E nilnil
+            -E misspell
+            -E makezero
+            -E lll
+            -E importas
+            -E ifshort
+            -E gosec
+            -E gomnd
+            -E gofmt
+            -E goconst
+            -E forcetypeassert
+            -E dogsled
+            -E dupl
+            -E errname
+            -E errorlint
           skip-go-installation: true
   test:
     runs-on: ubuntu-latest
