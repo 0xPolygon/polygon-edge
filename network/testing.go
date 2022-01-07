@@ -72,9 +72,9 @@ func LeaveAndWait(
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)
 	defer cancelFn()
-	_, connectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
+	_, disconnectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
 
-	return connectErr
+	return disconnectErr
 }
 
 func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {

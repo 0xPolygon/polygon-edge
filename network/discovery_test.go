@@ -208,7 +208,7 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	t.Cleanup(func() {
-		// close only servers[0] because servers[0] has closed already
+		// close only servers[0] because servers[1] has closed already
 		closeTestServers(t, servers[:1])
 	})
 
