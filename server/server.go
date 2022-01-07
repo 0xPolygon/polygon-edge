@@ -220,14 +220,18 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	if err != nil {
 		return 0
 	}
+
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
 	if !ok {
 		return 0
 	}
+
 	var account state.Account
+
 	if err := account.UnmarshalRlp(result); err != nil {
 		return 0
 	}
+
 	return account.Nonce
 }
 
@@ -365,10 +369,12 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 	if err != nil {
 		return nil, err
 	}
+
 	var account state.Account
 	if err := account.UnmarshalRlp(obj); err != nil {
 		return nil, err
 	}
+
 	return &account, nil
 }
 

@@ -14,10 +14,12 @@ func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storag
 	if !ok {
 		return nil, fmt.Errorf("path not found")
 	}
+
 	pathStr, ok := path.(string)
 	if !ok {
 		return nil, fmt.Errorf("path is not a string")
 	}
+
 	return NewLevelDBStorage(pathStr, logger)
 }
 
@@ -29,6 +31,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error
 	}
 
 	kv := &levelDBKV{db}
+
 	return storage.NewKeyValueStorage(logger.Named("leveldb"), kv), nil
 }
 

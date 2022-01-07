@@ -65,6 +65,7 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		Gas:      queryGasLimit,
 		Nonce:    t.GetNonce(from),
 	})
+
 	if err != nil {
 		return nil, err
 	}

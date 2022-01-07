@@ -224,10 +224,13 @@ func (t *TestServer) GenerateGenesis() error {
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
 		args = append(args, "--consensus", "ibft")
+
 		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
 		}
+
 		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
+
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}

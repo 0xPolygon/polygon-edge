@@ -145,6 +145,7 @@ func (e *Event) AddNewHeader(newHeader *types.Header) {
 // AddOldHeader appends a header to the event's OldChain array
 func (e *Event) AddOldHeader(oldHeader *types.Header) {
 	header := oldHeader.Copy()
+
 	if e.OldChain == nil {
 		// Array doesn't exist yet, create it
 		e.OldChain = []*types.Header{}
@@ -192,6 +193,7 @@ func (e *eventStream) Head() (*eventElem, chan void) {
 	head := e.head
 
 	ch := make(chan void)
+
 	if e.updateCh == nil {
 		e.updateCh = make([]chan void, 0)
 	}
@@ -214,6 +216,7 @@ func (e *eventStream) push(event *Event) {
 	if e.head != nil {
 		e.head.next = newHead
 	}
+
 	e.head = newHead
 
 	// Notify the listeners

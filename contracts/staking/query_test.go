@@ -24,14 +24,17 @@ func leftPad(buf []byte, n int) []byte {
 
 	tmp := make([]byte, n)
 	copy(tmp[n-l:], buf)
+
 	return tmp
 }
 
 func appendAll(bytesArrays ...[]byte) []byte {
 	var res []byte
+
 	for idx := range bytesArrays {
 		res = append(res, bytesArrays[idx]...)
 	}
+
 	return res
 }
 
@@ -46,6 +49,7 @@ func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) 
 	}
 
 	tx.ComputeHash()
+
 	res, ok := m.hashToRes[tx.Hash]
 	if ok {
 		return res, nil
@@ -58,6 +62,7 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	if m.nonce != nil {
 		return m.nonce[addr]
 	}
+
 	return 0
 }
 

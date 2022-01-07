@@ -154,6 +154,7 @@ func NewContract(depth int, origin types.Address, from types.Address, to types.A
 		Code:        code,
 		Depth:       depth,
 	}
+
 	return f
 }
 
@@ -165,5 +166,6 @@ func NewContractCreation(depth int, origin types.Address, from types.Address, to
 func NewContractCall(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	c.Input = input
+
 	return c
 }

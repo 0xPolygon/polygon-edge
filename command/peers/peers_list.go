@@ -59,6 +59,7 @@ func (p *PeersList) Run(args []string) int {
 
 	clt := proto.NewSystemClient(conn)
 	resp, err := clt.PeersList(context.Background(), &empty.Empty{})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
 		return 1
@@ -79,6 +80,7 @@ func NewPeersListResult(resp *proto.PeersListResponse) *PeersListResult {
 	for i, p := range resp.Peers {
 		peers[i] = p.Id
 	}
+
 	return &PeersListResult{
 		Peers: peers,
 	}
@@ -100,6 +102,7 @@ func (r *PeersListResult) Output() string {
 		}
 		buffer.WriteString(helper.FormatKV(rows))
 	}
+
 	buffer.WriteString("\n")
 
 	return buffer.String()

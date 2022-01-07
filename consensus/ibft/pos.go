@@ -141,6 +141,7 @@ func (i *Ibft) getNextValidators(header *types.Header) (ValidatorSet, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return staking.QueryValidators(transition, i.validatorKeyAddr)
 }
 
@@ -160,6 +161,7 @@ func (i *Ibft) updateValidators(num uint64) error {
 	if err != nil {
 		return err
 	}
+
 	if snap == nil {
 		return fmt.Errorf("cannot find snapshot at %d", header.Number)
 	}
@@ -176,6 +178,7 @@ func (i *Ibft) updateValidators(num uint64) error {
 			i.store.replace(newSnap)
 		}
 	}
+
 	return nil
 }
 
@@ -188,6 +191,7 @@ func (i *Ibft) batchUpdateValidators(from, to uint64) error {
 			}
 		}
 	}
+
 	return nil
 }
 

@@ -85,9 +85,11 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 	if err != nil {
 		return err
 	}
+
 	for indx, body := range bodies {
 		slot.blocks[bodyIndex[indx]].Transactions = body.Transactions
 	}
+
 	return nil
 }
 

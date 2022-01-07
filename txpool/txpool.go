@@ -462,7 +462,7 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 	t.pendingQueue.lock.Lock()
 
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
-	
+
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
 		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
@@ -837,6 +837,7 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	}
 	// tx.GasPrice < lowestTx.Price
 	underpriced := tx.GasPrice.Cmp(lowestTx.price) < 0
+
 	if pushErr := t.remoteTxns.Push(lowestTx.tx); pushErr != nil {
 		t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
 	}

@@ -186,6 +186,7 @@ func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]
 				return nil, err
 			}
 		}
+
 		res = append(res, &body)
 	}
 

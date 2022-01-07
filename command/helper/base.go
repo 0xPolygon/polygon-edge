@@ -31,6 +31,7 @@ func (c *Base) DefineFlags(ds ...FlagDefiner) {
 		// Flag map not initialized
 		c.FlagMap = make(map[string]FlagDescriptor)
 	}
+
 	for _, d := range ds {
 		d.DefineFlags(c.FlagMap)
 	}
@@ -42,5 +43,6 @@ func (m *Base) NewFlagSet(n string, ss ...FlagSetter) *flag.FlagSet {
 	for _, s := range ss {
 		s.FlagSet(flag)
 	}
+
 	return flag
 }

@@ -368,6 +368,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	for i := 0; i < numAccounts; i++ {
 		// Start a concurrent loop
 		wg.Add(1)
+
 		go func(index int, clt txpoolOp.TxnPoolOperatorClient, testAccounts []*testAccount) {
 			defer wg.Done()
 
@@ -771,6 +772,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 
 	for i := 0; i < numIterations; i++ {
 		wg.Add(1)
+
 		go sendTx()
 	}
 

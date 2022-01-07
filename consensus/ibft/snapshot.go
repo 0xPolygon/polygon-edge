@@ -28,6 +28,7 @@ func (i *Ibft) setupSnapshot() error {
 
 	header := i.blockchain.Header()
 	meta, err := i.getSnapshotMetadata()
+
 	if err != nil {
 		return err
 	}
@@ -48,12 +49,14 @@ func (i *Ibft) setupSnapshot() error {
 	currentEpoch := header.Number / i.epochSize
 	metaEpoch := meta.LastBlock / i.epochSize
 	snapshot, _ := i.getSnapshot(header.Number)
+
 	if snapshot == nil || metaEpoch < currentEpoch {
 		// Restore snapshot at the beginning of the current epoch by block header
 		// if list doesn't have any snapshots to calculate snapshot for the next header
 		i.logger.Info("snapshot was not found, restore snapshot at beginning of current epoch", "current epoch", currentEpoch)
 		beginHeight := currentEpoch * i.epochSize
 		beginHeader, ok := i.blockchain.GetHeaderByNumber(beginHeight)
+
 		if !ok {
 			return fmt.Errorf("header at %d not found", beginHeight)
 		}
@@ -61,6 +64,7 @@ func (i *Ibft) setupSnapshot() error {
 		if err := i.addHeaderSnap(beginHeader); err != nil {
 			return err
 		}
+
 		i.store.updateLastBlock(beginHeight)
 
 		if meta, err = i.getSnapshotMetadata(); err != nil {
@@ -76,10 +80,12 @@ func (i *Ibft) setupSnapshot() error {
 			if num == 0 {
 				continue
 			}
+
 			header, ok := i.blockchain.GetHeaderByNumber(num)
 			if !ok {
 				return fmt.Errorf("header %d not found", num)
 			}
+
 			if err := i.processHeaders([]*types.Header{header}); err != nil {
 				return err
 			}
@@ -138,6 +144,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	snap := parentSnap.Copy()
 
 	// saveSnap is a callback function to set height and hash in current snapshot with given header
@@ -230,6 +237,7 @@ func (v *Vote) Equal(vv *Vote) bool {
 func (v *Vote) Copy() *Vote {
 	vv := new(Vote)
 	*vv = *v
+
 	return vv
 }
 
@@ -279,6 +287,7 @@ func (s *Snapshot) Count(h func(v *Vote) bool) (count int) {
 			count++
 		}
 	}
+
 	return
 }
 
@@ -363,6 +372,7 @@ func (s *snapshotStore) loadFromPath(path string) error {
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
 		return err
 	}
+
 	if meta != nil {
 		s.lastNumber = meta.LastBlock
 	}
@@ -372,6 +382,7 @@ func (s *snapshotStore) loadFromPath(path string) error {
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
 		return err
 	}
+
 	for _, snap := range snaps {
 		s.add(snap)
 	}

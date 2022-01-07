@@ -128,6 +128,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		Transactions:    []transactionOrHash{},
 		Uncles:          []types.Hash{},
 	}
+	
 	for idx, txn := range b.Transactions {
 		if fullTx {
 			res.Transactions = append(
@@ -146,9 +147,11 @@ func toBlock(b *types.Block, fullTx bool) *block {
 			)
 		}
 	}
+
 	for _, uncle := range b.Uncles {
 		res.Uncles = append(res.Uncles, uncle.Hash)
 	}
+
 	return res
 }
 

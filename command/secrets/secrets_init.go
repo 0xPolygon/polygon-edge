@@ -116,6 +116,7 @@ func (p *SecretsInit) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter)
 
 	var dataDir string
+
 	var configPath string
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
@@ -132,6 +133,7 @@ func (p *SecretsInit) Run(args []string) int {
 	}
 
 	var secretsManager secrets.SecretsManager
+
 	if configPath == "" {
 		// No secrets manager config specified,
 		// use the local secrets manager

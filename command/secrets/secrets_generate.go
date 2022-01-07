@@ -101,12 +101,14 @@ func (s *SecretsGenerate) GetBaseCommand() string {
 func (s *SecretsGenerate) Run(args []string) int {
 	flags := s.Base.NewFlagSet(s.GetBaseCommand())
 
-	var path string
-	var token string
-	var serverURL string
-	var serviceType string
-	var name string
-	var namespace string
+	var (
+		path        string
+		token       string
+		serverURL   string
+		serviceType string
+		name        string
+		namespace   string
+	)
 
 	flags.StringVar(&path, "dir", defaultConfigFileName, "")
 	flags.StringVar(&token, "token", "", "")

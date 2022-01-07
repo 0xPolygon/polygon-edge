@@ -105,11 +105,13 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 	if err := tx.UnmarshalRLP(buf); err != nil {
 		return nil, err
 	}
+
 	tx.ComputeHash()
 
 	if err := e.d.store.AddTx(tx); err != nil {
 		return nil, err
 	}
+
 	return tx.Hash.String(), nil
 }
 

@@ -165,6 +165,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if err := s.WriteHeadNumber(i); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteHeadHash(hash); err != nil {
 			t.Fatal(err)
 		}
@@ -173,6 +174,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if !ok {
 			t.Fatal("num not found")
 		}
+
 		if n2 != i {
 			t.Fatal("bad")
 		}
@@ -181,6 +183,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if !ok {
 			t.Fatal("hash not found")
 		}
+
 		if !reflect.DeepEqual(hash1, hash) {
 			t.Fatal("bad")
 		}
@@ -324,6 +327,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 	body := &types.Body{
 		Transactions: []*types.Transaction{txn},
 	}
+
 	if err := s.WriteBody(h.Hash, body); err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +369,9 @@ func testReceipts(t *testing.T, m MockStorage) {
 	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
+
 	found, err := s.ReadReceipts(h.Hash)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,6 +411,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found head hash")
 	}
+
 	if headHash != h.Hash {
 		t.Fatal("head hash not correct")
 	}
@@ -413,6 +420,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found head num")
 	}
+
 	if headNum != h.Number {
 		t.Fatal("head num not correct")
 	}
@@ -421,6 +429,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found can hash")
 	}
+
 	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")
 	}

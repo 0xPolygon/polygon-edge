@@ -201,6 +201,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 
 	for i := 0; i < len(srvs); i += 2 {
 		src, dst := srvs[i], srvs[i+1]
+
 		go func() {
 			srcClient, dstClient := src.Operator(), dst.Operator()
 			dstStatus, err := dstClient.GetStatus(context.Background(), &empty.Empty{})
@@ -406,6 +407,7 @@ func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
 	var wg sync.WaitGroup
 	for i := 0; i < len(servers); i++ {
 		wg.Add(1)
+
 		go func(indx int) {
 			waitCtx, waitCancelFn := context.WithTimeout(context.Background(), time.Minute)
 			defer func() {

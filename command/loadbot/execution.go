@@ -77,8 +77,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	fastestTurnAround := defaultFastestTurnAround
 	slowestTurnAround := defaultSlowestTurnAround
 	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
-	var zeroTime time.Time  // Zero time
-	var totalTime time.Time // Zero time used for tracking
+
+	var (
+		zeroTime  time.Time // Zero time
+		totalTime time.Time // Zero time used for tracking
+	)
 
 	if totalPassing == 0 {
 		// No data to show, use zero data
@@ -163,6 +166,7 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	if err != nil {
 		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
 	}
+
 	return nonce, nil
 }
 
@@ -187,6 +191,7 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 	if err != nil {
 		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %v", err)
 	}
+
 	return hash, nil
 }
 
@@ -225,6 +230,7 @@ func (l *Loadbot) Run() error {
 		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
@@ -264,6 +270,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	wg.Wait()
+
 	endTime := time.Now()
 
 	// Calculate the turn around metrics now that the loadbot is done

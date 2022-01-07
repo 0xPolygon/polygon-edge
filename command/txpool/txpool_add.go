@@ -100,13 +100,11 @@ func (p *TxPoolAdd) Synopsis() string {
 func (p *TxPoolAdd) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
-	// Address types
-	var fromRaw, toRaw string
-
-	// BigInt types
-	var valueRaw, gasPriceRaw string
-
-	var nonce, gasLimit uint64
+	var (
+		fromRaw, toRaw        string
+		valueRaw, gasPriceRaw string
+		nonce, gasLimit       uint64
+	)
 
 	// Define the flags
 	flags.StringVar(&fromRaw, "from", "", "")
@@ -129,17 +127,22 @@ func (p *TxPoolAdd) Run(args []string) int {
 		p.Formatter.OutputError(fmt.Errorf("Failed to decode from address: %v", err))
 		return 1
 	}
+
 	to := types.Address{}
+
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
 		p.Formatter.OutputError(fmt.Errorf("Failed to decode to address: %v", err))
 		return 1
 	}
+
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %v", err))
 		return 1
 	}
+
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
+
 	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("Failed to decode to gasPrice: %v", err))
 		return 1

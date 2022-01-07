@@ -25,6 +25,7 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 	}
 
 	srvs := make([]*TestServer, 0, numNodes)
+
 	t.Cleanup(func() {
 		for _, s := range srvs {
 			s.Stop()

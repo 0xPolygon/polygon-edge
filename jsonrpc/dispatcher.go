@@ -66,11 +66,14 @@ func newDispatcher(logger hclog.Logger, store blockchainInterface, chainID uint6
 		store:   store,
 		chainID: chainID,
 	}
+
 	d.registerEndpoints()
+
 	if store != nil {
 		d.filterManager = NewFilterManager(logger, store)
 		go d.filterManager.Run()
 	}
+
 	return d
 }
 
@@ -98,10 +101,13 @@ func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) 
 	if !ok {
 		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
+
 	fd, ok := service.funcMap[funcName]
+
 	if !ok {
 		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
+
 	return service, fd, nil
 }
 
@@ -162,6 +168,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return false, NewInvalidRequestError("Invalid json request")
 	}
+
 	if len(params) != 1 {
 		return false, NewInvalidParamsError("Invalid params")
 	}
@@ -189,9 +196,11 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 		resp, err := formatFilterResponse(req.ID, filterID)
+
 		if err != nil {
 			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
+
 		return []byte(resp), nil
 	}
 
@@ -520,6 +529,8 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	if arg.To != nil {
 		txn.To = arg.To
 	}
+
 	txn.ComputeHash()
+
 	return txn, nil
 }

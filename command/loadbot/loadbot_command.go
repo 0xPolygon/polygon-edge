@@ -95,13 +95,16 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags := l.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
 	// Placeholders for flags
-	var tps uint64
-	var senderRaw string
-	var receiverRaw string
-	var valueRaw string
-	var count uint64
-	var jsonrpc string
-	var maxConns int
+	var (
+		tps         uint64
+		senderRaw   string
+		receiverRaw string
+		valueRaw    string
+		count       uint64
+		jsonrpc     string
+		maxConns    int
+	)
+
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
@@ -121,7 +124,9 @@ func (l *LoadbotCommand) Run(args []string) int {
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
 	}
+
 	var sender types.Address
+
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("Failed to decode sender address: %w", err))
 		return 1
@@ -265,14 +270,17 @@ func (lr *LoadbotResult) Output() string {
 		buffer.WriteString("\n\n")
 
 		keys := make([]uint64, 0, lr.BlockData.BlocksRequired)
+
 		for k := range lr.BlockData.BlockTransactionsMap {
 			keys = append(keys, k)
 		}
+
 		sort.Slice(keys, func(i, j int) bool {
 			return keys[i] < keys[j]
 		})
 
 		formattedStrings := make([]string, 0)
+
 		for _, blockNumber := range keys {
 			formattedStrings = append(formattedStrings,
 				fmt.Sprintf("Block #%d|%d txns", blockNumber, lr.BlockData.BlockTransactionsMap[blockNumber]),

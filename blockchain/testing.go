@@ -36,6 +36,7 @@ func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types
 		genesis = head(0)
 		genesis.ComputeHash()
 	}
+
 	headers := []*types.Header{genesis}
 
 	count := int64(genesis.Number) + 1
@@ -76,6 +77,7 @@ func HeadersToBlocks(headers []*types.Header) []*types.Block {
 	for indx, i := range headers {
 		blocks[indx] = &types.Block{Header: i}
 	}
+
 	return blocks
 }
 
@@ -166,13 +168,16 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
 	b, err := newBlockChain(config, state.NewExecutor(config.Params, st, hclog.NewNullLogger()))
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if headers != nil {
 		if _, err := b.advanceHead(headers[0]); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := b.WriteHeaders(headers[1:]); err != nil {
 			t.Fatal(err)
 		}
@@ -205,12 +210,14 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
 		genesis = &chain.Genesis{}
 	}
+
 	config := &chain.Chain{
 		Genesis: genesis,
 		Params: &chain.Params{
 			BlockGasTarget: defaultBlockGasTarget,
 		},
 	}
+
 	b, err := newBlockChain(config, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -223,6 +230,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	if executor == nil {
 		executor = &mockExecutor{}
 	}
+
 	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
 	if err != nil {
 		return nil, err
@@ -232,5 +240,6 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	if err = b.ComputeGenesis(); err != nil {
 		return nil, fmt.Errorf("compute genisis: %w", err)
 	}
+
 	return b, nil
 }

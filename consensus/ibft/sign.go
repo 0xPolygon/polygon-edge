@@ -53,7 +53,9 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 	if committed {
 		msg = commitMsg(hash)
 	}
+
 	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
+
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +66,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
 	seal, err := signSealImpl(prv, h, false)
+
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +182,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	rawMsg := commitMsg(hash)
 
 	visited := map[types.Address]struct{}{}

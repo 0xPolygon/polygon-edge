@@ -76,8 +76,10 @@ var (
 func (p *IbftPropose) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
-	var vote string
-	var ethAddress string
+	var (
+		vote       string
+		ethAddress string
+	)
 
 	flags.StringVar(&vote, "vote", "", "")
 	flags.StringVar(&ethAddress, "addr", "", "")

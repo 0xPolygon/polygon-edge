@@ -15,7 +15,9 @@ func createJsonRpcClient(endpoint string, maxConns int) (*jsonrpc.Client, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new JSON RPC client: %v", err)
 	}
+
 	client.SetMaxConnsLimit(maxConns)
+
 	return client, nil
 }
 
@@ -28,9 +30,12 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 	privateKeyRaw := os.Getenv("PSDK_" + address.String())
 	privateKeyRaw = strings.TrimPrefix(privateKeyRaw, "0x")
 	privateKey, err := crypto.BytesToPrivateKey([]byte(privateKeyRaw))
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract ECDSA private key from bytes: %v", err)
 	}
+
 	sender.PrivateKey = privateKey
+
 	return sender, nil
 }

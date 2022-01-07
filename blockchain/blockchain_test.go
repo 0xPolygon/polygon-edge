@@ -43,6 +43,7 @@ func (c *dummyChain) add(h *header) error {
 		if !ok {
 			return fmt.Errorf("parent not found %v", h.parent)
 		}
+
 		parent = p.Hash
 	}
 
@@ -52,8 +53,10 @@ func (c *dummyChain) add(h *header) error {
 		Difficulty: h.diff,
 		ExtraData:  []byte{h.hash},
 	}
+
 	hh.ComputeHash()
 	c.headers[h.hash] = hh
+
 	return nil
 }
 
@@ -67,6 +70,7 @@ type header struct {
 func (h *header) Parent(parent byte) *header {
 	h.parent = parent
 	h.number = uint64(parent) + 1
+
 	return h
 }
 

@@ -37,6 +37,7 @@ func (f *Forks) active(ff *Fork, block uint64) bool {
 	if ff == nil {
 		return false
 	}
+
 	return ff.Active(block)
 }
 

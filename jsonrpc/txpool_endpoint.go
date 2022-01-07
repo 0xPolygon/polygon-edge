@@ -64,13 +64,16 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 func (t *Txpool) Content() (interface{}, error) {
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	pendingRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
+
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address] = make(map[uint64]*txpoolTransaction)
 		for nonce, tx := range nonces {
 			pendingRpcTxns[address][nonce] = toTxPoolTransaction(tx)
 		}
 	}
+
 	queuedRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
+
 	for address, nonces := range queuedTxs {
 		queuedRpcTxns[address] = make(map[uint64]*txpoolTransaction)
 		for nonce, tx := range nonces {
@@ -91,6 +94,7 @@ func (t *Txpool) Content() (interface{}, error) {
 func (t *Txpool) Inspect() (interface{}, error) {
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	pendingRpcTxns := make(map[string]map[string]string)
+
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address.String()] = make(map[string]string)
 

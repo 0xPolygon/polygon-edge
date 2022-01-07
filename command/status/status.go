@@ -59,6 +59,7 @@ func (c *StatusCommand) Run(args []string) int {
 
 	clt := proto.NewSystemClient(conn)
 	status, err := clt.GetStatus(context.Background(), &emptypb.Empty{})
+
 	if err != nil {
 		c.Formatter.OutputError(err)
 		return 1

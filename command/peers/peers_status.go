@@ -75,6 +75,7 @@ func (p *PeersStatus) Run(args []string) int {
 
 	clt := proto.NewSystemClient(conn)
 	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeId})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
 		return 1

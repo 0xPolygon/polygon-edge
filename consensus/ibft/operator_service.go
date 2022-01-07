@@ -87,9 +87,11 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 	} else {
 		snap, err = o.ibft.getSnapshot(req.Number)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	resp := snap.ToProto()
 
 	return resp, nil
@@ -122,6 +124,7 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 			return nil, fmt.Errorf("the candidate is already a validator")
 		}
 	}
+
 	if !req.Auth {
 		if !snap.Set.Includes(addr) {
 			return nil, fmt.Errorf("cannot remove a validator if they're not in the snapshot")

@@ -56,10 +56,13 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if err != nil {
 		return err
 	}
+
 	elems, err := v.GetElems()
+
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 4 {
 		return fmt.Errorf("bad")
 	}

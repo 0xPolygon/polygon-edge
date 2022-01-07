@@ -66,6 +66,7 @@ func GenerateHelp(synopsys string, usage string, flagMap map[string]FlagDescript
 	helpOutput := ""
 
 	flagCounter := 0
+
 	for flagEl, descriptor := range flagMap {
 		helpOutput += GenerateFlagDesc(flagEl, descriptor) + "\n"
 		flagCounter++
@@ -124,6 +125,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 	maxFlagsPerLine := 3 // Just an arbitrary value, can be anything reasonable
 
 	var addedFlags int // Keeps track of when a newline character needs to be inserted
+
 	for flagEl, descriptor := range flagMap {
 		// Open the flag bracket
 		if descriptor.IsFlagOptional() {
@@ -195,6 +197,7 @@ func HandleSignals(closeFn func(), ui cli.Ui) int {
 		if closeFn != nil {
 			closeFn()
 		}
+
 		close(gracefulCh)
 	}()
 
@@ -238,6 +241,7 @@ func VerifyGenesisExistence(genesisPath string) *GenesisGenError {
 			errorType: StatError,
 		}
 	}
+
 	if !os.IsNotExist(err) {
 		return &GenesisGenError{
 			message:   fmt.Sprintf("genesis file at path (%s) already exists", genesisPath),
@@ -255,7 +259,9 @@ func FillPremineMap(
 ) error {
 	for _, prem := range premine {
 		var addr types.Address
+
 		val := DefaultPremineBalance
+
 		if indx := strings.Index(prem, ":"); indx != -1 {
 			// <addr>:<balance>
 			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
@@ -268,6 +274,7 @@ func FillPremineMap(
 		if err != nil {
 			return fmt.Errorf("failed to parse amount %s: %v", val, err)
 		}
+
 		premineMap[addr] = &chain.GenesisAccount{
 			Balance: amount,
 		}
@@ -281,6 +288,7 @@ func FillPremineMap(
 // will have its key value override the previous same key values
 func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
 	mergedMap := make(map[string]interface{})
+
 	for _, m := range maps {
 		for key, value := range m {
 			mergedMap[key] = value
@@ -296,6 +304,7 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate genesis: %w", err)
 	}
+
 	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
@@ -381,9 +390,11 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var premine helperFlags.ArrayFlags
-	var gaslimit uint64
-	var chainID uint64
+	var (
+		premine  helperFlags.ArrayFlags
+		gaslimit uint64
+		chainID  uint64
+	)
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
@@ -456,6 +467,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)

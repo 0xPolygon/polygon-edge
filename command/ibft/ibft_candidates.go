@@ -60,6 +60,7 @@ func (c *IbftCandidates) Run(args []string) int {
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Candidates(context.Background(), &empty.Empty{})
+
 	if err != nil {
 		c.Formatter.OutputError(err)
 		return 1
@@ -88,6 +89,7 @@ func NewIBFTCandidatesResult(resp *ibftOp.CandidatesResp) *IBFTCandidatesResult 
 		res.Candidates[i].Address = c.Address
 		res.Candidates[i].Vote = voteToString(c.Auth)
 	}
+
 	return res
 }
 
@@ -95,12 +97,14 @@ func (r *IBFTCandidatesResult) Output() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[IBFT CANDIDATES]\n")
+
 	if num := len(r.Candidates); num == 0 {
 		buffer.WriteString("No candidates found")
 	} else {
 		buffer.WriteString(fmt.Sprintf("Number of candidates: %d\n\n", num))
 		buffer.WriteString(formatCandidates(r.Candidates))
 	}
+
 	buffer.WriteString("\n")
 
 	return buffer.String()

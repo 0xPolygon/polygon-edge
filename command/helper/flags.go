@@ -89,6 +89,7 @@ func (f *FormatterFlag) OutputError(e error) {
 // OutputResult is helper function to print result with different format
 func (f *FormatterFlag) OutputResult(r CommandResult) {
 	var out string
+
 	var err error
 
 	if f.IsJSON {

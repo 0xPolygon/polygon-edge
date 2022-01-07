@@ -31,6 +31,7 @@ func getTempDir(t *testing.T) string {
 			t.Error(err)
 		}
 	})
+
 	return tmpDir
 }
 
@@ -56,15 +57,18 @@ func newTesterAccountPool(num ...int) *testerAccountPool {
 	t := &testerAccountPool{
 		accounts: []*testerAccount{},
 	}
+
 	if len(num) == 1 {
 		for i := 0; i < num[0]; i++ {
 			key, _ := crypto.GenerateKey()
+
 			t.accounts = append(t.accounts, &testerAccount{
 				alias: strconv.Itoa(i),
 				priv:  key,
 			})
 		}
 	}
+
 	return t
 }
 
@@ -73,10 +77,12 @@ func (ap *testerAccountPool) add(accounts ...string) {
 		if acct := ap.get(account); acct != nil {
 			continue
 		}
+
 		priv, err := crypto.GenerateKey()
 		if err != nil {
 			panic("BUG: Failed to generate crypto key")
 		}
+
 		ap.accounts = append(ap.accounts, &testerAccount{
 			alias: account,
 			priv:  priv,
@@ -95,6 +101,7 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 		Mixhash:   genesis.MixHash,
 		ExtraData: genesis.ExtraData,
 	}
+
 	return c
 }
 
@@ -104,6 +111,7 @@ func (ap *testerAccountPool) get(name string) *testerAccount {
 			return i
 		}
 	}
+
 	return nil
 }
 
@@ -112,6 +120,7 @@ func (ap *testerAccountPool) ValidatorSet() ValidatorSet {
 	for _, i := range ap.accounts {
 		v = append(v, i.Address())
 	}
+
 	return v
 }
 
@@ -156,6 +165,7 @@ func newMockHeader(validators []string, vote mockVote) mockHeader {
 func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
 	headers := make([]*types.Header, 0, len(mockHeaders))
 	parentHash := genesis.Hash()
+
 	for num, header := range mockHeaders {
 		v := header.action
 		pool.add(v.validator)
@@ -167,12 +177,14 @@ func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders [
 			MixHash:    IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
+
 		if v.candidate != "" {
 			// if candidate is empty, we are just creating a new block
 			// without votes
 			pool.add(v.candidate)
 			h.Miner = pool.get(v.candidate).Address()
 		}
+
 		if v.auth {
 			// add auth to the vote
 			h.Nonce = nonceAuthVote
@@ -187,11 +199,13 @@ func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders [
 		parentHash = h.Hash
 		headers = append(headers, h)
 	}
+
 	return headers
 }
 
 func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots []*Snapshot) {
 	t.Helper()
+
 	for _, s := range snapshots {
 		hash := b.GetHashByNumber(s.Number)
 		assert.NotNil(t, hash)
@@ -208,7 +222,9 @@ func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
 	for _, snap := range snapshots {
 		store.add(snap)
 	}
+
 	err := store.saveToPath(path)
+
 	assert.NoError(t, err)
 }
 
@@ -670,6 +686,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			epochSize := c.epochSize

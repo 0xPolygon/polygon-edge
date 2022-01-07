@@ -27,6 +27,7 @@ func (m *memoryKV) Get(p []byte) ([]byte, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
+
 	return v, true, nil
 }
 

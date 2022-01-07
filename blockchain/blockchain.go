@@ -1004,6 +1004,7 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	if blockNumber == uint64(0) {
 		full = false
 	}
+
 	return b.GetBlockByHash(blockHash, full)
 }
 

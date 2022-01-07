@@ -174,20 +174,19 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags := c.NewFlagSet(c.GetBaseCommand())
 	flags.Usage = func() {}
 
-	var baseDir string
-	var premine helperFlags.ArrayFlags
-	var chainID uint64
-	var epochSize uint64
-	var bootnodes = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
-	var name string
-	var consensus string
-	var isPos bool
-
-	// ibft flags
-	var ibftValidators helperFlags.ArrayFlags
-	var ibftValidatorsPrefixPath string
-
-	var blockGasLimit uint64
+	var (
+		baseDir                  string
+		premine                  helperFlags.ArrayFlags
+		chainID                  uint64
+		epochSize                uint64
+		bootnodes                = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
+		name                     string
+		consensus                string
+		isPos                    bool
+		ibftValidators           helperFlags.ArrayFlags
+		ibftValidatorsPrefixPath string
+		blockGasLimit            uint64
+	)
 
 	flags.StringVar(&baseDir, "dir", "", "")
 	flags.StringVar(&name, "name", helper.DefaultChainName, "")
@@ -205,6 +204,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
 		return 1
 	}
+
 	var err error = nil
 
 	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
@@ -352,9 +352,11 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 
 	for _, file := range files {
 		path := file.Name()
+
 		if !file.IsDir() {
 			continue
 		}
+
 		if !strings.HasPrefix(path, prefix) {
 			continue
 		}
@@ -371,6 +373,7 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
 	}
 

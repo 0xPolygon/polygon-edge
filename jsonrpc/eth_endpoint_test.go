@@ -121,6 +121,7 @@ func (m *mockBlockStore2) add(blocks ...*types.Block) {
 	if m.blocks == nil {
 		m.blocks = []*types.Block{}
 	}
+
 	m.blocks = append(m.blocks, blocks...)
 }
 

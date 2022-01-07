@@ -77,9 +77,11 @@ func (p *PeersAdd) Run(args []string) int {
 		return 1
 	}
 
-	var peersAdded int
-	var addedPeers []string
-	var visibleErrors []string
+	var (
+		peersAdded    int
+		addedPeers    []string
+		visibleErrors []string
+	)
 
 	// Adds all the peers and breaks if it hits an error
 	clt := proto.NewSystemClient(conn)
@@ -90,6 +92,7 @@ func (p *PeersAdd) Run(args []string) int {
 		}
 
 		peersAdded++
+
 		addedPeers = append(addedPeers, address)
 	}
 
@@ -129,6 +132,7 @@ func (r *PeersAddResult) Output() string {
 		buffer.WriteString("\n\n[ERRORS]\n")
 		buffer.WriteString(helper.FormatList(r.Errors))
 	}
+
 	buffer.WriteString("\n")
 
 	return buffer.String()

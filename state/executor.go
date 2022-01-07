@@ -96,6 +96,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 			return nil, err
 		}
 	}
+
 	_, root := txn.Commit()
 
 	res := &BlockResult{
@@ -103,6 +104,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 		Receipts: txn.Receipts(),
 		TotalGas: txn.TotalGas(),
 	}
+
 	return res, nil
 }
 
@@ -208,6 +210,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		t.logger.Error("failed to apply tx", "err", e)
 		return e
 	}
+
 	t.totalGas += result.GasUsed
 
 	logs := t.state.Logs()
@@ -260,7 +263,9 @@ func (t *Transition) subGasPool(amount uint64) error {
 	if t.gasPool < amount {
 		return ErrBlockLimitReached
 	}
+
 	t.gasPool -= amount
+
 	return nil
 }
 

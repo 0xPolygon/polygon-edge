@@ -49,6 +49,7 @@ func Factory(
 		if !ok {
 			return nil, fmt.Errorf("interval expected int")
 		}
+
 		d.interval = interval
 	}
 
@@ -144,6 +145,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 	}
 
 	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
+
 	return txns
 }
 
@@ -164,13 +166,16 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
 	}
+
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
+
 	if err != nil {
 		return err
 	}
