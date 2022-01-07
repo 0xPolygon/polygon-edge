@@ -40,6 +40,7 @@ func (e *ErrorResponse) Data() json.RawMessage {
 	if err != nil {
 		return json.RawMessage(err.Error())
 	}
+
 	return data
 }
 
@@ -66,6 +67,7 @@ func (s *SuccessResponse) Data() json.RawMessage {
 	if s.Result != nil {
 		return s.Result
 	}
+
 	return json.RawMessage("No Data")
 }
 
@@ -87,6 +89,7 @@ func (e *ErrorObject) Error() string {
 	if err != nil {
 		return fmt.Sprintf("jsonrpc.internal marshal error: %v", err)
 	}
+
 	return string(data)
 }
 
@@ -117,6 +120,7 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return BlockNumber(n), nil
 }
 
@@ -125,6 +129,7 @@ func createBlockNumberPointer(str string) (*BlockNumber, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &blockNumber, nil
 }
 
@@ -134,7 +139,9 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 	if err != nil {
 		return err
 	}
+
 	*b = num
+
 	return nil
 }
 
@@ -147,6 +154,7 @@ func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver str
 		ID:      id,
 		Error:   errObject,
 	}
+
 	return response
 }
 

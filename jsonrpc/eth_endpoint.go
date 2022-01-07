@@ -50,6 +50,7 @@ func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 		if number < 0 {
 			return 0, fmt.Errorf("invalid argument 0: block number larger than int64")
 		}
+
 		return uint64(number), nil
 	}
 }
@@ -60,10 +61,13 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 	if err != nil {
 		return nil, err
 	}
+
 	block, ok := e.d.store.GetBlockByNumber(num, true)
+
 	if !ok {
 		return nil, nil
 	}
+
 	return toBlock(block, fullTx), nil
 }
 
@@ -73,6 +77,7 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 	if !ok {
 		return nil, nil
 	}
+
 	return toBlock(block, fullTx), nil
 }
 
@@ -81,10 +86,13 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 	if err != nil {
 		return nil, err
 	}
+
 	block, ok := e.d.store.GetBlockByNumber(num, true)
+
 	if !ok {
 		return nil, nil
 	}
+
 	return len(block.Transactions), nil
 }
 
@@ -94,6 +102,7 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 	if h == nil {
 		return nil, fmt.Errorf("header has a nil value")
 	}
+
 	return argUintPtr(h.Number), nil
 }
 
@@ -121,9 +130,11 @@ func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := e.d.store.AddTx(transaction); err != nil {
 		return nil, err
 	}
+
 	return transaction.Hash.String(), nil
 }
 
@@ -140,7 +151,9 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 			// Block not found in storage
 			return nil
 		}
+
 		block, ok := e.d.store.GetBlockByHash(blockHash, true)
+
 		if !ok {
 			// Block receipts not found in storage
 			return nil
@@ -205,6 +218,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		e.d.logger.Warn(
 			fmt.Sprintf("Block with hash [%s] not found", blockHash.String()),
 		)
+
 		return nil, nil
 	}
 
@@ -214,13 +228,16 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		e.d.logger.Warn(
 			fmt.Sprintf("Receipts for block with hash [%s] not found", blockHash.String()),
 		)
+
 		return nil, nil
 	}
+
 	if len(receipts) == 0 {
 		// Receipts not written yet on the db
 		e.d.logger.Warn(
 			fmt.Sprintf("No receipts found for block with hash [%s]", blockHash.String()),
 		)
+
 		return nil, nil
 	}
 	// find the transaction in the body
@@ -232,6 +249,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 			break
 		}
 	}
+
 	if indx == -1 {
 		// txn not found
 		return nil, nil
@@ -254,6 +272,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 			Removed:     false,
 		}
 	}
+
 	res := &receipt{
 		Root:              raw.Root,
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
@@ -269,6 +288,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		ToAddr:            txn.To,
 		Logs:              logs,
 	}
+
 	return res, nil
 }
 
@@ -294,18 +314,23 @@ func (e *Eth) GetStorageAt(
 		if errors.As(err, &ErrStateNotFound) {
 			return argBytesPtr(types.ZeroHash[:]), nil
 		}
+
 		return nil, err
 	}
 	// Parse the RLP value
 	p := &fastrlp.Parser{}
 	v, err := p.Parse(result)
+
 	if err != nil {
 		return argBytesPtr(types.ZeroHash[:]), nil
 	}
+
 	data, err := v.Bytes()
+
 	if err != nil {
 		return argBytesPtr(types.ZeroHash[:]), nil
 	}
+
 	return argBytesPtr(data), nil
 }
 
@@ -325,7 +350,9 @@ func (e *Eth) Call(
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
+
 	transaction, err := e.d.decodeTxn(arg)
+
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +376,7 @@ func (e *Eth) Call(
 	if result.Failed() {
 		return nil, fmt.Errorf("unable to execute call: %s", result.Err.Error())
 	}
+
 	return argBytesPtr(result.ReturnValue), nil
 }
 
@@ -406,6 +434,7 @@ func (e *Eth) EstimateGas(
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
 		acc, err := e.d.store.GetAccount(header.StateRoot, transaction.From)
+
 		if err != nil && !errors.As(err, &ErrStateNotFound) {
 			// An unrelated error occurred, return it
 			return nil, err
@@ -518,6 +547,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 				}
 			}
 		}
+
 		return nil
 	}
 
@@ -526,13 +556,16 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("not found")
 		}
+
 		if len(block.Transactions) == 0 {
 			// no txs in block, return empty response
 			return result, nil
 		}
+
 		if err := parseReceipts(block); err != nil {
 			return nil, err
 		}
+
 		return result, nil
 	}
 
@@ -542,9 +575,11 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 		if num == PendingBlockNumber || num == EarliestBlockNumber {
 			num = LatestBlockNumber
 		}
+
 		if num == LatestBlockNumber {
 			return head
 		}
+
 		return uint64(num)
 	}
 
@@ -560,14 +595,17 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 		if !ok {
 			break
 		}
+
 		if block.Header.Number == 0 || len(block.Transactions) == 0 {
 			// do not check logs in genesis and skip if no txs
 			continue
 		}
+
 		if err := parseReceipts(block); err != nil {
 			return nil, err
 		}
 	}
+
 	return result, nil
 }
 
@@ -579,7 +617,9 @@ func (e *Eth) GetBalance(
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
+
 	header, err := e.d.getBlockHeaderImpl(*number)
+
 	if err != nil {
 		return nil, err
 	}
@@ -603,13 +643,17 @@ func (e *Eth) GetTransactionCount(
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
+
 	nonce, err := e.d.getNextNonce(address, *number)
+
 	if err != nil {
 		if errors.As(err, &ErrStateNotFound) {
 			return argUintPtr(0), nil
 		}
+
 		return nil, err
 	}
+
 	return argUintPtr(nonce), nil
 }
 
@@ -619,13 +663,16 @@ func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, 
 	if number == nil {
 		number, _ = createBlockNumberPointer("latest")
 	}
+
 	header, err := e.d.getBlockHeaderImpl(*number)
+
 	if err != nil {
 		return nil, err
 	}
 
 	emptySlice := []byte{}
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
+
 	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / is not initialized yet,
 		// return the default value

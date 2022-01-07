@@ -60,13 +60,16 @@ func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount2{}
 	}
+
 	acct := &mockAccount2{
 		store:   m,
 		address: addr,
 		account: &state.Account{},
 		storage: make(map[types.Hash][]byte),
 	}
+
 	m.accounts[addr] = acct
+
 	return acct
 }
 
@@ -79,6 +82,7 @@ func (m *mockAccountStore) GetAccount(root types.Hash, addr types.Address) (*sta
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	return acct.account, nil
 }
 
@@ -88,6 +92,7 @@ func (m *mockAccountStore) GetCode(hash types.Hash) ([]byte, error) {
 			return acct.code, nil
 		}
 	}
+
 	return nil, fmt.Errorf("code not found")
 }
 
@@ -96,10 +101,13 @@ func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot 
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	val, ok := acct.storage[slot]
+
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	return val, nil
 }
 
@@ -199,6 +207,7 @@ func (m *mockBlockStore2) GetHeaderByNumber(blockNumber uint64) (*types.Header, 
 	if !ok {
 		return nil, false
 	}
+
 	return b.Header, true
 }
 
@@ -208,6 +217,7 @@ func (m *mockBlockStore2) GetBlockByNumber(blockNumber uint64, full bool) (*type
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -217,6 +227,7 @@ func (m *mockBlockStore2) GetBlockByHash(hash types.Hash, full bool) (*types.Blo
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -291,6 +302,7 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 			Number: 10,
 		},
 	})
+
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	num, err := dispatcher.endpoints.Eth.BlockNumber()
@@ -412,6 +424,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 			},
 		})
 	}
+
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	for _, testCase := range testTable {
@@ -445,9 +458,11 @@ func TestEth_State_GetBalance(t *testing.T) {
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 	blockNumber, err := createBlockNumberPointer("latest")
+
 	if err != nil {
 		assert.Error(t, err)
 	}
+
 	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, blockNumber)
 	assert.NoError(t, err)
 	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
@@ -538,6 +553,7 @@ func TestEth_State_GetCode(t *testing.T) {
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 	blockNumber, err := createBlockNumberPointer("latest")
+
 	if err != nil {
 		assert.Error(t, err)
 	}
@@ -686,12 +702,14 @@ func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount2{}
 	}
+
 	acct := &mockAccount2{
 		address: addr,
 		account: &state.Account{},
 		storage: make(map[types.Hash][]byte),
 	}
 	m.accounts[addr] = acct
+
 	return acct
 }
 
@@ -704,6 +722,7 @@ func (m *mockStoreTxn) GetAccount(root types.Hash, addr types.Address) (*state.A
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	return acct.account, nil
 }
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {

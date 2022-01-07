@@ -138,6 +138,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return "", NewInvalidRequestError("Invalid json request")
 	}
+
 	if len(params) == 0 {
 		return "", NewInvalidParamsError("Invalid params")
 	}
@@ -195,6 +196,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 			//nolint
 			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
 		}
+
 		resp, err := formatFilterResponse(req.ID, filterID)
 
 		if err != nil {
@@ -227,6 +229,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
 }
 
@@ -235,11 +238,13 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	if len(x) == 0 {
 		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
+
 	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
 			return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
+
 		if req.Method == "" {
 			return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
@@ -274,6 +279,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	if err != nil {
 		return NewRpcResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
 	}
+
 	return respBytes, nil
 }
 
@@ -295,6 +301,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		inputs[i] = val.Interface()
 		inArgs[i+1] = val.Elem()
 	}
+
 	if fd.numParams() > 0 {
 		if err := json.Unmarshal(req.Params, &inputs); err != nil {
 			return nil, NewInvalidParamsError("Invalid Params")
@@ -319,6 +326,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 			return nil, NewInternalError("Internal error")
 		}
 	}
+
 	return data, nil
 }
 
@@ -330,6 +338,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 	if d.serviceMap == nil {
 		d.serviceMap = map[string]*serviceData{}
 	}
+
 	if serviceName == "" {
 		panic("jsonrpc: serviceName cannot be empty")
 	}
@@ -366,6 +375,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 				fd.isDyn = true
 			}
 		}
+
 		funcMap[name] = fd
 	}
 
@@ -394,6 +404,7 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 		err = fmt.Errorf("unexpected number of output arguments in the function '%s': %d. Expected 2", funcName, outNum)
 		return
 	}
+
 	if !isErrorType(ft.Out(1)) {
 		err = fmt.Errorf("unexpected type for the second return value of the function '%s': '%s'. Expected '%s'", funcName, ft.Out(1), errt)
 		return
@@ -403,6 +414,7 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 	for i := 0; i < inNum; i++ {
 		reqt[i] = ft.In(i)
 	}
+
 	return
 }
 
@@ -416,6 +428,7 @@ func getError(v reflect.Value) error {
 	if v.IsNil() {
 		return nil
 	}
+
 	return v.Interface().(error)
 }
 
@@ -423,6 +436,7 @@ func lowerCaseFirst(str string) string {
 	for i, v := range str {
 		return string(unicode.ToLower(v)) + str[i+1:]
 	}
+
 	return ""
 }
 
@@ -443,6 +457,7 @@ func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, erro
 		if !ok {
 			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
 		}
+
 		return header, nil
 	}
 }
@@ -463,7 +478,9 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 	if err != nil {
 		return 0, err
 	}
+
 	acc, err := d.store.GetAccount(header.StateRoot, address)
+
 	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / isn't initialized,
 		// return a nonce value of 0
@@ -492,9 +509,11 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		}
 		arg.Nonce = argUintPtr(nonce)
 	}
+
 	if arg.Value == nil {
 		arg.Value = argBytesPtr([]byte{})
 	}
+
 	if arg.GasPrice == nil {
 		arg.GasPrice = argBytesPtr([]byte{})
 	}
@@ -505,11 +524,13 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	} else if arg.Input != nil {
 		input = *arg.Input
 	}
+
 	if arg.To == nil {
 		if input == nil {
 			return nil, fmt.Errorf("contract creation without data provided")
 		}
 	}
+
 	if input == nil {
 		input = []byte{}
 	}

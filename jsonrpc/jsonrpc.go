@@ -62,6 +62,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	if err := srv.setupHTTP(); err != nil {
 		return nil, err
 	}
+
 	return srv, nil
 }
 
@@ -115,6 +116,7 @@ func (w *wsWrapper) WriteMessage(
 	w.writeLock.Lock()
 	defer w.writeLock.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)
+
 	if writeErr != nil {
 		w.logger.Error(
 			fmt.Sprintf("Unable to write WS message, %s", writeErr.Error()),
@@ -201,17 +203,21 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	if (*req).Method == "OPTIONS" {
 		return
 	}
+
 	if req.Method == "GET" {
 		//nolint
 		w.Write([]byte("PolygonSDK JSON-RPC"))
 		return
 	}
+
 	if req.Method != "POST" {
 		//nolint
 		w.Write([]byte("method " + req.Method + " not allowed"))
 		return
 	}
+
 	data, err := ioutil.ReadAll(req.Body)
+
 	if err != nil {
 		//nolint
 		w.Write([]byte(err.Error()))

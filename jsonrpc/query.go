@@ -45,7 +45,9 @@ func (l *LogFilter) addAddress(raw string) error {
 	if l.Addresses == nil {
 		l.Addresses = []types.Address{}
 	}
+
 	addr := types.Address{}
+
 	if err := addr.UnmarshalText([]byte(raw)); err != nil {
 		return err
 	}
@@ -79,7 +81,9 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 		Address   interface{}   `json:"address"`
 		Topics    []interface{} `json:"topics"`
 	}
+
 	err := json.Unmarshal(data, &obj)
+
 	if err != nil {
 		return err
 	}
@@ -149,6 +153,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 						return fmt.Errorf("hash expected")
 					}
 				}
+
 				if err := l.addTopicSet(res...); err != nil {
 					return err
 				}
@@ -180,6 +185,7 @@ func (l *LogFilter) Match(log *types.Log) bool {
 				match = true
 			}
 		}
+
 		if !match {
 			return false
 		}
@@ -198,9 +204,11 @@ func (l *LogFilter) Match(log *types.Log) bool {
 				break
 			}
 		}
+
 		if !match {
 			return false
 		}
 	}
+
 	return true
 }

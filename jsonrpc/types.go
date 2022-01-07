@@ -128,7 +128,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		Transactions:    []transactionOrHash{},
 		Uncles:          []types.Hash{},
 	}
-	
+
 	for idx, txn := range b.Transactions {
 		if fullTx {
 			res.Transactions = append(
@@ -195,9 +195,11 @@ func (a *argBig) UnmarshalText(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	b := new(big.Int)
 	b.SetBytes(buf)
 	*a = argBig(*b)
+
 	return nil
 }
 
@@ -225,16 +227,20 @@ func (b argUint64) MarshalText() ([]byte, error) {
 	buf := make([]byte, 2, 10)
 	copy(buf, `0x`)
 	buf = strconv.AppendUint(buf, uint64(b), 16)
+
 	return buf, nil
 }
 
 func (u *argUint64) UnmarshalText(input []byte) error {
 	str := strings.TrimPrefix(string(input), "0x")
 	num, err := strconv.ParseUint(str, 16, 64)
+
 	if err != nil {
 		return err
 	}
+
 	*u = argUint64(num)
+
 	return nil
 }
 
@@ -254,18 +260,22 @@ func (b *argBytes) UnmarshalText(input []byte) error {
 	if err != nil {
 		return nil
 	}
+
 	aux := make([]byte, len(hh))
 	copy(aux[:], hh[:])
 	*b = aux
+
 	return nil
 }
 
 func decodeToHex(b []byte) ([]byte, error) {
 	str := string(b)
 	str = strings.TrimPrefix(str, "0x")
+
 	if len(str)%2 != 0 {
 		str = "0" + str
 	}
+
 	return hex.DecodeString(str)
 }
 
@@ -274,6 +284,7 @@ func encodeToHex(b []byte) []byte {
 	if len(str)%2 != 0 {
 		str = "0" + str
 	}
+
 	return []byte("0x" + str)
 }
 
