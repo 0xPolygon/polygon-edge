@@ -435,32 +435,156 @@ var (
 	uninitializedAddress = types.Address{0x99}
 )
 
+type mockSpecialStore struct {
+	nullBlockchainInterface
+	account *mockAccount2
+	block   *types.Block
+}
+
+func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	if m.block.Header.Hash.String() != hash.String() {
+		return nil, false
+	}
+
+	return m.block, true
+}
+
+func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
+	if m.account.address.String() != addr.String() {
+		return nil, ErrStateNotFound
+	}
+	return m.account.account, nil
+}
+
+func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
+	if m.block.Number() != blockNumber {
+		return nil, false
+	}
+	return m.block.Header, true
+}
+
+func (m *mockSpecialStore) Header() *types.Header {
+	return &types.Header{
+		StateRoot: types.EmptyRootHash,
+	}
+}
+
 func TestEth_State_GetBalance(t *testing.T) {
-	store := &mockAccountStore{}
-
-	acct0 := store.AddAccount(addr0)
-	acct0.Balance(100)
-
-	latestBlock := LatestBlockNumber
-	filter := BlockNumberOrHash{
-		BlockNumber: &latestBlock,
+	store := &mockSpecialStore{
+		account: &mockAccount2{
+			address: addr0,
+			account: &state.Account{
+				Balance: big.NewInt(100),
+			},
+			storage: make(map[types.Hash][]byte),
+		},
+		block: &types.Block{
+			Header: &types.Header{
+				Hash:      types.ZeroHash,
+				Number:    0,
+				StateRoot: types.EmptyRootHash,
+			},
+		},
 	}
 
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	balance, err := dispatcher.endpoints.Eth.GetBalance(addr0, filter)
-	assert.NoError(t, err)
-	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
+	blockNumberLatest := LatestBlockNumber
+	blockNumberZero := BlockNumber(0x0)
+	blockNumberInvalid := BlockNumber(0x1)
 
-	// address not found
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr1, filter)
-	assert.NoError(t, err)
-	assert.Equal(t, balance, argUintPtr(0))
+	tests := []struct {
+		name            string
+		address         types.Address
+		shouldFail      bool
+		blockNumber     *BlockNumber
+		blockHash       *types.Hash
+		expectedBalance int64
+	}{
+		{
+			"valid implicit latest block number",
+			addr0,
+			false,
+			nil,
+			nil,
+			100,
+		},
+		{
+			"explicit latest block number",
+			addr0,
+			false,
+			&blockNumberLatest,
+			nil,
+			100,
+		},
+		{
+			"valid explicit block number",
+			addr0,
+			false,
+			&blockNumberZero,
+			nil,
+			100,
+		},
+		{
+			"block does not exist",
+			addr0,
+			true,
+			&blockNumberInvalid,
+			nil,
+			0,
+		},
+		{
+			"valid block hash",
+			addr0,
+			false,
+			nil,
+			&types.ZeroHash,
+			100,
+		},
+		{
+			"invalid block hash",
+			addr0,
+			true,
+			nil,
+			&hash1,
+			0,
+		},
+		{
+			"account with empty balance",
+			addr1,
+			false,
+			&blockNumberLatest,
+			nil,
+			0,
+		},
+	}
 
-	// block number not passed
-	filter.BlockNumber = nil
-	balance, err = dispatcher.endpoints.Eth.GetBalance(addr0, filter)
-	assert.NoError(t, err)
-	assert.Equal(t, balance, argBigPtr(big.NewInt(100)))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := BlockNumberOrHash{
+				BlockNumber: tt.blockNumber,
+				BlockHash:   tt.blockHash,
+			}
+
+			balance, err := dispatcher.endpoints.Eth.GetBalance(tt.address, filter)
+
+			if tt.shouldFail {
+				assert.Error(t, err)
+				assert.Equal(t, nil, balance)
+			} else {
+				assert.NoError(t, err)
+				if tt.expectedBalance == 0 {
+					assert.Equal(t, *argUintPtr(0), *balance.(*argUint64))
+				} else {
+					assert.Equal(t, *argBigPtr(big.NewInt(tt.expectedBalance)), *balance.(*argBig))
+				}
+			}
+		})
+	}
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
