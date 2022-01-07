@@ -48,6 +48,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	}
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()
+
 	if err := unmarshalledTxn.UnmarshalRLP(marshaledRlp); err != nil {
 		t.Fatal(err)
 	}

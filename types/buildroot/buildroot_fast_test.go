@@ -70,6 +70,7 @@ func buildInput(n, m int) func(i int) []byte {
 
 		res = append(res, b)
 	}
+
 	return func(i int) []byte {
 		return res[i]
 	}
@@ -83,6 +84,7 @@ func buildRandomInput(num int) func(i int) []byte {
 		rand.Read(b)
 		res = append(res, b)
 	}
+
 	return func(i int) []byte {
 		return res[i]
 	}

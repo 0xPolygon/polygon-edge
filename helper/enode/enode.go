@@ -83,14 +83,17 @@ func ParseURL(rawurl string) (*Enode, error) {
 		UDP: uint16(udpPort),
 		IP:  ip,
 	}
+
 	return node, nil
 }
 
 func (n *Enode) String() string {
 	url := fmt.Sprintf("enode://%s@%s", n.ID.String(), (&net.TCPAddr{IP: n.IP, Port: int(n.TCP)}).String())
+
 	if n.TCP != n.UDP {
 		url += "?discport=" + strconv.Itoa(int(n.UDP))
 	}
+
 	return url
 }
 

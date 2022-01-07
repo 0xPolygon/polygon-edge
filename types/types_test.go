@@ -73,6 +73,7 @@ func TestTransactionCopy(t *testing.T) {
 		R:        big.NewInt(27),
 	}
 	newTxn := txn.Copy()
+
 	if !reflect.DeepEqual(txn, newTxn) {
 		t.Fatal("[ERROR] Copied transaction not equal base transaction")
 	}

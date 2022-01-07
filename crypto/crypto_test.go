@@ -231,6 +231,7 @@ func TestPrivateKeyGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to generate private key, %v", err)
 	}
+
 	writtenAddress := getAddressFromKey(writtenKey, t)
 
 	// Read existing key and check if it matches
@@ -238,6 +239,7 @@ func TestPrivateKeyGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to read private key, %v", err)
 	}
+
 	readAddress := getAddressFromKey(readKey, t)
 
 	assert.True(t, writtenKey.Equal(readKey))

@@ -36,6 +36,7 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	} else {
 		signer = &FrontierSigner{}
 	}
+
 	return signer
 }
 
@@ -163,6 +164,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	if tx.V != nil {
 		bigV.SetBytes(tx.V.Bytes())
 	}
+
 	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
 		protected = vv != 27 && vv != 28
 	}
@@ -217,6 +219,7 @@ func (e *EIP155Signer) SignTx(
 func (e *EIP155Signer) CalculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big35)
+
 	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
 
 	reference.Add(reference, mulOperand)

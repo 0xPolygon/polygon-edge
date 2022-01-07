@@ -51,6 +51,7 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -65,6 +66,7 @@ func (b Bloom) Value() (driver.Value, error) {
 func (b *Bloom) Scan(src interface{}) error {
 	bb := hex.MustDecodeHex(string(src.([]byte)))
 	copy(b[:], bb[:])
+
 	return nil
 }
 

@@ -38,6 +38,7 @@ func trimLeftZeros(b []byte) []byte {
 			break
 		}
 	}
+
 	return b[i:]
 }
 
@@ -54,6 +55,7 @@ func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 
 	rr := r.Bytes()
 	rr = trimLeftZeros(rr)
+
 	if bytes.Compare(rr, secp256k1N) >= 0 || bytes.Compare(rr, one) < 0 {
 		return false
 	}
@@ -113,6 +115,7 @@ func ParsePublicKey(buf []byte) (*ecdsa.PublicKey, error) {
 	if x == nil || y == nil {
 		return nil, fmt.Errorf("cannot unmarshal")
 	}
+
 	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
 }
 
@@ -126,6 +129,7 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return MarshalPublicKey(pub), nil
 }
 
@@ -141,9 +145,11 @@ func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 
 	sig := append([]byte{term}, signature[:size-1]...)
 	pub, _, err := btcec.RecoverCompact(S256, sig, hash)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return pub.ToECDSA(), nil
 }
 
@@ -171,6 +177,7 @@ func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
 	}
 
 	x, y := elliptic.Unmarshal(S256, s)
+
 	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
 }
 
@@ -180,6 +187,7 @@ func Keccak256(v ...[]byte) []byte {
 	for _, i := range v {
 		h.Write(i)
 	}
+
 	return h.Sum(nil)
 }
 
@@ -197,6 +205,7 @@ func HexToECDSA(hexkey string) (*ecdsa.PrivateKey, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("invalid hex data for private key")
 	}
+
 	return ToECDSA(b)
 }
 
@@ -211,9 +220,11 @@ func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	priv := new(ecdsa.PrivateKey)
 	priv.PublicKey.Curve = S256
+
 	if strict && 8*len(d) != priv.Params().BitSize {
 		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
 	}
+
 	priv.D = new(big.Int).SetBytes(d)
 
 	// The priv.D must < N
@@ -229,6 +240,7 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	if priv.PublicKey.X == nil {
 		return nil, fmt.Errorf("invalid private key")
 	}
+
 	return priv, nil
 }
 

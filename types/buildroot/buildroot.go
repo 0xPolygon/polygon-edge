@@ -19,6 +19,7 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 	})
 
 	arenaPool.Put(ar)
+
 	return res
 }
 
@@ -32,6 +33,7 @@ func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 	})
 
 	arenaPool.Put(ar)
+
 	return res
 }
 
@@ -59,6 +61,7 @@ func calculateRootWithRlp(num int, h func(indx int) *fastrlp.Value) types.Hash {
 	hF := func(indx int) []byte {
 		return h(indx).MarshalTo(nil)
 	}
+
 	return CalculateRoot(num, hF)
 }
 
@@ -100,6 +103,8 @@ func deriveSlow(num int, h func(indx int) []byte) []byte {
 	}
 
 	numArenaPool.Put(ar)
+
 	x, _ := txn.Hash()
+
 	return x
 }

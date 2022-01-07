@@ -23,9 +23,13 @@ var (
 
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
+
 	key, err := crypto.GenerateKey()
+
 	assert.NoError(t, err)
+
 	addr := crypto.PubKeyToAddress(&key.PublicKey)
+
 	return key, addr
 }
 
@@ -55,7 +59,9 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 			time.Sleep(time.Second)
 		}
 	}()
+
 	res := <-resCh
+
 	return res.data, res.err
 }
 
@@ -76,6 +82,7 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 	if err != nil {
 		return nil, err
 	}
+
 	return res.(*txpoolOp.TxnPoolStatusResp), nil
 }
 
@@ -96,10 +103,13 @@ func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*
 		}
 		return nil, true
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	data := res.(result)
+
 	return data.receipt, data.err
 }
 

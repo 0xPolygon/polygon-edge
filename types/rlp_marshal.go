@@ -14,6 +14,7 @@ func MarshalRLPTo(obj marshalRLPFunc, dst []byte) []byte {
 	ar := fastrlp.DefaultArenaPool.Get()
 	dst = obj(ar).MarshalTo(dst)
 	fastrlp.DefaultArenaPool.Put(ar)
+
 	return dst
 }
 
@@ -94,6 +95,7 @@ func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	for _, rr := range *r {
 		vv.Set(rr.MarshalRLPWith(a))
 	}
+
 	return vv
 }
 
@@ -127,11 +129,13 @@ func (r *Receipt) MarshalLogsWith(a *fastrlp.Arena) *fastrlp.Value {
 		// There are no receipts, write the RLP null array entry
 		return a.NewNullArray()
 	}
+
 	logs := a.NewArray()
 
 	for _, l := range r.Logs {
 		logs.Set(l.MarshalRLPWith(a))
 	}
+
 	return logs
 }
 
