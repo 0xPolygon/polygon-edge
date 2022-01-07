@@ -249,6 +249,7 @@ func MeshJoin(servers ...*Server) []error {
 	// Join errors are used to gather all errors that happen
 	// inside the go routines, so they can be handled when they finish
 	joinErrors := make([]error, 0)
+
 	var joinErrorsLock sync.Mutex
 
 	appendJoinError := func(joinErr error) {
@@ -258,11 +259,14 @@ func MeshJoin(servers ...*Server) []error {
 	}
 
 	numServers := len(servers)
+
 	var wg sync.WaitGroup
+
 	for indx := 0; indx < numServers; indx++ {
 		for innerIndx := 0; innerIndx < numServers; innerIndx++ {
 			if innerIndx > indx {
 				wg.Add(1)
+
 				go func(src, dest int) {
 					defer wg.Done()
 

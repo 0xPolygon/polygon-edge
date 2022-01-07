@@ -368,11 +368,13 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 
 	// Check if there was a parent difficulty
 	parentTD := big.NewInt(0)
+
 	if newHeader.ParentHash != types.StringToHash("") {
 		td, ok := b.readTotalDifficulty(newHeader.ParentHash)
 		if !ok {
 			return nil, fmt.Errorf("parent difficulty not found")
 		}
+
 		parentTD = td
 	}
 
@@ -621,6 +623,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		"hash", header.Hash,
 		"txns", len(block.Transactions),
 	}
+
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
 		logArgs = append(logArgs, "generation_time_in_sec", diff)
@@ -761,6 +764,7 @@ func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res typ
 			}
 
 			hash = h.ParentHash
+
 			if num == 0 {
 				return
 			}
@@ -859,6 +863,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	}
 
 	newForks := []types.Hash{}
+
 	for _, fork := range forks {
 		if fork != header.ParentHash {
 			newForks = append(newForks, fork)

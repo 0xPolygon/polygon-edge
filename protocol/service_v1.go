@@ -66,6 +66,7 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 	resp := &proto.Response{
 		Objs: []*proto.Response_Component{},
 	}
+
 	for _, hash := range hashes {
 		var obj rlpObject
 
@@ -110,6 +111,7 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 	}
 
 	var origin *types.Header
+
 	var ok bool
 
 	if req.Number != 0 {
@@ -165,14 +167,18 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 // Helper functions to decode responses from the grpc layer
 func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]*types.Body, error) {
 	input := make([]string, 0, len(hashes))
+
 	for _, h := range hashes {
 		input = append(input, h.String())
 	}
+
 	resp, err := clt.GetObjectsByHash(ctx, &proto.HashRequest{Hash: input, Type: proto.HashRequest_BODIES})
 	if err != nil {
 		return nil, err
 	}
+
 	res := make([]*types.Body, 0, len(resp.Objs))
+
 	for _, obj := range resp.Objs {
 		var body types.Body
 		if obj.Spec.Value != nil {
@@ -182,8 +188,10 @@ func getBodies(ctx context.Context, clt proto.V1Client, hashes []types.Hash) ([]
 		}
 		res = append(res, &body)
 	}
+
 	if len(res) != len(input) {
 		return nil, fmt.Errorf("not correct size")
 	}
+
 	return res, nil
 }

@@ -426,6 +426,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	oneEth := framework.EthToWei(1)
 	zeroEth := framework.EthToWei(0)
+
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 		if i%2 == 0 {

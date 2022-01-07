@@ -543,6 +543,7 @@ func createSyncers(count int, servers []*network.Server, blockStores []*mockBloc
 // numSyncPeers returns the number of sync peers
 func numSyncPeers(syncer *Syncer) int64 {
 	num := 0
+
 	syncer.peers.Range(func(key, value interface{}) bool {
 		num++
 

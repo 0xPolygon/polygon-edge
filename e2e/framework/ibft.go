@@ -36,6 +36,7 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 
 	bootnodes := make([]string, 0, numNodes)
 	genesisValidators := make([]string, 0, numNodes)
+
 	for i := 0; i < numNodes; i++ {
 		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)

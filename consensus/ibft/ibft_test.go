@@ -537,7 +537,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}},            // not considered - stays in pool
+				{Nonce: 7}}, // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -580,6 +580,7 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *tes
 
 	// we need to change state from Sync in order to break from the loop inside runSyncState
 	stateChangeDelay := time.After(100 * time.Millisecond)
+
 	go func() {
 		<-stateChangeDelay
 		m.setState(AcceptState)
@@ -609,6 +610,7 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 
 	// we need to change state from Sync in order to break from the loop inside runSyncState
 	stateChangeDelay := time.After(100 * time.Millisecond)
+
 	go func() {
 		<-stateChangeDelay
 		m.setState(AcceptState)

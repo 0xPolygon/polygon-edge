@@ -51,6 +51,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	if err := unmarshalledTxn.UnmarshalRLP(marshaledRlp); err != nil {
 		t.Fatal(err)
 	}
+
 	unmarshalledTxn.ComputeHash()
 
 	txn.Hash = unmarshalledTxn.Hash

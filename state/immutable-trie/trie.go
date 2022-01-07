@@ -214,6 +214,7 @@ func (t *Trie) Hash() types.Hash {
 
 func (t *Trie) TryUpdate(key, value []byte) error {
 	k := keybytesToHex(key)
+
 	if len(value) != 0 {
 		tt := t.Txn()
 		n := tt.insert(t.root, k, value)
@@ -226,6 +227,7 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 		}
 		t.root = n
 	}
+
 	return nil
 }
 
@@ -479,6 +481,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 
 		n.setEdge(key, newChild)
 		indx := -1
+
 		var notEmpty bool
 
 		for edge, i := range n.children {
@@ -554,7 +557,9 @@ func prefixLen(k1, k2 []byte) int {
 	if l := len(k2); l < max {
 		max = l
 	}
+
 	var i int
+
 	for i = 0; i < max; i++ {
 		if k1[i] != k2[i] {
 			break
@@ -583,16 +588,17 @@ func show(obj interface{}, label int, d int) {
 	case *ShortNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d SHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			//return
 		}
+
 		fmt.Printf("%s%d Short: %s\n", depth(d), label, hex.EncodeToHex(n.key))
 		show(n.child, 0, d)
 	case *FullNode:
 		if h, ok := n.Hash(); ok {
 			fmt.Printf("%s%d FHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-			//return
 		}
+
 		fmt.Printf("%s%d Full\n", depth(d), label)
+
 		for indx, i := range n.children {
 			if i != nil {
 				show(i, indx, d+1)

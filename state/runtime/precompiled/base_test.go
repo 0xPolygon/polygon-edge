@@ -46,6 +46,7 @@ func TestSha256(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &sha256h{}, tests)
 }
 
@@ -57,6 +58,7 @@ func TestRipeMD(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &ripemd160h{}, tests)
 }
 
@@ -68,5 +70,6 @@ func TestIdentity(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &identity{}, tests)
 }

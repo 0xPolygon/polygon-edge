@@ -83,8 +83,10 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 
 	// Wait until Server 0 connects to Server 2 by discovery
 	discoveryTimeout := time.Second * 25
+
 	connectCtx, connectFn := context.WithTimeout(context.Background(), discoveryTimeout)
 	defer connectFn()
+
 	if _, connectErr := WaitUntilPeerConnectsTo(
 		connectCtx,
 		servers[0],
@@ -124,12 +126,15 @@ func TestRoutingTable_Connected(t *testing.T) {
 
 	// make sure each routing table has peer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	t.Cleanup(func() {
 		cancel()
 	})
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
 		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 	}
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
 		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 	}
@@ -164,9 +169,11 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 
 	// make sure each routing table has peer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	t.Cleanup(func() {
 		cancel()
 	})
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
 		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 	}
@@ -181,9 +188,11 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 
 	// make sure each routing table remove a peer
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+
 	t.Cleanup(func() {
 		cancel2()
 	})
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[0], 0); err != nil {
 		t.Fatalf("server 0 should remove a peer from routing table but didn't, peer=%s", servers[1].host.ID())
 	}
@@ -257,8 +266,10 @@ func TestDiscovery_FullNetwork(t *testing.T) {
 
 	// Wait until Server 0 connects to Server 2 by discovery
 	discoveryTimeout := time.Second * 25
+
 	connectCtx, connectFn := context.WithTimeout(context.Background(), discoveryTimeout)
 	defer connectFn()
+
 	if _, connectErr := WaitUntilPeerConnectsTo(
 		connectCtx,
 		servers[0],

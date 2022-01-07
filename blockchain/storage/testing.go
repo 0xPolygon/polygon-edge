@@ -82,16 +82,20 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 		}
 
 		hash := h.Hash
+
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteCanonicalHash(cc.Number, hash); err != nil {
 			t.Fatal(err)
 		}
+
 		data, ok := s.ReadCanonicalHash(cc.Number)
 		if !ok {
 			t.Fatal("not found")
 		}
+
 		if !reflect.DeepEqual(data, hash) {
 			t.Fatal("not match")
 		}
@@ -123,16 +127,20 @@ func testDifficulty(t *testing.T, m MockStorage) {
 		}
 
 		hash := h.Hash
+
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteTotalDifficulty(hash, cc.Diff); err != nil {
 			t.Fatal(err)
 		}
+
 		diff, ok := s.ReadTotalDifficulty(hash)
 		if !ok {
 			t.Fatal("not found")
 		}
+
 		if !reflect.DeepEqual(cc.Diff, diff) {
 			t.Fatal("bad")
 		}
@@ -220,6 +228,7 @@ func testHeader(t *testing.T, m MockStorage) {
 	if err := s.WriteHeader(header); err != nil {
 		t.Fatal(err)
 	}
+
 	header1, err := s.ReadHeader(header.Hash)
 	assert.NoError(t, err)
 
@@ -285,6 +294,7 @@ func testBody(t *testing.T, m MockStorage) {
 	if len(tx0) != len(tx1) {
 		t.Fatal("lengths are different")
 	}
+
 	for indx, i := range tx0 {
 		if i.Hash != tx1[indx].Hash {
 			t.Fatal("tx not correct")
@@ -359,6 +369,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	assert.True(t, reflect.DeepEqual(receipts, found))
 }
 

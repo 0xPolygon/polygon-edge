@@ -76,6 +76,7 @@ func TestStackUnderflow(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		code.push1()
 	}
+
 	for i := 0; i < 10; i++ {
 		code.pop()
 	}

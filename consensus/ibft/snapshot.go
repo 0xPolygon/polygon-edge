@@ -261,6 +261,7 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 	if len(s.Votes) != len(ss.Votes) {
 		return false
 	}
+
 	for indx := range s.Votes {
 		if !s.Votes[indx].Equal(ss.Votes[indx]) {
 			return false

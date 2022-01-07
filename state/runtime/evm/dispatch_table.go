@@ -14,6 +14,7 @@ func register(op OpCode, h handler) {
 	if dispatchTable[op].inst != nil {
 		panic(fmt.Errorf("instruction already exists"))
 	}
+
 	dispatchTable[op] = h
 }
 

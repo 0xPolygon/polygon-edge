@@ -36,24 +36,29 @@ func ParseURL(rawurl string) (*Enode, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if u.Scheme != "enode" {
 		return nil, fmt.Errorf("invalid URL scheme, expected 'enode'")
 	}
 
 	var id ID
+
 	h, err := hex.DecodeString(u.User.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode id: %v", err)
 	}
+
 	if len(h) != nodeIDBytes {
 		return nil, fmt.Errorf("id not found")
 	}
+
 	copy(id[:], h)
 
 	host, port, err := net.SplitHostPort(u.Host)
 	if err != nil {
 		return nil, fmt.Errorf("invalid host: %v", err)
 	}
+
 	ip := net.ParseIP(host)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid IP address '%s'", host)
@@ -104,20 +109,25 @@ func NodeIDToPubKey(buf []byte) (*ecdsa.PublicKey, error) {
 	if len(buf) != nodeIDBytes {
 		return nil, fmt.Errorf("not enough length: expected %d but found %d", nodeIDBytes, len(buf))
 	}
+
 	p := &ecdsa.PublicKey{Curve: crypto.S256, X: new(big.Int), Y: new(big.Int)}
 	half := len(buf) / 2
 	p.X.SetBytes(buf[:half])
 	p.Y.SetBytes(buf[half:])
+
 	if !p.Curve.IsOnCurve(p.X, p.Y) {
 		return nil, errors.New("id is invalid secp256k1 curve point")
 	}
+
 	return p, nil
 }
 
 // PubkeyToEnode converts a public key to an enode
 func PubkeyToEnode(pub *ecdsa.PublicKey) ID {
 	var id ID
+
 	pbytes := crypto.MarshalPublicKey(pub)
 	copy(id[:], pbytes[1:])
+
 	return id
 }

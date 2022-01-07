@@ -183,6 +183,7 @@ func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, e
 func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
 	t.Helper()
 	dials := []*TestServer{}
+
 	for i := 0; i < len(srvs)-1; i++ {
 		srv, dst := srvs[i], srvs[i+1]
 		dials = append(dials, srv, dst)
@@ -197,6 +198,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 	}
 
 	errCh := make(chan error, len(srvs)/2)
+
 	for i := 0; i < len(srvs); i += 2 {
 		src, dst := srvs[i], srvs[i+1]
 		go func() {
@@ -215,9 +217,11 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 	}
 
 	errCount := 0
+
 	for i := 0; i < len(srvs)/2; i++ {
 		if err := <-errCh; err != nil {
 			errCount++
+
 			t.Errorf("failed to connect from %d to %d, error=%+v ", 2*i, 2*i+1, err)
 		}
 	}
@@ -338,6 +342,7 @@ func FindAvailablePort(from, to int) *ReservedPort {
 func FindAvailablePorts(n, from, to int) ([]ReservedPort, error) {
 	ports := make([]ReservedPort, 0, n)
 	nextFrom := from
+
 	for i := 0; i < n; i++ {
 		newPort := FindAvailablePort(nextFrom, to)
 		if newPort == nil {
@@ -357,6 +362,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	t.Helper()
 
 	srvs := make([]*TestServer, 0, num)
+
 	t.Cleanup(func() {
 		for _, srv := range srvs {
 			srv.Stop()
@@ -375,8 +381,10 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		if err := srv.GenerateGenesis(); err != nil {
 			t.Fatal(err)
 		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		if err := srv.Start(ctx); err != nil {
 			t.Fatal(err)
 		}

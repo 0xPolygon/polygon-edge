@@ -72,6 +72,7 @@ func (d *dialQueue) del(peer peer.ID) {
 		if item.index >= 0 {
 			heap.Remove(&d.heap, item.index)
 		}
+
 		delete(d.items, peer)
 	}
 }

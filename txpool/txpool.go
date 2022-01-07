@@ -460,7 +460,9 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 // GetTxs gets pending and queued transactions
 func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
 	t.pendingQueue.lock.Lock()
+
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
+	
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
 		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
@@ -474,9 +476,11 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 	}
 
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
+
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
 		wrapper := t.lockAccountQueue(addr, false)
+
 		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
@@ -580,8 +584,8 @@ func (p *processEventWrapper) addTxn(txn *types.Transaction) {
 // promotedTxnCleanup looks through the promoted queue for any invalid transactions
 // made by a specific account, and removes them
 func (t *TxPool) promotedTxnCleanup(
-	address types.Address, // The address to filter by
-	stateNonce uint64, // The valid nonce (reference for pruning)
+	address types.Address,                        // The address to filter by
+	stateNonce uint64,                            // The valid nonce (reference for pruning)
 	cleanupCallback func(txn *types.Transaction), // Additional cleanup logic
 ) {
 	// Prune out all the now possibly low-nonce transactions in the promoted queue
@@ -589,6 +593,7 @@ func (t *TxPool) promotedTxnCleanup(
 
 	// Find the txns that correspond to this account
 	droppedPendingTxs := make([]*types.Transaction, 0)
+
 	for _, pendingQueueTxn := range t.pendingQueue.index {
 		// Check if the txn in the promoted queue matches the search criteria
 		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
@@ -639,6 +644,7 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 
 	// Legacy reorg logic //
 	addTxns := map[types.Hash]*types.Transaction{}
+
 	for _, evnt := range evnt.OldChain {
 		// reinject these transactions on the pool
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
@@ -760,7 +766,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(
 	tx *types.Transaction, // The transaction that should be validated
-	isLocal bool, // Flag indicating if the transaction is from a local account
+	isLocal bool,          // Flag indicating if the transaction is from a local account
 ) error {
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
@@ -840,6 +846,7 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 
 func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
+
 	for slotsToRemove > 0 {
 		if t.remoteTxns.Length() == 0 {
 			break
@@ -958,6 +965,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 
 	for {
 		promote = append(promote, tx)
+
 		t.Pop()
 
 		var nextTx *types.Transaction
@@ -975,7 +983,9 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 					tx.Nonce,
 				),
 			)
+
 			higherNonceTxs = append(higherNonceTxs, nextTx)
+
 			break
 		}
 

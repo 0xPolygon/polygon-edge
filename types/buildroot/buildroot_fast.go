@@ -206,6 +206,7 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 		if !ok {
 			return nil, false
 		}
+
 		f.buf = append(f.buf, rlpHashPrefix...)
 
 		n := getRlpSize(uint64(len(val)))
@@ -228,9 +229,11 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 	// write any other children left up to 16
 	if num < 16 {
 		last := 15
+
 		if from != 1 {
 			last = 16
 		}
+
 		for i := num; i < last; i++ {
 			f.buf = append(f.buf, rlpEmptyValue...)
 		}
@@ -270,8 +273,10 @@ func (f *FastHasher) marshalRlpSize(dst []byte, size uint64, short, long byte) [
 	intSize := intsize(size)
 
 	binary.BigEndian.PutUint64(buf[:], size)
+
 	dst = append(dst, long+byte(intSize))
 	dst = append(dst, buf[8-intSize:]...)
+
 	return dst
 }
 

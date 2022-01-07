@@ -284,14 +284,17 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		NewChain: []*types.Header{},
 		OldChain: []*types.Header{},
 	}
+
 	for _, i := range evnt.NewChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.NewChain = append(bEvnt.NewChain, i.header)
 	}
+
 	for _, i := range evnt.OldChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
+
 	m.subscription.Push(bEvnt)
 }
 

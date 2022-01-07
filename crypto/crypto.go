@@ -44,7 +44,6 @@ func trimLeftZeros(b []byte) []byte {
 // ValidateSignatureValues checks if the signature values are correct
 func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 	// TODO: ECDSA malleability
-
 	if r == nil || s == nil {
 		return false
 	}
@@ -61,9 +60,11 @@ func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 
 	ss := s.Bytes()
 	ss = trimLeftZeros(ss)
+
 	if bytes.Compare(ss, secp256k1N) >= 0 || bytes.Compare(ss, one) < 0 {
 		return false
 	}
+
 	return true
 }
 
@@ -133,6 +134,7 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	size := len(signature)
 	term := byte(27)
+
 	if signature[size-1] == 1 {
 		term = 28
 	}
@@ -152,10 +154,12 @@ func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	term := byte(0)
 	if sig[0] == 28 {
 		term = 1
 	}
+
 	return append(sig, term)[1:], nil
 }
 

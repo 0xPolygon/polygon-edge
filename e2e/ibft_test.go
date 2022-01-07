@@ -29,6 +29,7 @@ func TestIbft_Transfer(t *testing.T) {
 	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
+
 	for i := 0; i < IBFTMinNodes-1; i++ {
 		txn := &framework.PreparedTransaction{
 			From:     senderAddr,

@@ -301,6 +301,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.Data = dec.Data
+
 	for _, i := range dec.GasLimit {
 		if j, err := stringToUint64(i); err != nil {
 			return err
@@ -311,19 +312,16 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	for _, i := range dec.Value {
 		value := new(big.Int)
+
 		if i != "0x" {
 			v, err := types.ParseUint256orHex(&i)
 			if err != nil {
 				return err
 			}
-			/*
-				v, ok := math.ParseBig256(i)
-				if !ok {
-					return fmt.Errorf("invalid tx value %q", i)
-				}
-			*/
+
 			value = v
 		}
+
 		t.Value = append(t.Value, value)
 	}
 
@@ -338,15 +336,18 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.From = types.Address{}
+
 	if len(dec.SecretKey) > 0 {
 		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
 			return err
 		}
+
 		key, err := crypto.ParsePrivateKey(secretKey)
 		if err != nil {
 			return fmt.Errorf("invalid private key: %v", err)
 		}
+
 		t.From = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
@@ -450,6 +451,7 @@ func listFolders(paths ...string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		for _, i := range files {
 			if i.IsDir() {
 				folders = append(folders, filepath.Join(path, i.Name()))

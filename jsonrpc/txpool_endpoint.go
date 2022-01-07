@@ -93,6 +93,7 @@ func (t *Txpool) Inspect() (interface{}, error) {
 	pendingRpcTxns := make(map[string]map[string]string)
 	for address, nonces := range pendingTxs {
 		pendingRpcTxns[address.String()] = make(map[string]string)
+
 		for nonce, tx := range nonces {
 			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
 			pendingRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
@@ -102,6 +103,7 @@ func (t *Txpool) Inspect() (interface{}, error) {
 	queuedRpcTxns := make(map[string]map[string]string)
 	for address, nonces := range queuedTxs {
 		queuedRpcTxns[address.String()] = make(map[string]string)
+
 		for nonce, tx := range nonces {
 			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
 			queuedRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
@@ -125,11 +127,15 @@ func (t *Txpool) Inspect() (interface{}, error) {
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status.
 func (t *Txpool) Status() (interface{}, error) {
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+
 	var pendingCount int
+
 	for _, t := range pendingTxs {
 		pendingCount += len(t)
 	}
+
 	var queuedCount int
+
 	for _, t := range queuedTxs {
 		queuedCount += len(t)
 	}

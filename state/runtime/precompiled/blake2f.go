@@ -57,6 +57,7 @@ func (e *blake2f) run(input []byte) ([]byte, error) {
 	F(&h, m, c, flag == 1, rounds)
 
 	res := make([]byte, 64)
+
 	for i := 0; i < 8; i++ {
 		o := i * 8
 		binary.LittleEndian.PutUint64(res[o:o+8], h[i])

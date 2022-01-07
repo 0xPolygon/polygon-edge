@@ -311,6 +311,7 @@ func readConfigFile(path string) (*Config, error) {
 	}
 
 	var unmarshalFunc func([]byte, interface{}) error
+
 	switch {
 	case strings.HasSuffix(path, ".hcl"):
 		unmarshalFunc = hcl.Unmarshal

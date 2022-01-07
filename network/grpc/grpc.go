@@ -110,10 +110,12 @@ func WrapClient(s network.Stream) *grpc.ClientConn {
 		return &streamConn{s}, nil
 	})
 	conn, err := grpc.Dial("", grpc.WithInsecure(), opts)
+
 	if err != nil {
 		// TODO: this should not fail at all
 		panic(err)
 	}
+
 	return conn
 }
 
@@ -133,6 +135,7 @@ func (c *streamConn) LocalAddr() net.Addr {
 	if err != nil {
 		return fakeRemoteAddr()
 	}
+
 	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().LocalPeer()}
 }
 
@@ -142,6 +145,7 @@ func (c *streamConn) RemoteAddr() net.Addr {
 	if err != nil {
 		return fakeRemoteAddr()
 	}
+
 	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().RemotePeer()}
 }
 

@@ -44,11 +44,13 @@ func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) 
 	if m.hashToRes == nil {
 		return nil, nil
 	}
+
 	tx.ComputeHash()
 	res, ok := m.hashToRes[tx.Hash]
 	if ok {
 		return res, nil
 	}
+
 	return nil, errors.New("not found")
 }
 
@@ -116,6 +118,7 @@ func TestQueryValidators(t *testing.T) {
 		addr types.Address
 		tx   *types.Transaction
 	}
+
 	type MockReturns struct {
 		nonce uint64
 		res   *runtime.ExecutionResult

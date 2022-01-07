@@ -98,6 +98,7 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 	if factoryErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager, %v", factoryErr)
 	}
+
 	assert.NotNil(t, manager)
 
 	return manager

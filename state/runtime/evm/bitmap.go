@@ -18,6 +18,7 @@ func (b *bitmap) reset() {
 	for i := range b.buf {
 		b.buf[i] = 0
 	}
+
 	b.buf = b.buf[:0]
 }
 

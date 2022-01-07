@@ -112,9 +112,6 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 }
 
 func calculateHeaderHash(h *types.Header) ([]byte, error) {
-	//hash := istanbulHeaderHash(h)
-	//return hash.Bytes(), nil
-
 	h = h.Copy() // make a copy since we update the extra field
 
 	arena := fastrlp.DefaultArenaPool.Get()
@@ -185,6 +182,7 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	rawMsg := commitMsg(hash)
 
 	visited := map[types.Address]struct{}{}
+
 	for _, seal := range extra.CommittedSeal {
 		addr, err := ecrecoverImpl(seal, rawMsg)
 		if err != nil {

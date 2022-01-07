@@ -128,6 +128,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		for k, v := range g.Alloc {
 			alloc[k.String()] = v
 		}
+
 		enc.Alloc = &alloc
 	}
 
@@ -160,6 +161,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	}
 
 	var err, subErr error
+
 	parseError := func(field string, subErr error) {
 		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
 	}
@@ -168,6 +170,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if subErr != nil {
 		parseError("nonce", subErr)
 	}
+
 	binary.BigEndian.PutUint64(g.Nonce[:], nonce)
 
 	g.Timestamp, subErr = types.ParseUint64orHex(dec.Timestamp)
@@ -185,10 +188,12 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if dec.GasLimit == nil {
 		return fmt.Errorf("field 'gaslimit' is required")
 	}
+
 	g.GasLimit, subErr = types.ParseUint64orHex(dec.GasLimit)
 	if subErr != nil {
 		parseError("gaslimit", subErr)
 	}
+
 	g.Difficulty, subErr = types.ParseUint64orHex(dec.Difficulty)
 	if subErr != nil {
 		parseError("difficulty", subErr)
@@ -197,9 +202,11 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if dec.Mixhash != nil {
 		g.Mixhash = *dec.Mixhash
 	}
+
 	if dec.Coinbase != nil {
 		g.Coinbase = *dec.Coinbase
 	}
+
 	if dec.Alloc != nil {
 		g.Alloc = make(map[types.Address]*GenesisAccount, len(dec.Alloc))
 		for k, v := range dec.Alloc {
@@ -211,6 +218,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if subErr != nil {
 		parseError("number", subErr)
 	}
+
 	g.GasUsed, subErr = types.ParseUint64orHex(dec.GasUsed)
 	if subErr != nil {
 		parseError("gasused", subErr)
@@ -219,6 +227,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	if dec.ParentHash != nil {
 		g.ParentHash = *dec.ParentHash
 	}
+
 	return err
 }
 
@@ -245,21 +254,27 @@ type genesisAccountEncoder struct {
 
 func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	obj := &genesisAccountEncoder{}
+
 	if g.Code != nil {
 		obj.Code = types.EncodeBytes(g.Code)
 	}
+
 	if len(g.Storage) != 0 {
 		obj.Storage = g.Storage
 	}
+
 	if g.Balance != nil {
 		obj.Balance = types.EncodeBigInt(g.Balance)
 	}
+
 	if g.Nonce != 0 {
 		obj.Nonce = types.EncodeUint64(g.Nonce)
 	}
+
 	if g.PrivateKey != nil {
 		obj.PrivateKey = types.EncodeBytes(g.PrivateKey)
 	}
+
 	return json.Marshal(obj)
 }
 
@@ -280,6 +295,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	}
 
 	var err error
+
 	var subErr error
 
 	parseError := func(field string, subErr error) {
@@ -301,7 +317,9 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	if subErr != nil {
 		parseError("balance", subErr)
 	}
+
 	g.Nonce, subErr = types.ParseUint64orHex(dec.Nonce)
+
 	if subErr != nil {
 		parseError("nonce", subErr)
 	}
@@ -347,9 +365,11 @@ func ImportFromFile(filename string) (*Chain, error) {
 
 func importChain(content []byte) (*Chain, error) {
 	var chain *Chain
+
 	if err := json.Unmarshal(content, &chain); err != nil {
 		return nil, err
 	}
+
 	if engines := chain.Params.Engine; len(engines) != 1 {
 		return nil, fmt.Errorf("Expected one consensus engine but found %d", len(engines))
 	}

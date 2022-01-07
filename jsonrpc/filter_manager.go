@@ -163,6 +163,7 @@ func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterMan
 func (f *FilterManager) Run() {
 	// watch for new events in the blockchain
 	watchCh := make(chan *blockchain.Event)
+
 	go func() {
 		for {
 			evnt := f.subscription.GetEvent()
@@ -174,6 +175,7 @@ func (f *FilterManager) Run() {
 	}()
 
 	var timeoutCh <-chan time.Time
+
 	for {
 		// check for the next filter to be removed
 		filter := f.nextTimeoutFilter()
@@ -437,6 +439,7 @@ func (h *headElem) getUpdates() ([]*types.Header, *headElem) {
 	res := []*types.Header{}
 
 	cur := h
+
 	for {
 		if cur.next == nil {
 			break

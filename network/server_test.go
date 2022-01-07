@@ -49,6 +49,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 
 	// Disconnect Server 1 from Server 0 so Server 0 will have free slots
 	servers[0].Disconnect(servers[1].host.ID(), "bye")
+
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
 
@@ -321,6 +322,7 @@ func TestNat(t *testing.T) {
 
 	// NAT IP should be found in registered server addresses
 	found := false
+
 	for _, addr := range registeredAddresses {
 		if addr.String() == testMultiAddrString {
 			found = true

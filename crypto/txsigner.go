@@ -52,11 +52,13 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	v.Set(a.NewUint(tx.Nonce))
 	v.Set(a.NewBigInt(tx.GasPrice))
 	v.Set(a.NewUint(tx.Gas))
+
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
 	}
+
 	v.Set(a.NewBigInt(tx.Value))
 	v.Set(a.NewCopyBytes(tx.Input))
 
@@ -68,6 +70,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	hash := keccak.Keccak256Rlp(nil, v)
+
 	signerPool.Put(a)
 
 	return types.BytesToHash(hash)
@@ -90,6 +93,7 @@ func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 	if tx.V != nil {
 		refV.SetBytes(tx.V.Bytes())
 	}
+
 	refV.Sub(refV, big27)
 
 	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))

@@ -13,12 +13,15 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 	if err != nil {
 		return nil, err
 	}
+
 	headers := []*types.Header{}
+
 	for _, obj := range resp.Objs {
 		header := &types.Header{}
 		if err := header.UnmarshalRLP(obj.Spec.Value); err != nil {
 			return nil, err
 		}
+
 		headers = append(headers, header)
 	}
 	return headers, nil
@@ -55,7 +58,9 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 	if err != nil {
 		return err
 	}
+
 	slot.blocks = []*types.Block{}
+
 	for _, h := range resp {
 		slot.blocks = append(slot.blocks, &types.Block{
 			Header: h,
@@ -89,6 +94,7 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 func (s *skeleton) addSkeleton(headers []*types.Header) error {
 	// safe check make sure they all have the same difference
 	diff := uint64(0)
+
 	for i := 1; i < len(headers); i++ {
 		elemDiff := headers[i].Number - headers[i-1].Number
 		if diff == 0 {
@@ -100,6 +106,7 @@ func (s *skeleton) addSkeleton(headers []*types.Header) error {
 
 	// fill up the slots
 	s.slots = make([]*slot, len(headers))
+
 	for indx, header := range headers {
 		slot := &slot{
 			hash:   header.Hash,

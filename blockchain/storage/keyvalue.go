@@ -110,9 +110,11 @@ func (s *KeyValueStorage) ReadHeadNumber() (uint64, bool) {
 	if !ok {
 		return 0, false
 	}
+
 	if len(data) != 8 {
 		return 0, false
 	}
+
 	return s.decodeUint(data), true
 }
 
@@ -248,6 +250,7 @@ func (s *KeyValueStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) e
 // ReadTxLookup reads the block hash using the transaction hash
 func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	parser := &fastrlp.Parser{}
+
 	v := s.read2(TX_LOOKUP_PREFIX, hash.Bytes(), parser)
 	if v == nil {
 		return types.Hash{}, false
@@ -255,6 +258,7 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 
 	blockHash := []byte{}
 	blockHash, err := v.GetBytes(blockHash[:0], 32)
+
 	if err != nil {
 		panic(err)
 	}

@@ -463,6 +463,7 @@ func addStressTxnsWithHashes(
 	currentNonce := 1 // 1 because the first transaction was deployment
 
 	txHashes := make([]web3.Hash, 0)
+
 	for i := 0; i < numTransactions; i++ {
 		setNameTxn := generateStressTestTx(
 			t,
@@ -537,7 +538,9 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	// Send ~50 transactions
 	numTransactions := 50
+
 	var wg sync.WaitGroup
+
 	wg.Add(numTransactions)
 
 	// Add stress test transactions

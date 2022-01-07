@@ -35,6 +35,7 @@ func TestSimpleGossip(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 	messageCh := make(chan *testproto.GenericMessage)
+
 	t.Cleanup(func() {
 		close(messageCh)
 		closeTestServers(t, servers)
@@ -80,6 +81,7 @@ func TestSimpleGossip(t *testing.T) {
 	}
 
 	messagesGossiped := 0
+
 	for {
 		select {
 		case <-time.After(time.Second * 15):

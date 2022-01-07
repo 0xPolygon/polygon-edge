@@ -43,11 +43,13 @@ func CalculateUncleRoot(uncles []*types.Header) types.Hash {
 
 	a := arenaPool.Get()
 	v := a.NewArray()
+
 	for _, i := range uncles {
 		v.Set(i.MarshalRLPWith(a))
 	}
 
 	root := keccak.Keccak256Rlp(nil, v)
+
 	arenaPool.Put(a)
 
 	return types.BytesToHash(root)
@@ -72,6 +74,7 @@ func CalculateRoot(num int, h func(indx int) []byte) types.Hash {
 
 		// important to copy the return before releasing the hasher
 		res := types.BytesToHash(dst)
+
 		releaseFastHasher(fastH)
 
 		if ok {

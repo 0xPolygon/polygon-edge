@@ -54,6 +54,7 @@ func (p *PeersStatus) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	var nodeId string
+
 	flags.StringVar(&nodeId, "peer-id", "", "")
 
 	if err := flags.Parse(args); err != nil {

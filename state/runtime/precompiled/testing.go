@@ -39,7 +39,9 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 		Expected string
 		Gas      uint64
 	}
+
 	var cases []*testCase
+
 	if err := json.Unmarshal(data, &cases); err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +56,7 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 			Input:    inputDecode,
 			Expected: expectedDecode,
 		}
+
 		t.Run(i.Name, func(t *testing.T) {
 			f(t, c)
 		})

@@ -495,6 +495,7 @@ func (i *Ibft) runSyncState() {
 			} else {
 				time.Sleep(1 * time.Second)
 			}
+
 			continue
 		}
 
@@ -518,6 +519,7 @@ func (i *Ibft) runSyncState() {
 
 		// start watch mode
 		var isValidator bool
+
 		i.syncer.WatchSyncWithPeer(p, func(b *types.Block) bool {
 			// After each written block, update the snapshot store for PoS.
 			// The snapshot store is currently updated for PoA inside the ProcessHeadersHook
@@ -627,6 +629,7 @@ type transitionInterface interface {
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	txns := []*types.Transaction{}
 	returnTxnFuncs := []func(){}
+
 	for {
 		txn, retTxnFn := i.txpool.Pop()
 		if txn == nil {
@@ -636,6 +639,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		if txn.ExceedsBlockGasLimit(gasLimit) {
 			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			i.txpool.DecreaseAccountNonce(txn)
+
 			continue
 		}
 
@@ -648,6 +652,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 			} else {
 				i.txpool.DecreaseAccountNonce(txn)
 			}
+
 			continue
 		}
 
@@ -1025,6 +1030,7 @@ func (i *Ibft) runRoundChangeState() {
 			checkTimeout()
 			// update the timeout duration
 			timeout = exponentialTimeout(i.state.view.Round)
+
 			continue
 		}
 
@@ -1209,6 +1215,7 @@ func (i *Ibft) Close() error {
 // getNextMessage reads a new message from the message queue
 func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
 	timeoutCh := time.After(timeout)
+
 	for {
 		msg := i.msgQueue.readMessage(i.getState(), i.state.view)
 		if msg != nil {

@@ -54,6 +54,7 @@ type subscription struct {
 // GetEventCh creates a new event channel, and returns it
 func (s *subscription) GetEventCh() chan *Event {
 	eventCh := make(chan *Event)
+
 	go func() {
 		for {
 			evnt := s.GetEvent()
@@ -132,6 +133,7 @@ func (e *Event) SetDifficulty(b *big.Int) {
 // AddNewHeader appends a header to the event's NewChain array
 func (e *Event) AddNewHeader(newHeader *types.Header) {
 	header := newHeader.Copy()
+
 	if e.NewChain == nil {
 		// Array doesn't exist yet, create it
 		e.NewChain = []*types.Header{}
@@ -193,6 +195,7 @@ func (e *eventStream) Head() (*eventElem, chan void) {
 	if e.updateCh == nil {
 		e.updateCh = make([]chan void, 0)
 	}
+
 	e.updateCh = append(e.updateCh, ch)
 
 	e.lock.Unlock()

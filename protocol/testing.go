@@ -66,16 +66,20 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
 
 	countMap := func(m *sync.Map) int {
 		count := 0
+
 		m.Range(func(key, value interface{}) bool {
 			count++
+
 			return true
 		})
+
 		return count
 	}
 
@@ -94,6 +98,7 @@ func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Dura
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
@@ -109,6 +114,7 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
@@ -152,6 +158,7 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 
 	currentHeight := chain.Header().Number
 	oldHeaders := make([]*types.Header, currentHeight+1)
+
 	for i := uint64(1); i <= currentHeight; i++ {
 		var ok bool
 		oldHeaders[i], ok = chain.GetHeaderByNumber(i)
@@ -169,6 +176,7 @@ func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Dura
 	assert.NotNil(t, peer, "syncer doesn't have peer %s", peerID.String())
 
 	blockCh := make(chan *types.Block, 1)
+
 	go func() {
 		if block, _ := peer.popBlock(popTimeout); block != nil {
 			blockCh <- block

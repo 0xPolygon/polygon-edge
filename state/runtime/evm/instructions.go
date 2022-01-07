@@ -128,6 +128,7 @@ func opExp(c *state) {
 	} else {
 		gas = 10
 	}
+
 	gasCost := uint64((y.BitLen()+7)/8) * gas
 	if !c.consumeGas(gasCost) {
 		return
@@ -142,9 +143,11 @@ func opExp(c *state) {
 				toU256(z.Mul(z, x))
 			}
 			d >>= 1
+
 			toU256(x.Mul(x, x))
 		}
 	}
+
 	y.Set(z)
 	releaseBig(z)
 }
@@ -295,6 +298,7 @@ func opSignExtension(c *state) {
 	if ext.Cmp(wordSize) > 0 {
 		return
 	}
+
 	if x == nil {
 		return
 	}
@@ -394,6 +398,7 @@ func opMload(c *state) {
 	if !ok {
 		return
 	}
+
 	c.push1().SetBytes(c.tmp)
 }
 
@@ -609,6 +614,7 @@ func min(i, j uint64) uint64 {
 	if i < j {
 		return i
 	}
+
 	return j
 }
 
@@ -702,6 +708,7 @@ func (c *state) setBytes(dst, input []byte, size uint64, dataOffset *big.Int) {
 		for i := uint64(0); i < size; i++ {
 			dst[i] = 0
 		}
+
 		return
 	}
 
@@ -878,6 +885,7 @@ func opSelfDestruct(c *state) {
 	// EIP150 reprice fork
 	if c.config.EIP150 {
 		gas = 5000
+
 		if c.config.EIP158 {
 			// if empty and transfers value
 			if c.host.Empty(address) && c.host.GetBalance(c.msg.Address).Sign() != 0 {
@@ -1073,6 +1081,7 @@ func opCall(op OpCode) instruction {
 		}
 
 		var callType runtime.CallType
+
 		switch op {
 		case CALL:
 			callType = runtime.Call
@@ -1178,6 +1187,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	var gas uint64
 
 	ok = initialGas.IsUint64()
+
 	if c.config.EIP150 {
 		availableGas := c.gas - gasCost
 		availableGas = availableGas - availableGas/64
@@ -1249,6 +1259,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 
 	// Both CREATE and CREATE2 use memory
 	var input []byte
+
 	var ok bool
 
 	input, ok = c.get2(input[:0], offset, length) // Does the memory check

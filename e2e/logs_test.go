@@ -124,11 +124,15 @@ func TestFilterValue(t *testing.T) {
 
 	// Convert to right format
 	var placeholder web3.Hash
+
 	copy(placeholder[:], buf)
+
 	var filterEventHashes []*web3.Hash
+
 	filterEventHashes = append(filterEventHashes, &placeholder)
 
 	var filterAddresses []web3.Address
+
 	filterAddresses = append(filterAddresses, contractAddr)
 
 	id, err := client.Eth().NewFilter(&web3.LogFilter{

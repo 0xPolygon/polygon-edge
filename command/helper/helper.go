@@ -190,6 +190,7 @@ func HandleSignals(closeFn func(), ui cli.Ui) int {
 
 	// Call the Minimal server close callback
 	gracefulCh := make(chan struct{})
+
 	go func() {
 		if closeFn != nil {
 			closeFn()

@@ -77,8 +77,6 @@ func multComplexity(x *big.Int) *big.Int {
 }
 
 func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
-	// fmt.Println("-- calc gas --")
-
 	var val, tail []byte
 
 	val, tail = m.p.get(input, 32)
@@ -102,6 +100,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	}
 
 	expHead := new(big.Int)
+
 	if bLen := baseLen.Uint64(); bLen < uint64(len(input)) {
 		val, _ = m.p.get(input[bLen:], int(expHeadLen))
 		expHead.SetBytes(val)

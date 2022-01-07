@@ -95,6 +95,7 @@ func TestInsertHeaders(t *testing.T) {
 		OldChain []*header
 		Diff     *big.Int
 	}
+
 	type headerEvnt struct {
 		header *header
 		event  *evnt

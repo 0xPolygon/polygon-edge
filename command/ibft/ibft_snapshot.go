@@ -58,6 +58,7 @@ func (p *IbftSnapshot) Run(args []string) int {
 
 	// query a specific snapshot
 	var number int64
+
 	flags.Int64Var(&number, "number", -1, "")
 
 	if err := flags.Parse(args); err != nil {

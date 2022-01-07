@@ -21,9 +21,11 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 	if l == size {
 		return bb
 	}
+
 	if l > size {
 		return bb[l-size:]
 	}
+
 	tmp := make([]byte, size)
 	copy(tmp[size-l:], bb)
 
@@ -130,6 +132,7 @@ func PredeployStakingSC(
 	// Parse the default staked balance value into *big.Int
 	val := DefaultStakedBalance
 	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %v", err)
 	}
@@ -138,6 +141,7 @@ func PredeployStakingSC(
 	storageMap := make(map[types.Hash]types.Hash)
 	bigTrueValue := big.NewInt(1)
 	stakedAmount := big.NewInt(0)
+
 	for indx, validator := range validators {
 		// Update the total staked amount
 		stakedAmount.Add(stakedAmount, bigDefaultStakedBalance)

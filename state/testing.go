@@ -198,6 +198,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	txn := newTxn(state, snap)
 
 	code := []byte{0x1, 0x2, 0x3}
+
 	txn.SetNonce(addr1, 10)
 	txn.SetBalance(addr1, big.NewInt(100))
 	txn.SetCode(addr1, code)

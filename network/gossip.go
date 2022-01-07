@@ -50,6 +50,7 @@ func (t *Topic) Subscribe(handler func(obj interface{})) error {
 
 func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})) {
 	ctx, cancelFn := context.WithCancel(context.Background())
+
 	go func() {
 		<-t.closeCh
 		cancelFn()
@@ -61,12 +62,14 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 			t.logger.Error("failed to get topic", "err", err)
 			continue
 		}
+
 		go func() {
 			obj := t.createObj()
 			if err := proto.Unmarshal(msg.Data, obj); err != nil {
 				t.logger.Error("failed to unmarshal topic", "err", err)
 				return
 			}
+
 			handler(obj)
 		}()
 	}

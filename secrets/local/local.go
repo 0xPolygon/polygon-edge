@@ -149,6 +149,7 @@ func (l *LocalSecretsManager) RemoveSecret(name string) error {
 	if !ok {
 		return secrets.ErrSecretNotFound
 	}
+
 	delete(l.secretPathMap, name)
 
 	if removeErr := os.Remove(secretPath); removeErr != nil {

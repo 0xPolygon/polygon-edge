@@ -218,6 +218,7 @@ func (l *Loadbot) Run() error {
 	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 
 	startTime := time.Now()
+
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
@@ -251,6 +252,7 @@ func (l *Loadbot) Run() error {
 
 			// Stop the performance timer
 			end := time.Now()
+
 			l.metrics.TransactionDuration.reportTurnAroundTime(
 				txHash,
 				&metadata{

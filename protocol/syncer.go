@@ -70,6 +70,7 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 	defer s.enqueueLock.Unlock()
 
 	indx := -1
+
 	for i, b := range s.enqueue {
 		if b.Hash() == lastSeen {
 			indx = i
@@ -83,6 +84,7 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
+
 	for {
 		if !s.IsClosed() {
 			s.enqueueLock.Lock()
@@ -217,6 +219,7 @@ func (pw *progressionWrapper) startProgression(
 // updates the currently written block in the batch sync
 func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription) {
 	eventCh := subscription.GetEventCh()
+
 	for {
 		select {
 		case event := <-eventCh:
@@ -442,6 +445,7 @@ func (s *Syncer) Start() {
 	s.server.Register(syncerV1, grpcStream)
 
 	s.setupPeers()
+
 	go s.handlePeerEvent()
 }
 
@@ -486,6 +490,7 @@ func (s *Syncer) handlePeerEvent() {
 // BestPeer returns the best peer by difficulty (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
 	var bestPeer *SyncPeer
+
 	var bestTd *big.Int
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
@@ -572,6 +577,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	}
 
 	var header *types.Header
+
 	for min <= max {
 		m := uint64(math.Floor(float64(min+max) / 2))
 
@@ -581,7 +587,9 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 			if !ok {
 				return nil, nil, ErrLoadLocalGenesisFailed
 			}
+
 			header = genesis
+
 			break
 		}
 

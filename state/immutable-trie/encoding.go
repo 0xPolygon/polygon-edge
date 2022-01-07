@@ -13,7 +13,9 @@ func hexToCompact(hex []byte) []byte {
 		buf[0] |= hex[0] // first nibble is contained in the first byte
 		hex = hex[1:]
 	}
+
 	decodeNibbles(hex, buf[1:])
+
 	return buf
 }
 
@@ -30,7 +32,9 @@ func hasTerm(s []byte) bool {
 
 func keybytesToHex(str []byte) []byte {
 	l := len(str)*2 + 1
+
 	var nibbles = make([]byte, l)
+
 	for i, b := range str {
 		nibbles[i*2] = b / 16
 		nibbles[i*2+1] = b % 16

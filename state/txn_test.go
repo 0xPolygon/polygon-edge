@@ -56,6 +56,7 @@ func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mo
 	}
 
 	ar := &fastrlp.Arena{}
+
 	for addr, p := range preState {
 		account, snap := buildMockPreState(p)
 		if snap != nil {
@@ -85,8 +86,10 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 	root := emptyStateHash
 
 	ar := &fastrlp.Arena{}
+
 	if p.State != nil {
 		data := map[string][]byte{}
+
 		for k, v := range p.State {
 			vv := ar.NewBytes(bytes.TrimLeft(v.Bytes(), "\x00"))
 			data[k.String()] = vv.MarshalTo(nil)

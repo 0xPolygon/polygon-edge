@@ -17,6 +17,7 @@ func (p *Params) GetEngine() string {
 	for k := range p.Engine {
 		return k
 	}
+
 	return ""
 }
 

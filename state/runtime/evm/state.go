@@ -315,6 +315,7 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 
 func (c *state) Show() string {
 	str := []string{}
+
 	for i := 0; i < len(c.memory); i += 16 {
 		j := i + 16
 		if j > len(c.memory) {

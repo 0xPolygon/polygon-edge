@@ -223,6 +223,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	}
 	// find the transaction in the body
 	indx := -1
+
 	for i, txn := range block.Transactions {
 		if txn.Hash == hash {
 			indx = i
@@ -399,7 +400,6 @@ func (e *Eth) EstimateGas(
 	// If the sender address is present, recalculate the ceiling to his balance
 	if transaction.From != types.ZeroAddress && transaction.GasPrice != nil && gasPriceInt.BitLen() != 0 {
 		// Get the account balance
-
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
@@ -552,6 +552,7 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	if to < from {
 		return nil, fmt.Errorf("incorrect range")
 	}
+
 	for i := from; i <= to; i++ {
 		block, ok := e.d.store.GetBlockByNumber(i, true)
 		if !ok {

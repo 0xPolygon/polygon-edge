@@ -69,6 +69,7 @@ func (d *Dev) Start() error {
 func (d *Dev) nextNotify() chan struct{} {
 	if d.interval != 0 {
 		ch := make(chan struct{})
+
 		go func() {
 			<-time.After(time.Duration(d.interval) * time.Second)
 			ch <- struct{}{}
@@ -106,6 +107,7 @@ type transitionInterface interface {
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	txns := []*types.Transaction{}
 	returnTxnFuncs := []func(){}
+
 	for {
 		txn, retTxnFn := d.txpool.Pop()
 		if txn == nil {
@@ -115,6 +117,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		if txn.ExceedsBlockGasLimit(gasLimit) {
 			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
 			d.txpool.DecreaseAccountNonce(txn)
+
 			continue
 		}
 
@@ -127,6 +130,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			} else {
 				d.txpool.DecreaseAccountNonce(txn)
 			}
+
 			continue
 		}
 

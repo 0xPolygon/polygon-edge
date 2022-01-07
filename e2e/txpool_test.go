@@ -192,7 +192,6 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// -> tx shouldn't be executed, but shelved for later
 	// Add tx with nonce 1
 	// -> check if both tx with nonce 1 and tx with nonce 2 are parsed
-
 	// Predefined values
 	gasPrice := big.NewInt(10000)
 
@@ -311,7 +310,6 @@ func generateTestAccounts(numAccounts int, t *testing.T) []*testAccount {
 func TestTxPool_StressAddition(t *testing.T) {
 	// Test scenario:
 	// Add a large number of txns to the txpool concurrently
-
 	// Predefined values
 	defaultBalance := framework.EthToWei(10000)
 
@@ -770,6 +768,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 
 	numIterations := 100
 	numIterationsBig := big.NewInt(int64(numIterations))
+
 	for i := 0; i < numIterations; i++ {
 		wg.Add(1)
 		go sendTx()

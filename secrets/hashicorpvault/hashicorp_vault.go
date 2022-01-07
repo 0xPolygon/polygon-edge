@@ -86,6 +86,7 @@ func (v *VaultSecretsManager) Setup() error {
 
 	// Set the server URL
 	config.Address = v.serverURL
+
 	client, err := vault.NewClient(config)
 	if err != nil {
 		return fmt.Errorf("unable to initialize Vault client: %v", err)

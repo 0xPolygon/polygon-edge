@@ -245,12 +245,15 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
 		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
+
 	var responses []Response
+
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
 			errorResponse := NewRpcResponse(req.ID, "2.0", nil, err)
 			responses = append(responses, errorResponse)
+
 			continue
 		}
 
@@ -277,6 +280,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	inArgs[0] = service.sv
 
 	inputs := make([]interface{}, fd.numParams())
+
 	for i := 0; i < fd.inNum-1; i++ {
 		val := reflect.New(fd.reqt[i+1])
 		inputs[i] = val.Interface()
@@ -295,7 +299,9 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	}
 
 	var data []byte
+
 	var err error
+
 	res := output[0].Interface()
 	if res != nil {
 		data, err = json.Marshal(res)
@@ -325,6 +331,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 	}
 
 	funcMap := make(map[string]*funcData)
+
 	for i := 0; i < st.NumMethod(); i++ {
 		mv := st.Method(i)
 		if mv.PkgPath != "" {
@@ -337,7 +344,9 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		fd := &funcData{
 			fv: mv.Func,
 		}
+
 		var err error
+
 		if fd.inNum, fd.reqt, err = validateFunc(funcName, fd.fv, true); err != nil {
 			panic(fmt.Sprintf("jsonrpc: %s", err))
 		}

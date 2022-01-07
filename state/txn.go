@@ -74,8 +74,6 @@ func (txn *Txn) Snapshot() int {
 
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
-	// fmt.Printf("revert to snapshot ======> %d\n", id)
-
 	if id > len(txn.snapshots) {
 		panic("")
 	}
@@ -110,6 +108,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	}
 
 	var err error
+
 	var account Account
 	if err = account.UnmarshalRlp(data); err != nil {
 		return nil, false
@@ -259,12 +258,15 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 
 	if legacyGasMetering {
 		status = runtime.StorageModified
+
 		if oldValue == zeroHash {
 			return runtime.StorageAdded
 		} else if value == zeroHash {
 			txn.AddRefund(15000)
+
 			return runtime.StorageDeleted
 		}
+
 		return runtime.StorageModified
 	}
 
@@ -416,6 +418,7 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
+
 	txn.upsertAccount(addr, false, func(object *StateObject) {
 		if object == nil || object.Suicide {
 			suicided = false
@@ -438,8 +441,6 @@ func (txn *Txn) HasSuicided(addr types.Address) bool {
 
 // Refund
 func (txn *Txn) AddRefund(gas uint64) {
-	// fmt.Printf("=-----------ADD REFUND: %d\n", gas)
-
 	refund := txn.GetRefund() + gas
 	txn.txn.Insert(refundIndex, refund)
 }
@@ -454,7 +455,9 @@ func (txn *Txn) Logs() []*types.Log {
 	if !exists {
 		return nil
 	}
+
 	txn.txn.Delete(logIndex)
+
 	return data.([]*types.Log)
 }
 
@@ -527,6 +530,7 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 
 func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
+
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*StateObject)
 		if !ok {
@@ -564,6 +568,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 
 	// Do a more complex thing for now
 	objs := []*Object{}
+
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*StateObject)
 		if !ok {

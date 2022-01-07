@@ -347,6 +347,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 	topic1 := types.StringToHash("4")
 	topic2 := types.StringToHash("5")
 	topic3 := types.StringToHash("6")
+
 	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
 
 	testTable := []struct {
@@ -390,6 +391,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 	// setup test
 	store := &mockBlockStore2{}
 	store.topics = []types.Hash{topic1, topic2, topic3}
+
 	for i := 0; i < 5; i++ {
 		store.add(&types.Block{
 			Header: &types.Header{

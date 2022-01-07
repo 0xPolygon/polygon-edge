@@ -25,6 +25,7 @@ func (l *LogFilter) addTopicSet(set ...string) error {
 	}
 
 	res := []types.Hash{}
+
 	for _, i := range set {
 		item := types.Hash{}
 		if err := item.UnmarshalText([]byte(i)); err != nil {
@@ -140,6 +141,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 			case []interface{}:
 				// ["", ""]
 				res := []string{}
+
 				for _, i := range raw {
 					if item, ok := i.(string); ok {
 						res = append(res, item)
@@ -172,6 +174,7 @@ func (l *LogFilter) Match(log *types.Log) bool {
 	// check addresses
 	if len(l.Addresses) > 0 {
 		match := false
+
 		for _, addr := range l.Addresses {
 			if addr == log.Address {
 				match = true
@@ -185,8 +188,10 @@ func (l *LogFilter) Match(log *types.Log) bool {
 	if len(l.Topics) > len(log.Topics) {
 		return false
 	}
+
 	for i, sub := range l.Topics {
 		match := len(sub) == 0
+
 		for _, topic := range sub {
 			if log.Topics[i] == topic {
 				match = true

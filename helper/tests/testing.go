@@ -34,9 +34,12 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 		data interface{}
 		err  error
 	}
+
 	resCh := make(chan result, 1)
+
 	go func() {
 		defer close(resCh)
+
 		for {
 			select {
 			case <-ctx.Done():

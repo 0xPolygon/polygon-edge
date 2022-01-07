@@ -80,11 +80,13 @@ func (j *JSONRPC) setupHTTP() error {
 	srv := http.Server{
 		Handler: mux,
 	}
+
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			j.logger.Error("closed http connection", "err", err)
 		}
 	}()
+
 	return nil
 }
 
@@ -150,6 +152,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	}(ws)
 
 	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
+
 	j.logger.Info("Websocket connection established")
 	// Run the listen loop
 	for {

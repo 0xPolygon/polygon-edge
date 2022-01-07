@@ -72,6 +72,7 @@ func (m *MonitorCommand) Run(args []string) int {
 	}
 
 	doneCh := make(chan struct{})
+
 	go func() {
 		for {
 			evnt, err := stream.Recv()

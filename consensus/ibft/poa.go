@@ -124,10 +124,11 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 
 	// the nonce selects the action
 	var authorize bool
-	switch {
-	case params.header.Nonce == nonceAuthVote:
+
+	switch params.header.Nonce {
+	case nonceAuthVote:
 		authorize = true
-	case params.header.Nonce == nonceDropVote:
+	case nonceDropVote:
 		authorize = false
 	default:
 		return fmt.Errorf("incorrect vote nonce")

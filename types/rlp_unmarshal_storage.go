@@ -28,11 +28,13 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, txn := range txns {
 		bTxn := &Transaction{}
 		if err := bTxn.UnmarshalStoreRLPFrom(p, txn); err != nil {
 			return err
 		}
+
 		b.Transactions = append(b.Transactions, bTxn)
 	}
 
@@ -41,11 +43,13 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, uncle := range uncles {
 		bUncle := &Header{}
 		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
+
 		b.Uncles = append(b.Uncles, bUncle)
 	}
 
@@ -85,11 +89,13 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range elems {
 		rr := &Receipt{}
 		if err := rr.UnmarshalStoreRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		(*r) = append(*r, rr)
 	}
 	return nil

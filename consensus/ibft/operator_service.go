@@ -79,6 +79,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 // GetSnapshot returns the snapshot, based on the passed in request
 func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*proto.Snapshot, error) {
 	var snap *Snapshot
+
 	var err error
 
 	if req.Latest {

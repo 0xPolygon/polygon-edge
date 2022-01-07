@@ -237,6 +237,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		LastBlock uint64
 		Snapshots []*Snapshot
 	}
+
 	var cases = []struct {
 		name           string
 		epochSize      uint64
@@ -779,6 +780,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 
 	// write a header that creates a snapshot
 	headers := []*types.Header{}
+
 	for i := 1; i < 51; i++ {
 		id := strconv.Itoa(i)
 		pool.add(id)
@@ -808,6 +810,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	tmpDir := getTempDir(t)
 	store0 := newSnapshotStore()
+
 	for i := 0; i < 10; i++ {
 		store0.add(&Snapshot{
 			Number: uint64(i),

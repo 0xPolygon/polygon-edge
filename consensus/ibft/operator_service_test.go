@@ -86,6 +86,7 @@ func TestOperator_Propose(t *testing.T) {
 	assert.NoError(t, ibft.setupSnapshot())
 
 	o := &operator{ibft: ibft}
+
 	pool.add("X")
 
 	// we cannot propose to add a validator already in the set

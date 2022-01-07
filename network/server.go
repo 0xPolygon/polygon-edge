@@ -218,6 +218,7 @@ func (s *Server) Start() error {
 
 		// try to decode the bootnodes
 		bootnodes := []*peer.AddrInfo{}
+
 		for _, raw := range s.config.Chain.Bootnodes {
 			node, err := StringToAddrInfo(raw)
 			if err != nil {
@@ -227,6 +228,7 @@ func (s *Server) Start() error {
 				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
 			}
+
 			bootnodes = append(bootnodes, node)
 		}
 
@@ -634,6 +636,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
 	var closed bool
+
 	var mutex sync.Mutex
 
 	isClosed := func() bool {

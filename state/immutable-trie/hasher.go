@@ -123,6 +123,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 	var val *fastrlp.Value
 
 	var aa *fastrlp.Arena
+
 	var idx int
 
 	if h, ok := node.Hash(); ok {
@@ -144,6 +145,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		val = a.NewArray()
 
 		aa, idx = h.AcquireArena()
+
 		for _, i := range n.children {
 			if i == nil {
 				val.Set(a.NewNull())

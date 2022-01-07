@@ -18,6 +18,7 @@ func TestContentEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	var res ContentResponse
+
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Len(t, res.Pending, 0)
 	assert.Len(t, res.Queued, 0)
@@ -34,6 +35,7 @@ func TestInspectEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	var res InspectResponse
+
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Len(t, res.Pending, 0)
 	assert.Len(t, res.Queued, 0)
@@ -52,6 +54,7 @@ func TestStatusEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	var res StatusResponse
+
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Equal(t, res.Pending, uint64(0))
 	assert.Equal(t, res.Queued, uint64(0))

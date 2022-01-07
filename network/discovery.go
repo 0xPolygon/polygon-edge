@@ -172,6 +172,7 @@ func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 	}
 
 	d.srv.logger.Debug("Found new near peers", "peer", len(nodes))
+
 	for _, node := range nodes {
 		if err := d.addToTable(node); err != nil {
 			return err
@@ -214,11 +215,13 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	}
 
 	var addrInfo []*peer.AddrInfo
+
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
 			return nil, err
 		}
+
 		addrInfo = append(addrInfo, info)
 	}
 
@@ -264,6 +267,7 @@ func (d *discovery) FindPeers(
 	closer := d.routingTable.NearestPeers(kb.ConvertKey(req.GetKey()), int(req.Count))
 
 	filtered := []string{}
+
 	for _, id := range closer {
 		// do not include himself
 		if id != from {

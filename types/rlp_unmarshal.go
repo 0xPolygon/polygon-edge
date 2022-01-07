@@ -54,11 +54,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, txn := range txns {
 		bTxn := &Transaction{}
 		if err := bTxn.UnmarshalRLPFrom(p, txn); err != nil {
 			return err
 		}
+
 		b.Transactions = append(b.Transactions, bTxn)
 	}
 
@@ -67,11 +69,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, uncle := range uncles {
 		bUncle := &Header{}
 		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
+
 		b.Uncles = append(b.Uncles, bUncle)
 	}
 
@@ -152,6 +156,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	h.SetNonce(nonce)
 
 	// compute the hash after the decoding
@@ -168,11 +173,13 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range elems {
 		rr := &Receipt{}
 		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		(*r) = append(*r, rr)
 	}
 	return nil
@@ -197,6 +204,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	switch size := len(buf); size {
 	case 32:
 		// root
@@ -222,11 +230,13 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range logsElems {
 		log := &Log{}
 		if err := log.UnmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		r.Logs = append(r.Logs, log)
 	}
 	return nil
@@ -251,15 +261,18 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 	l.Topics = make([]Hash, len(topicElems))
+
 	for indx, topic := range topicElems {
 		if err := topic.GetHash(l.Topics[indx][:]); err != nil {
 			return err
 		}
 	}
+
 	// data
 	if l.Data, err = elems[2].GetBytes(l.Data[:0]); err != nil {
 		return err
 	}
+
 	return nil
 }
 

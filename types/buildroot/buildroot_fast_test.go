@@ -61,11 +61,13 @@ func randomInt(min, max uint64) uint64 {
 
 func buildInput(n, m int) func(i int) []byte {
 	res := [][]byte{}
+
 	for i := 0; i < n; i++ {
 		b := make([]byte, m)
 		for indx := range b {
 			b[indx] = byte(i)
 		}
+
 		res = append(res, b)
 	}
 	return func(i int) []byte {
@@ -75,6 +77,7 @@ func buildInput(n, m int) func(i int) []byte {
 
 func buildRandomInput(num int) func(i int) []byte {
 	res := [][]byte{}
+
 	for i := 0; i < num; i++ {
 		b := make([]byte, randomInt(33, 200))
 		rand.Read(b)

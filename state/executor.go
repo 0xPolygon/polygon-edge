@@ -62,6 +62,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		if len(account.Code) != 0 {
 			txn.SetCode(addr, account.Code)
 		}
+
 		for key, value := range account.Storage {
 			txn.SetState(addr, key, value)
 		}
@@ -374,7 +375,6 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// 4. there is no overflow when calculating intrinsic gas
 	// 5. the purchased gas is enough to cover intrinsic usage
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
-
 	txn := t.state
 
 	// 1. the nonce of the message caller is correct
@@ -651,6 +651,7 @@ func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address)
 	if !t.state.HasSuicided(addr) {
 		t.state.AddRefund(24000)
 	}
+
 	t.state.AddBalance(beneficiary, t.state.GetBalance(addr))
 	t.state.Suicide(addr)
 }
@@ -675,6 +676,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	payload := msg.Input
 	if len(payload) > 0 {
 		zeros := uint64(0)
+
 		for i := 0; i < len(payload); i++ {
 			if payload[i] == 0 {
 				zeros++
