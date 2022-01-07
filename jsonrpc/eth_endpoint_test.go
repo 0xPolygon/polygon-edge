@@ -474,6 +474,10 @@ func (m *mockSpecialStore) Header() *types.Header {
 	}
 }
 
+func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
+	return 1
+}
+
 func TestEth_State_GetBalance(t *testing.T) {
 	store := &mockSpecialStore{
 		account: &mockAccount2{
@@ -588,67 +592,109 @@ func TestEth_State_GetBalance(t *testing.T) {
 }
 
 func TestEth_State_GetTransactionCount(t *testing.T) {
-	latestBlock := LatestBlockNumber
-	filter := BlockNumberOrHash{
-		BlockNumber: &latestBlock,
+	store := &mockSpecialStore{
+		account: &mockAccount2{
+			address: addr0,
+			account: &state.Account{
+				Balance: big.NewInt(100),
+				Nonce:   100,
+			},
+			storage: make(map[types.Hash][]byte),
+		},
+		block: &types.Block{
+			Header: &types.Header{
+				Hash:      types.ZeroHash,
+				Number:    0,
+				StateRoot: types.EmptyRootHash,
+			},
+		},
 	}
+
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+	blockNumberLatest := LatestBlockNumber
+	blockNumberZero := BlockNumber(0x0)
+	blockNumberInvalid := BlockNumber(0x1)
 
 	tests := []struct {
 		name          string
-		initialNonces map[types.Address]uint64
 		target        types.Address
-		blockNumber   BlockNumberOrHash
-		succeeded     bool
-		expectedNonce *argUint64
+		blockNumber   *BlockNumber
+		blockHash     *types.Hash
+		shouldFail    bool
+		expectedNonce uint64
 	}{
 		{
-			name: "should return nonce for existing account",
-			initialNonces: map[types.Address]uint64{
-				addr0: 100,
-			},
-			target:        addr0,
-			blockNumber:   filter,
-			succeeded:     true,
-			expectedNonce: argUintPtr(100),
+			"should return valid nonce for implicit block number",
+			addr0,
+			nil,
+			nil,
+			false,
+			100,
 		},
 		{
-			name: "should return zero for non-existing account",
-			initialNonces: map[types.Address]uint64{
-				addr0: 100,
-			},
-			target:        addr1,
-			blockNumber:   filter,
-			succeeded:     true,
-			expectedNonce: argUintPtr(0),
+			"should return valid nonce for explicit latest block number",
+			addr0,
+			&blockNumberLatest,
+			nil,
+			false,
+			100,
 		},
 		{
-			name: "should not return error for empty block parameter",
-			initialNonces: map[types.Address]uint64{
-				addr0: 100,
-			},
-			target:        addr0,
-			blockNumber:   BlockNumberOrHash{},
-			succeeded:     true,
-			expectedNonce: argUintPtr(100),
+			"should return valid nonce for explicit block number",
+			addr0,
+			&blockNumberZero,
+			nil,
+			false,
+			100,
+		},
+		{
+			"should return an error for non-existing block",
+			addr0,
+			&blockNumberInvalid,
+			nil,
+			true,
+			0,
+		},
+		{
+			"should return valid nonce for valid block hash",
+			addr0,
+			nil,
+			&types.ZeroHash,
+			false,
+			100,
+		},
+		{
+			"should return an error for invalid block hash",
+			addr0,
+			nil,
+			&hash1,
+			true,
+			0,
+		},
+		{
+			"should return a zero-nonce for non-existing account",
+			addr1,
+			&blockNumberLatest,
+			nil,
+			false,
+			0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := &mockAccountStore{}
-
-			for addr, nonce := range tt.initialNonces {
-				account := store.AddAccount(addr)
-				account.Nonce(nonce)
+			filter := BlockNumberOrHash{
+				BlockNumber: tt.blockNumber,
+				BlockHash:   tt.blockHash,
 			}
-			dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, tt.blockNumber)
-			if tt.succeeded {
-				assert.NoError(t, err)
-				assert.NotNil(t, nonce)
-				assert.Equal(t, tt.expectedNonce, nonce)
-			} else {
+
+			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, filter)
+
+			if tt.shouldFail {
 				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, argUintPtr(tt.expectedNonce), nonce)
 			}
 		})
 	}
