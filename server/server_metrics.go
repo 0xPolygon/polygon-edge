@@ -22,6 +22,7 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 			txpool:    txpool.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
 		}
 	}
+
 	return &serverMetrics{
 		consensus: consensus.NilMetrics(),
 		network:   network.NilMetrics(),

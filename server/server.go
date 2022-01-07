@@ -125,6 +125,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	m.stateStorage = stateStorage
 
 	st := itrie.NewState(stateStorage)
@@ -302,6 +303,7 @@ func (s *Server) setupSecretsManager() error {
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[engineName]
+
 	if !ok {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
@@ -310,11 +312,13 @@ func (s *Server) setupConsensus() error {
 	if !ok {
 		engineConfig = map[string]interface{}{}
 	}
+
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
+
 	consensus, err := engine(
 		&consensus.ConsensusParams{
 			Context:        context.Background(),
@@ -330,9 +334,11 @@ func (s *Server) setupConsensus() error {
 			SecretsManager: s.secretsManager,
 		},
 	)
+
 	if err != nil {
 		return err
 	}
+
 	s.consensus = consensus
 
 	return nil
@@ -357,10 +363,13 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	result, ok := snap.Get(key)
+
 	if !ok {
 		return nil, jsonrpc.ErrStateNotFound
 	}
+
 	return result, nil
 }
 
@@ -452,6 +461,7 @@ func (s *Server) setupJSONRPC() error {
 	if err != nil {
 		return err
 	}
+
 	s.jsonrpcServer = srv
 
 	return nil
@@ -550,6 +560,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 
 	go func() {
 		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
 		}
