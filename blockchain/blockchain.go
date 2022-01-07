@@ -86,7 +86,6 @@ func NewBlockchain(
 	consensus Verifier,
 	executor Executor,
 ) (*Blockchain, error) {
-
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -571,7 +570,6 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	// Verify body data
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-
 		return fmt.Errorf(
 			"uncle root hash mismatch: have %s, want %s",
 			hash,

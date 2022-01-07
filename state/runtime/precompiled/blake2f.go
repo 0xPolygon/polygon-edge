@@ -223,7 +223,6 @@ func F(h *[8]uint64, m [16]uint64, c [2]uint64, f bool, rounds uint32) {
 		v9 += v14
 		v4 ^= v9
 		v4 = bits.RotateLeft64(v4, -63)
-
 	}
 
 	h[0] ^= v0 ^ v8

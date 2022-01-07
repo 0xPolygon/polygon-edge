@@ -144,14 +144,12 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var filterID string
 	if subscribeMethod == "newHeads" {
 		filterID = d.filterManager.NewBlockFilter(conn)
-
 	} else if subscribeMethod == "logs" {
 		logFilter, err := decodeLogFilterFromInterface(params[1])
 		if err != nil {
 			return "", NewInternalError(err.Error())
 		}
 		filterID = d.filterManager.NewLogFilter(logFilter, conn)
-
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
@@ -179,7 +177,6 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
-
 		return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
@@ -215,9 +212,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		}
 
 		return []byte(resp), nil
-
 	}
-
 	// its a normal query that we handle with the dispatcher
 	resp, err := d.handleReq(req)
 	if err != nil {
@@ -227,7 +222,6 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
-
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
 	if len(x) == 0 {
 		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
@@ -235,7 +229,6 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
-
 			return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 		if req.Method == "" {
@@ -312,7 +305,6 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		}
 	}
 	return data, nil
-
 }
 
 func (d *Dispatcher) logInternalError(method string, err error) {

@@ -161,7 +161,6 @@ func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterMan
 }
 
 func (f *FilterManager) Run() {
-
 	// watch for new events in the blockchain
 	watchCh := make(chan *blockchain.Event)
 	go func() {

@@ -135,7 +135,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		}
 
 		if c.Network.Dns != "" {
-
 			if conf.Network.Dns, err = helperFlags.MultiAddrFromDns(c.Network.Dns, conf.Network.Addr.Port); err != nil {
 				return nil, err
 			}

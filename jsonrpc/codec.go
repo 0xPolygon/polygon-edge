@@ -36,7 +36,6 @@ func (e *ErrorResponse) Id() interface{} {
 
 // Data returns ErrorObject
 func (e *ErrorResponse) Data() json.RawMessage {
-
 	data, err := json.Marshal(e.Error)
 	if err != nil {
 		return json.RawMessage(err.Error())
@@ -46,7 +45,6 @@ func (e *ErrorResponse) Data() json.RawMessage {
 
 // Bytes return the serialized response
 func (e *ErrorResponse) Bytes() ([]byte, error) {
-
 	return json.Marshal(e)
 }
 
@@ -65,7 +63,6 @@ func (s *SuccessResponse) Id() interface{} {
 
 // Data returns the result
 func (s *SuccessResponse) Data() json.RawMessage {
-
 	if s.Result != nil {
 		return s.Result
 	}
@@ -74,7 +71,6 @@ func (s *SuccessResponse) Data() json.RawMessage {
 
 // Bytes return the serialized response
 func (e *SuccessResponse) Bytes() ([]byte, error) {
-
 	return json.Marshal(e)
 }
 
@@ -156,7 +152,6 @@ func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver str
 
 // NewRpcResponse returns Success/Error response object
 func NewRpcResponse(id interface{}, jsonrpcver string, reply []byte, err Error) Response {
-
 	var response Response
 	switch err.(type) {
 	case nil:

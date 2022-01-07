@@ -382,7 +382,6 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(h, hh) {
-
 		fmt.Println("-- valid --")
 		fmt.Println(h)
 		fmt.Println("-- found --")

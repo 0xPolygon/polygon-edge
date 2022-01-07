@@ -457,7 +457,6 @@ func (m *mockBlockStore) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 }
 func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 	for _, b := range m.blocks {
-
 		if b.Hash() == hash {
 			return b.Body(), true
 		}

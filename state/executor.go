@@ -228,7 +228,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		} else {
 			receipt.SetStatus(types.ReceiptSuccess)
 		}
-
 	} else {
 		ss, aux := t.state.Commit(t.config.EIP155)
 		t.state = NewTxn(t.auxState, ss)

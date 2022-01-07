@@ -93,8 +93,6 @@ func TestIdentityHandshake(t *testing.T) {
 				assert.Equal(t, servers[0].numPeers(), int64(0))
 				assert.Equal(t, servers[1].numPeers(), int64(0))
 			}
-
 		})
 	}
-
 }

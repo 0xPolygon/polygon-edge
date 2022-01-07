@@ -90,7 +90,6 @@ func mock(number byte) *header {
 }
 
 func TestInsertHeaders(t *testing.T) {
-
 	type evnt struct {
 		NewChain []*header
 		OldChain []*header

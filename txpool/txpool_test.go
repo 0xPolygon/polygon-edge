@@ -353,7 +353,6 @@ func TestTxnQueue_Heap(t *testing.T) {
 				Value:    big.NewInt(0),
 			},
 		})
-
 	})
 
 	t.Run("sort by nonce when same from address", func(t *testing.T) {
@@ -559,7 +558,6 @@ func TestTx_MaxSize(t *testing.T) {
 			}
 		})
 	}
-
 }
 func TestTxnOperatorAddNilRaw(t *testing.T) {
 	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
@@ -729,7 +727,6 @@ func generateAddTx(arg addTx, signer crypto.TxSigner) *types.Transaction {
 }
 
 func TestSizeLimit(t *testing.T) {
-
 	signer := crypto.NewEIP155Signer(uint64(100))
 	numAccounts := 3
 	accounts := make([]*account, numAccounts)
@@ -884,7 +881,6 @@ func TestSizeLimit(t *testing.T) {
 }
 
 func TestGaugeCheck(t *testing.T) {
-
 	tests := []struct {
 		name         string
 		initialSlots uint64
@@ -1119,7 +1115,6 @@ func TestRejectExsistingTxn(t *testing.T) {
 			if tt.shouldFail {
 				assert.EqualError(t, pool.AddTx(DuplicateTx), "already known")
 			}
-
 		})
 	}
 }

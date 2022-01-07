@@ -89,7 +89,6 @@ func (t *Txpool) Content() (interface{}, error) {
 // Create response for txpool_inspect request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
 func (t *Txpool) Inspect() (interface{}, error) {
-
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
 	pendingRpcTxns := make(map[string]map[string]string)
 	for address, nonces := range pendingTxs {

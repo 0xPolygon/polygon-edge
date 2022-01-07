@@ -9,7 +9,6 @@ import (
 )
 
 func TestEIP55(t *testing.T) {
-
 	cases := []struct {
 		address  string
 		expected string
@@ -77,5 +76,4 @@ func TestTransactionCopy(t *testing.T) {
 	if !reflect.DeepEqual(txn, newTxn) {
 		t.Fatal("[ERROR] Copied transaction not equal base transaction")
 	}
-
 }

@@ -25,7 +25,6 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 			continue
 		}
 	}
-
 }
 
 func TestSimpleGossip(t *testing.T) {

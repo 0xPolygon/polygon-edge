@@ -680,6 +680,5 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				assert.NoError(t, createErr)
 			}
 		})
-
 	}
 }

@@ -293,7 +293,6 @@ func (s *Server) runDial() {
 	}
 
 	for {
-
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.

@@ -140,7 +140,6 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 		if obj.Deleted {
 			tt.Delete(hashit(obj.Address.Bytes()))
 		} else {
-
 			account := state.Account{
 				Balance:  obj.Balance,
 				Nonce:    obj.Nonce,
@@ -373,7 +372,6 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			// Keep this node as is and insert to child
 			child := t.insert(n.child, search[plen:], value)
 			return &ShortNode{key: n.key, child: child}
-
 		} else {
 			// Introduce a new branch
 			b := FullNode{epoch: t.epoch}

@@ -7,7 +7,6 @@ import (
 )
 
 func TestMultiAddrFromDns(t *testing.T) {
-
 	tests := []struct {
 		name       string
 		dnsAddress string

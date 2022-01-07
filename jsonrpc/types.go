@@ -52,7 +52,6 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
-
 	res := &transaction{
 		Nonce:    argUint64(t.Nonce),
 		GasPrice: argBig(*t.GasPrice),

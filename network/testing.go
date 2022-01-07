@@ -92,7 +92,6 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 			}
 		}
 		return nil, true
-
 	})
 	if err != nil {
 		return false, err
@@ -116,7 +115,6 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 			}
 		}
 		return nil, true
-
 	})
 	if err != nil {
 		return false, err

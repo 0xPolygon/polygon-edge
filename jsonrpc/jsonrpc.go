@@ -228,5 +228,4 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		w.Write(resp)
 	}
 	j.logger.Debug("handle", "response", string(resp))
-
 }

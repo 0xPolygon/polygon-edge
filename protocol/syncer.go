@@ -84,7 +84,6 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
 	for {
-
 		if !s.IsClosed() {
 			s.enqueueLock.Lock()
 			if len(s.enqueue) != 0 {
@@ -99,13 +98,10 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 			case <-timeoutCh:
 				return nil, ErrPopTimeout
 			}
-
 		} else {
 			return nil, ErrConnectionClosed
 		}
-
 	}
-
 }
 
 // appendBlock adds a new block to the block queue
@@ -360,7 +356,6 @@ func (s *Syncer) syncCurrentStatus() {
 			return
 		}
 	}
-
 }
 
 const syncerV1 = "/syncer/0.1"

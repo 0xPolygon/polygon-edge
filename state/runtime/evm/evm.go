@@ -28,7 +28,6 @@ func (e *EVM) Name() string {
 
 // Run implements the runtime interface
 func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
-
 	contract := acquireState()
 	contract.resetReturnData()
 

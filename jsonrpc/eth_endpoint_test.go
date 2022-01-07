@@ -341,7 +341,6 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 }
 
 func TestEth_Block_GetLogs(t *testing.T) {
-
 	blockHash := types.StringToHash("1")
 
 	// Topics we're searching for

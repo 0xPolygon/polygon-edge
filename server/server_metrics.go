@@ -27,5 +27,4 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 		network:   network.NilMetrics(),
 		txpool:    txpool.NilMetrics(),
 	}
-
 }

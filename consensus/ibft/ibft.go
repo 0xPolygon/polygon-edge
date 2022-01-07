@@ -899,7 +899,6 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	}
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
-
 }
 func (i *Ibft) insertBlock(block *types.Block) error {
 	committedSeals := [][]byte{}
