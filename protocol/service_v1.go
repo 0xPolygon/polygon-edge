@@ -42,13 +42,16 @@ func (s *serviceV1) Notify(ctx context.Context, req *proto.NotifyReq) (*empty.Em
 	if err := b.UnmarshalRLP(req.Raw.Value); err != nil {
 		return nil, err
 	}
+
 	status, err := fromProto(req.Status)
+
 	if err != nil {
 		return nil, err
 	}
 
 	s.syncer.enqueueBlock(id, b)
 	s.syncer.updatePeerStatus(id, status)
+
 	return &empty.Empty{}, nil
 }
 
@@ -63,6 +66,7 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 	if err != nil {
 		return nil, err
 	}
+
 	resp := &proto.Response{
 		Objs: []*proto.Response_Component{},
 	}
@@ -96,6 +100,7 @@ func (s *serviceV1) GetObjectsByHash(_ context.Context, req *proto.HashRequest) 
 			},
 		})
 	}
+
 	return resp, nil
 }
 
@@ -106,6 +111,7 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 	if req.Number != 0 && req.Hash != "" {
 		return nil, errors.New("cannot provide both a number and a hash")
 	}
+
 	if req.Amount > maxHeadersAmount {
 		req.Amount = maxHeadersAmount
 	}
@@ -151,7 +157,9 @@ func (s *serviceV1) GetHeaders(_ context.Context, req *proto.GetHeadersRequest) 
 		if block < 0 {
 			break
 		}
+
 		origin, ok = s.store.GetHeaderByNumber(uint64(block))
+
 		if !ok {
 			break
 		}

@@ -76,6 +76,7 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 			indx = i
 		}
 	}
+
 	if indx != -1 {
 		s.enqueue = s.enqueue[indx+1:]
 	}
@@ -91,6 +92,7 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 			if len(s.enqueue) != 0 {
 				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
 				s.enqueueLock.Unlock()
+
 				return
 			}
 
@@ -177,12 +179,14 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	if err := s.Hash.UnmarshalText([]byte(p.Hash)); err != nil {
 		return nil, err
 	}
+
 	s.Number = p.Number
 
 	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode difficulty")
 	}
+
 	s.Difficulty = diff
 
 	return s, nil
@@ -339,6 +343,7 @@ func (s *Syncer) syncCurrentStatus() {
 				// we do not want to notify forks
 				continue
 			}
+
 			if len(evnt.NewChain) == 0 {
 				// this should not happen
 				continue
@@ -525,6 +530,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to open a stream, err %w", err)
 	}
+
 	conn := libp2pGrpc.WrapClient(stream)
 
 	// watch for changes of the other node first
@@ -534,7 +540,9 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	if err != nil {
 		return err
 	}
+
 	status, err := statusFromProto(rawStatus)
+
 	if err != nil {
 		return err
 	}
@@ -557,6 +565,7 @@ func (s *Syncer) DeletePeer(peerID peer.ID) error {
 		if err := p.(*SyncPeer).conn.Close(); err != nil {
 			return err
 		}
+
 		close(p.(*SyncPeer).enqueueCh)
 	}
 
@@ -597,6 +606,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 		if err != nil {
 			return nil, nil, err
 		}
+
 		if found == nil {
 			// peer does not have the m peer, search in lower bounds
 			max = m - 1
@@ -624,9 +634,11 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	// get the block fork
 	forkNum := header.Number + 1
 	fork, err := getHeader(clt, &forkNum, nil)
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
 	}
+
 	if fork == nil {
 		return nil, nil, ErrForkNotFound
 	}
@@ -652,10 +664,12 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 			s.logSyncPeerPopBlockError(err, p)
 			break
 		}
+
 		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
 			break
 		}
+
 		if handler(b) {
 			break
 		}
@@ -697,6 +711,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 		// update target
 		target := p.status.Number
 		s.syncProgression.updateHighestProgression(target)
+
 		if target == lastTarget {
 			// there are no more changes to pull for now
 			break
@@ -750,6 +765,7 @@ func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header
 	if num != nil {
 		req.Number = int64(*num)
 	}
+
 	if hash != nil {
 		req.Hash = (*hash).String()
 	}
@@ -758,15 +774,20 @@ func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header
 	if err != nil {
 		return nil, err
 	}
+
 	if len(resp.Objs) == 0 {
 		return nil, nil
 	}
+
 	if len(resp.Objs) != 1 {
 		return nil, fmt.Errorf("unexpected more than 1 result")
 	}
+
 	header := &types.Header{}
+
 	if err := header.UnmarshalRLP(resp.Objs[0].Spec.Value); err != nil {
 		return nil, err
 	}
+
 	return header, nil
 }

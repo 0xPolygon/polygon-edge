@@ -38,12 +38,14 @@ func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
 	if !ok {
 		return nil
 	}
+
 	return rawPeer.(*SyncPeer)
 }
 
 // CreateSyncer initialize syncer with server
 func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *network.Config)) *Syncer {
 	t.Helper()
+
 	if serverCfg == nil {
 		serverCfg = &defaultNetworkConfig
 	}
@@ -137,6 +139,7 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 
 	syncer = CreateSyncer(t, chain, nil)
 	peerSyncers = make([]*Syncer, len(peerChains))
+
 	for idx, peerChain := range peerChains {
 		peerSyncers[idx] = CreateSyncer(t, peerChain, nil)
 
@@ -149,6 +152,7 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 			t.Fatalf("Unable to join servers, %v", joinErr)
 		}
 	}
+
 	return syncer, peerSyncers
 }
 
@@ -164,7 +168,9 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 		oldHeaders[i], ok = chain.GetHeaderByNumber(i)
 		assert.Truef(t, ok, "chain should have header at %d, but empty", i)
 	}
+
 	headers := blockchain.NewTestHeaderFromChain(oldHeaders, num)
+
 	return blockchain.HeadersToBlocks(headers[currentHeight+1:])
 }
 
@@ -206,6 +212,7 @@ func HeaderToStatus(h *types.Header) *Status {
 	for i := uint64(1); i <= h.Difficulty; i++ {
 		td = td + i
 	}
+
 	return &Status{
 		Hash:       h.Hash,
 		Number:     h.Number,
@@ -233,6 +240,7 @@ func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
 	subscription := NewMockSubscription()
 	b.subscriptions = append(b.subscriptions, subscription)
+
 	return subscription
 }
 
@@ -241,6 +249,7 @@ func (b *mockBlockchain) Header() *types.Header {
 	if l == 0 {
 		return nil
 	}
+
 	return b.blocks[l-1].Header
 }
 
@@ -251,6 +260,7 @@ func (b *mockBlockchain) CurrentTD() *big.Int {
 	}
 
 	td, _ := b.GetTD(current.Hash)
+
 	return td
 }
 
@@ -263,6 +273,7 @@ func (b *mockBlockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 			return big.NewInt(0).SetUint64(td), true
 		}
 	}
+
 	return nil, false
 }
 
@@ -280,6 +291,7 @@ func (b *mockBlockchain) GetHeaderByHash(h types.Hash) (*types.Header, bool) {
 			return b.Header, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -289,6 +301,7 @@ func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 			return b.Header, true
 		}
 	}
+
 	return nil, false
 }
 

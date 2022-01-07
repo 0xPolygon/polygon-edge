@@ -383,15 +383,19 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncBlocks := blockchain.HeadersToBlocks(syncHeaders)
 
 	syncer.syncProgression.startProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
+
 	if syncer.GetSyncProgression() == nil {
 		t.Fatalf("Unable to start progression")
 	}
+
 	assert.Equal(t, uint64(initialChainSize), syncer.syncProgression.getProgression().StartingBlock)
 
 	syncer.syncProgression.updateHighestProgression(uint64(targetChainSize))
+
 	assert.Equal(t, uint64(targetChainSize), syncer.syncProgression.getProgression().HighestBlock)
 
 	writeErr := syncerChain.WriteBlocks(syncBlocks[initialChainSize+1:])
+
 	assert.NoError(t, writeErr)
 
 	WaitUntilProgressionUpdated(t, syncer, 15*time.Second, uint64(targetChainSize-1))
@@ -418,6 +422,7 @@ func newMockBlockStore() *mockBlockStore {
 		subscription: blockchain.NewMockSubscription(),
 		td:           big.NewInt(1),
 	}
+
 	return bs
 }
 
@@ -429,6 +434,7 @@ func (m *mockBlockStore) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return b.Header, true
 }
 func (m *mockBlockStore) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
@@ -437,6 +443,7 @@ func (m *mockBlockStore) GetBlockByNumber(blockNumber uint64, full bool) (*types
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
@@ -453,6 +460,7 @@ func (m *mockBlockStore) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 			return header, true
 		}
 	}
+
 	return nil, true
 }
 func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
@@ -461,6 +469,7 @@ func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 			return b.Body(), true
 		}
 	}
+
 	return nil, true
 }
 
@@ -494,10 +503,12 @@ func createGenesisBlock() []*types.Block {
 	blocks := make([]*types.Block, 0)
 	genesis := &types.Header{Difficulty: 1, Number: 0}
 	genesis.ComputeHash()
+
 	b := &types.Block{
 		Header: genesis,
 	}
 	blocks = append(blocks, b)
+
 	return blocks
 }
 
@@ -507,6 +518,7 @@ func createBlockStores(count int) (bStore []*mockBlockStore) {
 	for i := 0; i < count; i++ {
 		bStore[i] = newMockBlockStore()
 	}
+
 	return
 }
 
@@ -566,6 +578,7 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 	if err != nil {
 		return 0, err
 	}
+
 	return res.(int64), nil
 }
 
@@ -617,7 +630,9 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	waitCtx, cancelWait = context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()
+
 	numPeers, err = WaitUntilSyncPeersNumber(waitCtx, syncers[1], 1)
+
 	if err != nil {
 		t.Fatalf("Unable to disconnect sync peers, %v", err)
 	}

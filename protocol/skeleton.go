@@ -24,6 +24,7 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 
 		headers = append(headers, header)
 	}
+
 	return headers, nil
 }
 
@@ -45,6 +46,7 @@ func (s *skeleton) build(clt proto.V1Client, ancestor types.Hash) error {
 		return err
 	}
 	s.addSkeleton(headers) // nolint
+
 	return nil
 }
 
@@ -55,6 +57,7 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 		Amount: s.span,
 	}
 	resp, err := getHeaders(clt, req)
+
 	if err != nil {
 		return err
 	}
@@ -77,6 +80,7 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 			bodyIndex = append(bodyIndex, indx)
 		}
 	}
+
 	if len(bodyHashes) == 0 {
 		return nil
 	}
@@ -117,6 +121,7 @@ func (s *skeleton) addSkeleton(headers []*types.Header) error {
 		}
 		s.slots[indx] = slot
 	}
+
 	return nil
 }
 

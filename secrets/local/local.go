@@ -45,6 +45,7 @@ func SecretsManagerFactory(
 	if !ok {
 		return nil, errors.New("no path specified for local secrets manager")
 	}
+
 	localManager.path = path.(string)
 
 	// Run the initial setup
@@ -117,6 +118,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	l.secretPathMapLock.Lock()
 	secretPath, ok := l.secretPathMap[name]
 	l.secretPathMapLock.Unlock()
+
 	if !ok {
 		return secrets.ErrSecretNotFound
 	}
