@@ -192,6 +192,7 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
+
 		if subscribeErr := topic.Subscribe(txPool.handleGossipTxn); subscribeErr != nil {
 			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
 		}
@@ -202,6 +203,7 @@ func NewTxPool(
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
+
 	return txPool, nil
 }
 
@@ -324,6 +326,7 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 
 	raw := obj.(*proto.Txn)
 	txn := new(types.Transaction)
+
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
@@ -365,6 +368,7 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 		default:
 		}
 	}
+
 	return nil
 }
 
@@ -384,6 +388,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// (2) from in tx is in locals addresses
 	isLocal := (!t.noLocals && origin == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
 	err := t.validateTx(tx, isLocal)
+
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
 		return err
@@ -468,9 +473,11 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
 			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
 		}
+
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
 	}
 	t.pendingQueue.lock.Unlock()
+
 	if !inclQueued {
 		return pendingTxs, nil
 	}
@@ -485,8 +492,10 @@ func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Tr
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
+
 			queuedTxs[addr][tx.Nonce] = tx
 		}
+
 		wrapper.unlock()
 	}
 
@@ -512,6 +521,7 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
 	t.gauge.decrease(slots)
+
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
@@ -519,8 +529,10 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 		} else {
 			t.metrics.PendingTxs.Add(1)
 		}
+
 		t.gauge.increase(slots)
 	}
+
 	return txn.tx, ret
 }
 
@@ -530,6 +542,7 @@ func (t *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	defer t.txnLookupMapLock.RUnlock()
 
 	txn, ok := t.txnLookupMap[txHash]
+
 	return txn, ok
 }
 
@@ -742,6 +755,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 					wrapper.accountQueue.nextNonce,
 				),
 			)
+
 			wrapper.accountQueue.nextNonce = stateNonce
 		}
 
@@ -871,6 +885,7 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 				t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
 			}
 		}
+
 		return nil, false
 	}
 
@@ -899,6 +914,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	// try to allocate space
 	overflow := t.gauge.height + txSlots - t.gauge.limit
 	dropped, success := t.Discard(overflow, isLocal)
+
 	if !isLocal && !success {
 		return ErrTxPoolOverflow
 	}
@@ -912,9 +928,11 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		t.pendingQueue.Delete(tx)
 		t.gauge.height -= slotsRequired(tx)
 	}
+
 	t.gauge.height += txSlots
 
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+
 	return nil
 }
 
@@ -1046,6 +1064,7 @@ func (t *txHeapWrapper) Remove(hash types.Hash) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -1060,6 +1079,7 @@ func (t *txHeap) Peek() *types.Transaction {
 	if len(*t) == 0 {
 		return nil
 	}
+
 	return (*t)[0]
 }
 
@@ -1084,6 +1104,7 @@ func (t *txHeap) Pop() interface{} {
 	n := len(old)
 	x := old[n-1]
 	*t = old[0 : n-1]
+
 	return x
 }
 
@@ -1147,6 +1168,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 	}
 	t.index[tx.Hash] = pTx
 	heap.Push(t.heap, pTx)
+
 	return nil
 }
 
@@ -1157,8 +1179,10 @@ func (t *txPriceHeap) Pop() *pricedTx {
 	if len(t.index) == 0 {
 		return nil
 	}
+
 	tx := heap.Pop(t.heap).(*pricedTx)
 	delete(t.index, tx.tx.Hash)
+
 	return tx
 }
 
@@ -1209,6 +1233,7 @@ func (t *txPriceHeapImplBase) Pop() interface{} {
 	job := old.txs[n-1]
 	job.index = -1
 	t.txs = old.txs[0 : n-1]
+
 	return job
 }
 
@@ -1268,6 +1293,7 @@ func newLocalAccounts(addrs []types.Address) *localAccounts {
 	for _, addr := range addrs {
 		accounts[addr] = true
 	}
+
 	return &localAccounts{
 		accounts: accounts,
 		mutex:    sync.RWMutex{},
@@ -1277,6 +1303,7 @@ func newLocalAccounts(addrs []types.Address) *localAccounts {
 func (a *localAccounts) containsAddr(addr types.Address) bool {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
+
 	return a.accounts[addr]
 }
 
@@ -1284,6 +1311,7 @@ func (a *localAccounts) containsTxSender(signer signer, tx *types.Transaction) b
 	if addr, err := signer.Sender(tx); err == nil {
 		return a.containsAddr(addr)
 	}
+
 	return false
 }
 

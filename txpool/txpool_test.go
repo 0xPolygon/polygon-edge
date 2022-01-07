@@ -232,6 +232,7 @@ func TestBroadcast(t *testing.T) {
 		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server, nilMetrics)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
+
 		return pool, server
 	}
 
@@ -720,6 +721,7 @@ func generateAddTx(arg addTx, signer crypto.TxSigner) *types.Transaction {
 		if err != nil {
 			return nil
 		}
+
 		return signedTx
 	}
 
@@ -730,6 +732,7 @@ func TestSizeLimit(t *testing.T) {
 	signer := crypto.NewEIP155Signer(uint64(100))
 	numAccounts := 3
 	accounts := make([]*account, numAccounts)
+
 	for i := range accounts {
 		key, addr := tests.GenerateKeyAndAddr(t)
 		accounts[i] = &account{
@@ -1037,9 +1040,11 @@ func TestRejectExsistingTxn(t *testing.T) {
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
+
 	acc := &account{
 		addr: addr1,
 	}
+
 	tests := []struct {
 		name       string
 		txs        []addTx
