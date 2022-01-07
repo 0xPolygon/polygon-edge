@@ -15,7 +15,7 @@ type SecretsGenerate struct {
 const (
 	defaultNodeName       = "polygon-sdk-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
-	defaultNamespace = "admin"
+	defaultNamespace      = "admin"
 )
 
 func (s *SecretsGenerate) DefineFlags() {
@@ -63,7 +63,7 @@ func (s *SecretsGenerate) DefineFlags() {
 			"NAMESPACE",
 		},
 		ArgumentsOptional: false,
-		FlagOptional: false,
+		FlagOptional:      false,
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{

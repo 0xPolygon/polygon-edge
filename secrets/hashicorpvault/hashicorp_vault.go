@@ -30,7 +30,7 @@ type VaultSecretsManager struct {
 	// The HTTP client used for interacting with the Vault server
 	client *vault.Client
 
-	// The namespace under which the secrets are stored 
+	// The namespace under which the secrets are stored
 	namespace string
 }
 
@@ -94,7 +94,7 @@ func (v *VaultSecretsManager) Setup() error {
 	// Set the access token
 	client.SetToken(v.token)
 
-	// Set the namespace 
+	// Set the namespace
 	client.SetNamespace(v.namespace)
 
 	v.client = client
