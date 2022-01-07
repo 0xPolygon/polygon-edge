@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"io"
 	"math/big"
 	"os"
@@ -108,6 +109,14 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 		t.t.Fatal(err)
 	}
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
+}
+
+func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+	return ibftOp.NewIbftOperatorClient(conn)
 }
 
 func (t *TestServer) ReleaseReservedPorts() {
@@ -222,10 +231,24 @@ func (t *TestServer) GenerateGenesis() error {
 		for _, bootnode := range t.Config.Bootnodes {
 			args = append(args, "--bootnode", bootnode)
 		}
+
+		if t.Config.EpochSize != 0 {
+			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
+		}
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
+
+		// Set up any initial staker addresses for the predeployed Staking SC
+		for _, stakerAddress := range t.Config.DevStakers {
+			args = append(args, "--ibft-validator", stakerAddress.String())
+		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
+	}
+
+	// Make sure the correct mechanism is selected
+	if t.Config.IsPos {
+		args = append(args, "--pos")
 	}
 
 	// add block gas limit
