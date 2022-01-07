@@ -75,9 +75,11 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		if result.Succeeded() {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")
 		}
+
 		if result.GasLeft > 0 {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned gas remaining > 0")
 		}
+
 		return
 	}
 
@@ -85,6 +87,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if c.Out == "" {
 		c.Out = "0x"
 	}
+
 	if ret := hex.EncodeToHex(result.ReturnValue); ret != c.Out {
 		t.Fatalf("return mismatch: got %s, want %s", ret, c.Out)
 	}
@@ -120,6 +123,7 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 	v := r.MarshalLogsWith(ar)
 
 	keccak.Keccak256Rlp(res[:0], v)
+
 	return
 }
 

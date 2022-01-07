@@ -42,6 +42,7 @@ func remove0xPrefix(str string) string {
 	if strings.HasPrefix(str, "0x") {
 		return strings.Replace(str, "0x", "", -1)
 	}
+
 	return str
 }
 
@@ -49,6 +50,7 @@ func stringToAddress(str string) (types.Address, error) {
 	if str == "" {
 		return types.Address{}, fmt.Errorf("value not found")
 	}
+
 	return types.StringToAddress(str), nil
 }
 
@@ -56,6 +58,7 @@ func stringToHash(str string) (types.Hash, error) {
 	if str == "" {
 		return types.Hash{}, fmt.Errorf("value not found")
 	}
+
 	return types.StringToHash(str), nil
 }
 
@@ -63,14 +66,19 @@ func stringToBigInt(str string) (*big.Int, error) {
 	if str == "" {
 		return nil, fmt.Errorf("value not found")
 	}
+
 	base := 10
+
 	if strings.HasPrefix(str, "0x") {
 		str, base = remove0xPrefix(str), 16
 	}
+
 	n, ok := big.NewInt(1).SetString(str, base)
+
 	if !ok {
 		return nil, fmt.Errorf("failed to convert %s to big.Int with base %d", str, base)
 	}
+
 	return n, nil
 }
 
@@ -79,6 +87,7 @@ func stringToAddressT(t *testing.T, str string) types.Address {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return address
 }
 
@@ -87,6 +96,7 @@ func stringToHashT(t *testing.T, str string) types.Hash {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return address
 }
 
@@ -95,6 +105,7 @@ func stringToUint64(str string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return n.Uint64(), nil
 }
 
@@ -103,6 +114,7 @@ func stringToUint64T(t *testing.T, str string) uint64 {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return n
 }
 
@@ -111,6 +123,7 @@ func stringToInt64T(t *testing.T, str string) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return int64(n)
 }
 
@@ -159,6 +172,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 
 	var dec execUnmarshall
 	err := json.Unmarshal(input, &dec)
+
 	if err != nil {
 		return err
 	}
@@ -171,6 +185,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	e.Data, err = types.ParseBytes(&dec.Data)
 	if err != nil {
 		return err
@@ -180,10 +195,12 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	e.GasLimit, err = types.ParseUint64orHex(&dec.Gas)
 	if err != nil {
 		return err
 	}
+
 	e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice)
 	if err != nil {
 		return err
@@ -213,6 +230,7 @@ func buildState(t *testing.T, allocs map[types.Address]*chain.GenesisAccount) (s
 	}
 
 	snap, root := txn.Commit(false)
+
 	return s, snap, types.BytesToHash(root)
 }
 
@@ -263,9 +281,11 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	if i.Data > len(t.Data) {
 		return nil, fmt.Errorf("data index %d out of bounds (%d)", i.Data, len(t.Data))
 	}
+
 	if i.Gas > len(t.GasLimit) {
 		return nil, fmt.Errorf("gas index %d out of bounds (%d)", i.Gas, len(t.GasLimit))
 	}
+
 	if i.Value > len(t.Value) {
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
@@ -280,6 +300,7 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	}
 
 	msg.From = t.From
+
 	return msg, nil
 }
 
@@ -296,6 +317,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	var dec txUnmarshall
 	err := json.Unmarshal(input, &dec)
+
 	if err != nil {
 		return err
 	}
@@ -355,6 +377,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		address := types.StringToAddress(dec.To)
 		t.To = &address
 	}
+
 	return nil
 }
 
@@ -438,6 +461,7 @@ func contains(l []string, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -458,6 +482,7 @@ func listFolders(paths ...string) ([]string, error) {
 			}
 		}
 	}
+
 	return folders, nil
 }
 
@@ -476,5 +501,6 @@ func listFiles(folder string) ([]string, error) {
 		}
 		return nil
 	})
+
 	return files, err
 }
