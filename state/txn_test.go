@@ -23,6 +23,7 @@ func (m *mockState) NewSnapshotAt(root types.Hash) (Snapshot, error) {
 	if !ok {
 		return nil, fmt.Errorf("not found")
 	}
+
 	return t, nil
 }
 
@@ -83,6 +84,7 @@ func newTestTxn(p map[types.Address]*PreState) *Txn {
 
 func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 	var snap *mockSnapshot
+
 	root := emptyStateHash
 
 	ar := &fastrlp.Arena{}
@@ -94,6 +96,7 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 			vv := ar.NewBytes(bytes.TrimLeft(v.Bytes(), "\x00"))
 			data[k.String()] = vv.MarshalTo(nil)
 		}
+
 		root = randomHash()
 		snap = &mockSnapshot{
 			data: data,
@@ -105,6 +108,7 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 		Balance: big.NewInt(int64(p.Balance)),
 		Root:    root,
 	}
+
 	return account, snap
 }
 
@@ -115,6 +119,7 @@ func randomHash() types.Hash {
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
+
 	return types.BytesToHash(b)
 }
 
@@ -135,5 +140,6 @@ func TestSnapshotUpdateData(t *testing.T) {
 func hashit(k []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write(k)
+
 	return h.Sum(nil)
 }

@@ -6,8 +6,10 @@ func hexToCompact(hex []byte) []byte {
 		terminator = 1
 		hex = hex[:len(hex)-1]
 	}
+
 	buf := make([]byte, len(hex)/2+1)
 	buf[0] = terminator << 5 // the flag byte
+
 	if len(hex)&1 == 1 {
 		buf[0] |= 1 << 4 // odd flag
 		buf[0] |= hex[0] // first nibble is contained in the first byte
@@ -39,7 +41,9 @@ func keybytesToHex(str []byte) []byte {
 		nibbles[i*2] = b / 16
 		nibbles[i*2+1] = b % 16
 	}
+
 	nibbles[l-1] = 16
+
 	return nibbles
 }
 
@@ -51,5 +55,6 @@ func compactToHex(compact []byte) []byte {
 	}
 	// apply odd flag
 	chop := 2 - base[0]&1
+
 	return base[chop:]
 }

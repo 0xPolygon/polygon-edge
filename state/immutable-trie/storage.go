@@ -77,6 +77,7 @@ func (kv *KVStorage) Get(k []byte) ([]byte, bool) {
 			panic(err)
 		}
 	}
+
 	return data, true
 }
 
@@ -89,6 +90,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (Storage, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &KVStorage{db}, nil
 }
 
@@ -117,6 +119,7 @@ func (m *memStorage) Get(p []byte) ([]byte, bool) {
 	if !ok {
 		return []byte{}, false
 	}
+
 	return v, true
 }
 
@@ -168,6 +171,7 @@ func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	}
 
 	n, err := decodeNode(v, storage)
+
 	return n, err == nil, err
 }
 
@@ -177,6 +181,7 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 			hash: true,
 		}
 		vv.buf = append(vv.buf[:0], v.Raw()...)
+
 		return vv, nil
 	}
 
@@ -193,11 +198,13 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 		// or bytes (leaf node)
 		nc := &ShortNode{}
 		nc.key = compactToHex(key.Raw())
+
 		if hasTerm(nc.key) {
 			// value node
 			if v.Get(1).Type() != fastrlp.TypeBytes {
 				return nil, fmt.Errorf("short leaf value expected to be bytes")
 			}
+
 			vv := &ValueNode{}
 			vv.buf = append(vv.buf, v.Get(1).Raw()...)
 			nc.child = vv
@@ -207,6 +214,7 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 				return nil, err
 			}
 		}
+
 		return nc, nil
 	} else if ll == 17 {
 		// full node
@@ -232,5 +240,6 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 		}
 		return nc, nil
 	}
+
 	return nil, fmt.Errorf("node has incorrect number of leafs")
 }

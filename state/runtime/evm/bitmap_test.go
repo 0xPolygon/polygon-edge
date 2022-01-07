@@ -16,6 +16,7 @@ func TestIsPush(t *testing.T) {
 			num++
 		}
 	}
+
 	if num != 32 {
 		t.Fatal("bad")
 	}

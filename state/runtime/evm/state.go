@@ -104,6 +104,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 	if dest.BitLen() >= 63 || udest >= uint64(len(c.code)) {
 		return false
 	}
+
 	return c.bitmap.isSet(uint(udest))
 }
 
@@ -115,6 +116,7 @@ func (c *state) exit(err error) {
 	if err == nil {
 		panic("cannot stop with none")
 	}
+
 	c.stop = true
 	c.err = err
 }
@@ -128,9 +130,11 @@ func (c *state) push1() *big.Int {
 		c.sp++
 		return c.stack[c.sp-1]
 	}
+
 	v := big.NewInt(0)
 	c.stack = append(c.stack, v)
 	c.sp++
+
 	return v
 }
 
@@ -159,6 +163,7 @@ func (c *state) top() *big.Int {
 	if c.sp == 0 {
 		return nil
 	}
+
 	return c.stack[c.sp-1]
 }
 
@@ -166,8 +171,10 @@ func (c *state) pop() *big.Int {
 	if c.sp == 0 {
 		return nil
 	}
+
 	o := c.stack[c.sp-1]
 	c.sp--
+
 	return o
 }
 
@@ -186,6 +193,7 @@ func (c *state) consumeGas(gas uint64) bool {
 	}
 
 	c.gas -= gas
+
 	return true
 }
 
@@ -236,6 +244,7 @@ func (c *state) Run() ([]byte, error) {
 	if err := c.err; err != nil {
 		vmerr = err
 	}
+
 	return c.ret, vmerr
 }
 
@@ -286,6 +295,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 		// resize the memory
 		c.memory = extendByteSlice(c.memory, int(w*32))
 	}
+
 	return true
 }
 
@@ -294,6 +304,7 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	if n := needLen - cap(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
+
 	return b[:needLen]
 }
 
@@ -310,6 +321,7 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 	l := length.Uint64()
 
 	dst = append(dst, c.memory[o:o+l]...)
+
 	return dst, true
 }
 
@@ -324,5 +336,6 @@ func (c *state) Show() string {
 
 		str = append(str, hex.EncodeToHex(c.memory[i:j]))
 	}
+
 	return strings.Join(str, "\n")
 }

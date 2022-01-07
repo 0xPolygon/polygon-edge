@@ -142,6 +142,7 @@ func opExp(c *state) {
 			if d&1 == 1 {
 				toU256(z.Mul(z, x))
 			}
+
 			d >>= 1
 
 			toU256(x.Mul(x, x))
@@ -395,6 +396,7 @@ func opMload(c *state) {
 
 	var ok bool
 	c.tmp, ok = c.get2(c.tmp[:0], offset, wordSize)
+
 	if !ok {
 		return
 	}
@@ -425,7 +427,9 @@ func opMStore(c *state) {
 	for _, d := range val.Bits() {
 		for j := 0; j < _S; j++ {
 			i--
+
 			buf[i] = byte(d)
+
 			d >>= 8
 		}
 	}
@@ -433,6 +437,7 @@ func opMStore(c *state) {
 	// fill the rest of the slot with zeros
 	for i > 0 {
 		i--
+
 		buf[i] = 0
 	}
 }
@@ -444,6 +449,7 @@ func opMStore8(c *state) {
 	if !c.checkMemory(offset, one) {
 		return
 	}
+
 	c.memory[offset.Uint64()] = byte(val.Uint64() & 0xff)
 }
 
@@ -461,6 +467,7 @@ func opSload(c *state) {
 	} else {
 		gas = 50
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -518,6 +525,7 @@ func opSStore(c *state) {
 	case runtime.StorageDeleted:
 		cost = 5000
 	}
+
 	if !c.consumeGas(cost) {
 		return
 	}
@@ -645,6 +653,7 @@ func opExtCodeSize(c *state) {
 	} else {
 		gas = 20
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -678,6 +687,7 @@ func opExtCodeHash(c *state) {
 	} else {
 		gas = 400
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -719,6 +729,7 @@ func (c *state) setBytes(dst, input []byte, size uint64, dataOffset *big.Int) {
 	if copySize > 0 {
 		copy(dst, input[begin:begin+copySize])
 	}
+
 	if size-copySize > 0 {
 		dst = dst[copySize:]
 		for i := uint64(0); i < size-copySize; i++ {
@@ -750,6 +761,7 @@ func opExtCodeCopy(c *state) {
 	} else {
 		gas = 20
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -803,9 +815,12 @@ func opReturnDataCopy(c *state) {
 		c.exit(errReturnDataOutOfBounds)
 		return
 	}
+
 	size = end.Uint64()
+
 	if uint64(len(c.returnData)) < size {
 		c.exit(errReturnDataOutOfBounds)
+
 		return
 	}
 
@@ -826,6 +841,7 @@ func opCodeCopy(c *state) {
 	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
+
 	if size != 0 {
 		c.setBytes(c.memory[memOffset.Uint64():], c.code, size, dataOffset)
 	}
@@ -969,6 +985,7 @@ func opSwap(n int) instruction {
 
 func opLog(size int) instruction {
 	size = size - 1
+
 	return func(c *state) {
 		if c.inStaticCall() {
 			c.exit(errWriteProtection)
@@ -989,6 +1006,7 @@ func opLog(size int) instruction {
 		}
 
 		var ok bool
+
 		c.tmp, ok = c.get2(c.tmp[:0], mStart, mSize)
 		if !ok {
 			return
@@ -999,6 +1017,7 @@ func opLog(size int) instruction {
 		if !c.consumeGas(uint64(size) * 375) {
 			return
 		}
+
 		if !c.consumeGas(mSize.Uint64() * 8) {
 			return
 		}
@@ -1029,11 +1048,14 @@ func opCreate(op OpCode) instruction {
 		contract, err := c.buildCreateContract(op)
 		if err != nil {
 			c.push1().Set(zero)
+
 			if contract != nil {
 				c.gas += contract.Gas
 			}
+
 			return
 		}
+
 		if contract == nil {
 			return
 		}
@@ -1075,6 +1097,7 @@ func opCall(op OpCode) instruction {
 			c.exit(errOpCodeNotFound)
 			return
 		}
+
 		if op == STATICCALL && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
 			return
@@ -1102,11 +1125,14 @@ func opCall(op OpCode) instruction {
 		contract, offset, size, err := c.buildCallContract(op)
 		if err != nil {
 			c.push1().Set(zero)
+
 			if contract != nil {
 				c.gas += contract.Gas
 			}
+
 			return
 		}
+
 		if contract == nil {
 			return
 		}
@@ -1180,6 +1206,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 			gasCost += 25000
 		}
 	}
+
 	if transfersValue {
 		gasCost += 9000
 	}
@@ -1211,6 +1238,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	if !c.consumeGas(gasCost) {
 		return nil, 0, 0, nil
 	}
+
 	if transfersValue {
 		gas += 2300
 	}
@@ -1222,6 +1250,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	if op == STATICCALL || parent.msg.Static {
 		contract.Static = true
 	}
+
 	if op == CALLCODE || op == DELEGATECALL {
 		contract.Address = parent.msg.Address
 		if op == DELEGATECALL {
@@ -1235,6 +1264,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 			return contract, 0, 0, fmt.Errorf("bad")
 		}
 	}
+
 	return contract, retOffset.Uint64(), retSize.Uint64(), nil
 }
 
@@ -1305,7 +1335,9 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 	} else {
 		address = crypto.CreateAddress2(c.msg.Address, bigToHash(salt), input)
 	}
+
 	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input)
+
 	return contract, nil
 }
 
@@ -1321,6 +1353,7 @@ func opHalt(op OpCode) instruction {
 
 		var ok bool
 		c.ret, ok = c.get2(c.ret[:0], offset, size)
+
 		if !ok {
 			return
 		}
@@ -1342,6 +1375,7 @@ func toU256(x *big.Int) *big.Int {
 	if x.Sign() < 0 || x.BitLen() > 256 {
 		x.And(x, tt256m1)
 	}
+
 	return x
 }
 
@@ -1349,5 +1383,6 @@ func to256(x *big.Int) *big.Int {
 	if x.BitLen() > 255 {
 		x.Sub(x, tt256)
 	}
+
 	return x
 }

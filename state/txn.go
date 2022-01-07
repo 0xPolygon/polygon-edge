@@ -88,6 +88,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	if !exists {
 		return nil, false
 	}
+
 	return object.Account, true
 }
 
@@ -99,6 +100,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 		if obj.Deleted {
 			return nil, false
 		}
+
 		return obj.Copy(), true
 	}
 
@@ -127,6 +129,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	obj := &StateObject{
 		Account: account.Copy(),
 	}
+
 	return obj, true
 }
 
@@ -202,6 +205,7 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	if !exists {
 		return big.NewInt(0)
 	}
+
 	return object.Account.Balance
 }
 
@@ -213,6 +217,7 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	log.Data = append(log.Data, data...)
 
 	var logs []*types.Log
+
 	val, exists := txn.txn.Get(logIndex)
 	if !exists {
 		logs = []*types.Log{}
@@ -274,12 +279,16 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 		if original == zeroHash { // create slot (2.1.1)
 			return runtime.StorageAdded
 		}
+
 		if value == zeroHash { // delete slot (2.1.2b)
 			txn.AddRefund(15000)
+
 			return runtime.StorageDeleted
 		}
+
 		return runtime.StorageModified
 	}
+
 	if original != zeroHash { // Storage slot was populated before this transaction started
 		if current == zeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
@@ -287,6 +296,7 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 			txn.AddRefund(15000)
 		}
 	}
+
 	if original == value {
 		if original == zeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
@@ -303,6 +313,7 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 			}
 		}
 	}
+
 	return runtime.StorageModifiedAgain
 }
 
@@ -340,12 +351,14 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 			if val == nil {
 				return types.Hash{}
 			}
+
 			return types.BytesToHash(val.([]byte))
 		}
 	}
 
 	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
 	k := txn.hashit(key.Bytes())
+
 	return object.GetCommitedState(types.BytesToHash(k))
 }
 
@@ -371,6 +384,7 @@ func (txn *Txn) GetNonce(addr types.Address) uint64 {
 	if !exists {
 		return 0
 	}
+
 	return object.Account.Nonce
 }
 
@@ -390,16 +404,20 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	if !exists {
 		return nil
 	}
+
 	if object.DirtyCode {
 		return object.Code
 	}
 	// TODO; Should we move this to state?
 	v, ok := txn.codeCache.Get(addr)
+
 	if ok {
 		return v.([]byte)
 	}
+
 	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
+
 	return code
 }
 
@@ -412,6 +430,7 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	if !exists {
 		return types.Hash{}
 	}
+
 	return types.BytesToHash(object.Account.CodeHash)
 }
 
@@ -430,6 +449,7 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 			object.Account.Balance = new(big.Int)
 		}
 	})
+
 	return suicided
 }
 
@@ -466,6 +486,7 @@ func (txn *Txn) GetRefund() uint64 {
 	if !exists {
 		return 0
 	}
+
 	return data.(uint64)
 }
 
@@ -475,6 +496,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	if !ok {
 		return types.Hash{}
 	}
+
 	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
 }
 
@@ -496,6 +518,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 	if !exists {
 		return true
 	}
+
 	return obj.Empty()
 }
 
@@ -547,7 +570,9 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 		if !ok {
 			panic("it should not happen")
 		}
+
 		obj, ok := v.(*StateObject)
+
 		if !ok {
 			panic("it should not happen")
 		}
@@ -607,5 +632,6 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 	})
 
 	t, hash := txn.snapshot.Commit(objs)
+
 	return t, hash
 }

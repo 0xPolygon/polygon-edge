@@ -25,6 +25,7 @@ func (c *codeHelper) pop() {
 
 func getState() (*state, func()) {
 	c := statePool.Get().(*state)
+
 	return c, func() {
 		c.reset()
 		statePool.Put(c)

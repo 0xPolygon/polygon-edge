@@ -56,9 +56,11 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 		if account.Balance != nil {
 			txn.AddBalance(addr, account.Balance)
 		}
+
 		if account.Nonce != 0 {
 			txn.SetNonce(addr, account.Nonce)
 		}
+
 		if len(account.Code) != 0 {
 			txn.SetCode(addr, account.Code)
 		}
@@ -69,6 +71,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	}
 
 	_, root := txn.Commit(false)
+
 	return types.BytesToHash(root)
 }
 
@@ -155,6 +158,7 @@ func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbas
 		receipts: []*types.Receipt{},
 		totalGas: 0,
 	}
+
 	return txn, nil
 }
 
@@ -289,6 +293,7 @@ func (t *Transition) GetTxnHash() types.Hash {
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	s := t.state.Snapshot()
 	result, err := t.apply(msg)
+
 	if err != nil {
 		t.state.RevertToSnapshot(s)
 	}
@@ -315,6 +320,7 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 		if err == runtime.ErrNotEnoughFunds {
 			return ErrNotEnoughFundsForGas
 		}
+
 		return err
 	}
 
@@ -450,6 +456,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 func (t *Transition) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
+
 	return t.applyCreate(contract, t)
 }
 
@@ -479,10 +486,12 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 		if err == runtime.ErrNotEnoughFunds {
 			return runtime.ErrInsufficientBalance
 		}
+
 		return err
 	}
 
 	t.state.AddBalance(to, amount)
+
 	return nil
 }
 
@@ -522,10 +531,13 @@ func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
 	if nonce != 0 {
 		return true
 	}
+
 	codeHash := t.state.GetCodeHash(addr)
+
 	if codeHash != emptyCodeHashTwo && codeHash != emptyHash {
 		return true
 	}
+
 	return false
 }
 
@@ -577,6 +589,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if t.config.EIP158 && len(result.ReturnValue) > spuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
 		t.state.RevertToSnapshot(snapshot)
+
 		return &runtime.ExecutionResult{
 			GasLeft: 0,
 			Err:     runtime.ErrMaxCodeSizeExceeded,
@@ -592,6 +605,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		// Out of gas creating the contract
 		if t.config.Homestead {
 			t.state.RevertToSnapshot(snapshot)
+
 			result.GasLeft = 0
 		}
 
@@ -665,6 +679,7 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 	if c.Type == runtime.Create {
 		return t.applyCreate(c, h)
 	}
+
 	return t.applyCall(c, c.Type, h)
 }
 
@@ -690,6 +705,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 
 		nonZeros := uint64(len(payload)) - zeros
 		nonZeroCost := uint64(68)
+
 		if isIstanbul {
 			nonZeroCost = 16
 		}

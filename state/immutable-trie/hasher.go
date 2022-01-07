@@ -46,6 +46,7 @@ func (h *hasher) ReleaseArenas(idx int) {
 	for i := idx; i < len(h.arena); i++ {
 		arenaPool.Put(h.arena[i])
 	}
+
 	h.arena = h.arena[:idx]
 }
 
@@ -58,6 +59,7 @@ func (h *hasher) AcquireArena() (*fastrlp.Arena, int) {
 	v := arenaPool.Get()
 	idx := len(h.arena)
 	h.arena = append(h.arena, v)
+
 	return v, idx
 }
 
@@ -65,12 +67,15 @@ func (h *hasher) Hash(data []byte) []byte {
 	h.hash.Reset()
 	h.hash.Write(data)
 	n, err := h.hash.Read(h.tmp[:])
+
 	if err != nil {
 		panic(err)
 	}
+
 	if n != 32 {
 		panic("incorrect length")
 	}
+
 	return h.tmp[:]
 }
 

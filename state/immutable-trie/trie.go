@@ -47,6 +47,7 @@ func (c *common) Hash() ([]byte, bool) {
 func (c *common) SetHash(b []byte) []byte {
 	c.hash = extendByteSlice(c.hash, len(b))
 	copy(c.hash, b)
+
 	return c.hash
 }
 
@@ -69,6 +70,7 @@ func (f *FullNode) copy() *FullNode {
 	nc := &FullNode{}
 	nc.value = f.value
 	copy(nc.children[:], f.children[:])
+
 	return nc
 }
 
@@ -110,12 +112,14 @@ func NewTrie() *Trie {
 func (t *Trie) Get(k []byte) ([]byte, bool) {
 	txn := t.Txn()
 	res := txn.Lookup(k)
+
 	return res, res != nil
 }
 
 func hashit(k []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write(k)
+
 	return h.Sum(nil)
 }
 
@@ -197,6 +201,7 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 	batch.Write()
 
 	t.state.AddState(types.BytesToHash(root), nTrie)
+
 	return nTrie, root
 }
 
@@ -209,6 +214,7 @@ func (t *Trie) Hash() types.Hash {
 
 	hash, cached, _ := t.hashRoot()
 	t.root = cached
+
 	return types.BytesToHash(hash)
 }
 
@@ -271,12 +277,16 @@ func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 			if err != nil {
 				panic(err)
 			}
+
 			if !ok {
 				return nil, nil
 			}
+
 			_, res := t.lookup(nc, key)
+
 			return nc, res
 		}
+
 		if len(key) == 0 {
 			return nil, n.buf
 		} else {
@@ -288,20 +298,26 @@ func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
 			return nil, nil
 		}
+
 		child, res := t.lookup(n.child, key[plen:])
+
 		if child != nil {
 			n.child = child
 		}
+
 		return nil, res
 
 	case *FullNode:
 		if len(key) == 0 {
 			return t.lookup(n.value, key)
 		}
+
 		child, res := t.lookup(n.getEdge(key[0]), key[1:])
+
 		if child != nil {
 			n.children[key[0]] = child
 		}
+
 		return nil, res
 
 	default:
@@ -319,6 +335,7 @@ func (t *Txn) writeNode(n *FullNode) *FullNode {
 		value: n.value,
 	}
 	copy(nc.children[:], n.children[:])
+
 	return nc
 }
 
@@ -337,6 +354,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			v := &ValueNode{}
 			v.buf = make([]byte, len(value))
 			copy(v.buf, value)
+
 			return v
 		} else {
 			return &ShortNode{
@@ -351,10 +369,13 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			if err != nil {
 				panic(err)
 			}
+
 			if !ok {
 				return nil
 			}
+
 			node = nc
+
 			return t.insert(node, search, value)
 		}
 
@@ -362,9 +383,11 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			v := &ValueNode{}
 			v.buf = make([]byte, len(value))
 			copy(v.buf, value)
+
 			return v
 		} else {
 			b := t.insert(&FullNode{epoch: t.epoch, value: n}, search, value)
+
 			return b
 		}
 
@@ -434,6 +457,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		if plen == len(search) {
 			return nil, true
 		}
+
 		if plen == 0 {
 			return nil, false
 		}
@@ -442,9 +466,11 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		if !ok {
 			return nil, false
 		}
+
 		if child == nil {
 			return nil, true
 		}
+
 		if short, ok := child.(*ShortNode); ok {
 			// merge nodes
 			return &ShortNode{key: concat(n.key, short.key), child: short.child}, true
@@ -459,14 +485,18 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			if err != nil {
 				panic(err)
 			}
+
 			if !ok {
 				return nil, false
 			}
+
 			return t.delete(nc, search)
 		}
+
 		if len(search) != 0 {
 			return nil, false
 		}
+
 		return nil, true
 
 	case *FullNode:
@@ -475,11 +505,13 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 
 		key := search[0]
 		newChild, ok := t.delete(n.getEdge(key), search[1:])
+
 		if !ok {
 			return nil, false
 		}
 
 		n.setEdge(key, newChild)
+
 		indx := -1
 
 		var notEmpty bool
@@ -494,15 +526,18 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 				}
 			}
 		}
+
 		if indx != -1 && n.value != nil {
 			// We have one children and value, set notEmpty to true
 			notEmpty = true
 		}
+
 		if notEmpty {
 			// fmt.Println("- node is not empty -")
 			// The full node still has some other values
 			return n, true
 		}
+
 		if indx == -1 {
 			// There are no children nodes
 			if n.value == nil {
@@ -523,9 +558,11 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			if err != nil {
 				panic(err)
 			}
+
 			if !ok {
 				return nil, false
 			}
+
 			nc = aux
 		}
 
@@ -534,6 +571,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			obj := &ShortNode{}
 			obj.key = []byte{byte(indx)}
 			obj.child = nc
+
 			return obj, true
 		}
 
@@ -565,6 +603,7 @@ func prefixLen(k1, k2 []byte) int {
 			break
 		}
 	}
+
 	return i
 }
 
@@ -572,6 +611,7 @@ func concat(a, b []byte) []byte {
 	c := make([]byte, len(a)+len(b))
 	copy(c, a)
 	copy(c[len(a):], b)
+
 	return c
 }
 
@@ -580,6 +620,7 @@ func depth(d int) string {
 	for i := 0; i < d; i++ {
 		s += "\t"
 	}
+
 	return s
 }
 
@@ -604,6 +645,7 @@ func show(obj interface{}, label int, d int) {
 				show(i, indx, d+1)
 			}
 		}
+
 		if n.value != nil {
 			show(n.value, 16, d)
 		}
@@ -623,5 +665,6 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	if n := needLen - cap(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
+
 	return b[:needLen]
 }

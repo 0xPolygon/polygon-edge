@@ -44,6 +44,7 @@ func adjustedExponentLength(len, head *big.Int) *big.Int {
 	head.Sub(len, big32)
 	head.Mul(head, big8)
 	head.Add(head, new(big.Int).SetUint64(bitlength))
+
 	return head
 }
 
@@ -73,6 +74,7 @@ func multComplexity(x *big.Int) *big.Int {
 		// x ** 2 // 16 + 480 * x - 199680
 		x = subMul(x, big16, big480, big199680)
 	}
+
 	return x
 }
 
@@ -113,6 +115,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	} else {
 		gasCost.Set(baseLen)
 	}
+
 	gasCost = multComplexity(gasCost)
 
 	// a = a * max(ADJUSTED_EXPONENT_LENGTH, 1)
@@ -130,6 +133,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	if !gasCost.IsUint64() {
 		return math.MaxUint64
 	}
+
 	return gasCost.Uint64()
 }
 
@@ -161,5 +165,6 @@ func (m *modExp) run(input []byte) ([]byte, error) {
 	if modulus.Sign() != 0 {
 		res = base.Exp(base, exponent, modulus).Bytes()
 	}
+
 	return m.p.leftPad(res, int(modulusLen)), nil
 }
