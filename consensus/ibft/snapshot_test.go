@@ -341,7 +341,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:      "should not count votes from the beginning of current epoch as there cannot be any proposals during the checkpoint block",
+			name: "should not count votes from the beginning of current epoch as there cannot be any proposals " +
+				"during the checkpoint block",
 			epochSize: 3,
 			headers: []mockHeader{
 				newMockHeader(validators, skipVote("A")),

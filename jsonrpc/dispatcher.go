@@ -405,7 +405,12 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 	}
 
 	if !isErrorType(ft.Out(1)) {
-		err = fmt.Errorf("unexpected type for the second return value of the function '%s': '%s'. Expected '%s'", funcName, ft.Out(1), errt)
+		err = fmt.Errorf(
+			"unexpected type for the second return value of the function '%s': '%s'. Expected '%s'",
+			funcName,
+			ft.Out(1),
+			errt,
+		)
 		return
 	}
 

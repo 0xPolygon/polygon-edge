@@ -562,7 +562,8 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		Miner:      types.Address{},
 		Nonce:      types.Nonce{},
 		MixHash:    IstanbulDigest,
-		Difficulty: parent.Number + 1,   // we need to do this because blockchain needs difficulty to organize blocks and forks
+		// this is required because blockchain needs difficulty to organize blocks and forks
+		Difficulty: parent.Number + 1,
 		StateRoot:  types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles: types.EmptyUncleHash,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
@@ -689,7 +690,8 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 //
 // The Accept state always checks the snapshot, and the validator set. If the current node is not in the validators set,
 // it moves back to the Sync state. On the other hand, if the node is a validator, it calculates the proposer.
-// If it turns out that the current node is the proposer, it builds a block, and sends preprepare and then prepare messages.
+// If it turns out that the current node is the proposer, it builds a block,
+// and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
@@ -845,7 +847,8 @@ func (i *Ibft) runAcceptState() { // start new round
 
 // runValidateState implements the Validate state loop.
 //
-// The Validate state is rather simple - all nodes do in this state is read messages and add them to their local snapshot state
+// The Validate state is rather simple - all nodes do in this state is read messages
+// and add them to their local snapshot state
 func (i *Ibft) runValidateState() {
 	hasCommitted := false
 	sendCommit := func() {

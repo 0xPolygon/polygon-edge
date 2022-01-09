@@ -29,10 +29,14 @@ func TestSignedTransaction(t *testing.T) {
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(senderAddr, preminedAmount)
-		config.SetSeal(true)
-	})
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(senderAddr, preminedAmount)
+			config.SetSeal(true)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -499,11 +503,15 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	defaultBalance := framework.EthToWei(100)
 
 	// Set up the test server
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(sender, defaultBalance)
-		config.SetSeal(true)
-		config.SetBlockLimit(20000000)
-	})
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(sender, defaultBalance)
+			config.SetSeal(true)
+			config.SetBlockLimit(20000000)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

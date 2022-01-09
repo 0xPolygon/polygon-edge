@@ -102,7 +102,14 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
 
-	routingTable, err := kb.NewRoutingTable(defaultBucketSize, keyID, time.Minute, d.srv.host.Peerstore(), 10*time.Second, nil)
+	routingTable, err := kb.NewRoutingTable(
+		defaultBucketSize,
+		keyID,
+		time.Minute,
+		d.srv.host.Peerstore(),
+		10*time.Second,
+		nil,
+	)
 	if err != nil {
 		return err
 	}

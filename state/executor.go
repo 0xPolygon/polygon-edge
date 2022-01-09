@@ -86,8 +86,12 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
-// ProcessBlock already does all the handling of the whole process, TODO
-func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*BlockResult, error) {
+// ProcessBlock already does all the handling of the whole process
+func (e *Executor) ProcessBlock(
+	parentRoot types.Hash,
+	block *types.Block,
+	blockCreator types.Address,
+) (*BlockResult, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
@@ -126,7 +130,11 @@ func (e *Executor) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 	return e.config.Forks.At(blockNumber)
 }
 
-func (e *Executor) BeginTxn(parentRoot types.Hash, header *types.Header, coinbaseReceiver types.Address) (*Transition, error) {
+func (e *Executor) BeginTxn(
+	parentRoot types.Hash,
+	header *types.Header,
+	coinbaseReceiver types.Address,
+) (*Transition, error) {
 	config := e.config.Forks.At(header.Number)
 
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
@@ -453,14 +461,25 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	return result, nil
 }
 
-func (t *Transition) Create2(caller types.Address, code []byte, value *big.Int, gas uint64) *runtime.ExecutionResult {
+func (t *Transition) Create2(
+	caller types.Address,
+	code []byte,
+	value *big.Int,
+	gas uint64,
+) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
 
 	return t.applyCreate(contract, t)
 }
 
-func (t *Transition) Call2(caller types.Address, to types.Address, input []byte, value *big.Int, gas uint64) *runtime.ExecutionResult {
+func (t *Transition) Call2(
+	caller types.Address,
+	to types.Address,
+	input []byte,
+	value *big.Int,
+	gas uint64,
+) *runtime.ExecutionResult {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -495,7 +514,11 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	return nil
 }
 
-func (t *Transition) applyCall(c *runtime.Contract, callType runtime.CallType, host runtime.Host) *runtime.ExecutionResult {
+func (t *Transition) applyCall(
+	c *runtime.Contract,
+	callType runtime.CallType,
+	host runtime.Host,
+) *runtime.ExecutionResult {
 	if c.Depth > int(1024)+1 {
 		return &runtime.ExecutionResult{
 			GasLeft: c.Gas,
@@ -618,7 +641,12 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	return result
 }
 
-func (t *Transition) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
+func (t *Transition) SetStorage(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+	config *chain.ForksInTime,
+) runtime.StorageStatus {
 	return t.state.SetStorage(addr, key, value, config)
 }
 

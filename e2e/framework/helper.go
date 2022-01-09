@@ -266,7 +266,11 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 
 // WaitUntilTxPoolFilled waits until node has required number of transactions in txpool,
 // otherwise returns timeout
-func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uint64) (*txpoolProto.TxnPoolStatusResp, error) {
+func WaitUntilTxPoolFilled(
+	ctx context.Context,
+	srv *TestServer,
+	requiredNum uint64,
+) (*txpoolProto.TxnPoolStatusResp, error) {
 	clt := srv.TxnPoolOperator()
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

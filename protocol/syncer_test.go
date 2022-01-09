@@ -222,7 +222,10 @@ func TestFindCommonAncestor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, peerChain := blockchain.NewTestBlockchain(t, tt.syncerHeaders), blockchain.NewTestBlockchain(t, tt.peerHeaders)
+			chain, peerChain := blockchain.NewTestBlockchain(
+				t,
+				tt.syncerHeaders,
+			), blockchain.NewTestBlockchain(t, tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
@@ -612,7 +615,8 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
 	}
 
-	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+	// wait until gossip protocol builds the mesh network
+	// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()
 

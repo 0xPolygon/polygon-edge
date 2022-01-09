@@ -29,7 +29,10 @@ const DefaultLibp2pPort int = 1478
 
 const (
 	MinimumPeerConnections int64 = 1
-	MinimumBootNodes       int   = 2 // MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+
+	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
+	// using other bootnode after restarting
+	MinimumBootNodes int = 2
 )
 
 // Priority for dial queue
@@ -282,7 +285,7 @@ func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		// only concerned about PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, and PeerAddedToDialQueue
+		// Only concerned about the listed event types
 		switch evnt.Type {
 		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
 		default:
@@ -435,7 +438,8 @@ func (s *Server) Disconnect(peer peer.ID, reason string) {
 }
 
 var (
-	DefaultJoinTimeout   = 40 * time.Second // Anything below 35s is prone to false timeouts, as seen from empirical test data
+	// Anything below 35s is prone to false timeouts, as seen from empirical test data
+	DefaultJoinTimeout   = 40 * time.Second
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 

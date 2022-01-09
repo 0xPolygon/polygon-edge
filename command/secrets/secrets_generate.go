@@ -22,7 +22,10 @@ func (s *SecretsGenerate) DefineFlags() {
 	s.Base.DefineFlags()
 
 	s.FlagMap["dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the secrets manager configuration file Default: %s", defaultConfigFileName),
+		Description: fmt.Sprintf(
+			"Sets the directory for the secrets manager configuration file Default: %s",
+			defaultConfigFileName,
+		),
 		Arguments: []string{
 			"DIRECTORY",
 		},
@@ -67,7 +70,10 @@ func (s *SecretsGenerate) DefineFlags() {
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default: %s", defaultNodeName),
+		Description: fmt.Sprintf(
+			"Specifies the name of the node for on-service record keeping. Default: %s",
+			defaultNodeName,
+		),
 		Arguments: []string{
 			"NODE_NAME",
 		},

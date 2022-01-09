@@ -75,11 +75,26 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 
 	_, root := txn.Commit(forks.EIP158)
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %s %s %d): expected %s but found %s", file, name, fork, index, p.Root.String(), hex.EncodeToHex(root))
+		t.Fatalf(
+			"root mismatch (%s %s %s %d): expected %s but found %s",
+			file,
+			name,
+			fork,
+			index,
+			p.Root.String(),
+			hex.EncodeToHex(root),
+		)
 	}
 
 	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
-		t.Fatalf("logs mismatch (%s, %s %d): expected %s but found %s", name, fork, index, p.Logs.String(), logs.String())
+		t.Fatalf(
+			"logs mismatch (%s, %s %d): expected %s but found %s",
+			name,
+			fork,
+			index,
+			p.Logs.String(),
+			logs.String(),
+		)
 	}
 }
 

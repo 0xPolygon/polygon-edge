@@ -107,7 +107,11 @@ func TestConnLimit_Outbound(t *testing.T) {
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
 
-	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], servers[1].AddrInfo().ID); disconnectErr != nil {
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(
+		disconnectCtx,
+		servers[0],
+		servers[1].AddrInfo().ID,
+	); disconnectErr != nil {
 		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 	}
 

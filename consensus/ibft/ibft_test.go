@@ -475,11 +475,17 @@ func TestWriteTransactions(t *testing.T) {
 	setupMockTransition := func(test testCase, mockTxPool *mockTxPool) *mockTransition {
 		mockTransition := &mockTransition{}
 		for _, i := range test.recoverableTxnsIndexes {
-			mockTransition.recoverableTransactions = append(mockTransition.recoverableTransactions, mockTxPool.transactions[i])
+			mockTransition.recoverableTransactions = append(
+				mockTransition.recoverableTransactions,
+				mockTxPool.transactions[i],
+			)
 		}
 
 		for _, i := range test.unrecoverableTxnsIndexes {
-			mockTransition.unrecoverableTransactions = append(mockTransition.unrecoverableTransactions, mockTxPool.transactions[i])
+			mockTransition.unrecoverableTransactions = append(
+				mockTransition.unrecoverableTransactions,
+				mockTxPool.transactions[i],
+			)
 		}
 
 		if test.gasLimitReachedTxnIndex > 0 {

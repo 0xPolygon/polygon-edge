@@ -67,7 +67,16 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	evmR := evm.NewEVM()
 
 	code := e.GetCode(c.Exec.Address)
-	contract := runtime.NewContractCall(1, c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, code, c.Exec.Data)
+	contract := runtime.NewContractCall(
+		1,
+		c.Exec.Caller,
+		c.Exec.Caller,
+		c.Exec.Address,
+		c.Exec.Value,
+		c.Exec.GasLimit,
+		code,
+		c.Exec.Data,
+	)
 
 	result := evmR.Run(contract, e, &config)
 

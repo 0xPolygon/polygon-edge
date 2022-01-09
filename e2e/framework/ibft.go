@@ -16,7 +16,12 @@ type IBFTServersManager struct {
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 
-func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
+func NewIBFTServersManager(
+	t *testing.T,
+	numNodes int,
+	ibftDirPrefix string,
+	callback IBFTServerConfigCallback,
+) *IBFTServersManager {
 	t.Helper()
 
 	dataDir, err := tempDir()

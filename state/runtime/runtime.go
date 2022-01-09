@@ -142,7 +142,15 @@ type Contract struct {
 	Static      bool
 }
 
-func NewContract(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func NewContract(
+	depth int,
+	origin types.Address,
+	from types.Address,
+	to types.Address,
+	value *big.Int,
+	gas uint64,
+	code []byte,
+) *Contract {
 	f := &Contract{
 		Caller:      from,
 		Origin:      origin,
@@ -157,12 +165,29 @@ func NewContract(depth int, origin types.Address, from types.Address, to types.A
 	return f
 }
 
-func NewContractCreation(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte) *Contract {
+func NewContractCreation(
+	depth int,
+	origin types.Address,
+	from types.Address,
+	to types.Address,
+	value *big.Int,
+	gas uint64,
+	code []byte,
+) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	return c
 }
 
-func NewContractCall(depth int, origin types.Address, from types.Address, to types.Address, value *big.Int, gas uint64, code []byte, input []byte) *Contract {
+func NewContractCall(
+	depth int,
+	origin types.Address,
+	from types.Address,
+	to types.Address,
+	value *big.Int,
+	gas uint64,
+	code []byte,
+	input []byte,
+) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
 	c.Input = input
 

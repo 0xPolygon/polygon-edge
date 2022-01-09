@@ -174,7 +174,13 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	return nonce, nil
 }
 
-func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) (web3.Hash, error) {
+func executeTxn(
+	client *jsonrpc.Client,
+	sender Account,
+	receiver types.Address,
+	value *big.Int,
+	nonce uint64,
+) (web3.Hash, error) {
 	signer := crypto.NewEIP155Signer(100)
 
 	txn, err := signer.SignTx(&types.Transaction{

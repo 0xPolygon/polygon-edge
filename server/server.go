@@ -418,7 +418,10 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (result *runtime.ExecutionResult, err error) {
+func (j *jsonRPCHub) ApplyTxn(
+	header *types.Header,
+	txn *types.Transaction,
+) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
 		return nil, err

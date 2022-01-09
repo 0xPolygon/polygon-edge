@@ -224,7 +224,8 @@ func testHeader(t *testing.T, m MockStorage) {
 		Difficulty: 17179869184,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
-		ExtraData:  hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"), // if not set it will fail
+		// if not set it will fail
+		ExtraData: hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"), //nolint:lll
 	}
 	header.ComputeHash()
 

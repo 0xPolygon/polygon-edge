@@ -1244,7 +1244,16 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	parent := c
 
-	contract := runtime.NewContractCall(c.msg.Depth+1, parent.msg.Origin, parent.msg.Address, addr, value, gas, c.host.GetCode(addr), args)
+	contract := runtime.NewContractCall(
+		c.msg.Depth+1,
+		parent.msg.Origin,
+		parent.msg.Address,
+		addr,
+		value,
+		gas,
+		c.host.GetCode(addr),
+		args,
+	)
 
 	if op == STATICCALL || parent.msg.Static {
 		contract.Static = true

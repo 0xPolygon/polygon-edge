@@ -134,7 +134,11 @@ func NewRandomChain(t *testing.T, height int) blockchainShim {
 }
 
 // SetupSyncerNetwork connects syncers
-func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockchainShim) (syncer *Syncer, peerSyncers []*Syncer) {
+func SetupSyncerNetwork(
+	t *testing.T,
+	chain blockchainShim,
+	peerChains []blockchainShim,
+) (syncer *Syncer, peerSyncers []*Syncer) {
 	t.Helper()
 
 	syncer = CreateSyncer(t, chain, nil)

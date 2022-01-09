@@ -67,7 +67,10 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["premine"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", helper.DefaultPremineBalance),
+		Description: fmt.Sprintf(
+			"Sets the premined accounts and balances. Default premined balance: %s",
+			helper.DefaultPremineBalance,
+		),
 		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -103,7 +106,8 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
-		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
+		Description: "Sets passed in addresses as IBFT validators. " +
+			"Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATOR_LIST",
 		},
@@ -130,7 +134,10 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
+		Description: fmt.Sprintf(
+			"Refers to the maximum amount of gas used by all operations in a block. Default: %d",
+			helper.GenesisGasLimit,
+		),
 		Arguments: []string{
 			"BLOCK_GAS_LIMIT",
 		},

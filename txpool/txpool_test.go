@@ -95,7 +95,19 @@ func TestAddingTransaction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+			pool, err := NewTxPool(
+				hclog.NewNullLogger(),
+				false,
+				nil,
+				false,
+				defaultPriceLimit,
+				defaultMaxSlots,
+				forks.At(0),
+				&mockStore{},
+				nil,
+				nil,
+				nilMetrics,
+			)
 			if err != nil {
 				t.Fatal("Failed to initialize transaction pool:", err)
 			}
@@ -118,7 +130,11 @@ func TestAddingTransaction(t *testing.T) {
 			if tc.shouldSucceed {
 				assert.NoError(t, err, "Expected adding transaction to succeed")
 				assert.NotEmpty(t, pool.Length(), "Expected pool to not be empty")
-				assert.True(t, pool.pendingQueue.Contains(signedTx), "Expected pool to contain added transaction")
+				assert.True(
+					t,
+					pool.pendingQueue.Contains(signedTx),
+					"Expected pool to contain added transaction",
+				)
 			} else {
 				assert.ErrorIs(t, err, ErrIntrinsicGas, "Expected adding transaction to fail")
 				assert.Empty(t, pool.Length(), "Expected pool to be empty")
@@ -129,7 +145,19 @@ func TestAddingTransaction(t *testing.T) {
 
 func TestMultipleTransactions(t *testing.T) {
 	// if we add the same transaction it should only be included once
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		true,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -164,7 +192,19 @@ func TestMultipleTransactions(t *testing.T) {
 }
 
 func TestGetPendingAndQueuedTransactions(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		false,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -229,7 +269,19 @@ func TestBroadcast(t *testing.T) {
 			t.Fatalf("Unable to create server, %v", createErr)
 		}
 
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, server, nilMetrics)
+		pool, err := NewTxPool(
+			hclog.NewNullLogger(),
+			false,
+			nil,
+			true,
+			defaultPriceLimit,
+			defaultMaxSlots,
+			forks.At(0),
+			&mockStore{},
+			nil,
+			server,
+			nilMetrics,
+		)
 		assert.NoError(t, err)
 		pool.AddSigner(signer)
 
@@ -262,7 +314,19 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestTxnQueue_Promotion(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		true,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -303,7 +367,19 @@ func TestTxnQueue_Heap(t *testing.T) {
 	}
 
 	test := func(t *testing.T, testTable []TestCase) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+		pool, err := NewTxPool(
+			hclog.NewNullLogger(),
+			false,
+			nil,
+			false,
+			defaultPriceLimit,
+			defaultMaxSlots,
+			forks.At(0),
+			&mockStore{},
+			nil,
+			nil,
+			nilMetrics,
+		)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.AddSigner(&mockSigner{})
@@ -376,7 +452,19 @@ func TestTxnQueue_Heap(t *testing.T) {
 	})
 
 	t.Run("make sure that heap is not functioning as a FIFO", func(t *testing.T) {
-		pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+		pool, err := NewTxPool(
+			hclog.NewNullLogger(),
+			false,
+			nil,
+			true,
+			defaultPriceLimit,
+			defaultMaxSlots,
+			forks.At(0),
+			&mockStore{},
+			nil,
+			nil,
+			nilMetrics,
+		)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.AddSigner(&mockSigner{})
@@ -497,7 +585,19 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), testCase.mockStore, nil, nil, nilMetrics)
+			pool, err := NewTxPool(
+				hclog.NewNullLogger(),
+				false,
+				nil,
+				true,
+				defaultPriceLimit,
+				defaultMaxSlots,
+				forks.At(0),
+				testCase.mockStore,
+				nil,
+				nil,
+				nilMetrics,
+			)
 			assert.NoError(t, err)
 			if testCase.devMode {
 				pool.EnableDev()
@@ -516,7 +616,19 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 	}
 }
 func TestTx_MaxSize(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		false,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
 	assert.NoError(t, err)
@@ -561,7 +673,19 @@ func TestTx_MaxSize(t *testing.T) {
 	}
 }
 func TestTxnOperatorAddNilRaw(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, true, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		true,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 
 	txnReq := new(proto.AddTxnReq)
@@ -664,7 +788,19 @@ func TestPriceLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, tt.locals, tt.noLocals, tt.priceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+			pool, err := NewTxPool(
+				hclog.NewNullLogger(),
+				false,
+				tt.locals,
+				tt.noLocals,
+				tt.priceLimit,
+				defaultMaxSlots,
+				forks.At(0),
+				&mockStore{},
+				nil,
+				nil,
+				nilMetrics,
+			)
 			assert.NoError(t, err)
 			pool.AddSigner(signer)
 
@@ -839,7 +975,8 @@ func TestSizeLimit(t *testing.T) {
 			slots: 2,
 		},
 		{
-			name:    "should discard existing remote transactions and add new tx forcibly if the new tx is local and set more expensive gas price",
+			name: "should discard existing remote transactions and add new tx forcibly " +
+				"if the new tx is local and set more expensive gas price",
 			maxSlot: 2,
 			initialTxs: []addTx{
 				{
@@ -865,7 +1002,19 @@ func TestSizeLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlot, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+			pool, err := NewTxPool(
+				hclog.NewNullLogger(),
+				false,
+				nil,
+				false,
+				defaultPriceLimit,
+				tt.maxSlot,
+				forks.At(0),
+				&mockStore{},
+				nil,
+				nil,
+				nilMetrics,
+			)
 			assert.NoError(t, err)
 			pool.AddSigner(signer)
 
@@ -950,7 +1099,19 @@ func TestGaugeCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, tt.maxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+			pool, err := NewTxPool(
+				hclog.NewNullLogger(),
+				false,
+				nil,
+				false,
+				defaultPriceLimit,
+				tt.maxSlots,
+				forks.At(0),
+				&mockStore{},
+				nil,
+				nil,
+				nilMetrics,
+			)
 			assert.NoError(t, err)
 			pool.EnableDev()
 			pool.AddSigner(&mockSigner{})
@@ -989,7 +1150,19 @@ func TestGaugeCheck(t *testing.T) {
 }
 
 func TestRejectLowNonceTx(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		false,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})
@@ -1036,7 +1209,19 @@ func TestRejectLowNonceTx(t *testing.T) {
 }
 
 func TestRejectExsistingTxn(t *testing.T) {
-	pool, err := NewTxPool(hclog.NewNullLogger(), false, nil, false, defaultPriceLimit, defaultMaxSlots, forks.At(0), &mockStore{}, nil, nil, nilMetrics)
+	pool, err := NewTxPool(
+		hclog.NewNullLogger(),
+		false,
+		nil,
+		false,
+		defaultPriceLimit,
+		defaultMaxSlots,
+		forks.At(0),
+		&mockStore{},
+		nil,
+		nil,
+		nilMetrics,
+	)
 	assert.NoError(t, err)
 	pool.EnableDev()
 	pool.AddSigner(&mockSigner{})

@@ -160,6 +160,9 @@ func (r *IBFTProposeResult) Message() string {
 	if r.Vote == positive {
 		return fmt.Sprintf("Successfully voted for the addition of address [%s] to the validator set", r.Address)
 	} else {
-		return fmt.Sprintf("Successfully voted for the removal of validator at address [%s] from the validator set", r.Address)
+		return fmt.Sprintf(
+			"Successfully voted for the removal of validator at address [%s] from the validator set",
+			r.Address,
+		)
 	}
 }
