@@ -52,8 +52,8 @@ func TestStorage(t *testing.T, m MockStorage) {
 }
 
 func testCanonicalChain(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Number     uint64
@@ -103,8 +103,8 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 }
 
 func testDifficulty(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Diff *big.Int
@@ -148,8 +148,8 @@ func testDifficulty(t *testing.T, m MockStorage) {
 }
 
 func testHead(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	for i := uint64(0); i < 5; i++ {
 		h := &types.Header{
@@ -191,8 +191,8 @@ func testHead(t *testing.T, m MockStorage) {
 }
 
 func testForks(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Forks []types.Hash
@@ -216,8 +216,8 @@ func testForks(t *testing.T, m MockStorage) {
 }
 
 func testHeader(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	header := &types.Header{
 		Number:     5,
@@ -242,8 +242,8 @@ func testHeader(t *testing.T, m MockStorage) {
 }
 
 func testBody(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	header := &types.Header{
 		Number:     5,
@@ -307,8 +307,8 @@ func testBody(t *testing.T, m MockStorage) {
 }
 
 func testReceipts(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	h := &types.Header{
 		Difficulty: 133,
@@ -381,8 +381,8 @@ func testReceipts(t *testing.T, m MockStorage) {
 }
 
 func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	s, closeFn := m(t)
+	defer closeFn()
 
 	h := &types.Header{
 		Number:    100,

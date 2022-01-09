@@ -33,8 +33,8 @@ func getState() (*state, func()) {
 }
 
 func TestStackTop(t *testing.T) {
-	s, close := getState()
-	defer close()
+	s, closeFn := getState()
+	defer closeFn()
 
 	s.push(one)
 	s.push(two)
@@ -49,8 +49,8 @@ func TestStackOverflow(t *testing.T) {
 		code.push1()
 	}
 
-	s, close := getState()
-	defer close()
+	s, closeFn := getState()
+	defer closeFn()
 
 	s.code = code.buf
 	s.gas = 10000
@@ -70,8 +70,8 @@ func TestStackOverflow(t *testing.T) {
 }
 
 func TestStackUnderflow(t *testing.T) {
-	s, close := getState()
-	defer close()
+	s, closeFn := getState()
+	defer closeFn()
 
 	code := codeHelper{}
 	for i := 0; i < 10; i++ {
@@ -99,8 +99,8 @@ func TestStackUnderflow(t *testing.T) {
 }
 
 func TestOpcodeNotFound(t *testing.T) {
-	s, close := getState()
-	defer close()
+	s, closeFn := getState()
+	defer closeFn()
 
 	s.code = []byte{0xA5}
 	s.gas = 1000

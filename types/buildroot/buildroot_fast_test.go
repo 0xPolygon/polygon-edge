@@ -44,9 +44,9 @@ func TestFastHasher(t *testing.T) {
 		res := buildRandomInput(int(num))
 
 		found, _ := f.Hash(int(num), res)
-		real := deriveSlow(int(num), res)
+		realRes := deriveSlow(int(num), res)
 
-		if !bytes.Equal(found, real) {
+		if !bytes.Equal(found, realRes) {
 			t.Fatal("bad")
 		}
 

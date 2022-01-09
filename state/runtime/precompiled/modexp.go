@@ -30,18 +30,18 @@ var (
 	divisor = big.NewInt(20)
 )
 
-func adjustedExponentLength(len, head *big.Int) *big.Int {
+func adjustedExponentLength(expLen, head *big.Int) *big.Int {
 	bitlength := uint64(0)
 	if head.Sign() != 0 {
 		bitlength = uint64(head.BitLen() - 1)
 	}
 
-	if len.Cmp(big32) <= 0 {
+	if expLen.Cmp(big32) <= 0 {
 		// return the index of the highest bit
 		return new(big.Int).SetUint64(bitlength)
 	}
 
-	head.Sub(len, big32)
+	head.Sub(expLen, big32)
 	head.Mul(head, big8)
 	head.Add(head, new(big.Int).SetUint64(bitlength))
 

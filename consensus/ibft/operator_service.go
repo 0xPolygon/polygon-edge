@@ -39,20 +39,20 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		addr := types.StringToAddress(o.candidates[i].Address)
 
 		// Define the delete callback method
-		delete := func() {
+		deleteFn := func() {
 			o.candidates = append(o.candidates[:i], o.candidates[i+1:]...)
 			i--
 		}
 
 		// Check if the candidate is already in the validator set, and wants to be added
 		if o.candidates[i].Auth && snap.Set.Includes(addr) {
-			delete()
+			deleteFn()
 			continue
 		}
 
 		// Check if the candidate is not in the validator set, and wants to be removed
 		if !o.candidates[i].Auth && !snap.Set.Includes(addr) {
-			delete()
+			deleteFn()
 		}
 	}
 

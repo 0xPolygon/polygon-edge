@@ -20,7 +20,7 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 		t.Fatal(err)
 	}
 
-	close := func() {
+	closeFn := func() {
 		if err := s.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -30,7 +30,7 @@ func newStorage(t *testing.T) (storage.Storage, func()) {
 		}
 	}
 
-	return s, close
+	return s, closeFn
 }
 
 func TestStorage(t *testing.T) {
