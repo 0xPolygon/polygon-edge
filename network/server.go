@@ -110,7 +110,7 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %v", readErr)
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
 		}
 
 		key = networkingKey
@@ -118,12 +118,12 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is not present in the secrets manager, generate it
 		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
 		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %v", keyErr)
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
 		}
 
 		// Write the networking private key to disk
 		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %v", setErr)
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
 		}
 
 		key = libp2pKey
@@ -168,7 +168,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		libp2p.Identity(key),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create libp2p stack: %v", err)
+		return nil, fmt.Errorf("failed to create libp2p stack: %w", err)
 	}
 
 	emitter, err := host.EventBus().Emitter(new(PeerEvent))
@@ -228,7 +228,7 @@ func (s *Server) Start() error {
 		for _, raw := range s.config.Chain.Bootnodes {
 			node, err := StringToAddrInfo(raw)
 			if err != nil {
-				return fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+				return fmt.Errorf("failed to parse bootnode %s: %w", raw, err)
 			}
 
 			if node.ID == s.host.ID() {
@@ -241,7 +241,7 @@ func (s *Server) Start() error {
 		}
 
 		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
-			return fmt.Errorf("unable to setup discovery, %v", setupErr)
+			return fmt.Errorf("unable to setup discovery, %w", setupErr)
 		}
 	}
 

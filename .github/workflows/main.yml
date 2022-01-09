@@ -48,7 +48,7 @@ jobs:
             -E dogsled
             -E dupl
             -E errname
-          #            -E errorlint
+            -E errorlint
           skip-go-installation: true
   test:
     runs-on: ubuntu-latest

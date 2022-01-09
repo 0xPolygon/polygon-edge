@@ -102,7 +102,7 @@ func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
 	secret, err := ioutil.ReadFile(secretPath)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"unable to read secret from disk (%s), %v",
+			"unable to read secret from disk (%s), %w",
 			secretPath,
 			err,
 		)
@@ -129,7 +129,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	// Write the secret to disk
 	if err := ioutil.WriteFile(secretPath, value, 0600); err != nil {
 		return fmt.Errorf(
-			"unable to write secret to disk (%s), %v",
+			"unable to write secret to disk (%s), %w",
 			secretPath,
 			err,
 		)
@@ -158,7 +158,7 @@ func (l *LocalSecretsManager) RemoveSecret(name string) error {
 	delete(l.secretPathMap, name)
 
 	if removeErr := os.Remove(secretPath); removeErr != nil {
-		return fmt.Errorf("unable to remove secret, %v", removeErr)
+		return fmt.Errorf("unable to remove secret, %w", removeErr)
 	}
 
 	return nil

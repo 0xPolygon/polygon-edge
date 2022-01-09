@@ -135,7 +135,7 @@ func PredeployStakingSC(
 	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %v", err)
+		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)
 	}
 
 	// Generate the empty account storage map

@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -566,7 +567,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	// Verify the header
 	if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
-		return fmt.Errorf("failed to verify the header: %v", err)
+		return fmt.Errorf("failed to verify the header: %w", err)
 	}
 
 	// Verify body data
@@ -700,7 +701,7 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 	}
 
 	if gasLimitErr := b.verifyGasLimit(header); gasLimitErr != nil {
-		return nil, fmt.Errorf("invalid gas limit, %v", gasLimitErr)
+		return nil, fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
 	return result, nil
@@ -855,7 +856,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 func (b *Blockchain) writeFork(header *types.Header) error {
 	forks, err := b.db.ReadForks()
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			forks = []types.Hash{}
 		} else {
 			return err
@@ -938,7 +939,7 @@ func (b *Blockchain) handleReorg(
 	}
 
 	if err := b.writeFork(oldChainHead); err != nil {
-		return fmt.Errorf("failed to write the old header as fork: %v", err)
+		return fmt.Errorf("failed to write the old header as fork: %w", err)
 	}
 
 	// Update canonical chain numbers

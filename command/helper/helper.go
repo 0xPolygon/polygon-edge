@@ -272,7 +272,7 @@ func FillPremineMap(
 
 		amount, err := types.ParseUint256orHex(&val)
 		if err != nil {
-			return fmt.Errorf("failed to parse amount %s: %v", val, err)
+			return fmt.Errorf("failed to parse amount %s: %w", val, err)
 		}
 
 		premineMap[addr] = &chain.GenesisAccount{

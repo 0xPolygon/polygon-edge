@@ -45,7 +45,7 @@ func ParseURL(rawurl string) (*Enode, error) {
 
 	h, err := hex.DecodeString(u.User.String())
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode id: %v", err)
+		return nil, fmt.Errorf("failed to decode id: %w", err)
 	}
 
 	if len(h) != nodeIDBytes {
@@ -56,7 +56,7 @@ func ParseURL(rawurl string) (*Enode, error) {
 
 	host, port, err := net.SplitHostPort(u.Host)
 	if err != nil {
-		return nil, fmt.Errorf("invalid host: %v", err)
+		return nil, fmt.Errorf("invalid host: %w", err)
 	}
 
 	ip := net.ParseIP(host)
@@ -66,14 +66,14 @@ func ParseURL(rawurl string) (*Enode, error) {
 
 	tcpPort, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
-		return nil, fmt.Errorf("invalid tcp port '%s': %v", port, err)
+		return nil, fmt.Errorf("invalid tcp port '%s': %w", port, err)
 	}
 
 	udpPort := tcpPort
 	if discPort := u.Query().Get("discport"); discPort != "" {
 		udpPort, err = strconv.ParseUint(discPort, 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("invalid udp port '%s': %v", discPort, err)
+			return nil, fmt.Errorf("invalid udp port '%s': %w", discPort, err)
 		}
 	}
 

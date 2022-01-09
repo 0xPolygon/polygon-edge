@@ -382,7 +382,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 		key, err := crypto.ParsePrivateKey(secretKey)
 		if err != nil {
-			return fmt.Errorf("invalid private key: %v", err)
+			return fmt.Errorf("invalid private key: %w", err)
 		}
 
 		t.From = crypto.PubKeyToAddress(&key.PublicKey)

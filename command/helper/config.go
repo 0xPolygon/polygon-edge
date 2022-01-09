@@ -97,7 +97,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	if c.Secrets != "" {
 		secretsConfig, readErr := secrets.ReadConfig(c.Secrets)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read config file, %v", readErr)
+			return nil, fmt.Errorf("unable to read config file, %w", readErr)
 		}
 
 		conf.SecretsManager = secretsConfig
@@ -166,7 +166,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	if c.BlockGasTarget != "" {
 		value, err := types.ParseUint256orHex(&c.BlockGasTarget)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse gas target %s, %v", c.BlockGasTarget, err)
+			return nil, fmt.Errorf("failed to parse gas target %s, %w", c.BlockGasTarget, err)
 		}
 
 		if !value.IsUint64() {
@@ -202,7 +202,7 @@ func resolveAddr(raw string) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", raw)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse addr '%s': %v", raw, err)
+		return nil, fmt.Errorf("failed to parse addr '%s': %w", raw, err)
 	}
 
 	if addr.IP == nil {

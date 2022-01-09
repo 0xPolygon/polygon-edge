@@ -195,7 +195,7 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	port, portErr := tests.GetFreePort()
 
 	if portErr != nil {
-		return nil, fmt.Errorf("unable to fetch free port, %v", portErr)
+		return nil, fmt.Errorf("unable to fetch free port, %w", portErr)
 	}
 
 	cfg.Addr.Port = port
@@ -283,7 +283,7 @@ func MeshJoin(servers ...*Server) []error {
 						DefaultBufferTimeout,
 						DefaultJoinTimeout,
 					); joinErr != nil {
-						appendJoinError(fmt.Errorf("unable to join peers, %v", joinErr))
+						appendJoinError(fmt.Errorf("unable to join peers, %w", joinErr))
 					}
 				}(indx, innerIndx)
 			}

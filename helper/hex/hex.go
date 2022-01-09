@@ -48,7 +48,7 @@ func DecodeHex(str string) ([]byte, error) {
 func MustDecodeHex(str string) []byte {
 	buf, err := DecodeHex(str)
 	if err != nil {
-		panic(fmt.Errorf("could not decode hex: %v", err))
+		panic(fmt.Errorf("could not decode hex: %w", err))
 	}
 
 	return buf

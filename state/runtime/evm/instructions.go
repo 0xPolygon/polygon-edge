@@ -2,6 +2,7 @@
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"math/bits"
@@ -1082,9 +1083,9 @@ func opCreate(op OpCode) instruction {
 		result := c.host.Callx(contract, c.host)
 
 		v := c.push1()
-		if op == CREATE && c.config.Homestead && result.Err == runtime.ErrCodeStoreOutOfGas {
+		if op == CREATE && c.config.Homestead && errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
-		} else if result.Failed() && result.Err != runtime.ErrCodeStoreOutOfGas {
+		} else if result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
 		} else {
 			v.SetBytes(contract.Address.Bytes())

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
@@ -91,7 +92,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// Generate all the paths in the dataDir
 	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
-		return nil, fmt.Errorf("failed to create data directories: %v", err)
+		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
 	if config.Telemetry.PrometheusAddr != nil {
@@ -102,7 +103,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
-		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
+		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
 	}
 
 	// start libp2p
@@ -239,7 +240,7 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	snap, err := t.state.NewSnapshotAt(root)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get snapshot for root, %v", err)
+		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
 	}
 
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
@@ -249,7 +250,7 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 
 	var account state.Account
 	if err = account.UnmarshalRlp(result); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %v", err)
+		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %w", err)
 	}
 
 	return account.Balance, nil
@@ -291,7 +292,7 @@ func (s *Server) setupSecretsManager() error {
 	)
 
 	if factoryErr != nil {
-		return fmt.Errorf("unable to instantiate secrets manager, %v", factoryErr)
+		return fmt.Errorf("unable to instantiate secrets manager, %w", factoryErr)
 	}
 
 	s.secretsManager = secretsManager
@@ -537,13 +538,13 @@ type Entry struct {
 // SetupDataDir sets up the polygon-sdk data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
-		return fmt.Errorf("failed to create data dir: (%s): %v", dataDir, err)
+		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
 		if err := createDir(path); err != nil {
-			return fmt.Errorf("failed to create path: (%s): %v", path, err)
+			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
 
@@ -564,7 +565,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	go func() {
 		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
 		}
 	}()

@@ -163,7 +163,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	var err, subErr error
 
 	parseError := func(field string, subErr error) {
-		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
+		err = multierror.Append(err, fmt.Errorf("%s: %w", field, subErr))
 	}
 
 	nonce, subErr := types.ParseUint64orHex(dec.Nonce)
@@ -299,7 +299,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	var subErr error
 
 	parseError := func(field string, subErr error) {
-		err = multierror.Append(err, fmt.Errorf("%s: %v", field, subErr))
+		err = multierror.Append(err, fmt.Errorf("%s: %w", field, subErr))
 	}
 
 	if dec.Code != nil {

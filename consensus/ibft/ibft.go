@@ -370,7 +370,7 @@ func (i *Ibft) createKey() error {
 			// The validator key is present in the secrets manager, load it
 			validatorKey, readErr := crypto.ReadConsensusKey(i.secretsManager)
 			if readErr != nil {
-				return fmt.Errorf("unable to read validator key from Secrets Manager, %v", readErr)
+				return fmt.Errorf("unable to read validator key from Secrets Manager, %w", readErr)
 			}
 
 			key = validatorKey
@@ -378,13 +378,13 @@ func (i *Ibft) createKey() error {
 			// The validator key is not present in the secrets manager, generate it
 			validatorKey, validatorKeyEncoded, genErr := crypto.GenerateAndEncodePrivateKey()
 			if genErr != nil {
-				return fmt.Errorf("unable to generate validator key for Secrets Manager, %v", genErr)
+				return fmt.Errorf("unable to generate validator key for Secrets Manager, %w", genErr)
 			}
 
 			// Save the key to the secrets manager
 			saveErr := i.secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
 			if saveErr != nil {
-				return fmt.Errorf("unable to save validator key to Secrets Manager, %v", saveErr)
+				return fmt.Errorf("unable to save validator key to Secrets Manager, %w", saveErr)
 			}
 
 			key = validatorKey
@@ -661,10 +661,12 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if err := transition.Write(txn); err != nil {
+			//nolint:errorlint
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 
 				break
+				//nolint:errorlint
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 			} else {

@@ -168,7 +168,7 @@ func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
 
 	return nonce, nil
@@ -194,12 +194,12 @@ func executeTxn(
 	}, sender.PrivateKey)
 
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
 	hash, err := client.Eth().SendRawTransaction(txn.MarshalRLP())
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %w", err)
 	}
 
 	return hash, nil
@@ -208,12 +208,12 @@ func executeTxn(
 func (l *Loadbot) Run() error {
 	sender, err := extractSenderAccount(l.cfg.Sender)
 	if err != nil {
-		return fmt.Errorf("failed to extract sender account: %v", err)
+		return fmt.Errorf("failed to extract sender account: %w", err)
 	}
 
 	client, err := createJSONRPCClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
-		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
 	}
 
 	defer func(client *jsonrpc.Client) {
@@ -222,7 +222,7 @@ func (l *Loadbot) Run() error {
 
 	nonce, err := getInitialSenderNonce(client, sender.Address)
 	if err != nil {
-		return fmt.Errorf("an error occurred while getting initial sender nonce: %v", err)
+		return fmt.Errorf("an error occurred while getting initial sender nonce: %w", err)
 	}
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))

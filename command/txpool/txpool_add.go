@@ -124,7 +124,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("failed to decode from address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode from address: %w", err))
 
 		return 1
 	}
@@ -132,14 +132,14 @@ func (p *TxPoolAdd) Run(args []string) int {
 	to := types.Address{}
 
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("failed to decode to address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to address: %w", err))
 
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("failed to decode to value: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to value: %w", err))
 
 		return 1
 	}
@@ -147,7 +147,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("failed to decode to gasPrice: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to gasPrice: %w", err))
 
 		return 1
 	}
@@ -180,7 +180,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	resp, err := clt.AddTxn(context.Background(), msg)
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("failed to add transaction: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to add transaction: %w", err))
 
 		return 1
 	}

@@ -41,7 +41,7 @@ func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, i
 	}
 
 	evnt, err := stream.Recv()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		t.Fatalf("Invalid stream close")
 	}
 

@@ -14,7 +14,7 @@ type createFn func() ([]byte, error)
 func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to stat (%s): %v", path, err)
+		return nil, fmt.Errorf("failed to stat (%s): %w", path, err)
 	}
 
 	var keyBuff []byte
@@ -22,7 +22,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 		// Key exists
 		keyBuff, err = ioutil.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read private key from disk (%s), %v", path, err)
+			return nil, fmt.Errorf("unable to read private key from disk (%s), %w", path, err)
 		}
 
 		return keyBuff, nil
@@ -31,13 +31,13 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 	// Key doesn't exist yet, generate it
 	keyBuff, err = create()
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate private key, %v", err)
+		return nil, fmt.Errorf("unable to generate private key, %w", err)
 	}
 
 	// Encode it to a readable format (Base64) and write to disk
 	keyBuff = []byte(hex.EncodeToString(keyBuff))
 	if err = ioutil.WriteFile(path, keyBuff, 0600); err != nil {
-		return nil, fmt.Errorf("unable to write private key to disk (%s), %v", path, err)
+		return nil, fmt.Errorf("unable to write private key to disk (%s), %w", path, err)
 	}
 
 	return keyBuff, nil
@@ -46,7 +46,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 func CreatePrivateKey(create createFn) ([]byte, error) {
 	keyBuff, err := create()
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate private key, %v", err)
+		return nil, fmt.Errorf("unable to generate private key, %w", err)
 	}
 
 	// Encode it to a readable format (Base64) and return

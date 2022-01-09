@@ -123,10 +123,12 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		}
 
 		if err := transition.Write(txn); err != nil {
+			//nolint:errorlint
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 
 				break
+				//nolint:errorlint
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 			} else {

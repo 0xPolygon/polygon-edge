@@ -3,6 +3,7 @@ package monitor
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -79,7 +80,7 @@ func (m *MonitorCommand) Run(args []string) int {
 	go func() {
 		for {
 			evnt, err := stream.Recv()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 

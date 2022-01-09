@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"errors"
 	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"testing"
@@ -551,7 +552,7 @@ func TestWriteTransactions(t *testing.T) {
 				{Nonce: 4, Gas: 10001}, // exceeds block gas limit
 				{Nonce: 5},             // included
 				{Nonce: 6},             // reaches gas limit - returned to pool
-				{Nonce: 7}}, // not considered - stays in pool
+				{Nonce: 7}},            // not considered - stays in pool
 			[]int{0},
 			[]int{1},
 			5,
@@ -913,7 +914,7 @@ func (m *mockIbft) expect(res expectResult) {
 		m.t.Fatalf("incorrect outgoing messages %v %v", size, res.outgoing)
 	}
 
-	if m.state.err != res.err {
+	if errors.Is(m.state.err, res.err) {
 		m.t.Fatalf("incorrect error %v %v", m.state.err, res.err)
 	}
 }

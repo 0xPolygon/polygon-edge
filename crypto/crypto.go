@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	hexCore "encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -199,53 +198,6 @@ func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	return types.BytesToAddress(buf)
 }
 
-// HexToECDSA parses a secp256k1 private key.
-func HexToECDSA(hexkey string) (*ecdsa.PrivateKey, error) {
-	b, err := hex.DecodeString(hexkey)
-	if byteErr, ok := err.(hexCore.InvalidByteError); ok {
-		return nil, fmt.Errorf("invalid hex character %q in private key", byte(byteErr))
-	} else if err != nil {
-		return nil, fmt.Errorf("invalid hex data for private key")
-	}
-
-	return ToECDSA(b)
-}
-
-// ToECDSA creates a private key with the given D value.
-func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
-	return toECDSA(d, true)
-}
-
-// toECDSA creates a private key with the given D value. The strict parameter
-// controls whether the key's length should be enforced at the curve size or
-// it can also accept legacy encodings (0 prefixes).
-func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
-	priv := new(ecdsa.PrivateKey)
-	priv.PublicKey.Curve = S256
-
-	if strict && 8*len(d) != priv.Params().BitSize {
-		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
-	}
-
-	priv.D = new(big.Int).SetBytes(d)
-
-	// The priv.D must < N
-	if priv.D.Cmp(new(big.Int).SetBytes(secp256k1N)) >= 0 {
-		return nil, fmt.Errorf("invalid private key, >=N")
-	}
-	// The priv.D must not be zero or negative.
-	if priv.D.Sign() <= 0 {
-		return nil, fmt.Errorf("invalid private key, zero or negative")
-	}
-
-	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
-	if priv.PublicKey.X == nil {
-		return nil, fmt.Errorf("invalid private key")
-	}
-
-	return priv, nil
-}
-
 // generateKeyAndMarshal generates a new private key and serializes it to a byte array
 func generateKeyAndMarshal() ([]byte, error) {
 	key, err := GenerateKey()
@@ -295,7 +247,7 @@ func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
 
 	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
+		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
 
 	return privateKey, nil
@@ -310,7 +262,7 @@ func GenerateAndEncodePrivateKey() (*ecdsa.PrivateKey, []byte, error) {
 
 	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
+		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
 
 	return privateKey, keyBuff, nil

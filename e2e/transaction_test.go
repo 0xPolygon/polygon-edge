@@ -305,7 +305,7 @@ func getCount(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to call StressTest contract method, %v", err)
+		return nil, fmt.Errorf("unable to call StressTest contract method, %w", err)
 	}
 
 	if response == "0x" {
@@ -315,7 +315,7 @@ func getCount(
 	bigResponse, decodeErr := types.ParseUint256orHex(&response)
 
 	if decodeErr != nil {
-		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeErr)
+		return nil, fmt.Errorf("wnable to decode hex response, %w", decodeErr)
 	}
 
 	return bigResponse, nil

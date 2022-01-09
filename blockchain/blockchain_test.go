@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -485,7 +486,7 @@ func TestInsertHeaders(t *testing.T) {
 			assert.Equal(t, head.Hash, expected.Hash)
 
 			forks, err := b.GetForks()
-			if err != nil && err != storage.ErrNotFound {
+			if err != nil && !errors.Is(err, storage.ErrNotFound) {
 				t.Fatal(err)
 			}
 

@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -326,7 +327,7 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
-		if err == runtime.ErrNotEnoughFunds {
+		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
 
@@ -504,7 +505,7 @@ func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	}
 
 	if err := t.state.SubBalance(from, amount); err != nil {
-		if err == runtime.ErrNotEnoughFunds {
+		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return runtime.ErrInsufficientBalance
 		}
 

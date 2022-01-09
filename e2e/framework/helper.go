@@ -74,12 +74,12 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method validators, %v", err)
+		return nil, fmt.Errorf("unable to call Staking contract method validators, %w", err)
 	}
 
 	byteResponse, decodeError := hex.DecodeHex(response)
 	if decodeError != nil {
-		return nil, fmt.Errorf("unable to decode hex response, %v", decodeError)
+		return nil, fmt.Errorf("unable to decode hex response, %w", decodeError)
 	}
 
 	return staking.DecodeValidators(validatorsMethod, byteResponse)
@@ -108,7 +108,7 @@ func StakeAmount(
 	_, err := srv.SendRawTx(ctx, txn, senderKey)
 
 	if err != nil {
-		return fmt.Errorf("unable to call Staking contract method stake, %v", err)
+		return fmt.Errorf("unable to call Staking contract method stake, %w", err)
 	}
 
 	return nil
@@ -136,7 +136,7 @@ func UnstakeAmount(
 	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method unstake, %v", err)
+		return nil, fmt.Errorf("unable to call Staking contract method unstake, %w", err)
 	}
 
 	return receipt, nil
@@ -163,7 +163,7 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method stakedAmount, %v", err)
+		return nil, fmt.Errorf("unable to call Staking contract method stakedAmount, %w", err)
 	}
 
 	bigResponse, decodeErr := types.ParseUint256orHex(&response)
@@ -450,7 +450,7 @@ func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
 
 			_, waitErr := WaitUntilBlockMined(waitCtx, servers[indx], desiredHeight)
 			if waitErr != nil {
-				appendWaitErr(fmt.Errorf("unable to wait for block, %v", waitErr))
+				appendWaitErr(fmt.Errorf("unable to wait for block, %w", waitErr))
 			}
 		}(i)
 	}

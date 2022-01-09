@@ -38,7 +38,7 @@ func (g *GRPCFlag) FlagSet(f *flag.FlagSet) {
 func (g *GRPCFlag) Conn() (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(g.Addr, grpc.WithInsecure())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to server: %v", err)
+		return nil, fmt.Errorf("failed to connect to server: %w", err)
 	}
 
 	return conn, nil

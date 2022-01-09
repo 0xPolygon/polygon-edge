@@ -151,7 +151,7 @@ func (p *SecretsInit) Run(args []string) int {
 		// Config file passed in
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			p.Formatter.OutputError(fmt.Errorf("unable to read config file, %v", readErr))
+			p.Formatter.OutputError(fmt.Errorf("unable to read config file, %w", readErr))
 
 			return 1
 		}

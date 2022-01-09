@@ -742,7 +742,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			}
 
 			if err := sk.build(p.client, startBlock.Hash); err != nil {
-				return fmt.Errorf("failed to build skeleton: %v", err)
+				return fmt.Errorf("failed to build skeleton: %w", err)
 			}
 
 			// fill skeleton
@@ -754,7 +754,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			for _, slot := range sk.slots {
 				for _, block := range slot.blocks {
 					if err := s.blockchain.WriteBlock(block); err != nil {
-						return fmt.Errorf("failed to write bulk sync blocks: %v", err)
+						return fmt.Errorf("failed to write bulk sync blocks: %w", err)
 					}
 
 					newBlockHandler(block)

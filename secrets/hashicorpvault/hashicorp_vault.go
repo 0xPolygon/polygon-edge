@@ -89,7 +89,7 @@ func (v *VaultSecretsManager) Setup() error {
 
 	client, err := vault.NewClient(config)
 	if err != nil {
-		return fmt.Errorf("unable to initialize Vault client: %v", err)
+		return fmt.Errorf("unable to initialize Vault client: %w", err)
 	}
 
 	// Set the access token
@@ -112,7 +112,7 @@ func (v *VaultSecretsManager) constructSecretPath(name string) string {
 func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 	secret, err := v.client.Logical().Read(v.constructSecretPath(name))
 	if err != nil {
-		return nil, fmt.Errorf("unable to read secret from Vault, %v", err)
+		return nil, fmt.Errorf("unable to read secret from Vault, %w", err)
 	}
 
 	if secret == nil {
@@ -169,7 +169,7 @@ func (v *VaultSecretsManager) SetSecret(name string, value []byte) error {
 		"data": data,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to store secret (%s), %v", name, err)
+		return fmt.Errorf("unable to store secret (%s), %w", name, err)
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func (v *VaultSecretsManager) RemoveSecret(name string) error {
 	// Delete the secret from Vault storage
 	_, err = v.client.Logical().Delete(v.constructSecretPath(name))
 	if err != nil {
-		return fmt.Errorf("unable to delete secret (%s), %v", name, err)
+		return fmt.Errorf("unable to delete secret (%s), %w", name, err)
 	}
 
 	return nil

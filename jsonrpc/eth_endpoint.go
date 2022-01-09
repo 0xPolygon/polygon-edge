@@ -375,7 +375,7 @@ func (e *Eth) Call(
 	}
 
 	if result.Failed() {
-		return nil, fmt.Errorf("unable to execute call: %s", result.Err.Error())
+		return nil, fmt.Errorf("unable to execute call: %w", result.Err)
 	}
 
 	return argBytesPtr(result.ReturnValue), nil
