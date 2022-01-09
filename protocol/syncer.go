@@ -685,7 +685,6 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 		}
 
 		if handler(b) {
-
 			break
 		}
 	}

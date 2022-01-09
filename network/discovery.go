@@ -48,7 +48,7 @@ func (ps *referencePeers) getRandomPeer() *referencePeer {
 	defer ps.mux.RUnlock()
 
 	// TODO remove this once 1.0.4 of ifshort is merged in golangci-lint
-	l := len(ps.peers) //nolint:ifshort
+	l := len(ps.peers)
 	if l == 0 {
 		return nil
 	}

@@ -247,6 +247,7 @@ func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 
 func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
+
 	state, snap := buildPreState(defaultPreState)
 
 	txn := newTxn(state, snap)

@@ -128,8 +128,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 
 				break
-				//nolint:errorlint
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
 			} else {
 				d.txpool.DecreaseAccountNonce(txn)
