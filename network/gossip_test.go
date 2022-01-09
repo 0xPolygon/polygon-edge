@@ -31,9 +31,11 @@ func TestSimpleGossip(t *testing.T) {
 	numServers := 10
 	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
 	servers, createErr := createServers(numServers, nil)
+
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	messageCh := make(chan *testproto.GenericMessage)
 
 	t.Cleanup(func() {
@@ -64,11 +66,13 @@ func TestSimpleGossip(t *testing.T) {
 			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
 		}
 	}
+
 	publisher := servers[0]
 	publisherTopic := serverTopics[0]
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)-1); waitErr != nil {
 		t.Fatalf("Unable to wait for subscribers, %v", waitErr)
 	}

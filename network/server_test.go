@@ -31,6 +31,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -83,6 +84,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -104,6 +106,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
+
 	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], servers[1].AddrInfo().ID); disconnectErr != nil {
 		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 	}
@@ -125,6 +128,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create server, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		assert.NoError(t, server.Close())
 	})
@@ -145,6 +149,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
 		id := peer.ID(strconv.Itoa(i))
 		event := events[i%len(events)]
+
 		return id, event
 	}
 
@@ -272,6 +277,7 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -352,6 +358,7 @@ func TestPeerReconnection(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, bootnodes)
 	})
@@ -381,6 +388,7 @@ func TestPeerReconnection(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		for indx, server := range servers {
 			if indx != 1 {
@@ -395,6 +403,7 @@ func TestPeerReconnection(t *testing.T) {
 
 		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 		defer disconnectFn()
+
 		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
 			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 		}
@@ -402,12 +411,14 @@ func TestPeerReconnection(t *testing.T) {
 
 	closePeerServer := func(server *Server, peer *Server) {
 		peerID := peer.AddrInfo().ID
+
 		if closeErr := peer.Close(); closeErr != nil {
 			t.Fatalf("Unable to close server, %v", closeErr)
 		}
 
 		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 		defer disconnectFn()
+
 		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
 			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 		}
@@ -444,6 +455,7 @@ func TestPeerReconnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to wait for peer connect, %v", err)
 	}
+
 	assert.True(t, reconnected)
 }
 
@@ -484,6 +496,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -495,12 +508,14 @@ func TestReconnectionWithNewIP(t *testing.T) {
 
 	// Server 1 terminates, so Server 0 should disconnect from it
 	peerID := servers[1].AddrInfo().ID
+
 	if err := servers[1].host.Close(); err != nil {
 		t.Fatalf("Unable to close peer server, %v", err)
 	}
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
+
 	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], peerID); disconnectErr != nil {
 		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 	}

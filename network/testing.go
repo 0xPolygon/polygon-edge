@@ -72,6 +72,7 @@ func LeaveAndWait(
 
 	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)
 	defer cancelFn()
+
 	_, disconnectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
 
 	return disconnectErr
@@ -159,6 +160,7 @@ func createServers(
 	paramsMap map[int]*CreateServerParams,
 ) ([]*Server, error) {
 	servers := make([]*Server, count)
+
 	if paramsMap == nil {
 		paramsMap = map[int]*CreateServerParams{}
 	}
@@ -188,9 +190,11 @@ var (
 func CreateServer(params *CreateServerParams) (*Server, error) {
 	cfg := DefaultConfig()
 	port, portErr := tests.GetFreePort()
+
 	if portErr != nil {
 		return nil, fmt.Errorf("unable to fetch free port, %v", portErr)
 	}
+
 	cfg.Addr.Port = port
 	cfg.Chain = &chain.Chain{
 		Params: &chain.Params{
@@ -284,6 +288,7 @@ func MeshJoin(servers ...*Server) []error {
 	}
 
 	wg.Wait()
+
 	return joinErrors
 }
 

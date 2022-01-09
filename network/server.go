@@ -101,6 +101,7 @@ type Peer struct {
 // setupLibp2pKey is a helper method for setting up the networking private key
 func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
 	var key crypto.PrivKey
+
 	if secretsManager.HasSecret(secrets.NetworkKey) {
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
@@ -194,6 +195,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	srv.ps = ps
 
 	return srv, nil
@@ -224,6 +226,7 @@ func (s *Server) Start() error {
 			if err != nil {
 				return fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
 			}
+
 			if node.ID == s.host.ID() {
 				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
 				continue
@@ -263,6 +266,7 @@ func (s *Server) checkPeerConnections() {
 		case <-s.closeCh:
 			return
 		}
+
 		if s.numPeers() < MinimumPeerConnections {
 			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
 				//TODO: dial peers from the peerstore
@@ -290,6 +294,7 @@ func (s *Server) runDial() {
 		default:
 		}
 	})
+
 	if err != nil {
 		s.logger.Error("dial manager failed to subscribe", "err", err)
 	}
@@ -304,6 +309,7 @@ func (s *Server) runDial() {
 				// dial closed
 				return
 			}
+
 			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
 
 			if s.isConnected(tt.addr.ID) {
@@ -333,6 +339,7 @@ func (s *Server) runDial() {
 func (s *Server) numPeers() int64 {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
+
 	return int64(len(s.peers))
 }
 
@@ -406,6 +413,7 @@ func (s *Server) delPeer(id peer.ID) {
 	defer s.peersLock.Unlock()
 
 	delete(s.peers, id)
+
 	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),
@@ -419,6 +427,7 @@ func (s *Server) delPeer(id peer.ID) {
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
+
 		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
 			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
 		}
@@ -435,10 +444,13 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
+
 	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
+
 	if err != nil {
 		return err
 	}
+
 	return s.Join(addr1, timeout)
 }
 
@@ -449,7 +461,9 @@ func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	if timeout == 0 {
 		return nil
 	}
+
 	err := s.watch(addr.ID, timeout)
+
 	return err
 }
 
@@ -460,6 +474,7 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 	if s.joinWatchers == nil {
 		s.joinWatchers = map[peer.ID]chan error{}
 	}
+
 	s.joinWatchers[peerID] = ch
 	s.joinWatchersLock.Unlock()
 
@@ -511,10 +526,13 @@ func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("protocol not found: %s", proto)
 	}
+
 	stream, err := s.NewStream(proto, id)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return p.Client(stream), nil
 }
 
@@ -606,6 +624,7 @@ func (s *Server) Subscribe() (*Subscription, error) {
 		ch:  make(chan *PeerEvent),
 	}
 	go sub.run()
+
 	return sub, nil
 }
 
@@ -628,6 +647,7 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 			}
 		}
 	}()
+
 	return nil
 }
 
@@ -642,6 +662,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	isClosed := func() bool {
 		mutex.Lock()
 		defer mutex.Unlock()
+
 		return closed
 	}
 
@@ -671,10 +692,13 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return addr1, nil
 }
 
@@ -740,6 +764,7 @@ func (s PeerEventType) String() string {
 	if !ok {
 		return "unknown"
 	}
+
 	return name
 }
 

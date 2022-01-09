@@ -43,6 +43,7 @@ func (i *identity) isPending(id peer.ID) bool {
 	if !ok {
 		return false
 	}
+
 	return val.(bool)
 }
 
@@ -125,10 +126,12 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	if err != nil {
 		return err
 	}
+
 	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
 	status := i.getStatus()
 	resp, err := clt.Hello(context.Background(), status)
+
 	if err != nil {
 		return err
 	}
@@ -139,6 +142,7 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	}
 
 	i.srv.addPeer(peerID)
+
 	return nil
 }
 

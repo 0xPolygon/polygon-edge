@@ -20,6 +20,7 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -38,6 +39,7 @@ func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -67,6 +69,7 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -116,6 +119,7 @@ func TestRoutingTable_Connected(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -158,6 +162,7 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -177,6 +182,7 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
 		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 	}
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
 		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 	}
@@ -196,6 +202,7 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[0], 0); err != nil {
 		t.Fatalf("server 0 should remove a peer from routing table but didn't, peer=%s", servers[1].host.ID())
 	}
+
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[1], 0); err != nil {
 		t.Fatalf("server 1 should remove a peer from routing table but didn't, peer=%s", servers[0].host.ID())
 	}
@@ -216,6 +223,7 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		// close only servers[0] because servers[1] has closed already
 		closeTestServers(t, servers[:1])
@@ -250,6 +258,7 @@ func TestDiscovery_FullNetwork(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})

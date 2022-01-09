@@ -54,6 +54,7 @@ func (d *dialQueue) popImpl() *dialTask {
 		// pop the first value and remove it from the heap
 		tt := heap.Pop(&d.heap)
 		d.lock.Unlock()
+
 		return tt.(*dialTask)
 	}
 
