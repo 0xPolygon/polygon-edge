@@ -69,7 +69,7 @@ func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed int) []
 	preHeaders := make([]*types.Header, len(headers))
 	copy(preHeaders, headers)
 
-	return append(preHeaders, newHeaders[1:]...)
+	return append(preHeaders, newHeaders[1:]...) //nolint:makezero
 }
 
 func HeadersToBlocks(headers []*types.Header) []*types.Block {
