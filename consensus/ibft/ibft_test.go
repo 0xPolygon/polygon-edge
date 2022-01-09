@@ -914,7 +914,7 @@ func (m *mockIbft) expect(res expectResult) {
 		m.t.Fatalf("incorrect outgoing messages %v %v", size, res.outgoing)
 	}
 
-	if errors.Is(m.state.err, res.err) {
+	if !errors.Is(m.state.err, res.err) {
 		m.t.Fatalf("incorrect error %v %v", m.state.err, res.err)
 	}
 }
