@@ -665,25 +665,8 @@ type mockTxPool struct {
 	resetWithHeadersParam []*types.Header
 }
 
-func (p *mockTxPool) LockPromoted(write bool) {
-}
+func (p *mockTxPool) Prepare() {
 
-func (p *mockTxPool) UnlockPromoted() {
-}
-
-func (p *mockTxPool) Recover(tx *types.Transaction) {
-	p.transactions = append(p.transactions, tx)
-}
-
-func (p *mockTxPool) Pop() *types.Transaction {
-	if len(p.transactions) == 0 {
-		return nil
-	}
-
-	tx := p.transactions[0]
-	p.transactions = p.transactions[1:]
-
-	return tx
 }
 
 func (p *mockTxPool) Peek() *types.Transaction {
@@ -694,19 +677,25 @@ func (p *mockTxPool) Peek() *types.Transaction {
 	return p.transactions[0]
 }
 
-func (p *mockTxPool) Demote() {
-	tx := p.Pop()
+func (p *mockTxPool) Pop(tx *types.Transaction) {
+	if len(p.transactions) == 0 {
+		return
+	}
+
+	p.transactions = p.transactions[1:]
+}
+
+func (p *mockTxPool) Demote(tx *types.Transaction) {
+	p.Pop(tx)
 	p.demoted = append(p.demoted, tx)
 }
 
-func (p *mockTxPool) Drop() {
+func (p *mockTxPool) Drop(tx *types.Transaction) {
 	if p.nonceDecreased == nil {
 		p.nonceDecreased = make(map[*types.Transaction]bool)
 	}
 
-	tx := p.transactions[0]
-	p.transactions = p.transactions[1:]
-
+	p.Pop(tx)
 	p.nonceDecreased[tx] = true
 }
 
