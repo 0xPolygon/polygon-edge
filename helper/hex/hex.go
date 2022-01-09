@@ -81,8 +81,7 @@ func DecodeNibble(in byte) uint64 {
 // EncodeBig encodes bigint as a hex string with 0x prefix.
 // The sign of the integer is ignored.
 func EncodeBig(bigint *big.Int) string {
-	numBits := bigint.BitLen()
-	if numBits == 0 {
+	if bigint.BitLen() == 0 {
 		return "0x0"
 	}
 

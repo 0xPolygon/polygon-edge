@@ -88,8 +88,7 @@ func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
 	r.GasUsed = gasLimit - r.GasLeft
 
 	// Refund can go up to half the gas used
-	maxRefund := r.GasUsed / 2
-	if refund > maxRefund {
+	if maxRefund := r.GasUsed / 2; refund > maxRefund {
 		refund = maxRefund
 	}
 

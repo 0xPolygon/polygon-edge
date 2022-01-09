@@ -1,3 +1,4 @@
+//nolint:ifshort
 package evm
 
 import (
@@ -921,9 +922,7 @@ func opSelfDestruct(c *state) {
 }
 
 func opJump(c *state) {
-	dest := c.pop()
-
-	if c.validJumpdest(dest) {
+	if dest := c.pop(); c.validJumpdest(dest) {
 		c.ip = int(dest.Uint64() - 1)
 	} else {
 		c.exit(errInvalidJump)

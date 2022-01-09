@@ -314,12 +314,12 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		return nil, NewInvalidRequestError(err.Error())
 	}
 
-	var data []byte
+	var (
+		data []byte
+		err  error
+	)
 
-	var err error
-
-	res := output[0].Interface()
-	if res != nil {
+	if res := output[0].Interface(); res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
 			d.logInternalError(req.Method, err)
@@ -398,9 +398,8 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 	}
 
 	inNum = ft.NumIn()
-	outNum := ft.NumOut()
 
-	if outNum != 2 {
+	if outNum := ft.NumOut(); ft.NumOut() != 2 {
 		err = fmt.Errorf("unexpected number of output arguments in the function '%s': %d. Expected 2", funcName, outNum)
 		return
 	}

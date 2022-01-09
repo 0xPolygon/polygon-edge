@@ -187,7 +187,8 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 
 	var err error
 
-	ll := v.Elems()
+	// TODO remove this once 1.0.4 of ifshort is merged in golangci-lint
+	ll := v.Elems() //nolint:ifshort
 	if ll == 2 {
 		key := v.Get(0)
 		if key.Type() != fastrlp.TypeBytes {

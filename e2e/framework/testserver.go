@@ -163,9 +163,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
-	_, err := cmd.Output()
-
-	if err != nil {
+	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
 

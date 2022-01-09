@@ -483,8 +483,7 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 // WriteHeadersWithBodies writes a batch of headers
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	// Check the size
-	size := len(headers)
-	if size == 0 {
+	if len(headers) == 0 {
 		return fmt.Errorf("passed in headers array is empty")
 	}
 
