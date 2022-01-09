@@ -36,7 +36,6 @@ jobs:
             -E predeclared
             -E nolintlint
             -E nlreturn
-            -E nilnil
             -E misspell
             -E makezero
             -E lll
