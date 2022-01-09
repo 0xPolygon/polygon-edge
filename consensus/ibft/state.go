@@ -222,7 +222,8 @@ type ValidatorSet []types.Address
 
 // CalcProposer calculates the address of the next proposer, from the validator set
 func (v *ValidatorSet) CalcProposer(round uint64, lastProposer types.Address) types.Address {
-	seed := uint64(0)
+	var seed uint64
+
 	if lastProposer == types.ZeroAddress {
 		seed = round
 	} else {

@@ -248,7 +248,7 @@ func (txn *Txn) AddLog(log *types.Log) {
 
 var zeroHash types.Hash
 
-func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) (status runtime.StorageStatus) {
+func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
 	oldValue := txn.GetState(addr, key)
 	if oldValue == value {
 		return runtime.StorageUnchanged
@@ -262,8 +262,6 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
 
 	if legacyGasMetering {
-		status = runtime.StorageModified
-
 		if oldValue == zeroHash {
 			return runtime.StorageAdded
 		} else if value == zeroHash {

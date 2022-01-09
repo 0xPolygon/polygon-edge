@@ -205,15 +205,16 @@ func (c *GenesisCommand) Run(args []string) int {
 		return 1
 	}
 
-	var err error = nil
-
 	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
 	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
 		c.UI.Error(generateError.GetMessage())
 		return 1
 	}
 
-	var extraData []byte
+	var (
+		extraData []byte
+		err       error
+	)
 
 	// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
 	var validators []types.Address

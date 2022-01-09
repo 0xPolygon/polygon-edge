@@ -428,7 +428,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
-	var result *runtime.ExecutionResult = nil
+	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
