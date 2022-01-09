@@ -315,7 +315,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	defaultBalance := framework.EthToWei(10000)
 
 	// Each account should add 50 transactions
-	numAccounts := 5
+	numAccounts := 4
 	numTxPerAccount := 50
 
 	testAccounts := generateTestAccounts(numAccounts, t)
