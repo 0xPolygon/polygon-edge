@@ -25,7 +25,7 @@ type SecretsInit struct {
 }
 
 var (
-	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
+	ErrInvalidSecretsConfig = errors.New("invalid secrets configuration file")
 )
 
 func (p *SecretsInit) DefineFlags() {

@@ -26,7 +26,7 @@ type Response interface {
 type ErrorResponse struct {
 	JSONRPC string       `json:"jsonrpc"`
 	ID      interface{}  `json:"id,omitempty"`
-	Error   *ErrorObject `json:"error"`
+	Error   *ObjectError `json:"error"`
 }
 
 // Id returns error response id
@@ -34,7 +34,7 @@ func (e *ErrorResponse) Id() interface{} {
 	return e.ID
 }
 
-// Data returns ErrorObject
+// Data returns ObjectError
 func (e *ErrorResponse) Data() json.RawMessage {
 	data, err := json.Marshal(e.Error)
 	if err != nil {
@@ -54,7 +54,7 @@ type SuccessResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      interface{}     `json:"id"`
 	Result  json.RawMessage `json:"result"`
-	Error   *ErrorObject    `json:"error,omitempty"`
+	Error   *ObjectError    `json:"error,omitempty"`
 }
 
 // Id returns success response id
@@ -76,15 +76,15 @@ func (e *SuccessResponse) Bytes() ([]byte, error) {
 	return json.Marshal(e)
 }
 
-// ErrorObject is a jsonrpc error
-type ErrorObject struct {
+// ObjectError is a jsonrpc error
+type ObjectError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
 // Error implements error interface
-func (e *ErrorObject) Error() string {
+func (e *ObjectError) Error() string {
 	data, err := json.Marshal(e)
 	if err != nil {
 		return fmt.Sprintf("jsonrpc.internal marshal error: %v", err)
@@ -147,7 +147,7 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 
 // NewRpcErrorResponse is used to create a custom error response
 func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver string) Response {
-	errObject := &ErrorObject{errCode, err, nil}
+	errObject := &ObjectError{errCode, err, nil}
 
 	response := &ErrorResponse{
 		JSONRPC: jsonrpcver,
