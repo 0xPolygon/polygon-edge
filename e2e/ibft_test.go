@@ -41,6 +41,7 @@ func TestIbft_Transfer(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 
 		assert.NoError(t, err)

@@ -32,6 +32,7 @@ func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, i
 	systemClient := srv.Operator()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
+
 	if err != nil {
 		cancelFn()
 		t.Fatalf("Unable to subscribe to blockchain events")
@@ -41,6 +42,7 @@ func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, i
 	if err == io.EOF {
 		t.Fatalf("Invalid stream close")
 	}
+
 	if err != nil {
 		t.Fatalf("Unable to read blockchain event")
 	}
@@ -397,6 +399,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unable to fetch block")
 		}
+
 		assert.Equal(t, uint64(numIterations/numAccounts), nonce)
 	}
 }
@@ -720,6 +723,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	// as a non-local transaction
 
 	var zeroPriceLimit uint64 = 0
+
 	startingBalance := framework.EthToWei(100)
 
 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -736,9 +740,12 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	client := server.JSONRPC()
 	operator := server.TxnPoolOperator()
 	ctx := context.Background()
-	var nonce uint64 = 0
-	var nonceMux sync.Mutex
-	var wg sync.WaitGroup
+
+	var (
+		nonce    uint64 = 0
+		nonceMux sync.Mutex
+		wg       sync.WaitGroup
+	)
 
 	sendTx := func() {
 		nonceMux.Lock()
@@ -777,6 +784,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	}
 
 	wg.Wait()
+
 	_ = waitForBlock(t, server, 1, 0)
 
 	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
@@ -834,6 +842,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	if getErr != nil {
 		t.Fatalf("Unable to get transaction by hash, %v", getErr)
 	}
+
 	assert.NotNil(t, txn)
 
 	// Make sure the specific fields are not filled yet
@@ -853,8 +862,8 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	if getErr != nil {
 		t.Fatalf("Unable to get transaction by hash, %v", getErr)
 	}
-	assert.NotNil(t, txn)
 
+	assert.NotNil(t, txn)
 	assert.Equal(t, uint64(0), txn.TxnIndex)
 	assert.Equal(t, block.Number, txn.BlockNumber)
 	assert.Equal(t, block.Hash, txn.BlockHash)

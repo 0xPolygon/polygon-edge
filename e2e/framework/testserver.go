@@ -92,6 +92,7 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return clt
 }
 
@@ -100,6 +101,7 @@ func (t *TestServer) Operator() proto.SystemClient {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return proto.NewSystemClient(conn)
 }
 
@@ -108,6 +110,7 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
@@ -116,6 +119,7 @@ func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return ibftOp.NewIbftOperatorClient(conn)
 }
 
@@ -125,11 +129,13 @@ func (t *TestServer) ReleaseReservedPorts() {
 			t.t.Error(err)
 		}
 	}
+
 	t.Config.ReservedPorts = nil
 }
 
 func (t *TestServer) Stop() {
 	t.ReleaseReservedPorts()
+
 	if t.cmd != nil {
 		if err := t.cmd.Process.Kill(); err != nil {
 			t.t.Error(err)
@@ -148,6 +154,7 @@ type InitIBFTResult struct {
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	secretsInitCmd := secretsCommand.SecretsInit{}
+
 	var args []string
 
 	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
@@ -157,6 +164,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	cmd := exec.Command(polygonSDKCmd, args...)
 	cmd.Dir = t.Config.RootDir
 	_, err := cmd.Output()
+
 	if err != nil {
 		return nil, err
 	}
@@ -258,6 +266,7 @@ func (t *TestServer) GenerateGenesis() error {
 	if t.Config.BlockGasLimit == 0 {
 		t.Config.BlockGasLimit = helper.GenesisGasLimit
 	}
+
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
@@ -347,6 +356,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		}
 		return nil, true
 	})
+
 	return err
 }
 
@@ -356,12 +366,15 @@ func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Ad
 	if err != nil {
 		return web3.Address{}, err
 	}
+
 	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		Input: buf,
 	})
+
 	if err != nil {
 		return web3.Address{}, err
 	}
+
 	return receipt.ContractAddress, nil
 }
 
@@ -378,16 +391,20 @@ func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.
 	if txn.From == emptyAddr {
 		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
 	}
+
 	if txn.GasPrice == 0 {
 		txn.GasPrice = DefaultGasPrice
 	}
+
 	if txn.Gas == 0 {
 		txn.Gas = DefaultGasLimit
 	}
+
 	hash, err := client.Eth().SendTransaction(txn)
 	if err != nil {
 		return nil, err
 	}
+
 	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), hash)
 }
 
@@ -452,7 +469,9 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 	if err != nil {
 		return nil, err
 	}
+
 	data := res.(result)
+
 	return data.receipt, data.err
 }
 
@@ -467,6 +486,7 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 		}
 		return num, false
 	})
+
 	return err
 }
 
@@ -476,8 +496,10 @@ func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method str
 		To:    &address,
 		Input: sig,
 	})
+
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return receipt
 }

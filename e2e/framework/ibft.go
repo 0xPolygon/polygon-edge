@@ -46,9 +46,11 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 			callback(i, config)
 		})
 		res, err := srv.InitIBFT()
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		libp2pAddr := ToLocalIPv4LibP2pAddr(srv.Config.LibP2PPort, res.NodeID)
 
 		srvs = append(srvs, srv)
@@ -62,6 +64,7 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 	for i, v := range genesisValidators {
 		addr := types.StringToAddress(v)
 		conf := srvs[i].Config
+
 		if conf.GenesisValidatorBalance != nil {
 			srv.Config.Premine(addr, conf.GenesisValidatorBalance)
 		}
@@ -80,6 +83,7 @@ func (m *IBFTServersManager) StartServers(ctx context.Context) {
 			m.t.Fatal(err)
 		}
 	}
+
 	for _, srv := range m.servers {
 		if err := srv.WaitForReady(ctx); err != nil {
 			m.t.Fatal(err)
@@ -97,5 +101,6 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 	if i >= len(m.servers) {
 		return nil
 	}
+
 	return m.servers[i]
 }

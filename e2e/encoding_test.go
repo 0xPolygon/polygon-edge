@@ -22,13 +22,16 @@ func TestEncoding(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	contractAddr, err := srv.DeployContract(ctx, sampleByteCode)
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	receipt := srv.TxnTo(ctx, contractAddr, "setA1")
 
 	// try to get the transaction

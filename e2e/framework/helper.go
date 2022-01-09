@@ -74,6 +74,7 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 		},
 		web3.Latest,
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("Unable to call Staking contract method validators, %v", err)
 	}
@@ -105,6 +106,7 @@ func StakeAmount(
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	_, err := srv.SendRawTx(ctx, txn, senderKey)
 
 	if err != nil {
@@ -132,6 +134,7 @@ func UnstakeAmount(
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 
 	if err != nil {
@@ -160,6 +163,7 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 		},
 		web3.Latest,
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("Unable to call Staking contract method stakedAmount, %v", err)
 	}
@@ -177,11 +181,13 @@ func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, e
 	if err != nil {
 		return types.Address{}, err
 	}
+
 	return crypto.PubKeyToAddress(pubKey), nil
 }
 
 func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
 	t.Helper()
+
 	dials := []*TestServer{}
 
 	for i := 0; i < len(srvs)-1; i++ {
@@ -193,6 +199,7 @@ func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
 
 func MultiJoin(t *testing.T, srvs ...*TestServer) {
 	t.Helper()
+
 	if len(srvs)%2 != 0 {
 		t.Fatal("not an even number")
 	}
@@ -205,14 +212,18 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 		go func() {
 			srcClient, dstClient := src.Operator(), dst.Operator()
 			dstStatus, err := dstClient.GetStatus(context.Background(), &empty.Empty{})
+
 			if err != nil {
 				errCh <- err
+
 				return
 			}
+
 			dstAddr := strings.Split(dstStatus.P2PAddr, ",")[0]
 			_, err = srcClient.PeersAdd(context.Background(), &proto.PeersAddRequest{
 				Id: dstAddr,
 			})
+
 			errCh <- err
 		}()
 	}
@@ -226,6 +237,7 @@ func MultiJoin(t *testing.T, srvs ...*TestServer) {
 			t.Errorf("failed to connect from %d to %d, error=%+v ", 2*i, 2*i+1, err)
 		}
 	}
+
 	if errCount > 0 {
 		t.Fail()
 	}
@@ -248,6 +260,7 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 	if err != nil {
 		return nil, err
 	}
+
 	return res.(*proto.PeersListResponse), nil
 }
 
@@ -268,6 +281,7 @@ func WaitUntilTxPoolFilled(ctx context.Context, srv *TestServer, requiredNum uin
 	if err != nil {
 		return nil, err
 	}
+
 	return res.(*txpoolProto.TxnPoolStatusResp), nil
 }
 
@@ -286,6 +300,7 @@ func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uin
 	if err != nil {
 		return 0, err
 	}
+
 	return res.(uint64), nil
 }
 
@@ -294,6 +309,7 @@ func MethodSig(name string) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write([]byte(name + "()"))
 	b := h.Sum(nil)
+
 	return b[:4]
 }
 
@@ -325,8 +341,10 @@ func (p *ReservedPort) Close() error {
 	if p.isClosed {
 		return nil
 	}
+
 	err := p.listener.Close()
 	p.isClosed = true
+
 	return err
 }
 
@@ -337,6 +355,7 @@ func FindAvailablePort(from, to int) *ReservedPort {
 			return &ReservedPort{port: port, listener: l}
 		}
 	}
+
 	return nil
 }
 
@@ -351,11 +370,14 @@ func FindAvailablePorts(n, from, to int) ([]ReservedPort, error) {
 			for _, p := range ports {
 				p.Close()
 			}
+
 			return nil, errors.New("couldn't reserve required number of ports")
 		}
+
 		ports = append(ports, *newPort)
 		nextFrom = newPort.Port() + 1
 	}
+
 	return ports, nil
 }
 
@@ -378,7 +400,9 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		srv := NewTestServer(t, dataDir, conf)
+
 		if err := srv.GenerateGenesis(); err != nil {
 			t.Fatal(err)
 		}
@@ -389,14 +413,18 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		if err := srv.Start(ctx); err != nil {
 			t.Fatal(err)
 		}
+
 		srvs = append(srvs, srv)
 	}
+
 	return srvs
 }
 
 func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
 	waitErrors := make([]error, 0)
+
 	var waitErrorsLock sync.Mutex
+
 	appendWaitErr := func(waitErr error) {
 		waitErrorsLock.Lock()
 		defer waitErrorsLock.Unlock()

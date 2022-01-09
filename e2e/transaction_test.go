@@ -57,6 +57,7 @@ func TestSignedTransaction(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
@@ -104,6 +105,7 @@ func TestPreminedBalance(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
+
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
@@ -178,6 +180,7 @@ func TestEthTransfer(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
+
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the balances before sending
@@ -296,6 +299,7 @@ func getCount(
 		},
 		web3.Latest,
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("Unable to call StressTest contract method, %v", err)
 	}
@@ -303,7 +307,9 @@ func getCount(
 	if response == "0x" {
 		response = "0x0"
 	}
+
 	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+
 	if decodeErr != nil {
 		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeErr)
 	}
@@ -325,6 +331,7 @@ func addStressTestTxns(
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
+
 		setNameTxn := generateStressTestTx(
 			t,
 			uint64(currentNonce),
@@ -370,7 +377,9 @@ func Test_TransactionDevLoop(t *testing.T) {
 	// Deploy the stress test contract
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,6 +533,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	assert.NotNil(t, receipt)
 
 	contractAddr := receipt.ContractAddress
+
 	if err != nil {
 		t.Fatalf("Unable to send transaction, %v", err)
 	}
@@ -578,10 +588,13 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer statusCancel()
+
 	resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
+
 	if err != nil {
 		t.Fatalf("Unable to get txpool status, %v", err)
 	}
+
 	assert.Equal(t, 0, int(resp.Length))
 
 	count, countErr = getCount(sender, contractAddr, client)

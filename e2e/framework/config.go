@@ -71,6 +71,7 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
 		t.PremineAccts = []*SrvAccount{}
 	}
+
 	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
 		Addr:    addr,
 		Balance: amount,

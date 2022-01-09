@@ -25,7 +25,9 @@ func TestNewFilter_Logs(t *testing.T) {
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
+
 	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +77,7 @@ func TestNewFilter_Block(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		_, err = tests.WaitForReceipt(ctx, srv.JSONRPC().Eth(), hash)
 		assert.NoError(t, err)
 	}
@@ -108,7 +111,9 @@ func TestFilterValue(t *testing.T) {
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
+
 	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode)
+
 	if err != nil {
 		t.Fatal(err)
 	}

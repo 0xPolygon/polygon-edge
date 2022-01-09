@@ -17,6 +17,7 @@ import (
 // Test if the custom block gas limit is properly set
 func TestGenesisCustomBlockGasLimit(t *testing.T) {
 	var blockGasLimit uint64 = 5000000000
+
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetBlockLimit(blockGasLimit)
@@ -38,6 +39,7 @@ func TestGenesisCustomBlockGasLimit(t *testing.T) {
 // Test if the default gas limit is properly set
 func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 	var blockGasLimit uint64 = helper.GenesisGasLimit
+
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 	})
@@ -58,6 +60,7 @@ func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 // Test if the custom block gas limit is propagated to the subsequent blocks
 func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	var blockGasLimit uint64 = 5000000000
+
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 
