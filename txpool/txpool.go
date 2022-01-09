@@ -597,8 +597,8 @@ func (p *processEventWrapper) addTxn(txn *types.Transaction) {
 // promotedTxnCleanup looks through the promoted queue for any invalid transactions
 // made by a specific account, and removes them
 func (t *TxPool) promotedTxnCleanup(
-	address types.Address,                        // The address to filter by
-	stateNonce uint64,                            // The valid nonce (reference for pruning)
+	address types.Address, // The address to filter by
+	stateNonce uint64, // The valid nonce (reference for pruning)
 	cleanupCallback func(txn *types.Transaction), // Additional cleanup logic
 ) {
 	// Prune out all the now possibly low-nonce transactions in the promoted queue
@@ -780,7 +780,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 // validateTx validates that the transaction conforms to specific constraints to be added to the txpool
 func (t *TxPool) validateTx(
 	tx *types.Transaction, // The transaction that should be validated
-	isLocal bool,          // Flag indicating if the transaction is from a local account
+	isLocal bool, // Flag indicating if the transaction is from a local account
 ) error {
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {

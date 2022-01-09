@@ -73,7 +73,7 @@ func (ps *referencePeers) delete(id peer.ID) *referencePeer {
 		if p.id == id {
 			deletePeer := ps.peers[idx]
 			ps.peers = append(ps.peers[:idx], ps.peers[idx+1:]...)
-			
+
 			return deletePeer
 		}
 	}
