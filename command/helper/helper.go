@@ -305,6 +305,7 @@ func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 		return fmt.Errorf("failed to generate genesis: %w", err)
 	}
 
+	//nolint: gosec
 	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}

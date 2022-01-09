@@ -20,11 +20,11 @@ var (
 )
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
-func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
+func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed uint64) []*types.Header {
 	head := func(i int64) *types.Header {
 		return &types.Header{
 			Number:       uint64(i),
-			GasLimit:     uint64(seed),
+			GasLimit:     seed,
 			TxRoot:       types.EmptyRootHash,
 			Sha3Uncles:   types.EmptyUncleHash,
 			ReceiptsRoot: types.EmptyRootHash,
@@ -62,7 +62,7 @@ func NewTestHeaderFromChain(headers []*types.Header, n int) []*types.Header {
 }
 
 // NewTestHeaderFromChainWithSeed creates n new headers from an already existing chain
-func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed int) []*types.Header {
+func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed uint64) []*types.Header {
 	// We do +1 because the first header will be the genesis we supplied
 	newHeaders := NewTestHeaderChainWithSeed(headers[len(headers)-1], n+1, seed)
 

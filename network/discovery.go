@@ -2,8 +2,9 @@ package network
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"sync"
 	"time"
 
@@ -14,10 +15,6 @@ import (
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
 )
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 var discProto = "/disc/0.1"
 
@@ -56,7 +53,9 @@ func (ps *referencePeers) getRandomPeer() *referencePeer {
 		return nil
 	}
 
-	return ps.peers[rand.Intn(l)]
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(l)))
+
+	return ps.peers[randNum.Int64()]
 }
 
 func (ps *referencePeers) add(id peer.ID) {

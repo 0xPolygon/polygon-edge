@@ -528,6 +528,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
+	//nolint: gosec
 	if err := ioutil.WriteFile(path, data, 0755); err != nil {
 		return err
 	}

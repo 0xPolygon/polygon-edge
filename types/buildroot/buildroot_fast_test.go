@@ -2,11 +2,10 @@ package buildroot
 
 import (
 	"bytes"
-	"math/rand"
-	"testing"
-	"time"
-
+	"crypto/rand"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"math/big"
+	"testing"
 )
 
 func BenchmarkFast(b *testing.B) {
@@ -55,9 +54,9 @@ func TestFastHasher(t *testing.T) {
 }
 
 func randomInt(min, max uint64) uint64 {
-	rand.Seed(time.Now().UnixNano())
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(max-min)))
 
-	return min + uint64(rand.Intn(int(max-min)))
+	return min + randNum.Uint64()
 }
 
 func buildInput(n, m int) func(i int) []byte {
@@ -82,7 +81,7 @@ func buildRandomInput(num int) func(i int) []byte {
 
 	for i := 0; i < num; i++ {
 		b := make([]byte, randomInt(33, 200))
-		rand.Read(b)
+		_, _ = rand.Read(b)
 		res = append(res, b)
 	}
 

@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"context"
+	"crypto/rand"
 	"math"
 	"math/big"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -27,10 +27,6 @@ var (
 		c.NoDiscover = true
 	}
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // getPeer returns a peer with given ID in syncer's map
 func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
@@ -132,9 +128,16 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	t.Helper()
 
-	seed := rand.Intn(maxSeed)
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(maxSeed)))
 
-	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))
+	return blockchain.NewTestBlockchain(
+		t,
+		blockchain.NewTestHeaderChainWithSeed(
+			nil,
+			height,
+			randNum.Uint64(),
+		),
+	)
 }
 
 // SetupSyncerNetwork connects syncers

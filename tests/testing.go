@@ -348,9 +348,10 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	for _, i := range dec.Value {
 		value := new(big.Int)
+		loopVal := i
 
-		if i != "0x" {
-			v, err := types.ParseUint256orHex(&i)
+		if loopVal != "0x" {
+			v, err := types.ParseUint256orHex(&loopVal)
 			if err != nil {
 				return err
 			}

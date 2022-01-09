@@ -2,9 +2,10 @@ package network
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net"
 	"regexp"
 	"sync"
@@ -348,7 +349,9 @@ func (s *Server) numPeers() int64 {
 }
 
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.discovery.bootnodes))))
+
+	return s.discovery.bootnodes[randNum.Int64()]
 }
 
 func (s *Server) Peers() []*Peer {

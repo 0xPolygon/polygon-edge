@@ -2,9 +2,9 @@ package state
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"testing"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
@@ -118,7 +118,8 @@ const letterBytes = "0123456789ABCDEF"
 func randomHash() types.Hash {
 	b := make([]byte, types.HashLength)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
+		b[i] = letterBytes[randNum.Int64()]
 	}
 
 	return types.BytesToHash(b)
