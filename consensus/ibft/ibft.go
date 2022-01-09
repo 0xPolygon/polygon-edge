@@ -89,7 +89,6 @@ type Ibft struct {
 
 	secretsManager secrets.SecretsManager
 
-	// nolint:unused
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 }
 
