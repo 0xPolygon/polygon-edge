@@ -103,8 +103,7 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	d.txpool.LockPromoted(true)
-	defer d.txpool.UnlockPromoted()
+	d.txpool.Prepare()
 
 	var successful []*types.Transaction
 	for {
@@ -114,8 +113,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
-			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.Drop() // unrecoverable tx
+			d.txpool.Drop(tx)
 			continue
 		}
 
@@ -123,21 +121,24 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				d.txpool.Demote()
+				d.txpool.Demote(tx)
 			} else {
-				d.txpool.Drop() // unrecoverable tx
+				d.txpool.Drop(tx)
 			}
 
 			continue
 		}
 
-		tx = d.txpool.Pop()
+		// no errors, pop the tx from the pool
+		d.txpool.Pop(tx)
+
 		successful = append(successful, tx)
 	}
 
 	d.logger.Info("picked out txns from pool", "num", len(successful))
 
 	return successful
+
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
