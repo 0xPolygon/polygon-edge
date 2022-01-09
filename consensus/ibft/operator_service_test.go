@@ -65,7 +65,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 
 	assert.NotNil(t, o.getNextCandidate(snap))
 
-	// add the new candiate to the set
+	// add the new candidate to the set
 	snap.Set = pool.ValidatorSet()
 
 	// now the candidate is on the new set so we have to remove

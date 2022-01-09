@@ -223,7 +223,7 @@ func (t *TestServer) GenerateGenesis() error {
 		genesisCmd.GetBaseCommand(),
 	}
 
-	// add premines
+	// add pre-mined accounts
 	for _, acct := range t.Config.PremineAccts {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}

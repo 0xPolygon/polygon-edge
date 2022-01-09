@@ -1209,7 +1209,7 @@ func (i *Ibft) VerifyHeader(parent, header *types.Header) error {
 		return err
 	}
 
-	// verify the commited seals
+	// verify the committed seals
 	if err := verifyCommitedFields(snap, header); err != nil {
 		return err
 	}

@@ -159,7 +159,7 @@ func opAddMod(c *state) {
 	z := c.top()
 
 	if z.Sign() == 0 {
-		// divison by zero
+		// division by zero
 		z.Set(zero)
 	} else {
 		a = a.Add(a, b)
@@ -174,7 +174,7 @@ func opMulMod(c *state) {
 	z := c.top()
 
 	if z.Sign() == 0 {
-		// divison by zero
+		// division by zero
 		z.Set(zero)
 	} else {
 		a = a.Mul(a, b)
@@ -1279,7 +1279,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		salt = c.pop()
 	}
 
-	// check if the value can be transfered
+	// check if the value can be transferred
 	hasTransfer := value != nil && value.Sign() != 0
 
 	// Calculate and consume gas cost

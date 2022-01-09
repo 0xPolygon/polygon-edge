@@ -173,7 +173,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// run the loadbot
 	if err := loadBot.Run(); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("an error occured while running the loadbot: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("an error occurred while running the loadbot: %w", err))
 		return 1
 	}
 

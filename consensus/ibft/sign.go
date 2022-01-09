@@ -48,7 +48,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 		return nil, err
 	}
 
-	// if we are singing the commited seals we need to do something more
+	// if we are singing the committed seals we need to do something more
 	msg := hash
 	if committed {
 		msg = commitMsg(hash)
@@ -127,7 +127,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Commited Seal fields, while keeping proposer vanity and validator set
+	// This will effectively remove the Seal and Committed Seal fields, while keeping proposer vanity and validator set
 	// 		because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
 
@@ -203,8 +203,8 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 		}
 	}
 
-	// Valid commited seals must be at least 2F+1
-	// 	2F 	is the required number of honest validators who provided the commited seals
+	// Valid committed seals must be at least 2F+1
+	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
 	validSeals := len(visited)
 	if validSeals <= 2*snap.Set.MaxFaultyNodes() {

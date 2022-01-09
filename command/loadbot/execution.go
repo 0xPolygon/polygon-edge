@@ -203,7 +203,7 @@ func (l *Loadbot) Run() error {
 
 	client, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
-		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %v", err)
 	}
 
 	defer func(client *jsonrpc.Client) {
@@ -212,7 +212,7 @@ func (l *Loadbot) Run() error {
 
 	nonce, err := getInitialSenderNonce(client, sender.Address)
 	if err != nil {
-		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
+		return fmt.Errorf("an error occurred while getting initial sender nonce: %v", err)
 	}
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))

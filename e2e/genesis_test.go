@@ -28,7 +28,7 @@ func TestGenesisCustomBlockGasLimit(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block: %v", err)
+		t.Fatalf("failed to retrieve block: %v", err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -49,7 +49,7 @@ func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block: %v", err)
+		t.Fatalf("failed to retrieve block: %v", err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -76,7 +76,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block %d: %v", 0, err)
+		t.Fatalf("failed to retrieve block %d: %v", 0, err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -112,7 +112,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	block, err = client.Eth().GetBlockByNumber(1, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block %d: %v", 1, err)
+		t.Fatalf("failed to retrieve block %d: %v", 1, err)
 	}
 
 	if block.GasLimit != blockGasLimit {
