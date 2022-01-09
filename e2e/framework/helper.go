@@ -76,12 +76,12 @@ func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Add
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to call Staking contract method validators, %v", err)
+		return nil, fmt.Errorf("unable to call Staking contract method validators, %v", err)
 	}
 
 	byteResponse, decodeError := hex.DecodeHex(response)
 	if decodeError != nil {
-		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeError)
+		return nil, fmt.Errorf("unable to decode hex response, %v", decodeError)
 	}
 
 	return staking.DecodeValidators(validatorsMethod, byteResponse)
@@ -165,12 +165,12 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to call Staking contract method stakedAmount, %v", err)
+		return nil, fmt.Errorf("unable to call Staking contract method stakedAmount, %v", err)
 	}
 
 	bigResponse, decodeErr := types.ParseUint256orHex(&response)
 	if decodeErr != nil {
-		return nil, fmt.Errorf("Unable to decode hex response")
+		return nil, fmt.Errorf("unable to decode hex response")
 	}
 
 	return bigResponse, nil

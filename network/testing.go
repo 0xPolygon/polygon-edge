@@ -298,7 +298,7 @@ func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
 		t.Fatalf("unable to generate libp2p key, %v", keyErr)
 	}
 
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	assert.NoError(t, err)
 
 	port, portErr := tests.GetFreePort()
@@ -306,7 +306,7 @@ func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
 		t.Fatalf("Unable to fetch free port, %v", portErr)
 	}
 
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeId))
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeID))
 	assert.NoError(t, err)
 
 	return addr

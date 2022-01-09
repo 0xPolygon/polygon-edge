@@ -458,7 +458,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		"the external IP address without port, as can be seen by peers",
 	)
 	flags.StringVar(
-		&cliConfig.Network.Dns,
+		&cliConfig.Network.DNS,
 		"dns",
 		"",
 		" the host DNS address which can be used by a remote peer for connection",

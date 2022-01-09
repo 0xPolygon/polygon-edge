@@ -1,3 +1,4 @@
+//nolint:stylecheck
 package storage
 
 import (

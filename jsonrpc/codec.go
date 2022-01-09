@@ -17,7 +17,7 @@ type Request struct {
 
 // Response is a jsonrpc response interface
 type Response interface {
-	Id() interface{}
+	GetID() interface{}
 	Data() json.RawMessage
 	Bytes() ([]byte, error)
 }
@@ -29,8 +29,8 @@ type ErrorResponse struct {
 	Error   *ObjectError `json:"error"`
 }
 
-// Id returns error response id
-func (e *ErrorResponse) Id() interface{} {
+// GetID returns error response id
+func (e *ErrorResponse) GetID() interface{} {
 	return e.ID
 }
 
@@ -57,8 +57,8 @@ type SuccessResponse struct {
 	Error   *ObjectError    `json:"error,omitempty"`
 }
 
-// Id returns success response id
-func (s *SuccessResponse) Id() interface{} {
+// GetID returns success response id
+func (s *SuccessResponse) GetID() interface{} {
 	return s.ID
 }
 
@@ -72,8 +72,8 @@ func (s *SuccessResponse) Data() json.RawMessage {
 }
 
 // Bytes return the serialized response
-func (e *SuccessResponse) Bytes() ([]byte, error) {
-	return json.Marshal(e)
+func (s *SuccessResponse) Bytes() ([]byte, error) {
+	return json.Marshal(s)
 }
 
 // ObjectError is a jsonrpc error
@@ -145,8 +145,8 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 	return nil
 }
 
-// NewRpcErrorResponse is used to create a custom error response
-func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver string) Response {
+// NewRPCErrorResponse is used to create a custom error response
+func NewRPCErrorResponse(id interface{}, errCode int, err string, jsonrpcver string) Response {
 	errObject := &ObjectError{errCode, err, nil}
 
 	response := &ErrorResponse{
@@ -158,14 +158,14 @@ func NewRpcErrorResponse(id interface{}, errCode int, err string, jsonrpcver str
 	return response
 }
 
-// NewRpcResponse returns Success/Error response object
-func NewRpcResponse(id interface{}, jsonrpcver string, reply []byte, err Error) Response {
+// NewRPCResponse returns Success/Error response object
+func NewRPCResponse(id interface{}, jsonrpcver string, reply []byte, err Error) Response {
 	var response Response
 	switch err.(type) {
 	case nil:
 		response = &SuccessResponse{JSONRPC: jsonrpcver, ID: id, Result: reply}
 	default:
-		response = NewRpcErrorResponse(id, err.ErrorCode(), err.Error(), jsonrpcver)
+		response = NewRPCErrorResponse(id, err.ErrorCode(), err.Error(), jsonrpcver)
 	}
 
 	return response

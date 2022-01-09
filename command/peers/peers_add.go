@@ -66,7 +66,7 @@ func (p *PeersAdd) Run(args []string) int {
 	}
 
 	if len(passedInAddresses) < 1 {
-		p.Formatter.OutputError(errors.New("At least 1 peer address is required"))
+		p.Formatter.OutputError(errors.New("at least 1 peer address is required"))
 		return 1
 	}
 

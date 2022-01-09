@@ -1170,7 +1170,7 @@ func TestRejectLowNonceTx(t *testing.T) {
 	var (
 		numTx          uint64 = 10
 		txSlots        uint64 = 2
-		expectedHeight uint64 = numTx * txSlots
+		expectedHeight        = numTx * txSlots
 	)
 
 	// send numTx from some acc

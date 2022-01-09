@@ -75,7 +75,7 @@ func TestWS_Response(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Convert the default JSONRPC address to a WebSocket one
-	wsURL := "ws" + strings.TrimPrefix(srv.JsonRPCAddr(), "http") + "/ws"
+	wsURL := "ws" + strings.TrimPrefix(srv.JSONRPCAddr(), "http") + "/ws"
 
 	// Connect to the websocket server
 	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)

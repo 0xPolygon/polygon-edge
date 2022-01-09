@@ -148,7 +148,7 @@ func (p *SecretsInit) Run(args []string) int {
 		// Config file passed in
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			p.Formatter.OutputError(fmt.Errorf("Unable to read config file, %v", readErr))
+			p.Formatter.OutputError(fmt.Errorf("unable to read config file, %v", readErr))
 			return 1
 		}
 
@@ -163,7 +163,7 @@ func (p *SecretsInit) Run(args []string) int {
 
 			secretsManager = vaultSecretsManager
 		default:
-			p.Formatter.OutputError(errors.New("Unknown secrets manager type"))
+			p.Formatter.OutputError(errors.New("unknown secrets manager type"))
 			return 1
 		}
 	}
@@ -194,7 +194,7 @@ func (p *SecretsInit) Run(args []string) int {
 		return 1
 	}
 
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
 		p.Formatter.OutputError(err)
 		return 1
@@ -202,7 +202,7 @@ func (p *SecretsInit) Run(args []string) int {
 
 	res := &SecretsInitResult{
 		Address: crypto.PubKeyToAddress(&validatorKey.PublicKey),
-		NodeID:  nodeId.String(),
+		NodeID:  nodeID.String(),
 	}
 	p.Formatter.OutputResult(res)
 

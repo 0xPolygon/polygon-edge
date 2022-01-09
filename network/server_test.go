@@ -549,7 +549,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 	// Create a temporary directory for storing the key file
 	key, directoryName := GenerateTestLibp2pKey(t)
-	peerId, err := peer.IDFromPrivateKey(key)
+	peerID, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	testMultiAddr := GenerateTestMultiAddr(t).String()
 	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
@@ -563,7 +563,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 		{
 			name:         "Should return an non empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), testMultiAddr},
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerID.Pretty(), testMultiAddr},
 			expectedList: []*peer.AddrInfo{peerAddressInfo},
 		},
 	}

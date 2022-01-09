@@ -37,13 +37,13 @@ func ToFixedFloat(num float64, precision int) float64 {
 // SetupDataDir sets up the data directory and the corresponding sub-directories
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
-		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+		return fmt.Errorf("failed to create data dir: (%s): %v", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
 		if err := createDir(path); err != nil {
-			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+			return fmt.Errorf("failed to create path: (%s): %v", path, err)
 		}
 	}
 

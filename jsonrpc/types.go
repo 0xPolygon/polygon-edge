@@ -223,10 +223,10 @@ func argUintPtr(n uint64) *argUint64 {
 	return &v
 }
 
-func (b argUint64) MarshalText() ([]byte, error) {
+func (u argUint64) MarshalText() ([]byte, error) {
 	buf := make([]byte, 2, 10)
 	copy(buf, `0x`)
-	buf = strconv.AppendUint(buf, uint64(b), 16)
+	buf = strconv.AppendUint(buf, uint64(u), 16)
 
 	return buf, nil
 }

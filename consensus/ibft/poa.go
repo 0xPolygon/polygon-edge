@@ -16,7 +16,7 @@ var (
 )
 
 var (
-	ErrInvalidNonce = errors.New("Invalid nonce specified")
+	ErrInvalidNonce = errors.New("invalid nonce specified")
 )
 
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism

@@ -211,7 +211,7 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("failed to extract sender account: %v", err)
 	}
 
-	client, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
+	client, err := createJSONRPCClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
 		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %v", err)
 	}

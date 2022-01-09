@@ -185,7 +185,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
-		return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
 	// if the request method is eth_subscribe we need to create a
@@ -194,13 +194,13 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		filterID, err := d.handleSubscribe(req, conn)
 		if err != nil {
 			//nolint
-			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
 		resp, err := formatFilterResponse(req.ID, filterID)
 
 		if err != nil {
-			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
 		return []byte(resp), nil
@@ -219,7 +219,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 
 		resp, err := formatFilterResponse(req.ID, res)
 		if err != nil {
-			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
 		return []byte(resp), nil
@@ -230,34 +230,34 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		return nil, err
 	}
 
-	return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
+	return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
 	if len(x) == 0 {
-		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
 	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
-			return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+			return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 
 		if req.Method == "" {
-			return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 
 		resp, err := d.handleReq(req)
 
-		return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
+		return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
 	}
 
 	// handle batch requests
 	var requests []Request
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
-		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
 	responses := make([]Response, 0)
@@ -265,19 +265,19 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			errorResponse := NewRpcResponse(req.ID, "2.0", nil, err)
+			errorResponse := NewRPCResponse(req.ID, "2.0", nil, err)
 			responses = append(responses, errorResponse)
 
 			continue
 		}
 
-		resp := NewRpcResponse(req.ID, "2.0", response, nil)
+		resp := NewRPCResponse(req.ID, "2.0", response, nil)
 		responses = append(responses, resp)
 	}
 
 	respBytes, err := json.Marshal(responses)
 	if err != nil {
-		return NewRpcResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
 	}
 
 	return respBytes, nil

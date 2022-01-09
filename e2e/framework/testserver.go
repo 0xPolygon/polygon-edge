@@ -65,7 +65,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		ReservedPorts: ports,
 		GRPCPort:      ports[0].Port(),
 		LibP2PPort:    ports[1].Port(),
-		JsonRPCPort:   ports[2].Port(),
+		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
 	}
 
@@ -83,12 +83,12 @@ func (t *TestServer) GrpcAddr() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.GRPCPort)
 }
 
-func (t *TestServer) JsonRPCAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JsonRPCPort)
+func (t *TestServer) JSONRPCAddr() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JSONRPCPort)
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	clt, err := jsonrpc.NewClient(t.JsonRPCAddr())
+	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -204,13 +204,13 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	// Get the node ID from the private key
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
 		return nil, err
 	}
 
 	res.Address = crypto.PubKeyToAddress(&validatorKey.PublicKey).String()
-	res.NodeID = nodeId.String()
+	res.NodeID = nodeID.String()
 
 	return res, nil
 }
@@ -285,7 +285,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		// enable libp2p
 		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JSONRPCPort),
 	}
 
 	switch t.Config.Consensus {

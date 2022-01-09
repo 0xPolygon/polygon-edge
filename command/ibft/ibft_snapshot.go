@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 )
 
@@ -72,7 +71,7 @@ func (p *IbftSnapshot) Run(args []string) int {
 		return 1
 	}
 
-	req := &proto.SnapshotReq{}
+	req := &ibftOp.SnapshotReq{}
 	if number >= 0 {
 		req.Number = uint64(number)
 	} else {

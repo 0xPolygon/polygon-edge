@@ -30,8 +30,8 @@ func (g *GRPCFlag) DefineFlags(flagMap map[string]FlagDescriptor) {
 }
 
 // FlagSet adds some default commands to handle grpc connections with the server
-func (m *GRPCFlag) FlagSet(f *flag.FlagSet) {
-	f.StringVar(&m.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
+func (g *GRPCFlag) FlagSet(f *flag.FlagSet) {
+	f.StringVar(&g.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
 }
 
 // Conn returns a grpc connection

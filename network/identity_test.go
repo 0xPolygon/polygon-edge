@@ -13,7 +13,7 @@ func TestIdentityHandshake(t *testing.T) {
 
 	testTable := []struct {
 		name    string
-		chainId int
+		chainID int
 	}{
 		{
 			"Successful handshake (same chain ID)",
@@ -38,7 +38,7 @@ func TestIdentityHandshake(t *testing.T) {
 				1: {
 					ConfigCallback: func(c *Config) {
 						c.Chain.Params = &chain.Params{
-							ChainID: testCase.chainId,
+							ChainID: testCase.chainID,
 						}
 					},
 				},

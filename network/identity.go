@@ -18,9 +18,9 @@ import (
 var identityProtoV1 = "/id/0.1"
 
 var (
-	ErrInvalidChainID   = errors.New("Invalid chain ID")
-	ErrNotReady         = errors.New("Not ready")
-	ErrNoAvailableSlots = errors.New("No available Slots")
+	ErrInvalidChainID   = errors.New("invalid chain ID")
+	ErrNotReady         = errors.New("not ready")
+	ErrNoAvailableSlots = errors.New("no available Slots")
 )
 
 type identity struct {

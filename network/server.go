@@ -45,7 +45,7 @@ type Config struct {
 	NoDiscover     bool
 	Addr           *net.TCPAddr
 	NatAddr        net.IP
-	Dns            multiaddr.Multiaddr
+	DNS            multiaddr.Multiaddr
 	DataDir        string
 	MaxPeers       uint64
 	Chain          *chain.Chain
@@ -151,8 +151,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			if addr != nil {
 				addrs = []multiaddr.Multiaddr{addr}
 			}
-		} else if config.Dns != nil {
-			addrs = []multiaddr.Multiaddr{config.Dns}
+		} else if config.DNS != nil {
+			addrs = []multiaddr.Multiaddr{config.DNS}
 		}
 
 		return addrs
@@ -215,7 +215,7 @@ func (s *Server) Start() error {
 
 	if !s.config.NoDiscover {
 		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return errors.New("Minimum two bootnodes are required")
+			return errors.New("minimum two bootnodes are required")
 		}
 
 		// start discovery

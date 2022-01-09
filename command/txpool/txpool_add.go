@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	any "google.golang.org/protobuf/types/known/anypb"
@@ -124,27 +123,27 @@ func (p *TxPoolAdd) Run(args []string) int {
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode from address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode from address: %v", err))
 		return 1
 	}
 
 	to := types.Address{}
 
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to address: %v", err))
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to value: %v", err))
 		return 1
 	}
 
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
 
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to gasPrice: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to gasPrice: %v", err))
 		return 1
 	}
 
@@ -165,7 +164,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}
 
-	msg := &proto.AddTxnReq{
+	msg := &txpoolOp.AddTxnReq{
 		Raw: &any.Any{
 			Value: txn.MarshalRLP(),
 		},
@@ -175,7 +174,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	resp, err := clt.AddTxn(context.Background(), msg)
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to add transaction: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to add transaction: %v", err))
 		return 1
 	}
 

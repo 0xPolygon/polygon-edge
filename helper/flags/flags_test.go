@@ -95,7 +95,7 @@ func TestMultiAddrFromDns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			multiAddr, err := MultiAddrFromDns(tt.dnsAddress, tt.port)
+			multiAddr, err := MultiAddrFromDNS(tt.dnsAddress, tt.port)
 			if !tt.err {
 				assert.NotNil(t, multiAddr, "Multi Address should not be nil")
 				assert.Equal(t, multiAddr.String(), tt.outcome)

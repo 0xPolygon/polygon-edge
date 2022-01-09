@@ -16,8 +16,8 @@ type Eth struct {
 	d *Dispatcher
 }
 
-// ChainId returns the chain id of the client
-func (e *Eth) ChainId() (interface{}, error) {
+// ChainID returns the chain id of the client
+func (e *Eth) ChainID() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
 }
 

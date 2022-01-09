@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
@@ -90,23 +89,23 @@ func (p *IbftPropose) Run(args []string) int {
 	}
 
 	if vote == "" {
-		p.Formatter.OutputError(errors.New("Vote value not specified"))
+		p.Formatter.OutputError(errors.New("vote value not specified"))
 		return 1
 	}
 
 	if vote != positive && vote != negative {
-		p.Formatter.OutputError(fmt.Errorf("Invalid vote value (should be '%s' or '%s')", positive, negative))
+		p.Formatter.OutputError(fmt.Errorf("invalid vote value (should be '%s' or '%s')", positive, negative))
 		return 1
 	}
 
 	if ethAddress == "" {
-		p.Formatter.OutputError(errors.New("Account address not specified"))
+		p.Formatter.OutputError(errors.New("account address not specified"))
 		return 1
 	}
 
 	var addr types.Address
 	if err := addr.UnmarshalText([]byte(ethAddress)); err != nil {
-		p.Formatter.OutputError(errors.New("Failed to decode address"))
+		p.Formatter.OutputError(errors.New("failed to decode address"))
 		return 1
 	}
 
@@ -117,7 +116,7 @@ func (p *IbftPropose) Run(args []string) int {
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
-	req := &proto.Candidate{
+	req := &ibftOp.Candidate{
 		Address: addr.String(),
 		Auth:    vote == positive,
 	}
