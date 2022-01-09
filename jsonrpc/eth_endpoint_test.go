@@ -598,7 +598,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			index:        hash1,
 			blockNumber:  "latest",
 			succeeded:    true,
-			expectedData: argBytesPtr([]byte(hash1[:])),
+			expectedData: argBytesPtr(hash1[:]),
 		},
 		{
 			name: "should return 32 bytes filled with zero for undefined slot",

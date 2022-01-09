@@ -958,7 +958,7 @@ func TestGaugeCheck(t *testing.T) {
 			// fill pool with remote txs of slot size 1
 			for i := uint64(0); i < tt.initialSlots; i++ {
 				arg := addTx{
-					nonce:    uint64(i),
+					nonce:    i,
 					slot:     1,
 					origin:   OriginGossip,
 					gasPrice: big.NewInt(1),

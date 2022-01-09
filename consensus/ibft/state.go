@@ -84,14 +84,14 @@ func newState() *currentState {
 
 // getState returns the current state
 func (c *currentState) getState() IbftState {
-	stateAddr := (*uint64)(&c.state)
+	stateAddr := &c.state
 
 	return IbftState(atomic.LoadUint64(stateAddr))
 }
 
 // setState sets the current state
 func (c *currentState) setState(s IbftState) {
-	stateAddr := (*uint64)(&c.state)
+	stateAddr := &c.state
 
 	atomic.StoreUint64(stateAddr, uint64(s))
 }

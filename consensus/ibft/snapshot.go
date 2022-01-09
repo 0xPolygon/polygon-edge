@@ -323,7 +323,7 @@ func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
 		Validators: []*proto.Snapshot_Validator{},
 		Votes:      []*proto.Snapshot_Vote{},
-		Number:     uint64(s.Number),
+		Number:     s.Number,
 		Hash:       s.Hash,
 	}
 

@@ -11,7 +11,7 @@ func (b *bitmap) isSet(i uint) bool {
 }
 
 func (b *bitmap) set(i uint) {
-	b.buf[i/bitmapSize] |= 1 << (uint(i) % bitmapSize)
+	b.buf[i/bitmapSize] |= 1 << (i % bitmapSize)
 }
 
 func (b *bitmap) reset() {
