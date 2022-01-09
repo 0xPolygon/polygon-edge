@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"bytes"
 	"fmt"
+	"github.com/umbracle/fastrlp"
 	"math/big"
 	"strconv"
 	"testing"
@@ -476,6 +477,19 @@ func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
 	return 1
 }
 
+func (m *mockSpecialStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	if m.account.address.String() != addr.String() {
+		return nil, ErrStateNotFound
+	}
+
+	acct := m.account
+	val, ok := acct.storage[slot]
+	if !ok {
+		return nil, ErrStateNotFound
+	}
+	return val, nil
+}
+
 func (m *mockSpecialStore) GetCode(hash types.Hash) ([]byte, error) {
 	if bytes.Equal(m.account.account.CodeHash, hash.Bytes()) {
 		return m.account.code, nil
@@ -826,114 +840,173 @@ func TestEth_State_GetCode(t *testing.T) {
 }
 
 func TestEth_State_GetStorageAt(t *testing.T) {
-	/*
-		latestBlock := LatestBlockNumber
-		blockAt64 := BlockNumber(0x64)
-		filter := BlockNumberOrHash{
-			BlockNumber: &latestBlock,
-		}
+	store := &mockSpecialStore{
+		account: &mockAccount2{
+			address: addr0,
+			account: &state.Account{
+				Balance: big.NewInt(100),
+				Nonce:   100,
+			},
+			storage: make(map[types.Hash][]byte),
+		},
+		block: &types.Block{
+			Header: &types.Header{
+				Hash:      types.ZeroHash,
+				Number:    0,
+				StateRoot: types.EmptyRootHash,
+			},
+		},
+	}
 
-		tests := []struct {
-			name           string
-			initialStorage map[types.Address]map[types.Hash]types.Hash
-			address        types.Address
-			index          types.Hash
-			blockNumber    BlockNumberOrHash
-			succeeded      bool
-			expectedData   *argBytes
-		}{
-			{
-				name: "should return data for existing slot",
-				initialStorage: map[types.Address]map[types.Hash]types.Hash{
-					addr0: {
-						hash1: hash1,
-					},
-				},
-				address:      addr0,
-				index:        hash1,
-				blockNumber:  filter,
-				succeeded:    true,
-				expectedData: argBytesPtr([]byte(hash1[:])),
-			},
-			{
-				name: "should return 32 bytes filled with zero for undefined slot",
-				initialStorage: map[types.Address]map[types.Hash]types.Hash{
-					addr0: {
-						hash1: hash1,
-					},
-				},
-				address:      addr0,
-				index:        hash2,
-				blockNumber:  filter,
-				succeeded:    true,
-				expectedData: argBytesPtr(types.ZeroHash[:]),
-			},
-			{
-				name: "should return 32 bytes filled with zero for non-existing account",
-				initialStorage: map[types.Address]map[types.Hash]types.Hash{
-					addr0: {
-						hash1: hash1,
-					},
-				},
-				address:      addr0,
-				index:        hash2,
-				blockNumber:  filter,
-				succeeded:    true,
-				expectedData: argBytesPtr(types.ZeroHash[:]),
-			},
-			{
-				name: "should return error for non-existing header",
-				initialStorage: map[types.Address]map[types.Hash]types.Hash{
-					addr0: {
-						hash1: hash1,
-					},
-				},
-				address:      addr0,
-				index:        hash2,
-				blockNumber:  BlockNumberOrHash{BlockNumber: &blockAt64},
-				succeeded:    false,
-				expectedData: nil,
-			},
-			{
-				name: "should not return error for empty block parameter",
-				initialStorage: map[types.Address]map[types.Hash]types.Hash{
-					addr0: {
-						hash1: hash1,
-					},
-				},
-				address:      addr0,
-				index:        hash2,
-				blockNumber:  BlockNumberOrHash{},
-				succeeded:    true,
-				expectedData: argBytesPtr(types.ZeroHash[:]),
-			},
-		}
+	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
+	blockNumberLatest := LatestBlockNumber
+	blockNumberZero := BlockNumber(0x0)
+	blockNumberInvalid := BlockNumber(0x1)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				store := &mockAccountStore{}
-				for addr, storage := range tt.initialStorage {
-					account := store.AddAccount(addr)
-					for index, data := range storage {
-						a := &fastrlp.Arena{}
-						value := a.NewBytes(data.Bytes())
-						newData := value.MarshalTo(nil)
-						account.Storage(index, newData)
-					}
+	tests := []struct {
+		name           string
+		initialStorage map[types.Address]map[types.Hash]types.Hash
+		address        types.Address
+		index          types.Hash
+		blockNumber    *BlockNumber
+		blockHash      *types.Hash
+		succeeded      bool
+		expectedData   *argBytes
+	}{
+		{
+			name: "should return data for existing slot",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash1,
+			blockNumber:  nil,
+			blockHash:    nil,
+			succeeded:    true,
+			expectedData: argBytesPtr(hash1[:]),
+		},
+		{
+			name: "should return 32 bytes filled with zero for undefined slot",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  &blockNumberLatest,
+			blockHash:    nil,
+			succeeded:    true,
+			expectedData: argBytesPtr(types.ZeroHash[:]),
+		},
+		{
+			name: "should return 32 bytes filled with zero for non-existing account",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  &blockNumberLatest,
+			succeeded:    true,
+			expectedData: argBytesPtr(types.ZeroHash[:]),
+		},
+		{
+			name: "should return error for invalid block number",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  &blockNumberInvalid,
+			blockHash:    nil,
+			succeeded:    false,
+			expectedData: nil,
+		},
+		{
+			name: "should not return an error for block zero",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash1,
+			blockNumber:  &blockNumberZero,
+			blockHash:    nil,
+			succeeded:    true,
+			expectedData: argBytesPtr(hash1[:]),
+		},
+		{
+			name: "should not return an error for valid block hash",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash1,
+			blockNumber:  nil,
+			blockHash:    &types.ZeroHash,
+			succeeded:    true,
+			expectedData: argBytesPtr(hash1[:]),
+		},
+		{
+			name: "should return error for invalid block hash",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash2,
+			blockNumber:  nil,
+			blockHash:    &hash1,
+			succeeded:    false,
+			expectedData: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for addr, storage := range tt.initialStorage {
+				store.account = &mockAccount2{
+					address: addr,
+					account: &state.Account{
+						Balance: big.NewInt(100),
+						Nonce:   100,
+					},
+					storage: make(map[types.Hash][]byte),
 				}
-				dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-				// blockNumber, _ := createBlockNumberPointer(tt.blockNumber)
-				res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, tt.blockNumber)
-				if tt.succeeded {
-					assert.NoError(t, err)
-					assert.NotNil(t, res)
-					assert.Equal(t, tt.expectedData, res)
-				} else {
-					assert.Error(t, err)
+				account := store.account
+				for index, data := range storage {
+					a := &fastrlp.Arena{}
+					value := a.NewBytes(data.Bytes())
+					newData := value.MarshalTo(nil)
+					account.Storage(index, newData)
 				}
-			})
-		}
-	*/
+			}
+
+			filter := BlockNumberOrHash{
+				BlockNumber: tt.blockNumber,
+				BlockHash:   tt.blockHash,
+			}
+
+			res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, filter)
+			if tt.succeeded {
+				assert.NoError(t, err)
+				assert.NotNil(t, res)
+				assert.Equal(t, tt.expectedData, res)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }
 
 type mockStoreTxn struct {
