@@ -10,6 +10,8 @@ import (
 )
 
 func newStorage(t *testing.T) (storage.Storage, func()) {
+	t.Helper()
+
 	path, err := ioutil.TempDir("/tmp", "minimal_storage")
 	if err != nil {
 		t.Fatal(err)

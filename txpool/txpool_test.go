@@ -368,6 +368,8 @@ func TestTxnQueue_Heap(t *testing.T) {
 	}
 
 	test := func(t *testing.T, testTable []TestCase) {
+		t.Helper()
+
 		pool, err := NewTxPool(
 			hclog.NewNullLogger(),
 			false,

@@ -37,6 +37,8 @@ func foundInValidatorSet(validatorSet []types.Address, searchValidator types.Add
 
 // getBigDefaultStakedBalance returns the default staked balance as a *big.Int
 func getBigDefaultStakedBalance(t *testing.T) *big.Int {
+	t.Helper()
+
 	val := stakingHelper.DefaultStakedBalance
 	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
 
@@ -50,12 +52,14 @@ func getBigDefaultStakedBalance(t *testing.T) *big.Int {
 // validateValidatorSet makes sure that the address is present / not present in the
 // validator set, as well as if the validator set is of a certain size
 func validateValidatorSet(
+	t *testing.T,
 	address types.Address,
 	client *jsonrpc.Client,
-	t *testing.T,
 	expectedExistence bool,
 	expectedSize int,
 ) {
+	t.Helper()
+
 	validatorSet, validatorSetErr := framework.GetValidatorSet(address, client)
 	if validatorSetErr != nil {
 		t.Fatalf("Unable to fetch validator set, %v", validatorSetErr)
@@ -116,12 +120,12 @@ func TestPoS_Stake(t *testing.T) {
 	}
 
 	// Check validator set
-	validateValidatorSet(stakerAddr, client, t, true, numGenesisValidators+1)
+	validateValidatorSet(t, stakerAddr, client, true, numGenesisValidators+1)
 
 	// Check the SC balance
 	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 
-	scBalance := framework.GetAccountBalance(staking.AddrStakingContract, client, t)
+	scBalance := framework.GetAccountBalance(t, staking.AddrStakingContract, client)
 	expectedBalance := big.NewInt(0).Mul(
 		bigDefaultStakedBalance,
 		big.NewInt(int64(numGenesisValidators)),
@@ -171,7 +175,7 @@ func TestPoS_Unstake(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Check the validator is in validator set
-	validateValidatorSet(unstakerAddr, client, t, true, numGenesisValidators)
+	validateValidatorSet(t, unstakerAddr, client, true, numGenesisValidators)
 
 	// Send transaction to unstake
 	receipt, unstakeError := framework.UnstakeAmount(
@@ -184,12 +188,12 @@ func TestPoS_Unstake(t *testing.T) {
 	}
 
 	// Check validator set
-	validateValidatorSet(unstakerAddr, client, t, false, numGenesisValidators-1)
+	validateValidatorSet(t, unstakerAddr, client, false, numGenesisValidators-1)
 
 	// Check the SC balance
 	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 
-	scBalance := framework.GetAccountBalance(staking.AddrStakingContract, client, t)
+	scBalance := framework.GetAccountBalance(t, staking.AddrStakingContract, client)
 	expectedBalance := big.NewInt(0).Mul(
 		bigDefaultStakedBalance,
 		big.NewInt(int64(numGenesisValidators)),
@@ -211,7 +215,7 @@ func TestPoS_Unstake(t *testing.T) {
 		big.NewInt(framework.DefaultGasPrice),
 	)
 
-	accountBalance := framework.GetAccountBalance(unstakerAddr, client, t)
+	accountBalance := framework.GetAccountBalance(t, unstakerAddr, client)
 	expectedAccountBalance := big.NewInt(0).Add(defaultBalance, bigDefaultStakedBalance)
 	expectedAccountBalance.Sub(expectedAccountBalance, fee)
 
@@ -247,7 +251,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	srv := srvs[0]
 	client := srv.JSONRPC()
 
-	previousAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	previousAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
 
 	// Check if the stake is present on the SC
 	actualStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
@@ -320,7 +324,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
-	actualAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
 	actualStakingSCBalance, fetchError = framework.GetStakedAmount(senderAddr, client)
 
 	if fetchError != nil {
@@ -472,7 +476,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
-	actualAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
 	actualStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
 
 	if fetchError != nil {
@@ -600,7 +604,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	paidFee := big.NewInt(0).Mul(bigGasPrice, big.NewInt(int64(block.GasUsed)))
 
 	// Check the balances
-	actualAccountBalance := framework.GetAccountBalance(senderAddr, client, t)
+	actualAccountBalance := framework.GetAccountBalance(t, senderAddr, client)
 	actualStakingSCBalance, fetchError := framework.GetStakedAmount(senderAddr, client)
 
 	if fetchError != nil {
@@ -624,7 +628,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		"Account balance mismatch after stake / unstake events",
 	)
 
-	validateValidatorSet(senderAddr, client, t, false, numDummyStakers)
+	validateValidatorSet(t, senderAddr, client, false, numDummyStakers)
 }
 
 func getSnapshot(
@@ -721,13 +725,7 @@ func TestSnapshotUpdating(t *testing.T) {
 	}
 
 	// Check validator set on the Staking Smart Contract
-	validateValidatorSet(
-		firstNonValidatorAddr,
-		firstValidator.JSONRPC(),
-		t,
-		true,
-		numGenesisValidators+1,
-	)
+	validateValidatorSet(t, firstNonValidatorAddr, firstValidator.JSONRPC(), true, numGenesisValidators+1)
 
 	// Find the nearest next epoch block
 	nextEpoch := getNextEpochBlock(receipt.BlockNumber, epochSize) + epochSize

@@ -18,7 +18,9 @@ type TestCase struct {
 }
 
 // decodeHex is a helper function for decoding a hex string
-func decodeHex(input string, t *testing.T) []byte {
+func decodeHex(t *testing.T, input string) []byte {
+	t.Helper()
+
 	inputDecode, decodeErr := hex.DecodeHex(input)
 	if decodeErr != nil {
 		t.Fatalf("unable to decode hex, %v", decodeErr)
@@ -28,6 +30,8 @@ func decodeHex(input string, t *testing.T) []byte {
 }
 
 func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) {
+	t.Helper()
+
 	data, err := ioutil.ReadFile(filepath.Join("./fixtures", path))
 	if err != nil {
 		t.Fatal(err)
@@ -47,8 +51,8 @@ func ReadTestCase(t *testing.T, path string, f func(t *testing.T, c *TestCase)) 
 	}
 
 	for _, i := range cases {
-		inputDecode := decodeHex(fmt.Sprintf("0x%s", i.Input), t)
-		expectedDecode := decodeHex(fmt.Sprintf("0x%s", i.Expected), t)
+		inputDecode := decodeHex(t, fmt.Sprintf("0x%s", i.Input))
+		expectedDecode := decodeHex(t, fmt.Sprintf("0x%s", i.Expected))
 
 		c := &TestCase{
 			Name:     i.Name,

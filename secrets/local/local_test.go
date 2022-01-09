@@ -70,6 +70,8 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 // getLocalSecretsManager is a helper method for creating an instance of the
 // local secrets manager
 func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
+	t.Helper()
+
 	// Set up the expected folder structure
 	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
 	if tempErr != nil {

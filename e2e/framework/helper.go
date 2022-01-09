@@ -40,11 +40,9 @@ func EthToWeiPrecise(ethValue int64, decimals int64) *big.Int {
 }
 
 // GetAccountBalance is a helper method for fetching the Balance field of an account
-func GetAccountBalance(
-	address types.Address,
-	rpcClient *jsonrpc.Client,
-	t *testing.T,
-) *big.Int {
+func GetAccountBalance(t *testing.T, address types.Address, rpcClient *jsonrpc.Client) *big.Int {
+	t.Helper()
+
 	accountBalance, err := rpcClient.Eth().GetBalance(
 		web3.Address(address),
 		web3.Latest,

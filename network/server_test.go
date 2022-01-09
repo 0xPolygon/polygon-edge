@@ -588,6 +588,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 func TestRunDial(t *testing.T) {
 	// setupServers returns server and list of peer's server
 	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+		t.Helper()
+
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
 			server, createErr := CreateServer(

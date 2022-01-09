@@ -130,6 +130,8 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 
 // NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
+	t.Helper()
+
 	seed := rand.Intn(maxSeed)
 
 	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))

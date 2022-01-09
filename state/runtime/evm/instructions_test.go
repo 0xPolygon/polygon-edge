@@ -22,6 +22,8 @@ type cases2To1 []struct {
 }
 
 func test2to1(t *testing.T, f instruction, tests cases2To1) {
+	t.Helper()
+
 	s, closeFn := getState()
 	defer closeFn()
 
@@ -42,6 +44,8 @@ type cases2ToBool []struct {
 }
 
 func test2toBool(t *testing.T, f instruction, tests cases2ToBool) {
+	t.Helper()
+
 	s, closeFn := getState()
 	defer closeFn()
 

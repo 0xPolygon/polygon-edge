@@ -36,6 +36,8 @@ func constructWSRequest(id int, method string, params []string) ([]byte, error) 
 }
 
 func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.SuccessResponse {
+	t.Helper()
+
 	if wsError := ws.WriteMessage(websocket.TextMessage, request); wsError != nil {
 		t.Fatalf("Unable to write message to WS connection: %v", wsError)
 	}

@@ -330,6 +330,8 @@ func addStressTestTxns(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) {
+	t.Helper()
+
 	currentNonce := 1 // 1 because the first transaction was deployment
 	clt := srv.TxnPoolOperator()
 
@@ -428,6 +430,8 @@ func generateStressTestTx(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) *types.Transaction {
+	t.Helper()
+
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
 	signer := crypto.NewEIP155Signer(100)
 
@@ -473,6 +477,8 @@ func addStressTxnsWithHashes(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) []web3.Hash {
+	t.Helper()
+
 	currentNonce := 1 // 1 because the first transaction was deployment
 
 	txHashes := make([]web3.Hash, 0)

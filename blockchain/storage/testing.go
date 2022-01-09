@@ -52,6 +52,8 @@ func TestStorage(t *testing.T, m MockStorage) {
 }
 
 func testCanonicalChain(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -103,6 +105,8 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 }
 
 func testDifficulty(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -148,6 +152,8 @@ func testDifficulty(t *testing.T, m MockStorage) {
 }
 
 func testHead(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -191,6 +197,8 @@ func testHead(t *testing.T, m MockStorage) {
 }
 
 func testForks(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -216,6 +224,8 @@ func testForks(t *testing.T, m MockStorage) {
 }
 
 func testHeader(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -242,6 +252,8 @@ func testHeader(t *testing.T, m MockStorage) {
 }
 
 func testBody(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -307,6 +319,8 @@ func testBody(t *testing.T, m MockStorage) {
 }
 
 func testReceipts(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 
@@ -381,6 +395,8 @@ func testReceipts(t *testing.T, m MockStorage) {
 }
 
 func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
+	t.Helper()
+
 	s, closeFn := m(t)
 	defer closeFn()
 

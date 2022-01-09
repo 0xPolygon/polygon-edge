@@ -522,7 +522,9 @@ func createBlockStores(count int) (bStore []*mockBlockStore) {
 }
 
 // createNetworkServers is a helper function for generating network servers
-func createNetworkServers(count int, t *testing.T, conf func(c *network.Config)) []*network.Server {
+func createNetworkServers(t *testing.T, count int, conf func(c *network.Config)) []*network.Server {
+	t.Helper()
+
 	networkServers := make([]*network.Server, count)
 
 	for indx := 0; indx < count; indx++ {
@@ -588,7 +590,7 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	blocks := createGenesisBlock()
 
 	// Create three servers
-	servers := createNetworkServers(3, t, conf)
+	servers := createNetworkServers(t, 3, conf)
 
 	// Create the block stores
 	blockStores := createBlockStores(3)

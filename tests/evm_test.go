@@ -46,11 +46,13 @@ type VMCase struct {
 }
 
 func testVMCase(t *testing.T, name string, c *VMCase) {
+	t.Helper()
+
 	env := c.Env.ToEnv(t)
 	env.GasPrice = types.BytesToHash(c.Exec.GasPrice.Bytes())
 	env.Origin = c.Exec.Origin
 
-	s, _, root := buildState(t, c.Pre)
+	s, _, root := buildState(c.Pre)
 
 	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 

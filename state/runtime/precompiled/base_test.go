@@ -15,6 +15,8 @@ type precompiledTest struct {
 }
 
 func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
+	t.Helper()
+
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h, _ := hex.DecodeString(c.Input)

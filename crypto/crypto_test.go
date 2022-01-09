@@ -158,7 +158,9 @@ func TestValidateSignatureValues(t *testing.T) {
 	}
 }
 
-func getAddressFromKey(key crypto.PrivateKey, t *testing.T) types.Address {
+func getAddressFromKey(t *testing.T, key crypto.PrivateKey) types.Address {
+	t.Helper()
+
 	privateKeyConv, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
 		t.Fatalf("Unable to assert key type")
@@ -214,7 +216,7 @@ func TestPrivateKeyRead(t *testing.T) {
 			}
 
 			if !testCase.shouldFail {
-				address := getAddressFromKey(privateKey, t)
+				address := getAddressFromKey(t, privateKey)
 				assert.Equal(t, testCase.checksummedAddress, address.String())
 			} else {
 				assert.Nil(t, privateKey)
@@ -236,7 +238,7 @@ func TestPrivateKeyGeneration(t *testing.T) {
 		t.Fatalf("Unable to generate private key, %v", err)
 	}
 
-	writtenAddress := getAddressFromKey(writtenKey, t)
+	writtenAddress := getAddressFromKey(t, writtenKey)
 
 	// Read existing key and check if it matches
 	readKey, err := GenerateOrReadPrivateKey(tempFile)
@@ -244,7 +246,7 @@ func TestPrivateKeyGeneration(t *testing.T) {
 		t.Fatalf("Unable to read private key, %v", err)
 	}
 
-	readAddress := getAddressFromKey(readKey, t)
+	readAddress := getAddressFromKey(t, readKey)
 
 	assert.True(t, writtenKey.Equal(readKey))
 	assert.Equal(t, writtenAddress.String(), readAddress.String())

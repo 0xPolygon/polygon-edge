@@ -296,6 +296,8 @@ func MeshJoin(servers ...*Server) []error {
 }
 
 func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
+	t.Helper()
+
 	libp2pKey, _, keyErr := GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
 		t.Fatalf("unable to generate libp2p key, %v", keyErr)
@@ -355,6 +357,8 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 }
 
 func closeTestServers(t *testing.T, servers []*Server) {
+	t.Helper()
+
 	for _, server := range servers {
 		assert.NoError(t, server.Close())
 	}

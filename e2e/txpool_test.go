@@ -29,6 +29,8 @@ var (
 )
 
 func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
+	t.Helper()
+
 	systemClient := srv.Operator()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
@@ -265,7 +267,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 
 	// Get to account balance
 	// Only the first tx should've gone through
-	toAccountBalance := framework.GetAccountBalance(toAddress, client, t)
+	toAccountBalance := framework.GetAccountBalance(t, toAddress, client)
 	assert.Equalf(t,
 		oneEth.String(),
 		toAccountBalance.String(),
@@ -284,7 +286,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	_ = waitForBlock(t, srv, 1, 0)
 
 	// Now both the added tx and the shelved tx should've gone through
-	toAccountBalance = framework.GetAccountBalance(toAddress, client, t)
+	toAccountBalance = framework.GetAccountBalance(t, toAddress, client)
 	assert.Equalf(t,
 		framework.EthToWei(3).String(),
 		toAccountBalance.String(),
@@ -297,7 +299,9 @@ type testAccount struct {
 	address types.Address
 }
 
-func generateTestAccounts(numAccounts int, t *testing.T) []*testAccount {
+func generateTestAccounts(t *testing.T, numAccounts int) []*testAccount {
+	t.Helper()
+
 	testAccounts := make([]*testAccount, numAccounts)
 
 	for indx := 0; indx < numAccounts; indx++ {
@@ -319,7 +323,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	numIterations := 200
 	numAccounts := 5
 
-	testAccounts := generateTestAccounts(numAccounts, t)
+	testAccounts := generateTestAccounts(t, numAccounts)
 
 	// Set up the test server
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {

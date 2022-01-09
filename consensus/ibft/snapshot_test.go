@@ -24,6 +24,8 @@ func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 }
 
 func getTempDir(t *testing.T) string {
+	t.Helper()
+
 	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
 	assert.NoError(t, err)
 	t.Cleanup(func() {
@@ -215,6 +217,8 @@ func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots [
 }
 
 func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
+	t.Helper()
+
 	if snapshots == nil {
 		return
 	}

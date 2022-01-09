@@ -33,7 +33,9 @@ type stateCase struct {
 
 var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
-func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
+func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
+	t.Helper()
+
 	config, ok := Forks[fork]
 	if !ok {
 		t.Fatalf("config %s not found", fork)
@@ -46,7 +48,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 		t.Fatal(err)
 	}
 
-	s, _, pastRoot := buildState(t, c.Pre)
+	s, _, pastRoot := buildState(c.Pre)
 	forks := config.At(uint64(env.Number))
 
 	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
@@ -155,7 +157,7 @@ func TestState(t *testing.T) {
 				for name, i := range c {
 					for fork, f := range i.Post {
 						for indx, e := range f {
-							RunSpecificTest(file, t, i, name, fork, indx, e)
+							RunSpecificTest(t, file, i, name, fork, indx, e)
 						}
 					}
 				}

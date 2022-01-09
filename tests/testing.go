@@ -83,6 +83,8 @@ func stringToBigInt(str string) (*big.Int, error) {
 }
 
 func stringToAddressT(t *testing.T, str string) types.Address {
+	t.Helper()
+
 	address, err := stringToAddress(str)
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +94,8 @@ func stringToAddressT(t *testing.T, str string) types.Address {
 }
 
 func stringToHashT(t *testing.T, str string) types.Hash {
+	t.Helper()
+
 	address, err := stringToHash(str)
 	if err != nil {
 		t.Fatal(err)
@@ -110,6 +114,8 @@ func stringToUint64(str string) (uint64, error) {
 }
 
 func stringToUint64T(t *testing.T, str string) uint64 {
+	t.Helper()
+
 	n, err := stringToUint64(str)
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +125,8 @@ func stringToUint64T(t *testing.T, str string) uint64 {
 }
 
 func stringToInt64T(t *testing.T, str string) int64 {
+	t.Helper()
+
 	n, err := stringToUint64(str)
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +136,8 @@ func stringToInt64T(t *testing.T, str string) int64 {
 }
 
 func (e *env) ToHeader(t *testing.T) *types.Header {
+	t.Helper()
+
 	return &types.Header{
 		Miner:      stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToUint64T(t, e.Difficulty),
@@ -138,6 +148,8 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 }
 
 func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+	t.Helper()
+
 	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToHashT(t, e.Difficulty),
@@ -210,7 +222,6 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 }
 
 func buildState(
-	t *testing.T,
 	allocs map[types.Address]*chain.GenesisAccount,
 ) (state.State, state.Snapshot, types.Hash) {
 	s := itrie.NewState(itrie.NewMemoryStorage())

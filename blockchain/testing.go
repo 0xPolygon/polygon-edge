@@ -151,6 +151,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
+	t.Helper()
+
 	genesis := &chain.Genesis{
 		Number:   0,
 		GasLimit: 0,

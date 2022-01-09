@@ -814,6 +814,8 @@ func (m *mockIbft) CalculateGasLimit(number uint64) (uint64, error) {
 }
 
 func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
+	t.Helper()
+
 	pool := newTesterAccountPool()
 	pool.add(accounts...)
 
