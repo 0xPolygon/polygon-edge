@@ -129,7 +129,7 @@ func (t dialQueueImpl) Swap(i, j int) {
 // Push adds a new item to the queue
 func (t *dialQueueImpl) Push(x interface{}) {
 	n := len(*t)
-	item := x.(*dialTask)
+	item := x.(*dialTask) //nolint:forcetypeassert
 	item.index = n
 	*t = append(*t, item)
 }

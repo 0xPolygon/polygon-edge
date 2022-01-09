@@ -46,7 +46,10 @@ func SecretsManagerFactory(
 		return nil, errors.New("no path specified for local secrets manager")
 	}
 
-	localManager.path = path.(string)
+	localManager.path, ok = path.(string)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	// Run the initial setup
 	_ = localManager.Setup()

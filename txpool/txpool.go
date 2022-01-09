@@ -324,7 +324,7 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn)
+	raw := obj.(*proto.Txn) //nolint:forcetypeassert
 	txn := new(types.Transaction)
 
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
@@ -1180,7 +1180,7 @@ func (t *txPriceHeap) Pop() *pricedTx {
 		return nil
 	}
 
-	tx := heap.Pop(t.heap).(*pricedTx)
+	tx := heap.Pop(t.heap).(*pricedTx) //nolint:forcetypeassert
 	delete(t.index, tx.tx.Hash)
 
 	return tx
@@ -1222,7 +1222,7 @@ func (t txPriceHeapImplBase) Swap(i, j int) {
 
 func (t *txPriceHeapImplBase) Push(x interface{}) {
 	n := len(t.txs)
-	job := x.(*pricedTx)
+	job := x.(*pricedTx) //nolint:forcetypeassert
 	job.index = n
 	t.txs = append(t.txs, job)
 }

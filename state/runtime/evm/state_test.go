@@ -24,7 +24,7 @@ func (c *codeHelper) pop() {
 }
 
 func getState() (*state, func()) {
-	c := statePool.Get().(*state)
+	c := statePool.Get().(*state) //nolint:forcetypeassert
 
 	return c, func() {
 		c.reset()

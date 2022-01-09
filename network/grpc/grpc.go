@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 
@@ -44,7 +45,10 @@ func interceptor(
 	peer, _ := grpcPeer.FromContext(ctx)
 
 	// we expect our libp2p wrapper
-	addr := peer.Addr.(*wrapLibp2pAddr)
+	addr, ok := peer.Addr.(*wrapLibp2pAddr)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	ctx2 := &Context{
 		Context: ctx,

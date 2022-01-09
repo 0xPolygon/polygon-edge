@@ -94,7 +94,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	}
 
 	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		data := value.(*metadata)
+		data, ok := value.(*metadata)
+		if !ok {
+			return false
+		}
+
 		turnAroundTime := data.turnAroundTime
 
 		// Update the duration metrics

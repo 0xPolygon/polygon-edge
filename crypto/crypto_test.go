@@ -159,7 +159,11 @@ func TestValidateSignatureValues(t *testing.T) {
 }
 
 func getAddressFromKey(key crypto.PrivateKey, t *testing.T) types.Address {
-	privateKeyConv := key.(*ecdsa.PrivateKey)
+	privateKeyConv, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatalf("Unable to assert key type")
+	}
+
 	assert.NotNil(t, privateKeyConv)
 
 	publicKey := privateKeyConv.PublicKey

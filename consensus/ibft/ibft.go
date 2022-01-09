@@ -319,7 +319,12 @@ func (i *Ibft) setupTransport() error {
 
 	// Subscribe to the newly created topic
 	err = topic.Subscribe(func(obj interface{}) {
-		msg := obj.(*proto.MessageReq)
+		msg, ok := obj.(*proto.MessageReq)
+		if !ok {
+			i.logger.Error("invalid type assertion for message request")
+
+			return
+		}
 
 		if !i.isSealing() {
 			// if we are not sealing we do not care about the messages

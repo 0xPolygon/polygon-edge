@@ -501,7 +501,14 @@ func (s *Syncer) BestPeer() *SyncPeer {
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		status := peer.(*SyncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = peer.(*SyncPeer), status.Difficulty
+			var correctAssertion bool
+
+			bestPeer, correctAssertion = peer.(*SyncPeer)
+			if !correctAssertion {
+				return false
+			}
+
+			bestTd = status.Difficulty
 		}
 
 		return true

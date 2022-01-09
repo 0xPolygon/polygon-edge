@@ -108,7 +108,10 @@ func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*
 		return nil, err
 	}
 
-	data := res.(result)
+	data, ok := res.(result)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	return data.receipt, data.err
 }

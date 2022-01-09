@@ -1,6 +1,7 @@
 package itrie
 
 import (
+	"errors"
 	"fmt"
 	"hash"
 	"sync"
@@ -84,7 +85,10 @@ func (t *Txn) Hash() ([]byte, error) {
 		return emptyRoot, nil
 	}
 
-	h := hasherPool.Get().(*hasher)
+	h, ok := hasherPool.Get().(*hasher)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	var root []byte
 

@@ -96,7 +96,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
-		obj := val.(*StateObject)
+		obj := val.(*StateObject) //nolint:forcetypeassert
 		if obj.Deleted {
 			return nil, false
 		}
@@ -222,7 +222,7 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	if !exists {
 		logs = []*types.Log{}
 	} else {
-		logs = val.([]*types.Log)
+		logs = val.([]*types.Log) //nolint:forcetypeassert
 	}
 
 	logs = append(logs, log)
@@ -237,7 +237,7 @@ func (txn *Txn) AddLog(log *types.Log) {
 	if !exists {
 		logs = []*types.Log{}
 	} else {
-		logs = data.([]*types.Log)
+		logs = data.([]*types.Log) //nolint:forcetypeassert
 	}
 
 	logs = append(logs, log)
@@ -617,7 +617,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 					if v == nil {
 						store.Deleted = true
 					} else {
-						store.Val = v.([]byte)
+						store.Val = v.([]byte) //nolint:forcetypeassert
 					}
 					obj.Storage = append(obj.Storage, store)
 					return false

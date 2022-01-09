@@ -21,7 +21,11 @@ func TestRLPEncoding(t *testing.T) {
 	for _, c := range cases {
 		buf := c.MarshalRLPTo(nil)
 
-		res := reflect.New(reflect.TypeOf(c).Elem()).Interface().(codec)
+		res, ok := reflect.New(reflect.TypeOf(c).Elem()).Interface().(codec)
+		if !ok {
+			t.Fatalf("Unable to assert type")
+		}
+
 		if err := res.UnmarshalRLP(buf); err != nil {
 			t.Fatal(err)
 		}

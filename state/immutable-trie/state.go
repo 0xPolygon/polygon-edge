@@ -1,6 +1,7 @@
 package itrie
 
 import (
+	"errors"
 	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -49,7 +50,11 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 
 	tt, ok := s.cache.Get(root)
 	if ok {
-		t := tt.(*Trie)
+		t, ok := tt.(*Trie)
+		if !ok {
+			return nil, errors.New("invalid type assertion")
+		}
+
 		t.state = s
 
 		return tt.(*Trie), nil
