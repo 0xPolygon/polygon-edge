@@ -225,7 +225,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	var addrInfo []*peer.AddrInfo
+	addrInfo := make([]*peer.AddrInfo, 0)
 
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)

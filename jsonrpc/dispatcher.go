@@ -260,7 +260,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
-	var responses []Response
+	responses := make([]Response, 0)
 
 	for _, req := range requests {
 		var response, err = d.handleReq(req)

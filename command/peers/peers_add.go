@@ -79,8 +79,8 @@ func (p *PeersAdd) Run(args []string) int {
 
 	var (
 		peersAdded    int
-		addedPeers    []string
-		visibleErrors []string
+		addedPeers    = make([]string, 0)
+		visibleErrors = make([]string, 0)
 	)
 
 	// Adds all the peers and breaks if it hits an error
