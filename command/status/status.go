@@ -48,12 +48,14 @@ func (c *StatusCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 	if err := flags.Parse(args); err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := c.GRPC.Conn()
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -62,6 +64,7 @@ func (c *StatusCommand) Run(args []string) int {
 
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 

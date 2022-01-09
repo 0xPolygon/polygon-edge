@@ -59,17 +59,20 @@ func (p *PeersStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if nodeID == "" {
 		p.UI.Error("peer-id argument not provided")
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -78,6 +81,7 @@ func (p *PeersStatus) Run(args []string) int {
 
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

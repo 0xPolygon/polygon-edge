@@ -43,6 +43,7 @@ func (k *Keccak) Reset() {
 func (k *Keccak) Read() []byte {
 	//nolint
 	k.hash.Read(k.tmp)
+
 	return k.tmp
 }
 

@@ -459,6 +459,7 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 // HasSuicided returns true if the account suicided
 func (txn *Txn) HasSuicided(addr types.Address) bool {
 	object, exists := txn.getStateObject(addr)
+
 	return exists && object.Suicide
 }
 
@@ -513,6 +514,7 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
+
 	return exists
 }
 
@@ -565,6 +567,7 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 		if a.Suicide || a.Empty() && deleteEmptyObjects {
 			remove = append(remove, k)
 		}
+
 		return false
 	})
 
@@ -625,12 +628,14 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 						store.Val = v.([]byte) //nolint:forcetypeassert
 					}
 					obj.Storage = append(obj.Storage, store)
+
 					return false
 				})
 			}
 		}
 
 		objs = append(objs, obj)
+
 		return false
 	})
 

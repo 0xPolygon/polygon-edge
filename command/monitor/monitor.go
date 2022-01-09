@@ -52,12 +52,14 @@ func (m *MonitorCommand) Run(args []string) int {
 	flags := m.Base.NewFlagSet(m.GetBaseCommand(), m.Formatter, m.GRPC)
 	if err := flags.Parse(args); err != nil {
 		m.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := m.GRPC.Conn()
 	if err != nil {
 		m.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -83,6 +85,7 @@ func (m *MonitorCommand) Run(args []string) int {
 
 			if err != nil {
 				m.Formatter.OutputError(fmt.Errorf("failed to read event: %w", err))
+
 				break
 			}
 

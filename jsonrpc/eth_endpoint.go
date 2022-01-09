@@ -246,6 +246,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	for i, txn := range block.Transactions {
 		if txn.Hash == hash {
 			indx = i
+
 			break
 		}
 	}
@@ -708,11 +709,13 @@ func (e *Eth) GetFilterChanges(id string) (interface{}, error) {
 // UninstallFilter uninstalls a filter with given ID
 func (e *Eth) UninstallFilter(id string) (bool, error) {
 	ok := e.d.filterManager.Uninstall(id)
+
 	return ok, nil
 }
 
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
 	ok := e.d.filterManager.Uninstall(id)
+
 	return ok, nil
 }

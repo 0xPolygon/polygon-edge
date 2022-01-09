@@ -92,6 +92,7 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 				return true, false
 			}
 		}
+
 		return nil, true
 	})
 	if err != nil {
@@ -115,6 +116,7 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 				return true, false
 			}
 		}
+
 		return nil, true
 	})
 	if err != nil {
@@ -130,6 +132,7 @@ func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int)
 		if size == srv.discovery.routingTable.Size() {
 			return true, false
 		}
+
 		return false, true
 	})
 	if err != nil {

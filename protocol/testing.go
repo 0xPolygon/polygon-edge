@@ -90,6 +90,7 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 		if num == numPeer {
 			return nil, false
 		}
+
 		return nil, true
 	})
 	assert.NoError(t, err)
@@ -130,6 +131,7 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 // NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
 	seed := rand.Intn(maxSeed)
+
 	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))
 }
 

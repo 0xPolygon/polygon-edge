@@ -329,6 +329,7 @@ func equalOrOverflowsUint256(b *big.Int) bool {
 func opShl(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -346,6 +347,7 @@ func opShl(c *state) {
 func opShr(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -363,6 +365,7 @@ func opShr(c *state) {
 func opSar(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -388,6 +391,7 @@ var bufPool = sync.Pool{
 		// Store pointer to avoid heap allocation in caller
 		// Please check SA6002 in StaticCheck for details
 		buf := make([]byte, 128)
+
 		return &buf
 	},
 }
@@ -480,11 +484,13 @@ func opSload(c *state) {
 func opSStore(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
+
 		return
 	}
 
 	if c.config.Istanbul && c.gas <= 2300 {
 		c.exit(errOutOfGas)
+
 		return
 	}
 
@@ -587,6 +593,7 @@ func opBalance(c *state) {
 func opSelfBalance(c *state) {
 	if !c.config.Istanbul {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -596,6 +603,7 @@ func opSelfBalance(c *state) {
 func opChainID(c *state) {
 	if !c.config.Istanbul {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -677,6 +685,7 @@ func opReturnDataSize(c *state) {
 func opExtCodeHash(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -795,6 +804,7 @@ func opCallDataCopy(c *state) {
 func opReturnDataCopy(c *state) {
 	if !c.config.Byzantium {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -814,6 +824,7 @@ func opReturnDataCopy(c *state) {
 	end := length.Add(dataOffset, length)
 	if !end.IsUint64() {
 		c.exit(errReturnDataOutOfBounds)
+
 		return
 	}
 
@@ -855,6 +866,7 @@ func opBlockHash(c *state) {
 
 	if !num.IsInt64() {
 		num.Set(zero)
+
 		return
 	}
 
@@ -891,6 +903,7 @@ func opGasLimit(c *state) {
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
+
 		return
 	}
 
@@ -988,11 +1001,13 @@ func opLog(size int) instruction {
 	return func(c *state) {
 		if c.inStaticCall() {
 			c.exit(errWriteProtection)
+
 			return
 		}
 
 		if !c.stackAtLeast(2 + size) {
 			c.exit(errStackUnderflow)
+
 			return
 		}
 
@@ -1031,12 +1046,14 @@ func opCreate(op OpCode) instruction {
 	return func(c *state) {
 		if c.inStaticCall() {
 			c.exit(errWriteProtection)
+
 			return
 		}
 
 		if op == CREATE2 {
 			if !c.config.Constantinople {
 				c.exit(errOpCodeNotFound)
+
 				return
 			}
 		}
@@ -1088,17 +1105,20 @@ func opCall(op OpCode) instruction {
 		if op == CALL && c.inStaticCall() {
 			if val := c.peekAt(3); val != nil && val.BitLen() > 0 {
 				c.exit(errWriteProtection)
+
 				return
 			}
 		}
 
 		if op == DELEGATECALL && !c.config.Homestead {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
 
 		if op == STATICCALL && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
 
@@ -1226,6 +1246,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	} else {
 		if !ok {
 			c.exit(errOutOfGas)
+
 			return nil, 0, 0, nil
 		}
 		gas = initialGas.Uint64()
@@ -1353,6 +1374,7 @@ func opHalt(op OpCode) instruction {
 	return func(c *state) {
 		if op == REVERT && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
 

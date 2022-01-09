@@ -129,6 +129,7 @@ func (m *memStorage) SetCode(hash types.Hash, code []byte) {
 
 func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
 	code, ok := m.code[hash.String()]
+
 	return code, ok
 }
 
@@ -239,6 +240,7 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 			vv.buf = append(vv.buf[:0], v.Get(16).Raw()...)
 			nc.value = vv
 		}
+
 		return nc, nil
 	}
 

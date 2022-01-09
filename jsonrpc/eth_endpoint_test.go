@@ -692,6 +692,7 @@ func (m *mockStoreTxn) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	m.txn = tx
+
 	return nil
 }
 

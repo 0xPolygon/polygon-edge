@@ -220,6 +220,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	result, e := t.Apply(msg)
 	if e != nil {
 		t.logger.Error("failed to apply tx", "err", e)
+
 		return e
 	}
 
@@ -481,6 +482,7 @@ func (t *Transition) Call2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+
 	return t.applyCall(c, runtime.Call, t)
 }
 
@@ -606,6 +608,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
+
 		return result
 	}
 

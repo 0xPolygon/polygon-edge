@@ -254,6 +254,7 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 		if res != nil && len(res.Peers) >= requiredNum {
 			return res, false
 		}
+
 		return nil, true
 	})
 
@@ -279,6 +280,7 @@ func WaitUntilTxPoolFilled(
 		if res != nil && res.Length >= requiredNum {
 			return res, false
 		}
+
 		return nil, true
 	})
 
@@ -298,6 +300,7 @@ func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uin
 		if err == nil && height >= desiredHeight {
 			return height, false
 		}
+
 		return nil, true
 	})
 

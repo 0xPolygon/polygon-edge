@@ -232,6 +232,7 @@ func (s *Server) Start() error {
 
 			if node.ID == s.host.ID() {
 				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
+
 				continue
 			}
 
@@ -609,6 +610,7 @@ func (s *Subscription) GetCh() chan *PeerEvent {
 
 func (s *Subscription) Get() *PeerEvent {
 	obj := <-s.ch
+
 	return obj
 }
 
@@ -647,6 +649,7 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 
 			case <-s.closeCh:
 				sub.Close()
+
 				return
 			}
 		}
@@ -677,6 +680,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	})
 	if err != nil {
 		close(ch)
+
 		return nil, err
 	}
 
@@ -734,6 +738,7 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 			if !loopbackRegex.MatchString(address.String()) {
 				// Not a loopback address, dial address found
 				dialAddress = address.String()
+
 				break
 			}
 		}

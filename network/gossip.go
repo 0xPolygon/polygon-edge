@@ -60,6 +60,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 		msg, err := sub.Next(ctx)
 		if err != nil {
 			t.logger.Error("failed to get topic", "err", err)
+
 			continue
 		}
 
@@ -67,6 +68,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 			obj := t.createObj()
 			if err := proto.Unmarshal(msg.Data, obj); err != nil {
 				t.logger.Error("failed to unmarshal topic", "err", err)
+
 				return
 			}
 

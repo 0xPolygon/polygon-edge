@@ -201,6 +201,7 @@ func (l *LogFilter) Match(log *types.Log) bool {
 		for _, topic := range sub {
 			if log.Topics[i] == topic {
 				match = true
+
 				break
 			}
 		}

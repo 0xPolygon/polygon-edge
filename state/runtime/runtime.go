@@ -175,6 +175,7 @@ func NewContractCreation(
 	code []byte,
 ) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code)
+
 	return c
 }
 

@@ -128,6 +128,7 @@ func (c *state) push(val *big.Int) {
 func (c *state) push1() *big.Int {
 	if len(c.stack) > c.sp {
 		c.sp++
+
 		return c.stack[c.sp-1]
 	}
 
@@ -189,6 +190,7 @@ func (c *state) swap(n int) {
 func (c *state) consumeGas(gas uint64) bool {
 	if c.gas < gas {
 		c.exit(errOutOfGas)
+
 		return false
 	}
 
@@ -209,6 +211,7 @@ func (c *state) Run() ([]byte, error) {
 	for !c.stop {
 		if c.ip >= codeSize {
 			c.halt()
+
 			break
 		}
 
@@ -217,16 +220,19 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
+
 			break
 		}
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
+
 			break
 		}
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
+
 			break
 		}
 
@@ -236,6 +242,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
 			c.exit(errStackOverflow)
+
 			break
 		}
 		c.ip++
@@ -267,6 +274,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 
 	if !offset.IsUint64() || !size.IsUint64() {
 		c.exit(errGasUintOverflow)
+
 		return false
 	}
 
@@ -275,6 +283,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
 		c.exit(errGasUintOverflow)
+
 		return false
 	}
 
@@ -286,6 +295,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 
 		if !c.consumeGas(cost) {
 			c.exit(errOutOfGas)
+
 			return false
 		}
 

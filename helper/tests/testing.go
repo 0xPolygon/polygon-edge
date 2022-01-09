@@ -48,11 +48,13 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 			select {
 			case <-ctx.Done():
 				resCh <- result{nil, ErrTimeout}
+
 				return
 			default:
 				res, retry := f()
 				if !retry {
 					resCh <- result{res, nil}
+
 					return
 				}
 			}
@@ -76,6 +78,7 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 		if res != nil && res.Length == 0 {
 			return res, false
 		}
+
 		return nil, true
 	})
 
@@ -101,6 +104,7 @@ func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}
+
 		return nil, true
 	})
 

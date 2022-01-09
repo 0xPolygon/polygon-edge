@@ -238,6 +238,7 @@ func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription
 			pw.updateCurrentProgression(event.NewChain[0].Number)
 		case <-pw.stopCh:
 			subscription.Close()
+
 			return
 		}
 	}
@@ -361,6 +362,7 @@ func (s *Syncer) syncCurrentStatus() {
 
 		case <-s.stopCh:
 			sub.Close()
+
 			return
 		}
 	}
@@ -402,6 +404,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	if !ok {
 		// not supposed to happen
 		s.logger.Error("total difficulty not found", "block number", b.Number())
+
 		return
 	}
 
@@ -468,6 +471,7 @@ func (s *Syncer) handlePeerEvent() {
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
+
 		return
 	}
 
@@ -663,21 +667,25 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 	for {
 		if p.IsClosed() {
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
+
 			break
 		}
 
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
 			s.logSyncPeerPopBlockError(err, p)
+
 			break
 		}
 
 		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
+
 			break
 		}
 
 		if handler(b) {
+
 			break
 		}
 	}

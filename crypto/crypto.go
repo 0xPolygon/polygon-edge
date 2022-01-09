@@ -96,6 +96,7 @@ func CreateAddress2(addr types.Address, salt [32]byte, inithash []byte) types.Ad
 
 func ParsePrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
 	prv, _ := btcec.PrivKeyFromBytes(S256, buf)
+
 	return prv.ToECDSA(), nil
 }
 
@@ -194,6 +195,7 @@ func Keccak256(v ...[]byte) []byte {
 // PubKeyToAddress returns the Ethereum address of a public key
 func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	buf := Keccak256(MarshalPublicKey(pub)[1:])[12:]
+
 	return types.BytesToAddress(buf)
 }
 

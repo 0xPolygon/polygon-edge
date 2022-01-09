@@ -125,6 +125,7 @@ func (b *Block) Size() uint64 {
 
 func (b *Block) String() string {
 	str := fmt.Sprintf(`Block(#%v):`, b.Number())
+
 	return str
 }
 

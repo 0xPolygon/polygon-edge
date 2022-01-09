@@ -15,6 +15,7 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 
 	res := calculateRootWithRlp(len(receipts), func(i int) *fastrlp.Value {
 		ar.Reset()
+
 		return receipts[i].MarshalRLPWith(ar)
 	})
 
@@ -29,6 +30,7 @@ func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 
 	res := calculateRootWithRlp(len(transactions), func(i int) *fastrlp.Value {
 		ar.Reset()
+
 		return transactions[i].MarshalRLPWith(ar)
 	})
 

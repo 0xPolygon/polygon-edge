@@ -22,11 +22,13 @@ var (
 
 func toArgUint64Ptr(value uint64) *argUint64 {
 	argValue := argUint64(value)
+
 	return &argValue
 }
 
 func toArgBytesPtr(value []byte) *argBytes {
 	argValue := argBytes(value)
+
 	return &argValue
 }
 
@@ -169,11 +171,13 @@ type mockService struct {
 
 func (m *mockService) Block(f BlockNumber) (interface{}, error) {
 	m.msgCh <- f
+
 	return nil, nil
 }
 
 func (m *mockService) Type(addr types.Address) (interface{}, error) {
 	m.msgCh <- addr
+
 	return nil, nil
 }
 
@@ -189,6 +193,7 @@ func (m *mockService) BlockPtr(a string, f *BlockNumber) (interface{}, error) {
 
 func (m *mockService) Filter(f LogFilter) (interface{}, error) {
 	m.msgCh <- f
+
 	return nil, nil
 }
 

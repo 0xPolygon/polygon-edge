@@ -386,6 +386,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 				_, err = tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash)
 				if err != nil {
 					t.Errorf("Unable to wait for receipt, %v", err)
+
 					return
 				}
 			}

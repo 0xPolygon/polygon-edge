@@ -47,6 +47,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		// Check if the candidate is already in the validator set, and wants to be added
 		if o.candidates[i].Auth && snap.Set.Includes(addr) {
 			deleteFn()
+
 			continue
 		}
 
@@ -69,6 +70,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		if count == 0 {
 			// Candidate found
 			candidate = c
+
 			break
 		}
 	}

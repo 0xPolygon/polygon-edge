@@ -125,6 +125,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		if err := transition.Write(txn); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
@@ -236,5 +237,6 @@ func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error
 
 func (d *Dev) Close() error {
 	close(d.closeCh)
+
 	return nil
 }

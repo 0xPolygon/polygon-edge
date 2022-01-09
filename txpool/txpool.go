@@ -381,6 +381,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	if _, isAvailable := t.GetPendingTx(tx.Hash); isAvailable {
 		t.logger.Info("Discarding already known transaction", "hash", tx.Hash)
+
 		return ErrAlreadyKnown
 	}
 	// should treat as local in the following cases
@@ -391,6 +392,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
+
 		return err
 	}
 
@@ -529,6 +531,7 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
+
 			return
 		} else {
 			t.metrics.PendingTxs.Add(1)
@@ -667,6 +670,7 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn add", "hash", block.Hash())
+
 			continue
 		}
 
@@ -681,6 +685,7 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn del", "hash", block.Hash())
+
 			continue
 		}
 		// Compile transactions that should be accounted for in the TxPool
@@ -906,6 +911,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	if t.gauge.height+txSlots <= t.gauge.limit {
 		// no overflow, just increase the height
 		t.gauge.height += txSlots
+
 		return nil
 	}
 
@@ -973,6 +979,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	if tx == nil || tx.Nonce != t.nextNonce {
 		// Nothing to promote
 		t.logger.Debug("No txs to promote")
+
 		return nil
 	}
 
@@ -1065,6 +1072,7 @@ func (t *txHeapWrapper) Remove(hash types.Hash) bool {
 	for i, tx := range t.txs {
 		if tx.Hash == hash {
 			t.txs = append(t.txs[:i], t.txs[i+1:]...)
+
 			return true
 		}
 	}
@@ -1192,6 +1200,7 @@ func (t *txPriceHeap) Pop() *pricedTx {
 
 func (t *txPriceHeap) Contains(tx *types.Transaction) bool {
 	_, ok := t.index[tx.Hash]
+
 	return ok
 }
 

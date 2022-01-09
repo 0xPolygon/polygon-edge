@@ -139,6 +139,7 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
 				d.srv.logger.Error("failed to add peer to routing table", "err", err)
+
 				return
 			}
 			d.peers.add(peerID)

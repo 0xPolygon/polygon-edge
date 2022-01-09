@@ -254,6 +254,7 @@ func (l *Loadbot) Run() error {
 			txHash, err := executeTxn(client, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
@@ -263,6 +264,7 @@ func (l *Loadbot) Run() error {
 			receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 

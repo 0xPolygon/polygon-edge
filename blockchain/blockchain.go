@@ -754,6 +754,7 @@ func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res typ
 		for {
 			if num == i {
 				res = hash
+
 				return
 			}
 

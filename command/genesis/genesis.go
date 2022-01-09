@@ -209,12 +209,14 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+
 		return 1
 	}
 
 	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
 	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
 		c.UI.Error(generateError.GetMessage())
+
 		return 1
 	}
 
@@ -235,10 +237,12 @@ func (c *GenesisCommand) Run(args []string) int {
 		case ibftValidatorsPrefixPath != "":
 			if validators, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
+
 				return 1
 			}
 		default:
 			c.UI.Error("cannot load validators for ibft")
+
 			return 1
 		}
 
@@ -262,6 +266,7 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
 		c.UI.Error("Minimum two bootnodes are required")
+
 		return 1
 	}
 
@@ -306,6 +311,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
+
 			return 1
 		}
 
@@ -314,6 +320,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		// Check is placed here to avoid additional parsing if epochSize < 2
 		if epochSize < 2 && consensus == ibftConsensus {
 			c.UI.Error("Epoch size must be greater than 1")
+
 			return 1
 		}
 
@@ -334,11 +341,13 @@ func (c *GenesisCommand) Run(args []string) int {
 
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
 	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 

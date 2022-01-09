@@ -76,11 +76,13 @@ func (h *header) Parent(parent byte) *header {
 
 func (h *header) Diff(d uint64) *header {
 	h.diff = d
+
 	return h
 }
 
 func (h *header) Number(d uint64) *header {
 	h.number = d
+
 	return h
 }
 

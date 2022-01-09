@@ -36,6 +36,7 @@ type skeleton struct {
 
 func (s *skeleton) LastHeader() *types.Header {
 	slot := s.slots[len(s.slots)-1]
+
 	return slot.blocks[len(slot.blocks)-1].Header
 }
 

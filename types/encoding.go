@@ -49,6 +49,7 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 
 func ParseInt64orHex(val *string) (int64, error) {
 	i, err := ParseUint64orHex(val)
+
 	return int64(i), err
 }
 
@@ -64,15 +65,18 @@ func ParseBytes(val *string) ([]byte, error) {
 
 func EncodeUint64(b uint64) *string {
 	res := fmt.Sprintf("0x%x", b)
+
 	return &res
 }
 
 func EncodeBytes(b []byte) *string {
 	res := "0x" + hex.EncodeToString(b)
+
 	return &res
 }
 
 func EncodeBigInt(b *big.Int) *string {
 	res := "0x" + b.Text(16)
+
 	return &res
 }

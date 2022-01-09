@@ -117,6 +117,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -124,6 +125,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
 		p.Formatter.OutputError(fmt.Errorf("failed to decode from address: %v", err))
+
 		return 1
 	}
 
@@ -131,12 +133,14 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
 		p.Formatter.OutputError(fmt.Errorf("failed to decode to address: %v", err))
+
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("failed to decode to value: %v", err))
+
 		return 1
 	}
 
@@ -144,12 +148,14 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("failed to decode to gasPrice: %v", err))
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -175,6 +181,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 	resp, err := clt.AddTxn(context.Background(), msg)
 	if err != nil {
 		p.Formatter.OutputError(fmt.Errorf("failed to add transaction: %v", err))
+
 		return 1
 	}
 

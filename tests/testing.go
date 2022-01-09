@@ -502,6 +502,7 @@ func listFiles(folder string) ([]string, error) {
 		if !info.IsDir() {
 			files = append(files, path)
 		}
+
 		return nil
 	})
 

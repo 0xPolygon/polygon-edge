@@ -569,6 +569,7 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 		if numPeers == requiredNum {
 			return numPeers, false
 		}
+
 		return nil, true
 	})
 

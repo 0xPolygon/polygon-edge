@@ -77,6 +77,7 @@ func (i *identity) setup() {
 			initialized := atomic.LoadUint32(&i.initialized)
 			if initialized == 0 {
 				i.srv.Disconnect(peerID, ErrNotReady.Error())
+
 				return
 			}
 
@@ -88,6 +89,7 @@ func (i *identity) setup() {
 
 			if i.srv.numOpenSlots() == 0 {
 				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
+
 				return
 			}
 			// pending of handshake
@@ -111,6 +113,7 @@ func (i *identity) setup() {
 
 func (i *identity) start() error {
 	atomic.StoreUint32(&i.initialized, 1)
+
 	return nil
 }
 
@@ -152,5 +155,6 @@ func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status,
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
 	i.srv.logger.Debug("peer bye", "id", ctx.(*grpc.Context).PeerID, "msg", req.Reason)
+
 	return &empty.Empty{}, nil
 }

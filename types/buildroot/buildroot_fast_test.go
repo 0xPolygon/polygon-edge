@@ -56,6 +56,7 @@ func TestFastHasher(t *testing.T) {
 
 func randomInt(min, max uint64) uint64 {
 	rand.Seed(time.Now().UnixNano())
+
 	return min + uint64(rand.Intn(int(max-min)))
 }
 

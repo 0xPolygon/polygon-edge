@@ -173,6 +173,7 @@ func TestEVM(t *testing.T) {
 				for name, cc := range vmcases {
 					if contains(long, name) && testing.Short() {
 						t.Skip()
+
 						continue
 					}
 					testVMCase(t, name, cc)

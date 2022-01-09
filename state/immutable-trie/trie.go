@@ -239,6 +239,7 @@ func (t *Trie) TryUpdate(key, value []byte) error {
 
 func (t *Trie) hashRoot() ([]byte, Node, error) {
 	hash, _ := t.root.Hash()
+
 	return hash, t.root, nil
 }
 
@@ -263,6 +264,7 @@ func (t *Txn) Commit() *Trie {
 
 func (t *Txn) Lookup(key []byte) []byte {
 	_, res := t.lookup(t.root, keybytesToHex(key))
+
 	return res
 }
 
@@ -396,6 +398,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 		if plen == len(n.key) {
 			// Keep this node as is and insert to child
 			child := t.insert(n.child, search[plen:], value)
+
 			return &ShortNode{key: n.key, child: child}
 		} else {
 			// Introduce a new branch
@@ -420,6 +423,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 
 		if len(search) == 0 {
 			b.value = t.insert(b.value, nil, value)
+
 			return b
 		} else {
 			k := search[0]
@@ -430,6 +434,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			} else {
 				b.replaceEdge(k, newChild)
 			}
+
 			return b
 		}
 
@@ -520,6 +525,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			if i != nil {
 				if indx != -1 {
 					notEmpty = true
+
 					break
 				} else {
 					indx = edge

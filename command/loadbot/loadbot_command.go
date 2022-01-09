@@ -118,6 +118,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// Parse cli arguments
 	if err = flags.Parse(args); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to parse args: %w", err))
+
 		return 1
 	}
 	// maxConns is set to 2*tps if not specified by the user.
@@ -129,23 +130,27 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode sender address: %w", err))
+
 		return 1
 	}
 
 	var receiver types.Address
 	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode receiver address: %w", err))
+
 		return 1
 	}
 
 	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("invalid JSON-RPC url : %w", err))
+
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode to value: %w", err))
+
 		return 1
 	}
 
@@ -174,6 +179,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// run the loadbot
 	if err := loadBot.Run(); err != nil {
 		l.Formatter.OutputError(fmt.Errorf("an error occurred while running the loadbot: %w", err))
+
 		return 1
 	}
 

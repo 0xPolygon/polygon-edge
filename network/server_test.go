@@ -336,6 +336,7 @@ func TestNat(t *testing.T) {
 	for _, addr := range registeredAddresses {
 		if addr.String() == testMultiAddrString {
 			found = true
+
 			break
 		}
 	}

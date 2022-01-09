@@ -140,6 +140,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	ws, err := wsUpgrader.Upgrade(w, req, nil)
 	if err != nil {
 		j.logger.Error(fmt.Sprintf("Unable to upgrade to a WS connection, %s", err.Error()))
+
 		return
 	}
 
@@ -210,12 +211,14 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	if req.Method == "GET" {
 		//nolint
 		w.Write([]byte("PolygonSDK JSON-RPC"))
+
 		return
 	}
 
 	if req.Method != "POST" {
 		//nolint
 		w.Write([]byte("method " + req.Method + " not allowed"))
+
 		return
 	}
 
@@ -224,6 +227,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		//nolint
 		w.Write([]byte(err.Error()))
+
 		return
 	}
 

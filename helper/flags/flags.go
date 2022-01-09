@@ -21,6 +21,7 @@ func (i *ArrayFlags) String() string {
 
 func (i *ArrayFlags) Set(value string) error {
 	*i = append(*i, value)
+
 	return nil
 }
 

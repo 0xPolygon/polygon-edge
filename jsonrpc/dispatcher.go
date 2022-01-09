@@ -311,6 +311,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
 		d.logInternalError(req.Method, err)
+
 		return nil, NewInvalidRequestError(err.Error())
 	}
 
@@ -323,6 +324,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		data, err = json.Marshal(res)
 		if err != nil {
 			d.logInternalError(req.Method, err)
+
 			return nil, NewInternalError("Internal error")
 		}
 	}
@@ -388,12 +390,14 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, reqt []reflect.Type, err error) {
 	if funcName == "" {
 		err = fmt.Errorf("funcName cannot be empty")
+
 		return
 	}
 
 	ft := fv.Type()
 	if ft.Kind() != reflect.Func {
 		err = fmt.Errorf("function '%s' must be a function instead of %s", funcName, ft)
+
 		return
 	}
 
@@ -401,6 +405,7 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 
 	if outNum := ft.NumOut(); ft.NumOut() != 2 {
 		err = fmt.Errorf("unexpected number of output arguments in the function '%s': %d. Expected 2", funcName, outNum)
+
 		return
 	}
 
@@ -411,6 +416,7 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 			ft.Out(1),
 			errt,
 		)
+
 		return
 	}
 

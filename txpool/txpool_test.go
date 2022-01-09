@@ -51,6 +51,7 @@ func (m *mockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
 
 func (m *mockStore) GetBalance(types.Hash, types.Address) (*big.Int, error) {
 	balance, _ := big.NewInt(0).SetString("10000000000000000000", 10)
+
 	return balance, nil
 }
 

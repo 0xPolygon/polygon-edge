@@ -516,6 +516,7 @@ func (i *Ibft) runSyncState() {
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
+
 			continue
 		}
 
@@ -523,6 +524,7 @@ func (i *Ibft) runSyncState() {
 		// we can just move ahead
 		if i.isValidSnapshot() {
 			i.setState(AcceptState)
+
 			continue
 		}
 
@@ -661,6 +663,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		if err := transition.Write(txn); err != nil {
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
 				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
@@ -791,11 +794,13 @@ func (i *Ibft) runAcceptState() { // start new round
 
 		if msg == nil {
 			i.setState(RoundChangeState)
+
 			continue
 		}
 
 		if msg.From != i.state.proposer.String() {
 			i.logger.Error("msg received from wrong proposer")
+
 			continue
 		}
 
@@ -822,6 +827,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
+
 				continue
 			}
 
@@ -873,6 +879,7 @@ func (i *Ibft) runValidateState() {
 
 		if msg == nil {
 			i.setState(RoundChangeState)
+
 			continue
 		}
 
@@ -1123,6 +1130,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
+
 			return
 		}
 
@@ -1138,6 +1146,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	if err := signMsg(i.validatorKey, msg); err != nil {
 		i.logger.Error("failed to sign message", "err", err)
+
 		return
 	}
 
@@ -1261,6 +1270,7 @@ func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
 
 		if i.forceTimeoutCh {
 			i.forceTimeoutCh = false
+
 			return nil, true
 		}
 
@@ -1269,6 +1279,7 @@ func (i *Ibft) getNextMessage(timeout time.Duration) (*proto.MessageReq, bool) {
 		select {
 		case <-timeoutCh:
 			i.logger.Info("unable to read new message from the message queue", "timeout expired", timeout)
+
 			return nil, true
 		case <-i.closeCh:
 			return nil, false

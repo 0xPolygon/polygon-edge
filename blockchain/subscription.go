@@ -36,6 +36,7 @@ func (m *MockSubscription) GetEventCh() chan *Event {
 
 func (m *MockSubscription) GetEvent() *Event {
 	evnt := <-m.eventCh
+
 	return evnt
 }
 

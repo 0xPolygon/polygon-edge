@@ -218,6 +218,7 @@ func (f *FilterManager) nextTimeoutFilter() *Filter {
 	f.lock.Lock()
 	if len(f.filters) == 0 {
 		f.lock.Unlock()
+
 		return nil
 	}
 

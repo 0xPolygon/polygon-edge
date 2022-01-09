@@ -62,11 +62,13 @@ func (p *PeersAdd) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if len(passedInAddresses) < 1 {
 		p.Formatter.OutputError(errors.New("at least 1 peer address is required"))
+
 		return 1
 	}
 
@@ -74,6 +76,7 @@ func (p *PeersAdd) Run(args []string) int {
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -88,6 +91,7 @@ func (p *PeersAdd) Run(args []string) int {
 	for _, address := range passedInAddresses {
 		if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: address}); err != nil {
 			visibleErrors = append(visibleErrors, err.Error())
+
 			break
 		}
 

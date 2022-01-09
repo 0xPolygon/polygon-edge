@@ -137,6 +137,7 @@ func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
 // WriteForks writes the current forks
 func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
 	ff := Forks(forks)
+
 	return s.writeRLP(FORK, EMPTY, &ff)
 }
 
@@ -242,6 +243,7 @@ func (s *KeyValueStorage) ReadSnapshot(hash types.Hash) ([]byte, bool) {
 // WriteReceipts writes the receipts
 func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
 	rr := types.Receipts(receipts)
+
 	return s.writeRLP(RECEIPTS, hash.Bytes(), &rr)
 }
 
@@ -346,6 +348,7 @@ func (s *KeyValueStorage) write2(p, k []byte, v *fastrlp.Value) error {
 
 func (s *KeyValueStorage) set(p []byte, k []byte, v []byte) error {
 	p = append(p, k...)
+
 	return s.db.Set(p, v)
 }
 

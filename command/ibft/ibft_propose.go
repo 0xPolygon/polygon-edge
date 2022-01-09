@@ -85,33 +85,39 @@ func (p *IbftPropose) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if vote == "" {
 		p.Formatter.OutputError(errors.New("vote value not specified"))
+
 		return 1
 	}
 
 	if vote != positive && vote != negative {
 		p.Formatter.OutputError(fmt.Errorf("invalid vote value (should be '%s' or '%s')", positive, negative))
+
 		return 1
 	}
 
 	if ethAddress == "" {
 		p.Formatter.OutputError(errors.New("account address not specified"))
+
 		return 1
 	}
 
 	var addr types.Address
 	if err := addr.UnmarshalText([]byte(ethAddress)); err != nil {
 		p.Formatter.OutputError(errors.New("failed to decode address"))
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -124,6 +130,7 @@ func (p *IbftPropose) Run(args []string) int {
 	_, err = clt.Propose(context.Background(), req)
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

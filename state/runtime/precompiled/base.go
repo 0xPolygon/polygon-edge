@@ -68,6 +68,7 @@ func (s *sha256h) gas(input []byte, config *chain.ForksInTime) uint64 {
 
 func (s *sha256h) run(input []byte) ([]byte, error) {
 	h := sha256.Sum256(input)
+
 	return h[:], nil
 }
 

@@ -124,11 +124,13 @@ func (p *SecretsInit) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if dataDir == "" && configPath == "" {
 		p.Formatter.OutputError(errors.New("required argument (data directory) not passed in"))
+
 		return 1
 	}
 
@@ -140,6 +142,7 @@ func (p *SecretsInit) Run(args []string) int {
 		localSecretsManager, setupErr := setupLocalSM(dataDir)
 		if setupErr != nil {
 			p.Formatter.OutputError(setupErr)
+
 			return 1
 		}
 
@@ -149,6 +152,7 @@ func (p *SecretsInit) Run(args []string) int {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
 			p.Formatter.OutputError(fmt.Errorf("unable to read config file, %v", readErr))
+
 			return 1
 		}
 
@@ -158,12 +162,14 @@ func (p *SecretsInit) Run(args []string) int {
 			vaultSecretsManager, setupErr := setupHashicorpVault(secretsConfig)
 			if setupErr != nil {
 				p.Formatter.OutputError(setupErr)
+
 				return 1
 			}
 
 			secretsManager = vaultSecretsManager
 		default:
 			p.Formatter.OutputError(errors.New("unknown secrets manager type"))
+
 			return 1
 		}
 	}
@@ -172,12 +178,14 @@ func (p *SecretsInit) Run(args []string) int {
 	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
 	if keyErr != nil {
 		p.Formatter.OutputError(keyErr)
+
 		return 1
 	}
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
 		p.Formatter.OutputError(setErr)
+
 		return 1
 	}
 
@@ -185,18 +193,21 @@ func (p *SecretsInit) Run(args []string) int {
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
 		p.Formatter.OutputError(keyErr)
+
 		return 1
 	}
 
 	// Write the networking private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
 		p.Formatter.OutputError(setErr)
+
 		return 1
 	}
 
 	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

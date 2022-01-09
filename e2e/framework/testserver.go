@@ -352,6 +352,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
 			return nil, false
 		}
+
 		return nil, true
 	})
 
@@ -466,6 +467,7 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}
+
 		return nil, true
 	})
 	if err != nil {
@@ -489,6 +491,7 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 		if num == 0 {
 			return nil, true
 		}
+
 		return num, false
 	})
 

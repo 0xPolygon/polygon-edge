@@ -49,12 +49,14 @@ func (p *IbftStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -63,6 +65,7 @@ func (p *IbftStatus) Run(args []string) int {
 
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

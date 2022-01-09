@@ -479,6 +479,7 @@ func (s *snapshotStore) replace(snap *Snapshot) {
 	for i, sn := range s.list {
 		if sn.Number == snap.Number {
 			s.list[i] = snap
+
 			return
 		}
 	}

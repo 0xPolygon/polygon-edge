@@ -19,11 +19,13 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	v, err := pr.Parse(input)
 	if err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
+
 		return err
 	}
 
 	if err := obj(pr, v); err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
+
 		return err
 	}
 

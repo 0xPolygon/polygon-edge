@@ -132,11 +132,13 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
+
 					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
+
 					continue
 				}
 

@@ -187,6 +187,7 @@ type argBig big.Int
 
 func argBigPtr(b *big.Int) *argBig {
 	v := argBig(*b)
+
 	return &v
 }
 
@@ -205,6 +206,7 @@ func (a *argBig) UnmarshalText(input []byte) error {
 
 func (a argBig) MarshalText() ([]byte, error) {
 	b := (*big.Int)(&a)
+
 	return []byte("0x" + b.Text(16)), nil
 }
 
@@ -220,6 +222,7 @@ type argUint64 uint64
 
 func argUintPtr(n uint64) *argUint64 {
 	v := argUint64(n)
+
 	return &v
 }
 
@@ -248,6 +251,7 @@ type argBytes []byte
 
 func argBytesPtr(b []byte) *argBytes {
 	bb := argBytes(b)
+
 	return &bb
 }
 

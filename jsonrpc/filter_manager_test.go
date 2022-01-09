@@ -191,6 +191,7 @@ type mockWsConn struct {
 
 func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
 	m.msgCh <- b
+
 	return nil
 }
 

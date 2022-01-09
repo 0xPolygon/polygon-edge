@@ -41,6 +41,7 @@ type mockSnapshot struct {
 
 func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
 	v, ok := m.data[hex.EncodeToHex(k)]
+
 	return v, ok
 }
 
