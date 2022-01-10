@@ -47,7 +47,6 @@ func (ps *referencePeers) getRandomPeer() *referencePeer {
 	ps.mux.RLock()
 	defer ps.mux.RUnlock()
 
-	// TODO remove this once 1.0.4 of ifshort is merged in golangci-lint
 	l := len(ps.peers)
 	if l == 0 {
 		return nil
@@ -232,15 +231,15 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	addrInfo := make([]*peer.AddrInfo, 0)
+	addrInfo := make([]*peer.AddrInfo, len(resp.Nodes))
 
-	for _, node := range resp.Nodes {
+	for indx, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
 			return nil, err
 		}
 
-		addrInfo = append(addrInfo, info)
+		addrInfo[indx] = info
 	}
 
 	return addrInfo, nil
