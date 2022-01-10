@@ -83,7 +83,7 @@ func (a *AwsSsmManager) constructSecretPath(name string) string {
 func (a *AwsSsmManager) GetSecret(name string) ([]byte, error) {
 	param, err := a.client.GetParameter(&ssm.GetParameterInput{
 		Name:           aws.String(a.constructSecretPath(name)),
-		WithDecryption: aws.Bool(false),
+		WithDecryption: aws.Bool(true),
 	})
 	if err != nil || param == nil {
 		return nil, secrets.ErrSecretNotFound

@@ -5,6 +5,7 @@ import (
 	consensusDummy "github.com/0xPolygon/polygon-sdk/consensus/dummy"
 	consensusIBFT "github.com/0xPolygon/polygon-sdk/consensus/ibft"
 	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/awsssm"
 	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 
@@ -22,4 +23,5 @@ var consensusBackends = map[string]consensus.Factory{
 var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManagerFactory{
 	secrets.Local:          local.SecretsManagerFactory,
 	secrets.HashicorpVault: hashicorpvault.SecretsManagerFactory,
+	secrets.AwsSsm:         awsssm.SecretsManagerFactory,
 }
