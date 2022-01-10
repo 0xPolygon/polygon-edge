@@ -77,7 +77,7 @@ func (s *SecretsGenerate) DefineFlags() {
 	}
 
 	s.FlagMap["extra"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the extra fields map in string format 'key1=val1,key2=val2'"),
+		Description: "Specifies the extra fields map in string format 'key1=val1,key2=val2'",
 		Arguments: []string{
 			"EXTRA",
 		},
