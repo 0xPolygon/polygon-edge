@@ -197,7 +197,7 @@ func TestAddTxErrors(t *testing.T) {
 			case ErrAlreadyKnown:
 				// send the tx beforehand
 				go pool.addTx(local, test.tx)
-				go pool.handleAddRequest(<-pool.addReqCh)
+				go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 				<-pool.promoteReqCh
 			case ErrInvalidAccountState:
 				pool.store = faultyMockStore{}
@@ -224,7 +224,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send higher nonce tx
 		go pool.addTx(local, newDummyTx(addr1, 10, 1)) // 10 > 0
-		pool.handleAddRequest(<-pool.addReqCh)
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.from(addr1).enqueued.length())
@@ -243,7 +243,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send tx
 		go pool.addTx(local, newDummyTx(addr1, 10, 1)) // 10 < 20
-		pool.handleAddRequest(<-pool.addReqCh)
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		assert.Equal(t, uint64(0), pool.gauge.read())
 		assert.Equal(t, uint64(0), pool.accounts.from(addr1).enqueued.length())
@@ -257,7 +257,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send tx
 		go pool.addTx(local, newDummyTx(addr1, 0, 1)) // 0 == 0
-		go pool.handleAddRequest(<-pool.addReqCh)
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		// catch pending promotion
 		<-pool.promoteReqCh
@@ -279,7 +279,7 @@ func TestAddHandler(t *testing.T) {
 		}
 
 		// send demoted (recovered and promotable)
-		go pool.handleAddRequest(addRequest{
+		go pool.handleEnqueueRequest(enqueueRequest{
 			tx:      newDummyTx(addr1, 3, 1), // 3 < 5
 			demoted: true,
 		})
@@ -303,7 +303,7 @@ func TestAddHandler(t *testing.T) {
 		}
 
 		// send demoted (recovered but not promotable)
-		pool.handleAddRequest(addRequest{
+		pool.handleEnqueueRequest(enqueueRequest{
 			tx:      newDummyTx(addr1, 8, 1), // 8 > 5
 			demoted: true,
 		})
@@ -340,7 +340,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		// enqueue higher nonce tx
 		go pool.addTx(local, newDummyTx(addr1, 10, 1))
-		pool.handleAddRequest(<-pool.addReqCh)
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		assert.Equal(t, uint64(1), pool.accounts.from(addr1).enqueued.length())
 		assert.Equal(t, uint64(0), pool.accounts.from(addr1).promoted.length())
 
@@ -358,7 +358,7 @@ func TestPromoteHandler(t *testing.T) {
 		pool.EnableDev()
 
 		go pool.addTx(local, newDummyTx(addr1, 0, 1))
-		go pool.handleAddRequest(<-pool.addReqCh)
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		// tx enqueued -> promotion signaled
 		pool.handlePromoteRequest(<-pool.promoteReqCh)
@@ -382,7 +382,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		// send the first (expected) tx -> signals promotion
 		go pool.addTx(local, newDummyTx(addr1, 0, 1)) // 0 == 0
-		go pool.handleAddRequest(<-pool.addReqCh)
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		// save the promotion handler
 		req := <-pool.promoteReqCh
@@ -390,7 +390,7 @@ func TestPromoteHandler(t *testing.T) {
 		// send the remaining txs (all will be enqueued)
 		for nonce := uint64(1); nonce < 10; nonce++ {
 			go pool.addTx(local, newDummyTx(addr1, nonce, 1))
-			pool.handleAddRequest(<-pool.addReqCh)
+			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		}
 
 		// verify all 10 are enqueued
@@ -417,7 +417,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		for nonce := uint64(0); nonce < 20; nonce++ {
 			go pool.addTx(local, newDummyTx(addr1, nonce, 1))
-			go pool.handleAddRequest(<-pool.addReqCh)
+			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 			pool.handlePromoteRequest(<-pool.promoteReqCh)
 		}
 
@@ -440,7 +440,7 @@ func TestPromoteHandler(t *testing.T) {
 		}
 
 		// send recovered tx
-		go pool.handleAddRequest(addRequest{
+		go pool.handleEnqueueRequest(enqueueRequest{
 			tx:      newDummyTx(addr1, 4, 1),
 			demoted: true,
 		})
@@ -527,7 +527,7 @@ func TestResetAccount(t *testing.T) {
 					acc.setNonce(test.txs[0].Nonce)
 
 					go pool.addTx(local, test.txs[0])
-					go pool.handleAddRequest(<-pool.addReqCh)
+					go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 					// save the promotion
 					req := <-pool.promoteReqCh
@@ -539,7 +539,7 @@ func TestResetAccount(t *testing.T) {
 							continue
 						}
 						go pool.addTx(local, tx)
-						pool.handleAddRequest(<-pool.addReqCh)
+						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 					}
 
 					pool.handlePromoteRequest(req)
@@ -652,7 +652,7 @@ func TestResetAccount(t *testing.T) {
 				{ // setup prestate
 					for _, tx := range test.txs {
 						go pool.addTx(local, tx)
-						pool.handleAddRequest(<-pool.addReqCh)
+						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 					}
 
 					assert.Equal(t, uint64(len(test.txs)), pool.accounts.from(addr1).enqueued.length())
@@ -792,7 +792,7 @@ func TestResetAccount(t *testing.T) {
 					acc.setNonce(test.txs[0].Nonce)
 
 					go pool.addTx(local, test.txs[0])
-					go pool.handleAddRequest(<-pool.addReqCh)
+					go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 					// save the promotion
 					req := <-pool.promoteReqCh
@@ -804,7 +804,7 @@ func TestResetAccount(t *testing.T) {
 							continue
 						}
 						go pool.addTx(local, tx)
-						pool.handleAddRequest(<-pool.addReqCh)
+						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 					}
 
 					pool.handlePromoteRequest(req)
@@ -837,7 +837,7 @@ func TestPop(t *testing.T) {
 
 	// send 1 tx and promote it
 	go pool.addTx(local, newDummyTx(addr1, 0, 1))
-	go pool.handleAddRequest(<-pool.addReqCh)
+	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 	pool.handlePromoteRequest(<-pool.promoteReqCh)
 
 	assert.Equal(t, uint64(1), pool.gauge.read())
@@ -859,7 +859,7 @@ func TestDrop(t *testing.T) {
 
 	// send 1 tx and promote it
 	go pool.addTx(local, newDummyTx(addr1, 0, 1))
-	go pool.handleAddRequest(<-pool.addReqCh)
+	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 	pool.handlePromoteRequest(<-pool.promoteReqCh)
 
 	assert.Equal(t, uint64(1), pool.gauge.read())
@@ -884,14 +884,14 @@ func TestDemote(t *testing.T) {
 
 		// send 1st tx
 		go pool.addTx(local, newDummyTx(addr1, 0, 1))
-		go pool.handleAddRequest(<-pool.addReqCh)
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		// save the promotion for later
 		prom := <-pool.promoteReqCh
 
 		// send 2nd tx
 		go pool.addTx(local, newDummyTx(addr1, 1, 1))
-		pool.handleAddRequest(<-pool.addReqCh)
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 		// promote
 		pool.handlePromoteRequest(prom)
@@ -914,15 +914,15 @@ func TestDemote(t *testing.T) {
 
 		// save the add request
 		// originating in Demote
-		var addReq addRequest
+		var addReq enqueueRequest
 		go func() {
-			addReq = <-pool.addReqCh
+			addReq = <-pool.enqueueReqCh
 		}()
 
 		pool.Demote(tx)
 
 		// handle add request
-		go pool.handleAddRequest(addReq)
+		go pool.handleEnqueueRequest(addReq)
 		pool.handlePromoteRequest(<-pool.promoteReqCh)
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
@@ -938,10 +938,10 @@ func TestDemote(t *testing.T) {
 
 		// send 2 txs and promote them
 		go pool.addTx(local, newDummyTx(addr1, 0, 1))
-		go pool.handleAddRequest(<-pool.addReqCh)
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		prom := <-pool.promoteReqCh
 		go pool.addTx(local, newDummyTx(addr1, 1, 1))
-		pool.handleAddRequest(<-pool.addReqCh)
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		pool.handlePromoteRequest(prom)
 
 		assert.Equal(t, uint64(2), pool.gauge.read())
@@ -962,15 +962,15 @@ func TestDemote(t *testing.T) {
 		tx = pool.Peek()
 		// save the add request
 		// originating in Demote
-		var addReq addRequest
+		var addReq enqueueRequest
 		go func() {
-			addReq = <-pool.addReqCh
+			addReq = <-pool.enqueueReqCh
 		}()
 
 		pool.Demote(tx)
 
 		// enqueue demoted
-		pool.handleAddRequest(addReq)
+		pool.handleEnqueueRequest(addReq)
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.from(addr1).enqueued.length())
@@ -999,9 +999,9 @@ func (p *TxPool) startTestMode() <-chan struct{} {
 	go func() {
 		for {
 			select {
-			case req := <-p.addReqCh:
+			case req := <-p.enqueueReqCh:
 				go func() {
-					p.handleAddRequest(req)
+					p.handleEnqueueRequest(req)
 					done <- struct{}{}
 				}()
 			case req := <-p.promoteReqCh:
