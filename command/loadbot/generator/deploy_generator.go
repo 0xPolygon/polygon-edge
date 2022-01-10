@@ -28,10 +28,8 @@ type DeployGenerator struct {
 func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	return dg.signer.SignTx(&types.Transaction{
 		From:     dg.params.SenderAddress,
-		Gas:      dg.estimatedGas,
 		Value:    big.NewInt(0),
 		GasPrice: dg.params.GasPrice,
-		Nonce:    dg.params.Nonce,
 		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, dg.params.SenderKey)
