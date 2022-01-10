@@ -87,23 +87,6 @@ func (q *accountQueue) length() uint64 {
 	return uint64(q.queue.Len())
 }
 
-// Empties the underlying queue and
-// returns the removed transactions.
-func (q *accountQueue) clear() (
-	removed transactions,
-) {
-	for {
-		tx := q.pop()
-		if tx == nil {
-			break
-		}
-
-		removed = append(removed, tx)
-	}
-
-	return
-}
-
 // transactions sorted by nonce (ascending)
 type minNonceQueue transactions
 
