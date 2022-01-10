@@ -17,7 +17,6 @@ import (
 )
 
 type mockAccount2 struct {
-	store   *mockAccountStore
 	address types.Address
 	code    []byte
 	account *state.Account
@@ -40,66 +39,6 @@ func (m *mockAccount2) Nonce(n uint64) {
 
 func (m *mockAccount2) Balance(n uint64) {
 	m.account.Balance = new(big.Int).SetUint64(n)
-}
-
-type mockAccountStore struct {
-	nullBlockchainInterface
-	accounts map[types.Address]*mockAccount2
-}
-
-func (m *mockAccountStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	panic("implement me")
-}
-
-func (m *mockAccountStore) GetCapacity() (uint64, uint64) {
-	panic("implement me")
-}
-
-func (m *mockAccountStore) AddAccount(addr types.Address) *mockAccount2 {
-	if m.accounts == nil {
-		m.accounts = map[types.Address]*mockAccount2{}
-	}
-	acct := &mockAccount2{
-		store:   m,
-		address: addr,
-		account: &state.Account{},
-		storage: make(map[types.Hash][]byte),
-	}
-	m.accounts[addr] = acct
-	return acct
-}
-
-func (m *mockAccountStore) Header() *types.Header {
-	return &types.Header{}
-}
-
-func (m *mockAccountStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	acct, ok := m.accounts[addr]
-	if !ok {
-		return nil, ErrStateNotFound
-	}
-	return acct.account, nil
-}
-
-func (m *mockAccountStore) GetCode(hash types.Hash) ([]byte, error) {
-	for _, acct := range m.accounts {
-		if bytes.Equal(acct.account.CodeHash, hash.Bytes()) {
-			return acct.code, nil
-		}
-	}
-	return nil, fmt.Errorf("code not found")
-}
-
-func (m *mockAccountStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	acct, ok := m.accounts[addr]
-	if !ok {
-		return nil, ErrStateNotFound
-	}
-	val, ok := acct.storage[slot]
-	if !ok {
-		return nil, ErrStateNotFound
-	}
-	return val, nil
 }
 
 type mockBlockStore2 struct {
