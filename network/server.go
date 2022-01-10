@@ -363,7 +363,6 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 }
 
 func (s *Server) numOpenSlots() int64 {
-
 	n := s.maxOutboundConns() - s.outboundConns()
 	if n < 0 {
 		n = 0
@@ -373,30 +372,23 @@ func (s *Server) numOpenSlots() int64 {
 }
 
 func (s *Server) inboundConns() int64 {
-
 	count := atomic.LoadInt64(&s.inboundConnCount)
 	if count < 0 {
 		count = 0
 	}
-
 	return count + s.identity.pendingInboundConns()
 }
 
 func (s *Server) outboundConns() int64 {
-
 	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
-
 }
 
 func (s *Server) maxInboundConns() int64 {
-
 	return int64(s.config.MaxInboundPeers)
-
 }
 
 func (s *Server) maxOutboundConns() int64 {
 	return int64(s.config.MaxOutboundPeers)
-
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
