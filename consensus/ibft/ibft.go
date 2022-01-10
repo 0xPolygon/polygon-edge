@@ -4,9 +4,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-hclog"
 	"reflect"
 	"time"
+
+	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
@@ -37,12 +38,11 @@ type blockchainInterface interface {
 }
 
 type txPoolInterface interface {
-	LockPromoted(write bool)
-	UnlockPromoted()
+	Prepare()
 	Peek() *types.Transaction
-	Pop() *types.Transaction
-	Drop()
-	Demote()
+	Pop(tx *types.Transaction)
+	Drop(tx *types.Transaction)
+	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
 }
 
@@ -628,9 +628,9 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var successful []*types.Transaction
+	i.txpool.Prepare()
 
-	i.txpool.LockPromoted(true)
+	var successful []*types.Transaction
 	for {
 		tx := i.txpool.Peek()
 		if tx == nil {
@@ -638,9 +638,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
-			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.Drop()
-			// i.txpool.RollbackNonce(tx) // unrecoverable tx
+			i.txpool.Drop(tx)
 			continue
 		}
 
@@ -648,21 +646,19 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				i.txpool.Demote()
+				i.txpool.Demote(tx)
 			} else {
-				// unrecoverable tx
-				i.txpool.Drop()
+				i.txpool.Drop(tx)
 			}
 
 			continue
 		}
 
 		// no errors, pop the tx from the pool
-		tx = i.txpool.Pop()
+		i.txpool.Pop(tx)
+
 		successful = append(successful, tx)
 	}
-
-	i.txpool.UnlockPromoted()
 
 	i.logger.Info("picked out txns from pool", "num", len(successful))
 
