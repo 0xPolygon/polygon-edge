@@ -7,7 +7,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 	"math/big"
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -28,10 +27,8 @@ type DeployGenerator struct {
 func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	return dg.signer.SignTx(&types.Transaction{
 		From:     dg.params.SenderAddress,
-		Gas:      dg.estimatedGas,
 		Value:    big.NewInt(0),
 		GasPrice: dg.params.GasPrice,
-		Nonce:    dg.params.Nonce,
 		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, dg.params.SenderKey)
@@ -58,14 +55,12 @@ func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
 }
 
 func (dg *DeployGenerator) GenerateTransaction() (*types.Transaction, error) {
-	newNextNonce := atomic.AddUint64(&dg.params.Nonce, 1)
-
 	txn, err := dg.signer.SignTx(&types.Transaction{
 		From:     dg.params.SenderAddress,
 		Gas:      dg.estimatedGas,
 		Value:    big.NewInt(0),
 		GasPrice: dg.params.GasPrice,
-		Nonce:    newNextNonce - 1,
+		Nonce:    dg.params.Nonce,
 		Input:    dg.contractBytecode,
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}, dg.params.SenderKey)
