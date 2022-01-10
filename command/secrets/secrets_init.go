@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-sdk/secrets/awsssm"
 	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/0xPolygon/polygon-sdk/types"
@@ -41,7 +42,7 @@ func (p *SecretsInit) DefineFlags() {
 	}
 
 	p.FlagMap["config"] = helper.FlagDescriptor{
-		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault. " +
+		Description: "Sets the path to the SecretsManager config file. Used for Hashicorp Vault and AWS SSM. " +
 			"If omitted, the local FS secrets manager is used",
 		Arguments: []string{
 			"SECRETS_CONFIG",
@@ -111,6 +112,18 @@ func setupHashicorpVault(
 	)
 }
 
+// setupAwsSsm is a helper method for boilerplate aws ssm secrets manager setup
+func setupAwsSsm(
+	secretsConfig *secrets.SecretsManagerConfig,
+) (secrets.SecretsManager, error) {
+	return awsssm.SecretsManagerFactory(
+		secretsConfig,
+		&secrets.SecretsManagerParams{
+			Logger: hclog.NewNullLogger(),
+		},
+	)
+}
+
 // Run implements the cli.SecretsInit interface
 func (p *SecretsInit) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter)
@@ -160,6 +173,13 @@ func (p *SecretsInit) Run(args []string) int {
 			}
 
 			secretsManager = vaultSecretsManager
+		case secrets.AwsSsm:
+			awsSsmSecretsManager, setupErr := setupAwsSsm(secretsConfig)
+			if setupErr != nil {
+				p.Formatter.OutputError(setupErr)
+				return 1
+			}
+			secretsManager = awsSsmSecretsManager
 		default:
 			p.Formatter.OutputError(errors.New("Unknown secrets manager type"))
 			return 1

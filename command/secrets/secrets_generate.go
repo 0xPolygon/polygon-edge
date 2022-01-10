@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/secrets"
@@ -15,7 +16,7 @@ type SecretsGenerate struct {
 const (
 	defaultNodeName       = "polygon-sdk-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
-	defaultNamespace = "admin"
+	defaultNamespace      = "admin"
 )
 
 func (s *SecretsGenerate) DefineFlags() {
@@ -63,7 +64,7 @@ func (s *SecretsGenerate) DefineFlags() {
 			"NAMESPACE",
 		},
 		ArgumentsOptional: false,
-		FlagOptional: false,
+		FlagOptional:      false,
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{
@@ -74,11 +75,20 @@ func (s *SecretsGenerate) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	s.FlagMap["extra"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Specifies the extra fields map in string format 'key1=val1,key2=val2'"),
+		Arguments: []string{
+			"EXTRA",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
 func (s *SecretsGenerate) GetHelperText() string {
-	return "Initializes the secrets manager configuration in the provided directory. Used for Hashicorp Vault"
+	return "Initializes the secrets manager configuration in the provided directory. Used for Hashicorp Vault and AWS SSM"
 }
 
 // Help implements the cli.SecretsManagerGenerate interface
@@ -107,6 +117,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 	var serviceType string
 	var name string
 	var namespace string
+	var extra string
 
 	flags.StringVar(&path, "dir", defaultConfigFileName, "")
 	flags.StringVar(&token, "token", "", "")
@@ -114,6 +125,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 	flags.StringVar(&serviceType, "type", string(secrets.HashicorpVault), "")
 	flags.StringVar(&name, "name", defaultNodeName, "")
 	flags.StringVar(&namespace, "namespace", defaultNamespace, "")
+	flags.StringVar(&extra, "extra", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		s.UI.Error(err.Error())
@@ -126,12 +138,12 @@ func (s *SecretsGenerate) Run(args []string) int {
 		return 1
 	}
 
-	if token == "" {
+	if token == "" && secrets.SecretsManagerType(serviceType) == secrets.HashicorpVault {
 		s.UI.Error("required argument (token) not passed in")
 		return 1
 	}
 
-	if serverURL == "" {
+	if serverURL == "" && secrets.SecretsManagerType(serviceType) == secrets.HashicorpVault {
 		s.UI.Error("required argument (serverURL) not passed in")
 		return 1
 	}
@@ -146,6 +158,15 @@ func (s *SecretsGenerate) Run(args []string) int {
 		return 1
 	}
 
+	extraMap := make(map[string]interface{})
+	if extra != "" {
+		entries := strings.Split(extra, ",")
+		for _, e := range entries {
+			parts := strings.Split(e, "=")
+			extraMap[parts[0]] = parts[1]
+		}
+	}
+
 	// Generate the configuration
 	config := &secrets.SecretsManagerConfig{
 		Token:     token,
@@ -153,7 +174,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		Type:      secrets.SecretsManagerType(serviceType),
 		Name:      name,
 		Namespace: namespace,
-		Extra:     nil,
+		Extra:     extraMap,
 	}
 
 	writeErr := config.WriteConfig(path)
@@ -170,6 +191,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 		fmt.Sprintf("Access Token|%s", token),
 		fmt.Sprintf("Node Name|%s", name),
 		fmt.Sprintf("Namespace|%s", namespace),
+		fmt.Sprintf("Extra|%s", extra),
 	})
 
 	output += "\n\nCONFIGURATION GENERATED"
