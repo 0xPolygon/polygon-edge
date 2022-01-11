@@ -1360,7 +1360,6 @@ func TestResetAccounts(t *testing.T) {
 							err := pool.addTx(local, tx)
 							assert.NoError(t, err)
 						}(tx)
-
 					}
 				}
 				waitUntilDone(done)

@@ -361,6 +361,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
+
 	for _, account := range testAccounts {
 		for nonce := uint64(0); nonce < uint64(numTxPerAccount); nonce++ {
 			wg.Add(1)
@@ -372,6 +373,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 				txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
 				if err != nil {
 					t.Errorf("Unable to send txn, %v", err)
+
 					return
 				}
 
@@ -400,6 +402,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unable to fetch block")
 		}
+
 		assert.Equal(t, uint64(numTxPerAccount), nonce)
 	}
 }
@@ -496,7 +499,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	server := servers[0]
 	client := server.JSONRPC()
 
-	var hashes []web3.Hash
+	hashes := make([]web3.Hash, 3)
 	for _, tx := range transactions {
 		signedTx, err := signer.SignTx(tx, senderKey)
 		assert.NoError(t, err)
@@ -671,6 +674,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	// Wait for the transaction to be included into a block
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
 	assert.NoError(t, err)
 	assert.NotNil(t, receipt)

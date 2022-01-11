@@ -648,9 +648,10 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	var successful []*types.Transaction
+
 	i.txpool.Prepare()
 
-	var successful []*types.Transaction
 	for {
 		tx := i.txpool.Next()
 		if tx == nil {
@@ -659,6 +660,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			i.txpool.Drop(tx)
+
 			continue
 		}
 

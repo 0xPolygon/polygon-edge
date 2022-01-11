@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"io"
 	"math/big"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -295,6 +296,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	case ConsensusDev:
 		args = append(args, "--data-dir", t.Config.RootDir)
 		args = append(args, "--dev")
+
 		if t.Config.DevInterval != 0 {
 			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
 		}

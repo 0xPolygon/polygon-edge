@@ -104,9 +104,10 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	var successful []*types.Transaction
+
 	d.txpool.Prepare()
 
-	var successful []*types.Transaction
 	for {
 		tx := d.txpool.Next()
 		if tx == nil {
@@ -115,6 +116,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.Drop(tx)
+
 			continue
 		}
 
@@ -139,7 +141,6 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
 
 	return successful
-
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,

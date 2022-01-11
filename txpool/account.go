@@ -38,6 +38,7 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 // exists checks if an account exists within the map.
 func (m *accountsMap) exists(addr types.Address) bool {
 	_, ok := m.Load(addr)
+
 	return ok
 }
 
@@ -80,6 +81,7 @@ func (m *accountsMap) promoted() (total uint64) {
 		defer account.promoted.unlock()
 
 		total += account.promoted.length()
+
 		return true
 	})
 
@@ -92,6 +94,7 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 ) {
 	allPromoted = make(map[types.Address][]*types.Transaction)
 	allEnqueued = make(map[types.Address][]*types.Transaction)
+
 	m.Range(func(key, value interface{}) bool {
 		addr := key.(types.Address)
 		account := m.get(addr)
@@ -167,6 +170,7 @@ func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
 func (a *account) promote() uint64 {
 	a.promoted.lock(true)
 	a.enqueued.lock(true)
+
 	defer func() {
 		a.promoted.unlock()
 		a.enqueued.unlock()
@@ -181,6 +185,7 @@ func (a *account) promote() uint64 {
 
 	promoted := uint64(0)
 	nextNonce := a.enqueued.peek().Nonce
+
 	for {
 		tx := a.enqueued.peek()
 		if tx == nil ||

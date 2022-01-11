@@ -24,6 +24,7 @@ func newAccountQueue() *accountQueue {
 	}
 
 	heap.Init(&q.queue)
+
 	return &q
 }
 
@@ -125,6 +126,7 @@ func (q *minNonceQueue) Pop() interface{} {
 	n := len(*old)
 	x := (*old)[n-1]
 	*q = (*old)[0 : n-1]
+
 	return x
 }
 
@@ -138,6 +140,7 @@ func newPricedQueue() *pricedQueue {
 	}
 
 	heap.Init(&q.queue)
+
 	return &q
 }
 
@@ -206,5 +209,6 @@ func (q *maxPriceQueue) Pop() interface{} {
 	n := len(*old)
 	x := (*old)[n-1]
 	*q = (*old)[0 : n-1]
+
 	return x
 }

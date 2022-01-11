@@ -98,7 +98,7 @@ type enqueueRequest struct {
 
 // A promoteRequest is created each time some account
 // is eligible for promotion. This request is signaled
-// on 2 ocassions:
+// on 2 occasions:
 //
 // 	1. When an enqueued transaction's nonce is
 // 	not greater than the expected (account's nextNonce).
@@ -194,6 +194,7 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
+
 		if subscribeErr := topic.Subscribe(pool.addGossipTx); subscribeErr != nil {
 			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
 		}
@@ -253,6 +254,7 @@ func (p *TxPool) EnableDev() {
 func (p *TxPool) AddTx(tx *types.Transaction) error {
 	if err := p.addTx(local, tx); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
+
 		return err
 	}
 
@@ -411,13 +413,14 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
+	stateNonces := make(map[types.Address]uint64)
 
 	// discover latest (next) nonces for all accounts
-	stateNonces := make(map[types.Address]uint64)
 	for _, header := range event.NewChain {
 		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
 			p.logger.Error("could not find block in store", "hash", header.Hash.String())
+
 			continue
 		}
 
@@ -583,6 +586,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	// enqueue tx
 	if err := account.enqueue(tx, req.demoted); err != nil {
 		p.logger.Error("enqueue request", "err", err)
+
 		return
 	}
 
@@ -632,6 +636,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
 		p.logger.Error("failed to decode broadcasted tx", "err", err)
+
 		return
 	}
 

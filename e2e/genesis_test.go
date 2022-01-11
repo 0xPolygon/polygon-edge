@@ -105,11 +105,12 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	_, err = framework.WaitUntilBlockMined(ctx, srv, 1)
 	assert.NoError(t, err)
 
 	block, err = client.Eth().GetBlockByNumber(1, true)
-	assert.NoError(t, err, "failed to retreive block %d: %v", 1, err)
+	assert.NoError(t, err, "failed to retrieve block %d: %v", 1, err)
 	assert.NotNil(t, block)
 
 	if block.GasLimit != blockGasLimit {
