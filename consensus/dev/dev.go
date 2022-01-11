@@ -135,7 +135,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		successful = append(successful, tx)
 	}
 
-	d.logger.Info("picked out txns from pool", "num", len(successful))
+	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
 
 	return successful
 

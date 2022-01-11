@@ -39,6 +39,7 @@ type blockchainInterface interface {
 
 type txPoolInterface interface {
 	Prepare()
+	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
 	Drop(tx *types.Transaction)
@@ -660,7 +661,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		successful = append(successful, tx)
 	}
 
-	i.logger.Info("picked out txns from pool", "num", len(successful))
+	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", i.txpool.Length())
 
 	return successful
 }

@@ -702,3 +702,8 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 
 	return account
 }
+
+// Length returns the total number of all promoted transactions.
+func (p *TxPool) Length() uint64 {
+	return p.accounts.promoted()
+}

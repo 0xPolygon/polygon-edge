@@ -555,7 +555,7 @@ func TestWriteTransactions(t *testing.T) {
 
 			included := m.writeTransactions(1000, mockTransition)
 
-			assert.Equal(t, test.expectedTxPoolLength, len(mockTxPool.demoted)+len(mockTxPool.transactions))
+			assert.Equal(t, uint64(test.expectedTxPoolLength), m.txpool.Length())
 			assert.Equal(t, test.expectedIncludedTxnsCount, len(included))
 			for _, recoverable := range mockTransition.recoverableTransactions {
 				assert.False(t, mockTxPool.nonceDecreased[recoverable])
@@ -667,6 +667,10 @@ type mockTxPool struct {
 
 func (p *mockTxPool) Prepare() {
 
+}
+
+func (p *mockTxPool) Length() uint64 {
+	return uint64(len(p.transactions) + len(p.demoted))
 }
 
 func (p *mockTxPool) Peek() *types.Transaction {
