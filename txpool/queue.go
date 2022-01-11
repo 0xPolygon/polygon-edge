@@ -139,19 +139,13 @@ func newPricedQueue() *pricedQueue {
 
 // Empties the underlying queue
 // and returns the removed transactions.
-func (q *pricedQueue) clear() (
-	removed transactions,
-) {
+func (q *pricedQueue) clear() {
 	for {
 		tx := q.pop()
 		if tx == nil {
 			break
 		}
-
-		removed = append(removed, tx)
 	}
-
-	return
 }
 
 // Pushes the given transactions onto the queue.
