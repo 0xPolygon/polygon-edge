@@ -3,12 +3,11 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/fastrlp"
+	"math/big"
 )
 
 // Eth is the eth jsonrpc endpoint
@@ -19,6 +18,29 @@ type Eth struct {
 // ChainID returns the chain id of the client
 func (e *Eth) ChainID() (interface{}, error) {
 	return argUintPtr(e.d.chainID), nil
+}
+
+func (e *Eth) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {
+	var (
+		header *types.Header
+		err    error
+	)
+
+	if bnh.BlockNumber != nil {
+		header, err = e.d.getBlockHeaderImpl(*bnh.BlockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
+		}
+	} else if bnh.BlockHash != nil {
+		block, ok := e.d.store.GetBlockByHash(*bnh.BlockHash, false)
+		if !ok {
+			return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+		}
+
+		header = block.Header
+	}
+
+	return header, nil
 }
 
 func (e *Eth) Syncing() (interface{}, error) {
@@ -297,16 +319,21 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 func (e *Eth) GetStorageAt(
 	address types.Address,
 	index types.Hash,
-	number *BlockNumber,
+	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	// Set the block number to latest
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+	var (
+		header *types.Header
+		err    error
+	)
+
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
-	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(*number)
+
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	// Get the storage for the passed in location
@@ -346,10 +373,21 @@ func (e *Eth) GasPrice() (interface{}, error) {
 // Call executes a smart contract call using the transaction object data
 func (e *Eth) Call(
 	arg *txnArgs,
-	number *BlockNumber,
+	filter BlockNumberOrHash,
 ) (interface{}, error) {
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+	var (
+		header *types.Header
+		err    error
+	)
+
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
+	}
+
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	transaction, err := e.d.decodeTxn(arg)
@@ -357,12 +395,6 @@ func (e *Eth) Call(
 	if err != nil {
 		return nil, err
 	}
-	// Fetch the requested header
-	header, err := e.d.getBlockHeaderImpl(*number)
-	if err != nil {
-		return nil, err
-	}
-
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if transaction.Gas == 0 {
 		transaction.Gas = header.GasLimit
@@ -610,21 +642,24 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	return result, nil
 }
 
-// GetBalance returns the account's balance at the referenced block
-func (e *Eth) GetBalance(
-	address types.Address,
-	number *BlockNumber,
-) (interface{}, error) {
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+// GetBalance returns the account's balance at the referenced block.
+func (e *Eth) GetBalance(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
+	var (
+		header *types.Header
+		err    error
+	)
+
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	header, err := e.d.getBlockHeaderImpl(*number)
-
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
+	// Extract the account balance
 	acc, err := e.d.store.GetAccount(header.StateRoot, address)
 	if errors.As(err, &ErrStateNotFound) {
 		// Account not found, return an empty account
@@ -637,18 +672,32 @@ func (e *Eth) GetBalance(
 }
 
 // GetTransactionCount returns account nonce
-func (e *Eth) GetTransactionCount(
-	address types.Address,
-	number *BlockNumber,
-) (interface{}, error) {
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+func (e *Eth) GetTransactionCount(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
+	var (
+		blockNumber BlockNumber
+		header      *types.Header
+		err         error
+	)
+
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	nonce, err := e.d.getNextNonce(address, *number)
+	if filter.BlockNumber == nil {
+		header, err = e.getHeaderFromBlockNumberOrHash(&filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get header from block hash or block number")
+		}
 
+		blockNumber = BlockNumber(header.Number)
+	} else {
+		blockNumber = *filter.BlockNumber
+	}
+
+	nonce, err := e.d.getNextNonce(address, blockNumber)
 	if err != nil {
-		if errors.As(err, &ErrStateNotFound) {
+		if errors.Is(err, ErrStateNotFound) {
 			return argUintPtr(0), nil
 		}
 
@@ -659,16 +708,20 @@ func (e *Eth) GetTransactionCount(
 }
 
 // GetCode returns account code at given block number
-func (e *Eth) GetCode(address types.Address, number *BlockNumber) (interface{}, error) {
-	// Set the block number to latest
-	if number == nil {
-		number, _ = createBlockNumberPointer("latest")
+func (e *Eth) GetCode(address types.Address, filter BlockNumberOrHash) (interface{}, error) {
+	var (
+		header *types.Header
+		err    error
+	)
+
+	// The filter is empty, use the latest block by default
+	if filter.BlockNumber == nil && filter.BlockHash == nil {
+		filter.BlockNumber, _ = createBlockNumberPointer("latest")
 	}
 
-	header, err := e.d.getBlockHeaderImpl(*number)
-
+	header, err = e.getHeaderFromBlockNumberOrHash(&filter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get header from block hash or block number")
 	}
 
 	emptySlice := []byte{}

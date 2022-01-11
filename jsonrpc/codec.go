@@ -101,6 +101,46 @@ const (
 
 type BlockNumber int64
 
+type BlockNumberOrHash struct {
+	BlockNumber *BlockNumber `json:"blockNumber,omitempty"`
+	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
+}
+
+// UnmarshalJSON will try to extract the filter's data.
+// Here are the possible input formats :
+//
+// 1 - "latest", "pending" or "earliest"	- self-explaining keywords
+// 2 - "0x2"								- block number #2 (EIP-1898 backward compatible)
+// 3 - {blockNumber:	"0x2"}				- EIP-1898 compliant block number #2
+// 4 - {blockHash:		"0xe0e..."}			- EIP-1898 compliant block hash 0xe0e...
+func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
+	type bnhCopy BlockNumberOrHash
+
+	var placeholder bnhCopy
+
+	err := json.Unmarshal(data, &placeholder)
+	if err != nil {
+		number, err := stringToBlockNumber(string(data))
+		if err != nil {
+			return err
+		}
+
+		placeholder.BlockNumber = &number
+	}
+
+	// Try to extract object
+	bnh.BlockNumber = placeholder.BlockNumber
+	bnh.BlockHash = placeholder.BlockHash
+
+	if bnh.BlockNumber != nil && bnh.BlockHash != nil {
+		return fmt.Errorf("cannot use both block number and block hash as filters")
+	} else if bnh.BlockNumber == nil && bnh.BlockHash == nil {
+		return fmt.Errorf("block number and block hash are empty, please provide one of them")
+	}
+
+	return nil
+}
+
 func stringToBlockNumber(str string) (BlockNumber, error) {
 	if str == "" {
 		return 0, fmt.Errorf("value is empty")
