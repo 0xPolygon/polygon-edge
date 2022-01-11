@@ -59,6 +59,7 @@ func (m *mockBlockStore2) add(blocks ...*types.Block) {
 	if m.blocks == nil {
 		m.blocks = []*types.Block{}
 	}
+
 	m.blocks = append(m.blocks, blocks...)
 }
 
@@ -136,6 +137,7 @@ func (m *mockBlockStore2) GetHeaderByNumber(blockNumber uint64) (*types.Header, 
 	if !ok {
 		return nil, false
 	}
+
 	return b.Header, true
 }
 
@@ -145,6 +147,7 @@ func (m *mockBlockStore2) GetBlockByNumber(blockNumber uint64, full bool) (*type
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -154,6 +157,7 @@ func (m *mockBlockStore2) GetBlockByHash(hash types.Hash, full bool) (*types.Blo
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -228,6 +232,7 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 			Number: 10,
 		},
 	})
+
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	num, err := dispatcher.endpoints.Eth.BlockNumber()
@@ -279,13 +284,13 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 }
 
 func TestEth_Block_GetLogs(t *testing.T) {
-
 	blockHash := types.StringToHash("1")
 
 	// Topics we're searching for
 	topic1 := types.StringToHash("4")
 	topic2 := types.StringToHash("5")
 	topic3 := types.StringToHash("6")
+
 	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
 
 	testTable := []struct {
@@ -329,6 +334,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 	// setup test
 	store := &mockBlockStore2{}
 	store.topics = []types.Hash{topic1, topic2, topic3}
+
 	for i := 0; i < 5; i++ {
 		store.add(&types.Block{
 			Header: &types.Header{
@@ -348,6 +354,7 @@ func TestEth_Block_GetLogs(t *testing.T) {
 			},
 		})
 	}
+
 	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
 
 	for _, testCase := range testTable {
@@ -396,6 +403,7 @@ func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*sta
 	if m.account.address.String() != addr.String() {
 		return nil, ErrStateNotFound
 	}
+
 	return m.account.account, nil
 }
 
@@ -403,6 +411,7 @@ func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header,
 	if m.block.Number() != blockNumber {
 		return nil, false
 	}
+
 	return m.block.Header, true
 }
 
@@ -423,9 +432,11 @@ func (m *mockSpecialStore) GetStorage(root types.Hash, addr types.Address, slot 
 
 	acct := m.account
 	val, ok := acct.storage[slot]
+
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	return val, nil
 }
 
@@ -433,6 +444,7 @@ func (m *mockSpecialStore) GetCode(hash types.Hash) ([]byte, error) {
 	if bytes.Equal(m.account.account.CodeHash, hash.Bytes()) {
 		return m.account.code, nil
 	}
+
 	return nil, fmt.Errorf("code not found")
 }
 
@@ -960,6 +972,7 @@ func (m *mockStoreTxn) GetForksInTime(blockNumber uint64) chain.ForksInTime {
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	m.txn = tx
+
 	return nil
 }
 
@@ -970,12 +983,14 @@ func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
 	if m.accounts == nil {
 		m.accounts = map[types.Address]*mockAccount2{}
 	}
+
 	acct := &mockAccount2{
 		address: addr,
 		account: &state.Account{},
 		storage: make(map[types.Hash][]byte),
 	}
 	m.accounts[addr] = acct
+
 	return acct
 }
 
@@ -988,6 +1003,7 @@ func (m *mockStoreTxn) GetAccount(root types.Hash, addr types.Address) (*state.A
 	if !ok {
 		return nil, ErrStateNotFound
 	}
+
 	return acct.account, nil
 }
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {

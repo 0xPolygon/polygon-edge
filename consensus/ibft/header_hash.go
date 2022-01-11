@@ -21,6 +21,7 @@ func istanbulHeaderHash(h *types.Header) types.Hash {
 	if err != nil {
 		return types.Hash{}
 	}
+
 	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()

@@ -2,9 +2,9 @@ package state
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"testing"
 
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
@@ -23,6 +23,7 @@ func (m *mockState) NewSnapshotAt(root types.Hash) (Snapshot, error) {
 	if !ok {
 		return nil, fmt.Errorf("not found")
 	}
+
 	return t, nil
 }
 
@@ -40,6 +41,7 @@ type mockSnapshot struct {
 
 func (m *mockSnapshot) Get(k []byte) ([]byte, bool) {
 	v, ok := m.data[hex.EncodeToHex(k)]
+
 	return v, ok
 }
 
@@ -56,6 +58,7 @@ func newStateWithPreState(preState map[types.Address]*PreState) (*mockState, *mo
 	}
 
 	ar := &fastrlp.Arena{}
+
 	for addr, p := range preState {
 		account, snap := buildMockPreState(p)
 		if snap != nil {
@@ -82,15 +85,19 @@ func newTestTxn(p map[types.Address]*PreState) *Txn {
 
 func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 	var snap *mockSnapshot
+
 	root := emptyStateHash
 
 	ar := &fastrlp.Arena{}
+
 	if p.State != nil {
 		data := map[string][]byte{}
+
 		for k, v := range p.State {
 			vv := ar.NewBytes(bytes.TrimLeft(v.Bytes(), "\x00"))
 			data[k.String()] = vv.MarshalTo(nil)
 		}
+
 		root = randomHash()
 		snap = &mockSnapshot{
 			data: data,
@@ -102,6 +109,7 @@ func buildMockPreState(p *PreState) (*Account, *mockSnapshot) {
 		Balance: big.NewInt(int64(p.Balance)),
 		Root:    root,
 	}
+
 	return account, snap
 }
 
@@ -110,8 +118,10 @@ const letterBytes = "0123456789ABCDEF"
 func randomHash() types.Hash {
 	b := make([]byte, types.HashLength)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(letterBytes))))
+		b[i] = letterBytes[randNum.Int64()]
 	}
+
 	return types.BytesToHash(b)
 }
 
@@ -132,5 +142,6 @@ func TestSnapshotUpdateData(t *testing.T) {
 func hashit(k []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write(k)
+
 	return h.Sum(nil)
 }

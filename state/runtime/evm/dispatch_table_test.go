@@ -14,6 +14,7 @@ func TestPushOpcodes(t *testing.T) {
 	}
 
 	c := 1
+
 	for i := PUSH1; i <= PUSH32; i++ {
 		s := &state{
 			code: code,

@@ -51,6 +51,7 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -65,6 +66,7 @@ func (b Bloom) Value() (driver.Value, error) {
 func (b *Bloom) Scan(src interface{}) error {
 	bb := hex.MustDecodeHex(string(src.([]byte)))
 	copy(b[:], bb[:])
+
 	return nil
 }
 
@@ -76,15 +78,19 @@ func (b Bloom) MarshalText() ([]byte, error) {
 // CreateBloom creates a new bloom filter from a set of receipts
 func CreateBloom(receipts []*Receipt) (b Bloom) {
 	h := keccak.DefaultKeccakPool.Get()
+
 	for _, receipt := range receipts {
 		for _, log := range receipt.Logs {
 			b.setEncode(h, log.Address[:])
+
 			for _, topic := range log.Topics {
 				b.setEncode(h, topic[:])
 			}
 		}
 	}
+
 	keccak.DefaultKeccakPool.Put(h)
+
 	return
 }
 

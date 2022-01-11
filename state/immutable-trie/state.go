@@ -1,6 +1,7 @@
 package itrie
 
 import (
+	"errors"
 	"fmt"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -21,6 +22,7 @@ func NewState(storage Storage) *State {
 		storage: storage,
 		cache:   cache,
 	}
+
 	return s
 }
 
@@ -28,6 +30,7 @@ func (s *State) NewSnapshot() state.Snapshot {
 	t := NewTrie()
 	t.state = s
 	t.storage = s.storage
+
 	return t
 }
 
@@ -47,22 +50,32 @@ func (s *State) NewSnapshotAt(root types.Hash) (state.Snapshot, error) {
 
 	tt, ok := s.cache.Get(root)
 	if ok {
-		t := tt.(*Trie)
+		t, ok := tt.(*Trie)
+		if !ok {
+			return nil, errors.New("invalid type assertion")
+		}
+
 		t.state = s
+
 		return tt.(*Trie), nil
 	}
+
 	n, ok, err := GetNode(root.Bytes(), s.storage)
+
 	if err != nil {
 		return nil, err
 	}
+
 	if !ok {
 		return nil, fmt.Errorf("state not found at hash %s", root)
 	}
+
 	t := &Trie{
 		root:    n,
 		state:   s,
 		storage: s.storage,
 	}
+
 	return t, nil
 }
 

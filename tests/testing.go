@@ -42,6 +42,7 @@ func remove0xPrefix(str string) string {
 	if strings.HasPrefix(str, "0x") {
 		return strings.Replace(str, "0x", "", -1)
 	}
+
 	return str
 }
 
@@ -49,6 +50,7 @@ func stringToAddress(str string) (types.Address, error) {
 	if str == "" {
 		return types.Address{}, fmt.Errorf("value not found")
 	}
+
 	return types.StringToAddress(str), nil
 }
 
@@ -56,6 +58,7 @@ func stringToHash(str string) (types.Hash, error) {
 	if str == "" {
 		return types.Hash{}, fmt.Errorf("value not found")
 	}
+
 	return types.StringToHash(str), nil
 }
 
@@ -63,30 +66,41 @@ func stringToBigInt(str string) (*big.Int, error) {
 	if str == "" {
 		return nil, fmt.Errorf("value not found")
 	}
+
 	base := 10
+
 	if strings.HasPrefix(str, "0x") {
 		str, base = remove0xPrefix(str), 16
 	}
+
 	n, ok := big.NewInt(1).SetString(str, base)
+
 	if !ok {
 		return nil, fmt.Errorf("failed to convert %s to big.Int with base %d", str, base)
 	}
+
 	return n, nil
 }
 
 func stringToAddressT(t *testing.T, str string) types.Address {
+	t.Helper()
+
 	address, err := stringToAddress(str)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return address
 }
 
 func stringToHashT(t *testing.T, str string) types.Hash {
+	t.Helper()
+
 	address, err := stringToHash(str)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return address
 }
 
@@ -95,26 +109,35 @@ func stringToUint64(str string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return n.Uint64(), nil
 }
 
 func stringToUint64T(t *testing.T, str string) uint64 {
+	t.Helper()
+
 	n, err := stringToUint64(str)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return n
 }
 
 func stringToInt64T(t *testing.T, str string) int64 {
+	t.Helper()
+
 	n, err := stringToUint64(str)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return int64(n)
 }
 
 func (e *env) ToHeader(t *testing.T) *types.Header {
+	t.Helper()
+
 	return &types.Header{
 		Miner:      stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToUint64T(t, e.Difficulty),
@@ -125,6 +148,8 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 }
 
 func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+	t.Helper()
+
 	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
 		Difficulty: stringToHashT(t, e.Difficulty),
@@ -159,6 +184,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 
 	var dec execUnmarshall
 	err := json.Unmarshal(input, &dec)
+
 	if err != nil {
 		return err
 	}
@@ -171,6 +197,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	e.Data, err = types.ParseBytes(&dec.Data)
 	if err != nil {
 		return err
@@ -180,10 +207,12 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	e.GasLimit, err = types.ParseUint64orHex(&dec.Gas)
 	if err != nil {
 		return err
 	}
+
 	e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice)
 	if err != nil {
 		return err
@@ -192,7 +221,9 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-func buildState(t *testing.T, allocs map[types.Address]*chain.GenesisAccount) (state.State, state.Snapshot, types.Hash) {
+func buildState(
+	allocs map[types.Address]*chain.GenesisAccount,
+) (state.State, state.Snapshot, types.Hash) {
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
@@ -213,6 +244,7 @@ func buildState(t *testing.T, allocs map[types.Address]*chain.GenesisAccount) (s
 	}
 
 	snap, root := txn.Commit(false)
+
 	return s, snap, types.BytesToHash(root)
 }
 
@@ -263,9 +295,11 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	if i.Data > len(t.Data) {
 		return nil, fmt.Errorf("data index %d out of bounds (%d)", i.Data, len(t.Data))
 	}
+
 	if i.Gas > len(t.GasLimit) {
 		return nil, fmt.Errorf("gas index %d out of bounds (%d)", i.Gas, len(t.GasLimit))
 	}
+
 	if i.Value > len(t.Value) {
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
@@ -280,6 +314,7 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 	}
 
 	msg.From = t.From
+
 	return msg, nil
 }
 
@@ -296,11 +331,13 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	var dec txUnmarshall
 	err := json.Unmarshal(input, &dec)
+
 	if err != nil {
 		return err
 	}
 
 	t.Data = dec.Data
+
 	for _, i := range dec.GasLimit {
 		if j, err := stringToUint64(i); err != nil {
 			return err
@@ -311,19 +348,17 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	for _, i := range dec.Value {
 		value := new(big.Int)
-		if i != "0x" {
-			v, err := types.ParseUint256orHex(&i)
+		loopVal := i
+
+		if loopVal != "0x" {
+			v, err := types.ParseUint256orHex(&loopVal)
 			if err != nil {
 				return err
 			}
-			/*
-				v, ok := math.ParseBig256(i)
-				if !ok {
-					return fmt.Errorf("invalid tx value %q", i)
-				}
-			*/
+
 			value = v
 		}
+
 		t.Value = append(t.Value, value)
 	}
 
@@ -338,15 +373,18 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.From = types.Address{}
+
 	if len(dec.SecretKey) > 0 {
 		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
 			return err
 		}
+
 		key, err := crypto.ParsePrivateKey(secretKey)
 		if err != nil {
-			return fmt.Errorf("invalid private key: %v", err)
+			return fmt.Errorf("invalid private key: %w", err)
 		}
+
 		t.From = crypto.PubKeyToAddress(&key.PublicKey)
 	}
 
@@ -354,6 +392,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		address := types.StringToAddress(dec.To)
 		t.To = &address
 	}
+
 	return nil
 }
 
@@ -437,6 +476,7 @@ func contains(l []string, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -450,12 +490,14 @@ func listFolders(paths ...string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		for _, i := range files {
 			if i.IsDir() {
 				folders = append(folders, filepath.Join(path, i.Name()))
 			}
 		}
 	}
+
 	return folders, nil
 }
 
@@ -472,7 +514,9 @@ func listFiles(folder string) ([]string, error) {
 		if !info.IsDir() {
 			files = append(files, path)
 		}
+
 		return nil
 	})
+
 	return files, err
 }

@@ -192,8 +192,9 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
+
 		if subscribeErr := topic.Subscribe(txPool.handleGossipTxn); subscribeErr != nil {
-			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %w", subscribeErr)
 		}
 
 		txPool.topic = topic
@@ -202,6 +203,7 @@ func NewTxPool(
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, txPool)
 	}
+
 	return txPool, nil
 }
 
@@ -322,8 +324,9 @@ func (t *TxPool) handleGossipTxn(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn)
+	raw := obj.(*proto.Txn) //nolint:forcetypeassert
 	txn := new(types.Transaction)
+
 	if err := txn.UnmarshalRLP(raw.Raw.Value); err != nil {
 		t.logger.Error("failed to decode broadcasted txn", "err", err)
 	} else {
@@ -365,6 +368,7 @@ func (t *TxPool) AddTx(tx *types.Transaction) error {
 		default:
 		}
 	}
+
 	return nil
 }
 
@@ -377,6 +381,7 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 
 	if _, isAvailable := t.GetPendingTx(tx.Hash); isAvailable {
 		t.logger.Info("Discarding already known transaction", "hash", tx.Hash)
+
 		return ErrAlreadyKnown
 	}
 	// should treat as local in the following cases
@@ -384,8 +389,10 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 	// (2) from in tx is in locals addresses
 	isLocal := (!t.noLocals && origin == OriginAddTxn) || t.locals.containsTxSender(t.signer, tx)
 	err := t.validateTx(tx, isLocal)
+
 	if err != nil {
 		t.logger.Error("Discarding invalid transaction", "hash", tx.Hash, "err", err)
+
 		return err
 	}
 
@@ -423,7 +430,8 @@ func (t *TxPool) addImpl(origin TxOrigin, tx *types.Transaction) error {
 		}
 	}
 
-	// Skip check of GasPrice in the future transactions created by same address when TxPool receives transaction by Gossip or Reorg
+	// Skip check of GasPrice in the future transactions created
+	// by same address when TxPool receives transaction by Gossip or Reorg
 	if isLocal && !t.locals.containsAddr(tx.From) {
 		t.locals.addAddr(tx.From)
 	}
@@ -458,31 +466,42 @@ func (t *TxPool) DecreaseAccountNonce(tx *types.Transaction) {
 }
 
 // GetTxs gets pending and queued transactions
-func (t *TxPool) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+func (t *TxPool) GetTxs(inclQueued bool) (
+	map[types.Address]map[uint64]*types.Transaction,
+	map[types.Address]map[uint64]*types.Transaction,
+) {
 	t.pendingQueue.lock.Lock()
+
 	pendingTxs := make(map[types.Address]map[uint64]*types.Transaction)
+
 	sortedPricedTxs := t.pendingQueue.index
 	for _, sortedPricedTx := range sortedPricedTxs {
 		if _, ok := pendingTxs[sortedPricedTx.from]; !ok {
 			pendingTxs[sortedPricedTx.from] = make(map[uint64]*types.Transaction)
 		}
+
 		pendingTxs[sortedPricedTx.from][sortedPricedTx.tx.Nonce] = sortedPricedTx.tx
 	}
 	t.pendingQueue.lock.Unlock()
+
 	if !inclQueued {
 		return pendingTxs, nil
 	}
 
 	queuedTxs := make(map[types.Address]map[uint64]*types.Transaction)
+
 	queue := t.accountQueues
 	for addr, queuedTxn := range queue {
 		wrapper := t.lockAccountQueue(addr, false)
+
 		for _, tx := range queuedTxn.accountQueue.txs {
 			if _, ok := queuedTxs[addr]; !ok {
 				queuedTxs[addr] = make(map[uint64]*types.Transaction)
 			}
+
 			queuedTxs[addr][tx.Nonce] = tx
 		}
+
 		wrapper.unlock()
 	}
 
@@ -508,15 +527,19 @@ func (t *TxPool) Pop() (*types.Transaction, func()) {
 	slots := slotsRequired(txn.tx)
 	// Subtracts tx slots
 	t.gauge.decrease(slots)
+
 	ret := func() {
 		if pushErr := t.pendingQueue.Push(txn.tx); pushErr != nil {
 			t.logger.Error(fmt.Sprintf("Unable to promote transaction %s, %v", txn.tx.Hash.String(), pushErr))
+
 			return
 		} else {
 			t.metrics.PendingTxs.Add(1)
 		}
+
 		t.gauge.increase(slots)
 	}
+
 	return txn.tx, ret
 }
 
@@ -526,6 +549,7 @@ func (t *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	defer t.txnLookupMapLock.RUnlock()
 
 	txn, ok := t.txnLookupMap[txHash]
+
 	return txn, ok
 }
 
@@ -589,6 +613,7 @@ func (t *TxPool) promotedTxnCleanup(
 
 	// Find the txns that correspond to this account
 	droppedPendingTxs := make([]*types.Transaction, 0)
+
 	for _, pendingQueueTxn := range t.pendingQueue.index {
 		// Check if the txn in the promoted queue matches the search criteria
 		if pendingQueueTxn.from == address && // The sender of this txn is the account we're looking for
@@ -639,11 +664,13 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 
 	// Legacy reorg logic //
 	addTxns := map[types.Hash]*types.Transaction{}
+
 	for _, evnt := range evnt.OldChain {
 		// reinject these transactions on the pool
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn add", "hash", block.Hash())
+
 			continue
 		}
 
@@ -658,6 +685,7 @@ func (t *TxPool) extractTransactions(evnt *blockchain.Event) map[types.Address]*
 		block, ok := t.store.GetBlockByHash(evnt.Hash, true)
 		if !ok {
 			t.logger.Error("block not found on txn del", "hash", block.Hash())
+
 			continue
 		}
 		// Compile transactions that should be accounted for in the TxPool
@@ -736,6 +764,7 @@ func (t *TxPool) ProcessEvent(evnt *blockchain.Event) {
 					wrapper.accountQueue.nextNonce,
 				),
 			)
+
 			wrapper.accountQueue.nextNonce = stateNonce
 		}
 
@@ -831,6 +860,7 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 	}
 	// tx.GasPrice < lowestTx.Price
 	underpriced := tx.GasPrice.Cmp(lowestTx.price) < 0
+
 	if pushErr := t.remoteTxns.Push(lowestTx.tx); pushErr != nil {
 		t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
 	}
@@ -840,6 +870,7 @@ func (t *TxPool) Underpriced(tx *types.Transaction) bool {
 
 func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction, bool) {
 	dropped := make([]*types.Transaction, 0)
+
 	for slotsToRemove > 0 {
 		if t.remoteTxns.Length() == 0 {
 			break
@@ -863,6 +894,7 @@ func (t *TxPool) Discard(slotsToRemove uint64, force bool) ([]*types.Transaction
 				t.logger.Error(fmt.Sprintf("Unable to push transaction to remoteTxn queue, %v", pushErr))
 			}
 		}
+
 		return nil, false
 	}
 
@@ -879,6 +911,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	if t.gauge.height+txSlots <= t.gauge.limit {
 		// no overflow, just increase the height
 		t.gauge.height += txSlots
+
 		return nil
 	}
 
@@ -891,6 +924,7 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 	// try to allocate space
 	overflow := t.gauge.height + txSlots - t.gauge.limit
 	dropped, success := t.Discard(overflow, isLocal)
+
 	if !isLocal && !success {
 		return ErrTxPoolOverflow
 	}
@@ -904,9 +938,11 @@ func (t *TxPool) processSlots(tx *types.Transaction, isLocal bool) error {
 		t.pendingQueue.Delete(tx)
 		t.gauge.height -= slotsRequired(tx)
 	}
+
 	t.gauge.height += txSlots
 
 	t.metrics.PendingTxs.Set(float64(t.pendingQueue.Length()))
+
 	return nil
 }
 
@@ -943,6 +979,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 	if tx == nil || tx.Nonce != t.nextNonce {
 		// Nothing to promote
 		t.logger.Debug("No txs to promote")
+
 		return nil
 	}
 
@@ -958,6 +995,7 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 
 	for {
 		promote = append(promote, tx)
+
 		t.Pop()
 
 		var nextTx *types.Transaction
@@ -975,7 +1013,9 @@ func (t *txHeapWrapper) Promote() []*types.Transaction {
 					tx.Nonce,
 				),
 			)
+
 			higherNonceTxs = append(higherNonceTxs, nextTx)
+
 			break
 		}
 
@@ -1032,9 +1072,11 @@ func (t *txHeapWrapper) Remove(hash types.Hash) bool {
 	for i, tx := range t.txs {
 		if tx.Hash == hash {
 			t.txs = append(t.txs[:i], t.txs[i+1:]...)
+
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -1049,6 +1091,7 @@ func (t *txHeap) Peek() *types.Transaction {
 	if len(*t) == 0 {
 		return nil
 	}
+
 	return (*t)[0]
 }
 
@@ -1073,6 +1116,7 @@ func (t *txHeap) Pop() interface{} {
 	n := len(old)
 	x := old[n-1]
 	*t = old[0 : n-1]
+
 	return x
 }
 
@@ -1136,6 +1180,7 @@ func (t *txPriceHeap) Push(tx *types.Transaction) error {
 	}
 	t.index[tx.Hash] = pTx
 	heap.Push(t.heap, pTx)
+
 	return nil
 }
 
@@ -1146,13 +1191,16 @@ func (t *txPriceHeap) Pop() *pricedTx {
 	if len(t.index) == 0 {
 		return nil
 	}
-	tx := heap.Pop(t.heap).(*pricedTx)
+
+	tx := heap.Pop(t.heap).(*pricedTx) //nolint:forcetypeassert
 	delete(t.index, tx.tx.Hash)
+
 	return tx
 }
 
 func (t *txPriceHeap) Contains(tx *types.Transaction) bool {
 	_, ok := t.index[tx.Hash]
+
 	return ok
 }
 
@@ -1187,7 +1235,7 @@ func (t txPriceHeapImplBase) Swap(i, j int) {
 
 func (t *txPriceHeapImplBase) Push(x interface{}) {
 	n := len(t.txs)
-	job := x.(*pricedTx)
+	job := x.(*pricedTx) //nolint:forcetypeassert
 	job.index = n
 	t.txs = append(t.txs, job)
 }
@@ -1198,6 +1246,7 @@ func (t *txPriceHeapImplBase) Pop() interface{} {
 	job := old.txs[n-1]
 	job.index = -1
 	t.txs = old.txs[0 : n-1]
+
 	return job
 }
 
@@ -1257,6 +1306,7 @@ func newLocalAccounts(addrs []types.Address) *localAccounts {
 	for _, addr := range addrs {
 		accounts[addr] = true
 	}
+
 	return &localAccounts{
 		accounts: accounts,
 		mutex:    sync.RWMutex{},
@@ -1266,6 +1316,7 @@ func newLocalAccounts(addrs []types.Address) *localAccounts {
 func (a *localAccounts) containsAddr(addr types.Address) bool {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
+
 	return a.accounts[addr]
 }
 
@@ -1273,6 +1324,7 @@ func (a *localAccounts) containsTxSender(signer signer, tx *types.Transaction) b
 	if addr, err := signer.Sender(tx); err == nil {
 		return a.containsAddr(addr)
 	}
+
 	return false
 }
 

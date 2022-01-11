@@ -19,6 +19,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if len(tuple) != 2 {
 		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", len(tuple))
 	}
@@ -28,11 +29,13 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, txn := range txns {
 		bTxn := &Transaction{}
 		if err := bTxn.UnmarshalStoreRLPFrom(p, txn); err != nil {
 			return err
 		}
+
 		b.Transactions = append(b.Transactions, bTxn)
 	}
 
@@ -41,11 +44,13 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, uncle := range uncles {
 		bUncle := &Header{}
 		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
+
 		b.Uncles = append(b.Uncles, bUncle)
 	}
 
@@ -61,6 +66,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 2 {
 		return fmt.Errorf("expected 2 elements")
 	}
@@ -73,6 +79,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	if err = elems[1].GetAddr(t.From[:]); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -85,13 +92,16 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range elems {
 		rr := &Receipt{}
 		if err := rr.UnmarshalStoreRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		(*r) = append(*r, rr)
 	}
+
 	return nil
 }
 
@@ -104,6 +114,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 3 {
 		return fmt.Errorf("expected 3 elements")
 	}
@@ -128,5 +139,6 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	if r.GasUsed, err = elems[2].GetUint64(); err != nil {
 		return err
 	}
+
 	return nil
 }
