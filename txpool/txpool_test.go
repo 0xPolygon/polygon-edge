@@ -44,7 +44,7 @@ var (
 )
 
 // returns a new valid tx of slots size with the given nonce
-func newDummyTx(addr types.Address, nonce, slots uint64) *types.Transaction {
+func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 	// base field should take 1 slot at least
 	size := txSlotSize * (slots - 1)
 	if size <= 0 {
@@ -228,7 +228,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send higher nonce tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 10, 1)) // 10 > 0
+			err := pool.addTx(local, newTx(addr1, 10, 1)) // 10 > 0
 			assert.NoError(t, err)
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -250,7 +250,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 10, 1)) // 10 < 20
+			err := pool.addTx(local, newTx(addr1, 10, 1)) // 10 < 20
 			assert.NoError(t, err)
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -267,7 +267,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 0, 1)) // 0 == 0
+			err := pool.addTx(local, newTx(addr1, 0, 1)) // 0 == 0
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -293,7 +293,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send demoted (recovered and promotable)
 		go pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newDummyTx(addr1, 3, 1), // 3 < 5
+			tx:      newTx(addr1, 3, 1), // 3 < 5
 			demoted: true,
 		})
 
@@ -317,7 +317,7 @@ func TestAddHandler(t *testing.T) {
 
 		// send demoted (recovered but not promotable)
 		pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newDummyTx(addr1, 8, 1), // 8 > 5
+			tx:      newTx(addr1, 8, 1), // 8 > 5
 			demoted: true,
 		})
 
@@ -353,7 +353,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		// enqueue higher nonce tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 10, 1))
+			err := pool.addTx(local, newTx(addr1, 10, 1))
 			assert.NoError(t, err)
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -374,7 +374,7 @@ func TestPromoteHandler(t *testing.T) {
 		pool.EnableDev()
 
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 0, 1))
+			err := pool.addTx(local, newTx(addr1, 0, 1))
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -401,7 +401,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		// send the first (expected) tx -> signals promotion
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 0, 1)) // 0 == 0
+			err := pool.addTx(local, newTx(addr1, 0, 1)) // 0 == 0
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -412,7 +412,7 @@ func TestPromoteHandler(t *testing.T) {
 		// send the remaining txs (all will be enqueued)
 		for nonce := uint64(1); nonce < 10; nonce++ {
 			go func() {
-				err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+				err := pool.addTx(local, newTx(addr1, nonce, 1))
 				assert.NoError(t, err)
 			}()
 			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -442,7 +442,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		for nonce := uint64(0); nonce < 20; nonce++ {
 			go func(nonce uint64) {
-				err := pool.addTx(local, newDummyTx(addr1, nonce, 1))
+				err := pool.addTx(local, newTx(addr1, nonce, 1))
 				assert.NoError(t, err)
 			}(nonce)
 			go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -469,7 +469,7 @@ func TestPromoteHandler(t *testing.T) {
 
 		// send recovered tx
 		go pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newDummyTx(addr1, 4, 1),
+			tx:      newTx(addr1, 4, 1),
 			demoted: true,
 		})
 
@@ -492,11 +492,11 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune all txs",
 				txs: transactions{
-					newDummyTx(addr1, 0, 1),
-					newDummyTx(addr1, 1, 1),
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
-					newDummyTx(addr1, 4, 1),
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
+					newTx(addr1, 4, 1),
 				},
 				newNonce: 5,
 				expected: result{
@@ -511,9 +511,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune no txs",
 				txs: transactions{
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
-					newDummyTx(addr1, 4, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
+					newTx(addr1, 4, 1),
 				},
 				newNonce: 1,
 				expected: result{
@@ -528,9 +528,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune some txs",
 				txs: transactions{
-					newDummyTx(addr1, 7, 1),
-					newDummyTx(addr1, 8, 1),
-					newDummyTx(addr1, 9, 1),
+					newTx(addr1, 7, 1),
+					newTx(addr1, 8, 1),
+					newTx(addr1, 9, 1),
 				},
 				newNonce: 8,
 				expected: result{
@@ -605,10 +605,10 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune all txs",
 				txs: transactions{
-					newDummyTx(addr1, 5, 1),
-					newDummyTx(addr1, 6, 1),
-					newDummyTx(addr1, 7, 1),
-					newDummyTx(addr1, 8, 1),
+					newTx(addr1, 5, 1),
+					newTx(addr1, 6, 1),
+					newTx(addr1, 7, 1),
+					newTx(addr1, 8, 1),
 				},
 				newNonce: 10,
 				expected: result{
@@ -623,9 +623,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune no txs",
 				txs: transactions{
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
-					newDummyTx(addr1, 4, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
+					newTx(addr1, 4, 1),
 				},
 				newNonce: 1,
 				expected: result{
@@ -640,10 +640,10 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune some txs",
 				txs: transactions{
-					newDummyTx(addr1, 4, 1),
-					newDummyTx(addr1, 5, 1),
-					newDummyTx(addr1, 8, 1),
-					newDummyTx(addr1, 9, 1),
+					newTx(addr1, 4, 1),
+					newTx(addr1, 5, 1),
+					newTx(addr1, 8, 1),
+					newTx(addr1, 9, 1),
 				},
 				newNonce: 6,
 				expected: result{
@@ -659,9 +659,9 @@ func TestResetAccount(t *testing.T) {
 				name:   "prune signals promotion",
 				signal: true,
 				txs: transactions{
-					newDummyTx(addr1, 8, 1),
-					newDummyTx(addr1, 9, 1),
-					newDummyTx(addr1, 10, 1),
+					newTx(addr1, 8, 1),
+					newTx(addr1, 9, 1),
+					newTx(addr1, 10, 1),
 				},
 				newNonce: 9,
 				expected: result{
@@ -726,14 +726,14 @@ func TestResetAccount(t *testing.T) {
 				name: "prune all txs",
 				txs: transactions{
 					// promoted
-					newDummyTx(addr1, 0, 1),
-					newDummyTx(addr1, 1, 1),
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
 					// enqueued
-					newDummyTx(addr1, 5, 1),
-					newDummyTx(addr1, 6, 1),
-					newDummyTx(addr1, 8, 1),
+					newTx(addr1, 5, 1),
+					newTx(addr1, 6, 1),
+					newTx(addr1, 8, 1),
 				},
 				newNonce: 10,
 				expected: result{
@@ -750,11 +750,11 @@ func TestResetAccount(t *testing.T) {
 				name: "prune no txs",
 				txs: transactions{
 					// promoted
-					newDummyTx(addr1, 5, 1),
-					newDummyTx(addr1, 6, 1),
+					newTx(addr1, 5, 1),
+					newTx(addr1, 6, 1),
 					// enqueued
-					newDummyTx(addr1, 9, 1),
-					newDummyTx(addr1, 10, 1),
+					newTx(addr1, 9, 1),
+					newTx(addr1, 10, 1),
 				},
 				newNonce: 3,
 				expected: result{
@@ -771,13 +771,13 @@ func TestResetAccount(t *testing.T) {
 				name: "prune some txs",
 				txs: transactions{
 					// promoted
-					newDummyTx(addr1, 1, 1),
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
 					// enqueued
-					newDummyTx(addr1, 5, 1),
-					newDummyTx(addr1, 8, 1),
-					newDummyTx(addr1, 9, 1),
+					newTx(addr1, 5, 1),
+					newTx(addr1, 8, 1),
+					newTx(addr1, 9, 1),
 				},
 				newNonce: 6,
 				expected: result{
@@ -795,14 +795,14 @@ func TestResetAccount(t *testing.T) {
 				signal: true,
 				txs: transactions{
 					// promoted
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
-					newDummyTx(addr1, 4, 1),
-					newDummyTx(addr1, 5, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
+					newTx(addr1, 4, 1),
+					newTx(addr1, 5, 1),
 					// enqueued
-					newDummyTx(addr1, 8, 1),
-					newDummyTx(addr1, 9, 1),
-					newDummyTx(addr1, 10, 1),
+					newTx(addr1, 8, 1),
+					newTx(addr1, 9, 1),
+					newTx(addr1, 10, 1),
 				},
 				newNonce: 8,
 				expected: result{
@@ -880,7 +880,7 @@ func TestPop(t *testing.T) {
 
 	// send 1 tx and promote it
 	go func() {
-		err := pool.addTx(local, newDummyTx(addr1, 0, 1))
+		err := pool.addTx(local, newTx(addr1, 0, 1))
 		assert.NoError(t, err)
 	}()
 	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -905,7 +905,7 @@ func TestDrop(t *testing.T) {
 
 	// send 1 tx and promote it
 	go func() {
-		err := pool.addTx(local, newDummyTx(addr1, 0, 1))
+		err := pool.addTx(local, newTx(addr1, 0, 1))
 		assert.NoError(t, err)
 	}()
 	go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -933,7 +933,7 @@ func TestDemote(t *testing.T) {
 
 		// send 1st tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 0, 1))
+			err := pool.addTx(local, newTx(addr1, 0, 1))
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -943,7 +943,7 @@ func TestDemote(t *testing.T) {
 
 		// send 2nd tx
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 1, 1))
+			err := pool.addTx(local, newTx(addr1, 1, 1))
 			assert.NoError(t, err)
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -993,13 +993,13 @@ func TestDemote(t *testing.T) {
 
 		// send 2 txs and promote them
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 0, 1))
+			err := pool.addTx(local, newTx(addr1, 0, 1))
 			assert.NoError(t, err)
 		}()
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		prom := <-pool.promoteReqCh
 		go func() {
-			err := pool.addTx(local, newDummyTx(addr1, 1, 1))
+			err := pool.addTx(local, newTx(addr1, 1, 1))
 			assert.NoError(t, err)
 		}()
 		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -1103,7 +1103,7 @@ func TestAddTx100(t *testing.T) {
 		addr := types.Address{0x1}
 		for nonce := uint64(0); nonce < 100; nonce++ {
 			go func(nonce uint64) {
-				err := pool.addTx(local, newDummyTx(addr, nonce, 1))
+				err := pool.addTx(local, newTx(addr, nonce, 1))
 				assert.NoError(t, err)
 			}(nonce)
 		}
@@ -1144,7 +1144,7 @@ func TestAddTx1000(t *testing.T) {
 		// send 1000
 		for _, addr := range accounts {
 			for nonce := uint64(0); nonce < 100; nonce++ {
-				tx, err := signer.SignTx(newDummyTx(addr, nonce, 3), key)
+				tx, err := signer.SignTx(newTx(addr, nonce, 3), key)
 				assert.NoError(t, err)
 				go func(nonce uint64) {
 					err := pool.addTx(local, tx)
@@ -1171,26 +1171,26 @@ func TestResetAccounts(t *testing.T) {
 			name: "reset promoted only",
 			allTxs: map[types.Address]transactions{ // all txs will end up in promoted queue
 				addr1: {
-					newDummyTx(addr1, 0, 1),
-					newDummyTx(addr1, 1, 1),
-					newDummyTx(addr1, 2, 1),
-					newDummyTx(addr1, 3, 1),
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+					newTx(addr1, 3, 1),
 				},
 				addr2: {
-					newDummyTx(addr2, 0, 1),
-					newDummyTx(addr2, 1, 1),
+					newTx(addr2, 0, 1),
+					newTx(addr2, 1, 1),
 				},
 				addr3: {
-					newDummyTx(addr3, 0, 1),
-					newDummyTx(addr3, 1, 1),
-					newDummyTx(addr3, 2, 1),
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 1),
+					newTx(addr3, 2, 1),
 				},
 				addr4: {
-					newDummyTx(addr4, 0, 1),
-					newDummyTx(addr4, 1, 1),
-					newDummyTx(addr4, 2, 1),
-					newDummyTx(addr4, 3, 1),
-					newDummyTx(addr4, 4, 1),
+					newTx(addr4, 0, 1),
+					newTx(addr4, 1, 1),
+					newTx(addr4, 2, 1),
+					newTx(addr4, 3, 1),
+					newTx(addr4, 4, 1),
 				},
 			},
 			newNonces: map[types.Address]uint64{
@@ -1221,21 +1221,21 @@ func TestResetAccounts(t *testing.T) {
 			name: "reset enqueued only",
 			allTxs: map[types.Address]transactions{
 				addr1: {
-					newDummyTx(addr1, 3, 1),
-					newDummyTx(addr1, 4, 1),
-					newDummyTx(addr1, 5, 1),
+					newTx(addr1, 3, 1),
+					newTx(addr1, 4, 1),
+					newTx(addr1, 5, 1),
 				},
 				addr2: {
-					newDummyTx(addr2, 2, 1),
-					newDummyTx(addr2, 3, 1),
-					newDummyTx(addr2, 5, 1),
-					newDummyTx(addr2, 6, 1),
-					newDummyTx(addr2, 7, 1),
+					newTx(addr2, 2, 1),
+					newTx(addr2, 3, 1),
+					newTx(addr2, 5, 1),
+					newTx(addr2, 6, 1),
+					newTx(addr2, 7, 1),
 				},
 				addr3: {
-					newDummyTx(addr3, 7, 1),
-					newDummyTx(addr3, 8, 1),
-					newDummyTx(addr3, 9, 1),
+					newTx(addr3, 7, 1),
+					newTx(addr3, 8, 1),
+					newTx(addr3, 9, 1),
 				},
 			},
 			newNonces: map[types.Address]uint64{
@@ -1266,45 +1266,45 @@ func TestResetAccounts(t *testing.T) {
 			allTxs: map[types.Address]transactions{
 				addr1: {
 					// promoted
-					newDummyTx(addr1, 0, 3),
-					newDummyTx(addr1, 1, 3),
-					newDummyTx(addr1, 2, 1),
+					newTx(addr1, 0, 3),
+					newTx(addr1, 1, 3),
+					newTx(addr1, 2, 1),
 					// enqueued
-					newDummyTx(addr1, 5, 2),
-					newDummyTx(addr1, 6, 2),
-					newDummyTx(addr1, 8, 2),
+					newTx(addr1, 5, 2),
+					newTx(addr1, 6, 2),
+					newTx(addr1, 8, 2),
 				},
 				addr2: {
 					// promoted
-					newDummyTx(addr2, 0, 2),
-					newDummyTx(addr2, 1, 1),
+					newTx(addr2, 0, 2),
+					newTx(addr2, 1, 1),
 					// enqueued
-					newDummyTx(addr2, 4, 1),
-					newDummyTx(addr2, 5, 2),
+					newTx(addr2, 4, 1),
+					newTx(addr2, 5, 2),
 				},
 				addr3: {
 					// promoted
-					newDummyTx(addr3, 0, 1),
-					newDummyTx(addr3, 1, 2),
-					newDummyTx(addr3, 2, 1),
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 2),
+					newTx(addr3, 2, 1),
 					// enqueued
-					newDummyTx(addr3, 4, 3),
-					newDummyTx(addr3, 7, 1),
-					newDummyTx(addr3, 9, 2),
+					newTx(addr3, 4, 3),
+					newTx(addr3, 7, 1),
+					newTx(addr3, 9, 2),
 				},
 				addr4: {
 					// promoted
-					newDummyTx(addr4, 0, 1),
-					newDummyTx(addr4, 1, 1),
-					newDummyTx(addr4, 2, 2),
-					newDummyTx(addr4, 3, 1),
+					newTx(addr4, 0, 1),
+					newTx(addr4, 1, 1),
+					newTx(addr4, 2, 2),
+					newTx(addr4, 3, 1),
 				},
 				addr5: {
 					// enqueued
-					newDummyTx(addr5, 6, 1),
-					newDummyTx(addr5, 8, 1),
-					newDummyTx(addr5, 9, 2),
-					newDummyTx(addr5, 10, 1),
+					newTx(addr5, 6, 1),
+					newTx(addr5, 8, 1),
+					newTx(addr5, 9, 2),
+					newTx(addr5, 10, 1),
 				},
 			},
 			newNonces: map[types.Address]uint64{
@@ -1384,7 +1384,7 @@ func TestResetAccounts(t *testing.T) {
 
 func TestExecutablesOrder(t *testing.T) {
 	newPricedTx := func(addr types.Address, nonce, gasPrice uint64) *types.Transaction {
-		tx := newDummyTx(addr, nonce, 1)
+		tx := newTx(addr, nonce, 1)
 		tx.GasPrice.SetUint64(gasPrice)
 
 		return tx
@@ -1551,21 +1551,21 @@ func TestRecovery(t *testing.T) {
 			name: "all recovered in enqueued",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
-					{newDummyTx(addr1, 0, 1), ok},
-					{newDummyTx(addr1, 1, 1), unrecoverable}, // will demote subsequent
-					{newDummyTx(addr1, 2, 1), recoverable},
-					{newDummyTx(addr1, 3, 1), recoverable},
-					{newDummyTx(addr1, 4, 1), recoverable},
+					{newTx(addr1, 0, 1), ok},
+					{newTx(addr1, 1, 1), unrecoverable}, // will demote subsequent
+					{newTx(addr1, 2, 1), recoverable},
+					{newTx(addr1, 3, 1), recoverable},
+					{newTx(addr1, 4, 1), recoverable},
 				},
 				addr2: {
-					{newDummyTx(addr2, 0, 1), unrecoverable}, // will demote subsequent
-					{newDummyTx(addr2, 1, 1), recoverable},
+					{newTx(addr2, 0, 1), unrecoverable}, // will demote subsequent
+					{newTx(addr2, 1, 1), recoverable},
 				},
 				addr3: {
-					{newDummyTx(addr3, 0, 1), ok},
-					{newDummyTx(addr3, 1, 1), unrecoverable}, // will demote subsequent
-					{newDummyTx(addr3, 2, 1), recoverable},
-					{newDummyTx(addr3, 3, 1), recoverable},
+					{newTx(addr3, 0, 1), ok},
+					{newTx(addr3, 1, 1), unrecoverable}, // will demote subsequent
+					{newTx(addr3, 2, 1), recoverable},
+					{newTx(addr3, 3, 1), recoverable},
 				},
 			},
 			expected: result{
@@ -1587,26 +1587,26 @@ func TestRecovery(t *testing.T) {
 			name: "all recovered in promoted",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
-					{newDummyTx(addr1, 0, 1), ok},
-					{newDummyTx(addr1, 1, 1), ok},
-					{newDummyTx(addr1, 2, 1), recoverable},
-					{newDummyTx(addr1, 3, 1), recoverable},
-					{newDummyTx(addr1, 4, 1), recoverable},
+					{newTx(addr1, 0, 1), ok},
+					{newTx(addr1, 1, 1), ok},
+					{newTx(addr1, 2, 1), recoverable},
+					{newTx(addr1, 3, 1), recoverable},
+					{newTx(addr1, 4, 1), recoverable},
 				},
 				addr2: {
-					{newDummyTx(addr2, 0, 1), ok},
-					{newDummyTx(addr2, 1, 1), ok},
+					{newTx(addr2, 0, 1), ok},
+					{newTx(addr2, 1, 1), ok},
 				},
 				addr3: {
-					{newDummyTx(addr3, 0, 1), ok},
-					{newDummyTx(addr3, 1, 1), ok},
-					{newDummyTx(addr3, 2, 1), ok},
-					{newDummyTx(addr3, 3, 1), recoverable},
+					{newTx(addr3, 0, 1), ok},
+					{newTx(addr3, 1, 1), ok},
+					{newTx(addr3, 2, 1), ok},
+					{newTx(addr3, 3, 1), recoverable},
 				},
 				addr4: {
-					{newDummyTx(addr4, 0, 1), ok},
-					{newDummyTx(addr4, 1, 1), recoverable},
-					{newDummyTx(addr4, 2, 1), recoverable},
+					{newTx(addr4, 0, 1), ok},
+					{newTx(addr4, 1, 1), recoverable},
+					{newTx(addr4, 2, 1), recoverable},
 				},
 			},
 			expected: result{
