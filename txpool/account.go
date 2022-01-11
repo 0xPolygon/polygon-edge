@@ -8,6 +8,7 @@ import (
 )
 
 // Thread safe map of all accounts registered by the pool.
+// Each account (value) is bound to one address (key).
 type accountsMap struct {
 	sync.Map
 	count uint64
@@ -34,7 +35,7 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	return newAccount
 }
 
-// Checks if an account exists within the map.
+// exists checks if an account exists within the map.
 func (m *accountsMap) exists(addr types.Address) bool {
 	_, ok := m.Load(addr)
 	return ok
@@ -59,7 +60,7 @@ func (m *accountsMap) getPrimaries() (primaries transactions) {
 	return primaries
 }
 
-// Returns the account associated with the given address.
+// get returns the account associated with the given address.
 func (m *accountsMap) get(addr types.Address) *account {
 	a, ok := m.Load(addr)
 	if !ok {
@@ -69,7 +70,7 @@ func (m *accountsMap) get(addr types.Address) *account {
 	return a.(*account)
 }
 
-// Returns the number of all promoted transactons.
+// promoted returns the number of all promoted transactons.
 func (m *accountsMap) promoted() (total uint64) {
 	m.Range(func(key, value interface{}) bool {
 		account := m.get(key.(types.Address))
@@ -84,7 +85,7 @@ func (m *accountsMap) promoted() (total uint64) {
 	return
 }
 
-// Returns all promoted and enqueued transactions (if the flag is set to true).
+// allTxs returns all promoted and all enqueued transactions, depending on the flag.
 func (m *accountsMap) allTxs(includeEnqueued bool) (
 	allPromoted, allEnqueued map[types.Address][]*types.Transaction,
 ) {
@@ -112,8 +113,6 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
-/* account impl */
-
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
 // field is what separetes the enqueued from promoted:
@@ -131,17 +130,17 @@ type account struct {
 	nextNonce          uint64
 }
 
-// Returns the next expected nonce for this account.
+// getNonce returns the next expected nonce for this account.
 func (a *account) getNonce() uint64 {
 	return atomic.LoadUint64(&a.nextNonce)
 }
 
-// Sets the next expected nonce for this account.
+// setNonce sets the next expected nonce for this account.
 func (a *account) setNonce(nonce uint64) {
 	atomic.StoreUint64(&a.nextNonce, nonce)
 }
 
-// Pushes the transaction onto the enqueued queue.
+// enqueue attempts tp push the transaction onto the enqueued queue.
 func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()

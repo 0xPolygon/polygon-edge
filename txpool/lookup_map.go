@@ -12,7 +12,7 @@ type lookupMap struct {
 	all map[types.Hash]*types.Transaction
 }
 
-// Adds the given transaction to the map. [thread-safe]
+// add inserts the given transaction into the map. [thread-safe]
 func (m *lookupMap) add(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -22,7 +22,7 @@ func (m *lookupMap) add(txs ...*types.Transaction) {
 	}
 }
 
-// Removes the given transactions from the map. [thread-safe]
+// remove removes the given transactions from the map. [thread-safe]
 func (m *lookupMap) remove(txs ...*types.Transaction) {
 	m.Lock()
 	defer m.Unlock()
@@ -32,7 +32,7 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 	}
 }
 
-// Returns the transaction associated with the given hash. [thread-safe]
+// get returns the transaction associated with the given hash. [thread-safe]
 func (m *lookupMap) get(hash types.Hash) (*types.Transaction, bool) {
 	m.RLock()
 	defer m.RUnlock()

@@ -166,7 +166,7 @@ type TxPool struct {
 	proto.UnimplementedTxnPoolOperatorServer
 }
 
-// Returns a new pool for processing incoming transactions.
+// NewTxPool returns a new pool for processing incoming transactions.
 func NewTxPool(
 	logger hclog.Logger,
 	forks chain.ForksInTime,
@@ -240,18 +240,18 @@ func (p *TxPool) Start() error {
 	return nil
 }
 
-// Stops the pool's main loop.
-func (p *TxPool) Stop() {
+// Close shuts down the pool's main loop.
+func (p *TxPool) Close() {
 	p.shutdownCh <- struct{}{}
 }
 
-// Sets the signer the pool will use
-// to check a transaction's signature.
+// SetSigner sets the signer the pool will use
+// to validate a transaction's signature.
 func (p *TxPool) SetSigner(s signer) {
 	p.signer = s
 }
 
-// Enables dev mode so the pool can accept
+// EnableDev enables the pool to accept
 // non-encrypted transactions. (used for testing)
 func (p *TxPool) EnableDev() {
 	p.dev = true
@@ -282,8 +282,8 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-// Generates all the transactions (primaries)
-// ready for execution.
+// Prepare generates all the transactions
+// ready for execution. (primaries)
 func (p *TxPool) Prepare() {
 	// clear from previous round
 	if p.executables.length() != 0 {
@@ -299,13 +299,13 @@ func (p *TxPool) Prepare() {
 	}
 }
 
-// Returns the highest priced transaction
-// from the executables queue.
+// Peek returns the best-price selected
+// transaction from the executables queue.
 func (p *TxPool) Peek() *types.Transaction {
 	return p.executables.pop()
 }
 
-// Pops the given transaction from the
+// Pop removes the given transaction from the
 // associated promoted queue (account).
 // Will update executables with the next primary
 // from that account (if any).
@@ -328,9 +328,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	}
 }
 
-// Drop pops the unrecoverable transaction from
+// Drop removes the given (unrecoverable) transaction from
 // its associated promoted queue (account) and rolls
-// back that account's nextNonce.
+// back the account's nextNonce.
 // Will update executables with the next primary
 // from that account (if any).
 func (p *TxPool) Drop(tx *types.Transaction) {
@@ -357,7 +357,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}
 }
 
-// Demote pops the recoverable transaction from
+// Demote removes the (recoverable) transaction from
 // its associated promoted queue (account) and
 // issues an enqueueRequest for it.
 // Will update executables with the next primary
@@ -382,10 +382,8 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
 }
 
-// ResetWithHeaders is called from within ibft when the node
-// has received a new block from a peer. The pool needs to align
-// its own state with the new one so it can correctly process
-// further incoming transactions.
+// ResetWithHeaders processes the transactions from the new
+// headers to sync the pool with the new state.
 func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
 	e := &blockchain.Event{
 		NewChain: headers,
@@ -396,10 +394,9 @@ func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
 	p.processEvent(e)
 }
 
-// Collects the latest nonces for each account containted
-// in the received event. Resets all accounts with the new nonce.
+// processEvent collects the latest nonces for each account containted
+// in the received event. Resets all known accounts with the new nonce.
 func (p *TxPool) processEvent(event *blockchain.Event) {
-	// txs in the OldCHain
 	oldTxs := make(map[types.Hash]*types.Transaction)
 
 	// Legacy reorg logic //
@@ -427,6 +424,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 			continue
 		}
 
+		// remove mined txs from the lookup map
 		p.index.remove(block.Transactions...)
 
 		// etract latest nonces
@@ -461,11 +459,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		return
 	}
 
-	// reset with the new state
+	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
 }
 
-// Ensures the transaction conforms to specific
+// validateTx ensures the transaction conforms to specific
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Check the transaction size to overcome DOS Attacks
@@ -574,12 +572,10 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	return nil
 }
 
-// handleEnqueueRequest is invoked when a new transaction is received
-// (result of a successful addTx() call) or a demoted transaction
-// is re-entering the pool.
-//
-// A transaction handled within this request can either be
-// dropped or enqueued, potentially signaling promotion in the latter case.
+// handleEnqueueRequest attempts to enqueue the transaction
+// contained in the given request to the associated account.
+// If, afterwards, the account is eligible for promotion,
+// a promoteRequest is signaled.
 func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	tx := req.tx
 	addr := req.tx.From
@@ -648,7 +644,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	}
 }
 
-// Updates existing accounts with the new nonce.
+// resetAccounts updates existing accounts with the new nonce.
 func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	for addr, nonce := range stateNonces {
 		if !p.accounts.exists(addr) {
@@ -660,8 +656,9 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 	}
 }
 
-// Removes all transactions from the account considered stale by the given nonce.
-// Signals a promotion request if first enqueued transaction is eligible (expected nonce).
+// resetAccount aligns the account's state with the given nonce,
+// pruning any present stale transaction. If, afterwards, the account
+// is eligible for promotion, a promoteRequest is signaled.
 func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	account := p.accounts.get(addr)
 
@@ -702,10 +699,8 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	}
 }
 
-// createAccountOnce is used when discovering an address
-// of a received transaction for the first time.
-// This function ensures that the account
-// is created atomically and only once.
+// createAccountOnce creates an account and
+// ensures it is only initialized once.
 func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 	// fetch nonce from state
 	stateRoot := p.store.Header().StateRoot

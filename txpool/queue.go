@@ -10,6 +10,8 @@ import (
 
 type transactions []*types.Transaction
 
+// A thread-safe wrapper of a minNonceQueue.
+// All methods assume the (correct) lock is held.
 type accountQueue struct {
 	sync.RWMutex
 	wLock uint32
@@ -44,6 +46,8 @@ func (q *accountQueue) unlock() {
 	}
 }
 
+// prune removes all transactions from the queue
+// with nonce lower than given.
 func (q *accountQueue) prune(nonce uint64) (pruned transactions) {
 	for {
 		tx := q.peek()
@@ -59,12 +63,12 @@ func (q *accountQueue) prune(nonce uint64) (pruned transactions) {
 	return
 }
 
-// Pushes the given transactions onto the queue.
+// push pushes the given transactions onto the queue.
 func (q *accountQueue) push(tx *types.Transaction) {
 	heap.Push(&q.queue, tx)
 }
 
-// Returns the first transaction from the queue without removing it.
+// peek returns the first transaction from the queue without removing it.
 func (q *accountQueue) peek() *types.Transaction {
 	if q.length() == 0 {
 		return nil
@@ -73,7 +77,7 @@ func (q *accountQueue) peek() *types.Transaction {
 	return q.queue.Peek()
 }
 
-// Removes the first transactions from the queue and returns it.
+// pop removes the first transactions from the queue and returns it.
 func (q *accountQueue) pop() *types.Transaction {
 	if q.length() == 0 {
 		return nil
@@ -82,7 +86,7 @@ func (q *accountQueue) pop() *types.Transaction {
 	return heap.Pop(&q.queue).(*types.Transaction)
 }
 
-// Returns the number of transactions in the queue.
+// length returns the number of transactions in the queue.
 func (q *accountQueue) length() uint64 {
 	return uint64(q.queue.Len())
 }
@@ -137,7 +141,7 @@ func newPricedQueue() *pricedQueue {
 	return &q
 }
 
-// Empties the underlying queue
+// clear empties the underlying queue
 // and returns the removed transactions.
 func (q *pricedQueue) clear() {
 	for {
@@ -153,7 +157,8 @@ func (q *pricedQueue) push(tx *types.Transaction) {
 	heap.Push(&q.queue, tx)
 }
 
-// Removes the first transactions from the queue and returns it.
+// Pop removes the first transaction from the queue
+// or nil if the queue is empty.
 func (q *pricedQueue) pop() *types.Transaction {
 	if q.length() == 0 {
 		return nil
@@ -162,7 +167,7 @@ func (q *pricedQueue) pop() *types.Transaction {
 	return heap.Pop(&q.queue).(*types.Transaction)
 }
 
-// Returns the number of transactions in the queue.
+// length returns the number of transactions in the queue.
 func (q *pricedQueue) length() uint64 {
 	return uint64(q.queue.Len())
 }
