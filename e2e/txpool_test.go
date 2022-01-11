@@ -365,6 +365,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	for _, account := range testAccounts {
 		for nonce := uint64(0); nonce < uint64(numTxPerAccount); nonce++ {
 			wg.Add(1)
+
 			go func(account *testAccount, nonce uint64) {
 				defer wg.Done()
 
@@ -498,9 +499,9 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	server := servers[0]
 	client := server.JSONRPC()
-
 	hashes := make([]web3.Hash, 3)
-	for _, tx := range transactions {
+
+	for i, tx := range transactions {
 		signedTx, err := signer.SignTx(tx, senderKey)
 		assert.NoError(t, err)
 
@@ -508,7 +509,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 		// save for later querying
-		hashes = append(hashes, txHash)
+		hashes[i] = txHash
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)

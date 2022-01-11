@@ -17,8 +17,7 @@ type accountsMap struct {
 // Intializes an account for the given address.
 func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	a, _ := m.LoadOrStore(addr, &account{})
-	newAccount := a.(*account)
-
+	newAccount := a.(*account) // nolint:forcetypeassert
 	// run only once
 	newAccount.init.Do(func() {
 		// create queues
@@ -96,7 +95,7 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	allEnqueued = make(map[types.Address][]*types.Transaction)
 
 	m.Range(func(key, value interface{}) bool {
-		addr := key.(types.Address)
+		addr, _ := key.(types.Address)
 		account := m.get(addr)
 
 		account.promoted.lock(false)

@@ -196,7 +196,7 @@ func NewTxPool(
 		}
 
 		if subscribeErr := topic.Subscribe(pool.addGossipTx); subscribeErr != nil {
-			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %w", subscribeErr)
 		}
 
 		pool.topic = topic
@@ -630,7 +630,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn)
+	raw := obj.(*proto.Txn) // nolint:forcetypeassert
 	tx := new(types.Transaction)
 
 	// decode tx

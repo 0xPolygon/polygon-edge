@@ -107,7 +107,10 @@ func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (
+	map[types.Address][]*types.Transaction,
+	map[types.Address][]*types.Transaction,
+) {
 	return nil, nil
 }
 
