@@ -273,7 +273,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	gasPrice := l.cfg.GasPrice
-	if gasPrice.Cmp(big.NewInt(-1)) == 0 {
+	if gasPrice == nil {
 		// No gas price specified, query the network for an estimation
 		avgGasPrice, err := getAverageGasPrice(jsonClient)
 		if err != nil {
@@ -318,7 +318,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	gasLimit := l.cfg.GasLimit
-	if gasLimit.Cmp(big.NewInt(-1)) == 0 {
+	if gasLimit == nil {
 		// No gas limit specified, query the network for an estimation
 		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
 		if estimateErr != nil {
