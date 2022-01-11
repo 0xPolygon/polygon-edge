@@ -50,6 +50,7 @@ func (tg *TransferGenerator) generateReceiver() error {
 	}
 
 	tg.receiverAddress = crypto.PubKeyToAddress(&key.PublicKey)
+
 	return nil
 }
 
@@ -67,7 +68,7 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	}, tg.params.SenderKey)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign transaction: %v", err)
+		return nil, fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
 	return txn, nil

@@ -23,6 +23,7 @@ func defHeaderHash(h *Header) (hash Hash) {
 
 	marshalArenaPool.Put(ar)
 	keccak.DefaultKeccakPool.Put(hasher)
+
 	return
 }
 

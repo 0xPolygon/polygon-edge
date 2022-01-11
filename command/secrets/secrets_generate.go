@@ -15,14 +15,17 @@ type SecretsGenerate struct {
 const (
 	defaultNodeName       = "polygon-sdk-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
-	defaultNamespace = "admin"
+	defaultNamespace      = "admin"
 )
 
 func (s *SecretsGenerate) DefineFlags() {
 	s.Base.DefineFlags()
 
 	s.FlagMap["dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the secrets manager configuration file Default: %s", defaultConfigFileName),
+		Description: fmt.Sprintf(
+			"Sets the directory for the secrets manager configuration file Default: %s",
+			defaultConfigFileName,
+		),
 		Arguments: []string{
 			"DIRECTORY",
 		},
@@ -63,11 +66,14 @@ func (s *SecretsGenerate) DefineFlags() {
 			"NAMESPACE",
 		},
 		ArgumentsOptional: false,
-		FlagOptional: false,
+		FlagOptional:      false,
 	}
 
 	s.FlagMap["name"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the name of the node for on-service record keeping. Default: %s", defaultNodeName),
+		Description: fmt.Sprintf(
+			"Specifies the name of the node for on-service record keeping. Default: %s",
+			defaultNodeName,
+		),
 		Arguments: []string{
 			"NODE_NAME",
 		},
@@ -101,12 +107,14 @@ func (s *SecretsGenerate) GetBaseCommand() string {
 func (s *SecretsGenerate) Run(args []string) int {
 	flags := s.Base.NewFlagSet(s.GetBaseCommand())
 
-	var path string
-	var token string
-	var serverURL string
-	var serviceType string
-	var name string
-	var namespace string
+	var (
+		path        string
+		token       string
+		serverURL   string
+		serviceType string
+		name        string
+		namespace   string
+	)
 
 	flags.StringVar(&path, "dir", defaultConfigFileName, "")
 	flags.StringVar(&token, "token", "", "")
@@ -117,32 +125,38 @@ func (s *SecretsGenerate) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		s.UI.Error(err.Error())
+
 		return 1
 	}
 
 	// Safety checks
 	if path == "" {
 		s.UI.Error("required argument (path) not passed in")
+
 		return 1
 	}
 
 	if token == "" {
 		s.UI.Error("required argument (token) not passed in")
+
 		return 1
 	}
 
 	if serverURL == "" {
 		s.UI.Error("required argument (serverURL) not passed in")
+
 		return 1
 	}
 
 	if name == "" {
 		s.UI.Error("required argument (name) not passed in")
+
 		return 1
 	}
 
 	if !secrets.SupportedServiceManager(secrets.SecretsManagerType(serviceType)) {
 		s.UI.Error("unsupported service manager type")
+
 		return 1
 	}
 
@@ -159,6 +173,7 @@ func (s *SecretsGenerate) Run(args []string) int {
 	writeErr := config.WriteConfig(path)
 	if writeErr != nil {
 		s.UI.Error("unable to write configuration file")
+
 		return 1
 	}
 

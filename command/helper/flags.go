@@ -30,15 +30,15 @@ func (g *GRPCFlag) DefineFlags(flagMap map[string]FlagDescriptor) {
 }
 
 // FlagSet adds some default commands to handle grpc connections with the server
-func (m *GRPCFlag) FlagSet(f *flag.FlagSet) {
-	f.StringVar(&m.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
+func (g *GRPCFlag) FlagSet(f *flag.FlagSet) {
+	f.StringVar(&g.Addr, "grpc-address", fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort), "")
 }
 
 // Conn returns a grpc connection
 func (g *GRPCFlag) Conn() (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(g.Addr, grpc.WithInsecure())
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to server: %v", err)
+		return nil, fmt.Errorf("failed to connect to server: %w", err)
 	}
 
 	return conn, nil
@@ -89,6 +89,7 @@ func (f *FormatterFlag) OutputError(e error) {
 // OutputResult is helper function to print result with different format
 func (f *FormatterFlag) OutputResult(r CommandResult) {
 	var out string
+
 	var err error
 
 	if f.IsJSON {

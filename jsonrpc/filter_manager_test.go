@@ -191,6 +191,7 @@ type mockWsConn struct {
 
 func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
 	m.msgCh <- b
+
 	return nil
 }
 
@@ -238,6 +239,7 @@ func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Acco
 	if acc, ok := m.accounts[addr]; ok {
 		return acc, nil
 	}
+
 	return nil, errors.New("given root and slot not found in storage")
 }
 
@@ -284,14 +286,17 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		NewChain: []*types.Header{},
 		OldChain: []*types.Header{},
 	}
+
 	for _, i := range evnt.NewChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.NewChain = append(bEvnt.NewChain, i.header)
 	}
+
 	for _, i := range evnt.OldChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
+
 	m.subscription.Push(bEvnt)
 }
 
@@ -304,6 +309,7 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 	defer m.receiptsLock.Unlock()
 
 	receipts := m.receipts[hash]
+
 	return receipts, nil
 }
 

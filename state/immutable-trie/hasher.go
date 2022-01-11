@@ -1,6 +1,7 @@
 package itrie
 
 import (
+	"errors"
 	"fmt"
 	"hash"
 	"sync"
@@ -46,6 +47,7 @@ func (h *hasher) ReleaseArenas(idx int) {
 	for i := idx; i < len(h.arena); i++ {
 		arenaPool.Put(h.arena[i])
 	}
+
 	h.arena = h.arena[:idx]
 }
 
@@ -58,6 +60,7 @@ func (h *hasher) AcquireArena() (*fastrlp.Arena, int) {
 	v := arenaPool.Get()
 	idx := len(h.arena)
 	h.arena = append(h.arena, v)
+
 	return v, idx
 }
 
@@ -65,12 +68,15 @@ func (h *hasher) Hash(data []byte) []byte {
 	h.hash.Reset()
 	h.hash.Write(data)
 	n, err := h.hash.Read(h.tmp[:])
+
 	if err != nil {
 		panic(err)
 	}
+
 	if n != 32 {
 		panic("incorrect length")
 	}
+
 	return h.tmp[:]
 }
 
@@ -79,7 +85,10 @@ func (t *Txn) Hash() ([]byte, error) {
 		return emptyRoot, nil
 	}
 
-	h := hasherPool.Get().(*hasher)
+	h, ok := hasherPool.Get().(*hasher)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	var root []byte
 
@@ -123,6 +132,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 	var val *fastrlp.Value
 
 	var aa *fastrlp.Arena
+
 	var idx int
 
 	if h, ok := node.Hash(); ok {
@@ -144,6 +154,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		val = a.NewArray()
 
 		aa, idx = h.AcquireArena()
+
 		for _, i := range n.children {
 			if i == nil {
 				val.Set(a.NewNull())

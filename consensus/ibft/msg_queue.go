@@ -42,6 +42,7 @@ func (m *msgQueue) readMessage(state IbftState, current *proto.View) *msgTask {
 		if queue.Len() == 0 {
 			return nil
 		}
+
 		msg := queue.head()
 
 		// check if the message is from the future
@@ -205,6 +206,7 @@ func (m *msgQueueImpl) Pop() interface{} {
 	item := old[n-1]
 	old[n-1] = nil
 	*m = old[0 : n-1]
+
 	return item
 }
 
@@ -223,6 +225,7 @@ func cmpView(v, y *proto.View) int {
 			return 1
 		}
 	}
+
 	if v.Round != y.Round {
 		if v.Round < y.Round {
 			return -1

@@ -66,11 +66,14 @@ func newDispatcher(logger hclog.Logger, store blockchainInterface, chainID uint6
 		store:   store,
 		chainID: chainID,
 	}
+
 	d.registerEndpoints()
+
 	if store != nil {
 		d.filterManager = NewFilterManager(logger, store)
 		go d.filterManager.Run()
 	}
+
 	return d
 }
 
@@ -98,10 +101,13 @@ func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) 
 	if !ok {
 		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
+
 	fd, ok := service.funcMap[funcName]
+
 	if !ok {
 		return nil, nil, NewMethodNotFoundError(req.Method)
 	}
+
 	return service, fd, nil
 }
 
@@ -132,6 +138,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return "", NewInvalidRequestError("Invalid json request")
 	}
+
 	if len(params) == 0 {
 		return "", NewInvalidParamsError("Invalid params")
 	}
@@ -144,14 +151,12 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var filterID string
 	if subscribeMethod == "newHeads" {
 		filterID = d.filterManager.NewBlockFilter(conn)
-
 	} else if subscribeMethod == "logs" {
 		logFilter, err := decodeLogFilterFromInterface(params[1])
 		if err != nil {
 			return "", NewInternalError(err.Error())
 		}
 		filterID = d.filterManager.NewLogFilter(logFilter, conn)
-
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
@@ -164,6 +169,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 	if err := json.Unmarshal(req.Params, &params); err != nil {
 		return false, NewInvalidRequestError("Invalid json request")
 	}
+
 	if len(params) != 1 {
 		return false, NewInvalidParamsError("Invalid params")
 	}
@@ -179,8 +185,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
-
-		return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
 	// if the request method is eth_subscribe we need to create a
@@ -189,12 +194,15 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		filterID, err := d.handleSubscribe(req, conn)
 		if err != nil {
 			//nolint
-			NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
+
 		resp, err := formatFilterResponse(req.ID, filterID)
+
 		if err != nil {
-			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
+
 		return []byte(resp), nil
 	}
 
@@ -211,64 +219,67 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 
 		resp, err := formatFilterResponse(req.ID, res)
 		if err != nil {
-			return NewRpcResponse(req.ID, "2.0", nil, err).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
 		}
 
 		return []byte(resp), nil
-
 	}
-
 	// its a normal query that we handle with the dispatcher
 	resp, err := d.handleReq(req)
 	if err != nil {
 		return nil, err
 	}
-	return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
+
+	return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
-
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
 	if len(x) == 0 {
-		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
+
 	if x[0] == '{' {
 		var req Request
 		if err := json.Unmarshal(reqBody, &req); err != nil {
-
-			return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+			return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
+
 		if req.Method == "" {
-			return NewRpcResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+			return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 
 		resp, err := d.handleReq(req)
 
-		return NewRpcResponse(req.ID, "2.0", resp, err).Bytes()
+		return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
 	}
 
 	// handle batch requests
 	var requests []Request
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
-		return NewRpcResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
-	var responses []Response
+
+	responses := make([]Response, 0)
+
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			errorResponse := NewRpcResponse(req.ID, "2.0", nil, err)
+			errorResponse := NewRPCResponse(req.ID, "2.0", nil, err)
 			responses = append(responses, errorResponse)
+
 			continue
 		}
 
-		resp := NewRpcResponse(req.ID, "2.0", response, nil)
+		resp := NewRPCResponse(req.ID, "2.0", response, nil)
 		responses = append(responses, resp)
 	}
 
 	respBytes, err := json.Marshal(responses)
 	if err != nil {
-		return NewRpcResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
+		return NewRPCResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
 	}
+
 	return respBytes, nil
 }
 
@@ -284,11 +295,13 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	inArgs[0] = service.sv
 
 	inputs := make([]interface{}, fd.numParams())
+
 	for i := 0; i < fd.inNum-1; i++ {
 		val := reflect.New(fd.reqt[i+1])
 		inputs[i] = val.Interface()
 		inArgs[i+1] = val.Elem()
 	}
+
 	if fd.numParams() > 0 {
 		if err := json.Unmarshal(req.Params, &inputs); err != nil {
 			return nil, NewInvalidParamsError("Invalid Params")
@@ -298,21 +311,25 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
 		d.logInternalError(req.Method, err)
+
 		return nil, NewInvalidRequestError(err.Error())
 	}
 
-	var data []byte
-	var err error
-	res := output[0].Interface()
-	if res != nil {
+	var (
+		data []byte
+		err  error
+	)
+
+	if res := output[0].Interface(); res != nil {
 		data, err = json.Marshal(res)
 		if err != nil {
 			d.logInternalError(req.Method, err)
+
 			return nil, NewInternalError("Internal error")
 		}
 	}
-	return data, nil
 
+	return data, nil
 }
 
 func (d *Dispatcher) logInternalError(method string, err error) {
@@ -323,6 +340,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 	if d.serviceMap == nil {
 		d.serviceMap = map[string]*serviceData{}
 	}
+
 	if serviceName == "" {
 		panic("jsonrpc: serviceName cannot be empty")
 	}
@@ -333,6 +351,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 	}
 
 	funcMap := make(map[string]*funcData)
+
 	for i := 0; i < st.NumMethod(); i++ {
 		mv := st.Method(i)
 		if mv.PkgPath != "" {
@@ -345,7 +364,9 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		fd := &funcData{
 			fv: mv.Func,
 		}
+
 		var err error
+
 		if fd.inNum, fd.reqt, err = validateFunc(funcName, fd.fv, true); err != nil {
 			panic(fmt.Sprintf("jsonrpc: %s", err))
 		}
@@ -356,6 +377,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 				fd.isDyn = true
 			}
 		}
+
 		funcMap[name] = fd
 	}
 
@@ -368,24 +390,33 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, reqt []reflect.Type, err error) {
 	if funcName == "" {
 		err = fmt.Errorf("funcName cannot be empty")
+
 		return
 	}
 
 	ft := fv.Type()
 	if ft.Kind() != reflect.Func {
 		err = fmt.Errorf("function '%s' must be a function instead of %s", funcName, ft)
+
 		return
 	}
 
 	inNum = ft.NumIn()
-	outNum := ft.NumOut()
 
-	if outNum != 2 {
+	if outNum := ft.NumOut(); ft.NumOut() != 2 {
 		err = fmt.Errorf("unexpected number of output arguments in the function '%s': %d. Expected 2", funcName, outNum)
+
 		return
 	}
+
 	if !isErrorType(ft.Out(1)) {
-		err = fmt.Errorf("unexpected type for the second return value of the function '%s': '%s'. Expected '%s'", funcName, ft.Out(1), errt)
+		err = fmt.Errorf(
+			"unexpected type for the second return value of the function '%s': '%s'. Expected '%s'",
+			funcName,
+			ft.Out(1),
+			errt,
+		)
+
 		return
 	}
 
@@ -393,6 +424,7 @@ func validateFunc(funcName string, fv reflect.Value, isMethod bool) (inNum int, 
 	for i := 0; i < inNum; i++ {
 		reqt[i] = ft.In(i)
 	}
+
 	return
 }
 
@@ -406,6 +438,7 @@ func getError(v reflect.Value) error {
 	if v.IsNil() {
 		return nil
 	}
+
 	return v.Interface().(error)
 }
 
@@ -413,6 +446,7 @@ func lowerCaseFirst(str string) string {
 	for i, v := range str {
 		return string(unicode.ToLower(v)) + str[i+1:]
 	}
+
 	return ""
 }
 
@@ -433,6 +467,7 @@ func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, erro
 		if !ok {
 			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
 		}
+
 		return header, nil
 	}
 }
@@ -453,7 +488,9 @@ func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (ui
 	if err != nil {
 		return 0, err
 	}
+
 	acc, err := d.store.GetAccount(header.StateRoot, address)
+
 	if errors.As(err, &ErrStateNotFound) {
 		// If the account doesn't exist / isn't initialized,
 		// return a nonce value of 0
@@ -482,9 +519,11 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 		}
 		arg.Nonce = argUintPtr(nonce)
 	}
+
 	if arg.Value == nil {
 		arg.Value = argBytesPtr([]byte{})
 	}
+
 	if arg.GasPrice == nil {
 		arg.GasPrice = argBytesPtr([]byte{})
 	}
@@ -495,11 +534,13 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	} else if arg.Input != nil {
 		input = *arg.Input
 	}
+
 	if arg.To == nil {
 		if input == nil {
 			return nil, fmt.Errorf("contract creation without data provided")
 		}
 	}
+
 	if input == nil {
 		input = []byte{}
 	}
@@ -519,6 +560,8 @@ func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
 	if arg.To != nil {
 		txn.To = arg.To
 	}
+
 	txn.ComputeHash()
+
 	return txn, nil
 }

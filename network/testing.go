@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
@@ -19,6 +19,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	DefaultLeaveTimeout = 10 * time.Second
 )
 
 // JoinAndWait is a helper method for joining a destination server
@@ -51,6 +55,29 @@ func JoinAndWait(
 	return connectErr
 }
 
+// LeaveAndWait is a helper method for leaving a destination server
+// and waiting for the connection to be closed
+func LeaveAndWait(
+	source,
+	destination *Server,
+	disconnectTimeout time.Duration,
+) error {
+	if disconnectTimeout == 0 {
+		disconnectTimeout = DefaultLeaveTimeout
+	}
+
+	go func() {
+		source.Disconnect(destination.host.ID(), "bye")
+	}()
+
+	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)
+	defer cancelFn()
+
+	_, disconnectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
+
+	return disconnectErr
+}
+
 func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
 	peersConnected := 0
 	targetPeers := len(ids)
@@ -65,8 +92,8 @@ func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (
 				return true, false
 			}
 		}
-		return nil, true
 
+		return nil, true
 	})
 	if err != nil {
 		return false, err
@@ -89,8 +116,24 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 				return true, false
 			}
 		}
-		return nil, true
 
+		return nil, true
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return res.(bool), nil
+}
+
+// WaitUntilRoutingTableToBeAdded check routing table has given ids and retry by timeout
+func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int) (bool, error) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		if size == srv.discovery.routingTable.Size() {
+			return true, false
+		}
+
+		return false, true
 	})
 	if err != nil {
 		return false, err
@@ -120,6 +163,7 @@ func createServers(
 	paramsMap map[int]*CreateServerParams,
 ) ([]*Server, error) {
 	servers := make([]*Server, count)
+
 	if paramsMap == nil {
 		paramsMap = map[int]*CreateServerParams{}
 	}
@@ -149,9 +193,11 @@ var (
 func CreateServer(params *CreateServerParams) (*Server, error) {
 	cfg := DefaultConfig()
 	port, portErr := tests.GetFreePort()
+
 	if portErr != nil {
-		return nil, fmt.Errorf("unable to fetch free port, %v", portErr)
+		return nil, fmt.Errorf("unable to fetch free port, %w", portErr)
 	}
+
 	cfg.Addr.Port = port
 	cfg.Chain = &chain.Chain{
 		Params: &chain.Params{
@@ -185,6 +231,7 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	}
 
 	cfg.SecretsManager = secretsManager
+	cfg.Metrics = NilMetrics()
 
 	server, err := NewServer(params.Logger, cfg)
 	if err != nil {
@@ -209,6 +256,7 @@ func MeshJoin(servers ...*Server) []error {
 	// Join errors are used to gather all errors that happen
 	// inside the go routines, so they can be handled when they finish
 	joinErrors := make([]error, 0)
+
 	var joinErrorsLock sync.Mutex
 
 	appendJoinError := func(joinErr error) {
@@ -218,11 +266,14 @@ func MeshJoin(servers ...*Server) []error {
 	}
 
 	numServers := len(servers)
+
 	var wg sync.WaitGroup
+
 	for indx := 0; indx < numServers; indx++ {
 		for innerIndx := 0; innerIndx < numServers; innerIndx++ {
 			if innerIndx > indx {
 				wg.Add(1)
+
 				go func(src, dest int) {
 					defer wg.Done()
 
@@ -232,7 +283,7 @@ func MeshJoin(servers ...*Server) []error {
 						DefaultBufferTimeout,
 						DefaultJoinTimeout,
 					); joinErr != nil {
-						appendJoinError(fmt.Errorf("unable to join peers, %v", joinErr))
+						appendJoinError(fmt.Errorf("unable to join peers, %w", joinErr))
 					}
 				}(indx, innerIndx)
 			}
@@ -240,16 +291,19 @@ func MeshJoin(servers ...*Server) []error {
 	}
 
 	wg.Wait()
+
 	return joinErrors
 }
 
 func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
+	t.Helper()
+
 	libp2pKey, _, keyErr := GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
 		t.Fatalf("unable to generate libp2p key, %v", keyErr)
 	}
 
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	assert.NoError(t, err)
 
 	port, portErr := tests.GetFreePort()
@@ -257,7 +311,7 @@ func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
 		t.Fatalf("Unable to fetch free port, %v", portErr)
 	}
 
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeId))
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeID))
 	assert.NoError(t, err)
 
 	return addr
@@ -303,6 +357,8 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 }
 
 func closeTestServers(t *testing.T, servers []*Server) {
+	t.Helper()
+
 	for _, server := range servers {
 		assert.NoError(t, server.Close())
 	}

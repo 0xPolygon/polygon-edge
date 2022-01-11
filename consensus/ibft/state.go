@@ -84,14 +84,14 @@ func newState() *currentState {
 
 // getState returns the current state
 func (c *currentState) getState() IbftState {
-	stateAddr := (*uint64)(&c.state)
+	stateAddr := &c.state
 
 	return IbftState(atomic.LoadUint64(stateAddr))
 }
 
 // setState sets the current state
 func (c *currentState) setState(s IbftState) {
-	stateAddr := (*uint64)(&c.state)
+	stateAddr := &c.state
 
 	atomic.StoreUint64(stateAddr, uint64(s))
 }
@@ -120,11 +120,13 @@ func (c *currentState) maxRound() (maxRound uint64, found bool) {
 		if len(round) < num {
 			continue
 		}
+
 		if maxRound < k {
 			maxRound = k
 			found = true
 		}
 	}
+
 	return
 }
 
@@ -159,6 +161,7 @@ func (c *currentState) AddRoundMessage(msg *proto.MessageReq) int {
 	if msg.Type != proto.MessageReq_RoundChange {
 		return 0
 	}
+
 	c.addMessage(msg)
 
 	return len(c.roundMessages[msg.View.Round])
@@ -200,6 +203,7 @@ func (c *currentState) addMessage(msg *proto.MessageReq) {
 		if _, ok := c.roundMessages[view.Round]; !ok {
 			c.roundMessages[view.Round] = map[types.Address]*proto.MessageReq{}
 		}
+
 		c.roundMessages[view.Round][addr] = msg
 	}
 }
@@ -218,7 +222,8 @@ type ValidatorSet []types.Address
 
 // CalcProposer calculates the address of the next proposer, from the validator set
 func (v *ValidatorSet) CalcProposer(round uint64, lastProposer types.Address) types.Address {
-	seed := uint64(0)
+	var seed uint64
+
 	if lastProposer == types.ZeroAddress {
 		seed = round
 	} else {
@@ -259,6 +264,7 @@ func (v *ValidatorSet) Equal(vv *ValidatorSet) bool {
 	if len(*v) != len(*vv) {
 		return false
 	}
+
 	for indx := range *v {
 		if (*v)[indx] != (*vv)[indx] {
 			return false

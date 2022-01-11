@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"context"
+	"crypto/rand"
 	"math"
 	"math/big"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -28,22 +28,20 @@ var (
 	}
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 // getPeer returns a peer with given ID in syncer's map
 func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
 	rawPeer, ok := syncer.peers.Load(id)
 	if !ok {
 		return nil
 	}
+
 	return rawPeer.(*SyncPeer)
 }
 
 // CreateSyncer initialize syncer with server
 func CreateSyncer(t *testing.T, blockchain blockchainShim, serverCfg *func(c *network.Config)) *Syncer {
 	t.Helper()
+
 	if serverCfg == nil {
 		serverCfg = &defaultNetworkConfig
 	}
@@ -66,16 +64,20 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
 
 	countMap := func(m *sync.Map) int {
 		count := 0
+
 		m.Range(func(key, value interface{}) bool {
 			count++
+
 			return true
 		})
+
 		return count
 	}
 
@@ -84,6 +86,7 @@ func WaitUntilPeerConnected(t *testing.T, syncer *Syncer, numPeer int, timeout t
 		if num == numPeer {
 			return nil, false
 		}
+
 		return nil, true
 	})
 	assert.NoError(t, err)
@@ -94,6 +97,7 @@ func WaitUntilProcessedAllEvents(t *testing.T, syncer *Syncer, timeout time.Dura
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
@@ -109,6 +113,7 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	t.Cleanup(func() {
 		cancel()
 	})
@@ -121,16 +126,31 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 
 // NewRandomChain returns new blockchain with random seed
 func NewRandomChain(t *testing.T, height int) blockchainShim {
-	seed := rand.Intn(maxSeed)
-	return blockchain.NewTestBlockchain(t, blockchain.NewTestHeaderChainWithSeed(nil, height, seed))
+	t.Helper()
+
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(maxSeed)))
+
+	return blockchain.NewTestBlockchain(
+		t,
+		blockchain.NewTestHeaderChainWithSeed(
+			nil,
+			height,
+			randNum.Uint64(),
+		),
+	)
 }
 
 // SetupSyncerNetwork connects syncers
-func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockchainShim) (syncer *Syncer, peerSyncers []*Syncer) {
+func SetupSyncerNetwork(
+	t *testing.T,
+	chain blockchainShim,
+	peerChains []blockchainShim,
+) (syncer *Syncer, peerSyncers []*Syncer) {
 	t.Helper()
 
 	syncer = CreateSyncer(t, chain, nil)
 	peerSyncers = make([]*Syncer, len(peerChains))
+
 	for idx, peerChain := range peerChains {
 		peerSyncers[idx] = CreateSyncer(t, peerChain, nil)
 
@@ -143,6 +163,7 @@ func SetupSyncerNetwork(t *testing.T, chain blockchainShim, peerChains []blockch
 			t.Fatalf("Unable to join servers, %v", joinErr)
 		}
 	}
+
 	return syncer, peerSyncers
 }
 
@@ -152,12 +173,15 @@ func GenerateNewBlocks(t *testing.T, chain blockchainShim, num int) []*types.Blo
 
 	currentHeight := chain.Header().Number
 	oldHeaders := make([]*types.Header, currentHeight+1)
+
 	for i := uint64(1); i <= currentHeight; i++ {
 		var ok bool
 		oldHeaders[i], ok = chain.GetHeaderByNumber(i)
 		assert.Truef(t, ok, "chain should have header at %d, but empty", i)
 	}
+
 	headers := blockchain.NewTestHeaderFromChain(oldHeaders, num)
+
 	return blockchain.HeadersToBlocks(headers[currentHeight+1:])
 }
 
@@ -169,6 +193,7 @@ func TryPopBlock(t *testing.T, syncer *Syncer, peerID peer.ID, timeout time.Dura
 	assert.NotNil(t, peer, "syncer doesn't have peer %s", peerID.String())
 
 	blockCh := make(chan *types.Block, 1)
+
 	go func() {
 		if block, _ := peer.popBlock(popTimeout); block != nil {
 			blockCh <- block
@@ -198,6 +223,7 @@ func HeaderToStatus(h *types.Header) *Status {
 	for i := uint64(1); i <= h.Difficulty; i++ {
 		td = td + i
 	}
+
 	return &Status{
 		Hash:       h.Hash,
 		Number:     h.Number,
@@ -225,6 +251,7 @@ func NewMockBlockchain(headers []*types.Header) *mockBlockchain {
 func (b *mockBlockchain) SubscribeEvents() blockchain.Subscription {
 	subscription := NewMockSubscription()
 	b.subscriptions = append(b.subscriptions, subscription)
+
 	return subscription
 }
 
@@ -233,6 +260,7 @@ func (b *mockBlockchain) Header() *types.Header {
 	if l == 0 {
 		return nil
 	}
+
 	return b.blocks[l-1].Header
 }
 
@@ -243,6 +271,7 @@ func (b *mockBlockchain) CurrentTD() *big.Int {
 	}
 
 	td, _ := b.GetTD(current.Hash)
+
 	return td
 }
 
@@ -255,6 +284,7 @@ func (b *mockBlockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 			return big.NewInt(0).SetUint64(td), true
 		}
 	}
+
 	return nil, false
 }
 
@@ -272,6 +302,7 @@ func (b *mockBlockchain) GetHeaderByHash(h types.Hash) (*types.Header, bool) {
 			return b.Header, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -281,6 +312,7 @@ func (b *mockBlockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 			return b.Header, true
 		}
 	}
+
 	return nil, false
 }
 

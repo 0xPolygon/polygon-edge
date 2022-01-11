@@ -11,13 +11,14 @@ func (b *bitmap) isSet(i uint) bool {
 }
 
 func (b *bitmap) set(i uint) {
-	b.buf[i/bitmapSize] |= 1 << (uint(i) % bitmapSize)
+	b.buf[i/bitmapSize] |= 1 << (i % bitmapSize)
 }
 
 func (b *bitmap) reset() {
 	for i := range b.buf {
 		b.buf[i] = 0
 	}
+
 	b.buf = b.buf[:0]
 }
 

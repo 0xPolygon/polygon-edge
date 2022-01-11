@@ -84,8 +84,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	fastestTurnAround := defaultFastestTurnAround
 	slowestTurnAround := defaultSlowestTurnAround
 	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
-	var zeroTime time.Time  // Zero time
-	var totalTime time.Time // Zero time used for tracking
+
+	var (
+		zeroTime  time.Time // Zero time
+		totalTime time.Time // Zero time used for tracking
+	)
 
 	if totalPassing == 0 {
 		// No data to show, use zero data
@@ -98,7 +101,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	}
 
 	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		data := value.(*metadata)
+		data, ok := value.(*metadata)
+		if !ok {
+			return false
+		}
+
 		turnAroundTime := data.turnAroundTime
 
 		// Update the duration metrics
@@ -172,16 +179,18 @@ func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
+
 	return nonce, nil
 }
 
 func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 	gasPrice, err := client.Eth().GasPrice()
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
+
 	return gasPrice, nil
 }
 
@@ -193,9 +202,11 @@ func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error)
 		GasPrice: txn.GasPrice.Uint64(),
 		Value:    txn.Value,
 	})
+
 	if err != nil {
-		return 0, fmt.Errorf("failed to query gas estimate: %v", err)
+		return 0, fmt.Errorf("failed to query gas estimate: %w", err)
 	}
+
 	if gasEstimate == 0 {
 		gasEstimate = defaultGasLimit
 	}
@@ -220,7 +231,7 @@ func (l *Loadbot) executeTxn(
 
 	addRes, addErr := client.AddTxn(context.Background(), addReq)
 	if addErr != nil {
-		return web3.Hash{}, fmt.Errorf("unable to add transaction, %v", addErr)
+		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
 	}
 
 	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
@@ -229,17 +240,17 @@ func (l *Loadbot) executeTxn(
 func (l *Loadbot) Run() error {
 	sender, err := extractSenderAccount(l.cfg.Sender)
 	if err != nil {
-		return fmt.Errorf("failed to extract sender account: %v", err)
+		return fmt.Errorf("failed to extract sender account: %w", err)
 	}
 
-	jsonClient, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
+	jsonClient, err := createJSONRPCClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
-		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
 	}
 
 	grpcClient, err := createGRPCClient(l.cfg.GRPC)
 	if err != nil {
-		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
 	}
 
 	defer func(client *jsonrpc.Client) {
@@ -248,12 +259,12 @@ func (l *Loadbot) Run() error {
 
 	nonce, err := getInitialSenderNonce(jsonClient, sender.Address)
 	if err != nil {
-		return fmt.Errorf("unable to get initial sender nonce: %v", err)
+		return fmt.Errorf("unable to get initial sender nonce: %w", err)
 	}
 
 	gasPrice, err := getAverageGasPrice(jsonClient)
 	if err != nil {
-		return fmt.Errorf("unable to get average gas price: %v", err)
+		return fmt.Errorf("unable to get average gas price: %w", err)
 	}
 
 	// Set up the transaction generator
@@ -266,8 +277,11 @@ func (l *Loadbot) Run() error {
 		Value:         l.cfg.Value,
 	}
 
-	var txnGenerator generator.TransactionGenerator
-	var genErr error = nil
+	var (
+		txnGenerator generator.TransactionGenerator
+		genErr       error = nil
+	)
+
 	switch l.cfg.GeneratorMode {
 	case 0:
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
@@ -276,19 +290,22 @@ func (l *Loadbot) Run() error {
 	}
 
 	if genErr != nil {
-		return fmt.Errorf("unable to start generator, %v", genErr)
+		return fmt.Errorf("unable to start generator, %w", genErr)
 	}
+
 	l.generator = txnGenerator
 
 	// Get the gas estimate
 	exampleTxn, err := l.generator.GetExampleTransaction()
 	if err != nil {
-		return fmt.Errorf("unable to get example transaction, %v", err)
+		return fmt.Errorf("unable to get example transaction, %w", err)
 	}
+
 	gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
 	if estimateErr != nil {
-		return fmt.Errorf("unable to get gas estimate, %v", err)
+		return fmt.Errorf("unable to get gas estimate, %w", err)
 	}
+
 	l.generator.SetGasEstimate(gasEstimate)
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
@@ -299,12 +316,14 @@ func (l *Loadbot) Run() error {
 	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 
 	startTime := time.Now()
+
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
 		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
+
 		go func(index uint64) {
 			defer wg.Done()
 
@@ -323,6 +342,7 @@ func (l *Loadbot) Run() error {
 					},
 				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
@@ -340,11 +360,13 @@ func (l *Loadbot) Run() error {
 					},
 				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
 			// Stop the performance timer
 			end := time.Now()
+
 			l.metrics.TransactionDuration.reportTurnAroundTime(
 				txHash,
 				&metadata{
@@ -356,6 +378,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	wg.Wait()
+
 	endTime := time.Now()
 
 	// Calculate the turn around metrics now that the loadbot is done

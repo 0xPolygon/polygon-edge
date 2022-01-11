@@ -49,19 +49,23 @@ func (p *IbftStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Status(context.Background(), &empty.Empty{})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

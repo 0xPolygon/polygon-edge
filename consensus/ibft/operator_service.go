@@ -39,20 +39,21 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		addr := types.StringToAddress(o.candidates[i].Address)
 
 		// Define the delete callback method
-		delete := func() {
+		deleteFn := func() {
 			o.candidates = append(o.candidates[:i], o.candidates[i+1:]...)
 			i--
 		}
 
 		// Check if the candidate is already in the validator set, and wants to be added
 		if o.candidates[i].Auth && snap.Set.Includes(addr) {
-			delete()
+			deleteFn()
+
 			continue
 		}
 
 		// Check if the candidate is not in the validator set, and wants to be removed
 		if !o.candidates[i].Auth && !snap.Set.Includes(addr) {
-			delete()
+			deleteFn()
 		}
 	}
 
@@ -69,6 +70,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 		if count == 0 {
 			// Candidate found
 			candidate = c
+
 			break
 		}
 	}
@@ -79,6 +81,7 @@ func (o *operator) getNextCandidate(snap *Snapshot) *proto.Candidate {
 // GetSnapshot returns the snapshot, based on the passed in request
 func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*proto.Snapshot, error) {
 	var snap *Snapshot
+
 	var err error
 
 	if req.Latest {
@@ -86,9 +89,11 @@ func (o *operator) GetSnapshot(ctx context.Context, req *proto.SnapshotReq) (*pr
 	} else {
 		snap, err = o.ibft.getSnapshot(req.Number)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	resp := snap.ToProto()
 
 	return resp, nil
@@ -121,6 +126,7 @@ func (o *operator) Propose(ctx context.Context, req *proto.Candidate) (*empty.Em
 			return nil, fmt.Errorf("the candidate is already a validator")
 		}
 	}
+
 	if !req.Auth {
 		if !snap.Set.Includes(addr) {
 			return nil, fmt.Errorf("cannot remove a validator if they're not in the snapshot")
