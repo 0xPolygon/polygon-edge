@@ -5,22 +5,19 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"math/big"
-	"sync"
 	"sync/atomic"
 )
 
 type TransferGenerator struct {
-	failedTxns     []*FailedTxnInfo
-	failedTxnsLock sync.RWMutex
+	BaseGenerator
 
-	params          *GeneratorParams
-	signer          *crypto.EIP155Signer
 	receiverAddress types.Address
-	estimatedGas    uint64
 }
 
 func NewTransferGenerator(params *GeneratorParams) (*TransferGenerator, error) {
-	transferGenerator := &TransferGenerator{
+	transferGenerator := &TransferGenerator{}
+
+	transferGenerator.BaseGenerator = BaseGenerator{
 		failedTxns: make([]*FailedTxnInfo, 0),
 		params:     params,
 		signer:     crypto.NewEIP155Signer(params.ChainID),
@@ -72,22 +69,4 @@ func (tg *TransferGenerator) GenerateTransaction() (*types.Transaction, error) {
 	}
 
 	return txn, nil
-}
-
-func (tg *TransferGenerator) GetTransactionErrors() []*FailedTxnInfo {
-	tg.failedTxnsLock.RLock()
-	defer tg.failedTxnsLock.RUnlock()
-
-	return tg.failedTxns
-}
-
-func (tg *TransferGenerator) MarkFailedTxn(failedTxn *FailedTxnInfo) {
-	tg.failedTxnsLock.Lock()
-	defer tg.failedTxnsLock.Unlock()
-
-	tg.failedTxns = append(tg.failedTxns, failedTxn)
-}
-
-func (tg *TransferGenerator) SetGasEstimate(gasEstimate uint64) {
-	tg.estimatedGas = gasEstimate
 }

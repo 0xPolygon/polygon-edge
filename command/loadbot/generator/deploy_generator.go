@@ -6,7 +6,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"math/big"
-	"sync"
 	"sync/atomic"
 )
 
@@ -16,12 +15,7 @@ const (
 )
 
 type DeployGenerator struct {
-	failedTxns     []*FailedTxnInfo
-	failedTxnsLock sync.RWMutex
-
-	params       *GeneratorParams
-	signer       *crypto.EIP155Signer
-	estimatedGas uint64
+	BaseGenerator
 
 	contractBytecode []byte
 }
@@ -36,12 +30,10 @@ func (dg *DeployGenerator) GetExampleTransaction() (*types.Transaction, error) {
 	}, dg.params.SenderKey)
 }
 
-func (dg *DeployGenerator) SetGasEstimate(gasEstimate uint64) {
-	dg.estimatedGas = gasEstimate
-}
-
 func NewDeployGenerator(params *GeneratorParams) (*DeployGenerator, error) {
-	deployGenerator := &DeployGenerator{
+	deployGenerator := &DeployGenerator{}
+
+	deployGenerator.BaseGenerator = BaseGenerator{
 		failedTxns: make([]*FailedTxnInfo, 0),
 		params:     params,
 		signer:     crypto.NewEIP155Signer(params.ChainID),
@@ -75,18 +67,4 @@ func (dg *DeployGenerator) GenerateTransaction() (*types.Transaction, error) {
 	}
 
 	return txn, nil
-}
-
-func (dg *DeployGenerator) GetTransactionErrors() []*FailedTxnInfo {
-	dg.failedTxnsLock.RLock()
-	defer dg.failedTxnsLock.RUnlock()
-
-	return dg.failedTxns
-}
-
-func (dg *DeployGenerator) MarkFailedTxn(failedTxn *FailedTxnInfo) {
-	dg.failedTxnsLock.Lock()
-	defer dg.failedTxnsLock.Unlock()
-
-	dg.failedTxns = append(dg.failedTxns, failedTxn)
 }
