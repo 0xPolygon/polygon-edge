@@ -254,7 +254,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	defer func(client *jsonrpc.Client) {
-		_ = shutdownClient(client)
+		_ = client.Close()
 	}(jsonClient)
 
 	nonce, err := getInitialSenderNonce(jsonClient, sender.Address)
