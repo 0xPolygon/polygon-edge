@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -170,7 +170,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 		// use the eip155 signer
 		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
-		m.txpool.AddSigner(signer)
+		m.txpool.SetSigner(signer)
 	}
 
 	{

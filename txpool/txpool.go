@@ -199,7 +199,7 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
-		if subscribeErr := topic.Subscribe(pool.handleGossipTx); subscribeErr != nil {
+		if subscribeErr := topic.Subscribe(pool.addGossipTx); subscribeErr != nil {
 			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
 		}
 
@@ -252,7 +252,7 @@ func (p *TxPool) Stop() {
 
 // Sets the signer the pool will use
 // to check a transaction's signature.
-func (p *TxPool) AddSigner(s signer) {
+func (p *TxPool) SetSigner(s signer) {
 	p.signer = s
 }
 
@@ -316,7 +316,7 @@ func (p *TxPool) Peek() *types.Transaction {
 // from that account (if any).
 func (p *TxPool) Pop(tx *types.Transaction) {
 	// fetch the associated account
-	account := p.accounts.from(tx.From)
+	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
@@ -339,7 +339,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // Will update executables with the next primary
 // from that account (if any).
 func (p *TxPool) Drop(tx *types.Transaction) {
-	account := p.accounts.from(tx.From)
+	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
@@ -368,7 +368,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 // Will update executables with the next primary
 // from that account (if any).
 func (p *TxPool) Demote(tx *types.Transaction) {
-	account := p.accounts.from(tx.From)
+	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
@@ -553,7 +553,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ComputeHash()
 
 	// check if already known
-	if _, ok := p.index.load(tx.Hash); ok {
+	if _, ok := p.index.get(tx.Hash); ok {
 		if origin == gossip {
 			// silently drop known tx
 			// that is gossiped back
@@ -590,7 +590,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	addr := req.tx.From
 
 	// fetch account
-	account := p.accounts.from(addr)
+	account := p.accounts.get(addr)
 
 	// enqueue tx
 	if err := account.enqueue(tx, req.demoted); err != nil {
@@ -621,7 +621,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 // invoked by handleEnqueueRequest or resetAccount.
 func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	addr := req.account
-	account := p.accounts.from(addr)
+	account := p.accounts.get(addr)
 
 	// promote enqueued txs
 	promoted := account.promote()
@@ -631,9 +631,9 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	p.metrics.PendingTxs.Add(float64(promoted))
 }
 
-// handleGossipTx handles receiving transactions
+// addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) handleGossipTx(obj interface{}) {
+func (p *TxPool) addGossipTx(obj interface{}) {
 	if !p.sealing {
 		return
 	}
@@ -668,7 +668,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 // Removes all transactions from the account considered stale by the given nonce.
 // Signals a promotion request if first enqueued transaction is eligible (expected nonce).
 func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
-	account := p.accounts.from(addr)
+	account := p.accounts.get(addr)
 
 	// lock promoted
 	account.promoted.lock(true)
@@ -728,7 +728,7 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // -> Returns the value from the TxPool if the account is initialized in-memory
 // -> Returns the value from the world state otherwise
 func (p *TxPool) GetNonce(addr types.Address) uint64 {
-	account := p.accounts.from(addr)
+	account := p.accounts.get(addr)
 	if account == nil {
 		stateRoot := p.store.Header().StateRoot
 		stateNonce := p.store.GetNonce(stateRoot, addr)
@@ -747,7 +747,7 @@ func (p *TxPool) GetCapacity() (uint64, uint64) {
 
 // GetPendingTx returns the transaction by hash in the TxPool (pending txn) [Thread-safe]
 func (p *TxPool) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
-	tx, ok := p.index.load(txHash)
+	tx, ok := p.index.get(txHash)
 	if !ok {
 		return nil, false
 	}
@@ -799,7 +799,7 @@ func (m *accountsMap) exists(addr types.Address) bool {
 // Collects the primaries of all accounts.
 func (m *accountsMap) getPrimaries() (primaries transactions) {
 	m.Range(func(key, value interface{}) bool {
-		account := m.from(key.(types.Address))
+		account := m.get(key.(types.Address))
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
@@ -816,7 +816,7 @@ func (m *accountsMap) getPrimaries() (primaries transactions) {
 }
 
 // Returns the account associated with the given address.
-func (m *accountsMap) from(addr types.Address) *account {
+func (m *accountsMap) get(addr types.Address) *account {
 	a, ok := m.Load(addr)
 	if !ok {
 		return nil
@@ -828,7 +828,7 @@ func (m *accountsMap) from(addr types.Address) *account {
 // Returns the number of all promoted transactons.
 func (m *accountsMap) promoted() (total uint64) {
 	m.Range(func(key, value interface{}) bool {
-		account := m.from(key.(types.Address))
+		account := m.get(key.(types.Address))
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
@@ -848,7 +848,7 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	allEnqueued = make(map[types.Address][]*types.Transaction)
 	m.Range(func(key, value interface{}) bool {
 		addr := key.(types.Address)
-		account := m.from(addr)
+		account := m.get(addr)
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
@@ -991,7 +991,7 @@ func (m *lookupMap) remove(txs ...*types.Transaction) {
 }
 
 // Returns the transaction associated with the given hash. [thread-safe]
-func (m *lookupMap) load(hash types.Hash) (*types.Transaction, bool) {
+func (m *lookupMap) get(hash types.Hash) (*types.Transaction, bool) {
 	m.RLock()
 	defer m.RUnlock()
 
