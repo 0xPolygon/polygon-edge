@@ -188,7 +188,7 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 	gasPrice, err := client.Eth().GasPrice()
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
+		return 0, fmt.Errorf("failed to query initial gas price: %w", err)
 	}
 
 	return gasPrice, nil
