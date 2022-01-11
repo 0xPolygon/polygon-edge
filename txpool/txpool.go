@@ -313,6 +313,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
 
+	// update metrics
+	p.metrics.PendingTxs.Add(-1)
+
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
 		p.executables.push(tx)
@@ -336,6 +339,9 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	// update state
 	p.index.remove(tx)
 	p.gauge.decrease(slotsRequired(tx))
+
+	// update metrics
+	p.metrics.PendingTxs.Add(-1)
 
 	if tx.Nonce < account.getNonce() {
 		// rollback nonce
@@ -663,6 +669,9 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	// update pool state
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
+
+	// update metrics
+	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
 
 	if nonce <= account.getNonce() {
 		// only the promoted queue needed pruning
