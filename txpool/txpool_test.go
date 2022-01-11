@@ -1084,7 +1084,7 @@ func waitUntilDone(done <-chan struct{}) {
 	for {
 		select {
 		case <-done:
-		case <-time.After(10 * time.Millisecond):
+		case <-time.After(500 * time.Millisecond /* 0.5 Seconds */):
 			return
 		}
 	}
