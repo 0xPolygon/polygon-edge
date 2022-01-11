@@ -397,6 +397,7 @@ func (s *Server) inboundConns() int64 {
 	if count < 0 {
 		count = 0
 	}
+
 	return count + s.identity.pendingInboundConns()
 }
 
@@ -435,6 +436,7 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 		connDirection: direction,
 	}
 	s.peers[id] = p
+
 	if direction == network.DirInbound {
 		atomic.AddInt64(&s.inboundConnCount, 1)
 	}
@@ -454,8 +456,10 @@ func (s *Server) delPeer(id peer.ID) {
 		if peer.connDirection == network.DirInbound {
 			atomic.AddInt64(&s.inboundConnCount, -1)
 		}
+
 		delete(s.peers, id)
 	}
+
 	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
 		s.logger.Error(
 			fmt.Sprintf("Unable to gracefully close connection to peer [%s], %v", id.String(), closeErr),

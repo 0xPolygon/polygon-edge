@@ -38,17 +38,16 @@ type identity struct {
 }
 
 func (i *identity) pendingInboundConns() int64 {
-
 	return atomic.LoadInt64(&i.pendingInboundCount)
 }
 
 func (i *identity) pendingOutboundConns() int64 {
-
 	return atomic.LoadInt64(&i.pendingOutboundCount)
 }
 
 func (i *identity) isPending(id peer.ID) bool {
 	_, ok := i.pending.Load(id)
+
 	return ok
 }
 
@@ -102,6 +101,7 @@ func (i *identity) setup() {
 
 			if conn.Stat().Direction == network.DirOutbound && i.srv.numOpenSlots() == 0 {
 				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
+
 				return
 			}
 
