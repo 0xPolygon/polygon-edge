@@ -24,6 +24,8 @@ func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 }
 
 func getTempDir(t *testing.T) string {
+	t.Helper()
+
 	tmpDir, err := ioutil.TempDir("/tmp", "snapshot-store")
 	assert.NoError(t, err)
 	t.Cleanup(func() {
@@ -31,6 +33,7 @@ func getTempDir(t *testing.T) string {
 			t.Error(err)
 		}
 	})
+
 	return tmpDir
 }
 
@@ -45,6 +48,7 @@ func (t *testerAccount) Address() types.Address {
 
 func (t *testerAccount) sign(h *types.Header) *types.Header {
 	h, _ = writeSeal(t.priv, h)
+
 	return h
 }
 
@@ -56,15 +60,18 @@ func newTesterAccountPool(num ...int) *testerAccountPool {
 	t := &testerAccountPool{
 		accounts: []*testerAccount{},
 	}
+
 	if len(num) == 1 {
 		for i := 0; i < num[0]; i++ {
 			key, _ := crypto.GenerateKey()
+
 			t.accounts = append(t.accounts, &testerAccount{
 				alias: strconv.Itoa(i),
 				priv:  key,
 			})
 		}
 	}
+
 	return t
 }
 
@@ -73,10 +80,12 @@ func (ap *testerAccountPool) add(accounts ...string) {
 		if acct := ap.get(account); acct != nil {
 			continue
 		}
+
 		priv, err := crypto.GenerateKey()
 		if err != nil {
 			panic("BUG: Failed to generate crypto key")
 		}
+
 		ap.accounts = append(ap.accounts, &testerAccount{
 			alias: account,
 			priv:  priv,
@@ -95,6 +104,7 @@ func (ap *testerAccountPool) genesis() *chain.Genesis {
 		Mixhash:   genesis.MixHash,
 		ExtraData: genesis.ExtraData,
 	}
+
 	return c
 }
 
@@ -104,6 +114,7 @@ func (ap *testerAccountPool) get(name string) *testerAccount {
 			return i
 		}
 	}
+
 	return nil
 }
 
@@ -112,6 +123,7 @@ func (ap *testerAccountPool) ValidatorSet() ValidatorSet {
 	for _, i := range ap.accounts {
 		v = append(v, i.Address())
 	}
+
 	return v
 }
 
@@ -156,6 +168,7 @@ func newMockHeader(validators []string, vote mockVote) mockHeader {
 func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders []mockHeader) []*types.Header {
 	headers := make([]*types.Header, 0, len(mockHeaders))
 	parentHash := genesis.Hash()
+
 	for num, header := range mockHeaders {
 		v := header.action
 		pool.add(v.validator)
@@ -167,12 +180,14 @@ func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders [
 			MixHash:    IstanbulDigest,
 			ExtraData:  genesis.ExtraData,
 		}
+
 		if v.candidate != "" {
 			// if candidate is empty, we are just creating a new block
 			// without votes
 			pool.add(v.candidate)
 			h.Miner = pool.get(v.candidate).Address()
 		}
+
 		if v.auth {
 			// add auth to the vote
 			h.Nonce = nonceAuthVote
@@ -187,11 +202,13 @@ func buildHeaders(pool *testerAccountPool, genesis *chain.Genesis, mockHeaders [
 		parentHash = h.Hash
 		headers = append(headers, h)
 	}
+
 	return headers
 }
 
 func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots []*Snapshot) {
 	t.Helper()
+
 	for _, s := range snapshots {
 		hash := b.GetHashByNumber(s.Number)
 		assert.NotNil(t, hash)
@@ -200,6 +217,8 @@ func updateHashesInSnapshots(t *testing.T, b *blockchain.Blockchain, snapshots [
 }
 
 func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
+	t.Helper()
+
 	if snapshots == nil {
 		return
 	}
@@ -208,7 +227,9 @@ func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
 	for _, snap := range snapshots {
 		store.add(snap)
 	}
+
 	err := store.saveToPath(path)
+
 	assert.NoError(t, err)
 }
 
@@ -237,6 +258,7 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 		LastBlock uint64
 		Snapshots []*Snapshot
 	}
+
 	var cases = []struct {
 		name           string
 		epochSize      uint64
@@ -324,7 +346,8 @@ func TestSnapshot_setupSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:      "should not count votes from the beginning of current epoch as there cannot be any proposals during the checkpoint block",
+			name: "should not count votes from the beginning of current epoch as there cannot be any proposals " +
+				"during the checkpoint block",
 			epochSize: 3,
 			headers: []mockHeader{
 				newMockHeader(validators, skipVote("A")),
@@ -669,6 +692,7 @@ func TestSnapshot_ProcessHeaders(t *testing.T) {
 			},
 		},
 	}
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			epochSize := c.epochSize
@@ -779,6 +803,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 
 	// write a header that creates a snapshot
 	headers := []*types.Header{}
+
 	for i := 1; i < 51; i++ {
 		id := strconv.Itoa(i)
 		pool.add(id)
@@ -808,6 +833,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	tmpDir := getTempDir(t)
 	store0 := newSnapshotStore()
+
 	for i := 0; i < 10; i++ {
 		store0.add(&Snapshot{
 			Number: uint64(i),

@@ -18,5 +18,6 @@ func ResolveNetworkID(id uint) string {
 	if ok {
 		return n
 	}
+
 	return strconv.Itoa(int(id))
 }

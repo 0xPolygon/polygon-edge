@@ -2,9 +2,10 @@ package network
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net"
 	"regexp"
 	"sync"
@@ -30,7 +31,10 @@ const DefaultLibp2pPort int = 1478
 
 const (
 	MinimumPeerConnections int64 = 1
-	MinimumBootNodes       int   = 2 // MinimumBootNodes Count is set to 2 so that, a bootnode can reconnect to the network using other bootnode after restarting.
+
+	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
+	// using other bootnode after restarting
+	MinimumBootNodes int = 2
 )
 
 // Priority for dial queue
@@ -108,11 +112,12 @@ type Peer struct {
 // setupLibp2pKey is a helper method for setting up the networking private key
 func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, error) {
 	var key crypto.PrivKey
+
 	if secretsManager.HasSecret(secrets.NetworkKey) {
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %v", readErr)
+			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
 		}
 
 		key = networkingKey
@@ -120,12 +125,12 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is not present in the secrets manager, generate it
 		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
 		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %v", keyErr)
+			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
 		}
 
 		// Write the networking private key to disk
 		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %v", setErr)
+			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
 		}
 
 		key = libp2pKey
@@ -154,8 +159,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			if addr != nil {
 				addrs = []multiaddr.Multiaddr{addr}
 			}
-		} else if config.Dns != nil {
-			addrs = []multiaddr.Multiaddr{config.Dns}
+		} else if config.DNS != nil {
+			addrs = []multiaddr.Multiaddr{config.DNS}
 		}
 
 		return addrs
@@ -170,7 +175,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		libp2p.Identity(key),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create libp2p stack: %v", err)
+		return nil, fmt.Errorf("failed to create libp2p stack: %w", err)
 	}
 
 	emitter, err := host.EventBus().Emitter(new(PeerEvent))
@@ -201,6 +206,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	srv.ps = ps
 
 	return srv, nil
@@ -217,7 +223,7 @@ func (s *Server) Start() error {
 
 	if !s.config.NoDiscover {
 		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return errors.New("Minimum two bootnodes are required")
+			return errors.New("minimum two bootnodes are required")
 		}
 
 		// start discovery
@@ -225,20 +231,24 @@ func (s *Server) Start() error {
 
 		// try to decode the bootnodes
 		bootnodes := []*peer.AddrInfo{}
+
 		for _, raw := range s.config.Chain.Bootnodes {
 			node, err := StringToAddrInfo(raw)
 			if err != nil {
-				return fmt.Errorf("failed to parse bootnode %s: %v", raw, err)
+				return fmt.Errorf("failed to parse bootnode %s: %w", raw, err)
 			}
+
 			if node.ID == s.host.ID() {
 				s.logger.Info("Omitting bootnode with same ID as host", "id", node.ID)
+
 				continue
 			}
+
 			bootnodes = append(bootnodes, node)
 		}
 
 		if setupErr := s.discovery.setup(bootnodes); setupErr != nil {
-			return fmt.Errorf("unable to setup discovery, %v", setupErr)
+			return fmt.Errorf("unable to setup discovery, %w", setupErr)
 		}
 	}
 
@@ -268,6 +278,7 @@ func (s *Server) checkPeerConnections() {
 		case <-s.closeCh:
 			return
 		}
+
 		if s.numPeers() < MinimumPeerConnections {
 			if s.config.NoDiscover || len(s.discovery.bootnodes) == 0 {
 				//TODO: dial peers from the peerstore
@@ -283,7 +294,7 @@ func (s *Server) runDial() {
 	// watch for events of peers included or removed
 	notifyCh := make(chan struct{})
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		// only concerned about PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, and PeerAddedToDialQueue
+		// Only concerned about the listed event types
 		switch evnt.Type {
 		case PeerConnected, PeerFailedToConnect, PeerDisconnected, PeerDialCompleted, PeerAddedToDialQueue:
 		default:
@@ -295,12 +306,12 @@ func (s *Server) runDial() {
 		default:
 		}
 	})
+
 	if err != nil {
 		s.logger.Error("dial manager failed to subscribe", "err", err)
 	}
 
 	for {
-
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.
@@ -310,6 +321,7 @@ func (s *Server) runDial() {
 				// dial closed
 				return
 			}
+
 			s.logger.Debug("dial", "local", s.host.ID(), "addr", tt.addr.String())
 
 			if s.isConnected(tt.addr.ID) {
@@ -339,11 +351,14 @@ func (s *Server) runDial() {
 func (s *Server) numPeers() int64 {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
+
 	return int64(len(s.peers))
 }
 
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.discovery.bootnodes))))
+
+	return s.discovery.bootnodes[randNum.Int64()]
 }
 
 func (s *Server) Peers() []*Peer {
@@ -433,6 +448,7 @@ func (s *Server) delPeer(id peer.ID) {
 
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
+
 	peer, ok := s.peers[id]
 	if ok {
 		if peer.connDirection == network.DirInbound {
@@ -453,6 +469,7 @@ func (s *Server) delPeer(id peer.ID) {
 func (s *Server) Disconnect(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
 		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
+
 		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
 			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
 		}
@@ -460,7 +477,8 @@ func (s *Server) Disconnect(peer peer.ID, reason string) {
 }
 
 var (
-	DefaultJoinTimeout   = 40 * time.Second // Anything below 35s is prone to false timeouts, as seen from empirical test data
+	// Anything below 35s is prone to false timeouts, as seen from empirical test data
+	DefaultJoinTimeout   = 40 * time.Second
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 
@@ -469,10 +487,13 @@ func (s *Server) JoinAddr(addr string, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
+
 	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
+
 	if err != nil {
 		return err
 	}
+
 	return s.Join(addr1, timeout)
 }
 
@@ -483,7 +504,9 @@ func (s *Server) Join(addr *peer.AddrInfo, timeout time.Duration) error {
 	if timeout == 0 {
 		return nil
 	}
+
 	err := s.watch(addr.ID, timeout)
+
 	return err
 }
 
@@ -494,6 +517,7 @@ func (s *Server) watch(peerID peer.ID, dur time.Duration) error {
 	if s.joinWatchers == nil {
 		s.joinWatchers = map[peer.ID]chan error{}
 	}
+
 	s.joinWatchers[peerID] = ch
 	s.joinWatchersLock.Unlock()
 
@@ -545,10 +569,13 @@ func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("protocol not found: %s", proto)
 	}
+
 	stream, err := s.NewStream(proto, id)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return p.Client(stream), nil
 }
 
@@ -621,6 +648,7 @@ func (s *Subscription) GetCh() chan *PeerEvent {
 
 func (s *Subscription) Get() *PeerEvent {
 	obj := <-s.ch
+
 	return obj
 }
 
@@ -640,6 +668,7 @@ func (s *Server) Subscribe() (*Subscription, error) {
 		ch:  make(chan *PeerEvent),
 	}
 	go sub.run()
+
 	return sub, nil
 }
 
@@ -658,10 +687,12 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 
 			case <-s.closeCh:
 				sub.Close()
+
 				return
 			}
 		}
 	}()
+
 	return nil
 }
 
@@ -670,11 +701,13 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
 	var closed bool
+
 	var mutex sync.Mutex
 
 	isClosed := func() bool {
 		mutex.Lock()
 		defer mutex.Unlock()
+
 		return closed
 	}
 
@@ -685,6 +718,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	})
 	if err != nil {
 		close(ch)
+
 		return nil, err
 	}
 
@@ -704,10 +738,13 @@ func StringToAddrInfo(addr string) (*peer.AddrInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	addr1, err := peer.AddrInfoFromP2pAddr(addr0)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return addr1, nil
 }
 
@@ -739,6 +776,7 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 			if !loopbackRegex.MatchString(address.String()) {
 				// Not a loopback address, dial address found
 				dialAddress = address.String()
+
 				break
 			}
 		}
@@ -773,6 +811,7 @@ func (s PeerEventType) String() string {
 	if !ok {
 		return "unknown"
 	}
+
 	return name
 }
 

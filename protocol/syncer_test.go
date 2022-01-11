@@ -222,7 +222,10 @@ func TestFindCommonAncestor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain, peerChain := blockchain.NewTestBlockchain(t, tt.syncerHeaders), blockchain.NewTestBlockchain(t, tt.peerHeaders)
+			chain, peerChain := blockchain.NewTestBlockchain(
+				t,
+				tt.syncerHeaders,
+			), blockchain.NewTestBlockchain(t, tt.peerHeaders)
 			syncer, peerSyncers := SetupSyncerNetwork(t, chain, []blockchainShim{peerChain})
 			peerSyncer := peerSyncers[0]
 
@@ -383,15 +386,19 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncBlocks := blockchain.HeadersToBlocks(syncHeaders)
 
 	syncer.syncProgression.startProgression(uint64(initialChainSize), syncerChain.SubscribeEvents())
+
 	if syncer.GetSyncProgression() == nil {
 		t.Fatalf("Unable to start progression")
 	}
+
 	assert.Equal(t, uint64(initialChainSize), syncer.syncProgression.getProgression().StartingBlock)
 
 	syncer.syncProgression.updateHighestProgression(uint64(targetChainSize))
+
 	assert.Equal(t, uint64(targetChainSize), syncer.syncProgression.getProgression().HighestBlock)
 
 	writeErr := syncerChain.WriteBlocks(syncBlocks[initialChainSize+1:])
+
 	assert.NoError(t, writeErr)
 
 	WaitUntilProgressionUpdated(t, syncer, 15*time.Second, uint64(targetChainSize-1))
@@ -400,7 +407,6 @@ func TestSyncer_GetSyncProgression(t *testing.T) {
 	syncer.syncProgression.stopProgression()
 }
 
-// nolint:unused
 type mockBlockStore struct {
 	blocks       []*types.Block
 	subscription *blockchain.MockSubscription
@@ -411,13 +417,13 @@ func (m *mockBlockStore) CalculateGasLimit(number uint64) (uint64, error) {
 	panic("implement me")
 }
 
-// nolint:unused
 func newMockBlockStore() *mockBlockStore {
 	bs := &mockBlockStore{
 		blocks:       make([]*types.Block, 0),
 		subscription: blockchain.NewMockSubscription(),
 		td:           big.NewInt(1),
 	}
+
 	return bs
 }
 
@@ -429,6 +435,7 @@ func (m *mockBlockStore) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	return b.Header, true
 }
 func (m *mockBlockStore) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
@@ -437,6 +444,7 @@ func (m *mockBlockStore) GetBlockByNumber(blockNumber uint64, full bool) (*types
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
@@ -453,15 +461,16 @@ func (m *mockBlockStore) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 			return header, true
 		}
 	}
+
 	return nil, true
 }
 func (m *mockBlockStore) GetBodyByHash(hash types.Hash) (*types.Body, bool) {
 	for _, b := range m.blocks {
-
 		if b.Hash() == hash {
 			return b.Body(), true
 		}
 	}
+
 	return nil, true
 }
 
@@ -490,30 +499,32 @@ func (m *mockBlockStore) GetTD(hash types.Hash) (*big.Int, bool) {
 	return m.td, false
 }
 
-// nolint:unused
 func createGenesisBlock() []*types.Block {
 	blocks := make([]*types.Block, 0)
 	genesis := &types.Header{Difficulty: 1, Number: 0}
 	genesis.ComputeHash()
+
 	b := &types.Block{
 		Header: genesis,
 	}
 	blocks = append(blocks, b)
+
 	return blocks
 }
 
-// nolint:unused
 func createBlockStores(count int) (bStore []*mockBlockStore) {
 	bStore = make([]*mockBlockStore, count)
 	for i := 0; i < count; i++ {
 		bStore[i] = newMockBlockStore()
 	}
+
 	return
 }
 
 // createNetworkServers is a helper function for generating network servers
-// nolint:unused
-func createNetworkServers(count int, t *testing.T, conf func(c *network.Config)) []*network.Server {
+func createNetworkServers(t *testing.T, count int, conf func(c *network.Config)) []*network.Server {
+	t.Helper()
+
 	networkServers := make([]*network.Server, count)
 
 	for indx := 0; indx < count; indx++ {
@@ -530,7 +541,6 @@ func createNetworkServers(count int, t *testing.T, conf func(c *network.Config))
 
 // createSyncers is a helper function for generating syncers. Servers and BlockStores should be at least the length
 // of count
-// nolint:unused
 func createSyncers(count int, servers []*network.Server, blockStores []*mockBlockStore) []*Syncer {
 	syncers := make([]*Syncer, count)
 
@@ -544,6 +554,7 @@ func createSyncers(count int, servers []*network.Server, blockStores []*mockBloc
 // numSyncPeers returns the number of sync peers
 func numSyncPeers(syncer *Syncer) int64 {
 	num := 0
+
 	syncer.peers.Range(func(key, value interface{}) bool {
 		num++
 
@@ -560,12 +571,14 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 		if numPeers == requiredNum {
 			return numPeers, false
 		}
+
 		return nil, true
 	})
 
 	if err != nil {
 		return 0, err
 	}
+
 	return res.(int64), nil
 }
 
@@ -578,7 +591,7 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 	blocks := createGenesisBlock()
 
 	// Create three servers
-	servers := createNetworkServers(3, t, conf)
+	servers := createNetworkServers(t, 3, conf)
 
 	// Create the block stores
 	blockStores := createBlockStores(3)
@@ -600,7 +613,8 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
 	}
 
-	// wait until gossip protocol builds the mesh network (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
+	// wait until gossip protocol builds the mesh network
+	// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()
 
@@ -618,7 +632,9 @@ func TestSyncer_PeerDisconnected(t *testing.T) {
 
 	waitCtx, cancelWait = context.WithTimeout(context.Background(), time.Second*10)
 	defer cancelWait()
+
 	numPeers, err = WaitUntilSyncPeersNumber(waitCtx, syncers[1], 1)
+
 	if err != nil {
 		t.Fatalf("Unable to disconnect sync peers, %v", err)
 	}

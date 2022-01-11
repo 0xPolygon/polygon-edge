@@ -34,6 +34,7 @@ func TestExtraEncoding(t *testing.T) {
 		if err := ii.UnmarshalRLP(data); err != nil {
 			t.Fatal(err)
 		}
+
 		if !reflect.DeepEqual(c.data, ii) {
 			t.Fatal("bad")
 		}

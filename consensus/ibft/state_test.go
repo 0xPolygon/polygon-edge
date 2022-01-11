@@ -42,10 +42,13 @@ func TestState_AddMessages(t *testing.T) {
 			View: &proto.View{Round: 0},
 		}
 		r := uint64(0)
+
 		if len(round) > 0 {
 			r = round[0]
 		}
+
 		msg.View.Round = r
+
 		return msg
 	}
 

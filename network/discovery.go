@@ -2,8 +2,9 @@ package network
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"sync"
 	"time"
 
@@ -14,10 +15,6 @@ import (
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
 )
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 var discProto = "/disc/0.1"
 
@@ -42,6 +39,7 @@ func (ps *referencePeers) find(id peer.ID) *referencePeer {
 			return p
 		}
 	}
+
 	return nil
 }
 
@@ -53,7 +51,10 @@ func (ps *referencePeers) getRandomPeer() *referencePeer {
 	if l == 0 {
 		return nil
 	}
-	return ps.peers[rand.Intn(l)]
+
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(l)))
+
+	return ps.peers[randNum.Int64()]
 }
 
 func (ps *referencePeers) add(id peer.ID) {
@@ -71,9 +72,11 @@ func (ps *referencePeers) delete(id peer.ID) *referencePeer {
 		if p.id == id {
 			deletePeer := ps.peers[idx]
 			ps.peers = append(ps.peers[:idx], ps.peers[idx+1:]...)
+
 			return deletePeer
 		}
 	}
+
 	return nil
 }
 
@@ -97,10 +100,18 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
 
-	routingTable, err := kb.NewRoutingTable(defaultBucketSize, keyID, time.Minute, d.srv.host.Peerstore(), 10*time.Second, nil)
+	routingTable, err := kb.NewRoutingTable(
+		defaultBucketSize,
+		keyID,
+		time.Minute,
+		d.srv.host.Peerstore(),
+		10*time.Second,
+		nil,
+	)
 	if err != nil {
 		return err
 	}
+
 	d.routingTable = routingTable
 
 	d.routingTable.PeerAdded = func(p peer.ID) {
@@ -126,6 +137,7 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
 				d.srv.logger.Error("failed to add peer to routing table", "err", err)
+
 				return
 			}
 			d.peers.add(peerID)
@@ -150,9 +162,11 @@ func (d *discovery) addToTable(node *peer.AddrInfo) error {
 	// we have to add them to the peerstore so that they are
 	// available to all the libp2p services
 	d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
+
 	if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -167,11 +181,13 @@ func (d *discovery) setupTable() {
 func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 	d.srv.logger.Debug("Querying a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
+
 	if err != nil {
 		return err
 	}
 
 	d.srv.logger.Debug("Found new near peers", "peer", len(nodes))
+
 	for _, node := range nodes {
 		if err := d.addToTable(node); err != nil {
 			return err
@@ -196,6 +212,7 @@ func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	p.stream = stream
 
 	return p.stream, nil
@@ -206,6 +223,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
@@ -213,13 +231,15 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	var addrInfo []*peer.AddrInfo
-	for _, node := range resp.Nodes {
+	addrInfo := make([]*peer.AddrInfo, len(resp.Nodes))
+
+	for indx, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
 			return nil, err
 		}
-		addrInfo = append(addrInfo, info)
+
+		addrInfo[indx] = info
 	}
 
 	return addrInfo, nil
@@ -256,6 +276,7 @@ func (d *discovery) FindPeers(
 		// max limit
 		req.Count = 16
 	}
+
 	if req.GetKey() == "" {
 		// use peer id if none specified
 		req.Key = from.String()
@@ -264,6 +285,7 @@ func (d *discovery) FindPeers(
 	closer := d.routingTable.NearestPeers(kb.ConvertKey(req.GetKey()), int(req.Count))
 
 	filtered := []string{}
+
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
@@ -271,6 +293,7 @@ func (d *discovery) FindPeers(
 			filtered = append(filtered, AddrInfoToString(&info))
 		}
 	}
+
 	resp := &proto.FindPeersResp{
 		Nodes: filtered,
 	}

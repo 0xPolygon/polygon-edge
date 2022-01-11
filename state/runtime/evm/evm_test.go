@@ -34,7 +34,12 @@ func (m *mockHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	panic("Not implemented in tests")
 }
 
-func (m *mockHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
+func (m *mockHost) SetStorage(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+	config *chain.ForksInTime,
+) runtime.StorageStatus {
 	panic("Not implemented in tests")
 }
 

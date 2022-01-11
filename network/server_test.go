@@ -31,6 +31,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -49,6 +50,7 @@ func TestConnLimit_Inbound(t *testing.T) {
 
 	// Disconnect Server 0 from Server 1 so Server 1 will have free slots
 	servers[0].Disconnect(servers[1].host.ID(), "bye")
+
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
 
@@ -83,6 +85,7 @@ func TestConnLimit_Outbound(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -104,7 +107,12 @@ func TestConnLimit_Outbound(t *testing.T) {
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
-	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], servers[1].AddrInfo().ID); disconnectErr != nil {
+
+	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(
+		disconnectCtx,
+		servers[0],
+		servers[1].AddrInfo().ID,
+	); disconnectErr != nil {
 		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 	}
 
@@ -125,6 +133,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create server, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		assert.NoError(t, server.Close())
 	})
@@ -145,6 +154,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 	getIDAndEventType := func(i int) (peer.ID, PeerEventType) {
 		id := peer.ID(strconv.Itoa(i))
 		event := events[i%len(events)]
+
 		return id, event
 	}
 
@@ -272,6 +282,7 @@ func TestJoinWhenAlreadyConnected(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -322,9 +333,11 @@ func TestNat(t *testing.T) {
 
 	// NAT IP should be found in registered server addresses
 	found := false
+
 	for _, addr := range registeredAddresses {
 		if addr.String() == testMultiAddrString {
 			found = true
+
 			break
 		}
 	}
@@ -355,6 +368,7 @@ func TestPeerReconnection(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, bootnodes)
 	})
@@ -386,6 +400,7 @@ func TestPeerReconnection(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		for indx, server := range servers {
 			if indx != 1 {
@@ -400,6 +415,7 @@ func TestPeerReconnection(t *testing.T) {
 
 		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 		defer disconnectFn()
+
 		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
 			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 		}
@@ -407,12 +423,14 @@ func TestPeerReconnection(t *testing.T) {
 
 	closePeerServer := func(server *Server, peer *Server) {
 		peerID := peer.AddrInfo().ID
+
 		if closeErr := peer.Close(); closeErr != nil {
 			t.Fatalf("Unable to close server, %v", closeErr)
 		}
 
 		disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 		defer disconnectFn()
+
 		if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, server, peerID); disconnectErr != nil {
 			t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 		}
@@ -449,6 +467,7 @@ func TestPeerReconnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to wait for peer connect, %v", err)
 	}
+
 	assert.True(t, reconnected)
 }
 
@@ -489,6 +508,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
+
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
@@ -500,12 +520,14 @@ func TestReconnectionWithNewIP(t *testing.T) {
 
 	// Server 1 terminates, so Server 0 should disconnect from it
 	peerID := servers[1].AddrInfo().ID
+
 	if err := servers[1].host.Close(); err != nil {
 		t.Fatalf("Unable to close peer server, %v", err)
 	}
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer disconnectFn()
+
 	if _, disconnectErr := WaitUntilPeerDisconnectsFrom(disconnectCtx, servers[0], peerID); disconnectErr != nil {
 		t.Fatalf("Unable to wait for disconnect from peer, %v", disconnectErr)
 	}
@@ -535,7 +557,7 @@ func TestReconnectionWithNewIP(t *testing.T) {
 func TestSelfConnection_WithBootNodes(t *testing.T) {
 	// Create a temporary directory for storing the key file
 	key, directoryName := GenerateTestLibp2pKey(t)
-	peerId, err := peer.IDFromPrivateKey(key)
+	peerID, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
 	testMultiAddr := GenerateTestMultiAddr(t).String()
 	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
@@ -549,7 +571,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 		{
 			name:         "Should return an non empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerId.Pretty(), testMultiAddr},
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerID.Pretty(), testMultiAddr},
 			expectedList: []*peer.AddrInfo{peerAddressInfo},
 		},
 	}
@@ -573,6 +595,8 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 func TestRunDial(t *testing.T) {
 	// setupServers returns server and list of peer's server
 	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+		t.Helper()
+
 		servers := make([]*Server, len(maxPeers))
 		for idx := range servers {
 			server, createErr := CreateServer(
@@ -688,6 +712,5 @@ func TestMinimumBootNodeCount(t *testing.T) {
 				assert.NoError(t, createErr)
 			}
 		})
-
 	}
 }
