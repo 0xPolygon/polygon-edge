@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
+	"math/big"
 	"net"
 	"net/url"
 	"sort"
@@ -112,6 +113,24 @@ func (l *LoadbotCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      false,
 	}
+
+	l.FlagMap["gas-price"] = helper.FlagDescriptor{
+		Description: "The gas price that should be used for the transactions. If omitted, the average gas price is " +
+			"fetched from the network",
+		Arguments: []string{
+			"GAS_PRICE",
+		},
+		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["gas-limit"] = helper.FlagDescriptor{
+		Description: "The gas limit that should be used for the transactions. If omitted, the gas limit is " +
+			"estimated before starting the loadbot",
+		Arguments: []string{
+			"GAS_LIMIT",
+		},
+		ArgumentsOptional: true,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -132,6 +151,21 @@ func (l *LoadbotCommand) Help() string {
 	return helper.GenerateHelp(l.Synopsis(), helper.GenerateUsage(l.GetBaseCommand(), l.FlagMap), l.FlagMap)
 }
 
+func parseGasValue(value string) (*big.Int, error) {
+	var err error
+
+	bigValue := big.NewInt(-1)
+
+	if value != "" {
+		bigValue, err = types.ParseUint256orHex(&value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return bigValue, nil
+}
+
 func (l *LoadbotCommand) Run(args []string) int {
 	flags := l.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
@@ -148,6 +182,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		grpc        string
 		maxConns    int
 		detailed    bool
+		gasPrice    string
+		gasLimit    string
 	)
 
 	// Map flags to placeholders
@@ -162,6 +198,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
 	flags.StringVar(&grpc, "grpc", "", "")
 	flags.IntVar(&maxConns, "max-conns", 0, "")
+	flags.StringVar(&gasPrice, "gas-price", "", "")
+	flags.StringVar(&gasLimit, "gas-limit", "", "")
 
 	var err error
 	// Parse cli arguments
@@ -181,6 +219,22 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// maxConns is set to 2*tps if not specified by the user.
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
+	}
+
+	// Parse the gas price
+	bigGasPrice, gasPriceErr := parseGasValue(gasPrice)
+	if gasPriceErr != nil {
+		l.Formatter.OutputError(fmt.Errorf("failed to decode gas price to value: %w", err))
+
+		return 1
+	}
+
+	// Parse the gas limit
+	bigGasLimit, gasLimitErr := parseGasValue(gasPrice)
+	if gasLimitErr != nil {
+		l.Formatter.OutputError(fmt.Errorf("failed to decode gas limit to value: %w", err))
+
+		return 1
 	}
 
 	var sender types.Address
@@ -228,6 +282,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		MaxConns:      maxConns,
 		GeneratorMode: convMode,
 		ChainID:       chainID,
+		GasPrice:      bigGasPrice,
+		GasLimit:      bigGasLimit,
 	}
 
 	// Create the metrics placeholder

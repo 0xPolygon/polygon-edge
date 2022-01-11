@@ -51,6 +51,8 @@ type Configuration struct {
 	MaxConns      int
 	GeneratorMode Mode
 	ChainID       uint64
+	GasPrice      *big.Int
+	GasLimit      *big.Int
 }
 
 type metadata struct {
@@ -270,9 +272,15 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("unable to get initial sender nonce: %w", err)
 	}
 
-	gasPrice, err := getAverageGasPrice(jsonClient)
-	if err != nil {
-		return fmt.Errorf("unable to get average gas price: %w", err)
+	gasPrice := l.cfg.GasPrice
+	if gasPrice.Cmp(big.NewInt(-1)) == 0 {
+		// No gas price specified, query the network for an estimation
+		avgGasPrice, err := getAverageGasPrice(jsonClient)
+		if err != nil {
+			return fmt.Errorf("unable to get average gas price: %w", err)
+		}
+
+		gasPrice.SetUint64(avgGasPrice)
 	}
 
 	// Set up the transaction generator
@@ -281,7 +289,7 @@ func (l *Loadbot) Run() error {
 		ChainID:       l.cfg.ChainID,
 		SenderAddress: sender.Address,
 		SenderKey:     sender.PrivateKey,
-		GasPrice:      big.NewInt(0).SetUint64(gasPrice),
+		GasPrice:      gasPrice,
 		Value:         l.cfg.Value,
 	}
 
@@ -309,12 +317,18 @@ func (l *Loadbot) Run() error {
 		return fmt.Errorf("unable to get example transaction, %w", err)
 	}
 
-	gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
-	if estimateErr != nil {
-		return fmt.Errorf("unable to get gas estimate, %w", err)
+	gasLimit := l.cfg.GasLimit
+	if gasLimit.Cmp(big.NewInt(-1)) == 0 {
+		// No gas limit specified, query the network for an estimation
+		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
+		if estimateErr != nil {
+			return fmt.Errorf("unable to get gas estimate, %w", err)
+		}
+
+		gasLimit.SetUint64(gasEstimate)
 	}
 
-	l.generator.SetGasEstimate(gasEstimate)
+	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
