@@ -38,8 +38,7 @@ var (
 	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
 	ErrInvalidAccountState = errors.New("invalid account state")
 	ErrAlreadyKnown        = errors.New("already known")
-	// ErrOversizedData is returned if size of a transction is greater than the specified limit
-	ErrOversizedData = errors.New("oversized data")
+	ErrOversizedData       = errors.New("oversized data")
 )
 
 // indicates origin of a transaction

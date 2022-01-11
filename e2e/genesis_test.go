@@ -64,7 +64,6 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetBlockLimit(blockGasLimit)
-		// config.SetDevInterval(3)
 		config.Premine(senderAddress, framework.EthToWei(100))
 		config.SetBlockGasTarget(blockGasLimit)
 	})
