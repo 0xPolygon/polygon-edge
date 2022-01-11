@@ -77,7 +77,7 @@ func (l *LoadbotCommand) DefineFlags() {
 		FlagOptional:      false,
 	}
 
-	l.FlagMap["grpc"] = helper.FlagDescriptor{
+	l.FlagMap["grpc-address"] = helper.FlagDescriptor{
 		Description: "The GRPC endpoint used to send transactions.",
 		Arguments: []string{
 			"GRPC_ADDRESS",
