@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -20,10 +19,9 @@ import (
 )
 
 const (
-	defaultIdlePeriod = 1 * time.Minute
-	txSlotSize        = 32 * 1024  // 32kB
-	txMaxSize         = 128 * 1024 //128Kb
-	topicNameV1       = "txpool/0.1"
+	txSlotSize  = 32 * 1024  // 32kB
+	txMaxSize   = 128 * 1024 //128Kb
+	topicNameV1 = "txpool/0.1"
 )
 
 // errors
@@ -126,11 +124,10 @@ type promoteRequest struct {
 // transactions are the first-in-line of some promoted queue,
 // ready to be written to the state (primaries).
 type TxPool struct {
-	logger     hclog.Logger
-	signer     signer
-	forks      chain.ForksInTime
-	store      store
-	idlePeriod time.Duration
+	logger hclog.Logger
+	signer signer
+	forks  chain.ForksInTime
+	store  store
 
 	// map of all accounts registered by the pool
 	accounts accountsMap
@@ -184,7 +181,6 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		idlePeriod:  defaultIdlePeriod,
 		metrics:     metrics,
 		accounts:    accountsMap{},
 		executables: newPricedQueue(),
