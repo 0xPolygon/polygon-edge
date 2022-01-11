@@ -216,19 +216,12 @@ func NewTxPool(
 // Start runs the pool's main loop in the background.
 // On each request received, the appropriate handler
 // is invoked in a separate goroutine.
-func (p *TxPool) Start() error {
+func (p *TxPool) Start() {
 	go func() {
-
-		// check if shutdown was called
-		select {
-		case <-p.shutdownCh:
-			return
-		default:
-		}
-
-		// handle requests
 		for {
 			select {
+			case <-p.shutdownCh:
+				return
 			case req := <-p.enqueueReqCh:
 				go p.handleEnqueueRequest(req)
 			case req := <-p.promoteReqCh:
@@ -236,8 +229,6 @@ func (p *TxPool) Start() error {
 			}
 		}
 	}()
-
-	return nil
 }
 
 // Close shuts down the pool's main loop.

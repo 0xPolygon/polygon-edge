@@ -206,9 +206,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := m.txpool.Start(); err != nil {
-		return nil, err
-	}
+	m.txpool.Start()
 
 	return m, nil
 }
@@ -510,6 +508,9 @@ func (s *Server) Close() {
 			s.logger.Error("Prometheus server shutdown error", err)
 		}
 	}
+
+	// close the txpool's main loop
+	s.txpool.Close()
 }
 
 // Entry is a backend configuration entry
