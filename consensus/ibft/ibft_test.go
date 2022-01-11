@@ -673,7 +673,7 @@ func (p *mockTxPool) Length() uint64 {
 	return uint64(len(p.transactions) + len(p.demoted))
 }
 
-func (p *mockTxPool) Peek() *types.Transaction {
+func (p *mockTxPool) Next() *types.Transaction {
 	if len(p.transactions) == 0 {
 		return nil
 	}

@@ -107,7 +107,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 
 	var successful []*types.Transaction
 	for {
-		tx := d.txpool.Peek()
+		tx := d.txpool.Next()
 		if tx == nil {
 			break
 		}

@@ -290,9 +290,9 @@ func (p *TxPool) Prepare() {
 	}
 }
 
-// Peek returns the best-price selected
-// transaction from the executables queue.
-func (p *TxPool) Peek() *types.Transaction {
+// Next returns the best-price selected
+// transaction ready for execution.
+func (p *TxPool) Next() *types.Transaction {
 	return p.executables.pop()
 }
 

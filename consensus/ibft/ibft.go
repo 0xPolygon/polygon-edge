@@ -40,7 +40,7 @@ type blockchainInterface interface {
 type txPoolInterface interface {
 	Prepare()
 	Length() uint64
-	Peek() *types.Transaction
+	Next() *types.Transaction
 	Pop(tx *types.Transaction)
 	Drop(tx *types.Transaction)
 	Demote(tx *types.Transaction)
@@ -633,7 +633,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 
 	var successful []*types.Transaction
 	for {
-		tx := i.txpool.Peek()
+		tx := i.txpool.Next()
 		if tx == nil {
 			break
 		}
