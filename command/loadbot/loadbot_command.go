@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/url"
 	"sort"
+	"strings"
 )
 
 type LoadbotCommand struct {
@@ -86,7 +87,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["mode"] = helper.FlagDescriptor{
-		Description: "The mode of operation [0, 1]. Default: 0",
+		Description: "The mode of operation [transfer, deploy]. Default: transfer",
 		Arguments: []string{
 			"MODE",
 		},
@@ -137,7 +138,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	// Placeholders for flags
 	var (
 		tps         uint64
-		mode        uint64
+		mode        string
 		chainID     uint64
 		senderRaw   string
 		receiverRaw string
@@ -151,7 +152,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
-	flags.Uint64Var(&mode, "mode", 0, "")
+	flags.StringVar(&mode, "mode", string(transfer), "")
 	flags.BoolVar(&detailed, "detailed", false, "")
 	flags.Uint64Var(&chainID, "chain-id", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
@@ -170,7 +171,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
-	if mode > 1 {
+	convMode := Mode(strings.ToLower(mode))
+	if convMode != transfer && convMode != deploy {
 		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
 
 		return 1
@@ -224,7 +226,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 		JSONRPC:       jsonrpc,
 		GRPC:          grpc,
 		MaxConns:      maxConns,
-		GeneratorMode: mode,
+		GeneratorMode: convMode,
 		ChainID:       chainID,
 	}
 

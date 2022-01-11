@@ -28,10 +28,18 @@ const (
 	defaultGasLimit = 5242880 // 0x500000
 )
 
+type Mode string
+
+const (
+	transfer Mode = "transfer"
+	deploy   Mode = "deploy"
+)
+
 type Account struct {
 	Address    types.Address
 	PrivateKey *ecdsa.PrivateKey
 }
+
 type Configuration struct {
 	TPS           uint64
 	Sender        types.Address
@@ -41,7 +49,7 @@ type Configuration struct {
 	JSONRPC       string
 	GRPC          string
 	MaxConns      int
-	GeneratorMode uint64
+	GeneratorMode Mode
 	ChainID       uint64
 }
 
@@ -283,9 +291,9 @@ func (l *Loadbot) Run() error {
 	)
 
 	switch l.cfg.GeneratorMode {
-	case 0:
+	case transfer:
 		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
-	case 1:
+	case deploy:
 		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
 	}
 
