@@ -49,6 +49,7 @@ type Config struct {
 	MaxOutboundPeers uint64
 	Chain            *chain.Chain
 	SecretsManager   secrets.SecretsManager
+	Metrics          *Metrics
 }
 
 func DefaultConfig() *Config {
@@ -71,6 +72,8 @@ type Server struct {
 
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
+
+	metrics *Metrics
 
 	dialQueue *dialQueue
 
@@ -181,6 +184,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		host:             host,
 		addrs:            host.Addrs(),
 		peers:            map[peer.ID]*Peer{},
+		metrics:          config.Metrics,
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -317,6 +321,7 @@ func (s *Server) runDial() {
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
 					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
 				}
 			}
 		}
@@ -336,6 +341,7 @@ func (s *Server) numPeers() int64 {
 	defer s.peersLock.Unlock()
 	return int64(len(s.peers))
 }
+
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
 	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
 }
@@ -419,6 +425,7 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 	}
 
 	s.emitEvent(id, PeerConnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -440,6 +447,7 @@ func (s *Server) delPeer(id peer.ID) {
 	}
 
 	s.emitEvent(id, PeerDisconnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {

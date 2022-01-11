@@ -9,11 +9,10 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/network/grpc"
 	"github.com/0xPolygon/polygon-sdk/network/proto"
-	rawGrpc "google.golang.org/grpc"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
+	rawGrpc "google.golang.org/grpc"
 )
 
 func init() {
@@ -24,16 +23,21 @@ var discProto = "/disc/0.1"
 
 const defaultBucketSize = 20
 
-// referencePeer is a representation of the peer the node is requesting for new peers
 type referencePeer struct {
 	id     peer.ID
 	stream interface{}
 }
 
-type referencePeers []*referencePeer
+type referencePeers struct {
+	mux   sync.RWMutex
+	peers []*referencePeer
+}
 
 func (ps *referencePeers) find(id peer.ID) *referencePeer {
-	for _, p := range *ps {
+	ps.mux.RLock()
+	defer ps.mux.RUnlock()
+
+	for _, p := range ps.peers {
 		if p.id == id {
 			return p
 		}
@@ -41,18 +45,34 @@ func (ps *referencePeers) find(id peer.ID) *referencePeer {
 	return nil
 }
 
-func (ps *referencePeers) delete(id peer.ID) *referencePeer {
-	idx := -1
-	for i, p := range *ps {
-		if p.id == id {
-			idx = i
-			break
-		}
+func (ps *referencePeers) getRandomPeer() *referencePeer {
+	ps.mux.RLock()
+	defer ps.mux.RUnlock()
+
+	l := len(ps.peers)
+	if l == 0 {
+		return nil
 	}
-	if idx != -1 {
-		deletePeer := (*ps)[idx]
-		*ps = append((*ps)[:idx], (*ps)[idx+1:]...)
-		return deletePeer
+	return ps.peers[rand.Intn(l)]
+}
+
+func (ps *referencePeers) add(id peer.ID) {
+	ps.mux.Lock()
+	defer ps.mux.Unlock()
+
+	ps.peers = append(ps.peers, &referencePeer{id: id, stream: nil})
+}
+
+func (ps *referencePeers) delete(id peer.ID) *referencePeer {
+	ps.mux.Lock()
+	defer ps.mux.Unlock()
+
+	for idx, p := range ps.peers {
+		if p.id == id {
+			deletePeer := ps.peers[idx]
+			ps.peers = append(ps.peers[:idx], ps.peers[idx+1:]...)
+			return deletePeer
+		}
 	}
 	return nil
 }
@@ -60,10 +80,9 @@ func (ps *referencePeers) delete(id peer.ID) *referencePeer {
 type discovery struct {
 	proto.UnimplementedDiscoveryServer
 	srv          *Server
-	routingTable *kb.RoutingTable
+	routingTable *kb.RoutingTable // kademlia 'k-bucket' routing table that contains connected nodes info
 
-	peers     referencePeers
-	peersLock sync.Mutex
+	peers *referencePeers // list of the peers discovery queries about near peers
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
@@ -73,7 +92,7 @@ type discovery struct {
 
 func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 	d.notifyCh = make(chan struct{}, 5)
-	d.peers = referencePeers{}
+	d.peers = &referencePeers{}
 	d.bootnodes = bootnodes
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
@@ -109,17 +128,10 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 				d.srv.logger.Error("failed to add peer to routing table", "err", err)
 				return
 			}
-			d.peersLock.Lock()
-			d.peers = append(d.peers, &referencePeer{
-				id:     peerID,
-				stream: nil,
-			})
-			d.peersLock.Unlock()
-		case PeerDisconnected:
+			d.peers.add(peerID)
+		case PeerDisconnected, PeerFailedToConnect:
 			d.routingTable.RemovePeer(peerID)
-			d.peersLock.Lock()
 			d.peers.delete(peerID)
-			d.peersLock.Unlock()
 		}
 	})
 	if err != nil {
@@ -170,9 +182,6 @@ func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 }
 
 func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
-	d.peersLock.Lock()
-	defer d.peersLock.Unlock()
-
 	p := d.peers.find(peerID)
 	if p == nil {
 		return nil, fmt.Errorf("peer not found in list")
@@ -216,11 +225,6 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	return addrInfo, nil
 }
 
-func (d *discovery) peersCount() int {
-	d.peersLock.Lock()
-	defer d.peersLock.Unlock()
-	return len(d.peers)
-}
 func (d *discovery) run() {
 	for {
 		select {
@@ -235,10 +239,9 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if d.srv.numOpenSlots() > 0 && d.peersCount() > 0 {
-		target := d.peers[rand.Intn(d.peersCount())]
+	if target := d.peers.getRandomPeer(); d.srv.numOpenSlots() > 0 && target != nil {
 		if err := d.attemptToFindPeers(target.id); err != nil {
-			d.srv.logger.Error("failed to find peers", "err", err)
+			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
 		}
 	}
 }
