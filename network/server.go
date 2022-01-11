@@ -47,7 +47,7 @@ type Config struct {
 	NoDiscover       bool
 	Addr             *net.TCPAddr
 	NatAddr          net.IP
-	Dns              multiaddr.Multiaddr
+	DNS              multiaddr.Multiaddr
 	DataDir          string
 	MaxInboundPeers  uint64
 	MaxOutboundPeers uint64
