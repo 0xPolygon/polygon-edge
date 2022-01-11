@@ -41,7 +41,8 @@ func (m *accountsMap) exists(addr types.Address) bool {
 	return ok
 }
 
-// Collects the primaries of all accounts.
+// getPrimaries collects the heads (first-in-line transaction)
+// from each of the promoted queues.
 func (m *accountsMap) getPrimaries() (primaries transactions) {
 	m.Range(func(key, value interface{}) bool {
 		account := m.get(key.(types.Address))
@@ -49,7 +50,7 @@ func (m *accountsMap) getPrimaries() (primaries transactions) {
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
 
-		// add primary
+		// add head of the queue
 		if tx := account.promoted.peek(); tx != nil {
 			primaries = append(primaries, tx)
 		}
