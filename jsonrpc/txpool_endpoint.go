@@ -146,11 +146,15 @@ func (t *Txpool) Inspect() (interface{}, error) {
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status.
 func (t *Txpool) Status() (interface{}, error) {
 	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+
 	var pendingCount int
+
 	for _, t := range pendingTxs {
 		pendingCount += len(t)
 	}
+
 	var queuedCount int
+
 	for _, t := range queuedTxs {
 		queuedCount += len(t)
 	}

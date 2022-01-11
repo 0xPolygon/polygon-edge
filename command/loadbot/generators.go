@@ -10,12 +10,14 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc"
 )
 
-func createJsonRpcClient(endpoint string, maxConns int) (*jsonrpc.Client, error) {
+func createJSONRPCClient(endpoint string, maxConns int) (*jsonrpc.Client, error) {
 	client, err := jsonrpc.NewClient(endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new JSON RPC client: %v", err)
+		return nil, fmt.Errorf("failed to create new JSON RPC client: %w", err)
 	}
+
 	client.SetMaxConnsLimit(maxConns)
+
 	return client, nil
 }
 
@@ -28,9 +30,12 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 	privateKeyRaw := os.Getenv("PSDK_" + address.String())
 	privateKeyRaw = strings.TrimPrefix(privateKeyRaw, "0x")
 	privateKey, err := crypto.BytesToPrivateKey([]byte(privateKeyRaw))
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract ECDSA private key from bytes: %v", err)
+		return nil, fmt.Errorf("failed to extract ECDSA private key from bytes: %w", err)
 	}
+
 	sender.PrivateKey = privateKey
+
 	return sender, nil
 }

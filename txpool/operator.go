@@ -34,6 +34,7 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 		if err := from.UnmarshalText([]byte(raw.From)); err != nil {
 			return nil, err
 		}
+
 		txn.From = from
 	}
 

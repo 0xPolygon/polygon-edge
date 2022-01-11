@@ -50,6 +50,7 @@ func Factory(
 		if !ok {
 			return nil, fmt.Errorf("interval expected int")
 		}
+
 		d.interval = interval
 	}
 
@@ -144,7 +145,6 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
-
 	// Generate the base block
 	num := parent.Number
 	header := &types.Header{
@@ -159,13 +159,16 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
 	}
+
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
+
 	if err != nil {
 		return err
 	}
@@ -226,5 +229,6 @@ func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error
 
 func (d *Dev) Close() error {
 	close(d.closeCh)
+
 	return nil
 }

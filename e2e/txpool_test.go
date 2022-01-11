@@ -28,18 +28,22 @@ var (
 )
 
 func waitForBlock(t *testing.T, srv *framework.TestServer, expectedBlocks int, index int) int64 {
+	t.Helper()
+
 	systemClient := srv.Operator()
 	ctx, cancelFn := context.WithCancel(context.Background())
 	stream, err := systemClient.Subscribe(ctx, &empty.Empty{})
+
 	if err != nil {
 		cancelFn()
 		t.Fatalf("Unable to subscribe to blockchain events")
 	}
 
 	evnt, err := stream.Recv()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		t.Fatalf("Invalid stream close")
 	}
+
 	if err != nil {
 		t.Fatalf("Unable to read blockchain event")
 	}
@@ -191,7 +195,6 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	// -> tx shouldn't be executed, but shelved for later
 	// Add tx with nonce 1
 	// -> check if both tx with nonce 1 and tx with nonce 2 are parsed
-
 	// Predefined values
 	gasPrice := big.NewInt(10000)
 
@@ -263,7 +266,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 
 	// Get to account balance
 	// Only the first tx should've gone through
-	toAccountBalance := framework.GetAccountBalance(toAddress, client, t)
+	toAccountBalance := framework.GetAccountBalance(t, toAddress, client)
 	assert.Equalf(t,
 		oneEth.String(),
 		toAccountBalance.String(),
@@ -282,7 +285,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	_ = waitForBlock(t, srv, 1, 0)
 
 	// Now both the added tx and the shelved tx should've gone through
-	toAccountBalance = framework.GetAccountBalance(toAddress, client, t)
+	toAccountBalance = framework.GetAccountBalance(t, toAddress, client)
 	assert.Equalf(t,
 		framework.EthToWei(3).String(),
 		toAccountBalance.String(),
@@ -295,7 +298,9 @@ type testAccount struct {
 	address types.Address
 }
 
-func generateTestAccounts(numAccounts int, t *testing.T) []*testAccount {
+func generateTestAccounts(t *testing.T, numAccounts int) []*testAccount {
+	t.Helper()
+
 	testAccounts := make([]*testAccount, numAccounts)
 
 	for indx := 0; indx < numAccounts; indx++ {
@@ -310,7 +315,6 @@ func generateTestAccounts(numAccounts int, t *testing.T) []*testAccount {
 func TestTxPool_StressAddition(t *testing.T) {
 	// Test scenario:
 	// Add a large number of txns to the txpool concurrently
-
 	// Predefined values
 	defaultBalance := framework.EthToWei(10000)
 
@@ -318,7 +322,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 	numAccounts := 4
 	numTxPerAccount := 50
 
-	testAccounts := generateTestAccounts(numAccounts, t)
+	testAccounts := generateTestAccounts(t, numAccounts)
 
 	// Set up the test server
 	srv := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -542,6 +546,7 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	// as a non-local transaction
 
 	var zeroPriceLimit uint64 = 0
+
 	startingBalance := framework.EthToWei(100)
 
 	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -558,9 +563,12 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 	client := server.JSONRPC()
 	operator := server.TxnPoolOperator()
 	ctx := context.Background()
-	var nonce uint64 = 0
-	var nonceMux sync.Mutex
-	var wg sync.WaitGroup
+
+	var (
+		nonce    uint64 = 0
+		nonceMux sync.Mutex
+		wg       sync.WaitGroup
+	)
 
 	sendTx := func() {
 		nonceMux.Lock()
@@ -591,12 +599,15 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 
 	numIterations := 100
 	numIterationsBig := big.NewInt(int64(numIterations))
+
 	for i := 0; i < numIterations; i++ {
 		wg.Add(1)
+
 		go sendTx()
 	}
 
 	wg.Wait()
+
 	_ = waitForBlock(t, server, 1, 0)
 
 	receiverBalance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)

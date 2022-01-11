@@ -38,6 +38,7 @@ func Factory(params *consensus.ConsensusParams) (consensus.Consensus, error) {
 
 func (d *Dummy) Start() error {
 	go d.run()
+
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (d *Dummy) GetSyncProgression() *protocol.Progression {
 
 func (d *Dummy) Close() error {
 	close(d.closeCh)
+
 	return nil
 }
 

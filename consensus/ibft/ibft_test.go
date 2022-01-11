@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -143,6 +144,7 @@ func TestTransition_AcceptState_Proposer_Locked(t *testing.T) {
 		locked:   true,
 		outgoing: 2, // preprepare and prepare
 	})
+
 	if i.state.block.Number() != 10 {
 		t.Fatal("bad block")
 	}
@@ -155,7 +157,9 @@ func TestTransition_AcceptState_Validator_VerifyCorrect(t *testing.T) {
 
 	block := i.DummyBlock()
 	header, err := writeSeal(i.pool.get("A").priv, block.Header)
+
 	assert.NoError(t, err)
+
 	block.Header = header
 
 	// A sends the message
@@ -186,7 +190,9 @@ func TestTransition_AcceptState_Validator_VerifyFails(t *testing.T) {
 	block.Header.MixHash = types.Hash{} // invalidates the block
 
 	header, err := writeSeal(i.pool.get("A").priv, block.Header)
+
 	assert.NoError(t, err)
+
 	block.Header = header
 
 	// A sends the message
@@ -470,14 +476,23 @@ func TestWriteTransactions(t *testing.T) {
 	setupMockTransition := func(test testCase, mockTxPool *mockTxPool) *mockTransition {
 		mockTransition := &mockTransition{}
 		for _, i := range test.recoverableTxnsIndexes {
-			mockTransition.recoverableTransactions = append(mockTransition.recoverableTransactions, mockTxPool.transactions[i])
+			mockTransition.recoverableTransactions = append(
+				mockTransition.recoverableTransactions,
+				mockTxPool.transactions[i],
+			)
 		}
+
 		for _, i := range test.unrecoverableTxnsIndexes {
-			mockTransition.unrecoverableTransactions = append(mockTransition.unrecoverableTransactions, mockTxPool.transactions[i])
+			mockTransition.unrecoverableTransactions = append(
+				mockTransition.unrecoverableTransactions,
+				mockTxPool.transactions[i],
+			)
 		}
+
 		if test.gasLimitReachedTxnIndex > 0 {
 			mockTransition.gasLimitReachedTransaction = mockTxPool.transactions[test.gasLimitReachedTxnIndex]
 		}
+
 		return mockTransition
 	}
 
@@ -570,6 +585,7 @@ func TestWriteTransactions(t *testing.T) {
 func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
 	m.setState(SyncState)
+
 	expectedNewBlockToSync := &types.Block{Header: &types.Header{Number: 1}}
 	mockSyncer := &mockSyncer{}
 	mockSyncer.receivedNewHeadFromPeer = expectedNewBlockToSync
@@ -579,6 +595,7 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *tes
 
 	// we need to change state from Sync in order to break from the loop inside runSyncState
 	stateChangeDelay := time.After(100 * time.Millisecond)
+
 	go func() {
 		<-stateChangeDelay
 		m.setState(AcceptState)
@@ -595,6 +612,7 @@ func TestRunSyncState_NewHeadReceivedFromPeer_CallsTxPoolResetWithHeaders(t *tes
 func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T) {
 	m := newMockIbft(t, []string{"A", "B", "C"}, "A")
 	m.setState(SyncState)
+
 	expectedNewBlocksToSync := []*types.Block{
 		{Header: &types.Header{Number: 1}},
 		{Header: &types.Header{Number: 2}},
@@ -608,6 +626,7 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 
 	// we need to change state from Sync in order to break from the loop inside runSyncState
 	stateChangeDelay := time.After(100 * time.Millisecond)
+
 	go func() {
 		<-stateChangeDelay
 		m.setState(AcceptState)
@@ -639,6 +658,7 @@ func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *
 	for _, block := range s.bulkSyncBlocksFromPeer {
 		handler(block)
 	}
+
 	return nil
 }
 
@@ -733,6 +753,7 @@ func (t *mockTransition) Write(txn *types.Transaction) error {
 	}
 
 	t.transactionsWritten = append(t.transactionsWritten, txn)
+
 	return nil
 }
 
@@ -764,6 +785,7 @@ func (m *mockIbft) DummyBlock() *types.Block {
 			GasLimit:   gasLimit,
 		},
 	}
+
 	return block
 }
 
@@ -797,6 +819,7 @@ func (m *mockIbft) addMessage(msg *proto.MessageReq) {
 
 func (m *mockIbft) Gossip(msg *proto.MessageReq) error {
 	m.respMsg = append(m.respMsg, msg)
+
 	return nil
 }
 
@@ -805,6 +828,8 @@ func (m *mockIbft) CalculateGasLimit(number uint64) (uint64, error) {
 }
 
 func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
+	t.Helper()
+
 	pool := newTesterAccountPool()
 	pool.add(accounts...)
 
@@ -816,6 +841,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	}
 
 	var addr *testerAccount
+
 	if account == "" {
 		// account not in validator set, create a new one that is not part
 		// of the genesis
@@ -824,6 +850,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	} else {
 		addr = pool.get(account)
 	}
+
 	ibft := &Ibft{
 		logger:           hclog.NewNullLogger(),
 		config:           &consensus.Config{},
@@ -852,6 +879,7 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 	ibft.state.validators = pool.ValidatorSet()
 
 	m.Ibft.transport = m
+
 	return m
 }
 
@@ -874,25 +902,32 @@ func (m *mockIbft) expect(res expectResult) {
 	if sequence := m.state.view.Sequence; sequence != res.sequence {
 		m.t.Fatalf("incorrect sequence %d %d", sequence, res.sequence)
 	}
+
 	if round := m.state.view.Round; round != res.round {
 		m.t.Fatalf("incorrect round %d %d", round, res.round)
 	}
+
 	if m.getState() != res.state {
 		m.t.Fatalf("incorrect state %s %s", m.getState(), res.state)
 	}
+
 	if size := len(m.state.prepared); uint64(size) != res.prepareMsgs {
 		m.t.Fatalf("incorrect prepared messages %d %d", size, res.prepareMsgs)
 	}
+
 	if size := len(m.state.committed); uint64(size) != res.commitMsgs {
 		m.t.Fatalf("incorrect commit messages %d %d", size, res.commitMsgs)
 	}
+
 	if m.state.locked != res.locked {
 		m.t.Fatalf("incorrect locked %v %v", m.state.locked, res.locked)
 	}
+
 	if size := len(m.respMsg); uint64(size) != res.outgoing {
 		m.t.Fatalf("incorrect outgoing messages %v %v", size, res.outgoing)
 	}
-	if m.state.err != res.err {
+
+	if !errors.Is(m.state.err, res.err) {
 		m.t.Fatalf("incorrect error %v %v", m.state.err, res.err)
 	}
 }

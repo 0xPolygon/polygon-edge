@@ -25,6 +25,7 @@ func (l *LogFilter) addTopicSet(set ...string) error {
 	}
 
 	res := []types.Hash{}
+
 	for _, i := range set {
 		item := types.Hash{}
 		if err := item.UnmarshalText([]byte(i)); err != nil {
@@ -44,7 +45,9 @@ func (l *LogFilter) addAddress(raw string) error {
 	if l.Addresses == nil {
 		l.Addresses = []types.Address{}
 	}
+
 	addr := types.Address{}
+
 	if err := addr.UnmarshalText([]byte(raw)); err != nil {
 		return err
 	}
@@ -78,7 +81,9 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 		Address   interface{}   `json:"address"`
 		Topics    []interface{} `json:"topics"`
 	}
+
 	err := json.Unmarshal(data, &obj)
+
 	if err != nil {
 		return err
 	}
@@ -140,6 +145,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 			case []interface{}:
 				// ["", ""]
 				res := []string{}
+
 				for _, i := range raw {
 					if item, ok := i.(string); ok {
 						res = append(res, item)
@@ -147,6 +153,7 @@ func (l *LogFilter) UnmarshalJSON(data []byte) error {
 						return fmt.Errorf("hash expected")
 					}
 				}
+
 				if err := l.addTopicSet(res...); err != nil {
 					return err
 				}
@@ -172,11 +179,13 @@ func (l *LogFilter) Match(log *types.Log) bool {
 	// check addresses
 	if len(l.Addresses) > 0 {
 		match := false
+
 		for _, addr := range l.Addresses {
 			if addr == log.Address {
 				match = true
 			}
 		}
+
 		if !match {
 			return false
 		}
@@ -185,17 +194,22 @@ func (l *LogFilter) Match(log *types.Log) bool {
 	if len(l.Topics) > len(log.Topics) {
 		return false
 	}
+
 	for i, sub := range l.Topics {
 		match := len(sub) == 0
+
 		for _, topic := range sub {
 			if log.Topics[i] == topic {
 				match = true
+
 				break
 			}
 		}
+
 		if !match {
 			return false
 		}
 	}
+
 	return true
 }

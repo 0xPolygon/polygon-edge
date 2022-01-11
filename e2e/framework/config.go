@@ -26,7 +26,7 @@ type SrvAccount struct {
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
-	JsonRPCPort             int             // The JSON RPC endpoint port
+	JSONRPCPort             int             // The JSON RPC endpoint port
 	GRPCPort                int             // The GRPC endpoint port
 	LibP2PPort              int             // The Libp2p endpoint port
 	Seal                    bool            // Flag indicating if blocks should be sealed
@@ -71,6 +71,7 @@ func (t *TestServerConfig) Premine(addr types.Address, amount *big.Int) {
 	if t.PremineAccts == nil {
 		t.PremineAccts = []*SrvAccount{}
 	}
+
 	t.PremineAccts = append(t.PremineAccts, &SrvAccount{
 		Addr:    addr,
 		Balance: amount,

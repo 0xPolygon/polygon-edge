@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -86,7 +87,6 @@ func NewBlockchain(
 	consensus Verifier,
 	executor Executor,
 ) (*Blockchain, error) {
-
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
 		config:    config,
@@ -369,11 +369,13 @@ func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
 
 	// Check if there was a parent difficulty
 	parentTD := big.NewInt(0)
+
 	if newHeader.ParentHash != types.StringToHash("") {
 		td, ok := b.readTotalDifficulty(newHeader.ParentHash)
 		if !ok {
 			return nil, fmt.Errorf("parent difficulty not found")
 		}
+
 		parentTD = td
 	}
 
@@ -482,8 +484,7 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 // WriteHeadersWithBodies writes a batch of headers
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	// Check the size
-	size := len(headers)
-	if size == 0 {
+	if len(headers) == 0 {
 		return fmt.Errorf("passed in headers array is empty")
 	}
 
@@ -566,12 +567,11 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	// Verify the header
 	if err := b.consensus.VerifyHeader(parent, block.Header); err != nil {
-		return fmt.Errorf("failed to verify the header: %v", err)
+		return fmt.Errorf("failed to verify the header: %w", err)
 	}
 
 	// Verify body data
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
-
 		return fmt.Errorf(
 			"uncle root hash mismatch: have %s, want %s",
 			hash,
@@ -623,6 +623,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 		"hash", header.Hash,
 		"txns", len(block.Transactions),
 	}
+
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
 		logArgs = append(logArgs, "generation_time_in_sec", diff)
@@ -700,7 +701,7 @@ func (b *Blockchain) processBlock(block *types.Block) (*state.BlockResult, error
 	}
 
 	if gasLimitErr := b.verifyGasLimit(header); gasLimitErr != nil {
-		return nil, fmt.Errorf("invalid gas limit, %v", gasLimitErr)
+		return nil, fmt.Errorf("invalid gas limit, %w", gasLimitErr)
 	}
 
 	return result, nil
@@ -754,6 +755,7 @@ func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res typ
 		for {
 			if num == i {
 				res = hash
+
 				return
 			}
 
@@ -763,6 +765,7 @@ func (b *Blockchain) GetHashHelper(header *types.Header) func(i uint64) (res typ
 			}
 
 			hash = h.ParentHash
+
 			if num == 0 {
 				return
 			}
@@ -853,7 +856,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 func (b *Blockchain) writeFork(header *types.Header) error {
 	forks, err := b.db.ReadForks()
 	if err != nil {
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			forks = []types.Hash{}
 		} else {
 			return err
@@ -861,6 +864,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	}
 
 	newForks := []types.Hash{}
+
 	for _, fork := range forks {
 		if fork != header.ParentHash {
 			newForks = append(newForks, fork)
@@ -935,7 +939,7 @@ func (b *Blockchain) handleReorg(
 	}
 
 	if err := b.writeFork(oldChainHead); err != nil {
-		return fmt.Errorf("failed to write the old header as fork: %v", err)
+		return fmt.Errorf("failed to write the old header as fork: %w", err)
 	}
 
 	// Update canonical chain numbers
@@ -1001,6 +1005,7 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 	if blockNumber == uint64(0) {
 		full = false
 	}
+
 	return b.GetBlockByHash(blockHash, full)
 }
 

@@ -104,6 +104,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 	if dest.BitLen() >= 63 || udest >= uint64(len(c.code)) {
 		return false
 	}
+
 	return c.bitmap.isSet(uint(udest))
 }
 
@@ -115,6 +116,7 @@ func (c *state) exit(err error) {
 	if err == nil {
 		panic("cannot stop with none")
 	}
+
 	c.stop = true
 	c.err = err
 }
@@ -126,11 +128,14 @@ func (c *state) push(val *big.Int) {
 func (c *state) push1() *big.Int {
 	if len(c.stack) > c.sp {
 		c.sp++
+
 		return c.stack[c.sp-1]
 	}
+
 	v := big.NewInt(0)
 	c.stack = append(c.stack, v)
 	c.sp++
+
 	return v
 }
 
@@ -159,6 +164,7 @@ func (c *state) top() *big.Int {
 	if c.sp == 0 {
 		return nil
 	}
+
 	return c.stack[c.sp-1]
 }
 
@@ -166,8 +172,10 @@ func (c *state) pop() *big.Int {
 	if c.sp == 0 {
 		return nil
 	}
+
 	o := c.stack[c.sp-1]
 	c.sp--
+
 	return o
 }
 
@@ -182,10 +190,12 @@ func (c *state) swap(n int) {
 func (c *state) consumeGas(gas uint64) bool {
 	if c.gas < gas {
 		c.exit(errOutOfGas)
+
 		return false
 	}
 
 	c.gas -= gas
+
 	return true
 }
 
@@ -201,6 +211,7 @@ func (c *state) Run() ([]byte, error) {
 	for !c.stop {
 		if c.ip >= codeSize {
 			c.halt()
+
 			break
 		}
 
@@ -209,16 +220,19 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
+
 			break
 		}
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
+
 			break
 		}
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
+
 			break
 		}
 
@@ -228,6 +242,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
 			c.exit(errStackOverflow)
+
 			break
 		}
 		c.ip++
@@ -236,6 +251,7 @@ func (c *state) Run() ([]byte, error) {
 	if err := c.err; err != nil {
 		vmerr = err
 	}
+
 	return c.ret, vmerr
 }
 
@@ -258,6 +274,7 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 
 	if !offset.IsUint64() || !size.IsUint64() {
 		c.exit(errGasUintOverflow)
+
 		return false
 	}
 
@@ -266,26 +283,26 @@ func (c *state) checkMemory(offset, size *big.Int) bool {
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
 		c.exit(errGasUintOverflow)
+
 		return false
 	}
 
-	m := uint64(len(c.memory))
-	newSize := o + s
-
-	if m < newSize {
+	if newSize, m := o+s, uint64(len(c.memory)); m < newSize {
 		w := (newSize + 31) / 32
-		newCost := uint64(3*w + w*w/512)
+		newCost := 3*w + w*w/512
 		cost := newCost - c.lastGasCost
 		c.lastGasCost = newCost
 
 		if !c.consumeGas(cost) {
 			c.exit(errOutOfGas)
+
 			return false
 		}
 
 		// resize the memory
 		c.memory = extendByteSlice(c.memory, int(w*32))
 	}
+
 	return true
 }
 
@@ -294,6 +311,7 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	if n := needLen - cap(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
+
 	return b[:needLen]
 }
 
@@ -310,11 +328,13 @@ func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
 	l := length.Uint64()
 
 	dst = append(dst, c.memory[o:o+l]...)
+
 	return dst, true
 }
 
 func (c *state) Show() string {
 	str := []string{}
+
 	for i := 0; i < len(c.memory); i += 16 {
 		j := i + 16
 		if j > len(c.memory) {
@@ -323,5 +343,6 @@ func (c *state) Show() string {
 
 		str = append(str, hex.EncodeToHex(c.memory[i:j]))
 	}
+
 	return strings.Join(str, "\n")
 }

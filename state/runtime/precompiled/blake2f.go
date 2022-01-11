@@ -16,6 +16,7 @@ func (e *blake2f) gas(input []byte, config *chain.ForksInTime) uint64 {
 	if len(input) != 213 {
 		return 0
 	}
+
 	return uint64(binary.BigEndian.Uint32(input[0:4]))
 }
 
@@ -24,6 +25,7 @@ func (e *blake2f) run(input []byte) ([]byte, error) {
 	if len(input) != 213 {
 		return nil, fmt.Errorf("bad length")
 	}
+
 	if lastByte := input[212]; lastByte != 0 && lastByte != 1 {
 		return nil, fmt.Errorf("bad flag")
 	}
@@ -57,10 +59,12 @@ func (e *blake2f) run(input []byte) ([]byte, error) {
 	F(&h, m, c, flag == 1, rounds)
 
 	res := make([]byte, 64)
+
 	for i := 0; i < 8; i++ {
 		o := i * 8
 		binary.LittleEndian.PutUint64(res[o:o+8], h[i])
 	}
+
 	return res, nil
 }
 
@@ -223,7 +227,6 @@ func F(h *[8]uint64, m [16]uint64, c [2]uint64, f bool, rounds uint32) {
 		v9 += v14
 		v4 ^= v9
 		v4 = bits.RotateLeft64(v4, -63)
-
 	}
 
 	h[0] ^= v0 ^ v8

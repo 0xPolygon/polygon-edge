@@ -25,6 +25,7 @@ func (n *NoProof) Prepare(header *types.Header) error {
 // Seal seals the block
 func (n *NoProof) Seal(block *types.Block, ctx context.Context) (*types.Block, error) {
 	block.Header.ComputeHash()
+
 	return block, nil
 }
 
