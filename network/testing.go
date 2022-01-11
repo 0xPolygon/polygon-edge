@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/secrets/local"
 	"github.com/hashicorp/go-hclog"
@@ -19,6 +19,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	DefaultLeaveTimeout = 10 * time.Second
 )
 
 // JoinAndWait is a helper method for joining a destination server
@@ -49,6 +53,28 @@ func JoinAndWait(
 	_, connectErr := WaitUntilPeerConnectsTo(connectCtx, source, destination.AddrInfo().ID)
 
 	return connectErr
+}
+
+// LeaveAndWait is a helper method for leaving a destination server
+// and waiting for the connection to be closed
+func LeaveAndWait(
+	source,
+	destination *Server,
+	disconnectTimeout time.Duration,
+) error {
+	if disconnectTimeout == 0 {
+		disconnectTimeout = DefaultLeaveTimeout
+	}
+
+	go func() {
+		source.Disconnect(destination.host.ID(), "bye")
+	}()
+
+	connectCtx, cancelFn := context.WithTimeout(context.Background(), disconnectTimeout)
+	defer cancelFn()
+	_, disconnectErr := WaitUntilPeerDisconnectsFrom(connectCtx, source, destination.AddrInfo().ID)
+
+	return disconnectErr
 }
 
 func WaitUntilPeerConnectsTo(ctx context.Context, srv *Server, ids ...peer.ID) (bool, error) {
@@ -91,6 +117,21 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 		}
 		return nil, true
 
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return res.(bool), nil
+}
+
+// WaitUntilRoutingTableToBeAdded check routing table has given ids and retry by timeout
+func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int) (bool, error) {
+	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
+		if size == srv.discovery.routingTable.Size() {
+			return true, false
+		}
+		return false, true
 	})
 	if err != nil {
 		return false, err
@@ -185,6 +226,7 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	}
 
 	cfg.SecretsManager = secretsManager
+	cfg.Metrics = NilMetrics()
 
 	server, err := NewServer(params.Logger, cfg)
 	if err != nil {

@@ -11,11 +11,8 @@ import (
 
 // Status implements the GRPC status endpoint. Returns the number of transactions in the pool
 func (p *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
-	p.LockPromoted(false)
-	defer p.UnlockPromoted()
-
 	resp := &proto.TxnPoolStatusResp{
-		Length: p.promoted.length(),
+		Length: p.accounts.promoted(),
 	}
 
 	return resp, nil

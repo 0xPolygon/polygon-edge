@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -111,6 +111,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		netConfig.Chain = m.config.Chain
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 		netConfig.SecretsManager = m.secretsManager
+		netConfig.Metrics = m.serverMetrics.network
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -169,7 +170,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 		// use the eip155 signer
 		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
-		m.txpool.AddSigner(signer)
+		m.txpool.SetSigner(signer)
 	}
 
 	{
@@ -205,9 +206,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := m.txpool.Start(); err != nil {
-		return nil, err
-	}
+	m.txpool.Start()
 
 	return m, nil
 }
@@ -513,6 +512,9 @@ func (s *Server) Close() {
 			s.logger.Error("Prometheus server shutdown error", err)
 		}
 	}
+
+	// close the txpool's main loop
+	s.txpool.Close()
 }
 
 // Entry is a backend configuration entry

@@ -47,6 +47,7 @@ type Config struct {
 	MaxPeers       uint64
 	Chain          *chain.Chain
 	SecretsManager secrets.SecretsManager
+	Metrics        *Metrics
 }
 
 func DefaultConfig() *Config {
@@ -68,6 +69,8 @@ type Server struct {
 
 	peers     map[peer.ID]*Peer
 	peersLock sync.Mutex
+
+	metrics *Metrics
 
 	dialQueue *dialQueue
 
@@ -174,6 +177,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		host:             host,
 		addrs:            host.Addrs(),
 		peers:            map[peer.ID]*Peer{},
+		metrics:          config.Metrics,
 		dialQueue:        newDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -310,6 +314,7 @@ func (s *Server) runDial() {
 				// the handshake done in the identity service.
 				if err := s.host.Connect(context.Background(), *tt.addr); err != nil {
 					s.logger.Debug("failed to dial", "addr", tt.addr.String(), "err", err)
+					s.emitEvent(tt.addr.ID, PeerFailedToConnect)
 				}
 			}
 		}
@@ -329,6 +334,7 @@ func (s *Server) numPeers() int64 {
 	defer s.peersLock.Unlock()
 	return int64(len(s.peers))
 }
+
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
 	return s.discovery.bootnodes[rand.Intn(len(s.discovery.bootnodes))]
 }
@@ -389,6 +395,7 @@ func (s *Server) addPeer(id peer.ID) {
 	s.peers[id] = p
 
 	s.emitEvent(id, PeerConnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) delPeer(id peer.ID) {
@@ -405,6 +412,7 @@ func (s *Server) delPeer(id peer.ID) {
 	}
 
 	s.emitEvent(id, PeerDisconnected)
+	s.metrics.Peers.Set(float64(len(s.peers)))
 }
 
 func (s *Server) Disconnect(peer peer.ID, reason string) {
@@ -417,7 +425,7 @@ func (s *Server) Disconnect(peer peer.ID, reason string) {
 }
 
 var (
-	DefaultJoinTimeout   = 20 * time.Second // Anything below 15s is prone to false timeouts, as seen from empirical test data
+	DefaultJoinTimeout   = 40 * time.Second // Anything below 35s is prone to false timeouts, as seen from empirical test data
 	DefaultBufferTimeout = DefaultJoinTimeout + time.Second*5
 )
 

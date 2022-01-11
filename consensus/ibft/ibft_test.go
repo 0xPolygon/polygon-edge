@@ -601,7 +601,7 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 		{Header: &types.Header{Number: 3}},
 	}
 	mockSyncer := &mockSyncer{}
-	mockSyncer.bulkSyncBocksFromPeer = expectedNewBlocksToSync
+	mockSyncer.bulkSyncBlocksFromPeer = expectedNewBlocksToSync
 	m.syncer = mockSyncer
 	mockTxPool := &mockTxPool{}
 	m.txpool = mockTxPool
@@ -616,13 +616,14 @@ func TestRunSyncState_BulkSyncWithPeer_CallsTxPoolResetWithHeaders(t *testing.T)
 	m.runSyncState()
 
 	assert.True(t, mockTxPool.resetWithHeaderCalled)
-	for i, expected := range expectedNewBlocksToSync {
-		assert.Equal(t, expected.Header, mockTxPool.resetWithHeadersParam[i])
-	}
+	assert.Equal(t,
+		expectedNewBlocksToSync[len(expectedNewBlocksToSync)-1].Header,
+		mockTxPool.resetWithHeadersParam[0],
+	)
 }
 
 type mockSyncer struct {
-	bulkSyncBocksFromPeer   []*types.Block
+	bulkSyncBlocksFromPeer  []*types.Block
 	receivedNewHeadFromPeer *types.Block
 	broadcastedBlock        *types.Block
 	broadcastCalled         bool
@@ -634,8 +635,10 @@ func (s *mockSyncer) BestPeer() *protocol.SyncPeer {
 	return &protocol.SyncPeer{}
 }
 
-func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(blocks []*types.Block)) error {
-	handler(s.bulkSyncBocksFromPeer)
+func (s *mockSyncer) BulkSyncWithPeer(p *protocol.SyncPeer, handler func(block *types.Block)) error {
+	for _, block := range s.bulkSyncBlocksFromPeer {
+		handler(block)
+	}
 	return nil
 }
 
@@ -662,25 +665,8 @@ type mockTxPool struct {
 	resetWithHeadersParam []*types.Header
 }
 
-func (p *mockTxPool) LockPromoted(write bool) {
-}
+func (p *mockTxPool) Prepare() {
 
-func (p *mockTxPool) UnlockPromoted() {
-}
-
-func (p *mockTxPool) Recover(tx *types.Transaction) {
-	p.transactions = append(p.transactions, tx)
-}
-
-func (p *mockTxPool) Pop() *types.Transaction {
-	if len(p.transactions) == 0 {
-		return nil
-	}
-
-	tx := p.transactions[0]
-	p.transactions = p.transactions[1:]
-
-	return tx
 }
 
 func (p *mockTxPool) Peek() *types.Transaction {
@@ -691,19 +677,25 @@ func (p *mockTxPool) Peek() *types.Transaction {
 	return p.transactions[0]
 }
 
-func (p *mockTxPool) Demote() {
-	tx := p.Pop()
+func (p *mockTxPool) Pop(tx *types.Transaction) {
+	if len(p.transactions) == 0 {
+		return
+	}
+
+	p.transactions = p.transactions[1:]
+}
+
+func (p *mockTxPool) Demote(tx *types.Transaction) {
+	p.Pop(tx)
 	p.demoted = append(p.demoted, tx)
 }
 
-func (p *mockTxPool) Drop() {
+func (p *mockTxPool) Drop(tx *types.Transaction) {
 	if p.nonceDecreased == nil {
 		p.nonceDecreased = make(map[*types.Transaction]bool)
 	}
 
-	tx := p.transactions[0]
-	p.transactions = p.transactions[1:]
-
+	p.Pop(tx)
 	p.nonceDecreased[tx] = true
 }
 
@@ -779,7 +771,7 @@ func (m *mockIbft) GetHeaderByNumber(i uint64) (*types.Header, bool) {
 	return m.blockchain.GetHeaderByNumber(i)
 }
 
-func (m *mockIbft) WriteBlocks(blocks []*types.Block) error {
+func (m *mockIbft) WriteBlock(block *types.Block) error {
 	return nil
 }
 
@@ -841,6 +833,8 @@ func newMockIbft(t *testing.T, accounts []string, account string) *mockIbft {
 		epochSize:        DefaultEpochSize,
 		metrics:          consensus.NilMetrics(),
 	}
+
+	initIbftMechanism(PoA, ibft)
 
 	// by default set the state to (1, 0)
 	ibft.state.view = proto.ViewMsg(1, 0)

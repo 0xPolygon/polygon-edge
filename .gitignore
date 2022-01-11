@@ -10,6 +10,7 @@ test-chain*
 .idea
 
 # Exclude the build .exe file from version control
+dist/
 main.exe
 main
 

@@ -23,6 +23,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: v1.39
+          args: --timeout=3m
           skip-go-installation: true
   test:
     runs-on: ubuntu-latest
