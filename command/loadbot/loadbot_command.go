@@ -407,11 +407,10 @@ func (lr *LoadbotResult) Output() string {
 				buffer.WriteString("\n\n[Tx Hash Unavailable]\n")
 			}
 
-			formattedStrings := make([]string, 0)
-			formattedStrings = append(formattedStrings,
+			formattedStrings := []string{
 				fmt.Sprintf("Index|%d", detailedError.Index),
 				fmt.Sprintf("Error|%s", detailedError.Error.Error.Error()),
-			)
+			}
 
 			buffer.WriteString(helper.FormatKV(formattedStrings))
 		}
