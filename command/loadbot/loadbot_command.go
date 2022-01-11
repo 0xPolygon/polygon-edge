@@ -296,7 +296,7 @@ type LoadbotResult struct {
 	CountData         TxnCountData         `json:"countData"`
 	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
 	BlockData         TxnBlockData         `json:"blockData"`
-	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData"`
+	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
