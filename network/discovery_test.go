@@ -103,7 +103,8 @@ func TestDiscovery_PeerAdded(t *testing.T) {
 func TestRoutingTable_Connected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -142,7 +143,8 @@ func TestRoutingTable_Connected(t *testing.T) {
 func TestRoutingTable_Disconnected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -196,7 +198,8 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
