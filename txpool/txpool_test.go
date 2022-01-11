@@ -1156,7 +1156,7 @@ func TestAddTx1000(t *testing.T) {
 		waitUntilDone(done)
 
 		assert.Equal(t, uint64(3000), pool.gauge.read())
-		// assert.Equal(t, uint64(1000), pool.promoted.length())
+		assert.Equal(t, uint64(1000), pool.accounts.promoted())
 	})
 }
 
@@ -1169,7 +1169,8 @@ func TestResetAccounts(t *testing.T) {
 	}{
 		{
 			name: "reset promoted only",
-			allTxs: map[types.Address]transactions{ // all txs will end up in promoted queue
+			// all txs will end up in promoted queue
+			allTxs: map[types.Address]transactions{
 				addr1: {
 					newTx(addr1, 0, 1),
 					newTx(addr1, 1, 1),
