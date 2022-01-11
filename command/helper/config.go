@@ -46,7 +46,7 @@ type Network struct {
 	NoDiscover       bool   `json:"no_discover"`
 	Addr             string `json:"libp2p_addr"`
 	NatAddr          string `json:"nat_addr"`
-	Dns              string `json:"dns_addr"`
+	DNS              string `json:"dns_addr"`
 	MaxOutboundPeers uint64 `json:"max_outbound_peers"`
 	MaxInboundPeers  uint64 `json:"max_inbound_peers"`
 }
@@ -281,7 +281,7 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 			c.Network.MaxInboundPeers = otherConfig.Network.MaxInboundPeers
 		}
 
-    if otherConfig.Network.MaxOutboundPeers != 0 {
+		if otherConfig.Network.MaxOutboundPeers != 0 {
 			c.Network.MaxOutboundPeers = otherConfig.Network.MaxOutboundPeers
 		}
 
