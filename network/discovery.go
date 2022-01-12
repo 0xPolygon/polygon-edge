@@ -259,9 +259,11 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if target := d.peers.getRandomPeer(); d.srv.numOpenSlots() > 0 && target != nil {
-		if err := d.attemptToFindPeers(target.id); err != nil {
-			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+	if d.srv.numOpenSlots() > 0 {
+		if target := d.peers.getRandomPeer(); target != nil {
+			if err := d.attemptToFindPeers(target.id); err != nil {
+				d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+			}
 		}
 	}
 }
