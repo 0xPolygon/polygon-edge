@@ -302,10 +302,9 @@ func TestAddHandler(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
 
-		{ // set up prestate
-			acc := pool.createAccountOnce(addr1)
-			acc.setNonce(20)
-		}
+		// setup prestate
+		acc := pool.createAccountOnce(addr1)
+		acc.setNonce(20)
 
 		// send tx
 		go func() {
@@ -345,10 +344,9 @@ func TestAddHandler(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
 
-		{ // set up prestate
-			acc := pool.createAccountOnce(addr1)
-			acc.setNonce(5)
-		}
+		// setup prestate
+		acc := pool.createAccountOnce(addr1)
+		acc.setNonce(5)
 
 		// send demoted (recovered and promotable)
 		go pool.handleEnqueueRequest(enqueueRequest{
@@ -369,10 +367,9 @@ func TestAddHandler(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
 
-		{ // set up prestate
-			acc := pool.createAccountOnce(addr1)
-			acc.setNonce(5)
-		}
+		// setup prestate
+		acc := pool.createAccountOnce(addr1)
+		acc.setNonce(5)
 
 		// send demoted (recovered but not promotable)
 		pool.handleEnqueueRequest(enqueueRequest{
@@ -521,10 +518,9 @@ func TestPromoteHandler(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
 
-		{ // setup prestate
-			acc := pool.createAccountOnce(addr1)
-			acc.setNonce(7)
-		}
+		// setup prestate
+		acc := pool.createAccountOnce(addr1)
+		acc.setNonce(7)
 
 		// send recovered tx
 		go pool.handleEnqueueRequest(enqueueRequest{
@@ -609,36 +605,35 @@ func TestResetAccount(t *testing.T) {
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
 
-				{ // setup prestate
-					acc := pool.createAccountOnce(addr1)
-					acc.setNonce(test.txs[0].Nonce)
+				// setup prestate
+				acc := pool.createAccountOnce(addr1)
+				acc.setNonce(test.txs[0].Nonce)
 
-					go func() {
-						err := pool.addTx(local, test.txs[0])
-						assert.NoError(t, err)
-					}()
-					go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+				go func() {
+					err := pool.addTx(local, test.txs[0])
+					assert.NoError(t, err)
+				}()
+				go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
-					// save the promotion
-					req := <-pool.promoteReqCh
+				// save the promotion
+				req := <-pool.promoteReqCh
 
-					// enqueue remaining
-					for i, tx := range test.txs {
-						if i == 0 {
-							// first was handled
-							continue
-						}
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+				// enqueue remaining
+				for i, tx := range test.txs {
+					if i == 0 {
+						// first was handled
+						continue
 					}
-
-					pool.handlePromoteRequest(req)
-					assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
-					assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).promoted.length())
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(tx)
+					pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 				}
+
+				pool.handlePromoteRequest(req)
+				assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+				assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).promoted.length())
 
 				pool.resetAccount(addr1, test.newNonce)
 
@@ -742,18 +737,17 @@ func TestResetAccount(t *testing.T) {
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
 
-				{ // setup prestate
-					for _, tx := range test.txs {
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-					}
-
-					assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).enqueued.length())
-					assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+				// setup prestate
+				for _, tx := range test.txs {
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(tx)
+					pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 				}
+
+				assert.Equal(t, uint64(len(test.txs)), pool.accounts.get(addr1).enqueued.length())
+				assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 				if test.signal {
 					go pool.resetAccount(addr1, test.newNonce)
@@ -883,34 +877,33 @@ func TestResetAccount(t *testing.T) {
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
 
-				{ // setup prestate
-					acc := pool.createAccountOnce(addr1)
-					acc.setNonce(test.txs[0].Nonce)
+				// setup prestate
+				acc := pool.createAccountOnce(addr1)
+				acc.setNonce(test.txs[0].Nonce)
 
-					go func() {
-						err := pool.addTx(local, test.txs[0])
-						assert.NoError(t, err)
-					}()
-					go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+				go func() {
+					err := pool.addTx(local, test.txs[0])
+					assert.NoError(t, err)
+				}()
+				go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
-					// save the promotion
-					req := <-pool.promoteReqCh
+				// save the promotion
+				req := <-pool.promoteReqCh
 
-					// enqueue remaining
-					for i, tx := range test.txs {
-						if i == 0 {
-							// first was handled
-							continue
-						}
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-						pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+				// enqueue remaining
+				for i, tx := range test.txs {
+					if i == 0 {
+						// first was handled
+						continue
 					}
-
-					pool.handlePromoteRequest(req)
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(tx)
+					pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 				}
+
+				pool.handlePromoteRequest(req)
 
 				if test.signal {
 					go pool.resetAccount(addr1, test.newNonce)
@@ -1412,17 +1405,16 @@ func TestResetAccounts(t *testing.T) {
 			// start the main loop
 			done := pool.startTestMode()
 
-			{ // setup prestate
-				for _, txs := range test.allTxs {
-					for _, tx := range txs {
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-					}
+			// setup prestate
+			for _, txs := range test.allTxs {
+				for _, tx := range txs {
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(tx)
 				}
-				waitUntilDone(done)
 			}
+			waitUntilDone(done)
 
 			pool.resetAccounts(test.newNonces)
 			waitUntilDone(done)
@@ -1710,17 +1702,16 @@ func TestRecovery(t *testing.T) {
 
 			done := pool.startTestMode()
 
-			{ // setup prestate
-				for _, txs := range test.allTxs {
-					for _, sTx := range txs {
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(sTx.tx)
-					}
+			// setup prestate
+			for _, txs := range test.allTxs {
+				for _, sTx := range txs {
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(sTx.tx)
 				}
-				waitUntilDone(done)
 			}
+			waitUntilDone(done)
 
 			// mock ibft.write[]*types.Transaction()
 			func() {
