@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,12 +17,13 @@ import (
 // IBFTSwitchCommand is the command to switch consensus
 type IBFTSwitchCommand struct {
 	helper.Base
+	Formatter *helper.FormatterFlag
 }
 
-func (i *IBFTSwitchCommand) DefineFlags() {
-	i.Base.DefineFlags()
+func (c *IBFTSwitchCommand) DefineFlags() {
+	c.Base.DefineFlags(c.Formatter)
 
-	i.FlagMap["chain"] = helper.FlagDescriptor{
+	c.FlagMap["chain"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Specifies the genesis file to update. Default: %s", helper.DefaultConfig().Chain),
 		Arguments: []string{
 			"GENESIS_FILE",
@@ -29,7 +31,7 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	i.FlagMap["type"] = helper.FlagDescriptor{
+	c.FlagMap["type"] = helper.FlagDescriptor{
 		Description: "Sets the new IBFT type [PoA, PoS]",
 		Arguments: []string{
 			"TYPE",
@@ -38,7 +40,7 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	i.FlagMap["deployment"] = helper.FlagDescriptor{
+	c.FlagMap["deployment"] = helper.FlagDescriptor{
 		Description: "Sets the height to deploy the contract in PoS",
 		Arguments: []string{
 			"DEPLOYMENT",
@@ -47,7 +49,7 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 		ArgumentsOptional: false,
 	}
 
-	i.FlagMap["from"] = helper.FlagDescriptor{
+	c.FlagMap["from"] = helper.FlagDescriptor{
 		Description: "Sets the height to switch the new type",
 		Arguments: []string{
 			"FROM",
@@ -58,29 +60,29 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 }
 
 // GetHelperText returns a simple description of the command
-func (i *IBFTSwitchCommand) GetHelperText() string {
+func (c *IBFTSwitchCommand) GetHelperText() string {
 	return "Add settings in genesis.json to switch IBFT type"
 }
 
-func (i *IBFTSwitchCommand) GetBaseCommand() string {
+func (c *IBFTSwitchCommand) GetBaseCommand() string {
 	return "ibft switch"
 }
 
 // Help implements the cli.PeersAdd interface
-func (i *IBFTSwitchCommand) Help() string {
-	i.DefineFlags()
+func (c *IBFTSwitchCommand) Help() string {
+	c.DefineFlags()
 
-	return helper.GenerateHelp(i.Synopsis(), helper.GenerateUsage(i.GetBaseCommand(), i.FlagMap), i.FlagMap)
+	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
 // Synopsis implements the cli.PeersAdd interface
-func (i *IBFTSwitchCommand) Synopsis() string {
-	return i.GetHelperText()
+func (c *IBFTSwitchCommand) Synopsis() string {
+	return c.GetHelperText()
 }
 
 // Run implements the cli.PeersAdd interface
-func (i *IBFTSwitchCommand) Run(args []string) int {
-	flags := i.Base.NewFlagSet(i.GetBaseCommand())
+func (c *IBFTSwitchCommand) Run(args []string) int {
+	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter)
 
 	var genesisPath, rawType, rawDeployment, rawFrom string
 
@@ -90,14 +92,14 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 	flags.StringVar(&rawFrom, "from", "", "")
 
 	if err := flags.Parse(args); err != nil {
-		i.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 
 		return 1
 	}
 
 	typ, err := ibft.ParseType(rawType)
 	if err != nil {
-		i.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 
 		return 1
 	}
@@ -108,14 +110,14 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 		if typ == ibft.PoS {
 			d, err := types.ParseUint64orHex(&rawDeployment)
 			if err != nil {
-				i.UI.Error(err.Error())
+				c.Formatter.OutputError(err)
 
 				return 1
 			}
 
 			deployment = &d
 		} else {
-			i.UI.Error(fmt.Sprintf("doesn't support contract deployment in %s", string(typ)))
+			c.Formatter.OutputError(fmt.Errorf(fmt.Sprintf("doesn't support contract deployment in %s", string(typ))))
 
 			return 1
 		}
@@ -123,43 +125,82 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 
 	from, err := types.ParseUint64orHex(&rawFrom)
 	if err != nil {
-		i.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 
 		return 1
 	}
 
 	if from <= 0 {
-		i.UI.Error(`"from" must be positive number`)
+		c.Formatter.OutputError(errors.New(`"from" must be positive number`))
 
 		return 1
 	}
 
 	cc, err := chain.Import(genesisPath)
 	if err != nil {
-		i.UI.Error(fmt.Sprintf("failed to load chain config from %s: %s", genesisPath, err.Error()))
+		c.Formatter.OutputError(fmt.Errorf("failed to load chain config from %s: %w", genesisPath, err))
 
 		return 1
 	}
 
 	if err := appendIBFTForks(cc, typ, from, deployment); err != nil {
-		i.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 
 		return 1
 	}
 
 	if err := os.Remove(genesisPath); err != nil {
-		i.UI.Error(err.Error())
+		c.Formatter.OutputError(err)
 
 		return 1
 	}
 
 	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
-		i.UI.Error(err.Error())
+		c.UI.Error(err.Error())
 
 		return 1
 	}
 
+	res := &IBFTSwitchResult{
+		Chain: genesisPath,
+		Type:  typ,
+		From:  DecOrHexInt{from},
+	}
+	if deployment != nil {
+		res.Deployment = &DecOrHexInt{*deployment}
+	}
+
+	c.Formatter.OutputResult(res)
+
 	return 0
+}
+
+type IBFTSwitchResult struct {
+	Chain      string             `json:"chain"`
+	Type       ibft.MechanismType `json:"type"`
+	From       DecOrHexInt        `json:"from"`
+	Deployment *DecOrHexInt       `json:"deployment,omitempty"`
+}
+
+func (r *IBFTSwitchResult) Output() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[MEW IBFT FORK]\n")
+
+	outputs := []string{
+		fmt.Sprintf("Chain|%s", r.Chain),
+		fmt.Sprintf("Type|%s", r.Type),
+	}
+	if r.Deployment != nil {
+		outputs = append(outputs, fmt.Sprintf("Deployment|%d", r.Deployment.Value))
+	}
+
+	outputs = append(outputs, fmt.Sprintf("Deployment|%d", r.From.Value))
+
+	buffer.WriteString(helper.FormatKV(outputs))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }
 
 type DecOrHexInt struct {

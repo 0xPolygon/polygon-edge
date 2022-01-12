@@ -44,7 +44,7 @@ func Commands() map[string]cli.CommandFactory {
 	ibftProposeCmd := ibft.IbftPropose{Base: base, Formatter: formatter, GRPC: grpc}
 	ibftSnapshotCmd := ibft.IbftSnapshot{Base: base, Formatter: formatter, GRPC: grpc}
 	ibftStatusCmd := ibft.IbftStatus{Base: base, Formatter: formatter, GRPC: grpc}
-	ibftSwitchCmd := ibft.IBFTSwitchCommand{Base: base}
+	ibftSwitchCmd := ibft.IBFTSwitchCommand{Base: base, Formatter: formatter}
 
 	peersCmd := peers.PeersCommand{}
 	peersAddCmd := peers.PeersAdd{Base: base, Formatter: formatter, GRPC: grpc}
