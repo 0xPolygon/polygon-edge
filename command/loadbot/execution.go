@@ -280,7 +280,7 @@ func (l *Loadbot) Run() error {
 			return fmt.Errorf("unable to get average gas price: %w", err)
 		}
 
-		gasPrice.SetUint64(avgGasPrice)
+		gasPrice = new(big.Int).SetUint64(avgGasPrice)
 	}
 
 	// Set up the transaction generator
@@ -325,7 +325,7 @@ func (l *Loadbot) Run() error {
 			return fmt.Errorf("unable to get gas estimate, %w", err)
 		}
 
-		gasLimit.SetUint64(gasEstimate)
+		gasLimit = new(big.Int).SetUint64(gasEstimate)
 	}
 
 	l.generator.SetGasEstimate(gasLimit.Uint64())

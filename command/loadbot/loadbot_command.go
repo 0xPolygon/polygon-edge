@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3"
+	"math/big"
 	"net"
 	"net/url"
 	"sort"
@@ -205,20 +206,32 @@ func (l *LoadbotCommand) Run(args []string) int {
 		maxConns = int(2 * tps)
 	}
 
-	// Parse the gas price
-	bigGasPrice, gasPriceErr := types.ParseUint256orHex(&gasPrice)
-	if gasPriceErr != nil {
-		l.Formatter.OutputError(fmt.Errorf("failed to decode gas price to value: %w", err))
+	var (
+		bigGasPrice *big.Int
+		gasPriceErr error
 
-		return 1
+		bigGasLimit *big.Int
+		gasLimitErr error
+	)
+
+	// Parse the gas price
+	if gasPrice != "" {
+		bigGasPrice, gasPriceErr = types.ParseUint256orHex(&gasPrice)
+		if gasPriceErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to decode gas price to value: %w", err))
+
+			return 1
+		}
 	}
 
 	// Parse the gas limit
-	bigGasLimit, gasLimitErr := types.ParseUint256orHex(&gasLimit)
-	if gasLimitErr != nil {
-		l.Formatter.OutputError(fmt.Errorf("failed to decode gas limit to value: %w", err))
+	if gasLimit != "" {
+		bigGasLimit, gasLimitErr = types.ParseUint256orHex(&gasLimit)
+		if gasLimitErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to decode gas limit to value: %w", err))
 
-		return 1
+			return 1
+		}
 	}
 
 	var sender types.Address
