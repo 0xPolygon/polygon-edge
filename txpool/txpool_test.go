@@ -94,129 +94,172 @@ type result struct {
 /* Singe account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
-	testCases := []struct {
-		name          string
-		expectedError error
-		tx            *types.Transaction
-	}{
-		{
-			name:          "ErrNegativeValue",
-			expectedError: ErrNegativeValue,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(-5),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrNonEncryptedTx",
-			expectedError: ErrNonEncryptedTx,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrInvalidSender",
-			expectedError: ErrInvalidSender,
-			tx: &types.Transaction{
-				From:     types.ZeroAddress,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrInvalidAccountState",
-			expectedError: ErrInvalidAccountState,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrTxPoolOverflow",
-			expectedError: ErrTxPoolOverflow,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrIntrinsicGas",
-			expectedError: ErrIntrinsicGas,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      1,
-			},
-		},
-		{
-			name:          "ErrAlreadyKnown",
-			expectedError: ErrAlreadyKnown,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-		{
-			name:          "ErrOversizedData",
-			expectedError: ErrOversizedData,
-			tx: &types.Transaction{
-				From:     addr1,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(1),
-				Gas:      validGasLimit,
-			},
-		},
-	}
+	t.Run("ErrNegativeValue", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			pool, err := newTestPool()
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+		tx.Value = big.NewInt(-5)
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrNegativeValue)
+	})
+
+	t.Run("ErrNonEncryptedTx", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+		pool.dev = false
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrNonEncryptedTx)
+	})
+
+	t.Run("ErrInvalidSender", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+		tx.From = types.ZeroAddress
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrInvalidSender)
+	})
+
+	t.Run("ErrInvalidAccountState", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		pool.store = faultyMockStore{}
+		// nonce is 1000000 so ErrNonceTooLow
+		// doesn't get triggered
+		tx := newTx(addr1, 1000000, 1)
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrInvalidAccountState)
+	})
+
+	t.Run("ErrTxPoolOverflow", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		// fill the pool
+		pool.gauge.increase(defaultMaxSlots)
+
+		tx := newTx(addr1, 0, 1)
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrTxPoolOverflow)
+	})
+
+	t.Run("ErrIntrinsicGas", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+		tx.Gas = 1
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrIntrinsicGas)
+	})
+
+	t.Run("ErrAlreadyKnown", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+
+		// send the tx beforehand
+		go func() {
+			err := pool.addTx(local, tx)
 			assert.NoError(t, err)
-			pool.EnableDev()
-			pool.SetSigner(crypto.NewEIP155Signer(100))
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		<-pool.promoteReqCh
 
-			/* special error setups */
-			switch test.expectedError {
-			case ErrTxPoolOverflow:
-				pool.gauge.increase(defaultMaxSlots)
-			case ErrNonEncryptedTx:
-				pool.dev = false
-			case ErrAlreadyKnown:
-				// send the tx beforehand
-				go func() {
-					err := pool.addTx(local, test.tx)
-					assert.NoError(t, err)
-				}()
-				go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-				<-pool.promoteReqCh
-			case ErrInvalidAccountState:
-				pool.store = faultyMockStore{}
-			case ErrOversizedData:
-				data := make([]byte, 989898)
-				_, err = rand.Read(data)
-				assert.NoError(t, err)
-				test.tx.Input = data
-			}
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrAlreadyKnown)
+	})
 
-			assert.ErrorIs(t,
-				test.expectedError,
-				pool.addTx(local, test.tx),
-			)
-		})
-	}
+	t.Run("ErrOversizedData", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+
+		// set oversized Input field
+		data := make([]byte, 989898)
+		_, err = rand.Read(data)
+		assert.NoError(t, err)
+		tx.Input = data
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrOversizedData)
+	})
+
+	t.Run("ErrNonceTooLow", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		// faultyMockStore.GetNonce() == 99999
+		pool.store = faultyMockStore{}
+		tx := newTx(addr1, 0, 1)
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrNonceTooLow)
+	})
+
+	t.Run("ErrInsufficientFunds", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		tx := newTx(addr1, 0, 1)
+		tx.GasPrice.SetUint64(1000000000000)
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrInsufficientFunds)
+	})
 }
 
 func TestAddHandler(t *testing.T) {

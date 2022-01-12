@@ -12,6 +12,10 @@ import (
 type defaultMockStore struct {
 }
 
+func (m defaultMockStore) Header() *types.Header {
+	return &types.Header{}
+}
+
 func (m defaultMockStore) GetNonce(types.Hash, types.Address) uint64 {
 	return 0
 }
@@ -21,13 +25,9 @@ func (m defaultMockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) 
 }
 
 func (m defaultMockStore) GetBalance(types.Hash, types.Address) (*big.Int, error) {
-	balance, _ := big.NewInt(0).SetString("10000000000000000000", 10)
+	balance := big.NewInt(0).SetUint64(100000000000000)
 
 	return balance, nil
-}
-
-func (m defaultMockStore) Header() *types.Header {
-	return &types.Header{}
 }
 
 type faultyMockStore struct {
@@ -38,7 +38,7 @@ func (fms faultyMockStore) Header() *types.Header {
 }
 
 func (fms faultyMockStore) GetNonce(root types.Hash, addr types.Address) uint64 {
-	return 0
+	return 99999
 }
 
 func (fms faultyMockStore) GetBlockByHash(hash types.Hash, b bool) (*types.Block, bool) {
