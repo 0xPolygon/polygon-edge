@@ -459,6 +459,7 @@ func (s *Server) setupJSONRPC() error {
 		TxPool:     s.txpool,
 		Executor:   s.executor,
 		Consensus:  s.consensus,
+		Server:		s.network,
 	}
 
 	conf := &jsonrpc.Config{
