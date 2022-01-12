@@ -489,23 +489,31 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		},
 	}
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
 		config.SetBlockLimit(2.5 * 21000)
 		config.SetDevInterval(2)
 		config.Premine(senderAddress, framework.EthToWei(100))
-	})
+	})[0]
 
-	server := servers[0]
 	client := server.JSONRPC()
+	operator := server.TxnPoolOperator()
 	hashes := make([]web3.Hash, 3)
 
 	for i, tx := range transactions {
 		signedTx, err := signer.SignTx(tx, senderKey)
 		assert.NoError(t, err)
 
-		txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+		response, err := operator.AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: signedTx.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		})
+		assert.NoError(t, err)
+
+		txHash := web3.Hash(types.StringToHash(response.TxHash))
 		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 		// save for later querying
@@ -530,7 +538,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, firstTx)
 
-	secondTx, err := client.Eth().GetTransactionByHash(hashes[0])
+	secondTx, err := client.Eth().GetTransactionByHash(hashes[1])
 	assert.NoError(t, err)
 	assert.NotNil(t, secondTx)
 
@@ -634,15 +642,15 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 
 	startingBalance := framework.EthToWei(100)
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
 		config.SetDevInterval(3)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
-	})
+	})[0]
 
-	server := servers[0]
+	operator := server.TxnPoolOperator()
 	client := server.JSONRPC()
 
 	// Construct the transaction
@@ -658,7 +666,15 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	assert.NoError(t, err, "failed to sign transaction")
 
 	// Add the transaction
-	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+	response, err := operator.AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+		Raw: &any.Any{
+			Value: signedTx.MarshalRLP(),
+		},
+		From: types.ZeroAddress.String(),
+	})
+	assert.NoError(t, err)
+
+	txHash := web3.Hash(types.StringToHash(response.TxHash))
 	assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 	// Grab the pending transaction from the pool

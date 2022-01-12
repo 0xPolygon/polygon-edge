@@ -10,7 +10,9 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,7 +101,12 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 			t.Fatalf("failed to sign txn: %v", err)
 		}
 
-		_, err = srv.JSONRPC().Eth().SendRawTransaction(signedTx.MarshalRLP())
+		_, err = srv.TxnPoolOperator().AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: signedTx.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		})
 		assert.NoError(t, err)
 	}
 
