@@ -109,8 +109,11 @@ type BlockNumberOrHash struct {
 // Here are the possible input formats :
 //
 // 1 - "latest" or "pending"			- self-explaining keywords
+//
 // 2 - "0x2"							- block number #2 (EIP-1898 backward compatible)
+//
 // 3 - {blockNumber:	"0x2"}			- EIP-1898 compliant block number #2
+//
 // 4 - {blockHash:		"0xe0e..."}		- EIP-1898 compliant block hash 0xe0e...
 func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 	type bnhCopy BlockNumberOrHash

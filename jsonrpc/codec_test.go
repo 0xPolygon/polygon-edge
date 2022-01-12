@@ -79,6 +79,12 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 				BlockHash: &blockHash,
 			},
 		},
+		{
+			"should not unmarshal earliest block number",
+			`earliest`,
+			true,
+			BlockNumberOrHash{},
+		},
 	}
 
 	for _, tt := range tests {
