@@ -41,18 +41,19 @@ type Account struct {
 }
 
 type Configuration struct {
-	TPS           uint64
-	Sender        types.Address
-	Receiver      types.Address
-	Value         *big.Int
-	Count         uint64
-	JSONRPC       string
-	GRPC          string
-	MaxConns      int
-	GeneratorMode Mode
-	ChainID       uint64
-	GasPrice      *big.Int
-	GasLimit      *big.Int
+	TPS              uint64
+	Sender           types.Address
+	Receiver         types.Address
+	Value            *big.Int
+	Count            uint64
+	JSONRPC          string
+	GRPC             string
+	MaxConns         int
+	GeneratorMode    Mode
+	ChainID          uint64
+	GasPrice         *big.Int
+	GasLimit         *big.Int
+	ContractArtifact *generator.ContractArtifact
 }
 
 type metadata struct {

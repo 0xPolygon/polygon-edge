@@ -131,6 +131,15 @@ func (l *LoadbotCommand) DefineFlags() {
 		},
 		ArgumentsOptional: true,
 	}
+
+	l.FlagMap["contract"] = helper.FlagDescriptor{
+		Description: "The path to the contract JSON artifact containing the bytecode. If omitted, a default " +
+			"contract is used",
+		Arguments: []string{
+			"CONTRACT_PATH",
+		},
+		ArgumentsOptional: true,
+	}
 }
 
 func (l *LoadbotCommand) GetHelperText() string {
@@ -156,19 +165,20 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Placeholders for flags
 	var (
-		tps         uint64
-		mode        string
-		chainID     uint64
-		senderRaw   string
-		receiverRaw string
-		valueRaw    string
-		count       uint64
-		jsonrpc     string
-		grpc        string
-		maxConns    int
-		detailed    bool
-		gasPrice    string
-		gasLimit    string
+		tps          uint64
+		mode         string
+		chainID      uint64
+		senderRaw    string
+		receiverRaw  string
+		valueRaw     string
+		count        uint64
+		jsonrpc      string
+		grpc         string
+		maxConns     int
+		detailed     bool
+		gasPrice     string
+		gasLimit     string
+		contractPath string
 	)
 
 	// Map flags to placeholders
@@ -185,6 +195,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.IntVar(&maxConns, "max-conns", 0, "")
 	flags.StringVar(&gasPrice, "gas-price", "", "")
 	flags.StringVar(&gasLimit, "gas-limit", "", "")
+	flags.StringVar(&contractPath, "contract", "", "")
 
 	var err error
 	// Parse cli arguments
@@ -268,19 +279,38 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
+	var (
+		contractArtifact = &generator.ContractArtifact{
+			Bytecode: generator.DefaultContractBytecode,
+		}
+
+		readErr error
+	)
+
+	if contractPath != "" {
+		// Try to read the contract bytecode from the JSON path
+		contractArtifact, readErr = generator.ReadContractArtifact(contractPath)
+		if readErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to read contract bytecode: %w", readErr))
+
+			return 1
+		}
+	}
+
 	configuration := &Configuration{
-		TPS:           tps,
-		Sender:        sender,
-		Receiver:      receiver,
-		Count:         count,
-		Value:         value,
-		JSONRPC:       jsonrpc,
-		GRPC:          grpc,
-		MaxConns:      maxConns,
-		GeneratorMode: convMode,
-		ChainID:       chainID,
-		GasPrice:      bigGasPrice,
-		GasLimit:      bigGasLimit,
+		TPS:              tps,
+		Sender:           sender,
+		Receiver:         receiver,
+		Count:            count,
+		Value:            value,
+		JSONRPC:          jsonrpc,
+		GRPC:             grpc,
+		MaxConns:         maxConns,
+		GeneratorMode:    convMode,
+		ChainID:          chainID,
+		GasPrice:         bigGasPrice,
+		GasLimit:         bigGasLimit,
+		ContractArtifact: contractArtifact,
 	}
 
 	// Create the metrics placeholder
