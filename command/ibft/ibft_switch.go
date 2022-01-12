@@ -1,12 +1,15 @@
 package ibft
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -27,7 +30,7 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 	}
 
 	i.FlagMap["type"] = helper.FlagDescriptor{
-		Description: "Sets the new consensus type [PoA, PoS]",
+		Description: "Sets the new IBFT type [PoA, PoS]",
 		Arguments: []string{
 			"TYPE",
 		},
@@ -36,7 +39,7 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 	}
 
 	i.FlagMap["deployment"] = helper.FlagDescriptor{
-		Description: "Sets the height to deploy the contract",
+		Description: "Sets the height to deploy the contract in PoS",
 		Arguments: []string{
 			"DEPLOYMENT",
 		},
@@ -45,18 +48,18 @@ func (i *IBFTSwitchCommand) DefineFlags() {
 	}
 
 	i.FlagMap["from"] = helper.FlagDescriptor{
-		Description: "Sets the height to start new consensus",
+		Description: "Sets the height to switch the new type",
 		Arguments: []string{
 			"FROM",
 		},
-		FlagOptional:      true,
+		FlagOptional:      false,
 		ArgumentsOptional: false,
 	}
 }
 
 // GetHelperText returns a simple description of the command
 func (i *IBFTSwitchCommand) GetHelperText() string {
-	return "Add new settings in genesis.json to switch IBFT mode"
+	return "Add settings in genesis.json to switch IBFT type"
 }
 
 func (i *IBFTSwitchCommand) GetBaseCommand() string {
@@ -99,17 +102,22 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 		return 1
 	}
 
-	if typ == ibft.PoA && rawDeployment != "" {
-		i.UI.Error("doesn't support deployment in PoA mode")
+	var deployment *uint64
+	if rawDeployment != "" {
+		if typ == ibft.PoS {
+			d, err := types.ParseUint64orHex(&rawDeployment)
+			if err != nil {
+				i.UI.Error(err.Error())
 
-		return 1
-	}
+				return 1
+			}
 
-	deployment, err := types.ParseUint64orHex(&rawDeployment)
-	if err != nil {
-		i.UI.Error(err.Error())
+			deployment = &d
+		} else {
+			i.UI.Error(fmt.Sprintf("doesn't support contract deployment in %s", string(typ)))
 
-		return 1
+			return 1
+		}
 	}
 
 	from, err := types.ParseUint64orHex(&rawFrom)
@@ -127,64 +135,13 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 
 	cc, err := chain.Import(genesisPath)
 	if err != nil {
+		i.UI.Error(fmt.Sprintf("failed to load chain config from %s: %s", genesisPath, err.Error()))
+
+		return 1
+	}
+
+	if err := appendIBFTForks(cc, typ, from, deployment); err != nil {
 		i.UI.Error(err.Error())
-
-		return 1
-	}
-
-	ibftSetting, ok := cc.Params.Engine["ibft"].(map[string]interface{})
-	if !ok {
-		i.UI.Error(`"ibft" setting doesn't exist in "engine" of genesis.json'`)
-
-		return 1
-	}
-
-	if originalType, ok := ibftSetting["type"].(string); ok {
-		// single setting
-		delete(ibftSetting, "type")
-
-		types := []map[string]interface{}{
-			{
-				"type": originalType,
-				"from": 0,
-				"to":   from - 1,
-			},
-		}
-		newType := map[string]interface{}{
-			"type": typ,
-			"from": from,
-		}
-
-		if typ == ibft.PoS {
-			newType["deployment"] = deployment
-		}
-
-		ibftSetting["types"] = append(types, newType)
-	} else if types, ok := ibftSetting["types"].([]interface{}); ok {
-		lastType, ok := types[len(types)-1].(map[string]interface{})
-		if !ok {
-			i.UI.Error(`invalid type in "types"`)
-
-			return 1
-		}
-
-		types[len(types)-1] = map[string]interface{}{
-			"type": lastType["type"],
-			"from": lastType["from"],
-			"to":   from - 1,
-		}
-		newType := map[string]interface{}{
-			"type": typ,
-			"from": from,
-		}
-
-		if typ == ibft.PoS {
-			newType["deployment"] = deployment
-		}
-
-		ibftSetting["types"] = append(types, newType)
-	} else {
-		i.UI.Error(`invalid settings in "engine"`)
 
 		return 1
 	}
@@ -202,4 +159,112 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 	}
 
 	return 0
+}
+
+type DecOrHexInt struct {
+	Value uint64
+}
+
+func (d *DecOrHexInt) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"0x%x"`, d.Value)), nil
+}
+
+func (d *DecOrHexInt) UnmarshalJSON(data []byte) error {
+	var rawValue interface{}
+	if err := json.Unmarshal(data, &rawValue); err != nil {
+		return err
+	}
+
+	val, err := common.ConvertUnmarshalledInt(rawValue)
+	if err != nil {
+		return err
+	}
+	if val < 0 {
+		return errors.New("must be positive value")
+	}
+
+	d.Value = uint64(val)
+
+	return nil
+}
+
+type IBFTFork struct {
+	Type       ibft.MechanismType `json:"type"`
+	Deployment *DecOrHexInt       `json:"deployment, omitempty"`
+	From       DecOrHexInt        `json:"from"`
+	To         *DecOrHexInt       `json:"to, omitempty"`
+}
+
+// getIBFTForks returns IBFT fork configurations from chain config
+func getIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
+	// no fork, only specifying IBFT type in chain config
+	if originalType, ok := ibftConfig["type"].(string); ok {
+		typ, err := ibft.ParseType(originalType)
+		if err != nil {
+			return nil, err
+		}
+
+		return []IBFTFork{
+			{
+				Type:       typ,
+				Deployment: nil,
+				From:       DecOrHexInt{0},
+				To:         nil,
+			},
+		}, nil
+	}
+
+	// with forks
+	if types, ok := ibftConfig["types"].([]interface{}); ok {
+		bytes, err := json.Marshal(types)
+		if err != nil {
+			return nil, err
+		}
+
+		var forks []IBFTFork
+		if err := json.Unmarshal(bytes, &forks); err != nil {
+			return nil, err
+		}
+
+		return forks, nil
+	}
+
+	return nil, errors.New("current IBFT type not found")
+}
+
+func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deployment *uint64) error {
+	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
+	if !ok {
+		return errors.New(`"ibft" setting doesn't exist in "engine" of genesis.json'`)
+	}
+
+	ibftForks, err := getIBFTForks(ibftConfig)
+	if err != nil {
+		return err
+	}
+
+	lastFork := &ibftForks[len(ibftForks)-1]
+	if from <= lastFork.From.Value {
+		return errors.New(`"from" must be greater than the beggining height of last fork`)
+	}
+
+	lastFork.To = &DecOrHexInt{from - 1}
+
+	newFork := IBFTFork{
+		Type: typ,
+		From: DecOrHexInt{from},
+	}
+	if typ == ibft.PoS {
+		newFork.Deployment = &DecOrHexInt{*deployment}
+	}
+
+	ibftForks = append(ibftForks, newFork)
+	ibftConfig["types"] = ibftForks
+
+	// remove leftover config
+	delete(ibftConfig, "type")
+
+	cc.Params.Engine["ibft"] = ibftConfig
+
+	return nil
 }
