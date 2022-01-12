@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
+
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
+	stakingHelper "github.com/0xPolygon/polygon-sdk/helper/staking"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
@@ -345,14 +347,14 @@ func generateDevGenesis(params devGenesisParams) error {
 		Bootnodes: []string{},
 	}
 
-	stakingAccount, err := staking.PredeployStakingSC(
+	stakingAccount, err := stakingHelper.PredeployStakingSC(
 		[]types.Address{},
 	)
 	if err != nil {
 		return err
 	}
 
-	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+	cc.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err

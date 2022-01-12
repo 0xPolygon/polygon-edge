@@ -2,16 +2,13 @@ package staking
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/types"
-)
-
-var (
-	StakingSCAddress = types.StringToAddress("1001")
 )
 
 // PadLeftOrTrim left-pads the passed in byte array to the specified size,

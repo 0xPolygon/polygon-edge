@@ -21,22 +21,21 @@ var (
 
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism
 type PoAMechanism struct {
-	// Reference to the main IBFT implementation
-	ibft *Ibft
-
-	// hookMap is the collection of registered hooks
-	hookMap map[string]func(interface{}) error
-
-	// Used for easy lookups
-	mechanismType MechanismType
+	BaseConsensusMechanism
 }
 
 // PoAFactory initializes the required data
 // for the Proof of Authority mechanism
-func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
+func PoAFactory(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, error) {
 	poa := &PoAMechanism{
-		mechanismType: PoA,
-		ibft:          ibft,
+		BaseConsensusMechanism: BaseConsensusMechanism{
+			mechanismType: PoA,
+			ibft:          ibft,
+		},
+	}
+
+	if err := poa.initializeParams(params); err != nil {
+		return nil, err
 	}
 
 	poa.initializeHookMap()
@@ -46,6 +45,10 @@ func PoAFactory(ibft *Ibft) (ConsensusMechanism, error) {
 
 // acceptStateLogHook logs the current snapshot with the number of votes
 func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
+	if !poa.IsAvailable() {
+		return nil
+	}
+
 	// Cast the param to a *Snapshot
 	snap, ok := snapParam.(*Snapshot)
 	if !ok {
@@ -66,6 +69,10 @@ func (poa *PoAMechanism) acceptStateLogHook(snapParam interface{}) error {
 
 // verifyHeadersHook verifies that the header nonce conforms to the IBFT PoA proposal format
 func (poa *PoAMechanism) verifyHeadersHook(nonceParam interface{}) error {
+	if !poa.IsAvailable() {
+		return nil
+	}
+
 	// Cast the param to the nonce
 	nonce, ok := nonceParam.(types.Nonce)
 	if !ok {
@@ -101,6 +108,9 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 	}
 
 	number := params.header.Number
+	if !poa.IsAvailableAtNumber(number) {
+		return nil
+	}
 
 	if number%poa.ibft.epochSize == 0 {
 		// during a checkpoint block, we reset the votes
@@ -207,6 +217,10 @@ func (poa *PoAMechanism) candidateVoteHook(hookParams interface{}) error {
 		return ErrInvalidHookParam
 	}
 
+	if !poa.IsAvailableAtNumber(params.header.Number) {
+		return nil
+	}
+
 	// try to pick a candidate
 	if candidate := poa.ibft.operator.getNextCandidate(params.snap); candidate != nil {
 		params.header.Miner = types.StringToAddress(candidate.Address)
@@ -243,7 +257,7 @@ func (poa *PoAMechanism) initializeHookMap() {
 func (poa *PoAMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 	// The PoA mechanism doesn't have special cases where transactions
 	// shouldn't be written to a block
-	return true
+	return poa.IsAvailableAtNumber(blockNumber)
 }
 
 // GetType implements the ConsensusMechanism interface method

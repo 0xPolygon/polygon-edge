@@ -83,7 +83,7 @@ type BlockResult struct {
 }
 
 // ProcessBlock already does all the handling of the whole process, TODO
-func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*BlockResult, error) {
+func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*Transition, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
@@ -95,14 +95,7 @@ func (e *Executor) ProcessBlock(parentRoot types.Hash, block *types.Block, block
 			return nil, err
 		}
 	}
-	_, root := txn.Commit()
-
-	res := &BlockResult{
-		Root:     root,
-		Receipts: txn.Receipts(),
-		TotalGas: txn.TotalGas(),
-	}
-	return res, nil
+	return txn, nil
 }
 
 // StateAt returns snapshot at given root
@@ -661,6 +654,22 @@ func (t *Transition) Callx(c *runtime.Contract, h runtime.Host) *runtime.Executi
 		return t.applyCreate(c, h)
 	}
 	return t.applyCall(c, c.Type, h)
+}
+
+// TODO: rename method
+// TODO: add description
+func (t *Transition) ForceToDeployContract(addr types.Address, account *chain.GenesisAccount) error {
+	if t.AccountExists(addr) {
+		return fmt.Errorf("can't deploy contract to %+v because an account exists already", addr)
+	}
+	t.state.SetCode(addr, account.Code)
+	for key, value := range account.Storage {
+		t.state.SetStorage(addr, key, value, &t.config)
+	}
+	t.state.SetBalance(addr, account.Balance)
+	t.state.SetNonce(addr, account.Nonce)
+
+	return nil
 }
 
 func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (uint64, error) {

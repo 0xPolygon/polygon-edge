@@ -1,7 +1,9 @@
 package common
 
 import (
+	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"math"
 	"os"
 	"path/filepath"
@@ -25,8 +27,23 @@ func Max(a, b uint64) uint64 {
 	return b
 }
 
-func roundFloat(num float64) int {
-	return int(num + math.Copysign(0.5, num))
+func ConvertUnmarshalledInt(x interface{}) (int64, error) {
+	switch tx := x.(type) {
+	case float64:
+		return roundFloat(tx), nil
+	case string:
+		v, err := types.ParseUint64orHex(&tx)
+		if err != nil {
+			return 0, err
+		}
+		return int64(v), nil
+	default:
+		return 0, errors.New("unsupported type for unmarshalled integer")
+	}
+}
+
+func roundFloat(num float64) int64 {
+	return int64(num + math.Copysign(0.5, num))
 }
 
 func ToFixedFloat(num float64, precision int) float64 {

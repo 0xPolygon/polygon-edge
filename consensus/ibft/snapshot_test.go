@@ -19,8 +19,8 @@ import (
 // initIbftMechanism initializes the IBFT mechanism for unit tests
 func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 	mechanismFactory := mechanismBackends[mechanismType]
-	mechanism, _ := mechanismFactory(ibft)
-	ibft.mechanism = mechanism
+	mechanism, _ := mechanismFactory(ibft, nil)
+	ibft.mechanisms = []ConsensusMechanism{mechanism}
 }
 
 func getTempDir(t *testing.T) string {
