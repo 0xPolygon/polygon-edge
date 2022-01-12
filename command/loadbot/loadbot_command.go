@@ -191,7 +191,7 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
-	flags.StringVar(&grpc, "grpc", "", "")
+	flags.StringVar(&grpc, "grpc-address", "", "")
 	flags.IntVar(&maxConns, "max-conns", 0, "")
 	flags.StringVar(&gasPrice, "gas-price", "", "")
 	flags.StringVar(&gasLimit, "gas-limit", "", "")
