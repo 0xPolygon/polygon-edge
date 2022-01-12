@@ -103,6 +103,7 @@ func (i *IBFTSwitchCommand) Run(args []string) int {
 	}
 
 	var deployment *uint64
+
 	if rawDeployment != "" {
 		if typ == ibft.PoS {
 			d, err := types.ParseUint64orHex(&rawDeployment)
@@ -179,6 +180,7 @@ func (d *DecOrHexInt) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	if val < 0 {
 		return errors.New("must be positive value")
 	}
@@ -190,9 +192,9 @@ func (d *DecOrHexInt) UnmarshalJSON(data []byte) error {
 
 type IBFTFork struct {
 	Type       ibft.MechanismType `json:"type"`
-	Deployment *DecOrHexInt       `json:"deployment, omitempty"`
+	Deployment *DecOrHexInt       `json:"deployment,omitempty"`
 	From       DecOrHexInt        `json:"from"`
-	To         *DecOrHexInt       `json:"to, omitempty"`
+	To         *DecOrHexInt       `json:"to,omitempty"`
 }
 
 // getIBFTForks returns IBFT fork configurations from chain config
@@ -245,7 +247,7 @@ func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deplo
 
 	lastFork := &ibftForks[len(ibftForks)-1]
 	if from <= lastFork.From.Value {
-		return errors.New(`"from" must be greater than the beggining height of last fork`)
+		return errors.New(`"from" must be greater than the beginning height of last fork`)
 	}
 
 	lastFork.To = &DecOrHexInt{from - 1}
