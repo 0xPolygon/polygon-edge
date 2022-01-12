@@ -94,9 +94,8 @@ func (e *ObjectError) Error() string {
 }
 
 const (
-	PendingBlockNumber  = BlockNumber(-3)
-	LatestBlockNumber   = BlockNumber(-2)
-	EarliestBlockNumber = BlockNumber(-1)
+	PendingBlockNumber = BlockNumber(-3)
+	LatestBlockNumber  = BlockNumber(-2)
 )
 
 type BlockNumber int64
@@ -109,10 +108,10 @@ type BlockNumberOrHash struct {
 // UnmarshalJSON will try to extract the filter's data.
 // Here are the possible input formats :
 //
-// 1 - "latest", "pending" or "earliest"	- self-explaining keywords
-// 2 - "0x2"								- block number #2 (EIP-1898 backward compatible)
-// 3 - {blockNumber:	"0x2"}				- EIP-1898 compliant block number #2
-// 4 - {blockHash:		"0xe0e..."}			- EIP-1898 compliant block hash 0xe0e...
+// 1 - "latest" or "pending"			- self-explaining keywords
+// 2 - "0x2"							- block number #2 (EIP-1898 backward compatible)
+// 3 - {blockNumber:	"0x2"}			- EIP-1898 compliant block number #2
+// 4 - {blockHash:		"0xe0e..."}		- EIP-1898 compliant block hash 0xe0e...
 func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 	type bnhCopy BlockNumberOrHash
 
@@ -152,8 +151,6 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 		return PendingBlockNumber, nil
 	case "latest":
 		return LatestBlockNumber, nil
-	case "earliest":
-		return EarliestBlockNumber, nil
 	}
 
 	n, err := types.ParseUint64orHex(&str)

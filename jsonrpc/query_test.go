@@ -100,16 +100,6 @@ func TestFilterDecode(t *testing.T) {
 		},
 		{
 			`{
-				"fromBlock": "pending",
-				"toBlock": "earliest"
-			}`,
-			&LogFilter{
-				fromBlock: PendingBlockNumber,
-				toBlock:   EarliestBlockNumber,
-			},
-		},
-		{
-			`{
 				"blockHash": "` + hash1.String() + `"
 			}`,
 			&LogFilter{

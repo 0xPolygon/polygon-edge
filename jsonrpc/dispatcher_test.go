@@ -222,11 +222,6 @@ func TestDispatcherFuncDecode(t *testing.T) {
 	}{
 		{
 			"block",
-			`["earliest"]`,
-			EarliestBlockNumber,
-		},
-		{
-			"block",
 			`["latest"]`,
 			LatestBlockNumber,
 		},
@@ -249,11 +244,6 @@ func TestDispatcherFuncDecode(t *testing.T) {
 			"blockPtr",
 			`["a", "latest"]`,
 			LatestBlockNumber,
-		},
-		{
-			"filter",
-			`[{"fromBlock": "pending", "toBlock": "earliest"}]`,
-			LogFilter{fromBlock: PendingBlockNumber, toBlock: EarliestBlockNumber},
 		},
 	}
 	for _, c := range cases {

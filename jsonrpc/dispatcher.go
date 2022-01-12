@@ -455,9 +455,6 @@ func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, erro
 	case LatestBlockNumber:
 		return d.store.Header(), nil
 
-	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
-
 	case PendingBlockNumber:
 		return nil, fmt.Errorf("fetching the pending header is not supported")
 

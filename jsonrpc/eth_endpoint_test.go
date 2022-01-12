@@ -183,7 +183,6 @@ func TestEth_Block_GetBlockByNumber(t *testing.T) {
 		err      bool
 	}{
 		{LatestBlockNumber, true, false},
-		{EarliestBlockNumber, false, true},
 		{BlockNumber(-50), false, true},
 		{BlockNumber(0), true, false},
 		{BlockNumber(2), true, false},
@@ -259,7 +258,6 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 		err      bool
 	}{
 		{LatestBlockNumber, true, false},
-		{EarliestBlockNumber, false, true},
 		{BlockNumber(-50), false, true},
 		{BlockNumber(0), true, false},
 		{BlockNumber(2), true, false},
