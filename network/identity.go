@@ -37,6 +37,14 @@ type identity struct {
 	initialized uint32
 }
 
+func (i *identity) updatePendingCount(direction network.Direction, delta int64) {
+	switch direction {
+	case network.DirInbound:
+		atomic.AddInt64(&i.pendingInboundCount, delta)
+	case network.DirOutbound:
+		atomic.AddInt64(&i.pendingOutboundCount, delta)
+	}
+}
 func (i *identity) pendingInboundConns() int64 {
 	return atomic.LoadInt64(&i.pendingInboundCount)
 }
@@ -53,21 +61,13 @@ func (i *identity) isPending(id peer.ID) bool {
 
 func (i *identity) delPending(id peer.ID) {
 	if value, loaded := i.pending.LoadAndDelete(id); loaded {
-		if value.(network.Direction) == network.DirInbound {
-			atomic.AddInt64(&i.pendingInboundCount, -1)
-		} else if value.(network.Direction) == network.DirOutbound {
-			atomic.AddInt64(&i.pendingOutboundCount, -1)
-		}
+		i.updatePendingCount(value.(network.Direction), -1)
 	}
 }
 
 func (i *identity) setPending(id peer.ID, direction network.Direction) {
 	if _, loaded := i.pending.LoadOrStore(id, direction); !loaded {
-		if direction == network.DirInbound {
-			atomic.AddInt64(&i.pendingInboundCount, 1)
-		} else if direction == network.DirOutbound {
-			atomic.AddInt64(&i.pendingOutboundCount, 1)
-		}
+		i.updatePendingCount(direction, 1)
 	}
 }
 
@@ -99,17 +99,10 @@ func (i *identity) setup() {
 				return
 			}
 
-			if conn.Stat().Direction == network.DirOutbound && i.srv.numOpenSlots() == 0 {
-				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
-
+			if i.checkSlots(conn.Stat().Direction, peerID) {
 				return
 			}
 
-			if conn.Stat().Direction == network.DirInbound && i.srv.inboundConns() >= i.srv.maxInboundConns() {
-				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
-
-				return
-			}
 			// pending of handshake
 			i.setPending(peerID, conn.Stat().Direction)
 
@@ -139,6 +132,24 @@ func (i *identity) getStatus() *proto.Status {
 	return &proto.Status{
 		Chain: int64(i.srv.config.Chain.Params.ChainID),
 	}
+}
+
+// checkSlots checks for the available connection slots and disconnects if slots are full
+func (i *identity) checkSlots(direction network.Direction, peerID peer.ID) (slotsFull bool) {
+	switch direction {
+	case network.DirInbound:
+		slotsFull = i.srv.numOpenSlots() == 0
+	case network.DirOutbound:
+		slotsFull = i.srv.inboundConns() >= i.srv.maxInboundConns()
+	default:
+		i.srv.logger.Info("Invalid connection direction", "peer", peerID)
+	}
+
+	if slotsFull {
+		i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
+	}
+
+	return slotsFull
 }
 
 func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) error {
