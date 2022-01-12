@@ -43,7 +43,7 @@ func (m *accountsMap) exists(addr types.Address) bool {
 
 // getPrimaries collects the heads (first-in-line transaction)
 // from each of the promoted queues.
-func (m *accountsMap) getPrimaries() (primaries transactions) {
+func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
 	m.Range(func(key, value interface{}) bool {
 		account := m.get(key.(types.Address))
 

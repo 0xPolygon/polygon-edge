@@ -544,13 +544,13 @@ func TestResetAccount(t *testing.T) {
 	t.Run("reset promoted", func(t *testing.T) {
 		testCases := []struct {
 			name     string
-			txs      transactions
+			txs      []*types.Transaction
 			newNonce uint64
 			expected result
 		}{
 			{
 				name: "prune all txs with low nonce",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 0, 1),
 					newTx(addr1, 1, 1),
 					newTx(addr1, 2, 1),
@@ -569,7 +569,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "no low nonce txs to prune",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 2, 1),
 					newTx(addr1, 3, 1),
 					newTx(addr1, 4, 1),
@@ -586,7 +586,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "prune some txs with low nonce",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 7, 1),
 					newTx(addr1, 8, 1),
 					newTx(addr1, 9, 1),
@@ -656,14 +656,14 @@ func TestResetAccount(t *testing.T) {
 	t.Run("reset enqueued", func(t *testing.T) {
 		testCases := []struct {
 			name     string
-			txs      transactions
+			txs      []*types.Transaction
 			newNonce uint64
 			expected result
 			signal   bool // flag indicating whether reset will cause a promotion
 		}{
 			{
 				name: "prune all txs with low nonce",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 5, 1),
 					newTx(addr1, 6, 1),
 					newTx(addr1, 7, 1),
@@ -681,7 +681,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "no low nonce txs to prune",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 2, 1),
 					newTx(addr1, 3, 1),
 					newTx(addr1, 4, 1),
@@ -698,7 +698,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "prune some txs with low nonce",
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 4, 1),
 					newTx(addr1, 5, 1),
 					newTx(addr1, 8, 1),
@@ -717,7 +717,7 @@ func TestResetAccount(t *testing.T) {
 			{
 				name:   "pruning low nonce signals promotion",
 				signal: true,
-				txs: transactions{
+				txs: []*types.Transaction{
 					newTx(addr1, 8, 1),
 					newTx(addr1, 9, 1),
 					newTx(addr1, 10, 1),
@@ -776,14 +776,14 @@ func TestResetAccount(t *testing.T) {
 	t.Run("reset enqueued and promoted", func(t *testing.T) {
 		testCases := []struct {
 			name     string
-			txs      transactions
+			txs      []*types.Transaction
 			newNonce uint64
 			expected result
 			signal   bool // flag indicating whether reset will cause a promotion
 		}{
 			{
 				name: "prune all txs with low nonce",
-				txs: transactions{
+				txs: []*types.Transaction{
 					// promoted
 					newTx(addr1, 0, 1),
 					newTx(addr1, 1, 1),
@@ -807,7 +807,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "no low nonce txs to prune",
-				txs: transactions{
+				txs: []*types.Transaction{
 					// promoted
 					newTx(addr1, 5, 1),
 					newTx(addr1, 6, 1),
@@ -828,7 +828,7 @@ func TestResetAccount(t *testing.T) {
 			},
 			{
 				name: "prune all promoted and 1 enqueued",
-				txs: transactions{
+				txs: []*types.Transaction{
 					// promoted
 					newTx(addr1, 1, 1),
 					newTx(addr1, 2, 1),
@@ -852,7 +852,7 @@ func TestResetAccount(t *testing.T) {
 			{
 				name:   "prune signals promotion",
 				signal: true,
-				txs: transactions{
+				txs: []*types.Transaction{
 					// promoted
 					newTx(addr1, 2, 1),
 					newTx(addr1, 3, 1),
@@ -1150,7 +1150,7 @@ func waitUntilDone(done <-chan struct{}) {
 }
 
 func TestAddTx100(t *testing.T) {
-	t.Run("send 100 transactions", func(t *testing.T) {
+	t.Run("send 100 []*types.Transaction", func(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -1175,7 +1175,7 @@ func TestAddTx100(t *testing.T) {
 }
 
 func TestAddTx1000(t *testing.T) {
-	t.Run("send 1000 transactions from 10 accounts", func(t *testing.T) {
+	t.Run("send 1000 []*types.Transaction from 10 accounts", func(t *testing.T) {
 		accounts := []types.Address{
 			addr1,
 			addr2,
@@ -1222,14 +1222,14 @@ func TestAddTx1000(t *testing.T) {
 func TestResetAccounts(t *testing.T) {
 	testCases := []struct {
 		name      string
-		allTxs    map[types.Address]transactions
+		allTxs    map[types.Address][]*types.Transaction
 		newNonces map[types.Address]uint64
 		expected  result
 	}{
 		{
 			name: "reset promoted only",
 			// all txs will end up in promoted queue
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newTx(addr1, 0, 1),
 					newTx(addr1, 1, 1),
@@ -1279,7 +1279,7 @@ func TestResetAccounts(t *testing.T) {
 		},
 		{
 			name: "reset enqueued only",
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newTx(addr1, 3, 1),
 					newTx(addr1, 4, 1),
@@ -1323,7 +1323,7 @@ func TestResetAccounts(t *testing.T) {
 		},
 		{
 			name: "reset all queues",
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					// promoted
 					newTx(addr1, 0, 3),
@@ -1451,12 +1451,12 @@ func TestExecutablesOrder(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		allTxs             map[types.Address]transactions
+		allTxs             map[types.Address][]*types.Transaction
 		expectedPriceOrder []uint64
 	}{
 		{
 			name: "case #1",
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newPricedTx(addr1, 0, 1),
 				},
@@ -1483,7 +1483,7 @@ func TestExecutablesOrder(t *testing.T) {
 		},
 		{
 			name: "case #2",
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newPricedTx(addr1, 0, 3),
 					newPricedTx(addr1, 1, 3),
@@ -1514,7 +1514,7 @@ func TestExecutablesOrder(t *testing.T) {
 		},
 		{
 			name: "case #3",
-			allTxs: map[types.Address]transactions{
+			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newPricedTx(addr1, 0, 9),
 					newPricedTx(addr1, 1, 5),
@@ -1559,7 +1559,7 @@ func TestExecutablesOrder(t *testing.T) {
 			waitUntilDone(done)
 			assert.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
 
-			var successful transactions
+			var successful []*types.Transaction
 			for {
 				tx := pool.Next()
 				if tx == nil {
@@ -1570,7 +1570,7 @@ func TestExecutablesOrder(t *testing.T) {
 				successful = append(successful, tx)
 			}
 
-			// verify the highest priced transactions
+			// verify the highest priced []*types.Transaction
 			// were processed first
 			for i, tx := range successful {
 				assert.Equal(t, test.expectedPriceOrder[i], tx.GasPrice.Uint64())
@@ -1722,7 +1722,7 @@ func TestRecovery(t *testing.T) {
 				waitUntilDone(done)
 			}
 
-			// mock ibft.writeTransactions()
+			// mock ibft.write[]*types.Transaction()
 			func() {
 				pool.Prepare()
 				for {

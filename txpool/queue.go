@@ -8,8 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
-type transactions []*types.Transaction
-
 // A thread-safe wrapper of a minNonceQueue.
 // All methods assume the (correct) lock is held.
 type accountQueue struct {
@@ -49,7 +47,7 @@ func (q *accountQueue) unlock() {
 
 // prune removes all transactions from the queue
 // with nonce lower than given.
-func (q *accountQueue) prune(nonce uint64) (pruned transactions) {
+func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
 	for {
 		tx := q.peek()
 		if tx == nil ||
@@ -93,7 +91,7 @@ func (q *accountQueue) length() uint64 {
 }
 
 // transactions sorted by nonce (ascending)
-type minNonceQueue transactions
+type minNonceQueue []*types.Transaction
 
 /* Queue methods required by the heap interface */
 
@@ -176,7 +174,7 @@ func (q *pricedQueue) length() uint64 {
 }
 
 // transactions sorted by gas price (descending)
-type maxPriceQueue transactions
+type maxPriceQueue []*types.Transaction
 
 /* Queue methods required by the heap interface */
 
