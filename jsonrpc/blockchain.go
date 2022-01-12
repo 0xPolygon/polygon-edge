@@ -169,3 +169,7 @@ func (b *nullBlockchainInterface) GetPendingTx(txHash types.Hash) (*types.Transa
 func (b *nullBlockchainInterface) GetSyncProgression() *protocol.Progression {
 	return nil
 }
+
+func (b *nullBlockchainInterface) GetPeers() int {
+	return 0
+}
