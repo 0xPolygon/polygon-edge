@@ -32,6 +32,7 @@ func PoSFactory(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, 
 	if err := pos.initializeParams(params); err != nil {
 		return nil, err
 	}
+
 	pos.initializeHookMap()
 
 	return pos, nil
@@ -42,6 +43,7 @@ func (pos *PoSMechanism) initializeParams(params map[string]interface{}) error {
 	if len(params) == 0 {
 		return nil
 	}
+
 	if err := pos.BaseConsensusMechanism.initializeParams(params); err != nil {
 		return err
 	}
@@ -50,18 +52,22 @@ func (pos *PoSMechanism) initializeParams(params map[string]interface{}) error {
 	if pos.From > 0 && !ok {
 		return fmt.Errorf("deployment must be given if PoS starts in the middle")
 	}
+
 	if ok {
 		deployment, err := common.ConvertUnmarshalledInt(rawDeployment)
 		if err != nil {
 			return fmt.Errorf(`failed to parse "deployment" params: %w`, err)
 		}
+
 		if deployment < 0 {
 			return fmt.Errorf(`"deployment" must be zero or positive integer: %d`, deployment)
 		}
+
 		uDeployment := uint64(deployment)
 		if uDeployment > pos.From {
 			return fmt.Errorf(`"deployment" must be less than or equal to "from": deployment=%d, from=%d`, deployment, pos.From)
 		}
+
 		pos.ContractDeployment = uDeployment
 	}
 
@@ -147,6 +153,7 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	if !ok {
 		return ErrInvalidHookParam
 	}
+
 	if params.header.Number != pos.ContractDeployment {
 		return nil
 	}
@@ -156,6 +163,7 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	if err := params.txn.ForceToDeployContract(staking.AddrStakingContract, contractState); err != nil {
 		return err
 	}
@@ -195,6 +203,7 @@ func (pos *PoSMechanism) getNextValidators(header *types.Header) (ValidatorSet, 
 	if err != nil {
 		return nil, err
 	}
+
 	return staking.QueryValidators(transition, pos.ibft.validatorKeyAddr)
 }
 
@@ -214,6 +223,7 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 	if err != nil {
 		return err
 	}
+
 	if snap == nil {
 		return fmt.Errorf("cannot find snapshot at %d", header.Number)
 	}
@@ -230,5 +240,6 @@ func (pos *PoSMechanism) updateValidators(num uint64) error {
 			pos.ibft.store.replace(newSnap)
 		}
 	}
+
 	return nil
 }

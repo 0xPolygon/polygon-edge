@@ -21,7 +21,11 @@ func TestRLPEncoding(t *testing.T) {
 	for _, c := range cases {
 		buf := c.MarshalRLPTo(nil)
 
-		res := reflect.New(reflect.TypeOf(c).Elem()).Interface().(codec)
+		res, ok := reflect.New(reflect.TypeOf(c).Elem()).Interface().(codec)
+		if !ok {
+			t.Fatalf("Unable to assert type")
+		}
+
 		if err := res.UnmarshalRLP(buf); err != nil {
 			t.Fatal(err)
 		}
@@ -48,9 +52,11 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	}
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()
+
 	if err := unmarshalledTxn.UnmarshalRLP(marshaledRlp); err != nil {
 		t.Fatal(err)
 	}
+
 	unmarshalledTxn.ComputeHash()
 
 	txn.Hash = unmarshalledTxn.Hash

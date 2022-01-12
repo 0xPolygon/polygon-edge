@@ -16,7 +16,7 @@ var (
 )
 
 var (
-	ErrInvalidNonce = errors.New("Invalid nonce specified")
+	ErrInvalidNonce = errors.New("invalid nonce specified")
 )
 
 // PoAMechanism defines specific hooks for the Proof of Authority IBFT mechanism
@@ -124,6 +124,7 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 			purgeBlock := uint64(epoch) * poa.ibft.epochSize
 			poa.ibft.store.deleteLower(purgeBlock)
 		}
+
 		return nil
 	}
 
@@ -134,10 +135,11 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 
 	// the nonce selects the action
 	var authorize bool
-	switch {
-	case params.header.Nonce == nonceAuthVote:
+
+	switch params.header.Nonce {
+	case nonceAuthVote:
 		authorize = true
-	case params.header.Nonce == nonceDropVote:
+	case nonceDropVote:
 		authorize = false
 	default:
 		return fmt.Errorf("incorrect vote nonce")
@@ -164,6 +166,7 @@ func (poa *PoAMechanism) processHeadersHook(hookParam interface{}) error {
 		// there can only be one vote per validator per address
 		return fmt.Errorf("more than one proposal per validator per address found")
 	}
+
 	if voteCount == 0 {
 		// cast the new vote since there is no one yet
 		params.snap.Votes = append(params.snap.Votes, &Vote{

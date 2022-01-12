@@ -24,6 +24,7 @@ func (w *Web3) Sha3(val string) (interface{}, error) {
 	if err != nil {
 		return nil, NewInvalidRequestError("Invalid hex string")
 	}
+
 	dst := keccak.Keccak256(nil, v)
 
 	return hex.EncodeToHex(dst), nil

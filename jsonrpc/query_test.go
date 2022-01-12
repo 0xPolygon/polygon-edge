@@ -123,12 +123,15 @@ func TestFilterDecode(t *testing.T) {
 	for indx, c := range cases {
 		res := &LogFilter{}
 		err := res.UnmarshalJSON([]byte(c.str))
+
 		if err != nil && c.res != nil {
 			t.Fatal(err)
 		}
+
 		if err == nil && c.res == nil {
 			t.Fatal("it should fail")
 		}
+
 		if c.res != nil {
 			if !reflect.DeepEqual(res, c.res) {
 				t.Fatalf("bad %d", indx)

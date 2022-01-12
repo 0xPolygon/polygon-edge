@@ -45,7 +45,11 @@ func SecretsManagerFactory(
 	if !ok {
 		return nil, errors.New("no path specified for local secrets manager")
 	}
-	localManager.path = path.(string)
+
+	localManager.path, ok = path.(string)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	// Run the initial setup
 	_ = localManager.Setup()
@@ -98,7 +102,7 @@ func (l *LocalSecretsManager) GetSecret(name string) ([]byte, error) {
 	secret, err := ioutil.ReadFile(secretPath)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"unable to read secret from disk (%s), %v",
+			"unable to read secret from disk (%s), %w",
 			secretPath,
 			err,
 		)
@@ -117,6 +121,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	l.secretPathMapLock.Lock()
 	secretPath, ok := l.secretPathMap[name]
 	l.secretPathMapLock.Unlock()
+
 	if !ok {
 		return secrets.ErrSecretNotFound
 	}
@@ -124,7 +129,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	// Write the secret to disk
 	if err := ioutil.WriteFile(secretPath, value, 0600); err != nil {
 		return fmt.Errorf(
-			"unable to write secret to disk (%s), %v",
+			"unable to write secret to disk (%s), %w",
 			secretPath,
 			err,
 		)
@@ -149,10 +154,11 @@ func (l *LocalSecretsManager) RemoveSecret(name string) error {
 	if !ok {
 		return secrets.ErrSecretNotFound
 	}
+
 	delete(l.secretPathMap, name)
 
 	if removeErr := os.Remove(secretPath); removeErr != nil {
-		return fmt.Errorf("unable to remove secret, %v", removeErr)
+		return fmt.Errorf("unable to remove secret, %w", removeErr)
 	}
 
 	return nil

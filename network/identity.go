@@ -18,9 +18,9 @@ import (
 var identityProtoV1 = "/id/0.1"
 
 var (
-	ErrInvalidChainID   = errors.New("Invalid chain ID")
-	ErrNotReady         = errors.New("Not ready")
-	ErrNoAvailableSlots = errors.New("No available Slots")
+	ErrInvalidChainID   = errors.New("invalid chain ID")
+	ErrNotReady         = errors.New("not ready")
+	ErrNoAvailableSlots = errors.New("no available Slots")
 )
 
 type identity struct {
@@ -43,6 +43,7 @@ func (i *identity) isPending(id peer.ID) bool {
 	if !ok {
 		return false
 	}
+
 	return val.(bool)
 }
 
@@ -76,6 +77,7 @@ func (i *identity) setup() {
 			initialized := atomic.LoadUint32(&i.initialized)
 			if initialized == 0 {
 				i.srv.Disconnect(peerID, ErrNotReady.Error())
+
 				return
 			}
 
@@ -87,6 +89,7 @@ func (i *identity) setup() {
 
 			if i.srv.numOpenSlots() == 0 {
 				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
+
 				return
 			}
 			// pending of handshake
@@ -110,6 +113,7 @@ func (i *identity) setup() {
 
 func (i *identity) start() error {
 	atomic.StoreUint32(&i.initialized, 1)
+
 	return nil
 }
 
@@ -125,10 +129,12 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	if err != nil {
 		return err
 	}
+
 	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
 	status := i.getStatus()
 	resp, err := clt.Hello(context.Background(), status)
+
 	if err != nil {
 		return err
 	}
@@ -139,6 +145,7 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	}
 
 	i.srv.addPeer(peerID)
+
 	return nil
 }
 
@@ -148,5 +155,6 @@ func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status,
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
 	i.srv.logger.Debug("peer bye", "id", ctx.(*grpc.Context).PeerID, "msg", req.Reason)
+
 	return &empty.Empty{}, nil
 }

@@ -1,3 +1,4 @@
+//nolint:lll
 package e2e
 
 // Data for mock contract

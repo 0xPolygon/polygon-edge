@@ -48,7 +48,7 @@ func DecodeHex(str string) ([]byte, error) {
 func MustDecodeHex(str string) []byte {
 	buf, err := DecodeHex(str)
 	if err != nil {
-		panic(fmt.Errorf("could not decode hex: %v", err))
+		panic(fmt.Errorf("could not decode hex: %w", err))
 	}
 
 	return buf
@@ -58,6 +58,7 @@ func MustDecodeHex(str string) []byte {
 func EncodeUint64(i uint64) string {
 	enc := make([]byte, 2, 10)
 	copy(enc, "0x")
+
 	return string(strconv.AppendUint(enc, i, 16))
 }
 
@@ -80,8 +81,7 @@ func DecodeNibble(in byte) uint64 {
 // EncodeBig encodes bigint as a hex string with 0x prefix.
 // The sign of the integer is ignored.
 func EncodeBig(bigint *big.Int) string {
-	numBits := bigint.BitLen()
-	if numBits == 0 {
+	if bigint.BitLen() == 0 {
 		return "0x0"
 	}
 

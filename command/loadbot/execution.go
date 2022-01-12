@@ -77,8 +77,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	fastestTurnAround := defaultFastestTurnAround
 	slowestTurnAround := defaultSlowestTurnAround
 	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
-	var zeroTime time.Time  // Zero time
-	var totalTime time.Time // Zero time used for tracking
+
+	var (
+		zeroTime  time.Time // Zero time
+		totalTime time.Time // Zero time used for tracking
+	)
 
 	if totalPassing == 0 {
 		// No data to show, use zero data
@@ -91,7 +94,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	}
 
 	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		data := value.(*metadata)
+		data, ok := value.(*metadata)
+		if !ok {
+			return false
+		}
+
 		turnAroundTime := data.turnAroundTime
 
 		// Update the duration metrics
@@ -161,12 +168,19 @@ func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
+
 	return nonce, nil
 }
 
-func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) (web3.Hash, error) {
+func executeTxn(
+	client *jsonrpc.Client,
+	sender Account,
+	receiver types.Address,
+	value *big.Int,
+	nonce uint64,
+) (web3.Hash, error) {
 	signer := crypto.NewEIP155Signer(100)
 
 	txn, err := signer.SignTx(&types.Transaction{
@@ -180,25 +194,26 @@ func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, 
 	}, sender.PrivateKey)
 
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
 	hash, err := client.Eth().SendRawTransaction(txn.MarshalRLP())
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %v", err)
+		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %w", err)
 	}
+
 	return hash, nil
 }
 
 func (l *Loadbot) Run() error {
 	sender, err := extractSenderAccount(l.cfg.Sender)
 	if err != nil {
-		return fmt.Errorf("failed to extract sender account: %v", err)
+		return fmt.Errorf("failed to extract sender account: %w", err)
 	}
 
-	client, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
+	client, err := createJSONRPCClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
-		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
 	}
 
 	defer func(client *jsonrpc.Client) {
@@ -207,7 +222,7 @@ func (l *Loadbot) Run() error {
 
 	nonce, err := getInitialSenderNonce(client, sender.Address)
 	if err != nil {
-		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
+		return fmt.Errorf("an error occurred while getting initial sender nonce: %w", err)
 	}
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
@@ -218,12 +233,14 @@ func (l *Loadbot) Run() error {
 	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 
 	startTime := time.Now()
+
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
 		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
@@ -237,6 +254,7 @@ func (l *Loadbot) Run() error {
 			txHash, err := executeTxn(client, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
@@ -246,11 +264,13 @@ func (l *Loadbot) Run() error {
 			receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
 			if err != nil {
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
 			// Stop the performance timer
 			end := time.Now()
+
 			l.metrics.TransactionDuration.reportTurnAroundTime(
 				txHash,
 				&metadata{
@@ -262,6 +282,7 @@ func (l *Loadbot) Run() error {
 	}
 
 	wg.Wait()
+
 	endTime := time.Now()
 
 	// Calculate the turn around metrics now that the loadbot is done
