@@ -451,8 +451,7 @@ func (s *Server) delPeer(id peer.ID) {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	peer, ok := s.peers[id]
-	if ok {
+	if peer, ok := s.peers[id]; ok {
 		if peer.connDirection == network.DirInbound {
 			atomic.AddInt64(&s.inboundConnCount, -1)
 		}

@@ -347,7 +347,7 @@ func TestNat(t *testing.T) {
 
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
-	//Create bootnode config
+	// Create bootnode config
 	bootnodeConfig1 := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 3
