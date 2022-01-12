@@ -497,6 +497,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		tx.From = from
 	}
 
+	// Reject underpriced transctions
+	if tx.GasPrice.Uint64() < p.priceLimit {
+		return ErrUnderpriced
+	}
+
 	// Grab the state root for the latest block
 	stateRoot := p.store.Header().StateRoot
 

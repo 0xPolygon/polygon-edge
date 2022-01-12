@@ -76,8 +76,9 @@ func newTestPool() (*TxPool, error) {
 		nil,
 		nilMetrics,
 		&Config{
-			MaxSlots: defaultMaxSlots,
-			Sealing:  false,
+			PriceLimit: defaultPriceLimit,
+			MaxSlots:   defaultMaxSlots,
+			Sealing:    false,
 		},
 	)
 }
@@ -137,6 +138,21 @@ func TestAddTxErrors(t *testing.T) {
 		// assert
 		err = pool.addTx(local, tx)
 		assert.ErrorIs(t, err, ErrInvalidSender)
+	})
+
+	t.Run("ErrUnderpriced", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+
+		pool.EnableDev()
+		pool.SetSigner(crypto.NewEIP155Signer(100))
+
+		pool.priceLimit = 1000000
+		tx := newTx(addr1, 0, 1) // gasPrice == 1
+
+		// assert
+		err = pool.addTx(local, tx)
+		assert.ErrorIs(t, err, ErrUnderpriced)
 	})
 
 	t.Run("ErrInvalidAccountState", func(t *testing.T) {
