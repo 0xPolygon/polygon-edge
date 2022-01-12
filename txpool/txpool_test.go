@@ -84,7 +84,7 @@ func newTestPool() (*TxPool, error) {
 }
 
 type accountState struct {
-	enqueued, promoted uint64
+	enqueued, promoted, nextNonce uint64
 }
 
 type result struct {
@@ -1599,7 +1599,7 @@ func TestRecovery(t *testing.T) {
 		expected result
 	}{
 		{
-			name: "all recovered in enqueued",
+			name: "all recovered txs are enqueued",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
 					{newTx(addr1, 0, 1), ok},
@@ -1609,33 +1609,36 @@ func TestRecovery(t *testing.T) {
 					{newTx(addr1, 4, 1), recoverable},
 				},
 				addr2: {
-					{newTx(addr2, 0, 1), unrecoverable}, // will demote subsequent
-					{newTx(addr2, 1, 1), recoverable},
+					{newTx(addr2, 9, 1), unrecoverable}, // will demote subsequent
+					{newTx(addr2, 10, 1), recoverable},
 				},
 				addr3: {
-					{newTx(addr3, 0, 1), ok},
-					{newTx(addr3, 1, 1), unrecoverable}, // will demote subsequent
-					{newTx(addr3, 2, 1), recoverable},
-					{newTx(addr3, 3, 1), recoverable},
+					{newTx(addr3, 5, 1), ok},
+					{newTx(addr3, 6, 1), unrecoverable}, // will demote subsequent
+					{newTx(addr3, 7, 1), recoverable},
+					{newTx(addr3, 8, 1), recoverable},
 				},
 			},
 			expected: result{
 				slots: 3 + 1 + 2,
 				accounts: map[types.Address]accountState{
 					addr1: {
-						enqueued: 3,
+						enqueued:  3,
+						nextNonce: 1,
 					},
 					addr2: {
-						enqueued: 1,
+						enqueued:  1,
+						nextNonce: 9,
 					},
 					addr3: {
-						enqueued: 2,
+						enqueued:  2,
+						nextNonce: 6,
 					},
 				},
 			},
 		},
 		{
-			name: "all recovered in promoted",
+			name: "all recovered txs are promoted",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
 					{newTx(addr1, 0, 1), ok},
@@ -1645,35 +1648,85 @@ func TestRecovery(t *testing.T) {
 					{newTx(addr1, 4, 1), recoverable},
 				},
 				addr2: {
-					{newTx(addr2, 0, 1), ok},
-					{newTx(addr2, 1, 1), ok},
+					{newTx(addr2, 5, 1), ok},
+					{newTx(addr2, 6, 1), ok},
 				},
 				addr3: {
-					{newTx(addr3, 0, 1), ok},
-					{newTx(addr3, 1, 1), ok},
-					{newTx(addr3, 2, 1), ok},
-					{newTx(addr3, 3, 1), recoverable},
+					{newTx(addr3, 21, 1), ok},
+					{newTx(addr3, 22, 1), ok},
+					{newTx(addr3, 23, 1), ok},
+					{newTx(addr3, 24, 1), recoverable},
 				},
 				addr4: {
-					{newTx(addr4, 0, 1), ok},
-					{newTx(addr4, 1, 1), recoverable},
-					{newTx(addr4, 2, 1), recoverable},
+					{newTx(addr4, 10, 1), ok},
+					{newTx(addr4, 11, 1), recoverable},
+					{newTx(addr4, 12, 1), recoverable},
 				},
 			},
 			expected: result{
 				slots: 3 + 0 + 1 + 2,
 				accounts: map[types.Address]accountState{
 					addr1: {
-						promoted: 3,
+						promoted:  3,
+						nextNonce: 5,
 					},
 					addr2: {
-						promoted: 0,
+						promoted:  0,
+						nextNonce: 7,
 					},
 					addr3: {
-						promoted: 1,
+						promoted:  1,
+						nextNonce: 25,
 					},
 					addr4: {
-						promoted: 2,
+						promoted:  2,
+						nextNonce: 13,
+					},
+				},
+			},
+		},
+		{
+			/* Case scenario:
+			All promoted transactions exceed
+			the block gas limit
+			*/
+			name: "only first unrecoverable rolls back nonce",
+			allTxs: map[types.Address][]statusTx{
+				addr1: {
+					{newTx(addr1, 0, 1), unrecoverable},
+					{newTx(addr1, 1, 1), unrecoverable},
+					{newTx(addr1, 2, 1), unrecoverable},
+				},
+				addr2: {
+					{newTx(addr2, 6, 1), unrecoverable},
+					{newTx(addr2, 7, 1), unrecoverable},
+					{newTx(addr2, 8, 1), unrecoverable},
+					{newTx(addr2, 9, 1), unrecoverable},
+				},
+				addr3: {
+					{newTx(addr3, 3, 1), unrecoverable},
+					{newTx(addr3, 4, 1), unrecoverable},
+				},
+				addr4: {
+					{newTx(addr4, 100, 1), unrecoverable},
+					{newTx(addr4, 101, 1), unrecoverable},
+					{newTx(addr4, 102, 1), unrecoverable},
+				},
+			},
+			expected: result{
+				slots: 0,
+				accounts: map[types.Address]accountState{
+					addr1: {
+						nextNonce: 0,
+					},
+					addr2: {
+						nextNonce: 6,
+					},
+					addr3: {
+						nextNonce: 3,
+					},
+					addr4: {
+						nextNonce: 100,
 					},
 				},
 			},
@@ -1703,7 +1756,12 @@ func TestRecovery(t *testing.T) {
 			done := pool.startTestMode()
 
 			// setup prestate
-			for _, txs := range test.allTxs {
+			for addr, txs := range test.allTxs {
+				// preset nonce so promotions can happen
+				acc := pool.createAccountOnce(addr)
+				acc.setNonce(txs[0].tx.Nonce)
+
+				// send txs
 				for _, sTx := range txs {
 					go func(tx *types.Transaction) {
 						err := pool.addTx(local, tx)
@@ -1713,7 +1771,7 @@ func TestRecovery(t *testing.T) {
 			}
 			waitUntilDone(done)
 
-			// mock ibft.write[]*types.Transaction()
+			// mock ibft.writeTransactions()
 			func() {
 				pool.Prepare()
 				for {
@@ -1738,6 +1796,9 @@ func TestRecovery(t *testing.T) {
 
 			assert.Equal(t, test.expected.slots, pool.gauge.read())
 			for addr := range test.expected.accounts {
+				assert.Equal(t, // nextNonce
+					test.expected.accounts[addr].nextNonce,
+					pool.accounts.get(addr).getNonce())
 				assert.Equal(t, // enqueued
 					test.expected.accounts[addr].enqueued,
 					pool.accounts.get(addr).enqueued.length())
