@@ -498,7 +498,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Reject underpriced transactions
-	if tx.GasPrice.Uint64() < p.priceLimit {
+	if tx.IsUnderpriced(p.priceLimit) {
 		return ErrUnderpriced
 	}
 
