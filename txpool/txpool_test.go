@@ -92,7 +92,7 @@ type result struct {
 	slots    uint64
 }
 
-/* Singe account cases (unit tests) */
+/* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
 	t.Run("ErrNegativeValue", func(t *testing.T) {
@@ -1143,7 +1143,7 @@ func waitUntilDone(done <-chan struct{}) {
 }
 
 func TestAddTx100(t *testing.T) {
-	t.Run("send 100 []*types.Transaction", func(t *testing.T) {
+	t.Run("send 100 transactions", func(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
@@ -1168,7 +1168,7 @@ func TestAddTx100(t *testing.T) {
 }
 
 func TestAddTx1000(t *testing.T) {
-	t.Run("send 1000 []*types.Transaction from 10 accounts", func(t *testing.T) {
+	t.Run("send 1000 transactions from 10 accounts", func(t *testing.T) {
 		accounts := []types.Address{
 			addr1,
 			addr2,
@@ -1220,7 +1220,7 @@ func TestResetAccounts(t *testing.T) {
 		expected  result
 	}{
 		{
-			name: "reset promoted only",
+			name: "only promoted queues are pruned",
 			// all txs will end up in promoted queue
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
@@ -1271,7 +1271,7 @@ func TestResetAccounts(t *testing.T) {
 			},
 		},
 		{
-			name: "reset enqueued only",
+			name: "only enqueued queues are pruned",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					newTx(addr1, 3, 1),
@@ -1315,7 +1315,7 @@ func TestResetAccounts(t *testing.T) {
 			},
 		},
 		{
-			name: "reset all queues",
+			name: "all queues are pruned",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
 					// promoted
@@ -1548,6 +1548,7 @@ func TestExecutablesOrder(t *testing.T) {
 					}(tx)
 				}
 			}
+
 			waitUntilDone(done)
 			assert.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
 
@@ -1562,7 +1563,7 @@ func TestExecutablesOrder(t *testing.T) {
 				successful = append(successful, tx)
 			}
 
-			// verify the highest priced []*types.Transaction
+			// verify the highest priced transactions
 			// were processed first
 			for i, tx := range successful {
 				assert.Equal(t, test.expectedPriceOrder[i], tx.GasPrice.Uint64())
@@ -1799,6 +1800,7 @@ func TestRecovery(t *testing.T) {
 				assert.Equal(t, // nextNonce
 					test.expected.accounts[addr].nextNonce,
 					pool.accounts.get(addr).getNonce())
+
 				assert.Equal(t, // enqueued
 					test.expected.accounts[addr].enqueued,
 					pool.accounts.get(addr).enqueued.length())
