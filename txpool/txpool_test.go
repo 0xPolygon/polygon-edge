@@ -549,7 +549,7 @@ func TestResetAccount(t *testing.T) {
 			expected result
 		}{
 			{
-				name: "prune all txs",
+				name: "prune all txs with low nonce",
 				txs: transactions{
 					newTx(addr1, 0, 1),
 					newTx(addr1, 1, 1),
@@ -568,7 +568,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune no txs",
+				name: "no low nonce txs to prune",
 				txs: transactions{
 					newTx(addr1, 2, 1),
 					newTx(addr1, 3, 1),
@@ -585,7 +585,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune some txs",
+				name: "prune some txs with low nonce",
 				txs: transactions{
 					newTx(addr1, 7, 1),
 					newTx(addr1, 8, 1),
@@ -662,7 +662,7 @@ func TestResetAccount(t *testing.T) {
 			signal   bool // flag indicating whether reset will cause a promotion
 		}{
 			{
-				name: "prune all txs",
+				name: "prune all txs with low nonce",
 				txs: transactions{
 					newTx(addr1, 5, 1),
 					newTx(addr1, 6, 1),
@@ -680,7 +680,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune no txs",
+				name: "no low nonce txs to prune",
 				txs: transactions{
 					newTx(addr1, 2, 1),
 					newTx(addr1, 3, 1),
@@ -697,7 +697,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune some txs",
+				name: "prune some txs with low nonce",
 				txs: transactions{
 					newTx(addr1, 4, 1),
 					newTx(addr1, 5, 1),
@@ -715,7 +715,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name:   "prune signals promotion",
+				name:   "pruning low nonce signals promotion",
 				signal: true,
 				txs: transactions{
 					newTx(addr1, 8, 1),
@@ -773,7 +773,7 @@ func TestResetAccount(t *testing.T) {
 		}
 	})
 
-	t.Run("reset all", func(t *testing.T) {
+	t.Run("reset enqueued and promoted", func(t *testing.T) {
 		testCases := []struct {
 			name     string
 			txs      transactions
@@ -782,7 +782,7 @@ func TestResetAccount(t *testing.T) {
 			signal   bool // flag indicating whether reset will cause a promotion
 		}{
 			{
-				name: "prune all txs",
+				name: "prune all txs with low nonce",
 				txs: transactions{
 					// promoted
 					newTx(addr1, 0, 1),
@@ -806,7 +806,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune no txs",
+				name: "no low nonce txs to prune",
 				txs: transactions{
 					// promoted
 					newTx(addr1, 5, 1),
@@ -827,7 +827,7 @@ func TestResetAccount(t *testing.T) {
 				},
 			},
 			{
-				name: "prune some txs",
+				name: "prune all promoted and 1 enqueued",
 				txs: transactions{
 					// promoted
 					newTx(addr1, 1, 1),
