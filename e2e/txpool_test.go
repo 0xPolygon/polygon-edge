@@ -511,10 +511,9 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			},
 			From: types.ZeroAddress.String(),
 		})
-		assert.NoError(t, err)
+		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 		txHash := web3.Hash(types.StringToHash(response.TxHash))
-		assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 		// save for later querying
 		hashes[i] = txHash
@@ -672,10 +671,9 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 		},
 		From: types.ZeroAddress.String(),
 	})
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 	txHash := web3.Hash(types.StringToHash(response.TxHash))
-	assert.NoError(t, err, "Unable to send transaction, %v", err)
 
 	// Grab the pending transaction from the pool
 	tx, err := client.Eth().GetTransactionByHash(txHash)
