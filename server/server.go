@@ -357,8 +357,9 @@ type jsonRPCHub struct {
 
 // HELPER + WRAPPER METHODS //
 
-func (j *jsonRPCHub) GetPeers() (int) {
+func (j *jsonRPCHub) GetPeers() int {
 	peers := j.Server.Peers()
+
 	return len(peers)
 }
 
@@ -459,7 +460,7 @@ func (s *Server) setupJSONRPC() error {
 		TxPool:     s.txpool,
 		Executor:   s.executor,
 		Consensus:  s.consensus,
-		Server:		s.network,
+		Server:     s.network,
 	}
 
 	conf := &jsonrpc.Config{
