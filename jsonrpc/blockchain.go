@@ -1,8 +1,9 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -18,6 +19,7 @@ type stateHelperInterface interface {
 	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	GetCode(hash types.Hash) ([]byte, error)
 	GetForksInTime(blockNumber uint64) chain.ForksInTime
+	GetPeers() int
 }
 
 // blockchain is the interface with the blockchain required
