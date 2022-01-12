@@ -162,8 +162,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			m.network,
 			m.serverMetrics.txpool,
 			&txpool.Config{
-				Sealing:  m.config.Seal,
-				MaxSlots: m.config.MaxSlots,
+				Sealing:    m.config.Seal,
+				MaxSlots:   m.config.MaxSlots,
+				PriceLimit: m.config.PriceLimit,
 			},
 		)
 		if err != nil {

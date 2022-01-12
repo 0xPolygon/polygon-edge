@@ -558,7 +558,6 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(5)
 		config.SetPriceLimit(&zeroPriceLimit)
-		config.SetNoLocals(true)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
 	})

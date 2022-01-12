@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
@@ -399,8 +400,6 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
@@ -466,8 +465,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")

@@ -73,8 +73,9 @@ type signer interface {
 }
 
 type Config struct {
-	MaxSlots uint64
-	Sealing  bool
+	PriceLimit uint64
+	MaxSlots   uint64
+	Sealing    bool
 }
 
 /* All requests are passed to the main loop
@@ -144,6 +145,9 @@ type TxPool struct {
 	// gauge for measuring pool capacity
 	gauge slotGauge
 
+	// priceLimit is a lower threshold for gas price
+	priceLimit uint64
+
 	// channels on which the pool's event loop
 	// does dispatching/handling requests.
 	enqueueReqCh chan enqueueRequest
@@ -185,6 +189,7 @@ func NewTxPool(
 		executables: newPricedQueue(),
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
+		priceLimit:  config.PriceLimit,
 		sealing:     config.Sealing,
 	}
 
