@@ -171,8 +171,8 @@ func (a *account) promote() uint64 {
 	a.enqueued.lock(true)
 
 	defer func() {
-		a.promoted.unlock()
 		a.enqueued.unlock()
+		a.promoted.unlock()
 	}()
 
 	currentNonce := a.getNonce()
