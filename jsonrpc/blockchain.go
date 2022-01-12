@@ -19,6 +19,11 @@ type stateHelperInterface interface {
 	GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error)
 	GetCode(hash types.Hash) ([]byte, error)
 	GetForksInTime(blockNumber uint64) chain.ForksInTime
+}
+
+// peersHelperInterface Wrapper for these peers functions
+// They are implemented by the jsonRPCHub in server.go
+type peersHelperInterface interface {
 	GetPeers() int
 }
 
@@ -74,6 +79,7 @@ type blockchainInterface interface {
 	GetCapacity() (uint64, uint64)
 
 	stateHelperInterface
+	peersHelperInterface
 }
 
 type nullBlockchainInterface struct {
