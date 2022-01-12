@@ -358,9 +358,7 @@ type jsonRPCHub struct {
 // HELPER + WRAPPER METHODS //
 
 func (j *jsonRPCHub) GetPeers() int {
-	peers := j.Server.Peers()
-
-	return len(peers)
+	return len(j.Server.Peers())
 }
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
