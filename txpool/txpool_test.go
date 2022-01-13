@@ -278,6 +278,30 @@ func TestAddTxErrors(t *testing.T) {
 	})
 }
 
+func TestDropKnownGossipTx(t *testing.T) {
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+	pool.SetSigner(&mockSigner{})
+	pool.EnableDev()
+
+	tx := newTx(addr1, 1, 1)
+
+	// send tx as local
+	go func() {
+		err := pool.addTx(local, tx)
+		assert.NoError(t, err)
+	}()
+	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+
+	// send tx as gossip (will be discarded)
+	err = pool.addTx(gossip, tx)
+	assert.Nil(t, err)
+
+	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+}
+
 func TestAddHandler(t *testing.T) {
 	t.Run("enqueue new tx with higher nonce", func(t *testing.T) {
 		pool, err := newTestPool()
