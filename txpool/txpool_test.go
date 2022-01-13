@@ -967,7 +967,7 @@ func TestPop(t *testing.T) {
 
 	// pop the tx
 	pool.Prepare()
-	tx := pool.Next()
+	tx := pool.Peek()
 	pool.Pop(tx)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
@@ -993,7 +993,7 @@ func TestDrop(t *testing.T) {
 
 	// pop the tx
 	pool.Prepare()
-	tx := pool.Next()
+	tx := pool.Peek()
 	pool.Drop(tx)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
@@ -1034,14 +1034,14 @@ func TestDemote(t *testing.T) {
 		pool.Prepare()
 
 		// process 1st tx
-		tx := pool.Next()
+		tx := pool.Peek()
 		pool.Pop(tx)
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		/* demote 2nd tx */
-		tx = pool.Next()
+		tx = pool.Peek()
 
 		// save the add request
 		// originating in Demote
@@ -1088,7 +1088,7 @@ func TestDemote(t *testing.T) {
 		pool.Prepare()
 
 		// drop first tx
-		tx := pool.Next()
+		tx := pool.Peek()
 		pool.Drop(tx) // this will rollback nonce
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
@@ -1096,7 +1096,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		// demote second tx
-		tx = pool.Next()
+		tx = pool.Peek()
 		// save the add request
 		// originating in Demote
 		var addReq enqueueRequest
@@ -1578,7 +1578,7 @@ func TestExecutablesOrder(t *testing.T) {
 
 			var successful []*types.Transaction
 			for {
-				tx := pool.Next()
+				tx := pool.Peek()
 				if tx == nil {
 					break
 				}
@@ -1800,7 +1800,7 @@ func TestRecovery(t *testing.T) {
 			func() {
 				pool.Prepare()
 				for {
-					tx := pool.Next()
+					tx := pool.Peek()
 					if tx == nil {
 						break
 					}
