@@ -30,8 +30,10 @@ func (m *mockSystemExportClient) Recv() (*proto.ExportEvent, error) {
 	if m.cur >= len(m.recvs) {
 		return nil, io.EOF
 	}
+
 	recv := m.recvs[m.cur]
 	m.cur++
+
 	return recv.event, recv.err
 }
 
@@ -63,6 +65,7 @@ var (
 
 func init() {
 	genesis.Header.ComputeHash()
+
 	for _, b := range blocks {
 		b.Header.ComputeHash()
 	}
@@ -80,7 +83,10 @@ func (m *systemClientMock) GetStatus(context.Context, *emptypb.Empty, ...grpc.Ca
 	return m.status, m.errForStatus
 }
 
-func (m *systemClientMock) BlockByNumber(context.Context, *proto.BlockByNumberRequest, ...grpc.CallOption) (*proto.BlockResponse, error) {
+func (m *systemClientMock) BlockByNumber(
+	context.Context,
+	*proto.BlockByNumberRequest, ...grpc.CallOption,
+) (*proto.BlockResponse, error) {
 	return m.block, m.errForBlock
 }
 

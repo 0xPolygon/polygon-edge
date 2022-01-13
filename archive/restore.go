@@ -29,6 +29,7 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 	if err != nil {
 		return err
 	}
+
 	blockStream := newBlockStream(fp)
 
 	return importBlocks(chain, blockStream)
@@ -42,6 +43,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	if err != nil {
 		return err
 	}
+
 	if metadata == nil {
 		return errors.New("expected metadata in archive but doesn't exist")
 	}
@@ -57,6 +59,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	if err != nil {
 		return err
 	}
+
 	if firstBlock == nil {
 		return nil
 	}
@@ -64,6 +67,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	blocks := make([]*types.Block, 0)
 	nextBlock := firstBlock         // the first block in the next chunk
 	nextBlockSize := firstBlockSize // the size of nextBlock
+
 	for {
 		blocks = append(blocks, nextBlock)
 		blocksSize := nextBlockSize
@@ -73,13 +77,16 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 			if err != nil {
 				return err
 			}
+
 			if nextBlock == nil {
 				break
 			}
+
 			// blocks will have a block at least
 			if len(blocks) > 0 && blocksSize+nextBlockSize > chunkSize {
 				break
 			}
+
 			blocks = append(blocks, nextBlock)
 			blocksSize += nextBlockSize
 		}
@@ -114,21 +121,33 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 
 // consumeCommonBlocks consumes blocks in blockstream to latest block in chain or different hash
 // returns the first block to be written into chain
-func consumeCommonBlocks(chain blockchainInterface, blockStream *blockStream, shutdownCh <-chan os.Signal) (*types.Block, uint64, error) {
+func consumeCommonBlocks(
+	chain blockchainInterface,
+	blockStream *blockStream,
+	shutdownCh <-chan os.Signal,
+) (*types.Block, uint64, error) {
 	for {
 		block, size, err := blockStream.nextBlock()
 		if err != nil {
 			return nil, 0, err
 		}
+
 		if block == nil {
 			return nil, 0, nil
 		}
+
 		if block.Number() == 0 {
 			if block.Hash() != chain.Genesis() {
-				return nil, 0, fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", block.Hash(), chain.Genesis())
+				return nil, 0, fmt.Errorf(
+					"the hash of genesis block (%s) does not match blockchain genesis (%s)",
+					block.Hash(),
+					chain.Genesis(),
+				)
 			}
+
 			continue
 		}
+
 		if hash := chain.GetHashByNumber(block.Number()); hash != block.Hash() {
 			return block, size, nil
 		}
@@ -160,9 +179,11 @@ func (b *blockStream) getMetadata() (*Metadata, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if size == 0 {
 		return nil, nil
 	}
+
 	return b.parseMetadata(size)
 }
 
@@ -172,13 +193,16 @@ func (b *blockStream) nextBlock() (*types.Block, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+
 	if size == 0 {
 		return nil, 0, nil
 	}
+
 	block, err := b.parseBlock(size)
 	if err != nil {
 		return nil, 0, err
 	}
+
 	return block, size, nil
 }
 
@@ -190,13 +214,16 @@ func (b *blockStream) loadRLPArray() (uint64, error) {
 	} else if err != nil {
 		return 0, err
 	}
+
 	headerSize, payloadSize, err := b.loadPrefixSize(1, prefix)
 	if err != nil {
 		return 0, err
 	}
+
 	if err = b.loadPayload(headerSize, payloadSize); err != nil {
 		return 0, err
 	}
+
 	return headerSize + payloadSize, nil
 }
 
@@ -206,11 +233,13 @@ func (b *blockStream) loadRLPPrefix() (byte, error) {
 	if _, err := b.input.Read(buf); err != nil {
 		return 0, err
 	}
+
 	return buf[0], nil
 }
 
 // loadPrefixSize loads array's size from input and return RLP header size and payload size
-// basically block should be array in RLP encoded value because block has 3 fields on the top: Header, Transactions, Uncles
+// basically block should be array in RLP encoded value
+// because block has 3 fields on the top: Header, Transactions, Uncles
 func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64, error) {
 	switch {
 	case prefix >= 0xc0 && prefix <= 0xf7:
@@ -224,16 +253,21 @@ func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64
 		b.reserveCap(offset + payloadSizeSize)
 		payloadSizeBytes := b.buffer[offset : offset+payloadSizeSize]
 		n, err := b.input.Read(payloadSizeBytes)
+
 		if err != nil {
 			return 0, 0, err
 		}
+
 		if uint64(n) < payloadSizeSize {
 			// couldn't load required amount of bytes
 			return 0, 0, io.EOF
 		}
+
 		payloadSize := new(big.Int).SetBytes(payloadSizeBytes).Int64()
-		return uint64(payloadSizeSize + 1), uint64(payloadSize), nil
+
+		return payloadSizeSize + 1, uint64(payloadSize), nil
 	}
+
 	return 0, 0, errors.New("expected array but got bytes")
 }
 
@@ -241,9 +275,11 @@ func (b *blockStream) loadPrefixSize(offset uint64, prefix byte) (uint64, uint64
 func (b *blockStream) loadPayload(offset uint64, size uint64) error {
 	b.reserveCap(offset + size)
 	buf := b.buffer[offset : offset+size]
+
 	if _, err := b.input.Read(buf); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -251,9 +287,11 @@ func (b *blockStream) loadPayload(offset uint64, size uint64) error {
 func (b *blockStream) parseMetadata(size uint64) (*Metadata, error) {
 	data := b.buffer[:size]
 	metadata := &Metadata{}
+
 	if err := metadata.UnmarshalRLP(data); err != nil {
 		return nil, err
 	}
+
 	return metadata, nil
 }
 
@@ -261,9 +299,11 @@ func (b *blockStream) parseMetadata(size uint64) (*Metadata, error) {
 func (b *blockStream) parseBlock(size uint64) (*types.Block, error) {
 	data := b.buffer[:size]
 	block := &types.Block{}
+
 	if err := block.UnmarshalRLP(data); err != nil {
 		return nil, err
 	}
+
 	return block, nil
 }
 

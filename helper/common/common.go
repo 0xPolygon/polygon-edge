@@ -90,5 +90,6 @@ func GetTerminationSignalCh() <-chan os.Signal {
 	// wait for the user to quit with ctrl-c
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
 	return signalCh
 }

@@ -262,6 +262,7 @@ func (c *ServerCommand) Run(args []string) int {
 	config, err := conf.BuildConfig()
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -273,6 +274,7 @@ func (c *ServerCommand) Run(args []string) int {
 	server, err := server.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 

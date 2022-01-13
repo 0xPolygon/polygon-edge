@@ -116,6 +116,7 @@ func (s *systemService) getPeer(id peer.ID) (*proto.Peer, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	info := s.server.network.GetPeerInfo(id)
 
 	addrs := []string{}
@@ -163,28 +164,34 @@ func (s *systemService) BlockByNumber(
 	if !ok {
 		return nil, errors.New("block not found")
 	}
+
 	return &proto.BlockResponse{
 		Data: block.MarshalRLP(),
 	}, nil
 }
 
 func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_ExportServer) error {
-	var from uint64 = 0
-	var to *uint64
+	var (
+		from uint64 = 0
+		to   *uint64
+	)
 
 	if req.From != from {
 		from = req.From
 	}
+
 	if req.To != 0 {
 		if from >= req.To {
 			return errors.New("to must be greater than from")
 		}
+
 		to = &req.To
 	}
 
 	canLoop := func(i uint64) bool {
 		if to == nil {
 			current := s.server.blockchain.Header()
+
 			return current != nil && i <= current.Number
 		} else {
 			return i <= *to
@@ -193,16 +200,20 @@ func (s *systemService) Export(req *proto.ExportRequest, stream proto.System_Exp
 
 	writer := newBlockStreamWriter(stream, s.server.blockchain, defaultMaxGRPCPayloadSize)
 	i := from
+
 	for canLoop(i) {
 		block, ok := s.server.blockchain.GetBlockByNumber(i, true)
 		if !ok {
 			break
 		}
+
 		if err := writer.appendBlock(block); err != nil {
 			return err
 		}
+
 		i++
 	}
+
 	if err := writer.flush(); err != nil {
 		return err
 	}
@@ -223,7 +234,11 @@ type blockStreamWriter struct {
 	pendingTo   *uint64 // last block height in buffer
 }
 
-func newBlockStreamWriter(stream proto.System_ExportServer, blockchain *blockchain.Blockchain, maxPayload uint64) *blockStreamWriter {
+func newBlockStreamWriter(
+	stream proto.System_ExportServer,
+	blockchain *blockchain.Blockchain,
+	maxPayload uint64,
+) *blockStreamWriter {
 	return &blockStreamWriter{
 		buf:        *bytes.NewBuffer(make([]byte, 0, maxPayload)),
 		blockchain: blockchain,
@@ -243,10 +258,12 @@ func (w *blockStreamWriter) appendBlock(b *types.Block) error {
 	}
 
 	w.buf.Write(data)
+
 	n := b.Number()
 	if w.pendingFrom == nil {
 		w.pendingFrom = &n
 	}
+
 	w.pendingTo = &n
 
 	return nil
@@ -262,16 +279,20 @@ func (w *blockStreamWriter) flush() error {
 		// should not reach
 		return errors.New("pendingFrom or pendingTo is nil")
 	}
+
 	err := w.stream.Send(&proto.ExportEvent{
 		From:   *w.pendingFrom,
 		To:     *w.pendingTo,
 		Latest: w.blockchain.Header().Number,
 		Data:   w.buf.Bytes(),
 	})
+
 	if err != nil {
 		return err
 	}
+
 	w.reset()
+
 	return nil
 }
 

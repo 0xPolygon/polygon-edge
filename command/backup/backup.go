@@ -30,7 +30,7 @@ func (c *BackupCommand) DefineFlags() {
 	}
 
 	c.FlagMap["from"] = helper.FlagDescriptor{
-		Description: "Begining height of chain in backup",
+		Description: "Beginning height of chain in backup",
 		Arguments: []string{
 			"FROM",
 		},
@@ -72,44 +72,55 @@ func (c *BackupCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 
 	var out, rawFrom, rawTo string
+
 	flags.StringVar(&out, "out", "", "")
 	flags.StringVar(&rawFrom, "from", "0", "")
 	flags.StringVar(&rawTo, "to", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
-	var from uint64
-	var to *uint64
-	var err error
+	var (
+		from uint64
+		to   *uint64
+		err  error
+	)
 
 	if out == "" {
 		c.Formatter.OutputError(errors.New("the path of backup file is required"))
+
 		return 1
 	}
 
 	if from, err = types.ParseUint64orHex(&rawFrom); err != nil {
-		c.Formatter.OutputError(fmt.Errorf("Failed to decode from: %w", err))
+		c.Formatter.OutputError(fmt.Errorf("failed to decode from: %w", err))
+
 		return 1
 	}
 
 	if rawTo != "" {
 		var parsedTo uint64
+
 		if parsedTo, err = types.ParseUint64orHex(&rawTo); err != nil {
-			c.Formatter.OutputError(fmt.Errorf("Failed to decode to: %w", err))
+			c.Formatter.OutputError(fmt.Errorf("failed to decode to: %w", err))
+
 			return 1
 		} else if from > parsedTo {
 			c.Formatter.OutputError(errors.New("to must be greater than or equal to from"))
+
 			return 1
 		}
+
 		to = &parsedTo
 	}
 
 	conn, err := c.GRPC.Conn()
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -122,6 +133,7 @@ func (c *BackupCommand) Run(args []string) int {
 	resFrom, resTo, err := archive.CreateBackup(conn, logger, from, to, out)
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 

@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
 	"github.com/0xPolygon/polygon-sdk/archive"
+	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
@@ -24,21 +24,16 @@ import (
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
-
 	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
+	"github.com/0xPolygon/polygon-sdk/state/runtime"
 	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
 	"github.com/0xPolygon/polygon-sdk/state/runtime/precompiled"
-
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
+	"github.com/0xPolygon/polygon-sdk/txpool"
+	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 // Minimal is the central manager of the blockchain client

@@ -17,8 +17,15 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// CreateBackup fetches blockchain data with the specific range via gRPC and save this data as binary archive to given path
-func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *uint64, outPath string) (uint64, uint64, error) {
+// CreateBackup fetches blockchain data with the specific range via gRPC
+// and save this data as binary archive to given path
+func CreateBackup(
+	conn *grpc.ClientConn,
+	logger hclog.Logger,
+	from uint64,
+	to *uint64,
+	outPath string,
+) (uint64, uint64, error) {
 	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
@@ -28,8 +35,10 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *u
 	closeFile := func() error {
 		if err := fs.Close(); err != nil {
 			logger.Error("an error occurred while closing file", "err", err)
+
 			return err
 		}
+
 		return nil
 	}
 	removeFile := func() {
@@ -46,7 +55,9 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *u
 
 	signalCh := common.GetTerminationSignalCh()
 	ctx, cancelFn := context.WithCancel(context.Background())
+
 	defer cancelFn()
+
 	go func() {
 		<-signalCh
 		logger.Info("Caught termination signal, shutting down...")
@@ -58,6 +69,7 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *u
 	reqTo, reqToHash, err := determineTo(ctx, clt, to)
 	if err != nil {
 		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
@@ -67,16 +79,19 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, from uint64, to *u
 	})
 	if err != nil {
 		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
 	if err := writeMetadata(fs, logger, reqTo, reqToHash); err != nil {
 		return 0, 0, err
 	}
+
 	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
 
 	if err := closeFile(); err != nil {
 		removeFile()
+
 		return 0, 0, err
 	}
 
@@ -109,15 +124,23 @@ func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash type
 		Latest:     to,
 		LatestHash: toHash,
 	}
+
 	_, err := writer.Write(metadata.MarshalRLP())
 	if err != nil {
 		return err
 	}
+
 	logger.Info("Wrote metadata to backup", "latest", to, "hash", toHash)
+
 	return err
 }
 
-func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, writer io.Writer, targetFrom, targetTo uint64) (*uint64, *uint64, error) {
+func processExportStream(
+	stream proto.System_ExportClient,
+	logger hclog.Logger,
+	writer io.Writer,
+	targetFrom, targetTo uint64,
+) (*uint64, *uint64, error) {
 	var from, to *uint64
 
 	getResult := func() (*uint64, *uint64, error) {
@@ -129,13 +152,16 @@ func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, 
 	}
 
 	var total uint64
+
 	showProgress := func(event *proto.ExportEvent) {
 		num := event.To - event.From
 		total += num
 		expectedTo := targetTo
+
 		if targetTo == 0 {
 			expectedTo = event.Latest
 		}
+
 		expectedTotal := event.Latest - targetFrom
 		progress := 100 * (float64(event.To) - float64(targetFrom)) / float64(expectedTotal)
 
@@ -153,6 +179,7 @@ func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, 
 		if errors.Is(io.EOF, err) || status.Code(err) == codes.Canceled {
 			return getResult()
 		}
+
 		if err != nil {
 			return nil, nil, err
 		}
@@ -164,6 +191,7 @@ func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, 
 		if from == nil {
 			from = &event.From
 		}
+
 		to = &event.To
 
 		showProgress(event)

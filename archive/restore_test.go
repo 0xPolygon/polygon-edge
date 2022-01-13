@@ -34,6 +34,7 @@ func (m *mockChain) GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 			return b, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -42,11 +43,13 @@ func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
 	if !ok {
 		return types.Hash{}
 	}
+
 	return b.Hash()
 }
 
 func (m *mockChain) WriteBlock(block *types.Block) error {
 	m.blocks = append(m.blocks, block)
+
 	return nil
 }
 
@@ -54,16 +57,20 @@ func getLatestBlockFromMockChain(m *mockChain) *types.Block {
 	if l := len(m.blocks); l != 0 {
 		return m.blocks[l-1]
 	}
+
 	return nil
 }
 
 func Test_importBlocks(t *testing.T) {
 	newTestBlockStream := func(metadata *Metadata, blocks ...*types.Block) *blockStream {
 		var buf bytes.Buffer
+
 		buf.Write(metadata.MarshalRLP())
+
 		for _, b := range blocks {
 			buf.Write(b.MarshalRLP())
 		}
+
 		return newBlockStream(&buf)
 	}
 
@@ -112,6 +119,7 @@ func Test_consumeCommonBlocks(t *testing.T) {
 		for _, b := range blocks {
 			buf.Write(b.MarshalRLP())
 		}
+
 		return newBlockStream(&buf)
 	}
 
@@ -156,7 +164,11 @@ func Test_consumeCommonBlocks(t *testing.T) {
 				blocks: []*types.Block{blocks[0], blocks[1]},
 			},
 			block: nil,
-			err:   fmt.Errorf("the hash of genesis block (%s) does not match blockchain genesis (%s)", genesis.Hash(), types.StringToHash("wrong genesis")),
+			err: fmt.Errorf(
+				"the hash of genesis block (%s) does not match blockchain genesis (%s)",
+				genesis.Hash(),
+				types.StringToHash("wrong genesis"),
+			),
 		},
 	}
 
