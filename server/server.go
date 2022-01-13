@@ -353,10 +353,15 @@ type jsonRPCHub struct {
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
+	*network.Server
 	consensus.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
+
+func (j *jsonRPCHub) GetPeers() int {
+	return len(j.Server.Peers())
+}
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	// the values in the trie are the hashed objects of the keys
@@ -455,6 +460,7 @@ func (s *Server) setupJSONRPC() error {
 		TxPool:     s.txpool,
 		Executor:   s.executor,
 		Consensus:  s.consensus,
+		Server:     s.network,
 	}
 
 	conf := &jsonrpc.Config{
