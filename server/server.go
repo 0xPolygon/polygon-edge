@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -351,10 +351,15 @@ type jsonRPCHub struct {
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
+	*network.Server
 	consensus.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
+
+func (j *jsonRPCHub) GetPeers() int {
+	return len(j.Server.Peers())
+}
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	// the values in the trie are the hashed objects of the keys
@@ -453,6 +458,7 @@ func (s *Server) setupJSONRPC() error {
 		TxPool:     s.txpool,
 		Executor:   s.executor,
 		Consensus:  s.consensus,
+		Server:     s.network,
 	}
 
 	conf := &jsonrpc.Config{
