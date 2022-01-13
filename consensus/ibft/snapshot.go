@@ -171,6 +171,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 
 		if hookErr := i.runHook(
 			ProcessHeadersHook,
+			h.Number,
 			&processHeadersHookParams{
 				header:     h,
 				snap:       snap,

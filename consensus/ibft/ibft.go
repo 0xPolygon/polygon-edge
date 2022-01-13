@@ -131,39 +131,42 @@ func ParseType(mechanism string) (MechanismType, error) {
 	return castType, nil
 }
 
-// Define constant hook names
+// Define the type of Hook
+
+type HookType string
+
 const (
 	// POA //
 
 	// VerifyHeadersHook defines additional checks that need to happen
 	// when verifying the headers
-	VerifyHeadersHook = "VerifyHeadersHook"
+	VerifyHeadersHook HookType = "VerifyHeadersHook"
 
 	// ProcessHeadersHook defines additional steps that need to happen
 	// when processing the headers
-	ProcessHeadersHook = "ProcessHeadersHook"
+	ProcessHeadersHook HookType = "ProcessHeadersHook"
 
 	// InsertBlockHook defines additional steps that need to happen
 	// when inserting a block into the chain
-	InsertBlockHook = "InsertBlockHook"
+	InsertBlockHook HookType = "InsertBlockHook"
 
 	// CandidateVoteHook defines additional steps that need to happen
 	// when building a block (candidate voting)
-	CandidateVoteHook = "CandidateVoteHook"
+	CandidateVoteHook HookType = "CandidateVoteHook"
 
 	// POA + POS //
 
 	// AcceptStateLogHook defines what should be logged out as the status
 	// from AcceptState
-	AcceptStateLogHook = "AcceptStateLogHook"
+	AcceptStateLogHook HookType = "AcceptStateLogHook"
 
 	// POS //
 
 	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
-	VerifyBlockHook = "VerifyBlockHook"
+	VerifyBlockHook HookType = "VerifyBlockHook"
 
 	// PreStateCommitHook defines the additional state transition injection
-	PreStateCommitHook = "PreStateCommitHook"
+	PreStateCommitHook HookType = "PreStateCommitHook"
 )
 
 type ConsensusMechanism interface {
@@ -171,7 +174,10 @@ type ConsensusMechanism interface {
 	GetType() MechanismType
 
 	// GetHookMap returns the hooks registered with the specific consensus mechanism
-	GetHookMap() map[string]func(interface{}) error
+	GetHookMap() map[HookType]func(interface{}) error
+
+	// IsAvailable returns whether the corresponding hook is available
+	IsAvailable(hook HookType, height uint64) bool
 
 	// ShouldWriteTransactions returns whether transactions should be written to a block
 	// from the TxPool
@@ -187,7 +193,7 @@ type BaseConsensusMechanism struct {
 
 	// hookMap is the collection of registered hooks
 	//nolint
-	hookMap map[string]func(interface{}) error
+	hookMap map[HookType]func(interface{}) error
 
 	// Used for easy lookups
 	mechanismType MechanismType
@@ -237,18 +243,18 @@ func (base *BaseConsensusMechanism) initializeParams(params map[string]interface
 	return nil
 }
 
-// IsAvailable returns indicates if mechanism should be called at current height
-func (base *BaseConsensusMechanism) IsAvailable() bool {
-	var blockNumber uint64
-	if base.ibft.state.view != nil {
-		blockNumber = base.ibft.state.view.Sequence
-	}
-
-	return base.IsAvailableAtNumber(blockNumber)
+// GetType implements the ConsensusMechanism interface method
+func (base *BaseConsensusMechanism) GetType() MechanismType {
+	return base.mechanismType
 }
 
-// IsAvailableAtNumber returns indicates if mechanism should be called at given height
-func (base *BaseConsensusMechanism) IsAvailableAtNumber(blockNumber uint64) bool {
+// GetHookMap implements the ConsensusMechanism interface method
+func (base *BaseConsensusMechanism) GetHookMap() map[HookType]func(interface{}) error {
+	return base.hookMap
+}
+
+// IsInRange returns indicates if the given blockNumber is between from and to
+func (base *BaseConsensusMechanism) IsInRange(blockNumber uint64) bool {
 	// not ready
 	if blockNumber < base.From {
 		return false
@@ -271,8 +277,12 @@ var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{
 }
 
 // runHook runs a specified hook if it is present in the hook map
-func (i *Ibft) runHook(hookName string, hookParam interface{}) error {
+func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) error {
 	for _, mechanism := range i.mechanisms {
+		if !mechanism.IsAvailable(hookName, height) {
+			continue
+		}
+
 		// Grab the hook map
 		hookMap := mechanism.GetHookMap()
 
@@ -625,7 +635,7 @@ func (i *Ibft) runSyncState() {
 	// updateSnapshotCallback keeps the snapshot store in sync with the updated
 	// chain data, by calling the SyncStateHook
 	callInsertBlockHook := func(blockNumber uint64) {
-		if hookErr := i.runHook(InsertBlockHook, blockNumber); hookErr != nil {
+		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
 		}
 	}
@@ -734,7 +744,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	header.GasLimit = gasLimit
 
-	if hookErr := i.runHook(CandidateVoteHook, &candidateVoteHookParams{
+	if hookErr := i.runHook(CandidateVoteHook, header.Number, &candidateVoteHookParams{
 		header: header,
 		snap:   snap,
 	}); hookErr != nil {
@@ -887,7 +897,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		return
 	}
 
-	if hookErr := i.runHook(AcceptStateLogHook, snap); hookErr != nil {
+	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
 	}
 
@@ -992,7 +1002,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				continue
 			}
 
-			if hookErr := i.runHook(VerifyBlockHook, block); hookErr != nil {
+			if hookErr := i.runHook(VerifyBlockHook, block.Number(), block); hookErr != nil {
 				if errors.As(hookErr, &errBlockVerificationFailed) {
 					i.logger.Error("block verification failed, block at the end of epoch has transactions")
 					i.handleStateErr(errBlockVerificationFailed)
@@ -1124,7 +1134,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 		return err
 	}
 
-	if hookErr := i.runHook(InsertBlockHook, header.Number); hookErr != nil {
+	if hookErr := i.runHook(InsertBlockHook, header.Number, header.Number); hookErr != nil {
 		return hookErr
 	}
 
@@ -1349,7 +1359,7 @@ func (i *Ibft) verifyHeaderImpl(snap *Snapshot, parent, header *types.Header) er
 		return err
 	}
 
-	if hookErr := i.runHook(VerifyHeadersHook, header.Nonce); hookErr != nil {
+	if hookErr := i.runHook(VerifyHeadersHook, header.Number, header.Nonce); hookErr != nil {
 		return hookErr
 	}
 
@@ -1410,7 +1420,7 @@ func (i *Ibft) PreStateCommit(header *types.Header, txn *state.Transition) error
 		header: header,
 		txn:    txn,
 	}
-	if hookErr := i.runHook(PreStateCommitHook, params); hookErr != nil {
+	if hookErr := i.runHook(PreStateCommitHook, header.Number, params); hookErr != nil {
 		return hookErr
 	}
 

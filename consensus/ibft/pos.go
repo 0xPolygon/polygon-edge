@@ -38,6 +38,22 @@ func PoSFactory(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, 
 	return pos, nil
 }
 
+// IsAvailable returns indicates if mechanism should be called at given height
+func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
+	switch hookType {
+	case AcceptStateLogHook, VerifyBlockHook:
+		return pos.IsInRange(height)
+	case PreStateCommitHook:
+		// deploy contract on ContractDeployment
+		return height == pos.ContractDeployment
+	case InsertBlockHook:
+		// update validators when the one before the beginning or the end of epoch
+		return height+1 == pos.From || pos.IsInRange(height) && pos.ibft.IsLastOfEpoch(height)
+	default:
+		return false
+	}
+}
+
 // initializeParams initializes mechanism parameters from chain config
 func (pos *PoSMechanism) initializeParams(params map[string]interface{}) error {
 	if len(params) == 0 {
@@ -74,26 +90,12 @@ func (pos *PoSMechanism) initializeParams(params map[string]interface{}) error {
 	return nil
 }
 
-// GetType implements the ConsensusMechanism interface method
-func (pos *PoSMechanism) GetType() MechanismType {
-	return pos.mechanismType
-}
-
-// GetHookMap implements the ConsensusMechanism interface method
-func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
-	return pos.hookMap
-}
-
 // acceptStateLogHook logs the current snapshot
 func (pos *PoSMechanism) acceptStateLogHook(snapParam interface{}) error {
 	// Cast the param to a *Snapshot
 	snap, ok := snapParam.(*Snapshot)
 	if !ok {
 		return ErrInvalidHookParam
-	}
-
-	if !pos.IsAvailable() {
-		return nil
 	}
 
 	// Log the info message
@@ -114,11 +116,7 @@ func (pos *PoSMechanism) insertBlockHook(numberParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	if headerNumber+1 == pos.From || pos.IsAvailableAtNumber(headerNumber) && pos.ibft.IsLastOfEpoch(headerNumber) {
-		return pos.updateValidators(headerNumber)
-	}
-
-	return nil
+	return pos.updateValidators(headerNumber)
 }
 
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
@@ -129,10 +127,6 @@ func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
 	}
 
 	blockNumber := block.Number()
-	if !pos.IsAvailableAtNumber(blockNumber) {
-		return nil
-	}
-
 	if pos.ibft.IsLastOfEpoch(blockNumber) && len(block.Transactions) > 0 {
 		return errBlockVerificationFailed
 	}
@@ -146,16 +140,11 @@ type preStateCommitHookParams struct {
 	txn    *state.Transition
 }
 
-// TODO: check preStateCommitHook is called during bulk syncing
 // verifyBlockHook checks if the block is an epoch block and if it has any transactions
 func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 	params, ok := rawParams.(*preStateCommitHookParams)
 	if !ok {
 		return ErrInvalidHookParam
-	}
-
-	if params.header.Number != pos.ContractDeployment {
-		return nil
 	}
 
 	// Deploy Staking contract
@@ -175,7 +164,7 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 // should have
 func (pos *PoSMechanism) initializeHookMap() {
 	// Create the hook map
-	pos.hookMap = make(map[string]func(interface{}) error)
+	pos.hookMap = make(map[HookType]func(interface{}) error)
 
 	// Register the AcceptStateLogHook
 	pos.hookMap[AcceptStateLogHook] = pos.acceptStateLogHook
@@ -193,7 +182,7 @@ func (pos *PoSMechanism) initializeHookMap() {
 // ShouldWriteTransactions indicates if transactions should be written to a block
 func (pos *PoSMechanism) ShouldWriteTransactions(blockNumber uint64) bool {
 	// Epoch blocks should be empty
-	return pos.IsAvailableAtNumber(blockNumber) && !pos.ibft.IsLastOfEpoch(blockNumber)
+	return pos.IsInRange(blockNumber) && !pos.ibft.IsLastOfEpoch(blockNumber)
 }
 
 // getNextValidators is a helper function for fetching the validator set
