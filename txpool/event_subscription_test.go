@@ -2,11 +2,13 @@ package txpool
 
 import (
 	"context"
+	"crypto/rand"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
-	"math/rand"
+	"math/big"
+	mathRand "math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -39,14 +41,15 @@ func shuffleTxPoolEvents(
 
 	randomEventType := func(supported bool) proto.EventType {
 		for {
-			randType := allEvents[rand.Intn(len(supportedTypes))]
+			randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(supportedTypes))))
+
+			randType := allEvents[randNum.Int64()]
 			if tempSubscription.eventSupported(randType) == supported {
 				return randType
 			}
 		}
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	events := make([]*proto.TxPoolEvent, 0)
 
 	// Fill in the unsupported events first
@@ -66,7 +69,8 @@ func shuffleTxPoolEvents(
 	}
 
 	// Shuffle the events
-	rand.Shuffle(len(events), func(i, j int) {
+	mathRand.Seed(time.Now().UnixNano())
+	mathRand.Shuffle(len(events), func(i, j int) {
 		events[i], events[j] = events[j], events[i]
 	})
 

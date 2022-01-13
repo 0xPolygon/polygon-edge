@@ -68,10 +68,12 @@ func (p *TxPool) Subscribe(
 
 			if sendErr := stream.Send(event); sendErr != nil {
 				cancel()
+
 				return nil
 			}
 		case <-stream.Context().Done():
 			cancel()
+
 			return nil
 		}
 	}

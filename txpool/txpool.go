@@ -246,6 +246,7 @@ func (p *TxPool) Start() {
 // Close shuts down the pool's main loop.
 func (p *TxPool) Close() {
 	p.shutdownCh <- struct{}{}
+	p.eventManager.close()
 }
 
 // SetSigner sets the signer the pool will use
@@ -654,6 +655,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(promoted))
+
 	for _, promotable := range promotedTxns {
 		p.eventManager.fireEvent(&proto.TxPoolEvent{
 			Type:   proto.EventType_PROMOTED,

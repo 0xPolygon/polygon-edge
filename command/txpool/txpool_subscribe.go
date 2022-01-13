@@ -3,6 +3,7 @@ package txpool
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
@@ -94,11 +95,13 @@ func (t *TxPoolSubscribeCommand) Synopsis() string {
 func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	flags := t.Base.NewFlagSet(t.GetBaseCommand(), t.Formatter, t.GRPC)
 
-	var added bool
-	var promoted bool
-	var enqueued bool
-	var dropped bool
-	var demoted bool
+	var (
+		added    bool
+		promoted bool
+		enqueued bool
+		dropped  bool
+		demoted  bool
+	)
 
 	flags.BoolVar(&added, "added", false, "")
 	flags.BoolVar(&promoted, "promoted", false, "")
@@ -108,6 +111,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		t.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -147,6 +151,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	conn, err := t.GRPC.Conn()
 	if err != nil {
 		t.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -159,19 +164,22 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	if err != nil {
 		t.Formatter.OutputError(err)
 		cancelFn()
+
 		return 1
 	}
 
 	doneCh := make(chan struct{})
+
 	go func() {
 		for {
 			streamEvent, err := stream.Recv()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 
 			if err != nil {
 				t.Formatter.OutputError(fmt.Errorf("failed to read event: %w", err))
+
 				break
 			}
 
@@ -180,6 +188,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 				TxHash:    streamEvent.TxHash,
 			})
 		}
+
 		doneCh <- struct{}{}
 	}()
 
@@ -191,6 +200,7 @@ func (t *TxPoolSubscribeCommand) Run(args []string) int {
 	case <-signalCh:
 	case <-doneCh:
 	}
+
 	cancelFn()
 
 	return 0
