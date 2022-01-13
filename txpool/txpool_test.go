@@ -9,7 +9,9 @@ import (
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -275,6 +277,65 @@ func TestAddTxErrors(t *testing.T) {
 		// assert
 		err = pool.addTx(local, tx)
 		assert.ErrorIs(t, err, ErrInsufficientFunds)
+	})
+}
+
+func TestAddGossipTx(t *testing.T) {
+	key, sender := tests.GenerateKeyAndAddr(t)
+	signer := crypto.NewEIP155Signer(uint64(100))
+	tx := newTx(addr1, 1, 1)
+
+	t.Run("node is a validator", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.EnableDev()
+		pool.SetSigner(signer)
+
+		pool.sealing = true
+
+		signedTx, err := signer.SignTx(tx, key)
+		if err != nil {
+			t.Fatalf("cannot sign transction - err: %v", err)
+		}
+
+		// send tx
+		go func() {
+			protoTx := &proto.Txn{
+				Raw: &any.Any{
+					Value: signedTx.MarshalRLP(),
+				},
+			}
+			pool.addGossipTx(protoTx)
+		}()
+		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+
+		assert.Equal(t, uint64(1), pool.accounts.get(sender).enqueued.length())
+	})
+
+	t.Run("node is a non validator", func(t *testing.T) {
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.EnableDev()
+		pool.SetSigner(signer)
+
+		pool.sealing = false
+
+		pool.createAccountOnce(sender)
+
+		signedTx, err := signer.SignTx(tx, key)
+		if err != nil {
+			t.Fatalf("cannot sign transction - err: %v", err)
+		}
+
+		// send tx
+		protoTx := &proto.Txn{
+			Raw: &any.Any{
+				Value: signedTx.MarshalRLP(),
+			},
+		}
+		pool.addGossipTx(protoTx)
+
+		assert.Equal(t, uint64(0), pool.accounts.get(sender).enqueued.length())
 	})
 }
 
