@@ -25,7 +25,7 @@ import (
 
 const (
 	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "example"
+	DefaultChainName      = "polygon-sdk"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
