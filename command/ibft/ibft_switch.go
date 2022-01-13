@@ -135,6 +135,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 		return 1
 	}
 
+	// import genesis from file
 	cc, err := chain.Import(genesisPath)
 	if err != nil {
 		c.Formatter.OutputError(fmt.Errorf("failed to load chain config from %s: %w", genesisPath, err))
@@ -148,12 +149,14 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 		return 1
 	}
 
+	// Remove current genesis
 	if err := os.Remove(genesisPath); err != nil {
 		c.Formatter.OutputError(err)
 
 		return 1
 	}
 
+	// Save new genesis
 	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
 		c.UI.Error(err.Error())
 
@@ -184,7 +187,7 @@ type IBFTSwitchResult struct {
 func (r *IBFTSwitchResult) Output() string {
 	var buffer bytes.Buffer
 
-	buffer.WriteString("\n[MEW IBFT FORK]\n")
+	buffer.WriteString("\n[NEW IBFT FORK]\n")
 
 	outputs := []string{
 		fmt.Sprintf("Chain|%s", r.Chain),
