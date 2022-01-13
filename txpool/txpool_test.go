@@ -9,9 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -278,89 +276,6 @@ func TestAddTxErrors(t *testing.T) {
 		err = pool.addTx(local, tx)
 		assert.ErrorIs(t, err, ErrInsufficientFunds)
 	})
-}
-
-func TestAddGossipTx(t *testing.T) {
-	key, sender := tests.GenerateKeyAndAddr(t)
-	signer := crypto.NewEIP155Signer(uint64(100))
-	tx := newTx(addr1, 1, 1)
-
-	t.Run("node is a validator", func(t *testing.T) {
-		pool, err := newTestPool()
-		assert.NoError(t, err)
-		pool.EnableDev()
-		pool.SetSigner(signer)
-
-		pool.sealing = true
-
-		signedTx, err := signer.SignTx(tx, key)
-		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
-		}
-
-		// send tx
-		go func() {
-			protoTx := &proto.Txn{
-				Raw: &any.Any{
-					Value: signedTx.MarshalRLP(),
-				},
-			}
-			pool.addGossipTx(protoTx)
-		}()
-		pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-
-		assert.Equal(t, uint64(1), pool.accounts.get(sender).enqueued.length())
-	})
-
-	t.Run("node is a non validator", func(t *testing.T) {
-		pool, err := newTestPool()
-		assert.NoError(t, err)
-		pool.EnableDev()
-		pool.SetSigner(signer)
-
-		pool.sealing = false
-
-		pool.createAccountOnce(sender)
-
-		signedTx, err := signer.SignTx(tx, key)
-		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
-		}
-
-		// send tx
-		protoTx := &proto.Txn{
-			Raw: &any.Any{
-				Value: signedTx.MarshalRLP(),
-			},
-		}
-		pool.addGossipTx(protoTx)
-
-		assert.Equal(t, uint64(0), pool.accounts.get(sender).enqueued.length())
-	})
-}
-
-func TestDropKnownGossipTx(t *testing.T) {
-	pool, err := newTestPool()
-	assert.NoError(t, err)
-	pool.SetSigner(&mockSigner{})
-	pool.EnableDev()
-
-	tx := newTx(addr1, 1, 1)
-
-	// send tx as local
-	go func() {
-		err := pool.addTx(local, tx)
-		assert.NoError(t, err)
-	}()
-	pool.handleEnqueueRequest(<-pool.enqueueReqCh)
-
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
-
-	// send tx as gossip (will be discarded)
-	err = pool.addTx(gossip, tx)
-	assert.Nil(t, err)
-
-	assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 }
 
 func TestAddHandler(t *testing.T) {
@@ -1028,7 +943,7 @@ func TestPop(t *testing.T) {
 
 	// pop the tx
 	pool.Prepare()
-	tx := pool.Peek()
+	tx := pool.Next()
 	pool.Pop(tx)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
@@ -1054,7 +969,7 @@ func TestDrop(t *testing.T) {
 
 	// pop the tx
 	pool.Prepare()
-	tx := pool.Peek()
+	tx := pool.Next()
 	pool.Drop(tx)
 
 	assert.Equal(t, uint64(0), pool.gauge.read())
@@ -1095,14 +1010,14 @@ func TestDemote(t *testing.T) {
 		pool.Prepare()
 
 		// process 1st tx
-		tx := pool.Peek()
+		tx := pool.Next()
 		pool.Pop(tx)
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		/* demote 2nd tx */
-		tx = pool.Peek()
+		tx = pool.Next()
 
 		// save the add request
 		// originating in Demote
@@ -1149,7 +1064,7 @@ func TestDemote(t *testing.T) {
 		pool.Prepare()
 
 		// drop first tx
-		tx := pool.Peek()
+		tx := pool.Next()
 		pool.Drop(tx) // this will rollback nonce
 
 		assert.Equal(t, uint64(1), pool.gauge.read())
@@ -1157,7 +1072,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		// demote second tx
-		tx = pool.Peek()
+		tx = pool.Next()
 		// save the add request
 		// originating in Demote
 		var addReq enqueueRequest
@@ -1639,7 +1554,7 @@ func TestExecutablesOrder(t *testing.T) {
 
 			var successful []*types.Transaction
 			for {
-				tx := pool.Peek()
+				tx := pool.Next()
 				if tx == nil {
 					break
 				}
@@ -1861,7 +1776,7 @@ func TestRecovery(t *testing.T) {
 			func() {
 				pool.Prepare()
 				for {
-					tx := pool.Peek()
+					tx := pool.Next()
 					if tx == nil {
 						break
 					}
@@ -1893,173 +1808,6 @@ func TestRecovery(t *testing.T) {
 				assert.Equal(t, // promoted
 					test.expected.accounts[addr].promoted,
 					pool.accounts.get(addr).promoted.length())
-			}
-		})
-	}
-}
-
-func TestGetTxs(t *testing.T) {
-	testCases := []struct {
-		name             string
-		allTxs           map[types.Address][]*types.Transaction
-		expectedEnqueued map[types.Address][]*types.Transaction
-		expectedPromoted map[types.Address][]*types.Transaction
-	}{
-		{
-			name: "get promoted txs",
-			allTxs: map[types.Address][]*types.Transaction{
-				addr1: {
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-				},
-				addr2: {
-					newTx(addr2, 0, 1),
-					newTx(addr2, 1, 1),
-					newTx(addr2, 2, 1),
-				},
-				addr3: {
-					newTx(addr3, 0, 1),
-					newTx(addr3, 1, 1),
-					newTx(addr3, 2, 1),
-				},
-			},
-			expectedPromoted: map[types.Address][]*types.Transaction{
-				addr1: {
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-				},
-				addr2: {
-					newTx(addr2, 0, 1),
-					newTx(addr2, 1, 1),
-					newTx(addr2, 2, 1),
-				},
-				addr3: {
-					newTx(addr3, 0, 1),
-					newTx(addr3, 1, 1),
-					newTx(addr3, 2, 1),
-				},
-			},
-		},
-		{
-			name: "get all txs",
-			allTxs: map[types.Address][]*types.Transaction{
-				addr1: {
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-					// enqueued
-					newTx(addr1, 10, 1),
-					newTx(addr1, 11, 1),
-					newTx(addr1, 12, 1),
-				},
-				addr2: {
-					newTx(addr2, 0, 1),
-					newTx(addr2, 1, 1),
-					newTx(addr2, 2, 1),
-					// enqueued
-					newTx(addr2, 10, 1),
-					newTx(addr2, 11, 1),
-					newTx(addr2, 12, 1),
-				},
-				addr3: {
-					newTx(addr3, 0, 1),
-					newTx(addr3, 1, 1),
-					newTx(addr3, 2, 1),
-					// enqueued
-					newTx(addr3, 10, 1),
-					newTx(addr3, 11, 1),
-					newTx(addr3, 12, 1),
-				},
-			},
-			expectedPromoted: map[types.Address][]*types.Transaction{
-				addr1: {
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-				},
-				addr2: {
-					newTx(addr2, 0, 1),
-					newTx(addr2, 1, 1),
-					newTx(addr2, 2, 1),
-				},
-				addr3: {
-					newTx(addr3, 0, 1),
-					newTx(addr3, 1, 1),
-					newTx(addr3, 2, 1),
-				},
-			},
-			expectedEnqueued: map[types.Address][]*types.Transaction{
-				addr1: {
-					newTx(addr1, 10, 1),
-					newTx(addr1, 11, 1),
-					newTx(addr1, 12, 1),
-				},
-				addr2: {
-					newTx(addr2, 10, 1),
-					newTx(addr2, 11, 1),
-					newTx(addr2, 12, 1),
-				},
-				addr3: {
-					newTx(addr3, 10, 1),
-					newTx(addr3, 11, 1),
-					newTx(addr3, 12, 1),
-				},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			find := func(
-				tx *types.Transaction,
-				all map[types.Address][]*types.Transaction,
-			) bool {
-				for _, txx := range all[tx.From] {
-					if tx.Nonce == txx.Nonce {
-						return true
-					}
-				}
-
-				return false
-			}
-
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
-
-			done := pool.startTestMode()
-
-			// send txs
-			for _, txs := range test.allTxs {
-				for _, tx := range txs {
-					// send all txs
-					go func(tx *types.Transaction) {
-						err := pool.addTx(local, tx)
-						assert.NoError(t, err)
-					}(tx)
-				}
-			}
-			waitUntilDone(done)
-
-			allPromoted, allEnqueued := pool.GetTxs(true)
-
-			// assert promoted
-			for _, txs := range allPromoted {
-				for _, tx := range txs {
-					found := find(tx, test.expectedPromoted)
-					assert.True(t, found)
-				}
-			}
-
-			// assert enqueued
-			for _, txs := range allEnqueued {
-				for _, tx := range txs {
-					found := find(tx, test.expectedEnqueued)
-					assert.True(t, found)
-				}
 			}
 		})
 	}
