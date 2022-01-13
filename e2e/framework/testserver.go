@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"io"
 	"math/big"
 	"os"
@@ -21,6 +20,8 @@ import (
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
 	"github.com/0xPolygon/polygon-sdk/command/server"
+	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
 	"github.com/0xPolygon/polygon-sdk/network"
@@ -358,6 +359,38 @@ func (t *TestServer) Start(ctx context.Context) error {
 	})
 
 	return err
+}
+
+func (t *TestServer) SwitchIBFTType(typ ibft.MechanismType, from uint64, to, deployment *uint64) error {
+	t.t.Helper()
+
+	args := []string{
+		"ibft", "switch",
+		// add custom chain
+		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
+		"--type", string(typ),
+		"--from", strconv.FormatUint(from, 10),
+	}
+
+	if to != nil {
+		args = append(args, "--to", strconv.FormatUint(*to, 10))
+	}
+
+	if deployment != nil {
+		args = append(args, "--deployment", strconv.FormatUint(*deployment, 10))
+	}
+
+	// Start the server
+	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd.Dir = t.Config.RootDir
+
+	if t.Config.ShowsLog {
+		stdout := io.Writer(os.Stdout)
+		t.cmd.Stdout = stdout
+		t.cmd.Stderr = stdout
+	}
+
+	return t.cmd.Run()
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
