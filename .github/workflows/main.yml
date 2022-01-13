@@ -19,37 +19,45 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: latest
-          args:
-            --timeout=3m
-            -E whitespace
-            -E wsl
-            -E wastedassign
-            -E unconvert
-            -E tparallel
-            -E thelper
-            -E stylecheck
-            -E prealloc
-            -E predeclared
-            -E nolintlint
-            -E nlreturn
-            -E misspell
-            -E makezero
-            -E lll
-            -E importas
-            -E ifshort
-            -E gosec
-            -E gofmt
-            -E goconst
-            -E forcetypeassert
-            -E dogsled
-            -E dupl
-            -E errname
-            -E errorlint
-          skip-go-installation: true
+      - name: Clean lint cache
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.43.0
+          golangci-lint cache clean
+          make lint
+
+      # - name: Lint
+      #   uses: golangci/golangci-lint-action@v2
+      #   with:
+      #     version: latest
+      #     skip-pkg-cache: true
+      #     skip-build-cache: true
+      #     args:
+      #       --timeout=3m
+      #       -E whitespace
+      #       -E wsl
+      #       -E wastedassign
+      #       -E unconvert
+      #       -E tparallel
+      #       -E thelper
+      #       -E stylecheck
+      #       -E prealloc
+      #       -E predeclared
+      #       -E nolintlint
+      #       -E nlreturn
+      #       -E misspell
+      #       -E makezero
+      #       -E lll
+      #       -E importas
+      #       -E ifshort
+      #       -E gosec
+      #       -E gofmt
+      #       -E goconst
+      #       -E forcetypeassert
+      #       -E dogsled
+      #       -E dupl
+      #       -E errname
+      #       -E errorlint
+      #     skip-go-installation: true
   test:
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +71,10 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Clean go cache
+        run: |
+          go clean --cache
+          go clean --modcache
 
       - name: Go build with race
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
