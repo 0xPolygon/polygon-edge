@@ -214,6 +214,8 @@ func (base *BaseConsensusMechanism) initializeParams(params *IBFTFork) error {
 		if params.To.Value < base.From {
 			return fmt.Errorf(`"to" must be grater than or equal to from: from=%d, to=%d`, base.From, params.To.Value)
 		}
+
+		base.To = &params.To.Value
 	}
 
 	return nil
