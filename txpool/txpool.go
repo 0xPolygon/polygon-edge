@@ -304,15 +304,9 @@ func (p *TxPool) Prepare() {
 	}
 }
 
-// Peek returns the best-price selected
+// Next returns the best-price selected
 // transaction ready for execution.
-func (p *TxPool) Peek() *types.Transaction {
-	// Popping the executables queue
-	// does not remove the actual tx
-	// from the pool.
-	// The executables queue just provides
-	// insight into which account has the
-	// highest priced tx (head of promoted queue)
+func (p *TxPool) Next() *types.Transaction {
 	return p.executables.pop()
 }
 
