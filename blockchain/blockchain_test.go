@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -43,6 +44,7 @@ func (c *dummyChain) add(h *header) error {
 		if !ok {
 			return fmt.Errorf("parent not found %v", h.parent)
 		}
+
 		parent = p.Hash
 	}
 
@@ -52,8 +54,10 @@ func (c *dummyChain) add(h *header) error {
 		Difficulty: h.diff,
 		ExtraData:  []byte{h.hash},
 	}
+
 	hh.ComputeHash()
 	c.headers[h.hash] = hh
+
 	return nil
 }
 
@@ -67,16 +71,19 @@ type header struct {
 func (h *header) Parent(parent byte) *header {
 	h.parent = parent
 	h.number = uint64(parent) + 1
+
 	return h
 }
 
 func (h *header) Diff(d uint64) *header {
 	h.diff = d
+
 	return h
 }
 
 func (h *header) Number(d uint64) *header {
 	h.number = d
+
 	return h
 }
 
@@ -90,12 +97,12 @@ func mock(number byte) *header {
 }
 
 func TestInsertHeaders(t *testing.T) {
-
 	type evnt struct {
 		NewChain []*header
 		OldChain []*header
 		Diff     *big.Int
 	}
+
 	type headerEvnt struct {
 		header *header
 		event  *evnt
@@ -479,7 +486,7 @@ func TestInsertHeaders(t *testing.T) {
 			assert.Equal(t, head.Hash, expected.Hash)
 
 			forks, err := b.GetForks()
-			if err != nil && err != storage.ErrNotFound {
+			if err != nil && !errors.Is(err, storage.ErrNotFound) {
 				t.Fatal(err)
 			}
 
@@ -510,8 +517,6 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			if td, _ := b.GetChainTD(); cc.TD != td.Uint64() {
-				fmt.Println(td)
-				fmt.Println(cc.TD)
 				t.Fatal("bad")
 			}
 		})
@@ -557,10 +562,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	if err := b.writeBody(block); err != nil {
 		t.Fatal(err)
 	}
-
-	body, ok := b.readBody(block.Hash())
-	fmt.Println(body)
-	fmt.Println(ok)
 }
 
 func TestCalculateGasLimit(t *testing.T) {

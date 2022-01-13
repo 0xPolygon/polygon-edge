@@ -2,68 +2,90 @@ package network
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-sdk/network/grpc"
 	"github.com/0xPolygon/polygon-sdk/network/proto"
-	rawGrpc "google.golang.org/grpc"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
+	rawGrpc "google.golang.org/grpc"
 )
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 var discProto = "/disc/0.1"
 
 const defaultBucketSize = 20
 
-// referencePeer is a representation of the peer the node is requesting for new peers
 type referencePeer struct {
 	id     peer.ID
 	stream interface{}
 }
 
-type referencePeers []*referencePeer
+type referencePeers struct {
+	mux   sync.RWMutex
+	peers []*referencePeer
+}
 
 func (ps *referencePeers) find(id peer.ID) *referencePeer {
-	for _, p := range *ps {
+	ps.mux.RLock()
+	defer ps.mux.RUnlock()
+
+	for _, p := range ps.peers {
 		if p.id == id {
 			return p
 		}
 	}
+
 	return nil
 }
 
+func (ps *referencePeers) getRandomPeer() *referencePeer {
+	ps.mux.RLock()
+	defer ps.mux.RUnlock()
+
+	l := len(ps.peers)
+	if l == 0 {
+		return nil
+	}
+
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(l)))
+
+	return ps.peers[randNum.Int64()]
+}
+
+func (ps *referencePeers) add(id peer.ID) {
+	ps.mux.Lock()
+	defer ps.mux.Unlock()
+
+	ps.peers = append(ps.peers, &referencePeer{id: id, stream: nil})
+}
+
 func (ps *referencePeers) delete(id peer.ID) *referencePeer {
-	idx := -1
-	for i, p := range *ps {
+	ps.mux.Lock()
+	defer ps.mux.Unlock()
+
+	for idx, p := range ps.peers {
 		if p.id == id {
-			idx = i
-			break
+			deletePeer := ps.peers[idx]
+			ps.peers = append(ps.peers[:idx], ps.peers[idx+1:]...)
+
+			return deletePeer
 		}
 	}
-	if idx != -1 {
-		deletePeer := (*ps)[idx]
-		(*ps) = append((*ps)[:idx], (*ps)[idx+1:]...)
-		return deletePeer
-	}
+
 	return nil
 }
 
 type discovery struct {
 	proto.UnimplementedDiscoveryServer
 	srv          *Server
-	routingTable *kb.RoutingTable
+	routingTable *kb.RoutingTable // kademlia 'k-bucket' routing table that contains connected nodes info
 
-	peers     referencePeers
-	peersLock sync.Mutex
+	peers *referencePeers // list of the peers discovery queries about near peers
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
@@ -73,15 +95,23 @@ type discovery struct {
 
 func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 	d.notifyCh = make(chan struct{}, 5)
-	d.peers = referencePeers{}
+	d.peers = &referencePeers{}
 	d.bootnodes = bootnodes
 
 	keyID := kb.ConvertPeerID(d.srv.host.ID())
 
-	routingTable, err := kb.NewRoutingTable(defaultBucketSize, keyID, time.Minute, d.srv.host.Peerstore(), 10*time.Second, nil)
+	routingTable, err := kb.NewRoutingTable(
+		defaultBucketSize,
+		keyID,
+		time.Minute,
+		d.srv.host.Peerstore(),
+		10*time.Second,
+		nil,
+	)
 	if err != nil {
 		return err
 	}
+
 	d.routingTable = routingTable
 
 	d.routingTable.PeerAdded = func(p peer.ID) {
@@ -107,19 +137,13 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 			_, err := d.routingTable.TryAddPeer(peerID, false, false)
 			if err != nil {
 				d.srv.logger.Error("failed to add peer to routing table", "err", err)
+
 				return
 			}
-			d.peersLock.Lock()
-			d.peers = append(d.peers, &referencePeer{
-				id:     peerID,
-				stream: nil,
-			})
-			d.peersLock.Unlock()
-		case PeerDisconnected:
+			d.peers.add(peerID)
+		case PeerDisconnected, PeerFailedToConnect:
 			d.routingTable.RemovePeer(peerID)
-			d.peersLock.Lock()
 			d.peers.delete(peerID)
-			d.peersLock.Unlock()
 		}
 	})
 	if err != nil {
@@ -138,9 +162,11 @@ func (d *discovery) addToTable(node *peer.AddrInfo) error {
 	// we have to add them to the peerstore so that they are
 	// available to all the libp2p services
 	d.srv.host.Peerstore().AddAddr(node.ID, node.Addrs[0], peerstore.AddressTTL)
+
 	if _, err := d.routingTable.TryAddPeer(node.ID, false, false); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -152,14 +178,16 @@ func (d *discovery) setupTable() {
 	}
 }
 
-func (d *discovery) call(peerID peer.ID) error {
+func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 	d.srv.logger.Debug("Querying a peer for near peers", "peer", peerID)
 	nodes, err := d.findPeersCall(peerID)
+
 	if err != nil {
 		return err
 	}
 
 	d.srv.logger.Debug("Found new near peers", "peer", len(nodes))
+
 	for _, node := range nodes {
 		if err := d.addToTable(node); err != nil {
 			return err
@@ -170,9 +198,6 @@ func (d *discovery) call(peerID peer.ID) error {
 }
 
 func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
-	d.peersLock.Lock()
-	defer d.peersLock.Unlock()
-
 	p := d.peers.find(peerID)
 	if p == nil {
 		return nil, fmt.Errorf("peer not found in list")
@@ -187,6 +212,7 @@ func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	p.stream = stream
 
 	return p.stream, nil
@@ -197,6 +223,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
@@ -204,23 +231,20 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	var addrInfo []*peer.AddrInfo
-	for _, node := range resp.Nodes {
+	addrInfo := make([]*peer.AddrInfo, len(resp.Nodes))
+
+	for indx, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
 			return nil, err
 		}
-		addrInfo = append(addrInfo, info)
+
+		addrInfo[indx] = info
 	}
 
 	return addrInfo, nil
 }
 
-func (d *discovery) peersCount() int {
-	d.peersLock.Lock()
-	defer d.peersLock.Unlock()
-	return len(d.peers)
-}
 func (d *discovery) run() {
 	for {
 		select {
@@ -235,10 +259,9 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if d.peersCount() > 0 {
-		target := d.peers[rand.Intn(d.peersCount())]
-		if err := d.call(target.id); err != nil {
-			d.srv.logger.Error("failed to dial bootnode", "err", err)
+	if target := d.peers.getRandomPeer(); target != nil {
+		if err := d.attemptToFindPeers(target.id); err != nil {
+			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
 		}
 	}
 }
@@ -253,6 +276,7 @@ func (d *discovery) FindPeers(
 		// max limit
 		req.Count = 16
 	}
+
 	if req.GetKey() == "" {
 		// use peer id if none specified
 		req.Key = from.String()
@@ -261,6 +285,7 @@ func (d *discovery) FindPeers(
 	closer := d.routingTable.NearestPeers(kb.ConvertKey(req.GetKey()), int(req.Count))
 
 	filtered := []string{}
+
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
@@ -268,6 +293,7 @@ func (d *discovery) FindPeers(
 			filtered = append(filtered, AddrInfoToString(&info))
 		}
 	}
+
 	resp := &proto.FindPeersResp{
 		Nodes: filtered,
 	}

@@ -47,6 +47,7 @@ func (f *Filter) getFilterUpdates() (string, error) {
 		for _, header := range headers {
 			updates = append(updates, header.Hash.String())
 		}
+
 		return fmt.Sprintf("[\"%s\"]", strings.Join(updates, "\",\"")), nil
 	}
 	// log filter
@@ -54,7 +55,9 @@ func (f *Filter) getFilterUpdates() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	f.logs = []*Log{}
+
 	return string(res), nil
 }
 
@@ -76,6 +79,7 @@ func (f *Filter) sendMessage(msg string) error {
 	if err := f.ws.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -90,6 +94,7 @@ func (f *Filter) flush() error {
 			if err != nil {
 				return err
 			}
+
 			if err := f.sendMessage(string(raw)); err != nil {
 				return err
 			}
@@ -107,6 +112,7 @@ func (f *Filter) flush() error {
 		}
 		f.logs = []*Log{}
 	}
+
 	return nil
 }
 
@@ -161,9 +167,9 @@ func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterMan
 }
 
 func (f *FilterManager) Run() {
-
 	// watch for new events in the blockchain
 	watchCh := make(chan *blockchain.Event)
+
 	go func() {
 		for {
 			evnt := f.subscription.GetEvent()
@@ -175,6 +181,7 @@ func (f *FilterManager) Run() {
 	}()
 
 	var timeoutCh <-chan time.Time
+
 	for {
 		// check for the next filter to be removed
 		filter := f.nextTimeoutFilter()
@@ -211,12 +218,14 @@ func (f *FilterManager) nextTimeoutFilter() *Filter {
 	f.lock.Lock()
 	if len(f.filters) == 0 {
 		f.lock.Unlock()
+
 		return nil
 	}
 
 	// pop the first item
 	item := f.timer[0]
 	f.lock.Unlock()
+
 	return item
 }
 
@@ -258,24 +267,32 @@ func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 				}
 			}
 		}
+
 		return nil
 	}
 
 	// process old chain
 	for _, i := range evnt.OldChain {
-		processBlock(i, true)
+		if processErr := processBlock(i, true); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+		}
 	}
 	// process new chain
 	for _, i := range evnt.NewChain {
-		processBlock(i, false)
+		if processErr := processBlock(i, false); processErr != nil {
+			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+		}
 	}
 
 	// flush all the websocket values
-	for _, f := range f.filters {
-		if f.isWS() {
-			f.flush()
+	for _, filter := range f.filters {
+		if filter.isWS() {
+			if flushErr := filter.flush(); flushErr != nil {
+				f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
+			}
 		}
 	}
+
 	return nil
 }
 
@@ -283,6 +300,7 @@ func (f *FilterManager) Exists(id string) bool {
 	f.lock.Lock()
 	_, ok := f.filters[id]
 	f.lock.Unlock()
+
 	return ok
 }
 
@@ -296,6 +314,7 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	if !ok {
 		return "", errFilterDoesNotExists
 	}
+
 	if item.isWS() {
 		// we cannot get updates from a ws filter with getFilterChanges
 		return "", errFilterDoesNotExists
@@ -305,6 +324,7 @@ func (f *FilterManager) GetFilterChanges(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return res, nil
 }
 
@@ -320,6 +340,7 @@ func (f *FilterManager) Uninstall(id string) bool {
 	heap.Remove(&f.timer, item.index)
 
 	f.lock.Unlock()
+
 	return true
 }
 
@@ -382,7 +403,7 @@ func (t timeHeapImpl) Swap(i, j int) {
 
 func (t *timeHeapImpl) Push(x interface{}) {
 	n := len(*t)
-	item := x.(*Filter)
+	item := x.(*Filter) //nolint: forcetypeassert
 	item.index = n
 	*t = append(*t, item)
 }
@@ -394,6 +415,7 @@ func (t *timeHeapImpl) Pop() interface{} {
 	old[n-1] = nil
 	item.index = -1
 	*t = old[0 : n-1]
+
 	return item
 }
 
@@ -408,6 +430,7 @@ func (b *blockStream) Head() *headElem {
 	b.lock.Lock()
 	head := b.head
 	b.lock.Unlock()
+
 	return head
 }
 
@@ -416,10 +439,13 @@ func (b *blockStream) push(header *types.Header) {
 	newHead := &headElem{
 		header: header.Copy(),
 	}
+
 	if b.head != nil {
 		b.head.next = newHead
 	}
+
 	b.head = newHead
+
 	b.lock.Unlock()
 }
 
@@ -432,12 +458,15 @@ func (h *headElem) getUpdates() ([]*types.Header, *headElem) {
 	res := []*types.Header{}
 
 	cur := h
+
 	for {
 		if cur.next == nil {
 			break
 		}
+
 		cur = cur.next
 		res = append(res, cur.header)
 	}
+
 	return res, cur
 }

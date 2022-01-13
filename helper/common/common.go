@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,16 +27,26 @@ func Max(a, b uint64) uint64 {
 	return b
 }
 
+func roundFloat(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func ToFixedFloat(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+
+	return float64(roundFloat(num*output)) / output
+}
+
 // SetupDataDir sets up the data directory and the corresponding sub-directories
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
-		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
 		if err := createDir(path); err != nil {
-			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
 
@@ -77,7 +88,8 @@ func createDir(path string) error {
 // GetTerminationSignalCh returns a channel to emit signals by ctrl + c
 func GetTerminationSignalCh() <-chan os.Signal {
 	// wait for the user to quit with ctrl-c
-	signalCh := make(chan os.Signal, 4)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
 	return signalCh
 }

@@ -72,6 +72,7 @@ func (pw *ProgressionWrapper) StartProgression(
 // updates the currently written block in the batch sync
 func (pw *ProgressionWrapper) RunUpdateLoop(subscription blockchain.Subscription) {
 	eventCh := subscription.GetEventCh()
+
 	for {
 		select {
 		case event := <-eventCh:
@@ -87,6 +88,7 @@ func (pw *ProgressionWrapper) RunUpdateLoop(subscription blockchain.Subscription
 			pw.UpdateCurrentProgression(lastBlock.Number)
 		case <-pw.stopCh:
 			subscription.Close()
+
 			return
 		}
 	}

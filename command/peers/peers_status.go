@@ -53,29 +53,35 @@ func (p *PeersStatus) Synopsis() string {
 func (p *PeersStatus) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
-	var nodeId string
-	flags.StringVar(&nodeId, "peer-id", "", "")
+	var nodeID string
+
+	flags.StringVar(&nodeID, "peer-id", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
-	if nodeId == "" {
+	if nodeID == "" {
 		p.UI.Error("peer-id argument not provided")
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
-	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeId})
+	resp, err := clt.PeersStatus(context.Background(), &proto.PeersStatusRequest{Id: nodeID})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

@@ -20,6 +20,12 @@ type stateHelperInterface interface {
 	GetForksInTime(blockNumber uint64) chain.ForksInTime
 }
 
+// peersHelperInterface Wrapper for these peers functions
+// They are implemented by the jsonRPCHub in server.go
+type peersHelperInterface interface {
+	GetPeers() int
+}
+
 // blockchain is the interface with the blockchain required
 // by the filter manager
 type blockchainInterface interface {
@@ -45,7 +51,10 @@ type blockchainInterface interface {
 	AddTx(tx *types.Transaction) error
 
 	// GetTxs gets tx pool transactions currently pending for inclusion and currently queued for validation
-	GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction)
+	GetTxs(inclQueued bool) (
+		map[types.Address]map[uint64]*types.Transaction,
+		map[types.Address]map[uint64]*types.Transaction,
+	)
 
 	// GetPendingTx gets the pending transaction from the transaction pool, if it's present
 	GetPendingTx(txHash types.Hash) (*types.Transaction, bool)
@@ -69,6 +78,7 @@ type blockchainInterface interface {
 	GetCapacity() (uint64, uint64)
 
 	stateHelperInterface
+	peersHelperInterface
 }
 
 type nullBlockchainInterface struct {
@@ -106,7 +116,10 @@ func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (map[types.Address]map[uint64]*types.Transaction, map[types.Address]map[uint64]*types.Transaction) {
+func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (
+	map[types.Address]map[uint64]*types.Transaction,
+	map[types.Address]map[uint64]*types.Transaction,
+) {
 	return nil, nil
 }
 
@@ -126,7 +139,10 @@ func (b *nullBlockchainInterface) GetBlockByNumber(num uint64, full bool) (*type
 	return nil, false
 }
 
-func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+func (b *nullBlockchainInterface) ApplyTxn(
+	header *types.Header,
+	txn *types.Transaction,
+) (*runtime.ExecutionResult, error) {
 	return nil, nil
 }
 
@@ -152,4 +168,8 @@ func (b *nullBlockchainInterface) GetPendingTx(txHash types.Hash) (*types.Transa
 
 func (b *nullBlockchainInterface) GetSyncProgression() *progress.Progression {
 	return nil
+}
+
+func (b *nullBlockchainInterface) GetPeers() int {
+	return 0
 }

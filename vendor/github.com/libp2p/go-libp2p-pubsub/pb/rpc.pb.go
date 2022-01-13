@@ -22,92 +22,6 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type TopicDescriptor_AuthOpts_AuthMode int32
-
-const (
-	TopicDescriptor_AuthOpts_NONE TopicDescriptor_AuthOpts_AuthMode = 0
-	TopicDescriptor_AuthOpts_KEY  TopicDescriptor_AuthOpts_AuthMode = 1
-	TopicDescriptor_AuthOpts_WOT  TopicDescriptor_AuthOpts_AuthMode = 2
-)
-
-var TopicDescriptor_AuthOpts_AuthMode_name = map[int32]string{
-	0: "NONE",
-	1: "KEY",
-	2: "WOT",
-}
-
-var TopicDescriptor_AuthOpts_AuthMode_value = map[string]int32{
-	"NONE": 0,
-	"KEY":  1,
-	"WOT":  2,
-}
-
-func (x TopicDescriptor_AuthOpts_AuthMode) Enum() *TopicDescriptor_AuthOpts_AuthMode {
-	p := new(TopicDescriptor_AuthOpts_AuthMode)
-	*p = x
-	return p
-}
-
-func (x TopicDescriptor_AuthOpts_AuthMode) String() string {
-	return proto.EnumName(TopicDescriptor_AuthOpts_AuthMode_name, int32(x))
-}
-
-func (x *TopicDescriptor_AuthOpts_AuthMode) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(TopicDescriptor_AuthOpts_AuthMode_value, data, "TopicDescriptor_AuthOpts_AuthMode")
-	if err != nil {
-		return err
-	}
-	*x = TopicDescriptor_AuthOpts_AuthMode(value)
-	return nil
-}
-
-func (TopicDescriptor_AuthOpts_AuthMode) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8, 0, 0}
-}
-
-type TopicDescriptor_EncOpts_EncMode int32
-
-const (
-	TopicDescriptor_EncOpts_NONE      TopicDescriptor_EncOpts_EncMode = 0
-	TopicDescriptor_EncOpts_SHAREDKEY TopicDescriptor_EncOpts_EncMode = 1
-	TopicDescriptor_EncOpts_WOT       TopicDescriptor_EncOpts_EncMode = 2
-)
-
-var TopicDescriptor_EncOpts_EncMode_name = map[int32]string{
-	0: "NONE",
-	1: "SHAREDKEY",
-	2: "WOT",
-}
-
-var TopicDescriptor_EncOpts_EncMode_value = map[string]int32{
-	"NONE":      0,
-	"SHAREDKEY": 1,
-	"WOT":       2,
-}
-
-func (x TopicDescriptor_EncOpts_EncMode) Enum() *TopicDescriptor_EncOpts_EncMode {
-	p := new(TopicDescriptor_EncOpts_EncMode)
-	*p = x
-	return p
-}
-
-func (x TopicDescriptor_EncOpts_EncMode) String() string {
-	return proto.EnumName(TopicDescriptor_EncOpts_EncMode_name, int32(x))
-}
-
-func (x *TopicDescriptor_EncOpts_EncMode) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(TopicDescriptor_EncOpts_EncMode_value, data, "TopicDescriptor_EncOpts_EncMode")
-	if err != nil {
-		return err
-	}
-	*x = TopicDescriptor_EncOpts_EncMode(value)
-	return nil
-}
-
-func (TopicDescriptor_EncOpts_EncMode) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8, 1, 0}
-}
-
 type RPC struct {
 	Subscriptions        []*RPC_SubOpts  `protobuf:"bytes,1,rep,name=subscriptions" json:"subscriptions,omitempty"`
 	Publish              []*Message      `protobuf:"bytes,2,rep,name=publish" json:"publish,omitempty"`
@@ -653,182 +567,7 @@ func (m *PeerInfo) GetSignedPeerRecord() []byte {
 	return nil
 }
 
-type TopicDescriptor struct {
-	Name                 *string                   `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	Auth                 *TopicDescriptor_AuthOpts `protobuf:"bytes,2,opt,name=auth" json:"auth,omitempty"`
-	Enc                  *TopicDescriptor_EncOpts  `protobuf:"bytes,3,opt,name=enc" json:"enc,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                  `json:"-"`
-	XXX_unrecognized     []byte                    `json:"-"`
-	XXX_sizecache        int32                     `json:"-"`
-}
-
-func (m *TopicDescriptor) Reset()         { *m = TopicDescriptor{} }
-func (m *TopicDescriptor) String() string { return proto.CompactTextString(m) }
-func (*TopicDescriptor) ProtoMessage()    {}
-func (*TopicDescriptor) Descriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8}
-}
-func (m *TopicDescriptor) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TopicDescriptor) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_TopicDescriptor.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *TopicDescriptor) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TopicDescriptor.Merge(m, src)
-}
-func (m *TopicDescriptor) XXX_Size() int {
-	return m.Size()
-}
-func (m *TopicDescriptor) XXX_DiscardUnknown() {
-	xxx_messageInfo_TopicDescriptor.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TopicDescriptor proto.InternalMessageInfo
-
-func (m *TopicDescriptor) GetName() string {
-	if m != nil && m.Name != nil {
-		return *m.Name
-	}
-	return ""
-}
-
-func (m *TopicDescriptor) GetAuth() *TopicDescriptor_AuthOpts {
-	if m != nil {
-		return m.Auth
-	}
-	return nil
-}
-
-func (m *TopicDescriptor) GetEnc() *TopicDescriptor_EncOpts {
-	if m != nil {
-		return m.Enc
-	}
-	return nil
-}
-
-type TopicDescriptor_AuthOpts struct {
-	Mode                 *TopicDescriptor_AuthOpts_AuthMode `protobuf:"varint,1,opt,name=mode,enum=pubsub.pb.TopicDescriptor_AuthOpts_AuthMode" json:"mode,omitempty"`
-	Keys                 [][]byte                           `protobuf:"bytes,2,rep,name=keys" json:"keys,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                           `json:"-"`
-	XXX_unrecognized     []byte                             `json:"-"`
-	XXX_sizecache        int32                              `json:"-"`
-}
-
-func (m *TopicDescriptor_AuthOpts) Reset()         { *m = TopicDescriptor_AuthOpts{} }
-func (m *TopicDescriptor_AuthOpts) String() string { return proto.CompactTextString(m) }
-func (*TopicDescriptor_AuthOpts) ProtoMessage()    {}
-func (*TopicDescriptor_AuthOpts) Descriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8, 0}
-}
-func (m *TopicDescriptor_AuthOpts) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TopicDescriptor_AuthOpts) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_TopicDescriptor_AuthOpts.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *TopicDescriptor_AuthOpts) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TopicDescriptor_AuthOpts.Merge(m, src)
-}
-func (m *TopicDescriptor_AuthOpts) XXX_Size() int {
-	return m.Size()
-}
-func (m *TopicDescriptor_AuthOpts) XXX_DiscardUnknown() {
-	xxx_messageInfo_TopicDescriptor_AuthOpts.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TopicDescriptor_AuthOpts proto.InternalMessageInfo
-
-func (m *TopicDescriptor_AuthOpts) GetMode() TopicDescriptor_AuthOpts_AuthMode {
-	if m != nil && m.Mode != nil {
-		return *m.Mode
-	}
-	return TopicDescriptor_AuthOpts_NONE
-}
-
-func (m *TopicDescriptor_AuthOpts) GetKeys() [][]byte {
-	if m != nil {
-		return m.Keys
-	}
-	return nil
-}
-
-type TopicDescriptor_EncOpts struct {
-	Mode                 *TopicDescriptor_EncOpts_EncMode `protobuf:"varint,1,opt,name=mode,enum=pubsub.pb.TopicDescriptor_EncOpts_EncMode" json:"mode,omitempty"`
-	KeyHashes            [][]byte                         `protobuf:"bytes,2,rep,name=keyHashes" json:"keyHashes,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                         `json:"-"`
-	XXX_unrecognized     []byte                           `json:"-"`
-	XXX_sizecache        int32                            `json:"-"`
-}
-
-func (m *TopicDescriptor_EncOpts) Reset()         { *m = TopicDescriptor_EncOpts{} }
-func (m *TopicDescriptor_EncOpts) String() string { return proto.CompactTextString(m) }
-func (*TopicDescriptor_EncOpts) ProtoMessage()    {}
-func (*TopicDescriptor_EncOpts) Descriptor() ([]byte, []int) {
-	return fileDescriptor_77a6da22d6a3feb1, []int{8, 1}
-}
-func (m *TopicDescriptor_EncOpts) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *TopicDescriptor_EncOpts) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_TopicDescriptor_EncOpts.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *TopicDescriptor_EncOpts) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TopicDescriptor_EncOpts.Merge(m, src)
-}
-func (m *TopicDescriptor_EncOpts) XXX_Size() int {
-	return m.Size()
-}
-func (m *TopicDescriptor_EncOpts) XXX_DiscardUnknown() {
-	xxx_messageInfo_TopicDescriptor_EncOpts.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TopicDescriptor_EncOpts proto.InternalMessageInfo
-
-func (m *TopicDescriptor_EncOpts) GetMode() TopicDescriptor_EncOpts_EncMode {
-	if m != nil && m.Mode != nil {
-		return *m.Mode
-	}
-	return TopicDescriptor_EncOpts_NONE
-}
-
-func (m *TopicDescriptor_EncOpts) GetKeyHashes() [][]byte {
-	if m != nil {
-		return m.KeyHashes
-	}
-	return nil
-}
-
 func init() {
-	proto.RegisterEnum("pubsub.pb.TopicDescriptor_AuthOpts_AuthMode", TopicDescriptor_AuthOpts_AuthMode_name, TopicDescriptor_AuthOpts_AuthMode_value)
-	proto.RegisterEnum("pubsub.pb.TopicDescriptor_EncOpts_EncMode", TopicDescriptor_EncOpts_EncMode_name, TopicDescriptor_EncOpts_EncMode_value)
 	proto.RegisterType((*RPC)(nil), "pubsub.pb.RPC")
 	proto.RegisterType((*RPC_SubOpts)(nil), "pubsub.pb.RPC.SubOpts")
 	proto.RegisterType((*Message)(nil), "pubsub.pb.Message")
@@ -838,57 +577,42 @@ func init() {
 	proto.RegisterType((*ControlGraft)(nil), "pubsub.pb.ControlGraft")
 	proto.RegisterType((*ControlPrune)(nil), "pubsub.pb.ControlPrune")
 	proto.RegisterType((*PeerInfo)(nil), "pubsub.pb.PeerInfo")
-	proto.RegisterType((*TopicDescriptor)(nil), "pubsub.pb.TopicDescriptor")
-	proto.RegisterType((*TopicDescriptor_AuthOpts)(nil), "pubsub.pb.TopicDescriptor.AuthOpts")
-	proto.RegisterType((*TopicDescriptor_EncOpts)(nil), "pubsub.pb.TopicDescriptor.EncOpts")
 }
 
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor_77a6da22d6a3feb1) }
 
 var fileDescriptor_77a6da22d6a3feb1 = []byte{
-	// 662 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x93, 0xcf, 0x6e, 0xd3, 0x4a,
-	0x14, 0xc6, 0xef, 0xd4, 0x4e, 0x1d, 0x9f, 0xba, 0xbd, 0xd1, 0xdc, 0xab, 0x62, 0xaa, 0x2a, 0x8a,
-	0x8c, 0x84, 0x42, 0x29, 0x5e, 0x04, 0x24, 0x36, 0x08, 0x51, 0x9a, 0x88, 0x44, 0xa8, 0x6d, 0x34,
-	0xad, 0x54, 0xb1, 0xb4, 0x9d, 0x49, 0x63, 0xa5, 0xf1, 0x18, 0xff, 0x29, 0xea, 0x1b, 0xb0, 0x61,
-	0xc7, 0xb3, 0xf0, 0x0c, 0x2c, 0x58, 0xf0, 0x08, 0xa8, 0x3b, 0xde, 0x02, 0xcd, 0xf1, 0x38, 0x71,
-	0x5a, 0x5a, 0x58, 0xf9, 0xcc, 0x99, 0xdf, 0x77, 0xce, 0x37, 0xc7, 0x33, 0x60, 0x26, 0x71, 0xe0,
-	0xc6, 0x89, 0xc8, 0x04, 0x35, 0xe3, 0xdc, 0x4f, 0x73, 0xdf, 0x8d, 0x7d, 0xe7, 0x27, 0x01, 0x8d,
-	0x0d, 0xf7, 0xe9, 0x0b, 0x58, 0x4f, 0x73, 0x3f, 0x0d, 0x92, 0x30, 0xce, 0x42, 0x11, 0xa5, 0x36,
-	0x69, 0x69, 0xed, 0xb5, 0xce, 0xa6, 0x3b, 0x47, 0x5d, 0x36, 0xdc, 0x77, 0x8f, 0x73, 0xff, 0x28,
-	0xce, 0x52, 0xb6, 0x0c, 0xd3, 0x5d, 0x30, 0xe2, 0xdc, 0x3f, 0x0f, 0xd3, 0x89, 0xbd, 0x82, 0x3a,
-	0x5a, 0xd1, 0x1d, 0xf0, 0x34, 0xf5, 0xce, 0x38, 0x2b, 0x11, 0xfa, 0x14, 0x8c, 0x40, 0x44, 0x59,
-	0x22, 0xce, 0x6d, 0xad, 0x45, 0xda, 0x6b, 0x9d, 0xfb, 0x15, 0x7a, 0xbf, 0xd8, 0x99, 0x8b, 0x14,
-	0xb9, 0xb5, 0x07, 0x86, 0x6a, 0x4e, 0xb7, 0xc1, 0x54, 0xed, 0x7d, 0x6e, 0x93, 0x16, 0x69, 0xd7,
-	0xd9, 0x22, 0x41, 0x6d, 0x30, 0x32, 0x11, 0x87, 0x41, 0x38, 0xb2, 0x57, 0x5a, 0xa4, 0x6d, 0xb2,
-	0x72, 0xe9, 0x7c, 0x22, 0x60, 0xa8, 0xba, 0x94, 0x82, 0x3e, 0x4e, 0xc4, 0x0c, 0xe5, 0x16, 0xc3,
-	0x58, 0xe6, 0x46, 0x5e, 0xe6, 0xa1, 0xcc, 0x62, 0x18, 0xd3, 0xff, 0xa1, 0x96, 0xf2, 0xf7, 0x91,
-	0x40, 0xa7, 0x16, 0x2b, 0x16, 0x32, 0x8b, 0x45, 0x6d, 0x1d, 0x3b, 0x14, 0x0b, 0xf4, 0x15, 0x9e,
-	0x45, 0x5e, 0x96, 0x27, 0xdc, 0xae, 0x21, 0xbf, 0x48, 0xd0, 0x06, 0x68, 0x53, 0x7e, 0x69, 0xaf,
-	0x62, 0x5e, 0x86, 0xce, 0x37, 0x02, 0x1b, 0xcb, 0xc7, 0xa5, 0x4f, 0xa0, 0x16, 0x4e, 0xbc, 0x0b,
-	0xae, 0xc6, 0x7f, 0xef, 0xe6, 0x60, 0x06, 0x7d, 0xef, 0x82, 0xb3, 0x82, 0x42, 0xfc, 0x83, 0x17,
-	0x65, 0x6a, 0xea, 0xbf, 0xc3, 0x4f, 0xbd, 0x28, 0x63, 0x05, 0x25, 0xf1, 0xb3, 0xc4, 0x1b, 0x67,
-	0xb6, 0x76, 0x1b, 0xfe, 0x46, 0x6e, 0xb3, 0x82, 0x92, 0x78, 0x9c, 0xe4, 0x11, 0xb7, 0xf5, 0xdb,
-	0xf0, 0xa1, 0xdc, 0x66, 0x05, 0xe5, 0xf4, 0xc1, 0xaa, 0x7a, 0x9c, 0xff, 0x88, 0x41, 0x17, 0xa7,
-	0x5c, 0xfe, 0x88, 0x41, 0x97, 0x36, 0x01, 0x66, 0xc5, 0x81, 0x07, 0xdd, 0x14, 0xbd, 0x9b, 0xac,
-	0x92, 0x71, 0xdc, 0x45, 0x25, 0x69, 0xff, 0x1a, 0x4f, 0x6e, 0xf0, 0xed, 0x39, 0x8f, 0xfe, 0x6f,
-	0xef, 0xec, 0xcc, 0xe6, 0x24, 0x5a, 0xbf, 0xc3, 0xe3, 0x23, 0xa8, 0xc5, 0x9c, 0x27, 0xa9, 0x1a,
-	0xed, 0x7f, 0x95, 0xc3, 0x0f, 0x39, 0x4f, 0x06, 0xd1, 0x58, 0xb0, 0x82, 0x90, 0x45, 0x7c, 0x2f,
-	0x98, 0x8a, 0xf1, 0x18, 0x6f, 0x89, 0xce, 0xca, 0xa5, 0x73, 0x08, 0xf5, 0x12, 0xa6, 0x9b, 0xb0,
-	0x2a, 0x71, 0xd5, 0xc9, 0x62, 0x6a, 0x45, 0x77, 0xa0, 0x21, 0x2f, 0x09, 0x1f, 0x49, 0x92, 0xf1,
-	0x40, 0x24, 0x23, 0x75, 0x03, 0x6f, 0xe4, 0x9d, 0x2f, 0x1a, 0xfc, 0x7b, 0x22, 0x0d, 0x76, 0x79,
-	0xf1, 0xfa, 0x44, 0x22, 0x6f, 0x6d, 0xe4, 0xcd, 0xb8, 0xf2, 0x8f, 0x31, 0x7d, 0x0e, 0xba, 0x97,
-	0x67, 0x13, 0xac, 0xb3, 0xd6, 0x79, 0x50, 0xf1, 0x7e, 0x4d, 0xed, 0xee, 0xe5, 0xd9, 0x04, 0x5f,
-	0x34, 0x0a, 0xe8, 0x33, 0xd0, 0x78, 0x14, 0xa8, 0x67, 0xe9, 0xdc, 0xa1, 0xeb, 0x45, 0x01, 0xca,
-	0x24, 0xbe, 0xf5, 0x91, 0x40, 0xbd, 0x2c, 0x44, 0x5f, 0x81, 0x3e, 0x13, 0xa3, 0xc2, 0xcf, 0x46,
-	0x67, 0xf7, 0x2f, 0x7a, 0x63, 0x70, 0x20, 0x46, 0x9c, 0xa1, 0x52, 0x9e, 0x68, 0xca, 0x2f, 0x8b,
-	0xc9, 0x5b, 0x0c, 0x63, 0xe7, 0x61, 0xd1, 0x41, 0x52, 0xb4, 0x0e, 0xfa, 0xe1, 0xd1, 0x61, 0xaf,
-	0xf1, 0x0f, 0x35, 0x40, 0x7b, 0xdb, 0x7b, 0xd7, 0x20, 0x32, 0x38, 0x3d, 0x3a, 0x69, 0xac, 0x6c,
-	0x7d, 0x26, 0x60, 0x28, 0x6f, 0xf4, 0xe5, 0x92, 0x93, 0x9d, 0x3f, 0x9f, 0x46, 0x7e, 0x2b, 0x3e,
-	0xb6, 0xc1, 0x9c, 0xf2, 0xcb, 0xbe, 0x97, 0x4e, 0x78, 0x69, 0x66, 0x91, 0x70, 0x1e, 0x63, 0xa3,
-	0x6b, 0x86, 0xd6, 0xc1, 0x3c, 0xee, 0xef, 0xb1, 0x5e, 0x77, 0xd9, 0xd6, 0x6b, 0xeb, 0xeb, 0x55,
-	0x93, 0x7c, 0xbf, 0x6a, 0x92, 0x1f, 0x57, 0x4d, 0xf2, 0x2b, 0x00, 0x00, 0xff, 0xff, 0xfc, 0x52,
-	0x7a, 0xa2, 0x8b, 0x05, 0x00, 0x00,
+	// 480 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x92, 0xc1, 0x8e, 0xd3, 0x3c,
+	0x10, 0xc7, 0xe5, 0x6d, 0xbb, 0xd9, 0xcc, 0xe6, 0xfb, 0xb4, 0x32, 0x68, 0x31, 0x08, 0x55, 0x55,
+	0x4e, 0x01, 0x41, 0x0e, 0xcb, 0x95, 0x0b, 0xb4, 0x12, 0x9b, 0x03, 0x50, 0x99, 0x03, 0x67, 0x27,
+	0x75, 0xba, 0xd1, 0x6e, 0x63, 0x63, 0x3b, 0x8b, 0x78, 0x08, 0xde, 0x8b, 0x03, 0x07, 0x1e, 0x01,
+	0xf5, 0xc6, 0x5b, 0x20, 0x3b, 0x4e, 0x9a, 0xa5, 0x94, 0x9b, 0xe7, 0xef, 0xdf, 0xcc, 0xfc, 0x3d,
+	0x1e, 0x08, 0x95, 0x2c, 0x52, 0xa9, 0x84, 0x11, 0x38, 0x94, 0x4d, 0xae, 0x9b, 0x3c, 0x95, 0x79,
+	0xfc, 0x0b, 0xc1, 0x88, 0x2e, 0xe7, 0xf8, 0x25, 0xfc, 0xa7, 0x9b, 0x5c, 0x17, 0xaa, 0x92, 0xa6,
+	0x12, 0xb5, 0x26, 0x68, 0x36, 0x4a, 0x4e, 0x2f, 0xce, 0xd3, 0x1e, 0x4d, 0xe9, 0x72, 0x9e, 0x7e,
+	0x68, 0xf2, 0xf7, 0xd2, 0x68, 0x7a, 0x17, 0xc6, 0xcf, 0x20, 0x90, 0x4d, 0x7e, 0x53, 0xe9, 0x2b,
+	0x72, 0xe4, 0xf2, 0xf0, 0x20, 0xef, 0x2d, 0xd7, 0x9a, 0xad, 0x39, 0xed, 0x10, 0xfc, 0x02, 0x82,
+	0x42, 0xd4, 0x46, 0x89, 0x1b, 0x32, 0x9a, 0xa1, 0xe4, 0xf4, 0xe2, 0xe1, 0x80, 0x9e, 0xb7, 0x37,
+	0x7d, 0x92, 0x27, 0x1f, 0xbd, 0x82, 0xc0, 0x37, 0xc7, 0x8f, 0x21, 0xf4, 0xed, 0x73, 0x4e, 0xd0,
+	0x0c, 0x25, 0x27, 0x74, 0x27, 0x60, 0x02, 0x81, 0x11, 0xb2, 0x2a, 0xaa, 0x15, 0x39, 0x9a, 0xa1,
+	0x24, 0xa4, 0x5d, 0x18, 0x7f, 0x45, 0x10, 0xf8, 0xba, 0x18, 0xc3, 0xb8, 0x54, 0x62, 0xe3, 0xd2,
+	0x23, 0xea, 0xce, 0x56, 0x5b, 0x31, 0xc3, 0x5c, 0x5a, 0x44, 0xdd, 0x19, 0xdf, 0x87, 0x89, 0xe6,
+	0x9f, 0x6a, 0xe1, 0x9c, 0x46, 0xb4, 0x0d, 0xac, 0xea, 0x8a, 0x92, 0xb1, 0xeb, 0xd0, 0x06, 0xce,
+	0x57, 0xb5, 0xae, 0x99, 0x69, 0x14, 0x27, 0x13, 0xc7, 0xef, 0x04, 0x7c, 0x06, 0xa3, 0x6b, 0xfe,
+	0x85, 0x1c, 0x3b, 0xdd, 0x1e, 0xe3, 0xef, 0x08, 0xfe, 0xbf, 0xfb, 0x5c, 0xfc, 0x1c, 0x26, 0xd5,
+	0x15, 0xbb, 0xe5, 0x7e, 0xfc, 0x0f, 0xf6, 0x07, 0x93, 0x5d, 0xb2, 0x5b, 0x4e, 0x5b, 0xca, 0xe1,
+	0x9f, 0x59, 0x6d, 0xfc, 0xd4, 0xff, 0x86, 0x7f, 0x64, 0xb5, 0xa1, 0x2d, 0x65, 0xf1, 0xb5, 0x62,
+	0xa5, 0x21, 0xa3, 0x43, 0xf8, 0x1b, 0x7b, 0x4d, 0x5b, 0xca, 0xe2, 0x52, 0x35, 0x35, 0x27, 0xe3,
+	0x43, 0xf8, 0xd2, 0x5e, 0xd3, 0x96, 0x8a, 0x2f, 0x21, 0x1a, 0x7a, 0xec, 0x3f, 0x22, 0x5b, 0xb8,
+	0x29, 0x77, 0x1f, 0x91, 0x2d, 0xf0, 0x14, 0x60, 0xd3, 0x3e, 0x38, 0x5b, 0x68, 0xe7, 0x3d, 0xa4,
+	0x03, 0x25, 0x4e, 0x77, 0x95, 0xac, 0xfd, 0x3f, 0x78, 0xb4, 0xc7, 0x27, 0x3d, 0xef, 0xfc, 0x1f,
+	0xee, 0x1c, 0x6f, 0x7a, 0xd2, 0x59, 0xff, 0x87, 0xc7, 0x27, 0x30, 0x91, 0x9c, 0x2b, 0xed, 0x47,
+	0x7b, 0x6f, 0xf0, 0xf8, 0x25, 0xe7, 0x2a, 0xab, 0x4b, 0x41, 0x5b, 0xc2, 0x16, 0xc9, 0x59, 0x71,
+	0x2d, 0xca, 0xd2, 0x6d, 0xc9, 0x98, 0x76, 0x61, 0xfc, 0x0e, 0x4e, 0x3a, 0x18, 0x9f, 0xc3, 0xb1,
+	0xc5, 0x7d, 0xa7, 0x88, 0xfa, 0x08, 0x3f, 0x85, 0x33, 0xbb, 0x24, 0x7c, 0x65, 0x49, 0xca, 0x0b,
+	0xa1, 0x56, 0x7e, 0x03, 0xf7, 0xf4, 0xd7, 0xd1, 0xb7, 0xed, 0x14, 0xfd, 0xd8, 0x4e, 0xd1, 0xcf,
+	0xed, 0x14, 0xfd, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xb2, 0xf8, 0xc4, 0x6e, 0xd2, 0x03, 0x00, 0x00,
 }
 
 func (m *RPC) Marshal() (dAtA []byte, err error) {
@@ -1361,146 +1085,6 @@ func (m *PeerInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *TopicDescriptor) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *TopicDescriptor) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *TopicDescriptor) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.XXX_unrecognized != nil {
-		i -= len(m.XXX_unrecognized)
-		copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	if m.Enc != nil {
-		{
-			size, err := m.Enc.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintRpc(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x1a
-	}
-	if m.Auth != nil {
-		{
-			size, err := m.Auth.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintRpc(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x12
-	}
-	if m.Name != nil {
-		i -= len(*m.Name)
-		copy(dAtA[i:], *m.Name)
-		i = encodeVarintRpc(dAtA, i, uint64(len(*m.Name)))
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *TopicDescriptor_AuthOpts) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *TopicDescriptor_AuthOpts) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *TopicDescriptor_AuthOpts) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.XXX_unrecognized != nil {
-		i -= len(m.XXX_unrecognized)
-		copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	if len(m.Keys) > 0 {
-		for iNdEx := len(m.Keys) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.Keys[iNdEx])
-			copy(dAtA[i:], m.Keys[iNdEx])
-			i = encodeVarintRpc(dAtA, i, uint64(len(m.Keys[iNdEx])))
-			i--
-			dAtA[i] = 0x12
-		}
-	}
-	if m.Mode != nil {
-		i = encodeVarintRpc(dAtA, i, uint64(*m.Mode))
-		i--
-		dAtA[i] = 0x8
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *TopicDescriptor_EncOpts) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *TopicDescriptor_EncOpts) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *TopicDescriptor_EncOpts) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.XXX_unrecognized != nil {
-		i -= len(m.XXX_unrecognized)
-		copy(dAtA[i:], m.XXX_unrecognized)
-	}
-	if len(m.KeyHashes) > 0 {
-		for iNdEx := len(m.KeyHashes) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.KeyHashes[iNdEx])
-			copy(dAtA[i:], m.KeyHashes[iNdEx])
-			i = encodeVarintRpc(dAtA, i, uint64(len(m.KeyHashes[iNdEx])))
-			i--
-			dAtA[i] = 0x12
-		}
-	}
-	if m.Mode != nil {
-		i = encodeVarintRpc(dAtA, i, uint64(*m.Mode))
-		i--
-		dAtA[i] = 0x8
-	}
-	return len(dAtA) - i, nil
-}
-
 func encodeVarintRpc(dAtA []byte, offset int, v uint64) int {
 	offset -= sovRpc(v)
 	base := offset
@@ -1732,72 +1316,6 @@ func (m *PeerInfo) Size() (n int) {
 	return n
 }
 
-func (m *TopicDescriptor) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Name != nil {
-		l = len(*m.Name)
-		n += 1 + l + sovRpc(uint64(l))
-	}
-	if m.Auth != nil {
-		l = m.Auth.Size()
-		n += 1 + l + sovRpc(uint64(l))
-	}
-	if m.Enc != nil {
-		l = m.Enc.Size()
-		n += 1 + l + sovRpc(uint64(l))
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
-func (m *TopicDescriptor_AuthOpts) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Mode != nil {
-		n += 1 + sovRpc(uint64(*m.Mode))
-	}
-	if len(m.Keys) > 0 {
-		for _, b := range m.Keys {
-			l = len(b)
-			n += 1 + l + sovRpc(uint64(l))
-		}
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
-func (m *TopicDescriptor_EncOpts) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Mode != nil {
-		n += 1 + sovRpc(uint64(*m.Mode))
-	}
-	if len(m.KeyHashes) > 0 {
-		for _, b := range m.KeyHashes {
-			l = len(b)
-			n += 1 + l + sovRpc(uint64(l))
-		}
-	}
-	if m.XXX_unrecognized != nil {
-		n += len(m.XXX_unrecognized)
-	}
-	return n
-}
-
 func sovRpc(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
@@ -1943,10 +1461,7 @@ func (m *RPC) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2051,10 +1566,7 @@ func (m *RPC_SubOpts) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2308,10 +1820,7 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2498,10 +2007,7 @@ func (m *ControlMessage) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2617,10 +2123,7 @@ func (m *ControlIHave) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2703,10 +2206,7 @@ func (m *ControlIWant) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2790,10 +2290,7 @@ func (m *ControlGraft) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -2931,10 +2428,7 @@ func (m *ControlPrune) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {
@@ -3053,381 +2547,7 @@ func (m *PeerInfo) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *TopicDescriptor) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: TopicDescriptor: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: TopicDescriptor: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthRpc
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			s := string(dAtA[iNdEx:postIndex])
-			m.Name = &s
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Auth", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthRpc
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Auth == nil {
-				m.Auth = &TopicDescriptor_AuthOpts{}
-			}
-			if err := m.Auth.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Enc", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthRpc
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Enc == nil {
-				m.Enc = &TopicDescriptor_EncOpts{}
-			}
-			if err := m.Enc.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *TopicDescriptor_AuthOpts) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: AuthOpts: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AuthOpts: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Mode", wireType)
-			}
-			var v TopicDescriptor_AuthOpts_AuthMode
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= TopicDescriptor_AuthOpts_AuthMode(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Mode = &v
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Keys", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthRpc
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Keys = append(m.Keys, make([]byte, postIndex-iNdEx))
-			copy(m.Keys[len(m.Keys)-1], dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *TopicDescriptor_EncOpts) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowRpc
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: EncOpts: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: EncOpts: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Mode", wireType)
-			}
-			var v TopicDescriptor_EncOpts_EncMode
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= TopicDescriptor_EncOpts_EncMode(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Mode = &v
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field KeyHashes", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowRpc
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthRpc
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.KeyHashes = append(m.KeyHashes, make([]byte, postIndex-iNdEx))
-			copy(m.KeyHashes[len(m.KeyHashes)-1], dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipRpc(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthRpc
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRpc
 			}
 			if (iNdEx + skippy) > l {

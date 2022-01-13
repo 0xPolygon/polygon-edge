@@ -5,6 +5,7 @@
 package mux
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -27,6 +28,13 @@ type MuxedStream interface {
 	//
 	// Close may be asynchronous and _does not_ guarantee receipt of the
 	// data.
+	//
+	// Close closes the stream for both reading and writing.
+	// Close is equivalent to calling `CloseRead` and `CloseWrite`. Importantly, Close will not wait for any form of acknowledgment.
+	// If acknowledgment is required, the caller must call `CloseWrite`, then wait on the stream for a response (or an EOF),
+	// then call Close() to free the stream object.
+	//
+	// When done with a stream, the user must call either Close() or `Reset()` to discard the stream, even after calling `CloseRead` and/or `CloseWrite`.
 	io.Closer
 
 	// CloseWrite closes the stream for writing but leaves it open for
@@ -36,8 +44,13 @@ type MuxedStream interface {
 	// Reset.
 	CloseWrite() error
 
-	// CloseRead closes the stream for writing but leaves it open for
-	// reading.
+	// CloseRead closes the stream for reading but leaves it open for
+	// writing.
+	//
+	// When CloseRead is called, all in-progress Read calls are interrupted with a non-EOF error and
+	// no further calls to Read will succeed.
+	//
+	// The handling of new incoming data on the stream after calling this function is implementation defined.
 	//
 	// CloseRead does not free the stream, users must still call Close or
 	// Reset.
@@ -74,7 +87,7 @@ type MuxedConn interface {
 	IsClosed() bool
 
 	// OpenStream creates a new stream.
-	OpenStream() (MuxedStream, error)
+	OpenStream(context.Context) (MuxedStream, error)
 
 	// AcceptStream accepts a stream opened by the other side.
 	AcceptStream() (MuxedStream, error)

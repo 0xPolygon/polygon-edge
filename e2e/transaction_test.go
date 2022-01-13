@@ -29,10 +29,14 @@ func TestSignedTransaction(t *testing.T) {
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	preminedAmount := framework.EthToWei(10)
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(senderAddr, preminedAmount)
-		config.SetSeal(true)
-	})
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(senderAddr, preminedAmount)
+			config.SetSeal(true)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -57,6 +61,7 @@ func TestSignedTransaction(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 		assert.NoError(t, err)
 		assert.NotNil(t, receipt)
@@ -104,6 +109,7 @@ func TestPreminedBalance(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
+
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			balance, err := rpcClient.Eth().GetBalance(web3.Address(testCase.address), web3.Latest)
@@ -178,6 +184,7 @@ func TestEthTransfer(t *testing.T) {
 	srv := srvs[0]
 
 	rpcClient := srv.JSONRPC()
+
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Fetch the balances before sending
@@ -206,8 +213,6 @@ func TestEthTransfer(t *testing.T) {
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
-
-			fee := big.NewInt(0)
 
 			// Do the transfer
 			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
@@ -245,8 +250,9 @@ func TestEthTransfer(t *testing.T) {
 			assert.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
+			expectedReceiverBalance := previousReceiverBalance
 			if testCase.shouldSucceed {
-				fee = new(big.Int).Mul(
+				fee := new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
 					big.NewInt(int64(txnObject.GasPrice)),
 				)
@@ -255,9 +261,7 @@ func TestEthTransfer(t *testing.T) {
 					previousSenderBalance,
 					new(big.Int).Add(testCase.amount, fee),
 				)
-			}
-			expectedReceiverBalance := previousReceiverBalance
-			if testCase.shouldSucceed {
+
 				expectedReceiverBalance = previousReceiverBalance.Add(
 					previousReceiverBalance,
 					testCase.amount,
@@ -299,16 +303,19 @@ func getCount(
 		},
 		web3.Latest,
 	)
+
 	if err != nil {
-		return nil, fmt.Errorf("Unable to call StressTest contract method, %v", err)
+		return nil, fmt.Errorf("unable to call StressTest contract method, %w", err)
 	}
 
 	if response == "0x" {
 		response = "0x0"
 	}
+
 	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+
 	if decodeErr != nil {
-		return nil, fmt.Errorf("Unable to decode hex response, %v", decodeErr)
+		return nil, fmt.Errorf("wnable to decode hex response, %w", decodeErr)
 	}
 
 	return bigResponse, nil
@@ -323,11 +330,14 @@ func addStressTestTxns(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) {
+	t.Helper()
+
 	currentNonce := 1 // 1 because the first transaction was deployment
 	clt := srv.TxnPoolOperator()
 
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
+
 		setNameTxn := generateStressTestTx(
 			t,
 			uint64(currentNonce),
@@ -373,7 +383,9 @@ func Test_TransactionDevLoop(t *testing.T) {
 	// Deploy the stress test contract
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,6 +430,8 @@ func generateStressTestTx(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) *types.Transaction {
+	t.Helper()
+
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
 	signer := crypto.NewEIP155Signer(100)
 
@@ -463,9 +477,12 @@ func addStressTxnsWithHashes(
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
 ) []web3.Hash {
+	t.Helper()
+
 	currentNonce := 1 // 1 because the first transaction was deployment
 
 	txHashes := make([]web3.Hash, 0)
+
 	for i := 0; i < numTransactions; i++ {
 		setNameTxn := generateStressTestTx(
 			t,
@@ -492,11 +509,15 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	defaultBalance := framework.EthToWei(100)
 
 	// Set up the test server
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(sender, defaultBalance)
-		config.SetSeal(true)
-		config.SetBlockLimit(20000000)
-	})
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(sender, defaultBalance)
+			config.SetSeal(true)
+			config.SetBlockLimit(20000000)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -526,6 +547,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 	assert.NotNil(t, receipt)
 
 	contractAddr := receipt.ContractAddress
+
 	if err != nil {
 		t.Fatalf("Unable to send transaction, %v", err)
 	}
@@ -540,7 +562,9 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	// Send ~50 transactions
 	numTransactions := 50
+
 	var wg sync.WaitGroup
+
 	wg.Add(numTransactions)
 
 	// Add stress test transactions
@@ -578,10 +602,13 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 	statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer statusCancel()
+
 	resp, err := tests.WaitUntilTxPoolEmpty(statusCtx, srv.TxnPoolOperator())
+
 	if err != nil {
 		t.Fatalf("Unable to get txpool status, %v", err)
 	}
+
 	assert.Equal(t, 0, int(resp.Length))
 
 	count, countErr = getCount(sender, contractAddr, client)

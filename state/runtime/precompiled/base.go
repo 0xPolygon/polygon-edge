@@ -28,9 +28,11 @@ func (e *ecrecover) run(input []byte) ([]byte, error) {
 			return nil, nil
 		}
 	}
+
 	v := input[63] - 27
 	r := big.NewInt(0).SetBytes(input[64:96])
 	s := big.NewInt(0).SetBytes(input[96:128])
+
 	if !crypto.ValidateSignatureValues(v, r, s) {
 		return nil, nil
 	}
@@ -66,6 +68,7 @@ func (s *sha256h) gas(input []byte, config *chain.ForksInTime) uint64 {
 
 func (s *sha256h) run(input []byte) ([]byte, error) {
 	h := sha256.Sum256(input)
+
 	return h[:], nil
 }
 
@@ -81,6 +84,7 @@ func (r *ripemd160h) run(input []byte) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
 	res := ripemd.Sum(nil)
+
 	return r.p.leftPad(res, 32), nil
 }
 

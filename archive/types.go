@@ -44,6 +44,7 @@ func (m *Metadata) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 2 {
 		return fmt.Errorf("not enough elements to decode Metadata, expected 2 but found %d", num)
 	}
@@ -51,6 +52,7 @@ func (m *Metadata) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if m.Latest, err = elems[0].GetUint64(); err != nil {
 		return err
 	}
+
 	if err = elems[1].GetHash(m.LatestHash[:]); err != nil {
 		return err
 	}

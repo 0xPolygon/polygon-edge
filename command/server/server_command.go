@@ -57,7 +57,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["chain"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", helper.DefaultConfig().Chain),
+		Description: fmt.Sprintf(
+			"Specifies the genesis file used for starting the chain. Default: %s",
+			helper.DefaultConfig().Chain,
+		),
 		Arguments: []string{
 			"GENESIS_FILE",
 		},
@@ -65,7 +68,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", helper.DefaultConfig().DataDir),
+		Description: fmt.Sprintf(
+			"Specifies the data directory used for storing Polygon SDK client data. Default: %s",
+			helper.DefaultConfig().DataDir,
+		),
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -73,7 +79,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["grpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d",
+			server.DefaultGRPCPort,
+		),
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -81,7 +90,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultJSONRPCPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d",
+			server.DefaultJSONRPCPort,
+		),
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -89,7 +101,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["libp2p"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d", network.DefaultLibp2pPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d",
+			network.DefaultLibp2pPort,
+		),
 		Arguments: []string{
 			"LIBP2P_ADDRESS",
 		},
@@ -153,7 +168,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["price-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Description: fmt.Sprintf(
+			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
+			helper.DefaultConfig().TxPool.PriceLimit,
+		),
 		Arguments: []string{
 			"PRICE_LIMIT",
 		},
@@ -244,6 +262,7 @@ func (c *ServerCommand) Run(args []string) int {
 	config, err := conf.BuildConfig()
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -255,6 +274,7 @@ func (c *ServerCommand) Run(args []string) int {
 	server, err := server.NewServer(logger, config)
 	if err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 

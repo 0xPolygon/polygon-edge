@@ -26,21 +26,23 @@ type Base struct {
 }
 
 // DefineFlags initializes and defines the common command flags
-func (c *Base) DefineFlags(ds ...FlagDefiner) {
-	if c.FlagMap == nil {
+func (b *Base) DefineFlags(ds ...FlagDefiner) {
+	if b.FlagMap == nil {
 		// Flag map not initialized
-		c.FlagMap = make(map[string]FlagDescriptor)
+		b.FlagMap = make(map[string]FlagDescriptor)
 	}
+
 	for _, d := range ds {
-		d.DefineFlags(c.FlagMap)
+		d.DefineFlags(b.FlagMap)
 	}
 }
 
 // FlagSet initializes Flag Set
-func (m *Base) NewFlagSet(n string, ss ...FlagSetter) *flag.FlagSet {
+func (b *Base) NewFlagSet(n string, ss ...FlagSetter) *flag.FlagSet {
 	flag := flag.NewFlagSet(n, flag.ContinueOnError)
 	for _, s := range ss {
 		s.FlagSet(flag)
 	}
+
 	return flag
 }

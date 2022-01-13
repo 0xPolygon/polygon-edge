@@ -103,6 +103,8 @@ type Stat struct {
 	Direction Direction
 	// Opened is the timestamp when this connection was opened.
 	Opened time.Time
+	// Transient indicates that this connection is transient and may be closed soon.
+	Transient bool
 	// Extra stores additional metadata about this connection.
 	Extra map[interface{}]interface{}
 }

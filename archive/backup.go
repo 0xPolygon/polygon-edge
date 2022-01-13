@@ -17,27 +17,47 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// CreateBackup creates an archive file of blockchain by getting data from a peer via gRPC
-func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64, targetTo *uint64, outPath string) (uint64, uint64, error) {
+// CreateBackup fetches blockchain data with the specific range via gRPC
+// and save this data as binary archive to given path
+func CreateBackup(
+	conn *grpc.ClientConn,
+	logger hclog.Logger,
+	from uint64,
+	to *uint64,
+	outPath string,
+) (uint64, uint64, error) {
 	// always create new file, throw error if the file exists
 	fs, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	closeAndRemove := func(fs *os.File) {
+	closeFile := func() error {
 		if err := fs.Close(); err != nil {
 			logger.Error("an error occurred while closing file", "err", err)
-			return
+
+			return err
 		}
+
+		return nil
+	}
+	removeFile := func() {
 		if err = os.Remove(outPath); err != nil {
 			logger.Error("an error occurred while removing file", "err", err)
+		}
+	}
+	// clean up function for the file when error occurs in the middle of function
+	closeAndRemoveFile := func() {
+		if err := closeFile(); err == nil {
+			removeFile()
 		}
 	}
 
 	signalCh := common.GetTerminationSignalCh()
 	ctx, cancelFn := context.WithCancel(context.Background())
+
 	defer cancelFn()
+
 	go func() {
 		<-signalCh
 		logger.Info("Caught termination signal, shutting down...")
@@ -46,30 +66,31 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 
 	clt := proto.NewSystemClient(conn)
 
-	to, toHash, err := determineTo(ctx, clt, targetTo)
+	reqTo, reqToHash, err := determineTo(ctx, clt, to)
 	if err != nil {
-		closeAndRemove(fs)
+		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
 	stream, err := clt.Export(ctx, &proto.ExportRequest{
-		From: targetFrom,
-		To:   to,
+		From: from,
+		To:   reqTo,
 	})
 	if err != nil {
-		closeAndRemove(fs)
+		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
-	writeMetadata(fs, logger, to, toHash)
-	// read blocks from gRPC stream and append to the file
-	resFrom, resTo, err := processExportStream(stream, logger, fs, targetFrom, to)
+	if err := writeMetadata(fs, logger, reqTo, reqToHash); err != nil {
+		return 0, 0, err
+	}
 
-	if err = fs.Close(); err != nil {
-		logger.Error("an error occurred while closing file", "err", err)
-		if removeErr := os.Remove(outPath); removeErr != nil {
-			logger.Error("an error occurred while removing file", "err", removeErr)
-		}
+	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
+
+	if err := closeFile(); err != nil {
+		removeFile()
 
 		return 0, 0, err
 	}
@@ -77,17 +98,16 @@ func CreateBackup(conn *grpc.ClientConn, logger hclog.Logger, targetFrom uint64,
 	return *resFrom, *resTo, nil
 }
 
-// determineTo returns the proper 'to' which is the height of the block the peer has
-func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) (uint64, types.Hash, error) {
+func determineTo(ctx context.Context, clt proto.SystemClient, to *uint64) (uint64, types.Hash, error) {
 	status, err := clt.GetStatus(ctx, &emptypb.Empty{})
 	if err != nil {
 		return 0, types.Hash{}, err
 	}
 
-	if targetTo != nil && *targetTo < uint64(status.Current.Number) {
+	if to != nil && *to < uint64(status.Current.Number) {
 		// check the existence of the block when you have targetTo
-		resp, err := clt.BlockByNumber(ctx, &proto.BlockByNumberRequest{Number: *targetTo})
-		if err == nil {
+		resp, err := clt.BlockByNumber(ctx, &proto.BlockByNumberRequest{Number: *to})
+		if err == nil && resp != nil {
 			block := types.Block{}
 			if err := block.UnmarshalRLP(resp.Data); err == nil {
 				// can use targetTo only if the node has the block at the specific height
@@ -95,6 +115,7 @@ func determineTo(ctx context.Context, clt proto.SystemClient, targetTo *uint64) 
 			}
 		}
 	}
+
 	// otherwise use latest block number as to
 	return uint64(status.Current.Number), types.StringToHash(status.Current.Hash), nil
 }
@@ -105,33 +126,44 @@ func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash type
 		Latest:     to,
 		LatestHash: toHash,
 	}
+
 	_, err := writer.Write(metadata.MarshalRLP())
 	if err != nil {
 		return err
 	}
+
 	logger.Info("Wrote metadata to backup", "latest", to, "hash", toHash)
+
 	return err
 }
 
-// processExportStream writing blocks while reading from gRPC stream
-func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, writer io.Writer, targetFrom, targetTo uint64) (*uint64, *uint64, error) {
+func processExportStream(
+	stream proto.System_ExportClient,
+	logger hclog.Logger,
+	writer io.Writer,
+	targetFrom, targetTo uint64,
+) (*uint64, *uint64, error) {
 	var from, to *uint64
 
 	getResult := func() (*uint64, *uint64, error) {
 		if from == nil || to == nil {
 			return nil, nil, errors.New("couldn't get any blocks")
 		}
+
 		return from, to, nil
 	}
 
 	var total uint64
+
 	showProgress := func(event *proto.ExportEvent) {
 		num := event.To - event.From
 		total += num
 		expectedTo := targetTo
+
 		if targetTo == 0 {
 			expectedTo = event.Latest
 		}
+
 		expectedTotal := event.Latest - targetFrom
 		progress := 100 * (float64(event.To) - float64(targetFrom)) / float64(expectedTotal)
 
@@ -149,6 +181,7 @@ func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, 
 		if errors.Is(io.EOF, err) || status.Code(err) == codes.Canceled {
 			return getResult()
 		}
+
 		if err != nil {
 			return nil, nil, err
 		}
@@ -160,6 +193,7 @@ func processExportStream(stream proto.System_ExportClient, logger hclog.Logger, 
 		if from == nil {
 			from = &event.From
 		}
+
 		to = &event.To
 
 		showProgress(event)

@@ -45,6 +45,7 @@ func (d *Dummy) Initialize() error {
 
 func (d *Dummy) Start() error {
 	go d.run()
+
 	return nil
 }
 
@@ -63,6 +64,7 @@ func (d *Dummy) GetSyncProgression() *progress.Progression {
 
 func (d *Dummy) Close() error {
 	close(d.closeCh)
+
 	return nil
 }
 

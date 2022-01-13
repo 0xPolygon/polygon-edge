@@ -9,6 +9,7 @@ import (
 // NewMemoryStorage creates the new storage reference with inmemory
 func NewMemoryStorage(logger hclog.Logger) (storage.Storage, error) {
 	db := &memoryKV{map[string][]byte{}}
+
 	return storage.NewKeyValueStorage(logger, db), nil
 }
 
@@ -19,6 +20,7 @@ type memoryKV struct {
 
 func (m *memoryKV) Set(p []byte, v []byte) error {
 	m.db[hex.EncodeToHex(p)] = v
+
 	return nil
 }
 
@@ -27,6 +29,7 @@ func (m *memoryKV) Get(p []byte) ([]byte, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
+
 	return v, true, nil
 }
 

@@ -3,9 +3,13 @@ package archive
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"testing"
 
+	"github.com/0xPolygon/polygon-sdk/blockchain"
+	"github.com/0xPolygon/polygon-sdk/helper/progress"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,6 +20,179 @@ var (
 		LatestHash: types.StringToHash("10"),
 	}
 )
+
+type mockChain struct {
+	genesis *types.Block
+	blocks  []*types.Block
+}
+
+func (m *mockChain) Genesis() types.Hash {
+	return m.genesis.Hash()
+}
+
+func (m *mockChain) GetBlockByNumber(num uint64, full bool) (*types.Block, bool) {
+	for _, b := range m.blocks {
+		if b.Number() == num {
+			return b, true
+		}
+	}
+
+	return nil, false
+}
+
+func (m *mockChain) GetHashByNumber(num uint64) types.Hash {
+	b, ok := m.GetBlockByNumber(num, false)
+	if !ok {
+		return types.Hash{}
+	}
+
+	return b.Hash()
+}
+
+func (m *mockChain) WriteBlock(block *types.Block) error {
+	m.blocks = append(m.blocks, block)
+
+	return nil
+}
+
+func (m *mockChain) SubscribeEvents() blockchain.Subscription {
+	return nil
+}
+
+func getLatestBlockFromMockChain(m *mockChain) *types.Block {
+	if l := len(m.blocks); l != 0 {
+		return m.blocks[l-1]
+	}
+
+	return nil
+}
+
+func Test_importBlocks(t *testing.T) {
+	newTestBlockStream := func(metadata *Metadata, blocks ...*types.Block) *blockStream {
+		var buf bytes.Buffer
+
+		buf.Write(metadata.MarshalRLP())
+
+		for _, b := range blocks {
+			buf.Write(b.MarshalRLP())
+		}
+
+		return newBlockStream(&buf)
+	}
+
+	tests := []struct {
+		name          string
+		metadata      *Metadata
+		archiveBlocks []*types.Block
+		chain         *mockChain
+		// result
+		err         error
+		latestBlock *types.Block
+	}{
+		{
+			name: "should write all blocks",
+			metadata: &Metadata{
+				Latest:     blocks[2].Number(),
+				LatestHash: blocks[2].Hash(),
+			},
+			archiveBlocks: []*types.Block{
+				genesis, blocks[0], blocks[1], blocks[2],
+			},
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{},
+			},
+			err:         nil,
+			latestBlock: blocks[2],
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			progression := progress.NewProgressionWrapper(progress.ChainSyncRestore)
+			blockStream := newTestBlockStream(tt.metadata, tt.archiveBlocks...)
+			err := importBlocks(tt.chain, blockStream, progression)
+
+			assert.Equal(t, tt.err, err)
+			latestBlock := getLatestBlockFromMockChain(tt.chain)
+			assert.Equal(t, tt.latestBlock, latestBlock)
+		})
+	}
+}
+
+func Test_consumeCommonBlocks(t *testing.T) {
+	newTestArchiveStream := func(blocks ...*types.Block) *blockStream {
+		var buf bytes.Buffer
+		for _, b := range blocks {
+			buf.Write(b.MarshalRLP())
+		}
+
+		return newBlockStream(&buf)
+	}
+
+	tests := []struct {
+		name        string
+		blockStream *blockStream
+		chain       blockchainInterface
+		// result
+		block *types.Block
+		err   error
+	}{
+		{
+			name:        "should consume common blocks",
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1], blocks[2]),
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{blocks[0], blocks[1]},
+			},
+			block: blocks[2],
+			err:   nil,
+		},
+		{
+			name:        "should consume all blocks",
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1]),
+			chain: &mockChain{
+				genesis: genesis,
+				blocks:  []*types.Block{blocks[0], blocks[1]},
+			},
+			block: nil,
+			err:   nil,
+		},
+		{
+			name:        "should return error in case of genesis mismatch",
+			blockStream: newTestArchiveStream(genesis, blocks[0], blocks[1]),
+			chain: &mockChain{
+				genesis: &types.Block{
+					Header: &types.Header{
+						Hash:   types.StringToHash("wrong genesis"),
+						Number: 0,
+					},
+				},
+				blocks: []*types.Block{blocks[0], blocks[1]},
+			},
+			block: nil,
+			err: fmt.Errorf(
+				"the hash of genesis block (%s) does not match blockchain genesis (%s)",
+				genesis.Hash(),
+				types.StringToHash("wrong genesis"),
+			),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			osSignal := make(<-chan os.Signal)
+			resultBlock, blockSize, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
+
+			assert.Equal(t, tt.block, resultBlock)
+			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
+		})
+	}
+}
 
 func Test_parseBlock(t *testing.T) {
 	tests := []struct {
@@ -41,9 +218,14 @@ func Test_parseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			block, err := tt.blockstream.nextBlock()
-			assert.Equal(t, tt.err, err)
+			block, blockSize, err := tt.blockstream.nextBlock()
+
 			assert.Equal(t, tt.block, block)
+			assert.Equal(t, tt.err, err)
+			if tt.block != nil {
+				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
+				assert.Equal(t, expectedBlockSize, blockSize)
+			}
 		})
 	}
 }
@@ -122,7 +304,7 @@ func Test_loadPrefixSize(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer([]byte{})),
 			prefix:      0xc5,
 			size:        5,
-			consumed:    0,
+			consumed:    1,
 			err:         nil,
 		},
 		{
@@ -130,7 +312,7 @@ func Test_loadPrefixSize(t *testing.T) {
 			blockstream: newBlockStream(bytes.NewBuffer([]byte{0x1, 0x00})),
 			prefix:      0xf9, // 2 bytes
 			size:        0x100,
-			consumed:    2,
+			consumed:    3,
 			err:         nil,
 		},
 		{
@@ -153,10 +335,10 @@ func Test_loadPrefixSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			size, consumed, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
+			headerSize, payloadSize, err := tt.blockstream.loadPrefixSize(0, tt.prefix)
 			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.size, size)
-			assert.Equal(t, tt.consumed, consumed)
+			assert.Equal(t, tt.consumed, headerSize)
+			assert.Equal(t, tt.size, payloadSize)
 		})
 	}
 }
@@ -264,7 +446,6 @@ func Test_reserveCap(t *testing.T) {
 		blockstream  *blockStream
 		expectedSize uint64
 		newLen       int
-		newCap       int
 	}{
 		{
 			name: "should expand and change size",
@@ -273,7 +454,6 @@ func Test_reserveCap(t *testing.T) {
 			},
 			expectedSize: 20,
 			newLen:       20,
-			newCap:       32,
 		},
 		{
 			name: "should change size",
@@ -282,7 +462,6 @@ func Test_reserveCap(t *testing.T) {
 			},
 			expectedSize: 20,
 			newLen:       20,
-			newCap:       30,
 		},
 	}
 
@@ -290,7 +469,7 @@ func Test_reserveCap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.blockstream.reserveCap(tt.expectedSize)
 			assert.Equal(t, tt.newLen, len(tt.blockstream.buffer))
-			assert.Equal(t, tt.newCap, cap(tt.blockstream.buffer))
+			assert.Greater(t, cap(tt.blockstream.buffer), tt.newLen)
 		})
 	}
 }

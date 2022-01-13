@@ -69,7 +69,9 @@ func TestFilterLog(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 }
 
 func TestFilterBlock(t *testing.T) {
@@ -110,7 +112,9 @@ func TestFilterBlock(t *testing.T) {
 	// we need to wait for the manager to process the data
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 
 	// emit one more event, it should not return the
 	// first three hashes
@@ -126,7 +130,9 @@ func TestFilterBlock(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	m.GetFilterChanges(id)
+	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
+		t.Fatalf("Unable to get filter changes, %v", fetchErr)
+	}
 }
 
 func TestFilterTimeout(t *testing.T) {
@@ -185,6 +191,7 @@ type mockWsConn struct {
 
 func (m *mockWsConn) WriteMessage(messageType int, b []byte) error {
 	m.msgCh <- b
+
 	return nil
 }
 
@@ -232,6 +239,7 @@ func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Acco
 	if acc, ok := m.accounts[addr]; ok {
 		return acc, nil
 	}
+
 	return nil, errors.New("given root and slot not found in storage")
 }
 
@@ -278,14 +286,17 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 		NewChain: []*types.Header{},
 		OldChain: []*types.Header{},
 	}
+
 	for _, i := range evnt.NewChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.NewChain = append(bEvnt.NewChain, i.header)
 	}
+
 	for _, i := range evnt.OldChain {
 		m.receipts[i.header.Hash] = i.receipts
 		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
 	}
+
 	m.subscription.Push(bEvnt)
 }
 
@@ -298,6 +309,7 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 	defer m.receiptsLock.Unlock()
 
 	receipts := m.receipts[hash]
+
 	return receipts, nil
 }
 

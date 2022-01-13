@@ -21,16 +21,16 @@ type BackupCommand struct {
 func (c *BackupCommand) DefineFlags() {
 	c.Base.DefineFlags(c.Formatter, c.GRPC)
 
-	c.FlagMap["data"] = helper.FlagDescriptor{
+	c.FlagMap["out"] = helper.FlagDescriptor{
 		Description: "The path of backup data to save",
 		Arguments: []string{
-			"BACKUP_FILE",
+			"OUT",
 		},
 		ArgumentsOptional: false,
 	}
 
 	c.FlagMap["from"] = helper.FlagDescriptor{
-		Description: "Begining height of chain in backup",
+		Description: "Beginning height of chain in backup",
 		Arguments: []string{
 			"FROM",
 		},
@@ -72,44 +72,55 @@ func (c *BackupCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 
 	var out, rawFrom, rawTo string
+
 	flags.StringVar(&out, "out", "", "")
 	flags.StringVar(&rawFrom, "from", "0", "")
 	flags.StringVar(&rawTo, "to", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
-	var targetFrom uint64
-	var targetTo *uint64
-	var err error
+	var (
+		from uint64
+		to   *uint64
+		err  error
+	)
 
 	if out == "" {
 		c.Formatter.OutputError(errors.New("the path of backup file is required"))
+
 		return 1
 	}
 
-	if targetFrom, err = types.ParseUint64orHex(&rawFrom); err != nil {
-		c.Formatter.OutputError(fmt.Errorf("Failed to decode from: %w", err))
+	if from, err = types.ParseUint64orHex(&rawFrom); err != nil {
+		c.Formatter.OutputError(fmt.Errorf("failed to decode from: %w", err))
+
 		return 1
 	}
 
 	if rawTo != "" {
 		var parsedTo uint64
+
 		if parsedTo, err = types.ParseUint64orHex(&rawTo); err != nil {
-			c.Formatter.OutputError(fmt.Errorf("Failed to decode to: %w", err))
+			c.Formatter.OutputError(fmt.Errorf("failed to decode to: %w", err))
+
 			return 1
-		} else if targetFrom > parsedTo {
+		} else if from > parsedTo {
 			c.Formatter.OutputError(errors.New("to must be greater than or equal to from"))
+
 			return 1
 		}
-		targetTo = &parsedTo
+
+		to = &parsedTo
 	}
 
 	conn, err := c.GRPC.Conn()
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -118,15 +129,17 @@ func (c *BackupCommand) Run(args []string) int {
 		Level: hclog.LevelFromString("INFO"),
 	})
 
-	from, to, err := archive.CreateBackup(conn, logger, targetFrom, targetTo, out)
+	// resFrom and resTo represents the range of blocks that can be included in the file
+	resFrom, resTo, err := archive.CreateBackup(conn, logger, from, to, out)
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	res := &BackupResult{
-		From: from,
-		To:   to,
+		From: resFrom,
+		To:   resTo,
 		Out:  out,
 	}
 	c.Formatter.OutputResult(res)

@@ -12,7 +12,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15.x
+          go-version: 1.16.x
 
       - name: Checkout code
         uses: actions/checkout@v2
@@ -22,8 +22,33 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.39
-          args: --disable staticcheck --disable errcheck
+          version: latest
+          args:
+            --timeout=3m
+            -E whitespace
+            -E wsl
+            -E wastedassign
+            -E unconvert
+            -E tparallel
+            -E thelper
+            -E stylecheck
+            -E prealloc
+            -E predeclared
+            -E nolintlint
+            -E nlreturn
+            -E misspell
+            -E makezero
+            -E lll
+            -E importas
+            -E ifshort
+            -E gosec
+            -E gofmt
+            -E goconst
+            -E forcetypeassert
+            -E dogsled
+            -E dupl
+            -E errname
+            -E errorlint
           skip-go-installation: true
   test:
     runs-on: ubuntu-latest
@@ -31,7 +56,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.15.x
+          go-version: 1.17.x
 
       - name: Checkout code
         uses: actions/checkout@v2
@@ -39,9 +64,9 @@ jobs:
           submodules: recursive
 
 
-      - name: Go build with race 
+      - name: Go build with race
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
-      
+
       - name: Add race artifacts directory to the path
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
@@ -51,17 +76,15 @@ jobs:
       - name: Go build without race
         run: CGO_ENABLED=0 GOOS=linux go build -a -o artifacts/polygon-sdk .
 
-      - name: Replace artificats 
+      - name: Replace artificats
         run: echo "$(pwd)/artifacts" >> $GITHUB_PATH
 
-      - 
-        name: Extract branch name
+      - name: Extract branch name
         if: github.event_name != 'pull_request'
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
-      - 
-        name: Prepare artifact for Deployer
+      - name: Prepare artifact for Deployer
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v2
         with:
@@ -72,13 +95,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
-      - 
-        name: Extract branch name
+      - name: Extract branch name
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
         id: extract_branch
-      -
-        name: Notify Deployer
+      - name: Notify Deployer
         env:
           ARTIFACT_NAME: polygon-sdk_${{ github.sha }}_${{ steps.extract_branch.outputs.branch }}
           COMMITER: ${{ github.actor }}
