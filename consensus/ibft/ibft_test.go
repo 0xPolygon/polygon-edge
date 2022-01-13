@@ -1028,7 +1028,7 @@ func Test_runHook(t *testing.T) {
 				// check fired only one time
 				if shouldReceive && received {
 					assert.Equalf(t,
-						1,
+						uint(1),
 						mockMechanism.fired[h],
 						"should fire %s hook only once, but it was called multipletimes",
 						string(h),
