@@ -1897,3 +1897,170 @@ func TestRecovery(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTxs(t *testing.T) {
+	testCases := []struct {
+		name             string
+		allTxs           map[types.Address][]*types.Transaction
+		expectedEnqueued map[types.Address][]*types.Transaction
+		expectedPromoted map[types.Address][]*types.Transaction
+	}{
+		{
+			name: "get promoted txs",
+			allTxs: map[types.Address][]*types.Transaction{
+				addr1: {
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+				},
+				addr2: {
+					newTx(addr2, 0, 1),
+					newTx(addr2, 1, 1),
+					newTx(addr2, 2, 1),
+				},
+				addr3: {
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 1),
+					newTx(addr3, 2, 1),
+				},
+			},
+			expectedPromoted: map[types.Address][]*types.Transaction{
+				addr1: {
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+				},
+				addr2: {
+					newTx(addr2, 0, 1),
+					newTx(addr2, 1, 1),
+					newTx(addr2, 2, 1),
+				},
+				addr3: {
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 1),
+					newTx(addr3, 2, 1),
+				},
+			},
+		},
+		{
+			name: "get all txs",
+			allTxs: map[types.Address][]*types.Transaction{
+				addr1: {
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+					// enqueued
+					newTx(addr1, 10, 1),
+					newTx(addr1, 11, 1),
+					newTx(addr1, 12, 1),
+				},
+				addr2: {
+					newTx(addr2, 0, 1),
+					newTx(addr2, 1, 1),
+					newTx(addr2, 2, 1),
+					// enqueued
+					newTx(addr2, 10, 1),
+					newTx(addr2, 11, 1),
+					newTx(addr2, 12, 1),
+				},
+				addr3: {
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 1),
+					newTx(addr3, 2, 1),
+					// enqueued
+					newTx(addr3, 10, 1),
+					newTx(addr3, 11, 1),
+					newTx(addr3, 12, 1),
+				},
+			},
+			expectedPromoted: map[types.Address][]*types.Transaction{
+				addr1: {
+					newTx(addr1, 0, 1),
+					newTx(addr1, 1, 1),
+					newTx(addr1, 2, 1),
+				},
+				addr2: {
+					newTx(addr2, 0, 1),
+					newTx(addr2, 1, 1),
+					newTx(addr2, 2, 1),
+				},
+				addr3: {
+					newTx(addr3, 0, 1),
+					newTx(addr3, 1, 1),
+					newTx(addr3, 2, 1),
+				},
+			},
+			expectedEnqueued: map[types.Address][]*types.Transaction{
+				addr1: {
+					newTx(addr1, 10, 1),
+					newTx(addr1, 11, 1),
+					newTx(addr1, 12, 1),
+				},
+				addr2: {
+					newTx(addr2, 10, 1),
+					newTx(addr2, 11, 1),
+					newTx(addr2, 12, 1),
+				},
+				addr3: {
+					newTx(addr3, 10, 1),
+					newTx(addr3, 11, 1),
+					newTx(addr3, 12, 1),
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			find := func(
+				tx *types.Transaction,
+				all map[types.Address][]*types.Transaction,
+			) bool {
+				for _, txx := range all[tx.From] {
+					if tx.Nonce == txx.Nonce {
+						return true
+					}
+				}
+
+				return false
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+			pool.EnableDev()
+
+			done := pool.startTestMode()
+
+			// send txs
+			for _, txs := range test.allTxs {
+				for _, tx := range txs {
+					// send all txs
+					go func(tx *types.Transaction) {
+						err := pool.addTx(local, tx)
+						assert.NoError(t, err)
+					}(tx)
+				}
+			}
+			waitUntilDone(done)
+
+			allPromoted, allEnqueued := pool.GetTxs(true)
+
+			// assert promoted
+			for _, txs := range allPromoted {
+				for _, tx := range txs {
+					found := find(tx, test.expectedPromoted)
+					assert.True(t, found)
+				}
+			}
+
+			// assert enqueued
+			for _, txs := range allEnqueued {
+				for _, tx := range txs {
+					found := find(tx, test.expectedEnqueued)
+					assert.True(t, found)
+				}
+			}
+		})
+	}
+}
