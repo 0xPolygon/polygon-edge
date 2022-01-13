@@ -214,6 +214,9 @@ func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deplo
 	}
 
 	lastFork := &ibftForks[len(ibftForks)-1]
+	if typ == lastFork.Type {
+		return errors.New(`cannot specify same IBFT type to the last fork`)
+	}
 	if from <= lastFork.From.Value {
 		return errors.New(`"from" must be greater than the beginning height of last fork`)
 	}

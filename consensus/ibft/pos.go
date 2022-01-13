@@ -141,7 +141,7 @@ func (pos *PoSMechanism) preStateCommitHook(rawParams interface{}) error {
 		return err
 	}
 
-	if err := params.txn.ForceToDeployContract(staking.AddrStakingContract, contractState); err != nil {
+	if err := params.txn.SetAccountDirectly(staking.AddrStakingContract, contractState); err != nil {
 		return err
 	}
 
