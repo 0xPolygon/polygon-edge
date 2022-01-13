@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,10 @@ import (
 // initIbftMechanism initializes the IBFT mechanism for unit tests
 func initIbftMechanism(mechanismType MechanismType, ibft *Ibft) {
 	mechanismFactory := mechanismBackends[mechanismType]
-	mechanism, _ := mechanismFactory(ibft, nil)
+	mechanism, _ := mechanismFactory(ibft, &IBFTFork{
+		Type: mechanismType,
+		From: common.JSONNumber{Value: 0},
+	})
 	ibft.mechanisms = []ConsensusMechanism{mechanism}
 }
 

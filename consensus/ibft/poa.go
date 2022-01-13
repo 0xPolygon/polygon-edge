@@ -26,7 +26,7 @@ type PoAMechanism struct {
 
 // PoAFactory initializes the required data
 // for the Proof of Authority mechanism
-func PoAFactory(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, error) {
+func PoAFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 	poa := &PoAMechanism{
 		BaseConsensusMechanism: BaseConsensusMechanism{
 			mechanismType: PoA,

@@ -1,12 +1,14 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
@@ -98,6 +100,35 @@ func createDir(path string) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+// JSONNumber is the number represented in decimal or hex in json
+type JSONNumber struct {
+	Value uint64
+}
+
+func (d *JSONNumber) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, hex.EncodeUint64(d.Value))), nil
+}
+
+func (d *JSONNumber) UnmarshalJSON(data []byte) error {
+	var rawValue interface{}
+	if err := json.Unmarshal(data, &rawValue); err != nil {
+		return err
+	}
+
+	val, err := ConvertUnmarshalledInt(rawValue)
+	if err != nil {
+		return err
+	}
+
+	if val < 0 {
+		return errors.New("must be positive value")
+	}
+
+	d.Value = uint64(val)
 
 	return nil
 }

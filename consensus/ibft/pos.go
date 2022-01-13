@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/state"
 
 	"github.com/0xPolygon/polygon-sdk/contracts/staking"
@@ -21,7 +20,7 @@ type PoSMechanism struct {
 
 // PoSFactory initializes the required data
 // for the Proof of Stake mechanism
-func PoSFactory(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, error) {
+func PoSFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 	pos := &PoSMechanism{
 		BaseConsensusMechanism: BaseConsensusMechanism{
 			mechanismType: PoS,
@@ -55,36 +54,25 @@ func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
 }
 
 // initializeParams initializes mechanism parameters from chain config
-func (pos *PoSMechanism) initializeParams(params map[string]interface{}) error {
-	if len(params) == 0 {
-		return nil
-	}
-
+func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 	if err := pos.BaseConsensusMechanism.initializeParams(params); err != nil {
 		return err
 	}
 
-	rawDeployment, ok := params["deployment"]
-	if pos.From > 0 && !ok {
-		return fmt.Errorf("deployment must be given if PoS starts in the middle")
-	}
-
-	if ok {
-		deployment, err := common.ConvertUnmarshalledInt(rawDeployment)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "deployment" params: %w`, err)
+	if pos.From != 0 {
+		if params.Deployment == nil {
+			return errors.New(`"deployment" must be specified in PoS fork`)
 		}
 
-		if deployment < 0 {
-			return fmt.Errorf(`"deployment" must be zero or positive integer: %d`, deployment)
+		if params.Deployment.Value > pos.From {
+			return fmt.Errorf(
+				`"deployment" must be less than or equal to "from": deployment=%d, from=%d`,
+				params.Deployment.Value,
+				pos.From,
+			)
 		}
 
-		uDeployment := uint64(deployment)
-		if uDeployment > pos.From {
-			return fmt.Errorf(`"deployment" must be less than or equal to "from": deployment=%d, from=%d`, deployment, pos.From)
-		}
-
-		pos.ContractDeployment = uDeployment
+		pos.ContractDeployment = params.Deployment.Value
 	}
 
 	return nil

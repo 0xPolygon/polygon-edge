@@ -2,16 +2,16 @@ package ibft
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
 	"github.com/0xPolygon/polygon-sdk/network"
 	"github.com/0xPolygon/polygon-sdk/protocol"
@@ -192,7 +192,6 @@ type BaseConsensusMechanism struct {
 	ibft *Ibft
 
 	// hookMap is the collection of registered hooks
-	//nolint
 	hookMap map[HookType]func(interface{}) error
 
 	// Used for easy lookups
@@ -204,40 +203,17 @@ type BaseConsensusMechanism struct {
 }
 
 // initializeParams initializes mechanism parameters from chain config
-func (base *BaseConsensusMechanism) initializeParams(params map[string]interface{}) error {
-	if len(params) == 0 {
+func (base *BaseConsensusMechanism) initializeParams(params *IBFTFork) error {
+	if params == nil {
 		return nil
 	}
 
-	if rawFrom, ok := params["from"]; ok {
-		from, err := common.ConvertUnmarshalledInt(rawFrom)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "from" params: %w`, err)
+	base.From = params.From.Value
+
+	if params.To != nil {
+		if params.To.Value < base.From {
+			return fmt.Errorf(`"to" must be grater than or equal to from: from=%d, to=%d`, base.From, params.To.Value)
 		}
-
-		if from < 0 {
-			return fmt.Errorf(`"from" must be zero or positive integer: %d`, from)
-		}
-
-		base.From = uint64(from)
-	}
-
-	if rawTo, ok := params["to"]; ok {
-		to, err := common.ConvertUnmarshalledInt(rawTo)
-		if err != nil {
-			return fmt.Errorf(`failed to parse "to" params: %w`, err)
-		}
-
-		if to < 0 {
-			return fmt.Errorf(`"to" must be zero or positive integer: %d`, to)
-		}
-
-		uto := uint64(to)
-		if uto < base.From {
-			return fmt.Errorf(`"to" must be grater than or equal to from: from=%d, to=%d`, base.From, to)
-		}
-
-		base.To = &uto
 	}
 
 	return nil
@@ -268,8 +244,16 @@ func (base *BaseConsensusMechanism) IsInRange(blockNumber uint64) bool {
 	return true
 }
 
+// IBFT Fork represents setting in params.engine.ibft of genesis.json
+type IBFTFork struct {
+	Type       MechanismType      `json:"type"`
+	Deployment *common.JSONNumber `json:"deployment,omitempty"`
+	From       common.JSONNumber  `json:"from"`
+	To         *common.JSONNumber `json:"to,omitempty"`
+}
+
 // ConsensusMechanismFactory is the factory function to create a consensus mechanism
-type ConsensusMechanismFactory func(ibft *Ibft, params map[string]interface{}) (ConsensusMechanism, error)
+type ConsensusMechanismFactory func(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error)
 
 var mechanismBackends = map[MechanismType]ConsensusMechanismFactory{
 	PoA: PoAFactory,
@@ -396,74 +380,65 @@ func (g *gossipTransport) Gossip(msg *proto.MessageReq) error {
 	return g.topic.Publish(msg)
 }
 
-// getMechanismFactory takes string mechanism type and returns corresponding consensus mechanism factory
-func getMechanismFactory(mechanismType string) (ConsensusMechanismFactory, error) {
-	parsedMechanismType, err := ParseType(mechanismType)
-	if err != nil {
-		return nil, err
-	}
-
-	return mechanismBackends[parsedMechanismType], nil
-}
-
-// newConsensusMechanism creates new ConsensusMechanism from params
-func (i *Ibft) newConsensusMechanism(rawMechanism interface{}) (ConsensusMechanism, error) {
-	switch mechanism := rawMechanism.(type) {
-	case string:
-		// without param
-		factory, err := getMechanismFactory(mechanism)
+// GetIBFTForks returns IBFT fork configurations from chain config
+func GetIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
+	// no fork, only specifying IBFT type in chain config
+	if originalType, ok := ibftConfig["type"].(string); ok {
+		typ, err := ParseType(originalType)
 		if err != nil {
 			return nil, err
 		}
 
-		return factory(i, nil)
-	case map[string]interface{}:
-		// with params
-		mechanismType, ok := mechanism["type"].(string)
-		if !ok {
-			return nil, ErrMissingMechanismType
-		}
+		return []IBFTFork{
+			{
+				Type:       typ,
+				Deployment: nil,
+				From:       common.JSONNumber{Value: 0},
+				To:         nil,
+			},
+		}, nil
+	}
 
-		factory, err := getMechanismFactory(mechanismType)
+	// with forks
+	if types, ok := ibftConfig["types"].([]interface{}); ok {
+		bytes, err := json.Marshal(types)
 		if err != nil {
 			return nil, err
 		}
 
-		return factory(i, mechanism)
-	default:
-		return nil, ErrInvalidMechanismType
+		var forks []IBFTFork
+		if err := json.Unmarshal(bytes, &forks); err != nil {
+			return nil, err
+		}
+
+		return forks, nil
 	}
+
+	return nil, errors.New("current IBFT type not found")
 }
 
 //  setupTransport read current mechanism in params and sets up consensus mechanism
 func (i *Ibft) setupMechanism() error {
-	// case1: A consensus mechanism
-	if rawType, ok := i.config.Config["type"]; ok {
-		mechanism, err := i.newConsensusMechanism(rawType)
-		if err != nil {
+	ibftForks, err := GetIBFTForks(i.config.Config)
+	if err != nil {
+		return err
+	}
+
+	i.mechanisms = make([]ConsensusMechanism, len(ibftForks))
+
+	for idx, fork := range ibftForks {
+		factory, ok := mechanismBackends[fork.Type]
+		if !ok {
+			return fmt.Errorf("consensus mechanism doesn't define: %s", fork.Type)
+		}
+
+		fork := fork
+		if i.mechanisms[idx], err = factory(i, &fork); err != nil {
 			return err
 		}
-
-		i.mechanisms = []ConsensusMechanism{mechanism}
-
-		return nil
 	}
 
-	// case2: Multiple consensus mechanism
-	if rawTypes, ok := i.config.Config["types"].([]interface{}); ok {
-		i.mechanisms = make([]ConsensusMechanism, len(rawTypes))
-
-		var err error
-		for idx, rawType := range rawTypes {
-			if i.mechanisms[idx], err = i.newConsensusMechanism(rawType); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	return ErrInvalidMechanismType
+	return nil
 }
 
 // setupTransport sets up the gossip transport protocol

@@ -2,7 +2,6 @@ package ibft
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -164,10 +163,10 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 	res := &IBFTSwitchResult{
 		Chain: genesisPath,
 		Type:  typ,
-		From:  DecOrHexInt{from},
+		From:  common.JSONNumber{Value: from},
 	}
 	if deployment != nil {
-		res.Deployment = &DecOrHexInt{*deployment}
+		res.Deployment = &common.JSONNumber{Value: *deployment}
 	}
 
 	c.Formatter.OutputResult(res)
@@ -178,8 +177,8 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 type IBFTSwitchResult struct {
 	Chain      string             `json:"chain"`
 	Type       ibft.MechanismType `json:"type"`
-	From       DecOrHexInt        `json:"from"`
-	Deployment *DecOrHexInt       `json:"deployment,omitempty"`
+	From       common.JSONNumber  `json:"from"`
+	Deployment *common.JSONNumber `json:"deployment,omitempty"`
 }
 
 func (r *IBFTSwitchResult) Output() string {
@@ -203,85 +202,13 @@ func (r *IBFTSwitchResult) Output() string {
 	return buffer.String()
 }
 
-type DecOrHexInt struct {
-	Value uint64
-}
-
-func (d *DecOrHexInt) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"0x%x"`, d.Value)), nil
-}
-
-func (d *DecOrHexInt) UnmarshalJSON(data []byte) error {
-	var rawValue interface{}
-	if err := json.Unmarshal(data, &rawValue); err != nil {
-		return err
-	}
-
-	val, err := common.ConvertUnmarshalledInt(rawValue)
-	if err != nil {
-		return err
-	}
-
-	if val < 0 {
-		return errors.New("must be positive value")
-	}
-
-	d.Value = uint64(val)
-
-	return nil
-}
-
-type IBFTFork struct {
-	Type       ibft.MechanismType `json:"type"`
-	Deployment *DecOrHexInt       `json:"deployment,omitempty"`
-	From       DecOrHexInt        `json:"from"`
-	To         *DecOrHexInt       `json:"to,omitempty"`
-}
-
-// getIBFTForks returns IBFT fork configurations from chain config
-func getIBFTForks(ibftConfig map[string]interface{}) ([]IBFTFork, error) {
-	// no fork, only specifying IBFT type in chain config
-	if originalType, ok := ibftConfig["type"].(string); ok {
-		typ, err := ibft.ParseType(originalType)
-		if err != nil {
-			return nil, err
-		}
-
-		return []IBFTFork{
-			{
-				Type:       typ,
-				Deployment: nil,
-				From:       DecOrHexInt{0},
-				To:         nil,
-			},
-		}, nil
-	}
-
-	// with forks
-	if types, ok := ibftConfig["types"].([]interface{}); ok {
-		bytes, err := json.Marshal(types)
-		if err != nil {
-			return nil, err
-		}
-
-		var forks []IBFTFork
-		if err := json.Unmarshal(bytes, &forks); err != nil {
-			return nil, err
-		}
-
-		return forks, nil
-	}
-
-	return nil, errors.New("current IBFT type not found")
-}
-
 func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deployment *uint64) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
 		return errors.New(`"ibft" setting doesn't exist in "engine" of genesis.json'`)
 	}
 
-	ibftForks, err := getIBFTForks(ibftConfig)
+	ibftForks, err := ibft.GetIBFTForks(ibftConfig)
 	if err != nil {
 		return err
 	}
@@ -291,14 +218,14 @@ func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deplo
 		return errors.New(`"from" must be greater than the beginning height of last fork`)
 	}
 
-	lastFork.To = &DecOrHexInt{from - 1}
+	lastFork.To = &common.JSONNumber{Value: from - 1}
 
-	newFork := IBFTFork{
+	newFork := ibft.IBFTFork{
 		Type: typ,
-		From: DecOrHexInt{from},
+		From: common.JSONNumber{Value: from},
 	}
 	if typ == ibft.PoS {
-		newFork.Deployment = &DecOrHexInt{*deployment}
+		newFork.Deployment = &common.JSONNumber{Value: *deployment}
 	}
 
 	ibftForks = append(ibftForks, newFork)
