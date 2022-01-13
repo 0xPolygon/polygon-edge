@@ -71,9 +71,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Clean lint cache
+      - name: Clean go cache
         run: |
           go clean --cache
+          go clean --modcache
 
       - name: Go build with race
         run: CGO_ENABLED=1 GOOS=linux go build -race -a -o artifacts/polygon-sdk .
