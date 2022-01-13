@@ -3,8 +3,6 @@ package jsonrpc
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/protocol"
