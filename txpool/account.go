@@ -17,8 +17,7 @@ type accountsMap struct {
 // Intializes an account for the given address.
 func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	a, _ := m.LoadOrStore(addr, &account{})
-	newAccount := a.(*account)
-
+	newAccount := a.(*account) // nolint:forcetypeassert
 	// run only once
 	newAccount.init.Do(func() {
 		// create queues
@@ -38,18 +37,20 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 // exists checks if an account exists within the map.
 func (m *accountsMap) exists(addr types.Address) bool {
 	_, ok := m.Load(addr)
+
 	return ok
 }
 
-// Collects the primaries of all accounts.
-func (m *accountsMap) getPrimaries() (primaries transactions) {
+// getPrimaries collects the heads (first-in-line transaction)
+// from each of the promoted queues.
+func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
 	m.Range(func(key, value interface{}) bool {
 		account := m.get(key.(types.Address))
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
 
-		// add primary
+		// add head of the queue
 		if tx := account.promoted.peek(); tx != nil {
 			primaries = append(primaries, tx)
 		}
@@ -79,6 +80,7 @@ func (m *accountsMap) promoted() (total uint64) {
 		defer account.promoted.unlock()
 
 		total += account.promoted.length()
+
 		return true
 	})
 
@@ -91,8 +93,9 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 ) {
 	allPromoted = make(map[types.Address][]*types.Transaction)
 	allEnqueued = make(map[types.Address][]*types.Transaction)
+
 	m.Range(func(key, value interface{}) bool {
-		addr := key.(types.Address)
+		addr, _ := key.(types.Address)
 		account := m.get(addr)
 
 		account.promoted.lock(false)
@@ -166,9 +169,10 @@ func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
 func (a *account) promote() (uint64, []*types.Transaction) {
 	a.promoted.lock(true)
 	a.enqueued.lock(true)
+
 	defer func() {
-		a.promoted.unlock()
 		a.enqueued.unlock()
+		a.promoted.unlock()
 	}()
 
 	currentNonce := a.getNonce()
@@ -181,6 +185,7 @@ func (a *account) promote() (uint64, []*types.Transaction) {
 	promoted := uint64(0)
 	promotedTxns := make([]*types.Transaction, 0)
 	nextNonce := a.enqueued.peek().Nonce
+
 	for {
 		tx := a.enqueued.peek()
 		if tx == nil ||

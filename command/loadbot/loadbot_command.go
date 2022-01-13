@@ -95,13 +95,16 @@ func (l *LoadbotCommand) Run(args []string) int {
 	flags := l.NewFlagSet(l.GetBaseCommand(), l.Formatter)
 
 	// Placeholders for flags
-	var tps uint64
-	var senderRaw string
-	var receiverRaw string
-	var valueRaw string
-	var count uint64
-	var jsonrpc string
-	var maxConns int
+	var (
+		tps         uint64
+		senderRaw   string
+		receiverRaw string
+		valueRaw    string
+		count       uint64
+		jsonrpc     string
+		maxConns    int
+	)
+
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
@@ -114,33 +117,40 @@ func (l *LoadbotCommand) Run(args []string) int {
 	var err error
 	// Parse cli arguments
 	if err = flags.Parse(args); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("Failed to parse args: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to parse args: %w", err))
+
 		return 1
 	}
 	// maxConns is set to 2*tps if not specified by the user.
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
 	}
+
 	var sender types.Address
+
 	if err = sender.UnmarshalText([]byte(senderRaw)); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("Failed to decode sender address: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to decode sender address: %w", err))
+
 		return 1
 	}
 
 	var receiver types.Address
 	if err = receiver.UnmarshalText([]byte(receiverRaw)); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("Failed to decode receiver address: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to decode receiver address: %w", err))
+
 		return 1
 	}
 
 	if _, err := url.ParseRequestURI(jsonrpc); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("Invalid JSON-RPC url : %w", err))
+		l.Formatter.OutputError(fmt.Errorf("invalid JSON-RPC url : %w", err))
+
 		return 1
 	}
 
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		l.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("failed to decode to value: %w", err))
+
 		return 1
 	}
 
@@ -168,7 +178,8 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// run the loadbot
 	if err := loadBot.Run(); err != nil {
-		l.Formatter.OutputError(fmt.Errorf("an error occured while running the loadbot: %w", err))
+		l.Formatter.OutputError(fmt.Errorf("an error occurred while running the loadbot: %w", err))
+
 		return 1
 	}
 
@@ -265,14 +276,17 @@ func (lr *LoadbotResult) Output() string {
 		buffer.WriteString("\n\n")
 
 		keys := make([]uint64, 0, lr.BlockData.BlocksRequired)
+
 		for k := range lr.BlockData.BlockTransactionsMap {
 			keys = append(keys, k)
 		}
+
 		sort.Slice(keys, func(i, j int) bool {
 			return keys[i] < keys[j]
 		})
 
 		formattedStrings := make([]string, 0)
+
 		for _, blockNumber := range keys {
 			formattedStrings = append(formattedStrings,
 				fmt.Sprintf("Block #%d|%d txns", blockNumber, lr.BlockData.BlockTransactionsMap[blockNumber]),

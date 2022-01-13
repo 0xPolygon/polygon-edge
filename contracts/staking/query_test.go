@@ -24,14 +24,17 @@ func leftPad(buf []byte, n int) []byte {
 
 	tmp := make([]byte, n)
 	copy(tmp[n-l:], buf)
+
 	return tmp
 }
 
 func appendAll(bytesArrays ...[]byte) []byte {
 	var res []byte
+
 	for idx := range bytesArrays {
 		res = append(res, bytesArrays[idx]...)
 	}
+
 	return res
 }
 
@@ -44,11 +47,14 @@ func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) 
 	if m.hashToRes == nil {
 		return nil, nil
 	}
+
 	tx.ComputeHash()
+
 	res, ok := m.hashToRes[tx.Hash]
 	if ok {
 		return res, nil
 	}
+
 	return nil, errors.New("not found")
 }
 
@@ -56,6 +62,7 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	if m.nonce != nil {
 		return m.nonce[addr]
 	}
+
 	return 0
 }
 
@@ -116,6 +123,7 @@ func TestQueryValidators(t *testing.T) {
 		addr types.Address
 		tx   *types.Transaction
 	}
+
 	type MockReturns struct {
 		nonce uint64
 		res   *runtime.ExecutionResult

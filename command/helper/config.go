@@ -46,14 +46,12 @@ type Network struct {
 	NoDiscover bool   `json:"no_discover"`
 	Addr       string `json:"libp2p_addr"`
 	NatAddr    string `json:"nat_addr"`
-	Dns        string `json:"dns_addr"`
+	DNS        string `json:"dns_addr"`
 	MaxPeers   uint64 `json:"max_peers"`
 }
 
 // TxPool defines the TxPool configuration params
 type TxPool struct {
-	Locals     string `json:"locals"`
-	NoLocals   bool   `json:"no_locals"`
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
 }
@@ -97,7 +95,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	if c.Secrets != "" {
 		secretsConfig, readErr := secrets.ReadConfig(c.Secrets)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read config file, %v", readErr)
+			return nil, fmt.Errorf("unable to read config file, %w", readErr)
 		}
 
 		conf.SecretsManager = secretsConfig
@@ -109,12 +107,14 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 			return nil, err
 		}
 	}
+
 	if c.JSONRPCAddr != "" {
 		// If an address was passed in, parse it
 		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
 	}
+
 	if c.Telemetry.PrometheusAddr != "" {
 		// If an address was passed in, parse it
 		if conf.Telemetry.PrometheusAddr, err = resolveAddr(c.Telemetry.PrometheusAddr); err != nil {
@@ -130,13 +130,12 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 		if c.Network.NatAddr != "" {
 			if conf.Network.NatAddr = net.ParseIP(c.Network.NatAddr); conf.Network.NatAddr == nil {
-				return nil, errors.New("Could not parse NAT IP address")
+				return nil, errors.New("could not parse NAT IP address")
 			}
 		}
 
-		if c.Network.Dns != "" {
-
-			if conf.Network.Dns, err = helperFlags.MultiAddrFromDns(c.Network.Dns, conf.Network.Addr.Port); err != nil {
+		if c.Network.DNS != "" {
+			if conf.Network.DNS, err = helperFlags.MultiAddrFromDNS(c.Network.DNS, conf.Network.Addr.Port); err != nil {
 				return nil, err
 			}
 		}
@@ -149,14 +148,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	// TxPool
 	{
-		if c.TxPool.Locals != "" {
-			strAddrs := strings.Split(c.TxPool.Locals, ",")
-			conf.Locals = make([]types.Address, len(strAddrs))
-			for i, sAddr := range strAddrs {
-				conf.Locals[i] = types.StringToAddress(sAddr)
-			}
-		}
-		conf.NoLocals = c.TxPool.NoLocals
 		conf.PriceLimit = c.TxPool.PriceLimit
 		conf.MaxSlots = c.TxPool.MaxSlots
 	}
@@ -165,8 +156,9 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	if c.BlockGasTarget != "" {
 		value, err := types.ParseUint256orHex(&c.BlockGasTarget)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse gas target %s, %v", c.BlockGasTarget, err)
+			return nil, fmt.Errorf("failed to parse gas target %s, %w", c.BlockGasTarget, err)
 		}
+
 		if !value.IsUint64() {
 			return nil, fmt.Errorf("gas target is too large (>64b) %s", c.BlockGasTarget)
 		}
@@ -185,6 +177,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		if c.DevInterval != 0 {
 			engineConfig["interval"] = c.DevInterval
 		}
+
 		conf.Chain.Params.Forks = chain.AllForksEnabled
 		conf.Chain.Params.Engine = map[string]interface{}{
 			"dev": engineConfig,
@@ -199,12 +192,13 @@ func resolveAddr(raw string) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", raw)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse addr '%s': %v", raw, err)
+		return nil, fmt.Errorf("failed to parse addr '%s': %w", raw, err)
 	}
 
 	if addr.IP == nil {
 		addr.IP = net.ParseIP("127.0.0.1")
 	}
+
 	return addr, nil
 }
 
@@ -261,15 +255,19 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		if otherConfig.Network.Addr != "" {
 			c.Network.Addr = otherConfig.Network.Addr
 		}
+
 		if otherConfig.Network.NatAddr != "" {
 			c.Network.NatAddr = otherConfig.Network.NatAddr
 		}
-		if otherConfig.Network.Dns != "" {
-			c.Network.Dns = otherConfig.Network.Dns
+
+		if otherConfig.Network.DNS != "" {
+			c.Network.DNS = otherConfig.Network.DNS
 		}
+
 		if otherConfig.Network.MaxPeers != 0 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers
 		}
+
 		if otherConfig.Network.NoDiscover {
 			c.Network.NoDiscover = true
 		}
@@ -277,15 +275,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.TxPool != nil {
 		// TxPool
-		if otherConfig.TxPool.Locals != "" {
-			c.TxPool.Locals = otherConfig.TxPool.Locals
-		}
-		if otherConfig.TxPool.NoLocals {
-			c.TxPool.NoLocals = otherConfig.TxPool.NoLocals
-		}
 		if otherConfig.TxPool.PriceLimit != 0 {
 			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
 		}
+
 		if otherConfig.TxPool.MaxSlots != 0 {
 			c.TxPool.MaxSlots = otherConfig.TxPool.MaxSlots
 		}
@@ -298,6 +291,7 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -312,13 +306,14 @@ func readConfigFile(path string) (*Config, error) {
 	}
 
 	var unmarshalFunc func([]byte, interface{}) error
+
 	switch {
 	case strings.HasSuffix(path, ".hcl"):
 		unmarshalFunc = hcl.Unmarshal
 	case strings.HasSuffix(path, ".json"):
 		unmarshalFunc = json.Unmarshal
 	default:
-		return nil, fmt.Errorf("Suffix of %s is neither hcl nor json", path)
+		return nil, fmt.Errorf("suffix of %s is neither hcl nor json", path)
 	}
 
 	var config Config

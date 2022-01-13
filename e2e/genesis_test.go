@@ -10,13 +10,16 @@ import (
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/stretchr/testify/assert"
 )
 
 // Test if the custom block gas limit is properly set
 func TestGenesisCustomBlockGasLimit(t *testing.T) {
 	var blockGasLimit uint64 = 5000000000
+
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetBlockLimit(blockGasLimit)
@@ -27,7 +30,7 @@ func TestGenesisCustomBlockGasLimit(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block: %v", err)
+		t.Fatalf("failed to retrieve block: %v", err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -38,6 +41,7 @@ func TestGenesisCustomBlockGasLimit(t *testing.T) {
 // Test if the default gas limit is properly set
 func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 	var blockGasLimit uint64 = helper.GenesisGasLimit
+
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 	})
@@ -47,7 +51,7 @@ func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block: %v", err)
+		t.Fatalf("failed to retrieve block: %v", err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -58,6 +62,7 @@ func TestGenesisDefaultBlockGasLimit(t *testing.T) {
 // Test if the custom block gas limit is propagated to the subsequent blocks
 func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	var blockGasLimit uint64 = 5000000000
+
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 
@@ -73,7 +78,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 	block, err := client.Eth().GetBlockByNumber(0, true)
 	if err != nil {
-		t.Fatalf("failed to retreive block %d: %v", 0, err)
+		t.Fatalf("failed to retrieve block %d: %v", 0, err)
 	}
 
 	if block.GasLimit != blockGasLimit {
@@ -96,17 +101,23 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 			t.Fatalf("failed to sign txn: %v", err)
 		}
 
-		_, err = srv.JSONRPC().Eth().SendRawTransaction(signedTx.MarshalRLP())
+		_, err = srv.TxnPoolOperator().AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: signedTx.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
+		})
 		assert.NoError(t, err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	_, err = framework.WaitUntilBlockMined(ctx, srv, 1)
 	assert.NoError(t, err)
 
 	block, err = client.Eth().GetBlockByNumber(1, true)
-	assert.NoError(t, err, "failed to retreive block %d: %v", 1, err)
+	assert.NoError(t, err, "failed to retrieve block %d: %v", 1, err)
 	assert.NotNil(t, block)
 
 	if block.GasLimit != blockGasLimit {

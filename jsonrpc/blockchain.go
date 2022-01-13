@@ -1,8 +1,9 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/chain"
@@ -106,7 +107,10 @@ func (b *nullBlockchainInterface) AddTx(tx *types.Transaction) error {
 	return nil
 }
 
-func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+func (b *nullBlockchainInterface) GetTxs(inclQueued bool) (
+	map[types.Address][]*types.Transaction,
+	map[types.Address][]*types.Transaction,
+) {
 	return nil, nil
 }
 
@@ -126,7 +130,10 @@ func (b *nullBlockchainInterface) GetBlockByNumber(num uint64, full bool) (*type
 	return nil, false
 }
 
-func (b *nullBlockchainInterface) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+func (b *nullBlockchainInterface) ApplyTxn(
+	header *types.Header,
+	txn *types.Transaction,
+) (*runtime.ExecutionResult, error) {
 	return nil, nil
 }
 

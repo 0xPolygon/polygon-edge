@@ -50,6 +50,7 @@ func Factory(
 		if !ok {
 			return nil, fmt.Errorf("interval expected int")
 		}
+
 		d.interval = interval
 	}
 
@@ -103,24 +104,26 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+	var successful []*types.Transaction
+
 	d.txpool.Prepare()
 
-	var successful []*types.Transaction
 	for {
-		tx := d.txpool.Peek()
+		tx := d.txpool.Next()
 		if tx == nil {
 			break
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			d.txpool.Drop(tx)
+
 			continue
 		}
 
 		if err := transition.Write(tx); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
 				d.txpool.Demote(tx)
 			} else {
 				d.txpool.Drop(tx)
@@ -135,16 +138,14 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		successful = append(successful, tx)
 	}
 
-	d.logger.Info("picked out txns from pool", "num", len(successful))
+	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
 
 	return successful
-
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
-
 	// Generate the base block
 	num := parent.Number
 	header := &types.Header{
@@ -159,13 +160,16 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
 	}
+
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
+
 	if err != nil {
 		return err
 	}
@@ -226,5 +230,6 @@ func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error
 
 func (d *Dev) Close() error {
 	close(d.closeCh)
+
 	return nil
 }

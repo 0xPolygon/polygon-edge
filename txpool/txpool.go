@@ -73,8 +73,9 @@ type signer interface {
 }
 
 type Config struct {
-	MaxSlots uint64
-	Sealing  bool
+	PriceLimit uint64
+	MaxSlots   uint64
+	Sealing    bool
 }
 
 /* All requests are passed to the main loop
@@ -98,7 +99,7 @@ type enqueueRequest struct {
 
 // A promoteRequest is created each time some account
 // is eligible for promotion. This request is signaled
-// on 2 ocassions:
+// on 2 occasions:
 //
 // 	1. When an enqueued transaction's nonce is
 // 	not greater than the expected (account's nextNonce).
@@ -144,6 +145,9 @@ type TxPool struct {
 	// gauge for measuring pool capacity
 	gauge slotGauge
 
+	// priceLimit is a lower threshold for gas price
+	priceLimit uint64
+
 	// channels on which the pool's event loop
 	// does dispatching/handling requests.
 	enqueueReqCh chan enqueueRequest
@@ -188,6 +192,7 @@ func NewTxPool(
 		executables: newPricedQueue(),
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
+		priceLimit:  config.PriceLimit,
 		sealing:     config.Sealing,
 	}
 
@@ -200,8 +205,9 @@ func NewTxPool(
 		if err != nil {
 			return nil, err
 		}
+
 		if subscribeErr := topic.Subscribe(pool.addGossipTx); subscribeErr != nil {
-			return nil, fmt.Errorf("unable to subscribe to gossip topic, %v", subscribeErr)
+			return nil, fmt.Errorf("unable to subscribe to gossip topic, %w", subscribeErr)
 		}
 
 		pool.topic = topic
@@ -259,6 +265,7 @@ func (p *TxPool) EnableDev() {
 func (p *TxPool) AddTx(tx *types.Transaction) error {
 	if err := p.addTx(local, tx); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
+
 		return err
 	}
 
@@ -296,9 +303,9 @@ func (p *TxPool) Prepare() {
 	}
 }
 
-// Peek returns the best-price selected
-// transaction from the executables queue.
-func (p *TxPool) Peek() *types.Transaction {
+// Next returns the best-price selected
+// transaction ready for execution.
+func (p *TxPool) Next() *types.Transaction {
 	return p.executables.pop()
 }
 
@@ -318,6 +325,9 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 
 	// update state
 	p.gauge.decrease(slotsRequired(tx))
+
+	// update metrics
+	p.metrics.PendingTxs.Add(-1)
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -342,6 +352,9 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	// update state
 	p.index.remove(tx)
 	p.gauge.decrease(slotsRequired(tx))
+
+	// update metrics
+	p.metrics.PendingTxs.Add(-1)
 
 	if tx.Nonce < account.getNonce() {
 		// rollback nonce
@@ -420,13 +433,14 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
+	stateNonces := make(map[types.Address]uint64)
 
 	// discover latest (next) nonces for all accounts
-	stateNonces := make(map[types.Address]uint64)
 	for _, header := range event.NewChain {
 		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
 			p.logger.Error("could not find block in store", "hash", header.Hash.String())
+
 			continue
 		}
 
@@ -496,6 +510,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 
 		tx.From = from
+	}
+
+	// Reject underpriced transactions
+	if tx.IsUnderpriced(p.priceLimit) {
+		return ErrUnderpriced
 	}
 
 	// Grab the state root for the latest block
@@ -596,6 +615,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	// enqueue tx
 	if err := account.enqueue(tx, req.demoted); err != nil {
 		p.logger.Error("enqueue request", "err", err)
+
 		return
 	}
 
@@ -649,12 +669,13 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 		return
 	}
 
-	raw := obj.(*proto.Txn)
+	raw := obj.(*proto.Txn) // nolint:forcetypeassert
 	tx := new(types.Transaction)
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
 		p.logger.Error("failed to decode broadcasted tx", "err", err)
+
 		return
 	}
 
@@ -693,6 +714,9 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
 
+	// update metrics
+	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
+
 	if nonce <= account.getNonce() {
 		// only the promoted queue needed pruning
 		return
@@ -730,4 +754,9 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 	account := p.accounts.initOnce(newAddr, stateNonce)
 
 	return account
+}
+
+// Length returns the total number of all promoted transactions.
+func (p *TxPool) Length() uint64 {
+	return p.accounts.promoted()
 }

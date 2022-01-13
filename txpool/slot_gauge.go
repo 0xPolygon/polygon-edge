@@ -31,9 +31,7 @@ func (g *slotGauge) decrease(slots uint64) {
 func slotsRequired(txs ...*types.Transaction) uint64 {
 	slots := uint64(0)
 	for _, tx := range txs {
-		slots += func(tx *types.Transaction) uint64 {
-			return (tx.Size() + txSlotSize - 1) / txSlotSize
-		}(tx)
+		slots += (tx.Size() + txSlotSize - 1) / txSlotSize
 	}
 
 	return slots

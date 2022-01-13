@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -91,7 +92,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 	// Generate all the paths in the dataDir
 	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
-		return nil, fmt.Errorf("failed to create data directories: %v", err)
+		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
 	if config.Telemetry.PrometheusAddr != nil {
@@ -102,7 +103,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
-		return nil, fmt.Errorf("failed to set up the secrets manager: %v", err)
+		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
 	}
 
 	// start libp2p
@@ -125,6 +126,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	m.stateStorage = stateStorage
 
 	st := itrie.NewState(stateStorage)
@@ -160,8 +162,9 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 			m.network,
 			m.serverMetrics.txpool,
 			&txpool.Config{
-				Sealing:  m.config.Seal,
-				MaxSlots: m.config.MaxSlots,
+				Sealing:    m.config.Seal,
+				MaxSlots:   m.config.MaxSlots,
+				PriceLimit: m.config.PriceLimit,
 			},
 		)
 		if err != nil {
@@ -221,21 +224,25 @@ func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	if err != nil {
 		return 0
 	}
+
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
 	if !ok {
 		return 0
 	}
+
 	var account state.Account
+
 	if err := account.UnmarshalRlp(result); err != nil {
 		return 0
 	}
+
 	return account.Nonce
 }
 
 func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	snap, err := t.state.NewSnapshotAt(root)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get snapshot for root, %v", err)
+		return nil, fmt.Errorf("unable to get snapshot for root, %w", err)
 	}
 
 	result, ok := snap.Get(keccak.Keccak256(nil, addr.Bytes()))
@@ -245,7 +252,7 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 
 	var account state.Account
 	if err = account.UnmarshalRlp(result); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %v", err)
+		return nil, fmt.Errorf("unable to unmarshal account from snapshot, %w", err)
 	}
 
 	return account.Balance, nil
@@ -287,7 +294,7 @@ func (s *Server) setupSecretsManager() error {
 	)
 
 	if factoryErr != nil {
-		return fmt.Errorf("unable to instantiate secrets manager, %v", factoryErr)
+		return fmt.Errorf("unable to instantiate secrets manager, %w", factoryErr)
 	}
 
 	s.secretsManager = secretsManager
@@ -299,6 +306,7 @@ func (s *Server) setupSecretsManager() error {
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[engineName]
+
 	if !ok {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)
 	}
@@ -307,11 +315,13 @@ func (s *Server) setupConsensus() error {
 	if !ok {
 		engineConfig = map[string]interface{}{}
 	}
+
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
 		Path:   filepath.Join(s.config.DataDir, "consensus"),
 	}
+
 	consensus, err := engine(
 		&consensus.ConsensusParams{
 			Context:        context.Background(),
@@ -327,9 +337,11 @@ func (s *Server) setupConsensus() error {
 			SecretsManager: s.secretsManager,
 		},
 	)
+
 	if err != nil {
 		return err
 	}
+
 	s.consensus = consensus
 
 	return nil
@@ -354,10 +366,13 @@ func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	result, ok := snap.Get(key)
+
 	if !ok {
 		return nil, jsonrpc.ErrStateNotFound
 	}
+
 	return result, nil
 }
 
@@ -366,10 +381,12 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*state.Acc
 	if err != nil {
 		return nil, err
 	}
+
 	var account state.Account
 	if err := account.UnmarshalRlp(obj); err != nil {
 		return nil, err
 	}
+
 	return &account, nil
 }
 
@@ -404,7 +421,10 @@ func (j *jsonRPCHub) GetCode(hash types.Hash) ([]byte, error) {
 	return res, nil
 }
 
-func (j *jsonRPCHub) ApplyTxn(header *types.Header, txn *types.Transaction) (result *runtime.ExecutionResult, err error) {
+func (j *jsonRPCHub) ApplyTxn(
+	header *types.Header,
+	txn *types.Transaction,
+) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
 		return nil, err
@@ -447,6 +467,7 @@ func (s *Server) setupJSONRPC() error {
 	if err != nil {
 		return err
 	}
+
 	s.jsonrpcServer = srv
 
 	return nil
@@ -526,13 +547,13 @@ type Entry struct {
 // SetupDataDir sets up the polygon-sdk data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
-		return fmt.Errorf("Failed to create data dir: (%s): %v", dataDir, err)
+		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
 		if err := createDir(path); err != nil {
-			return fmt.Errorf("Failed to create path: (%s): %v", path, err)
+			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
 
@@ -552,7 +573,8 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 
 	go func() {
 		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
 		}
 	}()

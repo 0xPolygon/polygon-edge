@@ -43,5 +43,6 @@ func (p *TxPool) GetTxs(inclQueued bool) (
 	allPromoted, allEnqueued map[types.Address][]*types.Transaction,
 ) {
 	allPromoted, allEnqueued = p.accounts.allTxs(inclQueued)
+
 	return
 }

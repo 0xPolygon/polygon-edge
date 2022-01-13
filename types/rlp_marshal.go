@@ -14,6 +14,7 @@ func MarshalRLPTo(obj marshalRLPFunc, dst []byte) []byte {
 	ar := fastrlp.DefaultArenaPool.Get()
 	dst = obj(ar).MarshalTo(dst)
 	fastrlp.DefaultArenaPool.Put(ar)
+
 	return dst
 }
 
@@ -94,6 +95,7 @@ func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	for _, rr := range *r {
 		vv.Set(rr.MarshalRLPWith(a))
 	}
+
 	return vv
 }
 
@@ -113,9 +115,11 @@ func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	} else {
 		vv.Set(a.NewBytes(r.Root[:]))
 	}
+
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
 	vv.Set(a.NewCopyBytes(r.LogsBloom[:]))
 	vv.Set(r.MarshalLogsWith(a))
+
 	return vv
 }
 
@@ -125,10 +129,13 @@ func (r *Receipt) MarshalLogsWith(a *fastrlp.Arena) *fastrlp.Value {
 		// There are no receipts, write the RLP null array entry
 		return a.NewNullArray()
 	}
+
 	logs := a.NewArray()
+
 	for _, l := range r.Logs {
 		logs.Set(l.MarshalRLPWith(a))
 	}
+
 	return logs
 }
 
@@ -140,8 +147,10 @@ func (l *Log) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	for _, t := range l.Topics {
 		topics.Set(a.NewBytes(t.Bytes()))
 	}
+
 	v.Set(topics)
 	v.Set(a.NewBytes(l.Data))
+
 	return v
 }
 

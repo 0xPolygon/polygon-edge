@@ -24,11 +24,14 @@ func DecodeValidators(method *abi.Method, returnValue []byte) ([]types.Address, 
 	if err != nil {
 		return nil, err
 	}
+
 	results, ok := decodedResults.(map[string]interface{})
 	if !ok {
 		return nil, errors.New("failed type assertion from decodedResults to map")
 	}
+
 	web3Addresses, ok := results["0"].([]web3.Address)
+
 	if !ok {
 		return nil, errors.New("failed type assertion from results[0] to []web3.Address")
 	}
@@ -62,9 +65,11 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		Gas:      queryGasLimit,
 		Nonce:    t.GetNonce(from),
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	if res.Failed() {
 		return nil, res.Err
 	}
