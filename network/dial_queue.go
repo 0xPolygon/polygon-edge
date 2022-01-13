@@ -54,6 +54,7 @@ func (d *dialQueue) popImpl() *dialTask {
 		// pop the first value and remove it from the heap
 		tt := heap.Pop(&d.heap)
 		d.lock.Unlock()
+
 		return tt.(*dialTask)
 	}
 
@@ -72,6 +73,7 @@ func (d *dialQueue) del(peer peer.ID) {
 		if item.index >= 0 {
 			heap.Remove(&d.heap, item.index)
 		}
+
 		delete(d.items, peer)
 	}
 }
@@ -127,7 +129,7 @@ func (t dialQueueImpl) Swap(i, j int) {
 // Push adds a new item to the queue
 func (t *dialQueueImpl) Push(x interface{}) {
 	n := len(*t)
-	item := x.(*dialTask)
+	item := x.(*dialTask) //nolint:forcetypeassert
 	item.index = n
 	*t = append(*t, item)
 }

@@ -25,15 +25,19 @@ func Listen(path string) (net.Listener, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0751); err != nil {
 		return nil, err
 	}
+
 	if removeErr := os.Remove(path); removeErr != nil {
 		return nil, removeErr
 	}
+
 	lis, err := net.Listen("unix", path)
 	if err != nil {
 		return nil, err
 	}
+
 	if chmodErr := os.Chmod(path, 0600); chmodErr != nil {
 		return nil, chmodErr
 	}
+
 	return lis, nil
 }

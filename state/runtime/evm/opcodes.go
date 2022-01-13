@@ -338,6 +338,7 @@ func opCodesToString(from, to OpCode, str string) {
 	if from == LOG0 {
 		c = 0
 	}
+
 	for i := from; i <= to; i++ {
 		opCodeToString[i] = fmt.Sprintf("%s%d", str, c)
 		c++

@@ -38,6 +38,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 		},
 		P2PAddr: network.AddrInfoToString(s.server.network.AddrInfo()),
 	}
+
 	return status, nil
 }
 
@@ -50,22 +51,26 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 		if evnt == nil {
 			break
 		}
+
 		pEvent := &proto.BlockchainEvent{
 			Added:   []*proto.BlockchainEvent_Header{},
 			Removed: []*proto.BlockchainEvent_Header{},
 		}
+
 		for _, h := range evnt.NewChain {
 			pEvent.Added = append(
 				pEvent.Added,
 				&proto.BlockchainEvent_Header{Hash: h.Hash.String(), Number: int64(h.Number)},
 			)
 		}
+
 		for _, h := range evnt.OldChain {
 			pEvent.Removed = append(
 				pEvent.Removed,
 				&proto.BlockchainEvent_Header{Hash: h.Hash.String(), Number: int64(h.Number)},
 			)
 		}
+
 		err := stream.Send(pEvent)
 
 		if err != nil {

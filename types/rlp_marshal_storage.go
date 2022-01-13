@@ -45,6 +45,7 @@ func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(t.MarshalRLPWith(a))
 	// context part
 	vv.Set(a.NewBytes(t.From.Bytes()))
+
 	return vv
 }
 
@@ -57,6 +58,7 @@ func (r *Receipts) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	for _, rr := range *r {
 		vv.Set(rr.MarshalStoreRLPWith(a))
 	}
+
 	return vv
 }
 
@@ -77,5 +79,6 @@ func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 
 	// gas used
 	vv.Set(a.NewUint(r.GasUsed))
+
 	return vv
 }

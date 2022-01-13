@@ -70,11 +70,13 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 	defer s.enqueueLock.Unlock()
 
 	indx := -1
+
 	for i, b := range s.enqueue {
 		if b.Hash() == lastSeen {
 			indx = i
 		}
 	}
+
 	if indx != -1 {
 		s.enqueue = s.enqueue[indx+1:]
 	}
@@ -83,13 +85,14 @@ func (s *SyncPeer) purgeBlocks(lastSeen types.Hash) {
 // popBlock pops a block from the block queue [BLOCKING]
 func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 	timeoutCh := time.After(timeout)
-	for {
 
+	for {
 		if !s.IsClosed() {
 			s.enqueueLock.Lock()
 			if len(s.enqueue) != 0 {
 				b, s.enqueue = s.enqueue[0], s.enqueue[1:]
 				s.enqueueLock.Unlock()
+
 				return
 			}
 
@@ -99,13 +102,10 @@ func (s *SyncPeer) popBlock(timeout time.Duration) (b *types.Block, err error) {
 			case <-timeoutCh:
 				return nil, ErrPopTimeout
 			}
-
 		} else {
 			return nil, ErrConnectionClosed
 		}
-
 	}
-
 }
 
 // appendBlock adds a new block to the block queue
@@ -179,12 +179,14 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	if err := s.Hash.UnmarshalText([]byte(p.Hash)); err != nil {
 		return nil, err
 	}
+
 	s.Number = p.Number
 
 	diff, ok := new(big.Int).SetString(p.Difficulty, 10)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode difficulty")
 	}
+
 	s.Difficulty = diff
 
 	return s, nil
@@ -221,6 +223,7 @@ func (pw *progressionWrapper) startProgression(
 // updates the currently written block in the batch sync
 func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription) {
 	eventCh := subscription.GetEventCh()
+
 	for {
 		select {
 		case event := <-eventCh:
@@ -235,6 +238,7 @@ func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription
 			pw.updateCurrentProgression(event.NewChain[0].Number)
 		case <-pw.stopCh:
 			subscription.Close()
+
 			return
 		}
 	}
@@ -340,6 +344,7 @@ func (s *Syncer) syncCurrentStatus() {
 				// we do not want to notify forks
 				continue
 			}
+
 			if len(evnt.NewChain) == 0 {
 				// this should not happen
 				continue
@@ -357,10 +362,10 @@ func (s *Syncer) syncCurrentStatus() {
 
 		case <-s.stopCh:
 			sub.Close()
+
 			return
 		}
 	}
-
 }
 
 const syncerV1 = "/syncer/0.1"
@@ -399,6 +404,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	if !ok {
 		// not supposed to happen
 		s.logger.Error("total difficulty not found", "block number", b.Number())
+
 		return
 	}
 
@@ -447,6 +453,7 @@ func (s *Syncer) Start() {
 	s.server.Register(syncerV1, grpcStream)
 
 	s.setupPeers()
+
 	go s.handlePeerEvent()
 }
 
@@ -464,6 +471,7 @@ func (s *Syncer) handlePeerEvent() {
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
+
 		return
 	}
 
@@ -475,7 +483,7 @@ func (s *Syncer) handlePeerEvent() {
 			}
 
 			switch evnt.Type {
-			case network.PeerConnected, network.PeerDialCompleted:
+			case network.PeerConnected:
 				if err := s.AddPeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to add peer", "err", err)
 				}
@@ -491,12 +499,20 @@ func (s *Syncer) handlePeerEvent() {
 // BestPeer returns the best peer by difficulty (if any)
 func (s *Syncer) BestPeer() *SyncPeer {
 	var bestPeer *SyncPeer
+
 	var bestTd *big.Int
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
 		status := peer.(*SyncPeer).status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = peer.(*SyncPeer), status.Difficulty
+			var correctAssertion bool
+
+			bestPeer, correctAssertion = peer.(*SyncPeer)
+			if !correctAssertion {
+				return false
+			}
+
+			bestTd = status.Difficulty
 		}
 
 		return true
@@ -525,6 +541,7 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to open a stream, err %w", err)
 	}
+
 	conn := libp2pGrpc.WrapClient(stream)
 
 	// watch for changes of the other node first
@@ -534,7 +551,9 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 	if err != nil {
 		return err
 	}
+
 	status, err := statusFromProto(rawStatus)
+
 	if err != nil {
 		return err
 	}
@@ -557,6 +576,7 @@ func (s *Syncer) DeletePeer(peerID peer.ID) error {
 		if err := p.(*SyncPeer).conn.Close(); err != nil {
 			return err
 		}
+
 		close(p.(*SyncPeer).enqueueCh)
 	}
 
@@ -577,6 +597,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	}
 
 	var header *types.Header
+
 	for min <= max {
 		m := uint64(math.Floor(float64(min+max) / 2))
 
@@ -586,7 +607,9 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 			if !ok {
 				return nil, nil, ErrLoadLocalGenesisFailed
 			}
+
 			header = genesis
+
 			break
 		}
 
@@ -594,6 +617,7 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 		if err != nil {
 			return nil, nil, err
 		}
+
 		if found == nil {
 			// peer does not have the m peer, search in lower bounds
 			max = m - 1
@@ -621,9 +645,11 @@ func (s *Syncer) findCommonAncestor(clt proto.V1Client, status *Status) (*types.
 	// get the block fork
 	forkNum := header.Number + 1
 	fork, err := getHeader(clt, &forkNum, nil)
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get fork at num %d", header.Number)
 	}
+
 	if fork == nil {
 		return nil, nil, ErrForkNotFound
 	}
@@ -641,18 +667,23 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, handler func(b *types.Block) boo
 	for {
 		if p.IsClosed() {
 			s.logger.Info("Connection to a peer has closed already", "id", p.peer)
+
 			break
 		}
 
 		b, err := p.popBlock(popTimeout)
 		if err != nil {
 			s.logSyncPeerPopBlockError(err, p)
+
 			break
 		}
+
 		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
+
 			break
 		}
+
 		if handler(b) {
 			break
 		}
@@ -694,6 +725,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 		// update target
 		target := p.status.Number
 		s.syncProgression.updateHighestProgression(target)
+
 		if target == lastTarget {
 			// there are no more changes to pull for now
 			break
@@ -709,7 +741,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			}
 
 			if err := sk.build(p.client, startBlock.Hash); err != nil {
-				return fmt.Errorf("failed to build skeleton: %v", err)
+				return fmt.Errorf("failed to build skeleton: %w", err)
 			}
 
 			// fill skeleton
@@ -721,7 +753,7 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 			for _, slot := range sk.slots {
 				for _, block := range slot.blocks {
 					if err := s.blockchain.WriteBlock(block); err != nil {
-						return fmt.Errorf("failed to write bulk sync blocks: %v", err)
+						return fmt.Errorf("failed to write bulk sync blocks: %w", err)
 					}
 
 					newBlockHandler(block)
@@ -747,6 +779,7 @@ func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header
 	if num != nil {
 		req.Number = int64(*num)
 	}
+
 	if hash != nil {
 		req.Hash = (*hash).String()
 	}
@@ -755,15 +788,20 @@ func getHeader(clt proto.V1Client, num *uint64, hash *types.Hash) (*types.Header
 	if err != nil {
 		return nil, err
 	}
+
 	if len(resp.Objs) == 0 {
 		return nil, nil
 	}
+
 	if len(resp.Objs) != 1 {
 		return nil, fmt.Errorf("unexpected more than 1 result")
 	}
+
 	header := &types.Header{}
+
 	if err := header.UnmarshalRLP(resp.Objs[0].Spec.Value); err != nil {
 		return nil, err
 	}
+
 	return header, nil
 }

@@ -377,7 +377,7 @@ github.com/spaolacci/murmur3
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
-# github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
+# github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 ## explicit
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache
@@ -432,7 +432,6 @@ go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
 go.uber.org/multierr
 # go.uber.org/zap v1.16.0
-## explicit
 go.uber.org/zap
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/bufferpool

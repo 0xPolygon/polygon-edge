@@ -26,7 +26,10 @@ func (d *DevCommand) DefineFlags() {
 	}
 
 	d.FlagMap["premine"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", helper.DefaultPremineBalance),
+		Description: fmt.Sprintf(
+			"Sets the premined accounts and balances. Default premined balance: %s",
+			helper.DefaultPremineBalance,
+		),
 		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -59,7 +62,10 @@ func (d *DevCommand) DefineFlags() {
 	}
 
 	d.FlagMap["price-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Description: fmt.Sprintf(
+			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
+			helper.DefaultConfig().TxPool.PriceLimit,
+		),
 		Arguments: []string{
 			"PRICE_LIMIT",
 		},

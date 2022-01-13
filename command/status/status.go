@@ -48,19 +48,23 @@ func (c *StatusCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 	if err := flags.Parse(args); err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := c.GRPC.Conn()
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	status, err := clt.GetStatus(context.Background(), &emptypb.Empty{})
+
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 

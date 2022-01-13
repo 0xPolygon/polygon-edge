@@ -22,11 +22,13 @@ var (
 
 func toArgUint64Ptr(value uint64) *argUint64 {
 	argValue := argUint64(value)
+
 	return &argValue
 }
 
 func toArgBytesPtr(value []byte) *argBytes {
 	argValue := argBytes(value)
+
 	return &argValue
 }
 
@@ -35,12 +37,15 @@ func expectJSONResult(data []byte, v interface{}) error {
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return err
 	}
+
 	if resp.Error != nil {
 		return resp.Error
 	}
+
 	if err := json.Unmarshal(resp.Result, v); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +53,7 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -144,12 +150,15 @@ func TestDispatcherWebsocketRequestFormats(t *testing.T) {
 		data, err := s.HandleWs(c.msg, mock)
 		resp := new(SuccessResponse)
 		merr := json.Unmarshal(data, resp)
+
 		if merr != nil {
 			t.Fatal("Invalid response")
 		}
+
 		if !c.expectError && (resp.Error != nil || err != nil) {
 			t.Fatal("Error unexpected but found")
 		}
+
 		if c.expectError && (resp.Error == nil && err == nil) {
 			t.Fatal("Error expected but not found")
 		}
@@ -162,11 +171,13 @@ type mockService struct {
 
 func (m *mockService) Block(f BlockNumber) (interface{}, error) {
 	m.msgCh <- f
+
 	return nil, nil
 }
 
 func (m *mockService) Type(addr types.Address) (interface{}, error) {
 	m.msgCh <- addr
+
 	return nil, nil
 }
 
@@ -176,11 +187,13 @@ func (m *mockService) BlockPtr(a string, f *BlockNumber) (interface{}, error) {
 	} else {
 		m.msgCh <- *f
 	}
+
 	return nil, nil
 }
 
 func (m *mockService) Filter(f LogFilter) (interface{}, error) {
 	m.msgCh <- f
+
 	return nil, nil
 }
 
@@ -196,6 +209,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 			Params: []byte(msg),
 		})
 		assert.NoError(t, err)
+
 		return <-srv.msgCh
 	}
 
@@ -265,9 +279,12 @@ func TestDispatcherBatchRequest(t *testing.T) {
 	assert.NoError(t, err)
 
 	var res []SuccessResponse
+
 	assert.NoError(t, expectBatchJSONResult(resp, &res))
 	assert.Len(t, res, 4)
-	jsonerr := &ErrorObject{Code: -32602, Message: "Invalid Params"}
+
+	jsonerr := &ObjectError{Code: -32602, Message: "Invalid Params"}
+
 	assert.Equal(t, res[0].Error, jsonerr)
 	assert.Nil(t, res[3].Error)
 }

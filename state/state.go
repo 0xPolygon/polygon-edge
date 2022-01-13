@@ -43,6 +43,7 @@ func (a *Account) MarshalWith(ar *fastrlp.Arena) *fastrlp.Value {
 	v.Set(ar.NewBigInt(a.Balance))
 	v.Set(ar.NewBytes(a.Root.Bytes()))
 	v.Set(ar.NewBytes(a.CodeHash))
+
 	return v
 }
 
@@ -56,10 +57,13 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if err != nil {
 		return err
 	}
+
 	elems, err := v.GetElems()
+
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 4 {
 		return fmt.Errorf("bad")
 	}
@@ -72,6 +76,7 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if a.Balance == nil {
 		a.Balance = new(big.Int)
 	}
+
 	if err = elems[1].GetBigInt(a.Balance); err != nil {
 		return err
 	}
@@ -83,6 +88,7 @@ func (a *Account) UnmarshalRlp(b []byte) error {
 	if a.CodeHash, err = elems[3].GetBytes(a.CodeHash[:0]); err != nil {
 		return err
 	}
+
 	return nil
 }
 
