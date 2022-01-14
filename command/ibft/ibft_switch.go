@@ -197,7 +197,7 @@ func (r *IBFTSwitchResult) Output() string {
 		outputs = append(outputs, fmt.Sprintf("Deployment|%d", r.Deployment.Value))
 	}
 
-	outputs = append(outputs, fmt.Sprintf("Deployment|%d", r.From.Value))
+	outputs = append(outputs, fmt.Sprintf("From|%d", r.From.Value))
 
 	buffer.WriteString(helper.FormatKV(outputs))
 	buffer.WriteString("\n")
