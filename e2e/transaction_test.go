@@ -122,6 +122,7 @@ func TestPreminedBalance(t *testing.T) {
 func TestEthTransfer(t *testing.T) {
 	// skiping test as we disables eth_sendTransaction jsonrpc call
 	t.SkipNow()
+
 	validAccounts := []struct {
 		address types.Address
 		balance *big.Int
