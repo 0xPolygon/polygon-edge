@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/helper/progress"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,7 +57,7 @@ func (m *mockChain) WriteBlock(block *types.Block) error {
 }
 
 func (m *mockChain) SubscribeEvents() blockchain.Subscription {
-	return nil
+	return protocol.NewMockSubscription()
 }
 
 func getLatestBlockFromMockChain(m *mockChain) *types.Block {

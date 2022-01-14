@@ -69,10 +69,11 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 
 	// Create a blockchain subscription for the sync progression and start tracking
 	progression.StartProgression(firstBlock.Number(), chain.SubscribeEvents())
-	// Set the goal
-	progression.UpdateHighestProgression(metadata.Latest)
 	// Stop monitoring the sync progression upon exit
 	defer progression.StopProgression()
+
+	// Set the goal
+	progression.UpdateHighestProgression(metadata.Latest)
 
 	blocks := make([]*types.Block, 0)
 	nextBlock := firstBlock         // the first block in the next chunk

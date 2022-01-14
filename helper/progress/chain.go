@@ -96,10 +96,11 @@ func (pw *ProgressionWrapper) RunUpdateLoop(subscription blockchain.Subscription
 
 // StopProgression stops the progression tracking
 func (pw *ProgressionWrapper) StopProgression() {
+	pw.stopCh <- struct{}{}
+
 	pw.lock.Lock()
 	defer pw.lock.Unlock()
 
-	pw.stopCh <- struct{}{}
 	pw.progression = nil
 }
 
