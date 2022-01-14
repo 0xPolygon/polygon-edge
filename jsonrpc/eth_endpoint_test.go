@@ -3,10 +3,11 @@ package jsonrpc
 import (
 	"bytes"
 	"fmt"
-	"github.com/umbracle/fastrlp"
 	"math/big"
 	"strconv"
 	"testing"
+
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
@@ -1025,20 +1026,4 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	if txn.Hash != store.txn.Hash {
 		t.Fatal("bad")
 	}
-}
-
-func TestEth_TxnPool_SendTransaction(t *testing.T) {
-	store := &mockStoreTxn{}
-	store.AddAccount(addr0)
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	arg := &txnArgs{
-		From:     argAddrPtr(addr0),
-		To:       argAddrPtr(addr0),
-		Nonce:    argUintPtr(0),
-		GasPrice: argBytesPtr([]byte{0x1}),
-	}
-	_, err := dispatcher.endpoints.Eth.SendTransaction(arg)
-	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 }
