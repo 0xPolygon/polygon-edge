@@ -33,7 +33,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"TPS",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["sender"] = helper.FlagDescriptor{
@@ -41,7 +40,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"SENDER",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["receiver"] = helper.FlagDescriptor{
@@ -49,7 +47,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"RECEIVER",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["value"] = helper.FlagDescriptor{
@@ -58,7 +55,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"VALUE",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["count"] = helper.FlagDescriptor{
@@ -66,7 +62,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"COUNT",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
@@ -83,8 +78,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
 	}
 
 	l.FlagMap["mode"] = helper.FlagDescriptor{
@@ -92,8 +85,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"MODE",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
 	}
 
 	l.FlagMap["chain-id"] = helper.FlagDescriptor{
@@ -101,8 +92,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"CHAIN_ID",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
 	}
 
 	l.FlagMap["detailed"] = helper.FlagDescriptor{
@@ -110,8 +99,7 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"DETAILED",
 		},
-		ArgumentsOptional: false,
-		FlagOptional:      false,
+		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["gas-price"] = helper.FlagDescriptor{
@@ -120,7 +108,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"GAS_PRICE",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["gas-limit"] = helper.FlagDescriptor{
@@ -129,7 +116,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"GAS_LIMIT",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["contract"] = helper.FlagDescriptor{
@@ -138,7 +124,13 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"CONTRACT_PATH",
 		},
-		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["max-conns"] = helper.FlagDescriptor{
+		Description: "Sets the maximum no.of connections allowed per host, Default: 2*tps",
+		Arguments: []string{
+			"MAX_CONNECTIONS_COUNT",
+		},
 	}
 }
 
