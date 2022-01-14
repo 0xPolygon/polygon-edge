@@ -133,7 +133,7 @@ func (i *identity) getStatus(peerID peer.ID) *proto.Status {
 		Metadata: make(map[string]string, 1),
 		Chain:    int64(i.srv.config.Chain.Params.ChainID),
 	}
-	if _, ok := i.srv.tempeoraryDials.Load(peerID); ok {
+	if _, ok := i.srv.temporaryDials.Load(peerID); ok {
 		status.TemporaryDial = true
 	}
 

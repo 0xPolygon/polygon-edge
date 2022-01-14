@@ -729,7 +729,7 @@ func TestTemporaryDial(t *testing.T) {
 		closeTestServers(t, servers)
 	})
 	//add server1 to server0 temperary dial list
-	servers[0].tempeoraryDials.Store(servers[1].host.ID(), true)
+	servers[0].temporaryDials.Store(servers[1].host.ID(), true)
 	//connect server0 to server1
 	err = servers[0].host.Connect(context.Background(), *servers[1].AddrInfo())
 	assert.NoError(t, err)

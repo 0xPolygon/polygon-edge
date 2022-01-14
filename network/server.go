@@ -100,7 +100,7 @@ type Server struct {
 
 	inboundConnCount int64
 
-	tempeoraryDials sync.Map
+	temporaryDials sync.Map
 }
 
 type Peer struct {

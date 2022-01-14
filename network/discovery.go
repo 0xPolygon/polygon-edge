@@ -298,10 +298,10 @@ func (d *discovery) bootnodeDiscovery() {
 		return
 	}
 
-	if _, loaded := d.srv.tempeoraryDials.LoadOrStore(bootNode.ID, true); loaded {
+	if _, loaded := d.srv.temporaryDials.LoadOrStore(bootNode.ID, true); loaded {
 		return
 	}
-	defer d.srv.tempeoraryDials.Delete(bootNode.ID)
+	defer d.srv.temporaryDials.Delete(bootNode.ID)
 
 	if len(d.srv.host.Peerstore().Addrs(bootNode.ID)) == 0 {
 		d.srv.host.Peerstore().AddAddr(bootNode.ID, bootNode.Addrs[0], peerstore.AddressTTL)
