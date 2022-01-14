@@ -173,7 +173,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
-  
+
 	c.FlagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
 			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
