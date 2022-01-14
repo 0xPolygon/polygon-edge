@@ -698,19 +698,21 @@ func TestMinimumBootNodeCount(t *testing.T) {
 			shouldFail: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, createErr := CreateServer(&CreateServerParams{
+			srv, createErr := CreateServer(&CreateServerParams{
 				ConfigCallback: func(c *Config) {
 					c.Chain.Bootnodes = tt.bootNodes
+					c.NoDiscover = false
 				},
 			})
-
 			if tt.shouldFail {
 				assert.Error(t, createErr)
 			} else {
 				assert.NoError(t, createErr)
 			}
+			assert.NoError(t, srv.Close())
 		})
 	}
 }

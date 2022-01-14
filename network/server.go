@@ -577,12 +577,11 @@ func (s *Server) runJoinWatcher() error {
 func (s *Server) Close() error {
 	err := s.host.Close()
 	s.dialQueue.Close()
+	close(s.closeCh)
 
 	if !s.config.NoDiscover {
 		s.discovery.Close()
 	}
-
-	close(s.closeCh)
 
 	return err
 }
