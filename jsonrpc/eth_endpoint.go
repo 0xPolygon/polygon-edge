@@ -151,7 +151,7 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 // SendTransaction creates new message call transaction or a contract creation, if the data field contains code.
 // Reject eth_sendTransaction json-rpc call as we don't support wallet management
 func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
-	return "We do not support wallet management. Any request call to the eth_sendTransaction method is not supported.", nil
+	return nil, fmt.Errorf("We do not support wallet management. Any request call to the eth_sendTransaction method is not supported.")
 	// transaction, err := e.d.decodeTxn(arg)
 	// if err != nil {
 	// 	return nil, err
