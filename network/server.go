@@ -99,6 +99,8 @@ type Server struct {
 	emitterPeerEvent event.Emitter
 
 	inboundConnCount int64
+
+	tempeoraryDials sync.Map
 }
 
 type Peer struct {
@@ -227,7 +229,7 @@ func (s *Server) Start() error {
 		}
 
 		// start discovery
-		s.discovery = &discovery{srv: s}
+		s.discovery = &discovery{srv: s, closeCh: make(chan struct{})}
 
 		// try to decode the bootnodes
 		bootnodes := []*peer.AddrInfo{}
@@ -356,11 +358,27 @@ func (s *Server) numPeers() int64 {
 }
 
 func (s *Server) getRandomBootNode() *peer.AddrInfo {
-	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(s.discovery.bootnodes))))
+	if size := int64(len(s.discovery.bootnodes)); size > 0 {
+		randNum, _ := rand.Int(rand.Reader, big.NewInt(size))
 
-	return s.discovery.bootnodes[randNum.Int64()]
+		return s.discovery.bootnodes[randNum.Int64()]
+	}
+
+	return nil
 }
 
+// getBootNode returns the address of a random bootnode which is not connected
+func (s *Server) getBootNode() *peer.AddrInfo {
+	size := int64(len(s.discovery.bootnodes))
+	for i := 0; i < int(size); i++ {
+		randNum, _ := rand.Int(rand.Reader, big.NewInt(size))
+		if peer := s.discovery.bootnodes[randNum.Int64()]; !s.hasPeer(peer.ID) {
+			return peer
+		}
+	}
+
+	return nil
+}
 func (s *Server) Peers() []*Peer {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
@@ -559,6 +577,11 @@ func (s *Server) runJoinWatcher() error {
 func (s *Server) Close() error {
 	err := s.host.Close()
 	s.dialQueue.Close()
+
+	if !s.config.NoDiscover {
+		s.discovery.Close()
+	}
+
 	close(s.closeCh)
 
 	return err
@@ -574,7 +597,6 @@ func (s *Server) NewProtoStream(proto string, id peer.ID) (interface{}, error) {
 	}
 
 	stream, err := s.NewStream(proto, id)
-
 	if err != nil {
 		return nil, err
 	}
