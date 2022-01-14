@@ -326,6 +326,7 @@ func getCount(
 
 // addStressTestTxns adds numTransactions that call the
 // passed in StressTest smart contract method
+//nolint:unused
 func addStressTestTxns(
 	t *testing.T,
 	srv *framework.TestServer,
@@ -368,6 +369,8 @@ func addStressTestTxns(
 // that modify it's state, and make sure that all
 // transactions were correctly executed
 func Test_TransactionDevLoop(t *testing.T) {
+	// skiping test as we disabled eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	senderKey, sender := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
 	devInterval := 5 // s

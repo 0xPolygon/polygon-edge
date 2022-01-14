@@ -74,6 +74,7 @@ func TestWS_Response(t *testing.T) {
 		}
 	})
 	srv := srvs[0]
+	//nolint:staticcheck
 	client := srv.JSONRPC()
 
 	// Convert the default JSONRPC address to a WebSocket one
@@ -117,6 +118,8 @@ func TestWS_Response(t *testing.T) {
 		assert.Equalf(t, 0, preminedAccounts[0].balance.Cmp(foundBalance), "Balances don't match")
 	})
 
+	// skiping test as we disabled eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	t.Run("Valid block number after transfer", func(t *testing.T) {
 		hash, err := client.Eth().SendTransaction(&web3.Transaction{
 			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
