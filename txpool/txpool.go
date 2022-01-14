@@ -373,10 +373,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 		p.executables.push(tx)
 	}
 
-	p.eventManager.fireEvent(&proto.TxPoolEvent{
-		Type:   proto.EventType_DROPPED,
-		TxHash: tx.Hash.String(),
-	})
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 }
 
 // Demote removes the (recoverable) transaction from
@@ -402,10 +399,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 	}
 
 	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
-	p.eventManager.fireEvent(&proto.TxPoolEvent{
-		Type:   proto.EventType_DEMOTED,
-		TxHash: tx.Hash.String(),
-	})
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -600,10 +594,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
-	p.eventManager.fireEvent(&proto.TxPoolEvent{
-		Type:   proto.EventType_ADDED,
-		TxHash: tx.Hash.String(),
-	})
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 
 	return nil
 }
@@ -627,10 +618,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
-	p.eventManager.fireEvent(&proto.TxPoolEvent{
-		Type:   proto.EventType_ENQUEUED,
-		TxHash: tx.Hash.String(),
-	})
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	// update lookup
 	p.index.add(tx)
@@ -656,18 +644,12 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	account := p.accounts.get(addr)
 
 	// promote enqueued txs
-	promoted, promotedTxns := account.promote()
+	promoted, promotedHashes := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(promoted))
-
-	for _, promotable := range promotedTxns {
-		p.eventManager.fireEvent(&proto.TxPoolEvent{
-			Type:   proto.EventType_PROMOTED,
-			TxHash: promotable.Hash.String(),
-		})
-	}
+	p.eventManager.signalEvent(proto.EventType_PROMOTED, promotedHashes...)
 }
 
 // addGossipTx handles receiving transactions

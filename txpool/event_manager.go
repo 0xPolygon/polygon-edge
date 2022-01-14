@@ -3,6 +3,7 @@ package txpool
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-hclog"
 	"sync"
@@ -73,8 +74,8 @@ func (em *eventManager) close() {
 	}
 }
 
-// fireEvent is a helper method for alerting listeners of a new TxPool event
-func (em *eventManager) fireEvent(event *proto.TxPoolEvent) {
+// signalEvent is a helper method for alerting listeners of a new TxPool event
+func (em *eventManager) signalEvent(eventType proto.EventType, txHashes ...types.Hash) {
 	go func() {
 		if atomic.LoadInt64(&em.numSubscriptions) < 1 {
 			// No reason to lock the subscriptions map
@@ -85,8 +86,15 @@ func (em *eventManager) fireEvent(event *proto.TxPoolEvent) {
 		em.subscriptionsLock.RLock()
 		defer em.subscriptionsLock.RUnlock()
 
-		for _, subscription := range em.subscriptions {
-			go subscription.pushEvent(event)
+		for _, txHash := range txHashes {
+			event := &proto.TxPoolEvent{
+				Type:   eventType,
+				TxHash: txHash.String(),
+			}
+
+			for _, subscription := range em.subscriptions {
+				go subscription.pushEvent(event)
+			}
 		}
 	}()
 }
