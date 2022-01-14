@@ -10,16 +10,16 @@ import (
 )
 
 // Status implements the GRPC status endpoint. Returns the number of transactions in the pool
-func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
+func (p *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
 	resp := &proto.TxnPoolStatusResp{
-		Length: t.pendingQueue.Length(),
+		Length: p.accounts.promoted(),
 	}
 
 	return resp, nil
 }
 
 // AddTxn adds a local transaction to the pool
-func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
+func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
 	if raw.Raw == nil {
 		return nil, fmt.Errorf("transaction's field raw is empty")
 	}
@@ -38,7 +38,7 @@ func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 		txn.From = from
 	}
 
-	if err := t.AddTx(txn); err != nil {
+	if err := p.AddTx(txn); err != nil {
 		return nil, err
 	}
 
@@ -48,7 +48,7 @@ func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 }
 
 // Subscribe implements the operator endpoint. It subscribes to new events in the tx pool
-func (t *TxPool) Subscribe(req *empty.Empty, stream proto.TxnPoolOperator_SubscribeServer) error {
+func (p *TxPool) Subscribe(req *empty.Empty, stream proto.TxnPoolOperator_SubscribeServer) error {
 	// TODO
 	return nil
 }
