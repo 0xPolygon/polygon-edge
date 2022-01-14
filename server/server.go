@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"math/big"
 	"net"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"github.com/0xPolygon/polygon-sdk/jsonrpc"
 	"github.com/0xPolygon/polygon-sdk/network"
+	"github.com/0xPolygon/polygon-sdk/protocol"
 	"github.com/0xPolygon/polygon-sdk/secrets"
 	"github.com/0xPolygon/polygon-sdk/server/proto"
 	"github.com/0xPolygon/polygon-sdk/state"
@@ -156,16 +156,16 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
-			m.config.Seal,
-			m.config.Locals,
-			m.config.NoLocals,
-			m.config.PriceLimit,
-			m.config.MaxSlots,
 			m.chain.Params.Forks.At(0),
 			hub,
 			m.grpcServer,
 			m.network,
 			m.serverMetrics.txpool,
+			&txpool.Config{
+				Sealing:    m.config.Seal,
+				MaxSlots:   m.config.MaxSlots,
+				PriceLimit: m.config.PriceLimit,
+			},
 		)
 		if err != nil {
 			return nil, err
@@ -173,7 +173,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 
 		// use the eip155 signer
 		signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
-		m.txpool.AddSigner(signer)
+		m.txpool.SetSigner(signer)
 	}
 
 	{
@@ -208,6 +208,8 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
+
+	m.txpool.Start()
 
 	return m, nil
 }
@@ -351,10 +353,15 @@ type jsonRPCHub struct {
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
+	*network.Server
 	consensus.Consensus
 }
 
 // HELPER + WRAPPER METHODS //
+
+func (j *jsonRPCHub) GetPeers() int {
+	return len(j.Server.Peers())
+}
 
 func (j *jsonRPCHub) getState(root types.Hash, slot []byte) ([]byte, error) {
 	// the values in the trie are the hashed objects of the keys
@@ -453,6 +460,7 @@ func (s *Server) setupJSONRPC() error {
 		TxPool:     s.txpool,
 		Executor:   s.executor,
 		Consensus:  s.consensus,
+		Server:     s.network,
 	}
 
 	conf := &jsonrpc.Config{
@@ -527,6 +535,9 @@ func (s *Server) Close() {
 			s.logger.Error("Prometheus server shutdown error", err)
 		}
 	}
+
+	// close the txpool's main loop
+	s.txpool.Close()
 }
 
 // Entry is a backend configuration entry
