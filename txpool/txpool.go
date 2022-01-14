@@ -245,8 +245,8 @@ func (p *TxPool) Start() {
 
 // Close shuts down the pool's main loop.
 func (p *TxPool) Close() {
-	p.shutdownCh <- struct{}{}
 	p.eventManager.close()
+	p.shutdownCh <- struct{}{}
 }
 
 // SetSigner sets the signer the pool will use
