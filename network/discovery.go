@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+
 	"crypto/rand"
+
 	"fmt"
 	"math/big"
 	"sync"
@@ -19,6 +21,12 @@ import (
 var discProto = "/disc/0.1"
 
 const defaultBucketSize = 20
+
+const defaultPeerReqCount = 16
+
+const peerDiscoveryInterval = 5 * time.Second
+
+const bootnodeDiscoveryInterval = 60 * time.Second
 
 type referencePeer struct {
 	id     peer.ID
@@ -87,14 +95,12 @@ type discovery struct {
 
 	peers *referencePeers // list of the peers discovery queries about near peers
 
-	notifyCh chan struct{}
-	closeCh  chan struct{}
+	closeCh chan struct{}
 
 	bootnodes []*peer.AddrInfo
 }
 
 func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
-	d.notifyCh = make(chan struct{}, 5)
 	d.peers = &referencePeers{}
 	d.bootnodes = bootnodes
 
@@ -226,7 +232,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 
 	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
 
-	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
+	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: defaultPeerReqCount})
 	if err != nil {
 		return nil, err
 	}
@@ -246,14 +252,27 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 }
 
 func (d *discovery) run() {
+	ticker1 := time.NewTicker(peerDiscoveryInterval)
+	ticker2 := time.NewTicker(bootnodeDiscoveryInterval)
+
+	defer func() {
+		ticker1.Stop()
+		ticker2.Stop()
+	}()
+
 	for {
 		select {
-		case <-time.After(5 * time.Second):
-		case <-d.notifyCh:
 		case <-d.closeCh:
 			return
+		default:
 		}
-		d.handleDiscovery()
+
+		select {
+		case <-ticker1.C:
+			go d.handleDiscovery()
+		case <-ticker2.C:
+			go d.bootnodeDiscovery()
+		}
 	}
 }
 
@@ -264,6 +283,62 @@ func (d *discovery) handleDiscovery() {
 			if err := d.attemptToFindPeers(target.id); err != nil {
 				d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
 			}
+		}
+	}
+}
+
+// bootnodeDiscovery queries a random bootnode for new peers and adds them to the routing table
+func (d *discovery) bootnodeDiscovery() {
+	if d.srv.numOpenSlots() <= 0 {
+		return
+	}
+	// get a random bootnode
+	bootNode := d.srv.getBootNode()
+	if bootNode == nil {
+		return
+	}
+
+	if _, loaded := d.srv.tempeoraryDials.LoadOrStore(bootNode.ID, true); loaded {
+		return
+	}
+	defer d.srv.tempeoraryDials.Delete(bootNode.ID)
+
+	if len(d.srv.host.Peerstore().Addrs(bootNode.ID)) == 0 {
+		d.srv.host.Peerstore().AddAddr(bootNode.ID, bootNode.Addrs[0], peerstore.AddressTTL)
+	}
+
+	stream, err := d.srv.NewProtoStream(discProto, bootNode.ID)
+	if err != nil {
+		d.srv.logger.Error("failed to open new stream", "peer", bootNode.ID, "err", err)
+
+		return
+	}
+
+	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
+
+	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: defaultPeerReqCount})
+	if err != nil {
+		d.srv.logger.Error("find peers call failed", "peer", bootNode.ID, "err", err)
+
+		return
+	}
+
+	if err := stream.(*rawGrpc.ClientConn).Close(); err != nil {
+		d.srv.logger.Error("Error closing grpc stream", "peer", bootNode.ID, "err", err)
+
+		return
+	}
+
+	d.srv.Disconnect(bootNode.ID, "Thank you")
+
+	for _, node := range resp.Nodes {
+		info, err := StringToAddrInfo(node)
+		if err != nil {
+			continue
+		}
+
+		if err := d.addToTable(info); err != nil {
+			d.srv.logger.Error("Unable to add peer to routing table", "peer", bootNode.ID, "err", err)
 		}
 	}
 }
@@ -301,4 +376,8 @@ func (d *discovery) FindPeers(
 	}
 
 	return resp, nil
+}
+
+func (d *discovery) Close() {
+	close(d.closeCh)
 }
