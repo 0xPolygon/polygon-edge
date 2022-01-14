@@ -467,8 +467,6 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", 0, "maximum number of inbound peers")
 	flags.Uint64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", 0, "maximum number of outbound peers")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
