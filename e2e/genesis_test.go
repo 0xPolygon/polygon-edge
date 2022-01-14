@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	"github.com/0xPolygon/polygon-sdk/crypto"
@@ -12,6 +13,7 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/stretchr/testify/assert"
 )
 
 // Test if the custom block gas limit is properly set
@@ -86,7 +88,7 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 	signer := crypto.NewEIP155Signer(100)
 
 	for i := 0; i < 20; i++ {
-		tx, err := signer.SignTx(&types.Transaction{
+		signedTx, err := signer.SignTx(&types.Transaction{
 			Nonce:    uint64(i),
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      blockGasLimit,
@@ -101,19 +103,22 @@ func TestCustomBlockGasLimitPropagation(t *testing.T) {
 
 		_, err = srv.TxnPoolOperator().AddTxn(context.Background(), &txpoolOp.AddTxnReq{
 			Raw: &any.Any{
-				Value: tx.MarshalRLP(),
+				Value: signedTx.MarshalRLP(),
 			},
 			From: types.ZeroAddress.String(),
 		})
-		if err != nil {
-			t.Fatalf("failed to add txn: %v", err)
-		}
+		assert.NoError(t, err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = framework.WaitUntilBlockMined(ctx, srv, 1)
+	assert.NoError(t, err)
+
 	block, err = client.Eth().GetBlockByNumber(1, true)
-	if err != nil {
-		t.Fatalf("failed to retrieve block %d: %v", 1, err)
-	}
+	assert.NoError(t, err, "failed to retrieve block %d: %v", 1, err)
+	assert.NotNil(t, block)
 
 	if block.GasLimit != blockGasLimit {
 		t.Fatalf("invalid block gas limit, expected [%d] but got [%d]", blockGasLimit, block.GasLimit)

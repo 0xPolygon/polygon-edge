@@ -157,6 +157,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
 	c.FlagMap["locals"] = helper.FlagDescriptor{
 		Description: "Sets comma separated accounts whose transactions are treated as locals",
 		Arguments: []string{
@@ -172,7 +173,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
-
+  
 	c.FlagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
 			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
