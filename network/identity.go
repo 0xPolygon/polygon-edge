@@ -138,9 +138,9 @@ func (i *identity) getStatus() *proto.Status {
 func (i *identity) checkSlots(direction network.Direction, peerID peer.ID) (slotsFull bool) {
 	switch direction {
 	case network.DirInbound:
-		slotsFull = i.srv.numOpenSlots() == 0
-	case network.DirOutbound:
 		slotsFull = i.srv.inboundConns() >= i.srv.maxInboundConns()
+	case network.DirOutbound:
+		slotsFull = i.srv.numOpenSlots() == 0
 	default:
 		i.srv.logger.Info("Invalid connection direction", "peer", peerID)
 	}
