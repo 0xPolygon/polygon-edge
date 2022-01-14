@@ -11,6 +11,8 @@ import (
 )
 
 func TestEncoding(t *testing.T) {
+	// skiping test as we disables eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	_, from := tests.GenerateKeyAndAddr(t)
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {

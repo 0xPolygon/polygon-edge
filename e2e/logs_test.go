@@ -2,11 +2,12 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/0xPolygon/polygon-sdk/e2e/framework"
 	"github.com/0xPolygon/polygon-sdk/helper/tests"
@@ -15,6 +16,8 @@ import (
 )
 
 func TestNewFilter_Logs(t *testing.T) {
+	// skiping test as we disables eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	_, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
@@ -49,6 +52,8 @@ func TestNewFilter_Logs(t *testing.T) {
 }
 
 func TestNewFilter_Block(t *testing.T) {
+	// skiping test as we disables eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	_, from := tests.GenerateKeyAndAddr(t)
 	_, to := tests.GenerateKeyAndAddr(t)
 	toAddr := web3.HexToAddress(to.String())
@@ -89,6 +94,8 @@ func TestNewFilter_Block(t *testing.T) {
 }
 
 func TestFilterValue(t *testing.T) {
+	// skiping test as we disables eth_sendTransaction jsonrpc call
+	t.SkipNow()
 	// Scenario :
 	//
 	//	1.	Deploy a smart contract which is able to emit an event when calling a method.
