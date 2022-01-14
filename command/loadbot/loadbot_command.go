@@ -127,7 +127,7 @@ func (l *LoadbotCommand) DefineFlags() {
 	}
 
 	l.FlagMap["max-conns"] = helper.FlagDescriptor{
-		Description: "Sets the maximum no.of connections allowed per host, Default: 2*tps",
+		Description: "Sets the maximum no.of connections allowed per host. Default: 2*tps",
 		Arguments: []string{
 			"MAX_CONNECTIONS_COUNT",
 		},
