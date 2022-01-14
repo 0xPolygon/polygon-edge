@@ -3,9 +3,10 @@ package buildroot
 import (
 	"bytes"
 	"crypto/rand"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 	"math/big"
 	"testing"
+
+	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 func BenchmarkFast(b *testing.B) {
