@@ -145,7 +145,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 
 		// Add the flag arguments list
 		for argIndex, argument := range argumentsList {
-			if argIndex == 0 {
+			if argIndex == 0 && !descriptor.AreArgumentsOptional() {
 				// Only called for the first argument
 				output += " "
 			}
