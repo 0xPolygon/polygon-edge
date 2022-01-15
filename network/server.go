@@ -219,8 +219,6 @@ func (s *Server) Start() error {
 		return identityStartErr
 	}
 
-	go s.runDial()
-	go s.checkPeerConnections()
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
@@ -254,6 +252,8 @@ func (s *Server) Start() error {
 		}
 	}
 
+	go s.runDial()
+	go s.checkPeerConnections()
 	go func() {
 		if err := s.runJoinWatcher(); err != nil {
 			s.logger.Error(fmt.Sprintf("Unable to start join watcher service, %v", err))
