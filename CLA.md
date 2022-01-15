@@ -51,7 +51,7 @@ required to provide support for your Contributions, except to the extent you des
 
 **No Obligation.** You acknowledge that Polygon is under no obligation to use or incorporate your Contributions
 into any of the Projects. The decision to use or incorporate your Contributions into any of the Projects will be
-made at the sole discretion of Polygon or its authorized delegates ..
+made at the sole discretion of Polygon or its authorized delegates.
 
 
 **Disputes.** This Agreement shall be governed by and construed in accordance with the laws of the State of
