@@ -281,7 +281,7 @@ func (d *discovery) handleDiscovery() {
 	if d.srv.numOpenSlots() > 0 {
 		if target := d.peers.getRandomPeer(); target != nil {
 			if err := d.attemptToFindPeers(target.id); err != nil {
-				d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+				d.srv.logger.Error("failed to find new peers", "peer", target.id, "err", err)
 			}
 		}
 	}
