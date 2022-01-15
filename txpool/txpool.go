@@ -26,7 +26,7 @@ const (
 // errors
 var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
-	ErrBlockLimitExceeded  = errors.New("transaction's gas limit exceeds block gas limit")
+	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
 	ErrNegativeValue       = errors.New("negative value")
 	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
 	ErrInvalidSender       = errors.New("invalid sender")
