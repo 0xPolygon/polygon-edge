@@ -13,7 +13,9 @@ type defaultMockStore struct {
 }
 
 func (m defaultMockStore) Header() *types.Header {
-	return &types.Header{}
+	return &types.Header{
+		GasLimit: 4712388,
+	}
 }
 
 func (m defaultMockStore) GetNonce(types.Hash, types.Address) uint64 {

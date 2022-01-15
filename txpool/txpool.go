@@ -26,6 +26,7 @@ const (
 // errors
 var (
 	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
+	ErrBlockLimitExceeded  = errors.New("transaction's gas limit exceeds block gas limit")
 	ErrNegativeValue       = errors.New("negative value")
 	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
 	ErrInvalidSender       = errors.New("invalid sender")
@@ -534,6 +535,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 	if tx.Gas < intrinsicGas {
 		return ErrIntrinsicGas
+	}
+
+	// Grab the block gas limit for the latest block
+	latestBlockGasLimit := p.store.Header().GasLimit
+
+	if tx.Gas > latestBlockGasLimit {
+		return ErrBlockLimitExceeded
 	}
 
 	return nil

@@ -19,7 +19,8 @@ import (
 const (
 	defaultPriceLimit uint64 = 1
 	defaultMaxSlots   uint64 = 4096
-	validGasLimit     uint64 = 10000000
+	validGasLimit     uint64 = 4712350
+	invalidGasLimit   uint64 = 10000000000001
 )
 
 var (
@@ -108,6 +109,19 @@ func TestAddTxErrors(t *testing.T) {
 
 		return pool
 	}
+
+	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
+		pool := setupPool()
+
+		tx := newTx(addr1, 0, 1)
+		tx.Value = big.NewInt(1)
+		tx.Gas = invalidGasLimit
+
+		assert.ErrorIs(t,
+			pool.addTx(local, tx),
+			ErrBlockLimitExceeded,
+		)
+	})
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		pool := setupPool()
