@@ -99,7 +99,7 @@ func (i *identity) setup() {
 				return
 			}
 
-			if i.checkSlots(conn.Stat().Direction, peerID) {
+			if i.checkSlotAndDisconnect(conn.Stat().Direction, peerID) {
 				return
 			}
 
@@ -140,8 +140,8 @@ func (i *identity) getStatus(peerID peer.ID) *proto.Status {
 	return status
 }
 
-// checkSlots checks for the available connection slots and disconnects if slots are full
-func (i *identity) checkSlots(direction network.Direction, peerID peer.ID) (slotsFull bool) {
+// checkSlotAndDisconnect checks for the available connection slots and disconnects if slots are full
+func (i *identity) checkSlotAndDisconnect(direction network.Direction, peerID peer.ID) (slotsFull bool) {
 	switch direction {
 	case network.DirInbound:
 		slotsFull = i.srv.inboundConns() >= i.srv.maxInboundConns()
