@@ -264,10 +264,6 @@ func (d *discovery) run() {
 		select {
 		case <-d.closeCh:
 			return
-		default:
-		}
-
-		select {
 		case <-ticker1.C:
 			go d.handleDiscovery()
 		case <-ticker2.C:
