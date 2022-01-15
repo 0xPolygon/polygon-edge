@@ -324,9 +324,11 @@ func (d *discovery) bootnodeDiscovery() {
 
 		return
 	}
+
 	if !d.srv.hasPeer(bootNode.ID) {
 		d.srv.Disconnect(bootNode.ID, "Thank you")
 	}
+
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
