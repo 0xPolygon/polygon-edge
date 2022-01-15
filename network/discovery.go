@@ -288,7 +288,7 @@ func (d *discovery) bootnodeDiscovery() {
 	if d.srv.numOpenSlots() <= 0 {
 		return
 	}
-	// get a random bootnode
+	// get a random bootnode which is not connected
 	bootNode := d.srv.getBootNode()
 	if bootNode == nil {
 		return
@@ -324,9 +324,9 @@ func (d *discovery) bootnodeDiscovery() {
 
 		return
 	}
-
-	d.srv.Disconnect(bootNode.ID, "Thank you")
-
+	if !d.srv.hasPeer(bootNode.ID) {
+		d.srv.Disconnect(bootNode.ID, "Thank you")
+	}
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
