@@ -556,7 +556,7 @@ func TestWriteTransactions(t *testing.T) {
 			[]int{1},
 			5,
 			3,
-			2,
+			3,
 		},
 	}
 
@@ -735,6 +735,10 @@ type mockTransition struct {
 	gasLimitReachedTransaction *types.Transaction
 }
 
+func (t *mockTransition) WriteFailedReceipt(txn *types.Transaction) {
+	t.transactionsWritten = append(t.transactionsWritten, txn)
+}
+
 func (t *mockTransition) Write(txn *types.Transaction) error {
 	if txn == t.gasLimitReachedTransaction {
 		return state.NewGasLimitReachedTransitionApplicationError(nil)
@@ -755,6 +759,10 @@ func (t *mockTransition) Write(txn *types.Transaction) error {
 	t.transactionsWritten = append(t.transactionsWritten, txn)
 
 	return nil
+}
+
+func (t *mockTransition) WriteFa(txn *types.Transaction) {
+	t.transactionsWritten = append(t.transactionsWritten, txn)
 }
 
 type mockIbft struct {

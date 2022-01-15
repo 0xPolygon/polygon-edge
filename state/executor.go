@@ -99,7 +99,14 @@ func (e *Executor) ProcessBlock(
 	}
 
 	txn.block = block
+
 	for _, t := range block.Transactions {
+		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
+			txn.WriteFailedReceipt(t)
+
+			continue
+		}
+
 		if err := txn.Write(t); err != nil {
 			return nil, err
 		}
@@ -201,6 +208,23 @@ func (t *Transition) Receipts() []*types.Receipt {
 }
 
 var emptyFrom = types.Address{}
+
+func (t *Transition) WriteFailedReceipt(txn *types.Transaction) {
+	logs := t.state.Logs()
+
+	receipt := &types.Receipt{
+		CumulativeGasUsed: t.totalGas,
+		TxHash:            txn.Hash,
+	}
+	receipt.Logs = logs
+	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
+	receipt.SetStatus(types.ReceiptFailed)
+	t.receipts = append(t.receipts, receipt)
+
+	if msg := txn.Copy(); msg.To == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce)
+	}
+}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {

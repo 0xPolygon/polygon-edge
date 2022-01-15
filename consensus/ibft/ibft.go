@@ -643,12 +643,13 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
+	WriteFailedReceipt(txn *types.Transaction)
 }
 
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var successful []*types.Transaction
+	var transactions []*types.Transaction
 
 	i.txpool.Prepare()
 
@@ -659,6 +660,8 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
+			transition.WriteFailedReceipt(tx)
+			transactions = append(transactions, tx)
 			i.txpool.Drop(tx)
 
 			continue
@@ -679,12 +682,12 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		// no errors, pop the tx from the pool
 		i.txpool.Pop(tx)
 
-		successful = append(successful, tx)
+		transactions = append(transactions, tx)
 	}
 
-	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", i.txpool.Length())
+	i.logger.Info("picked out txns from pool", "num", len(transactions), "remaining", i.txpool.Length())
 
-	return successful
+	return transactions
 }
 
 // runAcceptState runs the Accept state loop
