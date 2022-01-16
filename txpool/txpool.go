@@ -225,7 +225,7 @@ func NewTxPool(
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.metrics.PendingTxs.Set(0)
-	
+
 	go func() {
 		for {
 			select {
