@@ -3,9 +3,9 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 	"math/big"
 )

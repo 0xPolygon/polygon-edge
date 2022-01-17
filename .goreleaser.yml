@@ -1,4 +1,4 @@
-project_name: polygon-sdk
+project_name: polygon-edge
 
 release:
   disable: false
@@ -8,7 +8,7 @@ release:
 builds:
   - id: darwin-amd64
     main: ./main.go
-    binary: polygon-sdk
+    binary: polygon-edge
     goos:
       - darwin
     goarch:
@@ -21,7 +21,7 @@ builds:
 
   - id: darwin-arm64
     main: ./main.go
-    binary: polygon-sdk
+    binary: polygon-edge
     goos:
       - darwin
     goarch:
@@ -34,7 +34,7 @@ builds:
 
   - id: linux-amd64
     main: ./main.go
-    binary: polygon-sdk
+    binary: polygon-edge
     goos:
       - linux
     goarch:
@@ -48,7 +48,7 @@ builds:
 
   - id: linux-arm64
     main: ./main.go
-    binary: polygon-sdk
+    binary: polygon-edge
     goos:
       - linux
     goarch:
@@ -73,8 +73,8 @@ builds:
 #      - rpm
 #
 #    contents:
-#      - src: polygon-sdk.service
-#        dst: /lib/systemd/system/polygon-sdk.service
+#      - src: polygon-edge.service
+#        dst: /lib/systemd/system/polygon-edge.service
 #        type: config
 #
 #    overrides:

@@ -16,20 +16,20 @@ import (
 	"testing"
 	"time"
 
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 
-	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
-	"github.com/0xPolygon/polygon-sdk/command/server"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
-	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/server"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/server/proto"
+	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
@@ -42,7 +42,7 @@ type TestServerConfigCallback func(*TestServerConfig)
 
 const (
 	initialPort   = 12000
-	polygonSDKCmd = "polygon-sdk"
+	polygonSDKCmd = "polygon-edge"
 )
 
 type TestServer struct {

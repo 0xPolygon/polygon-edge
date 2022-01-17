@@ -1,8 +1,8 @@
 package version
 
 import (
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/version"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/version"
 )
 
 // VersionCommand is the command to show the version of the agent

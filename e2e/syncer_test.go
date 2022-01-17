@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
 )
 
 func TestClusterBlockSync(t *testing.T) {

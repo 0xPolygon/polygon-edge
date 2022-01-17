@@ -3,8 +3,8 @@ package ibft
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/contracts/staking"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // PoSMechanism defines specific hooks for the Proof of Stake IBFT mechanism
