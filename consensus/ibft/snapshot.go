@@ -367,16 +367,15 @@ func newSnapshotStore() *snapshotStore {
 }
 
 // loadFromPath loads a saved snapshot store from the specified file system path
-// passing variadic second param as we don't need logger in tests
-func (s *snapshotStore) loadFromPath(path string, l ...hclog.Logger) error {
+func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
 		// if we can't read metadata file delete it
 		// and log the error that we've encountered
-		l[0].Error("could not read metadata snapshot store file", "err", err.Error())
+		l.Error("Could not read metadata snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "metadata"))
-		l[0].Error("Removed invalid metadata snapshot store file")
+		l.Error("Removed invalid metadata snapshot store file")
 	}
 
 	if meta != nil {
@@ -388,9 +387,9 @@ func (s *snapshotStore) loadFromPath(path string, l ...hclog.Logger) error {
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
 		// if we can't read snapshot store file delete it
 		// and log the error that we've encountered
-		l[0].Error("could not read snapshot store file", "err", err.Error())
+		l.Error("Could not read snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "snapshots"))
-		l[0].Error("Removed invalid snapshot store file")
+		l.Error("Removed invalid snapshot store file")
 	}
 
 	for _, snap := range snaps {
