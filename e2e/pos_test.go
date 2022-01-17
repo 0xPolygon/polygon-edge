@@ -675,7 +675,7 @@ func TestSnapshotUpdating(t *testing.T) {
 				config.PremineValidatorBalance(defaultBalance)
 			} else {
 				// Other nodes should not be in the validator set
-				dirPrefix := "psdk-non-validator-"
+				dirPrefix := "polygon-edge-non-validator-"
 				config.SetIBFTDirPrefix(dirPrefix)
 				config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 			}
