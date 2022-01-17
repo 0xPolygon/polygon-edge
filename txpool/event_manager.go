@@ -59,7 +59,9 @@ func (em *eventManager) cancelSubscription(id subscriptionID) {
 
 	if subscription, ok := em.subscriptions[id]; ok {
 		subscription.close()
+		delete(em.subscriptions, id)
 		atomic.AddInt64(&em.numSubscriptions, -1)
+
 		em.logger.Info(fmt.Sprintf("Canceled subscription %d", id))
 	}
 }
@@ -72,6 +74,8 @@ func (em *eventManager) close() {
 	for _, subscription := range em.subscriptions {
 		subscription.close()
 	}
+
+	atomic.StoreInt64(&em.numSubscriptions, 0)
 }
 
 // signalEvent is a helper method for alerting listeners of a new TxPool event
