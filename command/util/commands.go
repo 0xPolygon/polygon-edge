@@ -62,7 +62,7 @@ func Commands() map[string]cli.CommandFactory {
 
 	return map[string]cli.CommandFactory{
 
-		// GENERIC SDK COMMANDS //
+		// GENERIC COMMANDS //
 
 		serverCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &serverCmd, nil

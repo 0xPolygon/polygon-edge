@@ -18,7 +18,7 @@ func (c *VersionCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *VersionCommand) GetHelperText() string {
-	return "Returns the current Polygon SDK version"
+	return "Returns the current Polygon Edge version"
 }
 
 func (c *VersionCommand) GetBaseCommand() string {

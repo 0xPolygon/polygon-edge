@@ -69,7 +69,7 @@ func (c *ServerCommand) DefineFlags() {
 
 	c.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
-			"Specifies the data directory used for storing Polygon SDK client data. Default: %s",
+			"Specifies the data directory used for storing Polygon Edge client data. Default: %s",
 			helper.DefaultConfig().DataDir,
 		),
 		Arguments: []string{
@@ -207,7 +207,7 @@ func (c *ServerCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *ServerCommand) GetHelperText() string {
-	return "The default command that starts the Polygon-SDK client, by bootstrapping all modules together"
+	return "The default command that starts the Polygon Edge client, by bootstrapping all modules together"
 }
 
 func (c *ServerCommand) GetBaseCommand() string {

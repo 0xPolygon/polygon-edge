@@ -32,7 +32,7 @@ func (p *SecretsInit) DefineFlags() {
 	p.Base.DefineFlags(p.Formatter)
 
 	p.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: "Sets the directory for the Polygon SDK data if the local FS is used",
+		Description: "Sets the directory for the Polygon Edge data if the local FS is used",
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -53,7 +53,7 @@ func (p *SecretsInit) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (p *SecretsInit) GetHelperText() string {
-	return "Initializes private keys for the Polygon SDK (Validator + Networking) to the specified Secrets Manager"
+	return "Initializes private keys for the Polygon Edge (Validator + Networking) to the specified Secrets Manager"
 }
 
 // Help implements the cli.SecretsInit interface

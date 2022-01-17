@@ -63,7 +63,7 @@ builds:
 #nfpms:
 #  - vendor: 0xPolygon
 #    homepage: https://polygon.technology
-#    maintainer: Polygon SDK Team <sdk@polygon.technology>
+#    maintainer: Polygon Edge Team <sdk@polygon.technology>
 #    description:  A Framework for Building Ethereum-compatible Blockchain Networks
 #    license: GPLv3 LGPLv3
 #

@@ -24,7 +24,7 @@ func (c *StatusCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *StatusCommand) GetHelperText() string {
-	return "Returns the status of the Polygon SDK client"
+	return "Returns the status of the Polygon Edge client"
 }
 
 func (c *StatusCommand) GetBaseCommand() string {

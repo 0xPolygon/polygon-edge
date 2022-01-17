@@ -49,7 +49,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the Polygon SDK genesis data. Default: %s", helper.GenesisFileName),
+		Description: fmt.Sprintf("Sets the directory for the Polygon Edge genesis data. Default: %s", helper.GenesisFileName),
 		Arguments: []string{
 			"DIRECTORY",
 		},
