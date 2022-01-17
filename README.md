@@ -1,5 +1,5 @@
 
-![Banner](.github/banner.png)
+![Banner](.github/banner.jpg)
 
 ## Polygon Edge
 
