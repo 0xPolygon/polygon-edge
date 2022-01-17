@@ -682,6 +682,9 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 		}
 	})
 	if err != nil {
+		mutex.Lock()
+		closed = true
+		mutex.Unlock()
 		close(ch)
 
 		return nil, err
