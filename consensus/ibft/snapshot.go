@@ -22,7 +22,7 @@ func (i *Ibft) setupSnapshot() error {
 
 	// Read from storage
 	if i.config.Path != "" {
-		if err := i.store.loadFromPath(i.config.Path,i.logger); err != nil {
+		if err := i.store.loadFromPath(i.config.Path, i.logger); err != nil {
 			return err
 		}
 	}
@@ -372,12 +372,12 @@ func (s *snapshotStore) loadFromPath(path string, l ...hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
-		// if we can't read file metadata file delete it and sync again
-		// and logout that we've had some problems
-		l[0].Error("could not read metadata file","err",err.Error())
-		l[0].Error("removing faulty metadata file...")
+		// if we can't read metadata file delete it
+		// and log the error that we've encountered
+		l[0].Error("could not read metadata snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "metadata"))
-	} 
+		l[0].Error("Removed invalid metadata snapshot store file")
+	}
 
 	if meta != nil {
 		s.lastNumber = meta.LastBlock
@@ -386,11 +386,11 @@ func (s *snapshotStore) loadFromPath(path string, l ...hclog.Logger) error {
 	// Load snapshots
 	snaps := []*Snapshot{}
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
-		// if we can't read snapshot file delete it and sync again
-		// and logout that we've had some problems
-		l[0].Error("could not read snapshots file","err",err.Error())
-		l[0].Error("removing faulty snapshots file...")
+		// if we can't read snapshot store file delete it
+		// and log the error that we've encountered
+		l[0].Error("could not read snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "snapshots"))
+		l[0].Error("Removed invalid snapshot store file")
 	}
 
 	for _, snap := range snaps {

@@ -279,7 +279,7 @@ func Factory(
 func (i *Ibft) Start() error {
 	// Start the syncer
 	i.syncer.Start()
-	
+
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
