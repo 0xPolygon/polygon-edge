@@ -30,8 +30,7 @@ type AwsSsmManager struct {
 // SecretsManagerFactory implements the factory method
 func SecretsManagerFactory(
 	config *secrets.SecretsManagerConfig,
-	params *secrets.SecretsManagerParams,
-) (secrets.SecretsManager, error) {
+	params *secrets.SecretsManagerParams) (secrets.SecretsManager, error) { //nolint
 
 	// Check if the node name is present
 	if config.Name == "" {
@@ -40,7 +39,7 @@ func SecretsManagerFactory(
 
 	// Check if the extra map is present
 	if config.Extra == nil || config.Extra["region"] == nil || config.Extra["ssm-parameter-path"] == nil {
-		return nil, errors.New("required extra map containing 'region' and 'ssm-parameter-path' not found for AWS SSM secrets manager")
+		return nil, errors.New("required extra map containing 'region' and 'ssm-parameter-path' not found for aws-ssm")
 	}
 
 	/// Set up the base object
@@ -65,7 +64,7 @@ func (a *AwsSsmManager) Setup() error {
 		SharedConfigState: session.SharedConfigEnable,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to initialize AWS SSM client: %v", err)
+		return fmt.Errorf("unable to initialize AWS SSM client: %w", err)
 	}
 
 	ssmsvc := ssm.New(sess, aws.NewConfig().WithRegion(a.region))
@@ -90,19 +89,19 @@ func (a *AwsSsmManager) GetSecret(name string) ([]byte, error) {
 	}
 
 	value := *param.Parameter.Value
+
 	return []byte(value), nil
 }
 
 // SetSecret saves a secret to AWS SSM
 func (a *AwsSsmManager) SetSecret(name string, value []byte) error {
-
 	if _, err := a.client.PutParameter(&ssm.PutParameterInput{
 		Name:      aws.String(a.constructSecretPath(name)),
 		Value:     aws.String(string(value)),
 		Type:      aws.String(ssm.ParameterTypeSecureString),
 		Overwrite: aws.Bool(false),
 	}); err != nil {
-		return fmt.Errorf("unable to store secret (%s), %v", name, err)
+		return fmt.Errorf("unable to store secret (%s), %w", name, err)
 	}
 
 	return nil
@@ -111,12 +110,13 @@ func (a *AwsSsmManager) SetSecret(name string, value []byte) error {
 // HasSecret checks if the secret is present on AWS SSM ParameterStore
 func (a *AwsSsmManager) HasSecret(name string) bool {
 	_, err := a.GetSecret(name)
+
 	return err == nil
 }
 
 // RemoveSecret removes a secret from AWS SSM ParameterStore
 func (a *AwsSsmManager) RemoveSecret(name string) error {
-	// Check if non-existant
+	// Check if non-existent
 	if _, err := a.GetSecret(name); err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (a *AwsSsmManager) RemoveSecret(name string) error {
 	if _, err := a.client.DeleteParameter(&ssm.DeleteParameterInput{
 		Name: aws.String(a.constructSecretPath(name)),
 	}); err != nil {
-		return fmt.Errorf("unable to delete secret (%s), %v", name, err)
+		return fmt.Errorf("unable to delete secret (%s), %w", name, err)
 	}
 
 	return nil

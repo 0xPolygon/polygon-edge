@@ -20,11 +20,11 @@ var (
 )
 
 // NewTestHeaderChainWithSeed creates a new chain with a seed factor
-func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types.Header {
+func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed uint64) []*types.Header {
 	head := func(i int64) *types.Header {
 		return &types.Header{
 			Number:       uint64(i),
-			GasLimit:     uint64(seed),
+			GasLimit:     seed,
 			TxRoot:       types.EmptyRootHash,
 			Sha3Uncles:   types.EmptyUncleHash,
 			ReceiptsRoot: types.EmptyRootHash,
@@ -36,6 +36,7 @@ func NewTestHeaderChainWithSeed(genesis *types.Header, n int, seed int) []*types
 		genesis = head(0)
 		genesis.ComputeHash()
 	}
+
 	headers := []*types.Header{genesis}
 
 	count := int64(genesis.Number) + 1
@@ -61,14 +62,14 @@ func NewTestHeaderFromChain(headers []*types.Header, n int) []*types.Header {
 }
 
 // NewTestHeaderFromChainWithSeed creates n new headers from an already existing chain
-func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed int) []*types.Header {
+func NewTestHeaderFromChainWithSeed(headers []*types.Header, n int, seed uint64) []*types.Header {
 	// We do +1 because the first header will be the genesis we supplied
 	newHeaders := NewTestHeaderChainWithSeed(headers[len(headers)-1], n+1, seed)
 
 	preHeaders := make([]*types.Header, len(headers))
 	copy(preHeaders, headers)
 
-	return append(preHeaders, newHeaders[1:]...)
+	return append(preHeaders, newHeaders[1:]...) //nolint:makezero
 }
 
 func HeadersToBlocks(headers []*types.Header) []*types.Block {
@@ -76,6 +77,7 @@ func HeadersToBlocks(headers []*types.Header) []*types.Block {
 	for indx, i := range headers {
 		blocks[indx] = &types.Block{Header: i}
 	}
+
 	return blocks
 }
 
@@ -149,6 +151,8 @@ func NewTestBodyChain(n int) ([]*types.Header, []*types.Block, [][]*types.Receip
 
 // NewTestBlockchain creates a new dummy blockchain for testing
 func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
+	t.Helper()
+
 	genesis := &chain.Genesis{
 		Number:   0,
 		GasLimit: 0,
@@ -166,13 +170,16 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
 	b, err := newBlockChain(config, state.NewExecutor(config.Params, st, hclog.NewNullLogger()))
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if headers != nil {
 		if _, err := b.advanceHead(headers[0]); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := b.WriteHeaders(headers[1:]); err != nil {
 			t.Fatal(err)
 		}
@@ -197,7 +204,11 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 type mockExecutor struct {
 }
 
-func (m *mockExecutor) ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error) {
+func (m *mockExecutor) ProcessBlock(
+	parentRoot types.Hash,
+	block *types.Block,
+	blockCreator types.Address,
+) (*state.BlockResult, error) {
 	return &state.BlockResult{}, nil
 }
 
@@ -205,12 +216,14 @@ func TestBlockchain(t *testing.T, genesis *chain.Genesis) *Blockchain {
 	if genesis == nil {
 		genesis = &chain.Genesis{}
 	}
+
 	config := &chain.Chain{
 		Genesis: genesis,
 		Params: &chain.Params{
 			BlockGasTarget: defaultBlockGasTarget,
 		},
 	}
+
 	b, err := newBlockChain(config, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -223,6 +236,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	if executor == nil {
 		executor = &mockExecutor{}
 	}
+
 	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
 	if err != nil {
 		return nil, err
@@ -232,5 +246,6 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	if err = b.ComputeGenesis(); err != nil {
 		return nil, fmt.Errorf("compute genisis: %w", err)
 	}
+
 	return b, nil
 }

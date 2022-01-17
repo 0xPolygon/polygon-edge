@@ -11,6 +11,7 @@ func (h *HashRequest) DecodeHashes() ([]types.Hash, error) {
 		if err := hh.UnmarshalText([]byte(h)); err != nil {
 			return nil, err
 		}
+
 		resp = append(resp, hh)
 	}
 

@@ -3,6 +3,7 @@ package monitor
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -52,12 +53,14 @@ func (m *MonitorCommand) Run(args []string) int {
 	flags := m.Base.NewFlagSet(m.GetBaseCommand(), m.Formatter, m.GRPC)
 	if err := flags.Parse(args); err != nil {
 		m.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := m.GRPC.Conn()
 	if err != nil {
 		m.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -68,23 +71,29 @@ func (m *MonitorCommand) Run(args []string) int {
 	if err != nil {
 		m.Formatter.OutputError(err)
 		cancelFn()
+
 		return 1
 	}
 
 	doneCh := make(chan struct{})
+
 	go func() {
 		for {
 			evnt, err := stream.Recv()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			if err != nil {
 				m.Formatter.OutputError(fmt.Errorf("failed to read event: %w", err))
+
 				break
 			}
+
 			res := NewBlockEventResult(evnt)
 			m.Formatter.OutputResult(res)
 		}
+
 		doneCh <- struct{}{}
 	}()
 
@@ -133,11 +142,13 @@ func NewBlockEventResult(e *proto.BlockchainEvent) *BlockEventResult {
 		res.Events.Added[i].Number = add.Number
 		res.Events.Added[i].Hash = add.Hash
 	}
+
 	for i, rem := range e.Removed {
 		res.Events.Removed[i].Type = eventRemoved
 		res.Events.Removed[i].Number = rem.Number
 		res.Events.Removed[i].Hash = rem.Hash
 	}
+
 	return res
 }
 
@@ -145,6 +156,7 @@ func (r *BlockEventResult) Output() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[BLOCK EVENT]\n")
+
 	for _, add := range r.Events.Added {
 		buffer.WriteString(helper.FormatKV([]string{
 			fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
@@ -152,6 +164,7 @@ func (r *BlockEventResult) Output() string {
 			fmt.Sprintf("Block Hash|%s", add.Hash),
 		}))
 	}
+
 	for _, rem := range r.Events.Removed {
 		buffer.WriteString(helper.FormatKV([]string{
 			fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),

@@ -58,6 +58,7 @@ func (n Nonce) Value() (driver.Value, error) {
 func (n *Nonce) Scan(src interface{}) error {
 	nn := hex.MustDecodeHex(string(src.([]byte)))
 	copy(n[:], nn[:])
+
 	return nil
 }
 
@@ -72,6 +73,7 @@ func (h *Header) Copy() *Header {
 
 	hh.ExtraData = make([]byte, len(h.ExtraData))
 	copy(hh.ExtraData[:], h.ExtraData[:])
+
 	return hh
 }
 
@@ -114,6 +116,7 @@ func (b *Block) Size() uint64 {
 		bytes := b.MarshalRLP()
 		size := uint64(len(bytes))
 		b.size.Store(&size)
+
 		return size
 	}
 
@@ -122,6 +125,7 @@ func (b *Block) Size() uint64 {
 
 func (b *Block) String() string {
 	str := fmt.Sprintf(`Block(#%v):`, b.Number())
+
 	return str
 }
 

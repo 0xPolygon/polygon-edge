@@ -30,6 +30,7 @@ func TestDialQueue(t *testing.T) {
 	assert.Nil(t, q.popImpl())
 
 	done := make(chan struct{})
+
 	go func() {
 		q.pop()
 		done <- struct{}{}
@@ -53,6 +54,7 @@ func TestDialQueue(t *testing.T) {
 
 func TestDel(t *testing.T) {
 	type Action string
+
 	const (
 		ActionAdd    Action = "add"
 		ActionDelete Action = "delete"

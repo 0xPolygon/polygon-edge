@@ -23,9 +23,13 @@ var (
 
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
+
 	key, err := crypto.GenerateKey()
+
 	assert.NoError(t, err)
+
 	addr := crypto.PubKeyToAddress(&key.PublicKey)
+
 	return key, addr
 }
 
@@ -34,25 +38,32 @@ func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (inter
 		data interface{}
 		err  error
 	}
+
 	resCh := make(chan result, 1)
+
 	go func() {
 		defer close(resCh)
+
 		for {
 			select {
 			case <-ctx.Done():
 				resCh <- result{nil, ErrTimeout}
+
 				return
 			default:
 				res, retry := f()
 				if !retry {
 					resCh <- result{res, nil}
+
 					return
 				}
 			}
 			time.Sleep(time.Second)
 		}
 	}()
+
 	res := <-resCh
+
 	return res.data, res.err
 }
 
@@ -67,12 +78,14 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 		if res != nil && res.Length == 0 {
 			return res, false
 		}
+
 		return nil, true
 	})
 
 	if err != nil {
 		return nil, err
 	}
+
 	return res.(*txpoolOp.TxnPoolStatusResp), nil
 }
 
@@ -91,26 +104,37 @@ func WaitForReceipt(ctx context.Context, client *jsonrpc.Eth, hash web3.Hash) (*
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}
+
 		return nil, true
 	})
+
 	if err != nil {
 		return nil, err
 	}
-	data := res.(result)
+
+	data, ok := res.(result)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
 	return data.receipt, data.err
 }
 
 // GetFreePort asks the kernel for a free open port that is ready to use
 func GetFreePort() (port int, err error) {
 	var addr *net.TCPAddr
+
 	if addr, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
 		var l *net.TCPListener
+
 		if l, err = net.ListenTCP("tcp", addr); err == nil {
 			defer func(l *net.TCPListener) {
 				_ = l.Close()
 			}(l)
+
 			return l.Addr().(*net.TCPAddr).Port, nil
 		}
 	}
+
 	return
 }

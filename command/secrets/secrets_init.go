@@ -26,7 +26,7 @@ type SecretsInit struct {
 }
 
 var (
-	ErrorInvalidSecretsConfig = errors.New("invalid secrets configuration file")
+	ErrInvalidSecretsConfig = errors.New("invalid secrets configuration file")
 )
 
 func (p *SecretsInit) DefineFlags() {
@@ -129,6 +129,7 @@ func (p *SecretsInit) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter)
 
 	var dataDir string
+
 	var configPath string
 
 	flags.StringVar(&dataDir, "data-dir", "", "")
@@ -136,21 +137,25 @@ func (p *SecretsInit) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if dataDir == "" && configPath == "" {
 		p.Formatter.OutputError(errors.New("required argument (data directory) not passed in"))
+
 		return 1
 	}
 
 	var secretsManager secrets.SecretsManager
+
 	if configPath == "" {
 		// No secrets manager config specified,
 		// use the local secrets manager
 		localSecretsManager, setupErr := setupLocalSM(dataDir)
 		if setupErr != nil {
 			p.Formatter.OutputError(setupErr)
+
 			return 1
 		}
 
@@ -159,7 +164,8 @@ func (p *SecretsInit) Run(args []string) int {
 		// Config file passed in
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			p.Formatter.OutputError(fmt.Errorf("Unable to read config file, %v", readErr))
+			p.Formatter.OutputError(fmt.Errorf("unable to read config file, %w", readErr))
+
 			return 1
 		}
 
@@ -169,6 +175,7 @@ func (p *SecretsInit) Run(args []string) int {
 			vaultSecretsManager, setupErr := setupHashicorpVault(secretsConfig)
 			if setupErr != nil {
 				p.Formatter.OutputError(setupErr)
+
 				return 1
 			}
 
@@ -177,11 +184,13 @@ func (p *SecretsInit) Run(args []string) int {
 			awsSsmSecretsManager, setupErr := setupAwsSsm(secretsConfig)
 			if setupErr != nil {
 				p.Formatter.OutputError(setupErr)
+
 				return 1
 			}
 			secretsManager = awsSsmSecretsManager
 		default:
-			p.Formatter.OutputError(errors.New("Unknown secrets manager type"))
+			p.Formatter.OutputError(errors.New("unknown secrets manager type"))
+
 			return 1
 		}
 	}
@@ -190,12 +199,14 @@ func (p *SecretsInit) Run(args []string) int {
 	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodePrivateKey()
 	if keyErr != nil {
 		p.Formatter.OutputError(keyErr)
+
 		return 1
 	}
 
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
 		p.Formatter.OutputError(setErr)
+
 		return 1
 	}
 
@@ -203,24 +214,27 @@ func (p *SecretsInit) Run(args []string) int {
 	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
 	if keyErr != nil {
 		p.Formatter.OutputError(keyErr)
+
 		return 1
 	}
 
 	// Write the networking private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
 		p.Formatter.OutputError(setErr)
+
 		return 1
 	}
 
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	res := &SecretsInitResult{
 		Address: crypto.PubKeyToAddress(&validatorKey.PublicKey),
-		NodeID:  nodeId.String(),
+		NodeID:  nodeID.String(),
 	}
 	p.Formatter.OutputResult(res)
 

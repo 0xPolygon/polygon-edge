@@ -20,6 +20,7 @@ func TestSubscriptionLinear(t *testing.T) {
 	sub := e.subscribe()
 
 	eventCh := make(chan *Event)
+
 	go func() {
 		for {
 			task := sub.GetEvent()
