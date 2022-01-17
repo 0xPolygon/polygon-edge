@@ -31,9 +31,12 @@ const DefaultLibp2pPort int = 1478
 const (
 	MinimumPeerConnections int64 = 1
 
-	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
-	// using other bootnode after restarting
-	MinimumBootNodes int = 2
+	MinimumBootNodes int = 1
+)
+
+var (
+	ErrNoBootnodes  = errors.New("no bootnodes specified")
+	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
 // Priority for dial queue
@@ -215,8 +218,14 @@ func (s *Server) Start() error {
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
-		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return errors.New("minimum two bootnodes are required")
+		// Check the bootnode config is present
+		if s.config.Chain.Bootnodes == nil {
+			return ErrNoBootnodes
+		}
+
+		// Check if at least one bootnode is specified
+		if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+			return ErrMinBootnodes
 		}
 
 		// start discovery

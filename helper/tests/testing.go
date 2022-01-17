@@ -4,6 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
+	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"net"
 	"testing"
 	"time"
@@ -31,6 +35,28 @@ func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	addr := crypto.PubKeyToAddress(&key.PublicKey)
 
 	return key, addr
+}
+
+func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
+	t.Helper()
+
+	priv, _, err := libp2pCrypto.GenerateKeyPair(libp2pCrypto.Secp256k1, 256)
+	if err != nil {
+		t.Fatalf("Unable to generate key pair, %v", err)
+	}
+
+	nodeID, err := peer.IDFromPrivateKey(priv)
+	assert.NoError(t, err)
+
+	port, portErr := GetFreePort()
+	if portErr != nil {
+		t.Fatalf("Unable to fetch free port, %v", portErr)
+	}
+
+	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeID))
+	assert.NoError(t, err)
+
+	return addr
 }
 
 func RetryUntilTimeout(ctx context.Context, f func() (interface{}, bool)) (interface{}, error) {
