@@ -37,7 +37,7 @@ func extractSenderAccount(address types.Address) (*Account, error) {
 		PrivateKey: nil,
 	}
 
-	privateKeyRaw := os.Getenv("PSDK_" + address.String())
+	privateKeyRaw := os.Getenv("LOADBOT_" + address.String())
 	privateKeyRaw = strings.TrimPrefix(privateKeyRaw, "0x")
 	privateKey, err := crypto.BytesToPrivateKey([]byte(privateKeyRaw))
 
