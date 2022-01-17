@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 // setupSnapshot sets up the snapshot store for the IBFT object
@@ -21,7 +22,7 @@ func (i *Ibft) setupSnapshot() error {
 
 	// Read from storage
 	if i.config.Path != "" {
-		if err := i.store.loadFromPath(i); err != nil {
+		if err := i.store.loadFromPath(i.config.Path,i.logger); err != nil {
 			return err
 		}
 	}
@@ -366,15 +367,15 @@ func newSnapshotStore() *snapshotStore {
 }
 
 // loadFromPath loads a saved snapshot store from the specified file system path
-func (s *snapshotStore) loadFromPath(i *Ibft) error {
+func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
-	if err := readDataStore(filepath.Join(i.config.Path, "metadata"), &meta); err != nil {
+	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
 		// if we can't read file metadata file delete it and sync again
 		// and logout that we've had some problems
-		i.logger.Error("could not read metadata file","err",err.Error())
-		i.logger.Error("removing faulty metadata file...")
-		os.Remove(filepath.Join(i.config.Path, "metadata"))
+		l.Error("could not read metadata file","err",err.Error())
+		l.Error("removing faulty metadata file...")
+		os.Remove(filepath.Join(path, "metadata"))
 	} 
 
 	if meta != nil {
@@ -383,12 +384,12 @@ func (s *snapshotStore) loadFromPath(i *Ibft) error {
 
 	// Load snapshots
 	snaps := []*Snapshot{}
-	if err := readDataStore(filepath.Join(i.config.Path, "snapshots"), &snaps); err != nil {
+	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
 		// if we can't read snapshot file delete it and sync again
 		// and logout that we've had some problems
-		i.logger.Error("could not read snapshots file","err",err.Error())
-		i.logger.Error("removing faulty snapshots file...")
-		os.Remove(filepath.Join(i.config.Path, "snapshots"))
+		l.Error("could not read snapshots file","err",err.Error())
+		l.Error("removing faulty snapshots file...")
+		os.Remove(filepath.Join(path, "snapshots"))
 	}
 
 	for _, snap := range snaps {
