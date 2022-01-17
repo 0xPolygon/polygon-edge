@@ -367,14 +367,15 @@ func newSnapshotStore() *snapshotStore {
 }
 
 // loadFromPath loads a saved snapshot store from the specified file system path
-func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
+// passing variadic second param as we don't need logger in tests
+func (s *snapshotStore) loadFromPath(path string, l ...hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
 		// if we can't read file metadata file delete it and sync again
 		// and logout that we've had some problems
-		l.Error("could not read metadata file","err",err.Error())
-		l.Error("removing faulty metadata file...")
+		l[0].Error("could not read metadata file","err",err.Error())
+		l[0].Error("removing faulty metadata file...")
 		os.Remove(filepath.Join(path, "metadata"))
 	} 
 
@@ -387,8 +388,8 @@ func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
 		// if we can't read snapshot file delete it and sync again
 		// and logout that we've had some problems
-		l.Error("could not read snapshots file","err",err.Error())
-		l.Error("removing faulty snapshots file...")
+		l[0].Error("could not read snapshots file","err",err.Error())
+		l[0].Error("removing faulty snapshots file...")
 		os.Remove(filepath.Join(path, "snapshots"))
 	}
 
