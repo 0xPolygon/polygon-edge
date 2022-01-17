@@ -2,9 +2,11 @@ package txpool
 
 import (
 	"github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestEventManager_SubscribeCancel(t *testing.T) {
@@ -66,9 +68,64 @@ func TestEventManager_SubscribeClose(t *testing.T) {
 
 	// Check if the subscription channels are closed
 	for indx, subscription := range subscriptions {
-		// Check that the appropriate channel is closed
 		if _, more := <-subscription.subscriptionChannel; more {
 			t.Fatalf("Subscription channel not closed for index %d", indx)
 		}
 	}
+}
+
+func TestEventManager_SignalEvent(t *testing.T) {
+	totalEvents := 10
+	invalidEvents := 3
+	validEvents := totalEvents - invalidEvents
+	supportedEventTypes := []proto.EventType{proto.EventType_ADDED, proto.EventType_DROPPED}
+
+	em := newEventManager(hclog.NewNullLogger())
+	defer em.close()
+
+	subscription := em.subscribe(supportedEventTypes)
+
+	eventSupported := func(eventType proto.EventType) bool {
+		for _, supportedType := range supportedEventTypes {
+			if supportedType == eventType {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	mockEvents := shuffleTxPoolEvents(supportedEventTypes, totalEvents, invalidEvents)
+	mockHash := types.StringToHash(mockEvents[0].TxHash)
+
+	// Send the events
+	for _, mockEvent := range mockEvents {
+		em.signalEvent(mockEvent.Type, mockHash)
+	}
+
+	// Make sure all valid events get processed
+	eventsProcessed := 0
+	supportedEventsProcessed := 0
+
+	completed := false
+	for !completed {
+		select {
+		case event := <-subscription.subscriptionChannel:
+			eventsProcessed++
+
+			if eventSupported(event.Type) {
+				supportedEventsProcessed++
+			}
+
+			if eventsProcessed == validEvents ||
+				supportedEventsProcessed == validEvents {
+				completed = true
+			}
+		case <-time.After(time.Second * 5):
+			completed = true
+		}
+	}
+
+	assert.Equal(t, validEvents, eventsProcessed)
+	assert.Equal(t, validEvents, supportedEventsProcessed)
 }
