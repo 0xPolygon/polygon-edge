@@ -41,8 +41,8 @@ import (
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
-	initialPort   = 12000
-	polygonSDKCmd = "polygon-edge"
+	initialPort = 12000
+	binaryName  = "polygon-edge"
 )
 
 type TestServer struct {
@@ -162,7 +162,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
@@ -270,7 +270,7 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
 	return cmd.Run()
@@ -324,7 +324,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd = exec.Command(binaryName, args...)
 	t.cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {
