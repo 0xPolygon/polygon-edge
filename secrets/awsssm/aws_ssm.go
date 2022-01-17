@@ -52,7 +52,9 @@ func SecretsManagerFactory(
 	awsSsmManager.basePath = fmt.Sprintf("%s/%s", config.Extra["ssm-parameter-path"], config.Name)
 
 	// Run the initial setup
-	_ = awsSsmManager.Setup()
+	if err := awsSsmManager.Setup(); err != nil {
+		return nil, err
+	}
 
 	return awsSsmManager, nil
 }
