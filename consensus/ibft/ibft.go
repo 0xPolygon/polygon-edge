@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/crypto"
