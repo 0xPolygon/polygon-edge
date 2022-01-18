@@ -11,11 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 )
 
-var (
-	// Size of blocks to pass to WriteBlock
-	chunkSize = uint64(10 * 1024 * 1024) // 10MB
-)
-
 type blockchainInterface interface {
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
@@ -55,7 +50,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	}
 
 	// skip existing blocks
-	firstBlock, firstBlockSize, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
+	firstBlock, err := consumeCommonBlocks(chain, blockStream, shutdownCh)
 	if err != nil {
 		return err
 	}
@@ -64,50 +59,19 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 		return nil
 	}
 
-	blocks := make([]*types.Block, 0)
-	nextBlock := firstBlock         // the first block in the next chunk
-	nextBlockSize := firstBlockSize // the size of nextBlock
-
+	nextBlock := firstBlock
 	for {
-		blocks = append(blocks, nextBlock)
-		blocksSize := nextBlockSize
-
-		for blocksSize < chunkSize {
-			nextBlock, nextBlockSize, err = blockStream.nextBlock()
-			if err != nil {
-				return err
-			}
-
-			if nextBlock == nil {
-				break
-			}
-
-			// blocks will have a block at least
-			if len(blocks) > 0 && blocksSize+nextBlockSize > chunkSize {
-				break
-			}
-
-			blocks = append(blocks, nextBlock)
-			blocksSize += nextBlockSize
+		if err := chain.WriteBlock(nextBlock); err != nil {
+			return err
 		}
 
-		// no blocks to be written any more
-		if len(blocks) == 0 {
-			break
+		nextBlock, err = blockStream.nextBlock()
+		if err != nil {
+			return err
 		}
-
-		for _, b := range blocks {
-			if err := chain.WriteBlock(b); err != nil {
-				return err
-			}
-		}
-
-		// no blocks to be written in the next loop
 		if nextBlock == nil {
 			break
 		}
-		// clear slice but keep the capacity
-		blocks = blocks[:0]
 
 		select {
 		case <-shutdownCh:
@@ -125,20 +89,20 @@ func consumeCommonBlocks(
 	chain blockchainInterface,
 	blockStream *blockStream,
 	shutdownCh <-chan os.Signal,
-) (*types.Block, uint64, error) {
+) (*types.Block, error) {
 	for {
-		block, size, err := blockStream.nextBlock()
+		block, err := blockStream.nextBlock()
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
 		if block == nil {
-			return nil, 0, nil
+			return nil, nil
 		}
 
 		if block.Number() == 0 {
 			if block.Hash() != chain.Genesis() {
-				return nil, 0, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"the hash of genesis block (%s) does not match blockchain genesis (%s)",
 					block.Hash(),
 					chain.Genesis(),
@@ -149,12 +113,12 @@ func consumeCommonBlocks(
 		}
 
 		if hash := chain.GetHashByNumber(block.Number()); hash != block.Hash() {
-			return block, size, nil
+			return block, nil
 		}
 
 		select {
 		case <-shutdownCh:
-			return nil, 0, nil
+			return nil, nil
 		default:
 		}
 	}
@@ -188,22 +152,22 @@ func (b *blockStream) getMetadata() (*Metadata, error) {
 }
 
 // nextBlock consumes some bytes from input and returns parsed block
-func (b *blockStream) nextBlock() (*types.Block, uint64, error) {
+func (b *blockStream) nextBlock() (*types.Block, error) {
 	size, err := b.loadRLPArray()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	if size == 0 {
-		return nil, 0, nil
+		return nil, nil
 	}
 
 	block, err := b.parseBlock(size)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	return block, size, nil
+	return block, nil
 }
 
 // loadRLPArray loads RLP encoded array from input to buffer
