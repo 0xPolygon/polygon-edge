@@ -19,5 +19,7 @@ func (n *Net) Listening() (interface{}, error) {
 
 // PeerCount returns number of peers currently connected to the client
 func (n *Net) PeerCount() (interface{}, error) {
-	return argUintPtr(0), nil
+	peers := n.d.store.GetPeers()
+
+	return strconv.FormatInt(int64(peers), 10), nil
 }

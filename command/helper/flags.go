@@ -57,7 +57,7 @@ func (f *FormatterFlag) DefineFlags(flagMap map[string]FlagDescriptor) {
 		Arguments: []string{
 			"JSON",
 		},
-		ArgumentsOptional: false,
+		ArgumentsOptional: true,
 		FlagOptional:      true,
 	}
 }

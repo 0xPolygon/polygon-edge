@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/state"
-
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-sdk/protocol"
+	"github.com/0xPolygon/polygon-sdk/state"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -528,7 +527,6 @@ func TestWriteTransactions(t *testing.T) {
 			0,
 		},
 		{
-
 			"unrecoverable transaction is not returned to pool and not included in transition",
 			[]*types.Transaction{{Nonce: 1}},
 			nil,
@@ -574,7 +572,7 @@ func TestWriteTransactions(t *testing.T) {
 
 			included := m.writeTransactions(1000, mockTransition)
 
-			assert.Equal(t, test.expectedTxPoolLength, len(mockTxPool.transactions))
+			assert.Equal(t, uint64(test.expectedTxPoolLength), m.txpool.Length())
 			assert.Equal(t, test.expectedIncludedTxnsCount, len(included))
 			for _, recoverable := range mockTransition.recoverableTransactions {
 				assert.False(t, mockTxPool.nonceDecreased[recoverable])
@@ -683,39 +681,53 @@ func (s *mockSyncer) Broadcast(b *types.Block) {
 
 type mockTxPool struct {
 	transactions          []*types.Transaction
+	demoted               []*types.Transaction
 	nonceDecreased        map[*types.Transaction]bool
 	resetWithHeaderCalled bool
 	resetWithHeadersParam []*types.Header
 }
 
-func (p *mockTxPool) ResetWithHeaders(headers ...*types.Header) {
-	p.resetWithHeaderCalled = true
-	p.resetWithHeadersParam = headers
+func (p *mockTxPool) Prepare() {
+
 }
 
-func (p *mockTxPool) Pop() (*types.Transaction, func()) {
+func (p *mockTxPool) Length() uint64 {
+	return uint64(len(p.transactions) + len(p.demoted))
+}
+
+func (p *mockTxPool) Peek() *types.Transaction {
 	if len(p.transactions) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	t := p.transactions[0]
-	p.transactions = p.transactions[1:]
-
-	return t, func() {
-		p.transactions = append(p.transactions, t)
-	}
+	return p.transactions[0]
 }
 
-func (p *mockTxPool) DecreaseAccountNonce(txn *types.Transaction) {
+func (p *mockTxPool) Pop(tx *types.Transaction) {
+	if len(p.transactions) == 0 {
+		return
+	}
+
+	p.transactions = p.transactions[1:]
+}
+
+func (p *mockTxPool) Demote(tx *types.Transaction) {
+	p.Pop(tx)
+	p.demoted = append(p.demoted, tx)
+}
+
+func (p *mockTxPool) Drop(tx *types.Transaction) {
 	if p.nonceDecreased == nil {
 		p.nonceDecreased = make(map[*types.Transaction]bool)
 	}
 
-	p.nonceDecreased[txn] = true
+	p.Pop(tx)
+	p.nonceDecreased[tx] = true
 }
 
-func (p *mockTxPool) Length() uint64 {
-	return uint64(len(p.transactions))
+func (p *mockTxPool) ResetWithHeaders(headers ...*types.Header) {
+	p.resetWithHeaderCalled = true
+	p.resetWithHeadersParam = headers
 }
 
 type mockTransition struct {

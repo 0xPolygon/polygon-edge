@@ -2,12 +2,13 @@ package loadbot
 
 import (
 	"fmt"
-	"os"
-	"strings"
-
 	"github.com/0xPolygon/polygon-sdk/crypto"
+	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/umbracle/go-web3/jsonrpc"
+	"google.golang.org/grpc"
+	"os"
+	"strings"
 )
 
 func createJSONRPCClient(endpoint string, maxConns int) (*jsonrpc.Client, error) {
@@ -19,6 +20,15 @@ func createJSONRPCClient(endpoint string, maxConns int) (*jsonrpc.Client, error)
 	client.SetMaxConnsLimit(maxConns)
 
 	return client, nil
+}
+
+func createGRPCClient(endpoint string) (txpoolOp.TxnPoolOperatorClient, error) {
+	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	return txpoolOp.NewTxnPoolOperatorClient(conn), nil
 }
 
 func extractSenderAccount(address types.Address) (*Account, error) {

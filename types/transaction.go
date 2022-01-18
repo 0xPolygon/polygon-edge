@@ -90,3 +90,7 @@ func (t *Transaction) Size() uint64 {
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Gas > blockGasLimit
 }
+
+func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
+	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
+}
