@@ -4,16 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/types"
-	"github.com/umbracle/go-web3"
+	"math"
 	"math/big"
 	"net"
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
+	"github.com/0xPolygon/polygon-sdk/helper/common"
+	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
 )
 
 type LoadbotCommand struct {
@@ -372,9 +374,14 @@ type LoadbotResult struct {
 	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
 	BlockData         TxnBlockData         `json:"blockData"`
 	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
+	RealTPS           uint64               `json:"realTps"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
+	// calculate real transactions per second value
+	// by deviding total transactions by total time in seconds
+	//nolint:lll
+	lr.RealTPS = metrics.TotalTransactionsSentCount / uint64(math.Floor(metrics.TransactionDuration.TotalExecTime.Seconds()))
 	lr.TurnAroundData.FastestTurnAround = common.ToFixedFloat(
 		metrics.TransactionDuration.FastestTurnAround.Seconds(),
 		durationPrecision,
@@ -431,6 +438,11 @@ func (lr *LoadbotResult) Output() string {
 	buffer.WriteString(helper.FormatKV([]string{
 		fmt.Sprintf("Transactions submitted|%d", lr.CountData.Total),
 		fmt.Sprintf("Transactions failed|%d", lr.CountData.Failed),
+	}))
+
+	buffer.WriteString("\n\n[REAL TPS]\n")
+	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("Real number of transactions per second|%d", lr.RealTPS),
 	}))
 
 	buffer.WriteString("\n\n[TURN AROUND DATA]\n")
