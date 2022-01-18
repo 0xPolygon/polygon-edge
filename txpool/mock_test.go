@@ -10,12 +10,25 @@ import (
 /* MOCK */
 
 type defaultMockStore struct {
+	DefaultHeader *types.Header
+}
+
+func NewDefaultMockStore(header *types.Header) defaultMockStore {
+	var defaultHeader = &types.Header{
+		GasLimit: 4712388,
+	}
+
+	if header != nil {
+		defaultHeader = header
+	}
+
+	return defaultMockStore{
+		defaultHeader,
+	}
 }
 
 func (m defaultMockStore) Header() *types.Header {
-	return &types.Header{
-		GasLimit: 4712388,
-	}
+	return m.DefaultHeader
 }
 
 func (m defaultMockStore) GetNonce(types.Hash, types.Address) uint64 {
