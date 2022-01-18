@@ -40,9 +40,16 @@ func (em *eventManager) subscribe(eventTypes []proto.EventType) *subscribeResult
 		eventTypes: eventTypes,
 		outputCh:   make(chan *proto.TxPoolEvent),
 		doneCh:     make(chan struct{}),
+		eventStore: &eventQueue{
+			events: make([]*proto.TxPoolEvent, 0),
+		},
+		notifyCh: make(chan struct{}),
 	}
 
 	em.subscriptions[subscriptionID(id)] = subscription
+
+	go subscription.runLoop()
+
 	em.logger.Info(fmt.Sprintf("Added new subscription %d", id))
 	atomic.AddInt64(&em.numSubscriptions, 1)
 
@@ -66,8 +73,8 @@ func (em *eventManager) cancelSubscription(id subscriptionID) {
 	}
 }
 
-// close stops the event manager, effectively cancelling all subscriptions
-func (em *eventManager) close() {
+// Close stops the event manager, effectively cancelling all subscriptions
+func (em *eventManager) Close() {
 	em.subscriptionsLock.Lock()
 	defer em.subscriptionsLock.Unlock()
 
@@ -80,25 +87,21 @@ func (em *eventManager) close() {
 
 // signalEvent is a helper method for alerting listeners of a new TxPool event
 func (em *eventManager) signalEvent(eventType proto.EventType, txHashes ...types.Hash) {
-	go func() {
-		if atomic.LoadInt64(&em.numSubscriptions) < 1 {
-			// No reason to lock the subscriptions map
-			// if no subscriptions exist
-			return
-		}
+	if atomic.LoadInt64(&em.numSubscriptions) < 1 {
+		// No reason to lock the subscriptions map
+		// if no subscriptions exist
+		return
+	}
 
-		em.subscriptionsLock.RLock()
-		defer em.subscriptionsLock.RUnlock()
+	em.subscriptionsLock.RLock()
+	defer em.subscriptionsLock.RUnlock()
 
-		for _, txHash := range txHashes {
-			event := &proto.TxPoolEvent{
+	for _, txHash := range txHashes {
+		for _, subscription := range em.subscriptions {
+			subscription.pushEvent(&proto.TxPoolEvent{
 				Type:   eventType,
 				TxHash: txHash.String(),
-			}
-
-			for _, subscription := range em.subscriptions {
-				go subscription.pushEvent(event)
-			}
+			})
 		}
-	}()
+	}
 }

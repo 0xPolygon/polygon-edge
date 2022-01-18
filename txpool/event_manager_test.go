@@ -5,6 +5,7 @@ import (
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
@@ -16,7 +17,7 @@ func TestEventManager_SubscribeCancel(t *testing.T) {
 	IDMap := make(map[subscriptionID]bool)
 
 	em := newEventManager(hclog.NewNullLogger())
-	defer em.close()
+	defer em.Close()
 
 	// Create the subscriptions
 	for i := 0; i < numSubscriptions; i++ {
@@ -63,7 +64,7 @@ func TestEventManager_SubscribeClose(t *testing.T) {
 	}
 
 	// Close off the event manager
-	em.close()
+	em.Close()
 	assert.Equal(t, int64(0), em.numSubscriptions)
 
 	// Check if the subscription channels are closed
@@ -81,7 +82,8 @@ func TestEventManager_SignalEvent(t *testing.T) {
 	supportedEventTypes := []proto.EventType{proto.EventType_ADDED, proto.EventType_DROPPED}
 
 	em := newEventManager(hclog.NewNullLogger())
-	defer em.close()
+
+	defer em.Close()
 
 	subscription := em.subscribe(supportedEventTypes)
 
@@ -128,4 +130,58 @@ func TestEventManager_SignalEvent(t *testing.T) {
 
 	assert.Equal(t, validEvents, eventsProcessed)
 	assert.Equal(t, validEvents, supportedEventsProcessed)
+}
+
+func TestEventManager_SignalEventOrder(t *testing.T) {
+	totalEvents := 1000
+	supportedEventTypes := []proto.EventType{
+		proto.EventType_ADDED,
+		proto.EventType_DROPPED,
+		proto.EventType_ENQUEUED,
+		proto.EventType_DEMOTED,
+		proto.EventType_PROMOTED,
+	}
+
+	em := newEventManager(hclog.NewNullLogger())
+
+	defer em.Close()
+
+	subscription := em.subscribe(supportedEventTypes)
+
+	mockEvents := shuffleTxPoolEvents(supportedEventTypes, totalEvents, 0)
+	mockHash := types.StringToHash(mockEvents[0].TxHash)
+	eventsProcessed := 0
+
+	var wg sync.WaitGroup
+
+	wg.Add(totalEvents)
+
+	go func() {
+		for {
+			select {
+			case event, more := <-subscription.subscriptionChannel:
+				if more {
+					assert.Equal(t, mockEvents[eventsProcessed].Type, event.Type)
+
+					eventsProcessed++
+
+					wg.Done()
+				}
+			case <-time.After(time.Second * 5):
+				for i := 0; i < totalEvents-eventsProcessed; i++ {
+					wg.Done()
+				}
+			}
+		}
+	}()
+
+	// Send the events
+	for _, mockEvent := range mockEvents {
+		em.signalEvent(mockEvent.Type, mockHash)
+	}
+
+	// Make sure all valid events get processed
+	wg.Wait()
+
+	assert.Equal(t, totalEvents, eventsProcessed)
 }

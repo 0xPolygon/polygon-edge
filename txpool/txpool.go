@@ -245,7 +245,7 @@ func (p *TxPool) Start() {
 
 // Close shuts down the pool's main loop.
 func (p *TxPool) Close() {
-	p.eventManager.close()
+	p.eventManager.Close()
 	p.shutdownCh <- struct{}{}
 }
 
