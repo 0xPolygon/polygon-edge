@@ -84,6 +84,8 @@ func CreateBackup(
 	}
 
 	if err := writeMetadata(fs, logger, reqTo, reqToHash); err != nil {
+		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
