@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/VividCortex/gohistogram v1.0.0 // indirect
-	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/go-kit/kit v0.9.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.4
