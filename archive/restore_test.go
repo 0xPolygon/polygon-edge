@@ -183,14 +183,10 @@ func Test_consumeCommonBlocks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			osSignal := make(<-chan os.Signal)
-			resultBlock, blockSize, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
+			resultBlock, err := consumeCommonBlocks(tt.chain, tt.blockStream, osSignal)
 
 			assert.Equal(t, tt.block, resultBlock)
 			assert.Equal(t, tt.err, err)
-			if tt.block != nil {
-				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
-				assert.Equal(t, expectedBlockSize, blockSize)
-			}
 		})
 	}
 }
@@ -219,14 +215,10 @@ func Test_parseBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			block, blockSize, err := tt.blockstream.nextBlock()
+			block, err := tt.blockstream.nextBlock()
 
 			assert.Equal(t, tt.block, block)
 			assert.Equal(t, tt.err, err)
-			if tt.block != nil {
-				expectedBlockSize := uint64(len(tt.block.MarshalRLP()))
-				assert.Equal(t, expectedBlockSize, blockSize)
-			}
 		})
 	}
 }
