@@ -223,6 +223,9 @@ func NewTxPool(
 // On each request received, the appropriate handler
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
+	// set default value of txpool pending transactions gauge
+	p.metrics.PendingTxs.Set(0)
+
 	go func() {
 		for {
 			select {
