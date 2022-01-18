@@ -651,6 +651,9 @@ type transitionInterface interface {
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var transactions []*types.Transaction
 
+	successTxCount := 0
+	failedTxCount := 0
+
 	i.txpool.Prepare()
 
 	for {
@@ -661,6 +664,8 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
 			transition.WriteFailedReceipt(tx)
+			failedTxCount++
+
 			transactions = append(transactions, tx)
 			i.txpool.Drop(tx)
 
@@ -682,10 +687,13 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		// no errors, pop the tx from the pool
 		i.txpool.Pop(tx)
 
+		successTxCount++
+
 		transactions = append(transactions, tx)
 	}
 
-	i.logger.Info("picked out txns from pool", "num", len(transactions), "remaining", i.txpool.Length())
+	//nolint:lll
+	i.logger.Info("picked out txns from pool", "numFailedTx ", failedTxCount, "numSuccessTx ", successTxCount, "remaining", i.txpool.Length())
 
 	return transactions
 }

@@ -761,10 +761,6 @@ func (t *mockTransition) Write(txn *types.Transaction) error {
 	return nil
 }
 
-func (t *mockTransition) WriteFa(txn *types.Transaction) {
-	t.transactionsWritten = append(t.transactionsWritten, txn)
-}
-
 type mockIbft struct {
 	t *testing.T
 	*Ibft
