@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 	"io"
 	"math/big"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
 
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
@@ -293,28 +294,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 	case ConsensusIBFT:
 		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
 	case ConsensusDev:
-		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
+		args = append(args, "--data-dir", t.Config.RootDir)
+		args = append(args, "--dev")
+
+		if t.Config.DevInterval != 0 {
+			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
+		}
 	case ConsensusDummy:
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
-	if t.Config.Consensus == ConsensusDev {
-		args = append(args, "--dev")
-		if t.Config.DevInterval != 0 {
-			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
-		}
-	}
-
 	if t.Config.Seal {
 		args = append(args, "--seal")
-	}
-
-	if len(t.Config.Locals) > 0 {
-		args = append(args, "--locals", strings.Join(t.Config.Locals, ","))
-	}
-
-	if t.Config.NoLocals {
-		args = append(args, "--nolocals")
 	}
 
 	if t.Config.PriceLimit != nil {

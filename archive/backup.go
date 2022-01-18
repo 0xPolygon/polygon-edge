@@ -42,7 +42,7 @@ func CreateBackup(
 		return nil
 	}
 	removeFile := func() {
-		if err = os.Remove(outPath); err != nil {
+		if err := os.Remove(outPath); err != nil {
 			logger.Error("an error occurred while removing file", "err", err)
 		}
 	}

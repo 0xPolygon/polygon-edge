@@ -38,11 +38,14 @@ type blockchainInterface interface {
 	CalculateGasLimit(number uint64) (uint64, error)
 }
 
-type transactionPoolInterface interface {
-	ResetWithHeaders(headers ...*types.Header)
-	Pop() (*types.Transaction, func())
-	DecreaseAccountNonce(tx *types.Transaction)
+type txPoolInterface interface {
+	Prepare()
 	Length() uint64
+	Peek() *types.Transaction
+	Pop(tx *types.Transaction)
+	Drop(tx *types.Transaction)
+	Demote(tx *types.Transaction)
+	ResetWithHeaders(headers ...*types.Header)
 }
 
 type syncerInterface interface {
@@ -70,7 +73,7 @@ type Ibft struct {
 	validatorKey     *ecdsa.PrivateKey // Private key for the validator
 	validatorKeyAddr types.Address
 
-	txpool transactionPoolInterface // Reference to the transaction pool
+	txpool txPoolInterface // Reference to the transaction pool
 
 	store     *snapshotStore // Snapshot store that keeps track of all snapshots
 	epochSize uint64
@@ -655,49 +658,43 @@ type transitionInterface interface {
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	txns := []*types.Transaction{}
-	returnTxnFuncs := []func(){}
+	var successful []*types.Transaction
+
+	i.txpool.Prepare()
 
 	for {
-		txn, retTxnFn := i.txpool.Pop()
-		if txn == nil {
+		tx := i.txpool.Peek()
+		if tx == nil {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			i.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			i.txpool.DecreaseAccountNonce(txn)
+		if tx.ExceedsBlockGasLimit(gasLimit) {
+			i.txpool.Drop(tx)
 
 			continue
 		}
 
-		if err := transition.Write(txn); err != nil {
-			//nolint:errorlint
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
-
+		if err := transition.Write(tx); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				i.txpool.Demote(tx)
 			} else {
-				i.txpool.DecreaseAccountNonce(txn)
+				i.txpool.Drop(tx)
 			}
 
 			continue
 		}
 
-		txns = append(txns, txn)
+		// no errors, pop the tx from the pool
+		i.txpool.Pop(tx)
+
+		successful = append(successful, tx)
 	}
 
-	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
-	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
-	for _, retFunc := range returnTxnFuncs {
-		retFunc()
-	}
+	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", i.txpool.Length())
 
-	i.logger.Info("picked out txns from pool", "num", len(txns), "remaining", i.txpool.Length())
-
-	return txns
+	return successful
 }
 
 // runAcceptState runs the Accept state loop
