@@ -150,9 +150,8 @@ func (e *Eth) SendRawTransaction(input string) (interface{}, error) {
 
 // Reject eth_sendTransaction json-rpc call as we don't support wallet management
 func (e *Eth) SendTransaction(arg *txnArgs) (interface{}, error) {
-	errMsg := "wallet management is not supported, any request call to the eth_sendTransaction method is not supported"
-
-	return nil, fmt.Errorf(errMsg)
+	//nolint:lll
+	return nil, fmt.Errorf("wallet management is not supported, any request call to the eth_sendTransaction method is not supported")
 }
 
 // GetTransactionByHash returns a transaction by its hash.
