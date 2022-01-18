@@ -13,11 +13,14 @@ type eventSubscription struct {
 	// outputCh is the update channel for the subscriber
 	outputCh chan *proto.TxPoolEvent
 
-	// doneCh indicating that the subscription is terminated
+	// doneCh is the channel for handling stop signals
 	doneCh chan struct{}
 
+	// notifyCh is the channel for receiving event requests
 	notifyCh chan struct{}
 
+	// eventStore is used for temporary concurrent event storage,
+	// required in order to preserve the chronological order of events
 	eventStore *eventQueue
 }
 
@@ -42,9 +45,10 @@ func (es *eventSubscription) close() {
 func (es *eventSubscription) runLoop() {
 	for {
 		select {
-		case <-es.doneCh:
+		case <-es.doneCh: // Break if a close signal has been received
 			return
-		case <-es.notifyCh:
+		case <-es.notifyCh: // Listen for new events to appear
+			// Grab the next event to be processed by order of sending
 			event := es.eventStore.pop()
 			if event == nil {
 				continue
@@ -62,6 +66,7 @@ func (es *eventSubscription) runLoop() {
 // pushEvent sends the event off for processing by the subscription. [NON-BLOCKING]
 func (es *eventSubscription) pushEvent(event *proto.TxPoolEvent) {
 	if es.eventSupported(event.Type) {
+		// Append the event to the event store, so order can be preserved
 		es.eventStore.push(event)
 
 		go func() {

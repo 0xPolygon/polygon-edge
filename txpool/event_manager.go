@@ -40,10 +40,10 @@ func (em *eventManager) subscribe(eventTypes []proto.EventType) *subscribeResult
 		eventTypes: eventTypes,
 		outputCh:   make(chan *proto.TxPoolEvent),
 		doneCh:     make(chan struct{}),
+		notifyCh:   make(chan struct{}),
 		eventStore: &eventQueue{
 			events: make([]*proto.TxPoolEvent, 0),
 		},
-		notifyCh: make(chan struct{}),
 	}
 
 	em.subscriptions[subscriptionID(id)] = subscription
