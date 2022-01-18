@@ -465,6 +465,10 @@ func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 		atomic.AddInt64(&s.inboundConnCount, 1)
 	}
 
+	if !s.config.NoDiscover && s.discovery.isBootNode(id) {
+		atomic.AddInt32(&s.discovery.bootnodeConnCount, 1)
+	}
+
 	s.emitEvent(id, PeerConnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
 }
@@ -478,6 +482,10 @@ func (s *Server) delPeer(id peer.ID) {
 	if peer, ok := s.peers[id]; ok {
 		if peer.connDirection == network.DirInbound {
 			atomic.AddInt64(&s.inboundConnCount, -1)
+		}
+
+		if !s.config.NoDiscover && s.discovery.isBootNode(id) {
+			atomic.AddInt32(&s.discovery.bootnodeConnCount, -1)
 		}
 
 		delete(s.peers, id)

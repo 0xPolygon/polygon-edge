@@ -98,6 +98,8 @@ type discovery struct {
 	closeCh chan struct{}
 
 	bootnodes []*peer.AddrInfo
+
+	bootnodeConnCount int32
 }
 
 func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
@@ -163,6 +165,16 @@ func (d *discovery) setup(bootnodes []*peer.AddrInfo) error {
 	return nil
 }
 
+// isBootNode checks whether the given peer is bootnode or not
+func (d *discovery) isBootNode(id peer.ID) bool {
+	for _, v := range d.bootnodes {
+		if v.ID == id {
+			return true
+		}
+	}
+
+	return false
+}
 func (d *discovery) addToTable(node *peer.AddrInfo) error {
 	// before we include peers on the routing table -> dial queue
 	// we have to add them to the peerstore so that they are
@@ -288,16 +300,26 @@ func (d *discovery) bootnodeDiscovery() {
 	if d.srv.numOpenSlots() <= 0 {
 		return
 	}
+
 	// get a random bootnode which is not connected
 	bootNode := d.srv.getBootNode()
 	if bootNode == nil {
 		return
 	}
 
-	if _, loaded := d.srv.temporaryDials.LoadOrStore(bootNode.ID, true); loaded {
-		return
+	// isTemporaryDial maintains the dial status
+	var isTemporaryDial bool
+
+	// if atlest one bootnode is connected the dial status is temporary
+	if d.bootnodeConnCount > 1 {
+		isTemporaryDial = true
 	}
-	defer d.srv.temporaryDials.Delete(bootNode.ID)
+
+	if isTemporaryDial {
+		if _, loaded := d.srv.temporaryDials.LoadOrStore(bootNode.ID, true); loaded {
+			return
+		}
+	}
 
 	if len(d.srv.host.Peerstore().Addrs(bootNode.ID)) == 0 {
 		d.srv.host.Peerstore().AddAddr(bootNode.ID, bootNode.Addrs[0], peerstore.AddressTTL)
@@ -325,9 +347,11 @@ func (d *discovery) bootnodeDiscovery() {
 		return
 	}
 
-	if !d.srv.hasPeer(bootNode.ID) {
+	if !d.srv.hasPeer(bootNode.ID) || isTemporaryDial {
 		d.srv.Disconnect(bootNode.ID, "Thank you")
 	}
+
+	d.srv.temporaryDials.Delete(bootNode.ID)
 
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
