@@ -2,12 +2,18 @@ package loadbot
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
+	"github.com/0xPolygon/polygon-sdk/command/loadbot/generator"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
 	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/umbracle/go-web3"
+	"math/big"
+	"net"
 	"net/url"
 	"sort"
+	"strings"
 )
 
 type LoadbotCommand struct {
@@ -27,7 +33,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"TPS",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["sender"] = helper.FlagDescriptor{
@@ -35,7 +40,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"SENDER",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["receiver"] = helper.FlagDescriptor{
@@ -43,7 +47,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"RECEIVER",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["value"] = helper.FlagDescriptor{
@@ -52,7 +55,6 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"VALUE",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["count"] = helper.FlagDescriptor{
@@ -60,16 +62,75 @@ func (l *LoadbotCommand) DefineFlags() {
 		Arguments: []string{
 			"COUNT",
 		},
-		ArgumentsOptional: true,
 	}
 
 	l.FlagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: "The JSON-RPC endpoint used to send transactions.",
+		Description: "The JSON-RPC endpoint used to query transactions.",
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      false,
+	}
+
+	l.FlagMap["grpc-address"] = helper.FlagDescriptor{
+		Description: "The GRPC endpoint used to send transactions.",
+		Arguments: []string{
+			"GRPC_ADDRESS",
+		},
+	}
+
+	l.FlagMap["mode"] = helper.FlagDescriptor{
+		Description: "The mode of operation [transfer, deploy]. Default: transfer",
+		Arguments: []string{
+			"MODE",
+		},
+	}
+
+	l.FlagMap["chain-id"] = helper.FlagDescriptor{
+		Description: "The network chain ID. Default: 100",
+		Arguments: []string{
+			"CHAIN_ID",
+		},
+	}
+
+	l.FlagMap["detailed"] = helper.FlagDescriptor{
+		Description: "Flag indicating if the error logs should be shown. Default: false",
+		Arguments: []string{
+			"DETAILED",
+		},
+		ArgumentsOptional: true,
+	}
+
+	l.FlagMap["gas-price"] = helper.FlagDescriptor{
+		Description: "The gas price that should be used for the transactions. If omitted, the average gas price is " +
+			"fetched from the network",
+		Arguments: []string{
+			"GAS_PRICE",
+		},
+	}
+
+	l.FlagMap["gas-limit"] = helper.FlagDescriptor{
+		Description: "The gas limit that should be used for the transactions. If omitted, the gas limit is " +
+			"estimated before starting the loadbot",
+		Arguments: []string{
+			"GAS_LIMIT",
+		},
+	}
+
+	l.FlagMap["contract"] = helper.FlagDescriptor{
+		Description: "The path to the contract JSON artifact containing the bytecode. If omitted, a default " +
+			"contract is used",
+		Arguments: []string{
+			"CONTRACT_PATH",
+		},
+	}
+
+	l.FlagMap["max-conns"] = helper.FlagDescriptor{
+		Description: "Sets the maximum no.of connections allowed per host. Default: 2*tps",
+		Arguments: []string{
+			"MAX_CONNECTIONS_COUNT",
+		},
 	}
 }
 
@@ -96,23 +157,37 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 	// Placeholders for flags
 	var (
-		tps         uint64
-		senderRaw   string
-		receiverRaw string
-		valueRaw    string
-		count       uint64
-		jsonrpc     string
-		maxConns    int
+		tps          uint64
+		mode         string
+		chainID      uint64
+		senderRaw    string
+		receiverRaw  string
+		valueRaw     string
+		count        uint64
+		jsonrpc      string
+		grpc         string
+		maxConns     int
+		detailed     bool
+		gasPrice     string
+		gasLimit     string
+		contractPath string
 	)
 
 	// Map flags to placeholders
 	flags.Uint64Var(&tps, "tps", 100, "")
+	flags.StringVar(&mode, "mode", string(transfer), "")
+	flags.BoolVar(&detailed, "detailed", false, "")
+	flags.Uint64Var(&chainID, "chain-id", 100, "")
 	flags.StringVar(&senderRaw, "sender", "", "")
 	flags.StringVar(&receiverRaw, "receiver", "", "")
 	flags.StringVar(&valueRaw, "value", "0x100", "")
 	flags.Uint64Var(&count, "count", 1000, "")
 	flags.StringVar(&jsonrpc, "jsonrpc", "", "")
+	flags.StringVar(&grpc, "grpc-address", "", "")
 	flags.IntVar(&maxConns, "max-conns", 0, "")
+	flags.StringVar(&gasPrice, "gas-price", "", "")
+	flags.StringVar(&gasLimit, "gas-limit", "", "")
+	flags.StringVar(&contractPath, "contract", "", "")
 
 	var err error
 	// Parse cli arguments
@@ -121,9 +196,45 @@ func (l *LoadbotCommand) Run(args []string) int {
 
 		return 1
 	}
+
+	convMode := Mode(strings.ToLower(mode))
+	if convMode != transfer && convMode != deploy {
+		l.Formatter.OutputError(errors.New("invalid loadbot mode"))
+
+		return 1
+	}
+
 	// maxConns is set to 2*tps if not specified by the user.
 	if maxConns == 0 {
 		maxConns = int(2 * tps)
+	}
+
+	var (
+		bigGasPrice *big.Int
+		gasPriceErr error
+
+		bigGasLimit *big.Int
+		gasLimitErr error
+	)
+
+	// Parse the gas price
+	if gasPrice != "" {
+		bigGasPrice, gasPriceErr = types.ParseUint256orHex(&gasPrice)
+		if gasPriceErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to decode gas price to value: %w", err))
+
+			return 1
+		}
+	}
+
+	// Parse the gas limit
+	if gasLimit != "" {
+		bigGasLimit, gasLimitErr = types.ParseUint256orHex(&gasLimit)
+		if gasLimitErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to decode gas limit to value: %w", err))
+
+			return 1
+		}
 	}
 
 	var sender types.Address
@@ -147,6 +258,12 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
+	if _, err := net.ResolveTCPAddr("tcp", grpc); err != nil {
+		l.Formatter.OutputError(fmt.Errorf("invalid GRPC url : %w", err))
+
+		return 1
+	}
+
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
 		l.Formatter.OutputError(fmt.Errorf("failed to decode to value: %w", err))
@@ -154,14 +271,38 @@ func (l *LoadbotCommand) Run(args []string) int {
 		return 1
 	}
 
+	var (
+		contractArtifact = &generator.ContractArtifact{
+			Bytecode: generator.DefaultContractBytecode,
+		}
+
+		readErr error
+	)
+
+	if contractPath != "" {
+		// Try to read the contract bytecode from the JSON path
+		contractArtifact, readErr = generator.ReadContractArtifact(contractPath)
+		if readErr != nil {
+			l.Formatter.OutputError(fmt.Errorf("failed to read contract bytecode: %w", readErr))
+
+			return 1
+		}
+	}
+
 	configuration := &Configuration{
-		TPS:      tps,
-		Sender:   sender,
-		Receiver: receiver,
-		Count:    count,
-		Value:    value,
-		JSONRPC:  jsonrpc,
-		MaxConns: maxConns,
+		TPS:              tps,
+		Sender:           sender,
+		Receiver:         receiver,
+		Count:            count,
+		Value:            value,
+		JSONRPC:          jsonrpc,
+		GRPC:             grpc,
+		MaxConns:         maxConns,
+		GeneratorMode:    convMode,
+		ChainID:          chainID,
+		GasPrice:         bigGasPrice,
+		GasLimit:         bigGasLimit,
+		ContractArtifact: contractArtifact,
 	}
 
 	// Create the metrics placeholder
@@ -191,6 +332,10 @@ func (l *LoadbotCommand) Run(args []string) int {
 	}
 	res.extractExecutionData(metrics)
 
+	if detailed {
+		res.extractDetailedErrors(loadBot.generator)
+	}
+
 	l.Formatter.OutputResult(res)
 
 	return 0
@@ -216,10 +361,17 @@ type TxnBlockData struct {
 	BlockTransactionsMap map[uint64]uint64 `json:"blockTransactionsMap"`
 }
 
+type TxnDetailedErrorData struct {
+	// DetailedErrorMap groups transaction errors by error type, with each transaction hash
+	// mapping to its specific error
+	DetailedErrorMap map[generator.TxnErrorType][]*generator.FailedTxnInfo `json:"detailedErrorMap"`
+}
+
 type LoadbotResult struct {
-	CountData      TxnCountData      `json:"countData"`
-	TurnAroundData TxnTurnAroundData `json:"turnAroundData"`
-	BlockData      TxnBlockData      `json:"blockData"`
+	CountData         TxnCountData         `json:"countData"`
+	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
+	BlockData         TxnBlockData         `json:"blockData"`
+	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
@@ -247,6 +399,28 @@ func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 		BlocksRequired:       uint64(len(metrics.TransactionDuration.blockTransactions)),
 		BlockTransactionsMap: metrics.TransactionDuration.blockTransactions,
 	}
+}
+
+func (lr *LoadbotResult) extractDetailedErrors(gen generator.TransactionGenerator) {
+	transactionErrors := gen.GetTransactionErrors()
+	if len(transactionErrors) == 0 {
+		return
+	}
+
+	errMap := make(map[generator.TxnErrorType][]*generator.FailedTxnInfo)
+
+	for _, txnError := range transactionErrors {
+		errArray, ok := errMap[txnError.Error.ErrorType]
+		if !ok {
+			errArray = make([]*generator.FailedTxnInfo, 0)
+		}
+
+		errArray = append(errArray, txnError)
+
+		errMap[txnError.Error.ErrorType] = errArray
+	}
+
+	lr.DetailedErrorData.DetailedErrorMap = errMap
 }
 
 func (lr *LoadbotResult) Output() string {
@@ -294,6 +468,45 @@ func (lr *LoadbotResult) Output() string {
 		}
 
 		buffer.WriteString(helper.FormatKV(formattedStrings))
+	}
+
+	// Write out the error logs if detailed view
+	// is requested
+	if len(lr.DetailedErrorData.DetailedErrorMap) != 0 {
+		buffer.WriteString("\n\n[DETAILED ERRORS]\n")
+
+		addToBuffer := func(detailedError *generator.FailedTxnInfo) {
+			if detailedError.TxHash != web3.ZeroHash.String() {
+				buffer.WriteString(fmt.Sprintf("\n\n[%s]\n", detailedError.TxHash))
+			} else {
+				buffer.WriteString("\n\n[Tx Hash Unavailable]\n")
+			}
+
+			formattedStrings := []string{
+				fmt.Sprintf("Index|%d", detailedError.Index),
+				fmt.Sprintf("Error|%s", detailedError.Error.Error.Error()),
+			}
+
+			buffer.WriteString(helper.FormatKV(formattedStrings))
+		}
+
+		receiptErrors, ok := lr.DetailedErrorData.DetailedErrorMap[generator.ReceiptErrorType]
+		if ok {
+			buffer.WriteString("[RECEIPT ERRORS]\n")
+
+			for _, receiptError := range receiptErrors {
+				addToBuffer(receiptError)
+			}
+		}
+
+		addErrors, ok := lr.DetailedErrorData.DetailedErrorMap[generator.AddErrorType]
+		if ok {
+			buffer.WriteString("[ADD ERRORS]\n")
+
+			for _, addError := range addErrors {
+				addToBuffer(addError)
+			}
+		}
 	}
 
 	buffer.WriteString("\n")

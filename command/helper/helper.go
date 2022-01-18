@@ -5,13 +5,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
@@ -143,7 +144,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 
 		// Add the flag arguments list
 		for argIndex, argument := range argumentsList {
-			if argIndex == 0 {
+			if argIndex == 0 && !descriptor.AreArgumentsOptional() {
 				// Only called for the first argument
 				output += " "
 			}
@@ -396,8 +397,6 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
@@ -464,12 +463,10 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
-	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
 	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")

@@ -3,8 +3,9 @@ package dev
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/protocol"
 
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
@@ -55,7 +56,6 @@ func Factory(
 
 	// enable dev mode so that we can accept non-signed txns
 	params.Txpool.EnableDev()
-	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
 }
@@ -73,16 +73,14 @@ func (d *Dev) Start() error {
 }
 
 func (d *Dev) nextNotify() chan struct{} {
-	if d.interval != 0 {
-		ch := make(chan struct{})
-
-		go func() {
-			<-time.After(time.Duration(d.interval) * time.Second)
-			ch <- struct{}{}
-		}()
-
-		return ch
+	if d.interval == 0 {
+		d.interval = 1
 	}
+
+	go func() {
+		<-time.After(time.Duration(d.interval) * time.Second)
+		d.notifyCh <- struct{}{}
+	}()
 
 	return d.notifyCh
 }
@@ -111,49 +109,43 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	txns := []*types.Transaction{}
-	returnTxnFuncs := []func(){}
+	var successful []*types.Transaction
+
+	d.txpool.Prepare()
 
 	for {
-		txn, retTxnFn := d.txpool.Pop()
-		if txn == nil {
+		tx := d.txpool.Peek()
+		if tx == nil {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.DecreaseAccountNonce(txn)
+		if tx.ExceedsBlockGasLimit(gasLimit) {
+			d.txpool.Drop(tx)
 
 			continue
 		}
 
-		if err := transition.Write(txn); err != nil {
-			//nolint:errorlint
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
-
+		if err := transition.Write(tx); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { //nolint:errorlint
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				d.txpool.Demote(tx)
 			} else {
-				d.txpool.DecreaseAccountNonce(txn)
+				d.txpool.Drop(tx)
 			}
 
 			continue
 		}
 
-		txns = append(txns, txn)
+		// no errors, pop the tx from the pool
+		d.txpool.Pop(tx)
+
+		successful = append(successful, tx)
 	}
 
-	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
-	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
-	for _, retFunc := range returnTxnFuncs {
-		retFunc()
-	}
+	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
 
-	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
-
-	return txns
+	return successful
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
