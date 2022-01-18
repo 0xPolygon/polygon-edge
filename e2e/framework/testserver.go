@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-
 	"github.com/0xPolygon/polygon-sdk/command/genesis"
 	"github.com/0xPolygon/polygon-sdk/command/helper"
 	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"

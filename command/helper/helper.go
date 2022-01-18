@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/contracts/staking"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	stakingHelper "github.com/0xPolygon/polygon-sdk/helper/staking"
 	"github.com/0xPolygon/polygon-sdk/types"
 	"github.com/mitchellh/cli"
