@@ -132,7 +132,7 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/imdario/mergo v0.3.7
+# github.com/imdario/mergo v0.3.12
 ## explicit
 github.com/imdario/mergo
 # github.com/ipfs/go-cid v0.0.7
