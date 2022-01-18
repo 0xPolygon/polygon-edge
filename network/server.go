@@ -369,12 +369,18 @@ func (s *Server) getRandomBootNode() *peer.AddrInfo {
 
 // getBootNode returns the address of a random bootnode which is not connected
 func (s *Server) getBootNode() *peer.AddrInfo {
-	size := int64(len(s.discovery.bootnodes))
-	for i := 0; i < int(size); i++ {
-		randNum, _ := rand.Int(rand.Reader, big.NewInt(size))
-		if peer := s.discovery.bootnodes[randNum.Int64()]; !s.hasPeer(peer.ID) {
-			return peer
+	nonConnectedNodes := make([]*peer.AddrInfo, 0)
+
+	for _, v := range s.discovery.bootnodes {
+		if !s.hasPeer(v.ID) {
+			nonConnectedNodes = append(nonConnectedNodes, v)
 		}
+	}
+
+	if len(nonConnectedNodes) > 0 {
+		randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(len(nonConnectedNodes))))
+
+		return nonConnectedNodes[randNum.Int64()]
 	}
 
 	return nil
