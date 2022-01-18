@@ -72,14 +72,14 @@ type ethStore interface {
 type Eth struct {
 	logger        hclog.Logger
 	store         ethStore
-	chainId       uint64
+	chainID       uint64
 	filterManager *FilterManager
 }
 
 // ChainId returns the chain id of the client
 //nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
-	return argUintPtr(e.chainId), nil
+	return argUintPtr(e.chainID), nil
 }
 
 func (e *Eth) getHeaderFromBlockNumberOrHash(bnh *BlockNumberOrHash) (*types.Header, error) {

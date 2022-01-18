@@ -10,12 +10,12 @@ type networkStore interface {
 // Net is the net jsonrpc endpoint
 type Net struct {
 	store   networkStore
-	chainId uint64
+	chainID uint64
 }
 
 // Version returns the current network id
 func (n *Net) Version() (interface{}, error) {
-	return strconv.FormatUint(n.chainId, 10), nil
+	return strconv.FormatUint(n.chainID, 10), nil
 }
 
 // Listening returns true if client is actively listening for network connections

@@ -45,7 +45,7 @@ type Dispatcher struct {
 	chainID       uint64
 }
 
-func newDispatcher(logger hclog.Logger, store JsonRPCStore, chainID uint64) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64) *Dispatcher {
 	d := &Dispatcher{
 		logger:  logger.Named("dispatcher"),
 		chainID: chainID,
@@ -61,7 +61,7 @@ func newDispatcher(logger hclog.Logger, store JsonRPCStore, chainID uint64) *Dis
 	return d
 }
 
-func (d *Dispatcher) registerEndpoints(store JsonRPCStore) {
+func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 	d.endpoints.Eth = &Eth{d.logger, store, d.chainID, d.filterManager}
 	d.endpoints.Net = &Net{store, d.chainID}
 	d.endpoints.Web3 = &Web3{}

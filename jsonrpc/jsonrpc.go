@@ -44,9 +44,9 @@ type dispatcher interface {
 	Handle(reqBody []byte) ([]byte, error)
 }
 
-// JsonRPCStore defines all the methods required
+// JSONRPCStore defines all the methods required
 // by all the JSON RPC endpoints
-type JsonRPCStore interface {
+type JSONRPCStore interface {
 	ethStore
 	networkStore
 	txPoolStore
@@ -54,7 +54,7 @@ type JsonRPCStore interface {
 }
 
 type Config struct {
-	Store   JsonRPCStore
+	Store   JSONRPCStore
 	Addr    *net.TCPAddr
 	ChainID uint64
 }

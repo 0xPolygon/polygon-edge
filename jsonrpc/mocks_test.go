@@ -45,7 +45,7 @@ type mockEvent struct {
 }
 
 type mockStore struct {
-	JsonRPCStore
+	JSONRPCStore
 
 	header       *types.Header
 	subscription *blockchain.MockSubscription
