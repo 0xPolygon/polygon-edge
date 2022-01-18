@@ -71,6 +71,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 	progression.UpdateHighestProgression(metadata.Latest)
 
 	nextBlock := firstBlock
+
 	for {
 		if err := chain.WriteBlock(nextBlock); err != nil {
 			return err
@@ -82,6 +83,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 		if err != nil {
 			return err
 		}
+
 		if nextBlock == nil {
 			break
 		}

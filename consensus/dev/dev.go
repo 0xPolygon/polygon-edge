@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
 	"github.com/0xPolygon/polygon-sdk/blockchain"
 	"github.com/0xPolygon/polygon-sdk/consensus"
 	"github.com/0xPolygon/polygon-sdk/helper/progress"

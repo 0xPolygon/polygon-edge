@@ -88,6 +88,11 @@ func CreateBackup(
 	}
 
 	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
+	if err != nil {
+		closeAndRemoveFile()
+
+		return 0, 0, err
+	}
 
 	if err := closeFile(); err != nil {
 		removeFile()
