@@ -60,6 +60,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 	}
 
 	nextBlock := firstBlock
+
 	for {
 		if err := chain.WriteBlock(nextBlock); err != nil {
 			return err
@@ -69,6 +70,7 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 		if err != nil {
 			return err
 		}
+
 		if nextBlock == nil {
 			break
 		}

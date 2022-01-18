@@ -84,10 +84,17 @@ func CreateBackup(
 	}
 
 	if err := writeMetadata(fs, logger, reqTo, reqToHash); err != nil {
+		closeAndRemoveFile()
+
 		return 0, 0, err
 	}
 
 	resFrom, resTo, err := processExportStream(stream, logger, fs, from, reqTo)
+	if err != nil {
+		closeAndRemoveFile()
+
+		return 0, 0, err
+	}
 
 	if err := closeFile(); err != nil {
 		removeFile()
