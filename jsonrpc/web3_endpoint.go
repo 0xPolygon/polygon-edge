@@ -9,9 +9,7 @@ import (
 )
 
 // Web3 is the web3 jsonrpc endpoint
-type Web3 struct {
-	d *Dispatcher
-}
+type Web3 struct{}
 
 // ClientVersion returns the version of the web3 client (web3_clientVersion)
 func (w *Web3) ClientVersion() (interface{}, error) {

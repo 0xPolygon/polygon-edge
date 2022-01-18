@@ -8,10 +8,9 @@ import (
 )
 
 func TestContentEndpoint(t *testing.T) {
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
-	s.registerEndpoints()
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 
-	resp, err := s.Handle([]byte(`{
+	resp, err := dispatcher.Handle([]byte(`{
 		"method": "txpool_content",
 		"params": []
 	}`))
@@ -25,10 +24,9 @@ func TestContentEndpoint(t *testing.T) {
 }
 
 func TestInspectEndpoint(t *testing.T) {
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
-	s.registerEndpoints()
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 
-	resp, err := s.Handle([]byte(`{
+	resp, err := dispatcher.Handle([]byte(`{
 		"method": "txpool_inspect",
 		"params": []
 	}`))
@@ -44,10 +42,9 @@ func TestInspectEndpoint(t *testing.T) {
 }
 
 func TestStatusEndpoint(t *testing.T) {
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
-	s.registerEndpoints()
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 
-	resp, err := s.Handle([]byte(`{
+	resp, err := dispatcher.Handle([]byte(`{
 		"method": "txpool_status",
 		"params": []
 	}`))
