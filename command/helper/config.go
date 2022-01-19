@@ -54,8 +54,6 @@ type Network struct {
 
 // TxPool defines the TxPool configuration params
 type TxPool struct {
-	Locals     string `json:"locals"`
-	NoLocals   bool   `json:"no_locals"`
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
 }
@@ -155,14 +153,6 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	// TxPool
 	{
-		if c.TxPool.Locals != "" {
-			strAddrs := strings.Split(c.TxPool.Locals, ",")
-			conf.Locals = make([]types.Address, len(strAddrs))
-			for i, sAddr := range strAddrs {
-				conf.Locals[i] = types.StringToAddress(sAddr)
-			}
-		}
-		conf.NoLocals = c.TxPool.NoLocals
 		conf.PriceLimit = c.TxPool.PriceLimit
 		conf.MaxSlots = c.TxPool.MaxSlots
 	}
@@ -298,14 +288,6 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.TxPool != nil {
 		// TxPool
-		if otherConfig.TxPool.Locals != "" {
-			c.TxPool.Locals = otherConfig.TxPool.Locals
-		}
-
-		if otherConfig.TxPool.NoLocals {
-			c.TxPool.NoLocals = otherConfig.TxPool.NoLocals
-		}
-
 		if otherConfig.TxPool.PriceLimit != 0 {
 			c.TxPool.PriceLimit = otherConfig.TxPool.PriceLimit
 		}

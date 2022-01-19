@@ -25,7 +25,7 @@ import (
 
 const (
 	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "example"
+	DefaultChainName      = "polygon-sdk"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
@@ -145,7 +145,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 
 		// Add the flag arguments list
 		for argIndex, argument := range argumentsList {
-			if argIndex == 0 {
+			if argIndex == 0 && !descriptor.AreArgumentsOptional() {
 				// Only called for the first argument
 				output += " "
 			}
@@ -401,8 +401,6 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
@@ -470,12 +468,10 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Int64Var(&cliConfig.Network.MaxPeers, "max-peers", -1, "maximum number of peers")
 	flags.Int64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", -1, "maximum number of inbound peers")
 	flags.Int64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", -1, "maximum number of outbound peers")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
-	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
 

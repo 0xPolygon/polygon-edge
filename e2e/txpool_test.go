@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"sync"
@@ -319,40 +318,33 @@ func TestTxPool_StressAddition(t *testing.T) {
 	// Predefined values
 	defaultBalance := framework.EthToWei(10000)
 
-	// Each account should add 40 transactions
-	numIterations := 200
-	numAccounts := 5
+	// Each account should add 50 transactions
+	numAccounts := 4
+	numTxPerAccount := 50
 
 	testAccounts := generateTestAccounts(t, numAccounts)
 
 	// Set up the test server
-	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	srv := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
 		config.SetBlockLimit(20000000)
 		for _, testAccount := range testAccounts {
 			config.Premine(testAccount.address, defaultBalance)
 		}
-	})
-	srv := srvs[0]
+	})[0]
 	client := srv.JSONRPC()
 
 	// Required default values
 	signer := crypto.NewEIP155Signer(100)
 
 	// TxPool client
-	clt := srv.TxnPoolOperator()
 	toAddress := types.StringToAddress("1")
 	defaultValue := framework.EthToWeiPrecise(1, 15) // 0.001 ETH
 
-	generateTx := func(account *testAccount) *types.Transaction {
-		nextNonce, err := client.Eth().GetNonce(web3.Address(account.address), web3.Latest)
-		if err != nil {
-			t.Fatalf("Unable to get nonce")
-		}
-
+	generateTx := func(account *testAccount, nonce uint64) *types.Transaction {
 		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    nextNonce,
+			Nonce:    nonce,
 			From:     account.address,
 			To:       &toAddress,
 			GasPrice: big.NewInt(10),
@@ -370,32 +362,39 @@ func TestTxPool_StressAddition(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	// Add the transactions with the following nonce order
-	for i := 0; i < numAccounts; i++ {
-		// Start a concurrent loop
-		wg.Add(1)
+	for _, account := range testAccounts {
+		for nonce := uint64(0); nonce < uint64(numTxPerAccount); nonce++ {
+			wg.Add(1)
 
-		go func(index int, clt txpoolOp.TxnPoolOperatorClient, testAccounts []*testAccount) {
-			defer wg.Done()
+			go func(account *testAccount, nonce uint64) {
+				defer wg.Done()
 
-			for innerIndex := 0; innerIndex < numIterations/numAccounts; innerIndex++ {
-				txHash, err := client.Eth().SendRawTransaction(generateTx(testAccounts[index]).MarshalRLP())
+				tx := generateTx(account, nonce)
+
+				txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
 				if err != nil {
 					t.Errorf("Unable to send txn, %v", err)
+
+					return
 				}
 
 				waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
 				defer waitCancel()
 
-				_, err = tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash)
-				if err != nil {
-					t.Errorf("Unable to wait for receipt, %v", err)
-
-					return
+				// if we don't receive the receipt
+				// for the last tx from some account
+				// the test can be considered failed
+				// (also prevents broken pipe errors - tcp write
+				// by reducing the number of requests)
+				if nonce == uint64(numTxPerAccount)-1 {
+					if _, err := tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash); err != nil {
+						t.Errorf("Unable to wait for receipt, %v", err)
+					}
 				}
-			}
-		}(i, clt, testAccounts)
+			}(account, nonce)
+		}
 	}
+
 	wg.Wait()
 
 	// Make sure the transactions went through
@@ -405,216 +404,46 @@ func TestTxPool_StressAddition(t *testing.T) {
 			t.Fatalf("Unable to fetch block")
 		}
 
-		assert.Equal(t, uint64(numIterations/numAccounts), nonce)
-	}
-}
-
-func TestPriceLimit(t *testing.T) {
-	signer := &crypto.FrontierSigner{}
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	testCases := []struct {
-		name             string
-		numNodes         int
-		locals           []string
-		noLocals         bool
-		priceLimit       uint64
-		gasPrice         int64
-		err              error // JSON-RPC error
-		numReceivedNodes int64
-	}{
-		{
-			name:             "tx should propagate",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         false,
-			priceLimit:       10,
-			gasPrice:         100,
-			err:              nil,
-			numReceivedNodes: 3,
-		},
-		{
-			name:             "tx should be rejected due to low gas price",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         true,
-			priceLimit:       10,
-			gasPrice:         5,
-			err:              errors.New("{\"code\":-32600,\"message\":\"transaction underpriced\"}"),
-			numReceivedNodes: 0,
-		},
-		{
-			name:             "tx should not propagate",
-			numNodes:         3,
-			locals:           nil,
-			noLocals:         false,
-			priceLimit:       10,
-			gasPrice:         0,
-			err:              nil,
-			numReceivedNodes: 1, // only first node receive
-		},
-		{
-			name:             "tx should propagate because sender address is treated as local transaction",
-			numNodes:         3,
-			locals:           []string{senderAddr.String()},
-			noLocals:         true,
-			priceLimit:       10,
-			gasPrice:         0,
-			err:              nil,
-			numReceivedNodes: 3,
-		},
-	}
-
-	defaultConfig := func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDummy)
-		config.Premine(senderAddr, framework.EthToWei(10))
-		config.SetSeal(true)
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			srvs := framework.NewTestServers(t, tt.numNodes, func(config *framework.TestServerConfig) {
-				defaultConfig(config)
-				config.SetLocals(tt.locals)
-				config.SetNoLocals(tt.noLocals)
-				config.SetPriceLimit(&tt.priceLimit)
-			})
-			framework.MultiJoinSerial(t, srvs)
-
-			// wait until gossip protocol build mesh network
-			// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
-			time.Sleep(time.Second * 2)
-
-			tx, err := signer.SignTx(&types.Transaction{
-				Nonce:    0,
-				From:     senderAddr,
-				To:       &receiverAddr,
-				Value:    framework.EthToWei(1),
-				Gas:      1000000,
-				GasPrice: big.NewInt(tt.gasPrice),
-				Input:    []byte{},
-			}, senderKey)
-			assert.NoError(t, err, "failed to sign transaction")
-
-			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
-			if tt.err != nil {
-				assert.Equal(t, tt.err.Error(), err.Error())
-			} else {
-				assert.NoError(t, err, "failed to send transaction")
-			}
-
-			for i, srv := range srvs {
-				srv := srv
-				shouldHaveTxPool := false
-				subTestName := fmt.Sprintf("node %d shouldn't have tx in txpool", i)
-				if i < int(tt.numReceivedNodes) {
-					shouldHaveTxPool = true
-					subTestName = fmt.Sprintf("node %d should have tx in txpool", i)
-				}
-
-				t.Run(subTestName, func(t *testing.T) {
-					t.Parallel()
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-					defer cancel()
-					res, err := framework.WaitUntilTxPoolFilled(ctx, srv, 1)
-
-					if shouldHaveTxPool {
-						assert.NoError(t, err)
-						assert.Equal(t, uint64(1), res.Length)
-					} else {
-						assert.ErrorIs(t, err, tests.ErrTimeout)
-					}
-				})
-			}
-		})
+		assert.Equal(t, uint64(numTxPerAccount), nonce)
 	}
 }
 
 func TestInvalidTransactionRecover(t *testing.T) {
 	// Test scenario :
-	//
-	// 1. Send a transaction with gasLimit > block gas limit.
+	// Send a transaction with gasLimit > block gas limit.
 	//		-> The transaction should not be applied, and the nonce should not be incremented.
-	//
-	// 2. Send a second transaction with a gasLimit < block gas limit.
-	//		-> The transaction should be applied, and the receiver balance increased.
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
-	testTable := []struct {
-		name              string
-		sender            types.Address
-		receiver          types.Address
-		nonce             uint64
-		submittedGasLimit uint64
-		value             *big.Int
-		shouldSucceed     bool
-	}{
-		{
-			name:              "Invalid transfer caused by exceeding block gas limit",
-			sender:            senderAddress,
-			receiver:          receiverAddress,
-			nonce:             0,
-			submittedGasLimit: 5000000000,
-			value:             oneEth,
-			shouldSucceed:     false,
-		},
-		{
-			name:              "Valid transfer #1",
-			sender:            senderAddress,
-			receiver:          receiverAddress,
-			nonce:             0,
-			submittedGasLimit: framework.DefaultGasLimit,
-			value:             oneEth,
-			shouldSucceed:     true,
-		},
-	}
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(5)
 		config.Premine(senderAddress, framework.EthToWei(100))
-	})
-
-	server := servers[0]
+	})[0]
 	client := server.JSONRPC()
-	operator := server.TxnPoolOperator()
-	ctx := context.Background()
 
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			tx, err := signer.SignTx(&types.Transaction{
-				Nonce:    testCase.nonce,
-				GasPrice: big.NewInt(10000),
-				Gas:      testCase.submittedGasLimit,
-				To:       &testCase.receiver,
-				Value:    testCase.value,
-				V:        big.NewInt(1),
-				From:     testCase.sender,
-			}, senderKey)
-			assert.NoError(t, err, "failed to sign transaction")
+	tx, err := signer.SignTx(&types.Transaction{
+		Nonce:    0,
+		GasPrice: big.NewInt(10000),
+		Gas:      5000000000,
+		To:       &receiverAddress,
+		Value:    oneEth,
+		V:        big.NewInt(1),
+		From:     senderAddress,
+	}, senderKey)
+	assert.NoError(t, err, "failed to sign transaction")
 
-			_, err = operator.AddTxn(ctx, &txpoolOp.AddTxnReq{
-				Raw: &any.Any{
-					Value: tx.MarshalRLP(),
-				},
-				From: types.ZeroAddress.String(),
-			})
-			assert.NoError(t, err, "failed to add txn using operator")
+	// send tx
+	_, err = server.JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
+	assert.NoError(t, err)
 
-			_ = waitForBlock(t, server, 1, 0)
+	balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
+	assert.NoError(t, err, "failed to retrieve receiver account balance")
+	assert.Equal(t, framework.EthToWei(0).String(), balance.String())
 
-			balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
-			assert.NoError(t, err, "failed to retrieve receiver account balance")
-
-			if testCase.shouldSucceed {
-				assert.Equal(t, oneEth.String(), balance.String())
-			} else {
-				assert.Equal(t, framework.EthToWei(0).String(), balance.String())
-			}
-		})
-	}
+	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), nextNonce)
 }
 
 func TestTxPool_RecoverableError(t *testing.T) {
@@ -629,95 +458,94 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	//
 	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
-	testTable := []struct {
-		name          string
-		sender        types.Address
-		senderKey     *ecdsa.PrivateKey
-		receiver      types.Address
-		nonce         uint64
-		gas           uint64
-		value         *big.Int
-		shouldSucceed bool
-	}{
+
+	transactions := []*types.Transaction{
 		{
-			name:          "Valid transaction #1",
-			sender:        senderAddress,
-			senderKey:     senderKey,
-			receiver:      receiverAddress,
-			nonce:         0,
-			gas:           framework.DefaultGasLimit - 1,
-			value:         oneEth,
-			shouldSucceed: true,
+			Nonce:    0,
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			Gas:      22000,
+			To:       &receiverAddress,
+			Value:    oneEth,
+			V:        big.NewInt(27),
+			From:     senderAddress,
 		},
 		{
-			name:          "Invalid transaction (no enough gas remaining in pool)",
-			sender:        senderAddress,
-			senderKey:     senderKey,
-			receiver:      receiverAddress,
-			nonce:         1,
-			gas:           framework.DefaultGasLimit / 2,
-			value:         oneEth,
-			shouldSucceed: false,
+			Nonce:    1,
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			Gas:      22000,
+			To:       &receiverAddress,
+			Value:    oneEth,
+			V:        big.NewInt(27),
+			From:     senderAddress,
 		},
 		{
-			name:          "Valid transaction #2",
-			sender:        senderAddress,
-			senderKey:     senderKey,
-			receiver:      receiverAddress,
-			nonce:         2,
-			gas:           framework.DefaultGasLimit / 2,
-			value:         oneEth,
-			shouldSucceed: true,
+			Nonce:    2,
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			Gas:      22000,
+			To:       &receiverAddress,
+			Value:    oneEth,
+			V:        big.NewInt(27),
+			From:     senderAddress,
 		},
 	}
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(5)
+		config.SetBlockLimit(2.5 * 21000)
+		config.SetDevInterval(2)
 		config.Premine(senderAddress, framework.EthToWei(100))
-	})
+	})[0]
 
-	server := servers[0]
 	client := server.JSONRPC()
 	operator := server.TxnPoolOperator()
-	ctx := context.Background()
+	hashes := make([]web3.Hash, 3)
 
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			tx, err := signer.SignTx(&types.Transaction{
-				Nonce:    testCase.nonce,
-				GasPrice: big.NewInt(10000),
-				Gas:      testCase.gas,
-				To:       &testCase.receiver,
-				Value:    testCase.value,
-				V:        big.NewInt(27),
-				From:     testCase.sender,
-			}, testCase.senderKey)
-			assert.NoError(t, err, "failed to sign transaction")
+	for i, tx := range transactions {
+		signedTx, err := signer.SignTx(tx, senderKey)
+		assert.NoError(t, err)
 
-			_, err = operator.AddTxn(ctx, &txpoolOp.AddTxnReq{
-				Raw: &any.Any{
-					Value: tx.MarshalRLP(),
-				},
-				From: types.ZeroAddress.String(),
-			})
-			assert.NoError(t, err, "failed to add txn using operator")
-
-			if testCase.shouldSucceed {
-				_ = waitForBlock(t, server, 1, 0)
-			}
+		response, err := operator.AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+			Raw: &any.Any{
+				Value: signedTx.MarshalRLP(),
+			},
+			From: types.ZeroAddress.String(),
 		})
+		assert.NoError(t, err, "Unable to send transaction, %v", err)
+
+		txHash := web3.Hash(types.StringToHash(response.TxHash))
+
+		// save for later querying
+		hashes[i] = txHash
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+
+	// wait for the last tx to be included in a block
+	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), hashes[2])
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
+
+	// assert balance moved
 	balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
 	assert.NoError(t, err, "failed to retrieve receiver account balance")
-
 	assert.Equal(t, framework.EthToWei(3).String(), balance.String())
 
-	blockNumber, err := client.Eth().BlockNumber()
-	assert.NoError(t, err, "failed to retrieve most recent block number")
-	assert.Equal(t, blockNumber, uint64(2))
+	// Query 1st and 2nd txs
+	firstTx, err := client.Eth().GetTransactionByHash(hashes[0])
+	assert.NoError(t, err)
+	assert.NotNil(t, firstTx)
+
+	secondTx, err := client.Eth().GetTransactionByHash(hashes[1])
+	assert.NoError(t, err)
+	assert.NotNil(t, secondTx)
+
+	// first two are in one block
+	assert.Equal(t, firstTx.BlockNumber, secondTx.BlockNumber)
+
+	// last tx is included in next block
+	assert.NotEqual(t, secondTx.BlockNumber, receipt.BlockNumber)
 }
 
 func TestTxPool_ZeroPriceDev(t *testing.T) {
@@ -737,7 +565,6 @@ func TestTxPool_ZeroPriceDev(t *testing.T) {
 		config.SetSeal(true)
 		config.SetDevInterval(5)
 		config.SetPriceLimit(&zeroPriceLimit)
-		config.SetNoLocals(true)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
 	})
@@ -814,15 +641,15 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 
 	startingBalance := framework.EthToWei(100)
 
-	servers := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
+	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.SetSeal(true)
-		config.SetDevInterval(5)
+		config.SetDevInterval(3)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
-	})
+	})[0]
 
-	server := servers[0]
+	operator := server.TxnPoolOperator()
 	client := server.JSONRPC()
 
 	// Construct the transaction
@@ -838,39 +665,42 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	assert.NoError(t, err, "failed to sign transaction")
 
 	// Add the transaction
-	txHash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
-	if err != nil {
-		t.Fatalf("Unable to send transaction, %v", err)
-	}
+	response, err := operator.AddTxn(context.Background(), &txpoolOp.AddTxnReq{
+		Raw: &any.Any{
+			Value: signedTx.MarshalRLP(),
+		},
+		From: types.ZeroAddress.String(),
+	})
+	assert.NoError(t, err, "Unable to send transaction, %v", err)
+
+	txHash := web3.Hash(types.StringToHash(response.TxHash))
 
 	// Grab the pending transaction from the pool
-	txn, getErr := client.Eth().GetTransactionByHash(txHash)
-	if getErr != nil {
-		t.Fatalf("Unable to get transaction by hash, %v", getErr)
-	}
-
-	assert.NotNil(t, txn)
+	tx, err := client.Eth().GetTransactionByHash(txHash)
+	assert.NoError(t, err, "Unable to get transaction by hash, %v", err)
+	assert.NotNil(t, tx)
 
 	// Make sure the specific fields are not filled yet
-	assert.Equal(t, uint64(0), txn.TxnIndex)
-	assert.Equal(t, uint64(0), txn.BlockNumber)
-	assert.Equal(t, web3.ZeroHash, txn.BlockHash)
+	assert.Equal(t, uint64(0), tx.TxnIndex)
+	assert.Equal(t, uint64(0), tx.BlockNumber)
+	assert.Equal(t, web3.ZeroHash, tx.BlockHash)
 
 	// Wait for the transaction to be included into a block
-	blockNum := waitForBlock(t, server, 1, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	block, blockErr := client.Eth().GetBlockByNumber(web3.BlockNumber(blockNum), false)
-	if blockErr != nil {
-		t.Fatalf("Unable to fetch block, %v", blockErr)
-	}
+	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
+	assert.NoError(t, err)
+	assert.NotNil(t, receipt)
 
-	txn, getErr = client.Eth().GetTransactionByHash(txHash)
-	if getErr != nil {
-		t.Fatalf("Unable to get transaction by hash, %v", getErr)
-	}
+	assert.Equal(t, tx.TxnIndex, receipt.TransactionIndex)
 
-	assert.NotNil(t, txn)
-	assert.Equal(t, uint64(0), txn.TxnIndex)
-	assert.Equal(t, block.Number, txn.BlockNumber)
-	assert.Equal(t, block.Hash, txn.BlockHash)
+	// fields should be updated
+	tx, err = client.Eth().GetTransactionByHash(txHash)
+	assert.NoError(t, err, "Unable to get transaction by hash, %v", err)
+	assert.NotNil(t, tx)
+
+	assert.Equal(t, uint64(0), tx.TxnIndex)
+	assert.Equal(t, receipt.BlockNumber, tx.BlockNumber)
+	assert.Equal(t, receipt.BlockHash, tx.BlockHash)
 }
