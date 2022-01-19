@@ -760,8 +760,10 @@ type mockTransition struct {
 	gasLimitReachedTransaction *types.Transaction
 }
 
-func (t *mockTransition) WriteFailedReceipt(txn *types.Transaction) {
+func (t *mockTransition) WriteFailedReceipt(txn *types.Transaction) error {
 	t.failReceiptsWritten = append(t.failReceiptsWritten, txn)
+
+	return nil
 }
 
 func (t *mockTransition) Write(txn *types.Transaction) error {

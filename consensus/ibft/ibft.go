@@ -643,7 +643,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
-	WriteFailedReceipt(txn *types.Transaction)
+	WriteFailedReceipt(txn *types.Transaction) error
 }
 
 // writeTransactions writes transactions from the txpool to the transition object
@@ -663,7 +663,14 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
-			transition.WriteFailedReceipt(tx)
+			if err := transition.WriteFailedReceipt(tx); err != nil {
+				failedTxCount++
+
+				i.txpool.Drop(tx)
+
+				continue
+			}
+
 			failedTxCount++
 
 			transactions = append(transactions, tx)
@@ -693,6 +700,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		transactions = append(transactions, tx)
 	}
 
+	//nolint:lll
 	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
 
 	return transactions
