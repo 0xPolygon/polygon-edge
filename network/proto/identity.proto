@@ -22,9 +22,11 @@ message Status {
 
     int64 chain = 3;
 
-    bool temporaryDial=4;
+    string genesis = 4;
 
-    string genesis = 5;
+    bool temporaryDial=5;
+
+    
     
     message Key {
         string signature = 1;
