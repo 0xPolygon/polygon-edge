@@ -14,6 +14,6 @@ WARNING: This is a work in progress so architectural changes may happen in the f
 ## Documentation 📝
 
 If you'd like to learn more about the Polygon Edge, how it works and how you can use it for your project,
-please check out the **[Polygon Edge Documentation](https://edge-docs.polygon.technology)**.
+please check out the **[Polygon Edge Documentation](https://sdk-docs.polygon.technology)**.
 
 There, you will find the most up to date information regarding potential features, as well as future roadmaps for the Edge.
