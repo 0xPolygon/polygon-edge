@@ -14,18 +14,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/contracts/staking"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	stakingHelper "github.com/0xPolygon/polygon-sdk/helper/staking"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 )
 
 const (
 	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "polygon-sdk"
+	DefaultChainName      = "polygon-edge"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"

@@ -8,11 +8,11 @@ import (
 	"net"
 	"strings"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/server"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/hcl"
 	"github.com/imdario/mergo"
 )

@@ -1,9 +1,9 @@
 package server
 
 import (
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/txpool"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/txpool"
 )
 
 // serverMetrics holds the metric instances of all sub systems
