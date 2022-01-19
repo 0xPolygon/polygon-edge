@@ -368,7 +368,6 @@ func isServerConnectedTo(server *Server, ids peer.ID) bool {
 	connectCtx, cancelWait := context.WithTimeout(context.Background(), DefaultJoinTimeout)
 	defer cancelWait()
 
-	// This should fail, since the server0 made a temporary dial to server1
 	if _, connectErr := WaitUntilPeerConnectsTo(connectCtx, server, ids); connectErr != nil {
 		return false
 	}
@@ -381,6 +380,6 @@ func dialServer(server *Server, addrs peer.AddrInfo, isTemporary bool) error {
 	if isTemporary {
 		server.temporaryDials.Store(addrs.ID, true)
 	}
-	//connect server0 to server1
+
 	return server.host.Connect(context.Background(), addrs)
 }
