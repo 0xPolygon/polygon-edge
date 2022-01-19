@@ -67,8 +67,8 @@ func DefaultConfig() *Config {
 		Network: &Network{
 			NoDiscover:       false,
 			MaxPeers:         40,
-			MaxOutboundPeers: -1,
-			MaxInboundPeers:  -1,
+			MaxOutboundPeers: 8,
+			MaxInboundPeers:  32,
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,

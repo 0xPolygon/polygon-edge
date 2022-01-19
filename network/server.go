@@ -65,8 +65,8 @@ func DefaultConfig() *Config {
 		NoDiscover:       false,
 		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
 		MaxPeers:         40,
-		MaxInboundPeers:  -1,
-		MaxOutboundPeers: -1,
+		MaxInboundPeers:  32,
+		MaxOutboundPeers: 8,
 	}
 }
 
@@ -147,7 +147,7 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
 
-	if config.MaxPeers >= 0 && (config.MaxInboundPeers == -1 && config.MaxOutboundPeers == -1) {
+	if config.MaxPeers != DefaultConfig().MaxPeers {
 		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
 		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
 	}
