@@ -20,13 +20,15 @@ import (
 
 var discProto = "/disc/0.1"
 
-const defaultBucketSize = 20
+const (
+	defaultBucketSize = 20
 
-const defaultPeerReqCount = 16
+	defaultPeerReqCount = 16
 
-const peerDiscoveryInterval = 5 * time.Second
+	peerDiscoveryInterval = 5 * time.Second
 
-const bootnodeDiscoveryInterval = 60 * time.Second
+	bootnodeDiscoveryInterval = 60 * time.Second
+)
 
 type referencePeer struct {
 	id     peer.ID
@@ -264,21 +266,21 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 }
 
 func (d *discovery) run() {
-	ticker1 := time.NewTicker(peerDiscoveryInterval)
-	ticker2 := time.NewTicker(bootnodeDiscoveryInterval)
+	peerDiscoveryTicker := time.NewTicker(peerDiscoveryInterval)
+	bootnodeDiscoveryTicker := time.NewTicker(bootnodeDiscoveryInterval)
 
 	defer func() {
-		ticker1.Stop()
-		ticker2.Stop()
+		peerDiscoveryTicker.Stop()
+		bootnodeDiscoveryTicker.Stop()
 	}()
 
 	for {
 		select {
 		case <-d.closeCh:
 			return
-		case <-ticker1.C:
+		case <-peerDiscoveryTicker.C:
 			go d.handleDiscovery()
-		case <-ticker2.C:
+		case <-bootnodeDiscoveryTicker.C:
 			go d.bootnodeDiscovery()
 		}
 	}
@@ -286,10 +288,10 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if d.srv.numOpenSlots() > 0 {
+	if d.srv.availableOutboundConns() > 0 {
 		if target := d.peers.getRandomPeer(); target != nil {
 			if err := d.attemptToFindPeers(target.id); err != nil {
-				d.srv.logger.Error("failed to find new peers", "peer", target.id, "err", err)
+				d.srv.logger.Error("Failed to find new peers", "peer", target.id, "err", err)
 			}
 		}
 	}
@@ -297,37 +299,37 @@ func (d *discovery) handleDiscovery() {
 
 // bootnodeDiscovery queries a random bootnode for new peers and adds them to the routing table
 func (d *discovery) bootnodeDiscovery() {
-	if d.srv.numOpenSlots() <= 0 {
+	if d.srv.availableOutboundConns() <= 0 {
 		return
 	}
 
 	// get a random bootnode which is not connected
-	bootNode := d.srv.getBootNode()
-	if bootNode == nil {
+	bootnode := d.srv.getBootNode()
+	if bootnode == nil {
 		return
 	}
 
 	// isTemporaryDial maintains the dial status
 	var isTemporaryDial bool
 
-	// if atlest one bootnode is connected the dial status is temporary
+	// if atleast one bootnode is connected the dial status is temporary
 	if d.bootnodeConnCount > 1 {
 		isTemporaryDial = true
 	}
 
 	if isTemporaryDial {
-		if _, loaded := d.srv.temporaryDials.LoadOrStore(bootNode.ID, true); loaded {
+		if _, loaded := d.srv.temporaryDials.LoadOrStore(bootnode.ID, true); loaded {
 			return
 		}
 	}
 
-	if len(d.srv.host.Peerstore().Addrs(bootNode.ID)) == 0 {
-		d.srv.host.Peerstore().AddAddr(bootNode.ID, bootNode.Addrs[0], peerstore.AddressTTL)
+	if len(d.srv.host.Peerstore().Addrs(bootnode.ID)) == 0 {
+		d.srv.host.Peerstore().AddAddr(bootnode.ID, bootnode.Addrs[0], peerstore.AddressTTL)
 	}
 
-	stream, err := d.srv.NewProtoStream(discProto, bootNode.ID)
+	stream, err := d.srv.NewProtoStream(discProto, bootnode.ID)
 	if err != nil {
-		d.srv.logger.Error("failed to open new stream", "peer", bootNode.ID, "err", err)
+		d.srv.logger.Error("Failed to open new stream", "peer", bootnode.ID, "err", err)
 
 		return
 	}
@@ -336,22 +338,21 @@ func (d *discovery) bootnodeDiscovery() {
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: defaultPeerReqCount})
 	if err != nil {
-		d.srv.logger.Error("find peers call failed", "peer", bootNode.ID, "err", err)
+		d.srv.logger.Error("Find peers call failed", "peer", bootnode.ID, "err", err)
 
 		return
 	}
 
 	if err := stream.(*rawGrpc.ClientConn).Close(); err != nil {
-		d.srv.logger.Error("Error closing grpc stream", "peer", bootNode.ID, "err", err)
+		d.srv.logger.Error("Error closing grpc stream", "peer", bootnode.ID, "err", err)
 
 		return
 	}
 
-	if !d.srv.hasPeer(bootNode.ID) || isTemporaryDial {
-		d.srv.Disconnect(bootNode.ID, "Thank you")
+	if isTemporaryDial {
+		d.srv.temporaryDials.Delete(bootnode.ID)
+		d.srv.Disconnect(bootnode.ID, "Thank you")
 	}
-
-	d.srv.temporaryDials.Delete(bootNode.ID)
 
 	for _, node := range resp.Nodes {
 		info, err := StringToAddrInfo(node)
@@ -360,7 +361,7 @@ func (d *discovery) bootnodeDiscovery() {
 		}
 
 		if err := d.addToTable(info); err != nil {
-			d.srv.logger.Error("Unable to add peer to routing table", "peer", bootNode.ID, "err", err)
+			d.srv.logger.Error("Unable to add peer to routing table", "peer", bootnode.ID, "err", err)
 		}
 	}
 }
