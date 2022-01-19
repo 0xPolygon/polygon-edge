@@ -177,6 +177,21 @@ func (d *discovery) isBootNode(id peer.ID) bool {
 
 	return false
 }
+
+func (d *discovery) addPeersToTable(nodes []string) error {
+	for _, node := range nodes {
+		info, err := StringToAddrInfo(node)
+		if err != nil {
+			continue
+		}
+
+		if err := d.addToTable(info); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 func (d *discovery) addToTable(node *peer.AddrInfo) error {
 	// before we include peers on the routing table -> dial queue
 	// we have to add them to the peerstore so that they are
@@ -208,13 +223,7 @@ func (d *discovery) attemptToFindPeers(peerID peer.ID) error {
 
 	d.srv.logger.Debug("Found new near peers", "peer", len(nodes))
 
-	for _, node := range nodes {
-		if err := d.addToTable(node); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return d.addPeersToTable(nodes)
 }
 
 func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
@@ -238,7 +247,7 @@ func (d *discovery) getStream(peerID peer.ID) (interface{}, error) {
 	return p.stream, nil
 }
 
-func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
+func (d *discovery) findPeersCall(peerID peer.ID) ([]string, error) {
 	stream, err := d.getStream(peerID)
 	if err != nil {
 		return nil, err
@@ -251,18 +260,7 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	addrInfo := make([]*peer.AddrInfo, len(resp.Nodes))
-
-	for indx, node := range resp.Nodes {
-		info, err := StringToAddrInfo(node)
-		if err != nil {
-			return nil, err
-		}
-
-		addrInfo[indx] = info
-	}
-
-	return addrInfo, nil
+	return resp.Nodes, nil
 }
 
 func (d *discovery) run() {
@@ -354,15 +352,8 @@ func (d *discovery) bootnodeDiscovery() {
 		d.srv.Disconnect(bootnode.ID, "Thank you")
 	}
 
-	for _, node := range resp.Nodes {
-		info, err := StringToAddrInfo(node)
-		if err != nil {
-			continue
-		}
-
-		if err := d.addToTable(info); err != nil {
-			d.srv.logger.Error("Unable to add peer to routing table", "peer", bootnode.ID, "err", err)
-		}
+	if err = d.addPeersToTable(resp.Nodes); err != nil {
+		d.srv.logger.Error("Failed to add peers to table", "err", err)
 	}
 }
 
