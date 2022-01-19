@@ -48,7 +48,33 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 }
 
 // Subscribe implements the operator endpoint. It subscribes to new events in the tx pool
-func (p *TxPool) Subscribe(req *empty.Empty, stream proto.TxnPoolOperator_SubscribeServer) error {
-	// TODO
-	return nil
+func (p *TxPool) Subscribe(
+	request *proto.SubscribeRequest,
+	stream proto.TxnPoolOperator_SubscribeServer,
+) error {
+	subscription := p.eventManager.subscribe(request.Types)
+
+	cancel := func() {
+		p.eventManager.cancelSubscription(subscription.subscriptionID)
+	}
+
+	for {
+		select {
+		case event, more := <-subscription.subscriptionChannel:
+			if !more {
+				// Subscription is closed from some other place
+				return nil
+			}
+
+			if sendErr := stream.Send(event); sendErr != nil {
+				cancel()
+
+				return nil
+			}
+		case <-stream.Context().Done():
+			cancel()
+
+			return nil
+		}
+	}
 }
