@@ -3,7 +3,7 @@ package txpool
 import (
 	"sync"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Lookup map used to find transactions present in the pool
