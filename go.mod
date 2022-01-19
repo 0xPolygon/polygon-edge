@@ -1,4 +1,4 @@
-module github.com/0xPolygon/polygon-sdk
+module github.com/0xPolygon/polygon-edge
 
 go 1.14
 

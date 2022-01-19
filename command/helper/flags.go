@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/mitchellh/cli"
 	"google.golang.org/grpc"
 )

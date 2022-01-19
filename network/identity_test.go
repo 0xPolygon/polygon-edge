@@ -2,7 +2,7 @@ package network
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

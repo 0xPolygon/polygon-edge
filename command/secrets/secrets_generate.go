@@ -3,8 +3,8 @@ package secrets
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/secrets"
 )
 
 // SecretsGenerate is the command to generate a secrets manager configuration
@@ -13,7 +13,7 @@ type SecretsGenerate struct {
 }
 
 const (
-	defaultNodeName       = "polygon-sdk-node"
+	defaultNodeName       = "polygon-edge-node"
 	defaultConfigFileName = "./secretsManagerConfig.json"
 	defaultNamespace      = "admin"
 )
