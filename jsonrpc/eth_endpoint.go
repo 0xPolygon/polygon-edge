@@ -125,7 +125,7 @@ func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 		return e.store.Header().Number, nil
 
 	case EarliestBlockNumber:
-		return 0, fmt.Errorf("fetching the earliest header is not supported")
+		return 0, nil
 
 	case PendingBlockNumber:
 		return 0, fmt.Errorf("fetching the pending header is not supported")
@@ -667,8 +667,12 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	head := e.store.Header().Number
 
 	resolveNum := func(num BlockNumber) uint64 {
-		if num == PendingBlockNumber || num == EarliestBlockNumber {
+		if num == PendingBlockNumber {
 			num = LatestBlockNumber
+		}
+
+		if num == EarliestBlockNumber {
+			num = 0
 		}
 
 		if num == LatestBlockNumber {
@@ -841,7 +845,12 @@ func (e *Eth) getBlockHeader(number BlockNumber) (*types.Header, error) {
 		return e.store.Header(), nil
 
 	case EarliestBlockNumber:
-		return nil, fmt.Errorf("fetching the earliest header is not supported")
+		header, ok := e.store.GetHeaderByNumber(uint64(0))
+		if !ok {
+			return nil, fmt.Errorf("error fetching genesis block header")
+		}
+
+		return header, nil
 
 	case PendingBlockNumber:
 		return nil, fmt.Errorf("fetching the pending header is not supported")

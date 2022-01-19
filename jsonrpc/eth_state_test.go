@@ -36,6 +36,7 @@ func TestEth_State_GetBalance(t *testing.T) {
 	}
 
 	eth := newTestEthEndpoint(store)
+	blockNumberEarliest := EarliestBlockNumber
 	blockNumberLatest := LatestBlockNumber
 	blockNumberZero := BlockNumber(0x0)
 	blockNumberInvalid := BlockNumber(0x1)
@@ -48,6 +49,14 @@ func TestEth_State_GetBalance(t *testing.T) {
 		blockHash       *types.Hash
 		expectedBalance int64
 	}{
+		{
+			"should return the balance based on the earliest block",
+			addr0,
+			false,
+			&blockNumberEarliest,
+			nil,
+			100,
+		},
 		{
 			"valid implicit latest block number",
 			addr0,
@@ -150,6 +159,7 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 	}
 
 	eth := newTestEthEndpoint(store)
+	blockNumberEarliest := EarliestBlockNumber
 	blockNumberLatest := LatestBlockNumber
 	blockNumberZero := BlockNumber(0x0)
 	blockNumberInvalid := BlockNumber(0x1)
@@ -162,6 +172,14 @@ func TestEth_State_GetTransactionCount(t *testing.T) {
 		shouldFail    bool
 		expectedNonce uint64
 	}{
+		{
+			"should return valid nonce using earliest block number",
+			addr0,
+			&blockNumberEarliest,
+			nil,
+			false,
+			100,
+		},
 		{
 			"should return valid nonce for implicit block number",
 			addr0,
@@ -260,6 +278,7 @@ func TestEth_State_GetCode(t *testing.T) {
 	}
 
 	eth := newTestEthEndpoint(store)
+	blockNumberEarliest := EarliestBlockNumber
 	blockNumberLatest := LatestBlockNumber
 	blockNumberZero := BlockNumber(0x0)
 	blockNumberInvalid := BlockNumber(0x1)
@@ -274,6 +293,14 @@ func TestEth_State_GetCode(t *testing.T) {
 		shouldFail   bool
 		expectedCode []byte
 	}{
+		{
+			"should return a valid code using earliest block number",
+			addr0,
+			&blockNumberEarliest,
+			nil,
+			false,
+			code0,
+		},
 		{
 			"should return a valid code for implicit block number",
 			addr0,
@@ -375,6 +402,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 	}
 
 	eth := newTestEthEndpoint(store)
+	blockNumberEarliest := EarliestBlockNumber
 	blockNumberLatest := LatestBlockNumber
 	blockNumberZero := BlockNumber(0x0)
 	blockNumberInvalid := BlockNumber(0x1)
@@ -485,6 +513,20 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 			blockHash:    &hash1,
 			succeeded:    false,
 			expectedData: nil,
+		},
+		{
+			name: "should return data using earliest block number",
+			initialStorage: map[types.Address]map[types.Hash]types.Hash{
+				addr0: {
+					hash1: hash1,
+				},
+			},
+			address:      addr0,
+			index:        hash1,
+			blockNumber:  &blockNumberEarliest,
+			blockHash:    nil,
+			succeeded:    true,
+			expectedData: argBytesPtr(hash1[:]),
 		},
 	}
 
