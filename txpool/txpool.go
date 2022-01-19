@@ -166,6 +166,9 @@ type TxPool struct {
 	// prometheus API
 	metrics *Metrics
 
+	// Event manager for txpool events
+	eventManager *eventManager
+
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
 }
@@ -192,6 +195,9 @@ func NewTxPool(
 		priceLimit:  config.PriceLimit,
 		sealing:     config.Sealing,
 	}
+
+	// Attach the event manager
+	pool.eventManager = newEventManager(pool.logger)
 
 	if network != nil {
 		// subscribe to the gossip protocol
@@ -223,6 +229,9 @@ func NewTxPool(
 // On each request received, the appropriate handler
 // is invoked in a separate goroutine.
 func (p *TxPool) Start() {
+	// set default value of txpool pending transactions gauge
+	p.metrics.PendingTxs.Set(0)
+
 	go func() {
 		for {
 			select {
@@ -239,6 +248,7 @@ func (p *TxPool) Start() {
 
 // Close shuts down the pool's main loop.
 func (p *TxPool) Close() {
+	p.eventManager.Close()
 	p.shutdownCh <- struct{}{}
 }
 
@@ -365,6 +375,8 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	if tx := account.promoted.peek(); tx != nil {
 		p.executables.push(tx)
 	}
+
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 }
 
 // Demote removes the (recoverable) transaction from
@@ -390,6 +402,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 	}
 
 	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -584,6 +597,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 
 	return nil
 }
@@ -607,6 +621,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	// update lookup
 	p.index.add(tx)
@@ -632,11 +647,12 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 	account := p.accounts.get(addr)
 
 	// promote enqueued txs
-	promoted := account.promote()
+	promoted, promotedHashes := account.promote()
 	p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(promoted))
+	p.eventManager.signalEvent(proto.EventType_PROMOTED, promotedHashes...)
 }
 
 // addGossipTx handles receiving transactions

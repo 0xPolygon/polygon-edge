@@ -166,7 +166,7 @@ func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
 // Eligible transactions are all sequential in order of nonce
 // and the first one has to have nonce less (or equal) to the account's
 // nextNonce.
-func (a *account) promote() uint64 {
+func (a *account) promote() (uint64, []types.Hash) {
 	a.promoted.lock(true)
 	a.enqueued.lock(true)
 
@@ -179,10 +179,11 @@ func (a *account) promote() uint64 {
 	if a.enqueued.length() == 0 ||
 		a.enqueued.peek().Nonce > currentNonce {
 		// nothing to promote
-		return 0
+		return 0, nil
 	}
 
 	promoted := uint64(0)
+	promotedTxnHashes := make([]types.Hash, 0)
 	nextNonce := a.enqueued.peek().Nonce
 
 	for {
@@ -197,6 +198,7 @@ func (a *account) promote() uint64 {
 
 		// push to promoted
 		a.promoted.push(tx)
+		promotedTxnHashes = append(promotedTxnHashes, tx.Hash)
 
 		// update counters
 		nextNonce += 1
@@ -209,5 +211,5 @@ func (a *account) promote() uint64 {
 		a.setNonce(nextNonce)
 	}
 
-	return promoted
+	return promoted, promotedTxnHashes
 }

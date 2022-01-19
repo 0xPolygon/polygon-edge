@@ -64,7 +64,7 @@ func GetNumericBlockNumber(number BlockNumber, e *Eth) (uint64, error) {
 		return e.d.store.Header().Number, nil
 
 	case EarliestBlockNumber:
-		return 0, fmt.Errorf("fetching the earliest header is not supported")
+		return 0, nil
 
 	case PendingBlockNumber:
 		return 0, fmt.Errorf("fetching the pending header is not supported")
@@ -606,8 +606,12 @@ func (e *Eth) GetLogs(filterOptions *LogFilter) (interface{}, error) {
 	head := e.d.store.Header().Number
 
 	resolveNum := func(num BlockNumber) uint64 {
-		if num == PendingBlockNumber || num == EarliestBlockNumber {
+		if num == PendingBlockNumber {
 			num = LatestBlockNumber
+		}
+
+		if num == EarliestBlockNumber {
+			num = 0
 		}
 
 		if num == LatestBlockNumber {

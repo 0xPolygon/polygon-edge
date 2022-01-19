@@ -53,6 +53,7 @@ func Commands() map[string]cli.CommandFactory {
 	txPoolCmd := txpool.TxPoolCommand{}
 	txPoolAddCmd := txpool.TxPoolAdd{Base: base, Formatter: formatter, GRPC: grpc}
 	txPoolStatusCmd := txpool.TxPoolStatus{Base: base, Formatter: formatter, GRPC: grpc}
+	txPoolSubscribeCmd := txpool.TxPoolSubscribeCommand{Base: base, Formatter: formatter, GRPC: grpc}
 
 	loadbotCmd := loadbot.LoadbotCommand{Base: base, Formatter: formatter}
 
@@ -117,6 +118,9 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		txPoolStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &txPoolStatusCmd, nil
+		},
+		txPoolSubscribeCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &txPoolSubscribeCmd, nil
 		},
 
 		// BLOCKCHAIN COMMANDS //
