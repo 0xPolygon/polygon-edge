@@ -372,6 +372,7 @@ func isServerConnectedTo(server *Server, ids peer.ID) bool {
 	if _, connectErr := WaitUntilPeerConnectsTo(connectCtx, server, ids); connectErr != nil {
 		return false
 	}
+
 	return true
 }
 

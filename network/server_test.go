@@ -724,6 +724,7 @@ func TestTemporaryDial(t *testing.T) {
 		},
 	}
 	servers, err := createServers(2, map[int]*CreateServerParams{0: defaultConfig, 1: defaultConfig})
+
 	if err != nil {
 		t.Fatalf("Unable to create servers, %v", err)
 	}
@@ -742,5 +743,4 @@ func TestTemporaryDial(t *testing.T) {
 	// since it is temporary dial, server should not have a persistent connection to its peer
 	connected := isServerConnectedTo(servers[0], servers[1].host.ID())
 	assert.False(t, connected)
-
 }

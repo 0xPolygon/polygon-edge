@@ -427,6 +427,7 @@ func (s *Server) inboundConns() int64 {
 
 func (s *Server) outboundConns() int64 {
 	activeOutboundConns := s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)
+
 	return activeOutboundConns + s.identity.pendingOutboundConns()
 }
 
