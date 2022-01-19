@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 )
 
 // PeersStatus is the PeersStatus to start the sever

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"

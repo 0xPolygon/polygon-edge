@@ -3,9 +3,9 @@ package server
 import (
 	"net"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
 )
 
 const DefaultGRPCPort int = 9632

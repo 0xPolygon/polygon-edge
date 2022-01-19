@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"math/big"
 	"testing"
-
 	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
