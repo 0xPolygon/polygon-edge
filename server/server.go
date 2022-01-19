@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
 	"github.com/0xPolygon/polygon-sdk/chain"
 	"github.com/0xPolygon/polygon-sdk/crypto"
 	"github.com/0xPolygon/polygon-sdk/helper/common"
