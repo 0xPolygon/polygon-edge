@@ -17,6 +17,8 @@ import (
 
 var identityProtoV1 = "/id/0.1"
 
+const PeerID = "peerID"
+
 var (
 	ErrInvalidChainID   = errors.New("invalid chain ID")
 	ErrNotReady         = errors.New("not ready")
@@ -128,7 +130,7 @@ func (i *identity) start() error {
 	return nil
 }
 
-func (i *identity) getStatus(peerID peer.ID) *proto.Status {
+func (i *identity) currentStatus(peerID peer.ID) *proto.Status {
 	status := &proto.Status{
 		Metadata: make(map[string]string, 1),
 		Chain:    int64(i.srv.config.Chain.Params.ChainID),
@@ -146,7 +148,7 @@ func (i *identity) checkSlotAndDisconnect(direction network.Direction, peerID pe
 	case network.DirInbound:
 		slotsFull = i.srv.inboundConns() >= i.srv.maxInboundConns()
 	case network.DirOutbound:
-		slotsFull = i.srv.numOpenSlots() == 0
+		slotsFull = i.srv.availableOutboundConns() == 0
 	default:
 		i.srv.logger.Info("Invalid connection direction", "peer", peerID)
 	}
@@ -167,9 +169,9 @@ func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) 
 
 	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
-	status := i.getStatus(peerID)
+	status := i.currentStatus(peerID)
 
-	status.Metadata["peerID"] = i.srv.host.ID().Pretty()
+	status.Metadata[PeerID] = i.srv.host.ID().Pretty()
 
 	resp, err := clt.Hello(context.Background(), status)
 	if err != nil {
@@ -189,12 +191,12 @@ func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) 
 }
 
 func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status, error) {
-	peerID, err := peer.Decode(req.Metadata["peerID"])
+	peerID, err := peer.Decode(req.Metadata[PeerID])
 	if err != nil {
 		return nil, err
 	}
 
-	return i.getStatus(peerID), nil
+	return i.currentStatus(peerID), nil
 }
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
