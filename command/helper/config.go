@@ -34,7 +34,7 @@ type Config struct {
 	DevInterval    uint64                 `json:"dev_interval"`
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
-	Headers        Headers                `json:"headers"`
+	Headers        *Headers               `json:"headers"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -119,7 +119,10 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 			return nil, err
 		}
 	}
-	conf.JsonRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
+
+	if c.Headers != nil {
+		conf.JsonRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
+	}
 
 	if c.Telemetry.PrometheusAddr != "" {
 		// If an address was passed in, parse it
