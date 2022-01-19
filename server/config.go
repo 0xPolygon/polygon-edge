@@ -25,6 +25,7 @@ type Config struct {
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
+	JsonRPC        *JsonRPC
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
@@ -41,4 +42,10 @@ func DefaultConfig() *Config {
 // Telemetry holds the config details for metric services
 type Telemetry struct {
 	PrometheusAddr *net.TCPAddr
+}
+
+// JsonRPC holds the config details for the JSON-RPC server
+type JsonRPC struct {
+	JSONRPCAddr              *net.TCPAddr
+	AccessControlAllowOrigin []string
 }

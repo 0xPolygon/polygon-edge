@@ -45,9 +45,10 @@ type dispatcherImpl interface {
 }
 
 type Config struct {
-	Store   blockchainInterface
-	Addr    *net.TCPAddr
-	ChainID uint64
+	Store                    blockchainInterface
+	Addr                     *net.TCPAddr
+	ChainID                  uint64
+	AccessControlAllowOrigin []string
 }
 
 // NewJSONRPC returns the JsonRPC http server
@@ -75,7 +76,11 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 
 	mux := http.DefaultServeMux
-	mux.HandleFunc("/", j.handle)
+
+	// The middleware factory returns a handler, so we need to wrap the handler function properly.
+	jsonRpcHandler := http.HandlerFunc(j.handle)
+	mux.Handle("/", middlewareFactory(j.config)(jsonRpcHandler))
+
 	mux.HandleFunc("/ws", j.handleWs)
 
 	srv := http.Server{
@@ -89,6 +94,24 @@ func (j *JSONRPC) setupHTTP() error {
 	}()
 
 	return nil
+}
+
+// The middlewareFactory builds a middleware which enables CORS using the provided config.
+func middlewareFactory(config *Config) func(http.Handler) http.Handler {
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+
+			for _, allowedOrigin := range config.AccessControlAllowOrigin {
+				if allowedOrigin == origin {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	return middleware
 }
 
 // wsUpgrader defines upgrade parameters for the WS connection

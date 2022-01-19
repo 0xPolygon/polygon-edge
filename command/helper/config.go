@@ -34,6 +34,7 @@ type Config struct {
 	DevInterval    uint64                 `json:"dev_interval"`
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
+	Headers        Headers                `json:"headers"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -54,6 +55,11 @@ type Network struct {
 type TxPool struct {
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
+}
+
+// Headers defines the HTTP response headers required to enable CORS.
+type Headers struct {
+	AccessControlAllowOrigin []string `json:"access_control_allow_origin"`
 }
 
 // DefaultConfig returns the default server configuration
@@ -109,11 +115,11 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	if c.JSONRPCAddr != "" {
-		// If an address was passed in, parse it
-		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
+		if conf.JsonRPC.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
 	}
+	conf.JsonRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
 
 	if c.Telemetry.PrometheusAddr != "" {
 		// If an address was passed in, parse it
