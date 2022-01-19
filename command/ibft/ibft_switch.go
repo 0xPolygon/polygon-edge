@@ -116,7 +116,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 
 			deployment = &d
 		} else {
-			c.Formatter.OutputError(fmt.Errorf(fmt.Sprintf("doesn't support contract deployment in %s", string(typ))))
+			c.Formatter.OutputError(fmt.Errorf(fmt.Sprintf("doesn't support contract deployment in %s", string(mechanismType))))
 
 			return 1
 		}
@@ -165,7 +165,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 
 	res := &IBFTSwitchResult{
 		Chain: genesisPath,
-		Type:  typ,
+		Type:  mechanismType,
 		From:  common.JSONNumber{Value: from},
 	}
 	if deployment != nil {
@@ -217,7 +217,7 @@ func appendIBFTForks(cc *chain.Chain, mechanismType ibft.MechanismType, from uin
 	}
 
 	lastFork := &ibftForks[len(ibftForks)-1]
-	if typ == lastFork.Type {
+	if mechanismType == lastFork.Type {
 		return errors.New(`cannot specify same IBFT type to the last fork`)
 	}
 
