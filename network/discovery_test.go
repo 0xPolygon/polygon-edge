@@ -9,10 +9,10 @@ import (
 )
 
 func discoveryConfig(c *Config) {
-	// we limit maxPeers=1 to limit the number of connections
+	// we limit maxPeers=2 to limit the number of connections
 	// since we only want to test discovery
-	c.MaxInboundPeers = 2
-	c.MaxOutboundPeers = 2
+	c.MaxInboundPeers = 1
+	c.MaxOutboundPeers = 1
 }
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {

@@ -60,8 +60,8 @@ func DefaultConfig() *Config {
 	return &Config{
 		NoDiscover:       false,
 		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxOutboundPeers: 10,
-		MaxInboundPeers:  40,
+		MaxOutboundPeers: 8,
+		MaxInboundPeers:  32,
 	}
 }
 
