@@ -678,6 +678,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
 				i.txpool.Demote(tx)
 			} else {
+				failedTxCount++
 				i.txpool.Drop(tx)
 			}
 
@@ -692,8 +693,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		transactions = append(transactions, tx)
 	}
 
-	//nolint:lll
-	i.logger.Info("picked out txns from pool", "numFailedTx ", failedTxCount, "numSuccessTx ", successTxCount, "remaining", i.txpool.Length())
+	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
 
 	return transactions
 }

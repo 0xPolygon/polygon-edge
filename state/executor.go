@@ -210,13 +210,12 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) {
-	logs := t.state.Logs()
-
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
 		TxHash:            txn.Hash,
+		Logs:              t.state.Logs(),
 	}
-	receipt.Logs = logs
+
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	receipt.SetStatus(types.ReceiptFailed)
 	t.receipts = append(t.receipts, receipt)
