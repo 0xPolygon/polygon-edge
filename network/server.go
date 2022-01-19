@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"regexp"
@@ -35,6 +36,8 @@ const (
 	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
 	// using other bootnode after restarting
 	MinimumBootNodes int = 2
+
+	DefaultDialRatio = 0.2
 )
 
 // Priority for dial queue
@@ -49,8 +52,9 @@ type Config struct {
 	NatAddr          net.IP
 	DNS              multiaddr.Multiaddr
 	DataDir          string
-	MaxInboundPeers  uint64
-	MaxOutboundPeers uint64
+	MaxPeers         int64
+	MaxInboundPeers  int64
+	MaxOutboundPeers int64
 	Chain            *chain.Chain
 	SecretsManager   secrets.SecretsManager
 	Metrics          *Metrics
@@ -60,8 +64,9 @@ func DefaultConfig() *Config {
 	return &Config{
 		NoDiscover:       false,
 		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxOutboundPeers: 10,
-		MaxInboundPeers:  40,
+		MaxPeers:         40,
+		MaxInboundPeers:  -1,
+		MaxOutboundPeers: -1,
 	}
 }
 
@@ -141,6 +146,11 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
+
+	if config.MaxPeers >= 0 && (config.MaxInboundPeers == -1 && config.MaxOutboundPeers == -1) {
+		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
+		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
+	}
 
 	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
@@ -406,11 +416,11 @@ func (s *Server) outboundConns() int64 {
 }
 
 func (s *Server) maxInboundConns() int64 {
-	return int64(s.config.MaxInboundPeers)
+	return s.config.MaxInboundPeers
 }
 
 func (s *Server) maxOutboundConns() int64 {
-	return int64(s.config.MaxOutboundPeers)
+	return s.config.MaxOutboundPeers
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {

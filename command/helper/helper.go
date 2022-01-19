@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/0xPolygon/polygon-sdk/helper/staking"
 
 	"github.com/0xPolygon/polygon-sdk/chain"
 	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
@@ -466,8 +467,9 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		" the host DNS address which can be used by a remote peer for connection",
 	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
-	flags.Uint64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", 0, "maximum number of inbound peers")
-	flags.Uint64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", 0, "maximum number of outbound peers")
+	flags.Int64Var(&cliConfig.Network.MaxPeers, "max-peers", -1, "maximum number of peers")
+	flags.Int64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", -1, "maximum number of inbound peers")
+	flags.Int64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", -1, "maximum number of outbound peers")
 	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
 	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
@@ -481,11 +483,23 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
+	if cliConfig.Network.MaxPeers != -1 {
+		if cliConfig.Network.MaxInboundPeers != -1 || cliConfig.Network.MaxOutboundPeers != -1 {
+			return nil, errors.New(" both max-peers & max-inbound/outbound flags are set")
+		}
+	}
+
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)
 		if err != nil {
 			return nil, err
+		}
+
+		if diskConfigFile.Network.MaxPeers != -1 {
+			if diskConfigFile.Network.MaxInboundPeers != -1 || diskConfigFile.Network.MaxOutboundPeers != -1 {
+				return nil, errors.New(" both max-peers & max-inbound/outbound flags are set")
+			}
 		}
 
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {
@@ -495,6 +509,10 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 	if err := config.mergeConfigWith(cliConfig); err != nil {
 		return nil, err
+	}
+
+	if config.Network.MaxInboundPeers != -1 || config.Network.MaxOutboundPeers != -1 {
+		config.Network.MaxPeers = -1
 	}
 
 	return config, nil

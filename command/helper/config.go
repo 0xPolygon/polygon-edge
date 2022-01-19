@@ -47,8 +47,9 @@ type Network struct {
 	Addr             string `json:"libp2p_addr"`
 	NatAddr          string `json:"nat_addr"`
 	DNS              string `json:"dns_addr"`
-	MaxOutboundPeers uint64 `json:"max_outbound_peers"`
-	MaxInboundPeers  uint64 `json:"max_inbound_peers"`
+	MaxPeers         int64  `json:"max_peers,omitempty"`
+	MaxOutboundPeers int64  `json:"max_outbound_peers,omitempty"`
+	MaxInboundPeers  int64  `json:"max_inbound_peers,omitempty"`
 }
 
 // TxPool defines the TxPool configuration params
@@ -67,8 +68,9 @@ func DefaultConfig() *Config {
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
 			NoDiscover:       false,
-			MaxOutboundPeers: 10,
-			MaxInboundPeers:  40,
+			MaxPeers:         40,
+			MaxOutboundPeers: -1,
+			MaxInboundPeers:  -1,
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,
@@ -143,8 +145,8 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 				return nil, err
 			}
 		}
-
 		conf.Network.NoDiscover = c.Network.NoDiscover
+		conf.Network.MaxPeers = c.Network.MaxPeers
 		conf.Network.MaxInboundPeers = c.Network.MaxInboundPeers
 		conf.Network.MaxOutboundPeers = c.Network.MaxOutboundPeers
 
@@ -277,11 +279,15 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 			c.Network.DNS = otherConfig.Network.DNS
 		}
 
-		if otherConfig.Network.MaxInboundPeers != 0 {
+		if otherConfig.Network.MaxPeers > -1 {
+			c.Network.MaxPeers = otherConfig.Network.MaxPeers
+		}
+
+		if otherConfig.Network.MaxInboundPeers > -1 {
 			c.Network.MaxInboundPeers = otherConfig.Network.MaxInboundPeers
 		}
 
-		if otherConfig.Network.MaxOutboundPeers != 0 {
+		if otherConfig.Network.MaxOutboundPeers > -1 {
 			c.Network.MaxOutboundPeers = otherConfig.Network.MaxOutboundPeers
 		}
 
@@ -341,10 +347,15 @@ func readConfigFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("suffix of %s is neither hcl nor json", path)
 	}
 
-	var config Config
-	if err := unmarshalFunc(data, &config); err != nil {
+	config := new(Config)
+	config.Network = new(Network)
+	config.Network.MaxPeers = -1
+	config.Network.MaxInboundPeers = -1
+	config.Network.MaxOutboundPeers = -1
+
+	if err := unmarshalFunc(data, config); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return config, nil
 }
