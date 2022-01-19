@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package v1;
 
-option go_package = "/minimal/proto";
+option go_package = "/server/proto";
 
 import "google/protobuf/empty.proto";
 
@@ -35,13 +35,13 @@ message BlockchainEvent {
 
 message ServerStatus {
     int64 network = 1;
-    
+
     string genesis = 2;
 
     Block current = 3;
 
     string p2pAddr = 4;
-    
+
     message Block {
         int64 number = 1;
         string hash = 2;
