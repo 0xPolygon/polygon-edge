@@ -724,22 +724,23 @@ func TestTemporaryDial(t *testing.T) {
 		},
 	}
 	servers, err := createServers(2, map[int]*CreateServerParams{0: defaultConfig, 1: defaultConfig})
-
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Unable to create servers, %v", err)
+	}
 
 	t.Cleanup(func() {
 		closeTestServers(t, servers)
 	})
-	//add server1 to server0 temperary dial list
-	servers[0].temporaryDials.Store(servers[1].host.ID(), true)
-	//connect server0 to server1
-	err = servers[0].host.Connect(context.Background(), *servers[1].AddrInfo())
+
+	//make a temporary dail to server1
+	err = dialServer(servers[0], *servers[1].AddrInfo(), true)
 	assert.NoError(t, err)
+
 	// ensure that the connection is established
 	assert.Equal(t, network.Connected, servers[0].host.Network().Connectedness(servers[1].host.ID()))
-	// wait until identity handshake is done
-	time.Sleep(10 * time.Second)
-	// since it is temporary dial, server should not contain its peer in the peerlist
-	assert.NotContains(t, servers[0].peers, servers[1].host.ID())
-	assert.NotContains(t, servers[1].peers, servers[0].host.ID())
+
+	// since it is temporary dial, server should not have a persistent connection to its peer
+	connected := isServerConnectedTo(servers[0], servers[1].host.ID())
+	assert.False(t, connected)
+
 }
