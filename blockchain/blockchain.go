@@ -58,7 +58,6 @@ type Verifier interface {
 }
 
 type Executor interface {
-	//ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.BlockResult, error)
 	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
 }
 

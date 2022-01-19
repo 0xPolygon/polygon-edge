@@ -107,7 +107,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Wait until deploying staking contract
+	// Wait until the staking contract is deployed
 	waitErrors := framework.WaitForServersToSeal(servers, posDeployContractAt)
 	if len(waitErrors) != 0 {
 		t.Fatalf("Unable to wait for all nodes to seal blocks, %v", waitErrors)

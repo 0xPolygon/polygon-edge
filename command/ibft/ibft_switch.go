@@ -96,7 +96,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 		return 1
 	}
 
-	typ, err := ibft.ParseType(rawType)
+	mechanismType, err := ibft.ParseType(rawType)
 	if err != nil {
 		c.Formatter.OutputError(err)
 
@@ -106,7 +106,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 	var deployment *uint64
 
 	if rawDeployment != "" {
-		if typ == ibft.PoS {
+		if mechanismType == ibft.PoS {
 			d, err := types.ParseUint64orHex(&rawDeployment)
 			if err != nil {
 				c.Formatter.OutputError(err)
@@ -143,7 +143,7 @@ func (c *IBFTSwitchCommand) Run(args []string) int {
 		return 1
 	}
 
-	if err := appendIBFTForks(cc, typ, from, deployment); err != nil {
+	if err := appendIBFTForks(cc, mechanismType, from, deployment); err != nil {
 		c.Formatter.OutputError(err)
 
 		return 1
@@ -205,7 +205,7 @@ func (r *IBFTSwitchResult) Output() string {
 	return buffer.String()
 }
 
-func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deployment *uint64) error {
+func appendIBFTForks(cc *chain.Chain, mechanismType ibft.MechanismType, from uint64, deployment *uint64) error {
 	ibftConfig, ok := cc.Params.Engine["ibft"].(map[string]interface{})
 	if !ok {
 		return errors.New(`"ibft" setting doesn't exist in "engine" of genesis.json'`)
@@ -228,10 +228,10 @@ func appendIBFTForks(cc *chain.Chain, typ ibft.MechanismType, from uint64, deplo
 	lastFork.To = &common.JSONNumber{Value: from - 1}
 
 	newFork := ibft.IBFTFork{
-		Type: typ,
+		Type: mechanismType,
 		From: common.JSONNumber{Value: from},
 	}
-	if typ == ibft.PoS {
+	if mechanismType == ibft.PoS {
 		newFork.Deployment = &common.JSONNumber{Value: *deployment}
 	}
 
