@@ -39,6 +39,7 @@ func (es *eventSubscription) eventSupported(eventType proto.EventType) bool {
 func (es *eventSubscription) close() {
 	close(es.doneCh)
 	close(es.outputCh)
+	close(es.notifyCh)
 }
 
 // runLoop is the main loop that listens for notifications and handles the event / close signals
@@ -48,16 +49,18 @@ func (es *eventSubscription) runLoop() {
 		case <-es.doneCh: // Break if a close signal has been received
 			return
 		case <-es.notifyCh: // Listen for new events to appear
-			// Grab the next event to be processed by order of sending
-			event := es.eventStore.pop()
-			if event == nil {
-				continue
-			}
+			for {
+				// Grab the next event to be processed by order of sending
+				event := es.eventStore.pop()
+				if event == nil {
+					break
+				}
 
-			select {
-			case es.outputCh <- event: // Pass the event to the output
-			case <-es.doneCh: // Break if a close signal has been received
-				return
+				select {
+				case <-es.doneCh: // Break if a close signal has been received
+					return
+				case es.outputCh <- event: // Pass the event to the output
+				}
 			}
 		}
 	}
@@ -69,12 +72,9 @@ func (es *eventSubscription) pushEvent(event *proto.TxPoolEvent) {
 		// Append the event to the event store, so order can be preserved
 		es.eventStore.push(event)
 
-		go func() {
-			select {
-			case es.notifyCh <- struct{}{}: // Notify the worker thread
-			case <-es.doneCh: // Break if a close signal has been received
-				return
-			}
-		}()
+		select {
+		case es.notifyCh <- struct{}{}: // Notify the worker thread
+		default:
+		}
 	}
 }
