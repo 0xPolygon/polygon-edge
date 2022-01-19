@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 

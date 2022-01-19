@@ -3,18 +3,18 @@ package util
 import (
 	"os"
 
-	"github.com/0xPolygon/polygon-sdk/command/dev"
-	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/command/ibft"
-	"github.com/0xPolygon/polygon-sdk/command/loadbot"
-	"github.com/0xPolygon/polygon-sdk/command/monitor"
-	"github.com/0xPolygon/polygon-sdk/command/peers"
-	"github.com/0xPolygon/polygon-sdk/command/secrets"
-	"github.com/0xPolygon/polygon-sdk/command/server"
-	"github.com/0xPolygon/polygon-sdk/command/status"
-	"github.com/0xPolygon/polygon-sdk/command/txpool"
-	"github.com/0xPolygon/polygon-sdk/command/version"
+	"github.com/0xPolygon/polygon-edge/command/dev"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/ibft"
+	"github.com/0xPolygon/polygon-edge/command/loadbot"
+	"github.com/0xPolygon/polygon-edge/command/monitor"
+	"github.com/0xPolygon/polygon-edge/command/peers"
+	"github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/server"
+	"github.com/0xPolygon/polygon-edge/command/status"
+	"github.com/0xPolygon/polygon-edge/command/txpool"
+	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/mitchellh/cli"
 )
 
@@ -63,7 +63,7 @@ func Commands() map[string]cli.CommandFactory {
 
 	return map[string]cli.CommandFactory{
 
-		// GENERIC SDK COMMANDS //
+		// GENERIC COMMANDS //
 
 		serverCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &serverCmd, nil
