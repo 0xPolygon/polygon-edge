@@ -317,7 +317,7 @@ func (s *Server) runDial() {
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently.
-		for i := int64(0); i < s.numOpenSlots(); i++ {
+		for i := int64(0); i < s.availableOutboundConns(); i++ {
 			tt := s.dialQueue.pop()
 			if tt == nil {
 				// dial closed
@@ -407,7 +407,7 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 	return ok
 }
 
-func (s *Server) numOpenSlots() int64 {
+func (s *Server) availableOutboundConns() int64 {
 	n := s.maxOutboundConns() - s.outboundConns()
 	if n < 0 {
 		n = 0
@@ -426,7 +426,8 @@ func (s *Server) inboundConns() int64 {
 }
 
 func (s *Server) outboundConns() int64 {
-	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
+	activeOutboundConns := s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)
+	return activeOutboundConns + s.identity.pendingOutboundConns()
 }
 
 func (s *Server) maxInboundConns() int64 {
