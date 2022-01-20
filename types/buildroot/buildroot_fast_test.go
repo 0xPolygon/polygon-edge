@@ -3,7 +3,7 @@ package buildroot
 import (
 	"bytes"
 	"crypto/rand"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"math/big"
 	"testing"
 )

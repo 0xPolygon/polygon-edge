@@ -9,15 +9,15 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/types"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -152,12 +152,6 @@ const (
 	// when building a block (candidate voting)
 	CandidateVoteHook = "CandidateVoteHook"
 
-	// POA + POS //
-
-	// AcceptStateLogHook defines what should be logged out as the status
-	// from AcceptState
-	AcceptStateLogHook = "AcceptStateLogHook"
-
 	// POS //
 
 	// SyncStateHook defines the additional snapshot update logic
@@ -166,6 +160,16 @@ const (
 
 	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
 	VerifyBlockHook = "VerifyBlockHook"
+
+	// POA + POS //
+
+	// AcceptStateLogHook defines what should be logged out as the status
+	// from AcceptState
+	AcceptStateLogHook = "AcceptStateLogHook"
+
+	// CalculateProposerHook defines what is the next proposer
+	// based on the previous
+	CalculateProposerHook = "CalculateProposerHook"
 )
 
 type ConsensusMechanism interface {
@@ -742,7 +746,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		lastProposer, _ = ecrecoverFromHeader(parent)
 	}
 
-	i.state.CalcProposer(lastProposer)
+	if hookErr := i.runHook(CalculateProposerHook, lastProposer); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
+	}
 
 	if i.state.proposer == i.validatorKeyAddr {
 		logger.Info("we are the proposer", "block", number)

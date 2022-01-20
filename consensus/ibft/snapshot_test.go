@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -842,7 +842,7 @@ func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	assert.NoError(t, store0.saveToPath(tmpDir))
 
 	store1 := newSnapshotStore()
-	assert.NoError(t, store1.loadFromPath(tmpDir))
+	assert.NoError(t, store1.loadFromPath(tmpDir, hclog.NewNullLogger()))
 
 	assert.Equal(t, store0, store1)
 }

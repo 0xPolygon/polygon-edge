@@ -233,6 +233,6 @@ func (g *generateContractImpl) getValue(t *Type) string {
 		return fmt.Sprintf("%s[%d]", g.getValue(t.elem), t.size)
 
 	default:
-		return t.raw
+		return t.String()
 	}
 }
