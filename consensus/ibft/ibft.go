@@ -167,7 +167,7 @@ const (
 	// from AcceptState
 	AcceptStateLogHook = "AcceptStateLogHook"
 
-	// SelectProposerHook defines what is the next proposer
+	// CalculateProposerHook defines what is the next proposer
 	// based on the previous
 	CalculateProposerHook = "CalculateProposerHook"
 )
