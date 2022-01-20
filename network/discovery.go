@@ -291,8 +291,9 @@ func (d *discovery) FindPeers(
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
-			info := d.srv.host.Peerstore().PeerInfo(id)
-			filtered = append(filtered, AddrInfoToString(&info))
+			if info := d.srv.host.Peerstore().PeerInfo(id); len(info.Addrs) > 0 {
+				filtered = append(filtered, AddrInfoToString(&info))
+			}
 		}
 	}
 
