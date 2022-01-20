@@ -144,15 +144,11 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 	}
 
 	// make sure each routing table remove a peer
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
 
 	t.Cleanup(func() {
 		cancel2()
 	})
-
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[0], 0); err != nil {
-		t.Fatalf("server 0 should remove a peer from routing table but didn't, peer=%s", servers[1].host.ID())
-	}
 
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[1], 0); err != nil {
 		t.Fatalf("server 1 should remove a peer from routing table but didn't, peer=%s", servers[0].host.ID())
