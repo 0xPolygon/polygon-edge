@@ -326,6 +326,12 @@ func (d *discovery) bootnodeDiscovery() {
 		}
 	}
 
+	defer func() {
+		if isTemporaryDial {
+			d.srv.temporaryDials.Delete(bootnode.ID)
+		}
+	}()
+
 	if len(d.srv.host.Peerstore().Addrs(bootnode.ID)) == 0 {
 		d.srv.host.Peerstore().AddAddr(bootnode.ID, bootnode.Addrs[0], peerstore.AddressTTL)
 	}
@@ -353,7 +359,6 @@ func (d *discovery) bootnodeDiscovery() {
 	}
 
 	if isTemporaryDial {
-		d.srv.temporaryDials.Delete(bootnode.ID)
 		d.srv.Disconnect(bootnode.ID, "Thank you")
 	}
 
