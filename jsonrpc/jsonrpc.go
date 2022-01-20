@@ -98,7 +98,7 @@ func (j *JSONRPC) setupHTTP() error {
 
 // The middlewareFactory builds a middleware which enables CORS using the provided config.
 func middlewareFactory(config *Config) func(http.Handler) http.Handler {
-	middleware := func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 
@@ -110,8 +110,6 @@ func middlewareFactory(config *Config) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
-
-	return middleware
 }
 
 // wsUpgrader defines upgrade parameters for the WS connection
