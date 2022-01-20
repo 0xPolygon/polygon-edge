@@ -392,29 +392,6 @@ const (
 
 var emptyAddr web3.Address
 
-func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.Receipt, error) {
-	client := t.JSONRPC()
-
-	if txn.From == emptyAddr {
-		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
-	}
-
-	if txn.GasPrice == 0 {
-		txn.GasPrice = DefaultGasPrice
-	}
-
-	if txn.Gas == 0 {
-		txn.Gas = DefaultGasLimit
-	}
-
-	hash, err := client.Eth().SendTransaction(txn)
-	if err != nil {
-		return nil, err
-	}
-
-	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), hash)
-}
-
 type PreparedTransaction struct {
 	From     types.Address
 	GasPrice *big.Int

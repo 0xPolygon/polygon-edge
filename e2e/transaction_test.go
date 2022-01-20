@@ -120,12 +120,6 @@ func TestPreminedBalance(t *testing.T) {
 }
 
 func TestEthTransfer(t *testing.T) {
-	type testAccount struct {
-		address types.Address
-		key     *ecdsa.PrivateKey
-		balance *big.Int
-	}
-
 	accountBalances := []*big.Int{
 		framework.EthToWei(50), // 50 ETH
 		big.NewInt(0),

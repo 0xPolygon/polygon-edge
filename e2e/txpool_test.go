@@ -296,6 +296,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 type testAccount struct {
 	key     *ecdsa.PrivateKey
 	address types.Address
+	balance *big.Int
 }
 
 func generateTestAccounts(t *testing.T, numAccounts int) []*testAccount {
