@@ -140,7 +140,7 @@ func (pos *PoSMechanism) initializeHookMap() {
 	// Register the VerifyBlockHook
 	pos.hookMap[VerifyBlockHook] = pos.verifyBlockHook
 
-	// Register the SelectProposerHook
+	// Register the CalculateProposerHook
 	pos.hookMap[CalculateProposerHook] = pos.calculateProposerHook
 }
 
