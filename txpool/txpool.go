@@ -621,7 +621,6 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	}
 
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	// update lookup
 	p.index.add(tx)
@@ -630,6 +629,8 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	if !req.demoted {
 		p.gauge.increase(slotsRequired(tx))
 	}
+
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	if tx.Nonce <= account.getNonce() {
 		// account queue is ready for promotion:
