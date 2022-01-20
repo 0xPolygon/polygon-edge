@@ -481,7 +481,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 	if cliConfig.Network.MaxPeers != -1 {
 		if cliConfig.Network.MaxInboundPeers != -1 || cliConfig.Network.MaxOutboundPeers != -1 {
-			return nil, errors.New(" both max-peers and max-inbound/outbound flags are set")
+			return nil, errors.New("both max-peers and max-inbound/outbound flags are set")
 		}
 	}
 
@@ -494,7 +494,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 		if diskConfigFile.Network.MaxPeers != -1 {
 			if diskConfigFile.Network.MaxInboundPeers != -1 || diskConfigFile.Network.MaxOutboundPeers != -1 {
-				return nil, errors.New(" both max-peers & max-inbound/outbound flags are set")
+				return nil, errors.New("both max-peers & max-inbound/outbound flags are set")
 			}
 		}
 
