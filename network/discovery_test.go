@@ -104,19 +104,18 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 			c.MaxPeers = 1
 		},
 	}
-
 	paramsMap := map[int]*CreateServerParams{
 		0: defaultConfig,
 		1: defaultConfig,
 	}
 
-	servers, createErr := createServers(2, paramsMap)
+	servers, createErr := createServers(3, paramsMap)
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 
 	t.Cleanup(func() {
-		closeTestServers(t, servers[1:])
+		closeTestServers(t, servers)
 	})
 
 	// connect to peer and make sure peer is in routing table
@@ -139,9 +138,9 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 	}
 
-	// disconnect the servers by closing server 0 to stop auto-reconnection
-	if closeErr := servers[0].Close(); closeErr != nil {
-		t.Fatalf("Unable to close server 0, %v", closeErr)
+	// disconnect
+	if leaveErr := LeaveAndWait(servers[1], servers[0], DefaultLeaveTimeout); leaveErr != nil {
+		t.Fatalf("Unable to disconnect from server[0], err=%v", leaveErr)
 	}
 
 	// make sure each routing table remove a peer
