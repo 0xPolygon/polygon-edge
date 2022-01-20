@@ -746,7 +746,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		lastProposer, _ = ecrecoverFromHeader(parent)
 	}
 
-	i.state.CalcProposer(lastProposer)
+	if hookErr := i.runHook(CalculateProposerHook, lastProposer); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
+	}
 
 	if i.state.proposer == i.validatorKeyAddr {
 		logger.Info("we are the proposer", "block", number)

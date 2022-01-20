@@ -43,12 +43,14 @@ func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
 	return pos.hookMap
 }
 
-// selectProposerHook calculates the next proposer based on the last
+// calculateProposerHook calculates the next proposer based on the last
 func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
-	_, ok := lastProposerParam.(types.Address)
+	lastProposer, ok := lastProposerParam.(types.Address)
 	if !ok {
 		return ErrInvalidHookParam
 	}
+
+	pos.ibft.state.CalcProposer(lastProposer)
 
 	return nil
 }

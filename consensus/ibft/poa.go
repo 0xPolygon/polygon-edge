@@ -225,10 +225,12 @@ func (poa *PoAMechanism) candidateVoteHook(hookParams interface{}) error {
 
 // calculateProposerHook calculates the next proposer based on the last
 func (poa *PoAMechanism) calculateProposerHook(lastProposerParam interface{}) error {
-	_, ok := lastProposerParam.(types.Address)
+	lastProposer, ok := lastProposerParam.(types.Address)
 	if !ok {
 		return ErrInvalidHookParam
 	}
+
+	poa.ibft.state.CalcProposer(lastProposer)
 
 	return nil
 }
@@ -251,7 +253,7 @@ func (poa *PoAMechanism) initializeHookMap() {
 	// Register the CandidateVoteHook
 	poa.hookMap[CandidateVoteHook] = poa.candidateVoteHook
 
-	// Register the SelectProposerHook
+	// Register the CalculateProposerHook
 	poa.hookMap[CalculateProposerHook] = poa.calculateProposerHook
 }
 
