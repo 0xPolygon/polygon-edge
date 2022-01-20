@@ -143,6 +143,15 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.FlagMap["max-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
 	c.FlagMap["max-inbound-peers"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the client's max no.of inbound peers allowded. Default: %d",
 			helper.DefaultConfig().Network.MaxInboundPeers),
@@ -151,6 +160,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
 	c.FlagMap["max-outbound-peers"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf("Sets the client's max no.of outbound peers allowded. Default: %d",
 			helper.DefaultConfig().Network.MaxOutboundPeers),
@@ -159,6 +169,7 @@ func (c *ServerCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
 	c.FlagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
 			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
