@@ -22,7 +22,7 @@ type Address [20]byte
 // HexToAddress converts an hex string value to an address object
 func HexToAddress(str string) Address {
 	a := Address{}
-	a.UnmarshalText([]byte(str))
+	a.UnmarshalText(completeHex(str, 20))
 	return a
 }
 
@@ -45,6 +45,11 @@ func (a *Address) UnmarshalText(b []byte) error {
 // MarshalText implements the marshal interface
 func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
+}
+
+// Bytes returns the bytes of the Address
+func (a Address) Bytes() []byte {
+	return a[:]
 }
 
 func (a Address) String() string {
@@ -76,7 +81,7 @@ type Hash [32]byte
 // HexToHash converts an hex string value to a hash object
 func HexToHash(str string) Hash {
 	h := Hash{}
-	h.UnmarshalText([]byte(str))
+	h.UnmarshalText(completeHex(str, 32))
 	return h
 }
 
@@ -99,6 +104,11 @@ func (h *Hash) UnmarshalText(b []byte) error {
 // MarshalText implements the marshal interface
 func (h Hash) MarshalText() ([]byte, error) {
 	return []byte(h.String()), nil
+}
+
+// Bytes returns the bytes of the Hash
+func (h Hash) Bytes() []byte {
+	return h[:]
 }
 
 func (h Hash) String() string {
@@ -128,28 +138,59 @@ type Block struct {
 	Uncles             []Hash
 }
 
+type TransactionType int
+
+const (
+	TransactionLegacy TransactionType = 0
+	// eip-2930
+	TransactionAccessList TransactionType = 1
+	// eip-1559
+	TransactionDynamicFee TransactionType = 2
+)
+
 type Transaction struct {
-	Hash        Hash
-	From        Address
-	To          *Address
-	Input       []byte
-	GasPrice    uint64
-	Gas         uint64
-	Value       *big.Int
-	Nonce       uint64
-	V           []byte
-	R           []byte
-	S           []byte
+	Type TransactionType
+
+	// legacy values
+	Hash     Hash
+	From     Address
+	To       *Address
+	Input    []byte
+	GasPrice uint64
+	Gas      uint64
+	Value    *big.Int
+	Nonce    uint64
+	V        []byte
+	R        []byte
+	S        []byte
+
+	// jsonrpc values
 	BlockHash   Hash
 	BlockNumber uint64
 	TxnIndex    uint64
+
+	// eip-2930 values
+	ChainID    *big.Int
+	AccessList AccessList
+
+	// eip-1559 values
+	MaxPriorityFeePerGas *big.Int
+	MaxFeePerGas         *big.Int
 }
+
+type AccessEntry struct {
+	Address Address
+	Storage []Hash
+}
+
+type AccessList []AccessEntry
 
 type CallMsg struct {
 	From     Address
 	To       *Address
 	Data     []byte
 	GasPrice uint64
+	Gas      *big.Int
 	Value    *big.Int
 }
 
@@ -204,8 +245,8 @@ type BlockNumber int
 
 const (
 	Latest   BlockNumber = -1
-	Earliest             = -2
-	Pending              = -3
+	Earliest BlockNumber = -2
+	Pending  BlockNumber = -3
 )
 
 func (b BlockNumber) Location() string {
@@ -254,4 +295,20 @@ func min(i, j int) int {
 type Key interface {
 	Address() Address
 	Sign(hash []byte) ([]byte, error)
+}
+
+func completeHex(str string, num int) []byte {
+	num = num * 2
+	str = strings.TrimPrefix(str, "0x")
+
+	size := len(str)
+	if size < num {
+		for i := size; i < num; i++ {
+			str = "0" + str
+		}
+	} else {
+		diff := size - num
+		str = str[diff:]
+	}
+	return []byte("0x" + str)
 }
