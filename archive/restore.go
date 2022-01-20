@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type blockchainInterface interface {

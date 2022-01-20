@@ -25,7 +25,7 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 		PendingTxs: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: "txpool",
-			Name:      "pendingTxs",
+			Name:      "pending_transactions",
 			Help:      "Pending transactions in the pool",
 		}, labels).With(labelsWithValues...),
 	}
