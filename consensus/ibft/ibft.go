@@ -152,12 +152,6 @@ const (
 	// when building a block (candidate voting)
 	CandidateVoteHook = "CandidateVoteHook"
 
-	// POA + POS //
-
-	// AcceptStateLogHook defines what should be logged out as the status
-	// from AcceptState
-	AcceptStateLogHook = "AcceptStateLogHook"
-
 	// POS //
 
 	// SyncStateHook defines the additional snapshot update logic
@@ -166,6 +160,16 @@ const (
 
 	// VerifyBlockHook defines the additional verification steps for the PoS mechanism
 	VerifyBlockHook = "VerifyBlockHook"
+
+	// POA + POS //
+
+	// AcceptStateLogHook defines what should be logged out as the status
+	// from AcceptState
+	AcceptStateLogHook = "AcceptStateLogHook"
+
+	// SelectProposerHook defines what is the next proposer
+	// based on the previous
+	CalculateProposerHook = "CalculateProposerHook"
 )
 
 type ConsensusMechanism interface {
