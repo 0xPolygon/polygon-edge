@@ -390,8 +390,6 @@ const (
 	DefaultGasLimit = 5242880    // 0x500000
 )
 
-var emptyAddr web3.Address
-
 type PreparedTransaction struct {
 	From     types.Address
 	GasPrice *big.Int
