@@ -214,13 +214,14 @@ var emptyFrom = types.Address{}
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.r.config.ChainID))
 
-	var err error
 	if txn.From == emptyFrom {
 		// Decrypt the from address
-		txn.From, err = signer.Sender(txn)
+		from, err := signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
+
+		txn.From = from
 	}
 
 	receipt := &types.Receipt{
