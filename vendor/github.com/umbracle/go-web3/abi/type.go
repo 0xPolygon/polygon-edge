@@ -102,7 +102,6 @@ type Type struct {
 	kind  Kind
 	size  int
 	elem  *Type
-	raw   string
 	tuple []*TupleElem
 	t     reflect.Type
 }
@@ -111,7 +110,24 @@ func NewTupleType(inputs []*TupleElem) *Type {
 	return &Type{
 		kind:  KindTuple,
 		tuple: inputs,
+		t:     tupleT,
 	}
+}
+
+func NewTupleTypeFromArgs(inputs []*ArgumentStr) (*Type, error) {
+	elems := []*TupleElem{}
+	for _, i := range inputs {
+		typ, err := NewTypeFromArgument(i)
+		if err != nil {
+			return nil, err
+		}
+		elems = append(elems, &TupleElem{
+			Name:    i.Name,
+			Elem:    typ,
+			Indexed: i.Indexed,
+		})
+	}
+	return NewTupleType(elems), nil
 }
 
 // ParseLog parses a log using this type
@@ -134,9 +150,60 @@ func (t *Type) Encode(v interface{}) ([]byte, error) {
 	return Encode(v, t)
 }
 
-// String returns the raw representation of the type
 func (t *Type) String() string {
-	return t.raw
+	return t.Format(false)
+}
+
+// String returns the raw representation of the type
+func (t *Type) Format(includeArgs bool) string {
+	switch t.kind {
+	case KindTuple:
+		rawAux := []string{}
+		for _, i := range t.TupleElems() {
+			name := i.Elem.Format(includeArgs)
+			if i.Indexed {
+				name += " indexed"
+			}
+			if includeArgs {
+				name += " " + i.Name
+			}
+			rawAux = append(rawAux, name)
+		}
+		return fmt.Sprintf("tuple(%s)", strings.Join(rawAux, ","))
+
+	case KindArray:
+		return fmt.Sprintf("%s[%d]", t.elem.Format(includeArgs), t.size)
+
+	case KindSlice:
+		return fmt.Sprintf("%s[]", t.elem.Format(includeArgs))
+
+	case KindBytes:
+		return "bytes"
+
+	case KindFixedBytes:
+		return fmt.Sprintf("bytes%d", t.size)
+
+	case KindString:
+		return "string"
+
+	case KindBool:
+		return "bool"
+
+	case KindAddress:
+		return "address"
+
+	case KindFunction:
+		return "function"
+
+	case KindUInt:
+		return fmt.Sprintf("uint%d", t.size)
+
+	case KindInt:
+		return fmt.Sprintf("int%d", t.size)
+
+	default:
+		panic(fmt.Errorf("BUG: abi type not found %s", t.kind.String()))
+	}
 }
 
 // Elem returns the elem value for slice and arrays
@@ -311,14 +378,7 @@ func readType(l *lexer) (*Type, error) {
 				return nil, notExpectedToken(next.typ)
 			}
 		}
-
-		rawAux := []string{}
-		for _, i := range elems {
-			rawAux = append(rawAux, i.Elem.raw)
-		}
-		raw := fmt.Sprintf("(%s)", strings.Join(rawAux, ","))
-
-		tt = &Type{kind: KindTuple, raw: raw, tuple: elems, t: tupleT}
+		tt = &Type{kind: KindTuple, tuple: elems, t: tupleT}
 
 	} else if tok.typ != strToken {
 		return nil, expectedToken(strToken)
@@ -343,7 +403,7 @@ func readType(l *lexer) (*Type, error) {
 
 		var tAux *Type
 		if n.typ == rbracketToken {
-			tAux = &Type{kind: KindSlice, elem: tt, raw: fmt.Sprintf("%s[]", tt.raw), t: reflect.SliceOf(tt.t)}
+			tAux = &Type{kind: KindSlice, elem: tt, t: reflect.SliceOf(tt.t)}
 
 		} else if n.typ == numberToken {
 			size, err := strconv.ParseUint(n.literal, 10, 32)
@@ -351,7 +411,7 @@ func readType(l *lexer) (*Type, error) {
 				return nil, fmt.Errorf("failed to read array size '%s': %v", n.literal, err)
 			}
 
-			tAux = &Type{kind: KindArray, elem: tt, raw: fmt.Sprintf("%s[%d]", tt.raw, size), size: int(size), t: reflect.ArrayOf(int(size), tt.t)}
+			tAux = &Type{kind: KindArray, elem: tt, size: int(size), t: reflect.ArrayOf(int(size), tt.t)}
 			if l.nextToken().typ != rbracketToken {
 				return nil, expectedToken(rbracketToken)
 			}
@@ -385,11 +445,11 @@ func decodeSimpleType(str string) (*Type, error) {
 		ok = true
 	}
 
-	// Only int and uint need bytes for sure, 'bytes' may
+	// int and uint without bytes default to 256, 'bytes' may
 	// have or not, the rest dont have bytes
 	if t == "int" || t == "uint" {
 		if !ok {
-			return nil, fmt.Errorf("int and uint expect bytes")
+			bytes = 256
 		}
 	} else if t != "bytes" && ok {
 		return nil, fmt.Errorf("type %s does not expect bytes", t)
@@ -413,7 +473,7 @@ func decodeSimpleType(str string) (*Type, error) {
 			}
 			k = bigIntT
 		}
-		return &Type{kind: KindUInt, size: int(bytes), t: k, raw: fmt.Sprintf("uint%d", bytes)}, nil
+		return &Type{kind: KindUInt, size: int(bytes), t: k}, nil
 
 	case "int":
 		var k reflect.Type
@@ -432,7 +492,7 @@ func decodeSimpleType(str string) (*Type, error) {
 			}
 			k = bigIntT
 		}
-		return &Type{kind: KindInt, size: int(bytes), t: k, raw: fmt.Sprintf("int%d", bytes)}, nil
+		return &Type{kind: KindInt, size: int(bytes), t: k}, nil
 
 	case "byte":
 		bytes = 1
@@ -440,21 +500,21 @@ func decodeSimpleType(str string) (*Type, error) {
 
 	case "bytes":
 		if bytes == 0 {
-			return &Type{kind: KindBytes, t: dynamicBytesT, raw: "bytes"}, nil
+			return &Type{kind: KindBytes, t: dynamicBytesT}, nil
 		}
-		return &Type{kind: KindFixedBytes, size: int(bytes), raw: fmt.Sprintf("bytes%d", bytes), t: reflect.ArrayOf(int(bytes), reflect.TypeOf(byte(0)))}, nil
+		return &Type{kind: KindFixedBytes, size: int(bytes), t: reflect.ArrayOf(int(bytes), reflect.TypeOf(byte(0)))}, nil
 
 	case "string":
-		return &Type{kind: KindString, t: stringT, raw: "string"}, nil
+		return &Type{kind: KindString, t: stringT}, nil
 
 	case "bool":
-		return &Type{kind: KindBool, t: boolT, raw: "bool"}, nil
+		return &Type{kind: KindBool, t: boolT}, nil
 
 	case "address":
-		return &Type{kind: KindAddress, t: addressT, size: 20, raw: "address"}, nil
+		return &Type{kind: KindAddress, t: addressT, size: 20}, nil
 
 	case "function":
-		return &Type{kind: KindFunction, size: 24, t: functionT, raw: "function"}, nil
+		return &Type{kind: KindFunction, size: 24, t: functionT}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown type '%s'", t)
@@ -523,13 +583,6 @@ func (l *lexer) readChar() {
 
 	l.position = l.readPosition
 	l.readPosition++
-}
-
-func (l *lexer) peekChar() byte {
-	if l.readPosition >= len(l.input) {
-		return 0
-	}
-	return l.input[l.readPosition]
 }
 
 func (l *lexer) nextToken() token {

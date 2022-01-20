@@ -16,16 +16,33 @@ type endpoints struct {
 	n *Net
 	d *Debug
 }
+type Config struct {
+	headers map[string]string
+}
 
-// NewClient creates a new client
-func NewClient(addr string) (*Client, error) {
+type ConfigOption func(*Config)
+
+func WithHeaders(headers map[string]string) ConfigOption {
+	return func(c *Config) {
+		for k, v := range headers {
+			c.headers[k] = v
+		}
+	}
+}
+
+func NewClient(addr string, opts ...ConfigOption) (*Client, error) {
+	config := &Config{headers: map[string]string{}}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	c := &Client{}
 	c.endpoints.w = &Web3{c}
 	c.endpoints.e = &Eth{c}
 	c.endpoints.n = &Net{c}
 	c.endpoints.d = &Debug{c}
 
-	t, err := transport.NewTransport(addr)
+	t, err := transport.NewTransport(addr, config.headers)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +50,7 @@ func NewClient(addr string) (*Client, error) {
 	return c, nil
 }
 
-// Close closes the tranport
+// Close closes the transport
 func (c *Client) Close() error {
 	return c.transport.Close()
 }
