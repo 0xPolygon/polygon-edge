@@ -463,7 +463,7 @@ func TestTransition_RoundChangeState_MaxRound(t *testing.T) {
 }
 
 func TestWriteTransactions(t *testing.T) {
-	type testCaseParams struct {
+	type testParams struct {
 		txns                        []*types.Transaction
 		recoverableTxnsIndexes      []int
 		unrecoverableTxnsIndexes    []int
@@ -475,7 +475,7 @@ func TestWriteTransactions(t *testing.T) {
 
 	type testCase struct {
 		description string
-		params      testCaseParams
+		params      testParams
 	}
 
 	setupMockTransition := func(test testCase, mockTxPool *mockTxPool) *mockTransition {
@@ -504,7 +504,7 @@ func TestWriteTransactions(t *testing.T) {
 	testCases := []testCase{
 		{
 			"transaction whose gas exceeds block gas limit is included but with failedReceipt",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{{Nonce: 1, Gas: 10000000000001}, {Nonce: 2, Gas: 10000000000002}, {Nonce: 1}},
 				nil,
 				nil,
@@ -516,7 +516,7 @@ func TestWriteTransactions(t *testing.T) {
 		},
 		{
 			"valid transaction is included in transition",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{{Nonce: 1}},
 				nil,
 				nil,
@@ -528,7 +528,7 @@ func TestWriteTransactions(t *testing.T) {
 		},
 		{
 			"recoverable transaction is returned to pool and not included in transition",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{{Nonce: 1}},
 				[]int{0},
 				nil,
@@ -540,7 +540,7 @@ func TestWriteTransactions(t *testing.T) {
 		},
 		{
 			"unrecoverable transaction is not returned to pool and not included in transition",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{{Nonce: 1}},
 				nil,
 				[]int{0},
@@ -552,7 +552,7 @@ func TestWriteTransactions(t *testing.T) {
 		},
 		{
 			"only valid transactions are ever included in transition",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{{Nonce: 1}, {Nonce: 2}, {Nonce: 3}, {Nonce: 4}, {Nonce: 5}},
 				[]int{0},
 				[]int{3, 4},
@@ -564,7 +564,7 @@ func TestWriteTransactions(t *testing.T) {
 		},
 		{
 			"write stops when next included transaction reaches block gas limit",
-			testCaseParams{
+			testParams{
 				[]*types.Transaction{
 					{Nonce: 1},             // recoverable - returned to pool
 					{Nonce: 2},             // unrecoverable
