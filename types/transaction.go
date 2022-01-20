@@ -47,10 +47,14 @@ func (t *Transaction) Copy() *Transaction {
 	*tt = *t
 
 	tt.GasPrice = new(big.Int)
-	tt.GasPrice.Set(t.GasPrice)
+	if t.GasPrice != nil {
+		tt.GasPrice.Set(t.GasPrice)
+	}
 
 	tt.Value = new(big.Int)
-	tt.Value.Set(t.Value)
+	if t.Value != nil {
+		tt.Value.Set(t.Value)
+	}
 
 	if t.R != nil {
 		tt.R = new(big.Int)

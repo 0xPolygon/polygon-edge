@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
 	"testing"
@@ -33,16 +34,11 @@ var (
 
 // addresses used in tests
 var (
-	addr1  = types.Address{0x1}
-	addr2  = types.Address{0x2}
-	addr3  = types.Address{0x3}
-	addr4  = types.Address{0x4}
-	addr5  = types.Address{0x5}
-	addr6  = types.Address{0x6}
-	addr7  = types.Address{0x7}
-	addr8  = types.Address{0x8}
-	addr9  = types.Address{0x9}
-	addr10 = types.Address{0x10}
+	addr1 = types.Address{0x1}
+	addr2 = types.Address{0x2}
+	addr3 = types.Address{0x3}
+	addr4 = types.Address{0x4}
+	addr5 = types.Address{0x5}
 )
 
 // returns a new valid tx of slots size with the given nonce
@@ -97,23 +93,38 @@ type result struct {
 /* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
+	poolSigner := crypto.NewEIP155Signer(100)
+
+	// Generate a private key and address
+	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
+
 	setupPool := func() *TxPool {
 		pool, err := newTestPool()
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
 
-		pool.EnableDev()
-		pool.SetSigner(crypto.NewEIP155Signer(100))
+		pool.SetSigner(poolSigner)
 
 		return pool
+	}
+
+	signTx := func(transaction *types.Transaction) *types.Transaction {
+		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+		if signErr != nil {
+			t.Fatalf("Unable to sign transaction, %v", signErr)
+		}
+
+		return signedTx
 	}
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
 		tx.Value = big.NewInt(-5)
+
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -121,15 +132,14 @@ func TestAddTxErrors(t *testing.T) {
 		)
 	})
 
-	t.Run("ErrNonEncryptedTx", func(t *testing.T) {
+	t.Run("ErrNonSignedTx", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
-		pool.dev = false
+		tx := newTx(defaultAddr, 0, 1)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
-			ErrNonEncryptedTx,
+			ErrInvalidSender,
 		)
 	})
 
@@ -137,7 +147,10 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(addr1, 0, 1)
-		tx.From = types.ZeroAddress
+
+		// Sign with a private key that corresponds
+		// to a different address
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -149,7 +162,8 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 		pool.priceLimit = 1000000
 
-		tx := newTx(addr1, 0, 1) // gasPrice == 1
+		tx := newTx(defaultAddr, 0, 1) // gasPrice == 1
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -163,7 +177,8 @@ func TestAddTxErrors(t *testing.T) {
 
 		// nonce is 1000000 so ErrNonceTooLow
 		// doesn't get triggered
-		tx := newTx(addr1, 1000000, 1)
+		tx := newTx(defaultAddr, 1000000, 1)
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -177,7 +192,8 @@ func TestAddTxErrors(t *testing.T) {
 		// fill the pool
 		pool.gauge.increase(defaultMaxSlots)
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -188,8 +204,9 @@ func TestAddTxErrors(t *testing.T) {
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
 		tx.Gas = 1
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -200,13 +217,15 @@ func TestAddTxErrors(t *testing.T) {
 	t.Run("ErrAlreadyKnown", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
+		tx = signTx(tx)
 
 		// send the tx beforehand
 		go func() {
 			err := pool.addTx(local, tx)
 			assert.NoError(t, err)
 		}()
+
 		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 		<-pool.promoteReqCh
 
@@ -219,13 +238,15 @@ func TestAddTxErrors(t *testing.T) {
 	t.Run("ErrOversizedData", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
 
 		// set oversized Input field
 		data := make([]byte, 989898)
 		_, err := rand.Read(data)
 		assert.NoError(t, err)
+
 		tx.Input = data
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -238,7 +259,8 @@ func TestAddTxErrors(t *testing.T) {
 
 		// faultyMockStore.GetNonce() == 99999
 		pool.store = faultyMockStore{}
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -249,8 +271,9 @@ func TestAddTxErrors(t *testing.T) {
 	t.Run("ErrInsufficientFunds", func(t *testing.T) {
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(defaultAddr, 0, 1)
 		tx.GasPrice.SetUint64(1000000000000)
+		tx = signTx(tx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -262,12 +285,11 @@ func TestAddTxErrors(t *testing.T) {
 func TestAddGossipTx(t *testing.T) {
 	key, sender := tests.GenerateKeyAndAddr(t)
 	signer := crypto.NewEIP155Signer(uint64(100))
-	tx := newTx(addr1, 1, 1)
+	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
-		pool.EnableDev()
 		pool.SetSigner(signer)
 
 		pool.sealing = true
@@ -294,7 +316,6 @@ func TestAddGossipTx(t *testing.T) {
 	t.Run("node is a non validator", func(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
-		pool.EnableDev()
 		pool.SetSigner(signer)
 
 		pool.sealing = false
@@ -322,7 +343,6 @@ func TestDropKnownGossipTx(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
-	pool.EnableDev()
 
 	tx := newTx(addr1, 1, 1)
 
@@ -347,7 +367,6 @@ func TestAddHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// send higher nonce tx
 		go func() {
@@ -364,7 +383,6 @@ func TestAddHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// setup prestate
 		acc := pool.createAccountOnce(addr1)
@@ -385,7 +403,6 @@ func TestAddHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// send tx
 		go func() {
@@ -406,7 +423,6 @@ func TestAddHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// setup prestate
 		acc := pool.createAccountOnce(addr1)
@@ -429,7 +445,6 @@ func TestAddHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// setup prestate
 		acc := pool.createAccountOnce(addr1)
@@ -454,7 +469,6 @@ func TestPromoteHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// fake a promotion signal
 		signalPromotion := func() {
@@ -491,7 +505,6 @@ func TestPromoteHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		go func() {
 			err := pool.addTx(local, newTx(addr1, 0, 1))
@@ -517,7 +530,6 @@ func TestPromoteHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// send the first (expected) tx -> signals promotion
 		go func() {
@@ -558,7 +570,6 @@ func TestPromoteHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		for nonce := uint64(0); nonce < 20; nonce++ {
 			go func(nonce uint64) {
@@ -580,7 +591,6 @@ func TestPromoteHandler(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// setup prestate
 		acc := pool.createAccountOnce(addr1)
@@ -667,7 +677,6 @@ func TestResetAccount(t *testing.T) {
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
-				pool.EnableDev()
 
 				// setup prestate
 				acc := pool.createAccountOnce(addr1)
@@ -799,7 +808,6 @@ func TestResetAccount(t *testing.T) {
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
-				pool.EnableDev()
 
 				// setup prestate
 				for _, tx := range test.txs {
@@ -939,7 +947,6 @@ func TestResetAccount(t *testing.T) {
 				pool, err := newTestPool()
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
-				pool.EnableDev()
 
 				// setup prestate
 				acc := pool.createAccountOnce(addr1)
@@ -992,7 +999,6 @@ func TestPop(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
-	pool.EnableDev()
 
 	// send 1 tx and promote it
 	go func() {
@@ -1017,7 +1023,6 @@ func TestDrop(t *testing.T) {
 	pool, err := newTestPool()
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
-	pool.EnableDev()
 
 	// send 1 tx and promote it
 	go func() {
@@ -1045,7 +1050,6 @@ func TestDemote(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// send 1st tx
 		go func() {
@@ -1105,7 +1109,6 @@ func TestDemote(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// send 2 txs and promote them
 		go func() {
@@ -1211,7 +1214,6 @@ func TestAddTx100(t *testing.T) {
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
 
 		// start the main loop
 		done := pool.startTestMode()
@@ -1233,34 +1235,33 @@ func TestAddTx100(t *testing.T) {
 
 func TestAddTx1000(t *testing.T) {
 	t.Run("send 1000 transactions from 10 accounts", func(t *testing.T) {
-		accounts := []types.Address{
-			addr1,
-			addr2,
-			addr3,
-			addr4,
-			addr5,
-			addr6,
-			addr7,
-			addr8,
-			addr9,
-			addr10,
+		type testAccount struct {
+			key     *ecdsa.PrivateKey
+			address types.Address
+		}
+
+		accounts := make([]testAccount, 10)
+		for indx := 0; indx < 10; indx++ {
+			key, addr := tests.GenerateKeyAndAddr(t)
+			accounts[indx] = testAccount{
+				key:     key,
+				address: addr,
+			}
 		}
 
 		signer := crypto.NewEIP155Signer(uint64(100))
-		key, _ := tests.GenerateKeyAndAddr(t)
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
-		pool.EnableDev()
 
 		// start the main loop
 		done := pool.startTestMode()
 
 		// send 1000
-		for _, addr := range accounts {
+		for _, acc := range accounts {
 			for nonce := uint64(0); nonce < 100; nonce++ {
-				tx, err := signer.SignTx(newTx(addr, nonce, 3), key)
+				tx, err := signer.SignTx(newTx(acc.address, nonce, 3), acc.key)
 				assert.NoError(t, err)
 				go func(nonce uint64) {
 					err := pool.addTx(local, tx)
@@ -1464,7 +1465,6 @@ func TestResetAccounts(t *testing.T) {
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
 
 			// start the main loop
 			done := pool.startTestMode()
@@ -1598,7 +1598,6 @@ func TestExecutablesOrder(t *testing.T) {
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
 
 			// start the main loop
 			done := pool.startTestMode()
@@ -1816,7 +1815,6 @@ func TestRecovery(t *testing.T) {
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
 
 			done := pool.startTestMode()
 
@@ -2007,7 +2005,6 @@ func TestGetTxs(t *testing.T) {
 			pool, err := newTestPool()
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
 
 			done := pool.startTestMode()
 
