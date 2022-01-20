@@ -210,6 +210,10 @@ func (a argBig) MarshalText() ([]byte, error) {
 	return []byte("0x" + b.Text(16)), nil
 }
 
+func argAddrPtr(a types.Address) *types.Address {
+	return &a
+}
+
 func argHashPtr(h types.Hash) *types.Hash {
 	return &h
 }
