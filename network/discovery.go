@@ -315,8 +315,8 @@ func (d *discovery) bootnodeDiscovery() {
 	// isTemporaryDial maintains the dial status
 	var isTemporaryDial bool
 
-	// if more one bootnode is connected the dial status is temporary
-	if d.getBootNodeConnCount() > 1 {
+	// if one or more bootnode is connected the dial status is temporary
+	if d.getBootNodeConnCount() >= 1 {
 		isTemporaryDial = true
 	}
 
