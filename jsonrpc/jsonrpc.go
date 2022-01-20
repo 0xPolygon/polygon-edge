@@ -51,7 +51,7 @@ type Config struct {
 	AccessControlAllowOrigin []string
 }
 
-// NewJSONRPC returns the JsonRPC http server
+// NewJSONRPC returns the JSONRPC http server
 func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
@@ -78,8 +78,8 @@ func (j *JSONRPC) setupHTTP() error {
 	mux := http.DefaultServeMux
 
 	// The middleware factory returns a handler, so we need to wrap the handler function properly.
-	jsonRpcHandler := http.HandlerFunc(j.handle)
-	mux.Handle("/", middlewareFactory(j.config)(jsonRpcHandler))
+	jsonRPCHandler := http.HandlerFunc(j.handle)
+	mux.Handle("/", middlewareFactory(j.config)(jsonRPCHandler))
 
 	mux.HandleFunc("/ws", j.handleWs)
 

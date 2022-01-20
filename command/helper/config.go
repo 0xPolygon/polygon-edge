@@ -115,13 +115,13 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	if c.JSONRPCAddr != "" {
-		if conf.JsonRPC.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
+		if conf.JSONRPC.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
 	}
 
 	if c.Headers != nil {
-		conf.JsonRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
+		conf.JSONRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
 	}
 
 	if c.Telemetry.PrometheusAddr != "" {

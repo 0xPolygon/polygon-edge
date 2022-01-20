@@ -465,7 +465,7 @@ func (s *Server) setupJSONRPC() error {
 
 	conf := &jsonrpc.Config{
 		Store:   hub,
-		Addr:    s.config.JsonRPC.JSONRPCAddr,
+		Addr:    s.config.JSONRPC.JSONRPCAddr,
 		ChainID: uint64(s.config.Chain.Params.ChainID),
 	}
 
