@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 // Header represents a block header in the Ethereum blockchain.

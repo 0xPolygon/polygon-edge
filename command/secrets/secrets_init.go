@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -32,7 +32,7 @@ func (p *SecretsInit) DefineFlags() {
 	p.Base.DefineFlags(p.Formatter)
 
 	p.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: "Sets the directory for the Polygon SDK data if the local FS is used",
+		Description: "Sets the directory for the Polygon Edge data if the local FS is used",
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -53,7 +53,7 @@ func (p *SecretsInit) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (p *SecretsInit) GetHelperText() string {
-	return "Initializes private keys for the Polygon SDK (Validator + Networking) to the specified Secrets Manager"
+	return "Initializes private keys for the Polygon Edge (Validator + Networking) to the specified Secrets Manager"
 }
 
 // Help implements the cli.SecretsInit interface

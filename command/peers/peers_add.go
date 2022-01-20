@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 )
 
 // PeersAdd is the PeersAdd to start the sever

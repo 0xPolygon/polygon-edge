@@ -1,8 +1,8 @@
 package version
 
 import (
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/version"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/version"
 )
 
 // VersionCommand is the command to show the version of the agent
@@ -18,7 +18,7 @@ func (c *VersionCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *VersionCommand) GetHelperText() string {
-	return "Returns the current Polygon SDK version"
+	return "Returns the current Polygon Edge version"
 }
 
 func (c *VersionCommand) GetBaseCommand() string {

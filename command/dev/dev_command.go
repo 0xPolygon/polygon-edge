@@ -3,8 +3,8 @@ package dev
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
 )
 

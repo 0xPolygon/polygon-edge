@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
