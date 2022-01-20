@@ -3,7 +3,7 @@ package txpool
 import (
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Gauge for measuring pool capacity in slots

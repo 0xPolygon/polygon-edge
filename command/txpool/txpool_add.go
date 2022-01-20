@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
