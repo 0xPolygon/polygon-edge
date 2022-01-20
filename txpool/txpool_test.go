@@ -2179,9 +2179,6 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestGetTxs(t *testing.T) {
-	// TODO remove
-	t.SkipNow()
-
 	testCases := []struct {
 		name             string
 		allTxs           map[types.Address][]*types.Transaction
@@ -2322,17 +2319,22 @@ func TestGetTxs(t *testing.T) {
 
 			// send txs
 			totalTx := 0
-			// TODO account for enqueued
 			for _, txs := range test.allTxs {
+				nonce := uint64(0)
+				promotable := uint64(0)
 				for _, tx := range txs {
 					// send all txs
-					totalTx++
+					if tx.Nonce == nonce+promotable {
+						promotable++
+					}
 
 					go func(tx *types.Transaction) {
 						err := pool.addTx(local, tx)
 						assert.NoError(t, err)
 					}(tx)
 				}
+
+				totalTx += int(promotable)
 			}
 
 			ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
