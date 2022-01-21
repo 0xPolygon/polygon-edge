@@ -702,11 +702,16 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.promoted.unlock()
 
 	// prune promoted
-	pruned := account.promoted.prune(nonce)
+	pruned, prunedHashes := account.promoted.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_PROMOTED,
+		prunedHashes...,
+	)
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(-1 * len(pruned)))
@@ -721,7 +726,7 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 	defer account.enqueued.unlock()
 
 	// prune enqueued
-	pruned = account.enqueued.prune(nonce)
+	pruned, prunedHashes = account.enqueued.prune(nonce)
 
 	// update pool state
 	p.index.remove(pruned...)
@@ -729,6 +734,11 @@ func (p *TxPool) resetAccount(addr types.Address, nonce uint64) {
 
 	// update next nonce
 	account.setNonce(nonce)
+
+	p.eventManager.signalEvent(
+		proto.EventType_PRUNED_ENQUEUED,
+		prunedHashes...,
+	)
 
 	if first := account.enqueued.peek(); first != nil &&
 		first.Nonce == nonce {

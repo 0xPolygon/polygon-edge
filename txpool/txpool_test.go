@@ -3,7 +3,6 @@ package txpool
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -1261,516 +1260,300 @@ func TestAddTxns(t *testing.T) {
 	}
 }
 
-func TestResetAccounts(t *testing.T) {
-	// @dusanBrajovic Break this up
-	// TODO remove
-	t.SkipNow()
-
-	t.Run("reset will not promote", func(t *testing.T) {
-		testCases := []struct {
-			name      string
-			allTxs    map[types.Address][]*types.Transaction
-			newNonces map[types.Address]uint64
-			expected  result
-		}{
-			{
-				name: "only promoted queues are pruned",
-				// all txs will end up in promoted queue
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						newTx(addr1, 0, 1),
-						newTx(addr1, 1, 1),
-						newTx(addr1, 2, 1),
-						newTx(addr1, 3, 1),
-					},
-					addr2: {
-						newTx(addr2, 0, 1),
-						newTx(addr2, 1, 1),
-					},
-					addr3: {
-						newTx(addr3, 0, 1),
-						newTx(addr3, 1, 1),
-						newTx(addr3, 2, 1),
-					},
-					addr4: {
-						newTx(addr4, 0, 1),
-						newTx(addr4, 1, 1),
-						newTx(addr4, 2, 1),
-						newTx(addr4, 3, 1),
-						newTx(addr4, 4, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 2,
-					addr2: 1,
-					addr3: 0,
-					addr4: 5,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							promoted: 2,
-						},
-						addr2: {
-							promoted: 1,
-						},
-						addr3: {
-							promoted: 3,
-						},
-						addr4: {
-							promoted: 0,
-						},
-					},
-					slots: 2 + 1 + 3 + 0,
-				},
+func TestResetAccounts_Promoted(t *testing.T) {
+	allTxs :=
+		map[types.Address][]*types.Transaction{
+			addr1: {
+				newTx(addr1, 0, 1),
+				newTx(addr1, 1, 1),
+				newTx(addr1, 2, 1),
+				newTx(addr1, 3, 1),
 			},
-			{
-				name: "only enqueued queues are pruned",
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						newTx(addr1, 3, 1),
-						newTx(addr1, 4, 1),
-					},
-					addr2: {
-						newTx(addr2, 2, 1),
-						newTx(addr2, 3, 1),
-						newTx(addr2, 5, 1),
-						newTx(addr2, 6, 1),
-						newTx(addr2, 7, 1),
-					},
-					addr3: {
-						newTx(addr3, 4, 1),
-						newTx(addr3, 5, 1),
-						newTx(addr3, 6, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 5,
-					addr2: 4,
-					addr3: 8,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							enqueued: 0,
-						},
-						addr2: {
-							enqueued: 3,
-							promoted: 0,
-						},
-						addr3: {
-							enqueued: 0,
-						},
-					},
-					slots: 3,
-				},
+			addr2: {
+				newTx(addr2, 0, 1),
+				newTx(addr2, 1, 1),
 			},
-			{
-				name: "all queues are pruned",
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						// promoted
-						newTx(addr1, 0, 3),
-						newTx(addr1, 1, 3),
-						newTx(addr1, 2, 1),
-						// enqueued
-						newTx(addr1, 7, 2),
-						newTx(addr1, 8, 2),
-						newTx(addr1, 9, 2),
-					},
-					addr2: {
-						// promoted
-						newTx(addr2, 0, 2),
-						newTx(addr2, 1, 1),
-						// enqueued
-						newTx(addr2, 4, 1),
-						newTx(addr2, 5, 2),
-					},
-					addr3: {
-						// promoted
-						newTx(addr3, 0, 1),
-						newTx(addr3, 1, 2),
-						newTx(addr3, 2, 1),
-						// enqueued
-						newTx(addr3, 4, 3),
-						newTx(addr3, 8, 1),
-						newTx(addr3, 9, 2),
-					},
-					addr4: {
-						// promoted
-						newTx(addr4, 0, 1),
-						newTx(addr4, 1, 1),
-						newTx(addr4, 2, 2),
-						newTx(addr4, 3, 1),
-					},
-					addr5: {
-						// enqueued
-						newTx(addr5, 10, 1),
-						newTx(addr5, 11, 1),
-						newTx(addr5, 12, 1),
-						newTx(addr5, 20, 1),
-						newTx(addr5, 21, 1),
-						newTx(addr5, 22, 1),
-						newTx(addr5, 23, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 5,
-					addr2: 3,
-					addr3: 7,
-					addr4: 2,
-					addr5: 15,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							enqueued: 3,
-						},
-						addr2: {
-							enqueued: 2,
-							promoted: 0,
-						},
-						addr3: {
-							enqueued: 2,
-							promoted: 0,
-						},
-						addr4: {
-							enqueued: 0,
-							promoted: 2,
-						},
-						addr5: {
-							enqueued: 4,
-							promoted: 0,
-						},
-					},
-					slots: 3 + 2 + 2 + 2 + 4,
-				},
+			addr3: {
+				newTx(addr3, 0, 1),
+				newTx(addr3, 1, 1),
+				newTx(addr3, 2, 1),
+			},
+			addr4: {
+				newTx(addr4, 0, 1),
+				newTx(addr4, 1, 1),
+				newTx(addr4, 2, 1),
+				newTx(addr4, 3, 1),
+				newTx(addr4, 4, 1),
 			},
 		}
 
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				pool, err := newTestPool()
+	newNonces := map[types.Address]uint64{
+		addr1: 2,
+		addr2: 1,
+		addr3: 0,
+		addr4: 5,
+	}
+
+	expected := result{
+		accounts: map[types.Address]accountState{
+			addr1: {
+				promoted: 2,
+			},
+			addr2: {
+				promoted: 1,
+			},
+			addr3: {
+				promoted: 3,
+			},
+			addr4: {
+				promoted: 0,
+			},
+		},
+		slots: 2 + 1 + 3 + 0,
+	}
+
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+	pool.SetSigner(&mockSigner{})
+	pool.EnableDev()
+
+	pool.Start()
+	defer pool.Close()
+
+	promotedSubscription := pool.eventManager.subscribe(
+		[]proto.EventType{
+			proto.EventType_PROMOTED,
+		},
+	)
+
+	// setup prestate
+	totalTx := 0
+	for _, txs := range allTxs {
+		for _, tx := range txs {
+			totalTx++
+			go func(tx *types.Transaction) {
+				err := pool.addTx(local, tx)
 				assert.NoError(t, err)
-				pool.SetSigner(&mockSigner{})
-				pool.EnableDev()
+			}(tx)
+		}
+	}
 
-				pool.Start()
-				defer pool.Close()
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFn()
 
-				subscription := pool.eventManager.subscribe(
-					[]proto.EventType{proto.EventType_PROMOTED},
-				)
+	// All txns should get added
+	assert.Len(t, waitForEvents(ctx, promotedSubscription, totalTx), totalTx)
+	pool.eventManager.cancelSubscription(promotedSubscription.subscriptionID)
 
-				// setup prestate
-				totalTx := 0
-				promotedAfterReset := uint64(0)
-				for addr, txs := range test.allTxs {
-					nextNonce := test.newNonces[addr]
-					promotable := uint64(0)
-					for _, tx := range txs {
-						totalTx++
-						if tx.Nonce == nextNonce+promotable {
-							// This tx will be promoted after accounts are reset
-							promotable++
-						}
+	pool.resetAccounts(newNonces)
 
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-					}
+	assert.Equal(t, expected.slots, pool.gauge.read())
+	for addr := range expected.accounts {
+		assert.Equal(t, // enqueued
+			expected.accounts[addr].enqueued,
+			pool.accounts.get(addr).enqueued.length())
 
-					promotedAfterReset += promotable
-				}
+		assert.Equal(t, // promoted
+			expected.accounts[addr].promoted,
+			pool.accounts.get(addr).promoted.length())
+	}
+}
 
-				ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
-				defer cancelFn()
-
-				// All txns should get added
-				assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
-
-				pool.resetAccounts(test.newNonces)
-
-				// Only a handful of transactions should be promoted after the reset
-				assert.Len(t, waitForEvents(ctx, subscription, int(promotedAfterReset)), int(promotedAfterReset))
-
-				// Make sure the gauge is correct
-				retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancelRetry()
-
-				_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-					return nil, test.expected.slots != pool.gauge.read()
-				})
-				assert.NoError(t, err)
-
-				for addr := range test.expected.accounts {
-					fmt.Println(addr)
-					assert.Equal(t, // enqueued
-						test.expected.accounts[addr].enqueued,
-						pool.accounts.get(addr).enqueued.length())
-
-					assert.Equal(t, // promoted
-						test.expected.accounts[addr].promoted,
-						pool.accounts.get(addr).promoted.length())
-				}
-			})
+func TestResetAccounts_Enqueued(t *testing.T) {
+	t.Run("reset will promote", func(t *testing.T) {
+		allTxs := map[types.Address][]*types.Transaction{
+			addr1: {
+				newTx(addr1, 3, 1),
+				newTx(addr1, 4, 1),
+				newTx(addr1, 5, 1),
+			},
+			addr2: {
+				newTx(addr2, 2, 1),
+				newTx(addr2, 3, 1),
+				newTx(addr2, 4, 1),
+				newTx(addr2, 5, 1),
+				newTx(addr2, 6, 1),
+				newTx(addr2, 7, 1),
+			},
+			addr3: {
+				newTx(addr3, 7, 1),
+				newTx(addr3, 8, 1),
+				newTx(addr3, 9, 1),
+			},
+		}
+		newNonces := map[types.Address]uint64{
+			addr1: 3,
+			addr2: 4,
+			addr3: 8,
+		}
+		expected := result{
+			accounts: map[types.Address]accountState{
+				addr1: {
+					enqueued: 0,
+					promoted: 3, // reset will promote
+				},
+				addr2: {
+					enqueued: 0,
+					promoted: 4,
+				},
+				addr3: {
+					enqueued: 0,
+					promoted: 2, // reset will promote
+				},
+			},
+			slots: 3 + 4 + 2,
 		}
 
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+		pool.EnableDev()
+
+		pool.Start()
+		defer pool.Close()
+
+		enqueuedSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{
+				proto.EventType_ENQUEUED,
+			},
+		)
+
+		promotedSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{
+				proto.EventType_PROMOTED,
+			},
+		)
+
+		// setup prestate
+		totalTx := 0
+		totalPromoted := uint64(0)
+		for addr, txs := range allTxs {
+			totalPromoted += expected.accounts[addr].promoted
+			for _, tx := range txs {
+				totalTx++
+				go func(tx *types.Transaction) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(tx)
+			}
+		}
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, totalTx), totalTx)
+		pool.eventManager.cancelSubscription(enqueuedSubscription.subscriptionID)
+
+		pool.resetAccounts(newNonces)
+
+		ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		assert.Len(t, waitForEvents(ctx, promotedSubscription, int(totalPromoted)), int(totalPromoted))
+
+		assert.Equal(t, expected.slots, pool.gauge.read())
+		for addr := range expected.accounts {
+			assert.Equal(t, // enqueued
+				expected.accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				expected.accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
 	})
 
-	t.Run("reset will promote", func(t *testing.T) {
-		testCases := []struct {
-			name      string
-			allTxs    map[types.Address][]*types.Transaction
-			newNonces map[types.Address]uint64
-			expected  result
-		}{
-			{
-				name: "only promoted queues are pruned",
-				// all txs will end up in promoted queue
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						newTx(addr1, 0, 1),
-						newTx(addr1, 1, 1),
-						newTx(addr1, 2, 1),
-						newTx(addr1, 3, 1),
-					},
-					addr2: {
-						newTx(addr2, 0, 1),
-						newTx(addr2, 1, 1),
-					},
-					addr3: {
-						newTx(addr3, 0, 1),
-						newTx(addr3, 1, 1),
-						newTx(addr3, 2, 1),
-					},
-					addr4: {
-						newTx(addr4, 0, 1),
-						newTx(addr4, 1, 1),
-						newTx(addr4, 2, 1),
-						newTx(addr4, 3, 1),
-						newTx(addr4, 4, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 2,
-					addr2: 1,
-					addr3: 0,
-					addr4: 5,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							promoted: 2,
-						},
-						addr2: {
-							promoted: 1,
-						},
-						addr3: {
-							promoted: 3,
-						},
-						addr4: {
-							promoted: 0,
-						},
-					},
-					slots: 2 + 1 + 3 + 0,
-				},
+	t.Run("reset will not promote", func(t *testing.T) {
+		allTxs := map[types.Address][]*types.Transaction{
+			addr1: {
+				newTx(addr1, 1, 1),
+				newTx(addr1, 2, 1),
+				newTx(addr1, 3, 1),
+				newTx(addr1, 4, 1),
 			},
-			{
-				name: "only enqueued queues are pruned",
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						newTx(addr1, 3, 1),
-						newTx(addr1, 4, 1),
-						newTx(addr1, 5, 1),
-					},
-					addr2: {
-						newTx(addr2, 2, 1),
-						newTx(addr2, 3, 1),
-						newTx(addr2, 5, 1),
-						newTx(addr2, 6, 1),
-						newTx(addr2, 7, 1),
-					},
-					addr3: {
-						newTx(addr3, 7, 1),
-						newTx(addr3, 8, 1),
-						newTx(addr3, 9, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 3,
-					addr2: 4,
-					addr3: 8,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							enqueued: 0,
-							promoted: 3, // reset will promote
-						},
-						addr2: {
-							enqueued: 3,
-							promoted: 0,
-						},
-						addr3: {
-							enqueued: 0,
-							promoted: 2, // reset will promote
-						},
-					},
-					slots: 3 + 3 + 2,
-				},
+			addr2: {
+				newTx(addr2, 3, 1),
+				newTx(addr2, 4, 1),
+				newTx(addr2, 5, 1),
+				newTx(addr2, 6, 1),
 			},
-			{
-				name: "all queues are pruned",
-				allTxs: map[types.Address][]*types.Transaction{
-					addr1: {
-						// promoted
-						newTx(addr1, 0, 3),
-						newTx(addr1, 1, 3),
-						newTx(addr1, 2, 1),
-						// enqueued
-						newTx(addr1, 5, 2),
-						newTx(addr1, 6, 2),
-						newTx(addr1, 8, 2),
-					},
-					addr2: {
-						// promoted
-						newTx(addr2, 0, 2),
-						newTx(addr2, 1, 1),
-						// enqueued
-						newTx(addr2, 4, 1),
-						newTx(addr2, 5, 2),
-					},
-					addr3: {
-						// promoted
-						newTx(addr3, 0, 1),
-						newTx(addr3, 1, 2),
-						newTx(addr3, 2, 1),
-						// enqueued
-						newTx(addr3, 4, 3),
-						newTx(addr3, 7, 1),
-						newTx(addr3, 9, 2),
-					},
-					addr4: {
-						// promoted
-						newTx(addr4, 0, 1),
-						newTx(addr4, 1, 1),
-						newTx(addr4, 2, 2),
-						newTx(addr4, 3, 1),
-					},
-					addr5: {
-						// enqueued
-						newTx(addr5, 6, 1),
-						newTx(addr5, 8, 1),
-						newTx(addr5, 9, 2),
-						newTx(addr5, 10, 1),
-					},
-				},
-				newNonces: map[types.Address]uint64{
-					addr1: 5,
-					addr2: 3,
-					addr3: 7,
-					addr4: 2,
-					addr5: 6,
-				},
-				expected: result{
-					accounts: map[types.Address]accountState{
-						addr1: {
-							enqueued: 1,
-							promoted: 2,
-						},
-						addr2: {
-							enqueued: 2,
-							promoted: 0,
-						},
-						addr3: {
-							enqueued: 1,
-							promoted: 1,
-						},
-						addr4: {
-							enqueued: 0,
-							promoted: 2,
-						},
-						addr5: {
-							enqueued: 3,
-							promoted: 1,
-						},
-					},
-					slots: 6 + 3 + 3 + 3 + 5,
-				},
+			addr3: {
+				newTx(addr3, 7, 1),
+				newTx(addr3, 8, 1),
+				newTx(addr3, 9, 1),
 			},
 		}
-
-		for _, test := range testCases {
-			t.Run(test.name, func(t *testing.T) {
-				pool, err := newTestPool()
-				assert.NoError(t, err)
-				pool.SetSigner(&mockSigner{})
-				pool.EnableDev()
-
-				pool.Start()
-				defer pool.Close()
-
-				subscription := pool.eventManager.subscribe(
-					[]proto.EventType{proto.EventType_PROMOTED},
-				)
-
-				// setup prestate
-				totalTx := 0
-				promotedAfterReset := uint64(0)
-				for addr, txs := range test.allTxs {
-					nextNonce := test.newNonces[addr]
-					promotable := uint64(0)
-					for _, tx := range txs {
-						totalTx++
-						if tx.Nonce == nextNonce+promotable {
-							// This tx will be promoted after accounts are reset
-							promotable++
-						}
-
-						go func(tx *types.Transaction) {
-							err := pool.addTx(local, tx)
-							assert.NoError(t, err)
-						}(tx)
-					}
-
-					promotedAfterReset += promotable
-				}
-
-				ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
-				defer cancelFn()
-
-				// All txns should get added
-				assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
-
-				pool.resetAccounts(test.newNonces)
-
-				// Only a handful of transactions should be promoted after the reset
-				assert.Len(t, waitForEvents(ctx, subscription, int(promotedAfterReset)), int(promotedAfterReset))
-
-				// Make sure the gauge is correct
-				retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancelRetry()
-
-				_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-					return nil, test.expected.slots != pool.gauge.read()
-				})
-				assert.NoError(t, err)
-
-				for addr := range test.expected.accounts {
-					fmt.Println(addr)
-					assert.Equal(t, // enqueued
-						test.expected.accounts[addr].enqueued,
-						pool.accounts.get(addr).enqueued.length())
-
-					assert.Equal(t, // promoted
-						test.expected.accounts[addr].promoted,
-						pool.accounts.get(addr).promoted.length())
-				}
-			})
+		newNonces := map[types.Address]uint64{
+			addr1: 5,
+			addr2: 7,
+			addr3: 12,
+		}
+		expected := result{
+			accounts: map[types.Address]accountState{
+				addr1: {
+					enqueued: 0,
+					promoted: 0, // reset will promote
+				},
+				addr2: {
+					enqueued: 0,
+					promoted: 0,
+				},
+				addr3: {
+					enqueued: 0,
+					promoted: 0, // reset will promote
+				},
+			},
+			slots: 0 + 0 + 0,
 		}
 
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+		pool.EnableDev()
+
+		pool.Start()
+		defer pool.Close()
+
+		enqueuedSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{
+				proto.EventType_ENQUEUED,
+			},
+		)
+
+		// setup prestate
+		totalTx := 0
+		totalPromoted := uint64(0)
+		for addr, txs := range allTxs {
+			totalPromoted += expected.accounts[addr].promoted
+			for _, tx := range txs {
+				totalTx++
+				go func(tx *types.Transaction) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(tx)
+			}
+		}
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, totalTx), totalTx)
+		pool.eventManager.cancelSubscription(enqueuedSubscription.subscriptionID)
+
+		pool.resetAccounts(newNonces)
+
+		assert.Equal(t, expected.slots, pool.gauge.read())
+		for addr := range expected.accounts {
+			assert.Equal(t, // enqueued
+				expected.accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				expected.accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
 	})
 }
 

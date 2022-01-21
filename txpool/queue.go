@@ -47,7 +47,10 @@ func (q *accountQueue) unlock() {
 
 // prune removes all transactions from the queue
 // with nonce lower than given.
-func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
+func (q *accountQueue) prune(nonce uint64) (
+	pruned []*types.Transaction,
+	prunedHashes []types.Hash,
+) {
 	for {
 		tx := q.peek()
 		if tx == nil ||
@@ -57,6 +60,7 @@ func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
 
 		tx = q.pop()
 		pruned = append(pruned, tx)
+		prunedHashes = append(prunedHashes, tx.Hash)
 	}
 
 	return
