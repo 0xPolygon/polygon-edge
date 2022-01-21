@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -162,7 +163,7 @@ func (s *systemService) BlockByNumber(
 ) (*proto.BlockResponse, error) {
 	block, ok := s.server.blockchain.GetBlockByNumber(req.Number, true)
 	if !ok {
-		return nil, errors.New("block not found")
+		return nil, fmt.Errorf("block #%d not found", req.Number)
 	}
 
 	return &proto.BlockResponse{
