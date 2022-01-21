@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	DefaultLeaveTimeout = 10 * time.Second
+	DefaultLeaveTimeout = 20 * time.Second
 )
 
 // JoinAndWait is a helper method for joining a destination server
@@ -190,6 +190,23 @@ var (
 	emptyParams = &CreateServerParams{}
 )
 
+// initBootnodes is a helper method for specifying the server's bootnode configuration
+func initBootnodes(server *Server, bootnodes ...string) {
+	savedBootnodes := bootnodes
+	if len(savedBootnodes) == 0 {
+		// Set the default bootnode to be the server itself
+		savedBootnodes = []string{
+			fmt.Sprintf(
+				"%s/p2p/%s",
+				server.addrs[0].String(),
+				server.host.ID().String(),
+			),
+		}
+	}
+
+	server.config.Chain.Bootnodes = savedBootnodes
+}
+
 func CreateServer(params *CreateServerParams) (*Server, error) {
 	cfg := DefaultConfig()
 	port, portErr := tests.GetFreePort()
@@ -237,6 +254,8 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	initBootnodes(server)
 
 	if params.ServerCallback != nil {
 		params.ServerCallback(server)
@@ -293,28 +312,6 @@ func MeshJoin(servers ...*Server) []error {
 	wg.Wait()
 
 	return joinErrors
-}
-
-func GenerateTestMultiAddr(t *testing.T) multiaddr.Multiaddr {
-	t.Helper()
-
-	libp2pKey, _, keyErr := GenerateAndEncodeLibp2pKey()
-	if keyErr != nil {
-		t.Fatalf("unable to generate libp2p key, %v", keyErr)
-	}
-
-	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
-	assert.NoError(t, err)
-
-	port, portErr := tests.GetFreePort()
-	if portErr != nil {
-		t.Fatalf("Unable to fetch free port, %v", portErr)
-	}
-
-	addr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, nodeID))
-	assert.NoError(t, err)
-
-	return addr
 }
 
 func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {

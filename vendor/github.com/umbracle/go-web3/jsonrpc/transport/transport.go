@@ -29,9 +29,9 @@ const (
 )
 
 // NewTransport creates a new transport object
-func NewTransport(url string) (Transport, error) {
+func NewTransport(url string, headers map[string]string) (Transport, error) {
 	if strings.HasPrefix(url, wsPrefix) || strings.HasPrefix(url, wssPrefix) {
-		t, err := newWebsocket(url)
+		t, err := newWebsocket(url, headers)
 		if err != nil {
 			return nil, err
 		}
@@ -45,5 +45,5 @@ func NewTransport(url string) (Transport, error) {
 		}
 		return t, nil
 	}
-	return newHTTP(url), nil
+	return newHTTP(url, headers), nil
 }
