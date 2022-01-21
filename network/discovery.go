@@ -183,11 +183,12 @@ func (d *discovery) addPeersToTable(nodes []string) error {
 	for _, node := range nodes {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
+			d.srv.logger.Error("Failed to parse address", "err", err)
 			continue
 		}
 
 		if err := d.addToTable(info); err != nil {
-			return err
+			d.srv.logger.Error("Failed to add new peer to routing table", "peer", info.ID, "err", err)
 		}
 	}
 
