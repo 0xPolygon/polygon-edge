@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -52,7 +53,7 @@ type syncerInterface interface {
 	BestPeer() *protocol.SyncPeer
 	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
 	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 	Broadcast(b *types.Block)
 }
 
@@ -305,7 +306,7 @@ func (i *Ibft) Start() error {
 }
 
 // GetSyncProgression gets the latest sync progression, if any
-func (i *Ibft) GetSyncProgression() *protocol.Progression {
+func (i *Ibft) GetSyncProgression() *progress.Progression {
 	return i.syncer.GetSyncProgression()
 }
 

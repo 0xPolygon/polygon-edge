@@ -3,7 +3,7 @@ package dummy
 import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -56,7 +56,7 @@ func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dummy) GetSyncProgression() *protocol.Progression {
+func (d *Dummy) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

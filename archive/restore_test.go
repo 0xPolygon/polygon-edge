@@ -8,6 +8,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,6 +54,10 @@ func (m *mockChain) WriteBlock(block *types.Block) error {
 	m.blocks = append(m.blocks, block)
 
 	return nil
+}
+
+func (m *mockChain) SubscribeEvents() blockchain.Subscription {
+	return protocol.NewMockSubscription()
 }
 
 func getLatestBlockFromMockChain(m *mockChain) *types.Block {
@@ -103,8 +110,9 @@ func Test_importBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			progression := progress.NewProgressionWrapper(progress.ChainSyncRestore)
 			blockStream := newTestBlockStream(tt.metadata, tt.archiveBlocks...)
-			err := importBlocks(tt.chain, blockStream)
+			err := importBlocks(tt.chain, blockStream, progression)
 
 			assert.Equal(t, tt.err, err)
 			latestBlock := getLatestBlockFromMockChain(tt.chain)

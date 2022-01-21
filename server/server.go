@@ -18,9 +18,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -67,8 +67,12 @@ type Server struct {
 	serverMetrics *serverMetrics
 
 	prometheusServer *http.Server
+
 	// secrets manager
 	secretsManager secrets.SecretsManager
+
+	// restore
+	restoreProgression *progress.ProgressionWrapper
 }
 
 var dirPaths = []string{
@@ -80,10 +84,11 @@ var dirPaths = []string{
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger:     logger,
-		config:     config,
-		chain:      config.Chain,
-		grpcServer: grpc.NewServer(),
+		logger:             logger,
+		config:             config,
+		chain:              config.Chain,
+		grpcServer:         grpc.NewServer(),
+		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -195,11 +200,14 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// setup and start jsonrpc server
+	if err := m.setupJSONRPC(); err != nil {
+		return nil, err
+	}
+
 	// restore archive data before starting
-	if config.RestoreFile != nil {
-		if err := archive.RestoreChain(m.blockchain, *config.RestoreFile); err != nil {
-			return nil, err
-		}
+	if err := m.restoreChain(); err != nil {
+		return nil, err
 	}
 
 	// start consensus
@@ -212,11 +220,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup and start jsonrpc server
-	if err := m.setupJSONRPC(); err != nil {
-		return nil, err
-	}
-
 	if err := m.network.Start(); err != nil {
 		return nil, err
 	}
@@ -224,6 +227,18 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func (s *Server) restoreChain() error {
+	if s.config.RestoreFile == nil {
+		return nil
+	}
+
+	if err := archive.RestoreChain(s.blockchain, *s.config.RestoreFile, s.restoreProgression); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type txpoolHub struct {
@@ -360,7 +375,8 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
-	state state.State
+	state              state.State
+	restoreProgression *progress.ProgressionWrapper
 
 	*blockchain.Blockchain
 	*txpool.TxPool
@@ -458,8 +474,18 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
-func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
-	return j.Consensus.GetSyncProgression()
+func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
+	// restore progression
+	if restoreProg := j.restoreProgression.GetProgression(); restoreProg != nil {
+		return restoreProg
+	}
+
+	// consensus sync progression
+	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
+		return consensusSyncProg
+	}
+
+	return nil
 }
 
 // SETUP //
@@ -467,12 +493,13 @@ func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
-		state:      s.state,
-		Blockchain: s.blockchain,
-		TxPool:     s.txpool,
-		Executor:   s.executor,
-		Consensus:  s.consensus,
-		Server:     s.network,
+		state:              s.state,
+		restoreProgression: s.restoreProgression,
+		Blockchain:         s.blockchain,
+		TxPool:             s.txpool,
+		Executor:           s.executor,
+		Consensus:          s.consensus,
+		Server:             s.network,
 	}
 
 	conf := &jsonrpc.Config{

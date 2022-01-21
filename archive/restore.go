@@ -7,19 +7,22 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type blockchainInterface interface {
+	SubscribeEvents() blockchain.Subscription
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
 	WriteBlock(*types.Block) error
 }
 
-// RestoreChain loads blockchain archive from file and write blocks to the chain
-func RestoreChain(chain blockchainInterface, filePath string) error {
+// RestoreChain reads blocks from the archive and write to the chain
+func RestoreChain(chain blockchainInterface, filePath string, progression *progress.ProgressionWrapper) error {
 	fp, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -27,11 +30,11 @@ func RestoreChain(chain blockchainInterface, filePath string) error {
 
 	blockStream := newBlockStream(fp)
 
-	return importBlocks(chain, blockStream)
+	return importBlocks(chain, blockStream, progression)
 }
 
 // import blocks scans all blocks from stream and write them to chain
-func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
+func importBlocks(chain blockchainInterface, blockStream *blockStream, progression *progress.ProgressionWrapper) error {
 	shutdownCh := common.GetTerminationSignalCh()
 
 	metadata, err := blockStream.getMetadata()
@@ -59,12 +62,22 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream) error {
 		return nil
 	}
 
+	// Create a blockchain subscription for the sync progression and start tracking
+	progression.StartProgression(firstBlock.Number(), chain.SubscribeEvents())
+	// Stop monitoring the sync progression upon exit
+	defer progression.StopProgression()
+
+	// Set the goal
+	progression.UpdateHighestProgression(metadata.Latest)
+
 	nextBlock := firstBlock
 
 	for {
 		if err := chain.WriteBlock(nextBlock); err != nil {
 			return err
 		}
+
+		progression.UpdateCurrentProgression(nextBlock.Number())
 
 		nextBlock, err = blockStream.nextBlock()
 		if err != nil {

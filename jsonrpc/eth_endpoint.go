@@ -3,15 +3,16 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/protocol"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
-	"math/big"
 )
 
 type ethTxPoolStore interface {
@@ -58,7 +59,7 @@ type ethBlockchainStore interface {
 	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 }
 
 // ethStore provides access to the methods needed by eth endpoint
@@ -109,6 +110,7 @@ func (e *Eth) Syncing() (interface{}, error) {
 	if syncProgression := e.store.GetSyncProgression(); syncProgression != nil {
 		// Node is bulk syncing, return the status
 		return progression{
+			Type:          string(syncProgression.SyncType),
 			StartingBlock: hex.EncodeUint64(syncProgression.StartingBlock),
 			CurrentBlock:  hex.EncodeUint64(syncProgression.CurrentBlock),
 			HighestBlock:  hex.EncodeUint64(syncProgression.HighestBlock),

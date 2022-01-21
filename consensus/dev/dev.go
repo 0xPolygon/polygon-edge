@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/protocol"
-
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -219,7 +218,7 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dev) GetSyncProgression() *protocol.Progression {
+func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

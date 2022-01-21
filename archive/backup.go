@@ -122,10 +122,12 @@ func determineTo(ctx context.Context, clt proto.SystemClient, to *uint64) (uint6
 			}
 		}
 	}
+
 	// otherwise use latest block number as to
 	return uint64(status.Current.Number), types.StringToHash(status.Current.Hash), nil
 }
 
+// writeMetadata writes the latest block height and the block hash to the writer
 func writeMetadata(writer io.Writer, logger hclog.Logger, to uint64, toHash types.Hash) error {
 	metadata := Metadata{
 		Latest:     to,
@@ -153,9 +155,9 @@ func processExportStream(
 	getResult := func() (*uint64, *uint64, error) {
 		if from == nil || to == nil {
 			return nil, nil, errors.New("couldn't get any blocks")
-		} else {
-			return from, to, nil
 		}
+
+		return from, to, nil
 	}
 
 	var total uint64
