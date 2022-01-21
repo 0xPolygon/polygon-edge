@@ -39,7 +39,7 @@ func PoSFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 // IsAvailable returns indicates if mechanism should be called at given height
 func (pos *PoSMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	switch hookType {
-	case AcceptStateLogHook, VerifyBlockHook:
+	case AcceptStateLogHook, VerifyBlockHook, CalculateProposerHook:
 		return pos.IsInRange(height)
 	case PreStateCommitHook:
 		// deploy contract on ContractDeployment
@@ -73,6 +73,18 @@ func (pos *PoSMechanism) initializeParams(params *IBFTFork) error {
 
 		pos.ContractDeployment = params.Deployment.Value
 	}
+
+	return nil
+}
+
+// calculateProposerHook calculates the next proposer based on the last
+func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
+	lastProposer, ok := lastProposerParam.(types.Address)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	pos.ibft.state.CalcProposer(lastProposer)
 
 	return nil
 }
@@ -164,6 +176,9 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the PreStateCommitHook
 	pos.hookMap[PreStateCommitHook] = pos.preStateCommitHook
+
+	// Register the CalculateProposerHook
+	pos.hookMap[CalculateProposerHook] = pos.calculateProposerHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block

@@ -846,7 +846,7 @@ func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	assert.NoError(t, store0.saveToPath(tmpDir))
 
 	store1 := newSnapshotStore()
-	assert.NoError(t, store1.loadFromPath(tmpDir))
+	assert.NoError(t, store1.loadFromPath(tmpDir, hclog.NewNullLogger()))
 
 	assert.Equal(t, store0, store1)
 }

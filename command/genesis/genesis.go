@@ -265,8 +265,8 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 	}
 
-	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
-		c.UI.Error("Minimum two bootnodes are required")
+	if !bootnodes.AreSet {
+		c.UI.Error("Minimum one bootnode is required")
 
 		return 1
 	}

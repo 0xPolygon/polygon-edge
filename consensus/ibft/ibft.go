@@ -170,6 +170,10 @@ const (
 
 	// PreStateCommitHook defines the additional state transition injection
 	PreStateCommitHook HookType = "PreStateCommitHook"
+
+	// CalculateProposerHook defines what is the next proposer
+	// based on the previous
+	CalculateProposerHook = "CalculateProposerHook"
 )
 
 type ConsensusMechanism interface {
@@ -793,12 +797,16 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
+	WriteFailedReceipt(txn *types.Transaction) error
 }
 
 // writeTransactions writes transactions from the txpool to the transition object
 // and returns transactions that were included in the transition (new block)
 func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	var successful []*types.Transaction
+	var transactions []*types.Transaction
+
+	successTxCount := 0
+	failedTxCount := 0
 
 	i.txpool.Prepare()
 
@@ -809,6 +817,17 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if tx.ExceedsBlockGasLimit(gasLimit) {
+			if err := transition.WriteFailedReceipt(tx); err != nil {
+				failedTxCount++
+
+				i.txpool.Drop(tx)
+
+				continue
+			}
+
+			failedTxCount++
+
+			transactions = append(transactions, tx)
 			i.txpool.Drop(tx)
 
 			continue
@@ -820,6 +839,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
 				i.txpool.Demote(tx)
 			} else {
+				failedTxCount++
 				i.txpool.Drop(tx)
 			}
 
@@ -829,12 +849,15 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		// no errors, pop the tx from the pool
 		i.txpool.Pop(tx)
 
-		successful = append(successful, tx)
+		successTxCount++
+
+		transactions = append(transactions, tx)
 	}
 
-	i.logger.Info("picked out txns from pool", "num", len(successful), "remaining", i.txpool.Length())
+	//nolint:lll
+	i.logger.Info("executed txns", "failed ", failedTxCount, "successful", successTxCount, "remaining in pool", i.txpool.Length())
 
-	return successful
+	return transactions
 }
 
 // runAcceptState runs the Accept state loop
@@ -892,7 +915,9 @@ func (i *Ibft) runAcceptState() { // start new round
 		lastProposer, _ = ecrecoverFromHeader(parent)
 	}
 
-	i.state.CalcProposer(lastProposer)
+	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
+		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
+	}
 
 	if i.state.proposer == i.validatorKeyAddr {
 		logger.Info("we are the proposer", "block", number)

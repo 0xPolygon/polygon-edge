@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 // setupSnapshot sets up the snapshot store for the IBFT object
@@ -20,7 +21,7 @@ func (i *Ibft) setupSnapshot() error {
 
 	// Read from storage
 	if i.config.Path != "" {
-		if err := i.store.loadFromPath(i.config.Path); err != nil {
+		if err := i.store.loadFromPath(i.config.Path, i.logger); err != nil {
 			return err
 		}
 	}
@@ -366,11 +367,15 @@ func newSnapshotStore() *snapshotStore {
 }
 
 // loadFromPath loads a saved snapshot store from the specified file system path
-func (s *snapshotStore) loadFromPath(path string) error {
+func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
-		return err
+		// if we can't read metadata file delete it
+		// and log the error that we've encountered
+		l.Error("Could not read metadata snapshot store file", "err", err.Error())
+		os.Remove(filepath.Join(path, "metadata"))
+		l.Error("Removed invalid metadata snapshot store file")
 	}
 
 	if meta != nil {
@@ -380,7 +385,11 @@ func (s *snapshotStore) loadFromPath(path string) error {
 	// Load snapshots
 	snaps := []*Snapshot{}
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
-		return err
+		// if we can't read snapshot store file delete it
+		// and log the error that we've encountered
+		l.Error("Could not read snapshot store file", "err", err.Error())
+		os.Remove(filepath.Join(path, "snapshots"))
+		l.Error("Removed invalid snapshot store file")
 	}
 
 	for _, snap := range snaps {

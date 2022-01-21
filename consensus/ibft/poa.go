@@ -46,7 +46,7 @@ func PoAFactory(ibft *Ibft, params *IBFTFork) (ConsensusMechanism, error) {
 // IsAvailable returns indicates if mechanism should be called at given height
 func (poa *PoAMechanism) IsAvailable(hookType HookType, height uint64) bool {
 	switch hookType {
-	case AcceptStateLogHook, VerifyHeadersHook, ProcessHeadersHook, CandidateVoteHook:
+	case AcceptStateLogHook, VerifyHeadersHook, ProcessHeadersHook, CandidateVoteHook, CalculateProposerHook:
 		return poa.IsInRange(height)
 	default:
 		return false
@@ -231,6 +231,18 @@ func (poa *PoAMechanism) candidateVoteHook(hookParams interface{}) error {
 	return nil
 }
 
+// calculateProposerHook calculates the next proposer based on the last
+func (poa *PoAMechanism) calculateProposerHook(lastProposerParam interface{}) error {
+	lastProposer, ok := lastProposerParam.(types.Address)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	poa.ibft.state.CalcProposer(lastProposer)
+
+	return nil
+}
+
 // initializeHookMap registers the hooks that the PoA mechanism
 // should have
 func (poa *PoAMechanism) initializeHookMap() {
@@ -248,6 +260,9 @@ func (poa *PoAMechanism) initializeHookMap() {
 
 	// Register the CandidateVoteHook
 	poa.hookMap[CandidateVoteHook] = poa.candidateVoteHook
+
+	// Register the CalculateProposerHook
+	poa.hookMap[CalculateProposerHook] = poa.calculateProposerHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block

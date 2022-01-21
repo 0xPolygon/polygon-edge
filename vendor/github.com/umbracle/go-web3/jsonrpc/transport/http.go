@@ -11,12 +11,14 @@ import (
 type HTTP struct {
 	addr   string
 	client *fasthttp.Client
+	headers map[string]string
 }
 
-func newHTTP(addr string) *HTTP {
+func newHTTP(addr string, headers map[string]string) *HTTP {
 	return &HTTP{
 		addr:   addr,
 		client: &fasthttp.Client{},
+		headers: headers,
 	}
 }
 
@@ -53,6 +55,9 @@ func (h *HTTP) Call(method string, out interface{}, params ...interface{}) error
 	req.SetRequestURI(h.addr)
 	req.Header.SetMethod("POST")
 	req.Header.SetContentType("application/json")
+	for k, v := range h.headers {
+		req.Header.Add(k, v)
+	}
 	req.SetBody(raw)
 
 	if err := h.client.Do(req, res); err != nil {
