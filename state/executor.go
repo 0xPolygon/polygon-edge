@@ -87,7 +87,7 @@ type BlockResult struct {
 	TotalGas uint64
 }
 
-// ProcessBlock already does all the handling of the whole process, TODO
+// ProcessBlock already does all the handling of the whole process
 func (e *Executor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
