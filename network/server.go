@@ -28,25 +28,24 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const DefaultLibp2pPort int = 1478
-
 const (
-	MinimumPeerConnections int64 = 1
-  
 	DefaultDialRatio = 0.2
-  
+
+	DefaultLibp2pPort int = 1478
+
+	MinimumPeerConnections int64 = 1
+
 	MinimumBootNodes int = 1
+
+	// Priority for dial queue
+	PriorityRequestedDial uint64 = 1
+
+	PriorityRandomDial uint64 = 10
 )
 
 var (
 	ErrNoBootnodes  = errors.New("no bootnodes specified")
 	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
-)
-
-// Priority for dial queue
-const (
-	PriorityRequestedDial uint64 = 1
-	PriorityRandomDial    uint64 = 10
 )
 
 type Config struct {

@@ -3,11 +3,12 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -367,7 +368,7 @@ func TestPeerReconnection(t *testing.T) {
 	t.Cleanup(func() {
 		closeTestServers(t, bootnodes)
 	})
-  
+
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxInboundPeers = 3
