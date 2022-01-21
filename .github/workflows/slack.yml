@@ -23,6 +23,5 @@ jobs:
           URL: { pull_request.html_url }
         PR_REJECTED_FORMAT: |
           *{ pull_request.title }* was rejected by { review.user.login } :cry:
-        SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        # USERNAME: Your username
+        SLACK_CHANNEL: ${{ secrets.SLACK_PR_CHANNEL }}
+        SLACK_WEBHOOK: ${{ secrets.SLACK_PR_WEBHOOK }}
