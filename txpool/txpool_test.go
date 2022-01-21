@@ -3,6 +3,7 @@ package txpool
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -34,16 +35,11 @@ var (
 
 // addresses used in tests
 var (
-	addr1  = types.Address{0x1}
-	addr2  = types.Address{0x2}
-	addr3  = types.Address{0x3}
-	addr4  = types.Address{0x4}
-	addr5  = types.Address{0x5}
-	addr6  = types.Address{0x6}
-	addr7  = types.Address{0x7}
-	addr8  = types.Address{0x8}
-	addr9  = types.Address{0x9}
-	addr10 = types.Address{0x10}
+	addr1 = types.Address{0x1}
+	addr2 = types.Address{0x2}
+	addr3 = types.Address{0x3}
+	addr4 = types.Address{0x4}
+	addr5 = types.Address{0x5}
 )
 
 // returns a new valid tx of slots size with the given nonce
@@ -76,7 +72,10 @@ func newTestPool() (*TxPool, error) {
 
 func newTestPoolWithSlots(maxSlots uint64) (*TxPool, error) {
 	return NewTxPool(
-		hclog.NewNullLogger(),
+		hclog.New(&hclog.LoggerOptions{
+			Name:  "polygon",
+			Level: hclog.LevelFromString("DEBUG"),
+		}),
 		forks.At(0),
 		defaultMockStore{},
 		nil,
@@ -1328,9 +1327,11 @@ func TestResetAccounts_Promoted(t *testing.T) {
 
 	// setup prestate
 	totalTx := 0
+
 	for _, txs := range allTxs {
 		for _, tx := range txs {
 			totalTx++
+
 			go func(tx *types.Transaction) {
 				err := pool.addTx(local, tx)
 				assert.NoError(t, err)
@@ -1348,6 +1349,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	pool.resetAccounts(newNonces)
 
 	assert.Equal(t, expected.slots, pool.gauge.read())
+
 	for addr := range expected.accounts {
 		assert.Equal(t, // enqueued
 			expected.accounts[addr].enqueued,
@@ -1728,237 +1730,443 @@ type statusTx struct {
 }
 
 func TestRecovery(t *testing.T) {
-	// TODO remove
-	t.SkipNow()
+	t.Run("recovered are enqueued", func(t *testing.T) {
+		allTxs := map[types.Address][]statusTx{
+			addr1: {
+				{newTx(addr1, 0, 1), ok},
+				{newTx(addr1, 1, 1), unrecoverable}, // will demote subsequent
+				{newTx(addr1, 2, 1), recoverable},
+				{newTx(addr1, 3, 1), recoverable},
+				{newTx(addr1, 4, 1), recoverable},
+			},
+			addr2: {
+				{newTx(addr2, 9, 1), unrecoverable}, // will demote subsequent
+				{newTx(addr2, 10, 1), recoverable},
+			},
+			addr3: {
+				{newTx(addr3, 5, 1), ok},
+				{newTx(addr3, 6, 1), unrecoverable}, // will demote subsequent
+				{newTx(addr3, 7, 1), recoverable},
+				{newTx(addr3, 8, 1), recoverable},
+			},
+		}
+		expected := result{
+			slots: 3 + 1 + 2,
+			accounts: map[types.Address]accountState{
+				addr1: {
+					enqueued:  3,
+					nextNonce: 1,
+				},
+				addr2: {
+					enqueued:  1,
+					nextNonce: 9,
+				},
+				addr3: {
+					enqueued:  2,
+					nextNonce: 6,
+				},
+			},
+		}
 
-	testCases := []struct {
-		name     string
-		allTxs   map[types.Address][]statusTx
-		expected result
-	}{
-		{
-			name: "all recovered txs are enqueued",
-			allTxs: map[types.Address][]statusTx{
+		// helper callback for transition errors
+		status := func(tx *types.Transaction) (s status) {
+			txs := allTxs[tx.From]
+			for _, sTx := range txs {
+				if tx.Nonce == sTx.tx.Nonce {
+					s = sTx.status
+				}
+			}
+
+			return
+		}
+
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+		pool.EnableDev()
+
+		pool.Start()
+		defer pool.Close()
+
+		promoteSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_PROMOTED},
+		)
+
+		enqueuedSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_ENQUEUED},
+		)
+
+		// setup prestate
+		totalTx := 0
+		expectedEnqueued := uint64(0)
+		for addr, txs := range allTxs {
+			// preset nonce so promotions can happen
+			acc := pool.createAccountOnce(addr)
+			acc.setNonce(txs[0].tx.Nonce)
+
+			expectedEnqueued += expected.accounts[addr].enqueued
+
+			// send txs
+			for _, sTx := range txs {
+				totalTx++
+				go func(tx *types.Transaction) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(sTx.tx)
+			}
+		}
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
+
+		func() {
+			pool.Prepare()
+			for {
+				tx := pool.Peek()
+				if tx == nil {
+					break
+				}
+
+				switch status(tx) {
+				case recoverable:
+					pool.Demote(tx)
+				case unrecoverable:
+					pool.Drop(tx)
+				case ok:
+					pool.Pop(tx)
+				}
+			}
+		}()
+
+		// pool was handling requests
+		ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, int(expectedEnqueued)), int(expectedEnqueued))
+
+		assert.Equal(t, expected.slots, pool.gauge.read())
+		for addr := range expected.accounts {
+			assert.Equal(t, // nextNonce
+				expected.accounts[addr].nextNonce,
+				pool.accounts.get(addr).getNonce())
+
+			assert.Equal(t, // enqueued
+				expected.accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				expected.accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
+	})
+
+	t.Run("recovered are promoted", func(t *testing.T) {
+		// TODO @dbrajovic will fix a bug present in this test
+		t.SkipNow()
+
+		allTxs := map[types.Address][]statusTx{
+			addr1: {
+				{newTx(addr1, 0, 1), ok},
+				{newTx(addr1, 1, 1), ok},
+				{newTx(addr1, 2, 1), recoverable},
+				{newTx(addr1, 3, 1), recoverable},
+				{newTx(addr1, 4, 1), recoverable},
+			},
+			addr2: {
+				{newTx(addr2, 5, 1), ok},
+				{newTx(addr2, 6, 1), ok},
+			},
+			addr3: {
+				{newTx(addr3, 21, 1), ok},
+				{newTx(addr3, 22, 1), ok},
+				{newTx(addr3, 23, 1), ok},
+				{newTx(addr3, 24, 1), recoverable},
+			},
+			addr4: {
+				{newTx(addr4, 10, 1), ok},
+				{newTx(addr4, 11, 1), recoverable},
+				{newTx(addr4, 12, 1), recoverable},
+			},
+		}
+		expected := result{
+			slots: 3 + 0 + 1 + 2,
+			accounts: map[types.Address]accountState{
 				addr1: {
-					{newTx(addr1, 0, 1), ok},
-					{newTx(addr1, 1, 1), unrecoverable}, // will demote subsequent
-					{newTx(addr1, 2, 1), recoverable},
-					{newTx(addr1, 3, 1), recoverable},
-					{newTx(addr1, 4, 1), recoverable},
+					promoted:  3,
+					nextNonce: 5,
 				},
 				addr2: {
-					{newTx(addr2, 9, 1), unrecoverable}, // will demote subsequent
-					{newTx(addr2, 10, 1), recoverable},
+					promoted:  0,
+					nextNonce: 7,
 				},
 				addr3: {
-					{newTx(addr3, 5, 1), ok},
-					{newTx(addr3, 6, 1), unrecoverable}, // will demote subsequent
-					{newTx(addr3, 7, 1), recoverable},
-					{newTx(addr3, 8, 1), recoverable},
-				},
-			},
-			expected: result{
-				slots: 3 + 1 + 2,
-				accounts: map[types.Address]accountState{
-					addr1: {
-						enqueued:  3,
-						nextNonce: 1,
-					},
-					addr2: {
-						enqueued:  1,
-						nextNonce: 9,
-					},
-					addr3: {
-						enqueued:  2,
-						nextNonce: 6,
-					},
-				},
-			},
-		},
-		{
-			name: "all recovered txs are promoted",
-			allTxs: map[types.Address][]statusTx{
-				addr1: {
-					{newTx(addr1, 0, 1), ok},
-					{newTx(addr1, 1, 1), ok},
-					{newTx(addr1, 2, 1), recoverable},
-					{newTx(addr1, 3, 1), recoverable},
-					{newTx(addr1, 4, 1), recoverable},
-				},
-				addr2: {
-					{newTx(addr2, 5, 1), ok},
-					{newTx(addr2, 6, 1), ok},
-				},
-				addr3: {
-					{newTx(addr3, 21, 1), ok},
-					{newTx(addr3, 22, 1), ok},
-					{newTx(addr3, 23, 1), ok},
-					{newTx(addr3, 24, 1), recoverable},
+					promoted:  1,
+					nextNonce: 25,
 				},
 				addr4: {
-					{newTx(addr4, 10, 1), ok},
-					{newTx(addr4, 11, 1), recoverable},
-					{newTx(addr4, 12, 1), recoverable},
+					promoted:  2,
+					nextNonce: 13,
 				},
 			},
-			expected: result{
-				slots: 3 + 0 + 1 + 2,
-				accounts: map[types.Address]accountState{
-					addr1: {
-						promoted:  3,
-						nextNonce: 5,
-					},
-					addr2: {
-						promoted:  0,
-						nextNonce: 7,
-					},
-					addr3: {
-						promoted:  1,
-						nextNonce: 25,
-					},
-					addr4: {
-						promoted:  2,
-						nextNonce: 13,
-					},
-				},
-			},
-		},
-		{
-			/* Case scenario:
-			All promoted transactions exceed
-			the block gas limit
-			*/
-			name: "only first unrecoverable rolls back nonce",
-			allTxs: map[types.Address][]statusTx{
-				addr1: {
-					{newTx(addr1, 0, 1), unrecoverable},
-					{newTx(addr1, 1, 1), unrecoverable},
-					{newTx(addr1, 2, 1), unrecoverable},
-				},
-				addr2: {
-					{newTx(addr2, 6, 1), unrecoverable},
-					{newTx(addr2, 7, 1), unrecoverable},
-					{newTx(addr2, 8, 1), unrecoverable},
-					{newTx(addr2, 9, 1), unrecoverable},
-				},
-				addr3: {
-					{newTx(addr3, 3, 1), unrecoverable},
-					{newTx(addr3, 4, 1), unrecoverable},
-				},
-				addr4: {
-					{newTx(addr4, 100, 1), unrecoverable},
-					{newTx(addr4, 101, 1), unrecoverable},
-					{newTx(addr4, 102, 1), unrecoverable},
-				},
-			},
-			expected: result{
-				slots: 0,
-				accounts: map[types.Address]accountState{
-					addr1: {
-						nextNonce: 0,
-					},
-					addr2: {
-						nextNonce: 6,
-					},
-					addr3: {
-						nextNonce: 3,
-					},
-					addr4: {
-						nextNonce: 100,
-					},
-				},
-			},
-		},
-	}
+		}
 
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			// helper callback for transition errors
-			status := func(tx *types.Transaction) (s status) {
-				txs := test.allTxs[tx.From]
-				for _, sTx := range txs {
-					if tx.Nonce == sTx.tx.Nonce {
-						s = sTx.status
-					}
-				}
-
-				return
-			}
-
-			// create pool
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
-			pool.EnableDev()
-
-			pool.Start()
-			defer pool.Close()
-
-			subscription := pool.eventManager.subscribe(
-				[]proto.EventType{proto.EventType_PROMOTED},
-			)
-
-			// setup prestate
-			totalTx := 0
-			for addr, txs := range test.allTxs {
-				// preset nonce so promotions can happen
-				acc := pool.createAccountOnce(addr)
-				acc.setNonce(txs[0].tx.Nonce)
-
-				// send txs
-				for _, sTx := range txs {
-					totalTx++
-					go func(tx *types.Transaction) {
-						err := pool.addTx(local, tx)
-						assert.NoError(t, err)
-					}(sTx.tx)
+		// helper callback for transition errors
+		status := func(tx *types.Transaction) (s status) {
+			txs := allTxs[tx.From]
+			for _, sTx := range txs {
+				if tx.Nonce == sTx.tx.Nonce {
+					s = sTx.status
 				}
 			}
 
-			ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
-			defer cancelFn()
+			return
+		}
 
-			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, subscription, totalTx), totalTx)
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+		pool.EnableDev()
 
-			func() {
-				pool.Prepare()
-				for {
-					tx := pool.Peek()
-					if tx == nil {
-						break
-					}
+		pool.Start()
+		defer pool.Close()
 
-					switch status(tx) {
-					case recoverable:
-						pool.Demote(tx)
-					case unrecoverable:
-						pool.Drop(tx)
-					case ok:
-						pool.Pop(tx)
-					}
-				}
-			}()
+		promoteSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_PROMOTED},
+		)
 
-			// pool was handling requests
-			//waitUntilDone(done)
+		// setup prestate
+		totalTx := 0
+		expectedPromoted := uint64(0)
+		for addr, txs := range allTxs {
+			// preset nonce so promotions can happen
+			acc := pool.createAccountOnce(addr)
+			acc.setNonce(txs[0].tx.Nonce)
 
-			assert.Equal(t, test.expected.slots, pool.gauge.read())
-			for addr := range test.expected.accounts {
-				assert.Equal(t, // nextNonce
-					test.expected.accounts[addr].nextNonce,
-					pool.accounts.get(addr).getNonce())
+			expectedPromoted += expected.accounts[addr].promoted
 
-				assert.Equal(t, // enqueued
-					test.expected.accounts[addr].enqueued,
-					pool.accounts.get(addr).enqueued.length())
-
-				assert.Equal(t, // promoted
-					test.expected.accounts[addr].promoted,
-					pool.accounts.get(addr).promoted.length())
+			// send txs
+			for _, sTx := range txs {
+				totalTx++
+				go func(tx *types.Transaction) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(sTx.tx)
 			}
+		}
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
+		pool.eventManager.cancelSubscription(promoteSubscription.subscriptionID)
+
+		demoteSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_DEMOTED, proto.EventType_PROMOTED},
+		)
+
+		func() {
+			pool.Prepare()
+			for {
+				tx := pool.Peek()
+				if tx == nil {
+					break
+				}
+				fmt.Println(tx.Hash.String())
+
+				switch status(tx) {
+				case recoverable:
+					pool.Demote(tx)
+				case unrecoverable:
+					pool.Drop(tx)
+				case ok:
+					pool.Pop(tx)
+				}
+			}
+		}()
+
+		// pool was handling requests
+		ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		events := waitForEvents(ctx, demoteSubscription, int(expectedPromoted)*2)
+		assert.Len(t, events, int(expectedPromoted)*2)
+
+		fmt.Println(events)
+
+		retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancelRetry()
+
+		_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
+			return nil, expected.slots != pool.gauge.read()
 		})
-	}
+		assert.NoError(t, err)
+
+		for addr := range expected.accounts {
+			assert.Equal(t, // nextNonce
+				expected.accounts[addr].nextNonce,
+				pool.accounts.get(addr).getNonce())
+
+			assert.Equal(t, // enqueued
+				expected.accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				expected.accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
+	})
+
+	t.Run("rollback nonce once", func(t *testing.T) {
+		allTxs := map[types.Address][]statusTx{
+			addr1: {
+				{newTx(addr1, 0, 1), unrecoverable},
+				{newTx(addr1, 1, 1), unrecoverable},
+				{newTx(addr1, 2, 1), unrecoverable},
+			},
+			addr2: {
+				{newTx(addr2, 6, 1), unrecoverable},
+				{newTx(addr2, 7, 1), unrecoverable},
+				{newTx(addr2, 8, 1), unrecoverable},
+				{newTx(addr2, 9, 1), unrecoverable},
+			},
+			addr3: {
+				{newTx(addr3, 3, 1), unrecoverable},
+				{newTx(addr3, 4, 1), unrecoverable},
+			},
+			addr4: {
+				{newTx(addr4, 100, 1), unrecoverable},
+				{newTx(addr4, 101, 1), unrecoverable},
+				{newTx(addr4, 102, 1), unrecoverable},
+			},
+		}
+		expected := result{
+			slots: 0,
+			accounts: map[types.Address]accountState{
+				addr1: {
+					nextNonce: 0,
+				},
+				addr2: {
+					nextNonce: 6,
+				},
+				addr3: {
+					nextNonce: 3,
+				},
+				addr4: {
+					nextNonce: 100,
+				},
+			},
+		}
+		// helper callback for transition errors
+		status := func(tx *types.Transaction) (s status) {
+			txs := allTxs[tx.From]
+			for _, sTx := range txs {
+				if tx.Nonce == sTx.tx.Nonce {
+					s = sTx.status
+				}
+			}
+
+			return
+		}
+
+		// create pool
+		pool, err := newTestPool()
+		assert.NoError(t, err)
+		pool.SetSigner(&mockSigner{})
+		pool.EnableDev()
+
+		pool.Start()
+		defer pool.Close()
+
+		promoteSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_PROMOTED},
+		)
+
+		// setup prestate
+		totalTx := 0
+		for addr, txs := range allTxs {
+			// preset nonce so promotions can happen
+			acc := pool.createAccountOnce(addr)
+			acc.setNonce(txs[0].tx.Nonce)
+
+			// send txs
+			for _, sTx := range txs {
+				totalTx++
+				go func(tx *types.Transaction) {
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
+				}(sTx.tx)
+			}
+		}
+
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
+		pool.eventManager.cancelSubscription(promoteSubscription.subscriptionID)
+
+		dropSubscription := pool.eventManager.subscribe(
+			[]proto.EventType{proto.EventType_DROPPED},
+		)
+
+		func() {
+			pool.Prepare()
+			for {
+				tx := pool.Peek()
+				if tx == nil {
+					break
+				}
+				fmt.Println(tx.Hash.String())
+
+				switch status(tx) {
+				case recoverable:
+					pool.Demote(tx)
+				case unrecoverable:
+					pool.Drop(tx)
+				case ok:
+					pool.Pop(tx)
+				}
+			}
+		}()
+
+		// pool was handling requests
+		ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancelFn()
+
+		// All txns should get added
+		events := waitForEvents(ctx, dropSubscription, totalTx)
+		assert.Len(t, events, totalTx)
+
+		retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancelRetry()
+
+		_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
+			return nil, expected.slots != pool.gauge.read()
+		})
+		assert.NoError(t, err)
+
+		for addr := range expected.accounts {
+			assert.Equal(t, // nextNonce
+				expected.accounts[addr].nextNonce,
+				pool.accounts.get(addr).getNonce())
+
+			assert.Equal(t, // enqueued
+				expected.accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				expected.accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
+	})
 }
 
 func TestGetTxs(t *testing.T) {
