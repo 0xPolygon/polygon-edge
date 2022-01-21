@@ -181,6 +181,7 @@ func (b *blockStream) loadRLPArray() (uint64, error) {
 		return 0, err
 	}
 
+	// read information from RLP array header
 	headerSize, payloadSize, err := b.loadPrefixSize(1, prefix)
 	if err != nil {
 		return 0, err
