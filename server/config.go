@@ -25,6 +25,7 @@ type Config struct {
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
+	RestoreFile    *string
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking

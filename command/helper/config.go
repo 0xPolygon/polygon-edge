@@ -34,6 +34,7 @@ type Config struct {
 	DevInterval    uint64                 `json:"dev_interval"`
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
+	RestoreFile    string                 `json:"restore_file"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -72,8 +73,9 @@ func DefaultConfig() *Config {
 			PriceLimit: 0,
 			MaxSlots:   4096,
 		},
-		Consensus: map[string]interface{}{},
-		LogLevel:  "INFO",
+		Consensus:   map[string]interface{}{},
+		LogLevel:    "INFO",
+		RestoreFile: "",
 	}
 }
 
@@ -164,6 +166,10 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 		}
 
 		conf.Chain.Params.BlockGasTarget = value.Uint64()
+	}
+
+	if c.RestoreFile != "" {
+		conf.RestoreFile = &c.RestoreFile
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -286,6 +292,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	// Read the secrets config file location
 	if otherConfig.Secrets != "" {
 		c.Secrets = otherConfig.Secrets
+	}
+
+	if otherConfig.RestoreFile != "" {
+		c.RestoreFile = otherConfig.RestoreFile
 	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {

@@ -203,6 +203,14 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["restore"] = helper.FlagDescriptor{
+		Description: "Sets the path to the archive blockchain data to restore on initialization",
+		Arguments: []string{
+			"RESTORE",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
