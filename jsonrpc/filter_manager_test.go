@@ -1,17 +1,10 @@
 package jsonrpc
 
 import (
-	"errors"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
@@ -215,105 +208,4 @@ func TestHeadStream(t *testing.T) {
 	// there are no new entries
 	updates, _ = next.getUpdates()
 	assert.Len(t, updates, 0)
-}
-
-type mockStore struct {
-	nullBlockchainInterface
-
-	header       *types.Header
-	subscription *blockchain.MockSubscription
-	receiptsLock sync.Mutex
-	receipts     map[types.Hash][]*types.Receipt
-	accounts     map[types.Address]*state.Account
-}
-
-func (m *mockStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	panic("implement me")
-}
-
-func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
-	panic("implement me")
-}
-
-func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	if acc, ok := m.accounts[addr]; ok {
-		return acc, nil
-	}
-
-	return nil, errors.New("given root and slot not found in storage")
-}
-
-func (m *mockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	panic("implement me")
-}
-
-func (m *mockStore) GetCode(hash types.Hash) ([]byte, error) {
-	panic("implement me")
-}
-
-func (m *mockStore) SetAccount(addr types.Address, account *state.Account) {
-	m.accounts[addr] = account
-}
-
-func (m *mockStore) GetCapacity() (uint64, uint64) {
-	return 0, 0
-}
-
-func newMockStore() *mockStore {
-	return &mockStore{
-		header:       &types.Header{Number: 0},
-		subscription: blockchain.NewMockSubscription(),
-		accounts:     map[types.Address]*state.Account{},
-	}
-}
-
-type mockHeader struct {
-	header   *types.Header
-	receipts []*types.Receipt
-}
-
-type mockEvent struct {
-	OldChain []*mockHeader
-	NewChain []*mockHeader
-}
-
-func (m *mockStore) emitEvent(evnt *mockEvent) {
-	if m.receipts == nil {
-		m.receipts = map[types.Hash][]*types.Receipt{}
-	}
-
-	bEvnt := &blockchain.Event{
-		NewChain: []*types.Header{},
-		OldChain: []*types.Header{},
-	}
-
-	for _, i := range evnt.NewChain {
-		m.receipts[i.header.Hash] = i.receipts
-		bEvnt.NewChain = append(bEvnt.NewChain, i.header)
-	}
-
-	for _, i := range evnt.OldChain {
-		m.receipts[i.header.Hash] = i.receipts
-		bEvnt.OldChain = append(bEvnt.OldChain, i.header)
-	}
-
-	m.subscription.Push(bEvnt)
-}
-
-func (m *mockStore) Header() *types.Header {
-	return m.header
-}
-
-func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
-	m.receiptsLock.Lock()
-	defer m.receiptsLock.Unlock()
-
-	receipts := m.receipts[hash]
-
-	return receipts, nil
-}
-
-// Subscribe subscribes for chain head events
-func (m *mockStore) SubscribeEvents() blockchain.Subscription {
-	return m.subscription
 }
