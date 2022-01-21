@@ -1,0 +1,28 @@
+on: 
+  pull_request:
+    types: [opened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+name: Notify about PR ready for review
+jobs:
+  slackNotification:
+    name: Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Slack Notification
+      uses: kv109/action-ready-for-review@0.1
+      env:
+        IGNORE_DRAFTS: false # Ignore draft pull requests. Default: true.
+        PR_APPROVED_FORMAT: | # Format is fully customizable.
+          *{ pull_request.title }* was approved by { review.user.login } :heavy_check_mark:
+        PR_READY_FOR_REVIEW_FORMAT: |
+          New PR! :smile:
+          Title: *{ pull_request.title }*
+          Author: { pull_request.user.login }
+          URL: { pull_request.html_url }
+        PR_REJECTED_FORMAT: |
+          *{ pull_request.title }* was rejected by { review.user.login } :cry:
+        SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        # USERNAME: Your username
