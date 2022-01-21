@@ -240,10 +240,6 @@ func (t *TestServer) GenerateGenesis() error {
 
 		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
 
-		for _, bootnode := range t.Config.Bootnodes {
-			args = append(args, "--bootnode", bootnode)
-		}
-
 		if t.Config.EpochSize != 0 {
 			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
@@ -256,6 +252,10 @@ func (t *TestServer) GenerateGenesis() error {
 		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
+	}
+
+	for _, bootnode := range t.Config.Bootnodes {
+		args = append(args, "--bootnode", bootnode)
 	}
 
 	// Make sure the correct mechanism is selected
