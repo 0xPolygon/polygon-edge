@@ -72,10 +72,7 @@ func newTestPool() (*TxPool, error) {
 
 func newTestPoolWithSlots(maxSlots uint64) (*TxPool, error) {
 	return NewTxPool(
-		hclog.New(&hclog.LoggerOptions{
-			Name:  "polygon",
-			Level: hclog.LevelFromString("DEBUG"),
-		}),
+		hclog.NewNullLogger(),
 		forks.At(0),
 		defaultMockStore{},
 		nil,
