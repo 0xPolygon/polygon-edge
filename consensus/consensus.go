@@ -2,12 +2,12 @@ package consensus
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"log"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -28,7 +28,10 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *protocol.Progression
 
-	// Start starts the consensus
+	// Initialize initializes the consensus (e.g. setup data)
+	Initialize() error
+
+	// Start starts the consensus and servers
 	Start() error
 
 	// Close closes the connection

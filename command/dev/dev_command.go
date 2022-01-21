@@ -81,6 +81,14 @@ func (d *DevCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	d.FlagMap["restore"] = helper.FlagDescriptor{
+		Description: "Sets the path to the archive blockchain data to restore on initialization",
+		Arguments: []string{
+			"RESTORE",
+		},
+		FlagOptional: true,
+	}
 }
 
 func (d *DevCommand) GetHelperText() string {

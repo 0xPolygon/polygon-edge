@@ -11,7 +11,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/archive"
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -21,21 +24,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/txpool"
-	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
-
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
-
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 // Minimal is the central manager of the blockchain client
@@ -101,6 +99,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	} else {
 		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
 	}
+
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
@@ -191,17 +190,30 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup grpc server
+	// initialize data in consensus layer
+	if err := m.consensus.Initialize(); err != nil {
+		return nil, err
+	}
+
+	// restore archive data before starting
+	if config.RestoreFile != nil {
+		if err := archive.RestoreChain(m.blockchain, *config.RestoreFile); err != nil {
+			return nil, err
+		}
+	}
+
+	// start consensus
+	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
+
+	// setup and start grpc server
 	if err := m.setupGRPC(); err != nil {
 		return nil, err
 	}
 
-	// setup jsonrpc
+	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
-		return nil, err
-	}
-
-	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
 
@@ -481,7 +493,7 @@ func (s *Server) setupJSONRPC() error {
 
 // setupGRPC sets up the grpc server and listens on tcp
 func (s *Server) setupGRPC() error {
-	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
+	proto.RegisterSystemServer(s.grpcServer, &systemService{server: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
 	if err != nil {
