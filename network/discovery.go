@@ -184,6 +184,7 @@ func (d *discovery) addPeersToTable(nodes []string) error {
 		info, err := StringToAddrInfo(node)
 		if err != nil {
 			d.srv.logger.Error("Failed to parse address", "err", err)
+
 			continue
 		}
 

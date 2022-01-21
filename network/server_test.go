@@ -3,11 +3,12 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -374,7 +375,7 @@ func TestPeerReconnection(t *testing.T) {
 			c.NoDiscover = false
 		},
 		ServerCallback: func(server *Server) {
-			  server.config.Chain.Bootnodes = []string{
+			server.config.Chain.Bootnodes = []string{
 				AddrInfoToString(bootnodes[0].AddrInfo()),
 				AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
