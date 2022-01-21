@@ -734,8 +734,7 @@ func TestTemporaryDial(t *testing.T) {
 	})
 
 	//make a temporary dail to server1
-	err = dialServer(servers[0], *servers[1].AddrInfo(), true)
-	assert.NoError(t, err)
+	assert.NoError(t, dialServer(servers[0], *servers[1].AddrInfo(), true))
 
 	// ensure that the connection is established
 	assert.Equal(t, network.Connected, servers[0].host.Network().Connectedness(servers[1].host.ID()))
