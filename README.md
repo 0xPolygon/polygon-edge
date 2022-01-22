@@ -7,7 +7,7 @@ Polygon Edge is a modular and extensible framework for building Ethereum-compati
 
 To find out more about Polygon, visit the [official website](https://polygon.technology/).
 
-WARNING: This is a work in progress so architectural changes may happen in the future. The code has not been audited yet, so please contact [Polygon team](mailto:contact@polygon.technology) if you would like to use it in production.
+WARNING: This is a work in progress so architectural changes may happen in the future. The code has not been audited yet, so please contact [Polygon Edge team](mailto:edge@polygon.technology) if you would like to use it in production.
 
 ## Documentation 📝
 
