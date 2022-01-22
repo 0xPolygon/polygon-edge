@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xPolygon/polygon-sdk/command/util"
+	"github.com/0xPolygon/polygon-edge/command/util"
 	"github.com/mitchellh/cli"
 )
 
@@ -25,6 +25,7 @@ func Run(args []string) int {
 	exitCode, err := cli.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error executing CLI: %s\n", err.Error())
+
 		return 1
 	}
 

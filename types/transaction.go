@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 type Transaction struct {
@@ -38,6 +38,7 @@ func (t *Transaction) ComputeHash() *Transaction {
 
 	marshalArenaPool.Put(ar)
 	keccak.DefaultKeccakPool.Put(hash)
+
 	return t
 }
 
@@ -63,6 +64,7 @@ func (t *Transaction) Copy() *Transaction {
 
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])
+
 	return tt
 }
 
@@ -70,6 +72,7 @@ func (t *Transaction) Copy() *Transaction {
 func (t *Transaction) Cost() *big.Int {
 	total := new(big.Int).Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
 	total.Add(total, t.Value)
+
 	return total
 }
 
@@ -77,11 +80,17 @@ func (t *Transaction) Size() uint64 {
 	if size := t.size.Load(); size != nil {
 		return size.(uint64)
 	}
+
 	size := uint64(len(t.MarshalRLP()))
 	t.size.Store(size)
+
 	return size
 }
 
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Gas > blockGasLimit
+}
+
+func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
+	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
 }

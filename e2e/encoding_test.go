@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/e2e/framework"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,13 +22,16 @@ func TestEncoding(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	contractAddr, err := srv.DeployContract(ctx, sampleByteCode)
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	receipt := srv.TxnTo(ctx, contractAddr, "setA1")
 
 	// try to get the transaction

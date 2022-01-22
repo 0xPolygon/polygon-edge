@@ -1,14 +1,15 @@
 package memory
 
 import (
-	"github.com/0xPolygon/polygon-sdk/blockchain/storage"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/hashicorp/go-hclog"
 )
 
 // NewMemoryStorage creates the new storage reference with inmemory
 func NewMemoryStorage(logger hclog.Logger) (storage.Storage, error) {
 	db := &memoryKV{map[string][]byte{}}
+
 	return storage.NewKeyValueStorage(logger, db), nil
 }
 
@@ -19,6 +20,7 @@ type memoryKV struct {
 
 func (m *memoryKV) Set(p []byte, v []byte) error {
 	m.db[hex.EncodeToHex(p)] = v
+
 	return nil
 }
 
@@ -27,6 +29,7 @@ func (m *memoryKV) Get(p []byte) ([]byte, bool, error) {
 	if !ok {
 		return nil, false, nil
 	}
+
 	return v, true, nil
 }
 

@@ -19,14 +19,18 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	v, err := pr.Parse(input)
 	if err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
+
 		return err
 	}
+
 	if err := obj(pr, v); err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
+
 		return err
 	}
 
 	fastrlp.DefaultParserPool.Put(pr)
+
 	return nil
 }
 
@@ -39,6 +43,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 3 {
 		return fmt.Errorf("not enough elements to decode block, expected 3 but found %d", num)
 	}
@@ -54,11 +59,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, txn := range txns {
 		bTxn := &Transaction{}
 		if err := bTxn.UnmarshalRLPFrom(p, txn); err != nil {
 			return err
 		}
+
 		b.Transactions = append(b.Transactions, bTxn)
 	}
 
@@ -67,11 +74,13 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, uncle := range uncles {
 		bUncle := &Header{}
 		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
+
 		b.Uncles = append(b.Uncles, bUncle)
 	}
 
@@ -87,6 +96,7 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 15 {
 		return fmt.Errorf("not enough elements to decode header, expected 15 but found %d", num)
 	}
@@ -152,10 +162,12 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	h.SetNonce(nonce)
 
 	// compute the hash after the decoding
 	h.ComputeHash()
+
 	return err
 }
 
@@ -168,13 +180,16 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range elems {
 		rr := &Receipt{}
 		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		(*r) = append(*r, rr)
 	}
+
 	return nil
 }
 
@@ -188,6 +203,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 4 {
 		return fmt.Errorf("expected 4 elements")
 	}
@@ -197,6 +213,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	switch size := len(buf); size {
 	case 32:
 		// root
@@ -222,13 +239,16 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	for _, elem := range logsElems {
 		log := &Log{}
 		if err := log.UnmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
+
 		r.Logs = append(r.Logs, log)
 	}
+
 	return nil
 }
 
@@ -237,6 +257,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	if len(elems) != 3 {
 		return fmt.Errorf("bad elems")
 	}
@@ -250,16 +271,20 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if err != nil {
 		return err
 	}
+
 	l.Topics = make([]Hash, len(topicElems))
+
 	for indx, topic := range topicElems {
 		if err := topic.GetHash(l.Topics[indx][:]); err != nil {
 			return err
 		}
 	}
+
 	// data
 	if l.Data, err = elems[2].GetBytes(l.Data[:0]); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -273,6 +298,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 9 {
 		return fmt.Errorf("not enough elements to decode transaction, expected 9 but found %d", num)
 	}
@@ -328,5 +354,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
+
 	return nil
 }

@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -48,19 +48,23 @@ func (p *PeersList) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	resp, err := clt.PeersList(context.Background(), &empty.Empty{})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -79,6 +83,7 @@ func NewPeersListResult(resp *proto.PeersListResponse) *PeersListResult {
 	for i, p := range resp.Peers {
 		peers[i] = p.Id
 	}
+
 	return &PeersListResult{
 		Peers: peers,
 	}
@@ -100,6 +105,7 @@ func (r *PeersListResult) Output() string {
 		}
 		buffer.WriteString(helper.FormatKV(rows))
 	}
+
 	buffer.WriteString("\n")
 
 	return buffer.String()

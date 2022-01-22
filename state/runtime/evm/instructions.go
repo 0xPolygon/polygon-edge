@@ -1,15 +1,17 @@
+//nolint:ifshort, forcetypeassert
 package evm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"math/bits"
 	"sync"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type instruction func(c *state)
@@ -128,6 +130,7 @@ func opExp(c *state) {
 	} else {
 		gas = 10
 	}
+
 	gasCost := uint64((y.BitLen()+7)/8) * gas
 	if !c.consumeGas(gasCost) {
 		return
@@ -141,10 +144,13 @@ func opExp(c *state) {
 			if d&1 == 1 {
 				toU256(z.Mul(z, x))
 			}
+
 			d >>= 1
+
 			toU256(x.Mul(x, x))
 		}
 	}
+
 	y.Set(z)
 	releaseBig(z)
 }
@@ -155,7 +161,7 @@ func opAddMod(c *state) {
 	z := c.top()
 
 	if z.Sign() == 0 {
-		// divison by zero
+		// division by zero
 		z.Set(zero)
 	} else {
 		a = a.Add(a, b)
@@ -170,7 +176,7 @@ func opMulMod(c *state) {
 	z := c.top()
 
 	if z.Sign() == 0 {
-		// divison by zero
+		// division by zero
 		z.Set(zero)
 	} else {
 		a = a.Mul(a, b)
@@ -295,6 +301,7 @@ func opSignExtension(c *state) {
 	if ext.Cmp(wordSize) > 0 {
 		return
 	}
+
 	if x == nil {
 		return
 	}
@@ -323,6 +330,7 @@ func equalOrOverflowsUint256(b *big.Int) bool {
 func opShl(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -340,6 +348,7 @@ func opShl(c *state) {
 func opShr(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -357,6 +366,7 @@ func opShr(c *state) {
 func opSar(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -382,6 +392,7 @@ var bufPool = sync.Pool{
 		// Store pointer to avoid heap allocation in caller
 		// Please check SA6002 in StaticCheck for details
 		buf := make([]byte, 128)
+
 		return &buf
 	},
 }
@@ -391,9 +402,11 @@ func opMload(c *state) {
 
 	var ok bool
 	c.tmp, ok = c.get2(c.tmp[:0], offset, wordSize)
+
 	if !ok {
 		return
 	}
+
 	c.push1().SetBytes(c.tmp)
 }
 
@@ -420,7 +433,9 @@ func opMStore(c *state) {
 	for _, d := range val.Bits() {
 		for j := 0; j < _S; j++ {
 			i--
+
 			buf[i] = byte(d)
+
 			d >>= 8
 		}
 	}
@@ -428,6 +443,7 @@ func opMStore(c *state) {
 	// fill the rest of the slot with zeros
 	for i > 0 {
 		i--
+
 		buf[i] = 0
 	}
 }
@@ -439,6 +455,7 @@ func opMStore8(c *state) {
 	if !c.checkMemory(offset, one) {
 		return
 	}
+
 	c.memory[offset.Uint64()] = byte(val.Uint64() & 0xff)
 }
 
@@ -456,6 +473,7 @@ func opSload(c *state) {
 	} else {
 		gas = 50
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -467,11 +485,13 @@ func opSload(c *state) {
 func opSStore(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
+
 		return
 	}
 
 	if c.config.Istanbul && c.gas <= 2300 {
 		c.exit(errOutOfGas)
+
 		return
 	}
 
@@ -513,6 +533,7 @@ func opSStore(c *state) {
 	case runtime.StorageDeleted:
 		cost = 5000
 	}
+
 	if !c.consumeGas(cost) {
 		return
 	}
@@ -573,6 +594,7 @@ func opBalance(c *state) {
 func opSelfBalance(c *state) {
 	if !c.config.Istanbul {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -582,6 +604,7 @@ func opSelfBalance(c *state) {
 func opChainID(c *state) {
 	if !c.config.Istanbul {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -609,6 +632,7 @@ func min(i, j uint64) uint64 {
 	if i < j {
 		return i
 	}
+
 	return j
 }
 
@@ -639,6 +663,7 @@ func opExtCodeSize(c *state) {
 	} else {
 		gas = 20
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -661,6 +686,7 @@ func opReturnDataSize(c *state) {
 func opExtCodeHash(c *state) {
 	if !c.config.Constantinople {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -672,6 +698,7 @@ func opExtCodeHash(c *state) {
 	} else {
 		gas = 400
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -702,6 +729,7 @@ func (c *state) setBytes(dst, input []byte, size uint64, dataOffset *big.Int) {
 		for i := uint64(0); i < size; i++ {
 			dst[i] = 0
 		}
+
 		return
 	}
 
@@ -712,6 +740,7 @@ func (c *state) setBytes(dst, input []byte, size uint64, dataOffset *big.Int) {
 	if copySize > 0 {
 		copy(dst, input[begin:begin+copySize])
 	}
+
 	if size-copySize > 0 {
 		dst = dst[copySize:]
 		for i := uint64(0); i < size-copySize; i++ {
@@ -743,6 +772,7 @@ func opExtCodeCopy(c *state) {
 	} else {
 		gas = 20
 	}
+
 	if !c.consumeGas(gas) {
 		return
 	}
@@ -775,6 +805,7 @@ func opCallDataCopy(c *state) {
 func opReturnDataCopy(c *state) {
 	if !c.config.Byzantium {
 		c.exit(errOpCodeNotFound)
+
 		return
 	}
 
@@ -794,11 +825,15 @@ func opReturnDataCopy(c *state) {
 	end := length.Add(dataOffset, length)
 	if !end.IsUint64() {
 		c.exit(errReturnDataOutOfBounds)
+
 		return
 	}
+
 	size = end.Uint64()
+
 	if uint64(len(c.returnData)) < size {
 		c.exit(errReturnDataOutOfBounds)
+
 		return
 	}
 
@@ -819,6 +854,7 @@ func opCodeCopy(c *state) {
 	if !c.consumeGas(((size + 31) / 32) * copyGas) {
 		return
 	}
+
 	if size != 0 {
 		c.setBytes(c.memory[memOffset.Uint64():], c.code, size, dataOffset)
 	}
@@ -831,6 +867,7 @@ func opBlockHash(c *state) {
 
 	if !num.IsInt64() {
 		num.Set(zero)
+
 		return
 	}
 
@@ -867,6 +904,7 @@ func opGasLimit(c *state) {
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
+
 		return
 	}
 
@@ -878,6 +916,7 @@ func opSelfDestruct(c *state) {
 	// EIP150 reprice fork
 	if c.config.EIP150 {
 		gas = 5000
+
 		if c.config.EIP158 {
 			// if empty and transfers value
 			if c.host.Empty(address) && c.host.GetBalance(c.msg.Address).Sign() != 0 {
@@ -897,9 +936,7 @@ func opSelfDestruct(c *state) {
 }
 
 func opJump(c *state) {
-	dest := c.pop()
-
-	if c.validJumpdest(dest) {
+	if dest := c.pop(); c.validJumpdest(dest) {
 		c.ip = int(dest.Uint64() - 1)
 	} else {
 		c.exit(errInvalidJump)
@@ -961,14 +998,17 @@ func opSwap(n int) instruction {
 
 func opLog(size int) instruction {
 	size = size - 1
+
 	return func(c *state) {
 		if c.inStaticCall() {
 			c.exit(errWriteProtection)
+
 			return
 		}
 
 		if !c.stackAtLeast(2 + size) {
 			c.exit(errStackUnderflow)
+
 			return
 		}
 
@@ -981,6 +1021,7 @@ func opLog(size int) instruction {
 		}
 
 		var ok bool
+
 		c.tmp, ok = c.get2(c.tmp[:0], mStart, mSize)
 		if !ok {
 			return
@@ -991,6 +1032,7 @@ func opLog(size int) instruction {
 		if !c.consumeGas(uint64(size) * 375) {
 			return
 		}
+
 		if !c.consumeGas(mSize.Uint64() * 8) {
 			return
 		}
@@ -1005,12 +1047,14 @@ func opCreate(op OpCode) instruction {
 	return func(c *state) {
 		if c.inStaticCall() {
 			c.exit(errWriteProtection)
+
 			return
 		}
 
 		if op == CREATE2 {
 			if !c.config.Constantinople {
 				c.exit(errOpCodeNotFound)
+
 				return
 			}
 		}
@@ -1021,11 +1065,14 @@ func opCreate(op OpCode) instruction {
 		contract, err := c.buildCreateContract(op)
 		if err != nil {
 			c.push1().Set(zero)
+
 			if contract != nil {
 				c.gas += contract.Gas
 			}
+
 			return
 		}
+
 		if contract == nil {
 			return
 		}
@@ -1036,9 +1083,9 @@ func opCreate(op OpCode) instruction {
 		result := c.host.Callx(contract, c.host)
 
 		v := c.push1()
-		if op == CREATE && c.config.Homestead && result.Err == runtime.ErrCodeStoreOutOfGas {
+		if op == CREATE && c.config.Homestead && errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
-		} else if result.Failed() && result.Err != runtime.ErrCodeStoreOutOfGas {
+		} else if result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
 		} else {
 			v.SetBytes(contract.Address.Bytes())
@@ -1059,20 +1106,25 @@ func opCall(op OpCode) instruction {
 		if op == CALL && c.inStaticCall() {
 			if val := c.peekAt(3); val != nil && val.BitLen() > 0 {
 				c.exit(errWriteProtection)
+
 				return
 			}
 		}
 
 		if op == DELEGATECALL && !c.config.Homestead {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
+
 		if op == STATICCALL && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
 
 		var callType runtime.CallType
+
 		switch op {
 		case CALL:
 			callType = runtime.Call
@@ -1093,11 +1145,14 @@ func opCall(op OpCode) instruction {
 		contract, offset, size, err := c.buildCallContract(op)
 		if err != nil {
 			c.push1().Set(zero)
+
 			if contract != nil {
 				c.gas += contract.Gas
 			}
+
 			return
 		}
+
 		if contract == nil {
 			return
 		}
@@ -1171,6 +1226,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 			gasCost += 25000
 		}
 	}
+
 	if transfersValue {
 		gasCost += 9000
 	}
@@ -1178,6 +1234,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	var gas uint64
 
 	ok = initialGas.IsUint64()
+
 	if c.config.EIP150 {
 		availableGas := c.gas - gasCost
 		availableGas = availableGas - availableGas/64
@@ -1190,6 +1247,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	} else {
 		if !ok {
 			c.exit(errOutOfGas)
+
 			return nil, 0, 0, nil
 		}
 		gas = initialGas.Uint64()
@@ -1201,17 +1259,28 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	if !c.consumeGas(gasCost) {
 		return nil, 0, 0, nil
 	}
+
 	if transfersValue {
 		gas += 2300
 	}
 
 	parent := c
 
-	contract := runtime.NewContractCall(c.msg.Depth+1, parent.msg.Origin, parent.msg.Address, addr, value, gas, c.host.GetCode(addr), args)
+	contract := runtime.NewContractCall(
+		c.msg.Depth+1,
+		parent.msg.Origin,
+		parent.msg.Address,
+		addr,
+		value,
+		gas,
+		c.host.GetCode(addr),
+		args,
+	)
 
 	if op == STATICCALL || parent.msg.Static {
 		contract.Static = true
 	}
+
 	if op == CALLCODE || op == DELEGATECALL {
 		contract.Address = parent.msg.Address
 		if op == DELEGATECALL {
@@ -1225,6 +1294,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 			return contract, 0, 0, fmt.Errorf("bad")
 		}
 	}
+
 	return contract, retOffset.Uint64(), retSize.Uint64(), nil
 }
 
@@ -1239,7 +1309,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		salt = c.pop()
 	}
 
-	// check if the value can be transfered
+	// check if the value can be transferred
 	hasTransfer := value != nil && value.Sign() != 0
 
 	// Calculate and consume gas cost
@@ -1249,6 +1319,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 
 	// Both CREATE and CREATE2 use memory
 	var input []byte
+
 	var ok bool
 
 	input, ok = c.get2(input[:0], offset, length) // Does the memory check
@@ -1294,7 +1365,9 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 	} else {
 		address = crypto.CreateAddress2(c.msg.Address, bigToHash(salt), input)
 	}
+
 	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input)
+
 	return contract, nil
 }
 
@@ -1302,6 +1375,7 @@ func opHalt(op OpCode) instruction {
 	return func(c *state) {
 		if op == REVERT && !c.config.Byzantium {
 			c.exit(errOpCodeNotFound)
+
 			return
 		}
 
@@ -1310,6 +1384,7 @@ func opHalt(op OpCode) instruction {
 
 		var ok bool
 		c.ret, ok = c.get2(c.ret[:0], offset, size)
+
 		if !ok {
 			return
 		}
@@ -1331,6 +1406,7 @@ func toU256(x *big.Int) *big.Int {
 	if x.Sign() < 0 || x.BitLen() > 256 {
 		x.And(x, tt256m1)
 	}
+
 	return x
 }
 
@@ -1338,5 +1414,6 @@ func to256(x *big.Int) *big.Int {
 	if x.BitLen() > 255 {
 		x.Sub(x, tt256)
 	}
+
 	return x
 }

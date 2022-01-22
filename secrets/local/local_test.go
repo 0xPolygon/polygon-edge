@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/stretchr/testify/assert"
@@ -70,6 +70,8 @@ func TestLocalSecretsManagerFactory(t *testing.T) {
 // getLocalSecretsManager is a helper method for creating an instance of the
 // local secrets manager
 func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
+	t.Helper()
+
 	// Set up the expected folder structure
 	workingDirectory, tempErr := ioutil.TempDir("/tmp", "local-secrets-manager")
 	if tempErr != nil {
@@ -98,6 +100,7 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 	if factoryErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager, %v", factoryErr)
 	}
+
 	assert.NotNil(t, manager)
 
 	return manager
@@ -231,6 +234,7 @@ func TestLocalSecretsManager_RemoveSecret(t *testing.T) {
 	// Set the secret
 	manager := getLocalSecretsManager(t)
 	setErr := manager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded)
+
 	if setErr != nil {
 		t.Fatalf("Unable to save validator private key, %v", setErr)
 	}

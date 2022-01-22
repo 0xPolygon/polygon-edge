@@ -7,23 +7,23 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/helper/staking"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 )
 
 const (
 	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "example"
+	DefaultChainName      = "polygon-edge"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
@@ -65,6 +65,7 @@ func GenerateHelp(synopsys string, usage string, flagMap map[string]FlagDescript
 	helpOutput := ""
 
 	flagCounter := 0
+
 	for flagEl, descriptor := range flagMap {
 		helpOutput += GenerateFlagDesc(flagEl, descriptor) + "\n"
 		flagCounter++
@@ -123,6 +124,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 	maxFlagsPerLine := 3 // Just an arbitrary value, can be anything reasonable
 
 	var addedFlags int // Keeps track of when a newline character needs to be inserted
+
 	for flagEl, descriptor := range flagMap {
 		// Open the flag bracket
 		if descriptor.IsFlagOptional() {
@@ -141,7 +143,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 
 		// Add the flag arguments list
 		for argIndex, argument := range argumentsList {
-			if argIndex == 0 {
+			if argIndex == 0 && !descriptor.AreArgumentsOptional() {
 				// Only called for the first argument
 				output += " "
 			}
@@ -177,9 +179,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 // HandleSignals is a helper method for handling signals sent to the console
 // Like stop, error, etc.
 func HandleSignals(closeFn func(), ui cli.Ui) int {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
+	signalCh := common.GetTerminationSignalCh()
 	sig := <-signalCh
 
 	output := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
@@ -189,10 +189,12 @@ func HandleSignals(closeFn func(), ui cli.Ui) int {
 
 	// Call the Minimal server close callback
 	gracefulCh := make(chan struct{})
+
 	go func() {
 		if closeFn != nil {
 			closeFn()
 		}
+
 		close(gracefulCh)
 	}()
 
@@ -236,6 +238,7 @@ func VerifyGenesisExistence(genesisPath string) *GenesisGenError {
 			errorType: StatError,
 		}
 	}
+
 	if !os.IsNotExist(err) {
 		return &GenesisGenError{
 			message:   fmt.Sprintf("genesis file at path (%s) already exists", genesisPath),
@@ -253,7 +256,9 @@ func FillPremineMap(
 ) error {
 	for _, prem := range premine {
 		var addr types.Address
+
 		val := DefaultPremineBalance
+
 		if indx := strings.Index(prem, ":"); indx != -1 {
 			// <addr>:<balance>
 			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
@@ -264,8 +269,9 @@ func FillPremineMap(
 
 		amount, err := types.ParseUint256orHex(&val)
 		if err != nil {
-			return fmt.Errorf("failed to parse amount %s: %v", val, err)
+			return fmt.Errorf("failed to parse amount %s: %w", val, err)
 		}
+
 		premineMap[addr] = &chain.GenesisAccount{
 			Balance: amount,
 		}
@@ -274,12 +280,29 @@ func FillPremineMap(
 	return nil
 }
 
+// MergeMaps is a helper method for merging multiple maps.
+// If two or more maps have the same keys, the map that is passed in later
+// will have its key value override the previous same key values
+func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
+	mergedMap := make(map[string]interface{})
+
+	for _, m := range maps {
+		for key, value := range m {
+			mergedMap[key] = value
+		}
+	}
+
+	return mergedMap
+}
+
 // WriteGenesisToDisk writes the passed in configuration to a genesis.json file at the specified path
 func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
 	data, err := json.MarshalIndent(chain, "", "    ")
 	if err != nil {
 		return fmt.Errorf("failed to generate genesis: %w", err)
 	}
+
+	//nolint: gosec
 	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
@@ -330,6 +353,15 @@ func generateDevGenesis(params devGenesisParams) error {
 		Bootnodes: []string{},
 	}
 
+	stakingAccount, err := staking.PredeployStakingSC(
+		[]types.Address{},
+	)
+	if err != nil {
+		return err
+	}
+
+	cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+
 	if err := FillPremineMap(cc.Genesis.Alloc, params.premine); err != nil {
 		return err
 	}
@@ -356,20 +388,21 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var premine helperFlags.ArrayFlags
-	var gaslimit uint64
-	var chainID uint64
+	var (
+		premine  helperFlags.ArrayFlags
+		gaslimit uint64
+		chainID  uint64
+	)
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", DefaultConfig().LogLevel, "")
 	flags.Var(&premine, "premine", "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.Uint64Var(&gaslimit, "block-gas-limit", GenesisGasLimit, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -415,22 +448,32 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.Join, "join", "", "")
 	flags.StringVar(&cliConfig.Network.Addr, "libp2p", "", "")
 	flags.StringVar(&cliConfig.Telemetry.PrometheusAddr, "prometheus", "", "")
-	flags.StringVar(&cliConfig.Network.NatAddr, "nat", "", "the external IP address without port, as can be seen by peers")
-	flags.StringVar(&cliConfig.Network.Dns, "dns", "", " the host DNS address which can be used by a remote peer for connection")
+	flags.StringVar(
+		&cliConfig.Network.NatAddr,
+		"nat",
+		"",
+		"the external IP address without port, as can be seen by peers",
+	)
+	flags.StringVar(
+		&cliConfig.Network.DNS,
+		"dns",
+		"",
+		" the host DNS address which can be used by a remote peer for connection",
+	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
 	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
-	flags.StringVar(&cliConfig.TxPool.Locals, "locals", "", "")
-	flags.BoolVar(&cliConfig.TxPool.NoLocals, "nolocals", false, "")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
-	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
+	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)

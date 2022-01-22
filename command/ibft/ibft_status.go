@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -49,19 +49,23 @@ func (p *IbftStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.Status(context.Background(), &empty.Empty{})
+
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

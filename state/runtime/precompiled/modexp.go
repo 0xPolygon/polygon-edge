@@ -5,7 +5,7 @@ import (
 
 	"math"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-edge/chain"
 )
 
 type modExp struct {
@@ -30,20 +30,21 @@ var (
 	divisor = big.NewInt(20)
 )
 
-func adjustedExponentLength(len, head *big.Int) *big.Int {
+func adjustedExponentLength(expLen, head *big.Int) *big.Int {
 	bitlength := uint64(0)
 	if head.Sign() != 0 {
 		bitlength = uint64(head.BitLen() - 1)
 	}
 
-	if len.Cmp(big32) <= 0 {
+	if expLen.Cmp(big32) <= 0 {
 		// return the index of the highest bit
 		return new(big.Int).SetUint64(bitlength)
 	}
 
-	head.Sub(len, big32)
+	head.Sub(expLen, big32)
 	head.Mul(head, big8)
 	head.Add(head, new(big.Int).SetUint64(bitlength))
+
 	return head
 }
 
@@ -73,12 +74,11 @@ func multComplexity(x *big.Int) *big.Int {
 		// x ** 2 // 16 + 480 * x - 199680
 		x = subMul(x, big16, big480, big199680)
 	}
+
 	return x
 }
 
 func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
-	// fmt.Println("-- calc gas --")
-
 	var val, tail []byte
 
 	val, tail = m.p.get(input, 32)
@@ -102,6 +102,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	}
 
 	expHead := new(big.Int)
+
 	if bLen := baseLen.Uint64(); bLen < uint64(len(input)) {
 		val, _ = m.p.get(input[bLen:], int(expHeadLen))
 		expHead.SetBytes(val)
@@ -114,6 +115,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	} else {
 		gasCost.Set(baseLen)
 	}
+
 	gasCost = multComplexity(gasCost)
 
 	// a = a * max(ADJUSTED_EXPONENT_LENGTH, 1)
@@ -131,6 +133,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	if !gasCost.IsUint64() {
 		return math.MaxUint64
 	}
+
 	return gasCost.Uint64()
 }
 
@@ -162,5 +165,6 @@ func (m *modExp) run(input []byte) ([]byte, error) {
 	if modulus.Sign() != 0 {
 		res = base.Exp(base, exponent, modulus).Bytes()
 	}
+
 	return m.p.leftPad(res, int(modulusLen)), nil
 }

@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,8 +22,10 @@ type cases2To1 []struct {
 }
 
 func test2to1(t *testing.T, f instruction, tests cases2To1) {
-	s, close := getState()
-	defer close()
+	t.Helper()
+
+	s, closeFn := getState()
+	defer closeFn()
 
 	for _, i := range tests {
 		s.push(i.a)
@@ -42,8 +44,10 @@ type cases2ToBool []struct {
 }
 
 func test2toBool(t *testing.T, f instruction, tests cases2ToBool) {
-	s, close := getState()
-	defer close()
+	t.Helper()
+
+	s, closeFn := getState()
+	defer closeFn()
 
 	for _, i := range tests {
 		s.push(i.a)
@@ -83,8 +87,8 @@ func TestIsZero(t *testing.T) {
 }
 
 func TestMStore(t *testing.T) {
-	s, close := getState()
-	defer close()
+	s, closeFn := getState()
+	defer closeFn()
 
 	s.push(big.NewInt(10))   // value
 	s.push(big.NewInt(1024)) // offset
@@ -352,8 +356,8 @@ func TestCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, close := getState()
-			defer close()
+			s, closeFn := getState()
+			defer closeFn()
 
 			s.msg = tt.contract
 			s.gas = tt.initState.gas

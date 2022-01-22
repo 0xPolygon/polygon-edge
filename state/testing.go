@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var addr1 = types.StringToAddress("1")
@@ -79,6 +79,8 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 }
 
 func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
 	state, snap := buildPreState(nil)
 	txn := newTxn(state, snap)
 
@@ -108,6 +110,8 @@ func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
 }
 
 func testWriteState(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
 	state, snap := buildPreState(nil)
 	txn := newTxn(state, snap)
 
@@ -125,6 +129,7 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 }
 
 func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// Create account and write empty state
 	state, snap := buildPreState(nil)
 	txn := newTxn(state, snap)
@@ -148,6 +153,8 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 }
 
 func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
 	// If the state (in prestate) is updated to empty it should be removed
 	state, snap := buildPreState(defaultPreState)
 
@@ -163,6 +170,8 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 }
 
 func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
 	// Suicide an account created in the prestate
 	state, snap := buildPreState(defaultPreState)
 
@@ -175,6 +184,7 @@ func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 }
 
 func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// Create a new account and suicide it
 	state, snap := buildPreState(nil)
 
@@ -192,12 +202,14 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 }
 
 func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// Data (nonce, balance, code) from a suicided account should be empty
 	state, snap := buildPreState(nil)
 
 	txn := newTxn(state, snap)
 
 	code := []byte{0x1, 0x2, 0x3}
+
 	txn.SetNonce(addr1, 10)
 	txn.SetBalance(addr1, big.NewInt(100))
 	txn.SetCode(addr1, code)
@@ -220,6 +232,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 }
 
 func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// Suicide the coinbase of the block
 	state, snap := buildPreState(defaultPreState)
 
@@ -233,6 +246,8 @@ func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 }
 
 func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
 	state, snap := buildPreState(defaultPreState)
 
 	txn := newTxn(state, snap)
@@ -249,6 +264,7 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 }
 
 func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// refunds are only valid per single txn so after each
 	// intermediateCommit they have to be restarted
 	state, snap := buildPreState(nil)
@@ -265,6 +281,7 @@ func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 }
 
 func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// If the balance of the account changes to zero the account is deleted
 	preState := map[types.Address]*PreState{
 		addr1: {
@@ -283,6 +300,7 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 }
 
 func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
 	// If the balance of the account changes to zero the account is deleted
 	state, snap := buildPreState(nil)
 

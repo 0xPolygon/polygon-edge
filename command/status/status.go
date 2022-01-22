@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -24,7 +24,7 @@ func (c *StatusCommand) DefineFlags() {
 
 // GetHelperText returns a simple description of the command
 func (c *StatusCommand) GetHelperText() string {
-	return "Returns the status of the Polygon SDK client"
+	return "Returns the status of the Polygon Edge client"
 }
 
 func (c *StatusCommand) GetBaseCommand() string {
@@ -48,19 +48,23 @@ func (c *StatusCommand) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter, c.GRPC)
 	if err := flags.Parse(args); err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := c.GRPC.Conn()
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	clt := proto.NewSystemClient(conn)
 	status, err := clt.GetStatus(context.Background(), &emptypb.Empty{})
+
 	if err != nil {
 		c.Formatter.OutputError(err)
+
 		return 1
 	}
 

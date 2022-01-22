@@ -3,9 +3,9 @@ package precompiled
 import (
 	"encoding/binary"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var _ runtime.Runtime = &Precompiled{}
@@ -25,6 +25,7 @@ type Precompiled struct {
 func NewPrecompiled() *Precompiled {
 	p := &Precompiled{}
 	p.setupContracts()
+
 	return p
 }
 
@@ -48,6 +49,7 @@ func (p *Precompiled) register(addrStr string, b contract) {
 	if len(p.contracts) == 0 {
 		p.contracts = map[types.Address]contract{}
 	}
+
 	p.contracts[types.StringToAddress(addrStr)] = b
 }
 
@@ -132,12 +134,14 @@ func (p *Precompiled) leftPad(buf []byte, n int) []byte {
 
 	tmp := make([]byte, n)
 	copy(tmp[n-l:], buf)
+
 	return tmp
 }
 
 func (p *Precompiled) get(input []byte, size int) ([]byte, []byte) {
 	p.buf = extendByteSlice(p.buf, size)
 	n := size
+
 	if len(input) < n {
 		n = len(input)
 	}
@@ -154,12 +158,14 @@ func (p *Precompiled) get(input []byte, size int) ([]byte, []byte) {
 			copy(p.buf[n:], make([]byte, rest))
 		}
 	}
+
 	return p.buf, input[n:]
 }
 
 func (p *Precompiled) getUint64(input []byte) (uint64, []byte) {
 	p.buf, input = p.get(input, 32)
 	num := binary.BigEndian.Uint64(p.buf[24:32])
+
 	return num, input
 }
 
@@ -168,5 +174,6 @@ func extendByteSlice(b []byte, needLen int) []byte {
 	if n := needLen - cap(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}
+
 	return b[:needLen]
 }

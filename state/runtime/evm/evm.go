@@ -1,8 +1,9 @@
 package evm
 
 import (
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
+	"errors"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 )
 
 var _ runtime.Runtime = &EVM{}
@@ -28,7 +29,6 @@ func (e *EVM) Name() string {
 
 // Run implements the runtime interface
 func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInTime) *runtime.ExecutionResult {
-
 	contract := acquireState()
 	contract.resetReturnData()
 
@@ -51,7 +51,7 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 
 	releaseState(contract)
 
-	if err != nil && err != errRevert {
+	if err != nil && !errors.Is(err, errRevert) {
 		gasLeft = 0
 	}
 

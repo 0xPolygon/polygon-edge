@@ -2,17 +2,36 @@ package genesis
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	ibftConsensus = "ibft"
+	devConsensus  = "dev"
+)
+
+// Define initial consensus engine configuration values
+var (
+	initialPoSMap = map[string]interface{}{
+		"type": ibft.PoS,
+	}
+
+	initialPoAMap = map[string]interface{}{
+		"type": ibft.PoA,
+	}
+
+	initialEmptyMap = map[string]interface{}{}
 )
 
 // GenesisCommand is the command to show the version of the agent
@@ -30,7 +49,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the Polygon SDK genesis data. Default: %s", helper.GenesisFileName),
+		Description: fmt.Sprintf("Sets the directory for the Polygon Edge genesis data. Default: %s", helper.GenesisFileName),
 		Arguments: []string{
 			"DIRECTORY",
 		},
@@ -48,7 +67,10 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["premine"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the premined accounts and balances. Default premined balance: %s", helper.DefaultPremineBalance),
+		Description: fmt.Sprintf(
+			"Sets the premined accounts and balances. Default premined balance: %s",
+			helper.DefaultPremineBalance,
+		),
 		Arguments: []string{
 			"ADDRESS:VALUE",
 		},
@@ -84,7 +106,8 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["ibft-validator"] = helper.FlagDescriptor{
-		Description: "Sets passed in addresses as IBFT validators. Needs to be present if ibft-validators-prefix-path is omitted",
+		Description: "Sets passed in addresses as IBFT validators. " +
+			"Needs to be present if ibft-validators-prefix-path is omitted",
 		Arguments: []string{
 			"IBFT_VALIDATOR_LIST",
 		},
@@ -101,13 +124,34 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional:      true,
 	}
 
+	c.FlagMap["epoch-size"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the epoch size for the chain. Default %d", ibft.DefaultEpochSize),
+		Arguments: []string{
+			"EPOCH_SIZE",
+		},
+		ArgumentsOptional: false,
+		FlagOptional:      true,
+	}
+
 	c.FlagMap["block-gas-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Refers to the maximum amount of gas used by all operations in a block. Default: %d", helper.GenesisGasLimit),
+		Description: fmt.Sprintf(
+			"Refers to the maximum amount of gas used by all operations in a block. Default: %d",
+			helper.GenesisGasLimit,
+		),
 		Arguments: []string{
 			"BLOCK_GAS_LIMIT",
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      true,
+	}
+
+	c.FlagMap["pos"] = helper.FlagDescriptor{
+		Description: "Sets the flag indicating that the client should use Proof of Stake IBFT. Defaults to " +
+			"Proof of Authority if flag is not provided or false",
+		Arguments: []string{
+			"IS_POS",
+		},
+		FlagOptional: true,
 	}
 }
 
@@ -137,18 +181,19 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags := c.NewFlagSet(c.GetBaseCommand())
 	flags.Usage = func() {}
 
-	var baseDir string
-	var premine helperFlags.ArrayFlags
-	var chainID uint64
-	var bootnodes = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
-	var name string
-	var consensus string
-
-	// ibft flags
-	var ibftValidators helperFlags.ArrayFlags
-	var ibftValidatorsPrefixPath string
-
-	var blockGasLimit uint64
+	var (
+		baseDir                  string
+		premine                  helperFlags.ArrayFlags
+		chainID                  uint64
+		epochSize                uint64
+		bootnodes                = helperFlags.BootnodeFlags{AreSet: false, Addrs: make([]string, 0)}
+		name                     string
+		consensus                string
+		isPos                    bool
+		ibftValidators           helperFlags.ArrayFlags
+		ibftValidatorsPrefixPath string
+		blockGasLimit            uint64
+	)
 
 	flags.StringVar(&baseDir, "dir", "", "")
 	flags.StringVar(&name, "name", helper.DefaultChainName, "")
@@ -158,38 +203,46 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.StringVar(&consensus, "consensus", helper.DefaultConsensus, "")
 	flags.Var(&ibftValidators, "ibft-validator", "list of ibft validators")
 	flags.StringVar(&ibftValidatorsPrefixPath, "ibft-validators-prefix-path", "", "")
+	flags.Uint64Var(&epochSize, "epoch-size", ibft.DefaultEpochSize, "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
+	flags.BoolVar(&isPos, "pos", false, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
+
 		return 1
 	}
-	var err error = nil
 
 	genesisPath := filepath.Join(baseDir, helper.GenesisFileName)
 	if generateError := helper.VerifyGenesisExistence(genesisPath); generateError != nil {
 		c.UI.Error(generateError.GetMessage())
+
 		return 1
 	}
 
-	var extraData []byte
+	var (
+		extraData []byte
+		err       error
+	)
 
-	if consensus == "ibft" {
-		// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
-		var validators []types.Address
-		if len(ibftValidators) != 0 {
+	// we either use validatorsFlags or ibftValidatorsPrefixPath to set the validators
+	var validators []types.Address
+
+	if consensus == ibftConsensus {
+		switch {
+		case len(ibftValidators) != 0:
 			for _, val := range ibftValidators {
 				validators = append(validators, types.StringToAddress(val))
 			}
-		} else if ibftValidatorsPrefixPath != "" {
-			// read all folders with the ibftValidatorsPrefixPath and search for Istanbul addresses
+		case ibftValidatorsPrefixPath != "":
 			if validators, err = readValidatorsByRegexp(ibftValidatorsPrefixPath); err != nil {
 				c.UI.Error(fmt.Sprintf("failed to read from prefix: %v", err))
+
 				return 1
 			}
-
-		} else {
+		default:
 			c.UI.Error("cannot load validators for ibft")
+
 			return 1
 		}
 
@@ -199,13 +252,38 @@ func (c *GenesisCommand) Run(args []string) int {
 			Seal:          []byte{},
 			CommittedSeal: [][]byte{},
 		}
+
 		extraData = make([]byte, ibft.IstanbulExtraVanity)
 		extraData = ibftExtra.MarshalRLPTo(extraData)
 	}
 
-	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
-		c.UI.Error("Minimum two bootnodes are required")
+	if consensus == devConsensus {
+		// Grab the validator addresses if present
+		for _, val := range ibftValidators {
+			validators = append(validators, types.StringToAddress(val))
+		}
+	}
+
+	if !bootnodes.AreSet {
+		c.UI.Error("Minimum one bootnode is required")
+
 		return 1
+	}
+
+	// constructEngineConfig is a helper method for
+	// parametrizing the consensus configuration, which
+	// can be retrieved at runtime from the consensus module
+	constructEngineConfig := func() map[string]interface{} {
+		if consensus != ibftConsensus {
+			// Dev consensus, return an empty map
+			return initialEmptyMap
+		}
+
+		if isPos {
+			return initialPoSMap
+		}
+
+		return initialPoAMap
 	}
 
 	cc := &chain.Chain{
@@ -221,19 +299,55 @@ func (c *GenesisCommand) Run(args []string) int {
 			ChainID: int(chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
-				consensus: map[string]interface{}{},
+				consensus: constructEngineConfig(),
 			},
 		},
 		Bootnodes: bootnodes.Addrs,
 	}
 
+	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
+	// deploy the Staking SC
+	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
+		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
+		if predeployErr != nil {
+			c.UI.Error(predeployErr.Error())
+
+			return 1
+		}
+
+		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
+		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
+		// Check is placed here to avoid additional parsing if epochSize < 2
+		if epochSize < 2 && consensus == ibftConsensus {
+			c.UI.Error("Epoch size must be greater than 1")
+
+			return 1
+		}
+
+		// Add the account to the premine map so the executor can apply it to state
+		cc.Genesis.Alloc[staking.StakingSCAddress] = stakingAccount
+
+		// Set the epoch size if the consensus is IBFT
+		cc.Params.Engine[consensus] = helper.MergeMaps(
+			// Epoch parameter
+			map[string]interface{}{
+				"epochSize": epochSize,
+			},
+
+			// Existing consensus configuration
+			cc.Params.Engine[consensus].(map[string]interface{}),
+		)
+	}
+
 	if err = helper.FillPremineMap(cc.Genesis.Alloc, premine); err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
 	if err = helper.WriteGenesisToDisk(cc, genesisPath); err != nil {
 		c.UI.Error(err.Error())
+
 		return 1
 	}
 
@@ -255,9 +369,11 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 
 	for _, file := range files {
 		path := file.Name()
+
 		if !file.IsDir() {
 			continue
 		}
+
 		if !strings.HasPrefix(path, prefix) {
 			continue
 		}
@@ -274,6 +390,7 @@ func readValidatorsByRegexp(prefix string) ([]types.Address, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
 	}
 

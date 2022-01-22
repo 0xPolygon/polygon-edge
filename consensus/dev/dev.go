@@ -3,14 +3,14 @@ package dev
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -49,14 +49,19 @@ func Factory(
 		if !ok {
 			return nil, fmt.Errorf("interval expected int")
 		}
+
 		d.interval = interval
 	}
 
 	// enable dev mode so that we can accept non-signed txns
 	params.Txpool.EnableDev()
-	params.Txpool.NotifyCh = d.notifyCh
 
 	return d, nil
+}
+
+// Initialize initializes the consensus
+func (d *Dev) Initialize() error {
+	return nil
 }
 
 // Start starts the consensus mechanism
@@ -67,15 +72,14 @@ func (d *Dev) Start() error {
 }
 
 func (d *Dev) nextNotify() chan struct{} {
-	if d.interval != 0 {
-		ch := make(chan struct{})
-		go func() {
-			<-time.After(time.Duration(d.interval) * time.Second)
-			ch <- struct{}{}
-		}()
-
-		return ch
+	if d.interval == 0 {
+		d.interval = 1
 	}
+
+	go func() {
+		<-time.After(time.Duration(d.interval) * time.Second)
+		d.notifyCh <- struct{}{}
+	}()
 
 	return d.notifyCh
 }
@@ -104,49 +108,48 @@ type transitionInterface interface {
 }
 
 func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
-	txns := []*types.Transaction{}
-	returnTxnFuncs := []func(){}
+	var successful []*types.Transaction
+
+	d.txpool.Prepare()
+
 	for {
-		txn, retTxnFn := d.txpool.Pop()
-		if txn == nil {
+		tx := d.txpool.Peek()
+		if tx == nil {
 			break
 		}
 
-		if txn.ExceedsBlockGasLimit(gasLimit) {
-			d.logger.Error(fmt.Sprintf("failed to write transaction: %v", state.ErrBlockLimitExceeded))
-			d.txpool.DecreaseAccountNonce(txn)
+		if tx.ExceedsBlockGasLimit(gasLimit) {
+			d.txpool.Drop(tx)
+
 			continue
 		}
 
-		if err := transition.Write(txn); err != nil {
-			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+		if err := transition.Write(tx); err != nil {
+			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
-			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable {
-				returnTxnFuncs = append(returnTxnFuncs, retTxnFn)
+			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
+				d.txpool.Demote(tx)
 			} else {
-				d.txpool.DecreaseAccountNonce(txn)
+				d.txpool.Drop(tx)
 			}
+
 			continue
 		}
 
-		txns = append(txns, txn)
+		// no errors, pop the tx from the pool
+		d.txpool.Pop(tx)
+
+		successful = append(successful, tx)
 	}
 
-	// we return recoverable txns that were popped from the txpool after the above for loop breaks,
-	// since we don't want to return the tx to the pool just to pop the same txn in the next loop iteration
-	for _, retFunc := range returnTxnFuncs {
-		retFunc()
-	}
+	d.logger.Info("picked out txns from pool", "num", len(successful), "remaining", d.txpool.Length())
 
-	d.logger.Info("picked out txns from pool", "num", len(txns), "remaining", d.txpool.Length())
-	return txns
+	return successful
 }
 
 // writeNewBLock generates a new block based on transactions from the pool,
 // and writes them to the blockchain
 func (d *Dev) writeNewBlock(parent *types.Header) error {
-
 	// Generate the base block
 	num := parent.Number
 	header := &types.Header{
@@ -161,13 +164,16 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	header.GasLimit = gasLimit
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
 		return err
 	}
+
 	transition, err := d.executor.BeginTxn(parent.StateRoot, header, miner)
+
 	if err != nil {
 		return err
 	}
@@ -190,7 +196,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	})
 
 	// Write the block to the blockchain
-	if err := d.blockchain.WriteBlocks([]*types.Block{block}); err != nil {
+	if err := d.blockchain.WriteBlock(block); err != nil {
 		return err
 	}
 
@@ -212,7 +218,7 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dev) GetSyncProgression() *protocol.Progression {
+func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }
 
@@ -228,5 +234,6 @@ func (d *Dev) Seal(block *types.Block, ctx context.Context) (*types.Block, error
 
 func (d *Dev) Close() error {
 	close(d.closeCh)
+
 	return nil
 }

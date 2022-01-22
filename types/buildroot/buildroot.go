@@ -1,9 +1,9 @@
 package buildroot
 
 import (
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -15,10 +15,12 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 
 	res := calculateRootWithRlp(len(receipts), func(i int) *fastrlp.Value {
 		ar.Reset()
+
 		return receipts[i].MarshalRLPWith(ar)
 	})
 
 	arenaPool.Put(ar)
+
 	return res
 }
 
@@ -28,10 +30,12 @@ func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 
 	res := calculateRootWithRlp(len(transactions), func(i int) *fastrlp.Value {
 		ar.Reset()
+
 		return transactions[i].MarshalRLPWith(ar)
 	})
 
 	arenaPool.Put(ar)
+
 	return res
 }
 
@@ -43,11 +47,13 @@ func CalculateUncleRoot(uncles []*types.Header) types.Hash {
 
 	a := arenaPool.Get()
 	v := a.NewArray()
+
 	for _, i := range uncles {
 		v.Set(i.MarshalRLPWith(a))
 	}
 
 	root := keccak.Keccak256Rlp(nil, v)
+
 	arenaPool.Put(a)
 
 	return types.BytesToHash(root)
@@ -57,6 +63,7 @@ func calculateRootWithRlp(num int, h func(indx int) *fastrlp.Value) types.Hash {
 	hF := func(indx int) []byte {
 		return h(indx).MarshalTo(nil)
 	}
+
 	return CalculateRoot(num, hF)
 }
 
@@ -72,6 +79,7 @@ func CalculateRoot(num int, h func(indx int) []byte) types.Hash {
 
 		// important to copy the return before releasing the hasher
 		res := types.BytesToHash(dst)
+
 		releaseFastHasher(fastH)
 
 		if ok {
@@ -97,6 +105,8 @@ func deriveSlow(num int, h func(indx int) []byte) []byte {
 	}
 
 	numArenaPool.Put(ar)
+
 	x, _ := txn.Hash()
+
 	return x
 }

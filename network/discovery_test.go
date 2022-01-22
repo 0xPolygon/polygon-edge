@@ -1,7 +1,7 @@
 package network
 
 import (
-	"fmt"
+	"context"
 	"testing"
 	"time"
 
@@ -16,80 +16,232 @@ func discoveryConfig(c *Config) {
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	// when two nodes connect, they populate their kademlia routing tables
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	servers, createErr := createServers(2, nil)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	MultiJoin(t, srv0, srv1)
-	time.Sleep(1 * time.Second)
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
 
-	assert.Equal(t, srv0.discovery.routingTable.Size(), 1)
-	assert.Equal(t, srv1.discovery.routingTable.Size(), 1)
+	joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout)
+	if joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
+
+	assert.Equal(t, servers[0].discovery.routingTable.Size(), 1)
+	assert.Equal(t, servers[1].discovery.routingTable.Size(), 1)
 }
 
 func TestDiscovery_ProtocolFindPeers(t *testing.T) {
-	srv0 := CreateServer(t, nil)
-	srv1 := CreateServer(t, nil)
+	servers, createErr := createServers(2, nil)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	MultiJoin(t, srv0, srv1)
-	time.Sleep(1 * time.Second)
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
+
+	joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout)
+	if joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
 
 	// find peers should not include our identity
-	resp, err := srv0.discovery.findPeersCall(srv1.AddrInfo().ID)
+	resp, err := servers[0].discovery.findPeersCall(servers[1].AddrInfo().ID)
 	assert.NoError(t, err)
 	assert.Empty(t, resp)
 }
 
-func TestDiscovery_PeerAdded(t *testing.T) {
-	srv0 := CreateServer(t, discoveryConfig)
-	srv1 := CreateServer(t, discoveryConfig)
-	srv2 := CreateServer(t, discoveryConfig)
+func TestRoutingTable_Connected(t *testing.T) {
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 1
+		},
+	}
+	paramsMap := map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+	}
 
-	// server0 should connect to server2 by discovery
-	connectedCh := asyncWaitForEvent(srv0, 15*time.Second, connectedPeerHandler(srv2.AddrInfo().ID))
+	servers, createErr := createServers(2, paramsMap)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
 
-	// serial join, srv0 -> srv1 -> srv2
-	MultiJoin(t,
-		srv0, srv1,
-		srv1, srv2,
-	)
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
 
-	// wait until server0 connects to server2
-	assert.True(t, <-connectedCh)
-	assert.Len(t, srv0.host.Peerstore().Peers(), 3)
-	assert.Len(t, srv1.host.Peerstore().Peers(), 3)
-	assert.Len(t, srv2.host.Peerstore().Peers(), 3)
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
 
-	// TODO: We should put MaxPeers to 0 or 1 so that we do not
-	// mix data and we only test how the peers are being populated
-	// In theory, even if they are connected only to one peer, all of them
-	// should end up with the same idea of the network.
+	// make sure each routing table has peer
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
+		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
+	}
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
+		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
+	}
+
+	assert.Contains(t, servers[0].discovery.routingTable.ListPeers(), servers[1].AddrInfo().ID)
+	assert.Contains(t, servers[1].discovery.routingTable.ListPeers(), servers[0].AddrInfo().ID)
+}
+
+func TestRoutingTable_Disconnected(t *testing.T) {
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 1
+		},
+	}
+	paramsMap := map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+	}
+
+	servers, createErr := createServers(3, paramsMap)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
+
+	// connect to peer and make sure peer is in routing table
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
+
+	// make sure each routing table has peer
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
+		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
+	}
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
+		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
+	}
+
+	// disconnect
+	if leaveErr := LeaveAndWait(servers[1], servers[0], DefaultLeaveTimeout); leaveErr != nil {
+		t.Fatalf("Unable to disconnect from server[0], err=%v", leaveErr)
+	}
+
+	// make sure each routing table remove a peer
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+
+	t.Cleanup(func() {
+		cancel2()
+	})
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[0], 0); err != nil {
+		t.Fatalf("server 0 should remove a peer from routing table but didn't, peer=%s", servers[1].host.ID())
+	}
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[1], 0); err != nil {
+		t.Fatalf("server 1 should remove a peer from routing table but didn't, peer=%s", servers[0].host.ID())
+	}
+}
+
+func TestRoutingTable_ConnectionFailure(t *testing.T) {
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: func(c *Config) {
+			c.MaxPeers = 1
+		},
+	}
+	paramsMap := map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+	}
+
+	servers, createErr := createServers(3, paramsMap)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
+	}
+
+	t.Cleanup(func() {
+		// close only servers[0] because servers[1] has closed already
+		closeTestServers(t, servers[:1])
+	})
+
+	// close before dialing
+	if err := servers[1].Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set a small join timeout, no need to wait ~40s for the connection to fail
+	smallTimeout := time.Second * 10
+	if joinErr := JoinAndWait(servers[0], servers[1], smallTimeout+time.Second*5, smallTimeout); joinErr == nil {
+		t.Fatalf("should fail to connect to server[1], but connected")
+	}
+
+	// routing tables should be empty
+	for _, srv := range servers {
+		assert.Equal(t, 0, srv.discovery.routingTable.Size())
+	}
 }
 
 func TestDiscovery_FullNetwork(t *testing.T) {
-	t.Skip()
-
-	// create a network of serially connected nodes
-	// eventually, they have to find each other
-
-	nodes := 20
-	servers := []*Server{}
-	for i := 0; i < nodes; i++ {
-		srv := CreateServer(t, discoveryConfig)
-		servers = append(servers, srv)
+	defaultConfig := &CreateServerParams{
+		ConfigCallback: discoveryConfig,
+	}
+	paramsMap := map[int]*CreateServerParams{
+		0: defaultConfig,
+		1: defaultConfig,
+		2: defaultConfig,
 	}
 
-	// link nodes in serial
-	MultiJoinSerial(t, servers)
-
-	// force the discover of other nodes several times
-	for i := 0; i < 50; i++ {
-		for _, srv := range servers {
-			srv.discovery.handleDiscovery()
-		}
+	servers, createErr := createServers(3, paramsMap)
+	if createErr != nil {
+		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 
-	for _, srv := range servers {
-		fmt.Println("-- peerstore --")
-		fmt.Println(srv.host.Peerstore().Peers().Len())
+	t.Cleanup(func() {
+		closeTestServers(t, servers)
+	})
+
+	// Server 0 -> Server 1
+	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
+
+	// Server 1 -> Server 2
+	if joinErr := JoinAndWait(servers[1], servers[2], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+		t.Fatalf("Unable to join peers, %v", joinErr)
+	}
+
+	// Wait until Server 0 connects to Server 2 by discovery
+	discoveryTimeout := time.Second * 25
+
+	connectCtx, connectFn := context.WithTimeout(context.Background(), discoveryTimeout)
+	defer connectFn()
+
+	if _, connectErr := WaitUntilPeerConnectsTo(
+		connectCtx,
+		servers[0],
+		servers[2].AddrInfo().ID,
+	); connectErr != nil {
+		t.Fatalf("Unable to connect to peer, %v", connectErr)
+	}
+
+	// Check that all peers are connected to each other
+	for _, server := range servers {
+		assert.Len(t, server.host.Peerstore().Peers(), 3)
 	}
 }

@@ -3,7 +3,7 @@ package ibft
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -66,6 +66,7 @@ func getIbftExtra(h *types.Header) (*IstanbulExtra, error) {
 
 	data := h.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{}
+
 	if err := extra.UnmarshalRLP(data); err != nil {
 		return nil, err
 	}
@@ -94,6 +95,7 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	for _, a := range i.Validators {
 		vals.Set(ar.NewBytes(a.Bytes()))
 	}
+
 	vv.Set(vals)
 
 	// Seal
@@ -132,6 +134,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	if err != nil {
 		return err
 	}
+
 	if num := len(elems); num != 3 {
 		return fmt.Errorf("not enough elements to decode istambul extra, expected 3 but found %d", num)
 	}
@@ -170,5 +173,6 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 			}
 		}
 	}
+
 	return nil
 }

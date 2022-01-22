@@ -5,9 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 )
 
 // IbftSnapshot is the command to query the snapshot
@@ -58,20 +57,23 @@ func (p *IbftSnapshot) Run(args []string) int {
 
 	// query a specific snapshot
 	var number int64
+
 	flags.Int64Var(&number, "number", -1, "")
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
-	req := &proto.SnapshotReq{}
+	req := &ibftOp.SnapshotReq{}
 	if number >= 0 {
 		req.Number = uint64(number)
 	} else {
@@ -80,8 +82,10 @@ func (p *IbftSnapshot) Run(args []string) int {
 
 	clt := ibftOp.NewIbftOperatorClient(conn)
 	resp, err := clt.GetSnapshot(context.Background(), req)
+
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -116,9 +120,11 @@ func NewIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
 		res.Votes[i].Address = v.Proposed
 		res.Votes[i].Vote = voteToString(v.Auth)
 	}
+
 	for i, v := range resp.Validators {
 		res.Validators[i] = v.Address
 	}
+
 	return res
 }
 
@@ -136,6 +142,7 @@ func (r *IBFTSnapshotResult) Output() string {
 	// votes
 	numVotes := len(r.Votes)
 	votes := make([]string, numVotes+1)
+
 	if numVotes == 0 {
 		votes[0] = "No votes found"
 	} else {
@@ -144,6 +151,7 @@ func (r *IBFTSnapshotResult) Output() string {
 			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Proposer, d.Address, d.Vote == VoteAdd)
 		}
 	}
+
 	buffer.WriteString("\n[VOTES]\n")
 	buffer.WriteString(helper.FormatList(votes))
 	buffer.WriteString("\n")
@@ -151,6 +159,7 @@ func (r *IBFTSnapshotResult) Output() string {
 	// validators
 	numValidators := len(r.Validators)
 	validators := make([]string, numValidators+1)
+
 	if numValidators == 0 {
 		validators[0] = "No validators found"
 	} else {
@@ -159,6 +168,7 @@ func (r *IBFTSnapshotResult) Output() string {
 			validators[i+1] = d
 		}
 	}
+
 	buffer.WriteString("\n[VALIDATORS]\n")
 	buffer.WriteString(helper.FormatList(validators))
 	buffer.WriteString("\n")

@@ -8,10 +8,10 @@ import (
 
 	"github.com/umbracle/go-web3"
 
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
-	"github.com/0xPolygon/polygon-sdk/e2e/framework"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,16 +19,21 @@ func TestIbft_Transfer(t *testing.T) {
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
-	ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-		config.Premine(senderAddr, framework.EthToWei(10))
-		config.SetSeal(true)
-	})
+	ibftManager := framework.NewIBFTServersManager(
+		t,
+		IBFTMinNodes,
+		IBFTDirPrefix,
+		func(i int, config *framework.TestServerConfig) {
+			config.Premine(senderAddr, framework.EthToWei(10))
+			config.SetSeal(true)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	ibftManager.StartServers(ctx)
 
 	srv := ibftManager.GetServer(0)
+
 	for i := 0; i < IBFTMinNodes-1; i++ {
 		txn := &framework.PreparedTransaction{
 			From:     senderAddr,
@@ -40,6 +45,7 @@ func TestIbft_Transfer(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
 		receipt, err := srv.SendRawTx(ctx, txn, senderKey)
 
 		assert.NoError(t, err)
@@ -71,10 +77,14 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 			_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
-			ibftManager := framework.NewIBFTServersManager(t, IBFTMinNodes, IBFTDirPrefix, func(i int, config *framework.TestServerConfig) {
-				config.Premine(senderAddr, framework.EthToWei(10))
-				config.SetSeal(true)
-			})
+			ibftManager := framework.NewIBFTServersManager(
+				t,
+				IBFTMinNodes,
+				IBFTDirPrefix,
+				func(i int, config *framework.TestServerConfig) {
+					config.Premine(senderAddr, framework.EthToWei(10))
+					config.SetSeal(true)
+				})
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()

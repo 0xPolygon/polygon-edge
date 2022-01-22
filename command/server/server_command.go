@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -57,7 +57,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["chain"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the genesis file used for starting the chain. Default: %s", helper.DefaultConfig().Chain),
+		Description: fmt.Sprintf(
+			"Specifies the genesis file used for starting the chain. Default: %s",
+			helper.DefaultConfig().Chain,
+		),
 		Arguments: []string{
 			"GENESIS_FILE",
 		},
@@ -65,7 +68,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["data-dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Specifies the data directory used for storing Polygon SDK client data. Default: %s", helper.DefaultConfig().DataDir),
+		Description: fmt.Sprintf(
+			"Specifies the data directory used for storing Polygon Edge client data. Default: %s",
+			helper.DefaultConfig().DataDir,
+		),
 		Arguments: []string{
 			"DATA_DIRECTORY",
 		},
@@ -73,7 +79,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["grpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultGRPCPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the gRPC service (address:port). Default: address: 127.0.0.1:%d",
+			server.DefaultGRPCPort,
+		),
 		Arguments: []string{
 			"GRPC_ADDRESS",
 		},
@@ -81,7 +90,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["jsonrpc"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d", server.DefaultJSONRPCPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the JSON-RPC service (address:port). Default: address: 127.0.0.1:%d",
+			server.DefaultJSONRPCPort,
+		),
 		Arguments: []string{
 			"JSONRPC_ADDRESS",
 		},
@@ -89,7 +101,10 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["libp2p"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d", network.DefaultLibp2pPort),
+		Description: fmt.Sprintf(
+			"Sets the address and port for the libp2p service (address:port). Default: address: 127.0.0.1:%d",
+			network.DefaultLibp2pPort,
+		),
 		Arguments: []string{
 			"LIBP2P_ADDRESS",
 		},
@@ -136,24 +151,11 @@ func (c *ServerCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
-	c.FlagMap["locals"] = helper.FlagDescriptor{
-		Description: "Sets comma separated accounts whose transactions are treated as locals",
-		Arguments: []string{
-			"LOCALS",
-		},
-		FlagOptional: true,
-	}
-
-	c.FlagMap["nolocals"] = helper.FlagDescriptor{
-		Description: "Sets flag to disable price exemptions for locally submitted transactions",
-		Arguments: []string{
-			"NOLOCALS",
-		},
-		FlagOptional: true,
-	}
-
 	c.FlagMap["price-limit"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d", helper.DefaultConfig().TxPool.PriceLimit),
+		Description: fmt.Sprintf(
+			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
+			helper.DefaultConfig().TxPool.PriceLimit,
+		),
 		Arguments: []string{
 			"PRICE_LIMIT",
 		},
@@ -201,11 +203,19 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["restore"] = helper.FlagDescriptor{
+		Description: "Sets the path to the archive blockchain data to restore on initialization",
+		Arguments: []string{
+			"RESTORE",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
 func (c *ServerCommand) GetHelperText() string {
-	return "The default command that starts the Polygon-SDK client, by bootstrapping all modules together"
+	return "The default command that starts the Polygon Edge client, by bootstrapping all modules together"
 }
 
 func (c *ServerCommand) GetBaseCommand() string {

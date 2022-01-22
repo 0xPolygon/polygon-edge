@@ -20,6 +20,7 @@ func (p *Pool) Get() *Keccak {
 	if v == nil {
 		return NewKeccak256()
 	}
+
 	return v.(*Keccak)
 }
 
@@ -32,9 +33,11 @@ func (p *Pool) Put(k *Keccak) {
 // Keccak256 hashes a src with keccak-256
 func Keccak256(dst, src []byte) []byte {
 	h := DefaultKeccakPool.Get()
+	//nolint
 	h.Write(src)
 	dst = h.Sum(dst)
 	DefaultKeccakPool.Put(h)
+
 	return dst
 }
 
@@ -43,5 +46,6 @@ func Keccak256Rlp(dst []byte, src *fastrlp.Value) []byte {
 	h := DefaultKeccakPool.Get()
 	dst = h.WriteRlp(dst, src)
 	DefaultKeccakPool.Put(h)
+
 	return dst
 }

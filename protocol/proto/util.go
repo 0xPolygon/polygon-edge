@@ -1,6 +1,6 @@
 package proto
 
-import "github.com/0xPolygon/polygon-sdk/types"
+import "github.com/0xPolygon/polygon-edge/types"
 
 // DecodeHashes decode to types Hash in the request
 func (h *HashRequest) DecodeHashes() ([]types.Hash, error) {
@@ -11,6 +11,7 @@ func (h *HashRequest) DecodeHashes() ([]types.Hash, error) {
 		if err := hh.UnmarshalText([]byte(h)); err != nil {
 			return nil, err
 		}
+
 		resp = append(resp, hh)
 	}
 

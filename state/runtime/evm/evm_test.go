@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +34,12 @@ func (m *mockHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	panic("Not implemented in tests")
 }
 
-func (m *mockHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
+func (m *mockHost) SetStorage(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+	config *chain.ForksInTime,
+) runtime.StorageStatus {
 	panic("Not implemented in tests")
 }
 

@@ -4,10 +4,10 @@ package proto
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -20,11 +20,11 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TxnPoolOperatorClient interface {
 	// Status returns the current status of the pool
-	Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error)
+	Status(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error)
 	// AddTxn adds a local transaction to the pool
-	AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*empty.Empty, error)
+	AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*AddTxnResp, error)
 	// Subscribe subscribes for new events in the txpool
-	Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error)
+	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error)
 }
 
 type txnPoolOperatorClient struct {
@@ -35,7 +35,7 @@ func NewTxnPoolOperatorClient(cc grpc.ClientConnInterface) TxnPoolOperatorClient
 	return &txnPoolOperatorClient{cc}
 }
 
-func (c *txnPoolOperatorClient) Status(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error) {
+func (c *txnPoolOperatorClient) Status(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TxnPoolStatusResp, error) {
 	out := new(TxnPoolStatusResp)
 	err := c.cc.Invoke(ctx, "/v1.TxnPoolOperator/Status", in, out, opts...)
 	if err != nil {
@@ -44,8 +44,8 @@ func (c *txnPoolOperatorClient) Status(ctx context.Context, in *empty.Empty, opt
 	return out, nil
 }
 
-func (c *txnPoolOperatorClient) AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
+func (c *txnPoolOperatorClient) AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*AddTxnResp, error) {
+	out := new(AddTxnResp)
 	err := c.cc.Invoke(ctx, "/v1.TxnPoolOperator/AddTxn", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *txnPoolOperatorClient) AddTxn(ctx context.Context, in *AddTxnReq, opts 
 	return out, nil
 }
 
-func (c *txnPoolOperatorClient) Subscribe(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error) {
+func (c *txnPoolOperatorClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error) {
 	stream, err := c.cc.NewStream(ctx, &TxnPoolOperator_ServiceDesc.Streams[0], "/v1.TxnPoolOperator/Subscribe", opts...)
 	if err != nil {
 		return nil, err
@@ -90,11 +90,11 @@ func (x *txnPoolOperatorSubscribeClient) Recv() (*TxPoolEvent, error) {
 // for forward compatibility
 type TxnPoolOperatorServer interface {
 	// Status returns the current status of the pool
-	Status(context.Context, *empty.Empty) (*TxnPoolStatusResp, error)
+	Status(context.Context, *emptypb.Empty) (*TxnPoolStatusResp, error)
 	// AddTxn adds a local transaction to the pool
-	AddTxn(context.Context, *AddTxnReq) (*empty.Empty, error)
+	AddTxn(context.Context, *AddTxnReq) (*AddTxnResp, error)
 	// Subscribe subscribes for new events in the txpool
-	Subscribe(*empty.Empty, TxnPoolOperator_SubscribeServer) error
+	Subscribe(*SubscribeRequest, TxnPoolOperator_SubscribeServer) error
 	mustEmbedUnimplementedTxnPoolOperatorServer()
 }
 
@@ -102,13 +102,13 @@ type TxnPoolOperatorServer interface {
 type UnimplementedTxnPoolOperatorServer struct {
 }
 
-func (UnimplementedTxnPoolOperatorServer) Status(context.Context, *empty.Empty) (*TxnPoolStatusResp, error) {
+func (UnimplementedTxnPoolOperatorServer) Status(context.Context, *emptypb.Empty) (*TxnPoolStatusResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
-func (UnimplementedTxnPoolOperatorServer) AddTxn(context.Context, *AddTxnReq) (*empty.Empty, error) {
+func (UnimplementedTxnPoolOperatorServer) AddTxn(context.Context, *AddTxnReq) (*AddTxnResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTxn not implemented")
 }
-func (UnimplementedTxnPoolOperatorServer) Subscribe(*empty.Empty, TxnPoolOperator_SubscribeServer) error {
+func (UnimplementedTxnPoolOperatorServer) Subscribe(*SubscribeRequest, TxnPoolOperator_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedTxnPoolOperatorServer) mustEmbedUnimplementedTxnPoolOperatorServer() {}
@@ -125,7 +125,7 @@ func RegisterTxnPoolOperatorServer(s grpc.ServiceRegistrar, srv TxnPoolOperatorS
 }
 
 func _TxnPoolOperator_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(empty.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func _TxnPoolOperator_Status_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/v1.TxnPoolOperator/Status",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TxnPoolOperatorServer).Status(ctx, req.(*empty.Empty))
+		return srv.(TxnPoolOperatorServer).Status(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -161,7 +161,7 @@ func _TxnPoolOperator_AddTxn_Handler(srv interface{}, ctx context.Context, dec f
 }
 
 func _TxnPoolOperator_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(empty.Empty)
+	m := new(SubscribeRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -204,5 +204,5 @@ var TxnPoolOperator_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "txpool/proto/operator.proto",
+	Metadata: "operator.proto",
 }

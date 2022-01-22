@@ -1,9 +1,10 @@
+//nolint: lll
 package precompiled
 
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,6 +15,8 @@ type precompiledTest struct {
 }
 
 func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
+	t.Helper()
+
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h, _ := hex.DecodeString(c.Input)
@@ -46,6 +49,7 @@ func TestSha256(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &sha256h{}, tests)
 }
 
@@ -57,6 +61,7 @@ func TestRipeMD(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &ripemd160h{}, tests)
 }
 
@@ -68,5 +73,6 @@ func TestIdentity(t *testing.T) {
 			Name:     "128",
 		},
 	}
+
 	testPrecompiled(t, &identity{}, tests)
 }

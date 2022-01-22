@@ -8,25 +8,52 @@ import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 
 service TxnPoolOperator {
-    // Status returns the current status of the pool
-    rpc Status(google.protobuf.Empty) returns (TxnPoolStatusResp);
+  // Status returns the current status of the pool
+  rpc Status(google.protobuf.Empty) returns (TxnPoolStatusResp);
 
-    // AddTxn adds a local transaction to the pool
-    rpc AddTxn(AddTxnReq) returns (google.protobuf.Empty);
+  // AddTxn adds a local transaction to the pool
+  rpc AddTxn(AddTxnReq) returns (AddTxnResp);
 
-    // Subscribe subscribes for new events in the txpool
-    rpc Subscribe(google.protobuf.Empty) returns (stream TxPoolEvent);
+  // Subscribe subscribes for new events in the txpool
+  rpc Subscribe(SubscribeRequest) returns (stream TxPoolEvent);
 }
 
 message AddTxnReq {
-    google.protobuf.Any raw = 1;
-    string from = 2;
+  google.protobuf.Any raw = 1;
+  string from = 2;
+}
+
+message AddTxnResp {
+  string txHash = 1;
 }
 
 message TxnPoolStatusResp {
-    uint64 length = 1;
+  uint64 length = 1;
+}
+
+message SubscribeRequest {
+  // Requested event types
+  repeated EventType types = 1;
+}
+
+enum EventType {
+  // For initially added transactions
+  ADDED = 0;
+
+  // For enqueued transactions in the account queue
+  ENQUEUED = 1;
+
+  // For promoted transactions
+  PROMOTED = 2;
+
+  // For dropped transactions
+  DROPPED = 3;
+
+  // For demoted transactions
+  DEMOTED = 4;
 }
 
 message TxPoolEvent {
-
+  EventType type = 1;
+  string txHash = 2;
 }

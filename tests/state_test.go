@@ -10,12 +10,12 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
-	"github.com/0xPolygon/polygon-sdk/state/runtime/precompiled"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -33,7 +33,9 @@ type stateCase struct {
 
 var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
-func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, index int, p postEntry) {
+func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
+	t.Helper()
+
 	config, ok := Forks[fork]
 	if !ok {
 		t.Fatalf("config %s not found", fork)
@@ -46,7 +48,7 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 		t.Fatal(err)
 	}
 
-	s, _, pastRoot := buildState(t, c.Pre)
+	s, _, pastRoot := buildState(c.Pre)
 	forks := config.At(uint64(env.Number))
 
 	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
@@ -75,11 +77,26 @@ func RunSpecificTest(file string, t *testing.T, c stateCase, name, fork string, 
 
 	_, root := txn.Commit(forks.EIP158)
 	if !bytes.Equal(root, p.Root.Bytes()) {
-		t.Fatalf("root mismatch (%s %s %s %d): expected %s but found %s", file, name, fork, index, p.Root.String(), hex.EncodeToHex(root))
+		t.Fatalf(
+			"root mismatch (%s %s %s %d): expected %s but found %s",
+			file,
+			name,
+			fork,
+			index,
+			p.Root.String(),
+			hex.EncodeToHex(root),
+		)
 	}
 
 	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
-		t.Fatalf("logs mismatch (%s, %s %d): expected %s but found %s", name, fork, index, p.Logs.String(), logs.String())
+		t.Fatalf(
+			"logs mismatch (%s, %s %d): expected %s but found %s",
+			name,
+			fork,
+			index,
+			p.Logs.String(),
+			logs.String(),
+		)
 	}
 }
 
@@ -117,11 +134,13 @@ func TestState(t *testing.T) {
 
 				if contains(long, file) && testing.Short() {
 					t.Skipf("Long tests are skipped in short mode")
+
 					continue
 				}
 
 				if contains(skip, file) {
 					t.Skip()
+
 					continue
 				}
 
@@ -138,7 +157,7 @@ func TestState(t *testing.T) {
 				for name, i := range c {
 					for fork, f := range i.Post {
 						for indx, e := range f {
-							RunSpecificTest(file, t, i, name, fork, indx, e)
+							RunSpecificTest(t, file, i, name, fork, indx, e)
 						}
 					}
 				}

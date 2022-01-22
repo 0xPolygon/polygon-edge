@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var emptyAddr types.Address
@@ -33,7 +33,7 @@ func TestGenesisAlloc(t *testing.T) {
 				}
 			}`,
 			output: map[types.Address]GenesisAccount{
-				emptyAddr: GenesisAccount{
+				emptyAddr: {
 					Balance: big.NewInt(17),
 				},
 			},
@@ -50,7 +50,7 @@ func TestGenesisAlloc(t *testing.T) {
 				}
 			}`,
 			output: map[types.Address]GenesisAccount{
-				emptyAddr: GenesisAccount{
+				emptyAddr: {
 					Balance: big.NewInt(17),
 					Nonce:   256,
 					Storage: map[types.Hash]types.Hash{
@@ -70,10 +70,10 @@ func TestGenesisAlloc(t *testing.T) {
 				}
 			}`,
 			output: map[types.Address]GenesisAccount{
-				addr("0"): GenesisAccount{
+				addr("0"): {
 					Balance: big.NewInt(17),
 				},
-				addr("1"): GenesisAccount{
+				addr("1"): {
 					Balance: big.NewInt(18),
 				},
 			},

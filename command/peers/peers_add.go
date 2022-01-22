@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 )
 
 // PeersAdd is the PeersAdd to start the sever
@@ -57,15 +57,18 @@ func (p *PeersAdd) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
 	var passedInAddresses = make(helperFlags.ArrayFlags, 0)
+
 	flags.Var(&passedInAddresses, "addr", "")
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	if len(passedInAddresses) < 1 {
-		p.Formatter.OutputError(errors.New("At least 1 peer address is required"))
+		p.Formatter.OutputError(errors.New("at least 1 peer address is required"))
+
 		return 1
 	}
 
@@ -73,22 +76,27 @@ func (p *PeersAdd) Run(args []string) int {
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
-	var peersAdded int
-	var addedPeers []string
-	var visibleErrors []string
+	var (
+		peersAdded    int
+		addedPeers    = make([]string, 0)
+		visibleErrors = make([]string, 0)
+	)
 
 	// Adds all the peers and breaks if it hits an error
 	clt := proto.NewSystemClient(conn)
 	for _, address := range passedInAddresses {
 		if _, err := clt.PeersAdd(context.Background(), &proto.PeersAddRequest{Id: address}); err != nil {
 			visibleErrors = append(visibleErrors, err.Error())
+
 			break
 		}
 
 		peersAdded++
+
 		addedPeers = append(addedPeers, address)
 	}
 
@@ -128,6 +136,7 @@ func (r *PeersAddResult) Output() string {
 		buffer.WriteString("\n\n[ERRORS]\n")
 		buffer.WriteString(helper.FormatList(r.Errors))
 	}
+
 	buffer.WriteString("\n")
 
 	return buffer.String()

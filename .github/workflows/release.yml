@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches-ignore:
+      - '**'
+    tags:
+      - 'v*.*.*'
+      # to be used by fork patch-releases ^^
+      - 'v*.*.*-*'
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@master
+        with:
+          go-version: 1.16.x
+
+      - name: Prepare
+        id: prepare
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo ::set-output name=tag_name::${TAG}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Run GoReleaser
+        run: |
+          docker run \
+          		--rm \
+          		--privileged \
+          		-e CGO_ENABLED=1 \
+          		-e GITHUB_TOKEN \
+          		-e DOCKER_USERNAME \
+          		-e DOCKER_PASSWORD \
+          		-e SLACK_WEBHOOK \
+          		-v /var/run/docker.sock:/var/run/docker.sock \
+          		-v `pwd`:/go/src/$(PACKAGE_NAME) \
+          		-w /go/src/$(PACKAGE_NAME) \
+          		ghcr.io/troian/golang-cross:${GOLANG_CROSS_VERSION} \
+          		--rm-dist --skip-validate
+        env:
+          PACKAGE_NAME: github.com/0xPolygon/polygon-edge
+          GOLANG_CROSS_VERSION: v1.17.2
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.prepare.outputs.tag_name }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    if: github.actor == 'lazartravica'
