@@ -185,8 +185,10 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr == nil {
-		t.Fatalf("should failed to connect to server[1], but connected")
+	// Set a small join timeout, no need to wait ~40s for the connection to fail
+	smallTimeout := time.Second * 10
+	if joinErr := JoinAndWait(servers[0], servers[1], smallTimeout+time.Second*5, smallTimeout); joinErr == nil {
+		t.Fatalf("should fail to connect to server[1], but connected")
 	}
 
 	// routing tables should be empty

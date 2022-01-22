@@ -16,9 +16,11 @@ import (
 
 // ABI represents the ethereum abi format
 type ABI struct {
-	Constructor *Method
-	Methods     map[string]*Method
-	Events      map[string]*Event
+	Constructor        *Method
+	Methods            map[string]*Method
+	MethodsBySignature map[string]*Method
+	Events             map[string]*Event
+	Errors             map[string]*Error
 }
 
 func (a *ABI) GetMethod(name string) *Method {
@@ -26,18 +28,52 @@ func (a *ABI) GetMethod(name string) *Method {
 	return m
 }
 
+func (a *ABI) GetMethodBySignature(methodSignature string) *Method {
+	m := a.MethodsBySignature[methodSignature]
+	return m
+}
+
+func (a *ABI) addError(e *Error) {
+	if len(a.Errors) == 0 {
+		a.Errors = map[string]*Error{}
+	}
+	a.Errors[e.Name] = e
+}
+
 func (a *ABI) addEvent(e *Event) {
-	if len(a.Methods) == 0 {
+	if len(a.Events) == 0 {
 		a.Events = map[string]*Event{}
 	}
-	a.Events[e.Name] = e
+	name := overloadedName(e.Name, func(s string) bool {
+		_, ok := a.Events[s]
+		return ok
+	})
+	a.Events[name] = e
 }
 
 func (a *ABI) addMethod(m *Method) {
 	if len(a.Methods) == 0 {
 		a.Methods = map[string]*Method{}
 	}
-	a.Methods[m.Name] = m
+	if len(a.MethodsBySignature) == 0 {
+		a.MethodsBySignature = map[string]*Method{}
+	}
+	name := overloadedName(m.Name, func(s string) bool {
+		_, ok := a.Methods[s]
+		return ok
+	})
+	a.Methods[name] = m
+	a.MethodsBySignature[m.Sig()] = m
+}
+
+func overloadedName(rawName string, isAvail func(string) bool) string {
+	name := rawName
+	ok := isAvail(name)
+	for idx := 0; ok; idx++ {
+		name = fmt.Sprintf("%s%d", rawName, idx)
+		ok = isAvail(name)
+	}
+	return name
 }
 
 // NewABI returns a parsed ABI struct
@@ -72,16 +108,13 @@ func (a *ABI) UnmarshalJSON(data []byte) error {
 		Constant        bool
 		Anonymous       bool
 		StateMutability string
-		Inputs          arguments
-		Outputs         arguments
+		Inputs          []*ArgumentStr
+		Outputs         []*ArgumentStr
 	}
 
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-
-	a.Methods = make(map[string]*Method)
-	a.Events = make(map[string]*Event)
 
 	for _, field := range fields {
 		switch field.Type {
@@ -89,8 +122,12 @@ func (a *ABI) UnmarshalJSON(data []byte) error {
 			if a.Constructor != nil {
 				return fmt.Errorf("multiple constructor declaration")
 			}
+			input, err := NewTupleTypeFromArgs(field.Inputs)
+			if err != nil {
+				panic(err)
+			}
 			a.Constructor = &Method{
-				Inputs: field.Inputs.Type(),
+				Inputs: input,
 			}
 
 		case "function", "":
@@ -99,19 +136,44 @@ func (a *ABI) UnmarshalJSON(data []byte) error {
 				c = true
 			}
 
-			a.Methods[field.Name] = &Method{
+			inputs, err := NewTupleTypeFromArgs(field.Inputs)
+			if err != nil {
+				panic(err)
+			}
+			outputs, err := NewTupleTypeFromArgs(field.Outputs)
+			if err != nil {
+				panic(err)
+			}
+			method := &Method{
 				Name:    field.Name,
 				Const:   c,
-				Inputs:  field.Inputs.Type(),
-				Outputs: field.Outputs.Type(),
+				Inputs:  inputs,
+				Outputs: outputs,
 			}
+			a.addMethod(method)
 
 		case "event":
-			a.Events[field.Name] = &Event{
+			input, err := NewTupleTypeFromArgs(field.Inputs)
+			if err != nil {
+				panic(err)
+			}
+			event := &Event{
 				Name:      field.Name,
 				Anonymous: field.Anonymous,
-				Inputs:    field.Inputs.Type(),
+				Inputs:    input,
 			}
+			a.addEvent(event)
+
+		case "error":
+			input, err := NewTupleTypeFromArgs(field.Inputs)
+			if err != nil {
+				panic(err)
+			}
+			errObj := &Error{
+				Name:   field.Name,
+				Inputs: input,
+			}
+			a.addError(errObj)
 
 		case "fallback":
 		case "receive":
@@ -179,8 +241,8 @@ func NewMethod(name string) (*Method, error) {
 }
 
 var (
-	funcRegexpWithReturn    = regexp.MustCompile(`(.*)\((.*)\)(.*) returns \((.*)\)`)
-	funcRegexpWithoutReturn = regexp.MustCompile(`(.*)\((.*)\)(.*)`)
+	funcRegexpWithReturn    = regexp.MustCompile(`(\w*)\((.*)\)(.*) returns \((.*)\)`)
+	funcRegexpWithoutReturn = regexp.MustCompile(`(\w*)\((.*)\)(.*)`)
 )
 
 func parseMethodSignature(name string) (string, *Type, *Type, error) {
@@ -250,15 +312,34 @@ func MustNewEvent(name string) *Event {
 
 // NewEvent creates a new solidity event object using the signature
 func NewEvent(name string) (*Event, error) {
-	name, typ, err := parseEventSignature(name)
+	name, typ, err := parseEventOrErrorSignature("event ", name)
 	if err != nil {
 		return nil, err
 	}
 	return NewEventFromType(name, typ), nil
 }
 
-func parseEventSignature(name string) (string, *Type, error) {
-	name = strings.TrimPrefix(name, "event ")
+// Error is a solidity error object
+type Error struct {
+	Name   string
+	Inputs *Type
+}
+
+// NewError creates a new solidity error object
+func NewError(name string) (*Error, error) {
+	name, typ, err := parseEventOrErrorSignature("error ", name)
+	if err != nil {
+		return nil, err
+	}
+	return &Error{Name: name, Inputs: typ}, nil
+}
+
+func parseEventOrErrorSignature(prefix string, name string) (string, *Type, error) {
+	if !strings.HasPrefix(name, prefix) {
+		return "", nil, fmt.Errorf("prefix '%s' not found", prefix)
+	}
+	name = strings.TrimPrefix(name, prefix)
+
 	if !strings.HasSuffix(name, ")") {
 		return "", nil, fmt.Errorf("failed to parse input, expected 'name(types)'")
 	}
@@ -304,52 +385,9 @@ func (e *Event) ParseLog(log *web3.Log) (map[string]interface{}, error) {
 func buildSignature(name string, typ *Type) string {
 	types := make([]string, len(typ.tuple))
 	for i, input := range typ.tuple {
-		types[i] = input.Elem.raw
+		types[i] = strings.Replace(input.Elem.String(), "tuple", "", -1)
 	}
 	return fmt.Sprintf("%v(%v)", name, strings.Join(types, ","))
-}
-
-type argument struct {
-	Name    string
-	Type    *Type
-	Indexed bool
-}
-
-type arguments []*argument
-
-func (a *arguments) Type() *Type {
-	inputs := []*TupleElem{}
-	for _, i := range *a {
-		inputs = append(inputs, &TupleElem{
-			Name:    i.Name,
-			Elem:    i.Type,
-			Indexed: i.Indexed,
-		})
-	}
-
-	tt := &Type{
-		kind:  KindTuple,
-		raw:   "tuple",
-		tuple: inputs,
-	}
-	return tt
-}
-
-func (a *argument) UnmarshalJSON(data []byte) error {
-	var arg *ArgumentStr
-	if err := json.Unmarshal(data, &arg); err != nil {
-		return fmt.Errorf("argument json err: %v", err)
-	}
-
-	t, err := NewTypeFromArgument(arg)
-	if err != nil {
-		return err
-	}
-
-	a.Type = t
-	a.Name = arg.Name
-	a.Indexed = arg.Indexed
-	return nil
 }
 
 // ArgumentStr encodes a type object
@@ -378,18 +416,36 @@ func releaseKeccak(k hash.Hash) {
 func NewABIFromList(humanReadableAbi []string) (*ABI, error) {
 	res := &ABI{}
 	for _, c := range humanReadableAbi {
-		if strings.HasPrefix(c, "function ") {
+		if strings.HasPrefix(c, "constructor") {
+			typ, err := NewType("tuple" + strings.TrimPrefix(c, "constructor"))
+			if err != nil {
+				return nil, err
+			}
+			res.Constructor = &Method{
+				Inputs: typ,
+			}
+
+		} else if strings.HasPrefix(c, "function ") {
 			method, err := NewMethod(c)
 			if err != nil {
 				return nil, err
 			}
 			res.addMethod(method)
+
 		} else if strings.HasPrefix(c, "event ") {
 			evnt, err := NewEvent(c)
 			if err != nil {
 				return nil, err
 			}
 			res.addEvent(evnt)
+
+		} else if strings.HasPrefix(c, "error ") {
+			errTyp, err := NewError(c)
+			if err != nil {
+				return nil, err
+			}
+			res.addError(errTyp)
+
 		} else {
 			return nil, fmt.Errorf("either event or function expected")
 		}

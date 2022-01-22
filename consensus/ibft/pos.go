@@ -3,6 +3,7 @@ package ibft
 import (
 	"errors"
 	"fmt"
+
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -40,6 +41,18 @@ func (pos *PoSMechanism) GetType() MechanismType {
 // GetHookMap implements the ConsensusMechanism interface method
 func (pos *PoSMechanism) GetHookMap() map[string]func(interface{}) error {
 	return pos.hookMap
+}
+
+// calculateProposerHook calculates the next proposer based on the last
+func (pos *PoSMechanism) calculateProposerHook(lastProposerParam interface{}) error {
+	lastProposer, ok := lastProposerParam.(types.Address)
+	if !ok {
+		return ErrInvalidHookParam
+	}
+
+	pos.ibft.state.CalcProposer(lastProposer)
+
+	return nil
 }
 
 // acceptStateLogHook logs the current snapshot
@@ -126,6 +139,9 @@ func (pos *PoSMechanism) initializeHookMap() {
 
 	// Register the VerifyBlockHook
 	pos.hookMap[VerifyBlockHook] = pos.verifyBlockHook
+
+	// Register the CalculateProposerHook
+	pos.hookMap[CalculateProposerHook] = pos.calculateProposerHook
 }
 
 // ShouldWriteTransactions indicates if transactions should be written to a block

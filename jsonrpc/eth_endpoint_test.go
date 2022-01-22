@@ -1,1071 +1,247 @@
 package jsonrpc
 
 import (
-	"bytes"
-	"fmt"
+	"errors"
 	"math/big"
-	"strconv"
 	"testing"
 
-	"github.com/umbracle/fastrlp"
-
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 )
 
-type mockAccount2 struct {
-	address types.Address
-	code    []byte
-	account *state.Account
-	storage map[types.Hash][]byte
-}
-
-func (m *mockAccount2) Storage(k types.Hash, v []byte) {
-	m.storage[k] = v
-}
-
-func (m *mockAccount2) Code(code []byte) {
-	codeHash := types.BytesToHash(m.address.Bytes())
-	m.code = code
-	m.account.CodeHash = codeHash.Bytes()
-}
-
-func (m *mockAccount2) Nonce(n uint64) {
-	m.account.Nonce = n
-}
-
-func (m *mockAccount2) Balance(n uint64) {
-	m.account.Balance = new(big.Int).SetUint64(n)
-}
-
-type mockBlockStore2 struct {
-	nullBlockchainInterface
-	blocks []*types.Block
-	topics []types.Hash
-}
-
-func (m *mockBlockStore2) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	panic("implement me")
-}
-
-func (m *mockBlockStore2) GetCapacity() (uint64, uint64) {
-	panic("implement me")
-}
-
-func (m *mockBlockStore2) add(blocks ...*types.Block) {
-	if m.blocks == nil {
-		m.blocks = []*types.Block{}
-	}
-
-	m.blocks = append(m.blocks, blocks...)
-}
-
-func (m *mockBlockStore2) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
-	switch hash {
-	case types.StringToHash(strconv.Itoa(1)):
-		return []*types.Receipt{
-			{
-				Logs: []*types.Log{
-					{
-						Topics: []types.Hash{
-							hash1,
-						},
-					},
-					{
-						Topics: m.topics,
-					},
-				},
-			},
-		}, nil
-	case types.StringToHash(strconv.Itoa(2)):
-		return []*types.Receipt{
-			{
-				Logs: []*types.Log{
-					{
-						Topics: []types.Hash{
-							hash1, hash2, hash3,
-						},
-					},
-				},
-			},
-			{
-				Logs: []*types.Log{
-					{
-						Topics: m.topics,
-					},
-				},
-			},
-		}, nil
-	case types.StringToHash(strconv.Itoa(3)):
-		return []*types.Receipt{
-			{
-				Logs: []*types.Log{
-					{
-						Topics: m.topics,
-					},
-				},
-			},
-			{
-				Logs: []*types.Log{
-					{
-						Topics: []types.Hash{
-							hash1, hash2, hash3,
-						},
-					},
-				},
-			},
-			{
-				Logs: []*types.Log{
-					{
-						Topics: []types.Hash{
-							hash1, hash2, hash3,
-						},
-					},
-				},
-			},
-		}, nil
-	}
-
-	return nil, nil
-}
-
-func (m *mockBlockStore2) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
-	b, ok := m.GetBlockByNumber(blockNumber, false)
-	if !ok {
-		return nil, false
-	}
-
-	return b.Header, true
-}
-
-func (m *mockBlockStore2) GetBlockByNumber(blockNumber uint64, full bool) (*types.Block, bool) {
-	for _, b := range m.blocks {
-		if b.Number() == blockNumber {
-			return b, true
-		}
-	}
-
-	return nil, false
-}
-
-func (m *mockBlockStore2) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
-	for _, b := range m.blocks {
-		if b.Hash() == hash {
-			return b, true
-		}
-	}
-
-	return nil, false
-}
-
-func (m *mockBlockStore2) Header() *types.Header {
-	return m.blocks[len(m.blocks)-1].Header
-}
-
-func TestEth_Block_GetBlockByNumber(t *testing.T) {
-	store := &mockBlockStore2{}
-	for i := 0; i < 10; i++ {
-		store.add(&types.Block{
-			Header: &types.Header{
-				Number: uint64(i),
-			},
-		})
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	cases := []struct {
-		blockNum BlockNumber
-		isNotNil bool
-		err      bool
-	}{
-		{LatestBlockNumber, true, false},
-		{EarliestBlockNumber, true, false},
-		{BlockNumber(-50), false, true},
-		{BlockNumber(0), true, false},
-		{BlockNumber(2), true, false},
-		{BlockNumber(50), false, false},
-	}
-	for _, c := range cases {
-		res, err := dispatcher.endpoints.Eth.GetBlockByNumber(c.blockNum, false)
-
-		if c.isNotNil {
-			assert.NotNil(t, res, "expected to return block, but got nil")
-		} else {
-			assert.Nil(t, res, "expected to return nil, but got data")
-		}
-
-		if c.err {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
-	}
-}
-
-func TestEth_Block_GetBlockByHash(t *testing.T) {
-	store := &mockBlockStore2{}
-	store.add(&types.Block{
-		Header: &types.Header{
-			Hash: hash1,
-		},
-	})
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	res, err := dispatcher.endpoints.Eth.GetBlockByHash(hash1, false)
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
-
-	res, err = dispatcher.endpoints.Eth.GetBlockByHash(hash2, false)
-	assert.NoError(t, err)
-	assert.Nil(t, res)
-}
-
-func TestEth_Block_BlockNumber(t *testing.T) {
-	store := &mockBlockStore2{}
-	store.add(&types.Block{
-		Header: &types.Header{
-			Number: 10,
-		},
-	})
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	num, err := dispatcher.endpoints.Eth.BlockNumber()
-	assert.NoError(t, err)
-	assert.Equal(t, argUintPtr(10), num)
-}
-
-func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
-	store := &mockBlockStore2{}
-	for i := 0; i < 10; i++ {
-		store.add(&types.Block{
-			Header: &types.Header{
-				Number: uint64(i),
-			},
-			Transactions: []*types.Transaction{{From: addr0}},
-		})
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	cases := []struct {
-		blockNum BlockNumber
-		isNotNil bool
-		err      bool
-	}{
-		{LatestBlockNumber, true, false},
-		{EarliestBlockNumber, true, false},
-		{BlockNumber(-50), false, true},
-		{BlockNumber(0), true, false},
-		{BlockNumber(2), true, false},
-		{BlockNumber(50), false, false},
-	}
-	for _, c := range cases {
-		res, err := dispatcher.endpoints.Eth.GetBlockTransactionCountByNumber(c.blockNum)
-
-		if c.isNotNil {
-			assert.NotNil(t, res, "expected to return block, but got nil")
-			assert.Equal(t, res, 1)
-		} else {
-			assert.Nil(t, res, "expected to return nil, but got data")
-		}
-
-		if c.err {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-		}
-	}
-}
-
-func TestEth_Block_GetLogs(t *testing.T) {
-	blockHash := types.StringToHash("1")
-
-	// Topics we're searching for
-	topic1 := types.StringToHash("4")
-	topic2 := types.StringToHash("5")
-	topic3 := types.StringToHash("6")
-
-	var topics = [][]types.Hash{{topic1}, {topic2}, {topic3}}
-
-	testTable := []struct {
-		name           string
-		filterOptions  *LogFilter
-		shouldFail     bool
-		expectedLength int
-	}{
-		{"Found matching logs, fromBlock < toBlock",
-			&LogFilter{
-				fromBlock: 1,
-				toBlock:   3,
-				Topics:    topics,
-			},
-			false, 3},
-		{"Found matching logs, fromBlock == toBlock",
-			&LogFilter{
-				fromBlock: 2,
-				toBlock:   2,
-				Topics:    topics,
-			},
-			false, 1},
-		{"Found matching logs, BlockHash present",
-			&LogFilter{
-				BlockHash: &blockHash,
-				Topics:    topics,
-			},
-			false, 1},
-		{"No logs found", &LogFilter{
-			fromBlock: 4,
-			toBlock:   5,
-			Topics:    topics,
-		}, false, 0},
-		{"Invalid block range", &LogFilter{
-			fromBlock: 10,
-			toBlock:   5,
-			Topics:    topics,
-		}, true, 0},
-	}
-
-	// setup test
-	store := &mockBlockStore2{}
-	store.topics = []types.Hash{topic1, topic2, topic3}
-
-	for i := 0; i < 5; i++ {
-		store.add(&types.Block{
-			Header: &types.Header{
-				Number: uint64(i),
-				Hash:   types.StringToHash(strconv.Itoa(i)),
-			},
-			Transactions: []*types.Transaction{
-				{
-					Value: big.NewInt(10),
-				},
-				{
-					Value: big.NewInt(11),
-				},
-				{
-					Value: big.NewInt(12),
-				},
-			},
-		})
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	for _, testCase := range testTable {
-		t.Run(testCase.name, func(t *testing.T) {
-			foundLogs, logError := dispatcher.endpoints.Eth.GetLogs(
-				testCase.filterOptions,
-			)
-
-			if logError != nil && !testCase.shouldFail {
-				// If there is an error and test isn't expected to fail
-				t.Fatalf("Error: %v", logError)
-			} else if !testCase.shouldFail {
-				assert.Lenf(t, foundLogs, testCase.expectedLength, "Invalid number of logs found")
-			} else {
-				assert.Nil(t, foundLogs, "Expected first return param to be nil")
-			}
-		})
-	}
-}
-
-var (
-	addr0                = types.Address{0x1}
-	uninitializedAddress = types.Address{0x99}
-)
-
-type mockSpecialStore struct {
-	nullBlockchainInterface
-	account *mockAccount2
-	block   *types.Block
-}
-
-func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
-	if m.block.Header.Hash.String() != hash.String() {
-		return nil, false
-	}
-
-	return m.block, true
-}
-
-func (m *mockSpecialStore) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	if m.account.address.String() != addr.String() {
-		return nil, ErrStateNotFound
-	}
-
-	return m.account.account, nil
-}
-
-func (m *mockSpecialStore) GetHeaderByNumber(blockNumber uint64) (*types.Header, bool) {
-	if m.block.Number() != blockNumber {
-		return nil, false
-	}
-
-	return m.block.Header, true
-}
-
-func (m *mockSpecialStore) Header() *types.Header {
-	return &types.Header{
-		StateRoot: types.EmptyRootHash,
-	}
-}
-
-func (m *mockSpecialStore) GetNonce(addr types.Address) uint64 {
-	return 1
-}
-
-func (m *mockSpecialStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
-	if m.account.address.String() != addr.String() {
-		return nil, ErrStateNotFound
-	}
-
-	acct := m.account
-	val, ok := acct.storage[slot]
-
-	if !ok {
-		return nil, ErrStateNotFound
-	}
-
-	return val, nil
-}
-
-func (m *mockSpecialStore) GetCode(hash types.Hash) ([]byte, error) {
-	if bytes.Equal(m.account.account.CodeHash, hash.Bytes()) {
-		return m.account.code, nil
-	}
-
-	return nil, fmt.Errorf("code not found")
-}
-
-func TestEth_State_GetBalance(t *testing.T) {
-	store := &mockSpecialStore{
-		account: &mockAccount2{
-			address: addr0,
-			account: &state.Account{
-				Balance: big.NewInt(100),
-			},
-			storage: make(map[types.Hash][]byte),
-		},
-		block: &types.Block{
-			Header: &types.Header{
-				Hash:      types.ZeroHash,
-				Number:    0,
-				StateRoot: types.EmptyRootHash,
-			},
-		},
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumberEarliest := EarliestBlockNumber
-	blockNumberLatest := LatestBlockNumber
-	blockNumberZero := BlockNumber(0x0)
-	blockNumberInvalid := BlockNumber(0x1)
-
+func TestEth_DecodeTxn(t *testing.T) {
 	tests := []struct {
-		name            string
-		address         types.Address
-		shouldFail      bool
-		blockNumber     *BlockNumber
-		blockHash       *types.Hash
-		expectedBalance int64
+		name     string
+		accounts map[types.Address]*state.Account
+		arg      *txnArgs
+		res      *types.Transaction
+		err      error
 	}{
 		{
-			"should return the balance based on the earliest block",
-			addr0,
-			false,
-			&blockNumberEarliest,
-			nil,
-			100,
+			name: "should be failed when both Data and Input are given",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    toArgBytesPtr(big.NewInt(100).Bytes()),
+				Data:     toArgBytesPtr(big.NewInt(200).Bytes()),
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: nil,
+			err: errors.New("both input and data cannot be set"),
 		},
 		{
-			"valid implicit latest block number",
-			addr0,
-			false,
-			nil,
-			nil,
-			100,
+			name: "should be failed when both To and Data doesn't set",
+			arg: &txnArgs{
+				From:     &addr1,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: nil,
+			err: errors.New("contract creation without data provided"),
 		},
 		{
-			"explicit latest block number",
-			addr0,
-			false,
-			&blockNumberLatest,
-			nil,
-			100,
+			name: "should be successful",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(0),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    0,
+			},
+			err: nil,
 		},
 		{
-			"valid explicit block number",
-			addr0,
-			false,
-			&blockNumberZero,
-			nil,
-			100,
+			name: "should set zero address and zero nonce as default",
+			arg: &txnArgs{
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+			},
+			res: &types.Transaction{
+				From:     types.ZeroAddress,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    0,
+			},
+			err: nil,
 		},
 		{
-			"block does not exist",
-			addr0,
-			true,
-			&blockNumberInvalid,
-			nil,
-			0,
+			name: "should set latest nonce as default",
+			accounts: map[types.Address]*state.Account{
+				addr1: {
+					Nonce: 10,
+				},
+			},
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Value:    toArgBytesPtr(oneEther.Bytes()),
+				Input:    nil,
+				Data:     nil,
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    oneEther,
+				Input:    []byte{},
+				Nonce:    10,
+			},
+			err: nil,
 		},
 		{
-			"valid block hash",
-			addr0,
-			false,
-			nil,
-			&types.ZeroHash,
-			100,
+			name: "should set empty bytes as default Input",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				Gas:      toArgUint64Ptr(21000),
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(1),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      21000,
+				GasPrice: big.NewInt(10000),
+				Value:    new(big.Int).SetBytes([]byte{}),
+				Input:    []byte{},
+				Nonce:    1,
+			},
+			err: nil,
 		},
 		{
-			"invalid block hash",
-			addr0,
-			true,
-			nil,
-			&hash1,
-			0,
-		},
-		{
-			"account with empty balance",
-			addr1,
-			false,
-			&blockNumberLatest,
-			nil,
-			0,
+			name: "should set zero as default Gas",
+			arg: &txnArgs{
+				From:     &addr1,
+				To:       &addr2,
+				GasPrice: toArgBytesPtr(big.NewInt(10000).Bytes()),
+				Input:    nil,
+				Data:     nil,
+				Nonce:    toArgUint64Ptr(1),
+			},
+			res: &types.Transaction{
+				From:     addr1,
+				To:       &addr2,
+				Gas:      0,
+				GasPrice: big.NewInt(10000),
+				Value:    new(big.Int).SetBytes([]byte{}),
+				Input:    []byte{},
+				Nonce:    1,
+			},
+			err: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter := BlockNumberOrHash{
-				BlockNumber: tt.blockNumber,
-				BlockHash:   tt.blockHash,
+			if tt.res != nil {
+				tt.res.ComputeHash()
+			}
+			store := newMockStore()
+			for addr, acc := range tt.accounts {
+				store.SetAccount(addr, acc)
 			}
 
-			balance, err := dispatcher.endpoints.Eth.GetBalance(tt.address, filter)
-
-			if tt.shouldFail {
-				assert.Error(t, err)
-				assert.Equal(t, nil, balance)
-			} else {
-				assert.NoError(t, err)
-				if tt.expectedBalance == 0 {
-					assert.Equal(t, *argUintPtr(0), *balance.(*argUint64))
-				} else {
-					assert.Equal(t, *argBigPtr(big.NewInt(tt.expectedBalance)), *balance.(*argBig))
-				}
-			}
+			eth := newTestEthEndpoint(store)
+			res, err := eth.decodeTxn(tt.arg)
+			assert.Equal(t, tt.res, res)
+			assert.Equal(t, tt.err, err)
 		})
 	}
 }
 
-func TestEth_State_GetTransactionCount(t *testing.T) {
-	store := &mockSpecialStore{
-		account: &mockAccount2{
-			address: addr0,
-			account: &state.Account{
-				Balance: big.NewInt(100),
-				Nonce:   100,
-			},
-			storage: make(map[types.Hash][]byte),
-		},
-		block: &types.Block{
-			Header: &types.Header{
-				Hash:      types.ZeroHash,
-				Number:    0,
-				StateRoot: types.EmptyRootHash,
+func TestEth_GetNextNonce(t *testing.T) {
+	// Set up the mock accounts
+	accounts := []struct {
+		address types.Address
+		account *state.Account
+	}{
+		{
+			types.StringToAddress("123"),
+			&state.Account{
+				Nonce: 5,
 			},
 		},
 	}
 
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumberEarliest := EarliestBlockNumber
-	blockNumberLatest := LatestBlockNumber
-	blockNumberZero := BlockNumber(0x0)
-	blockNumberInvalid := BlockNumber(0x1)
+	// Set up the mock store
+	store := newMockStore()
+	for _, acc := range accounts {
+		store.SetAccount(acc.address, acc.account)
+	}
 
-	tests := []struct {
+	eth := newTestEthEndpoint(store)
+
+	testTable := []struct {
 		name          string
-		target        types.Address
-		blockNumber   *BlockNumber
-		blockHash     *types.Hash
-		shouldFail    bool
+		account       types.Address
+		number        BlockNumber
 		expectedNonce uint64
 	}{
 		{
-			"should return valid nonce using earliest block number",
-			addr0,
-			&blockNumberEarliest,
-			nil,
-			false,
-			100,
+			"Valid latest nonce for touched account",
+			accounts[0].address,
+			LatestBlockNumber,
+			accounts[0].account.Nonce,
 		},
 		{
-			"should return valid nonce for implicit block number",
-			addr0,
-			nil,
-			nil,
-			false,
-			100,
-		},
-		{
-			"should return valid nonce for explicit latest block number",
-			addr0,
-			&blockNumberLatest,
-			nil,
-			false,
-			100,
-		},
-		{
-			"should return valid nonce for explicit block number",
-			addr0,
-			&blockNumberZero,
-			nil,
-			false,
-			100,
-		},
-		{
-			"should return an error for non-existing block",
-			addr0,
-			&blockNumberInvalid,
-			nil,
-			true,
+			"Valid latest nonce for untouched account",
+			types.StringToAddress("456"),
+			LatestBlockNumber,
 			0,
 		},
 		{
-			"should return valid nonce for valid block hash",
-			addr0,
-			nil,
-			&types.ZeroHash,
-			false,
-			100,
-		},
-		{
-			"should return an error for invalid block hash",
-			addr0,
-			nil,
-			&hash1,
-			true,
-			0,
-		},
-		{
-			"should return a zero-nonce for non-existing account",
-			addr1,
-			&blockNumberLatest,
-			nil,
-			false,
+			"Valid pending nonce for untouched account",
+			types.StringToAddress("789"),
+			LatestBlockNumber,
 			0,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			filter := BlockNumberOrHash{
-				BlockNumber: tt.blockNumber,
-				BlockHash:   tt.blockHash,
-			}
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Grab the nonce
+			nonce, err := eth.getNextNonce(testCase.account, testCase.number)
 
-			nonce, err := dispatcher.endpoints.Eth.GetTransactionCount(tt.target, filter)
+			// Assert errors
+			assert.NoError(t, err)
 
-			if tt.shouldFail {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, argUintPtr(tt.expectedNonce), nonce)
-			}
+			// Assert equality
+			assert.Equal(t, testCase.expectedNonce, nonce)
 		})
 	}
 }
 
-var (
-	code0 = []byte{0x1, 0x2, 0x3}
-)
-
-func TestEth_State_GetCode(t *testing.T) {
-	store := &mockSpecialStore{
-		account: &mockAccount2{
-			address: addr0,
-			account: &state.Account{
-				Balance:  big.NewInt(100),
-				Nonce:    100,
-				CodeHash: types.BytesToHash(addr0.Bytes()).Bytes(),
-			},
-			code: code0,
-		},
-		block: &types.Block{
-			Header: &types.Header{
-				Hash:      types.ZeroHash,
-				Number:    0,
-				StateRoot: types.EmptyRootHash,
-			},
-		},
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumberEarliest := EarliestBlockNumber
-	blockNumberLatest := LatestBlockNumber
-	blockNumberZero := BlockNumber(0x0)
-	blockNumberInvalid := BlockNumber(0x1)
-
-	emptyCode := []byte("0x")
-
-	tests := []struct {
-		name         string
-		target       types.Address
-		blockNumber  *BlockNumber
-		blockHash    *types.Hash
-		shouldFail   bool
-		expectedCode []byte
-	}{
-		{
-			"should return a valid code using earliest block number",
-			addr0,
-			&blockNumberEarliest,
-			nil,
-			false,
-			code0,
-		},
-		{
-			"should return a valid code for implicit block number",
-			addr0,
-			nil,
-			nil,
-			false,
-			code0,
-		},
-		{
-			"should return a valid code for explicit latest block number",
-			addr0,
-			&blockNumberLatest,
-			nil,
-			false,
-			code0,
-		},
-		{
-			"should return a valid code for explicit block number",
-			addr0,
-			&blockNumberZero,
-			nil,
-			false,
-			code0,
-		},
-		{
-			"should return an error for non-existing block",
-			addr0,
-			&blockNumberInvalid,
-			nil,
-			true,
-			emptyCode,
-		},
-		{
-			"should return a valid code for valid block hash",
-			addr0,
-			nil,
-			&types.ZeroHash,
-			false,
-			code0,
-		},
-		{
-			"should return an error for invalid block hash",
-			addr0,
-			nil,
-			&hash1,
-			true,
-			emptyCode,
-		},
-		{
-			"should not return an error for non-existing account",
-			uninitializedAddress,
-			&blockNumberLatest,
-			nil,
-			false,
-			emptyCode,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			filter := BlockNumberOrHash{
-				BlockNumber: tt.blockNumber,
-				BlockHash:   tt.blockHash,
-			}
-
-			code, err := dispatcher.endpoints.Eth.GetCode(tt.target, filter)
-
-			if tt.shouldFail {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				if tt.target.String() == uninitializedAddress.String() {
-					assert.Equal(t, "0x", code)
-				} else {
-					assert.Equal(t, argBytesPtr(tt.expectedCode), code)
-				}
-			}
-		})
-	}
-}
-
-func TestEth_State_GetStorageAt(t *testing.T) {
-	store := &mockSpecialStore{
-		account: &mockAccount2{
-			address: addr0,
-			account: &state.Account{
-				Balance: big.NewInt(100),
-				Nonce:   100,
-			},
-			storage: make(map[types.Hash][]byte),
-		},
-		block: &types.Block{
-			Header: &types.Header{
-				Hash:      types.ZeroHash,
-				Number:    0,
-				StateRoot: types.EmptyRootHash,
-			},
-		},
-	}
-
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-	blockNumberEarliest := EarliestBlockNumber
-	blockNumberLatest := LatestBlockNumber
-	blockNumberZero := BlockNumber(0x0)
-	blockNumberInvalid := BlockNumber(0x1)
-
-	tests := []struct {
-		name           string
-		initialStorage map[types.Address]map[types.Hash]types.Hash
-		address        types.Address
-		index          types.Hash
-		blockNumber    *BlockNumber
-		blockHash      *types.Hash
-		succeeded      bool
-		expectedData   *argBytes
-	}{
-		{
-			name: "should return data for existing slot",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash1,
-			blockNumber:  nil,
-			blockHash:    nil,
-			succeeded:    true,
-			expectedData: argBytesPtr(hash1[:]),
-		},
-		{
-			name: "should return 32 bytes filled with zero for undefined slot",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash2,
-			blockNumber:  &blockNumberLatest,
-			blockHash:    nil,
-			succeeded:    true,
-			expectedData: argBytesPtr(types.ZeroHash[:]),
-		},
-		{
-			name: "should return 32 bytes filled with zero for non-existing account",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash2,
-			blockNumber:  &blockNumberLatest,
-			succeeded:    true,
-			expectedData: argBytesPtr(types.ZeroHash[:]),
-		},
-		{
-			name: "should return error for invalid block number",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash2,
-			blockNumber:  &blockNumberInvalid,
-			blockHash:    nil,
-			succeeded:    false,
-			expectedData: nil,
-		},
-		{
-			name: "should not return an error for block zero",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash1,
-			blockNumber:  &blockNumberZero,
-			blockHash:    nil,
-			succeeded:    true,
-			expectedData: argBytesPtr(hash1[:]),
-		},
-		{
-			name: "should not return an error for valid block hash",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash1,
-			blockNumber:  nil,
-			blockHash:    &types.ZeroHash,
-			succeeded:    true,
-			expectedData: argBytesPtr(hash1[:]),
-		},
-		{
-			name: "should return error for invalid block hash",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash2,
-			blockNumber:  nil,
-			blockHash:    &hash1,
-			succeeded:    false,
-			expectedData: nil,
-		},
-		{
-			name: "should return data using earliest block number",
-			initialStorage: map[types.Address]map[types.Hash]types.Hash{
-				addr0: {
-					hash1: hash1,
-				},
-			},
-			address:      addr0,
-			index:        hash1,
-			blockNumber:  &blockNumberEarliest,
-			blockHash:    nil,
-			succeeded:    true,
-			expectedData: argBytesPtr(hash1[:]),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			for addr, storage := range tt.initialStorage {
-				store.account = &mockAccount2{
-					address: addr,
-					account: &state.Account{
-						Balance: big.NewInt(100),
-						Nonce:   100,
-					},
-					storage: make(map[types.Hash][]byte),
-				}
-				account := store.account
-				for index, data := range storage {
-					a := &fastrlp.Arena{}
-					value := a.NewBytes(data.Bytes())
-					newData := value.MarshalTo(nil)
-					account.Storage(index, newData)
-				}
-			}
-
-			filter := BlockNumberOrHash{
-				BlockNumber: tt.blockNumber,
-				BlockHash:   tt.blockHash,
-			}
-
-			res, err := dispatcher.endpoints.Eth.GetStorageAt(tt.address, tt.index, filter)
-			if tt.succeeded {
-				assert.NoError(t, err)
-				assert.NotNil(t, res)
-				assert.Equal(t, tt.expectedData, res)
-			} else {
-				assert.Error(t, err)
-			}
-		})
-	}
-}
-
-type mockStoreTxn struct {
-	nullBlockchainInterface
-	accounts map[types.Address]*mockAccount2
-	txn      *types.Transaction
-}
-
-func (m *mockStoreTxn) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	panic("implement me")
-}
-
-func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
-	m.txn = tx
-
-	return nil
-}
-
-func (m *mockStoreTxn) GetNonce(addr types.Address) uint64 {
-	return 1
-}
-func (m *mockStoreTxn) AddAccount(addr types.Address) *mockAccount2 {
-	if m.accounts == nil {
-		m.accounts = map[types.Address]*mockAccount2{}
-	}
-
-	acct := &mockAccount2{
-		address: addr,
-		account: &state.Account{},
-		storage: make(map[types.Hash][]byte),
-	}
-	m.accounts[addr] = acct
-
-	return acct
-}
-
-func (m *mockStoreTxn) Header() *types.Header {
-	return &types.Header{}
-}
-
-func (m *mockStoreTxn) GetAccount(root types.Hash, addr types.Address) (*state.Account, error) {
-	acct, ok := m.accounts[addr]
-	if !ok {
-		return nil, ErrStateNotFound
-	}
-
-	return acct.account, nil
-}
-func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
-	store := &mockStoreTxn{}
-	dispatcher := newTestDispatcher(hclog.NewNullLogger(), store)
-
-	txn := &types.Transaction{
-		From: addr0,
-		V:    big.NewInt(1),
-	}
-	txn.ComputeHash()
-
-	data := txn.MarshalRLP()
-	_, err := dispatcher.endpoints.Eth.SendRawTransaction(hex.EncodeToHex(data))
-	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
-
-	// the hash in the txn pool should match the one we send
-	if txn.Hash != store.txn.Hash {
-		t.Fatal("bad")
-	}
+func newTestEthEndpoint(store ethStore) *Eth {
+	return &Eth{hclog.NewNullLogger(), store, 100, nil}
 }
