@@ -606,7 +606,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(time.Duration(i.blockTime))
+	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Second)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
