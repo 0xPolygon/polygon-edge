@@ -35,6 +35,7 @@ type Config struct {
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
 	RestoreFile    string                 `json:"restore_file"`
+	BlockTime      uint64                 `json:"block_time"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -76,6 +77,7 @@ func DefaultConfig() *Config {
 		Consensus:   map[string]interface{}{},
 		LogLevel:    "INFO",
 		RestoreFile: "",
+		BlockTime:   2,
 	}
 }
 
@@ -170,6 +172,11 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	if c.RestoreFile != "" {
 		conf.RestoreFile = &c.RestoreFile
+	}
+
+	// set block time if not default
+	if c.BlockTime != 2 {
+		conf.BlockTime = c.BlockTime
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -296,6 +303,11 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.RestoreFile != "" {
 		c.RestoreFile = otherConfig.RestoreFile
+	}
+
+	// if block time not default, set to new value
+	if otherConfig.BlockTime != 2 {
+		c.BlockTime = otherConfig.BlockTime
 	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {

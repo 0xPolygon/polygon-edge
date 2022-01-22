@@ -96,6 +96,8 @@ type Ibft struct {
 	secretsManager secrets.SecretsManager
 
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
+
+	blockTime uint64 // Configurable consensus blocktime in seconds
 }
 
 // Define the type of the IBFT consensus
@@ -240,6 +242,7 @@ func Factory(
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
+		blockTime:      params.BlockTime,
 	}
 
 	// Initialize the mechanism
@@ -571,8 +574,6 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-var defaultBlockPeriod = 2 * time.Second
-
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
@@ -605,7 +606,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 
 	// set the timestamp
 	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(defaultBlockPeriod)
+	headerTime := parentTime.Add(time.Duration(i.blockTime))
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
