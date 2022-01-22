@@ -5,14 +5,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	hexCore "encoding/hex"
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/helper/keystore"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keystore"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/btcsuite/btcd/btcec"
 	"golang.org/x/crypto/sha3"
 
@@ -38,13 +37,13 @@ func trimLeftZeros(b []byte) []byte {
 			break
 		}
 	}
+
 	return b[i:]
 }
 
 // ValidateSignatureValues checks if the signature values are correct
 func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 	// TODO: ECDSA malleability
-
 	if r == nil || s == nil {
 		return false
 	}
@@ -55,15 +54,18 @@ func ValidateSignatureValues(v byte, r, s *big.Int) bool {
 
 	rr := r.Bytes()
 	rr = trimLeftZeros(rr)
+
 	if bytes.Compare(rr, secp256k1N) >= 0 || bytes.Compare(rr, one) < 0 {
 		return false
 	}
 
 	ss := s.Bytes()
 	ss = trimLeftZeros(ss)
+
 	if bytes.Compare(ss, secp256k1N) >= 0 || bytes.Compare(ss, one) < 0 {
 		return false
 	}
+
 	return true
 }
 
@@ -93,6 +95,7 @@ func CreateAddress2(addr types.Address, salt [32]byte, inithash []byte) types.Ad
 
 func ParsePrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
 	prv, _ := btcec.PrivKeyFromBytes(S256, buf)
+
 	return prv.ToECDSA(), nil
 }
 
@@ -112,6 +115,7 @@ func ParsePublicKey(buf []byte) (*ecdsa.PublicKey, error) {
 	if x == nil || y == nil {
 		return nil, fmt.Errorf("cannot unmarshal")
 	}
+
 	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
 }
 
@@ -125,6 +129,7 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return MarshalPublicKey(pub), nil
 }
 
@@ -133,15 +138,18 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	size := len(signature)
 	term := byte(27)
+
 	if signature[size-1] == 1 {
 		term = 28
 	}
 
 	sig := append([]byte{term}, signature[:size-1]...)
 	pub, _, err := btcec.RecoverCompact(S256, sig, hash)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return pub.ToECDSA(), nil
 }
 
@@ -152,10 +160,12 @@ func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	term := byte(0)
 	if sig[0] == 28 {
 		term = 1
 	}
+
 	return append(sig, term)[1:], nil
 }
 
@@ -167,6 +177,7 @@ func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
 	}
 
 	x, y := elliptic.Unmarshal(S256, s)
+
 	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
 }
 
@@ -176,56 +187,15 @@ func Keccak256(v ...[]byte) []byte {
 	for _, i := range v {
 		h.Write(i)
 	}
+
 	return h.Sum(nil)
 }
 
 // PubKeyToAddress returns the Ethereum address of a public key
 func PubKeyToAddress(pub *ecdsa.PublicKey) types.Address {
 	buf := Keccak256(MarshalPublicKey(pub)[1:])[12:]
+
 	return types.BytesToAddress(buf)
-}
-
-// HexToECDSA parses a secp256k1 private key.
-func HexToECDSA(hexkey string) (*ecdsa.PrivateKey, error) {
-	b, err := hex.DecodeString(hexkey)
-	if byteErr, ok := err.(hexCore.InvalidByteError); ok {
-		return nil, fmt.Errorf("invalid hex character %q in private key", byte(byteErr))
-	} else if err != nil {
-		return nil, fmt.Errorf("invalid hex data for private key")
-	}
-	return ToECDSA(b)
-}
-
-// ToECDSA creates a private key with the given D value.
-func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
-	return toECDSA(d, true)
-}
-
-// toECDSA creates a private key with the given D value. The strict parameter
-// controls whether the key's length should be enforced at the curve size or
-// it can also accept legacy encodings (0 prefixes).
-func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
-	priv := new(ecdsa.PrivateKey)
-	priv.PublicKey.Curve = S256
-	if strict && 8*len(d) != priv.Params().BitSize {
-		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
-	}
-	priv.D = new(big.Int).SetBytes(d)
-
-	// The priv.D must < N
-	if priv.D.Cmp(new(big.Int).SetBytes(secp256k1N)) >= 0 {
-		return nil, fmt.Errorf("invalid private key, >=N")
-	}
-	// The priv.D must not be zero or negative.
-	if priv.D.Sign() <= 0 {
-		return nil, fmt.Errorf("invalid private key, zero or negative")
-	}
-
-	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
-	if priv.PublicKey.X == nil {
-		return nil, fmt.Errorf("invalid private key")
-	}
-	return priv, nil
 }
 
 // generateKeyAndMarshal generates a new private key and serializes it to a byte array
@@ -277,7 +247,7 @@ func GenerateOrReadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
 
 	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
+		return nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
 
 	return privateKey, nil
@@ -292,7 +262,7 @@ func GenerateAndEncodePrivateKey() (*ecdsa.PrivateKey, []byte, error) {
 
 	privateKey, err := BytesToPrivateKey(keyBuff)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %v", err)
+		return nil, nil, fmt.Errorf("unable to execute byte array -> private key conversion, %w", err)
 	}
 
 	return privateKey, keyBuff, nil

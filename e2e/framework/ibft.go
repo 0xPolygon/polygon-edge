@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type IBFTServersManager struct {
@@ -14,7 +16,12 @@ type IBFTServersManager struct {
 
 type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 
-func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, callback IBFTServerConfigCallback) *IBFTServersManager {
+func NewIBFTServersManager(
+	t *testing.T,
+	numNodes int,
+	ibftDirPrefix string,
+	callback IBFTServerConfigCallback,
+) *IBFTServersManager {
 	t.Helper()
 
 	dataDir, err := tempDir()
@@ -23,7 +30,7 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 	}
 
 	srvs := make([]*TestServer, 0, numNodes)
-	bootnodes := make([]string, 0, numNodes)
+
 	t.Cleanup(func() {
 		for _, s := range srvs {
 			s.Stop()
@@ -33,6 +40,9 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 		}
 	})
 
+	bootnodes := make([]string, 0, numNodes)
+	genesisValidators := make([]string, 0, numNodes)
+
 	for i := 0; i < numNodes; i++ {
 		srv := NewTestServer(t, dataDir, func(config *TestServerConfig) {
 			config.SetConsensus(ConsensusIBFT)
@@ -41,17 +51,31 @@ func NewIBFTServersManager(t *testing.T, numNodes int, ibftDirPrefix string, cal
 			callback(i, config)
 		})
 		res, err := srv.InitIBFT()
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		libp2pAddr := ToLocalIPv4LibP2pAddr(srv.Config.LibP2PPort, res.NodeID)
 
 		srvs = append(srvs, srv)
 		bootnodes = append(bootnodes, libp2pAddr)
+		genesisValidators = append(genesisValidators, res.Address)
 	}
 
-	srvs[0].Config.SetBootnodes(bootnodes)
-	if err := srvs[0].GenerateGenesis(); err != nil {
+	srv := srvs[0]
+	srv.Config.SetBootnodes(bootnodes)
+	// Set genesis staking balance for genesis validators
+	for i, v := range genesisValidators {
+		addr := types.StringToAddress(v)
+		conf := srvs[i].Config
+
+		if conf.GenesisValidatorBalance != nil {
+			srv.Config.Premine(addr, conf.GenesisValidatorBalance)
+		}
+	}
+
+	if err := srv.GenerateGenesis(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,6 +88,7 @@ func (m *IBFTServersManager) StartServers(ctx context.Context) {
 			m.t.Fatal(err)
 		}
 	}
+
 	for _, srv := range m.servers {
 		if err := srv.WaitForReady(ctx); err != nil {
 			m.t.Fatal(err)
@@ -81,5 +106,6 @@ func (m *IBFTServersManager) GetServer(i int) *TestServer {
 	if i >= len(m.servers) {
 		return nil
 	}
+
 	return m.servers[i]
 }

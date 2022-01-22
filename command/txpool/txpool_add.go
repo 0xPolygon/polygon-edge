@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/txpool/proto"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -100,13 +99,11 @@ func (p *TxPoolAdd) Synopsis() string {
 func (p *TxPoolAdd) Run(args []string) int {
 	flags := p.Base.NewFlagSet(p.GetBaseCommand(), p.Formatter, p.GRPC)
 
-	// Address types
-	var fromRaw, toRaw string
-
-	// BigInt types
-	var valueRaw, gasPriceRaw string
-
-	var nonce, gasLimit uint64
+	var (
+		fromRaw, toRaw        string
+		valueRaw, gasPriceRaw string
+		nonce, gasLimit       uint64
+	)
 
 	// Define the flags
 	flags.StringVar(&fromRaw, "from", "", "")
@@ -120,34 +117,45 @@ func (p *TxPoolAdd) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.UI.Error(err.Error())
+
 		return 1
 	}
 
 	// try to decode to the custom types (TODO: Use custom flag helpers to decode this)
 	from := types.Address{}
 	if err := from.UnmarshalText([]byte(fromRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode from address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode from address: %w", err))
+
 		return 1
 	}
+
 	to := types.Address{}
+
 	if err := to.UnmarshalText([]byte(toRaw)); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to address: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to address: %w", err))
+
 		return 1
 	}
+
 	value, err := types.ParseUint256orHex(&valueRaw)
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to value: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to value: %w", err))
+
 		return 1
 	}
+
 	gasPrice, err := types.ParseUint256orHex(&gasPriceRaw)
+
 	if err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to decode to gasPrice: %v", err))
+		p.Formatter.OutputError(fmt.Errorf("failed to decode to gasPrice: %w", err))
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -162,7 +170,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 		V:        big.NewInt(1), // it is necessary to encode in rlp
 	}
 
-	msg := &proto.AddTxnReq{
+	msg := &txpoolOp.AddTxnReq{
 		Raw: &any.Any{
 			Value: txn.MarshalRLP(),
 		},
@@ -170,12 +178,15 @@ func (p *TxPoolAdd) Run(args []string) int {
 		From: from.String(),
 	}
 
-	if _, err := clt.AddTxn(context.Background(), msg); err != nil {
-		p.Formatter.OutputError(fmt.Errorf("Failed to add transaction: %v", err))
+	resp, err := clt.AddTxn(context.Background(), msg)
+	if err != nil {
+		p.Formatter.OutputError(fmt.Errorf("failed to add transaction: %w", err))
+
 		return 1
 	}
 
 	res := &TxPoolAddResult{
+		Hash:     resp.TxHash,
 		From:     fromRaw,
 		To:       toRaw,
 		Value:    *types.EncodeBigInt(value),
@@ -188,6 +199,7 @@ func (p *TxPoolAdd) Run(args []string) int {
 }
 
 type TxPoolAddResult struct {
+	Hash     string `json:"hash"`
 	From     string `json:"from"`
 	To       string `json:"to"`
 	Value    string `json:"value"`
@@ -201,6 +213,7 @@ func (r *TxPoolAddResult) Output() string {
 	buffer.WriteString("\n[ADD TRANSACTION]\n")
 	buffer.WriteString("Successfully added transaction:\n")
 	buffer.WriteString(helper.FormatKV([]string{
+		fmt.Sprintf("HASH|%s", r.Hash),
 		fmt.Sprintf("FROM|%s", r.From),
 		fmt.Sprintf("TO|%s", r.To),
 		fmt.Sprintf("VALUE|%s", r.Value),

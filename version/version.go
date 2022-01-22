@@ -10,10 +10,15 @@ var (
 
 // GetVersion returns a string representation of the version
 func GetVersion() string {
-	version := "\n[POLYGON-SDK VERSION]\n"
+	version := "\n[POLYGON EDGE VERSION]\n"
 	version += Version
 
 	version += "\n"
 
 	return version
+}
+
+// returns jsonrpc representation of the version
+func GetVersionJsonrpc() string {
+	return "v" + Version
 }

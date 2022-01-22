@@ -36,16 +36,25 @@ func (s serverType) String() string {
 type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
-	dispatcher dispatcherImpl
+	dispatcher dispatcher
 }
 
-type dispatcherImpl interface {
+type dispatcher interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
 	Handle(reqBody []byte) ([]byte, error)
 }
 
+// JSONRPCStore defines all the methods required
+// by all the JSON RPC endpoints
+type JSONRPCStore interface {
+	ethStore
+	networkStore
+	txPoolStore
+	filterManagerStore
+}
+
 type Config struct {
-	Store   blockchainInterface
+	Store   JSONRPCStore
 	Addr    *net.TCPAddr
 	ChainID uint64
 }
@@ -62,6 +71,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	if err := srv.setupHTTP(); err != nil {
 		return nil, err
 	}
+
 	return srv, nil
 }
 
@@ -80,11 +90,13 @@ func (j *JSONRPC) setupHTTP() error {
 	srv := http.Server{
 		Handler: mux,
 	}
+
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			j.logger.Error("closed http connection", "err", err)
 		}
 	}()
+
 	return nil
 }
 
@@ -113,6 +125,7 @@ func (w *wsWrapper) WriteMessage(
 	w.writeLock.Lock()
 	defer w.writeLock.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)
+
 	if writeErr != nil {
 		w.logger.Error(
 			fmt.Sprintf("Unable to write WS message, %s", writeErr.Error()),
@@ -136,6 +149,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	ws, err := wsUpgrader.Upgrade(w, req, nil)
 	if err != nil {
 		j.logger.Error(fmt.Sprintf("Unable to upgrade to a WS connection, %s", err.Error()))
+
 		return
 	}
 
@@ -150,6 +164,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	}(ws)
 
 	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
+
 	j.logger.Info("Websocket connection established")
 	// Run the listen loop
 	for {
@@ -193,22 +208,35 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	w.Header().Set(
+		"Access-Control-Allow-Headers",
+		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization",
+	)
 
 	if (*req).Method == "OPTIONS" {
 		return
 	}
+
 	if req.Method == "GET" {
-		w.Write([]byte("PolygonSDK JSON-RPC"))
+		//nolint
+		w.Write([]byte("Polygon Edge JSON-RPC"))
+
 		return
 	}
+
 	if req.Method != "POST" {
+		//nolint
 		w.Write([]byte("method " + req.Method + " not allowed"))
+
 		return
 	}
+
 	data, err := ioutil.ReadAll(req.Body)
+
 	if err != nil {
+		//nolint
 		w.Write([]byte(err.Error()))
+
 		return
 	}
 
@@ -218,10 +246,12 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	resp, err := j.dispatcher.Handle(data)
 
 	if err != nil {
+		//nolint
 		w.Write([]byte(err.Error()))
 	} else {
+		//nolint
 		w.Write(resp)
 	}
-	j.logger.Debug("handle", "response", string(resp))
 
+	j.logger.Debug("handle", "response", string(resp))
 }

@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -48,12 +48,14 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 		return nil, err
 	}
 
-	// if we are singing the commited seals we need to do something more
+	// if we are singing the committed seals we need to do something more
 	msg := hash
 	if committed {
 		msg = commitMsg(hash)
 	}
+
 	seal, err := crypto.Sign(prv, crypto.Keccak256(msg))
+
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +66,7 @@ func signSealImpl(prv *ecdsa.PrivateKey, h *types.Header, committed bool) ([]byt
 func writeSeal(prv *ecdsa.PrivateKey, h *types.Header) (*types.Header, error) {
 	h = h.Copy()
 	seal, err := signSealImpl(prv, h, false)
+
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +115,6 @@ func writeCommittedSeals(h *types.Header, seals [][]byte) (*types.Header, error)
 }
 
 func calculateHeaderHash(h *types.Header) ([]byte, error) {
-	//hash := istanbulHeaderHash(h)
-	//return hash.Bytes(), nil
-
 	h = h.Copy() // make a copy since we update the extra field
 
 	arena := fastrlp.DefaultArenaPool.Get()
@@ -127,7 +127,7 @@ func calculateHeaderHash(h *types.Header) ([]byte, error) {
 		return nil, err
 	}
 
-	// This will effectively remove the Seal and Commited Seal fields, while keeping proposer vanity and validator set
+	// This will effectively remove the Seal and Committed Seal fields, while keeping proposer vanity and validator set
 	// 		because extra.Validators is what we got from `h` in the first place.
 	putIbftExtraValidators(h, extra.Validators)
 
@@ -182,9 +182,11 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	rawMsg := commitMsg(hash)
 
 	visited := map[types.Address]struct{}{}
+
 	for _, seal := range extra.CommittedSeal {
 		addr, err := ecrecoverImpl(seal, rawMsg)
 		if err != nil {
@@ -201,11 +203,10 @@ func verifyCommitedFields(snap *Snapshot, header *types.Header) error {
 		}
 	}
 
-	// Valid commited seals must be at least 2F+1
-	// 	2F 	is the required number of honest validators who provided the commited seals
+	// Valid committed seals must be at least 2F+1
+	// 	2F 	is the required number of honest validators who provided the committed seals
 	// 	+1	is the proposer
-	validSeals := len(visited)
-	if validSeals <= 2*snap.Set.MaxFaultyNodes() {
+	if validSeals := len(visited); validSeals <= 2*snap.Set.MaxFaultyNodes() {
 		return fmt.Errorf("not enough seals to seal block")
 	}
 

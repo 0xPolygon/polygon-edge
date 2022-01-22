@@ -12,8 +12,12 @@ import (
 	"github.com/umbracle/go-web3/jsonrpc/codec"
 )
 
-func newWebsocket(url string) (Transport, error) {
-	wsConn, _, err := websocket.DefaultDialer.Dial(url, http.Header{})
+func newWebsocket(url string, headers map[string]string) (Transport, error) {
+	wsHeaders := http.Header{}
+	for k, v := range headers {
+		wsHeaders.Add(k, v)
+	}
+	wsConn, _, err := websocket.DefaultDialer.Dial(url, wsHeaders)
 	if err != nil {
 		return nil, err
 	}

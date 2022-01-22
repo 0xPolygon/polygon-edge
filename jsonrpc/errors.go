@@ -74,24 +74,19 @@ func (e *methodNotFoundError) ErrorCode() int {
 }
 
 func NewMethodNotFoundError(method string) *methodNotFoundError {
-	e := &methodNotFoundError{fmt.Sprintf("the method %s does not exist/is not available", method)}
-	return e
+	return &methodNotFoundError{fmt.Sprintf("the method %s does not exist/is not available", method)}
 }
 func NewInvalidRequestError(msg string) *invalidRequestError {
-	e := &invalidRequestError{msg}
-	return e
+	return &invalidRequestError{msg}
 }
 func NewInvalidParamsError(msg string) *invalidParamsError {
-	e := &invalidParamsError{msg}
-	return e
+	return &invalidParamsError{msg}
 }
 
 func NewInternalError(msg string) *internalError {
-	e := &internalError{msg}
-	return e
+	return &internalError{msg}
 }
 
 func NewSubscriptionNotFoundError(method string) *subscriptionNotFoundError {
-	e := &subscriptionNotFoundError{fmt.Sprintf("subscribe method %s not found", method)}
-	return e
+	return &subscriptionNotFoundError{fmt.Sprintf("subscribe method %s not found", method)}
 }

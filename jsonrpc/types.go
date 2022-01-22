@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // For union type of transaction and types.Hash
@@ -52,7 +52,6 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
-
 	res := &transaction{
 		Nonce:    argUint64(t.Nonce),
 		GasPrice: argBig(*t.GasPrice),
@@ -129,6 +128,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		Transactions:    []transactionOrHash{},
 		Uncles:          []types.Hash{},
 	}
+
 	for idx, txn := range b.Transactions {
 		if fullTx {
 			res.Transactions = append(
@@ -147,9 +147,11 @@ func toBlock(b *types.Block, fullTx bool) *block {
 			)
 		}
 	}
+
 	for _, uncle := range b.Uncles {
 		res.Uncles = append(res.Uncles, uncle.Hash)
 	}
+
 	return res
 }
 
@@ -185,6 +187,7 @@ type argBig big.Int
 
 func argBigPtr(b *big.Int) *argBig {
 	v := argBig(*b)
+
 	return &v
 }
 
@@ -193,14 +196,17 @@ func (a *argBig) UnmarshalText(input []byte) error {
 	if err != nil {
 		return err
 	}
+
 	b := new(big.Int)
 	b.SetBytes(buf)
 	*a = argBig(*b)
+
 	return nil
 }
 
 func (a argBig) MarshalText() ([]byte, error) {
 	b := (*big.Int)(&a)
+
 	return []byte("0x" + b.Text(16)), nil
 }
 
@@ -216,23 +222,28 @@ type argUint64 uint64
 
 func argUintPtr(n uint64) *argUint64 {
 	v := argUint64(n)
+
 	return &v
 }
 
-func (b argUint64) MarshalText() ([]byte, error) {
+func (u argUint64) MarshalText() ([]byte, error) {
 	buf := make([]byte, 2, 10)
 	copy(buf, `0x`)
-	buf = strconv.AppendUint(buf, uint64(b), 16)
+	buf = strconv.AppendUint(buf, uint64(u), 16)
+
 	return buf, nil
 }
 
 func (u *argUint64) UnmarshalText(input []byte) error {
 	str := strings.TrimPrefix(string(input), "0x")
 	num, err := strconv.ParseUint(str, 16, 64)
+
 	if err != nil {
 		return err
 	}
+
 	*u = argUint64(num)
+
 	return nil
 }
 
@@ -240,6 +251,7 @@ type argBytes []byte
 
 func argBytesPtr(b []byte) *argBytes {
 	bb := argBytes(b)
+
 	return &bb
 }
 
@@ -252,18 +264,22 @@ func (b *argBytes) UnmarshalText(input []byte) error {
 	if err != nil {
 		return nil
 	}
+
 	aux := make([]byte, len(hh))
 	copy(aux[:], hh[:])
 	*b = aux
+
 	return nil
 }
 
 func decodeToHex(b []byte) ([]byte, error) {
 	str := string(b)
 	str = strings.TrimPrefix(str, "0x")
+
 	if len(str)%2 != 0 {
 		str = "0" + str
 	}
+
 	return hex.DecodeString(str)
 }
 
@@ -272,6 +288,7 @@ func encodeToHex(b []byte) []byte {
 	if len(str)%2 != 0 {
 		str = "0" + str
 	}
+
 	return []byte("0x" + str)
 }
 
@@ -288,6 +305,7 @@ type txnArgs struct {
 }
 
 type progression struct {
+	Type          string `json:"type"`
 	StartingBlock string `json:"startingBlock"`
 	CurrentBlock  string `json:"currentBlock"`
 	HighestBlock  string `json:"highestBlock"`

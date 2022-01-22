@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	vault "github.com/hashicorp/vault/api"
 )
@@ -30,7 +30,7 @@ type VaultSecretsManager struct {
 	// The HTTP client used for interacting with the Vault server
 	client *vault.Client
 
-	// The namespace under which the secrets are stored 
+	// The namespace under which the secrets are stored
 	namespace string
 }
 
@@ -86,15 +86,16 @@ func (v *VaultSecretsManager) Setup() error {
 
 	// Set the server URL
 	config.Address = v.serverURL
+
 	client, err := vault.NewClient(config)
 	if err != nil {
-		return fmt.Errorf("unable to initialize Vault client: %v", err)
+		return fmt.Errorf("unable to initialize Vault client: %w", err)
 	}
 
 	// Set the access token
 	client.SetToken(v.token)
 
-	// Set the namespace 
+	// Set the namespace
 	client.SetNamespace(v.namespace)
 
 	v.client = client
@@ -111,7 +112,7 @@ func (v *VaultSecretsManager) constructSecretPath(name string) string {
 func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 	secret, err := v.client.Logical().Read(v.constructSecretPath(name))
 	if err != nil {
-		return nil, fmt.Errorf("unable to read secret from Vault, %v", err)
+		return nil, fmt.Errorf("unable to read secret from Vault, %w", err)
 	}
 
 	if secret == nil {
@@ -168,7 +169,7 @@ func (v *VaultSecretsManager) SetSecret(name string, value []byte) error {
 		"data": data,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to store secret (%s), %v", name, err)
+		return fmt.Errorf("unable to store secret (%s), %w", name, err)
 	}
 
 	return nil
@@ -192,7 +193,7 @@ func (v *VaultSecretsManager) RemoveSecret(name string) error {
 	// Delete the secret from Vault storage
 	_, err = v.client.Logical().Delete(v.constructSecretPath(name))
 	if err != nil {
-		return fmt.Errorf("unable to delete secret (%s), %v", name, err)
+		return fmt.Errorf("unable to delete secret (%s), %w", name, err)
 	}
 
 	return nil

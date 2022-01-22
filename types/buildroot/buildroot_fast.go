@@ -4,13 +4,14 @@ import (
 	"encoding/binary"
 	"sync"
 
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 func min(i, j int) int {
 	if i < j {
 		return i
 	}
+
 	return j
 }
 
@@ -21,6 +22,7 @@ func acquireFastHasher() *FastHasher {
 	if v == nil {
 		return &FastHasher{k: keccak.NewKeccak256()}
 	}
+
 	return v.(*FastHasher)
 }
 
@@ -53,10 +55,13 @@ func (f *FastHasher) getCb(i int) ([]byte, bool) {
 	if i > f.num {
 		return nil, false
 	}
+
 	val := f.cb(i)
+
 	if len(val) < 32 {
 		return nil, false
 	}
+
 	return val, true
 }
 
@@ -74,6 +79,7 @@ func (f *FastHasher) encodeOneItem() ([]byte, bool) {
 	f.buf2 = append(f.buf2, val...)
 
 	f.dst = f.hash(f.dst, f.buf2)
+
 	return f.dst, true
 }
 
@@ -98,6 +104,7 @@ func (f *FastHasher) Hash(num int, cb func(i int) []byte) ([]byte, bool) {
 
 		f.dst = append(f.dst, rlpHashPrefix...)
 		f.dst, ok = f.deriveGroup(f.dst, ini, min(step1, i+16))
+
 		if !ok {
 			return nil, false
 		}
@@ -115,6 +122,7 @@ func (f *FastHasher) Hash(num int, cb func(i int) []byte) ([]byte, bool) {
 	if !ok {
 		return nil, false
 	}
+
 	f.dst = f.encodeSingle(f.dst, val, false)
 
 	// fill up from 9 to 16 with empty values
@@ -126,6 +134,7 @@ func (f *FastHasher) Hash(num int, cb func(i int) []byte) ([]byte, bool) {
 	f.buf2 = append(f.buf2, f.dst...)
 
 	f.dst = f.hash(f.dst[:0], f.buf2)
+
 	return f.dst, true
 }
 
@@ -133,6 +142,7 @@ func (f *FastHasher) hash(dst, b []byte) []byte {
 	f.k.Write(b) //nolint
 	dst = f.k.Sum(dst)
 	f.k.Reset()
+
 	return dst
 }
 
@@ -187,11 +197,13 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 		if !ok {
 			return nil, false
 		}
+
 		if from == 1 {
 			dst = f.encodeSingle(dst, val, true)
 		} else {
 			dst = f.encodeSingle(dst, val, false)
 		}
+
 		return dst, true
 	}
 
@@ -206,6 +218,7 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 		if !ok {
 			return nil, false
 		}
+
 		f.buf = append(f.buf, rlpHashPrefix...)
 
 		n := getRlpSize(uint64(len(val)))
@@ -228,9 +241,11 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 	// write any other children left up to 16
 	if num < 16 {
 		last := 15
+
 		if from != 1 {
 			last = 16
 		}
+
 		for i := num; i < last; i++ {
 			f.buf = append(f.buf, rlpEmptyValue...)
 		}
@@ -243,6 +258,7 @@ func (f *FastHasher) deriveGroup(dst []byte, from, to int) ([]byte, bool) {
 	f.buf2 = append(f.buf2, f.buf...)
 
 	dst = f.hash(dst, f.buf2)
+
 	return dst, true
 }
 
@@ -258,6 +274,7 @@ func getRlpSize(size uint64) int {
 	if size < 56 {
 		return 1
 	}
+
 	return int(intsize(size)) + 1
 }
 
@@ -270,8 +287,10 @@ func (f *FastHasher) marshalRlpSize(dst []byte, size uint64, short, long byte) [
 	intSize := intsize(size)
 
 	binary.BigEndian.PutUint64(buf[:], size)
+
 	dst = append(dst, long+byte(intSize))
 	dst = append(dst, buf[8-intSize:]...)
+
 	return dst
 }
 
@@ -292,5 +311,6 @@ func intsize(val uint64) uint64 {
 	case val < (1 << 56):
 		return 7
 	}
+
 	return 8
 }

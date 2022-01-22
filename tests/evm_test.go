@@ -10,15 +10,15 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/types"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
+	"github.com/0xPolygon/polygon-edge/crypto"
 )
 
 var mainnetChainConfig = chain.Params{
@@ -46,11 +46,13 @@ type VMCase struct {
 }
 
 func testVMCase(t *testing.T, name string, c *VMCase) {
+	t.Helper()
+
 	env := c.Env.ToEnv(t)
 	env.GasPrice = types.BytesToHash(c.Exec.GasPrice.Bytes())
 	env.Origin = c.Exec.Origin
 
-	s, _, root := buildState(t, c.Pre)
+	s, _, root := buildState(c.Pre)
 
 	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 
@@ -67,7 +69,16 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	evmR := evm.NewEVM()
 
 	code := e.GetCode(c.Exec.Address)
-	contract := runtime.NewContractCall(1, c.Exec.Caller, c.Exec.Caller, c.Exec.Address, c.Exec.Value, c.Exec.GasLimit, code, c.Exec.Data)
+	contract := runtime.NewContractCall(
+		1,
+		c.Exec.Caller,
+		c.Exec.Caller,
+		c.Exec.Address,
+		c.Exec.Value,
+		c.Exec.GasLimit,
+		code,
+		c.Exec.Data,
+	)
 
 	result := evmR.Run(contract, e, &config)
 
@@ -75,9 +86,11 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 		if result.Succeeded() {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned no error")
 		}
+
 		if result.GasLeft > 0 {
 			t.Fatalf("gas unspecified (indicating an error), but VM returned gas remaining > 0")
 		}
+
 		return
 	}
 
@@ -85,6 +98,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 	if c.Out == "" {
 		c.Out = "0x"
 	}
+
 	if ret := hex.EncodeToHex(result.ReturnValue); ret != c.Out {
 		t.Fatalf("return mismatch: got %s, want %s", ret, c.Out)
 	}
@@ -120,6 +134,7 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 	v := r.MarshalLogsWith(ar)
 
 	keccak.Keccak256Rlp(res[:0], v)
+
 	return
 }
 
@@ -160,6 +175,7 @@ func TestEVM(t *testing.T) {
 				for name, cc := range vmcases {
 					if contains(long, name) && testing.Short() {
 						t.Skip()
+
 						continue
 					}
 					testVMCase(t, name, cc)

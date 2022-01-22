@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -49,12 +49,14 @@ func (p *TxPoolStatus) Run(args []string) int {
 
 	if err := flags.Parse(args); err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
 	conn, err := p.GRPC.Conn()
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 
@@ -63,6 +65,7 @@ func (p *TxPoolStatus) Run(args []string) int {
 	resp, err := clt.Status(context.Background(), &empty.Empty{})
 	if err != nil {
 		p.Formatter.OutputError(err)
+
 		return 1
 	}
 

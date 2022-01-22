@@ -16,18 +16,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
-	"github.com/0xPolygon/polygon-sdk/command/server"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
-	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/server"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/server/proto"
+	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
@@ -39,8 +41,8 @@ import (
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
-	initialPort   = 12000
-	polygonSDKCmd = "polygon-sdk"
+	initialPort = 12000
+	binaryName  = "polygon-edge"
 )
 
 type TestServer struct {
@@ -64,7 +66,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		ReservedPorts: ports,
 		GRPCPort:      ports[0].Port(),
 		LibP2PPort:    ports[1].Port(),
-		JsonRPCPort:   ports[2].Port(),
+		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
 	}
 
@@ -82,15 +84,16 @@ func (t *TestServer) GrpcAddr() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.GRPCPort)
 }
 
-func (t *TestServer) JsonRPCAddr() string {
-	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JsonRPCPort)
+func (t *TestServer) JSONRPCAddr() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", t.Config.JSONRPCPort)
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
-	clt, err := jsonrpc.NewClient(t.JsonRPCAddr())
+	clt, err := jsonrpc.NewClient(t.JSONRPCAddr())
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return clt
 }
 
@@ -99,6 +102,7 @@ func (t *TestServer) Operator() proto.SystemClient {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return proto.NewSystemClient(conn)
 }
 
@@ -107,7 +111,17 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
+}
+
+func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+
+	return ibftOp.NewIbftOperatorClient(conn)
 }
 
 func (t *TestServer) ReleaseReservedPorts() {
@@ -116,11 +130,13 @@ func (t *TestServer) ReleaseReservedPorts() {
 			t.t.Error(err)
 		}
 	}
+
 	t.Config.ReservedPorts = nil
 }
 
 func (t *TestServer) Stop() {
 	t.ReleaseReservedPorts()
+
 	if t.cmd != nil {
 		if err := t.cmd.Process.Kill(); err != nil {
 			t.t.Error(err)
@@ -139,16 +155,17 @@ type InitIBFTResult struct {
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	secretsInitCmd := secretsCommand.SecretsInit{}
+
 	var args []string
 
 	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
-	_, err := cmd.Output()
-	if err != nil {
+
+	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
 
@@ -189,13 +206,13 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	}
 
 	// Get the node ID from the private key
-	nodeId, err := peer.IDFromPrivateKey(libp2pKey)
+	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
 	if err != nil {
 		return nil, err
 	}
 
 	res.Address = crypto.PubKeyToAddress(&validatorKey.PublicKey).String()
-	res.NodeID = nodeId.String()
+	res.NodeID = nodeID.String()
 
 	return res, nil
 }
@@ -206,7 +223,7 @@ func (t *TestServer) GenerateGenesis() error {
 		genesisCmd.GetBaseCommand(),
 	}
 
-	// add premines
+	// add pre-mined accounts
 	for _, acct := range t.Config.PremineAccts {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
@@ -215,27 +232,45 @@ func (t *TestServer) GenerateGenesis() error {
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
 		args = append(args, "--consensus", "ibft")
+
 		if t.Config.IBFTDirPrefix == "" {
 			return errors.New("prefix of IBFT directory is not set")
 		}
+
 		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
-		for _, bootnode := range t.Config.Bootnodes {
-			args = append(args, "--bootnode", bootnode)
+
+		if t.Config.EpochSize != 0 {
+			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
 	case ConsensusDev:
 		args = append(args, "--consensus", "dev")
+
+		// Set up any initial staker addresses for the predeployed Staking SC
+		for _, stakerAddress := range t.Config.DevStakers {
+			args = append(args, "--ibft-validator", stakerAddress.String())
+		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
+	}
+
+	for _, bootnode := range t.Config.Bootnodes {
+		args = append(args, "--bootnode", bootnode)
+	}
+
+	// Make sure the correct mechanism is selected
+	if t.Config.IsPos {
+		args = append(args, "--pos")
 	}
 
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
 		t.Config.BlockGasLimit = helper.GenesisGasLimit
 	}
+
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
 	return cmd.Run()
@@ -252,35 +287,25 @@ func (t *TestServer) Start(ctx context.Context) error {
 		// enable libp2p
 		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
-		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JsonRPCPort),
+		"--jsonrpc", fmt.Sprintf(":%d", t.Config.JSONRPCPort),
 	}
 
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
 		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
 	case ConsensusDev:
-		args = append(args, "--data-dir", t.Config.RootDir, "--dev")
+		args = append(args, "--data-dir", t.Config.RootDir)
+		args = append(args, "--dev")
+
+		if t.Config.DevInterval != 0 {
+			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
+		}
 	case ConsensusDummy:
 		args = append(args, "--data-dir", t.Config.RootDir)
 	}
 
-	if t.Config.Consensus == ConsensusDev {
-		args = append(args, "--dev")
-		if t.Config.DevInterval != 0 {
-			args = append(args, "--dev-interval", strconv.Itoa(t.Config.DevInterval))
-		}
-	}
-
 	if t.Config.Seal {
 		args = append(args, "--seal")
-	}
-
-	if len(t.Config.Locals) > 0 {
-		args = append(args, "--locals", strings.Join(t.Config.Locals, ","))
-	}
-
-	if t.Config.NoLocals {
-		args = append(args, "--nolocals")
 	}
 
 	if t.Config.PriceLimit != nil {
@@ -299,7 +324,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd = exec.Command(binaryName, args...)
 	t.cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {
@@ -319,8 +344,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 		if _, err := t.Operator().GetStatus(ctx, &empty.Empty{}); err == nil {
 			return nil, false
 		}
+
 		return nil, true
 	})
+
 	return err
 }
 
@@ -330,12 +357,15 @@ func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Ad
 	if err != nil {
 		return web3.Address{}, err
 	}
+
 	receipt, err := t.SendTxn(ctx, &web3.Transaction{
 		Input: buf,
 	})
+
 	if err != nil {
 		return web3.Address{}, err
 	}
+
 	return receipt.ContractAddress, nil
 }
 
@@ -352,16 +382,20 @@ func (t *TestServer) SendTxn(ctx context.Context, txn *web3.Transaction) (*web3.
 	if txn.From == emptyAddr {
 		txn.From = web3.Address(t.Config.PremineAccts[0].Addr)
 	}
+
 	if txn.GasPrice == 0 {
 		txn.GasPrice = DefaultGasPrice
 	}
+
 	if txn.Gas == 0 {
 		txn.Gas = DefaultGasLimit
 	}
+
 	hash, err := client.Eth().SendTransaction(txn)
 	if err != nil {
 		return nil, err
 	}
+
 	return tests.WaitForReceipt(ctx, t.JSONRPC().Eth(), hash)
 }
 
@@ -375,7 +409,11 @@ type PreparedTransaction struct {
 }
 
 // SendRawTx signs the transaction with the provided private key, executes it, and returns the receipt
-func (t *TestServer) SendRawTx(ctx context.Context, tx *PreparedTransaction, signerKey *ecdsa.PrivateKey) (*web3.Receipt, error) {
+func (t *TestServer) SendRawTx(
+	ctx context.Context,
+	tx *PreparedTransaction,
+	signerKey *ecdsa.PrivateKey,
+) (*web3.Receipt, error) {
 	signer := crypto.NewEIP155Signer(100)
 	client := t.JSONRPC()
 
@@ -421,12 +459,18 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash web3.Hash) (*web3.
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}
+
 		return nil, true
 	})
 	if err != nil {
 		return nil, err
 	}
-	data := res.(result)
+
+	data, ok := res.(result)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
 	return data.receipt, data.err
 }
 
@@ -439,8 +483,10 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 		if num == 0 {
 			return nil, true
 		}
+
 		return num, false
 	})
+
 	return err
 }
 
@@ -450,8 +496,10 @@ func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method str
 		To:    &address,
 		Input: sig,
 	})
+
 	if err != nil {
 		t.t.Fatal(err)
 	}
+
 	return receipt
 }

@@ -1,8 +1,8 @@
 package ibft
 
 import (
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -21,6 +21,7 @@ func istanbulHeaderHash(h *types.Header) types.Hash {
 	if err != nil {
 		return types.Hash{}
 	}
+
 	putIbftExtraValidators(h, extra.Validators)
 
 	vv := arena.NewArray()

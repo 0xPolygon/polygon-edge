@@ -9,9 +9,9 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -120,6 +120,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	jsonV, _ := jsonTx.V.MarshalText()
 	jsonR, _ := jsonTx.R.MarshalText()
 	jsonS, _ := jsonTx.S.MarshalText()
+
 	assert.Equal(t, hexWithoutLeading0, string(jsonV))
 	assert.Equal(t, hexWithoutLeading0, string(jsonR))
 	assert.Equal(t, hexWithoutLeading0, string(jsonS))

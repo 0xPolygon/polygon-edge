@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -23,6 +23,7 @@ func defHeaderHash(h *Header) (hash Hash) {
 
 	marshalArenaPool.Put(ar)
 	keccak.DefaultKeccakPool.Put(hasher)
+
 	return
 }
 

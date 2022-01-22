@@ -4,12 +4,21 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// Txpool is the txpool jsonrpc endpoint
-type Txpool struct {
-	d *Dispatcher
+// txPoolStore provides access to the methods needed for txpool endpoint
+type txPoolStore interface {
+	// GetTxs gets tx pool transactions currently pending for inclusion and currently queued for validation
+	GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction)
+
+	// GetCapacity returns the current and max capacity of the pool
+	GetCapacity() (uint64, uint64)
+}
+
+// TxPool is the txpool jsonrpc endpoint
+type TxPool struct {
+	store txPoolStore
 }
 
 type ContentResponse struct {
@@ -61,26 +70,38 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 
 // Create response for txpool_content request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content.
-func (t *Txpool) Content() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
-	pendingRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for address, nonces := range pendingTxs {
-		pendingRpcTxns[address] = make(map[uint64]*txpoolTransaction)
-		for nonce, tx := range nonces {
-			pendingRpcTxns[address][nonce] = toTxPoolTransaction(tx)
+func (t *TxPool) Content() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
+
+	// collect pending
+	pendingRPCTxs := make(map[types.Address]map[uint64]*txpoolTransaction)
+	for addr, txs := range pendingTxs {
+		pendingRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
+
+		for _, tx := range txs {
+			nonce := tx.Nonce
+			rpcTx := toTxPoolTransaction(tx)
+
+			pendingRPCTxs[addr][nonce] = rpcTx
 		}
 	}
-	queuedRpcTxns := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for address, nonces := range queuedTxs {
-		queuedRpcTxns[address] = make(map[uint64]*txpoolTransaction)
-		for nonce, tx := range nonces {
-			queuedRpcTxns[address][nonce] = toTxPoolTransaction(tx)
+
+	// collect enqueued
+	queuedRPCTxs := make(map[types.Address]map[uint64]*txpoolTransaction)
+	for addr, txs := range queuedTxs {
+		queuedRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
+
+		for _, tx := range txs {
+			nonce := tx.Nonce
+			rpcTx := toTxPoolTransaction(tx)
+
+			queuedRPCTxs[addr][nonce] = rpcTx
 		}
 	}
 
 	resp := ContentResponse{
-		Pending: pendingRpcTxns,
-		Queued:  queuedRpcTxns,
+		Pending: pendingRPCTxs,
+		Queued:  queuedRPCTxs,
 	}
 
 	return resp, nil
@@ -88,33 +109,41 @@ func (t *Txpool) Content() (interface{}, error) {
 
 // Create response for txpool_inspect request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
-func (t *Txpool) Inspect() (interface{}, error) {
+func (t *TxPool) Inspect() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
 
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
-	pendingRpcTxns := make(map[string]map[string]string)
-	for address, nonces := range pendingTxs {
-		pendingRpcTxns[address.String()] = make(map[string]string)
-		for nonce, tx := range nonces {
-			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
-			pendingRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
+	// collect pending
+	pendingRPCTxs := make(map[string]map[string]string)
+	for addr, txs := range pendingTxs {
+		pendingRPCTxs[addr.String()] = make(map[string]string, len(txs))
+
+		for _, tx := range txs {
+			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+			pendingRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
+				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
+			)
 		}
 	}
 
-	queuedRpcTxns := make(map[string]map[string]string)
-	for address, nonces := range queuedTxs {
-		queuedRpcTxns[address.String()] = make(map[string]string)
-		for nonce, tx := range nonces {
-			msg := fmt.Sprintf("%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice)
-			queuedRpcTxns[address.String()][strconv.FormatUint(nonce, 10)] = msg
+	// collect enqueued
+	queuedRPCTxs := make(map[string]map[string]string)
+	for addr, txs := range queuedTxs {
+		queuedRPCTxs[addr.String()] = make(map[string]string, len(txs))
+
+		for _, tx := range txs {
+			nonceStr := strconv.FormatUint(tx.Nonce, 10)
+			queuedRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
+				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
+			)
 		}
 	}
 
 	// get capacity of the TxPool
-	current, max := t.d.store.GetCapacity()
+	current, max := t.store.GetCapacity()
 
 	resp := InspectResponse{
-		Pending:         pendingRpcTxns,
-		Queued:          queuedRpcTxns,
+		Pending:         pendingRPCTxs,
+		Queued:          queuedRPCTxs,
 		CurrentCapacity: current,
 		MaxCapacity:     max,
 	}
@@ -124,13 +153,17 @@ func (t *Txpool) Inspect() (interface{}, error) {
 
 // Create response for txpool_status request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status.
-func (t *Txpool) Status() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+func (t *TxPool) Status() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
+
 	var pendingCount int
+
 	for _, t := range pendingTxs {
 		pendingCount += len(t)
 	}
+
 	var queuedCount int
+
 	for _, t := range queuedTxs {
 		queuedCount += len(t)
 	}

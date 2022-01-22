@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,8 +52,10 @@ func TestStorage(t *testing.T, m MockStorage) {
 }
 
 func testCanonicalChain(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Number     uint64
@@ -82,16 +84,20 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 		}
 
 		hash := h.Hash
+
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteCanonicalHash(cc.Number, hash); err != nil {
 			t.Fatal(err)
 		}
+
 		data, ok := s.ReadCanonicalHash(cc.Number)
 		if !ok {
 			t.Fatal("not found")
 		}
+
 		if !reflect.DeepEqual(data, hash) {
 			t.Fatal("not match")
 		}
@@ -99,8 +105,10 @@ func testCanonicalChain(t *testing.T, m MockStorage) {
 }
 
 func testDifficulty(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Diff *big.Int
@@ -123,16 +131,20 @@ func testDifficulty(t *testing.T, m MockStorage) {
 		}
 
 		hash := h.Hash
+
 		if err := s.WriteHeader(h); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteTotalDifficulty(hash, cc.Diff); err != nil {
 			t.Fatal(err)
 		}
+
 		diff, ok := s.ReadTotalDifficulty(hash)
 		if !ok {
 			t.Fatal("not found")
 		}
+
 		if !reflect.DeepEqual(cc.Diff, diff) {
 			t.Fatal("bad")
 		}
@@ -140,8 +152,10 @@ func testDifficulty(t *testing.T, m MockStorage) {
 }
 
 func testHead(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	for i := uint64(0); i < 5; i++ {
 		h := &types.Header{
@@ -157,6 +171,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if err := s.WriteHeadNumber(i); err != nil {
 			t.Fatal(err)
 		}
+
 		if err := s.WriteHeadHash(hash); err != nil {
 			t.Fatal(err)
 		}
@@ -165,6 +180,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if !ok {
 			t.Fatal("num not found")
 		}
+
 		if n2 != i {
 			t.Fatal("bad")
 		}
@@ -173,6 +189,7 @@ func testHead(t *testing.T, m MockStorage) {
 		if !ok {
 			t.Fatal("hash not found")
 		}
+
 		if !reflect.DeepEqual(hash1, hash) {
 			t.Fatal("bad")
 		}
@@ -180,8 +197,10 @@ func testHead(t *testing.T, m MockStorage) {
 }
 
 func testForks(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	var cases = []struct {
 		Forks []types.Hash
@@ -205,21 +224,25 @@ func testForks(t *testing.T, m MockStorage) {
 }
 
 func testHeader(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	header := &types.Header{
 		Number:     5,
 		Difficulty: 17179869184,
 		ParentHash: types.StringToHash("11"),
 		Timestamp:  10,
-		ExtraData:  hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"), // if not set it will fail
+		// if not set it will fail
+		ExtraData: hex.MustDecodeHex("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
 	}
 	header.ComputeHash()
 
 	if err := s.WriteHeader(header); err != nil {
 		t.Fatal(err)
 	}
+
 	header1, err := s.ReadHeader(header.Hash)
 	assert.NoError(t, err)
 
@@ -229,8 +252,10 @@ func testHeader(t *testing.T, m MockStorage) {
 }
 
 func testBody(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	header := &types.Header{
 		Number:     5,
@@ -285,6 +310,7 @@ func testBody(t *testing.T, m MockStorage) {
 	if len(tx0) != len(tx1) {
 		t.Fatal("lengths are different")
 	}
+
 	for indx, i := range tx0 {
 		if i.Hash != tx1[indx].Hash {
 			t.Fatal("tx not correct")
@@ -293,8 +319,10 @@ func testBody(t *testing.T, m MockStorage) {
 }
 
 func testReceipts(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	h := &types.Header{
 		Difficulty: 133,
@@ -314,6 +342,7 @@ func testReceipts(t *testing.T, m MockStorage) {
 	body := &types.Body{
 		Transactions: []*types.Transaction{txn},
 	}
+
 	if err := s.WriteBody(h.Hash, body); err != nil {
 		t.Fatal(err)
 	}
@@ -355,16 +384,21 @@ func testReceipts(t *testing.T, m MockStorage) {
 	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
+
 	found, err := s.ReadReceipts(h.Hash)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	assert.True(t, reflect.DeepEqual(receipts, found))
 }
 
 func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
-	s, close := m(t)
-	defer close()
+	t.Helper()
+
+	s, closeFn := m(t)
+	defer closeFn()
 
 	h := &types.Header{
 		Number:    100,
@@ -382,7 +416,6 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(h, hh) {
-
 		fmt.Println("-- valid --")
 		fmt.Println(h)
 		fmt.Println("-- found --")
@@ -395,6 +428,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found head hash")
 	}
+
 	if headHash != h.Hash {
 		t.Fatal("head hash not correct")
 	}
@@ -403,6 +437,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found head num")
 	}
+
 	if headNum != h.Number {
 		t.Fatal("head num not correct")
 	}
@@ -411,6 +446,7 @@ func testWriteCanonicalHeader(t *testing.T, m MockStorage) {
 	if !ok {
 		t.Fatal("not found can hash")
 	}
+
 	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")
 	}

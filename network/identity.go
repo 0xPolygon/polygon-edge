@@ -2,20 +2,26 @@ package network
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"sync/atomic"
 
 	rawGrpc "google.golang.org/grpc"
 
-	"github.com/0xPolygon/polygon-sdk/network/grpc"
-	"github.com/0xPolygon/polygon-sdk/network/proto"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
+	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var identityProtoV1 = "/id/0.1"
+
+var (
+	ErrInvalidChainID   = errors.New("invalid chain ID")
+	ErrNotReady         = errors.New("not ready")
+	ErrNoAvailableSlots = errors.New("no available Slots")
+)
 
 type identity struct {
 	proto.UnimplementedIdentityServer
@@ -37,6 +43,7 @@ func (i *identity) isPending(id peer.ID) bool {
 	if !ok {
 		return false
 	}
+
 	return val.(bool)
 }
 
@@ -65,22 +72,24 @@ func (i *identity) setup() {
 	i.srv.host.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(net network.Network, conn network.Conn) {
 			peerID := conn.RemotePeer()
-			i.srv.logger.Trace("Conn", "peer", peerID, "direction", conn.Stat().Direction)
+			i.srv.logger.Debug("Conn", "peer", peerID, "direction", conn.Stat().Direction)
 
 			initialized := atomic.LoadUint32(&i.initialized)
 			if initialized == 0 {
-				i.srv.Disconnect(peerID, "not ready")
+				i.srv.Disconnect(peerID, ErrNotReady.Error())
+
 				return
 			}
 
-			// limit by MaxPeers on incomming/outgoing requests
+			// limit by MaxPeers on incoming / outgoing requests
 			if i.isPending(peerID) {
 				// handshake has already started
 				return
 			}
 
 			if i.srv.numOpenSlots() == 0 {
-				i.srv.Disconnect(peerID, "no available slots")
+				i.srv.Disconnect(peerID, ErrNoAvailableSlots.Error())
+
 				return
 			}
 			// pending of handshake
@@ -104,6 +113,7 @@ func (i *identity) setup() {
 
 func (i *identity) start() error {
 	atomic.StoreUint32(&i.initialized, 1)
+
 	return nil
 }
 
@@ -119,20 +129,23 @@ func (i *identity) handleConnected(peerID peer.ID) error {
 	if err != nil {
 		return err
 	}
+
 	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
 	status := i.getStatus()
 	resp, err := clt.Hello(context.Background(), status)
+
 	if err != nil {
 		return err
 	}
 
 	// validation
 	if status.Chain != resp.Chain {
-		return fmt.Errorf("incorrect chain id")
+		return ErrInvalidChainID
 	}
 
 	i.srv.addPeer(peerID)
+
 	return nil
 }
 
@@ -142,5 +155,6 @@ func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status,
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
 	i.srv.logger.Debug("peer bye", "id", ctx.(*grpc.Context).PeerID, "msg", req.Reason)
+
 	return &empty.Empty{}, nil
 }

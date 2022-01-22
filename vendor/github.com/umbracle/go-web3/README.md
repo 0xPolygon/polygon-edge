@@ -186,7 +186,7 @@ import (
 
     web3 "github.com/umbracle/go-web3"
     "github.com/umbracle/go-web3/jsonrpc"
-    "github.com/umbracle/go-web3/contract/builtin/ens"
+    "github.com/umbracle/go-web3/blocktracker"
 )
 
 func main() {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 var ZeroAddress = Address{}
@@ -37,6 +37,7 @@ func BytesToHash(b []byte) Hash {
 	min := min(size, HashLength)
 
 	copy(h[HashLength-min:], b[len(b)-min:])
+
 	return h
 }
 
@@ -55,6 +56,7 @@ func (h Hash) Value() (driver.Value, error) {
 func (h *Hash) Scan(src interface{}) error {
 	hh := hex.MustDecodeHex(string(src.([]byte)))
 	copy(h[:], hh[:])
+
 	return nil
 }
 
@@ -98,6 +100,7 @@ func (a Address) Value() (driver.Value, error) {
 func (a *Address) Scan(src interface{}) error {
 	aa := hex.MustDecodeHex(string(src.([]byte)))
 	copy(a[:], aa[:])
+
 	return nil
 }
 
@@ -120,6 +123,7 @@ func BytesToAddress(b []byte) Address {
 	min := min(size, AddressLength)
 
 	copy(a[AddressLength-min:], b[len(b)-min:])
+
 	return a
 }
 
@@ -128,13 +132,16 @@ func stringToBytes(str string) []byte {
 	if len(str)%2 == 1 {
 		str = "0" + str
 	}
+
 	b, _ := hex.DecodeString(str)
+
 	return b
 }
 
 // UnmarshalText parses a hash in hex syntax.
 func (h *Hash) UnmarshalText(input []byte) error {
 	*h = BytesToHash(stringToBytes(string(input)))
+
 	return nil
 }
 
@@ -144,7 +151,9 @@ func (a *Address) UnmarshalText(input []byte) error {
 	if len(buf) != AddressLength {
 		return fmt.Errorf("incorrect length")
 	}
+
 	*a = BytesToAddress(buf)
+
 	return nil
 }
 

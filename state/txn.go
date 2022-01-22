@@ -6,11 +6,11 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
@@ -74,8 +74,6 @@ func (txn *Txn) Snapshot() int {
 
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
-	// fmt.Printf("revert to snapshot ======> %d\n", id)
-
 	if id > len(txn.snapshots) {
 		panic("")
 	}
@@ -90,6 +88,7 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	if !exists {
 		return nil, false
 	}
+
 	return object.Account, true
 }
 
@@ -97,10 +96,11 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
-		obj := val.(*StateObject)
+		obj := val.(*StateObject) //nolint:forcetypeassert
 		if obj.Deleted {
 			return nil, false
 		}
+
 		return obj.Copy(), true
 	}
 
@@ -110,6 +110,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	}
 
 	var err error
+
 	var account Account
 	if err = account.UnmarshalRlp(data); err != nil {
 		return nil, false
@@ -128,6 +129,7 @@ func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
 	obj := &StateObject{
 		Account: account.Copy(),
 	}
+
 	return obj, true
 }
 
@@ -203,6 +205,7 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	if !exists {
 		return big.NewInt(0)
 	}
+
 	return object.Account.Balance
 }
 
@@ -214,11 +217,12 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	log.Data = append(log.Data, data...)
 
 	var logs []*types.Log
+
 	val, exists := txn.txn.Get(logIndex)
 	if !exists {
 		logs = []*types.Log{}
 	} else {
-		logs = val.([]*types.Log)
+		logs = val.([]*types.Log) //nolint:forcetypeassert
 	}
 
 	logs = append(logs, log)
@@ -233,7 +237,7 @@ func (txn *Txn) AddLog(log *types.Log) {
 	if !exists {
 		logs = []*types.Log{}
 	} else {
-		logs = data.([]*types.Log)
+		logs = data.([]*types.Log) //nolint:forcetypeassert
 	}
 
 	logs = append(logs, log)
@@ -244,7 +248,12 @@ func (txn *Txn) AddLog(log *types.Log) {
 
 var zeroHash types.Hash
 
-func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) (status runtime.StorageStatus) {
+func (txn *Txn) SetStorage(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+	config *chain.ForksInTime,
+) runtime.StorageStatus {
 	oldValue := txn.GetState(addr, key)
 	if oldValue == value {
 		return runtime.StorageUnchanged
@@ -258,13 +267,14 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
 
 	if legacyGasMetering {
-		status = runtime.StorageModified
 		if oldValue == zeroHash {
 			return runtime.StorageAdded
 		} else if value == zeroHash {
 			txn.AddRefund(15000)
+
 			return runtime.StorageDeleted
 		}
+
 		return runtime.StorageModified
 	}
 
@@ -272,12 +282,16 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 		if original == zeroHash { // create slot (2.1.1)
 			return runtime.StorageAdded
 		}
+
 		if value == zeroHash { // delete slot (2.1.2b)
 			txn.AddRefund(15000)
+
 			return runtime.StorageDeleted
 		}
+
 		return runtime.StorageModified
 	}
+
 	if original != zeroHash { // Storage slot was populated before this transaction started
 		if current == zeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
@@ -285,6 +299,7 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 			txn.AddRefund(15000)
 		}
 	}
+
 	if original == value {
 		if original == zeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
@@ -301,11 +316,16 @@ func (txn *Txn) SetStorage(addr types.Address, key types.Hash, value types.Hash,
 			}
 		}
 	}
+
 	return runtime.StorageModifiedAgain
 }
 
 // SetState change the state of an address
-func (txn *Txn) SetState(addr types.Address, key, value types.Hash) {
+func (txn *Txn) SetState(
+	addr types.Address,
+	key,
+	value types.Hash,
+) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Txn == nil {
 			object.Txn = iradix.New().Txn()
@@ -334,12 +354,14 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 			if val == nil {
 				return types.Hash{}
 			}
+
 			return types.BytesToHash(val.([]byte))
 		}
 	}
 
 	// If the object was not found in the radix trie due to no state update, we fetch it from the trie tre
 	k := txn.hashit(key.Bytes())
+
 	return object.GetCommitedState(types.BytesToHash(k))
 }
 
@@ -365,6 +387,7 @@ func (txn *Txn) GetNonce(addr types.Address) uint64 {
 	if !exists {
 		return 0
 	}
+
 	return object.Account.Nonce
 }
 
@@ -384,16 +407,20 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	if !exists {
 		return nil
 	}
+
 	if object.DirtyCode {
 		return object.Code
 	}
 	// TODO; Should we move this to state?
 	v, ok := txn.codeCache.Get(addr)
+
 	if ok {
 		return v.([]byte)
 	}
+
 	code, _ := txn.state.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
+
 	return code
 }
 
@@ -406,12 +433,14 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	if !exists {
 		return types.Hash{}
 	}
+
 	return types.BytesToHash(object.Account.CodeHash)
 }
 
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
+
 	txn.upsertAccount(addr, false, func(object *StateObject) {
 		if object == nil || object.Suicide {
 			suicided = false
@@ -423,19 +452,19 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 			object.Account.Balance = new(big.Int)
 		}
 	})
+
 	return suicided
 }
 
 // HasSuicided returns true if the account suicided
 func (txn *Txn) HasSuicided(addr types.Address) bool {
 	object, exists := txn.getStateObject(addr)
+
 	return exists && object.Suicide
 }
 
 // Refund
 func (txn *Txn) AddRefund(gas uint64) {
-	// fmt.Printf("=-----------ADD REFUND: %d\n", gas)
-
 	refund := txn.GetRefund() + gas
 	txn.txn.Insert(refundIndex, refund)
 }
@@ -450,7 +479,9 @@ func (txn *Txn) Logs() []*types.Log {
 	if !exists {
 		return nil
 	}
+
 	txn.txn.Delete(logIndex)
+
 	return data.([]*types.Log)
 }
 
@@ -459,6 +490,7 @@ func (txn *Txn) GetRefund() uint64 {
 	if !exists {
 		return 0
 	}
+
 	return data.(uint64)
 }
 
@@ -468,6 +500,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	if !ok {
 		return types.Hash{}
 	}
+
 	return obj.GetCommitedState(types.BytesToHash(txn.hashit(key.Bytes())))
 }
 
@@ -481,6 +514,7 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
+
 	return exists
 }
 
@@ -489,6 +523,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 	if !exists {
 		return true
 	}
+
 	return obj.Empty()
 }
 
@@ -523,6 +558,7 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 
 func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	remove := [][]byte{}
+
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*StateObject)
 		if !ok {
@@ -531,6 +567,7 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 		if a.Suicide || a.Empty() && deleteEmptyObjects {
 			remove = append(remove, k)
 		}
+
 		return false
 	})
 
@@ -539,7 +576,9 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 		if !ok {
 			panic("it should not happen")
 		}
+
 		obj, ok := v.(*StateObject)
+
 		if !ok {
 			panic("it should not happen")
 		}
@@ -560,6 +599,7 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 
 	// Do a more complex thing for now
 	objs := []*Object{}
+
 	x.Root().Walk(func(k []byte, v interface{}) bool {
 		a, ok := v.(*StateObject)
 		if !ok {
@@ -585,18 +625,21 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) (Snapshot, []byte) {
 					if v == nil {
 						store.Deleted = true
 					} else {
-						store.Val = v.([]byte)
+						store.Val = v.([]byte) //nolint:forcetypeassert
 					}
 					obj.Storage = append(obj.Storage, store)
+
 					return false
 				})
 			}
 		}
 
 		objs = append(objs, obj)
+
 		return false
 	})
 
 	t, hash := txn.snapshot.Commit(objs)
+
 	return t, hash
 }

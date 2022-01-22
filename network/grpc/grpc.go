@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 
@@ -44,7 +45,10 @@ func interceptor(
 	peer, _ := grpcPeer.FromContext(ctx)
 
 	// we expect our libp2p wrapper
-	addr := peer.Addr.(*wrapLibp2pAddr)
+	addr, ok := peer.Addr.(*wrapLibp2pAddr)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
 
 	ctx2 := &Context{
 		Context: ctx,
@@ -60,7 +64,9 @@ func (g *GrpcStream) Client(stream network.Stream) interface{} {
 }
 
 func (g *GrpcStream) Serve() {
-	go g.grpcServer.Serve(g)
+	go func() {
+		_ = g.grpcServer.Serve(g)
+	}()
 }
 
 func (g *GrpcStream) Handler() func(network.Stream) {
@@ -108,10 +114,12 @@ func WrapClient(s network.Stream) *grpc.ClientConn {
 		return &streamConn{s}, nil
 	})
 	conn, err := grpc.Dial("", grpc.WithInsecure(), opts)
+
 	if err != nil {
 		// TODO: this should not fail at all
 		panic(err)
 	}
+
 	return conn
 }
 
@@ -131,6 +139,7 @@ func (c *streamConn) LocalAddr() net.Addr {
 	if err != nil {
 		return fakeRemoteAddr()
 	}
+
 	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().LocalPeer()}
 }
 
@@ -140,6 +149,7 @@ func (c *streamConn) RemoteAddr() net.Addr {
 	if err != nil {
 		return fakeRemoteAddr()
 	}
+
 	return &wrapLibp2pAddr{Addr: addr, id: c.Stream.Conn().RemotePeer()}
 }
 
@@ -147,12 +157,16 @@ var _ net.Conn = &streamConn{}
 
 // fakeLocalAddr returns a dummy local address.
 func fakeLocalAddr() net.Addr {
-	localIp := net.ParseIP("127.0.0.1")
-	return &net.TCPAddr{IP: localIp, Port: 0}
+	return &net.TCPAddr{
+		IP:   net.ParseIP("127.0.0.1"),
+		Port: 0,
+	}
 }
 
 // fakeRemoteAddr returns a dummy remote address.
 func fakeRemoteAddr() net.Addr {
-	remoteIp := net.ParseIP("127.1.0.1")
-	return &net.TCPAddr{IP: remoteIp, Port: 0}
+	return &net.TCPAddr{
+		IP:   net.ParseIP("127.1.0.1"),
+		Port: 0,
+	}
 }

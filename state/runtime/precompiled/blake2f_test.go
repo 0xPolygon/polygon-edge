@@ -8,8 +8,9 @@ import (
 func TestBlake2f(t *testing.T) {
 	b := &blake2f{}
 
-	// TODO: Use this for all the precompiled test cases
 	ReadTestCase(t, "blake2f.json", func(t *testing.T, c *TestCase) {
+		t.Helper()
+
 		out, err := b.run(c.Input)
 		if err != nil {
 			t.Fatal(err)

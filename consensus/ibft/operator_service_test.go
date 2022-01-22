@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,7 +65,7 @@ func TestOperator_GetNextCandidate(t *testing.T) {
 
 	assert.NotNil(t, o.getNextCandidate(snap))
 
-	// add the new candiate to the set
+	// add the new candidate to the set
 	snap.Set = pool.ValidatorSet()
 
 	// now the candidate is on the new set so we have to remove
@@ -86,6 +86,7 @@ func TestOperator_Propose(t *testing.T) {
 	assert.NoError(t, ibft.setupSnapshot())
 
 	o := &operator{ibft: ibft}
+
 	pool.add("X")
 
 	// we cannot propose to add a validator already in the set

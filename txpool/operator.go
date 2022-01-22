@@ -4,22 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Status implements the GRPC status endpoint. Returns the number of transactions in the pool
-func (t *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
+func (p *TxPool) Status(ctx context.Context, req *empty.Empty) (*proto.TxnPoolStatusResp, error) {
 	resp := &proto.TxnPoolStatusResp{
-		Length: t.pendingQueue.Length(),
+		Length: p.accounts.promoted(),
 	}
 
 	return resp, nil
 }
 
 // AddTxn adds a local transaction to the pool
-func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*empty.Empty, error) {
+func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTxnResp, error) {
 	if raw.Raw == nil {
 		return nil, fmt.Errorf("transaction's field raw is empty")
 	}
@@ -34,18 +34,47 @@ func (t *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*empty.Empty
 		if err := from.UnmarshalText([]byte(raw.From)); err != nil {
 			return nil, err
 		}
+
 		txn.From = from
 	}
 
-	if err := t.AddTx(txn); err != nil {
+	if err := p.AddTx(txn); err != nil {
 		return nil, err
 	}
 
-	return &empty.Empty{}, nil
+	return &proto.AddTxnResp{
+		TxHash: txn.Hash.String(),
+	}, nil
 }
 
 // Subscribe implements the operator endpoint. It subscribes to new events in the tx pool
-func (t *TxPool) Subscribe(req *empty.Empty, stream proto.TxnPoolOperator_SubscribeServer) error {
-	// TODO
-	return nil
+func (p *TxPool) Subscribe(
+	request *proto.SubscribeRequest,
+	stream proto.TxnPoolOperator_SubscribeServer,
+) error {
+	subscription := p.eventManager.subscribe(request.Types)
+
+	cancel := func() {
+		p.eventManager.cancelSubscription(subscription.subscriptionID)
+	}
+
+	for {
+		select {
+		case event, more := <-subscription.subscriptionChannel:
+			if !more {
+				// Subscription is closed from some other place
+				return nil
+			}
+
+			if sendErr := stream.Send(event); sendErr != nil {
+				cancel()
+
+				return nil
+			}
+		case <-stream.Context().Done():
+			cancel()
+
+			return nil
+		}
+	}
 }

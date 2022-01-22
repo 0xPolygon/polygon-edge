@@ -2,11 +2,10 @@ package buildroot
 
 import (
 	"bytes"
-	"math/rand"
+	"crypto/rand"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"math/big"
 	"testing"
-	"time"
-
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
 )
 
 func BenchmarkFast(b *testing.B) {
@@ -44,9 +43,9 @@ func TestFastHasher(t *testing.T) {
 		res := buildRandomInput(int(num))
 
 		found, _ := f.Hash(int(num), res)
-		real := deriveSlow(int(num), res)
+		realRes := deriveSlow(int(num), res)
 
-		if !bytes.Equal(found, real) {
+		if !bytes.Equal(found, realRes) {
 			t.Fatal("bad")
 		}
 
@@ -55,19 +54,23 @@ func TestFastHasher(t *testing.T) {
 }
 
 func randomInt(min, max uint64) uint64 {
-	rand.Seed(time.Now().UnixNano())
-	return min + uint64(rand.Intn(int(max-min)))
+	randNum, _ := rand.Int(rand.Reader, big.NewInt(int64(max-min)))
+
+	return min + randNum.Uint64()
 }
 
 func buildInput(n, m int) func(i int) []byte {
 	res := [][]byte{}
+
 	for i := 0; i < n; i++ {
 		b := make([]byte, m)
 		for indx := range b {
 			b[indx] = byte(i)
 		}
+
 		res = append(res, b)
 	}
+
 	return func(i int) []byte {
 		return res[i]
 	}
@@ -75,11 +78,13 @@ func buildInput(n, m int) func(i int) []byte {
 
 func buildRandomInput(num int) func(i int) []byte {
 	res := [][]byte{}
+
 	for i := 0; i < num; i++ {
 		b := make([]byte, randomInt(33, 200))
-		rand.Read(b)
+		_, _ = rand.Read(b)
 		res = append(res, b)
 	}
+
 	return func(i int) []byte {
 		return res[i]
 	}

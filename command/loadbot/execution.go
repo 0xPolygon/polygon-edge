@@ -4,14 +4,16 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/loadbot/generator"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/golang/protobuf/ptypes/any"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/jsonrpc"
 )
@@ -22,20 +24,36 @@ const (
 
 	defaultFastestTurnAround = time.Hour * 24
 	defaultSlowestTurnAround = time.Duration(0)
+
+	defaultGasLimit = 5242880 // 0x500000
+)
+
+type Mode string
+
+const (
+	transfer Mode = "transfer"
+	deploy   Mode = "deploy"
 )
 
 type Account struct {
 	Address    types.Address
 	PrivateKey *ecdsa.PrivateKey
 }
+
 type Configuration struct {
-	TPS      uint64
-	Sender   types.Address
-	Receiver types.Address
-	Value    *big.Int
-	Count    uint64
-	JSONRPC  string
-	MaxConns int
+	TPS              uint64
+	Sender           types.Address
+	Receiver         types.Address
+	Value            *big.Int
+	Count            uint64
+	JSONRPC          string
+	GRPC             string
+	MaxConns         int
+	GeneratorMode    Mode
+	ChainID          uint64
+	GasPrice         *big.Int
+	GasLimit         *big.Int
+	ContractArtifact *generator.ContractArtifact
 }
 
 type metadata struct {
@@ -77,8 +95,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	fastestTurnAround := defaultFastestTurnAround
 	slowestTurnAround := defaultSlowestTurnAround
 	totalPassing := atomic.LoadUint64(&ed.turnAroundMapSize)
-	var zeroTime time.Time  // Zero time
-	var totalTime time.Time // Zero time used for tracking
+
+	var (
+		zeroTime  time.Time // Zero time
+		totalTime time.Time // Zero time used for tracking
+	)
 
 	if totalPassing == 0 {
 		// No data to show, use zero data
@@ -91,7 +112,11 @@ func (ed *ExecDuration) calcTurnAroundMetrics() {
 	}
 
 	ed.turnAroundMap.Range(func(_, value interface{}) bool {
-		data := value.(*metadata)
+		data, ok := value.(*metadata)
+		if !ok {
+			return false
+		}
+
 		turnAroundTime := data.turnAroundTime
 
 		// Update the duration metrics
@@ -134,8 +159,9 @@ type Metrics struct {
 }
 
 type Loadbot struct {
-	cfg     *Configuration
-	metrics *Metrics
+	cfg       *Configuration
+	metrics   *Metrics
+	generator generator.TransactionGenerator
 }
 
 // calcMaxTimeout calculates the max timeout for transactions receipts
@@ -155,60 +181,155 @@ func calcMaxTimeout(count, tps uint64) time.Duration {
 }
 
 func NewLoadBot(cfg *Configuration, metrics *Metrics) *Loadbot {
-	return &Loadbot{cfg: cfg, metrics: metrics}
+	return &Loadbot{
+		cfg:     cfg,
+		metrics: metrics,
+	}
 }
 
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query initial sender nonce: %v", err)
+		return 0, fmt.Errorf("failed to query initial sender nonce: %w", err)
 	}
+
 	return nonce, nil
 }
 
-func executeTxn(client *jsonrpc.Client, sender Account, receiver types.Address, value *big.Int, nonce uint64) (web3.Hash, error) {
-	signer := crypto.NewEIP155Signer(100)
-
-	txn, err := signer.SignTx(&types.Transaction{
-		From:     sender.Address,
-		To:       &receiver,
-		Gas:      1000000,
-		Value:    value,
-		GasPrice: big.NewInt(0x100000),
-		Nonce:    nonce,
-		V:        big.NewInt(1), // it is necessary to encode in rlp
-	}, sender.PrivateKey)
-
+func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
+	gasPrice, err := client.Eth().GasPrice()
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to sign transaction: %v", err)
+		return 0, fmt.Errorf("failed to query initial gas price: %w", err)
 	}
 
-	hash, err := client.Eth().SendRawTransaction(txn.MarshalRLP())
+	return gasPrice, nil
+}
+
+func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
+	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
+		From:     web3.Address(txn.From),
+		To:       (*web3.Address)(txn.To),
+		Data:     txn.Input,
+		GasPrice: txn.GasPrice.Uint64(),
+		Value:    txn.Value,
+	})
+
 	if err != nil {
-		return web3.Hash{}, fmt.Errorf("failed to send raw transaction: %v", err)
+		return 0, fmt.Errorf("failed to query gas estimate: %w", err)
 	}
-	return hash, nil
+
+	if gasEstimate == 0 {
+		gasEstimate = defaultGasLimit
+	}
+
+	return gasEstimate, nil
+}
+
+func (l *Loadbot) executeTxn(
+	client txpoolOp.TxnPoolOperatorClient,
+) (web3.Hash, error) {
+	txn, err := l.generator.GenerateTransaction()
+	if err != nil {
+		return web3.Hash{}, err
+	}
+
+	addReq := &txpoolOp.AddTxnReq{
+		Raw: &any.Any{
+			Value: txn.MarshalRLP(),
+		},
+		From: types.ZeroAddress.String(),
+	}
+
+	addRes, addErr := client.AddTxn(context.Background(), addReq)
+	if addErr != nil {
+		return web3.Hash{}, fmt.Errorf("unable to add transaction, %w", addErr)
+	}
+
+	return web3.Hash(types.StringToHash(addRes.TxHash)), nil
 }
 
 func (l *Loadbot) Run() error {
 	sender, err := extractSenderAccount(l.cfg.Sender)
 	if err != nil {
-		return fmt.Errorf("failed to extract sender account: %v", err)
+		return fmt.Errorf("failed to extract sender account: %w", err)
 	}
 
-	client, err := createJsonRpcClient(l.cfg.JSONRPC, l.cfg.MaxConns)
+	jsonClient, err := createJSONRPCClient(l.cfg.JSONRPC, l.cfg.MaxConns)
 	if err != nil {
-		return fmt.Errorf("an error has occured while creating JSON-RPC client: %v", err)
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
+	}
+
+	grpcClient, err := createGRPCClient(l.cfg.GRPC)
+	if err != nil {
+		return fmt.Errorf("an error has occurred while creating JSON-RPC client: %w", err)
 	}
 
 	defer func(client *jsonrpc.Client) {
-		_ = shutdownClient(client)
-	}(client)
+		_ = client.Close()
+	}(jsonClient)
 
-	nonce, err := getInitialSenderNonce(client, sender.Address)
+	nonce, err := getInitialSenderNonce(jsonClient, sender.Address)
 	if err != nil {
-		return fmt.Errorf("an error occured while getting initial sender nonce: %v", err)
+		return fmt.Errorf("unable to get initial sender nonce: %w", err)
 	}
+
+	gasPrice := l.cfg.GasPrice
+	if gasPrice == nil {
+		// No gas price specified, query the network for an estimation
+		avgGasPrice, err := getAverageGasPrice(jsonClient)
+		if err != nil {
+			return fmt.Errorf("unable to get average gas price: %w", err)
+		}
+
+		gasPrice = new(big.Int).SetUint64(avgGasPrice)
+	}
+
+	// Set up the transaction generator
+	generatorParams := &generator.GeneratorParams{
+		Nonce:         nonce,
+		ChainID:       l.cfg.ChainID,
+		SenderAddress: sender.Address,
+		SenderKey:     sender.PrivateKey,
+		GasPrice:      gasPrice,
+		Value:         l.cfg.Value,
+	}
+
+	var (
+		txnGenerator generator.TransactionGenerator
+		genErr       error = nil
+	)
+
+	switch l.cfg.GeneratorMode {
+	case transfer:
+		txnGenerator, genErr = generator.NewTransferGenerator(generatorParams)
+	case deploy:
+		txnGenerator, genErr = generator.NewDeployGenerator(generatorParams)
+	}
+
+	if genErr != nil {
+		return fmt.Errorf("unable to start generator, %w", genErr)
+	}
+
+	l.generator = txnGenerator
+
+	// Get the gas estimate
+	exampleTxn, err := l.generator.GetExampleTransaction()
+	if err != nil {
+		return fmt.Errorf("unable to get example transaction, %w", err)
+	}
+
+	gasLimit := l.cfg.GasLimit
+	if gasLimit == nil {
+		// No gas limit specified, query the network for an estimation
+		gasEstimate, estimateErr := estimateGas(jsonClient, exampleTxn)
+		if estimateErr != nil {
+			return fmt.Errorf("unable to get gas estimate, %w", err)
+		}
+
+		gasLimit = new(big.Int).SetUint64(gasEstimate)
+	}
+
+	l.generator.SetGasEstimate(gasLimit.Uint64())
 
 	ticker := time.NewTicker(1 * time.Second / time.Duration(l.cfg.TPS))
 	defer ticker.Stop()
@@ -218,39 +339,57 @@ func (l *Loadbot) Run() error {
 	receiptTimeout := calcMaxTimeout(l.cfg.Count, l.cfg.TPS)
 
 	startTime := time.Now()
+
 	for i := uint64(0); i < l.cfg.Count; i++ {
 		<-ticker.C
 
 		l.metrics.TotalTransactionsSentCount += 1
 
 		wg.Add(1)
-		go func() {
-			defer wg.Done()
 
-			// take nonce first
-			newNextNonce := atomic.AddUint64(&nonce, 1)
+		go func(index uint64) {
+			defer wg.Done()
 
 			// Start the performance timer
 			start := time.Now()
 
 			// Execute the transaction
-			txHash, err := executeTxn(client, *sender, l.cfg.Receiver, l.cfg.Value, newNextNonce-1)
+			txHash, err := l.executeTxn(grpcClient)
 			if err != nil {
+				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+					Index:  index,
+					TxHash: txHash.String(),
+					Error: &generator.TxnError{
+						Error:     err,
+						ErrorType: generator.AddErrorType,
+					},
+				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), receiptTimeout)
 			defer cancel()
 
-			receipt, err := tests.WaitForReceipt(ctx, client.Eth(), txHash)
+			receipt, err := tests.WaitForReceipt(ctx, jsonClient.Eth(), txHash)
 			if err != nil {
+				l.generator.MarkFailedTxn(&generator.FailedTxnInfo{
+					Index:  index,
+					TxHash: txHash.String(),
+					Error: &generator.TxnError{
+						Error:     err,
+						ErrorType: generator.ReceiptErrorType,
+					},
+				})
 				atomic.AddUint64(&l.metrics.FailedTransactionsCount, 1)
+
 				return
 			}
 
 			// Stop the performance timer
 			end := time.Now()
+
 			l.metrics.TransactionDuration.reportTurnAroundTime(
 				txHash,
 				&metadata{
@@ -258,10 +397,11 @@ func (l *Loadbot) Run() error {
 					blockNumber:    receipt.BlockNumber,
 				},
 			)
-		}()
+		}(i)
 	}
 
 	wg.Wait()
+
 	endTime := time.Now()
 
 	// Calculate the turn around metrics now that the loadbot is done

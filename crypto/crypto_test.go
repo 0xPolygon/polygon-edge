@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -158,8 +158,14 @@ func TestValidateSignatureValues(t *testing.T) {
 	}
 }
 
-func getAddressFromKey(key crypto.PrivateKey, t *testing.T) types.Address {
-	privateKeyConv := key.(*ecdsa.PrivateKey)
+func getAddressFromKey(t *testing.T, key crypto.PrivateKey) types.Address {
+	t.Helper()
+
+	privateKeyConv, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatalf("Unable to assert key type")
+	}
+
 	assert.NotNil(t, privateKeyConv)
 
 	publicKey := privateKeyConv.PublicKey
@@ -210,7 +216,7 @@ func TestPrivateKeyRead(t *testing.T) {
 			}
 
 			if !testCase.shouldFail {
-				address := getAddressFromKey(privateKey, t)
+				address := getAddressFromKey(t, privateKey)
 				assert.Equal(t, testCase.checksummedAddress, address.String())
 			} else {
 				assert.Nil(t, privateKey)
@@ -221,6 +227,7 @@ func TestPrivateKeyRead(t *testing.T) {
 
 func TestPrivateKeyGeneration(t *testing.T) {
 	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
+
 	t.Cleanup(func() {
 		_ = os.Remove(tempFile)
 	})
@@ -230,14 +237,16 @@ func TestPrivateKeyGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to generate private key, %v", err)
 	}
-	writtenAddress := getAddressFromKey(writtenKey, t)
+
+	writtenAddress := getAddressFromKey(t, writtenKey)
 
 	// Read existing key and check if it matches
 	readKey, err := GenerateOrReadPrivateKey(tempFile)
 	if err != nil {
 		t.Fatalf("Unable to read private key, %v", err)
 	}
-	readAddress := getAddressFromKey(readKey, t)
+
+	readAddress := getAddressFromKey(t, readKey)
 
 	assert.True(t, writtenKey.Equal(readKey))
 	assert.Equal(t, writtenAddress.String(), readAddress.String())

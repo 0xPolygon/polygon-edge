@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,16 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
-)
-
-var (
-	// Magic nonce number to vote on adding a new validator
-	nonceAuthVote = types.Nonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-
-	// Magic nonce number to vote on removing a validator.
-	nonceDropVote = types.Nonce{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 // setupSnapshot sets up the snapshot store for the IBFT object
@@ -28,13 +22,14 @@ func (i *Ibft) setupSnapshot() error {
 
 	// Read from storage
 	if i.config.Path != "" {
-		if err := i.store.loadFromPath(i.config.Path); err != nil {
+		if err := i.store.loadFromPath(i.config.Path, i.logger); err != nil {
 			return err
 		}
 	}
 
 	header := i.blockchain.Header()
 	meta, err := i.getSnapshotMetadata()
+
 	if err != nil {
 		return err
 	}
@@ -55,12 +50,14 @@ func (i *Ibft) setupSnapshot() error {
 	currentEpoch := header.Number / i.epochSize
 	metaEpoch := meta.LastBlock / i.epochSize
 	snapshot, _ := i.getSnapshot(header.Number)
+
 	if snapshot == nil || metaEpoch < currentEpoch {
 		// Restore snapshot at the beginning of the current epoch by block header
 		// if list doesn't have any snapshots to calculate snapshot for the next header
 		i.logger.Info("snapshot was not found, restore snapshot at beginning of current epoch", "current epoch", currentEpoch)
 		beginHeight := currentEpoch * i.epochSize
 		beginHeader, ok := i.blockchain.GetHeaderByNumber(beginHeight)
+
 		if !ok {
 			return fmt.Errorf("header at %d not found", beginHeight)
 		}
@@ -68,6 +65,7 @@ func (i *Ibft) setupSnapshot() error {
 		if err := i.addHeaderSnap(beginHeader); err != nil {
 			return err
 		}
+
 		i.store.updateLastBlock(beginHeight)
 
 		if meta, err = i.getSnapshotMetadata(); err != nil {
@@ -83,10 +81,12 @@ func (i *Ibft) setupSnapshot() error {
 			if num == 0 {
 				continue
 			}
+
 			header, ok := i.blockchain.GetHeaderByNumber(num)
 			if !ok {
 				return fmt.Errorf("header %d not found", num)
 			}
+
 			if err := i.processHeaders([]*types.Header{header}); err != nil {
 				return err
 			}
@@ -145,6 +145,7 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	if err != nil {
 		return err
 	}
+
 	snap := parentSnap.Copy()
 
 	// saveSnap is a callback function to set height and hash in current snapshot with given header
@@ -160,8 +161,6 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 	}
 
 	for _, h := range headers {
-		number := h.Number
-
 		proposer, err := ecrecoverFromHeader(h)
 		if err != nil {
 			return err
@@ -172,90 +171,16 @@ func (i *Ibft) processHeaders(headers []*types.Header) error {
 			return fmt.Errorf("unauthorized proposer")
 		}
 
-		if number%i.epochSize == 0 {
-			// during a checkpoint block, we reset the votes
-			// and there cannot be any proposals
-			snap.Votes = nil
-			saveSnap(h)
-
-			// remove in-memory snapshots from two epochs before this one
-			epoch := int(number/i.epochSize) - 2
-			if epoch > 0 {
-				purgeBlock := uint64(epoch) * i.epochSize
-				i.store.deleteLower(purgeBlock)
-			}
-			continue
-		}
-
-		// if we have a miner address, this might be a vote
-		if h.Miner == types.ZeroAddress {
-			continue
-		}
-
-		// the nonce selects the action
-		var authorize bool
-		if h.Nonce == nonceAuthVote {
-			authorize = true
-		} else if h.Nonce == nonceDropVote {
-			authorize = false
-		} else {
-			return fmt.Errorf("incorrect vote nonce")
-		}
-
-		// validate the vote
-		if authorize {
-			// we can only authorize if they are not on the validators list
-			if snap.Set.Includes(h.Miner) {
-				continue
-			}
-		} else {
-			// we can only remove if they are part of the validators list
-			if !snap.Set.Includes(h.Miner) {
-				continue
-			}
-		}
-
-		voteCount := snap.Count(func(v *Vote) bool {
-			return v.Validator == proposer && v.Address == h.Miner
-		})
-
-		if voteCount > 1 {
-			// there can only be one vote per validator per address
-			return fmt.Errorf("more than one proposal per validator per address found")
-		}
-		if voteCount == 0 {
-			// cast the new vote since there is no one yet
-			snap.Votes = append(snap.Votes, &Vote{
-				Validator: proposer,
-				Address:   h.Miner,
-				Authorize: authorize,
-			})
-		}
-
-		// check the tally for the proposed validator
-		tally := snap.Count(func(v *Vote) bool {
-			return v.Address == h.Miner
-		})
-
-		// If more than a half of all validators voted
-		if tally > snap.Set.Len()/2 {
-			if authorize {
-				// add the candidate to the validators list
-				snap.Set.Add(h.Miner)
-			} else {
-				// remove the candidate from the validators list
-				snap.Set.Del(h.Miner)
-
-				// remove any votes casted by the removed validator
-				snap.RemoveVotes(func(v *Vote) bool {
-					return v.Validator == h.Miner
-				})
-			}
-
-			// remove all the votes that promoted this validator
-			snap.RemoveVotes(func(v *Vote) bool {
-				return v.Address == h.Miner
-			})
+		if hookErr := i.runHook(
+			ProcessHeadersHook,
+			&processHeadersHookParams{
+				header:     h,
+				snap:       snap,
+				parentSnap: parentSnap,
+				proposer:   proposer,
+				saveSnap:   saveSnap,
+			}); hookErr != nil && !errors.Is(hookErr, ErrMissingHook) {
+			return hookErr
 		}
 
 		if !snap.Equal(parentSnap) {
@@ -313,6 +238,7 @@ func (v *Vote) Equal(vv *Vote) bool {
 func (v *Vote) Copy() *Vote {
 	vv := new(Vote)
 	*vv = *v
+
 	return vv
 }
 
@@ -344,6 +270,7 @@ func (s *Snapshot) Equal(ss *Snapshot) bool {
 	if len(s.Votes) != len(ss.Votes) {
 		return false
 	}
+
 	for indx := range s.Votes {
 		if !s.Votes[indx].Equal(ss.Votes[indx]) {
 			return false
@@ -361,6 +288,7 @@ func (s *Snapshot) Count(h func(v *Vote) bool) (count int) {
 			count++
 		}
 	}
+
 	return
 }
 
@@ -396,7 +324,7 @@ func (s *Snapshot) ToProto() *proto.Snapshot {
 	resp := &proto.Snapshot{
 		Validators: []*proto.Snapshot_Validator{},
 		Votes:      []*proto.Snapshot_Vote{},
-		Number:     uint64(s.Number),
+		Number:     s.Number,
 		Hash:       s.Hash,
 	}
 
@@ -439,12 +367,17 @@ func newSnapshotStore() *snapshotStore {
 }
 
 // loadFromPath loads a saved snapshot store from the specified file system path
-func (s *snapshotStore) loadFromPath(path string) error {
+func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 	// Load metadata
 	var meta *snapshotMetadata
 	if err := readDataStore(filepath.Join(path, "metadata"), &meta); err != nil {
-		return err
+		// if we can't read metadata file delete it
+		// and log the error that we've encountered
+		l.Error("Could not read metadata snapshot store file", "err", err.Error())
+		os.Remove(filepath.Join(path, "metadata"))
+		l.Error("Removed invalid metadata snapshot store file")
 	}
+
 	if meta != nil {
 		s.lastNumber = meta.LastBlock
 	}
@@ -452,8 +385,13 @@ func (s *snapshotStore) loadFromPath(path string) error {
 	// Load snapshots
 	snaps := []*Snapshot{}
 	if err := readDataStore(filepath.Join(path, "snapshots"), &snaps); err != nil {
-		return err
+		// if we can't read snapshot store file delete it
+		// and log the error that we've encountered
+		l.Error("Could not read snapshot store file", "err", err.Error())
+		os.Remove(filepath.Join(path, "snapshots"))
+		l.Error("Removed invalid snapshot store file")
 	}
+
 	for _, snap := range snaps {
 		s.add(snap)
 	}
@@ -543,6 +481,19 @@ func (s *snapshotStore) add(snap *Snapshot) {
 	sort.Sort(&s.list)
 }
 
+func (s *snapshotStore) replace(snap *Snapshot) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	for i, sn := range s.list {
+		if sn.Number == snap.Number {
+			s.list[i] = snap
+
+			return
+		}
+	}
+}
+
 // snapshotSortedList defines the sorted snapshot list
 type snapshotSortedList []*Snapshot
 
@@ -586,6 +537,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
+	//nolint: gosec
 	if err := ioutil.WriteFile(path, data, 0755); err != nil {
 		return err
 	}

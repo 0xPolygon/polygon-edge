@@ -5,8 +5,8 @@ import (
 
 	goHex "encoding/hex"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 type ReceiptStatus uint64
@@ -51,6 +51,7 @@ func (b *Bloom) UnmarshalText(input []byte) error {
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -65,6 +66,7 @@ func (b Bloom) Value() (driver.Value, error) {
 func (b *Bloom) Scan(src interface{}) error {
 	bb := hex.MustDecodeHex(string(src.([]byte)))
 	copy(b[:], bb[:])
+
 	return nil
 }
 
@@ -76,20 +78,25 @@ func (b Bloom) MarshalText() ([]byte, error) {
 // CreateBloom creates a new bloom filter from a set of receipts
 func CreateBloom(receipts []*Receipt) (b Bloom) {
 	h := keccak.DefaultKeccakPool.Get()
+
 	for _, receipt := range receipts {
 		for _, log := range receipt.Logs {
 			b.setEncode(h, log.Address[:])
+
 			for _, topic := range log.Topics {
 				b.setEncode(h, topic[:])
 			}
 		}
 	}
+
 	keccak.DefaultKeccakPool.Put(h)
+
 	return
 }
 
 func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 	hasher.Reset()
+	//nolint
 	hasher.Write(h[:])
 	buf := hasher.Read()
 
@@ -131,6 +138,7 @@ func (b *Bloom) IsLogInBloom(log *Log) bool {
 // isByteArrPresent checks if the byte array is possibly present in the Bloom filter
 func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 	hasher.Reset()
+	//nolint
 	hasher.Write(data[:])
 	buf := hasher.Read()
 

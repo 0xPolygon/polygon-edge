@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/protocol/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/protocol/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Header, error) {
@@ -13,14 +13,18 @@ func getHeaders(clt proto.V1Client, req *proto.GetHeadersRequest) ([]*types.Head
 	if err != nil {
 		return nil, err
 	}
+
 	headers := []*types.Header{}
+
 	for _, obj := range resp.Objs {
 		header := &types.Header{}
 		if err := header.UnmarshalRLP(obj.Spec.Value); err != nil {
 			return nil, err
 		}
+
 		headers = append(headers, header)
 	}
+
 	return headers, nil
 }
 
@@ -32,6 +36,7 @@ type skeleton struct {
 
 func (s *skeleton) LastHeader() *types.Header {
 	slot := s.slots[len(s.slots)-1]
+
 	return slot.blocks[len(slot.blocks)-1].Header
 }
 
@@ -42,6 +47,7 @@ func (s *skeleton) build(clt proto.V1Client, ancestor types.Hash) error {
 		return err
 	}
 	s.addSkeleton(headers) // nolint
+
 	return nil
 }
 
@@ -52,10 +58,13 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 		Amount: s.span,
 	}
 	resp, err := getHeaders(clt, req)
+
 	if err != nil {
 		return err
 	}
+
 	slot.blocks = []*types.Block{}
+
 	for _, h := range resp {
 		slot.blocks = append(slot.blocks, &types.Block{
 			Header: h,
@@ -72,6 +81,7 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 			bodyIndex = append(bodyIndex, indx)
 		}
 	}
+
 	if len(bodyHashes) == 0 {
 		return nil
 	}
@@ -80,15 +90,18 @@ func (s *skeleton) fillSlot(indx uint64, clt proto.V1Client) error {
 	if err != nil {
 		return err
 	}
+
 	for indx, body := range bodies {
 		slot.blocks[bodyIndex[indx]].Transactions = body.Transactions
 	}
+
 	return nil
 }
 
 func (s *skeleton) addSkeleton(headers []*types.Header) error {
 	// safe check make sure they all have the same difference
 	diff := uint64(0)
+
 	for i := 1; i < len(headers); i++ {
 		elemDiff := headers[i].Number - headers[i-1].Number
 		if diff == 0 {
@@ -100,6 +113,7 @@ func (s *skeleton) addSkeleton(headers []*types.Header) error {
 
 	// fill up the slots
 	s.slots = make([]*slot, len(headers))
+
 	for indx, header := range headers {
 		slot := &slot{
 			hash:   header.Hash,
@@ -108,6 +122,7 @@ func (s *skeleton) addSkeleton(headers []*types.Header) error {
 		}
 		s.slots[indx] = slot
 	}
+
 	return nil
 }
 
