@@ -1208,18 +1208,6 @@ func waitForEvents(
 	return receivedEvents
 }
 
-// waitForGaugeMatch is a helper function for waiting on the gauge to reach a certain slot size
-func waitForGaugeMatch(expectedSlots uint64, pool *TxPool) error {
-	retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancelRetry()
-
-	_, err := tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-		return nil, expectedSlots != pool.gauge.read()
-	})
-
-	return err
-}
-
 func TestAddTxns(t *testing.T) {
 	slotSize := uint64(1)
 
@@ -1265,20 +1253,18 @@ func TestAddTxns(t *testing.T) {
 
 			addr := types.Address{0x1}
 			for nonce := uint64(0); nonce < testCase.numTxs; nonce++ {
-				go func(nonce uint64) {
-					err := pool.addTx(local, newTx(addr, nonce, slotSize))
-					assert.NoError(t, err)
-				}(nonce)
+				err := pool.addTx(local, newTx(addr, nonce, slotSize))
+				assert.NoError(t, err)
 			}
 
-			ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*10)
+			ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*20)
 			defer cancelFunc()
 
 			waitForEvents(ctx, subscription, int(testCase.numTxs))
 
 			assert.Equal(t, testCase.numTxs, pool.accounts.get(addr).promoted.length())
 
-			assert.NoError(t, waitForGaugeMatch(testCase.numTxs*slotSize, pool))
+			assert.Equal(t, testCase.numTxs*slotSize, pool.gauge.read())
 		})
 	}
 }
@@ -2022,7 +2008,7 @@ func TestRecovery(t *testing.T) {
 		events := waitForEvents(ctx, demoteSubscription, int(expectedPromoted)*2)
 		assert.Len(t, events, int(expectedPromoted)*2)
 
-		assert.NoError(t, waitForGaugeMatch(expected.slots, pool))
+		assert.Equal(t, expected.slots, pool.gauge.read())
 
 		commonAssert(expected.accounts, pool)
 	})
@@ -2147,7 +2133,7 @@ func TestRecovery(t *testing.T) {
 		events := waitForEvents(ctx, dropSubscription, totalTx)
 		assert.Len(t, events, totalTx)
 
-		assert.NoError(t, waitForGaugeMatch(expected.slots, pool))
+		assert.Equal(t, expected.slots, pool.gauge.read())
 
 		commonAssert(expected.accounts, pool)
 	})
