@@ -345,17 +345,15 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	}
 }
 
-// Drop removes the given (unrecoverable) transaction from
-// its associated promoted queue (account) and rolls
-// back the account's nextNonce.
-// Will update executables with the next primary
-// from that account (if any).
+// Drop clears the entire account associated with the given transaction
+// and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
-	// drop the entire account and rollback nonce
+	// drop the entire account and revert nonce
 	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
+
 	defer func() {
 		account.enqueued.unlock()
 		account.promoted.unlock()
@@ -387,7 +385,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	)
 }
 
-// Demote TODO
+// Demote (TODO dbrajovic)
 func (p *TxPool) Demote(tx *types.Transaction) {
 
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
@@ -412,11 +410,12 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 	// Legacy reorg logic //
 	for _, header := range event.OldChain {
-		// transactios to be returned to the pool
+		// transactions to be returned to the pool
 		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
 			continue
 		}
+
 		for _, tx := range block.Transactions {
 			oldTxs[tx.Hash] = tx
 		}
