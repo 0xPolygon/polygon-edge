@@ -415,49 +415,6 @@ func TestAddHandler(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 	})
-
-	t.Run("signal promotion for demoted tx with low nonce", func(t *testing.T) {
-		pool, err := newTestPool(nil)
-		assert.NoError(t, err)
-		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
-
-		// setup prestate
-		acc := pool.createAccountOnce(addr1)
-		acc.setNonce(5)
-
-		// send demoted (recovered and promotable)
-		go pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newTx(addr1, 3, 1), // 3 < 5
-			demoted: true,
-		})
-
-		// catch pending promotion
-		<-pool.promoteReqCh
-
-		assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
-		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
-	})
-
-	t.Run("enqueue demoted tx with higher nonce", func(t *testing.T) {
-		pool, err := newTestPool(nil)
-		assert.NoError(t, err)
-		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
-
-		// setup prestate
-		acc := pool.createAccountOnce(addr1)
-		acc.setNonce(5)
-
-		// send demoted (recovered but not promotable)
-		pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newTx(addr1, 8, 1), // 8 > 5
-			demoted: true,
-		})
-
-		assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
-		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
-	})
 }
 
 func TestPromoteHandler(t *testing.T) {
@@ -588,29 +545,6 @@ func TestPromoteHandler(t *testing.T) {
 
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 		assert.Equal(t, uint64(20), pool.accounts.get(addr1).promoted.length())
-	})
-
-	t.Run("promote demoted tx with low nonce", func(t *testing.T) {
-		pool, err := newTestPool(nil)
-		assert.NoError(t, err)
-		pool.SetSigner(&mockSigner{})
-		pool.EnableDev()
-
-		// setup prestate
-		acc := pool.createAccountOnce(addr1)
-		acc.setNonce(7)
-
-		// send recovered tx
-		go pool.handleEnqueueRequest(enqueueRequest{
-			tx:      newTx(addr1, 4, 1),
-			demoted: true,
-		})
-
-		// promote
-		pool.handlePromoteRequest(<-pool.promoteReqCh)
-
-		assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
-		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 	})
 }
 

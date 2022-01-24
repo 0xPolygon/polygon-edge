@@ -144,14 +144,12 @@ func (a *account) setNonce(nonce uint64) {
 }
 
 // enqueue attempts tp push the transaction onto the enqueued queue.
-func (a *account) enqueue(tx *types.Transaction, demoted bool) error {
+func (a *account) enqueue(tx *types.Transaction) error {
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
 
-	// only accept low nonce if
-	// tx was demoted
-	if tx.Nonce < a.getNonce() &&
-		!demoted {
+	// reject low nonce tx
+	if tx.Nonce < a.getNonce() {
 		return ErrNonceTooLow
 	}
 

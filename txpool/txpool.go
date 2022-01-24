@@ -94,8 +94,7 @@ through their designated channels. */
 // 	to the pool (Demote). These requests have the
 // 	demoted flag set to true.
 type enqueueRequest struct {
-	tx      *types.Transaction
-	demoted bool
+	tx *types.Transaction
 }
 
 // A promoteRequest is created each time some account
@@ -386,7 +385,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	)
 }
 
-// Demote (TODO dbrajovic)
+// Demote
 func (p *TxPool) Demote(tx *types.Transaction) {
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
@@ -607,7 +606,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	account := p.accounts.get(addr)
 
 	// enqueue tx
-	if err := account.enqueue(tx, req.demoted); err != nil {
+	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
 		return
@@ -616,20 +615,17 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
-	// update lookup
+	// update state
 	p.index.add(tx)
+	p.gauge.increase(slotsRequired(tx))
 
-	// demoted transactions never decrease the gauge
-	if !req.demoted {
-		p.gauge.increase(slotsRequired(tx))
+	if tx.Nonce > account.getNonce() {
+		// don't signal promotion for
+		// higher nonce txs
+		return
 	}
 
-	if tx.Nonce <= account.getNonce() {
-		// account queue is ready for promotion:
-		// 	1. New tx is matching nonce expected
-		// 	2. Demoted tx is eligible for promotion
-		p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
-	}
+	p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
 }
 
 // handlePromoteRequest handles moving promotable transactions
