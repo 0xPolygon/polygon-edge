@@ -388,7 +388,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 // Demote (TODO dbrajovic)
 func (p *TxPool) Demote(tx *types.Transaction) {
-
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
