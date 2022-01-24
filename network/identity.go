@@ -130,7 +130,7 @@ func (i *identity) start() error {
 	return nil
 }
 
-func (i *identity) currentStatus(peerID peer.ID) *proto.Status {
+func (i *identity) constructStatus(peerID peer.ID) *proto.Status {
 	status := &proto.Status{
 		Metadata: make(map[string]string, 1),
 		Chain:    int64(i.srv.config.Chain.Params.ChainID),
@@ -169,7 +169,7 @@ func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) 
 
 	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
 
-	status := i.currentStatus(peerID)
+	status := i.constructStatus(peerID)
 
 	status.Metadata[PeerID] = i.srv.host.ID().Pretty()
 
@@ -196,7 +196,7 @@ func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status,
 		return nil, err
 	}
 
-	return i.currentStatus(peerID), nil
+	return i.constructStatus(peerID), nil
 }
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
