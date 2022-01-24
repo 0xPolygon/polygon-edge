@@ -384,33 +384,12 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	p.logger.Debug("dropped account",
 		"next_nonce", nextNonce,
 		"address", tx.From.String(),
-		)
+	)
 }
 
-// Demote removes the (recoverable) transaction from
-// its associated promoted queue (account) and
-// issues an enqueueRequest for it.
-// Will update executables with the next primary
-// from that account (if any).
+// Demote TODO
 func (p *TxPool) Demote(tx *types.Transaction) {
-	account := p.accounts.get(tx.From)
 
-	account.promoted.lock(true)
-	defer account.promoted.unlock()
-
-	// drop the tx from account promoted
-	account.promoted.pop()
-
-	// signal enqueue request [BLOCKING]
-	p.enqueueReqCh <- enqueueRequest{tx: tx, demoted: true}
-
-	// update executables
-	if tx := account.promoted.peek(); tx != nil {
-		p.executables.push(tx)
-	}
-
-	p.logger.Debug("demoted transaction", "hash", tx.Hash.String())
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
 // ResetWithHeaders processes the transactions from the new
