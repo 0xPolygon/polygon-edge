@@ -390,6 +390,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 // Demote TODO
 func (p *TxPool) Demote(tx *types.Transaction) {
 
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -416,7 +417,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		if !ok {
 			continue
 		}
-
 		for _, tx := range block.Transactions {
 			oldTxs[tx.Hash] = tx
 		}
