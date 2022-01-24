@@ -21,7 +21,7 @@ import (
 const (
 	defaultPriceLimit uint64 = 1
 	defaultMaxSlots   uint64 = 4096
-	validGasLimit     uint64 = 10000000
+	validGasLimit     uint64 = 4712350
 )
 
 var (
@@ -66,15 +66,24 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 }
 
 // returns a new txpool with default test config
-func newTestPool() (*TxPool, error) {
-	return newTestPoolWithSlots(defaultMaxSlots)
+func newTestPool(mockStore ...store) (*TxPool, error) {
+	return newTestPoolWithSlots(defaultMaxSlots, mockStore...)
 }
 
-func newTestPoolWithSlots(maxSlots uint64) (*TxPool, error) {
+func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) {
+	var storeToUse store
+	if len(mockStore) != 0 {
+		storeToUse = mockStore[0]
+	} else {
+		storeToUse = defaultMockStore{
+			DefaultHeader: mockHeader,
+		}
+	}
+
 	return NewTxPool(
 		hclog.NewNullLogger(),
 		forks.At(0),
-		defaultMockStore{},
+		storeToUse,
 		nil,
 		nil,
 		nilMetrics,
@@ -109,6 +118,19 @@ func TestAddTxErrors(t *testing.T) {
 
 		return pool
 	}
+
+	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
+		pool := setupPool()
+
+		tx := newTx(addr1, 0, 1)
+		tx.Value = big.NewInt(1)
+		tx.Gas = 10000000000001
+
+		assert.ErrorIs(t,
+			pool.addTx(local, tx),
+			ErrBlockLimitExceeded,
+		)
+	})
 
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		pool := setupPool()
