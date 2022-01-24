@@ -62,6 +62,16 @@ func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
 	return
 }
 
+// clear removes all transactions from the queue.
+func (q *accountQueue) clear() (removed []*types.Transaction) {
+	for {
+		tx := q.pop()
+		removed = append(removed, tx)
+	}
+
+	return
+}
+
 // push pushes the given transactions onto the queue.
 func (q *accountQueue) push(tx *types.Transaction) {
 	heap.Push(&q.queue, tx)
