@@ -7,17 +7,18 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc"
 	any "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -52,7 +53,7 @@ type syncerInterface interface {
 	BestPeer() *protocol.SyncPeer
 	BulkSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(block *types.Block)) error
 	WatchSyncWithPeer(p *protocol.SyncPeer, newBlockHandler func(b *types.Block) bool)
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 	Broadcast(b *types.Block)
 }
 
@@ -62,6 +63,7 @@ type Ibft struct {
 
 	logger hclog.Logger      // Output logger
 	config *consensus.Config // Consensus configuration
+	Grpc   *grpc.Server      // gRPC configuration
 	state  *currentState     // Reference to the current state
 
 	blockchain blockchainInterface // Interface exposed by the blockchain layer
@@ -227,6 +229,7 @@ func Factory(
 	p := &Ibft{
 		logger:         params.Logger.Named("ibft"),
 		config:         params.Config,
+		Grpc:           params.Grpc,
 		blockchain:     params.Blockchain,
 		executor:       params.Executor,
 		closeCh:        make(chan struct{}),
@@ -260,34 +263,41 @@ func Factory(
 
 	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
 
-	// register the grpc operator
-	p.operator = &operator{ibft: p}
-	proto.RegisterIbftOperatorServer(params.Grpc, p.operator)
-
-	// Set up the node's validator key
-	if err := p.createKey(); err != nil {
-		return nil, err
-	}
-
-	p.logger.Info("validator key", "addr", p.validatorKeyAddr.String())
-
-	// start the transport protocol
-	if err := p.setupTransport(); err != nil {
-		return nil, err
-	}
-
 	return p, nil
 }
 
 // Start starts the IBFT consensus
-func (i *Ibft) Start() error {
-	// Start the syncer
-	i.syncer.Start()
-
+func (i *Ibft) Initialize() error {
 	// Set up the snapshots
 	if err := i.setupSnapshot(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// Start starts the IBFT consensus
+func (i *Ibft) Start() error {
+	// register the grpc operator
+	if i.Grpc != nil {
+		i.operator = &operator{ibft: i}
+		proto.RegisterIbftOperatorServer(i.Grpc, i.operator)
+	}
+
+	// Set up the node's validator key
+	if err := i.createKey(); err != nil {
+		return err
+	}
+
+	i.logger.Info("validator key", "addr", i.validatorKeyAddr.String())
+
+	// start the transport protocol
+	if err := i.setupTransport(); err != nil {
+		return err
+	}
+
+	// Start the syncer
+	i.syncer.Start()
 
 	// Start the actual IBFT protocol
 	go i.start()
@@ -296,7 +306,7 @@ func (i *Ibft) Start() error {
 }
 
 // GetSyncProgression gets the latest sync progression, if any
-func (i *Ibft) GetSyncProgression() *protocol.Progression {
+func (i *Ibft) GetSyncProgression() *progress.Progression {
 	return i.syncer.GetSyncProgression()
 }
 

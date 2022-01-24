@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	libp2pGrpc "github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/protocol/proto"
@@ -192,106 +193,6 @@ func statusFromProto(p *proto.V1Status) (*Status, error) {
 	return s, nil
 }
 
-type progressionWrapper struct {
-	// progression is a reference to the ongoing batch sync.
-	// Nil if no batch sync is currently in progress
-	progression *Progression
-
-	// stopCh is the channel for receiving stop signals
-	// in progression tracking
-	stopCh chan struct{}
-
-	lock sync.RWMutex
-}
-
-// startProgression initializes the progression tracking
-func (pw *progressionWrapper) startProgression(
-	startingBlock uint64,
-	subscription blockchain.Subscription,
-) {
-	pw.lock.Lock()
-	defer pw.lock.Unlock()
-
-	pw.progression = &Progression{
-		StartingBlock: startingBlock,
-	}
-
-	go pw.runUpdateLoop(subscription)
-}
-
-// runUpdateLoop starts the blockchain event monitoring loop and
-// updates the currently written block in the batch sync
-func (pw *progressionWrapper) runUpdateLoop(subscription blockchain.Subscription) {
-	eventCh := subscription.GetEventCh()
-
-	for {
-		select {
-		case event := <-eventCh:
-			if event.Type == blockchain.EventFork {
-				continue
-			}
-
-			if len(event.NewChain) == 0 {
-				continue
-			}
-
-			pw.updateCurrentProgression(event.NewChain[0].Number)
-		case <-pw.stopCh:
-			subscription.Close()
-
-			return
-		}
-	}
-}
-
-// stopProgression stops the progression tracking
-func (pw *progressionWrapper) stopProgression() {
-	pw.stopCh <- struct{}{}
-
-	pw.lock.Lock()
-	defer pw.lock.Unlock()
-
-	pw.progression = nil
-}
-
-// updateCurrentProgression sets the currently written block in the bulk sync
-func (pw *progressionWrapper) updateCurrentProgression(currentBlock uint64) {
-	pw.lock.Lock()
-	defer pw.lock.Unlock()
-
-	pw.progression.CurrentBlock = currentBlock
-}
-
-// updateHighestProgression sets the highest-known target block in the bulk sync
-func (pw *progressionWrapper) updateHighestProgression(highestBlock uint64) {
-	pw.lock.Lock()
-	defer pw.lock.Unlock()
-
-	pw.progression.HighestBlock = highestBlock
-}
-
-// getProgression returns the latest sync progression
-func (pw *progressionWrapper) getProgression() *Progression {
-	pw.lock.RLock()
-	defer pw.lock.RUnlock()
-
-	return pw.progression
-}
-
-// Progression defines the status of the sync
-// progression of the node
-type Progression struct {
-	// StartingBlock is the initial block that the node is starting
-	// the sync from. It is reset after every sync batch
-	StartingBlock uint64
-
-	// CurrentBlock is the last written block from the sync batch
-	CurrentBlock uint64
-
-	// HighestBlock is the target block in the sync batch
-	HighestBlock uint64
-}
-
 // Syncer is a sync protocol
 type Syncer struct {
 	logger     hclog.Logger
@@ -307,28 +208,25 @@ type Syncer struct {
 
 	server *network.Server
 
-	syncProgression *progressionWrapper
+	syncProgression *progress.ProgressionWrapper
 }
 
 // NewSyncer creates a new Syncer instance
 func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
 	s := &Syncer{
-		logger:     logger.Named("syncer"),
-		stopCh:     make(chan struct{}),
-		blockchain: blockchain,
-		server:     server,
-		syncProgression: &progressionWrapper{
-			progression: nil,
-			stopCh:      make(chan struct{}),
-		},
+		logger:          logger.Named("syncer"),
+		stopCh:          make(chan struct{}),
+		blockchain:      blockchain,
+		server:          server,
+		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
 	}
 
 	return s
 }
 
 // GetSyncProgression returns the latest sync progression, if any
-func (s *Syncer) GetSyncProgression() *Progression {
-	return s.syncProgression.getProgression()
+func (s *Syncer) GetSyncProgression() *progress.Progression {
+	return s.syncProgression.GetProgression()
 }
 
 // syncCurrentStatus taps into the blockchain event steam and updates the Syncer.status field
@@ -715,16 +613,17 @@ func (s *Syncer) BulkSyncWithPeer(p *SyncPeer, newBlockHandler func(block *types
 	var lastTarget uint64
 
 	// Create a blockchain subscription for the sync progression and start tracking
-	s.syncProgression.startProgression(startBlock.Number, s.blockchain.SubscribeEvents())
+	s.syncProgression.StartProgression(startBlock.Number, s.blockchain.SubscribeEvents())
 
 	// Stop monitoring the sync progression upon exit
-	defer s.syncProgression.stopProgression()
+	defer s.syncProgression.StopProgression()
 
 	// sync up to the current known header
 	for {
 		// update target
 		target := p.status.Number
-		s.syncProgression.updateHighestProgression(target)
+
+		s.syncProgression.UpdateHighestProgression(target)
 
 		if target == lastTarget {
 			// there are no more changes to pull for now

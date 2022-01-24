@@ -19,7 +19,8 @@ import (
 const (
 	defaultPriceLimit uint64 = 1
 	defaultMaxSlots   uint64 = 4096
-	validGasLimit     uint64 = 10000000
+	validGasLimit     uint64 = 4712350
+	invalidGasLimit   uint64 = 10000000000001
 )
 
 var (
@@ -69,11 +70,11 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 }
 
 // returns a new txpool with default test config
-func newTestPool() (*TxPool, error) {
+func newTestPool(header *types.Header) (*TxPool, error) {
 	return NewTxPool(
 		hclog.NewNullLogger(),
 		forks.At(0),
-		defaultMockStore{},
+		NewDefaultMockStore(header),
 		nil,
 		nil,
 		nilMetrics,
@@ -97,8 +98,8 @@ type result struct {
 /* Single account cases (unit tests) */
 
 func TestAddTxErrors(t *testing.T) {
-	setupPool := func() *TxPool {
-		pool, err := newTestPool()
+	setupPool := func(header *types.Header) *TxPool {
+		pool, err := newTestPool(header)
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
@@ -109,8 +110,21 @@ func TestAddTxErrors(t *testing.T) {
 		return pool
 	}
 
+	t.Run("ErrBlockLimitExceeded", func(t *testing.T) {
+		pool := setupPool(nil)
+
+		tx := newTx(addr1, 0, 1)
+		tx.Value = big.NewInt(1)
+		tx.Gas = invalidGasLimit
+
+		assert.ErrorIs(t,
+			pool.addTx(local, tx),
+			ErrBlockLimitExceeded,
+		)
+	})
+
 	t.Run("ErrNegativeValue", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 		tx.Value = big.NewInt(-5)
@@ -122,7 +136,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonEncryptedTx", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 		pool.dev = false
@@ -134,7 +148,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidSender", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 		tx.From = types.ZeroAddress
@@ -146,7 +160,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrUnderpriced", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 		pool.priceLimit = 1000000
 
 		tx := newTx(addr1, 0, 1) // gasPrice == 1
@@ -158,7 +172,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInvalidAccountState", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 		pool.store = faultyMockStore{}
 
 		// nonce is 1000000 so ErrNonceTooLow
@@ -172,7 +186,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrTxPoolOverflow", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		// fill the pool
 		pool.gauge.increase(defaultMaxSlots)
@@ -186,7 +200,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 		tx.Gas = 1
@@ -198,7 +212,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrAlreadyKnown", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 
@@ -217,7 +231,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrOversizedData", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 
@@ -234,7 +248,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrNonceTooLow", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		// faultyMockStore.GetNonce() == 99999
 		pool.store = faultyMockStore{}
@@ -247,7 +261,7 @@ func TestAddTxErrors(t *testing.T) {
 	})
 
 	t.Run("ErrInsufficientFunds", func(t *testing.T) {
-		pool := setupPool()
+		pool := setupPool(nil)
 
 		tx := newTx(addr1, 0, 1)
 		tx.GasPrice.SetUint64(1000000000000)
@@ -265,7 +279,7 @@ func TestAddGossipTx(t *testing.T) {
 	tx := newTx(addr1, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.SetSigner(signer)
@@ -292,7 +306,7 @@ func TestAddGossipTx(t *testing.T) {
 	})
 
 	t.Run("node is a non validator", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.EnableDev()
 		pool.SetSigner(signer)
@@ -319,7 +333,7 @@ func TestAddGossipTx(t *testing.T) {
 }
 
 func TestDropKnownGossipTx(t *testing.T) {
-	pool, err := newTestPool()
+	pool, err := newTestPool(nil)
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
 	pool.EnableDev()
@@ -344,7 +358,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 func TestAddHandler(t *testing.T) {
 	t.Run("enqueue new tx with higher nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -361,7 +375,7 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("reject new tx with low nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -382,7 +396,7 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("signal promotion for new tx with expected nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -403,7 +417,7 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("signal promotion for demoted tx with low nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -426,7 +440,7 @@ func TestAddHandler(t *testing.T) {
 	})
 
 	t.Run("enqueue demoted tx with higher nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -451,7 +465,7 @@ func TestPromoteHandler(t *testing.T) {
 		/* This test demonstrates that if some promotion handler
 		got its job done by a previous one, it will not perform any logic
 		by doing an early return. */
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -488,7 +502,7 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote one tx", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -514,7 +528,7 @@ func TestPromoteHandler(t *testing.T) {
 		One promotion handler can be executed at any time after it
 		was invoked (when the runtime decides), resulting in promotion
 		of several enqueued txs. */
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -555,7 +569,7 @@ func TestPromoteHandler(t *testing.T) {
 	t.Run("one tx -> one promotion", func(t *testing.T) {
 		/* In this scenario, each received tx will be instantly promoted.
 		All txs are sent in the order of expected nonce. */
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -577,7 +591,7 @@ func TestPromoteHandler(t *testing.T) {
 	})
 
 	t.Run("promote demoted tx with low nonce", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -664,7 +678,7 @@ func TestResetAccount(t *testing.T) {
 		}
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				pool, err := newTestPool()
+				pool, err := newTestPool(nil)
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
@@ -796,7 +810,7 @@ func TestResetAccount(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				pool, err := newTestPool()
+				pool, err := newTestPool(nil)
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
@@ -936,7 +950,7 @@ func TestResetAccount(t *testing.T) {
 
 		for _, test := range testCases {
 			t.Run(test.name, func(t *testing.T) {
-				pool, err := newTestPool()
+				pool, err := newTestPool(nil)
 				assert.NoError(t, err)
 				pool.SetSigner(&mockSigner{})
 				pool.EnableDev()
@@ -989,7 +1003,7 @@ func TestResetAccount(t *testing.T) {
 }
 
 func TestPop(t *testing.T) {
-	pool, err := newTestPool()
+	pool, err := newTestPool(nil)
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
 	pool.EnableDev()
@@ -1014,7 +1028,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 }
 func TestDrop(t *testing.T) {
-	pool, err := newTestPool()
+	pool, err := newTestPool(nil)
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
 	pool.EnableDev()
@@ -1099,7 +1113,7 @@ func waitUntilDone(done <-chan struct{}) {
 
 func TestAddTx100(t *testing.T) {
 	t.Run("send 100 transactions", func(t *testing.T) {
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 		pool.EnableDev()
@@ -1140,7 +1154,7 @@ func TestAddTx1000(t *testing.T) {
 		signer := crypto.NewEIP155Signer(uint64(100))
 		key, _ := tests.GenerateKeyAndAddr(t)
 
-		pool, err := newTestPool()
+		pool, err := newTestPool(nil)
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
 		pool.EnableDev()
@@ -1352,7 +1366,7 @@ func TestResetAccounts(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pool, err := newTestPool()
+			pool, err := newTestPool(nil)
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 			pool.EnableDev()
@@ -1486,7 +1500,7 @@ func TestExecutablesOrder(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			pool, err := newTestPool()
+			pool, err := newTestPool(nil)
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 			pool.EnableDev()
@@ -1532,12 +1546,13 @@ type status int
 // Status of a transaction resulted
 // from a transition write attempt
 const (
+	// if a tx is recoverable,
+	// account is excluded from
+	// further processing
 	recoverable status = iota
 
-	/* if a tx is unrecoverable,
-	all subsequent ones are
-	considered recoverable (nonce mismatch)
-	*/
+	// if a tx is unrecoverable,
+	// entire account is dropped
 	unrecoverable
 
 	ok
@@ -1555,7 +1570,7 @@ func TestRecovery(t *testing.T) {
 		expected result
 	}{
 		{
-			name: "all recovered txs are enqueued",
+			name: "unrecoverable drops account",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
 					{newTx(addr1, 0, 1), ok},
@@ -1589,9 +1604,40 @@ func TestRecovery(t *testing.T) {
 						nextNonce: 9,
 					},
 					addr3: {
-						enqueued: 0,
-						promoted: 3,
+						enqueued:  0,
+						promoted:  3,
 						nextNonce: 9,
+					},
+				},
+			},
+		},
+		{
+			name: "recoverable remains in account",
+			allTxs: map[types.Address][]statusTx{
+				addr1: {
+					{newTx(addr1, 0, 1), ok},
+					{newTx(addr1, 1, 1), ok},
+					{newTx(addr1, 2, 1), ok},
+					{newTx(addr1, 3, 1), recoverable},
+					{newTx(addr1, 4, 1), recoverable},
+				},
+				addr2: {
+					{newTx(addr2, 9, 1), recoverable},
+					{newTx(addr2, 10, 1), recoverable},
+				},
+			},
+			expected: result{
+				slots: 4,
+				accounts: map[types.Address]accountState{
+					addr1: {
+						enqueued:  0,
+						promoted:  2,
+						nextNonce: 5,
+					},
+					addr2: {
+						enqueued:  0,
+						promoted:  2,
+						nextNonce: 11,
 					},
 				},
 			},
@@ -1613,7 +1659,7 @@ func TestRecovery(t *testing.T) {
 			}
 
 			// create pool
-			pool, err := newTestPool()
+			pool, err := newTestPool(nil)
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 			pool.EnableDev()
@@ -1803,7 +1849,7 @@ func TestGetTxs(t *testing.T) {
 				return false
 			}
 
-			pool, err := newTestPool()
+			pool, err := newTestPool(nil)
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 			pool.EnableDev()
