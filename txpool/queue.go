@@ -66,6 +66,10 @@ func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
 func (q *accountQueue) clear() (removed []*types.Transaction) {
 	for {
 		tx := q.pop()
+		if tx == nil {
+			break
+		}
+
 		removed = append(removed, tx)
 	}
 
