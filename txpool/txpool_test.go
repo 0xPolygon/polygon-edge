@@ -3,7 +3,6 @@ package txpool
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -1209,6 +1208,18 @@ func waitForEvents(
 	return receivedEvents
 }
 
+// waitForGaugeMatch is a helper function for waiting on the gauge to reach a certain slot size
+func waitForGaugeMatch(expectedSlots uint64, pool *TxPool) error {
+	retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancelRetry()
+
+	_, err := tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
+		return nil, expectedSlots != pool.gauge.read()
+	})
+
+	return err
+}
+
 func TestAddTxns(t *testing.T) {
 	slotSize := uint64(1)
 
@@ -1267,13 +1278,7 @@ func TestAddTxns(t *testing.T) {
 
 			assert.Equal(t, testCase.numTxs, pool.accounts.get(addr).promoted.length())
 
-			retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancelRetry()
-
-			_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-				return nil, testCase.numTxs*slotSize != pool.gauge.read()
-			})
-			assert.NoError(t, err)
+			assert.NoError(t, waitForGaugeMatch(testCase.numTxs*slotSize, pool))
 		})
 	}
 }
@@ -1381,6 +1386,18 @@ func TestResetAccounts_Promoted(t *testing.T) {
 }
 
 func TestResetAccounts_Enqueued(t *testing.T) {
+	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
+		for addr := range accounts {
+			assert.Equal(t, // enqueued
+				accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
+	}
+
 	t.Run("reset will promote", func(t *testing.T) {
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
@@ -1474,15 +1491,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		assert.Len(t, waitForEvents(ctx, promotedSubscription, int(totalPromoted)), int(totalPromoted))
 
 		assert.Equal(t, expected.slots, pool.gauge.read())
-		for addr := range expected.accounts {
-			assert.Equal(t, // enqueued
-				expected.accounts[addr].enqueued,
-				pool.accounts.get(addr).enqueued.length())
-
-			assert.Equal(t, // promoted
-				expected.accounts[addr].promoted,
-				pool.accounts.get(addr).promoted.length())
-		}
+		commonAssert(expected.accounts, pool)
 	})
 
 	t.Run("reset will not promote", func(t *testing.T) {
@@ -1566,15 +1575,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 		pool.resetAccounts(newNonces)
 
 		assert.Equal(t, expected.slots, pool.gauge.read())
-		for addr := range expected.accounts {
-			assert.Equal(t, // enqueued
-				expected.accounts[addr].enqueued,
-				pool.accounts.get(addr).enqueued.length())
-
-			assert.Equal(t, // promoted
-				expected.accounts[addr].promoted,
-				pool.accounts.get(addr).promoted.length())
-		}
+		commonAssert(expected.accounts, pool)
 	})
 }
 
@@ -1749,6 +1750,22 @@ type statusTx struct {
 }
 
 func TestRecovery(t *testing.T) {
+	commonAssert := func(accounts map[types.Address]accountState, pool *TxPool) {
+		for addr := range accounts {
+			assert.Equal(t, // nextNonce
+				accounts[addr].nextNonce,
+				pool.accounts.get(addr).getNonce())
+
+			assert.Equal(t, // enqueued
+				accounts[addr].enqueued,
+				pool.accounts.get(addr).enqueued.length())
+
+			assert.Equal(t, // promoted
+				accounts[addr].promoted,
+				pool.accounts.get(addr).promoted.length())
+		}
+	}
+
 	t.Run("recovered are enqueued", func(t *testing.T) {
 		allTxs := map[types.Address][]statusTx{
 			addr1: {
@@ -1869,19 +1886,7 @@ func TestRecovery(t *testing.T) {
 		assert.Len(t, waitForEvents(ctx, enqueuedSubscription, int(expectedEnqueued)), int(expectedEnqueued))
 
 		assert.Equal(t, expected.slots, pool.gauge.read())
-		for addr := range expected.accounts {
-			assert.Equal(t, // nextNonce
-				expected.accounts[addr].nextNonce,
-				pool.accounts.get(addr).getNonce())
-
-			assert.Equal(t, // enqueued
-				expected.accounts[addr].enqueued,
-				pool.accounts.get(addr).enqueued.length())
-
-			assert.Equal(t, // promoted
-				expected.accounts[addr].promoted,
-				pool.accounts.get(addr).promoted.length())
-		}
+		commonAssert(expected.accounts, pool)
 	})
 
 	t.Run("recovered are promoted", func(t *testing.T) {
@@ -1997,7 +2002,6 @@ func TestRecovery(t *testing.T) {
 				if tx == nil {
 					break
 				}
-				fmt.Println(tx.Hash.String())
 
 				switch status(tx) {
 				case recoverable:
@@ -2018,29 +2022,9 @@ func TestRecovery(t *testing.T) {
 		events := waitForEvents(ctx, demoteSubscription, int(expectedPromoted)*2)
 		assert.Len(t, events, int(expectedPromoted)*2)
 
-		fmt.Println(events)
+		assert.NoError(t, waitForGaugeMatch(expected.slots, pool))
 
-		retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancelRetry()
-
-		_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-			return nil, expected.slots != pool.gauge.read()
-		})
-		assert.NoError(t, err)
-
-		for addr := range expected.accounts {
-			assert.Equal(t, // nextNonce
-				expected.accounts[addr].nextNonce,
-				pool.accounts.get(addr).getNonce())
-
-			assert.Equal(t, // enqueued
-				expected.accounts[addr].enqueued,
-				pool.accounts.get(addr).enqueued.length())
-
-			assert.Equal(t, // promoted
-				expected.accounts[addr].promoted,
-				pool.accounts.get(addr).promoted.length())
-		}
+		commonAssert(expected.accounts, pool)
 	})
 
 	t.Run("rollback nonce once", func(t *testing.T) {
@@ -2143,7 +2127,6 @@ func TestRecovery(t *testing.T) {
 				if tx == nil {
 					break
 				}
-				fmt.Println(tx.Hash.String())
 
 				switch status(tx) {
 				case recoverable:
@@ -2164,27 +2147,9 @@ func TestRecovery(t *testing.T) {
 		events := waitForEvents(ctx, dropSubscription, totalTx)
 		assert.Len(t, events, totalTx)
 
-		retryCtx, cancelRetry := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancelRetry()
+		assert.NoError(t, waitForGaugeMatch(expected.slots, pool))
 
-		_, err = tests.RetryUntilTimeout(retryCtx, func() (interface{}, bool) {
-			return nil, expected.slots != pool.gauge.read()
-		})
-		assert.NoError(t, err)
-
-		for addr := range expected.accounts {
-			assert.Equal(t, // nextNonce
-				expected.accounts[addr].nextNonce,
-				pool.accounts.get(addr).getNonce())
-
-			assert.Equal(t, // enqueued
-				expected.accounts[addr].enqueued,
-				pool.accounts.get(addr).enqueued.length())
-
-			assert.Equal(t, // promoted
-				expected.accounts[addr].promoted,
-				pool.accounts.get(addr).promoted.length())
-		}
+		commonAssert(expected.accounts, pool)
 	})
 }
 
