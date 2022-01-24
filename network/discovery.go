@@ -360,10 +360,6 @@ func (d *discovery) bootnodeDiscovery() {
 		return
 	}
 
-	if isTemporaryDial {
-		d.srv.Disconnect(bootnode.ID, "Thank you")
-	}
-
 	if err = d.addPeersToTable(resp.Nodes); err != nil {
 		d.srv.logger.Error("Failed to add peers to table", "err", err)
 	}
