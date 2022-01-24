@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"strconv"
 	"testing"
@@ -346,20 +347,15 @@ func TestNat(t *testing.T) {
 
 // TestPeerReconnection checks whether the node is able to reconnect with bootnodes on losing all active connections
 func TestPeerReconnection(t *testing.T) {
-	bootnodeConfig1 := &CreateServerParams{
+	bootnodeConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
 		},
 	}
-	bootnodeConfig2 := &CreateServerParams{
-		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
-			c.NoDiscover = false
-		},
-	}
+
 	// Create bootnodes
-	bootnodes, createErr := createServers(2, map[int]*CreateServerParams{0: bootnodeConfig1, 1: bootnodeConfig2})
+	bootnodes, createErr := createServers(2, map[int]*CreateServerParams{0: bootnodeConfig, 1: bootnodeConfig})
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
@@ -368,28 +364,20 @@ func TestPeerReconnection(t *testing.T) {
 		closeTestServers(t, bootnodes)
 	})
 
-	defaultConfig1 := &CreateServerParams{
+	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
 			c.MaxPeers = 3
 			c.NoDiscover = false
-			c.Chain.Bootnodes = []string{
-				AddrInfoToString(bootnodes[0].AddrInfo()),
-				AddrInfoToString(bootnodes[1].AddrInfo()),
-			}
 		},
-	}
-	defaultConfig2 := &CreateServerParams{
-		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
-			c.NoDiscover = false
-			c.Chain.Bootnodes = []string{
+		ServerCallback: func(server *Server) {
+			server.config.Chain.Bootnodes = []string{
 				AddrInfoToString(bootnodes[0].AddrInfo()),
 				AddrInfoToString(bootnodes[1].AddrInfo()),
 			}
 		},
 	}
 
-	servers, createErr := createServers(2, map[int]*CreateServerParams{0: defaultConfig1, 1: defaultConfig2})
+	servers, createErr := createServers(2, map[int]*CreateServerParams{0: defaultConfig, 1: defaultConfig})
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
@@ -552,7 +540,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 	key, directoryName := GenerateTestLibp2pKey(t)
 	peerID, err := peer.IDFromPrivateKey(key)
 	assert.NoError(t, err)
-	testMultiAddr := GenerateTestMultiAddr(t).String()
+	testMultiAddr := tests.GenerateTestMultiAddr(t).String()
 	peerAddressInfo, err := StringToAddrInfo(testMultiAddr)
 	assert.NoError(t, err)
 
@@ -571,11 +559,15 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			server, createErr := CreateServer(&CreateServerParams{ConfigCallback: func(c *Config) {
-				c.NoDiscover = false
-				c.DataDir = directoryName
-				c.Chain.Bootnodes = tt.bootNodes
-			}})
+			server, createErr := CreateServer(&CreateServerParams{
+				ConfigCallback: func(c *Config) {
+					c.NoDiscover = false
+					c.DataDir = directoryName
+				},
+				ServerCallback: func(server *Server) {
+					server.config.Chain.Bootnodes = tt.bootNodes
+				},
+			})
 			if createErr != nil {
 				t.Fatalf("Unable to create server, %v", createErr)
 			}
@@ -670,39 +662,35 @@ func TestRunDial(t *testing.T) {
 
 func TestMinimumBootNodeCount(t *testing.T) {
 	tests := []struct {
-		name       string
-		bootNodes  []string
-		shouldFail bool
+		name          string
+		bootNodes     []string
+		expectedError error
 	}{
 		{
-			name:       "Server config with empty bootnodes",
-			bootNodes:  []string{},
-			shouldFail: true,
+			name:          "Server config with no bootnodes",
+			bootNodes:     nil,
+			expectedError: ErrNoBootnodes,
 		},
 		{
-			name:       "Server config with less than two bootnodes",
-			bootNodes:  []string{GenerateTestMultiAddr(t).String()},
-			shouldFail: true,
+			name:          "Server config with less than one bootnode",
+			bootNodes:     []string{},
+			expectedError: ErrMinBootnodes,
 		},
 		{
-			name:       "Server config with more than two bootnodes",
-			bootNodes:  []string{GenerateTestMultiAddr(t).String(), GenerateTestMultiAddr(t).String()},
-			shouldFail: false,
+			name:          "Server config with at least one bootnode",
+			bootNodes:     []string{tests.GenerateTestMultiAddr(t).String()},
+			expectedError: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, createErr := CreateServer(&CreateServerParams{
-				ConfigCallback: func(c *Config) {
-					c.Chain.Bootnodes = tt.bootNodes
+				ServerCallback: func(server *Server) {
+					server.config.Chain.Bootnodes = tt.bootNodes
 				},
 			})
 
-			if tt.shouldFail {
-				assert.Error(t, createErr)
-			} else {
-				assert.NoError(t, createErr)
-			}
+			assert.Equal(t, tt.expectedError, createErr)
 		})
 	}
 }

@@ -2,18 +2,18 @@ package genesis
 
 import (
 	"fmt"
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
+	"github.com/0xPolygon/polygon-edge/helper/staking"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/consensus/ibft"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -49,7 +49,7 @@ func (c *GenesisCommand) DefineFlags() {
 	}
 
 	c.FlagMap["dir"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the directory for the Polygon SDK genesis data. Default: %s", helper.GenesisFileName),
+		Description: fmt.Sprintf("Sets the directory for the Polygon Edge genesis data. Default: %s", helper.GenesisFileName),
 		Arguments: []string{
 			"DIRECTORY",
 		},
@@ -264,8 +264,8 @@ func (c *GenesisCommand) Run(args []string) int {
 		}
 	}
 
-	if bootnodes.AreSet && len(bootnodes.Addrs) < 2 {
-		c.UI.Error("Minimum two bootnodes are required")
+	if !bootnodes.AreSet {
+		c.UI.Error("Minimum one bootnode is required")
 
 		return 1
 	}

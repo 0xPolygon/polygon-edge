@@ -7,25 +7,23 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/helper/staking"
-
-	"github.com/0xPolygon/polygon-sdk/chain"
-	helperFlags "github.com/0xPolygon/polygon-sdk/helper/flags"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
+	"github.com/0xPolygon/polygon-edge/helper/staking"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/cli"
 	"github.com/ryanuber/columnize"
 )
 
 const (
 	GenesisFileName       = "./genesis.json"
-	DefaultChainName      = "polygon-sdk"
+	DefaultChainName      = "polygon-edge"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
 	DefaultConsensus      = "pow"
@@ -181,9 +179,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 // HandleSignals is a helper method for handling signals sent to the console
 // Like stop, error, etc.
 func HandleSignals(closeFn func(), ui cli.Ui) int {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
+	signalCh := common.GetTerminationSignalCh()
 	sig := <-signalCh
 
 	output := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
@@ -406,6 +402,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -471,6 +468,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

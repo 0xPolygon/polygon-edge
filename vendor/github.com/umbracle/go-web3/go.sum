@@ -44,6 +44,8 @@ github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5y
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/google/go-cmp v0.3.1 h1:Xye71clBPdm5HgqGwUkwhbynsUJZhDbS20FvLhQ2izg=
 github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
+github.com/google/gofuzz v1.2.0 h1:xRy4A+RhZaiKjJ1bPfwQ8sedCA+YS2YcCHW6ec7JMi0=
+github.com/google/gofuzz v1.2.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/gorilla/websocket v1.4.1 h1:q7AeDBpnBk8AogcD4DSag/Ukw/KV+YhzLj2bP5HvKCM=
 github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gotestyourself/gotestyourself v2.2.0+incompatible h1:AQwinXlbQR2HvPjQZOmDhRqsv5mZf+Jb1RnSLxcqZcI=
@@ -110,6 +112,16 @@ github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2n
 github.com/tyler-smith/go-bip39 v1.1.0/go.mod h1:gUYDtqQw1JS3ZJ8UWVcGTGqqr6YIN3CWg+kkNaLt55U=
 github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8 h1:lWWKP+Oi7FSORlB3Y8rLz1Q7OOxtD8vecmtYOSNkIpo=
 github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8/go.mod h1:z0AyVhz/7VbuYSaCB+tFgypZKD1DJL76ATih6XqFlig=
+github.com/umbracle/fastrlp v0.0.0-20211210202053-92c528b55dea h1:KkTT5DT0SPmtNlQLSAI9jj0l2kkhn55Tl+txokkiWxQ=
+github.com/umbracle/fastrlp v0.0.0-20211210202053-92c528b55dea/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
+github.com/umbracle/fastrlp v0.0.0-20211228214822-d284b9a1ca89 h1:1HVAbF+D8wO8q7u+VMVZPysfZDdAdPdTDn5YECH2xrM=
+github.com/umbracle/fastrlp v0.0.0-20211228214822-d284b9a1ca89/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
+github.com/umbracle/fastrlp v0.0.0-20211228220138-9c20635803fb h1:jFYwAm/Nn6aWh2QCtejD0Ys/QVNKgf1AStCMONzcEDs=
+github.com/umbracle/fastrlp v0.0.0-20211228220138-9c20635803fb/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
+github.com/umbracle/fastrlp v0.0.0-20211228223544-26f56490122f h1:swxOU4cwCfjk8Uv/80lOantbwVAoUIzDgm+sZpqX/oY=
+github.com/umbracle/fastrlp v0.0.0-20211228223544-26f56490122f/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
+github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17 h1:ZZy8Rj2SqGcZn1hTcoLdwFBROzrf5KiuRwhp8G4nnfA=
+github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.4.0 h1:PuaTGZIw3mjYhhhbVbCQp8aciRZN9YdoB7MGX9Ko76A=

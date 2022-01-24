@@ -3,8 +3,8 @@ package protocol
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Blockchain is the interface required by the syncer to connect to the blockchain

@@ -1,15 +1,14 @@
 package server
 
 import (
-	consensusDev "github.com/0xPolygon/polygon-sdk/consensus/dev"
-	consensusDummy "github.com/0xPolygon/polygon-sdk/consensus/dummy"
-	consensusIBFT "github.com/0xPolygon/polygon-sdk/consensus/ibft"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/awsssm"
-	"github.com/0xPolygon/polygon-sdk/secrets/hashicorpvault"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
-
-	"github.com/0xPolygon/polygon-sdk/consensus"
+	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
+	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
+	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
+	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/consensus"
 )
 
 var consensusBackends = map[string]consensus.Factory{

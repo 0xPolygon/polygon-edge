@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	testproto "github.com/0xPolygon/polygon-sdk/network/proto"
+	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"testing"
 	"time"
 )

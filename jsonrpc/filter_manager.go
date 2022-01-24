@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -126,10 +126,22 @@ func (f *Filter) isBlockFilter() bool {
 
 var defaultTimeout = 1 * time.Minute
 
+// filterManagerStore provides methods required by FilterManager
+type filterManagerStore interface {
+	// Header returns the current header of the chain (genesis if empty)
+	Header() *types.Header
+
+	// SubscribeEvents subscribes for chain head events
+	SubscribeEvents() blockchain.Subscription
+
+	// GetReceiptsByHash returns the receipts for a block hash
+	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+}
+
 type FilterManager struct {
 	logger hclog.Logger
 
-	store   blockchainInterface
+	store   filterManagerStore
 	closeCh chan struct{}
 
 	subscription blockchain.Subscription
@@ -144,7 +156,7 @@ type FilterManager struct {
 	blockStream *blockStream
 }
 
-func NewFilterManager(logger hclog.Logger, store blockchainInterface) *FilterManager {
+func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
 	m := &FilterManager{
 		logger:      logger.Named("filter"),
 		store:       store,

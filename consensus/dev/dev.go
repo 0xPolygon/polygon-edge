@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/protocol"
-
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -58,6 +57,11 @@ func Factory(
 	params.Txpool.EnableDev()
 
 	return d, nil
+}
+
+// Initialize initializes the consensus
+func (d *Dev) Initialize() error {
+	return nil
 }
 
 // Start starts the consensus mechanism
@@ -214,7 +218,7 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 	return header.Miner, nil
 }
 
-func (d *Dev) GetSyncProgression() *protocol.Progression {
+func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

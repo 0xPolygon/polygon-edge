@@ -36,16 +36,25 @@ func (s serverType) String() string {
 type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
-	dispatcher dispatcherImpl
+	dispatcher dispatcher
 }
 
-type dispatcherImpl interface {
+type dispatcher interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
 	Handle(reqBody []byte) ([]byte, error)
 }
 
+// JSONRPCStore defines all the methods required
+// by all the JSON RPC endpoints
+type JSONRPCStore interface {
+	ethStore
+	networkStore
+	txPoolStore
+	filterManagerStore
+}
+
 type Config struct {
-	Store   blockchainInterface
+	Store   JSONRPCStore
 	Addr    *net.TCPAddr
 	ChainID uint64
 }
@@ -210,7 +219,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 
 	if req.Method == "GET" {
 		//nolint
-		w.Write([]byte("PolygonSDK JSON-RPC"))
+		w.Write([]byte("Polygon Edge JSON-RPC"))
 
 		return
 	}

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/network/grpc"
-	"github.com/0xPolygon/polygon-sdk/network/proto"
+	"github.com/0xPolygon/polygon-edge/network/grpc"
+	"github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"

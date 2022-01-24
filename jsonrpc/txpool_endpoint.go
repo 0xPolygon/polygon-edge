@@ -4,12 +4,21 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// Txpool is the txpool jsonrpc endpoint
-type Txpool struct {
-	d *Dispatcher
+// txPoolStore provides access to the methods needed for txpool endpoint
+type txPoolStore interface {
+	// GetTxs gets tx pool transactions currently pending for inclusion and currently queued for validation
+	GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction)
+
+	// GetCapacity returns the current and max capacity of the pool
+	GetCapacity() (uint64, uint64)
+}
+
+// TxPool is the txpool jsonrpc endpoint
+type TxPool struct {
+	store txPoolStore
 }
 
 type ContentResponse struct {
@@ -61,8 +70,8 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 
 // Create response for txpool_content request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content.
-func (t *Txpool) Content() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+func (t *TxPool) Content() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
 
 	// collect pending
 	pendingRPCTxs := make(map[types.Address]map[uint64]*txpoolTransaction)
@@ -100,8 +109,8 @@ func (t *Txpool) Content() (interface{}, error) {
 
 // Create response for txpool_inspect request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
-func (t *Txpool) Inspect() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+func (t *TxPool) Inspect() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
 
 	// collect pending
 	pendingRPCTxs := make(map[string]map[string]string)
@@ -130,7 +139,7 @@ func (t *Txpool) Inspect() (interface{}, error) {
 	}
 
 	// get capacity of the TxPool
-	current, max := t.d.store.GetCapacity()
+	current, max := t.store.GetCapacity()
 
 	resp := InspectResponse{
 		Pending:         pendingRPCTxs,
@@ -144,8 +153,8 @@ func (t *Txpool) Inspect() (interface{}, error) {
 
 // Create response for txpool_status request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status.
-func (t *Txpool) Status() (interface{}, error) {
-	pendingTxs, queuedTxs := t.d.store.GetTxs(true)
+func (t *TxPool) Status() (interface{}, error) {
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
 
 	var pendingCount int
 

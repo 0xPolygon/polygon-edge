@@ -24,7 +24,7 @@ type TxnPoolOperatorClient interface {
 	// AddTxn adds a local transaction to the pool
 	AddTxn(ctx context.Context, in *AddTxnReq, opts ...grpc.CallOption) (*AddTxnResp, error)
 	// Subscribe subscribes for new events in the txpool
-	Subscribe(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error)
+	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error)
 }
 
 type txnPoolOperatorClient struct {
@@ -53,7 +53,7 @@ func (c *txnPoolOperatorClient) AddTxn(ctx context.Context, in *AddTxnReq, opts 
 	return out, nil
 }
 
-func (c *txnPoolOperatorClient) Subscribe(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error) {
+func (c *txnPoolOperatorClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (TxnPoolOperator_SubscribeClient, error) {
 	stream, err := c.cc.NewStream(ctx, &TxnPoolOperator_ServiceDesc.Streams[0], "/v1.TxnPoolOperator/Subscribe", opts...)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ type TxnPoolOperatorServer interface {
 	// AddTxn adds a local transaction to the pool
 	AddTxn(context.Context, *AddTxnReq) (*AddTxnResp, error)
 	// Subscribe subscribes for new events in the txpool
-	Subscribe(*emptypb.Empty, TxnPoolOperator_SubscribeServer) error
+	Subscribe(*SubscribeRequest, TxnPoolOperator_SubscribeServer) error
 	mustEmbedUnimplementedTxnPoolOperatorServer()
 }
 
@@ -108,7 +108,7 @@ func (UnimplementedTxnPoolOperatorServer) Status(context.Context, *emptypb.Empty
 func (UnimplementedTxnPoolOperatorServer) AddTxn(context.Context, *AddTxnReq) (*AddTxnResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddTxn not implemented")
 }
-func (UnimplementedTxnPoolOperatorServer) Subscribe(*emptypb.Empty, TxnPoolOperator_SubscribeServer) error {
+func (UnimplementedTxnPoolOperatorServer) Subscribe(*SubscribeRequest, TxnPoolOperator_SubscribeServer) error {
 	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 func (UnimplementedTxnPoolOperatorServer) mustEmbedUnimplementedTxnPoolOperatorServer() {}
@@ -161,7 +161,7 @@ func _TxnPoolOperator_AddTxn_Handler(srv interface{}, ctx context.Context, dec f
 }
 
 func _TxnPoolOperator_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(emptypb.Empty)
+	m := new(SubscribeRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

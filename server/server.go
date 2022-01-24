@@ -11,31 +11,29 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/common"
-	"github.com/0xPolygon/polygon-sdk/helper/keccak"
-	"github.com/0xPolygon/polygon-sdk/jsonrpc"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/protocol"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/state/runtime"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/archive"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/jsonrpc"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/0xPolygon/polygon-edge/state"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
-
-	itrie "github.com/0xPolygon/polygon-sdk/state/immutable-trie"
-	"github.com/0xPolygon/polygon-sdk/state/runtime/evm"
-	"github.com/0xPolygon/polygon-sdk/state/runtime/precompiled"
-
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/consensus"
 )
 
 // Minimal is the central manager of the blockchain client
@@ -69,8 +67,12 @@ type Server struct {
 	serverMetrics *serverMetrics
 
 	prometheusServer *http.Server
+
 	// secrets manager
 	secretsManager secrets.SecretsManager
+
+	// restore
+	restoreProgression *progress.ProgressionWrapper
 }
 
 var dirPaths = []string{
@@ -82,10 +84,11 @@ var dirPaths = []string{
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m := &Server{
-		logger:     logger,
-		config:     config,
-		chain:      config.Chain,
-		grpcServer: grpc.NewServer(),
+		logger:             logger,
+		config:             config,
+		chain:              config.Chain,
+		grpcServer:         grpc.NewServer(),
+		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
@@ -96,11 +99,12 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	if config.Telemetry.PrometheusAddr != nil {
-		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, true)
+		m.serverMetrics = metricProvider("polygon", config.Chain.Name, true)
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	} else {
-		m.serverMetrics = metricProvider("PSDK", config.Chain.Name, false)
+		m.serverMetrics = metricProvider("polygon", config.Chain.Name, false)
 	}
+
 	// Set up the secrets manager
 	if err := m.setupSecretsManager(); err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
@@ -191,17 +195,28 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// setup grpc server
-	if err := m.setupGRPC(); err != nil {
+	// initialize data in consensus layer
+	if err := m.consensus.Initialize(); err != nil {
 		return nil, err
 	}
 
-	// setup jsonrpc
+	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
 		return nil, err
 	}
 
+	// restore archive data before starting
+	if err := m.restoreChain(); err != nil {
+		return nil, err
+	}
+
+	// start consensus
 	if err := m.consensus.Start(); err != nil {
+		return nil, err
+	}
+
+	// setup and start grpc server
+	if err := m.setupGRPC(); err != nil {
 		return nil, err
 	}
 
@@ -212,6 +227,18 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func (s *Server) restoreChain() error {
+	if s.config.RestoreFile == nil {
+		return nil
+	}
+
+	if err := archive.RestoreChain(s.blockchain, *s.config.RestoreFile, s.restoreProgression); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type txpoolHub struct {
@@ -348,7 +375,8 @@ func (s *Server) setupConsensus() error {
 }
 
 type jsonRPCHub struct {
-	state state.State
+	state              state.State
+	restoreProgression *progress.ProgressionWrapper
 
 	*blockchain.Blockchain
 	*txpool.TxPool
@@ -446,8 +474,18 @@ func (j *jsonRPCHub) ApplyTxn(
 	return
 }
 
-func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
-	return j.Consensus.GetSyncProgression()
+func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
+	// restore progression
+	if restoreProg := j.restoreProgression.GetProgression(); restoreProg != nil {
+		return restoreProg
+	}
+
+	// consensus sync progression
+	if consensusSyncProg := j.Consensus.GetSyncProgression(); consensusSyncProg != nil {
+		return consensusSyncProg
+	}
+
+	return nil
 }
 
 // SETUP //
@@ -455,12 +493,13 @@ func (j *jsonRPCHub) GetSyncProgression() *protocol.Progression {
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
 	hub := &jsonRPCHub{
-		state:      s.state,
-		Blockchain: s.blockchain,
-		TxPool:     s.txpool,
-		Executor:   s.executor,
-		Consensus:  s.consensus,
-		Server:     s.network,
+		state:              s.state,
+		restoreProgression: s.restoreProgression,
+		Blockchain:         s.blockchain,
+		TxPool:             s.txpool,
+		Executor:           s.executor,
+		Consensus:          s.consensus,
+		Server:             s.network,
 	}
 
 	conf := &jsonrpc.Config{
@@ -481,7 +520,7 @@ func (s *Server) setupJSONRPC() error {
 
 // setupGRPC sets up the grpc server and listens on tcp
 func (s *Server) setupGRPC() error {
-	proto.RegisterSystemServer(s.grpcServer, &systemService{s: s})
+	proto.RegisterSystemServer(s.grpcServer, &systemService{server: s})
 
 	lis, err := net.Listen("tcp", s.config.GRPCAddr.String())
 	if err != nil {
@@ -546,7 +585,7 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
-// SetupDataDir sets up the polygon-sdk data directory and sub-folders
+// SetupDataDir sets up the polygon-edge data directory and sub-folders
 func SetupDataDir(dataDir string, paths []string) error {
 	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
