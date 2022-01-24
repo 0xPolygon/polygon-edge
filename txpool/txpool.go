@@ -351,32 +351,40 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // Will update executables with the next primary
 // from that account (if any).
 func (p *TxPool) Drop(tx *types.Transaction) {
+	// drop the entire account and rollback nonce
 	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
-	defer account.promoted.unlock()
+	account.enqueued.lock(true)
+	defer func() {
+		account.enqueued.unlock()
+		account.promoted.unlock()
+	}()
 
-	// pop the top most promoted tx
-	account.promoted.pop()
+	p.logger.Debug("dropping tx (unrecoverable)", "hash", tx.Hash.String())
 
-	// update state
-	p.index.remove(tx)
-	p.gauge.decrease(slotsRequired(tx))
+	// rollback nonce
+	nextNonce := tx.Nonce
+	account.setNonce(nextNonce)
+
+	// drop promoted
+	removed := account.promoted.clear()
+	p.index.remove(removed...)
+	p.gauge.decrease(slotsRequired(removed...))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(-1)
+	p.metrics.PendingTxs.Add(float64(-1 * len(removed)))
 
-	if tx.Nonce < account.getNonce() {
-		// rollback nonce
-		account.setNonce(tx.Nonce)
-	}
-
-	// update executables
-	if tx := account.promoted.peek(); tx != nil {
-		p.executables.push(tx)
-	}
+	// drop enqueued
+	removed = account.enqueued.clear()
+	p.index.remove(removed...)
+	p.gauge.decrease(slotsRequired(removed...))
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.logger.Debug("dropped account",
+		"next_nonce", nextNonce,
+		"address", tx.From.String(),
+		)
 }
 
 // Demote removes the (recoverable) transaction from
