@@ -84,7 +84,12 @@ func (m *accountsMap) get(addr types.Address) *account {
 // promoted returns the number of all promoted transactons.
 func (m *accountsMap) promoted() (total uint64) {
 	m.Range(func(key, value interface{}) bool {
-		account := m.get(key.(types.Address))
+		accountKey, ok := key.(types.Address)
+		if !ok {
+			return false
+		}
+
+		account := m.get(accountKey)
 
 		account.promoted.lock(false)
 		defer account.promoted.unlock()

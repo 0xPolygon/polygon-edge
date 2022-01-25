@@ -579,7 +579,12 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 		return 0, err
 	}
 
-	return res.(int64), nil
+	resVal, ok := res.(int64)
+	if !ok {
+		return 0, errors.New("invalid type assert")
+	}
+
+	return resVal, nil
 }
 
 func TestSyncer_PeerDisconnected(t *testing.T) {
