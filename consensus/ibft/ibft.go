@@ -728,8 +728,11 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 // If it turns out that the current node is the proposer, it builds a block,
 // and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
+	// set log output
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
+	// set consensus_rounds metric output
+	i.metrics.Rounds.Set(float64(i.state.view.Round+1))
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
