@@ -732,7 +732,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
 	// set consensus_rounds metric output
-	i.metrics.Rounds.Set(float64(i.state.view.Round+1))
+	i.metrics.Rounds.Set(float64(i.state.view.Round + 1))
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
@@ -973,7 +973,7 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
 	// calculate difference between previous and current header timestamps
 	diff := time.UnixMilli(int64(block.Header.Timestamp)).Sub(time.UnixMilli(int64(prvHeader.Timestamp)))
-	
+
 	// update block_interval metric
 	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
 
