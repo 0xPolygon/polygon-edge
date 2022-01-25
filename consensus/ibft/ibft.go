@@ -966,15 +966,14 @@ func (i *Ibft) runValidateState() {
 // updateMetrics will update various metrics based on the given block
 // currently we capture No.of Txs and block interval metrics using this function
 func (i *Ibft) updateMetrics(block *types.Block) {
+	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
-	parentTime := time.UnixMilli(int64(prvHeader.Timestamp))
-	headerTime := time.UnixMilli(int64(block.Header.Timestamp))
-	//Update the block interval metric
-	if block.Number() > 1 {
-		i.metrics.BlockInterval.Observe(
-			float64(headerTime.Sub(parentTime).Milliseconds()),
-		)
-	}
+	// calculate difference between previous and current header timestamps
+	diff := time.UnixMilli(int64(block.Header.Timestamp)).Sub(time.UnixMilli(int64(prvHeader.Timestamp)))
+	
+	// update block_interval metric
+	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
+
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
