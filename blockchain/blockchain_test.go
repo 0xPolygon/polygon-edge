@@ -7,12 +7,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain/storage"
-	"github.com/0xPolygon/polygon-sdk/blockchain/storage/memory"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestGenesis(t *testing.T) {

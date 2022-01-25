@@ -15,7 +15,7 @@ service TxnPoolOperator {
   rpc AddTxn(AddTxnReq) returns (AddTxnResp);
 
   // Subscribe subscribes for new events in the txpool
-  rpc Subscribe(google.protobuf.Empty) returns (stream TxPoolEvent);
+  rpc Subscribe(SubscribeRequest) returns (stream TxPoolEvent);
 }
 
 message AddTxnReq {
@@ -31,6 +31,29 @@ message TxnPoolStatusResp {
   uint64 length = 1;
 }
 
-message TxPoolEvent {
+message SubscribeRequest {
+  // Requested event types
+  repeated EventType types = 1;
+}
 
+enum EventType {
+  // For initially added transactions
+  ADDED = 0;
+
+  // For enqueued transactions in the account queue
+  ENQUEUED = 1;
+
+  // For promoted transactions
+  PROMOTED = 2;
+
+  // For dropped transactions
+  DROPPED = 3;
+
+  // For demoted transactions
+  DEMOTED = 4;
+}
+
+message TxPoolEvent {
+  EventType type = 1;
+  string txHash = 2;
 }

@@ -79,6 +79,13 @@ func (t *Block) MarshalJSON() ([]byte, error) {
 		}
 		o.Set("transactions", txns)
 	}
+	if len(t.Transactions) != 0 {
+		txns := a.NewArray()
+		for indx, txn := range t.Transactions {
+			txns.SetArrayItem(indx, txn.marshalJSON(a))
+		}
+		o.Set("transactions", txns)
+	}
 
 	res := o.MarshalTo(nil)
 	defaultArena.Put(a)
@@ -88,7 +95,13 @@ func (t *Block) MarshalJSON() ([]byte, error) {
 // MarshalJSON implements the Marshal interface.
 func (t *Transaction) MarshalJSON() ([]byte, error) {
 	a := defaultArena.Get()
+	v := t.marshalJSON(a)
+	res := v.MarshalTo(nil)
+	defaultArena.Put(a)
+	return res, nil
+}
 
+func (t *Transaction) marshalJSON(a *fastjson.Arena) *fastjson.Value {
 	o := a.NewObject()
 	o.Set("hash", a.NewString(t.Hash.String()))
 	o.Set("from", a.NewString(t.From.String()))
@@ -99,7 +112,18 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		o.Set("value", a.NewString(fmt.Sprintf("0x%x", t.Value)))
 	}
 	o.Set("gasPrice", a.NewString(fmt.Sprintf("0x%x", t.GasPrice)))
-	o.Set("gas", a.NewString(fmt.Sprintf("0x%x", t.Gas)))
+
+	// gas limit fields
+	if t.Gas != 0 {
+		o.Set("gas", a.NewString(fmt.Sprintf("0x%x", t.Gas)))
+	}
+	if t.MaxPriorityFeePerGas != nil {
+		o.Set("maxPriorityFeePerGas", a.NewString(fmt.Sprintf("0x%x", t.MaxPriorityFeePerGas)))
+	}
+	if t.MaxFeePerGas != nil {
+		o.Set("maxFeePerGas", a.NewString(fmt.Sprintf("0x%x", t.MaxFeePerGas)))
+	}
+
 	if t.Nonce != 0 {
 		// we can remove this once we include support for custom nonces
 		o.Set("nonce", a.NewString(fmt.Sprintf("0x%x", t.Nonce)))
@@ -111,7 +135,7 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 	}
 	o.Set("v", a.NewString("0x"+hex.EncodeToString(t.V)))
 	o.Set("r", a.NewString("0x"+hex.EncodeToString(t.R)))
-	o.Set("s", a.NewString("0x"+hex.EncodeToString(t.R)))
+	o.Set("s", a.NewString("0x"+hex.EncodeToString(t.S)))
 
 	if t.BlockHash == ZeroHash {
 		// The transaction is a pending transaction
@@ -125,9 +149,29 @@ func (t *Transaction) MarshalJSON() ([]byte, error) {
 		o.Set("transactionIndex", a.NewString(fmt.Sprintf("0x%x", t.TxnIndex)))
 	}
 
-	res := o.MarshalTo(nil)
-	defaultArena.Put(a)
-	return res, nil
+	if t.ChainID != nil {
+		o.Set("chainId", a.NewString(fmt.Sprintf("0x%x", t.ChainID)))
+	}
+	if t.AccessList != nil {
+		o.Set("accessList", t.AccessList.marshalJSON(a))
+	}
+	return o
+}
+
+func (t *AccessList) marshalJSON(a *fastjson.Arena) *fastjson.Value {
+	arr := a.NewArray()
+	for indx, elem := range *t {
+		arrElem := a.NewObject()
+		arrElem.Set("address", a.NewString(elem.Address.String()))
+
+		strg := a.NewArray()
+		for subIndx, elem := range elem.Storage {
+			strg.SetArrayItem(subIndx, a.NewString(elem.String()))
+		}
+		arrElem.Set("storageKeys", strg)
+		arr.SetArrayItem(indx, arrElem)
+	}
+	return arr
 }
 
 // MarshalJSON implements the Marshal interface.
@@ -147,6 +191,9 @@ func (c *CallMsg) MarshalJSON() ([]byte, error) {
 	}
 	if c.Value != nil {
 		o.Set("value", a.NewString(fmt.Sprintf("0x%x", c.Value)))
+	}
+	if c.Gas != nil {
+		o.Set("gas", a.NewString(fmt.Sprintf("0x%x", c.Gas)))
 	}
 
 	res := o.MarshalTo(nil)

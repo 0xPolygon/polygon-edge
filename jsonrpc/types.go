@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-sdk/helper/hex"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // For union type of transaction and types.Hash
@@ -305,6 +305,7 @@ type txnArgs struct {
 }
 
 type progression struct {
+	Type          string `json:"type"`
 	StartingBlock string `json:"startingBlock"`
 	CurrentBlock  string `json:"currentBlock"`
 	HighestBlock  string `json:"highestBlock"`

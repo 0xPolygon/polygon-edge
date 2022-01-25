@@ -9,10 +9,11 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -31,9 +32,12 @@ const DefaultLibp2pPort int = 1478
 const (
 	MinimumPeerConnections int64 = 1
 
-	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
-	// using other bootnode after restarting
-	MinimumBootNodes int = 2
+	MinimumBootNodes int = 1
+)
+
+var (
+	ErrNoBootnodes  = errors.New("no bootnodes specified")
+	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
 // Priority for dial queue
@@ -215,8 +219,14 @@ func (s *Server) Start() error {
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
-		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return errors.New("minimum two bootnodes are required")
+		// Check the bootnode config is present
+		if s.config.Chain.Bootnodes == nil {
+			return ErrNoBootnodes
+		}
+
+		// Check if at least one bootnode is specified
+		if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+			return ErrMinBootnodes
 		}
 
 		// start discovery
@@ -665,23 +675,15 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
-	var closed bool
-
-	var mutex sync.Mutex
-
-	isClosed := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		return closed
-	}
+	var isClosed int32 = 0
 
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		if !isClosed() {
+		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
 	})
 	if err != nil {
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 
 		return nil, err
@@ -689,9 +691,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 
 	go func() {
 		<-s.closeCh
-		mutex.Lock()
-		closed = true
-		mutex.Unlock()
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 	}()
 

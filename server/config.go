@@ -3,9 +3,9 @@ package server
 import (
 	"net"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
 )
 
 const DefaultGRPCPort int = 9632
@@ -25,6 +25,7 @@ type Config struct {
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
+	RestoreFile    *string
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
