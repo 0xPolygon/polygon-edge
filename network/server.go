@@ -9,6 +9,7 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -674,23 +675,15 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
-	var closed bool
-
-	var mutex sync.Mutex
-
-	isClosed := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		return closed
-	}
+	var isClosed int32 = 0
 
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		if !isClosed() {
+		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
 	})
 	if err != nil {
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 
 		return nil, err
@@ -698,9 +691,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 
 	go func() {
 		<-s.closeCh
-		mutex.Lock()
-		closed = true
-		mutex.Unlock()
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 	}()
 
