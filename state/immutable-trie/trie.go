@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
@@ -72,14 +71,6 @@ func (f *FullNode) copy() *FullNode {
 	copy(nc.children[:], f.children[:])
 
 	return nc
-}
-
-func (f *FullNode) replaceEdge(idx byte, e Node) {
-	if idx == 16 {
-		f.value = e
-	} else {
-		f.children[idx] = e
-	}
 }
 
 func (f *FullNode) setEdge(idx byte, e Node) {
@@ -432,7 +423,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			if child == nil {
 				b.setEdge(k, newChild)
 			} else {
-				b.replaceEdge(k, newChild)
+				b.setEdge(k, newChild)
 			}
 
 			return b
@@ -539,7 +530,6 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		}
 
 		if notEmpty {
-			// fmt.Println("- node is not empty -")
 			// The full node still has some other values
 			return n, true
 		}
@@ -588,12 +578,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		return ncc, true
 	}
 
-	// fmt.Println(node)
 	panic("it should not happen")
-}
-
-func (t *Txn) Show() {
-	show(t.root, 0, 0)
 }
 
 func prefixLen(k1, k2 []byte) int {
@@ -619,51 +604,6 @@ func concat(a, b []byte) []byte {
 	copy(c[len(a):], b)
 
 	return c
-}
-
-func depth(d int) string {
-	s := ""
-	for i := 0; i < d; i++ {
-		s += "\t"
-	}
-
-	return s
-}
-
-func show(obj interface{}, label int, d int) {
-	switch n := obj.(type) {
-	case *ShortNode:
-		if h, ok := n.Hash(); ok {
-			fmt.Printf("%s%d SHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-		}
-
-		fmt.Printf("%s%d Short: %s\n", depth(d), label, hex.EncodeToHex(n.key))
-		show(n.child, 0, d)
-	case *FullNode:
-		if h, ok := n.Hash(); ok {
-			fmt.Printf("%s%d FHash: %s\n", depth(d), label, hex.EncodeToHex(h))
-		}
-
-		fmt.Printf("%s%d Full\n", depth(d), label)
-
-		for indx, i := range n.children {
-			if i != nil {
-				show(i, indx, d+1)
-			}
-		}
-
-		if n.value != nil {
-			show(n.value, 16, d)
-		}
-	case *ValueNode:
-		if n.hash {
-			fmt.Printf("%s%d  Hash: %s\n", depth(d), label, hex.EncodeToHex(n.buf))
-		} else {
-			fmt.Printf("%s%d  Value: %s\n", depth(d), label, hex.EncodeToHex(n.buf))
-		}
-	default:
-		fmt.Printf("%s Nil\n", depth(d))
-	}
 }
 
 func extendByteSlice(b []byte, needLen int) []byte {
