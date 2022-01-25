@@ -59,7 +59,7 @@ type TxPool struct {
 
 // Headers defines the HTTP response headers required to enable CORS.
 type Headers struct {
-	AccessControlAllowOrigin []string `json:"access_control_allow_origin"`
+	AccessControlAllowOrigins []string `json:"access_control_allow_origins"`
 }
 
 // DefaultConfig returns the default server configuration
@@ -121,7 +121,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	if c.Headers != nil {
-		conf.JSONRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigin
+		conf.JSONRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigins
 	}
 
 	if c.Telemetry.PrometheusAddr != "" {
