@@ -28,8 +28,12 @@ func decodeNibbles(nibbles []byte, bytes []byte) {
 }
 
 // hasTerm returns whether a hex key has the terminator flag.
-func hasTerm(s []byte) bool {
-	return len(s) > 0 && s[len(s)-1] == 16
+func hasTerm(hex []byte) bool {
+	if len(hex) == 0 {
+		return false
+	}
+
+	return hex[len(hex)-1] == 16
 }
 
 func keybytesToHex(str []byte) []byte {
