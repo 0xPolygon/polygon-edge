@@ -37,7 +37,7 @@ func DefaultConfig() *Config {
 		Network:        network.DefaultConfig(),
 		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
-		BlockTime:      2,
+		BlockTime:      2000,
 	}
 }
 

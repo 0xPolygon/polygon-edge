@@ -213,7 +213,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["block-time"] = helper.FlagDescriptor{
-		Description: "Sets block time in seconds. Default: 2",
+		Description: "Sets block time in miliseconds. Default: 2000",
 		Arguments: []string{
 			"BLOCK_TIME",
 		},

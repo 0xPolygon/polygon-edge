@@ -77,7 +77,7 @@ func DefaultConfig() *Config {
 		Consensus:   map[string]interface{}{},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   2,
+		BlockTime:   2000,
 	}
 }
 
@@ -175,7 +175,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	// set block time if not default
-	if c.BlockTime != 2 {
+	if c.BlockTime != 2000 {
 		conf.BlockTime = c.BlockTime
 	}
 
