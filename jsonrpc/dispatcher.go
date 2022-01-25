@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -129,6 +130,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 
 	subscribeMethod, ok := params[0].(string)
 	if !ok {
+		//nolint:forcetypeassert
 		return "", NewSubscriptionNotFoundError(params[0].(string))
 	}
 
@@ -160,6 +162,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 
 	filterID, ok := params[0].(string)
 	if !ok {
+		//nolint:forcetypeassert
 		return false, NewSubscriptionNotFoundError(params[0].(string))
 	}
 
@@ -423,7 +426,12 @@ func getError(v reflect.Value) error {
 		return nil
 	}
 
-	return v.Interface().(error)
+	extractedErr, ok := v.Interface().(error)
+	if !ok {
+		return errors.New("invalid type assertion, unable to extract error")
+	}
+
+	return extractedErr
 }
 
 func lowerCaseFirst(str string) string {
