@@ -116,13 +116,17 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 		account.promoted.lock(false)
 		defer account.promoted.unlock()
 
-		allPromoted[addr] = account.promoted.queue
+		if account.promoted.length() != 0 {
+			allPromoted[addr] = account.promoted.queue
+		}
 
 		if includeEnqueued {
 			account.enqueued.lock(false)
 			defer account.enqueued.unlock()
 
-			allEnqueued[addr] = account.enqueued.queue
+			if account.enqueued.length() != 0 {
+				allEnqueued[addr] = account.enqueued.queue
+			}
 		}
 
 		return true
