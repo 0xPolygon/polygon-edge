@@ -306,7 +306,7 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	}
 
 	// if block time not default, set to new value
-	if otherConfig.BlockTime != 2 {
+	if otherConfig.BlockTime != 2000 {
 		c.BlockTime = otherConfig.BlockTime
 	}
 
