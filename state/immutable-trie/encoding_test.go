@@ -190,6 +190,7 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 
 func TestEncoding_HexCompact(t *testing.T) {
 	// As per the official spec:
+	// nolint:lll
 	// https://eth.wiki/en/fundamentals/patricia-tree#specification-compact-encoding-of-hex-sequence-with-optional-terminator
 	// hex char    bits    |    node type partial     path length
 	// ----------------------------------------------------------
@@ -197,7 +198,6 @@ func TestEncoding_HexCompact(t *testing.T) {
 	// 1        0001    |       extension              odd
 	// 2        0010    |   terminating (leaf)         even
 	// 3        0011    |   terminating (leaf)         odd
-
 	testTable := []struct {
 		name           string
 		inputHex       []byte
