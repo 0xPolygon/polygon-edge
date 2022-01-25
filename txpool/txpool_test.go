@@ -124,10 +124,8 @@ func TestAddTxErrors(t *testing.T) {
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Value = big.NewInt(-5)
 
-		tx = signTx(tx)
-
 		assert.ErrorIs(t,
-			pool.addTx(local, tx),
+			pool.addTx(local, signTx(tx)),
 			ErrNegativeValue,
 		)
 	})
