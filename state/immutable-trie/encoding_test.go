@@ -124,9 +124,11 @@ func TestEncoding_NibblesToBytes(t *testing.T) {
 	}
 }
 
-func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
-	termSignal := byte(0x10) // 16
+const (
+	termSignal = byte(0x10) // 16
+)
 
+func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 	testTable := []struct {
 		name           string
 		inputString    []byte
@@ -182,6 +184,56 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 
 			assert.Len(t, output, len(testCase.expectedOutput))
 			assert.Equal(t, testCase.expectedOutput, output)
+		})
+	}
+}
+
+func TestEncoding_HexCompact(t *testing.T) {
+	// As per the official spec:
+	// https://eth.wiki/en/fundamentals/patricia-tree#specification-compact-encoding-of-hex-sequence-with-optional-terminator
+	// hex char    bits    |    node type partial     path length
+	// ----------------------------------------------------------
+	// 0        0000    |       extension              even
+	// 1        0001    |       extension              odd
+	// 2        0010    |   terminating (leaf)         even
+	// 3        0011    |   terminating (leaf)         odd
+
+	testTable := []struct {
+		name           string
+		inputHex       []byte
+		expectedOutput []byte
+	}{
+		{
+			"Valid case #1 - Odd, no terminator",
+			[]byte{0x1, 0x2, 0x3, 0x4, 0x5},
+			[]byte{0x11, 0x23, 0x45},
+		},
+		{
+			"Valid case #2 - Even, no terminator",
+			[]byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5},
+			[]byte{0x00, 0x01, 0x23, 0x45},
+		},
+		{
+			"Valid case #3 - Odd, terminator",
+			[]byte{0xf, 0x1, 0xc, 0xb, 0x8, termSignal},
+			[]byte{0x3f, 0x1c, 0xb8},
+		},
+		{
+			"Valid case #4 - Even, terminator",
+			[]byte{0x0, 0xf, 0x1, 0xc, 0xb, 0x8, termSignal},
+			[]byte{0x20, 0x0f, 0x1c, 0xb8},
+		},
+	}
+
+	for _, testCase := range testTable {
+		t.Run(testCase.name, func(t *testing.T) {
+			compactOutput := hexToCompact(testCase.inputHex)
+
+			// Check if the compact outputs match
+			assert.Equal(t, testCase.expectedOutput, compactOutput)
+
+			// Check if the reverse action matches the original input
+			assert.Equal(t, testCase.inputHex, compactToHex(compactOutput))
 		})
 	}
 }
