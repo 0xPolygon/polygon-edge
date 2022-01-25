@@ -97,7 +97,7 @@ type Ibft struct {
 
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	blockTime uint64 // Configurable consensus blocktime in seconds
+	blockTime uint64 // Configurable consensus blocktime in miliseconds
 }
 
 // Define the type of the IBFT consensus
@@ -605,14 +605,14 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 
 	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
+	parentTime := time.UnixMilli(int64(parent.Timestamp))
 	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
 
-	header.Timestamp = uint64(headerTime.Unix())
+	header.Timestamp = uint64(headerTime.UnixMilli())
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -794,7 +794,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// calculate how much time do we have to wait to mine the block
-			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
+			delay := time.Until(time.UnixMilli(int64(i.state.block.Header.Timestamp)))
 
 			select {
 			case <-time.After(delay):
