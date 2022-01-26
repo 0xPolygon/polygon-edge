@@ -65,6 +65,7 @@ type ConsensusParams struct {
 	Logger         hclog.Logger
 	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
+	// block time in miliseconds
 	BlockTime      uint64
 }
 

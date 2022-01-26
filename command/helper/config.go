@@ -35,7 +35,8 @@ type Config struct {
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
 	RestoreFile    string                 `json:"restore_file"`
-	BlockTime      uint64                 `json:"block_time"`
+	// block time im miliseconds
+	BlockTime      uint64                 `json:"block_time_ms"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -57,6 +58,9 @@ type TxPool struct {
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
 }
+
+// variable defining default BlockTime parameter
+var defaultBlockTime uint64 = 2000
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
@@ -175,7 +179,7 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	// set block time if not default
-	if c.BlockTime != 2000 {
+	if c.BlockTime != defaultBlockTime {
 		conf.BlockTime = c.BlockTime
 	}
 
@@ -306,7 +310,7 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 	}
 
 	// if block time not default, set to new value
-	if otherConfig.BlockTime != 2000 {
+	if otherConfig.BlockTime != defaultBlockTime {
 		c.BlockTime = otherConfig.BlockTime
 	}
 

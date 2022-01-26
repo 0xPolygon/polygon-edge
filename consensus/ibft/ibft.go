@@ -605,14 +605,17 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 
 	// set the timestamp
-	parentTime := time.UnixMilli(int64(parent.Timestamp))
+	// present miliseconds with time.Unix instead of time.UnixMili for go backward compatibility
+	// Timestamps are stored in seconds ( time.Unix() ) so we multiply by 1000 to get miliseconds
+	parentTime := time.Unix(int64(parent.Timestamp) * 1000,0)
 	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
 
-	header.Timestamp = uint64(headerTime.UnixMilli())
+	header.Timestamp = uint64(headerTime.Unix())
+	
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -797,7 +800,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// calculate how much time do we have to wait to mine the block
-			delay := time.Until(time.UnixMilli(int64(i.state.block.Header.Timestamp)))
+			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp),0))
 
 			select {
 			case <-time.After(delay):
@@ -972,7 +975,7 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
 	// calculate difference between previous and current header timestamps
-	diff := time.UnixMilli(int64(block.Header.Timestamp)).Sub(time.UnixMilli(int64(prvHeader.Timestamp)))
+	diff := time.Unix(int64(block.Header.Timestamp),0).Sub(time.Unix(int64(prvHeader.Timestamp),0))
 
 	// update block_interval metric
 	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
