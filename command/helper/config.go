@@ -61,7 +61,7 @@ type TxPool struct {
 }
 
 // variable defining default BlockTime parameter in miliseconds
-var defaultBlockTime uint64 = 2000
+const defaultBlockTime uint64 = 2000
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
