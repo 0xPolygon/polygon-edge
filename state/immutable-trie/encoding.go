@@ -1,39 +1,43 @@
 package itrie
 
-func hexToCompact(hex []byte) []byte {
-	terminator := byte(0)
-	if hasTerm(hex) {
-		terminator = 1
-		hex = hex[:len(hex)-1]
-	}
-
-	buf := make([]byte, len(hex)/2+1)
-	buf[0] = terminator << 5 // the flag byte
-
-	if len(hex)&1 == 1 {
-		buf[0] |= 1 << 4 // odd flag
-		buf[0] |= hex[0] // first nibble is contained in the first byte
-		hex = hex[1:]
-	}
-
-	decodeNibbles(hex, buf[1:])
-
-	return buf
-}
-
-func decodeNibbles(nibbles []byte, bytes []byte) {
-	for bi, ni := 0, 0; ni < len(nibbles); bi, ni = bi+1, ni+2 {
-		bytes[bi] = nibbles[ni]<<4 | nibbles[ni+1]
-	}
-}
-
-// hasTerm returns whether a hex key has the terminator flag.
+// hasTerm checks if hex is ending
+// with a terminator flag.
 func hasTerm(hex []byte) bool {
 	if len(hex) == 0 {
 		return false
 	}
 
 	return hex[len(hex)-1] == 16
+}
+
+func hexToCompact(hex []byte) []byte {
+	// check terminator flag
+	var terminator int
+	if hasTerm(hex) {
+		hex = hex[:len(hex)-1]
+		terminator = 1
+	} else {
+		terminator = 0
+	}
+
+	// determine prefix flag
+	oddLen := len(hex) % 2
+	flag := 2*terminator + oddLen
+
+	// insert flag
+	if oddLen == 1 {
+		hex = append([]byte{byte(flag)}, hex...)
+	} else {
+		hex = append([]byte{byte(flag), byte(0)}, hex...)
+	}
+
+	// hex slice is of even length now - pack nibbles
+	result := make([]byte, len(hex)/2)
+	for i := 0; i < cap(result); i++ {
+		result[i] = hex[2*i]<<4 | hex[2*i+1]
+	}
+
+	return result
 }
 
 func keybytesToHex(str []byte) []byte {
