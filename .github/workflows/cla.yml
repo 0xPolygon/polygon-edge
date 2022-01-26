@@ -21,4 +21,4 @@ jobs:
           path-to-signatures: 'cla.json'
           path-to-document: 'https://github.com/0xPolygon/polygon-edge/blob/develop/CLA.md'
           branch: 'cla-signatures'
-          allowlist: dependabot
+          allowlist: dependabot[bot],dependabot-preview[bot]
