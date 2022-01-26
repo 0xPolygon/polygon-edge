@@ -17,9 +17,17 @@ Please complete this section if any breaking changes have been made, otherwise d
 
 - [ ] I have assigned this PR to myself
 - [ ] I have added at least 1 reviewer
-- [ ] I have tested this code
 - [ ] I have updated the official documentation
 - [ ] I have added sufficient documentation in code
+
+# Testing
+
+- [ ] I ran the official test suite
+- [ ] I ran custom tests
+
+## Custom tests
+
+Please complete this section if you ran custom tests for this functionality, otherwise delete it
 
 # Documentation update
 
