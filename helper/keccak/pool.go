@@ -21,7 +21,12 @@ func (p *Pool) Get() *Keccak {
 		return NewKeccak256()
 	}
 
-	return v.(*Keccak)
+	keccakVal, ok := v.(*Keccak)
+	if !ok {
+		return nil
+	}
+
+	return keccakVal
 }
 
 // Put releases the keccak

@@ -86,7 +86,12 @@ func (q *accountQueue) pop() *types.Transaction {
 		return nil
 	}
 
-	return heap.Pop(&q.queue).(*types.Transaction)
+	transaction, ok := heap.Pop(&q.queue).(*types.Transaction)
+	if !ok {
+		return nil
+	}
+
+	return transaction
 }
 
 // length returns the number of transactions in the queue.
@@ -120,7 +125,12 @@ func (q *minNonceQueue) Less(i, j int) bool {
 }
 
 func (q *minNonceQueue) Push(x interface{}) {
-	(*q) = append((*q), x.(*types.Transaction))
+	transaction, ok := x.(*types.Transaction)
+	if !ok {
+		return
+	}
+
+	*q = append(*q, transaction)
 }
 
 func (q *minNonceQueue) Pop() interface{} {
@@ -169,7 +179,12 @@ func (q *pricedQueue) pop() *types.Transaction {
 		return nil
 	}
 
-	return heap.Pop(&q.queue).(*types.Transaction)
+	transaction, ok := heap.Pop(&q.queue).(*types.Transaction)
+	if !ok {
+		return nil
+	}
+
+	return transaction
 }
 
 // length returns the number of transactions in the queue.
@@ -203,7 +218,12 @@ func (q *maxPriceQueue) Less(i, j int) bool {
 }
 
 func (q *maxPriceQueue) Push(x interface{}) {
-	(*q) = append((*q), x.(*types.Transaction))
+	transaction, ok := x.(*types.Transaction)
+	if !ok {
+		return
+	}
+
+	*q = append(*q, transaction)
 }
 
 func (q *maxPriceQueue) Pop() interface{} {

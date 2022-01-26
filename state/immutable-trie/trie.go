@@ -157,7 +157,12 @@ func (t *Trie) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 					panic(err)
 				}
 
-				localTxn := localSnapshot.(*Trie).Txn()
+				trie, ok := localSnapshot.(*Trie)
+				if !ok {
+					panic("invalid type assertion")
+				}
+
+				localTxn := trie.Txn()
 				localTxn.batch = batch
 
 				for _, entry := range obj.Storage {

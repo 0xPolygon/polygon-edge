@@ -319,8 +319,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 	// to
-	vv, _ := v.Get(3).Bytes()
-	if len(vv) == 20 {
+	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr

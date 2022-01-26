@@ -20,7 +20,12 @@ var statePool = sync.Pool{
 }
 
 func acquireState() *state {
-	return statePool.Get().(*state)
+	aquiredState, ok := statePool.Get().(*state)
+	if !ok {
+		return nil
+	}
+
+	return aquiredState
 }
 
 func releaseState(s *state) {
