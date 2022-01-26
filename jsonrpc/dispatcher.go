@@ -130,8 +130,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 
 	subscribeMethod, ok := params[0].(string)
 	if !ok {
-		//nolint:forcetypeassert
-		return "", NewSubscriptionNotFoundError(params[0].(string))
+		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
 
 	var filterID string
@@ -162,8 +161,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 
 	filterID, ok := params[0].(string)
 	if !ok {
-		//nolint:forcetypeassert
-		return false, NewSubscriptionNotFoundError(params[0].(string))
+		return false, NewSubscriptionNotFoundError(filterID)
 	}
 
 	return d.filterManager.Uninstall(filterID), nil
