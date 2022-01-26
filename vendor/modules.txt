@@ -1,3 +1,9 @@
+# github.com/Masterminds/goutils v1.1.0
+github.com/Masterminds/goutils
+# github.com/Masterminds/semver v1.5.0
+github.com/Masterminds/semver
+# github.com/Masterminds/sprig v2.22.0+incompatible
+github.com/Masterminds/sprig
 # github.com/VividCortex/gohistogram v1.0.0
 ## explicit
 # github.com/armon/go-metrics v0.3.9
@@ -8,7 +14,7 @@ github.com/armon/go-radix
 github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy v0.1.0
 github.com/bgentry/speakeasy
-# github.com/btcsuite/btcd v0.21.0-beta
+# github.com/btcsuite/btcd v0.22.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
 # github.com/cenkalti/backoff/v3 v3.0.0
@@ -47,7 +53,7 @@ github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
 # github.com/google/gopacket v1.1.19
 github.com/google/gopacket/routing
-# github.com/google/uuid v1.1.4
+# github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
 # github.com/gorilla/websocket v1.4.2
@@ -124,6 +130,8 @@ github.com/hashicorp/vault/sdk/physical/inmem
 github.com/hashicorp/vault/sdk/version
 # github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb
 github.com/hashicorp/yamux
+# github.com/huandu/xstrings v1.3.2
+github.com/huandu/xstrings
 # github.com/huin/goupnp v1.0.0
 github.com/huin/goupnp
 github.com/huin/goupnp/dcps/internetgateway1
@@ -132,7 +140,7 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/imdario/mergo v0.3.7
+# github.com/imdario/mergo v0.3.12
 ## explicit
 github.com/imdario/mergo
 # github.com/ipfs/go-cid v0.0.7
@@ -295,7 +303,7 @@ github.com/miekg/dns
 github.com/minio/blake2b-simd
 # github.com/minio/sha256-simd v0.1.1
 github.com/minio/sha256-simd
-# github.com/mitchellh/cli v1.0.0
+# github.com/mitchellh/cli v1.1.2
 ## explicit
 github.com/mitchellh/cli
 # github.com/mitchellh/copystructure v1.0.0
@@ -391,13 +399,13 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/umbracle/fastrlp v0.0.0-20211210202053-92c528b55dea
+# github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20211216153058-58e3410a6fa5
+# github.com/umbracle/go-web3 v0.0.0-20220120123135-b6d93c310279
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/abi
@@ -438,7 +446,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
+# golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 ## explicit
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
@@ -456,6 +464,7 @@ golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/salsa20/salsa
+golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 # golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 golang.org/x/net/bpf
@@ -474,7 +483,7 @@ golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
+# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader

@@ -10,12 +10,12 @@ bindata:
 
 .PHONY: protoc
 protoc:
-	protoc --go_out=. --go-grpc_out=. ./minimal/proto/*.proto
+	protoc --go_out=. --go-grpc_out=. ./server/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./network/proto/test/*.proto
 	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/proto/*.proto
+	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
+
 
 .PHONY: lint
 lint:

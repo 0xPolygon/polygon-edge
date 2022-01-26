@@ -6,12 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"reflect"
 	"strings"
 	"unicode"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -35,58 +33,45 @@ type endpoints struct {
 	Eth    *Eth
 	Web3   *Web3
 	Net    *Net
-	Txpool *Txpool
+	TxPool *TxPool
 }
 
-// Dispatcher handles jsonrpc requests
+// Dispatcher handles all json rpc requests by delegating
+// the execution flow to the corresponding service
 type Dispatcher struct {
 	logger        hclog.Logger
-	store         blockchainInterface
 	serviceMap    map[string]*serviceData
-	endpoints     endpoints
 	filterManager *FilterManager
+	endpoints     endpoints
 	chainID       uint64
 }
 
-// newTestDispatcher returns a dispatcher without the filter manager, used for testing
-func newTestDispatcher(logger hclog.Logger, store blockchainInterface) *Dispatcher {
-	d := &Dispatcher{
-		logger: logger.Named("dispatcher"),
-		store:  store,
-	}
-
-	d.registerEndpoints()
-
-	return d
-}
-
-func newDispatcher(logger hclog.Logger, store blockchainInterface, chainID uint64) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64) *Dispatcher {
 	d := &Dispatcher{
 		logger:  logger.Named("dispatcher"),
-		store:   store,
 		chainID: chainID,
 	}
-
-	d.registerEndpoints()
 
 	if store != nil {
 		d.filterManager = NewFilterManager(logger, store)
 		go d.filterManager.Run()
 	}
 
+	d.registerEndpoints(store)
+
 	return d
 }
 
-func (d *Dispatcher) registerEndpoints() {
-	d.endpoints.Eth = &Eth{d}
-	d.endpoints.Net = &Net{d}
-	d.endpoints.Web3 = &Web3{d}
-	d.endpoints.Txpool = &Txpool{d}
+func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
+	d.endpoints.Eth = &Eth{d.logger, store, d.chainID, d.filterManager}
+	d.endpoints.Net = &Net{store, d.chainID}
+	d.endpoints.Web3 = &Web3{}
+	d.endpoints.TxPool = &TxPool{store}
 
 	d.registerService("eth", d.endpoints.Eth)
 	d.registerService("net", d.endpoints.Net)
 	d.registerService("web3", d.endpoints.Web3)
-	d.registerService("txpool", d.endpoints.Txpool)
+	d.registerService("txpool", d.endpoints.TxPool)
 }
 
 func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) {
@@ -145,7 +130,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 
 	subscribeMethod, ok := params[0].(string)
 	if !ok {
-		return "", NewSubscriptionNotFoundError(params[0].(string))
+		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}
 
 	var filterID string
@@ -176,7 +161,7 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 
 	filterID, ok := params[0].(string)
 	if !ok {
-		return false, NewSubscriptionNotFoundError(params[0].(string))
+		return false, NewSubscriptionNotFoundError(filterID)
 	}
 
 	return d.filterManager.Uninstall(filterID), nil
@@ -439,7 +424,12 @@ func getError(v reflect.Value) error {
 		return nil
 	}
 
-	return v.Interface().(error)
+	extractedErr, ok := v.Interface().(error)
+	if !ok {
+		return errors.New("invalid type assertion, unable to extract error")
+	}
+
+	return extractedErr
 }
 
 func lowerCaseFirst(str string) string {
@@ -448,125 +438,4 @@ func lowerCaseFirst(str string) string {
 	}
 
 	return ""
-}
-
-func (d *Dispatcher) getBlockHeaderImpl(number BlockNumber) (*types.Header, error) {
-	switch number {
-	case LatestBlockNumber:
-		return d.store.Header(), nil
-
-	case EarliestBlockNumber:
-		header, ok := d.store.GetHeaderByNumber(uint64(0))
-		if !ok {
-			return nil, fmt.Errorf("error fetching genesis block header")
-		}
-
-		return header, nil
-
-	case PendingBlockNumber:
-		return nil, fmt.Errorf("fetching the pending header is not supported")
-
-	default:
-		// Convert the block number from hex to uint64
-		header, ok := d.store.GetHeaderByNumber(uint64(number))
-		if !ok {
-			return nil, fmt.Errorf("Error fetching block number %d header", uint64(number))
-		}
-
-		return header, nil
-	}
-}
-
-// getNextNonce returns the next nonce for the account for the specified block
-func (d *Dispatcher) getNextNonce(address types.Address, number BlockNumber) (uint64, error) {
-	if number == PendingBlockNumber {
-		// Grab the latest pending nonce from the TxPool
-		//
-		// If the account is not initialized in the local TxPool,
-		// return the latest nonce from the world state
-		res := d.store.GetNonce(address)
-
-		return res, nil
-	}
-
-	header, err := d.getBlockHeaderImpl(number)
-	if err != nil {
-		return 0, err
-	}
-
-	acc, err := d.store.GetAccount(header.StateRoot, address)
-
-	if errors.As(err, &ErrStateNotFound) {
-		// If the account doesn't exist / isn't initialized,
-		// return a nonce value of 0
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-
-	return acc.Nonce, nil
-}
-
-func (d *Dispatcher) decodeTxn(arg *txnArgs) (*types.Transaction, error) {
-	if arg.Data != nil && arg.Input != nil {
-		return nil, fmt.Errorf("both input and data cannot be set")
-	}
-
-	// set default values
-	if arg.From == nil {
-		arg.From = &types.ZeroAddress
-		arg.Nonce = argUintPtr(0)
-	} else if arg.Nonce == nil {
-		// get nonce from the pool
-		nonce, err := d.getNextNonce(*arg.From, LatestBlockNumber)
-		if err != nil {
-			return nil, err
-		}
-		arg.Nonce = argUintPtr(nonce)
-	}
-
-	if arg.Value == nil {
-		arg.Value = argBytesPtr([]byte{})
-	}
-
-	if arg.GasPrice == nil {
-		arg.GasPrice = argBytesPtr([]byte{})
-	}
-
-	var input []byte
-	if arg.Data != nil {
-		input = *arg.Data
-	} else if arg.Input != nil {
-		input = *arg.Input
-	}
-
-	if arg.To == nil {
-		if input == nil {
-			return nil, fmt.Errorf("contract creation without data provided")
-		}
-	}
-
-	if input == nil {
-		input = []byte{}
-	}
-
-	if arg.Gas == nil {
-		arg.Gas = argUintPtr(0)
-	}
-
-	txn := &types.Transaction{
-		From:     *arg.From,
-		Gas:      uint64(*arg.Gas),
-		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
-		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    input,
-		Nonce:    uint64(*arg.Nonce),
-	}
-	if arg.To != nil {
-		txn.To = arg.To
-	}
-
-	txn.ComputeHash()
-
-	return txn, nil
 }

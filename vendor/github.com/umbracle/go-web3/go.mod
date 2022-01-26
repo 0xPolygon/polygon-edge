@@ -29,7 +29,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/tyler-smith/go-bip39 v1.1.0
-	github.com/umbracle/fastrlp v0.0.0-20210128110402-41364ca56ca8
+	github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
 	github.com/valyala/fasthttp v1.4.0
 	github.com/valyala/fastjson v1.4.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
