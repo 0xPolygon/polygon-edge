@@ -259,9 +259,11 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if target := d.peers.getRandomPeer(); target != nil {
-		if err := d.attemptToFindPeers(target.id); err != nil {
-			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+	if d.srv.numOpenSlots() > 0 {
+		if target := d.peers.getRandomPeer(); target != nil {
+			if err := d.attemptToFindPeers(target.id); err != nil {
+				d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+			}
 		}
 	}
 }
@@ -289,8 +291,9 @@ func (d *discovery) FindPeers(
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
-			info := d.srv.host.Peerstore().PeerInfo(id)
-			filtered = append(filtered, AddrInfoToString(&info))
+			if info := d.srv.host.Peerstore().PeerInfo(id); len(info.Addrs) > 0 {
+				filtered = append(filtered, AddrInfoToString(&info))
+			}
 		}
 	}
 

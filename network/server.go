@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"regexp"
@@ -27,12 +28,19 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const DefaultLibp2pPort int = 1478
-
 const (
+	DefaultDialRatio = 0.2
+
+	DefaultLibp2pPort int = 1478
+
 	MinimumPeerConnections int64 = 1
 
 	MinimumBootNodes int = 1
+
+	// Priority for dial queue
+	PriorityRequestedDial uint64 = 1
+
+	PriorityRandomDial uint64 = 10
 )
 
 var (
@@ -40,29 +48,27 @@ var (
 	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
-// Priority for dial queue
-const (
-	PriorityRequestedDial uint64 = 1
-	PriorityRandomDial    uint64 = 10
-)
-
 type Config struct {
-	NoDiscover     bool
-	Addr           *net.TCPAddr
-	NatAddr        net.IP
-	DNS            multiaddr.Multiaddr
-	DataDir        string
-	MaxPeers       uint64
-	Chain          *chain.Chain
-	SecretsManager secrets.SecretsManager
-	Metrics        *Metrics
+	NoDiscover       bool
+	Addr             *net.TCPAddr
+	NatAddr          net.IP
+	DNS              multiaddr.Multiaddr
+	DataDir          string
+	MaxPeers         int64
+	MaxInboundPeers  int64
+	MaxOutboundPeers int64
+	Chain            *chain.Chain
+	SecretsManager   secrets.SecretsManager
+	Metrics          *Metrics
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		NoDiscover: false,
-		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxPeers:   10,
+		NoDiscover:       false,
+		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
+		MaxPeers:         40,
+		MaxInboundPeers:  32,
+		MaxOutboundPeers: 8,
 	}
 }
 
@@ -98,12 +104,16 @@ type Server struct {
 	joinWatchersLock sync.Mutex
 
 	emitterPeerEvent event.Emitter
+
+	inboundConnCount int64
 }
 
 type Peer struct {
 	srv *Server
 
 	Info peer.AddrInfo
+
+	connDirection network.Direction
 }
 
 // setupLibp2pKey is a helper method for setting up the networking private key
@@ -138,6 +148,11 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
+
+	if config.MaxPeers != DefaultConfig().MaxPeers {
+		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
+		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
+	}
 
 	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
@@ -387,12 +402,33 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 }
 
 func (s *Server) numOpenSlots() int64 {
-	n := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
+	n := s.maxOutboundConns() - s.outboundConns()
 	if n < 0 {
 		n = 0
 	}
 
 	return n
+}
+
+func (s *Server) inboundConns() int64 {
+	count := atomic.LoadInt64(&s.inboundConnCount)
+	if count < 0 {
+		count = 0
+	}
+
+	return count + s.identity.pendingInboundConns()
+}
+
+func (s *Server) outboundConns() int64 {
+	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
+}
+
+func (s *Server) maxInboundConns() int64 {
+	return s.config.MaxInboundPeers
+}
+
+func (s *Server) maxOutboundConns() int64 {
+	return s.config.MaxOutboundPeers
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
@@ -407,17 +443,21 @@ func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
 	return s.host.Peerstore().PeerInfo(peerID)
 }
 
-func (s *Server) addPeer(id peer.ID) {
+func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 	s.logger.Info("Peer connected", "id", id.String())
-
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
 	p := &Peer{
-		srv:  s,
-		Info: s.host.Peerstore().PeerInfo(id),
+		srv:           s,
+		Info:          s.host.Peerstore().PeerInfo(id),
+		connDirection: direction,
 	}
 	s.peers[id] = p
+
+	if direction == network.DirInbound {
+		atomic.AddInt64(&s.inboundConnCount, 1)
+	}
 
 	s.emitEvent(id, PeerConnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
@@ -429,7 +469,13 @@ func (s *Server) delPeer(id peer.ID) {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	delete(s.peers, id)
+	if peer, ok := s.peers[id]; ok {
+		if peer.connDirection == network.DirInbound {
+			atomic.AddInt64(&s.inboundConnCount, -1)
+		}
+
+		delete(s.peers, id)
+	}
 
 	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
 		s.logger.Error(
