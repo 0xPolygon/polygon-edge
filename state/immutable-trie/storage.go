@@ -199,7 +199,7 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 		// this can be either an array (extension node)
 		// or bytes (leaf node)
 		nc := &ShortNode{}
-		nc.key = compactToHex(key.Raw())
+		nc.key = decodeCompact(key.Raw())
 
 		if hasTerm(nc.key) {
 			// value node

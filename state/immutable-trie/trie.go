@@ -215,7 +215,7 @@ func (t *Trie) Hash() types.Hash {
 }
 
 func (t *Trie) TryUpdate(key, value []byte) error {
-	k := keybytesToHex(key)
+	k := bytesToHexNibbles(key)
 
 	if len(value) != 0 {
 		tt := t.Txn()
@@ -259,7 +259,7 @@ func (t *Txn) Commit() *Trie {
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
-	_, res := t.lookup(t.root, keybytesToHex(key))
+	_, res := t.lookup(t.root, bytesToHexNibbles(key))
 
 	return res
 }
@@ -338,7 +338,7 @@ func (t *Txn) writeNode(n *FullNode) *FullNode {
 }
 
 func (t *Txn) Insert(key, value []byte) {
-	root := t.insert(t.root, keybytesToHex(key), value)
+	root := t.insert(t.root, bytesToHexNibbles(key), value)
 	if root != nil {
 		t.root = root
 	}
@@ -440,7 +440,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 }
 
 func (t *Txn) Delete(key []byte) {
-	root, ok := t.delete(t.root, keybytesToHex(key))
+	root, ok := t.delete(t.root, bytesToHexNibbles(key))
 	if ok {
 		t.root = root
 	}

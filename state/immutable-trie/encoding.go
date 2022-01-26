@@ -10,7 +10,7 @@ func hasTerm(hex []byte) bool {
 	return hex[len(hex)-1] == 16
 }
 
-func hexToCompact(hex []byte) []byte {
+func encodeCompact(hex []byte) []byte {
 	// check terminator flag
 	var terminator int
 	if hasTerm(hex) {
@@ -40,7 +40,7 @@ func hexToCompact(hex []byte) []byte {
 	return result
 }
 
-func keybytesToHex(str []byte) []byte {
+func bytesToHexNibbles(str []byte) []byte {
 	nibbles := make([]byte, len(str)*2+1)
 	for i, b := range str {
 		nibbles[i*2] = b / 16
@@ -52,8 +52,8 @@ func keybytesToHex(str []byte) []byte {
 	return nibbles
 }
 
-func compactToHex(compact []byte) []byte {
-	base := keybytesToHex(compact)
+func decodeCompact(compact []byte) []byte {
+	base := bytesToHexNibbles(compact)
 	// delete terminator flag
 	if base[0] < 2 {
 		base = base[:len(base)-1]

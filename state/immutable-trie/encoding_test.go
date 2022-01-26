@@ -101,7 +101,7 @@ func TestEncoding_KeyBytesToHexNibbles(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			output := keybytesToHex(testCase.inputString)
+			output := bytesToHexNibbles(testCase.inputString)
 
 			assert.Len(t, output, len(testCase.expectedOutput))
 			assert.Equal(t, testCase.expectedOutput, output)
@@ -148,13 +148,13 @@ func TestEncoding_HexCompact(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			compactOutput := hexToCompact(testCase.inputHex)
+			compactOutput := encodeCompact(testCase.inputHex)
 
 			// Check if the compact outputs match
 			assert.Equal(t, testCase.expectedOutput, compactOutput)
 
 			// Check if the reverse action matches the original input
-			assert.Equal(t, testCase.inputHex, compactToHex(compactOutput))
+			assert.Equal(t, testCase.inputHex, decodeCompact(compactOutput))
 		})
 	}
 }
