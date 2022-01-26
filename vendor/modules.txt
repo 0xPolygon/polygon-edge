@@ -53,7 +53,7 @@ github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
 # github.com/google/gopacket v1.1.19
 github.com/google/gopacket/routing
-# github.com/google/uuid v1.1.4
+# github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
 # github.com/gorilla/websocket v1.4.2
