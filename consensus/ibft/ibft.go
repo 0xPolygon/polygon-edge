@@ -604,17 +604,18 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
+	// calculate milisecond values from consensus custom functions in utils.go file
+	// to preserve go backward compatibility as time.UnixMili is available as of go 17
+	
 	// set the timestamp
-	// present miliseconds with time.Unix instead of time.UnixMili for go backward compatibility
-	// Timestamps are stored in seconds ( time.Unix() ) so we multiply by 1000 to get miliseconds
-	parentTime := time.Unix(int64(parent.Timestamp) * 1000,0)
+	parentTime := consensus.MilliToUnix(parent.Timestamp)
 	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
 
-	header.Timestamp = uint64(headerTime.Unix())
+	header.Timestamp = consensus.UnixToMilli(headerTime)
 	
 
 	// we need to include in the extra field the current set of validators
@@ -800,7 +801,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// calculate how much time do we have to wait to mine the block
-			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp),0))
+			delay := time.Until(consensus.MilliToUnix(i.state.block.Header.Timestamp))
 
 			select {
 			case <-time.After(delay):
@@ -975,7 +976,8 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
 	// calculate difference between previous and current header timestamps
-	diff := time.Unix(int64(block.Header.Timestamp),0).Sub(time.Unix(int64(prvHeader.Timestamp),0))
+	// diff := time.Unix(int64(block.Header.Timestamp),0).Sub(time.Unix(int64(prvHeader.Timestamp),0))
+	diff := consensus.MilliToUnix(block.Header.Timestamp).Sub(consensus.MilliToUnix(prvHeader.Timestamp))
 
 	// update block_interval metric
 	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
