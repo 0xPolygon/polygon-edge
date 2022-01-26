@@ -85,7 +85,7 @@ func DefaultConfig() *Config {
 		Consensus:   map[string]interface{}{},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   2000,
+		BlockTime:   defaultBlockTime,
 	}
 }
 
