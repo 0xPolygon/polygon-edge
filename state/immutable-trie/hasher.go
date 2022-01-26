@@ -19,8 +19,13 @@ var (
 
 var hasherPool = sync.Pool{
 	New: func() interface{} {
+		impl, ok := sha3.NewLegacyKeccak256().(hashImpl)
+		if !ok {
+			return nil
+		}
+
 		return &hasher{
-			hash: sha3.NewLegacyKeccak256().(hashImpl),
+			hash: impl,
 		}
 	},
 }

@@ -61,7 +61,12 @@ func (i *identity) isPending(id peer.ID) bool {
 
 func (i *identity) delPending(id peer.ID) {
 	if value, loaded := i.pending.LoadAndDelete(id); loaded {
-		i.updatePendingCount(value.(network.Direction), -1)
+		direction, ok := value.(network.Direction)
+		if !ok {
+			return
+		}
+
+		i.updatePendingCount(direction, -1)
 	}
 }
 
@@ -159,7 +164,12 @@ func (i *identity) handleConnected(peerID peer.ID, direction network.Direction) 
 		return err
 	}
 
-	clt := proto.NewIdentityClient(conn.(*rawGrpc.ClientConn))
+	rawGrpcConn, ok := conn.(*rawGrpc.ClientConn)
+	if !ok {
+		return errors.New("invalid type assert")
+	}
+
+	clt := proto.NewIdentityClient(rawGrpcConn)
 
 	status := i.getStatus()
 	resp, err := clt.Hello(context.Background(), status)
@@ -183,7 +193,12 @@ func (i *identity) Hello(ctx context.Context, req *proto.Status) (*proto.Status,
 }
 
 func (i *identity) Bye(ctx context.Context, req *proto.ByeMsg) (*empty.Empty, error) {
-	i.srv.logger.Debug("peer bye", "id", ctx.(*grpc.Context).PeerID, "msg", req.Reason)
+	connContext, ok := ctx.(*grpc.Context)
+	if !ok {
+		return nil, errors.New("invalid type assert")
+	}
+
+	i.srv.logger.Debug("peer bye", "id", connContext.PeerID, "msg", req.Reason)
 
 	return &empty.Empty{}, nil
 }

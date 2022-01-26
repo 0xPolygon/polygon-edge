@@ -112,7 +112,12 @@ func WaitUntilTxPoolEmpty(ctx context.Context, client txpoolOp.TxnPoolOperatorCl
 		return nil, err
 	}
 
-	return res.(*txpoolOp.TxnPoolStatusResp), nil
+	status, ok := res.(*txpoolOp.TxnPoolStatusResp)
+	if !ok {
+		return nil, errors.New("invalid type assertion to txpool status response")
+	}
+
+	return status, nil
 }
 
 // WaitForReceipt waits transaction receipt
@@ -158,7 +163,12 @@ func GetFreePort() (port int, err error) {
 				_ = l.Close()
 			}(l)
 
-			return l.Addr().(*net.TCPAddr).Port, nil
+			netAddr, ok := l.Addr().(*net.TCPAddr)
+			if !ok {
+				return 0, errors.New("invalid type assert to TCPAddr")
+			}
+
+			return netAddr.Port, nil
 		}
 	}
 
