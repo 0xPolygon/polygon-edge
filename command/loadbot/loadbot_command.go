@@ -374,14 +374,15 @@ type LoadbotResult struct {
 	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
 	BlockData         TxnBlockData         `json:"blockData"`
 	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
-	RealTPS           uint64               `json:"realTps"`
+	ApproxTPS         uint64               `json:"approxTps"`
 }
 
 func (lr *LoadbotResult) extractExecutionData(metrics *Metrics) {
 	// calculate real transactions per second value
 	// by deviding total transactions by total time in seconds
-	//nolint:lll
-	lr.RealTPS = metrics.TotalTransactionsSentCount / uint64(math.Floor(metrics.TransactionDuration.TotalExecTime.Seconds()))
+	lr.ApproxTPS = metrics.TotalTransactionsSentCount /
+		uint64(math.Floor(metrics.TransactionDuration.TotalExecTime.Seconds()))
+
 	lr.TurnAroundData.FastestTurnAround = common.ToFixedFloat(
 		metrics.TransactionDuration.FastestTurnAround.Seconds(),
 		durationPrecision,
@@ -440,9 +441,9 @@ func (lr *LoadbotResult) Output() string {
 		fmt.Sprintf("Transactions failed|%d", lr.CountData.Failed),
 	}))
 
-	buffer.WriteString("\n\n[REAL TPS]\n")
+	buffer.WriteString("\n\n[APPROXIMATE TPS]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Real number of transactions per second|%d", lr.RealTPS),
+		fmt.Sprintf("Approximate number of transactions per second|%d", lr.ApproxTPS),
 	}))
 
 	buffer.WriteString("\n\n[TURN AROUND DATA]\n")
