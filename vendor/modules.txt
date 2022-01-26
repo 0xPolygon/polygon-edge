@@ -14,7 +14,7 @@ github.com/armon/go-radix
 github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy v0.1.0
 github.com/bgentry/speakeasy
-# github.com/btcsuite/btcd v0.21.0-beta
+# github.com/btcsuite/btcd v0.22.0-beta
 ## explicit
 github.com/btcsuite/btcd/btcec
 # github.com/cenkalti/backoff/v3 v3.0.0
