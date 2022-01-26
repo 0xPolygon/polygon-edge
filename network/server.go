@@ -5,14 +5,16 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -26,39 +28,47 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-const DefaultLibp2pPort int = 1478
-
 const (
+	DefaultDialRatio = 0.2
+
+	DefaultLibp2pPort int = 1478
+
 	MinimumPeerConnections int64 = 1
 
-	// MinimumBootNodes Count is set to 2 so that a bootnode can reconnect to the network
-	// using other bootnode after restarting
-	MinimumBootNodes int = 2
+	MinimumBootNodes int = 1
+
+	// Priority for dial queue
+	PriorityRequestedDial uint64 = 1
+
+	PriorityRandomDial uint64 = 10
 )
 
-// Priority for dial queue
-const (
-	PriorityRequestedDial uint64 = 1
-	PriorityRandomDial    uint64 = 10
+var (
+	ErrNoBootnodes  = errors.New("no bootnodes specified")
+	ErrMinBootnodes = errors.New("minimum 1 bootnode is required")
 )
 
 type Config struct {
-	NoDiscover     bool
-	Addr           *net.TCPAddr
-	NatAddr        net.IP
-	DNS            multiaddr.Multiaddr
-	DataDir        string
-	MaxPeers       uint64
-	Chain          *chain.Chain
-	SecretsManager secrets.SecretsManager
-	Metrics        *Metrics
+	NoDiscover       bool
+	Addr             *net.TCPAddr
+	NatAddr          net.IP
+	DNS              multiaddr.Multiaddr
+	DataDir          string
+	MaxPeers         int64
+	MaxInboundPeers  int64
+	MaxOutboundPeers int64
+	Chain            *chain.Chain
+	SecretsManager   secrets.SecretsManager
+	Metrics          *Metrics
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		NoDiscover: false,
-		Addr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
-		MaxPeers:   10,
+		NoDiscover:       false,
+		Addr:             &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultLibp2pPort},
+		MaxPeers:         40,
+		MaxInboundPeers:  32,
+		MaxOutboundPeers: 8,
 	}
 }
 
@@ -94,12 +104,16 @@ type Server struct {
 	joinWatchersLock sync.Mutex
 
 	emitterPeerEvent event.Emitter
+
+	inboundConnCount int64
 }
 
 type Peer struct {
 	srv *Server
 
 	Info peer.AddrInfo
+
+	connDirection network.Direction
 }
 
 // setupLibp2pKey is a helper method for setting up the networking private key
@@ -134,6 +148,11 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
+
+	if config.MaxPeers != DefaultConfig().MaxPeers {
+		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
+		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
+	}
 
 	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {
@@ -215,8 +234,14 @@ func (s *Server) Start() error {
 	s.logger.Info("LibP2P server running", "addr", AddrInfoToString(s.AddrInfo()))
 
 	if !s.config.NoDiscover {
-		if s.config.Chain.Bootnodes != nil && len(s.config.Chain.Bootnodes) < MinimumBootNodes {
-			return errors.New("minimum two bootnodes are required")
+		// Check the bootnode config is present
+		if s.config.Chain.Bootnodes == nil {
+			return ErrNoBootnodes
+		}
+
+		// Check if at least one bootnode is specified
+		if len(s.config.Chain.Bootnodes) < MinimumBootNodes {
+			return ErrMinBootnodes
 		}
 
 		// start discovery
@@ -377,12 +402,33 @@ func (s *Server) hasPeer(peerID peer.ID) bool {
 }
 
 func (s *Server) numOpenSlots() int64 {
-	n := int64(s.config.MaxPeers) - (s.numPeers() + s.identity.numPending())
+	n := s.maxOutboundConns() - s.outboundConns()
 	if n < 0 {
 		n = 0
 	}
 
 	return n
+}
+
+func (s *Server) inboundConns() int64 {
+	count := atomic.LoadInt64(&s.inboundConnCount)
+	if count < 0 {
+		count = 0
+	}
+
+	return count + s.identity.pendingInboundConns()
+}
+
+func (s *Server) outboundConns() int64 {
+	return (s.numPeers() - atomic.LoadInt64(&s.inboundConnCount)) + s.identity.pendingOutboundConns()
+}
+
+func (s *Server) maxInboundConns() int64 {
+	return s.config.MaxInboundPeers
+}
+
+func (s *Server) maxOutboundConns() int64 {
+	return s.config.MaxOutboundPeers
 }
 
 func (s *Server) isConnected(peerID peer.ID) bool {
@@ -397,17 +443,21 @@ func (s *Server) GetPeerInfo(peerID peer.ID) peer.AddrInfo {
 	return s.host.Peerstore().PeerInfo(peerID)
 }
 
-func (s *Server) addPeer(id peer.ID) {
+func (s *Server) addPeer(id peer.ID, direction network.Direction) {
 	s.logger.Info("Peer connected", "id", id.String())
-
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
 	p := &Peer{
-		srv:  s,
-		Info: s.host.Peerstore().PeerInfo(id),
+		srv:           s,
+		Info:          s.host.Peerstore().PeerInfo(id),
+		connDirection: direction,
 	}
 	s.peers[id] = p
+
+	if direction == network.DirInbound {
+		atomic.AddInt64(&s.inboundConnCount, 1)
+	}
 
 	s.emitEvent(id, PeerConnected)
 	s.metrics.Peers.Set(float64(len(s.peers)))
@@ -419,7 +469,13 @@ func (s *Server) delPeer(id peer.ID) {
 	s.peersLock.Lock()
 	defer s.peersLock.Unlock()
 
-	delete(s.peers, id)
+	if peer, ok := s.peers[id]; ok {
+		if peer.connDirection == network.DirInbound {
+			atomic.AddInt64(&s.inboundConnCount, -1)
+		}
+
+		delete(s.peers, id)
+	}
 
 	if closeErr := s.host.Network().ClosePeer(id); closeErr != nil {
 		s.logger.Error(
@@ -665,23 +721,15 @@ func (s *Server) SubscribeFn(handler func(evnt *PeerEvent)) error {
 func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 	ch := make(chan *PeerEvent)
 
-	var closed bool
-
-	var mutex sync.Mutex
-
-	isClosed := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		return closed
-	}
+	var isClosed int32 = 0
 
 	err := s.SubscribeFn(func(evnt *PeerEvent) {
-		if !isClosed() {
+		if atomic.LoadInt32(&isClosed) == 0 {
 			ch <- evnt
 		}
 	})
 	if err != nil {
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 
 		return nil, err
@@ -689,9 +737,7 @@ func (s *Server) SubscribeCh() (<-chan *PeerEvent, error) {
 
 	go func() {
 		<-s.closeCh
-		mutex.Lock()
-		closed = true
-		mutex.Unlock()
+		atomic.StoreInt32(&isClosed, 1)
 		close(ch)
 	}()
 

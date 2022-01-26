@@ -11,7 +11,8 @@ import (
 func discoveryConfig(c *Config) {
 	// we limit maxPeers=1 to limit the number of connections
 	// since we only want to test discovery
-	c.MaxPeers = 2
+	c.MaxInboundPeers = 2
+	c.MaxOutboundPeers = 2
 }
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
@@ -58,7 +59,8 @@ func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 func TestRoutingTable_Connected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -101,7 +103,8 @@ func TestRoutingTable_Connected(t *testing.T) {
 func TestRoutingTable_Disconnected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -162,7 +165,8 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -185,8 +189,10 @@ func TestRoutingTable_ConnectionFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if joinErr := JoinAndWait(servers[0], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr == nil {
-		t.Fatalf("should failed to connect to server[1], but connected")
+	// Set a small join timeout, no need to wait ~40s for the connection to fail
+	smallTimeout := time.Second * 10
+	if joinErr := JoinAndWait(servers[0], servers[1], smallTimeout+time.Second*5, smallTimeout); joinErr == nil {
+		t.Fatalf("should fail to connect to server[1], but connected")
 	}
 
 	// routing tables should be empty

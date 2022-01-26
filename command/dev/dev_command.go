@@ -3,8 +3,8 @@ package dev
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -80,6 +80,14 @@ func (d *DevCommand) DefineFlags() {
 		},
 		ArgumentsOptional: false,
 		FlagOptional:      true,
+	}
+
+	d.FlagMap["restore"] = helper.FlagDescriptor{
+		Description: "Sets the path to the archive blockchain data to restore on initialization",
+		Arguments: []string{
+			"RESTORE",
+		},
+		FlagOptional: true,
 	}
 }
 

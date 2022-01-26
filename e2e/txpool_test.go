@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/e2e/framework"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	txpoolOp "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
@@ -406,44 +406,6 @@ func TestTxPool_StressAddition(t *testing.T) {
 
 		assert.Equal(t, uint64(numTxPerAccount), nonce)
 	}
-}
-
-func TestInvalidTransactionRecover(t *testing.T) {
-	// Test scenario :
-	// Send a transaction with gasLimit > block gas limit.
-	//		-> The transaction should not be applied, and the nonce should not be incremented.
-	senderKey, senderAddress := tests.GenerateKeyAndAddr(t)
-	_, receiverAddress := tests.GenerateKeyAndAddr(t)
-
-	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDev)
-		config.SetSeal(true)
-		config.Premine(senderAddress, framework.EthToWei(100))
-	})[0]
-	client := server.JSONRPC()
-
-	tx, err := signer.SignTx(&types.Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(10000),
-		Gas:      5000000000,
-		To:       &receiverAddress,
-		Value:    oneEth,
-		V:        big.NewInt(1),
-		From:     senderAddress,
-	}, senderKey)
-	assert.NoError(t, err, "failed to sign transaction")
-
-	// send tx
-	_, err = server.JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
-	assert.NoError(t, err)
-
-	balance, err := client.Eth().GetBalance(web3.Address(receiverAddress), web3.Latest)
-	assert.NoError(t, err, "failed to retrieve receiver account balance")
-	assert.Equal(t, framework.EthToWei(0).String(), balance.String())
-
-	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), nextNonce)
 }
 
 func TestTxPool_RecoverableError(t *testing.T) {

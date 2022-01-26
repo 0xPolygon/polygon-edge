@@ -121,6 +121,33 @@ func isKeySet(v *fastjson.Value, key string) bool {
 }
 
 func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
+	exists := func(names ...string) error {
+		for _, name := range names {
+			if !v.Exists(name) {
+				return fmt.Errorf("'%s' not found", name)
+			}
+		}
+		return nil
+	}
+
+	// detect transaction type
+	var typ TransactionType
+	if isKeySet(v, "chainId") {
+		if isKeySet(v, "maxFeePerGas") {
+			typ = TransactionDynamicFee
+		} else {
+			typ = TransactionAccessList
+		}
+	} else {
+		typ = TransactionLegacy
+	}
+	t.Type = typ
+
+	// 'to' must exists
+	if err := exists("to"); err != nil {
+		return err
+	}
+
 	var err error
 	if err := decodeHash(&t.Hash, v, "hash"); err != nil {
 		return err
@@ -129,9 +156,6 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 		return err
 	}
 	if t.GasPrice, err = decodeUint(v, "gasPrice"); err != nil {
-		return err
-	}
-	if t.Gas, err = decodeUint(v, "gas"); err != nil {
 		return err
 	}
 	if t.Input, err = decodeBytes(t.Input[:0], v, "input"); err != nil {
@@ -144,15 +168,14 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 		return err
 	}
 
-	if !v.Exists("to") {
-		return fmt.Errorf("'to' not found")
-	}
-	if v.Get("to").String() != "null" {
-		var to Address
-		if err = decodeAddr(&to, v, "to"); err != nil {
-			return err
+	{
+		if v.Get("to").String() != "null" {
+			var to Address
+			if err = decodeAddr(&to, v, "to"); err != nil {
+				return err
+			}
+			t.To = &to
 		}
-		t.To = &to
 	}
 
 	if t.V, err = decodeBytes(t.V[:0], v, "v"); err != nil {
@@ -163,6 +186,30 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 	}
 	if t.S, err = decodeBytes(t.S[:0], v, "s"); err != nil {
 		return err
+	}
+
+	if typ != TransactionLegacy {
+		if t.ChainID, err = decodeBigInt(t.ChainID, v, "chainId"); err != nil {
+			return err
+		}
+		if isKeySet(v, "accessList") {
+			if err := t.AccessList.unmarshalJSON(v.Get("accessList")); err != nil {
+				return err
+			}
+		}
+	}
+
+	if typ == TransactionDynamicFee {
+		if t.MaxPriorityFeePerGas, err = decodeBigInt(t.MaxPriorityFeePerGas, v, "maxPriorityFeePerGas"); err != nil {
+			return err
+		}
+		if t.MaxFeePerGas, err = decodeBigInt(t.MaxFeePerGas, v, "maxFeePerGas"); err != nil {
+			return err
+		}
+	} else {
+		if t.Gas, err = decodeUint(v, "gas"); err != nil {
+			return err
+		}
 	}
 
 	// Check if the block hash field is set
@@ -187,6 +234,36 @@ func (t *Transaction) unmarshalJSON(v *fastjson.Value) error {
 		}
 	}
 
+	return nil
+}
+
+func (t *AccessList) unmarshalJSON(v *fastjson.Value) error {
+	elems, err := v.Array()
+	if err != nil {
+		return err
+	}
+	for _, elem := range elems {
+		entry := AccessEntry{}
+		if err = decodeAddr(&entry.Address, elem, "address"); err != nil {
+			return err
+		}
+		storage, err := elem.Get("storageKeys").Array()
+		if err != nil {
+			return err
+		}
+
+		entry.Storage = make([]Hash, len(storage))
+		for indx, stg := range storage {
+			b, err := stg.StringBytes()
+			if err != nil {
+				return err
+			}
+			if err := entry.Storage[indx].UnmarshalText(b); err != nil {
+				return err
+			}
+		}
+		*t = append(*t, entry)
+	}
 	return nil
 }
 

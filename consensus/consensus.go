@@ -2,16 +2,16 @@ package consensus
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-sdk/protocol"
 	"log"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/chain"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/state"
-	"github.com/0xPolygon/polygon-sdk/txpool"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/txpool"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"google.golang.org/grpc"
 )
@@ -26,9 +26,12 @@ type Consensus interface {
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 
-	// Start starts the consensus
+	// Initialize initializes the consensus (e.g. setup data)
+	Initialize() error
+
+	// Start starts the consensus and servers
 	Start() error
 
 	// Close closes the connection

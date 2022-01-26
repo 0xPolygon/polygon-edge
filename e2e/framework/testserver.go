@@ -16,20 +16,20 @@ import (
 	"testing"
 	"time"
 
-	ibftOp "github.com/0xPolygon/polygon-sdk/consensus/ibft/proto"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 
-	"github.com/0xPolygon/polygon-sdk/command/genesis"
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	secretsCommand "github.com/0xPolygon/polygon-sdk/command/secrets"
-	"github.com/0xPolygon/polygon-sdk/command/server"
-	"github.com/0xPolygon/polygon-sdk/crypto"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/secrets"
-	"github.com/0xPolygon/polygon-sdk/secrets/local"
-	"github.com/0xPolygon/polygon-sdk/server/proto"
-	txpoolProto "github.com/0xPolygon/polygon-sdk/txpool/proto"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/server"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
+	"github.com/0xPolygon/polygon-edge/server/proto"
+	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/umbracle/go-web3"
@@ -41,8 +41,8 @@ import (
 type TestServerConfigCallback func(*TestServerConfig)
 
 const (
-	initialPort   = 12000
-	polygonSDKCmd = "polygon-sdk"
+	initialPort = 12000
+	binaryName  = "polygon-edge"
 )
 
 type TestServer struct {
@@ -162,7 +162,7 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
 	if _, err := cmd.Output(); err != nil {
@@ -239,10 +239,6 @@ func (t *TestServer) GenerateGenesis() error {
 
 		args = append(args, "--ibft-validators-prefix-path", t.Config.IBFTDirPrefix)
 
-		for _, bootnode := range t.Config.Bootnodes {
-			args = append(args, "--bootnode", bootnode)
-		}
-
 		if t.Config.EpochSize != 0 {
 			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
 		}
@@ -255,6 +251,10 @@ func (t *TestServer) GenerateGenesis() error {
 		}
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
+	}
+
+	for _, bootnode := range t.Config.Bootnodes {
+		args = append(args, "--bootnode", bootnode)
 	}
 
 	// Make sure the correct mechanism is selected
@@ -270,7 +270,7 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	cmd := exec.Command(polygonSDKCmd, args...)
+	cmd := exec.Command(binaryName, args...)
 	cmd.Dir = t.Config.RootDir
 
 	return cmd.Run()
@@ -324,7 +324,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.ReleaseReservedPorts()
 
 	// Start the server
-	t.cmd = exec.Command(polygonSDKCmd, args...)
+	t.cmd = exec.Command(binaryName, args...)
 	t.cmd.Dir = t.Config.RootDir
 
 	if t.Config.ShowsLog {

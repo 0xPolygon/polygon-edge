@@ -3,7 +3,7 @@ package itrie
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-sdk/state"
+	"github.com/0xPolygon/polygon-edge/state"
 )
 
 func TestState(t *testing.T) {

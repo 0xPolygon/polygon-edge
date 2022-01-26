@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-sdk/blockchain"
-	"github.com/0xPolygon/polygon-sdk/helper/tests"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/types"
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
@@ -119,7 +119,7 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 	})
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		return nil, syncer.syncProgression.getProgression().CurrentBlock < target
+		return nil, syncer.syncProgression.GetProgression().CurrentBlock < target
 	})
 	assert.NoError(t, err)
 }

@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/command/helper"
-	"github.com/0xPolygon/polygon-sdk/network"
-	"github.com/0xPolygon/polygon-sdk/server"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -69,7 +69,7 @@ func (c *ServerCommand) DefineFlags() {
 
 	c.FlagMap["data-dir"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
-			"Specifies the data directory used for storing Polygon SDK client data. Default: %s",
+			"Specifies the data directory used for storing Polygon Edge client data. Default: %s",
 			helper.DefaultConfig().DataDir,
 		),
 		Arguments: []string{
@@ -144,7 +144,26 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["max-peers"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
+		Description: fmt.Sprintf("Sets the client's max no.of peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-inbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of inbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxInboundPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-outbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of outbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxOutboundPeers),
 		Arguments: []string{
 			"PEER_COUNT",
 		},
@@ -203,11 +222,19 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["restore"] = helper.FlagDescriptor{
+		Description: "Sets the path to the archive blockchain data to restore on initialization",
+		Arguments: []string{
+			"RESTORE",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
 func (c *ServerCommand) GetHelperText() string {
-	return "The default command that starts the Polygon-SDK client, by bootstrapping all modules together"
+	return "The default command that starts the Polygon Edge client, by bootstrapping all modules together"
 }
 
 func (c *ServerCommand) GetBaseCommand() string {

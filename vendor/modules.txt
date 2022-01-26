@@ -391,13 +391,13 @@ github.com/syndtr/goleveldb/leveldb/opt
 github.com/syndtr/goleveldb/leveldb/storage
 github.com/syndtr/goleveldb/leveldb/table
 github.com/syndtr/goleveldb/leveldb/util
-# github.com/umbracle/fastrlp v0.0.0-20211210202053-92c528b55dea
+# github.com/umbracle/fastrlp v0.0.0-20211229195328-c1416904ae17
 ## explicit
 github.com/umbracle/fastrlp
 # github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b
 ## explicit
 github.com/umbracle/go-eth-bn256
-# github.com/umbracle/go-web3 v0.0.0-20211216153058-58e3410a6fa5
+# github.com/umbracle/go-web3 v0.0.0-20220120123135-b6d93c310279
 ## explicit
 github.com/umbracle/go-web3
 github.com/umbracle/go-web3/abi
@@ -438,7 +438,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
+# golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 ## explicit
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blake2s
@@ -474,7 +474,7 @@ golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/route
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
+# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
