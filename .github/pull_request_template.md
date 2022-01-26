@@ -20,12 +20,12 @@ Please complete this section if any breaking changes have been made, otherwise d
 - [ ] I have updated the official documentation
 - [ ] I have added sufficient documentation in code
 
-# Testing
+## Testing
 
 - [ ] I ran the official test suite
 - [ ] I ran custom tests
 
-## Custom tests
+### Custom tests
 
 Please complete this section if you ran custom tests for this functionality, otherwise delete it
 
