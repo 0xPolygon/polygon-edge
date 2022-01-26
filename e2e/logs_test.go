@@ -27,7 +27,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key, addr)
+	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", addr, key)
+		srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)
@@ -109,7 +109,7 @@ func TestFilterValue(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, key, addr)
+	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func TestFilterValue(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.InvokeMethod(ctx, types.Address(contractAddr), "TriggerMyEvent", addr, key)
+		srv.InvokeMethod(ctx, types.Address(contractAddr), "TriggerMyEvent", key)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)

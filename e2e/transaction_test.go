@@ -376,7 +376,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode, senderKey, sender)
+	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode, senderKey)
 
 	if err != nil {
 		t.Fatal(err)

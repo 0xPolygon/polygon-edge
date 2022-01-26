@@ -24,7 +24,7 @@ func TestEncoding(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	contractAddr, err := srv.DeployContract(ctx, sampleByteCode, key, from)
+	contractAddr, err := srv.DeployContract(ctx, sampleByteCode, key)
 
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestEncoding(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	receipt := srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", from, key)
+	receipt := srv.InvokeMethod(ctx, types.Address(contractAddr), "setA1", key)
 
 	// try to get the transaction
 	client := srv.JSONRPC().Eth()

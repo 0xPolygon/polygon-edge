@@ -365,11 +365,15 @@ func (t *TestServer) DeployContract(
 	ctx context.Context,
 	binary string,
 	privateKey *ecdsa.PrivateKey,
-	sender types.Address,
 ) (web3.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
 		return web3.Address{}, err
+	}
+
+	sender, err := crypto.GetAddressFromKey(privateKey)
+	if err != nil {
+		return web3.ZeroAddress, fmt.Errorf("unable to extract key, %w", err)
 	}
 
 	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
@@ -484,10 +488,14 @@ func (t *TestServer) InvokeMethod(
 	ctx context.Context,
 	contractAddress types.Address,
 	method string,
-	fromAddress types.Address,
 	fromKey *ecdsa.PrivateKey,
 ) *web3.Receipt {
 	sig := MethodSig(method)
+
+	fromAddress, err := crypto.GetAddressFromKey(fromKey)
+	if err != nil {
+		t.t.Fatalf("unable to extract key, %v", err)
+	}
 
 	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
 		Gas:      DefaultGasLimit,
