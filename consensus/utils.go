@@ -17,7 +17,6 @@ type BuildBlockParams struct {
 // BuildBlock is a utility function that builds a block, based on the passed in header, transactions and receipts
 func BuildBlock(params BuildBlockParams) *types.Block {
 	txs := params.Txns
-	receipts := params.Receipts
 	header := params.Header
 
 	if len(txs) == 0 {
@@ -26,10 +25,10 @@ func BuildBlock(params BuildBlockParams) *types.Block {
 		header.TxRoot = buildroot.CalculateTransactionsRoot(txs)
 	}
 
-	if len(receipts) == 0 {
+	if len(params.Receipts) == 0 {
 		header.ReceiptsRoot = types.EmptyRootHash
 	} else {
-		header.ReceiptsRoot = buildroot.CalculateReceiptsRoot(receipts)
+		header.ReceiptsRoot = buildroot.CalculateReceiptsRoot(params.Receipts)
 	}
 
 	// TODO: Compute uncles

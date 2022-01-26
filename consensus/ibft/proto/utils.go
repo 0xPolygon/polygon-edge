@@ -33,15 +33,30 @@ func ViewMsg(sequence, round uint64) *View {
 
 // Copy makes a copy of the message request, and returns it
 func (m *MessageReq) Copy() *MessageReq {
-	return proto.Clone(m).(*MessageReq)
+	request, ok := proto.Clone(m).(*MessageReq)
+	if !ok {
+		return nil
+	}
+
+	return request
 }
 
 // Copy makes a copy of the candidate and returns it
 func (c *Candidate) Copy() *Candidate {
-	return proto.Clone(c).(*Candidate)
+	candidateClone, ok := proto.Clone(c).(*Candidate)
+	if !ok {
+		return nil
+	}
+
+	return candidateClone
 }
 
 // Copy makes a copy of the view and returns it
 func (v *View) Copy() *View {
-	return proto.Clone(v).(*View)
+	viewClone, ok := proto.Clone(v).(*View)
+	if !ok {
+		return nil
+	}
+
+	return viewClone
 }

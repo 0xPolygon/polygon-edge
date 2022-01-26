@@ -375,8 +375,9 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	cliConfig := &Config{
 		Network: &Network{
-			NoDiscover: true,
-			MaxPeers:   0,
+			NoDiscover:       true,
+			MaxOutboundPeers: 0,
+			MaxInboundPeers:  0,
 		},
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
@@ -461,7 +462,9 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		" the host DNS address which can be used by a remote peer for connection",
 	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
-	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.Int64Var(&cliConfig.Network.MaxPeers, "max-peers", -1, "maximum number of peers")
+	flags.Int64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", -1, "maximum number of inbound peers")
+	flags.Int64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", -1, "maximum number of outbound peers")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
@@ -475,11 +478,23 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		return nil, err
 	}
 
+	if cliConfig.Network.MaxPeers != -1 {
+		if cliConfig.Network.MaxInboundPeers != -1 || cliConfig.Network.MaxOutboundPeers != -1 {
+			return nil, errors.New("both max-peers and max-inbound/outbound flags are set")
+		}
+	}
+
 	if configFile != "" {
 		// A config file has been passed in, parse it
 		diskConfigFile, err := readConfigFile(configFile)
 		if err != nil {
 			return nil, err
+		}
+
+		if diskConfigFile.Network.MaxPeers != -1 {
+			if diskConfigFile.Network.MaxInboundPeers != -1 || diskConfigFile.Network.MaxOutboundPeers != -1 {
+				return nil, errors.New("both max-peers & max-inbound/outbound flags are set")
+			}
 		}
 
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {
