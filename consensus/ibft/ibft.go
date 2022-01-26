@@ -223,7 +223,12 @@ func Factory(
 		epochSize = DefaultEpochSize
 	} else {
 		// Epoch size is defined, use the passed in one
-		epochSize = uint64(definedEpochSize.(float64))
+		readSize, ok := definedEpochSize.(float64)
+		if !ok {
+			return nil, errors.New("invalid type assertion")
+		}
+
+		epochSize = uint64(readSize)
 	}
 
 	p := &Ibft{

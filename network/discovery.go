@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -224,7 +225,12 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
+	rawGrpcConn, ok := stream.(*rawGrpc.ClientConn)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	clt := proto.NewDiscoveryClient(rawGrpcConn)
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
 	if err != nil {
@@ -272,7 +278,12 @@ func (d *discovery) FindPeers(
 	ctx context.Context,
 	req *proto.FindPeersReq,
 ) (*proto.FindPeersResp, error) {
-	from := ctx.(*grpc.Context).PeerID
+	grpcContext, ok := ctx.(*grpc.Context)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	from := grpcContext.PeerID
 
 	if req.Count > 16 {
 		// max limit

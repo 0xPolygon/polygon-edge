@@ -130,9 +130,19 @@ func TestEth_State_GetBalance(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				if tt.expectedBalance == 0 {
-					assert.Equal(t, *argUintPtr(0), *balance.(*argUint64))
+					uintBalance, ok := balance.(*argUint64)
+					if !ok {
+						t.Fatalf("invalid type assertion")
+					}
+
+					assert.Equal(t, *argUintPtr(0), *uintBalance)
 				} else {
-					assert.Equal(t, *argBigPtr(big.NewInt(tt.expectedBalance)), *balance.(*argBig))
+					bigBalance, ok := balance.(*argBig)
+					if !ok {
+						t.Fatalf("invalid type assertion")
+					}
+
+					assert.Equal(t, *argBigPtr(big.NewInt(tt.expectedBalance)), *bigBalance)
 				}
 			}
 		})
