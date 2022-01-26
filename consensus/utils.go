@@ -46,7 +46,7 @@ func MilliToUnix(m uint64) time.Time {
 	return time.Unix(0, int64(m)*1e6)
 }
 
-// UnixToMilli returns the returns uint64 represented as miliseconds
+// UnixToMilli returns uint64 value for miliseconds
 func UnixToMilli(t time.Time) uint64 {
 	return uint64(t.UnixNano() / 1e6)
 }
