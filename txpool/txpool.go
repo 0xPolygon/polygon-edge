@@ -84,15 +84,8 @@ through their designated channels. */
 
 // An enqueueRequest is created for any transaction
 // meant to be enqueued onto some account.
-// This request is made on 2 occasions:
-//
-// 	1. When a transaction is initially discovered with addTx
-// 	and passes validation.
-//
-//	2. When consensus is processing a previously
-// 	promoted transaction and decides to return it
-// 	to the pool (Demote). These requests have the
-// 	demoted flag set to true.
+// This request is created for (new) transactions
+// that passed validation in addTx.
 type enqueueRequest struct {
 	tx *types.Transaction
 }
