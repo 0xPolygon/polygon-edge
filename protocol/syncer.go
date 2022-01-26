@@ -274,7 +274,14 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 
 	peer, ok := s.peers.Load(peerID)
 	if ok {
-		peer.(*SyncPeer).appendBlock(b)
+		syncPeer, ok := peer.(*SyncPeer)
+		if !ok {
+			s.logger.Error("invalid sync peer type cast")
+
+			return
+		}
+
+		syncPeer.appendBlock(b)
 	}
 }
 
@@ -291,7 +298,14 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 	)
 
 	if peer, ok := s.peers.Load(peerID); ok {
-		peer.(*SyncPeer).updateStatus(status)
+		syncPeer, ok := peer.(*SyncPeer)
+		if !ok {
+			s.logger.Error("invalid sync peer type cast")
+
+			return
+		}
+
+		syncPeer.updateStatus(status)
 	}
 }
 
@@ -401,7 +415,12 @@ func (s *Syncer) BestPeer() *SyncPeer {
 	var bestTd *big.Int
 
 	s.peers.Range(func(peerID, peer interface{}) bool {
-		status := peer.(*SyncPeer).status
+		syncPeer, ok := peer.(*SyncPeer)
+		if !ok {
+			return false
+		}
+
+		status := syncPeer.status
 		if bestPeer == nil || status.Difficulty.Cmp(bestTd) > 0 {
 			var correctAssertion bool
 
@@ -471,11 +490,16 @@ func (s *Syncer) AddPeer(peerID peer.ID) error {
 func (s *Syncer) DeletePeer(peerID peer.ID) error {
 	p, ok := s.peers.LoadAndDelete(peerID)
 	if ok {
-		if err := p.(*SyncPeer).conn.Close(); err != nil {
+		syncPeer, ok := p.(*SyncPeer)
+		if !ok {
+			return errors.New("invalid type assertion")
+		}
+
+		if err := syncPeer.conn.Close(); err != nil {
 			return err
 		}
 
-		close(p.(*SyncPeer).enqueueCh)
+		close(syncPeer.enqueueCh)
 	}
 
 	return nil

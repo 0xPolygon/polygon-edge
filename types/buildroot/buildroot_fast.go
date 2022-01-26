@@ -23,7 +23,12 @@ func acquireFastHasher() *FastHasher {
 		return &FastHasher{k: keccak.NewKeccak256()}
 	}
 
-	return v.(*FastHasher)
+	hasher, ok := v.(*FastHasher)
+	if !ok {
+		return nil
+	}
+
+	return hasher
 }
 
 func releaseFastHasher(f *FastHasher) {

@@ -144,7 +144,26 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["max-peers"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
+		Description: fmt.Sprintf("Sets the client's max no.of peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-inbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of inbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxInboundPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-outbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of outbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxOutboundPeers),
 		Arguments: []string{
 			"PEER_COUNT",
 		},

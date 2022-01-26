@@ -35,7 +35,12 @@ func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
 		return nil
 	}
 
-	return rawPeer.(*SyncPeer)
+	syncPeer, ok := rawPeer.(*SyncPeer)
+	if !ok {
+		return nil
+	}
+
+	return syncPeer
 }
 
 // CreateSyncer initialize syncer with server
