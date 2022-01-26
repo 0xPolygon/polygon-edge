@@ -10,9 +10,11 @@ func hasTerm(hex []byte) bool {
 	return hex[len(hex)-1] == 16
 }
 
+// encodeCompact converts hex nibbles to compact byte form for HP
 func encodeCompact(hex []byte) []byte {
-	// check terminator flag
 	var terminator int
+
+	// check terminator flag
 	if hasTerm(hex) {
 		hex = hex[:len(hex)-1]
 		terminator = 1
@@ -40,6 +42,7 @@ func encodeCompact(hex []byte) []byte {
 	return result
 }
 
+// bytesToHexNibbles converts a byte array to a hex nibble array
 func bytesToHexNibbles(str []byte) []byte {
 	nibbles := make([]byte, len(str)*2+1)
 	for i, b := range str {
@@ -52,6 +55,7 @@ func bytesToHexNibbles(str []byte) []byte {
 	return nibbles
 }
 
+// decodeCompact transforms the HP bytes to hex nibbles
 func decodeCompact(compact []byte) []byte {
 	base := bytesToHexNibbles(compact)
 	// delete terminator flag
