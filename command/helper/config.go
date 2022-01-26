@@ -36,7 +36,7 @@ type Config struct {
 	Consensus      map[string]interface{} `json:"consensus"`
 	RestoreFile    string                 `json:"restore_file"`
 	// block time im miliseconds
-	BlockTime      uint64                 `json:"block_time_ms"`
+	BlockTime uint64 `json:"block_time_ms"`
 }
 
 // Telemetry holds the config details for metric services.

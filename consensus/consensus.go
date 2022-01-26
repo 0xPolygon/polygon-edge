@@ -66,7 +66,7 @@ type ConsensusParams struct {
 	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
 	// block time in miliseconds
-	BlockTime      uint64
+	BlockTime uint64
 }
 
 // Factory is the factory function to create a discovery backend

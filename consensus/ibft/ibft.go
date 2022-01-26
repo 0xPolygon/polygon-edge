@@ -609,9 +609,9 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
-	// calculate milisecond values from consensus custom functions in utils.go file
+	// calculate millisecond values from consensus custom functions in utils.go file
 	// to preserve go backward compatibility as time.UnixMili is available as of go 17
-	
+
 	// set the timestamp
 	parentTime := consensus.MilliToUnix(parent.Timestamp)
 	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
@@ -621,7 +621,6 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	}
 
 	header.Timestamp = consensus.UnixToMilli(headerTime)
-	
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
