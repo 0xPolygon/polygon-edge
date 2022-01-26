@@ -2,19 +2,20 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/go-web3"
 )
 
 type testWSRequest struct {
@@ -57,12 +58,15 @@ func getWSResponse(t *testing.T, ws *websocket.Conn, request []byte) jsonrpc.Suc
 }
 
 func TestWS_Response(t *testing.T) {
+	key1, addr1 := tests.GenerateKeyAndAddr(t)
+	key2, addr2 := tests.GenerateKeyAndAddr(t)
 	preminedAccounts := []struct {
 		address types.Address
+		privKey *ecdsa.PrivateKey
 		balance *big.Int
 	}{
-		{types.StringToAddress("1"), framework.EthToWei(10)},
-		{types.StringToAddress("2"), framework.EthToWei(20)},
+		{addr1, key1, framework.EthToWei(10)},
+		{addr2, key2, framework.EthToWei(20)},
 	}
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -75,6 +79,7 @@ func TestWS_Response(t *testing.T) {
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
+	signer := crypto.NewEIP155Signer(100)
 
 	// Convert the default JSONRPC address to a WebSocket one
 	wsURL := "ws" + strings.TrimPrefix(srv.JSONRPCAddr(), "http") + "/ws"
@@ -118,14 +123,19 @@ func TestWS_Response(t *testing.T) {
 	})
 
 	t.Run("Valid block number after transfer", func(t *testing.T) {
-		hash, err := client.Eth().SendTransaction(&web3.Transaction{
-			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
-			To:       (*web3.Address)(&preminedAccounts[1].address),
-			GasPrice: 10000,
+		signedTxn, err := signer.SignTx(&types.Transaction{
+			From:     preminedAccounts[0].address,
+			To:       &preminedAccounts[1].address,
+			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(0),
-		})
+		}, preminedAccounts[0].privKey)
+		if err != nil {
+			t.Log("Could not sign transaction")
+		}
+
+		hash, err := client.Eth().SendRawTransaction(signedTxn.MarshalRLP())
 		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

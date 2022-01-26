@@ -120,23 +120,31 @@ func TestPreminedBalance(t *testing.T) {
 }
 
 func TestEthTransfer(t *testing.T) {
+	key1, addr1 := tests.GenerateKeyAndAddr(t)
+	key2, addr2 := tests.GenerateKeyAndAddr(t)
+	key3, addr3 := tests.GenerateKeyAndAddr(t)
+
 	validAccounts := []struct {
 		address types.Address
+		privKey *ecdsa.PrivateKey
 		balance *big.Int
 	}{
 		// Valid account #1
 		{
-			types.StringToAddress("1"),
+			addr1,
+			key1,
 			framework.EthToWei(50), // 50 ETH
 		},
 		// Empty account
 		{
-			types.StringToAddress("2"),
+			addr2,
+			key2,
 			big.NewInt(0),
 		},
 		// Valid account #2
 		{
-			types.StringToAddress("3"),
+			addr3,
+			key3,
 			framework.EthToWei(10), // 10 ETH
 		},
 	}
@@ -144,6 +152,7 @@ func TestEthTransfer(t *testing.T) {
 	testTable := []struct {
 		name          string
 		sender        types.Address
+		senderKey     *ecdsa.PrivateKey
 		recipient     types.Address
 		amount        *big.Int
 		shouldSucceed bool
@@ -152,6 +161,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #1 -> ACC #3
 			"Valid ETH transfer #1",
 			validAccounts[0].address,
+			validAccounts[0].privKey,
 			validAccounts[2].address,
 			framework.EthToWei(10),
 			true,
@@ -160,6 +170,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #2 -> ACC #3
 			"Invalid ETH transfer",
 			validAccounts[1].address,
+			validAccounts[1].privKey,
 			validAccounts[2].address,
 			framework.EthToWei(100),
 			false,
@@ -168,6 +179,7 @@ func TestEthTransfer(t *testing.T) {
 			// ACC #3 -> ACC #2
 			"Valid ETH transfer #2",
 			validAccounts[2].address,
+			validAccounts[2].privKey,
 			validAccounts[1].address,
 			framework.EthToWei(5),
 			true,
@@ -204,18 +216,21 @@ func TestEthTransfer(t *testing.T) {
 			previousSenderBalance := balanceSender
 			previousReceiverBalance := balanceReceiver
 
-			// Create the transaction
-			toAddr := web3.Address(testCase.recipient)
-			txnObject := &web3.Transaction{
-				From:     web3.Address(testCase.sender),
-				To:       &toAddr,
-				GasPrice: uint64(1048576),
+			// Get signer
+			signer := crypto.NewEIP155Signer(100)
+			// Sign txn
+			txnObject, err := signer.SignTx(&types.Transaction{
+				From:     testCase.sender,
+				GasPrice: big.NewInt(int64(1048576)),
 				Gas:      1000000,
+				To:       &testCase.recipient,
 				Value:    testCase.amount,
+			}, testCase.senderKey)
+			if err != nil {
+				t.Error("Could not sign transacion", err.Error())
 			}
-
-			// Do the transfer
-			txnHash, err := rpcClient.Eth().SendTransaction(txnObject)
+			// Do the raw transfer
+			txnHash, err := rpcClient.Eth().SendRawTransaction(txnObject.MarshalRLP())
 			if testCase.shouldSucceed {
 				assert.NoError(t, err)
 			} else {
@@ -254,7 +269,7 @@ func TestEthTransfer(t *testing.T) {
 			if testCase.shouldSucceed {
 				fee := new(big.Int).Mul(
 					big.NewInt(int64(receipt.GasUsed)),
-					big.NewInt(int64(txnObject.GasPrice)),
+					big.NewInt(txnObject.GasPrice.Int64()),
 				)
 
 				expectedSenderBalance = previousSenderBalance.Sub(
@@ -384,7 +399,7 @@ func Test_TransactionDevLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode)
+	contractAddr, err := srv.DeployContract(ctx, stressTestBytecode, senderKey)
 
 	if err != nil {
 		t.Fatal(err)

@@ -2,11 +2,14 @@ package e2e
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"golang.org/x/crypto/sha3"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -15,7 +18,7 @@ import (
 )
 
 func TestNewFilter_Logs(t *testing.T) {
-	_, addr := tests.GenerateKeyAndAddr(t)
+	addrPrivKey, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, framework.EthToWei(10))
@@ -26,7 +29,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode)
+	contractAddr, err := srv.DeployContract(ctx1, sampleByteCode, addrPrivKey)
 
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +43,7 @@ func TestNewFilter_Logs(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.TxnTo(ctx, contractAddr, "setA1")
+		srv.TxnTo(ctx, contractAddr, "setA1", addrPrivKey)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)
@@ -49,9 +52,8 @@ func TestNewFilter_Logs(t *testing.T) {
 }
 
 func TestNewFilter_Block(t *testing.T) {
-	_, from := tests.GenerateKeyAndAddr(t)
+	signerKey, from := tests.GenerateKeyAndAddr(t)
 	_, to := tests.GenerateKeyAndAddr(t)
-	toAddr := web3.HexToAddress(to.String())
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
@@ -60,19 +62,26 @@ func TestNewFilter_Block(t *testing.T) {
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
+	signer := crypto.NewEIP155Signer(100)
 
 	id, err := client.Eth().NewBlockFilter()
 	assert.NoError(t, err)
 
 	for i := 0; i < 3; i++ {
-		hash, err := client.Eth().SendTransaction(&web3.Transaction{
-			From:     web3.HexToAddress(srv.Config.PremineAccts[0].Addr.String()),
-			To:       &toAddr,
-			GasPrice: 10000,
+		signedTx, err := signer.SignTx(&types.Transaction{
+			From:     srv.Config.PremineAccts[0].Addr,
+			GasPrice: big.NewInt(10000),
 			Gas:      1000000,
+			To:       &to,
 			Value:    big.NewInt(10000),
 			Nonce:    uint64(i),
-		})
+		}, signerKey)
+		if err != nil {
+			t.Error("Could not sign transacion")
+		}
+
+		hash, err := client.Eth().SendRawTransaction(signedTx.MarshalRLP())
+
 		assert.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -101,7 +110,7 @@ func TestFilterValue(t *testing.T) {
 	//
 	//	3.	Query the block's bloom filter to make sure the data has been properly inserted.
 	//
-	_, addr := tests.GenerateKeyAndAddr(t)
+	addrPrivKey, addr := tests.GenerateKeyAndAddr(t)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(addr, framework.EthToWei(10))
@@ -112,7 +121,7 @@ func TestFilterValue(t *testing.T) {
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel1()
 
-	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode)
+	contractAddr, err := srv.DeployContract(ctx1, bloomFilterTestBytecode, addrPrivKey)
 
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +159,7 @@ func TestFilterValue(t *testing.T) {
 	for i := 0; i < numCalls; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		srv.TxnTo(ctx, contractAddr, "TriggerMyEvent")
+		srv.TxnTo(ctx, contractAddr, "TriggerMyEvent", addrPrivKey)
 	}
 
 	res, err := client.Eth().GetFilterChanges(id)

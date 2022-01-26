@@ -352,15 +352,16 @@ func (t *TestServer) Start(ctx context.Context) error {
 }
 
 // DeployContract deploys a contract with account 0 and returns the address
-func (t *TestServer) DeployContract(ctx context.Context, binary string) (web3.Address, error) {
+//nolint:lll
+func (t *TestServer) DeployContract(ctx context.Context, binary string, privKey *ecdsa.PrivateKey) (web3.Address, error) {
 	buf, err := hex.DecodeString(binary)
 	if err != nil {
 		return web3.Address{}, err
 	}
 
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
 		Input: buf,
-	})
+	}, privKey)
 
 	if err != nil {
 		return web3.Address{}, err
@@ -417,9 +418,27 @@ func (t *TestServer) SendRawTx(
 	signer := crypto.NewEIP155Signer(100)
 	client := t.JSONRPC()
 
+	// if there is no from addr passed in we can find it in test server configuration
+	var blankAddr types.Address
+	if tx.From == blankAddr {
+		tx.From = t.Config.PremineAccts[0].Addr
+	}
+
 	nextNonce, err := client.Eth().GetNonce(web3.Address(tx.From), web3.Latest)
 	if err != nil {
 		return nil, err
+	}
+
+	if tx.GasPrice == big.NewInt(int64(0)) || tx.GasPrice == nil {
+		tx.GasPrice = big.NewInt(DefaultGasPrice)
+	}
+
+	if tx.Gas == 0 {
+		tx.Gas = DefaultGasLimit
+	}
+
+	if tx.Value == big.NewInt(0) || tx.Value == nil {
+		tx.Value = big.NewInt(0)
 	}
 
 	signedTx, err := signer.SignTx(&types.Transaction{
@@ -490,12 +509,16 @@ func (t *TestServer) WaitForReady(ctx context.Context) error {
 	return err
 }
 
-func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string) *web3.Receipt {
+//nolint:lll
+func (t *TestServer) TxnTo(ctx context.Context, address web3.Address, method string, signerKey *ecdsa.PrivateKey) *web3.Receipt {
 	sig := MethodSig(method)
-	receipt, err := t.SendTxn(ctx, &web3.Transaction{
-		To:    &address,
+
+	toAddr := types.BytesToAddress(address.Bytes())
+
+	receipt, err := t.SendRawTx(ctx, &PreparedTransaction{
+		To:    &toAddr,
 		Input: sig,
-	})
+	}, signerKey)
 
 	if err != nil {
 		t.t.Fatal(err)
