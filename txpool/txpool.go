@@ -341,7 +341,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // Drop clears the entire account associated with the given transaction
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
-	// drop the entire account and revert nonce
+	// fetch associated account
 	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
@@ -352,24 +352,22 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 		account.promoted.unlock()
 	}()
 
-	p.logger.Debug("dropping tx (unrecoverable)", "hash", tx.Hash.String())
-
 	// rollback nonce
 	nextNonce := tx.Nonce
 	account.setNonce(nextNonce)
 
 	// drop promoted
-	removed := account.promoted.clear()
-	p.index.remove(removed...)
-	p.gauge.decrease(slotsRequired(removed...))
+	dropped := account.promoted.clear()
+	p.index.remove(dropped...)
+	p.gauge.decrease(slotsRequired(dropped...))
 
 	// update metrics
-	p.metrics.PendingTxs.Add(float64(-1 * len(removed)))
+	p.metrics.PendingTxs.Add(float64(-1 * len(dropped)))
 
 	// drop enqueued
-	removed = account.enqueued.clear()
-	p.index.remove(removed...)
-	p.gauge.decrease(slotsRequired(removed...))
+	dropped = account.enqueued.clear()
+	p.index.remove(dropped...)
+	p.gauge.decrease(slotsRequired(dropped...))
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 	p.logger.Debug("dropped account",
