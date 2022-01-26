@@ -41,16 +41,13 @@ func hexToCompact(hex []byte) []byte {
 }
 
 func keybytesToHex(str []byte) []byte {
-	l := len(str)*2 + 1
-
-	var nibbles = make([]byte, l)
-
+	nibbles := make([]byte, len(str)*2+1)
 	for i, b := range str {
 		nibbles[i*2] = b / 16
 		nibbles[i*2+1] = b % 16
 	}
 
-	nibbles[l-1] = 16
+	nibbles[len(nibbles)-1] = 16
 
 	return nibbles
 }
@@ -62,7 +59,11 @@ func compactToHex(compact []byte) []byte {
 		base = base[:len(base)-1]
 	}
 	// apply odd flag
-	chop := 2 - base[0]&1
+	if base[0]&1 == 1 {
+		base = base[1:]
+	} else {
+		base = base[2:]
+	}
 
-	return base[chop:]
+	return base
 }
