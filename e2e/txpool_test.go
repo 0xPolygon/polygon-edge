@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"sync"
@@ -365,11 +366,22 @@ func TestTxPool_StressAddition(t *testing.T) {
 	// The sender worker forwards the transaction hash to the receipt worker.
 	// The numAccounts receipt worker threads wait for tx hashes to arrive and wait for their receipts
 
-	var wg sync.WaitGroup
+	var (
+		wg           sync.WaitGroup
+		errorsLock   sync.Mutex
+		workerErrors = make([]error, 0)
+	)
 
 	wg.Add(numAccounts)
 
-	senderWorker := func(account *testAccount, receiptsChan chan web3.Hash) {
+	appendError := func(err error) {
+		errorsLock.Lock()
+		defer errorsLock.Unlock()
+
+		workerErrors = append(workerErrors, err)
+	}
+
+	sendWorker := func(account *testAccount, receiptsChan chan web3.Hash) {
 		defer close(receiptsChan)
 
 		nonce := uint64(0)
@@ -379,7 +391,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 
 			txHash, err := client.Eth().SendRawTransaction(tx.MarshalRLP())
 			if err != nil {
-				t.Fatalf("Unable to send txn, %v", err)
+				appendError(fmt.Errorf("unable to send txn, %w", err))
 
 				return
 			}
@@ -397,7 +409,8 @@ func TestTxPool_StressAddition(t *testing.T) {
 			waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second*30)
 
 			if _, err := tests.WaitForReceipt(waitCtx, srv.JSONRPC().Eth(), txHash); err != nil {
-				t.Fatalf("Unable to wait for receipt, %v", err)
+				appendError(fmt.Errorf("unable to wait for receipt, %w", err))
+				waitCancel()
 
 				return
 			}
@@ -408,7 +421,7 @@ func TestTxPool_StressAddition(t *testing.T) {
 
 	for _, testAccount := range testAccounts {
 		receiptsCh := make(chan web3.Hash, numTxPerAccount)
-		go senderWorker(
+		go sendWorker(
 			testAccount,
 			receiptsCh,
 		)
@@ -417,6 +430,10 @@ func TestTxPool_StressAddition(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	if len(workerErrors) != 0 {
+		t.Fatalf("%v", workerErrors)
+	}
 
 	// Make sure the transactions went through
 	for _, account := range testAccounts {
