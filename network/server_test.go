@@ -3,11 +3,12 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -19,7 +20,8 @@ func TestConnLimit_Inbound(t *testing.T) {
 	// we should not receive more inbound connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
@@ -42,14 +44,14 @@ func TestConnLimit_Inbound(t *testing.T) {
 		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
 
-	// Server 2 tries to connect to Server 0
-	// but Server 0 is already connected to max peers
+	// Server 2 tries to connect to Server 1
+	// but Server 1 is already connected to max inbound peers
 	smallTimeout := time.Second * 5
-	if joinErr := JoinAndWait(servers[2], servers[0], smallTimeout, smallTimeout); joinErr == nil {
-		t.Fatal("Peer join should've failed")
+	if joinErr := JoinAndWait(servers[2], servers[1], smallTimeout, smallTimeout); joinErr == nil {
+		t.Fatal("Peer join should've failed", joinErr)
 	}
 
-	// Disconnect Server 1 from Server 0 so Server 0 will have free slots
+	// Disconnect Server 0 from Server 1 so Server 1 will have free slots
 	servers[0].Disconnect(servers[1].host.ID(), "bye")
 
 	disconnectCtx, disconnectFn := context.WithTimeout(context.Background(), DefaultJoinTimeout)
@@ -63,16 +65,18 @@ func TestConnLimit_Inbound(t *testing.T) {
 		t.Fatalf("Unable to disconnect from peer, %v", disconnectErr)
 	}
 
-	// Attempt a connection between Server 2 and Server 0 again
-	if joinErr := JoinAndWait(servers[2], servers[0], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
+	// Attempt a connection between Server 2 and Server 1 again
+	if joinErr := JoinAndWait(servers[2], servers[1], DefaultBufferTimeout, DefaultJoinTimeout); joinErr != nil {
 		t.Fatalf("Unable to join servers, %v", joinErr)
 	}
 }
 
 func TestConnLimit_Outbound(t *testing.T) {
+	// we should not try to make connections if we are already connected to max peers
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 			c.NoDiscover = true
 		},
 	}
@@ -349,7 +353,8 @@ func TestNat(t *testing.T) {
 func TestPeerReconnection(t *testing.T) {
 	bootnodeConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
+			c.MaxInboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 		},
 	}
@@ -366,7 +371,8 @@ func TestPeerReconnection(t *testing.T) {
 
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 3
+			c.MaxInboundPeers = 3
+			c.MaxOutboundPeers = 3
 			c.NoDiscover = false
 		},
 		ServerCallback: func(server *Server) {
@@ -579,7 +585,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 func TestRunDial(t *testing.T) {
 	// setupServers returns server and list of peer's server
-	setupServers := func(t *testing.T, maxPeers []uint64) []*Server {
+	setupServers := func(t *testing.T, maxPeers []int64) []*Server {
 		t.Helper()
 
 		servers := make([]*Server, len(maxPeers))
@@ -587,7 +593,8 @@ func TestRunDial(t *testing.T) {
 			server, createErr := CreateServer(
 				&CreateServerParams{
 					ConfigCallback: func(c *Config) {
-						c.MaxPeers = maxPeers[idx]
+						c.MaxInboundPeers = maxPeers[idx]
+						c.MaxOutboundPeers = maxPeers[idx]
 						c.NoDiscover = true
 					},
 				})
@@ -608,7 +615,7 @@ func TestRunDial(t *testing.T) {
 	}
 
 	t.Run("should connect to all peers", func(t *testing.T) {
-		maxPeers := []uint64{2, 1, 1}
+		maxPeers := []int64{2, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
@@ -621,12 +628,12 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should fail to connect to some peers due to reaching limit", func(t *testing.T) {
-		maxPeers := []uint64{2, 1, 1, 1}
+		maxPeers := []int64{2, 1, 1, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 
 		for idx, p := range peers {
-			if uint64(idx) < maxPeers[0] {
+			if int64(idx) < maxPeers[0] {
 				// Connection should be successful
 				joinErr := JoinAndWait(srv, p, DefaultBufferTimeout, DefaultJoinTimeout)
 				assert.NoError(t, joinErr)
@@ -641,7 +648,7 @@ func TestRunDial(t *testing.T) {
 	})
 
 	t.Run("should try to connect after adding a peer to queue", func(t *testing.T) {
-		maxPeers := []uint64{1, 0, 1}
+		maxPeers := []int64{1, 0, 1}
 		servers := setupServers(t, maxPeers)
 		srv, peers := servers[0], servers[1:]
 

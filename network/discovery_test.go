@@ -11,7 +11,8 @@ import (
 func discoveryConfig(c *Config) {
 	// we limit maxPeers=1 to limit the number of connections
 	// since we only want to test discovery
-	c.MaxPeers = 2
+	c.MaxInboundPeers = 2
+	c.MaxOutboundPeers = 2
 }
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
@@ -58,7 +59,8 @@ func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 func TestRoutingTable_Connected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -101,7 +103,8 @@ func TestRoutingTable_Connected(t *testing.T) {
 func TestRoutingTable_Disconnected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -109,13 +112,13 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 		1: defaultConfig,
 	}
 
-	servers, createErr := createServers(3, paramsMap)
+	servers, createErr := createServers(2, paramsMap)
 	if createErr != nil {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 
 	t.Cleanup(func() {
-		closeTestServers(t, servers)
+		closeTestServers(t, servers[1:])
 	})
 
 	// connect to peer and make sure peer is in routing table
@@ -138,21 +141,17 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 	}
 
-	// disconnect
-	if leaveErr := LeaveAndWait(servers[1], servers[0], DefaultLeaveTimeout); leaveErr != nil {
-		t.Fatalf("Unable to disconnect from server[0], err=%v", leaveErr)
+	// disconnect the servers by closing server 0 to stop auto-reconnection
+	if closeErr := servers[0].Close(); closeErr != nil {
+		t.Fatalf("Unable to close server 0, %v", closeErr)
 	}
 
 	// make sure each routing table remove a peer
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
 
 	t.Cleanup(func() {
 		cancel2()
 	})
-
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[0], 0); err != nil {
-		t.Fatalf("server 0 should remove a peer from routing table but didn't, peer=%s", servers[1].host.ID())
-	}
 
 	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[1], 0); err != nil {
 		t.Fatalf("server 1 should remove a peer from routing table but didn't, peer=%s", servers[0].host.ID())
@@ -162,7 +161,8 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
