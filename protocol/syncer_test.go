@@ -584,7 +584,8 @@ func WaitUntilSyncPeersNumber(ctx context.Context, syncer *Syncer, requiredNum i
 
 func TestSyncer_PeerDisconnected(t *testing.T) {
 	conf := func(c *network.Config) {
-		c.MaxPeers = 4
+		c.MaxInboundPeers = 4
+		c.MaxOutboundPeers = 4
 		c.NoDiscover = true
 	}
 	blocks := createGenesisBlock()

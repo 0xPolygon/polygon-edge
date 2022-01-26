@@ -11,7 +11,8 @@ import (
 func discoveryConfig(c *Config) {
 	// we limit maxPeers=1 to limit the number of connections
 	// since we only want to test discovery
-	c.MaxPeers = 2
+	c.MaxInboundPeers = 2
+	c.MaxOutboundPeers = 2
 }
 
 func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
@@ -58,7 +59,8 @@ func TestDiscovery_ProtocolFindPeers(t *testing.T) {
 func TestRoutingTable_Connected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -101,7 +103,8 @@ func TestRoutingTable_Connected(t *testing.T) {
 func TestRoutingTable_Disconnected(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
@@ -158,7 +161,8 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
 	defaultConfig := &CreateServerParams{
 		ConfigCallback: func(c *Config) {
-			c.MaxPeers = 1
+			c.MaxInboundPeers = 1
+			c.MaxOutboundPeers = 1
 		},
 	}
 	paramsMap := map[int]*CreateServerParams{
