@@ -205,12 +205,22 @@ func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
 
 // Header returns the current header (atomic)
 func (b *Blockchain) Header() *types.Header {
-	return b.currentHeader.Load().(*types.Header)
+	header, ok := b.currentHeader.Load().(*types.Header)
+	if !ok {
+		return nil
+	}
+
+	return header
 }
 
 // CurrentTD returns the current total difficulty (atomic)
 func (b *Blockchain) CurrentTD() *big.Int {
-	return b.currentDifficulty.Load().(*big.Int)
+	td, ok := b.currentDifficulty.Load().(*big.Int)
+	if !ok {
+		return nil
+	}
+
+	return td
 }
 
 // Config returns the blockchain configuration
@@ -419,7 +429,12 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	h, ok := b.headersCache.Get(hash)
 	if ok {
 		// Hit, return the3 header
-		return h.(*types.Header), true
+		header, ok := h.(*types.Header)
+		if !ok {
+			return nil, false
+		}
+
+		return header, true
 	}
 
 	// Cache miss, load it from the DB
@@ -453,7 +468,12 @@ func (b *Blockchain) readTotalDifficulty(headerHash types.Hash) (*big.Int, bool)
 	foundDifficulty, ok := b.difficultyCache.Get(headerHash)
 	if ok {
 		// Hit, return the difficulty
-		return foundDifficulty.(*big.Int), true
+		fd, ok := foundDifficulty.(*big.Int)
+		if !ok {
+			return nil, false
+		}
+
+		return fd, true
 	}
 
 	// Miss, read the difficulty from the DB

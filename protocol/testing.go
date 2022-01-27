@@ -35,7 +35,12 @@ func getPeer(syncer *Syncer, id peer.ID) *SyncPeer {
 		return nil
 	}
 
-	return rawPeer.(*SyncPeer)
+	syncPeer, ok := rawPeer.(*SyncPeer)
+	if !ok {
+		return nil
+	}
+
+	return syncPeer
 }
 
 // CreateSyncer initialize syncer with server
@@ -119,7 +124,7 @@ func WaitUntilProgressionUpdated(t *testing.T, syncer *Syncer, timeout time.Dura
 	})
 
 	_, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
-		return nil, syncer.syncProgression.getProgression().CurrentBlock < target
+		return nil, syncer.syncProgression.GetProgression().CurrentBlock < target
 	})
 	assert.NoError(t, err)
 }

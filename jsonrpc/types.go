@@ -305,6 +305,7 @@ type txnArgs struct {
 }
 
 type progression struct {
+	Type          string `json:"type"`
 	StartingBlock string `json:"startingBlock"`
 	CurrentBlock  string `json:"currentBlock"`
 	HighestBlock  string `json:"highestBlock"`

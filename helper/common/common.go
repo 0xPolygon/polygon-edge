@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -131,4 +133,13 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 	d.Value = uint64(val)
 
 	return nil
+}
+
+// GetTerminationSignalCh returns a channel to emit signals by ctrl + c
+func GetTerminationSignalCh() <-chan os.Signal {
+	// wait for the user to quit with ctrl-c
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+
+	return signalCh
 }

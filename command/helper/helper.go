@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	helperFlags "github.com/0xPolygon/polygon-edge/helper/flags"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -181,9 +180,7 @@ func GenerateUsage(baseCommand string, flagMap map[string]FlagDescriptor) string
 // HandleSignals is a helper method for handling signals sent to the console
 // Like stop, error, etc.
 func HandleSignals(closeFn func(), ui cli.Ui) int {
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-
+	signalCh := common.GetTerminationSignalCh()
 	sig := <-signalCh
 
 	output := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
@@ -379,8 +376,9 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 
 	cliConfig := &Config{
 		Network: &Network{
-			NoDiscover: true,
-			MaxPeers:   0,
+			NoDiscover:       true,
+			MaxOutboundPeers: 0,
+			MaxInboundPeers:  0,
 		},
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
@@ -406,6 +404,7 @@ func BootstrapDevCommand(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 0, "")
 	flags.Uint64Var(&chainID, "chainid", DefaultChainID, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
@@ -464,16 +463,25 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		" the host DNS address which can be used by a remote peer for connection",
 	)
 	flags.BoolVar(&cliConfig.Network.NoDiscover, "no-discover", false, "")
-	flags.Uint64Var(&cliConfig.Network.MaxPeers, "max-peers", 0, "")
+	flags.Int64Var(&cliConfig.Network.MaxPeers, "max-peers", -1, "maximum number of peers")
+	flags.Int64Var(&cliConfig.Network.MaxInboundPeers, "max-inbound-peers", -1, "maximum number of inbound peers")
+	flags.Int64Var(&cliConfig.Network.MaxOutboundPeers, "max-outbound-peers", -1, "maximum number of outbound peers")
 	flags.Uint64Var(&cliConfig.TxPool.PriceLimit, "price-limit", 0, "")
 	flags.Uint64Var(&cliConfig.TxPool.MaxSlots, "max-slots", DefaultMaxSlots, "")
 	flags.BoolVar(&cliConfig.Dev, "dev", false, "")
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
+	}
+
+	if cliConfig.Network.MaxPeers != -1 {
+		if cliConfig.Network.MaxInboundPeers != -1 || cliConfig.Network.MaxOutboundPeers != -1 {
+			return nil, errors.New("both max-peers and max-inbound/outbound flags are set")
+		}
 	}
 
 	if configFile != "" {
@@ -481,6 +489,12 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		diskConfigFile, err := readConfigFile(configFile)
 		if err != nil {
 			return nil, err
+		}
+
+		if diskConfigFile.Network.MaxPeers != -1 {
+			if diskConfigFile.Network.MaxInboundPeers != -1 || diskConfigFile.Network.MaxOutboundPeers != -1 {
+				return nil, errors.New("both max-peers & max-inbound/outbound flags are set")
+			}
 		}
 
 		if err := config.mergeConfigWith(diskConfigFile); err != nil {

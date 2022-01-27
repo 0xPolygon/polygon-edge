@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -694,7 +695,7 @@ func (s *mockSyncer) WatchSyncWithPeer(p *protocol.SyncPeer, handler func(b *typ
 	}
 }
 
-func (s *mockSyncer) GetSyncProgression() *protocol.Progression {
+func (s *mockSyncer) GetSyncProgression() *progress.Progression {
 	return nil
 }
 

@@ -329,6 +329,13 @@ func (c *GenesisCommand) Run(args []string) int {
 		cc.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 
 		// Set the epoch size if the consensus is IBFT
+		existingMap, ok := cc.Params.Engine[consensus].(map[string]interface{})
+		if !ok {
+			c.UI.Error("invalid type assertion with existing map")
+
+			return 1
+		}
+
 		cc.Params.Engine[consensus] = helper.MergeMaps(
 			// Epoch parameter
 			map[string]interface{}{
@@ -336,7 +343,7 @@ func (c *GenesisCommand) Run(args []string) int {
 			},
 
 			// Existing consensus configuration
-			cc.Params.Engine[consensus].(map[string]interface{}),
+			existingMap,
 		)
 	}
 
