@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
 	"os"
@@ -99,7 +100,9 @@ func (t *TestServer) JSONRPC() *jsonrpc.Client {
 }
 
 func (t *TestServer) Operator() proto.SystemClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -108,7 +111,9 @@ func (t *TestServer) Operator() proto.SystemClient {
 }
 
 func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -117,7 +122,9 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 }
 
 func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort), grpc.WithInsecure())
+	conn, err := grpc.Dial(
+		fmt.Sprintf("127.0.0.1:%d", t.Config.GRPCPort),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.t.Fatal(err)
 	}

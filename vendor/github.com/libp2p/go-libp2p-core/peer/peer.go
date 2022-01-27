@@ -2,12 +2,11 @@
 package peer
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	b58 "github.com/mr-tron/base58/base58"
 	mh "github.com/multiformats/go-multihash"
@@ -43,7 +42,7 @@ type ID string
 
 // Pretty returns a base58-encoded string representation of the ID.
 func (id ID) Pretty() string {
-	return IDB58Encode(id)
+	return Encode(id)
 }
 
 // Loggable returns a pretty peer ID string in loggable JSON format.
@@ -131,39 +130,6 @@ func IDFromBytes(b []byte) (ID, error) {
 	return ID(b), nil
 }
 
-// IDB58Decode decodes a peer ID.
-//
-// Deprecated: Use Decode.
-func IDB58Decode(s string) (ID, error) {
-	return Decode(s)
-}
-
-// IDB58Encode returns the base58-encoded multihash representation of the ID.
-//
-// Deprecated: Use Encode.
-func IDB58Encode(id ID) string {
-	return b58.Encode([]byte(id))
-}
-
-// IDHexDecode accepts a hex-encoded multihash representing a peer ID
-// and returns the decoded ID if the input is valid.
-//
-// Deprecated: Don't raw-hex encode peer IDs, use base16 CIDs.
-func IDHexDecode(s string) (ID, error) {
-	m, err := mh.FromHexString(s)
-	if err != nil {
-		return "", err
-	}
-	return ID(m), err
-}
-
-// IDHexEncode returns the hex-encoded multihash representation of the ID.
-//
-// Deprecated: Don't raw-hex encode peer IDs, use base16 CIDs.
-func IDHexEncode(id ID) string {
-	return hex.EncodeToString([]byte(id))
-}
-
 // Decode accepts an encoded peer ID and returns the decoded ID if the input is
 // valid.
 //
@@ -191,7 +157,7 @@ func Decode(s string) (ID, error) {
 // At the moment, it base58 encodes the peer ID but, in the future, it will
 // switch to encoding it as a CID by default.
 func Encode(id ID) string {
-	return IDB58Encode(id)
+	return b58.Encode([]byte(id))
 }
 
 // FromCid converts a CID to a peer ID, if possible.
@@ -220,13 +186,13 @@ func ToCid(id ID) cid.Cid {
 
 // IDFromPublicKey returns the Peer ID corresponding to the public key pk.
 func IDFromPublicKey(pk ic.PubKey) (ID, error) {
-	b, err := pk.Bytes()
+	b, err := ic.MarshalPublicKey(pk)
 	if err != nil {
 		return "", err
 	}
 	var alg uint64 = mh.SHA2_256
 	if AdvancedEnableInlining && len(b) <= maxInlineKeyLength {
-		alg = mh.ID
+		alg = mh.IDENTITY
 	}
 	hash, _ := mh.Sum(b, alg, -1)
 	return ID(hash), nil
