@@ -1,8 +1,8 @@
 package itrie
 
-// hasTerm checks if hex is ending
+// hasTerminator checks if hex is ending
 // with a terminator flag.
-func hasTerm(hex []byte) bool {
+func hasTerminator(hex []byte) bool {
 	if len(hex) == 0 {
 		return false
 	}
@@ -10,12 +10,12 @@ func hasTerm(hex []byte) bool {
 	return hex[len(hex)-1] == 16
 }
 
-// encodeCompact converts hex nibbles to compact byte form for HP
+// encodeCompact packs a hex sequence (of nibbles)
+// into compact encoding.
 func encodeCompact(hex []byte) []byte {
 	var terminator int
-
-	// check terminator flag
-	if hasTerm(hex) {
+	if hasTerminator(hex) {
+		// remove terminator flag
 		hex = hex[:len(hex)-1]
 		terminator = 1
 	} else {
@@ -42,10 +42,11 @@ func encodeCompact(hex []byte) []byte {
 	return result
 }
 
-// bytesToHexNibbles converts a byte array to a hex nibble array
-func bytesToHexNibbles(str []byte) []byte {
-	nibbles := make([]byte, len(str)*2+1)
-	for i, b := range str {
+// bytesToHexNibbles splits bytes into nibbles
+// (with terminator flag). Prefix flag is not removed.
+func bytesToHexNibbles(bytes []byte) []byte {
+	nibbles := make([]byte, len(bytes)*2+1)
+	for i, b := range bytes {
 		nibbles[i*2] = b / 16
 		nibbles[i*2+1] = b % 16
 	}
@@ -55,17 +56,22 @@ func bytesToHexNibbles(str []byte) []byte {
 	return nibbles
 }
 
-// decodeCompact transforms the HP bytes to hex nibbles
+// decodeCompact unpacks compact encoding
+// into a hex sequence of nibbles.
 func decodeCompact(compact []byte) []byte {
 	base := bytesToHexNibbles(compact)
-	// delete terminator flag
+
+	// remove the terminator flag
 	if base[0] < 2 {
 		base = base[:len(base)-1]
 	}
-	// apply odd flag
+
+	// remove prefix flag
 	if base[0]&1 == 1 {
+		// odd length
 		base = base[1:]
 	} else {
+		// even length
 		base = base[2:]
 	}
 

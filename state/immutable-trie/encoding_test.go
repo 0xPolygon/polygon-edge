@@ -40,7 +40,7 @@ func TestEncoding_HasTermSymbol(t *testing.T) {
 
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
-			assert.Equal(t, testCase.shouldHaveTerm, hasTerm(testCase.value))
+			assert.Equal(t, testCase.shouldHaveTerm, hasTerminator(testCase.value))
 		})
 	}
 }
