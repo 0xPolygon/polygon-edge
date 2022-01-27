@@ -356,7 +356,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 		p.gauge.decrease(slotsRequired(txs...))
 
 		// increase counter
-		droppedCount += len(dropped)
+		droppedCount += len(txs)
 	}
 
 	defer func() {
