@@ -17,13 +17,13 @@ type ToNetAddrFunc func(ma ma.Multiaddr) (net.Addr, error)
 var defaultCodecs = NewCodecMap()
 
 func init() {
-	defaultCodecs.RegisterFromNetAddr(parseTCPNetAddr, "tcp", "tcp4", "tcp6")
-	defaultCodecs.RegisterFromNetAddr(parseUDPNetAddr, "udp", "udp4", "udp6")
-	defaultCodecs.RegisterFromNetAddr(parseIPNetAddr, "ip", "ip4", "ip6")
-	defaultCodecs.RegisterFromNetAddr(parseIPPlusNetAddr, "ip+net")
-	defaultCodecs.RegisterFromNetAddr(parseUnixNetAddr, "unix")
+	RegisterFromNetAddr(parseTCPNetAddr, "tcp", "tcp4", "tcp6")
+	RegisterFromNetAddr(parseUDPNetAddr, "udp", "udp4", "udp6")
+	RegisterFromNetAddr(parseIPNetAddr, "ip", "ip4", "ip6")
+	RegisterFromNetAddr(parseIPPlusNetAddr, "ip+net")
+	RegisterFromNetAddr(parseUnixNetAddr, "unix")
 
-	defaultCodecs.RegisterToNetAddr(parseBasicNetMaddr, "tcp", "udp", "ip6", "ip4", "unix")
+	RegisterToNetAddr(parseBasicNetMaddr, "tcp", "udp", "ip6", "ip4", "unix")
 }
 
 // CodecMap holds a map of NetCodecs indexed by their Protocol ID
@@ -31,7 +31,6 @@ func init() {
 // It is used to keep a list of supported network address codecs (protocols
 // which addresses can be converted to and from multiaddresses).
 type CodecMap struct {
-	codecs       map[string]*NetCodec
 	addrParsers  map[string]FromNetAddrFunc
 	maddrParsers map[string]ToNetAddrFunc
 	lk           sync.Mutex
@@ -45,49 +44,14 @@ func NewCodecMap() *CodecMap {
 	}
 }
 
-// NetCodec is used to identify a network codec, that is, a network type for
-// which we are able to translate multiaddresses into standard Go net.Addr
-// and back.
-//
-// Deprecated: Unfortunately, these mappings aren't one to one. This abstraction
-// assumes that multiple "networks" can map to a single multiaddr protocol but
-// not the reverse. For example, this abstraction supports `tcp6, tcp4, tcp ->
-// /tcp/` really well but doesn't support `ip -> {/ip4/, /ip6/}`.
-//
-// Please use `RegisterFromNetAddr` and `RegisterToNetAddr` directly.
-type NetCodec struct {
-	// NetAddrNetworks is an array of strings that may be returned
-	// by net.Addr.Network() calls on addresses belonging to this type
-	NetAddrNetworks []string
-
-	// ProtocolName is the string value for Multiaddr address keys
-	ProtocolName string
-
-	// ParseNetAddr parses a net.Addr belonging to this type into a multiaddr
-	ParseNetAddr FromNetAddrFunc
-
-	// ConvertMultiaddr converts a multiaddr of this type back into a net.Addr
-	ConvertMultiaddr ToNetAddrFunc
-
-	// Protocol returns the multiaddr protocol struct for this type
-	Protocol ma.Protocol
+// RegisterFromNetAddr registers a conversion from net.Addr instances to multiaddrs.
+func RegisterFromNetAddr(from FromNetAddrFunc, networks ...string) {
+	defaultCodecs.RegisterFromNetAddr(from, networks...)
 }
 
-// RegisterNetCodec adds a new NetCodec to the default codecs.
-func RegisterNetCodec(a *NetCodec) {
-	defaultCodecs.RegisterNetCodec(a)
-}
-
-// RegisterNetCodec adds a new NetCodec to the CodecMap. This function is
-// thread safe.
-func (cm *CodecMap) RegisterNetCodec(a *NetCodec) {
-	cm.lk.Lock()
-	defer cm.lk.Unlock()
-	for _, n := range a.NetAddrNetworks {
-		cm.addrParsers[n] = a.ParseNetAddr
-	}
-
-	cm.maddrParsers[a.ProtocolName] = a.ConvertMultiaddr
+// RegisterToNetAddr registers a conversion from multiaddrs to net.Addr instances.
+func RegisterToNetAddr(to ToNetAddrFunc, protocols ...string) {
+	defaultCodecs.RegisterToNetAddr(to, protocols...)
 }
 
 // RegisterFromNetAddr registers a conversion from net.Addr instances to multiaddrs
