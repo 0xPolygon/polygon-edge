@@ -347,6 +347,15 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
 
+	// num of all txs dropped
+	droppedCount := 0
+
+	// pool resource cleanup
+	clearAccountQueue := func(txs []*types.Transaction) {
+		p.index.remove(txs...)
+		p.gauge.decrease(slotsRequired(txs...))
+	}
+
 	defer func() {
 		account.enqueued.unlock()
 		account.promoted.unlock()
@@ -358,25 +367,25 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop promoted
 	dropped := account.promoted.clear()
-	p.index.remove(dropped...)
-	p.gauge.decrease(slotsRequired(dropped...))
+	droppedCount += len(dropped)
+	clearAccountQueue(dropped)
 
 	// update metrics
 	p.metrics.PendingTxs.Add(float64(-1 * len(dropped)))
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
-	p.index.remove(dropped...)
-	p.gauge.decrease(slotsRequired(dropped...))
+	droppedCount += len(dropped)
+	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
-	p.logger.Debug("dropped account",
+	p.logger.Debug("Drop",
+		"num", droppedCount,
 		"next_nonce", nextNonce,
 		"address", tx.From.String(),
 	)
 }
 
-// Demote
 func (p *TxPool) Demote(tx *types.Transaction) {
 	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
