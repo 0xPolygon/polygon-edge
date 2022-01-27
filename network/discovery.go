@@ -331,6 +331,7 @@ func (d *discovery) bootnodeDiscovery() {
 	defer func() {
 		if isTemporaryDial {
 			d.srv.temporaryDials.Delete(bootnode.ID)
+			d.srv.Disconnect(bootnode.ID, "Thank you")
 		}
 	}()
 
