@@ -3,6 +3,7 @@ package ssdp
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,7 +23,7 @@ type Monitor struct {
 
 // Start starts to monitor SSDP messages.
 func (m *Monitor) Start() error {
-	conn, err := multicastListen(recvAddrIPv4)
+	conn, err := multicastListen(recvAddrResolver)
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func (m *Monitor) serve() error {
 		go m.handleRaw(addr, msg)
 		return nil
 	})
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil
@@ -52,7 +53,6 @@ func (m *Monitor) serve() error {
 func (m *Monitor) handleRaw(addr net.Addr, raw []byte) error {
 	// Add newline to workaround buggy SSDP responses
 	if !bytes.HasSuffix(raw, endOfHeader) {
-		// FIXME: https://github.com/koron/go-ssdp/issues/10
 		raw = bytes.Join([][]byte{raw, endOfHeader}, nil)
 	}
 	if bytes.HasPrefix(raw, []byte("M-SEARCH ")) {

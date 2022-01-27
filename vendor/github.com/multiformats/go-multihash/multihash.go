@@ -51,6 +51,7 @@ const (
 	KECCAK_256 = 0x1B
 	KECCAK_384 = 0x1C
 	KECCAK_512 = 0x1D
+	BLAKE3     = 0x1E
 
 	SHAKE_128 = 0x18
 	SHAKE_256 = 0x19
@@ -64,9 +65,9 @@ const (
 
 	DBL_SHA2_256 = 0x56
 
-	MURMUR3_128 = 0x22
-	// Deprecated: use MURMUR3_128
-	MURMUR3 = MURMUR3_128
+	MURMUR3X64_64 = 0x22
+	// Deprecated: use MURMUR3X64_64
+	MURMUR3 = MURMUR3X64_64
 
 	SHA2_256_TRUNC254_PADDED  = 0x1012
 	X11                       = 0x1100
@@ -80,7 +81,6 @@ func init() {
 		name := fmt.Sprintf("blake2b-%d", n*8)
 		Names[name] = c
 		Codes[c] = name
-		DefaultLengths[c] = int(n)
 	}
 
 	// Add blake2s (32 codes)
@@ -89,7 +89,6 @@ func init() {
 		name := fmt.Sprintf("blake2s-%d", n*8)
 		Names[name] = c
 		Codes[c] = name
-		DefaultLengths[c] = int(n)
 	}
 }
 
@@ -105,11 +104,12 @@ var Names = map[string]uint64{
 	"sha3-384":                  SHA3_384,
 	"sha3-512":                  SHA3_512,
 	"dbl-sha2-256":              DBL_SHA2_256,
-	"murmur3-128":               MURMUR3_128,
+	"murmur3-x64-64":            MURMUR3X64_64,
 	"keccak-224":                KECCAK_224,
 	"keccak-256":                KECCAK_256,
 	"keccak-384":                KECCAK_384,
 	"keccak-512":                KECCAK_512,
+	"blake3":                    BLAKE3,
 	"shake-128":                 SHAKE_128,
 	"shake-256":                 SHAKE_256,
 	"sha2-256-trunc254-padded":  SHA2_256_TRUNC254_PADDED,
@@ -129,39 +129,18 @@ var Codes = map[uint64]string{
 	SHA3_384:                  "sha3-384",
 	SHA3_512:                  "sha3-512",
 	DBL_SHA2_256:              "dbl-sha2-256",
-	MURMUR3_128:               "murmur3-128",
+	MURMUR3X64_64:             "murmur3-x64-64",
 	KECCAK_224:                "keccak-224",
 	KECCAK_256:                "keccak-256",
 	KECCAK_384:                "keccak-384",
 	KECCAK_512:                "keccak-512",
+	BLAKE3:                    "blake3",
 	SHAKE_128:                 "shake-128",
 	SHAKE_256:                 "shake-256",
 	SHA2_256_TRUNC254_PADDED:  "sha2-256-trunc254-padded",
 	X11:                       "x11",
 	POSEIDON_BLS12_381_A1_FC1: "poseidon-bls12_381-a2-fc1",
 	MD5:                       "md5",
-}
-
-// DefaultLengths maps a hash code to it's default length
-var DefaultLengths = map[uint64]int{
-	IDENTITY:     -1,
-	SHA1:         20,
-	SHA2_256:     32,
-	SHA2_512:     64,
-	SHA3_224:     28,
-	SHA3_256:     32,
-	SHA3_384:     48,
-	SHA3_512:     64,
-	DBL_SHA2_256: 32,
-	KECCAK_224:   28,
-	KECCAK_256:   32,
-	MURMUR3_128:  4,
-	KECCAK_384:   48,
-	KECCAK_512:   64,
-	SHAKE_128:    32,
-	SHAKE_256:    64,
-	X11:          64,
-	MD5:          16,
 }
 
 func uvarint(buf []byte) (uint64, []byte, error) {
@@ -194,12 +173,12 @@ type DecodedMultihash struct {
 type Multihash []byte
 
 // HexString returns the hex-encoded representation of a multihash.
-func (m *Multihash) HexString() string {
-	return hex.EncodeToString([]byte(*m))
+func (m Multihash) HexString() string {
+	return hex.EncodeToString([]byte(m))
 }
 
 // String is an alias to HexString().
-func (m *Multihash) String() string {
+func (m Multihash) String() string {
 	return m.HexString()
 }
 
@@ -231,13 +210,9 @@ func FromB58String(s string) (m Multihash, err error) {
 // Cast casts a buffer onto a multihash, and returns an error
 // if it does not work.
 func Cast(buf []byte) (Multihash, error) {
-	dm, err := Decode(buf)
+	_, err := Decode(buf)
 	if err != nil {
 		return Multihash{}, err
-	}
-
-	if !ValidCode(dm.Code) {
-		return Multihash{}, ErrUnknownCode
 	}
 
 	return Multihash(buf), nil
@@ -266,11 +241,10 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 
 // Encode a hash digest along with the specified function code.
 // Note: the length is derived from the length of the digest itself.
+//
+// The error return is legacy; it is always nil.
 func Encode(buf []byte, code uint64) ([]byte, error) {
-	if !ValidCode(code) {
-		return nil, ErrUnknownCode
-	}
-
+	// FUTURE: this function always causes heap allocs... but when used, this value is almost always going to be appended to another buffer (either as part of CID creation, or etc) -- should this whole function be rethought and alternatives offered?
 	newBuf := make([]byte, varint.UvarintSize(code)+varint.UvarintSize(uint64(len(buf)))+len(buf))
 	n := varint.PutUvarint(newBuf, code)
 	n += varint.PutUvarint(newBuf[n:], uint64(len(buf)))
@@ -283,12 +257,6 @@ func Encode(buf []byte, code uint64) ([]byte, error) {
 // instead of a numeric code. See Names for allowed values.
 func EncodeName(buf []byte, name string) ([]byte, error) {
 	return Encode(buf, Names[name])
-}
-
-// ValidCode checks whether a multihash code is valid.
-func ValidCode(code uint64) bool {
-	_, ok := Codes[code]
-	return ok
 }
 
 // readMultihashFromBuf reads a multihash from the given buffer, returning the

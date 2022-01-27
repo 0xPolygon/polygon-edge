@@ -1,9 +1,7 @@
 package libp2p
 
 import (
-	"context"
-
-	config "github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/config"
 
 	"github.com/libp2p/go-libp2p-core/host"
 )
@@ -36,7 +34,7 @@ func ChainOptions(opts ...Option) Option {
 // - If no transport and listen addresses are provided, the node listens to
 // the multiaddresses "/ip4/0.0.0.0/tcp/0" and "/ip6/::/tcp/0";
 //
-// - If no transport options are provided, the node uses TCP and websocket
+// - If no transport options are provided, the node uses TCP, websocket and QUIC
 // transport protocols;
 //
 // - If no multiplexer configuration is provided, the node is configured by
@@ -53,8 +51,8 @@ func ChainOptions(opts ...Option) Option {
 // peerstore.
 //
 // To stop/shutdown the returned libp2p node, the user needs to cancel the passed context and call `Close` on the returned Host.
-func New(ctx context.Context, opts ...Option) (host.Host, error) {
-	return NewWithoutDefaults(ctx, append(opts, FallbackDefaults)...)
+func New(opts ...Option) (host.Host, error) {
+	return NewWithoutDefaults(append(opts, FallbackDefaults)...)
 }
 
 // NewWithoutDefaults constructs a new libp2p node with the given options but
@@ -63,10 +61,10 @@ func New(ctx context.Context, opts ...Option) (host.Host, error) {
 // Warning: This function should not be considered a stable interface. We may
 // choose to add required services at any time and, by using this function, you
 // opt-out of any defaults we may provide.
-func NewWithoutDefaults(ctx context.Context, opts ...Option) (host.Host, error) {
+func NewWithoutDefaults(opts ...Option) (host.Host, error) {
 	var cfg Config
 	if err := cfg.Apply(opts...); err != nil {
 		return nil, err
 	}
-	return cfg.NewNode(ctx)
+	return cfg.NewNode()
 }

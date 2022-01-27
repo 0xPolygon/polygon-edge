@@ -3,7 +3,8 @@ package swarm
 import (
 	"time"
 
-	addrutil "github.com/libp2p/go-addr-util"
+	manet "github.com/multiformats/go-multiaddr/net"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -52,8 +53,7 @@ func (s *Swarm) InterfaceListenAddresses() ([]ma.Multiaddr, error) {
 		if len(listenAddres) > 0 {
 			// We're actually listening on addresses.
 			var err error
-			ifaceListenAddres, err = addrutil.ResolveUnspecifiedAddresses(listenAddres, nil)
-
+			ifaceListenAddres, err = manet.ResolveUnspecifiedAddresses(listenAddres, nil)
 			if err != nil {
 				s.listeners.Unlock() // Lock early exit
 				return nil, err

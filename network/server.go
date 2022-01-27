@@ -179,7 +179,6 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	}
 
 	host, err := libp2p.New(
-		context.Background(),
 		// Use noise as the encryption protocol
 		libp2p.Security(noise.ID, noise.New),
 		libp2p.ListenAddrs(listenAddr),
