@@ -17,6 +17,7 @@ Please complete this section if any breaking changes have been made, otherwise d
 
 - [ ] I have assigned this PR to myself
 - [ ] I have added at least 1 reviewer
+- [ ] I have added the relevant labels
 - [ ] I have updated the official documentation
 - [ ] I have added sufficient documentation in code
 
