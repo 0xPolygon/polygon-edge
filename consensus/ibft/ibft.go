@@ -295,7 +295,7 @@ func (i *Ibft) runHook(hookName HookType, height uint64, hookParam interface{}) 
 
 		// Run the hook
 		if err := hook(hookParam); err != nil {
-			return fmt.Errorf("error occurres during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
+			return fmt.Errorf("error occurred during a call of %s hook in %s: %w", hookName, mechanism.GetType(), err)
 		}
 	}
 
@@ -713,7 +713,7 @@ func (i *Ibft) runSyncState() {
 var defaultBlockPeriod = 2 * time.Second
 
 // shouldWriteTransactions checks if each consensus mechanism accepts a block with transactions at given height
-// returns true if all mechanisms accepts
+// returns true if all mechanisms accept
 // otherwise return false
 func (i *Ibft) shouldWriteTransactions(height uint64) bool {
 	for _, m := range i.mechanisms {
@@ -787,7 +787,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 
-	// builtxd the block
+	// build the block
 	block := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,

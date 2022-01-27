@@ -1074,7 +1074,7 @@ func Test_runHook(t *testing.T) {
 					assert.Equalf(t,
 						uint(1),
 						mockMechanism.fired[h],
-						"should fire %s hook only once, but it was called multipletimes",
+						"should fire %s hook only once, but it was called multiple times",
 						string(h),
 					)
 				}

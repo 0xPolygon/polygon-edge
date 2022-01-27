@@ -125,8 +125,7 @@ func (pos *PoSMechanism) verifyBlockHook(blockParam interface{}) error {
 		return ErrInvalidHookParam
 	}
 
-	blockNumber := block.Number()
-	if pos.ibft.IsLastOfEpoch(blockNumber) && len(block.Transactions) > 0 {
+	if pos.ibft.IsLastOfEpoch(block.Number()) && len(block.Transactions) > 0 {
 		return errBlockVerificationFailed
 	}
 

@@ -13,13 +13,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// IBFTSwitchCommand is the command to switch consensus
-type IBFTSwitchCommand struct {
+// IBFTSwitch is the command to switch consensus
+type IBFTSwitch struct {
 	helper.Base
 	Formatter *helper.FormatterFlag
 }
 
-func (c *IBFTSwitchCommand) DefineFlags() {
+func (c *IBFTSwitch) DefineFlags() {
 	c.Base.DefineFlags(c.Formatter)
 
 	c.FlagMap["chain"] = helper.FlagDescriptor{
@@ -59,28 +59,28 @@ func (c *IBFTSwitchCommand) DefineFlags() {
 }
 
 // GetHelperText returns a simple description of the command
-func (c *IBFTSwitchCommand) GetHelperText() string {
+func (c *IBFTSwitch) GetHelperText() string {
 	return "Add settings in genesis.json to switch IBFT type"
 }
 
-func (c *IBFTSwitchCommand) GetBaseCommand() string {
+func (c *IBFTSwitch) GetBaseCommand() string {
 	return "ibft switch"
 }
 
-// Help implements the cli.PeersAdd interface
-func (c *IBFTSwitchCommand) Help() string {
+// Help implements the cli.IBFTSwitchCommand interface
+func (c *IBFTSwitch) Help() string {
 	c.DefineFlags()
 
 	return helper.GenerateHelp(c.Synopsis(), helper.GenerateUsage(c.GetBaseCommand(), c.FlagMap), c.FlagMap)
 }
 
-// Synopsis implements the cli.PeersAdd interface
-func (c *IBFTSwitchCommand) Synopsis() string {
+// Synopsis implements the cli.IBFTSwitch interface
+func (c *IBFTSwitch) Synopsis() string {
 	return c.GetHelperText()
 }
 
-// Run implements the cli.PeersAdd interface
-func (c *IBFTSwitchCommand) Run(args []string) int {
+// Run implements the cli.IBFTSwitch interface
+func (c *IBFTSwitch) Run(args []string) int {
 	flags := c.Base.NewFlagSet(c.GetBaseCommand(), c.Formatter)
 
 	var genesisPath, rawType, rawDeployment, rawFrom string
