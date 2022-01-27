@@ -14,6 +14,7 @@ func hasTerminator(hex []byte) bool {
 // into compact encoding.
 func encodeCompact(hex []byte) []byte {
 	var terminator int
+
 	if hasTerminator(hex) {
 		// remove terminator flag
 		hex = hex[:len(hex)-1]
