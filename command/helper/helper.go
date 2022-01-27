@@ -472,6 +472,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
 	flags.StringVar(&cliConfig.RestoreFile, "restore", "", "")
+	flags.Uint64Var(&cliConfig.BlockTime, "block-time", config.BlockTime, "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err

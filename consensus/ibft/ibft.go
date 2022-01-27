@@ -96,6 +96,8 @@ type Ibft struct {
 	secretsManager secrets.SecretsManager
 
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
+
+	blockTime uint64 // Configurable consensus blocktime in miliseconds
 }
 
 // Define the type of the IBFT consensus
@@ -245,6 +247,7 @@ func Factory(
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
+		blockTime:      params.BlockTime,
 	}
 
 	// Initialize the mechanism
@@ -576,8 +579,6 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-var defaultBlockPeriod = 2 * time.Second
-
 // buildBlock builds the block, based on the passed in snapshot and parent header
 func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
@@ -608,15 +609,18 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
 	}
 
+	// calculate millisecond values from consensus custom functions in utils.go file
+	// to preserve go backward compatibility as time.UnixMili is available as of go 17
+
 	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(defaultBlockPeriod)
+	parentTime := consensus.MilliToUnix(parent.Timestamp)
+	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
 
-	header.Timestamp = uint64(headerTime.Unix())
+	header.Timestamp = consensus.UnixToMilli(headerTime)
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -732,8 +736,11 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 // If it turns out that the current node is the proposer, it builds a block,
 // and sends preprepare and then prepare messages.
 func (i *Ibft) runAcceptState() { // start new round
+	// set log output
 	logger := i.logger.Named("acceptState")
 	logger.Info("Accept state", "sequence", i.state.view.Sequence, "round", i.state.view.Round+1)
+	// set consensus_rounds metric output
+	i.metrics.Rounds.Set(float64(i.state.view.Round + 1))
 
 	// This is the state in which we either propose a block or wait for the pre-prepare message
 	parent := i.blockchain.Header()
@@ -798,7 +805,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// calculate how much time do we have to wait to mine the block
-			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
+			delay := time.Until(consensus.MilliToUnix(i.state.block.Header.Timestamp))
 
 			select {
 			case <-time.After(delay):
@@ -970,15 +977,15 @@ func (i *Ibft) runValidateState() {
 // updateMetrics will update various metrics based on the given block
 // currently we capture No.of Txs and block interval metrics using this function
 func (i *Ibft) updateMetrics(block *types.Block) {
+	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
-	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
-	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
-	//Update the block interval metric
-	if block.Number() > 1 {
-		i.metrics.BlockInterval.Observe(
-			headerTime.Sub(parentTime).Seconds(),
-		)
-	}
+	// calculate difference between previous and current header timestamps
+	// diff := time.Unix(int64(block.Header.Timestamp),0).Sub(time.Unix(int64(prvHeader.Timestamp),0))
+	diff := consensus.MilliToUnix(block.Header.Timestamp).Sub(consensus.MilliToUnix(prvHeader.Timestamp))
+
+	// update block_interval metric
+	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
+
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
 }
