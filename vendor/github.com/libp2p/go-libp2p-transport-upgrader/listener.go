@@ -1,29 +1,26 @@
-package stream
+package upgrader
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/transport"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	tec "github.com/jbenet/go-temp-err-catcher"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-var log = logging.Logger("stream-upgrader")
-
-type connErr struct {
-	conn transport.CapableConn
-	err  error
-}
+var log = logging.Logger("upgrader")
 
 type listener struct {
 	manet.Listener
 
 	transport transport.Transport
-	upgrader  *Upgrader
+	upgrader  *upgrader
+	rcmgr     network.ResourceManager
 
 	incoming chan transport.CapableConn
 	err      error
@@ -84,14 +81,23 @@ func (l *listener) handleIncoming() {
 			l.err = err
 			return
 		}
+		catcher.Reset()
 
 		// gate the connection if applicable
-		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+		if l.upgrader.connGater != nil && !l.upgrader.connGater.InterceptAccept(maconn) {
 			log.Debugf("gater blocked incoming connection on local addr %s from %s",
 				maconn.LocalMultiaddr(), maconn.RemoteMultiaddr())
-
 			if err := maconn.Close(); err != nil {
-				log.Warnf("failed to incoming connection rejected by gater; err: %s", err)
+				log.Warnf("failed to close incoming connection rejected by gater: %s", err)
+			}
+			continue
+		}
+
+		connScope, err := l.rcmgr.OpenConnection(network.DirInbound, true)
+		if err != nil {
+			log.Debugw("resource manager blocked accept of new connection", "error", err)
+			if err := maconn.Close(); err != nil {
+				log.Warnf("failed to incoming connection rejected by resource manager: %s", err)
 			}
 			continue
 		}
@@ -109,10 +115,10 @@ func (l *listener) handleIncoming() {
 		go func() {
 			defer wg.Done()
 
-			ctx, cancel := context.WithTimeout(l.ctx, transport.AcceptTimeout)
+			ctx, cancel := context.WithTimeout(l.ctx, l.upgrader.acceptTimeout)
 			defer cancel()
 
-			conn, err := l.upgrader.UpgradeInbound(ctx, l.transport, maconn)
+			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "", connScope)
 			if err != nil {
 				// Don't bother bubbling this up. We just failed
 				// to completely negotiate the connection.
@@ -120,6 +126,7 @@ func (l *listener) handleIncoming() {
 					err,
 					maconn.LocalMultiaddr(),
 					maconn.RemoteMultiaddr())
+				connScope.Done()
 				return
 			}
 
@@ -138,7 +145,7 @@ func (l *listener) handleIncoming() {
 			case <-ctx.Done():
 				if l.ctx.Err() == nil {
 					// Listener *not* closed but the accept timeout expired.
-					log.Warningf("listener dropped connection due to slow accept")
+					log.Warn("listener dropped connection due to slow accept")
 				}
 				// Wait on the context with a timeout. This way,
 				// if we stop accepting connections for some reason,

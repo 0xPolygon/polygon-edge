@@ -20,32 +20,23 @@ type dialResult struct {
 }
 
 type dialJob struct {
-	addr ma.Multiaddr
-	peer peer.ID
-	ctx  context.Context
-	resp chan dialResult
+	addr    ma.Multiaddr
+	peer    peer.ID
+	ctx     context.Context
+	resp    chan dialResult
+	timeout time.Duration
 }
 
 func (dj *dialJob) cancelled() bool {
 	return dj.ctx.Err() != nil
 }
 
-func (dj *dialJob) dialTimeout() time.Duration {
-	timeout := transport.DialTimeout
-	if lowTimeoutFilters.AddrBlocked(dj.addr) {
-		timeout = DialTimeoutLocal
-	}
-
-	return timeout
-}
-
 type dialLimiter struct {
 	lk sync.Mutex
 
-	isFdConsumingFnc isFdConsumingFnc
-	fdConsuming      int
-	fdLimit          int
-	waitingOnFd      []*dialJob
+	fdConsuming int
+	fdLimit     int
+	waitingOnFd []*dialJob
 
 	dialFunc dialfunc
 
@@ -55,21 +46,19 @@ type dialLimiter struct {
 }
 
 type dialfunc func(context.Context, peer.ID, ma.Multiaddr) (transport.CapableConn, error)
-type isFdConsumingFnc func(ma.Multiaddr) bool
 
-func newDialLimiter(df dialfunc, fdFnc isFdConsumingFnc) *dialLimiter {
+func newDialLimiter(df dialfunc) *dialLimiter {
 	fd := ConcurrentFdDials
 	if env := os.Getenv("LIBP2P_SWARM_FD_LIMIT"); env != "" {
 		if n, err := strconv.ParseInt(env, 10, 32); err == nil {
 			fd = int(n)
 		}
 	}
-	return newDialLimiterWithParams(fdFnc, df, fd, DefaultPerPeerRateLimit)
+	return newDialLimiterWithParams(df, fd, DefaultPerPeerRateLimit)
 }
 
-func newDialLimiterWithParams(isFdConsumingFnc isFdConsumingFnc, df dialfunc, fdLimit, perPeerLimit int) *dialLimiter {
+func newDialLimiterWithParams(df dialfunc, fdLimit, perPeerLimit int) *dialLimiter {
 	return &dialLimiter{
-		isFdConsumingFnc:   isFdConsumingFnc,
 		fdLimit:            fdLimit,
 		perPeerLimit:       perPeerLimit,
 		waitingOnPeerLimit: make(map[peer.ID][]*dialJob),
@@ -157,7 +146,7 @@ func (dl *dialLimiter) shouldConsumeFd(addr ma.Multiaddr) bool {
 
 	isRelay := err == nil
 
-	return !isRelay && dl.isFdConsumingFnc(addr)
+	return !isRelay && isFdConsumingAddr(addr)
 }
 
 func (dl *dialLimiter) addCheckFdLimit(dj *dialJob) {
@@ -224,7 +213,7 @@ func (dl *dialLimiter) executeDial(j *dialJob) {
 		return
 	}
 
-	dctx, cancel := context.WithTimeout(j.ctx, j.dialTimeout())
+	dctx, cancel := context.WithTimeout(j.ctx, j.timeout)
 	defer cancel()
 
 	con, err := dl.dialFunc(dctx, j.peer, j.addr)

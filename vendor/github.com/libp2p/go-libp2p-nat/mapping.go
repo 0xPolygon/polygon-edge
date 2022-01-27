@@ -5,8 +5,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"github.com/jbenet/goprocess"
 )
 
 // Mapping represents a port mapping in a NAT.
@@ -38,12 +36,10 @@ type Mapping interface {
 type mapping struct {
 	sync.Mutex // guards all fields
 
-	nat       *NAT
-	proto     string
-	intport   int
-	extport   int
-	permanent bool
-	proc      goprocess.Process
+	nat     *NAT
+	proto   string
+	intport int
+	extport int
 
 	cached    net.IP
 	cacheTime time.Time
@@ -118,5 +114,6 @@ func (m *mapping) ExternalAddr() (net.Addr, error) {
 }
 
 func (m *mapping) Close() error {
-	return m.proc.Close()
+	m.nat.removeMapping(m)
+	return nil
 }
