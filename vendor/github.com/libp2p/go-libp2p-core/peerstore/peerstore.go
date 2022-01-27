@@ -28,14 +28,14 @@ var (
 	// ProviderAddrTTL is the TTL of an address we've received from a provider.
 	// This is also a temporary address, but lasts longer. After this expires,
 	// the records we return will require an extra lookup.
-	ProviderAddrTTL = time.Minute * 10
+	ProviderAddrTTL = time.Minute * 30
 
 	// RecentlyConnectedAddrTTL is used when we recently connected to a peer.
 	// It means that we are reasonably certain of the peer's address.
-	RecentlyConnectedAddrTTL = time.Minute * 10
+	RecentlyConnectedAddrTTL = time.Minute * 30
 
 	// OwnObservedAddrTTL is used for our own external addresses observed by peers.
-	OwnObservedAddrTTL = time.Minute * 10
+	OwnObservedAddrTTL = time.Minute * 30
 )
 
 // Permanent TTLs (distinct so we can distinguish between them, constant as they
@@ -78,16 +78,18 @@ type Peerstore interface {
 // Refer to the docs of the underlying implementation for more
 // information.
 type PeerMetadata interface {
-	// Get/Put is a simple registry for other peer-related key/value pairs.
-	// if we find something we use often, it should become its own set of
-	// methods. this is a last resort.
+	// Get / Put is a simple registry for other peer-related key/value pairs.
+	// If we find something we use often, it should become its own set of
+	// methods. This is a last resort.
 	Get(p peer.ID, key string) (interface{}, error)
 	Put(p peer.ID, key string, val interface{}) error
+
+	// RemovePeer removes all values stored for a peer.
+	RemovePeer(peer.ID)
 }
 
 // AddrBook holds the multiaddrs of peers.
 type AddrBook interface {
-
 	// AddAddr calls AddAddrs(p, []ma.Multiaddr{addr}, ttl)
 	AddAddr(p peer.ID, addr ma.Multiaddr, ttl time.Duration)
 
@@ -212,12 +214,14 @@ type KeyBook interface {
 	// AddPrivKey stores the private key of a peer.
 	AddPrivKey(peer.ID, ic.PrivKey) error
 
-	// PeersWithKeys returns all the peer IDs stored in the KeyBook
+	// PeersWithKeys returns all the peer IDs stored in the KeyBook.
 	PeersWithKeys() peer.IDSlice
+
+	// RemovePeer removes all keys associated with a peer.
+	RemovePeer(peer.ID)
 }
 
-// Metrics is just an object that tracks metrics
-// across a set of peers.
+// Metrics tracks metrics across a set of peers.
 type Metrics interface {
 	// RecordLatency records a new latency measurement
 	RecordLatency(peer.ID, time.Duration)
@@ -225,6 +229,9 @@ type Metrics interface {
 	// LatencyEWMA returns an exponentially-weighted moving avg.
 	// of all measurements of a peer's latency.
 	LatencyEWMA(peer.ID) time.Duration
+
+	// RemovePeer removes all metrics stored for a peer.
+	RemovePeer(peer.ID)
 }
 
 // ProtoBook tracks the protocols supported by peers.
@@ -242,4 +249,7 @@ type ProtoBook interface {
 	// If the peer does not support any of the given protocols, this function will return an empty string and a nil error.
 	// If the returned error is not nil, the result is indeterminate.
 	FirstSupportedProtocol(peer.ID, ...string) (string, error)
+
+	// RemovePeer removes all protocols associated with a peer.
+	RemovePeer(peer.ID)
 }

@@ -21,7 +21,6 @@ This repo contains the canonical pubsub implementation for libp2p. We currently 
 - Randomsub, which is a simple probabilistic router that propagates to random subsets of peers.
 - Gossipsub, which is a more advanced router with mesh formation and gossip propagation. See [spec](https://github.com/libp2p/specs/tree/master/pubsub/gossipsub) and  [implementation](https://github.com/libp2p/go-libp2p-pubsub/blob/master/gossipsub.go) for more details.
 
-**PSA: The Hardening Extensions for Gossipsub (Gossipsub V1.1) can be found under development at https://github.com/libp2p/go-libp2p-pubsub/pull/263**
 
 ## Repo Lead Maintainer
 
@@ -106,12 +105,22 @@ If you want to trace using a remote peer, you can do so using the `traced` daemo
 
 For instance, to capture the trace as a json file, you can use the following option:
 ```go
-pubsub.NewGossipSub(..., pubsub.NewEventTracer(pubsub.NewJSONTracer("/path/to/trace.json")))
+tracer, err := pubsub.NewJSONTracer("/path/to/trace.json")
+if err != nil {
+  panic(err)
+}
+
+pubsub.NewGossipSub(..., pubsub.WithEventTracer(tracer))
 ```
 
 To capture the trace as a protobuf, you can use the following option:
 ```go
-pubsub.NewGossipSub(..., pubsub.NewEventTracer(pubsub.NewPBTracer("/path/to/trace.pb")))
+tracer, err := pubsub.NewPBTracer("/path/to/trace.pb")
+if err != nil {
+  panic(err)
+}
+
+pubsub.NewGossipSub(..., pubsub.WithEventTracer(tracer))
 ```
 
 Finally, to use the remote tracer, you can use the following incantations:

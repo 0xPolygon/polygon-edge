@@ -143,7 +143,7 @@ func (v *validation) AddValidator(req *addValReq) {
 
 	_, ok := v.topicVals[topic]
 	if ok {
-		req.resp <- fmt.Errorf("Duplicate validator for topic %s", topic)
+		req.resp <- fmt.Errorf("duplicate validator for topic %s", topic)
 		return
 	}
 
@@ -170,7 +170,7 @@ func (v *validation) AddValidator(req *addValReq) {
 		validator = v
 
 	default:
-		req.resp <- fmt.Errorf("Unknown validator type for topic %s; must be an instance of Validator or ValidatorEx", topic)
+		req.resp <- fmt.Errorf("unknown validator type for topic %s; must be an instance of Validator or ValidatorEx", topic)
 		return
 	}
 
@@ -206,7 +206,7 @@ func (v *validation) RemoveValidator(req *rmValReq) {
 		delete(v.topicVals, topic)
 		req.resp <- nil
 	} else {
-		req.resp <- fmt.Errorf("No validator for topic %s", topic)
+		req.resp <- fmt.Errorf("no validator for topic %s", topic)
 	}
 }
 
@@ -384,7 +384,7 @@ func (v *validation) doValidateTopic(vals []*topicVal, src peer.ID, msg *Message
 
 	default:
 		// BUG: this would be an internal programming error, so a panic seems appropiate.
-		panic(fmt.Errorf("Unexpected validation result: %d", result))
+		panic(fmt.Errorf("unexpected validation result: %d", result))
 	}
 }
 

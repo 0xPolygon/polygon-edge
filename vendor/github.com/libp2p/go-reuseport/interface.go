@@ -19,9 +19,8 @@ package reuseport
 
 import (
 	"context"
+	"fmt"
 	"net"
-
-	"github.com/pkg/errors"
 )
 
 // Available returns whether or not SO_REUSEPORT or equivalent behaviour is
@@ -54,7 +53,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
 func Dial(network, laddr, raddr string) (net.Conn, error) {
 	nla, err := ResolveAddr(network, laddr)
 	if err != nil {
-		return nil, errors.Wrap(err, "resolving local addr")
+		return nil, fmt.Errorf("failed to resolve local addr: %w", err)
 	}
 	d := net.Dialer{
 		Control:   Control,

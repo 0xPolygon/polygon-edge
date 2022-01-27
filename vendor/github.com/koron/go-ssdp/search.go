@@ -65,10 +65,10 @@ const (
 	RootDevice = "upnp:rootdevice"
 )
 
-// Search searchs services by SSDP.
+// Search searches services by SSDP.
 func Search(searchType string, waitSec int, localAddr string) ([]Service, error) {
 	// dial multicast UDP packet.
-	conn, err := multicastListen(localAddr)
+	conn, err := multicastListen(&udpAddrResolver{addr: localAddr})
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +76,15 @@ func Search(searchType string, waitSec int, localAddr string) ([]Service, error)
 	logf("search on %s", conn.LocalAddr().String())
 
 	// send request.
-	msg, err := buildSearch(ssdpAddrIPv4, searchType, waitSec)
+	addr, err := multicastSendAddr()
 	if err != nil {
 		return nil, err
 	}
-	if _, err := conn.WriteTo(msg, ssdpAddrIPv4); err != nil {
+	msg, err := buildSearch(addr, searchType, waitSec)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.WriteTo(msg, addr); err != nil {
 		return nil, err
 	}
 
@@ -120,7 +124,6 @@ var (
 	errWithoutHTTPPrefix = errors.New("without HTTP prefix")
 )
 
-// FIXME: https://github.com/koron/go-ssdp/issues/10
 var endOfHeader = []byte{'\r', '\n', '\r', '\n'}
 
 func parseService(addr net.Addr, data []byte) (*Service, error) {
