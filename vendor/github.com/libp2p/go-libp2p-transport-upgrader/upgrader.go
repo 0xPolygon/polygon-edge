@@ -4,18 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/network"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
-	"github.com/libp2p/go-libp2p-pnet"
-
-	manet "github.com/multiformats/go-multiaddr-net"
+	pnet "github.com/libp2p/go-libp2p-pnet"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 // ErrNilPeer is returned when attempting to upgrade an outbound connection
@@ -52,20 +51,23 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 
 // UpgradeOutbound upgrades the given outbound multiaddr-net connection into a
 // full libp2p-transport connection.
+// Deprecated: use Upgrade instead.
 func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
-	if p == "" {
-		return nil, ErrNilPeer
-	}
-	return u.upgrade(ctx, t, maconn, p, network.DirOutbound)
+	return u.Upgrade(ctx, t, maconn, network.DirOutbound, p)
 }
 
 // UpgradeInbound upgrades the given inbound multiaddr-net connection into a
 // full libp2p-transport connection.
+// Deprecated: use Upgrade instead.
 func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
-	return u.upgrade(ctx, t, maconn, "", network.DirInbound)
+	return u.Upgrade(ctx, t, maconn, network.DirInbound, "")
 }
 
-func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID, dir network.Direction) (transport.CapableConn, error) {
+// Upgrade upgrades the multiaddr/net connection into a full libp2p-transport connection.
+func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID) (transport.CapableConn, error) {
+	if dir == network.DirOutbound && p == "" {
+		return nil, ErrNilPeer
+	}
 	var stat network.Stat
 	if cs, ok := maconn.(network.ConnStat); ok {
 		stat = cs.Stat()
@@ -80,12 +82,11 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		}
 		conn = pconn
 	} else if ipnet.ForcePrivateNetwork {
-		log.Error("tried to dial with no Private Network Protector but usage" +
-			" of Private Networks is forced by the enviroment")
+		log.Error("tried to dial with no Private Network Protector but usage of Private Networks is forced by the environment")
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
 
-	sconn, server, err := u.setupSecurity(ctx, conn, p)
+	sconn, server, err := u.setupSecurity(ctx, conn, p, dir)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
@@ -117,9 +118,9 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return tc, nil
 }
 
-func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (sec.SecureConn, bool, error) {
-	if p == "" {
-		return u.Secure.SecureInbound(ctx, conn)
+func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {
+	if dir == network.DirInbound {
+		return u.Secure.SecureInbound(ctx, conn, p)
 	}
 	return u.Secure.SecureOutbound(ctx, conn, p)
 }

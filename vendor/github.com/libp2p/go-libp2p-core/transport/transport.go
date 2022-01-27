@@ -17,12 +17,12 @@ import (
 // DialTimeout is the maximum duration a Dial is allowed to take.
 // This includes the time between dialing the raw network connection,
 // protocol selection as well the handshake, if applicable.
-var DialTimeout = 60 * time.Second
+var DialTimeout = 15 * time.Second
 
 // AcceptTimeout is the maximum duration an Accept is allowed to take.
 // This includes the time between accepting the raw network connection,
 // protocol selection as well as the handshake, if applicable.
-var AcceptTimeout = 60 * time.Second
+var AcceptTimeout = 15 * time.Second
 
 // A CapableConn represents a connection that has offers the basic
 // capabilities required by libp2p: stream multiplexing, encryption and
@@ -53,6 +53,10 @@ type CapableConn interface {
 // Connections returned by Dial and passed into Listeners are of type
 // CapableConn, which means that they have been upgraded to support
 // stream multiplexing and connection security (encryption and authentication).
+//
+// If a transport implements `io.Closer` (optional), libp2p will call `Close` on
+// shutdown. NOTE: `Dial` and `Listen` may be called after or concurrently with
+// `Close`.
 //
 // For a conceptual overview, see https://docs.libp2p.io/concepts/transport/
 type Transport interface {

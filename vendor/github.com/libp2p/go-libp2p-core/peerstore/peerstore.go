@@ -28,14 +28,14 @@ var (
 	// ProviderAddrTTL is the TTL of an address we've received from a provider.
 	// This is also a temporary address, but lasts longer. After this expires,
 	// the records we return will require an extra lookup.
-	ProviderAddrTTL = time.Minute * 10
+	ProviderAddrTTL = time.Minute * 30
 
 	// RecentlyConnectedAddrTTL is used when we recently connected to a peer.
 	// It means that we are reasonably certain of the peer's address.
-	RecentlyConnectedAddrTTL = time.Minute * 10
+	RecentlyConnectedAddrTTL = time.Minute * 30
 
 	// OwnObservedAddrTTL is used for our own external addresses observed by peers.
-	OwnObservedAddrTTL = time.Minute * 10
+	OwnObservedAddrTTL = time.Minute * 30
 )
 
 // Permanent TTLs (distinct so we can distinguish between them, constant as they

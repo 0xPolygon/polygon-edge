@@ -5,19 +5,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/transport"
 
 	logging "github.com/ipfs/go-log"
 	tec "github.com/jbenet/go-temp-err-catcher"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 var log = logging.Logger("stream-upgrader")
-
-type connErr struct {
-	conn transport.CapableConn
-	err  error
-}
 
 type listener struct {
 	manet.Listener
@@ -112,7 +108,7 @@ func (l *listener) handleIncoming() {
 			ctx, cancel := context.WithTimeout(l.ctx, transport.AcceptTimeout)
 			defer cancel()
 
-			conn, err := l.upgrader.UpgradeInbound(ctx, l.transport, maconn)
+			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "")
 			if err != nil {
 				// Don't bother bubbling this up. We just failed
 				// to completely negotiate the connection.
@@ -138,7 +134,7 @@ func (l *listener) handleIncoming() {
 			case <-ctx.Done():
 				if l.ctx.Err() == nil {
 					// Listener *not* closed but the accept timeout expired.
-					log.Warningf("listener dropped connection due to slow accept")
+					log.Warn("listener dropped connection due to slow accept")
 				}
 				// Wait on the context with a timeout. This way,
 				// if we stop accepting connections for some reason,

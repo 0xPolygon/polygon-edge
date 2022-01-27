@@ -259,7 +259,7 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, network.GetDialPeerTimeout(ctx))
 	defer cancel()
 
-	conn, err = s.dsync.DialLock(ctx, p)
+	conn, err = s.dsync.Dial(ctx, p)
 	if err == nil {
 		return conn, nil
 	}
@@ -294,17 +294,8 @@ type dialResponse struct {
 	err  error
 }
 
-// startDialWorker starts an active dial goroutine that synchronizes and executes concurrent dials
-func (s *Swarm) startDialWorker(ctx context.Context, p peer.ID, reqch <-chan dialRequest) error {
-	if p == s.local {
-		return ErrDialToSelf
-	}
-
-	go s.dialWorkerLoop(ctx, p, reqch)
-	return nil
-}
-
-func (s *Swarm) dialWorkerLoop(ctx context.Context, p peer.ID, reqch <-chan dialRequest) {
+// dialWorkerLoop synchronizes and executes concurrent dials to a single peer
+func (s *Swarm) dialWorkerLoop(p peer.ID, reqch <-chan dialRequest) {
 	defer s.limiter.clearAllPeerDials(p)
 
 	type pendRequest struct {
@@ -461,7 +452,11 @@ loop:
 
 			for _, ad := range tojoin {
 				if !ad.dialed {
-					ad.ctx = s.mergeDialContexts(ad.ctx, req.ctx)
+					if simConnect, isClient, reason := network.GetSimultaneousConnect(req.ctx); simConnect {
+						if simConnect, _, _ := network.GetSimultaneousConnect(ad.ctx); !simConnect {
+							ad.ctx = network.WithSimultaneousConnect(ad.ctx, isClient, reason)
+						}
+					}
 				}
 				ad.requests = append(ad.requests, reqno)
 			}
@@ -575,18 +570,6 @@ func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) ([]ma.Multiaddr, er
 	}
 
 	return goodAddrs, nil
-}
-
-func (s *Swarm) mergeDialContexts(a, b context.Context) context.Context {
-	dialCtx := a
-
-	if simConnect, reason := network.GetSimultaneousConnect(b); simConnect {
-		if simConnect, _ := network.GetSimultaneousConnect(a); !simConnect {
-			dialCtx = network.WithSimultaneousConnect(dialCtx, reason)
-		}
-	}
-
-	return dialCtx
 }
 
 func (s *Swarm) dialNextAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, resch chan dialResult) error {

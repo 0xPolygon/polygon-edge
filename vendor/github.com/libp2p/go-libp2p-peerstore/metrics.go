@@ -5,16 +5,12 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	core "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
 // LatencyEWMASmooting governs the decay of the EWMA (the speed
 // at which it changes). This must be a normalized (0-1) value.
 // 1 is 100% change, 0 is no change.
 var LatencyEWMASmoothing = 0.1
-
-// Deprecated: use github.com/libp2p/go-libp2p-core/peerstore.Metrics instead.
-type Metrics = core.Metrics
 
 type metrics struct {
 	latmap map[peer.ID]time.Duration

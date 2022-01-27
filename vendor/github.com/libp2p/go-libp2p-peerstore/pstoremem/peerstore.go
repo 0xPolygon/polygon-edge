@@ -2,10 +2,11 @@ package pstoremem
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-	"io"
 )
 
 type pstoremem struct {
@@ -17,15 +18,26 @@ type pstoremem struct {
 	*memoryPeerMetadata
 }
 
+func WithMaxProtocols(num int) Option {
+	return func(pb *memoryProtoBook) error {
+		pb.maxProtos = num
+		return nil
+	}
+}
+
 // NewPeerstore creates an in-memory threadsafe collection of peers.
-func NewPeerstore() *pstoremem {
+func NewPeerstore(opts ...Option) (*pstoremem, error) {
+	pb, err := NewProtoBook(opts...)
+	if err != nil {
+		return nil, err
+	}
 	return &pstoremem{
 		Metrics:            pstore.NewMetrics(),
 		memoryKeyBook:      NewKeyBook(),
 		memoryAddrBook:     NewAddrBook(),
-		memoryProtoBook:    NewProtoBook(),
+		memoryProtoBook:    pb,
 		memoryPeerMetadata: NewPeerMetadata(),
-	}
+	}, nil
 }
 
 func (ps *pstoremem) Close() (err error) {

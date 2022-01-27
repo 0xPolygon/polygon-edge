@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
@@ -242,7 +243,44 @@ func (t *Topic) Publish(ctx context.Context, data []byte, opts ...PubOpt) error 
 	}
 
 	if pub.ready != nil {
-		t.p.disc.Bootstrap(ctx, t.topic, pub.ready)
+		if t.p.disc.discovery != nil {
+			t.p.disc.Bootstrap(ctx, t.topic, pub.ready)
+		} else {
+			// TODO: we could likely do better than polling every 200ms.
+			// For example, block this goroutine on a channel,
+			// and check again whenever events tell us that the number of
+			// peers has increased.
+			var ticker *time.Ticker
+		readyLoop:
+			for {
+				// Check if ready for publishing.
+				// Similar to what disc.Bootstrap does.
+				res := make(chan bool, 1)
+				select {
+				case t.p.eval <- func() {
+					done, _ := pub.ready(t.p.rt, t.topic)
+					res <- done
+				}:
+					if <-res {
+						break readyLoop
+					}
+				case <-t.p.ctx.Done():
+					return t.p.ctx.Err()
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				if ticker == nil {
+					ticker = time.NewTicker(200 * time.Millisecond)
+					defer ticker.Stop()
+				}
+
+				select {
+				case <-ticker.C:
+				case <-ctx.Done():
+					return fmt.Errorf("router is not ready: %w", ctx.Err())
+				}
+			}
+		}
 	}
 
 	return t.p.val.PushLocal(&Message{m, t.p.host.ID(), nil})

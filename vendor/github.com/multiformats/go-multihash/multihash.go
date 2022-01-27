@@ -80,7 +80,6 @@ func init() {
 		name := fmt.Sprintf("blake2b-%d", n*8)
 		Names[name] = c
 		Codes[c] = name
-		DefaultLengths[c] = int(n)
 	}
 
 	// Add blake2s (32 codes)
@@ -89,7 +88,6 @@ func init() {
 		name := fmt.Sprintf("blake2s-%d", n*8)
 		Names[name] = c
 		Codes[c] = name
-		DefaultLengths[c] = int(n)
 	}
 }
 
@@ -140,28 +138,6 @@ var Codes = map[uint64]string{
 	X11:                       "x11",
 	POSEIDON_BLS12_381_A1_FC1: "poseidon-bls12_381-a2-fc1",
 	MD5:                       "md5",
-}
-
-// DefaultLengths maps a hash code to it's default length
-var DefaultLengths = map[uint64]int{
-	IDENTITY:     -1,
-	SHA1:         20,
-	SHA2_256:     32,
-	SHA2_512:     64,
-	SHA3_224:     28,
-	SHA3_256:     32,
-	SHA3_384:     48,
-	SHA3_512:     64,
-	DBL_SHA2_256: 32,
-	KECCAK_224:   28,
-	KECCAK_256:   32,
-	MURMUR3_128:  4,
-	KECCAK_384:   48,
-	KECCAK_512:   64,
-	SHAKE_128:    32,
-	SHAKE_256:    64,
-	X11:          64,
-	MD5:          16,
 }
 
 func uvarint(buf []byte) (uint64, []byte, error) {
@@ -231,13 +207,9 @@ func FromB58String(s string) (m Multihash, err error) {
 // Cast casts a buffer onto a multihash, and returns an error
 // if it does not work.
 func Cast(buf []byte) (Multihash, error) {
-	dm, err := Decode(buf)
+	_, err := Decode(buf)
 	if err != nil {
 		return Multihash{}, err
-	}
-
-	if !ValidCode(dm.Code) {
-		return Multihash{}, ErrUnknownCode
 	}
 
 	return Multihash(buf), nil
@@ -266,11 +238,10 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 
 // Encode a hash digest along with the specified function code.
 // Note: the length is derived from the length of the digest itself.
+//
+// The error return is legacy; it is always nil.
 func Encode(buf []byte, code uint64) ([]byte, error) {
-	if !ValidCode(code) {
-		return nil, ErrUnknownCode
-	}
-
+	// FUTURE: this function always causes heap allocs... but when used, this value is almost always going to be appended to another buffer (either as part of CID creation, or etc) -- should this whole function be rethought and alternatives offered?
 	newBuf := make([]byte, varint.UvarintSize(code)+varint.UvarintSize(uint64(len(buf)))+len(buf))
 	n := varint.PutUvarint(newBuf, code)
 	n += varint.PutUvarint(newBuf[n:], uint64(len(buf)))
@@ -283,12 +254,6 @@ func Encode(buf []byte, code uint64) ([]byte, error) {
 // instead of a numeric code. See Names for allowed values.
 func EncodeName(buf []byte, name string) ([]byte, error) {
 	return Encode(buf, Names[name])
-}
-
-// ValidCode checks whether a multihash code is valid.
-func ValidCode(code uint64) bool {
-	_, ok := Codes[code]
-	return ok
 }
 
 // readMultihashFromBuf reads a multihash from the given buffer, returning the

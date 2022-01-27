@@ -12,7 +12,7 @@ import (
 
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
-	sha256 "github.com/minio/sha256-simd"
+	"github.com/minio/sha256-simd"
 )
 
 // ECDSAPrivateKey is an implementation of an ECDSA private key
@@ -102,11 +102,6 @@ func UnmarshalECDSAPublicKey(data []byte) (PubKey, error) {
 	return &ECDSAPublicKey{pub}, nil
 }
 
-// Bytes returns the private key as protobuf bytes
-func (ePriv *ECDSAPrivateKey) Bytes() ([]byte, error) {
-	return MarshalPrivateKey(ePriv)
-}
-
 // Type returns the key type
 func (ePriv *ECDSAPrivateKey) Type() pb.KeyType {
 	return pb.KeyType_ECDSA
@@ -139,11 +134,6 @@ func (ePriv *ECDSAPrivateKey) Sign(data []byte) ([]byte, error) {
 // GetPublic returns a public key
 func (ePriv *ECDSAPrivateKey) GetPublic() PubKey {
 	return &ECDSAPublicKey{&ePriv.priv.PublicKey}
-}
-
-// Bytes returns the public key as protobuf bytes
-func (ePub *ECDSAPublicKey) Bytes() ([]byte, error) {
-	return MarshalPublicKey(ePub)
 }
 
 // Type returns the key type

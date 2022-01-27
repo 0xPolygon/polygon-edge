@@ -86,7 +86,7 @@ import (
 
 	ma "github.com/multiformats/go-multiaddr"
 	mafmt "github.com/multiformats/go-multiaddr-fmt"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 	tpt "github.com/libp2p/go-libp2p-core/transport"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -161,13 +161,13 @@ MIT
 The last gx published version of this module was: 0.1.28: QmeqC5shQjEBRG9B8roZqQCJ9xb7Pq6AbWxJFMyLgqBBWh
 
 [tpt]: https://godoc.org/github.com/libp2p/go-libp2p-core/transport
-[manet]: https://github.com/multiformats/go-multiaddr-net
+[manet]: https://github.com/multiformats/go-multiaddr/
 [ss]: https://godoc.org/github.com/libp2p/go-libp2p-core/sec
 [smux]: https://godoc.org/github.com/libp2p/go-libp2p-core/mux
 [pnet]: https://godoc.org/github.com/libp2p/go-libp2p-core/pnet
-[manet-conn]: https://godoc.org/github.com/multiformats/go-multiaddr-net#Conn
-[manet-listener]: https://godoc.org/github.com/multiformats/go-multiaddr-net#Listener
-[maddr-filter]: https://github.com/libp2p/go-maddr-filter
+[manet-conn]: https://godoc.org/github.com/multiformats/go-multiaddr/net#Conn
+[manet-listener]: https://godoc.org/github.com/multiformats/go-multiaddr/net#Listener
+[maddr-filter]: https://github.com/multiformats/go-multiaddr
 [docs-transport]: https://docs.libp2p.io/concepts/transport
 [multiaddr]: https://github.com/multiformats/multiaddr
 [go-libp2p]: https://github.com/lib2p2/go-libp2p
