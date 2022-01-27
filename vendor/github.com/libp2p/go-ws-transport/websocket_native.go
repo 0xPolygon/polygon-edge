@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package websocket
@@ -74,7 +75,7 @@ func (t *WebsocketTransport) Listen(a ma.Multiaddr) (transport.Listener, error) 
 	if err != nil {
 		return nil, err
 	}
-	return t.Upgrader.UpgradeListener(t, malist), nil
+	return t.upgrader.UpgradeListener(t, malist), nil
 }
 
 func (t *WebsocketTransport) wrapListener(l net.Listener, origin *url.URL) (*listener, error) {

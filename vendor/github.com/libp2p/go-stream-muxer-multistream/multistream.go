@@ -1,4 +1,4 @@
-// package multistream implements a peerstream transport using
+// Package multistream implements a peerstream transport using
 // go-multistream to select the underlying stream muxer
 package multistream
 
@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/network"
 
 	mss "github.com/multiformats/go-multistream"
 )
@@ -17,7 +17,7 @@ var DefaultNegotiateTimeout = time.Second * 60
 type Transport struct {
 	mux *mss.MultistreamMuxer
 
-	tpts map[string]mux.Multiplexer
+	tpts map[string]network.Multiplexer
 
 	NegotiateTimeout time.Duration
 
@@ -27,18 +27,18 @@ type Transport struct {
 func NewBlankTransport() *Transport {
 	return &Transport{
 		mux:              mss.NewMultistreamMuxer(),
-		tpts:             make(map[string]mux.Multiplexer),
+		tpts:             make(map[string]network.Multiplexer),
 		NegotiateTimeout: DefaultNegotiateTimeout,
 	}
 }
 
-func (t *Transport) AddTransport(path string, tpt mux.Multiplexer) {
+func (t *Transport) AddTransport(path string, tpt network.Multiplexer) {
 	t.mux.AddHandler(path, nil)
 	t.tpts[path] = tpt
 	t.OrderPreference = append(t.OrderPreference, path)
 }
 
-func (t *Transport) NewConn(nc net.Conn, isServer bool) (mux.MuxedConn, error) {
+func (t *Transport) NewConn(nc net.Conn, isServer bool, scope network.PeerScope) (network.MuxedConn, error) {
 	if t.NegotiateTimeout != 0 {
 		if err := nc.SetDeadline(time.Now().Add(t.NegotiateTimeout)); err != nil {
 			return nil, err
@@ -71,5 +71,5 @@ func (t *Transport) NewConn(nc net.Conn, isServer bool) (mux.MuxedConn, error) {
 		return nil, fmt.Errorf("selected protocol we don't have a transport for")
 	}
 
-	return tpt.NewConn(nc, isServer)
+	return tpt.NewConn(nc, isServer, scope)
 }

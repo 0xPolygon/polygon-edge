@@ -68,15 +68,15 @@ func WithBackoffDiscoveryReturnedChannelSize(size int) BackoffDiscoveryOption {
 }
 
 type backoffCache struct {
+	// strat is assigned on creation and not written to
+	strat BackoffStrategy
+
+	mux          sync.Mutex // guards writes to all following fields
 	nextDiscover time.Time
 	prevPeers    map[peer.ID]peer.AddrInfo
-
-	peers      map[peer.ID]peer.AddrInfo
-	sendingChs map[chan peer.AddrInfo]int
-
-	ongoing bool
-	strat   BackoffStrategy
-	mux     sync.Mutex
+	peers        map[peer.ID]peer.AddrInfo
+	sendingChs   map[chan peer.AddrInfo]int
+	ongoing      bool
 }
 
 func (d *BackoffDiscovery) Advertise(ctx context.Context, ns string, opts ...discovery.Option) (time.Duration, error) {
@@ -112,6 +112,7 @@ func (d *BackoffDiscovery) FindPeers(ctx context.Context, ns string, opts ...dis
 			sendingChs:   make(map[chan peer.AddrInfo]int),
 			strat:        d.stratFactory(),
 		}
+
 		d.peerCacheMux.Lock()
 		c, ok = d.peerCache[ns]
 
@@ -139,7 +140,11 @@ func (d *BackoffDiscovery) FindPeers(ctx context.Context, ns string, opts ...dis
 		}
 		pch := make(chan peer.AddrInfo, chLen)
 		for _, ai := range c.prevPeers {
-			pch <- ai
+			select {
+			case pch <- ai:
+			default:
+				// skip if we have asked for a lower limit than the number of peers known
+			}
 		}
 		close(pch)
 		return pch, nil

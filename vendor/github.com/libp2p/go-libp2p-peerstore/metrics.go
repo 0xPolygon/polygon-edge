@@ -5,20 +5,16 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	core "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
-// LatencyEWMASmooting governs the decay of the EWMA (the speed
+// LatencyEWMASmoothing governs the decay of the EWMA (the speed
 // at which it changes). This must be a normalized (0-1) value.
 // 1 is 100% change, 0 is no change.
 var LatencyEWMASmoothing = 0.1
 
-// Deprecated: use github.com/libp2p/go-libp2p-core/peerstore.Metrics instead.
-type Metrics = core.Metrics
-
 type metrics struct {
+	mutex  sync.RWMutex
 	latmap map[peer.ID]time.Duration
-	latmu  sync.RWMutex
 }
 
 func NewMetrics() *metrics {
@@ -35,7 +31,7 @@ func (m *metrics) RecordLatency(p peer.ID, next time.Duration) {
 		s = 0.1 // ignore the knob. it's broken. look, it jiggles.
 	}
 
-	m.latmu.Lock()
+	m.mutex.Lock()
 	ewma, found := m.latmap[p]
 	ewmaf := float64(ewma)
 	if !found {
@@ -44,14 +40,19 @@ func (m *metrics) RecordLatency(p peer.ID, next time.Duration) {
 		nextf = ((1.0 - s) * ewmaf) + (s * nextf)
 		m.latmap[p] = time.Duration(nextf)
 	}
-	m.latmu.Unlock()
+	m.mutex.Unlock()
 }
 
 // LatencyEWMA returns an exponentially-weighted moving avg.
 // of all measurements of a peer's latency.
 func (m *metrics) LatencyEWMA(p peer.ID) time.Duration {
-	m.latmu.RLock()
-	lat := m.latmap[p]
-	m.latmu.RUnlock()
-	return time.Duration(lat)
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	return m.latmap[p]
+}
+
+func (m *metrics) RemovePeer(p peer.ID) {
+	m.mutex.Lock()
+	delete(m.latmap, p)
+	m.mutex.Unlock()
 }

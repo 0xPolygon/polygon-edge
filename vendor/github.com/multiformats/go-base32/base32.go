@@ -115,55 +115,58 @@ func (enc *Encoding) Encode(dst, src []byte) {
 		return
 	}
 
-	for len(src) > 0 {
-		var carry byte
-
-		// Unpack 8x 5-bit source blocks into a 5 byte
-		// destination quantum
-		switch len(src) {
-		default:
-			dst[7] = enc.encode[src[4]&0x1F]
-			carry = src[4] >> 5
-			fallthrough
-		case 4:
-			dst[6] = enc.encode[carry|(src[3]<<3)&0x1F]
-			dst[5] = enc.encode[(src[3]>>2)&0x1F]
-			carry = src[3] >> 7
-			fallthrough
-		case 3:
-			dst[4] = enc.encode[carry|(src[2]<<1)&0x1F]
-			carry = (src[2] >> 4) & 0x1F
-			fallthrough
-		case 2:
-			dst[3] = enc.encode[carry|(src[1]<<4)&0x1F]
-			dst[2] = enc.encode[(src[1]>>1)&0x1F]
-			carry = (src[1] >> 6) & 0x1F
-			fallthrough
-		case 1:
-			dst[1] = enc.encode[carry|(src[0]<<2)&0x1F]
-			dst[0] = enc.encode[src[0]>>3]
-		}
-
-		// Pad the final quantum
-		if len(src) < 5 {
-			if enc.padChar != NoPadding {
-				dst[7] = byte(enc.padChar)
-				if len(src) < 4 {
-					dst[6] = byte(enc.padChar)
-					dst[5] = byte(enc.padChar)
-					if len(src) < 3 {
-						dst[4] = byte(enc.padChar)
-						if len(src) < 2 {
-							dst[3] = byte(enc.padChar)
-							dst[2] = byte(enc.padChar)
-						}
-					}
-				}
-			}
-			break
-		}
+	// Unpack 8x 5-bit source blocks into a 5 byte
+	// destination quantum
+	for len(src) > 4 {
+		dst[7] = enc.encode[src[4]&0x1F]
+		dst[6] = enc.encode[(src[4]>>5)|(src[3]<<3)&0x1F]
+		dst[5] = enc.encode[(src[3]>>2)&0x1F]
+		dst[4] = enc.encode[(src[3]>>7)|(src[2]<<1)&0x1F]
+		dst[3] = enc.encode[((src[2]>>4)|(src[1]<<4))&0x1F]
+		dst[2] = enc.encode[(src[1]>>1)&0x1F]
+		dst[1] = enc.encode[((src[1]>>6)|(src[0]<<2))&0x1F]
+		dst[0] = enc.encode[src[0]>>3]
 		src = src[5:]
 		dst = dst[8:]
+	}
+
+	var carry byte
+
+	switch len(src) {
+	case 4:
+		dst[6] = enc.encode[(src[3]<<3)&0x1F]
+		dst[5] = enc.encode[(src[3]>>2)&0x1F]
+		carry = src[3] >> 7
+		fallthrough
+	case 3:
+		dst[4] = enc.encode[carry|(src[2]<<1)&0x1F]
+		carry = (src[2] >> 4) & 0x1F
+		fallthrough
+	case 2:
+		dst[3] = enc.encode[carry|(src[1]<<4)&0x1F]
+		dst[2] = enc.encode[(src[1]>>1)&0x1F]
+		carry = (src[1] >> 6) & 0x1F
+		fallthrough
+	case 1:
+		dst[1] = enc.encode[carry|(src[0]<<2)&0x1F]
+		dst[0] = enc.encode[src[0]>>3]
+	case 0:
+		return
+	}
+
+	if enc.padChar != NoPadding {
+		dst[7] = byte(enc.padChar)
+		if len(src) < 4 {
+			dst[6] = byte(enc.padChar)
+			dst[5] = byte(enc.padChar)
+			if len(src) < 3 {
+				dst[4] = byte(enc.padChar)
+				if len(src) < 2 {
+					dst[3] = byte(enc.padChar)
+					dst[2] = byte(enc.padChar)
+				}
+			}
+		}
 	}
 }
 

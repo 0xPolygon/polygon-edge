@@ -9,7 +9,6 @@ import (
 	"time"
 
 	ic "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/transport"
@@ -39,8 +38,10 @@ type Conn struct {
 		m map[*Stream]struct{}
 	}
 
-	stat network.Stat
+	stat network.ConnStats
 }
+
+var _ network.Conn = &Conn{}
 
 func (c *Conn) ID() string {
 	// format: <first 10 chars of peer id>-<global conn ordinal>
@@ -90,8 +91,10 @@ func (c *Conn) doClose() {
 
 func (c *Conn) removeStream(s *Stream) {
 	c.streams.Lock()
+	c.stat.NumStreams--
 	delete(c.streams.m, s)
 	c.streams.Unlock()
+	s.scope.Done()
 }
 
 // listens for new streams.
@@ -108,9 +111,14 @@ func (c *Conn) start() {
 			if err != nil {
 				return
 			}
+			scope, err := c.swarm.ResourceManager().OpenStream(c.RemotePeer(), network.DirInbound)
+			if err != nil {
+				ts.Reset()
+				continue
+			}
 			c.swarm.refs.Add(1)
 			go func() {
-				s, err := c.addStream(ts, network.DirInbound)
+				s, err := c.addStream(ts, network.DirInbound, scope)
 
 				// Don't defer this. We don't want to block
 				// swarm shutdown on the connection handler.
@@ -171,7 +179,9 @@ func (c *Conn) RemotePublicKey() ic.PubKey {
 }
 
 // Stat returns metadata pertaining to this connection
-func (c *Conn) Stat() network.Stat {
+func (c *Conn) Stat() network.ConnStats {
+	c.streams.Lock()
+	defer c.streams.Unlock()
 	return c.stat
 }
 
@@ -183,34 +193,40 @@ func (c *Conn) NewStream(ctx context.Context) (network.Stream, error) {
 		}
 	}
 
-	ts, err := c.conn.OpenStream(ctx)
-
+	scope, err := c.swarm.ResourceManager().OpenStream(c.RemotePeer(), network.DirOutbound)
 	if err != nil {
 		return nil, err
 	}
-	return c.addStream(ts, network.DirOutbound)
+	ts, err := c.conn.OpenStream(ctx)
+	if err != nil {
+		scope.Done()
+		return nil, err
+	}
+	return c.addStream(ts, network.DirOutbound, scope)
 }
 
-func (c *Conn) addStream(ts mux.MuxedStream, dir network.Direction) (*Stream, error) {
+func (c *Conn) addStream(ts network.MuxedStream, dir network.Direction, scope network.StreamManagementScope) (*Stream, error) {
 	c.streams.Lock()
 	// Are we still online?
 	if c.streams.m == nil {
 		c.streams.Unlock()
+		scope.Done()
 		ts.Reset()
 		return nil, ErrConnClosed
 	}
 
 	// Wrap and register the stream.
-	stat := network.Stat{
-		Direction: dir,
-		Opened:    time.Now(),
-	}
 	s := &Stream{
 		stream: ts,
 		conn:   c,
-		stat:   stat,
-		id:     atomic.AddUint64(&c.swarm.nextStreamID, 1),
+		scope:  scope,
+		stat: network.Stats{
+			Direction: dir,
+			Opened:    time.Now(),
+		},
+		id: atomic.AddUint64(&c.swarm.nextStreamID, 1),
 	}
+	c.stat.NumStreams++
 	c.streams.m[s] = struct{}{}
 
 	// Released once the stream disconnect notifications have finished
@@ -240,4 +256,8 @@ func (c *Conn) GetStreams() []network.Stream {
 		streams = append(streams, s)
 	}
 	return streams
+}
+
+func (c *Conn) Scope() network.ConnScope {
+	return c.conn.Scope()
 }
