@@ -1,31 +1,30 @@
 package basichost
 
 import (
+	"context"
+	"io"
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
-	goprocess "github.com/jbenet/goprocess"
-	goprocessctx "github.com/jbenet/goprocess/context"
 	"github.com/libp2p/go-libp2p-core/network"
 	inat "github.com/libp2p/go-libp2p-nat"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-// A simple interface to manage NAT devices.
+// NATManager is a simple interface to manage NAT devices.
 type NATManager interface {
-
-	// Get the NAT device managed by the NAT manager.
+	// NAT gets the NAT device managed by the NAT manager.
 	NAT() *inat.NAT
 
-	// Receive a notification when the NAT device is ready for use.
+	// Ready receives a notification when the NAT device is ready for use.
 	Ready() <-chan struct{}
 
-	// Close all resources associated with a NAT manager.
-	Close() error
+	io.Closer
 }
 
-// Create a NAT manager.
+// NewNATManager creates a NAT manager.
 func NewNATManager(net network.Network) NATManager {
 	return newNatManager(net)
 }
@@ -44,26 +43,29 @@ type natManager struct {
 	ready    chan struct{} // closed once the nat is ready to process port mappings
 	syncFlag chan struct{}
 
-	proc goprocess.Process // natManager has a process + children. can be closed.
+	refCount  sync.WaitGroup
+	ctxCancel context.CancelFunc
 }
 
 func newNatManager(net network.Network) *natManager {
+	ctx, cancel := context.WithCancel(context.Background())
 	nmgr := &natManager{
-		net:      net,
-		ready:    make(chan struct{}),
-		syncFlag: make(chan struct{}, 1),
+		net:       net,
+		ready:     make(chan struct{}),
+		syncFlag:  make(chan struct{}, 1),
+		ctxCancel: cancel,
 	}
-
-	nmgr.proc = goprocess.WithParent(goprocess.Background())
-
-	nmgr.start()
+	nmgr.refCount.Add(1)
+	go nmgr.background(ctx)
 	return nmgr
 }
 
 // Close closes the natManager, closing the underlying nat
 // and unregistering from network events.
 func (nmgr *natManager) Close() error {
-	return nmgr.proc.Close()
+	nmgr.ctxCancel()
+	nmgr.refCount.Wait()
+	return nil
 }
 
 // Ready returns a channel which will be closed when the NAT has been found
@@ -72,52 +74,38 @@ func (nmgr *natManager) Ready() <-chan struct{} {
 	return nmgr.ready
 }
 
-func (nmgr *natManager) start() {
-	nmgr.proc.Go(func(worker goprocess.Process) {
-		// inat.DiscoverNAT blocks until the nat is found or a timeout
-		// is reached. we unfortunately cannot specify timeouts-- the
-		// library we're using just blocks.
-		//
-		// Note: on early shutdown, there may be a case where we're trying
-		// to close before DiscoverNAT() returns. Since we cant cancel it
-		// (library) we can choose to (1) drop the result and return early,
-		// or (2) wait until it times out to exit. For now we choose (2),
-		// to avoid leaking resources in a non-obvious way. the only case
-		// this affects is when the daemon is being started up and _immediately_
-		// asked to close. other services are also starting up, so ok to wait.
+func (nmgr *natManager) background(ctx context.Context) {
+	defer nmgr.refCount.Done()
 
-		natInstance, err := inat.DiscoverNAT(goprocessctx.OnClosingContext(worker))
-		if err != nil {
-			log.Info("DiscoverNAT error:", err)
-			close(nmgr.ready)
+	discoverCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	natInstance, err := inat.DiscoverNAT(discoverCtx)
+	if err != nil {
+		log.Info("DiscoverNAT error:", err)
+		close(nmgr.ready)
+		return
+	}
+
+	nmgr.natmu.Lock()
+	nmgr.nat = natInstance
+	nmgr.natmu.Unlock()
+	close(nmgr.ready)
+
+	// sign natManager up for network notifications
+	// we need to sign up here to avoid missing some notifs
+	// before the NAT has been found.
+	nmgr.net.Notify((*nmgrNetNotifiee)(nmgr))
+	defer nmgr.net.StopNotify((*nmgrNetNotifiee)(nmgr))
+
+	nmgr.doSync() // sync one first.
+	for {
+		select {
+		case <-nmgr.syncFlag:
+			nmgr.doSync() // sync when our listen addresses chnage.
+		case <-ctx.Done():
 			return
 		}
-
-		nmgr.natmu.Lock()
-		nmgr.nat = natInstance
-		nmgr.natmu.Unlock()
-		close(nmgr.ready)
-
-		// wire up the nat to close when nmgr closes.
-		// nmgr.proc is our parent, and waiting for us.
-		nmgr.proc.AddChild(nmgr.nat.Process())
-
-		// sign natManager up for network notifications
-		// we need to sign up here to avoid missing some notifs
-		// before the NAT has been found.
-		nmgr.net.Notify((*nmgrNetNotifiee)(nmgr))
-		defer nmgr.net.StopNotify((*nmgrNetNotifiee)(nmgr))
-
-		nmgr.doSync() // sync one first.
-		for {
-			select {
-			case <-nmgr.syncFlag:
-				nmgr.doSync() // sync when our listen addresses chnage.
-			case <-worker.Closing():
-				return
-			}
-		}
-	})
+	}
 }
 
 func (nmgr *natManager) sync() {

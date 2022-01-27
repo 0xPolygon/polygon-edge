@@ -42,11 +42,6 @@ As `go-libp2p-noise` is still in development, it is not included as a default de
 go get github.com/libp2p/go-libp2p-noise
 ```
 
-This repo is [gomod](https://github.com/golang/go/wiki/Modules) compatible, and users of
-go 1.12 and later with modules enabled will automatically pull the latest tagged release
-by referencing this package. Upgrades to future releases can be managed using `go get`,
-or by editing your `go.mod` file as [described by the gomod documentation](https://github.com/golang/go/wiki/Modules#how-to-upgrade-and-downgrade-dependencies).
-
 ## Usage
 
 `go-libp2p-noise` is not currently enabled by default when constructing a new libp2p

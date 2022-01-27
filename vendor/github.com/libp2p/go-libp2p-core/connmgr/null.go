@@ -12,13 +12,13 @@ type NullConnMgr struct{}
 
 var _ ConnManager = (*NullConnMgr)(nil)
 
-func (_ NullConnMgr) TagPeer(peer.ID, string, int)             {}
-func (_ NullConnMgr) UntagPeer(peer.ID, string)                {}
-func (_ NullConnMgr) UpsertTag(peer.ID, string, func(int) int) {}
-func (_ NullConnMgr) GetTagInfo(peer.ID) *TagInfo              { return &TagInfo{} }
-func (_ NullConnMgr) TrimOpenConns(ctx context.Context)        {}
-func (_ NullConnMgr) Notifee() network.Notifiee                { return network.GlobalNoopNotifiee }
-func (_ NullConnMgr) Protect(peer.ID, string)                  {}
-func (_ NullConnMgr) Unprotect(peer.ID, string) bool           { return false }
-func (_ NullConnMgr) IsProtected(peer.ID, string) bool         { return false }
-func (_ NullConnMgr) Close() error                             { return nil }
+func (NullConnMgr) TagPeer(peer.ID, string, int)             {}
+func (NullConnMgr) UntagPeer(peer.ID, string)                {}
+func (NullConnMgr) UpsertTag(peer.ID, string, func(int) int) {}
+func (NullConnMgr) GetTagInfo(peer.ID) *TagInfo              { return &TagInfo{} }
+func (NullConnMgr) TrimOpenConns(ctx context.Context)        {}
+func (NullConnMgr) Notifee() network.Notifiee                { return network.GlobalNoopNotifiee }
+func (NullConnMgr) Protect(peer.ID, string)                  {}
+func (NullConnMgr) Unprotect(peer.ID, string) bool           { return false }
+func (NullConnMgr) IsProtected(peer.ID, string) bool         { return false }
+func (NullConnMgr) Close() error                             { return nil }

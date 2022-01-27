@@ -33,7 +33,7 @@ func DecayLinear(coef float64) DecayFn {
 // DecayExpireWhenInactive expires a tag after a certain period of no bumps.
 func DecayExpireWhenInactive(after time.Duration) DecayFn {
 	return func(value DecayingValue) (_ int, rm bool) {
-		rm = value.LastVisit.Sub(time.Now()) >= after
+		rm = time.Until(value.LastVisit) >= after
 		return 0, rm
 	}
 }
