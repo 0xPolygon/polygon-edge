@@ -64,14 +64,11 @@ func (q *accountQueue) prune(nonce uint64) (pruned []*types.Transaction) {
 
 // clear removes all transactions from the queue.
 func (q *accountQueue) clear() (removed []*types.Transaction) {
-	for {
-		tx := q.pop()
-		if tx == nil {
-			break
-		}
+	// store txs
+	removed = q.queue
 
-		removed = append(removed, tx)
-	}
+	// clear the underlying queue
+	q.queue = q.queue[:0]
 
 	return
 }
@@ -156,15 +153,9 @@ func newPricedQueue() *pricedQueue {
 	return &q
 }
 
-// clear empties the underlying queue
-// and returns the removed transactions.
+// clear empties the underlying queue.
 func (q *pricedQueue) clear() {
-	for {
-		tx := q.pop()
-		if tx == nil {
-			break
-		}
-	}
+	q.queue = q.queue[:0]
 }
 
 // Pushes the given transactions onto the queue.
