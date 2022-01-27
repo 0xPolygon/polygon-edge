@@ -379,7 +379,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
-	p.logger.Debug("Drop",
+	p.logger.Debug("dropped account txs",
 		"num", droppedCount,
 		"next_nonce", nextNonce,
 		"address", tx.From.String(),
