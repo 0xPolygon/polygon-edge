@@ -199,7 +199,7 @@ github.com/libp2p/go-libp2p-blankhost
 # github.com/libp2p/go-libp2p-circuit v0.4.0
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
-# github.com/libp2p/go-libp2p-core v0.8.5
+# github.com/libp2p/go-libp2p-core v0.14.0
 ## explicit
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
@@ -318,7 +318,7 @@ github.com/mr-tron/base58/base58
 github.com/multiformats/go-base32
 # github.com/multiformats/go-base36 v0.1.0
 github.com/multiformats/go-base36
-# github.com/multiformats/go-multiaddr v0.3.1
+# github.com/multiformats/go-multiaddr v0.4.1
 ## explicit
 github.com/multiformats/go-multiaddr
 github.com/multiformats/go-multiaddr/net
@@ -421,15 +421,6 @@ github.com/valyala/fastjson/fastfloat
 github.com/whyrusleeping/multiaddr-filter
 # github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee
 github.com/whyrusleeping/timecache
-# go.opencensus.io v0.23.0
-go.opencensus.io/internal/tagencoding
-go.opencensus.io/metric/metricdata
-go.opencensus.io/metric/metricproducer
-go.opencensus.io/resource
-go.opencensus.io/stats
-go.opencensus.io/stats/internal
-go.opencensus.io/stats/view
-go.opencensus.io/tag
 # go.uber.org/atomic v1.9.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.7.0
