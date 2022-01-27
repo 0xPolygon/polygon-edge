@@ -354,6 +354,9 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	clearAccountQueue := func(txs []*types.Transaction) {
 		p.index.remove(txs...)
 		p.gauge.decrease(slotsRequired(txs...))
+
+		// increase counter
+		droppedCount += len(dropped)
 	}
 
 	defer func() {
@@ -367,7 +370,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop promoted
 	dropped := account.promoted.clear()
-	droppedCount += len(dropped)
 	clearAccountQueue(dropped)
 
 	// update metrics
@@ -375,7 +377,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// drop enqueued
 	dropped = account.enqueued.clear()
-	droppedCount += len(dropped)
 	clearAccountQueue(dropped)
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
