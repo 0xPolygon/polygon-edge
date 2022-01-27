@@ -5,10 +5,10 @@ import (
 
 	config "github.com/libp2p/go-libp2p/config"
 
-	"github.com/libp2p/go-libp2p-core/host"
+	host "github.com/libp2p/go-libp2p-host"
 )
 
-// Config describes a set of settings for a libp2p node.
+// Config describes a set of settings for a libp2p node
 type Config = config.Config
 
 // Option is a libp2p config option that can be given to the libp2p constructor
@@ -19,9 +19,6 @@ type Option = config.Option
 func ChainOptions(opts ...Option) Option {
 	return func(cfg *Config) error {
 		for _, opt := range opts {
-			if opt == nil {
-				continue
-			}
 			if err := opt(cfg); err != nil {
 				return err
 			}
@@ -43,16 +40,16 @@ func ChainOptions(opts ...Option) Option {
 // default to use the "yamux/1.0.0" and "mplux/6.7.0" stream connection
 // multiplexers;
 //
-// - If no security transport is provided, the host uses the go-libp2p's noise
-// and/or tls encrypted transport to encrypt all traffic;
+// - If no security transport is provided, the host uses the go-libp2p's secio
+// encrypted transport to encrypt all traffic;
 //
-// - If no peer identity is provided, it generates a random RSA 2048 key-pair
+// - If no peer identity is provided, it generates a random RSA 2048 key-par
 // and derives a new identity from it;
 //
 // - If no peerstore is provided, the host is initialized with an empty
 // peerstore.
 //
-// To stop/shutdown the returned libp2p node, the user needs to cancel the passed context and call `Close` on the returned Host.
+// Canceling the passed context will stop the returned libp2p node.
 func New(ctx context.Context, opts ...Option) (host.Host, error) {
 	return NewWithoutDefaults(ctx, append(opts, FallbackDefaults)...)
 }

@@ -1,29 +1,23 @@
 package libp2p
 
 // This file contains all libp2p configuration options (except the defaults,
-// those are in defaults.go).
+// those are in defaults.go)
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"time"
+
+	config "github.com/libp2p/go-libp2p/config"
+	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 
 	circuit "github.com/libp2p/go-libp2p-circuit"
-	"github.com/libp2p/go-libp2p-core/connmgr"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/metrics"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/pnet"
-
-	"github.com/libp2p/go-libp2p/config"
-	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	autorelay "github.com/libp2p/go-libp2p/p2p/host/relay"
-
+	crypto "github.com/libp2p/go-libp2p-crypto"
+	ifconnmgr "github.com/libp2p/go-libp2p-interface-connmgr"
+	pnet "github.com/libp2p/go-libp2p-interface-pnet"
+	metrics "github.com/libp2p/go-libp2p-metrics"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
+	filter "github.com/libp2p/go-maddr-filter"
 	ma "github.com/multiformats/go-multiaddr"
-	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 // ListenAddrStrings configures libp2p to listen on the given (unparsed)
@@ -138,7 +132,7 @@ func Transport(tpt interface{}) Option {
 }
 
 // Peerstore configures libp2p to use the given peerstore.
-func Peerstore(ps peerstore.Peerstore) Option {
+func Peerstore(ps pstore.Peerstore) Option {
 	return func(cfg *Config) error {
 		if cfg.Peerstore != nil {
 			return fmt.Errorf("cannot specify multiple peerstore options")
@@ -150,13 +144,13 @@ func Peerstore(ps peerstore.Peerstore) Option {
 }
 
 // PrivateNetwork configures libp2p to use the given private network protector.
-func PrivateNetwork(psk pnet.PSK) Option {
+func PrivateNetwork(prot pnet.Protector) Option {
 	return func(cfg *Config) error {
-		if cfg.PSK != nil {
+		if cfg.Protector != nil {
 			return fmt.Errorf("cannot specify multiple private network options")
 		}
 
-		cfg.PSK = psk
+		cfg.Protector = prot
 		return nil
 	}
 }
@@ -186,7 +180,7 @@ func Identity(sk crypto.PrivKey) Option {
 }
 
 // ConnectionManager configures libp2p to use the given connection manager.
-func ConnectionManager(connman connmgr.ConnManager) Option {
+func ConnectionManager(connman ifconnmgr.ConnManager) Option {
 	return func(cfg *Config) error {
 		if cfg.ConnManager != nil {
 			return fmt.Errorf("cannot specify multiple connection managers")
@@ -207,12 +201,7 @@ func AddrsFactory(factory config.AddrsFactory) Option {
 	}
 }
 
-// EnableRelay configures libp2p to enable the relay transport with
-// configuration options. By default, this option only configures libp2p to
-// accept inbound connections from relays and make outbound connections
-// _through_ relays when requested by the remote peer. (default: enabled)
-//
-// To _act_ as a relay, pass the circuit.OptHop option.
+// EnableRelay configures libp2p to enable the relay transport with configuration options.
 func EnableRelay(options ...circuit.RelayOpt) Option {
 	return func(cfg *Config) error {
 		cfg.RelayCustom = true
@@ -222,7 +211,7 @@ func EnableRelay(options ...circuit.RelayOpt) Option {
 	}
 }
 
-// DisableRelay configures libp2p to disable the relay transport.
+// DisableRelay configures libp2p to disable the relay transport
 func DisableRelay() Option {
 	return func(cfg *Config) error {
 		cfg.RelayCustom = true
@@ -231,164 +220,16 @@ func DisableRelay() Option {
 	}
 }
 
-// EnableAutoRelay configures libp2p to enable the AutoRelay subsystem.
-//
-// Dependencies:
-//  * Relay (enabled by default)
-//  * Routing (to find relays), or StaticRelays/DefaultStaticRelays.
-//
-// This subsystem performs two functions:
-//
-// 1. When this libp2p node is configured to act as a relay "hop"
-//    (circuit.OptHop is passed to EnableRelay), this node will advertise itself
-//    as a public relay using the provided routing system.
-// 2. When this libp2p node is _not_ configured as a relay "hop", it will
-//    automatically detect if it is unreachable (e.g., behind a NAT). If so, it will
-//    find, configure, and announce a set of public relays.
-func EnableAutoRelay() Option {
-	return func(cfg *Config) error {
-		cfg.EnableAutoRelay = true
-		return nil
-	}
-}
-
-// StaticRelays configures known relays for autorelay; when this option is enabled
-// then the system will use the configured relays instead of querying the DHT to
-// discover relays.
-func StaticRelays(relays []peer.AddrInfo) Option {
-	return func(cfg *Config) error {
-		cfg.StaticRelays = append(cfg.StaticRelays, relays...)
-		return nil
-	}
-}
-
-// DefaultStaticRelays configures the static relays to use the known PL-operated relays.
-func DefaultStaticRelays() Option {
-	return func(cfg *Config) error {
-		for _, addr := range autorelay.DefaultRelays {
-			a, err := ma.NewMultiaddr(addr)
-			if err != nil {
-				return err
-			}
-			pi, err := peer.AddrInfoFromP2pAddr(a)
-			if err != nil {
-				return err
-			}
-			cfg.StaticRelays = append(cfg.StaticRelays, *pi)
-		}
-
-		return nil
-	}
-}
-
-// ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
-// forcing the local node to believe it is reachable externally.
-func ForceReachabilityPublic() Option {
-	return func(cfg *Config) error {
-		public := network.Reachability(network.ReachabilityPublic)
-		cfg.AutoNATConfig.ForceReachability = &public
-		return nil
-	}
-}
-
-// ForceReachabilityPrivate overrides automatic reachability detection in the AutoNAT subsystem,
-// forceing the local node to believe it is behind a NAT and not reachable externally.
-func ForceReachabilityPrivate() Option {
-	return func(cfg *Config) error {
-		private := network.Reachability(network.ReachabilityPrivate)
-		cfg.AutoNATConfig.ForceReachability = &private
-		return nil
-	}
-}
-
-// EnableNATService configures libp2p to provide a service to peers for determining
-// their reachability status. When enabled, the host will attempt to dial back
-// to peers, and then tell them if it was successful in making such connections.
-func EnableNATService() Option {
-	return func(cfg *Config) error {
-		cfg.AutoNATConfig.EnableService = true
-		return nil
-	}
-}
-
-// AutoNATServiceRateLimit changes the default rate limiting configured in helping
-// other peers determine their reachability status. When set, the host will limit
-// the number of requests it responds to in each 60 second period to the set
-// numbers. A value of '0' disables throttling.
-func AutoNATServiceRateLimit(global, perPeer int, interval time.Duration) Option {
-	return func(cfg *Config) error {
-		cfg.AutoNATConfig.ThrottleGlobalLimit = global
-		cfg.AutoNATConfig.ThrottlePeerLimit = perPeer
-		cfg.AutoNATConfig.ThrottleInterval = interval
-		return nil
-	}
-}
-
 // FilterAddresses configures libp2p to never dial nor accept connections from
-// the given addresses. FilterAddresses should be used for cases where the
-// addresses you want to deny are known ahead of time.
-//
-// Note: Using Filter + FilterAddresses at the same time is fine, but you cannot
-// configure a both ConnectionGater and filtered addresses.
-//
-// Deprecated: Please use ConnectionGater() instead.
+// the given addresses.
 func FilterAddresses(addrs ...*net.IPNet) Option {
 	return func(cfg *Config) error {
-		var f *filtersConnectionGater
-
-		// preserve backwards compatibility.
-		// if we have a connection gater, try to cast it to a *filtersConnectionGater.
-		if cfg.ConnectionGater != nil {
-			var ok bool
-			if f, ok = cfg.ConnectionGater.(*filtersConnectionGater); !ok {
-				return errors.New("cannot configure both Filters and Connection Gater; please consider configuring just a ConnectionGater instead")
-			}
+		if cfg.Filters == nil {
+			cfg.Filters = filter.NewFilters()
 		}
-
-		if f == nil {
-			f = (*filtersConnectionGater)(ma.NewFilters())
-			cfg.ConnectionGater = f
-		}
-
 		for _, addr := range addrs {
-			(*ma.Filters)(f).AddFilter(*addr, ma.ActionDeny)
+			cfg.Filters.AddDialFilter(addr)
 		}
-
-		return nil
-	}
-}
-
-// Filters configures libp2p to use the given filters for accepting/denying
-// certain addresses. Filters offers more control and should be used when the
-// addresses you want to accept/deny are not known ahead of time and can
-// dynamically change.
-//
-// Note: You cannot configure both a ConnectionGater and a Filter at the same
-// time. Under the hood, the Filters object is converted to a ConnectionGater.
-//
-// Deprecated: use ConnectionGater() instead.
-func Filters(filters *ma.Filters) Option {
-	return func(cfg *Config) error {
-		if cfg.ConnectionGater != nil {
-			return errors.New("cannot configure both Filters and Connection Gater; please consider configuring just a ConnectionGater instead")
-
-		}
-		cfg.ConnectionGater = (*filtersConnectionGater)(filters)
-		return nil
-	}
-}
-
-// ConnectionGater configures libp2p to use the given ConnectionGater
-// to actively reject inbound/outbound connections based on the lifecycle stage
-// of the connection.
-//
-// For more information, refer to go-libp2p-core.ConnectionGater.
-func ConnectionGater(cg connmgr.ConnectionGater) Option {
-	return func(cfg *Config) error {
-		if cfg.ConnectionGater != nil {
-			return errors.New("cannot configure multiple connection gaters, or cannot configure both Filters and ConnectionGater")
-		}
-		cfg.ConnectionGater = cg
 		return nil
 	}
 }
@@ -419,17 +260,6 @@ func Ping(enable bool) Option {
 	}
 }
 
-// Routing will configure libp2p to use routing.
-func Routing(rt config.RoutingC) Option {
-	return func(cfg *Config) error {
-		if cfg.Routing != nil {
-			return fmt.Errorf("cannot specify multiple routing options")
-		}
-		cfg.Routing = rt
-		return nil
-	}
-}
-
 // NoListenAddrs will configure libp2p to not listen by default.
 //
 // This will both clear any configured listen addrs and prevent libp2p from
@@ -452,20 +282,4 @@ var NoListenAddrs = func(cfg *Config) error {
 var NoTransports = func(cfg *Config) error {
 	cfg.Transports = []config.TptC{}
 	return nil
-}
-
-// UserAgent sets the libp2p user-agent sent along with the identify protocol
-func UserAgent(userAgent string) Option {
-	return func(cfg *Config) error {
-		cfg.UserAgent = userAgent
-		return nil
-	}
-}
-
-// MultiaddrResolver sets the libp2p dns resolver
-func MultiaddrResolver(rslv *madns.Resolver) Option {
-	return func(cfg *Config) error {
-		cfg.MultiaddrResolver = rslv
-		return nil
-	}
 }

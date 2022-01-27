@@ -5,25 +5,21 @@ package libp2p
 import (
 	"crypto/rand"
 
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	mplex "github.com/libp2p/go-libp2p-mplex"
-	noise "github.com/libp2p/go-libp2p-noise"
+	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstoremem "github.com/libp2p/go-libp2p-peerstore/pstoremem"
-	tls "github.com/libp2p/go-libp2p-tls"
-	yamux "github.com/libp2p/go-libp2p-yamux"
+	secio "github.com/libp2p/go-libp2p-secio"
 	tcp "github.com/libp2p/go-tcp-transport"
 	ws "github.com/libp2p/go-ws-transport"
 	multiaddr "github.com/multiformats/go-multiaddr"
+	mplex "github.com/whyrusleeping/go-smux-multiplex"
+	yamux "github.com/whyrusleeping/go-smux-yamux"
 )
 
 // DefaultSecurity is the default security option.
 //
 // Useful when you want to extend, but not replace, the supported transport
 // security protocols.
-var DefaultSecurity = ChainOptions(
-	Security(noise.ID, noise.New),
-	Security(tls.ID, tls.New),
-)
+var DefaultSecurity = Security(secio.ID, secio.New)
 
 // DefaultMuxers configures libp2p to use the stream connection multiplexers.
 //
@@ -48,7 +44,7 @@ var DefaultPeerstore Option = func(cfg *Config) error {
 	return cfg.Apply(Peerstore(pstoremem.NewPeerstore()))
 }
 
-// RandomIdentity generates a random identity. (default behaviour)
+// RandomIdentity generates a random identity (default behaviour)
 var RandomIdentity = func(cfg *Config) error {
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.Reader)
 	if err != nil {
@@ -57,7 +53,7 @@ var RandomIdentity = func(cfg *Config) error {
 	return cfg.Apply(Identity(priv))
 }
 
-// DefaultListenAddrs configures libp2p to use default listen address.
+// DefaultListenAddrs configures libp2p to use default listen address
 var DefaultListenAddrs = func(cfg *Config) error {
 	defaultIP4ListenAddr, err := multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
 	if err != nil {
@@ -74,7 +70,7 @@ var DefaultListenAddrs = func(cfg *Config) error {
 	))
 }
 
-// DefaultEnableRelay enables relay dialing and listening by default.
+// DefaultEnableRelay enables relay dialing and listening by default
 var DefaultEnableRelay = func(cfg *Config) error {
 	return cfg.Apply(EnableRelay())
 }
@@ -129,7 +125,7 @@ var Defaults Option = func(cfg *Config) error {
 }
 
 // FallbackDefaults applies default options to the libp2p node if and only if no
-// other relevant options have been applied. will be appended to the options
+// other relevent options have been applied. will be appended to the options
 // passed into New.
 var FallbackDefaults Option = func(cfg *Config) error {
 	for _, def := range defaults {

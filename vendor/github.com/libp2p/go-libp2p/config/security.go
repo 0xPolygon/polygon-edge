@@ -3,17 +3,15 @@ package config
 import (
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/sec"
-	"github.com/libp2p/go-libp2p-core/sec/insecure"
-
+	security "github.com/libp2p/go-conn-security"
 	csms "github.com/libp2p/go-conn-security-multistream"
+	insecure "github.com/libp2p/go-conn-security/insecure"
+	host "github.com/libp2p/go-libp2p-host"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
 
-// SecC is a security transport constructor.
-type SecC func(h host.Host) (sec.SecureTransport, error)
+// SecC is a security transport constructor
+type SecC func(h host.Host) (security.Transport, error)
 
 // MsSecC is a tuple containing a security transport constructor and a protocol
 // ID.
@@ -29,34 +27,34 @@ var securityArgTypes = newArgTypeSet(
 
 // SecurityConstructor creates a security constructor from the passed parameter
 // using reflection.
-func SecurityConstructor(security interface{}) (SecC, error) {
+func SecurityConstructor(sec interface{}) (SecC, error) {
 	// Already constructed?
-	if t, ok := security.(sec.SecureTransport); ok {
-		return func(_ host.Host) (sec.SecureTransport, error) {
+	if t, ok := sec.(security.Transport); ok {
+		return func(_ host.Host) (security.Transport, error) {
 			return t, nil
 		}, nil
 	}
 
-	ctor, err := makeConstructor(security, securityType, securityArgTypes)
+	ctor, err := makeConstructor(sec, securityType, securityArgTypes)
 	if err != nil {
 		return nil, err
 	}
-	return func(h host.Host) (sec.SecureTransport, error) {
-		t, err := ctor(h, nil, nil)
+	return func(h host.Host) (security.Transport, error) {
+		t, err := ctor(h, nil)
 		if err != nil {
 			return nil, err
 		}
-		return t.(sec.SecureTransport), nil
+		return t.(security.Transport), nil
 	}, nil
 }
 
-func makeInsecureTransport(id peer.ID, privKey crypto.PrivKey) sec.SecureMuxer {
+func makeInsecureTransport(id peer.ID) security.Transport {
 	secMuxer := new(csms.SSMuxer)
-	secMuxer.AddTransport(insecure.ID, insecure.NewWithIdentity(id, privKey))
+	secMuxer.AddTransport(insecure.ID, insecure.New(id))
 	return secMuxer
 }
 
-func makeSecurityMuxer(h host.Host, tpts []MsSecC) (sec.SecureMuxer, error) {
+func makeSecurityTransport(h host.Host, tpts []MsSecC) (security.Transport, error) {
 	secMuxer := new(csms.SSMuxer)
 	transportSet := make(map[string]struct{}, len(tpts))
 	for _, tptC := range tpts {
