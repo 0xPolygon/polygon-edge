@@ -31,7 +31,7 @@ require (
 	github.com/umbracle/go-web3 v0.0.0-20220120123135-b6d93c310279
 	github.com/valyala/fastjson v1.6.3 // indirect
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
-	google.golang.org/grpc v1.41.0
+	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
