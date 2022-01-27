@@ -203,6 +203,15 @@ func (c *ServerCommand) DefineFlags() {
 		ArgumentsOptional: false,
 		FlagOptional:      true,
 	}
+
+	c.FlagMap["access-control-allow-origins"] = helper.FlagDescriptor{
+		Description: "Sets the header indicating whether any JSON-RPC response can be shared with requesting code" +
+			" from the given origin",
+		Arguments: []string{
+			"ACCESS_CONTROL_ALLOW_ORIGINS",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command

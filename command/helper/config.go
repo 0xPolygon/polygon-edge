@@ -255,6 +255,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 		c.JSONRPCAddr = otherConfig.JSONRPCAddr
 	}
 
+	if otherConfig.Headers != nil {
+		c.Headers = otherConfig.Headers
+	}
+
 	if otherConfig.Join != "" {
 		c.Join = otherConfig.Join
 	}

@@ -434,12 +434,14 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 		Network:   &Network{},
 		TxPool:    &TxPool{},
 		Telemetry: &Telemetry{},
+		Headers:   &Headers{},
 	}
 
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
 	var configFile string
+	var accessControlAllowOrigins helperFlags.ArrayFlags
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
@@ -471,10 +473,12 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags.Uint64Var(&cliConfig.DevInterval, "dev-interval", 1, "")
 	flags.StringVar(&cliConfig.BlockGasTarget, "block-gas-target", strconv.FormatUint(0, 10), "")
 	flags.StringVar(&cliConfig.Secrets, "secrets-config", "", "")
+	flags.Var(&accessControlAllowOrigins, "access-control-allow-origins", "")
 
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+	cliConfig.Headers.AccessControlAllowOrigins = accessControlAllowOrigins
 
 	if configFile != "" {
 		// A config file has been passed in, parse it
