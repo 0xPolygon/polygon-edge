@@ -10,7 +10,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/jbenet/goprocess"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 
@@ -148,8 +147,7 @@ type Network interface {
 	// use the known local interfaces.
 	InterfaceListenAddresses() ([]ma.Multiaddr, error)
 
-	// Process returns the network's Process
-	Process() goprocess.Process
+	io.Closer
 }
 
 // Dialer represents a service that can dial out to peers

@@ -164,6 +164,8 @@ github.com/jbenet/goprocess/periodic
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/gzip
 github.com/klauspost/compress/zlib
+# github.com/klauspost/cpuid/v2 v2.0.4
+github.com/klauspost/cpuid/v2
 # github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d
 github.com/koron/go-ssdp
 # github.com/libp2p/go-addr-util v0.0.2
@@ -199,7 +201,7 @@ github.com/libp2p/go-libp2p-blankhost
 # github.com/libp2p/go-libp2p-circuit v0.4.0
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
-# github.com/libp2p/go-libp2p-core v0.8.5
+# github.com/libp2p/go-libp2p-core v0.10.0
 ## explicit
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/control
@@ -236,7 +238,7 @@ github.com/libp2p/go-libp2p-kbucket/peerdiversity
 github.com/libp2p/go-libp2p-mplex
 # github.com/libp2p/go-libp2p-nat v0.0.6
 github.com/libp2p/go-libp2p-nat
-# github.com/libp2p/go-libp2p-noise v0.2.0
+# github.com/libp2p/go-libp2p-noise v0.3.0
 ## explicit
 github.com/libp2p/go-libp2p-noise
 github.com/libp2p/go-libp2p-noise/pb
@@ -297,7 +299,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/miekg/dns
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
-# github.com/minio/sha256-simd v0.1.1
+# github.com/minio/sha256-simd v1.0.0
 github.com/minio/sha256-simd
 # github.com/mitchellh/cli v1.1.2
 ## explicit
@@ -318,7 +320,7 @@ github.com/mr-tron/base58/base58
 github.com/multiformats/go-base32
 # github.com/multiformats/go-base36 v0.1.0
 github.com/multiformats/go-base36
-# github.com/multiformats/go-multiaddr v0.3.1
+# github.com/multiformats/go-multiaddr v0.3.3
 ## explicit
 github.com/multiformats/go-multiaddr
 github.com/multiformats/go-multiaddr/net
@@ -330,8 +332,13 @@ github.com/multiformats/go-multiaddr-fmt
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.3
 github.com/multiformats/go-multibase
-# github.com/multiformats/go-multihash v0.0.14
+# github.com/multiformats/go-multihash v0.0.15
 github.com/multiformats/go-multihash
+github.com/multiformats/go-multihash/core
+github.com/multiformats/go-multihash/register/all
+github.com/multiformats/go-multihash/register/blake2
+github.com/multiformats/go-multihash/register/miniosha256
+github.com/multiformats/go-multihash/register/sha3
 # github.com/multiformats/go-multistream v0.2.2
 github.com/multiformats/go-multistream
 # github.com/multiformats/go-varint v0.0.6
@@ -375,8 +382,6 @@ github.com/ryanuber/columnize
 github.com/ryanuber/go-glob
 # github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572
 github.com/spacemonkeygo/spacelog
-# github.com/spaolacci/murmur3 v1.1.0
-github.com/spaolacci/murmur3
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
@@ -421,15 +426,6 @@ github.com/valyala/fastjson/fastfloat
 github.com/whyrusleeping/multiaddr-filter
 # github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee
 github.com/whyrusleeping/timecache
-# go.opencensus.io v0.23.0
-go.opencensus.io/internal/tagencoding
-go.opencensus.io/metric/metricdata
-go.opencensus.io/metric/metricproducer
-go.opencensus.io/resource
-go.opencensus.io/stats
-go.opencensus.io/stats/internal
-go.opencensus.io/stats/view
-go.opencensus.io/tag
 # go.uber.org/atomic v1.9.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.7.0

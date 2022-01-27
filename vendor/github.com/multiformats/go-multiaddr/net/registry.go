@@ -17,13 +17,13 @@ type ToNetAddrFunc func(ma ma.Multiaddr) (net.Addr, error)
 var defaultCodecs = NewCodecMap()
 
 func init() {
-	defaultCodecs.RegisterFromNetAddr(parseTCPNetAddr, "tcp", "tcp4", "tcp6")
-	defaultCodecs.RegisterFromNetAddr(parseUDPNetAddr, "udp", "udp4", "udp6")
-	defaultCodecs.RegisterFromNetAddr(parseIPNetAddr, "ip", "ip4", "ip6")
-	defaultCodecs.RegisterFromNetAddr(parseIPPlusNetAddr, "ip+net")
-	defaultCodecs.RegisterFromNetAddr(parseUnixNetAddr, "unix")
+	RegisterFromNetAddr(parseTCPNetAddr, "tcp", "tcp4", "tcp6")
+	RegisterFromNetAddr(parseUDPNetAddr, "udp", "udp4", "udp6")
+	RegisterFromNetAddr(parseIPNetAddr, "ip", "ip4", "ip6")
+	RegisterFromNetAddr(parseIPPlusNetAddr, "ip+net")
+	RegisterFromNetAddr(parseUnixNetAddr, "unix")
 
-	defaultCodecs.RegisterToNetAddr(parseBasicNetMaddr, "tcp", "udp", "ip6", "ip4", "unix")
+	RegisterToNetAddr(parseBasicNetMaddr, "tcp", "udp", "ip6", "ip4", "unix")
 }
 
 // CodecMap holds a map of NetCodecs indexed by their Protocol ID
@@ -31,7 +31,6 @@ func init() {
 // It is used to keep a list of supported network address codecs (protocols
 // which addresses can be converted to and from multiaddresses).
 type CodecMap struct {
-	codecs       map[string]*NetCodec
 	addrParsers  map[string]FromNetAddrFunc
 	maddrParsers map[string]ToNetAddrFunc
 	lk           sync.Mutex
@@ -76,6 +75,16 @@ type NetCodec struct {
 // RegisterNetCodec adds a new NetCodec to the default codecs.
 func RegisterNetCodec(a *NetCodec) {
 	defaultCodecs.RegisterNetCodec(a)
+}
+
+// RegisterFromNetAddr registers a conversion from net.Addr instances to multiaddrs.
+func RegisterFromNetAddr(from FromNetAddrFunc, networks ...string) {
+	defaultCodecs.RegisterFromNetAddr(from, networks...)
+}
+
+// RegisterToNetAddr registers a conversion from multiaddrs to net.Addr instances.
+func RegisterToNetAddr(to ToNetAddrFunc, protocols ...string) {
+	defaultCodecs.RegisterToNetAddr(to, protocols...)
 }
 
 // RegisterNetCodec adds a new NetCodec to the CodecMap. This function is
