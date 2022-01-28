@@ -97,7 +97,7 @@ type Ibft struct {
 
 	mechanism ConsensusMechanism // IBFT ConsensusMechanism used (PoA / PoS)
 
-	blockTime uint64 // Configurable consensus blocktime in miliseconds
+	blockTime time.Duration // Minimum block generation time in seconds
 }
 
 // Define the type of the IBFT consensus
@@ -247,7 +247,7 @@ func Factory(
 		sealing:        params.Seal,
 		metrics:        params.Metrics,
 		secretsManager: params.SecretsManager,
-		blockTime:      params.BlockTime,
+		blockTime:      time.Duration(params.BlockTime) * time.Second,
 	}
 
 	// Initialize the mechanism
@@ -613,14 +613,14 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	// to preserve go backward compatibility as time.UnixMili is available as of go 17
 
 	// set the timestamp
-	parentTime := consensus.MilliToUnix(parent.Timestamp)
-	headerTime := parentTime.Add(time.Duration(i.blockTime) * time.Millisecond)
+	parentTime := time.Unix(int64(parent.Timestamp), 0)
+	headerTime := parentTime.Add(i.blockTime)
 
 	if headerTime.Before(time.Now()) {
 		headerTime = time.Now()
 	}
 
-	header.Timestamp = consensus.UnixToMilli(headerTime)
+	header.Timestamp = uint64(headerTime.Unix())
 
 	// we need to include in the extra field the current set of validators
 	putIbftExtraValidators(header, snap.Set)
@@ -805,7 +805,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			}
 
 			// calculate how much time do we have to wait to mine the block
-			delay := time.Until(consensus.MilliToUnix(i.state.block.Header.Timestamp))
+			delay := time.Until(time.Unix(int64(i.state.block.Header.Timestamp), 0))
 
 			select {
 			case <-time.After(delay):
@@ -979,12 +979,15 @@ func (i *Ibft) runValidateState() {
 func (i *Ibft) updateMetrics(block *types.Block) {
 	// get previous header
 	prvHeader, _ := i.blockchain.GetHeaderByNumber(block.Number() - 1)
-	// calculate difference between previous and current header timestamps
-	// diff := time.Unix(int64(block.Header.Timestamp),0).Sub(time.Unix(int64(prvHeader.Timestamp),0))
-	diff := consensus.MilliToUnix(block.Header.Timestamp).Sub(consensus.MilliToUnix(prvHeader.Timestamp))
+	parentTime := time.Unix(int64(prvHeader.Timestamp), 0)
+	headerTime := time.Unix(int64(block.Header.Timestamp), 0)
 
-	// update block_interval metric
-	i.metrics.BlockInterval.Set(float64(diff.Milliseconds()))
+	//Update the block interval metric
+	if block.Number() > 1 {
+		i.metrics.BlockInterval.Set(
+			headerTime.Sub(parentTime).Seconds(),
+		)
+	}
 
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))

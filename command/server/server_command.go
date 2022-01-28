@@ -232,7 +232,7 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["block-time"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets block time in miliseconds. Default: %d", helper.DefaultConfig().BlockTime),
+		Description: fmt.Sprintf("Sets block time in seconds. Default: %ds", helper.DefaultConfig().BlockTime),
 		Arguments: []string{
 			"BLOCK_TIME",
 		},
