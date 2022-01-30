@@ -130,6 +130,10 @@ type GossipSubParams struct {
 	// HeartbeatInterval controls the time between heartbeats.
 	HeartbeatInterval time.Duration
 
+	// SlowHeartbeatWarning is the duration threshold for heartbeat processing before emitting
+	// a warning; this would be indicative of an overloaded peer.
+	SlowHeartbeatWarning float64
+
 	// FanoutTTL controls how long we keep track of the fanout state. If it's been
 	// FanoutTTL since we've published to a topic that we're not subscribed to,
 	// we'll delete the fanout map for that topic.
@@ -210,8 +214,8 @@ func NewGossipSub(ctx context.Context, h host.Host, opts ...Option) (*PubSub, er
 		outbound:  make(map[peer.ID]bool),
 		connect:   make(chan connectInfo, params.MaxPendingConnections),
 		mcache:    NewMessageCache(params.HistoryGossip, params.HistoryLength),
-		protos:  GossipSubDefaultProtocols,
-		feature: GossipSubDefaultFeatures,
+		protos:    GossipSubDefaultProtocols,
+		feature:   GossipSubDefaultFeatures,
 		tagTracer: newTagTracer(h.ConnManager()),
 		params:    params,
 	}
@@ -251,6 +255,7 @@ func DefaultGossipSubParams() GossipSubParams {
 		MaxIHaveLength:            GossipSubMaxIHaveLength,
 		MaxIHaveMessages:          GossipSubMaxIHaveMessages,
 		IWantFollowupTime:         GossipSubIWantFollowupTime,
+		SlowHeartbeatWarning:      0.1,
 	}
 }
 
@@ -635,6 +640,10 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 			continue
 		}
 
+		if !gs.p.peerFilter(p, topic) {
+			continue
+		}
+
 		for _, mid := range ihave.GetMessageIDs() {
 			if gs.p.seenMessage(mid) {
 				continue
@@ -668,7 +677,7 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	gs.gossipTracer.AddPromise(p, iwantlst)
 
-	return []*pb.ControlIWant{&pb.ControlIWant{MessageIDs: iwantlst}}
+	return []*pb.ControlIWant{{MessageIDs: iwantlst}}
 }
 
 func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.Message {
@@ -684,6 +693,10 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 		for _, mid := range iwant.GetMessageIDs() {
 			msg, count, ok := gs.mcache.GetForPeer(mid, p)
 			if !ok {
+				continue
+			}
+
+			if !gs.p.peerFilter(p, msg.GetTopic()) {
 				continue
 			}
 
@@ -719,6 +732,11 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 
 	for _, graft := range ctl.GetGraft() {
 		topic := graft.GetTopicID()
+
+		if !gs.p.peerFilter(p, topic) {
+			continue
+		}
+
 		peers, ok := gs.mesh[topic]
 		if !ok {
 			// don't do PX when there is an unknown topic to avoid leaking our peers
@@ -901,7 +919,6 @@ func (gs *GossipSubRouter) pxConnect(peers []*pb.PeerInfo) {
 		case gs.connect <- ci:
 		default:
 			log.Debugf("ignoring peer connection attempt; too many pending connections")
-			break
 		}
 	}
 }
@@ -1078,7 +1095,7 @@ func (gs *GossipSubRouter) Leave(topic string) {
 }
 
 func (gs *GossipSubRouter) sendGraft(p peer.ID, topic string) {
-	graft := []*pb.ControlGraft{&pb.ControlGraft{TopicID: &topic}}
+	graft := []*pb.ControlGraft{{TopicID: &topic}}
 	out := rpcWithControl(nil, nil, nil, graft, nil)
 	gs.sendRPC(p, out)
 }
@@ -1297,7 +1314,15 @@ func (gs *GossipSubRouter) heartbeatTimer() {
 }
 
 func (gs *GossipSubRouter) heartbeat() {
-	defer log.EventBegin(gs.p.ctx, "heartbeat").Done()
+	start := time.Now()
+	defer func() {
+		if gs.params.SlowHeartbeatWarning > 0 {
+			slowWarning := time.Duration(gs.params.SlowHeartbeatWarning * float64(gs.params.HeartbeatInterval))
+			if dt := time.Since(start); dt > slowWarning {
+				log.Warnw("slow heartbeat", "took", dt)
+			}
+		}
+	}()
 
 	gs.heartbeatTicks++
 
@@ -1650,7 +1675,6 @@ func (gs *GossipSubRouter) sendGraftPrune(tograft, toprune map[peer.ID][]string,
 		out := rpcWithControl(nil, nil, nil, nil, prune)
 		gs.sendRPC(p, out)
 	}
-
 }
 
 // emitGossip emits IHAVE gossip advertising items in the message cache window
@@ -1846,7 +1870,7 @@ func (gs *GossipSubRouter) getPeers(topic string, count int, filter func(peer.ID
 
 	peers := make([]peer.ID, 0, len(tmap))
 	for p := range tmap {
-		if gs.feature(GossipSubFeatureMesh, gs.peers[p]) && filter(p) {
+		if gs.feature(GossipSubFeatureMesh, gs.peers[p]) && filter(p) && gs.p.peerFilter(p, topic) {
 			peers = append(peers, p)
 		}
 	}

@@ -6,7 +6,7 @@ import "log"
 var Logger *log.Logger
 
 func logf(s string, a ...interface{}) {
-	if Logger != nil {
-		Logger.Printf(s, a...)
+	if l := Logger; l != nil {
+		l.Printf(s, a...)
 	}
 }

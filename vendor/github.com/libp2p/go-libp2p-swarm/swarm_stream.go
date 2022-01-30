@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 )
@@ -19,8 +18,9 @@ var _ network.Stream = &Stream{}
 type Stream struct {
 	id uint64
 
-	stream mux.MuxedStream
+	stream network.MuxedStream
 	conn   *Conn
+	scope  network.StreamManagementScope
 
 	closeOnce sync.Once
 
@@ -28,7 +28,7 @@ type Stream struct {
 
 	protocol atomic.Value
 
-	stat network.Stat
+	stat network.Stats
 }
 
 func (s *Stream) ID() string {
@@ -131,8 +131,13 @@ func (s *Stream) Protocol() protocol.ID {
 // This doesn't actually *do* anything other than record the fact that we're
 // speaking the given protocol over this stream. It's still up to the user to
 // negotiate the protocol. This is usually done by the Host.
-func (s *Stream) SetProtocol(p protocol.ID) {
+func (s *Stream) SetProtocol(p protocol.ID) error {
+	if err := s.scope.SetProtocol(p); err != nil {
+		return err
+	}
+
 	s.protocol.Store(p)
+	return nil
 }
 
 // SetDeadline sets the read and write deadlines for this stream.
@@ -151,6 +156,10 @@ func (s *Stream) SetWriteDeadline(t time.Time) error {
 }
 
 // Stat returns metadata information for this stream.
-func (s *Stream) Stat() network.Stat {
+func (s *Stream) Stat() network.Stats {
 	return s.stat
+}
+
+func (s *Stream) Scope() network.StreamScope {
+	return s.scope
 }

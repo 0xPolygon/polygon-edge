@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/mitchellh/cli"
@@ -36,7 +37,7 @@ func (g *GRPCFlag) FlagSet(f *flag.FlagSet) {
 
 // Conn returns a grpc connection
 func (g *GRPCFlag) Conn() (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial(g.Addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(g.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to server: %w", err)
 	}

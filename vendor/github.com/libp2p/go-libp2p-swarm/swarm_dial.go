@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/transport"
 
-	addrutil "github.com/libp2p/go-addr-util"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -259,7 +258,7 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 	ctx, cancel := context.WithTimeout(ctx, network.GetDialPeerTimeout(ctx))
 	defer cancel()
 
-	conn, err = s.dsync.DialLock(ctx, p)
+	conn, err = s.dsync.Dial(ctx, p)
 	if err == nil {
 		return conn, nil
 	}
@@ -279,10 +278,10 @@ func (s *Swarm) dialPeer(ctx context.Context, p peer.ID) (*Conn, error) {
 	return nil, err
 }
 
-///////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////
 // lo and behold, The Dialer
 // TODO explain how all this works
-//////////////////////////////////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////////////
 
 type dialRequest struct {
 	ctx   context.Context
@@ -294,17 +293,8 @@ type dialResponse struct {
 	err  error
 }
 
-// startDialWorker starts an active dial goroutine that synchronizes and executes concurrent dials
-func (s *Swarm) startDialWorker(ctx context.Context, p peer.ID, reqch <-chan dialRequest) error {
-	if p == s.local {
-		return ErrDialToSelf
-	}
-
-	go s.dialWorkerLoop(ctx, p, reqch)
-	return nil
-}
-
-func (s *Swarm) dialWorkerLoop(ctx context.Context, p peer.ID, reqch <-chan dialRequest) {
+// dialWorkerLoop synchronizes and executes concurrent dials to a single peer
+func (s *Swarm) dialWorkerLoop(p peer.ID, reqch <-chan dialRequest) {
 	defer s.limiter.clearAllPeerDials(p)
 
 	type pendRequest struct {
@@ -461,7 +451,11 @@ loop:
 
 			for _, ad := range tojoin {
 				if !ad.dialed {
-					ad.ctx = s.mergeDialContexts(ad.ctx, req.ctx)
+					if simConnect, isClient, reason := network.GetSimultaneousConnect(req.ctx); simConnect {
+						if simConnect, _, _ := network.GetSimultaneousConnect(ad.ctx); !simConnect {
+							ad.ctx = network.WithSimultaneousConnect(ad.ctx, isClient, reason)
+						}
+					}
 				}
 				ad.requests = append(ad.requests, reqno)
 			}
@@ -485,6 +479,8 @@ loop:
 				err := s.dialNextAddr(ad.ctx, p, addr, resch)
 				if err != nil {
 					dispatchError(ad, err)
+				} else {
+					active++
 				}
 			}
 
@@ -567,7 +563,7 @@ func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) ([]ma.Multiaddr, er
 
 	goodAddrs := s.filterKnownUndialables(p, peerAddrs)
 	if forceDirect, _ := network.GetForceDirectDial(ctx); forceDirect {
-		goodAddrs = addrutil.FilterAddrs(goodAddrs, s.nonProxyAddr)
+		goodAddrs = ma.FilterAddrs(goodAddrs, s.nonProxyAddr)
 	}
 
 	if len(goodAddrs) == 0 {
@@ -575,18 +571,6 @@ func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) ([]ma.Multiaddr, er
 	}
 
 	return goodAddrs, nil
-}
-
-func (s *Swarm) mergeDialContexts(a, b context.Context) context.Context {
-	dialCtx := a
-
-	if simConnect, reason := network.GetSimultaneousConnect(b); simConnect {
-		if simConnect, _ := network.GetSimultaneousConnect(a); !simConnect {
-			dialCtx = network.WithSimultaneousConnect(dialCtx, reason)
-		}
-	}
-
-	return dialCtx
 }
 
 func (s *Swarm) dialNextAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr, resch chan dialResult) error {
@@ -666,11 +650,18 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Mul
 		}
 	}
 
-	return addrutil.FilterAddrs(addrs,
-		addrutil.SubtractFilter(ourAddrs...),
+	return ma.FilterAddrs(addrs,
+		func(addr ma.Multiaddr) bool {
+			for _, a := range ourAddrs {
+				if a.Equal(addr) {
+					return false
+				}
+			}
+			return true
+		},
 		s.canDial,
 		// TODO: Consider allowing link-local addresses
-		addrutil.AddrOverNonLocalIP,
+		func(addr ma.Multiaddr) bool { return !manet.IsIP6LinkLocal(addr) },
 		func(addr ma.Multiaddr) bool {
 			return s.gater == nil || s.gater.InterceptAddrDial(p, addr)
 		},
@@ -681,11 +672,16 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Mul
 // it is able, respecting the various different types of rate
 // limiting that occur without using extra goroutines per addr
 func (s *Swarm) limitedDial(ctx context.Context, p peer.ID, a ma.Multiaddr, resp chan dialResult) {
+	timeout := s.dialTimeout
+	if lowTimeoutFilters.AddrBlocked(a) && s.dialTimeoutLocal < s.dialTimeout {
+		timeout = s.dialTimeoutLocal
+	}
 	s.limiter.AddDialJob(&dialJob{
-		addr: a,
-		peer: p,
-		resp: resp,
-		ctx:  ctx,
+		addr:    a,
+		peer:    p,
+		resp:    resp,
+		ctx:     ctx,
+		timeout: timeout,
 	})
 }
 

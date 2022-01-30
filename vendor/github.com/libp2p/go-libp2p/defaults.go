@@ -5,15 +5,18 @@ package libp2p
 import (
 	"crypto/rand"
 
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	noise "github.com/libp2p/go-libp2p-noise"
-	pstoremem "github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
+	quic "github.com/libp2p/go-libp2p-quic-transport"
+	rcmgr "github.com/libp2p/go-libp2p-resource-manager"
 	tls "github.com/libp2p/go-libp2p-tls"
 	yamux "github.com/libp2p/go-libp2p-yamux"
-	tcp "github.com/libp2p/go-tcp-transport"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-tcp-transport"
 	ws "github.com/libp2p/go-ws-transport"
-	multiaddr "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 )
 
 // DefaultSecurity is the default security option.
@@ -40,12 +43,17 @@ var DefaultMuxers = ChainOptions(
 // libp2p instead of replacing them.
 var DefaultTransports = ChainOptions(
 	Transport(tcp.NewTCPTransport),
+	Transport(quic.NewTransport),
 	Transport(ws.New),
 )
 
 // DefaultPeerstore configures libp2p to use the default peerstore.
 var DefaultPeerstore Option = func(cfg *Config) error {
-	return cfg.Apply(Peerstore(pstoremem.NewPeerstore()))
+	ps, err := pstoremem.NewPeerstore()
+	if err != nil {
+		return err
+	}
+	return cfg.Apply(Peerstore(ps))
 }
 
 // RandomIdentity generates a random identity. (default behaviour)
@@ -77,6 +85,29 @@ var DefaultListenAddrs = func(cfg *Config) error {
 // DefaultEnableRelay enables relay dialing and listening by default.
 var DefaultEnableRelay = func(cfg *Config) error {
 	return cfg.Apply(EnableRelay())
+}
+
+var DefaultResourceManager = func(cfg *Config) error {
+	// Default memory limit: 1/8th of total memory, minimum 128MB, maximum 1GB
+	limiter := rcmgr.NewDefaultLimiter()
+	SetDefaultServiceLimits(limiter)
+
+	mgr, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		return err
+	}
+
+	return cfg.Apply(ResourceManager(mgr))
+}
+
+// DefaultConnManager creates a default connection manager
+var DefaultConnectionManager = func(cfg *Config) error {
+	mgr, err := connmgr.NewConnManager(160, 192)
+	if err != nil {
+		return err
+	}
+
+	return cfg.Apply(ConnectionManager(mgr))
 }
 
 // Complete list of default options and when to fallback on them.
@@ -114,6 +145,14 @@ var defaults = []struct {
 	{
 		fallback: func(cfg *Config) bool { return !cfg.RelayCustom },
 		opt:      DefaultEnableRelay,
+	},
+	{
+		fallback: func(cfg *Config) bool { return cfg.ResourceManager == nil },
+		opt:      DefaultResourceManager,
+	},
+	{
+		fallback: func(cfg *Config) bool { return cfg.ConnManager == nil },
+		opt:      DefaultConnectionManager,
 	},
 }
 

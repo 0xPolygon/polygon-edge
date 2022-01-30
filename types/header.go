@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -56,7 +57,12 @@ func (n Nonce) Value() (driver.Value, error) {
 }
 
 func (n *Nonce) Scan(src interface{}) error {
-	nn := hex.MustDecodeHex(string(src.([]byte)))
+	stringVal, ok := src.([]byte)
+	if !ok {
+		return errors.New("invalid type assert")
+	}
+
+	nn := hex.MustDecodeHex(string(stringVal))
 	copy(n[:], nn[:])
 
 	return nil
@@ -120,7 +126,12 @@ func (b *Block) Size() uint64 {
 		return size
 	}
 
-	return *sizePtr.(*uint64)
+	sizeVal, ok := sizePtr.(*uint64)
+	if !ok {
+		return 0
+	}
+
+	return *sizeVal
 }
 
 func (b *Block) String() string {

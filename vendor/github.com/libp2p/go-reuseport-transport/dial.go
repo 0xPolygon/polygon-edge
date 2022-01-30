@@ -4,9 +4,9 @@ import (
 	"context"
 	"net"
 
-	reuseport "github.com/libp2p/go-reuseport"
+	"github.com/libp2p/go-reuseport"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 type dialer interface {

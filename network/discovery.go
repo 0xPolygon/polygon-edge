@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -224,7 +225,12 @@ func (d *discovery) findPeersCall(peerID peer.ID) ([]*peer.AddrInfo, error) {
 		return nil, err
 	}
 
-	clt := proto.NewDiscoveryClient(stream.(*rawGrpc.ClientConn))
+	rawGrpcConn, ok := stream.(*rawGrpc.ClientConn)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	clt := proto.NewDiscoveryClient(rawGrpcConn)
 
 	resp, err := clt.FindPeers(context.Background(), &proto.FindPeersReq{Count: 16})
 	if err != nil {
@@ -259,9 +265,11 @@ func (d *discovery) run() {
 
 func (d *discovery) handleDiscovery() {
 	// take a random peer and find peers
-	if target := d.peers.getRandomPeer(); target != nil {
-		if err := d.attemptToFindPeers(target.id); err != nil {
-			d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+	if d.srv.numOpenSlots() > 0 {
+		if target := d.peers.getRandomPeer(); target != nil {
+			if err := d.attemptToFindPeers(target.id); err != nil {
+				d.srv.logger.Error("failed to dial peer", "peer", target.id, "err", err)
+			}
 		}
 	}
 }
@@ -270,7 +278,12 @@ func (d *discovery) FindPeers(
 	ctx context.Context,
 	req *proto.FindPeersReq,
 ) (*proto.FindPeersResp, error) {
-	from := ctx.(*grpc.Context).PeerID
+	grpcContext, ok := ctx.(*grpc.Context)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	from := grpcContext.PeerID
 
 	if req.Count > 16 {
 		// max limit
@@ -289,8 +302,9 @@ func (d *discovery) FindPeers(
 	for _, id := range closer {
 		// do not include himself
 		if id != from {
-			info := d.srv.host.Peerstore().PeerInfo(id)
-			filtered = append(filtered, AddrInfoToString(&info))
+			if info := d.srv.host.Peerstore().PeerInfo(id); len(info.Addrs) > 0 {
+				filtered = append(filtered, AddrInfoToString(&info))
+			}
 		}
 	}
 

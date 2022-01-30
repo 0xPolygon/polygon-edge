@@ -144,7 +144,26 @@ func (c *ServerCommand) DefineFlags() {
 	}
 
 	c.FlagMap["max-peers"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the client's max peer count. Default: %d", helper.DefaultConfig().Network.MaxPeers),
+		Description: fmt.Sprintf("Sets the client's max no.of peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-inbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of inbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxInboundPeers),
+		Arguments: []string{
+			"PEER_COUNT",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["max-outbound-peers"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets the client's max no.of outbound peers allowded. Default: %d",
+			helper.DefaultConfig().Network.MaxOutboundPeers),
 		Arguments: []string{
 			"PEER_COUNT",
 		},
@@ -208,6 +227,14 @@ func (c *ServerCommand) DefineFlags() {
 		Description: "Sets the path to the archive blockchain data to restore on initialization",
 		Arguments: []string{
 			"RESTORE",
+		},
+		FlagOptional: true,
+	}
+
+	c.FlagMap["block-time"] = helper.FlagDescriptor{
+		Description: fmt.Sprintf("Sets block time in miliseconds. Default: %d", helper.DefaultConfig().BlockTime),
+		Arguments: []string{
+			"BLOCK_TIME",
 		},
 		FlagOptional: true,
 	}

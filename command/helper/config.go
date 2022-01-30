@@ -35,6 +35,7 @@ type Config struct {
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
 	RestoreFile    string                 `json:"restore_file"`
+	BlockTime      uint64                 `json:"block_time_ms"` // block time im miliseconds
 }
 
 // Telemetry holds the config details for metric services.
@@ -44,11 +45,13 @@ type Telemetry struct {
 
 // Network defines the network configuration params
 type Network struct {
-	NoDiscover bool   `json:"no_discover"`
-	Addr       string `json:"libp2p_addr"`
-	NatAddr    string `json:"nat_addr"`
-	DNS        string `json:"dns_addr"`
-	MaxPeers   uint64 `json:"max_peers"`
+	NoDiscover       bool   `json:"no_discover"`
+	Addr             string `json:"libp2p_addr"`
+	NatAddr          string `json:"nat_addr"`
+	DNS              string `json:"dns_addr"`
+	MaxPeers         int64  `json:"max_peers,omitempty"`
+	MaxOutboundPeers int64  `json:"max_outbound_peers,omitempty"`
+	MaxInboundPeers  int64  `json:"max_inbound_peers,omitempty"`
 }
 
 // TxPool defines the TxPool configuration params
@@ -57,6 +60,9 @@ type TxPool struct {
 	MaxSlots   uint64 `json:"max_slots"`
 }
 
+// variable defining default BlockTime parameter in miliseconds
+const defaultBlockTime uint64 = 2000
+
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
 	return &Config{
@@ -64,8 +70,10 @@ func DefaultConfig() *Config {
 		DataDir:        "./test-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
-			NoDiscover: false,
-			MaxPeers:   50,
+			NoDiscover:       false,
+			MaxPeers:         40,
+			MaxOutboundPeers: 8,
+			MaxInboundPeers:  32,
 		},
 		Telemetry: &Telemetry{},
 		Seal:      false,
@@ -76,6 +84,7 @@ func DefaultConfig() *Config {
 		Consensus:   map[string]interface{}{},
 		LogLevel:    "INFO",
 		RestoreFile: "",
+		BlockTime:   defaultBlockTime, // default block time in miliseconds
 	}
 }
 
@@ -141,9 +150,10 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 				return nil, err
 			}
 		}
-
 		conf.Network.NoDiscover = c.Network.NoDiscover
 		conf.Network.MaxPeers = c.Network.MaxPeers
+		conf.Network.MaxInboundPeers = c.Network.MaxInboundPeers
+		conf.Network.MaxOutboundPeers = c.Network.MaxOutboundPeers
 
 		conf.Chain = cc
 	}
@@ -170,6 +180,11 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 
 	if c.RestoreFile != "" {
 		conf.RestoreFile = &c.RestoreFile
+	}
+
+	// set block time if not default
+	if c.BlockTime != defaultBlockTime {
+		conf.BlockTime = c.BlockTime
 	}
 
 	// if we are in dev mode, change the consensus protocol with 'dev'
@@ -270,8 +285,16 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 			c.Network.DNS = otherConfig.Network.DNS
 		}
 
-		if otherConfig.Network.MaxPeers != 0 {
+		if otherConfig.Network.MaxPeers > -1 {
 			c.Network.MaxPeers = otherConfig.Network.MaxPeers
+		}
+
+		if otherConfig.Network.MaxInboundPeers > -1 {
+			c.Network.MaxInboundPeers = otherConfig.Network.MaxInboundPeers
+		}
+
+		if otherConfig.Network.MaxOutboundPeers > -1 {
+			c.Network.MaxOutboundPeers = otherConfig.Network.MaxOutboundPeers
 		}
 
 		if otherConfig.Network.NoDiscover {
@@ -296,6 +319,11 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.RestoreFile != "" {
 		c.RestoreFile = otherConfig.RestoreFile
+	}
+
+	// if block time not default, set to new value
+	if otherConfig.BlockTime != defaultBlockTime {
+		c.BlockTime = otherConfig.BlockTime
 	}
 
 	if err := mergo.Merge(&c.Consensus, otherConfig.Consensus, mergo.WithOverride); err != nil {
@@ -326,10 +354,15 @@ func readConfigFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("suffix of %s is neither hcl nor json", path)
 	}
 
-	var config Config
-	if err := unmarshalFunc(data, &config); err != nil {
+	config := new(Config)
+	config.Network = new(Network)
+	config.Network.MaxPeers = -1
+	config.Network.MaxInboundPeers = -1
+	config.Network.MaxOutboundPeers = -1
+
+	if err := unmarshalFunc(data, config); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return config, nil
 }

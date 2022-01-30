@@ -1,3 +1,4 @@
+//nolint:forcetypeassert
 package state
 
 import (

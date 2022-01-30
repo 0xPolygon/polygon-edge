@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/discovery"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	logging "github.com/ipfs/go-log"
@@ -12,7 +13,7 @@ import (
 var log = logging.Logger("discovery")
 
 // FindPeers is a utility function that synchronously collects peers from a Discoverer.
-func FindPeers(ctx context.Context, d Discoverer, ns string, opts ...Option) ([]peer.AddrInfo, error) {
+func FindPeers(ctx context.Context, d discovery.Discoverer, ns string, opts ...discovery.Option) ([]peer.AddrInfo, error) {
 	var res []peer.AddrInfo
 
 	ch, err := d.FindPeers(ctx, ns, opts...)
@@ -28,7 +29,7 @@ func FindPeers(ctx context.Context, d Discoverer, ns string, opts ...Option) ([]
 }
 
 // Advertise is a utility function that persistently advertises a service through an Advertiser.
-func Advertise(ctx context.Context, a Advertiser, ns string, opts ...Option) {
+func Advertise(ctx context.Context, a discovery.Advertiser, ns string, opts ...discovery.Option) {
 	go func() {
 		for {
 			ttl, err := a.Advertise(ctx, ns, opts...)

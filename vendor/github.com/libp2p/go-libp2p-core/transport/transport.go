@@ -5,24 +5,13 @@ package transport
 import (
 	"context"
 	"net"
-	"time"
 
-	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
-
-// DialTimeout is the maximum duration a Dial is allowed to take.
-// This includes the time between dialing the raw network connection,
-// protocol selection as well the handshake, if applicable.
-var DialTimeout = 60 * time.Second
-
-// AcceptTimeout is the maximum duration an Accept is allowed to take.
-// This includes the time between accepting the raw network connection,
-// protocol selection as well as the handshake, if applicable.
-var AcceptTimeout = 60 * time.Second
 
 // A CapableConn represents a connection that has offers the basic
 // capabilities required by libp2p: stream multiplexing, encryption and
@@ -36,9 +25,10 @@ var AcceptTimeout = 60 * time.Second
 // CapableConn provides accessors for the local and remote multiaddrs used to
 // establish the connection and an accessor for the underlying Transport.
 type CapableConn interface {
-	mux.MuxedConn
+	network.MuxedConn
 	network.ConnSecurity
 	network.ConnMultiaddrs
+	network.ConnScoper
 
 	// Transport returns the transport to which this connection belongs.
 	Transport() Transport
@@ -53,6 +43,10 @@ type CapableConn interface {
 // Connections returned by Dial and passed into Listeners are of type
 // CapableConn, which means that they have been upgraded to support
 // stream multiplexing and connection security (encryption and authentication).
+//
+// If a transport implements `io.Closer` (optional), libp2p will call `Close` on
+// shutdown. NOTE: `Dial` and `Listen` may be called after or concurrently with
+// `Close`.
 //
 // For a conceptual overview, see https://docs.libp2p.io/concepts/transport/
 type Transport interface {
@@ -94,7 +88,7 @@ type Listener interface {
 	Multiaddr() ma.Multiaddr
 }
 
-// Network is an inet.Network with methods for managing transports.
+// TransportNetwork is an inet.Network with methods for managing transports.
 type TransportNetwork interface {
 	network.Network
 
@@ -110,4 +104,13 @@ type TransportNetwork interface {
 	// transport, if any. Otherwise, it'll pick the transport registered to
 	// handle the last protocol in the multiaddr.
 	AddTransport(t Transport) error
+}
+
+// Upgrader is a multistream upgrader that can upgrade an underlying connection
+// to a full transport connection (secure and multiplexed).
+type Upgrader interface {
+	// UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
+	UpgradeListener(Transport, manet.Listener) Listener
+	// Upgrade upgrades the multiaddr/net connection into a full libp2p-transport connection.
+	Upgrade(ctx context.Context, t Transport, maconn manet.Conn, dir network.Direction, p peer.ID, scope network.ConnManagementScope) (CapableConn, error)
 }

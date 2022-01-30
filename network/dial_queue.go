@@ -55,7 +55,12 @@ func (d *dialQueue) popImpl() *dialTask {
 		tt := heap.Pop(&d.heap)
 		d.lock.Unlock()
 
-		return tt.(*dialTask)
+		task, ok := tt.(*dialTask)
+		if !ok {
+			return nil
+		}
+
+		return task
 	}
 
 	d.lock.Unlock()

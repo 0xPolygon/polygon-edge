@@ -12,12 +12,28 @@ import (
 	"time"
 )
 
+// ClientInterface is the general interface provided to perform HTTP-over-UDP
+// requests.
+type ClientInterface interface {
+	// Do performs a request. The timeout is how long to wait for before returning
+	// the responses that were received. An error is only returned for failing to
+	// send the request. Failures in receipt simply do not add to the resulting
+	// responses.
+	Do(
+		req *http.Request,
+		timeout time.Duration,
+		numSends int,
+	) ([]*http.Response, error)
+}
+
 // HTTPUClient is a client for dealing with HTTPU (HTTP over UDP). Its typical
 // function is for HTTPMU, and particularly SSDP.
 type HTTPUClient struct {
 	connLock sync.Mutex // Protects use of conn.
 	conn     net.PacketConn
 }
+
+var _ ClientInterface = &HTTPUClient{}
 
 // NewHTTPUClient creates a new HTTPUClient, opening up a new UDP socket for the
 // purpose.
@@ -51,14 +67,15 @@ func (httpu *HTTPUClient) Close() error {
 	return httpu.conn.Close()
 }
 
-// Do performs a request. The timeout is how long to wait for before returning
-// the responses that were received. An error is only returned for failing to
-// send the request. Failures in receipt simply do not add to the resulting
-// responses.
+// Do implements ClientInterface.Do.
 //
 // Note that at present only one concurrent connection will happen per
 // HTTPUClient.
-func (httpu *HTTPUClient) Do(req *http.Request, timeout time.Duration, numSends int) ([]*http.Response, error) {
+func (httpu *HTTPUClient) Do(
+	req *http.Request,
+	timeout time.Duration,
+	numSends int,
+) ([]*http.Response, error) {
 	httpu.connLock.Lock()
 	defer httpu.connLock.Unlock()
 

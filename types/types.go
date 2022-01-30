@@ -2,6 +2,7 @@ package types
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode"
@@ -54,7 +55,12 @@ func (h Hash) Value() (driver.Value, error) {
 }
 
 func (h *Hash) Scan(src interface{}) error {
-	hh := hex.MustDecodeHex(string(src.([]byte)))
+	stringVal, ok := src.([]byte)
+	if !ok {
+		return errors.New("invalid type assert")
+	}
+
+	hh := hex.MustDecodeHex(string(stringVal))
 	copy(h[:], hh[:])
 
 	return nil
@@ -98,7 +104,12 @@ func (a Address) Value() (driver.Value, error) {
 }
 
 func (a *Address) Scan(src interface{}) error {
-	aa := hex.MustDecodeHex(string(src.([]byte)))
+	stringVal, ok := src.([]byte)
+	if !ok {
+		return errors.New("invalid type assert")
+	}
+
+	aa := hex.MustDecodeHex(string(stringVal))
 	copy(a[:], aa[:])
 
 	return nil

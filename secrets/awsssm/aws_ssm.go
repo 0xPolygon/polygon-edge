@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-sdk/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"

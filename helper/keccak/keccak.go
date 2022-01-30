@@ -65,10 +65,10 @@ func newKeccak(hash hashImpl) *Keccak {
 
 // NewKeccak256 returns a new keccak 256
 func NewKeccak256() *Keccak {
-	return newKeccak(sha3.NewLegacyKeccak256().(hashImpl))
-}
+	impl, ok := sha3.NewLegacyKeccak256().(hashImpl)
+	if !ok {
+		return nil
+	}
 
-// NewKeccak512 returns a new keccak 512
-func NewKeccak512() *Keccak {
-	return newKeccak(sha3.NewLegacyKeccak512().(hashImpl))
+	return newKeccak(impl)
 }
