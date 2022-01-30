@@ -435,10 +435,7 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(
-	arg *txnArgs,
-	filter BlockNumberOrHash,
-) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) {
 	var (
 		header *types.Header
 		err    error
@@ -478,10 +475,7 @@ func (e *Eth) Call(
 }
 
 // EstimateGas estimates the gas needed to execute a transaction
-func (e *Eth) EstimateGas(
-	arg *txnArgs,
-	rawNum *BlockNumber,
-) (interface{}, error) {
+func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
 	transaction, err := e.decodeTxn(arg)
 	if err != nil {
 		return nil, err

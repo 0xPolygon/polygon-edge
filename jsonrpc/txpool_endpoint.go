@@ -12,7 +12,7 @@ type txPoolStore interface {
 	// GetTxs gets tx pool transactions currently pending for inclusion and currently queued for validation
 	GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction)
 
-	// GetCapacity returns the current and max capacity of the pool
+	// GetCapacity returns the current and max capacity of the pool in slots
 	GetCapacity() (uint64, uint64)
 }
 
@@ -59,7 +59,7 @@ func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
 		Gas:         argUint64(t.Gas),
 		To:          t.To,
 		Value:       argBig(*t.Value),
-		Input:       argBytes(t.Input),
+		Input:       t.Input,
 		Hash:        t.Hash,
 		From:        t.From,
 		BlockHash:   types.ZeroHash,

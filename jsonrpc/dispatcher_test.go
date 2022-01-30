@@ -55,44 +55,46 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 	return nil
 }
 
-func TestDispatcherWebsocket(t *testing.T) {
-	store := newMockStore()
-	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
+func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
+	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
+		store := newMockStore()
+		dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
 
-	mock := &mockWsConn{
-		msgCh: make(chan []byte, 1),
-	}
+		mockConnection := &mockWsConn{
+			msgCh: make(chan []byte, 1),
+		}
 
-	req := []byte(`{
+		req := []byte(`{
 		"method": "eth_subscribe",
 		"params": ["newHeads"]
 	}`)
-	if _, err := dispatcher.HandleWs(req, mock); err != nil {
-		t.Fatal(err)
-	}
+		if _, err := dispatcher.HandleWs(req, mockConnection); err != nil {
+			t.Fatal(err)
+		}
 
-	store.emitEvent(&mockEvent{
-		NewChain: []*mockHeader{
-			{
-				header: &types.Header{
-					Hash: types.StringToHash("1"),
+		store.emitEvent(&mockEvent{
+			NewChain: []*mockHeader{
+				{
+					header: &types.Header{
+						Hash: types.StringToHash("1"),
+					},
 				},
 			},
-		},
-	})
+		})
 
-	select {
-	case <-mock.msgCh:
-	case <-time.After(2 * time.Second):
-		t.Fatal("bad")
-	}
+		select {
+		case <-mockConnection.msgCh:
+		case <-time.After(2 * time.Second):
+			t.Fatal("\"newHeads\" event not received in 2 seconds")
+		}
+	})
 }
 
-func TestDispatcherWebsocketRequestFormats(t *testing.T) {
+func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 	store := newMockStore()
 	dispatcher := newDispatcher(hclog.NewNullLogger(), store, 0)
 
-	mock := &mockWsConn{
+	mockConnection := &mockWsConn{
 		msgCh: make(chan []byte, 1),
 	}
 
@@ -141,7 +143,7 @@ func TestDispatcherWebsocketRequestFormats(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		data, err := dispatcher.HandleWs(c.msg, mock)
+		data, err := dispatcher.HandleWs(c.msg, mockConnection)
 		resp := new(SuccessResponse)
 		merr := json.Unmarshal(data, resp)
 

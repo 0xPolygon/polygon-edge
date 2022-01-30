@@ -118,10 +118,7 @@ type wsWrapper struct {
 }
 
 // WriteMessage writes out the message to the WS peer
-func (w *wsWrapper) WriteMessage(
-	messageType int,
-	data []byte,
-) error {
+func (w *wsWrapper) WriteMessage(messageType int, data []byte) error {
 	w.writeLock.Lock()
 	defer w.writeLock.Unlock()
 	writeErr := w.ws.WriteMessage(messageType, data)

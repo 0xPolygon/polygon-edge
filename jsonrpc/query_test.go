@@ -14,6 +14,7 @@ var (
 	hash1 = types.StringToHash("1")
 	hash2 = types.StringToHash("2")
 	hash3 = types.StringToHash("3")
+	hash4 = types.StringToHash("4")
 )
 
 func TestFilterDecode(t *testing.T) {
