@@ -61,6 +61,16 @@ func SplitAddr(m ma.Multiaddr) (transport ma.Multiaddr, id ID) {
 	return transport, id
 }
 
+// AddrInfoFromString builds an AddrInfo from the string representation of a Multiaddr
+func AddrInfoFromString(s string) (*AddrInfo, error) {
+	a, err := ma.NewMultiaddr(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return AddrInfoFromP2pAddr(a)
+}
+
 // AddrInfoFromP2pAddr converts a Multiaddr to an AddrInfo.
 func AddrInfoFromP2pAddr(m ma.Multiaddr) (*AddrInfo, error) {
 	transport, id := SplitAddr(m)
@@ -77,7 +87,7 @@ func AddrInfoFromP2pAddr(m ma.Multiaddr) (*AddrInfo, error) {
 // AddrInfoToP2pAddrs converts an AddrInfo to a list of Multiaddrs.
 func AddrInfoToP2pAddrs(pi *AddrInfo) ([]ma.Multiaddr, error) {
 	var addrs []ma.Multiaddr
-	p2ppart, err := ma.NewComponent("p2p", IDB58Encode(pi.ID))
+	p2ppart, err := ma.NewComponent("p2p", Encode(pi.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -95,4 +105,13 @@ func (pi *AddrInfo) Loggable() map[string]interface{} {
 		"peerID": pi.ID.Pretty(),
 		"addrs":  pi.Addrs,
 	}
+}
+
+// AddrInfosToIDs extracts the peer IDs from the passed AddrInfos and returns them in-order.
+func AddrInfosToIDs(pis []AddrInfo) []ID {
+	ps := make([]ID, len(pis))
+	for i, pi := range pis {
+		ps[i] = pi.ID
+	}
+	return ps
 }

@@ -2,10 +2,12 @@ package pstoremem
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-	"io"
 )
 
 type pstoremem struct {
@@ -17,15 +19,34 @@ type pstoremem struct {
 	*memoryPeerMetadata
 }
 
+var _ peerstore.Peerstore = &pstoremem{}
+
+type Option interface{}
+
 // NewPeerstore creates an in-memory threadsafe collection of peers.
-func NewPeerstore() *pstoremem {
+// It's the caller's responsibility to call RemovePeer to ensure
+// that memory consumption of the peerstore doesn't grow unboundedly.
+func NewPeerstore(opts ...Option) (*pstoremem, error) {
+	var protoBookOpts []ProtoBookOption
+	for _, opt := range opts {
+		switch o := opt.(type) {
+		case ProtoBookOption:
+			protoBookOpts = append(protoBookOpts, o)
+		default:
+			return nil, fmt.Errorf("unexpected peer store option: %v", o)
+		}
+	}
+	pb, err := NewProtoBook(protoBookOpts...)
+	if err != nil {
+		return nil, err
+	}
 	return &pstoremem{
 		Metrics:            pstore.NewMetrics(),
 		memoryKeyBook:      NewKeyBook(),
 		memoryAddrBook:     NewAddrBook(),
-		memoryProtoBook:    NewProtoBook(),
+		memoryProtoBook:    pb,
 		memoryPeerMetadata: NewPeerMetadata(),
-	}
+	}, nil
 }
 
 func (ps *pstoremem) Close() (err error) {
@@ -37,7 +58,6 @@ func (ps *pstoremem) Close() (err error) {
 			}
 		}
 	}
-
 	weakClose("keybook", ps.memoryKeyBook)
 	weakClose("addressbook", ps.memoryAddrBook)
 	weakClose("protobook", ps.memoryProtoBook)
@@ -70,4 +90,17 @@ func (ps *pstoremem) PeerInfo(p peer.ID) peer.AddrInfo {
 		ID:    p,
 		Addrs: ps.memoryAddrBook.Addrs(p),
 	}
+}
+
+// RemovePeer removes entries associated with a peer from:
+// * the KeyBook
+// * the ProtoBook
+// * the PeerMetadata
+// * the Metrics
+// It DOES NOT remove the peer from the AddrBook.
+func (ps *pstoremem) RemovePeer(p peer.ID) {
+	ps.memoryKeyBook.RemovePeer(p)
+	ps.memoryProtoBook.RemovePeer(p)
+	ps.memoryPeerMetadata.RemovePeer(p)
+	ps.Metrics.RemovePeer(p)
 }

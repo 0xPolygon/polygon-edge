@@ -646,7 +646,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
-		logArgs = append(logArgs, "generation_time_in_sec", diff)
+		logArgs = append(logArgs, "generation_time_in_miliseconds", diff)
 	}
 
 	b.logger.Info("new block", logArgs...)

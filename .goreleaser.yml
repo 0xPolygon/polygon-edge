@@ -120,9 +120,3 @@ docker_manifests:
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-amd64
       - 0xpolygon/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: false
-
-announce:
-  slack:
-    enabled: true
-    # The name of the channel that the user selected as a destination for webhook messages.
-    channel: "{{ .Env.SLACK_CHANNEL }}"

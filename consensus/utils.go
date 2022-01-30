@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
 )
@@ -37,4 +39,14 @@ func BuildBlock(params BuildBlockParams) *types.Block {
 		Header:       header,
 		Transactions: txs,
 	}
+}
+
+// MilliToUnix returns the local Time corresponding to the given Unix time m milliseconds since January 1, 1970 UTC.
+func MilliToUnix(m uint64) time.Time {
+	return time.Unix(0, int64(m)*1e6)
+}
+
+// UnixToMilli returns uint64 value for miliseconds
+func UnixToMilli(t time.Time) uint64 {
+	return uint64(t.UnixNano() / 1e6)
 }
