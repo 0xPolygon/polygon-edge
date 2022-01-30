@@ -629,6 +629,7 @@ func TestEth_EstimateGas(t *testing.T) {
 		assert.Nil(t, res)
 	})
 
+	// nolint:lll
 	t.Run("returns estimated gas value +1 when transaction has gas field greater than estimated gas value", func(t *testing.T) {
 		balance := int64(10000000)
 		txnGasLimit := uint64(30000)
