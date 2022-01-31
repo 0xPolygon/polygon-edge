@@ -640,7 +640,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 
-	// build the block
+	// build the bloc
 	block := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
 		Txns:     txns,
