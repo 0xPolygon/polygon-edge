@@ -143,14 +143,14 @@ func PredeployStakingSC(
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)
 	}
 
+	if maxValidatorCount > math.MaxUint32 {
+		maxValidatorCount = math.MaxUint32
+	}
+
 	// Generate the empty account storage map
 	storageMap := make(map[types.Hash]types.Hash)
 	bigTrueValue := big.NewInt(1)
 	stakedAmount := big.NewInt(0)
-
-	if maxValidatorCount > math.MaxUint32 {
-		maxValidatorCount = math.MaxUint32
-	}
 	maxNumValidators := big.NewInt(int64(maxValidatorCount))
 
 	for indx, validator := range validators {
