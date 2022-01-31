@@ -91,6 +91,13 @@ func TestMultiAddrFromDns(t *testing.T) {
 			err:        true,
 			outcome:    "",
 		},
+		{
+			name:       "valid long domain suffix",
+			dnsAddress: "dns/validator-1.foo.technology",
+			port:       12345,
+			err:        false,
+			outcome:    "/dns/validator-1.foo.technology/tcp/12345",
+		},
 	}
 
 	for _, tt := range tests {
