@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"math"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -125,6 +126,7 @@ const (
 // using the passed in validators as prestaked validators
 func PredeployStakingSC(
 	validators []types.Address,
+	maxValidatorCount uint,
 ) (*chain.GenesisAccount, error) {
 	// Set the code for the staking smart contract
 	// Code retrieved from https://github.com/0xPolygon/staking-contracts
@@ -145,7 +147,11 @@ func PredeployStakingSC(
 	storageMap := make(map[types.Hash]types.Hash)
 	bigTrueValue := big.NewInt(1)
 	stakedAmount := big.NewInt(0)
-	maxNumValidators := big.NewInt(10)
+
+	if maxValidatorCount > math.MaxUint32 {
+		maxValidatorCount = math.MaxUint32
+	}
+	maxNumValidators := big.NewInt(int64(maxValidatorCount))
 
 	for indx, validator := range validators {
 		// Update the total staked amount

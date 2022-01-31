@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -355,6 +356,7 @@ func generateDevGenesis(params devGenesisParams) error {
 
 	stakingAccount, err := staking.PredeployStakingSC(
 		[]types.Address{},
+		math.MaxUint32,
 	)
 	if err != nil {
 		return err

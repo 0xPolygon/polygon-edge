@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/helper/staking"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,6 +154,14 @@ func (c *GenesisCommand) DefineFlags() {
 		},
 		FlagOptional: true,
 	}
+
+	c.FlagMap["max-validator-count"] = helper.FlagDescriptor{
+		Description: "Sets the flag indicating the maximum number of validators in the validator set for PoS",
+		Arguments: []string{
+			"MAX_VALIDATOR_COUNT",
+		},
+		FlagOptional: true,
+	}
 }
 
 // GetHelperText returns a simple description of the command
@@ -193,6 +202,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		ibftValidators           helperFlags.ArrayFlags
 		ibftValidatorsPrefixPath string
 		blockGasLimit            uint64
+		maxNumValidator          uint
 	)
 
 	flags.StringVar(&baseDir, "dir", "", "")
@@ -206,6 +216,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.Uint64Var(&epochSize, "epoch-size", ibft.DefaultEpochSize, "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
 	flags.BoolVar(&isPos, "pos", false, "")
+	flags.UintVar(&maxNumValidator, "max-validator-count", math.MaxUint32, "")
 
 	if err := flags.Parse(args); err != nil {
 		c.UI.Error(fmt.Sprintf("failed to parse args: %v", err))
@@ -308,7 +319,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		stakingAccount, predeployErr := staking.PredeployStakingSC(validators)
+		stakingAccount, predeployErr := staking.PredeployStakingSC(validators, maxNumValidator)
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
 
