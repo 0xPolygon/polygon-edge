@@ -235,7 +235,7 @@ func TestAddrInfoToString(t *testing.T) {
 			),
 		},
 		{
-			// A host address is explicitly specified
+			// A dns name is explicitly specified
 			"Valid dial dns address",
 			[]string{formatMultiaddr("dns", "foobar.com", defaultPort)},
 			formatExpectedOutput(
