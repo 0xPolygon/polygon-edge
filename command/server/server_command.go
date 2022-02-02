@@ -228,11 +228,11 @@ func (c *ServerCommand) DefineFlags() {
 			" from the given origin",
 		Arguments: []string{
 			"ACCESS_CONTROL_ALLOW_ORIGINS",
-      },
+		},
 		FlagOptional: true,
 	}
 
-  c.FlagMap["restore"] = helper.FlagDescriptor{
+	c.FlagMap["restore"] = helper.FlagDescriptor{
 		Description: "Sets the path to the archive blockchain data to restore on initialization",
 		Arguments: []string{
 			"RESTORE",

@@ -65,6 +65,7 @@ type TxPool struct {
 type Headers struct {
 	AccessControlAllowOrigins []string `json:"access_control_allow_origins"`
 }
+
 // minimum block generation time in seconds
 const defaultBlockTime uint64 = 2
 

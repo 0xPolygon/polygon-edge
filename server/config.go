@@ -41,7 +41,7 @@ func DefaultConfig() *Config {
 			JSONRPCAddr:              &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
 			AccessControlAllowOrigin: nil,
 		},
-		BlockTime:      DefaultBlockTime,
+		BlockTime: DefaultBlockTime,
 	}
 }
 

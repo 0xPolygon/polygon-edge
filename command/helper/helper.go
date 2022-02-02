@@ -438,8 +438,10 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	flags := flag.NewFlagSet(baseCommand, flag.ContinueOnError)
 	flags.Usage = func() {}
 
-	var configFile string
-	var accessControlAllowOrigins helperFlags.ArrayFlags
+	var (
+		configFile                string
+		accessControlAllowOrigins helperFlags.ArrayFlags
+	)
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
@@ -480,6 +482,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 	if err := flags.Parse(args); err != nil {
 		return nil, err
 	}
+
 	cliConfig.Headers.AccessControlAllowOrigins = accessControlAllowOrigins
 
 	if cliConfig.Network.MaxPeers != -1 {

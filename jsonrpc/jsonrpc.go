@@ -55,7 +55,7 @@ type JSONRPCStore interface {
 
 type Config struct {
 	Store                    JSONRPCStore
-  Addr                     *net.TCPAddr
+	Addr                     *net.TCPAddr
 	ChainID                  uint64
 	AccessControlAllowOrigin []string
 }
