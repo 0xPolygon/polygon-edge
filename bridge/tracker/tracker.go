@@ -59,7 +59,7 @@ type ethHeader struct {
 	Hash         types.Hash    `json:"hash"`
 }
 
-type tracker struct {
+type Tracker struct {
 	logger hclog.Logger
 
 	// cancel funcs
@@ -84,9 +84,9 @@ type tracker struct {
 	db *leveldb.DB
 }
 
-func newTracker(logger hclog.Logger, confirmations uint64) (*tracker, error) {
-	tracker := &tracker{
-		logger:        logger.Named("event tracker"),
+func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
+	tracker := &Tracker{
+		logger:        logger.Named("event Tracker"),
 		confirmations: confirmations,
 		headerCh:      make(chan *ethHeader),
 		eventCh:       make(chan []byte),
@@ -111,7 +111,7 @@ func newTracker(logger hclog.Logger, confirmations uint64) (*tracker, error) {
 	return tracker, nil
 }
 
-func (t *tracker) Start() (<-chan []byte, error) {
+func (t *Tracker) Start() (<-chan []byte, error) {
 	if err := t.connect(); err != nil {
 		//	log
 		t.logger.Error("could not connect", "err", err)
@@ -140,7 +140,7 @@ func (t *tracker) Start() (<-chan []byte, error) {
 	return t.eventCh, nil
 }
 
-func (t *tracker) Stop() {
+func (t *Tracker) Stop() error {
 	//	stop subscription
 	t.cancelSubscription()
 
@@ -148,11 +148,18 @@ func (t *tracker) Stop() {
 	t.cancelHeaderProcess()
 
 	//	disconnect
-	t.rpcClient.Close()
-	t.wsConn.Close()
+	if err := t.rpcClient.Close(); err != nil {
+		return err
+	}
+
+	if err := t.wsConn.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (t *tracker) connect() error {
+func (t *Tracker) connect() error {
 	// create ws connection
 	conn, _, err := websocket.DefaultDialer.Dial(
 		ethWS,
@@ -181,7 +188,7 @@ func (t *tracker) connect() error {
 	return nil
 }
 
-func (t *tracker) startSubscription(ctx context.Context) {
+func (t *Tracker) startSubscription(ctx context.Context) {
 	for {
 		//	check if subscription is closed
 		select {
@@ -212,7 +219,7 @@ func (t *tracker) startSubscription(ctx context.Context) {
 	}
 }
 
-func (t *tracker) startHeaderProcess(ctx context.Context) {
+func (t *Tracker) startHeaderProcess(ctx context.Context) {
 	for {
 		select {
 		case header := <-t.headerCh:
@@ -223,7 +230,7 @@ func (t *tracker) startHeaderProcess(ctx context.Context) {
 	}
 }
 
-func (t *tracker) processHeader(header *ethHeader) {
+func (t *Tracker) processHeader(header *ethHeader) {
 	//	determine range of blocks to query
 	fromBlock, toBlock := t.calculateRange(header)
 
@@ -255,7 +262,7 @@ func (t *tracker) processHeader(header *ethHeader) {
 	}
 }
 
-func (t *tracker) calculateRange(header *ethHeader) (from, to uint64) {
+func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
 	latestHeight, err := types.ParseUint256orHex(&header.Number)
 	if err != nil {
@@ -338,7 +345,7 @@ func (t *tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	return
 }
 
-func (t *tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
+func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	queryFilter := &web3.LogFilter{
 		Address: []web3.Address{
 			web3.HexToAddress(stateSenderAddress),
@@ -361,11 +368,11 @@ func (t *tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 }
 
 //
-//func (t *tracker) notify(logs ...*Log) {
+//func (t *Tracker) notify(logs ...*Log) {
 //
 //}
 
-func (t *tracker) subscribeNewHeads() error {
+func (t *Tracker) subscribeNewHeads() error {
 	// send subscription request
 	request := ethSubscribeRequest{
 		JsonRPC: "2.0",
