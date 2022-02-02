@@ -440,6 +440,7 @@ func ReadConfig(baseCommand string, args []string) (*Config, error) {
 
 	flags.StringVar(&cliConfig.LogLevel, "log-level", "", "")
 	flags.BoolVar(&cliConfig.Seal, "seal", false, "")
+	flags.BoolVar(&cliConfig.Tracker, "tracker", false, "")
 	flags.StringVar(&configFile, "config", "", "")
 	flags.StringVar(&cliConfig.Chain, "chain", "", "")
 	flags.StringVar(&cliConfig.DataDir, "data-dir", "", "")
