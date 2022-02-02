@@ -10,7 +10,7 @@ import (
 
 const DefaultGRPCPort int = 9632
 const DefaultJSONRPCPort int = 8545
-const DefaultBlockTime = 2000 // in milliseconds
+const DefaultBlockTime = 2 // in seconds
 
 // Config is used to parametrize the minimal client
 type Config struct {
@@ -38,7 +38,7 @@ func DefaultConfig() *Config {
 		Network:        network.DefaultConfig(),
 		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
-		BlockTime:      DefaultBlockTime, // default block time in milliseconds
+		BlockTime:      DefaultBlockTime,
 	}
 }
 

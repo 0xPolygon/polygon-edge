@@ -65,7 +65,7 @@ type ConsensusParams struct {
 	Logger         hclog.Logger
 	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
-	BlockTime      uint64 // block time im miliseconds
+	BlockTime      uint64
 }
 
 // Factory is the factory function to create a discovery backend

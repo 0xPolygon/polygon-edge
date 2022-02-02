@@ -52,7 +52,7 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Namespace: namespace,
 			Subsystem: "consensus",
 			Name:      "block_interval",
-			Help:      "Time between current block and the previous block in miliseconds.",
+			Help:      "Time between current block and the previous block in seconds.",
 		}, labels).With(labelsWithValues...),
 	}
 }
