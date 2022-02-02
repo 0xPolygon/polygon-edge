@@ -3,10 +3,12 @@ module github.com/0xPolygon/polygon-edge
 go 1.14
 
 require (
+	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-kit/kit v0.12.0
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
@@ -27,8 +29,10 @@ require (
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-noise v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.6.1
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/miekg/dns v1.1.45 // indirect
 	github.com/mitchellh/cli v1.1.2
+	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multihash v0.1.0 // indirect
@@ -45,6 +49,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220126234351-aa10faf2a1f8
 	golang.org/x/net v0.0.0-20220127074510-2fabfed7e28f // indirect
 	golang.org/x/tools v0.1.9 // indirect
+	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa // indirect
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
