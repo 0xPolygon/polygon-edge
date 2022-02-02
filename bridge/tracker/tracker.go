@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -61,12 +62,11 @@ type ethHeader struct {
 type tracker struct {
 	logger hclog.Logger
 
-	// cancel process
+	// cancel funcs
+	cancelSubscription, cancelHeaderProcess context.CancelFunc
 
 	// requiredConfirmations
 	confirmations uint64
-
-	// db db (last-processed-block)
 
 	// subscription channel
 	headerCh chan *ethHeader
@@ -114,31 +114,42 @@ func newTracker(logger hclog.Logger, confirmations uint64) (*tracker, error) {
 func (t *tracker) Start() (<-chan []byte, error) {
 	if err := t.connect(); err != nil {
 		//	log
+		t.logger.Error("could not connect", "err", err)
 		return nil, err
 	}
 
 	if err := t.subscribeNewHeads(); err != nil {
+		t.logger.Error("could not subscribe", "err", err)
+
 		return nil, err
 	}
 
+	//	create cancellable contexts
+	ctxSubscription, cancelSub := context.WithCancel(context.Background())
+	t.cancelSubscription = cancelSub
+
+	ctxHeaderProcess, cancelHeader := context.WithCancel(context.Background())
+	t.cancelHeaderProcess = cancelHeader
+
 	//	start the header processing early
-	go t.startHeaderProcess()
+	go t.startHeaderProcess(ctxSubscription)
 
 	//	start processing new headers from subscription
-	go t.startSubscription()
+	go t.startSubscription(ctxHeaderProcess)
 
 	return t.eventCh, nil
 }
 
 func (t *tracker) Stop() {
+	//	stop subscription
+	t.cancelSubscription()
+
+	// 	stop processing headers
+	t.cancelHeaderProcess()
+
 	//	disconnect
 	t.rpcClient.Close()
 	t.wsConn.Close()
-
-	//	stop subscription
-
-	//	stop the header process
-
 }
 
 func (t *tracker) connect() error {
@@ -170,15 +181,21 @@ func (t *tracker) connect() error {
 	return nil
 }
 
-func (t *tracker) startSubscription() {
-	// listen for new heads...
+func (t *tracker) startSubscription(ctx context.Context) {
 	for {
+		//	check if subscription is closed
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		res := ethSubscribeResponse{}
 		err := t.wsConn.ReadJSON(&res)
 		if err != nil {
 			//	ErrReadJSON
 			println("listener: cant read message")
-			continue
+			return
 		}
 
 		header := &ethHeader{}
@@ -195,12 +212,13 @@ func (t *tracker) startSubscription() {
 	}
 }
 
-func (t *tracker) startHeaderProcess() {
+func (t *tracker) startHeaderProcess(ctx context.Context) {
 	for {
 		select {
 		case header := <-t.headerCh:
 			t.processHeader(header)
-			//	case cancel
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -228,6 +246,10 @@ func (t *tracker) processHeader(header *ethHeader) {
 		}
 		if StateSyncedEvent.Match(log) {
 			//	match
+			continue
+		}
+		if PoCEvent.Match(log) {
+			t.logger.Info("PoC event", "contract address", log.Address.String())
 			continue
 		}
 	}

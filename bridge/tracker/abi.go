@@ -21,3 +21,5 @@ var StateSyncedEvent = abi.MustNewEvent(`event StateSynced(
 	address indexed contractAddress,
 	bytes data
 )`)
+
+var PoCEvent = abi.MustNewEvent(``)
