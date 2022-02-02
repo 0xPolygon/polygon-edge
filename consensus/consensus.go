@@ -2,11 +2,11 @@ package consensus
 
 import (
 	"context"
-	"github.com/0xPolygon/polygon-edge/protocol"
 	"log"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -26,9 +26,12 @@ type Consensus interface {
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
-	GetSyncProgression() *protocol.Progression
+	GetSyncProgression() *progress.Progression
 
-	// Start starts the consensus
+	// Initialize initializes the consensus (e.g. setup data)
+	Initialize() error
+
+	// Start starts the consensus and servers
 	Start() error
 
 	// Close closes the connection
@@ -62,6 +65,7 @@ type ConsensusParams struct {
 	Logger         hclog.Logger
 	Metrics        *Metrics
 	SecretsManager secrets.SecretsManager
+	BlockTime      uint64
 }
 
 // Factory is the factory function to create a discovery backend

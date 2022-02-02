@@ -25,7 +25,12 @@ type Topic struct {
 }
 
 func (t *Topic) createObj() proto.Message {
-	return reflect.New(t.typ).Interface().(proto.Message)
+	message, ok := reflect.New(t.typ).Interface().(proto.Message)
+	if !ok {
+		return nil
+	}
+
+	return message
 }
 
 func (t *Topic) Publish(obj proto.Message) error {

@@ -8,25 +8,14 @@
 <p align="center">
   <a href="http://protocol.ai"><img src="https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square" /></a>
   <a href="http://libp2p.io/"><img src="https://img.shields.io/badge/project-libp2p-yellow.svg?style=flat-square" /></a>
-  <a href="http://webchat.freenode.net/?channels=%23libp2p"><img src="https://img.shields.io/badge/freenode-%23libp2p-yellow.svg?style=flat-square" /></a>
-  <a href="https://waffle.io/libp2p/libp2p"><img src="https://img.shields.io/badge/pm-waffle-yellow.svg?style=flat-square" /></a>
-  <a href="https://discuss.libp2p.io"><img src="https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg"/></a>
-</p>
-
-<p align="center">
-  <a href="https://travis-ci.com/libp2p/go-libp2p"><img src="https://travis-ci.com/libp2p/go-libp2p.svg?branch=master" /></a>
-  <br>
-  <a href="https://github.com/RichardLitt/standard-readme"><img src="https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square" /></a>
   <a href="https://godoc.org/github.com/libp2p/go-libp2p"><img src="https://godoc.org/github.com/libp2p/go-libp2p?status.svg" /></a>
-  <a href=""><img src="https://img.shields.io/badge/golang-%3E%3D1.8.0-orange.svg?style=flat-square" /></a>
-  <br>
+  <a href="https://discuss.libp2p.io"><img src="https://img.shields.io/discourse/https/discuss.libp2p.io/posts.svg"/></a>
 </p>
 
 # Table of Contents
 
 - [Background](#background)
 - [Usage](#usage)
-  - [API](#api)
   - [Examples](#examples)
 - [Development](#development)
   - [Using the go-libp2p Workspace](#using-the-go-libp2p-workspace)
@@ -52,9 +41,7 @@ libp2p is the product of a long, and arduous quest of understanding -- a deep di
 
 ## Usage
 
-This repository (`go-libp2p`) serves as the entrypoint to the universe of modules that compose the Go implementation of the libp2p stack. Libp2p requires go 1.12+.
-
-We mainly use [Go modules](https://github.com/golang/go/wiki/Modules) for our dependency and release management (and thus require go >= 1.12+). In order to get the best developer experience, we recommend you do too. Otherwise, you may ocassionally encounter a breaking build as you'll be running off master (which, by definition, is not guaranteed to be stable).
+This repository (`go-libp2p`) serves as the entrypoint to the universe of modules that compose the Go implementation of the libp2p stack.
 
 You can start using go-libp2p in your Go application simply by adding imports from our repos, e.g.:
 
@@ -62,23 +49,9 @@ You can start using go-libp2p in your Go application simply by adding imports fr
 import "github.com/libp2p/go-libp2p"
 ```
 
-Run `go get` or `go build`, excluding the libp2p repos from Go modules proxy usage. You only need to do this the first time you import go-libp2p to make sure you latch onto the correct version lineage (see [golang/go#34189](https://github.com/golang/go/issues/34189) for context):
-
-```sh
-$ GOPRIVATE='github.com/libp2p/*' go get ./...
-```
-
-The Go build tools will look for [available releases](https://github.com/libp2p/go-libp2p/releases), and will pick the highest available one.
-
-As new releases of go-libp2p are made available, you can upgrade your application by manually editing your `go.mod` file, or using the [Go tools](https://golang.org/cmd/go/#hdr-Maintaining_module_requirements) to maintain module requirements.
-
-### API
-
-[![GoDoc](https://godoc.org/github.com/libp2p/go-libp2p?status.svg)](https://godoc.org/github.com/libp2p/go-libp2p)
-
 ### Examples
 
-Examples can be found in the [examples repo](https://github.com/libp2p/go-libp2p-examples).
+Examples can be found in the [examples folder](examples).
 
 ## Development
 
@@ -138,7 +111,7 @@ List of packages currently in existence for libp2p:
 | [`go-libp2p-transport-upgrader`](//github.com/libp2p/go-libp2p-transport-upgrader) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-transport-upgrader) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-transport-upgrader) | upgrades multiaddr-net connections into full libp2p transports |
 | [`go-libp2p-reuseport-transport`](//github.com/libp2p/go-libp2p-reuseport-transport) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-reuseport-transport) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-reuseport-transport) | partial transport for building transports that reuse ports |
 | **Encrypted Channels** |
-| [`go-libp2p-secio`](//github.com/libp2p/go-libp2p-secio) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-secio.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-secio) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-secio/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-secio) | SecIO crypto channel |
+| [`go-libp2p-noise`](//github.com/libp2p/go-libp2p-noise) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-noise.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-noise) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-noise/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-noise) | Noise crypto channel |
 | [`go-libp2p-tls`](//github.com/libp2p/go-libp2p-tls) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-tls.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-tls) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-tls/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-tls) | TLS 1.3+ crypto channel |
 | [`go-conn-security-multistream`](//github.com/libp2p/go-conn-security-multistream) | [![Travis CI](https://travis-ci.com/libp2p/go-conn-security-multistream.svg?branch=master)](https://travis-ci.com/libp2p/go-conn-security-multistream) | [![codecov](https://codecov.io/gh/libp2p/go-conn-security-multistream/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-conn-security-multistream) | multistream multiplexed meta crypto channel |
 | **Private Network** |
@@ -180,7 +153,6 @@ List of packages currently in existence for libp2p:
 | [`go-libp2p-http`](//github.com/libp2p/go-libp2p-http) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-http.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-http) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-http/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-http) | HTTP on top of libp2p streams |
 | **Testing and examples** |
 | [`go-libp2p-testing`](//github.com/libp2p/go-libp2p-testing) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-testing.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-testing) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-testing/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-testing) | a collection of testing utilities for libp2p |
-| [`go-libp2p-examples`](//github.com/libp2p/go-libp2p-examples) | [![Travis CI](https://travis-ci.com/libp2p/go-libp2p-examples.svg?branch=master)](https://travis-ci.com/libp2p/go-libp2p-examples) | [![codecov](https://codecov.io/gh/libp2p/go-libp2p-examples/branch/master/graph/badge.svg)](https://codecov.io/gh/libp2p/go-libp2p-examples) | go-libp2p examples and tutorials |
 
 # Contribute
 

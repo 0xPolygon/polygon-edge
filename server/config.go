@@ -10,6 +10,7 @@ import (
 
 const DefaultGRPCPort int = 9632
 const DefaultJSONRPCPort int = 8545
+const DefaultBlockTime = 2 // in seconds
 
 // Config is used to parametrize the minimal client
 type Config struct {
@@ -25,6 +26,8 @@ type Config struct {
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
 	JSONRPC        *JSONRPC
+	RestoreFile    *string
+	BlockTime      uint64
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
@@ -38,6 +41,7 @@ func DefaultConfig() *Config {
 			JSONRPCAddr:              &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
 			AccessControlAllowOrigin: nil,
 		},
+		BlockTime:      DefaultBlockTime,
 	}
 }
 

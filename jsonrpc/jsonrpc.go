@@ -36,17 +36,26 @@ func (s serverType) String() string {
 type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
-	dispatcher dispatcherImpl
+	dispatcher dispatcher
 }
 
-type dispatcherImpl interface {
+type dispatcher interface {
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
 	Handle(reqBody []byte) ([]byte, error)
 }
 
+// JSONRPCStore defines all the methods required
+// by all the JSON RPC endpoints
+type JSONRPCStore interface {
+	ethStore
+	networkStore
+	txPoolStore
+	filterManagerStore
+}
+
 type Config struct {
-	Store                    blockchainInterface
-	Addr                     *net.TCPAddr
+	Store                    JSONRPCStore
+  Addr                     *net.TCPAddr
 	ChainID                  uint64
 	AccessControlAllowOrigin []string
 }

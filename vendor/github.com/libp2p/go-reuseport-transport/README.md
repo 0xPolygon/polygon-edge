@@ -26,11 +26,6 @@ NOTE: Currently, we don't make any attempts to prevent two reusport transports f
 go get github.com/libp2p/go-reuseport-transport
 ```
 
-This repo is [gomod](https://github.com/golang/go/wiki/Modules)-compatible, and users of
-go 1.11 and later with modules enabled will automatically pull the latest tagged release
-by referencing this package. Upgrades to future releases can be managed using `go get`,
-or by editing your `go.mod` file as [described by the gomod documentation](https://github.com/golang/go/wiki/Modules#how-to-upgrade-and-downgrade-dependencies).
-
 ## Current use in libp2p
 
 This package is *currently* used by the [go-tcp-transport](https://github.com/libp2p/go-tcp-transport) libp2p transport and will likely be used by more libp2p transports in the future.

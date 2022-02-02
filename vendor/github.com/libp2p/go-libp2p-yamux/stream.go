@@ -3,17 +3,20 @@ package sm_yamux
 import (
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/mux"
-	"github.com/libp2p/go-yamux/v2"
+	"github.com/libp2p/go-libp2p-core/network"
+
+	"github.com/libp2p/go-yamux/v3"
 )
 
 // stream implements mux.MuxedStream over yamux.Stream.
 type stream yamux.Stream
 
+var _ network.MuxedStream = &stream{}
+
 func (s *stream) Read(b []byte) (n int, err error) {
 	n, err = s.yamux().Read(b)
 	if err == yamux.ErrStreamReset {
-		err = mux.ErrReset
+		err = network.ErrReset
 	}
 
 	return n, err
@@ -22,7 +25,7 @@ func (s *stream) Read(b []byte) (n int, err error) {
 func (s *stream) Write(b []byte) (n int, err error) {
 	n, err = s.yamux().Write(b)
 	if err == yamux.ErrStreamReset {
-		err = mux.ErrReset
+		err = network.ErrReset
 	}
 
 	return n, err
@@ -59,5 +62,3 @@ func (s *stream) SetWriteDeadline(t time.Time) error {
 func (s *stream) yamux() *yamux.Stream {
 	return (*yamux.Stream)(s)
 }
-
-var _ mux.MuxedStream = &stream{}

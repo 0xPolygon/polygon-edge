@@ -8,10 +8,9 @@ import (
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	s := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
-	s.registerEndpoints()
+	dispatcher := newDispatcher(hclog.NewNullLogger(), newMockStore(), 0)
 
-	resp, err := s.Handle([]byte(`{
+	resp, err := dispatcher.Handle([]byte(`{
 		"method": "web3_sha3",
 		"params": ["0x68656c6c6f20776f726c64"]
 	}`))
@@ -20,5 +19,5 @@ func TestWeb3EndpointSha3(t *testing.T) {
 	var res string
 
 	assert.NoError(t, expectJSONResult(resp, &res))
-	assert.Equal(t, res, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad")
+	assert.Equal(t, "0x47173285a8d7341e5e972fc677286384f802f8ef42a5ec5f03bbfa254cb01fad", res)
 }

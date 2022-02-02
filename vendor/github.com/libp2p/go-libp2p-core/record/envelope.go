@@ -215,9 +215,9 @@ func (e *Envelope) Equal(other *Envelope) bool {
 		return e == nil
 	}
 	return e.PublicKey.Equals(other.PublicKey) &&
-		bytes.Compare(e.PayloadType, other.PayloadType) == 0 &&
-		bytes.Compare(e.signature, other.signature) == 0 &&
-		bytes.Compare(e.RawPayload, other.RawPayload) == 0
+		bytes.Equal(e.PayloadType, other.PayloadType) &&
+		bytes.Equal(e.signature, other.signature) &&
+		bytes.Equal(e.RawPayload, other.RawPayload)
 }
 
 // Record returns the Envelope's payload unmarshalled as a Record.

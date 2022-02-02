@@ -199,9 +199,9 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 		// this can be either an array (extension node)
 		// or bytes (leaf node)
 		nc := &ShortNode{}
-		nc.key = compactToHex(key.Raw())
+		nc.key = decodeCompact(key.Raw())
 
-		if hasTerm(nc.key) {
+		if hasTerminator(nc.key) {
 			// value node
 			if v.Get(1).Type() != fastrlp.TypeBytes {
 				return nil, fmt.Errorf("short leaf value expected to be bytes")
