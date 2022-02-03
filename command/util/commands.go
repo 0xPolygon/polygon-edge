@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
-	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/mitchellh/cli"
 )
 
@@ -38,7 +37,7 @@ func Commands() map[string]cli.CommandFactory {
 	genesisCmd := genesis.GenesisCommand{Base: base}
 	monitorCmd := monitor.MonitorCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	statusCmd := status.StatusCommand{Base: base, Formatter: formatter, GRPC: grpc}
-	versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
+	//versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
 	backupCmd := backup.BackupCommand{Base: base, Formatter: formatter, GRPC: grpc}
 
 	ibftCmd := ibft.IbftCommand{}
@@ -133,9 +132,9 @@ func Commands() map[string]cli.CommandFactory {
 		monitorCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &monitorCmd, nil
 		},
-		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
-			return &versionCmd, nil
-		},
+		//versionCmd.GetBaseCommand(): func() (cli.Command, error) {
+		//	return &versionCmd, nil
+		//},
 		backupCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &backupCmd, nil
 		},

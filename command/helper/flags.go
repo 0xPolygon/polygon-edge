@@ -51,6 +51,10 @@ type FormatterFlag struct {
 	IsJSON bool
 }
 
+type OutputFormatter interface {
+	GetOutput()
+}
+
 // DefineFlags sets some flags for json output
 func (f *FormatterFlag) DefineFlags(flagMap map[string]FlagDescriptor) {
 	flagMap["json"] = FlagDescriptor{
@@ -89,9 +93,10 @@ func (f *FormatterFlag) OutputError(e error) {
 
 // OutputResult is helper function to print result with different format
 func (f *FormatterFlag) OutputResult(r CommandResult) {
-	var out string
-
-	var err error
+	var (
+		out string
+		err error
+	)
 
 	if f.IsJSON {
 		var bytes []byte

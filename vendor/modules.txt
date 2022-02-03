@@ -5,7 +5,6 @@ github.com/Masterminds/semver
 # github.com/Masterminds/sprig v2.22.0+incompatible
 github.com/Masterminds/sprig
 # github.com/armon/go-metrics v0.3.10
-## explicit
 github.com/armon/go-metrics
 # github.com/armon/go-radix v1.0.0
 github.com/armon/go-radix
@@ -45,14 +44,12 @@ github.com/docker/go-units
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
 # github.com/fatih/color v1.13.0
-## explicit
 github.com/fatih/color
 # github.com/flynn/noise v1.0.0
 github.com/flynn/noise
 # github.com/francoispqt/gojay v1.2.13
 github.com/francoispqt/gojay
 # github.com/fsnotify/fsnotify v1.5.1
-## explicit
 github.com/fsnotify/fsnotify
 # github.com/go-kit/kit v0.12.0
 ## explicit
@@ -175,6 +172,8 @@ github.com/huin/goupnp/ssdp
 # github.com/imdario/mergo v0.3.12
 ## explicit
 github.com/imdario/mergo
+# github.com/inconshreveable/mousetrap v1.0.0
+github.com/inconshreveable/mousetrap
 # github.com/ipfs/go-cid v0.1.0
 ## explicit
 github.com/ipfs/go-cid
@@ -357,7 +356,6 @@ github.com/marten-seemann/qtls-go1-18
 # github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd
 github.com/marten-seemann/tcp
 # github.com/mattn/go-colorable v0.1.12
-## explicit
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.14
 github.com/mattn/go-isatty
@@ -384,7 +382,6 @@ github.com/mitchellh/go-homedir
 # github.com/mitchellh/go-testing-interface v1.0.0
 github.com/mitchellh/go-testing-interface
 # github.com/mitchellh/mapstructure v1.4.3
-## explicit
 github.com/mitchellh/mapstructure
 # github.com/mitchellh/reflectwalk v1.0.0
 github.com/mitchellh/reflectwalk
@@ -499,6 +496,11 @@ github.com/ryanuber/go-glob
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
 github.com/spaolacci/murmur3
+# github.com/spf13/cobra v1.3.0
+## explicit
+github.com/spf13/cobra
+# github.com/spf13/pflag v1.0.5
+github.com/spf13/pflag
 # github.com/stretchr/testify v1.7.0
 ## explicit
 github.com/stretchr/testify/assert
@@ -634,7 +636,6 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
-## explicit
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.44.0
 ## explicit

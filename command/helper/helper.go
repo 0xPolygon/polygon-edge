@@ -30,6 +30,7 @@ const (
 	DefaultMaxSlots       = 4096
 	GenesisGasUsed        = 458752  // 0x70000
 	GenesisGasLimit       = 5242880 // 0x500000
+	JSONOutputFlag        = "json"
 )
 
 // FlagDescriptor contains the description elements for a command flag
