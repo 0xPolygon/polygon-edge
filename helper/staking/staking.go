@@ -146,7 +146,7 @@ func PredeployStakingSC(
 	if maxValidatorCount > math.MaxUint32 {
 		maxValidatorCount = math.MaxUint32
 	} else if maxValidatorCount < 4 {
-		maxValidatorCount = 4
+		return nil, fmt.Errorf("maximum number of validator can not be lower than 4")
 	}
 
 	// Generate the empty account storage map
