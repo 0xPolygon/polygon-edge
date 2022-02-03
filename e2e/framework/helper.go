@@ -260,7 +260,12 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 		return nil, err
 	}
 
-	return res.(*proto.PeersListResponse), nil
+	peersListResponse, ok := res.(*proto.PeersListResponse)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	return peersListResponse, nil
 }
 
 // WaitUntilTxPoolFilled waits until node has required number of transactions in txpool,
@@ -286,7 +291,12 @@ func WaitUntilTxPoolFilled(
 		return nil, err
 	}
 
-	return res.(*txpoolProto.TxnPoolStatusResp), nil
+	status, ok := res.(*txpoolProto.TxnPoolStatusResp)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	return status, nil
 }
 
 // WaitUntilBlockMined waits until server mined block with bigger height than given height
@@ -306,7 +316,12 @@ func WaitUntilBlockMined(ctx context.Context, srv *TestServer, desiredHeight uin
 		return 0, err
 	}
 
-	return res.(uint64), nil
+	blockNum, ok := res.(uint64)
+	if !ok {
+		return 0, errors.New("invalid type assert")
+	}
+
+	return blockNum, nil
 }
 
 // MethodSig returns the signature of a non-parametrized function

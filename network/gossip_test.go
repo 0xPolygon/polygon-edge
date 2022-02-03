@@ -61,7 +61,12 @@ func TestSimpleGossip(t *testing.T) {
 
 		if subscribeErr := topic.Subscribe(func(obj interface{}) {
 			// Everyone should relay they got the message
-			messageCh <- obj.(*testproto.GenericMessage)
+			genericMessage, ok := obj.(*testproto.GenericMessage)
+			if !ok {
+				t.Fatalf("invalid type assert")
+			}
+
+			messageCh <- genericMessage
 		}); subscribeErr != nil {
 			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
 		}

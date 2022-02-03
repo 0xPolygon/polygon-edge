@@ -5,21 +5,16 @@ package crypto
 
 import (
 	"crypto/elliptic"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha1"
-	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 
 	pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
 	"github.com/gogo/protobuf/proto"
-	sha256 "github.com/minio/sha256-simd"
 )
 
 const (
@@ -69,10 +64,6 @@ var PrivKeyUnmarshallers = map[pb.KeyType]PrivKeyUnmarshaller{
 
 // Key represents a crypto key that can be compared to another key
 type Key interface {
-	// Bytes returns a serialized, storeable representation of this key
-	// DEPRECATED in favor of Marshal / Unmarshal
-	Bytes() ([]byte, error)
-
 	// Equals checks whether two PubKeys are the same
 	Equals(Key) bool
 
@@ -82,7 +73,7 @@ type Key interface {
 	// This function is the inverse of {Priv,Pub}KeyUnmarshaler.
 	Raw() ([]byte, error)
 
-	// Type returns the protobof key type.
+	// Type returns the protobuf key type.
 	Type() pb.KeyType
 }
 
@@ -172,106 +163,6 @@ func GenerateEKeyPair(curveName string) ([]byte, GenSharedKey, error) {
 	}
 
 	return pubKey, done, nil
-}
-
-// StretchedKeys ...
-type StretchedKeys struct {
-	IV        []byte
-	MacKey    []byte
-	CipherKey []byte
-}
-
-// PENDING DEPRECATION:  KeyStretcher() will be deprecated with secio; for new
-// code, please use PBKDF2 (golang.org/x/crypto/pbkdf2) instead.
-// KeyStretcher returns a set of keys for each party by stretching the shared key.
-// (myIV, theirIV, myCipherKey, theirCipherKey, myMACKey, theirMACKey).
-// This function accepts the following cipher types:
-// - AES-128
-// - AES-256
-// The function will panic upon receiving an unknown cipherType
-func KeyStretcher(cipherType string, hashType string, secret []byte) (StretchedKeys, StretchedKeys) {
-	var cipherKeySize int
-	var ivSize int
-	switch cipherType {
-	case "AES-128":
-		ivSize = 16
-		cipherKeySize = 16
-	case "AES-256":
-		ivSize = 16
-		cipherKeySize = 32
-	default:
-		panic("Unrecognized cipher, programmer error?")
-	}
-
-	hmacKeySize := 20
-
-	seed := []byte("key expansion")
-
-	result := make([]byte, 2*(ivSize+cipherKeySize+hmacKeySize))
-
-	var h func() hash.Hash
-
-	switch hashType {
-	case "SHA1":
-		h = sha1.New
-	case "SHA256":
-		h = sha256.New
-	case "SHA512":
-		h = sha512.New
-	default:
-		panic("Unrecognized hash function, programmer error?")
-	}
-
-	m := hmac.New(h, secret)
-	// note: guaranteed to never return an error
-	m.Write(seed)
-
-	a := m.Sum(nil)
-
-	j := 0
-	for j < len(result) {
-		m.Reset()
-
-		// note: guaranteed to never return an error.
-		m.Write(a)
-		m.Write(seed)
-
-		b := m.Sum(nil)
-
-		todo := len(b)
-
-		if j+todo > len(result) {
-			todo = len(result) - j
-		}
-
-		copy(result[j:j+todo], b)
-
-		j += todo
-
-		m.Reset()
-
-		// note: guaranteed to never return an error.
-		m.Write(a)
-
-		a = m.Sum(nil)
-	}
-
-	half := len(result) / 2
-	r1 := result[:half]
-	r2 := result[half:]
-
-	var k1 StretchedKeys
-	var k2 StretchedKeys
-
-	k1.IV = r1[0:ivSize]
-	k1.CipherKey = r1[ivSize : ivSize+cipherKeySize]
-	k1.MacKey = r1[ivSize+cipherKeySize:]
-
-	k2.IV = r2[0:ivSize]
-	k2.CipherKey = r2[ivSize : ivSize+cipherKeySize]
-	k2.MacKey = r2[ivSize+cipherKeySize:]
-
-	return k1, k2
 }
 
 // UnmarshalPublicKey converts a protobuf serialized public key into its

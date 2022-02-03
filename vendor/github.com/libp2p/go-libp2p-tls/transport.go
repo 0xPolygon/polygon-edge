@@ -5,19 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
-	"os"
 	"sync"
 
 	ci "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/sec"
 )
-
-// TLS 1.3 is opt-in in Go 1.12
-// Activate it by setting the tls13 GODEBUG flag.
-func init() {
-	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",tls13=1")
-}
 
 // ID is the protocol ID (used when negotiating with multistream)
 const ID = "/tls/1.0.0"
@@ -52,8 +45,9 @@ func New(key ci.PrivKey) (*Transport, error) {
 var _ sec.SecureTransport = &Transport{}
 
 // SecureInbound runs the TLS handshake as a server.
-func (t *Transport) SecureInbound(ctx context.Context, insecure net.Conn) (sec.SecureConn, error) {
-	config, keyCh := t.identity.ConfigForAny()
+// If p is empty, connections from any peer are accepted.
+func (t *Transport) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, error) {
+	config, keyCh := t.identity.ConfigForPeer(p)
 	cs, err := t.handshake(ctx, tls.Server(insecure, config), keyCh)
 	if err != nil {
 		insecure.Close()

@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net"
 
@@ -113,7 +114,7 @@ func WrapClient(s network.Stream) *grpc.ClientConn {
 	opts := grpc.WithContextDialer(func(ctx context.Context, peerIdStr string) (net.Conn, error) {
 		return &streamConn{s}, nil
 	})
-	conn, err := grpc.Dial("", grpc.WithInsecure(), opts)
+	conn, err := grpc.Dial("", grpc.WithTransportCredentials(insecure.NewCredentials()), opts)
 
 	if err != nil {
 		// TODO: this should not fail at all

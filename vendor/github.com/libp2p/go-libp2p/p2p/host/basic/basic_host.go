@@ -9,7 +9,14 @@ import (
 	"sync"
 	"time"
 
-	autonat "github.com/libp2p/go-libp2p-autonat"
+	"github.com/libp2p/go-libp2p/p2p/host/autonat"
+	"github.com/libp2p/go-libp2p/p2p/host/pstoremanager"
+	"github.com/libp2p/go-libp2p/p2p/host/relaysvc"
+	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
+	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/event"
@@ -20,11 +27,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/record"
 
-	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-eventbus"
 	inat "github.com/libp2p/go-libp2p-nat"
-	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
-	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-netroute"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -46,7 +50,7 @@ var log = logging.Logger("basichost")
 
 var (
 	// DefaultNegotiationTimeout is the default value for HostOpts.NegotiationTimeout.
-	DefaultNegotiationTimeout = time.Second * 60
+	DefaultNegotiationTimeout = 10 * time.Second
 
 	// DefaultAddrsFactory is the default value for HostOpts.AddrsFactory.
 	DefaultAddrsFactory = func(addrs []ma.Multiaddr) []ma.Multiaddr { return addrs }
@@ -55,20 +59,6 @@ var (
 // AddrsFactory functions can be passed to New in order to override
 // addresses returned by Addrs.
 type AddrsFactory func([]ma.Multiaddr) []ma.Multiaddr
-
-// Option is a type used to pass in options to the host.
-//
-// Deprecated in favor of HostOpts and NewHost.
-type Option int
-
-// NATPortMap makes the host attempt to open port-mapping in NAT devices
-// for all its listeners. Pass in this option in the constructor to
-// asynchronously a) find a gateway, b) open port mappings, c) republish
-// port mappings periodically. The NATed addresses are included in the
-// Host's Addrs() list.
-//
-// This option is deprecated in favor of HostOpts and NewHost.
-const NATPortMap Option = iota
 
 // BasicHost is the basic implementation of the host.Host interface. This
 // particular host implementation:
@@ -83,14 +73,17 @@ type BasicHost struct {
 	// keep track of resources we need to wait on before shutting down
 	refCount sync.WaitGroup
 
-	network    network.Network
-	mux        *msmux.MultistreamMuxer
-	ids        *identify.IDService
-	pings      *ping.PingService
-	natmgr     NATManager
-	maResolver *madns.Resolver
-	cmgr       connmgr.ConnManager
-	eventbus   event.Bus
+	network      network.Network
+	psManager    *pstoremanager.PeerstoreManager
+	mux          *msmux.MultistreamMuxer
+	ids          identify.IDService
+	hps          *holepunch.Service
+	pings        *ping.PingService
+	natmgr       NATManager
+	maResolver   *madns.Resolver
+	cmgr         connmgr.ConnManager
+	eventbus     event.Bus
+	relayManager *relaysvc.RelayManager
 
 	AddrsFactory AddrsFactory
 
@@ -145,24 +138,43 @@ type HostOpts struct {
 	// EnablePing indicates whether to instantiate the ping service
 	EnablePing bool
 
-	// UserAgent sets the user-agent for the host. Defaults to ClientVersion.
+	// EnableRelayService enables the circuit v2 relay (if we're publicly reachable).
+	EnableRelayService bool
+	// RelayServiceOpts are options for the circuit v2 relay.
+	RelayServiceOpts []relayv2.Option
+
+	// UserAgent sets the user-agent for the host.
 	UserAgent string
 
 	// DisableSignedPeerRecord disables the generation of Signed Peer Records on this host.
 	DisableSignedPeerRecord bool
+
+	// EnableHolePunching enables the peer to initiate/respond to hole punching attempts for NAT traversal.
+	EnableHolePunching bool
+	// HolePunchingOptions are options for the hole punching service
+	HolePunchingOptions []holepunch.Option
 }
 
 // NewHost constructs a new *BasicHost and activates it by attaching its stream and connection handlers to the given inet.Network.
-func NewHost(ctx context.Context, n network.Network, opts *HostOpts) (*BasicHost, error) {
-	hostCtx, cancel := context.WithCancel(ctx)
+func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
+	eventBus := eventbus.NewBus()
+	psManager, err := pstoremanager.NewPeerstoreManager(n.Peerstore(), eventBus)
+	if err != nil {
+		return nil, err
+	}
+	hostCtx, cancel := context.WithCancel(context.Background())
+	if opts == nil {
+		opts = &HostOpts{}
+	}
 
 	h := &BasicHost{
 		network:                 n,
+		psManager:               psManager,
 		mux:                     msmux.NewMultistreamMuxer(),
 		negtimeout:              DefaultNegotiationTimeout,
 		AddrsFactory:            DefaultAddrsFactory,
 		maResolver:              madns.DefaultResolver,
-		eventbus:                eventbus.NewBus(),
+		eventbus:                eventBus,
 		addrChangeChan:          make(chan struct{}, 1),
 		ctx:                     hostCtx,
 		ctxCancel:               cancel,
@@ -171,13 +183,17 @@ func NewHost(ctx context.Context, n network.Network, opts *HostOpts) (*BasicHost
 
 	h.updateLocalIpAddr()
 
-	var err error
 	if h.emitters.evtLocalProtocolsUpdated, err = h.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}); err != nil {
 		return nil, err
 	}
-	if h.emitters.evtLocalAddrsUpdated, err = h.eventbus.Emitter(&event.EvtLocalAddressesUpdated{}); err != nil {
+	if h.emitters.evtLocalAddrsUpdated, err = h.eventbus.Emitter(&event.EvtLocalAddressesUpdated{}, eventbus.Stateful); err != nil {
 		return nil, err
 	}
+	evtPeerConnectednessChanged, err := h.eventbus.Emitter(&event.EvtPeerConnectednessChanged{})
+	if err != nil {
+		return nil, err
+	}
+	h.Network().Notify(newPeerConnectWatcher(evtPeerConnectednessChanged))
 
 	if !h.disableSignedPeerRecord {
 		cab, ok := peerstore.GetCertifiedAddrBook(n.Peerstore())
@@ -219,6 +235,13 @@ func NewHost(ctx context.Context, n network.Network, opts *HostOpts) (*BasicHost
 		return nil, fmt.Errorf("failed to create Identify service: %s", err)
 	}
 
+	if opts.EnableHolePunching {
+		h.hps, err = holepunch.NewService(h, h.ids, opts.HolePunchingOptions...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create hole punch service: %w", err)
+		}
+	}
+
 	if uint64(opts.NegotiationTimeout) != 0 {
 		h.negtimeout = opts.NegotiationTimeout
 	}
@@ -240,6 +263,10 @@ func NewHost(ctx context.Context, n network.Network, opts *HostOpts) (*BasicHost
 	} else {
 		h.cmgr = opts.ConnManager
 		n.Notify(h.cmgr.Notifee())
+	}
+
+	if opts.EnableRelayService {
+		h.relayManager = relaysvc.NewRelayManager(h, opts.RelayServiceOpts...)
 	}
 
 	if opts.EnablePing {
@@ -329,46 +356,9 @@ func (h *BasicHost) updateLocalIpAddr() {
 	}
 }
 
-// New constructs and sets up a new *BasicHost with given Network and options.
-// The following options can be passed:
-// * NATPortMap
-// * AddrsFactory
-// * connmgr.ConnManager
-// * madns.Resolver
-//
-// This function is deprecated in favor of NewHost and HostOpts.
-func New(net network.Network, opts ...interface{}) *BasicHost {
-	hostopts := &HostOpts{}
-
-	for _, o := range opts {
-		switch o := o.(type) {
-		case Option:
-			switch o {
-			case NATPortMap:
-				hostopts.NATManager = NewNATManager
-			}
-		case AddrsFactory:
-			hostopts.AddrsFactory = o
-		case connmgr.ConnManager:
-			hostopts.ConnManager = o
-		case *madns.Resolver:
-			hostopts.MultiaddrResolver = o
-		}
-	}
-
-	h, err := NewHost(context.Background(), net, hostopts)
-	if err != nil {
-		// this cannot happen with legacy options
-		// plus we want to keep the (deprecated) legacy interface unchanged
-		panic(err)
-	}
-	h.Start()
-
-	return h
-}
-
 // Start starts background tasks in the host
 func (h *BasicHost) Start() {
+	h.psManager.Start()
 	h.refCount.Add(1)
 	go h.background()
 }
@@ -415,7 +405,12 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 		}
 	}
 
-	s.SetProtocol(protocol.ID(protoID))
+	if err := s.SetProtocol(protocol.ID(protoID)); err != nil {
+		log.Debugf("error setting stream protocol: %s", err)
+		s.Reset()
+		return
+	}
+
 	log.Debugf("protocol negotiation took %s", took)
 
 	go handle(protoID, s)
@@ -520,7 +515,11 @@ func (h *BasicHost) background() {
 	defer ticker.Stop()
 
 	for {
-		h.updateLocalIpAddr()
+		if len(h.network.ListenAddresses()) > 0 {
+			h.updateLocalIpAddr()
+		}
+		// Request addresses anyways because, technically, address filters still apply.
+		// The underlying AllAddrs call is effectivley a no-op.
 		curr := h.Addrs()
 		emitAddrChange(curr, lastAddrs)
 		lastAddrs = curr
@@ -555,7 +554,7 @@ func (h *BasicHost) Mux() protocol.Switch {
 }
 
 // IDService returns
-func (h *BasicHost) IDService() *identify.IDService {
+func (h *BasicHost) IDService() identify.IDService {
 	return h.ids
 }
 
@@ -619,6 +618,7 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 	select {
 	case <-h.ids.IdentifyWait(s.Conn()):
 	case <-ctx.Done():
+		_ = s.Reset()
 		return nil, ctx.Err()
 	}
 
@@ -654,7 +654,7 @@ func (h *BasicHost) NewStream(ctx context.Context, p peer.ID, pids ...protocol.I
 		}
 	case <-ctx.Done():
 		s.Reset()
-		// wait for the negotiation to cancel.
+		// wait for `SelectOneOf` to error out because of resetting the stream.
 		<-errCh
 		return nil, ctx.Err()
 	}
@@ -687,8 +687,11 @@ func (h *BasicHost) Connect(ctx context.Context, pi peer.AddrInfo) error {
 	// absorb addresses into peerstore
 	h.Peerstore().AddAddrs(pi.ID, pi.Addrs, peerstore.TempAddrTTL)
 
-	if h.Network().Connectedness(pi.ID) == network.Connected {
-		return nil
+	forceDirect, _ := network.GetForceDirectDial(ctx)
+	if !forceDirect {
+		if h.Network().Connectedness(pi.ID) == network.Connected {
+			return nil
+		}
 	}
 
 	resolved, err := h.resolveAddrs(ctx, h.Peerstore().PeerInfo(pi.ID))
@@ -813,6 +816,11 @@ func dedupAddrs(addrs []ma.Multiaddr) (uniqueAddrs []ma.Multiaddr) {
 // AllAddrs returns all the addresses of BasicHost at this moment in time.
 // It's ok to not include addresses if they're not available to be used now.
 func (h *BasicHost) AllAddrs() []ma.Multiaddr {
+	listenAddrs := h.Network().ListenAddresses()
+	if len(listenAddrs) == 0 {
+		return nil
+	}
+
 	h.addrMu.RLock()
 	filteredIfaceAddrs := h.filteredInterfaceAddrs
 	allIfaceAddrs := h.allInterfaceAddrs
@@ -821,9 +829,8 @@ func (h *BasicHost) AllAddrs() []ma.Multiaddr {
 
 	// Iterate over all _unresolved_ listen addresses, resolving our primary
 	// interface only to avoid advertising too many addresses.
-	listenAddrs := h.Network().ListenAddresses()
 	var finalAddrs []ma.Multiaddr
-	if resolved, err := addrutil.ResolveUnspecifiedAddresses(listenAddrs, filteredIfaceAddrs); err != nil {
+	if resolved, err := manet.ResolveUnspecifiedAddresses(listenAddrs, filteredIfaceAddrs); err != nil {
 		// This can happen if we're listening on no addrs, or listening
 		// on IPv6 addrs, but only have IPv4 interface addrs.
 		log.Debugw("failed to resolve listen addrs", "error", err)
@@ -949,14 +956,14 @@ func (h *BasicHost) AllAddrs() []ma.Multiaddr {
 
 			// Did the router give us a routable public addr?
 			if manet.IsPublicAddr(extMaddr) {
-				//well done
+				// well done
 				continue
 			}
 
 			// No.
 			// in case the router gives us a wrong address or we're behind a double-NAT.
 			// also add observed addresses
-			resolved, err := addrutil.ResolveUnspecifiedAddress(listen, allIfaceAddrs)
+			resolved, err := manet.ResolveUnspecifiedAddress(listen, allIfaceAddrs)
 			if err != nil {
 				// This can happen if we try to resolve /ip6/::/...
 				// without any IPv6 interface addresses.
@@ -1007,7 +1014,7 @@ func (h *BasicHost) SetAutoNat(a autonat.AutoNAT) {
 	}
 }
 
-// Return the host's AutoNAT service, if AutoNAT is enabled.
+// GetAutoNat returns the host's AutoNAT service, if AutoNAT is enabled.
 func (h *BasicHost) GetAutoNat() autonat.AutoNAT {
 	h.addrMu.Lock()
 	defer h.addrMu.Unlock()
@@ -1027,11 +1034,21 @@ func (h *BasicHost) Close() error {
 		if h.ids != nil {
 			h.ids.Close()
 		}
+		if h.autoNat != nil {
+			h.autoNat.Close()
+		}
+		if h.relayManager != nil {
+			h.relayManager.Close()
+		}
+		if h.hps != nil {
+			h.hps.Close()
+		}
 
 		_ = h.emitters.evtLocalProtocolsUpdated.Close()
 		_ = h.emitters.evtLocalAddrsUpdated.Close()
 		h.Network().Close()
 
+		h.psManager.Close()
 		if h.Peerstore() != nil {
 			h.Peerstore().Close()
 		}
