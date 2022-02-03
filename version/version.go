@@ -2,7 +2,8 @@ package version
 
 var (
 	// Version is the main version at the moment.
-	Version = "0.1.0"
+	// Embedded by --ldflags on build time
+	Version = "v0.1.0"
 )
 
 // Versioning should follow the SemVer guidelines
@@ -10,15 +11,10 @@ var (
 
 // GetVersion returns a string representation of the version
 func GetVersion() string {
-	version := "\n[POLYGON EDGE VERSION]\n"
-	version += Version
-
-	version += "\n"
-
-	return version
+	return Version
 }
 
 // returns jsonrpc representation of the version
 func GetVersionJsonrpc() string {
-	return "v" + Version
+	return Version
 }

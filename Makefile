@@ -16,6 +16,11 @@ protoc:
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
 
+.PHONY: build
+build:
+	$(eval LATEST_VERSION = $(shell git describe --tags --abbrev=0))
+	$(eval COMMIT_HASH = $(shell git rev-parse --short HEAD))
+	go build -ldflags="-X 'github.com/0xPolygon/polygon-edge/version.Version=$(LATEST_VERSION)+$(COMMIT_HASH)'" main.go
 
 .PHONY: lint
 lint:
