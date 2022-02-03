@@ -19,12 +19,10 @@ func runVersionCommand(cmd *cobra.Command, _ []string) {
 }
 
 func NewVersionCommand() *cobra.Command {
-	versionCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "version",
 		Short: "Returns the current Polygon Edge version",
 		Args:  cobra.NoArgs,
 		Run:   runVersionCommand,
 	}
-
-	return versionCmd
 }

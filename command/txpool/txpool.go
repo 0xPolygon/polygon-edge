@@ -1,26 +1,38 @@
 package txpool
 
-import "github.com/mitchellh/cli"
+import (
+	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/txpool/add"
+	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/spf13/cobra"
+)
 
-// TxPoolCommand is the top level ibft command
 type TxPoolCommand struct {
+	baseCmd *cobra.Command
 }
 
-// Help implements the cli.Command interface
-func (c *TxPoolCommand) Help() string {
-	return c.Synopsis()
+func NewTxPoolCommand() *cobra.Command {
+	txPoolCmd := &TxPoolCommand{
+		baseCmd: &cobra.Command{
+			Use:   "txpool",
+			Short: "Top level command for interacting with the transaction pool. Only accepts subcommands.",
+		},
+	}
+
+	// Register the base GRPC address flag
+	txPoolCmd.baseCmd.PersistentFlags().String(
+		helper.GRPCAddressFlag,
+		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
+		helper.GRPCAddressFlag,
+	)
+
+	txPoolCmd.registerSubcommands()
+
+	return txPoolCmd.baseCmd
 }
 
-func (c *TxPoolCommand) GetBaseCommand() string {
-	return "txpool"
-}
-
-// Synopsis implements the cli.Command interface
-func (c *TxPoolCommand) Synopsis() string {
-	return "Top level command for interacting with the transaction pool. Only accepts subcommands"
-}
-
-// Run implements the cli.Command interface
-func (c *TxPoolCommand) Run(args []string) int {
-	return cli.RunResultHelp
+func (t *TxPoolCommand) registerSubcommands() {
+	// txpool add
+	t.baseCmd.AddCommand(add.NewTxPoolAddCommand())
 }

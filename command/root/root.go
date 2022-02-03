@@ -13,27 +13,22 @@ type RootCommand struct {
 
 func NewRootCommand() *RootCommand {
 	rootCommand := &RootCommand{
-		baseCmd: initBaseCommand(),
+		baseCmd: &cobra.Command{
+			Short: "Polygon Edge is a framework for building Ethereum-compatible Blockchain networks",
+		},
 	}
 
 	// Register the --json output setting for all child commands
 	rootCommand.baseCmd.PersistentFlags().Bool(
 		helper.JSONOutputFlag,
 		false,
-		helper.JSONOutputFlag,
+		"Specifies if the output should be in JSON",
 	)
 
 	// Register all the commands
 	rootCommand.registerCommands()
 
 	return rootCommand
-}
-
-// initBaseCommand initializes basic command info
-func initBaseCommand() *cobra.Command {
-	return &cobra.Command{
-		Short: "Polygon Edge is a framework for building Ethereum-compatible Blockchain networks",
-	}
 }
 
 func (rc *RootCommand) Execute() {

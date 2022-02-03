@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -30,7 +32,11 @@ const (
 	DefaultMaxSlots       = 4096
 	GenesisGasUsed        = 458752  // 0x70000
 	GenesisGasLimit       = 5242880 // 0x500000
-	JSONOutputFlag        = "json"
+)
+
+const (
+	JSONOutputFlag  = "json"
+	GRPCAddressFlag = "grpc-address"
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -535,4 +541,14 @@ func FormatKV(in []string) string {
 	columnConf.Glue = " = "
 
 	return columnize.Format(in, columnConf)
+}
+
+// GetGRPCConnection returns a grpc client connection
+func GetGRPCConnection(address string) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to server: %w", err)
+	}
+
+	return conn, nil
 }
