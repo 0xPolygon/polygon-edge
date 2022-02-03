@@ -28,7 +28,7 @@ Please complete this section if any breaking changes have been made, otherwise d
 
 ### Manual tests
 
-Please complete this section if you ran custom tests for this functionality, otherwise delete it
+Please complete this section if you ran manual tests for this functionality, otherwise delete it
 
 # Documentation update
 
