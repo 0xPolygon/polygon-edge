@@ -4,22 +4,22 @@ import "github.com/umbracle/go-web3/abi"
 
 /* ABI events as defined by StateSender.sol */
 
-var NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
+var (
+	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
 	address indexed user,
 	address indexed sender,
-    address indexed receiver
-)`)
+    address indexed receiver)`)
 
-var RegistrationUpdatedEvent = abi.MustNewEvent(`event RegistrationUpdated(
+	RegistrationUpdatedEvent = abi.MustNewEvent(`event RegistrationUpdated(
 	address indexed user,
 	address indexed sender,
-	address indexed receiver
-)`)
+	address indexed receiver)`)
 
-var StateSyncedEvent = abi.MustNewEvent(`event StateSynced(
+	StateSyncedEvent = abi.MustNewEvent(`event StateSynced(
 	uint256 indexed id,
 	address indexed contractAddress,
-	bytes data
-)`)
+	bytes data)`)
 
-var PoCEvent = abi.MustNewEvent(``)
+	PoCEvent = abi.MustNewEvent(`event trackerEvent(
+	address indexed sender)`)
+)

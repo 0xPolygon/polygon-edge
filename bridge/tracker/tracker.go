@@ -3,7 +3,7 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"math/big"
 	"os"
 	"strconv"
@@ -21,72 +21,16 @@ import (
 const (
 
 	//	ropsten
-	//ethWS          = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
-	//ethHTTP        = "https://ropsten.infura.io/v3/58f8f6612b494cac85e2c8ab2ce11ed1"
+	//rootchainWS_URL          = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
+	//rootchainHTTP_URL        = "https://ropsten.infura.io/v3/58f8f6612b494cac85e2c8ab2ce11ed1"
 
 	//	edge
-	ethWS   = "ws://127.0.0.1:10002/ws"
-	ethHTTP = "http://127.0.0.1:10002"
+	rootchainWS_URL   = "ws://127.0.0.1:10002/ws"
+	rootchainHTTP_URL = "http://127.0.0.1:10002"
 
 	lastProcessedBlock = "last-processed-block"
 	stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
 )
-
-type ethSubscribeRequest struct {
-	JsonRPC string   `json:"jsonrpc"`
-	Method  string   `json:"method"`
-	Params  []string `json:"params"`
-	Id      int      `json:"id"`
-}
-
-type ethSubscribeResponse struct {
-	JsonRPC string `json:"jsonrpc"`
-	Method  string `json:"method"`
-	Params  struct {
-		Result       json.RawMessage `json:"result"`
-		Subscription string          `json:"subscription"`
-	} `json:"params"`
-}
-
-//	Ethereum header
-//type ethHeader struct {
-//	Difficulty   string        `json:"difficulty"`
-//	ExtraData    string        `json:"extraData"`
-//	GasLimit     string        `json:"gasLimit"`
-//	GasUsed      string        `json:"gasUsed"`
-//	LogsBloom    types.Bloom   `json:"logsBloom"`
-//	Miner        types.Address `json:"miner"`
-//	Nonce        string        `json:"nonce"`
-//	Number       string        `json:"number"`
-//	ParentHash   types.Hash    `json:"parentHash"`
-//	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-//	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-//	StateRoot    types.Hash    `json:"stateRoot"`
-//	Timestamp    string        `json:"timestamp"`
-//	TxRoot       types.Hash    `json:"transactionsRoot"`
-//	MixHash      types.Hash    `json:"mixHash"`
-//	Hash         types.Hash    `json:"hash"`
-//}
-
-//	Edge header
-type ethHeader struct {
-	Difficulty   uint64        `json:"difficulty"`
-	ExtraData    string        `json:"extraData"`
-	GasLimit     uint64        `json:"gasLimit"`
-	GasUsed      uint64        `json:"gasUsed"`
-	LogsBloom    types.Bloom   `json:"logsBloom"`
-	Miner        types.Address `json:"miner"`
-	Nonce        string        `json:"nonce"`
-	Number       uint64        `json:"number"`
-	ParentHash   types.Hash    `json:"parentHash"`
-	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
-	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
-	StateRoot    types.Hash    `json:"stateRoot"`
-	Timestamp    uint64        `json:"timestamp"`
-	TxRoot       types.Hash    `json:"transactionsRoot"`
-	MixHash      types.Hash    `json:"mixHash"`
-	Hash         types.Hash    `json:"hash"`
-}
 
 //	Tracker represents an event listener that notifies
 //	for each event emitted to the rootchain (ethereum - hardcoded).
@@ -112,7 +56,7 @@ type Tracker struct {
 	// rpc client (eth_getLogs)
 	rpcClient *rpc.Client
 
-	//	db (last processed block)
+	//	db for last processed block number
 	db *leveldb.DB
 }
 
@@ -214,15 +158,15 @@ func (t *Tracker) Stop() error {
 	return nil
 }
 
-//	connect connects the tracker to http and ws endpoints.
+//	connect connects the tracker to rootchain's http and ws endpoints.
 func (t *Tracker) connect() error {
 	// create ws connection
 	conn, _, err := websocket.DefaultDialer.Dial(
-		ethWS,
+		rootchainWS_URL,
 		nil)
 	if err != nil {
 		t.logger.Error(
-			"cannot connect to websocket",
+			"ws: cannot connect",
 			"err", err)
 
 		return err
@@ -232,9 +176,9 @@ func (t *Tracker) connect() error {
 	t.logger.Debug("connected to ws endpoint")
 
 	//	create http connection
-	rpcClient, err := rpc.NewClient(ethHTTP)
+	rpcClient, err := rpc.NewClient(rootchainHTTP_URL)
 	if err != nil {
-		t.logger.Error("cannot connect to http")
+		t.logger.Error("http: cannot connect")
 		return err
 	}
 
@@ -302,12 +246,16 @@ func (t *Tracker) startHeaderProcess(ctx context.Context) {
 		case header := <-t.headerCh:
 			t.processHeader(header)
 		case <-ctx.Done():
-			t.logger.Debug("stopping header processing")
+			t.logger.Debug("stopping header process")
 			return
 		}
 	}
 }
 
+//	processHeader determines the range of block to query
+//	based on the blockNumber of the header and issues
+//	eth_getLogs call. If an event of interest was emitted,
+//	it is sent to eventCh.
 func (t *Tracker) processHeader(header *ethHeader) {
 	t.logger.Info("processing header", "num", header.Number)
 
@@ -317,14 +265,19 @@ func (t *Tracker) processHeader(header *ethHeader) {
 	//	fetch logs
 	logs := t.queryEvents(fromBlock, toBlock)
 
+	//	notify each matched log event
 	t.matchAndDispatch(logs)
-
 }
 
 func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
 	if len(logs) == 0 {
 		return
 	}
+
+	//	TODO: refactor once PoC is reached
+	//	Events will be matched by server,
+	//	when they are included as topics
+	//	in queryFilter()
 
 	//	match each log with defined abi events
 	for _, log := range logs {
@@ -375,18 +328,6 @@ func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
 
 			continue
 		}
-
-		if TransferEvent.Match(log) {
-			t.logger.Info("TransferEvent")
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
 	}
 }
 
@@ -402,7 +343,10 @@ func (t *Tracker) notify(log *web3.Log) error {
 	}
 
 	// notify
-	t.eventCh <- bLog
+	select {
+	case t.eventCh <- bLog:
+	default:
+	}
 
 	return nil
 }
@@ -410,7 +354,7 @@ func (t *Tracker) notify(log *web3.Log) error {
 func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
-	//latestHeight, err := types.ParseUint256orHex(&header.Number)	TODO
+	//latestHeight, err := types.ParseUint256orHex(&header.Number)	TODO (ethHeader)
 
 	confirmationBlocks := big.NewInt(0).SetUint64(t.confirmations)
 	if latestHeight.Cmp(confirmationBlocks) < 0 {
@@ -434,17 +378,21 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 		// 	lastBlock not available
 		fromBlock = toBlock
 	} else {
-		//	increment
+		//	increment last block number
 		fromBlock = lastBlock.Add(
 			lastBlock,
 			big.NewInt(1))
+	}
+
+	if toBlock.Cmp(fromBlock) < 0 {
+		fromBlock = toBlock
 	}
 
 	return fromBlock.Uint64(), lastBlock.Uint64()
 }
 
 //	loadLastBlock returns the block number of the last
-// 	block processed (if available).
+// 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() (*big.Int, bool) {
 	//	check if db has last block
 	if exists, _ := t.db.Has(
@@ -484,13 +432,16 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 		Address: []web3.Address{
 			web3.HexToAddress(stateSenderAddress),
 		},
-		Topics: nil,
 	}
 
 	queryFilter.SetFromUint64(fromBlock)
 	queryFilter.SetToUint64(toBlock)
 
-	fmt.Printf("eth_getLogs (from -> to): %d %d\n", fromBlock, toBlock)
+	t.logger.Debug("eth_getLogs",
+		"from", fromBlock,
+		"to", toBlock,
+	)
+
 	logs, err := t.rpcClient.Eth().GetLogs(queryFilter)
 	if err != nil {
 		//	eth_getLogs err
@@ -513,7 +464,7 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 }
 
 func (t *Tracker) subscribeNewHeads() error {
-	// send subscription request
+	// 	prepare subscribe request
 	request := ethSubscribeRequest{
 		JsonRPC: "2.0",
 		Method:  "eth_subscribe",
@@ -521,42 +472,87 @@ func (t *Tracker) subscribeNewHeads() error {
 		Id:      1,
 	}
 
-	// 	prepare subscribe request
 	bytes, err := json.Marshal(request)
 	if err != nil {
-		//	ErrMarshalJSON
-		return err
+		return errors.New("failed to marshal subscribe request")
 	}
 
-	// send req
+	// subscribe
 	if err := t.wsConn.WriteMessage(
 		websocket.TextMessage,
 		bytes,
 	); err != nil {
-		//	ErrWriteWS
-		return err
+		return errors.New("failed to write ws message")
 	}
-	println("send subscribe request")
 
-	// verify ok
+	// receive subscription response
 	var res jsonrpc.SuccessResponse
 	_, msg, err := t.wsConn.ReadMessage()
 	if err != nil {
-		//	ErrReadWS
-		println("cannot read msg")
-
-		return err
+		return errors.New("failed to read ws message")
 	}
-
-	println(string(msg))
 
 	if err := json.Unmarshal(msg, &res); err != nil {
-		//	ErrUnmarshalJSON
-		println("Unable to unmarshal WS response: %v", err)
-
-		return err
+		return errors.New("failed to unmarshal response")
 	}
 
-	// all good, ws is listening...
 	return nil
+}
+
+/* Structures used for message parsing (json) */
+
+type ethSubscribeRequest struct {
+	JsonRPC string   `json:"jsonrpc"`
+	Method  string   `json:"method"`
+	Params  []string `json:"params"`
+	Id      int      `json:"id"`
+}
+
+type ethSubscribeResponse struct {
+	JsonRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  struct {
+		Result       json.RawMessage `json:"result"`
+		Subscription string          `json:"subscription"`
+	} `json:"params"`
+}
+
+//	Ethereum header
+//type ethHeader struct {
+//	Difficulty   string        `json:"difficulty"`
+//	ExtraData    string        `json:"extraData"`
+//	GasLimit     string        `json:"gasLimit"`
+//	GasUsed      string        `json:"gasUsed"`
+//	LogsBloom    types.Bloom   `json:"logsBloom"`
+//	Miner        types.Address `json:"miner"`
+//	Nonce        string        `json:"nonce"`
+//	Number       string        `json:"number"`
+//	ParentHash   types.Hash    `json:"parentHash"`
+//	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
+//	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
+//	StateRoot    types.Hash    `json:"stateRoot"`
+//	Timestamp    string        `json:"timestamp"`
+//	TxRoot       types.Hash    `json:"transactionsRoot"`
+//	MixHash      types.Hash    `json:"mixHash"`
+//	Hash         types.Hash    `json:"hash"`
+//}
+
+//	Polygon-Edge header
+type ethHeader struct {
+	Difficulty   uint64        `json:"difficulty"`
+	ExtraData    string        `json:"extraData"`
+	GasLimit     uint64        `json:"gasLimit"`
+	GasUsed      uint64        `json:"gasUsed"`
+	LogsBloom    types.Bloom   `json:"logsBloom"`
+	Miner        types.Address `json:"miner"`
+	Nonce        string        `json:"nonce"`
+	Number       uint64        `json:"number"`
+	ParentHash   types.Hash    `json:"parentHash"`
+	ReceiptsRoot types.Hash    `json:"receiptsRoot"`
+	Sha3Uncles   types.Hash    `json:"sha3Uncles"`
+	StateRoot    types.Hash    `json:"stateRoot"`
+	Timestamp    uint64        `json:"timestamp"`
+	TxRoot       types.Hash    `json:"transactionsRoot"`
+	MixHash      types.Hash    `json:"mixHash"`
+	Hash         types.Hash    `json:"hash"`
 }
