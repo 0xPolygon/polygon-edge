@@ -49,7 +49,7 @@ func (c *VersionCommand) Run(args []string) int {
 	}
 
 	c.Formatter.OutputResult(&VersionResult{
-		Version: version.GetVersion(),
+		Version: version.Version,
 	})
 
 	return 0
@@ -66,5 +66,8 @@ func (r *VersionResult) Output() string {
 	buffer.WriteString(r.Version)
 	buffer.WriteString("\n")
 
+	buffer.WriteString("\n[LICENSE]\n\n")
+	buffer.WriteString(version.License)
+	buffer.WriteString("\n")
 	return buffer.String()
 }

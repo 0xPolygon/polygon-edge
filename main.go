@@ -1,12 +1,23 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/util"
+	"github.com/0xPolygon/polygon-edge/version"
 	"github.com/mitchellh/cli"
 )
+
+var (
+	//go:embed LICENSE
+	license string
+)
+
+func init() {
+	version.SetLicense(license)
+}
 
 func main() {
 	os.Exit(Run(os.Args[1:]))

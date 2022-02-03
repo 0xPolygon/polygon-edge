@@ -1,6 +1,6 @@
 module github.com/0xPolygon/polygon-edge
 
-go 1.14
+go 1.16
 
 require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
