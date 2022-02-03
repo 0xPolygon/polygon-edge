@@ -21,15 +21,16 @@ import (
 const (
 
 	//	ropsten
-	//rootchainWS_URL          = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
-	//rootchainHTTP_URL        = "https://ropsten.infura.io/v3/58f8f6612b494cac85e2c8ab2ce11ed1"
+	//rootchainWS          = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
+	//rootchainHTTP        = "https://ropsten.infura.io/v3/58f8f6612b494cac85e2c8ab2ce11ed1"
 
 	//	edge
-	rootchainWS_URL   = "ws://127.0.0.1:10002/ws"
-	rootchainHTTP_URL = "http://127.0.0.1:10002"
+	rootchainWS   = "ws://127.0.0.1:10002/ws"
+	rootchainHTTP = "http://127.0.0.1:10002"
 
 	lastProcessedBlock = "last-processed-block"
 	stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
+	//	pocAddress = "1A2dB8920ed2d8E4D14b3091DA0c4febEbdd7BCc"
 )
 
 //	Tracker represents an event listener that notifies
@@ -139,9 +140,9 @@ func (t *Tracker) Start() error {
 }
 
 //	getEventChannel returns the tracker's event channel.
-func (t *Tracker) getEventChannel() <-chan []byte {
-	return t.eventCh
-}
+//func (t *Tracker) getEventChannel() <-chan []byte {
+//	return t.eventCh
+//}
 
 func (t *Tracker) Stop() error {
 	//	stop subscription
@@ -162,7 +163,7 @@ func (t *Tracker) Stop() error {
 func (t *Tracker) connect() error {
 	// create ws connection
 	conn, _, err := websocket.DefaultDialer.Dial(
-		rootchainWS_URL,
+		rootchainWS,
 		nil)
 	if err != nil {
 		t.logger.Error(
@@ -176,9 +177,10 @@ func (t *Tracker) connect() error {
 	t.logger.Debug("connected to ws endpoint")
 
 	//	create http connection
-	rpcClient, err := rpc.NewClient(rootchainHTTP_URL)
+	rpcClient, err := rpc.NewClient(rootchainHTTP)
 	if err != nil {
 		t.logger.Error("http: cannot connect")
+
 		return err
 	}
 
@@ -210,11 +212,10 @@ func (t *Tracker) startSubscription(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			t.logger.Debug("stopping subscription")
-			return
 
 		default:
-			//	read the subscription message
 			res := ethSubscribeResponse{}
+			//	read the subscription message
 			if err := t.wsConn.ReadJSON(&res); err != nil {
 				t.logger.Error(
 					"cannot read message from ws",
@@ -247,6 +248,7 @@ func (t *Tracker) startHeaderProcess(ctx context.Context) {
 			t.processHeader(header)
 		case <-ctx.Done():
 			t.logger.Debug("stopping header process")
+
 			return
 		}
 	}
@@ -424,7 +426,6 @@ func (t *Tracker) loadLastBlock() (*big.Int, bool) {
 	}
 
 	return lastBlock, true
-
 }
 
 func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
@@ -444,8 +445,9 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 
 	logs, err := t.rpcClient.Eth().GetLogs(queryFilter)
 	if err != nil {
-		//	eth_getLogs err
 		println("eth_getLogs failed", err.Error())
+		t.logger.Error("eth_getLogs failed", "err", err)
+
 		return nil
 	}
 
@@ -466,10 +468,10 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 func (t *Tracker) subscribeNewHeads() error {
 	// 	prepare subscribe request
 	request := ethSubscribeRequest{
-		JsonRPC: "2.0",
+		JSONRPC: "2.0",
 		Method:  "eth_subscribe",
 		Params:  []string{"newHeads"},
-		Id:      1,
+		ID:      1,
 	}
 
 	bytes, err := json.Marshal(request)
@@ -487,6 +489,7 @@ func (t *Tracker) subscribeNewHeads() error {
 
 	// receive subscription response
 	var res jsonrpc.SuccessResponse
+
 	_, msg, err := t.wsConn.ReadMessage()
 	if err != nil {
 		return errors.New("failed to read ws message")
@@ -502,14 +505,14 @@ func (t *Tracker) subscribeNewHeads() error {
 /* Structures used for message parsing (json) */
 
 type ethSubscribeRequest struct {
-	JsonRPC string   `json:"jsonrpc"`
+	JSONRPC string   `json:"jsonrpc"`
 	Method  string   `json:"method"`
 	Params  []string `json:"params"`
-	Id      int      `json:"id"`
+	ID      int      `json:"id"`
 }
 
 type ethSubscribeResponse struct {
-	JsonRPC string `json:"jsonrpc"`
+	JSONRPC string `json:"jsonrpc"`
 	Method  string `json:"method"`
 	Params  struct {
 		Result       json.RawMessage `json:"result"`
