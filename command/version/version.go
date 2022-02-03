@@ -2,6 +2,7 @@ package version
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/version"
@@ -69,5 +70,20 @@ func (r *VersionResult) Output() string {
 	buffer.WriteString("\n[LICENSE]\n\n")
 	buffer.WriteString(version.License)
 	buffer.WriteString("\n")
+
+	buffer.WriteString("\n[DEPENDENCY LICENSES]\n\n")
+
+	for _, l := range version.BsdLicenses {
+		buffer.WriteString(fmt.Sprintf(
+			"   This product bundles %s %s,\n"+
+				"   which is available under a \"%s\" license.\n"+
+				"   For details, see %s.\n\n",
+			l.Name,
+			l.Version,
+			l.Type,
+			l.Path,
+		))
+	}
+
 	return buffer.String()
 }
