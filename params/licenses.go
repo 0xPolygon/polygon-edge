@@ -1,4 +1,4 @@
-package version
+package params
 
 import (
 	_ "embed"
@@ -16,14 +16,10 @@ type DepLicense struct {
 }
 
 var (
-	// Version is the main version at the moment.
-	// Embedded by --ldflags on build time
-	// Versioning should follow the SemVer guidelines
-	// https://semver.org/
-	Version string
-
+	// Polygon Edge License
 	License string
 
+	// Dependency Licenses
 	//go:embed bsd_licenses.json
 	bsdLicensesJSON string
 	BsdLicenses     []DepLicense

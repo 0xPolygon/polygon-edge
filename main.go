@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/util"
-	"github.com/0xPolygon/polygon-edge/version"
+	"github.com/0xPolygon/polygon-edge/params"
 	"github.com/mitchellh/cli"
 )
 
@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	version.SetLicense(license)
+	params.SetLicense(license)
 }
 
 func main() {

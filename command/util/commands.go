@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
+	"github.com/0xPolygon/polygon-edge/command/license"
 	"github.com/0xPolygon/polygon-edge/command/loadbot"
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
@@ -39,6 +40,7 @@ func Commands() map[string]cli.CommandFactory {
 	monitorCmd := monitor.MonitorCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	statusCmd := status.StatusCommand{Base: base, Formatter: formatter, GRPC: grpc}
 	versionCmd := version.VersionCommand{Base: base, Formatter: formatter}
+	licenseCmd := license.LicenseCommand{Base: base}
 	backupCmd := backup.BackupCommand{Base: base, Formatter: formatter, GRPC: grpc}
 
 	ibftCmd := ibft.IbftCommand{}
@@ -135,6 +137,9 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		versionCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &versionCmd, nil
+		},
+		licenseCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &licenseCmd, nil
 		},
 		backupCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &backupCmd, nil
