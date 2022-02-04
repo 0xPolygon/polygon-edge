@@ -27,6 +27,8 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
+	params.initEventMap()
+
 	cmd.Flags().BoolVar(
 		params.eventSubscriptionMap[txpoolProto.EventType_ADDED],
 		"added",

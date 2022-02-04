@@ -3,14 +3,23 @@ package subscribe
 import "github.com/0xPolygon/polygon-edge/txpool/proto"
 
 var (
-	params = &subscribeParams{
-		eventSubscriptionMap: make(map[proto.EventType]*bool),
-	}
+	params = &subscribeParams{}
 )
 
 type subscribeParams struct {
 	eventSubscriptionMap map[proto.EventType]*bool
 	supportedEvents      []proto.EventType
+}
+
+func (sp *subscribeParams) initEventMap() {
+	falseRaw := false
+	sp.eventSubscriptionMap = map[proto.EventType]*bool{
+		proto.EventType_ADDED:    &falseRaw,
+		proto.EventType_ENQUEUED: &falseRaw,
+		proto.EventType_PROMOTED: &falseRaw,
+		proto.EventType_DROPPED:  &falseRaw,
+		proto.EventType_DEMOTED:  &falseRaw,
+	}
 }
 
 func (sp *subscribeParams) init() {

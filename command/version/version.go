@@ -6,23 +6,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func runVersionCommand(cmd *cobra.Command, _ []string) {
-	output := output.InitializeOutputter(cmd)
+func GetCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Returns the current Polygon Edge version",
+		Args:  cobra.NoArgs,
+		Run:   runCommand,
+	}
+}
 
-	output.SetCommandResult(
+func runCommand(cmd *cobra.Command, _ []string) {
+	outputter := output.InitializeOutputter(cmd)
+
+	outputter.SetCommandResult(
 		&VersionResult{
 			Version: version.GetVersion(),
 		},
 	)
 
-	output.WriteOutput()
-}
-
-func NewVersionCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "version",
-		Short: "Returns the current Polygon Edge version",
-		Args:  cobra.NoArgs,
-		Run:   runVersionCommand,
-	}
+	outputter.WriteOutput()
 }

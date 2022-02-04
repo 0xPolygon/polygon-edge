@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -556,6 +557,19 @@ func GetTxPoolClientConnection(address string) (
 	}
 
 	return txpoolOp.NewTxnPoolOperatorClient(conn), nil
+}
+
+// GetSystemClientConnection returns the System operator client connection
+func GetSystemClientConnection(address string) (
+	proto.SystemClient,
+	error,
+) {
+	conn, err := getGRPCConnection(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return proto.NewSystemClient(conn), nil
 }
 
 // getGRPCConnection returns a grpc client connection

@@ -10,37 +10,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type TxPoolCommand struct {
-	baseCmd *cobra.Command
-}
-
-func NewTxPoolCommand() *cobra.Command {
-	txPoolCmd := &TxPoolCommand{
-		baseCmd: &cobra.Command{
-			Use:   "txpool",
-			Short: "Top level command for interacting with the transaction pool. Only accepts subcommands.",
-		},
+func GetCommand() *cobra.Command {
+	txPoolCmd := &cobra.Command{
+		Use:   "txpool",
+		Short: "Top level command for interacting with the transaction pool. Only accepts subcommands.",
 	}
 
 	// Register the base GRPC address flag
-	txPoolCmd.baseCmd.PersistentFlags().String(
+	txPoolCmd.PersistentFlags().String(
 		helper.GRPCAddressFlag,
 		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
 		helper.GRPCAddressFlag,
 	)
 
-	txPoolCmd.registerSubcommands()
+	registerSubcommands(txPoolCmd)
 
-	return txPoolCmd.baseCmd
+	return txPoolCmd
 }
 
-func (t *TxPoolCommand) registerSubcommands() {
+func registerSubcommands(baseCmd *cobra.Command) {
 	// txpool add
-	t.baseCmd.AddCommand(add.GetCommand())
+	baseCmd.AddCommand(add.GetCommand())
 
 	// txpool status
-	t.baseCmd.AddCommand(status.GetCommand())
+	baseCmd.AddCommand(status.GetCommand())
 
 	// txpool subscribe
-	t.baseCmd.AddCommand(subscribe.GetCommand())
+	baseCmd.AddCommand(subscribe.GetCommand())
 }
