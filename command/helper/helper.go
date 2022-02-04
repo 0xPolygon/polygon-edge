@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"io/ioutil"
@@ -543,12 +545,30 @@ func FormatKV(in []string) string {
 	return columnize.Format(in, columnConf)
 }
 
-// GetGRPCConnection returns a grpc client connection
-func GetGRPCConnection(address string) (*grpc.ClientConn, error) {
+// GetTxPoolClientConnection returns the TxPool operator client connection
+func GetTxPoolClientConnection(address string) (
+	txpoolOp.TxnPoolOperatorClient,
+	error,
+) {
+	conn, err := getGRPCConnection(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return txpoolOp.NewTxnPoolOperatorClient(conn), nil
+}
+
+// getGRPCConnection returns a grpc client connection
+func getGRPCConnection(address string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to server: %w", err)
 	}
 
 	return conn, nil
+}
+
+// GetGRPCAddress extracts the set GRPC address
+func GetGRPCAddress(cmd *cobra.Command) string {
+	return cmd.Flag(GRPCAddressFlag).Value.String()
 }

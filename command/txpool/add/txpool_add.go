@@ -20,11 +20,11 @@ var (
 	nonce    uint64
 )
 
-func NewTxPoolAddCommand() *cobra.Command {
+func GetCommand() *cobra.Command {
 	txPoolAddCmd := &cobra.Command{
 		Use:   "add",
 		Short: "Adds a transaction to the transaction pool",
-		Run:   runTxPoolAddCommand,
+		Run:   runCommand,
 	}
 
 	setFlags(txPoolAddCmd)
@@ -48,21 +48,7 @@ func setRequiredFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired("value")
 }
 
-func getGRPCClientConnection(address string) (
-	clt txpoolOp.TxnPoolOperatorClient,
-	err error,
-) {
-	conn, err := helper.GetGRPCConnection(address)
-	if err != nil {
-		return
-	}
-
-	clt = txpoolOp.NewTxnPoolOperatorClient(conn)
-
-	return
-}
-
-func runTxPoolAddCommand(cmd *cobra.Command, _ []string) {
+func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := output.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
@@ -79,7 +65,7 @@ func runTxPoolAddCommand(cmd *cobra.Command, _ []string) {
 
 	resp, err := addTransaction(
 		addParams.constructAddRequest(),
-		cmd.Flag(helper.GRPCAddressFlag).Value.String(),
+		helper.GetGRPCAddress(cmd),
 	)
 	if err != nil {
 		outputter.SetError(err)
@@ -101,7 +87,7 @@ func addTransaction(
 	txnRequest *txpoolOp.AddTxnReq,
 	grpcAddress string,
 ) (*txpoolOp.AddTxnResp, error) {
-	client, err := getGRPCClientConnection(
+	client, err := helper.GetTxPoolClientConnection(
 		grpcAddress,
 	)
 	if err != nil {

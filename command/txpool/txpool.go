@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/txpool/add"
+	"github.com/0xPolygon/polygon-edge/command/txpool/status"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/spf13/cobra"
 )
@@ -34,5 +35,8 @@ func NewTxPoolCommand() *cobra.Command {
 
 func (t *TxPoolCommand) registerSubcommands() {
 	// txpool add
-	t.baseCmd.AddCommand(add.NewTxPoolAddCommand())
+	t.baseCmd.AddCommand(add.GetCommand())
+
+	// txpool status
+	t.baseCmd.AddCommand(status.GetCommand())
 }
