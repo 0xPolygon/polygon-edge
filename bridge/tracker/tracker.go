@@ -31,7 +31,8 @@ const (
 	lastProcessedBlock = "last-processed-block"
 	//stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
 	//stateSenderAddress = "1A2dB8920ed2d8E4D14b3091DA0c4febEbdd7BCc"
-	stateSenderAddress = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
+	PoCSC          = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
+	AnotherEventSC = "69ceed5Ff0FA5106F4Df7299C8812377394A9388"
 )
 
 //	Tracker represents an event listener that notifies
@@ -332,6 +333,18 @@ func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
 
 			continue
 		}
+
+		if AnotherEvent.Match(log) {
+			t.logger.Info("AnotherEvent", "contract address", log.Address.String())
+
+			if err := t.notify(log); err != nil {
+				t.logger.Error(
+					"cannot marshal log",
+					"err", err)
+			}
+
+			continue
+		}
 	}
 }
 
@@ -412,7 +425,8 @@ func (t *Tracker) loadLastBlock() (*big.Int, bool) {
 func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	queryFilter := &web3.LogFilter{
 		Address: []web3.Address{
-			web3.HexToAddress(stateSenderAddress),
+			web3.HexToAddress(PoCSC),
+			web3.HexToAddress(AnotherEventSC),
 		},
 	}
 

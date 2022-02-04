@@ -22,4 +22,7 @@ var (
 
 	PoCEvent = abi.MustNewEvent(`event MyEvent(
         address indexed sender)`)
+
+	AnotherEvent = abi.MustNewEvent(`event AnotherEvent(
+        address indexed sender)`)
 )
