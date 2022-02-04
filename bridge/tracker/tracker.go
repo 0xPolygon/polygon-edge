@@ -29,8 +29,9 @@ const (
 	rootchainHTTP = "http://127.0.0.1:10002"
 
 	lastProcessedBlock = "last-processed-block"
-	stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
-	//	pocAddress = "1A2dB8920ed2d8E4D14b3091DA0c4febEbdd7BCc"
+	//stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
+	//stateSenderAddress = "1A2dB8920ed2d8E4D14b3091DA0c4febEbdd7BCc"
+	stateSenderAddress = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
 )
 
 //	Tracker represents an event listener that notifies
@@ -273,6 +274,7 @@ func (t *Tracker) processHeader(header *ethHeader) {
 
 func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
 	if len(logs) == 0 {
+		t.logger.Debug("no events")
 		return
 	}
 
@@ -333,26 +335,6 @@ func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
 	}
 }
 
-//	notify sends the given log to the event channel.
-func (t *Tracker) notify(log *web3.Log) error {
-	bLog, err := json.Marshal(log)
-	if err != nil {
-		t.logger.Error(
-			"cannot marshal log",
-			"err", err)
-
-		return err
-	}
-
-	// notify
-	select {
-	case t.eventCh <- bLog:
-	default:
-	}
-
-	return nil
-}
-
 func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
@@ -390,7 +372,7 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 		fromBlock = toBlock
 	}
 
-	return fromBlock.Uint64(), lastBlock.Uint64()
+	return fromBlock.Uint64(), toBlock.Uint64()
 }
 
 //	loadLastBlock returns the block number of the last
@@ -409,7 +391,6 @@ func (t *Tracker) loadLastBlock() (*big.Int, bool) {
 		[]byte(lastProcessedBlock),
 		nil)
 	if err != nil {
-		//	log (cannot get db)
 		t.logger.Error(
 			"cannot read db",
 			"err", err)
@@ -463,6 +444,26 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	}
 
 	return logs
+}
+
+//	notify sends the given log to the event channel.
+func (t *Tracker) notify(log *web3.Log) error {
+	bLog, err := json.Marshal(log)
+	if err != nil {
+		t.logger.Error(
+			"cannot marshal log",
+			"err", err)
+
+		return err
+	}
+
+	// notify
+	select {
+	case t.eventCh <- bLog:
+	default:
+	}
+
+	return nil
 }
 
 func (t *Tracker) subscribeNewHeads() error {

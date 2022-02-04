@@ -20,6 +20,6 @@ var (
 	address indexed contractAddress,
 	bytes data)`)
 
-	PoCEvent = abi.MustNewEvent(`event trackerEvent(
-	address indexed sender)`)
+	PoCEvent = abi.MustNewEvent(`event MyEvent(
+        address indexed sender)`)
 )
