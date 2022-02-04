@@ -10,16 +10,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Define local flag values
-var (
-	from     string
-	to       string
-	value    string
-	gasPrice string
-	gasLimit uint64
-	nonce    uint64
-)
-
 func GetCommand() *cobra.Command {
 	txPoolAddCmd := &cobra.Command{
 		Use:   "add",

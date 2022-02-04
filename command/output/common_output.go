@@ -1,11 +1,6 @@
 package output
 
-import (
-	"github.com/spf13/cobra"
-)
-
 type commonOutputFormatter struct {
-	baseCmd       *cobra.Command
 	errorOutput   error
 	commandOutput CommandResult
 }

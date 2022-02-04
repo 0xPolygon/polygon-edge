@@ -8,6 +8,16 @@ import (
 	"math/big"
 )
 
+// Define local flag values
+var (
+	from     string
+	to       string
+	value    string
+	gasPrice string
+	gasLimit uint64
+	nonce    uint64
+)
+
 type addParams struct {
 	from     types.Address
 	to       types.Address
