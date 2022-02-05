@@ -1,12 +1,10 @@
 package txpool
 
 import (
-	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/txpool/add"
 	"github.com/0xPolygon/polygon-edge/command/txpool/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool/subscribe"
-	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/spf13/cobra"
 )
 
@@ -16,12 +14,7 @@ func GetCommand() *cobra.Command {
 		Short: "Top level command for interacting with the transaction pool. Only accepts subcommands.",
 	}
 
-	// Register the base GRPC address flag
-	txPoolCmd.PersistentFlags().String(
-		helper.GRPCAddressFlag,
-		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
-		helper.GRPCAddressFlag,
-	)
+	helper.RegisterGRPCAddressFlag(txPoolCmd)
 
 	registerSubcommands(txPoolCmd)
 

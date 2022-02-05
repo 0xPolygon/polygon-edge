@@ -3,6 +3,10 @@ package root
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/status"
+	"github.com/0xPolygon/polygon-edge/command/txpool"
+	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -18,17 +22,19 @@ func NewRootCommand() *RootCommand {
 		},
 	}
 
-	// Register the --json output setting for all child commands
-	rootCommand.baseCmd.PersistentFlags().Bool(
-		helper.JSONOutputFlag,
-		false,
-		"Specifies if the output should be in JSON",
-	)
+	helper.RegisterJSONOutputFlag(rootCommand.baseCmd)
 
 	// Register all the commands
-	rootCommand.registerCommands()
+	rootCommand.registerSubCommands()
 
 	return rootCommand
+}
+
+func (rc *RootCommand) registerSubCommands() {
+	rc.baseCmd.AddCommand(version.GetCommand())
+	rc.baseCmd.AddCommand(txpool.GetCommand())
+	rc.baseCmd.AddCommand(status.GetCommand())
+	rc.baseCmd.AddCommand(secrets.GetCommand())
 }
 
 func (rc *RootCommand) Execute() {

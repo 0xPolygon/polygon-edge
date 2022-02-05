@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/spf13/cobra"
@@ -585,4 +586,22 @@ func getGRPCConnection(address string) (*grpc.ClientConn, error) {
 // GetGRPCAddress extracts the set GRPC address
 func GetGRPCAddress(cmd *cobra.Command) string {
 	return cmd.Flag(GRPCAddressFlag).Value.String()
+}
+
+// RegisterJSONOutputFlag registers the --json output setting for all child commands
+func RegisterJSONOutputFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().Bool(
+		JSONOutputFlag,
+		false,
+		"Specifies if the output should be in JSON",
+	)
+}
+
+// RegisterGRPCAddressFlag registers the base GRPC address flag for all child commands
+func RegisterGRPCAddressFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().String(
+		GRPCAddressFlag,
+		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
+		GRPCAddressFlag,
+	)
 }

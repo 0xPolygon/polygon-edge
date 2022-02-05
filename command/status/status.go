@@ -2,9 +2,7 @@ package status
 
 import (
 	"context"
-	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/output"
-	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/cobra"
 
@@ -20,12 +18,7 @@ func GetCommand() *cobra.Command {
 		Run:   runCommand,
 	}
 
-	// Register the base GRPC address flag
-	statusCmd.PersistentFlags().String(
-		helper.GRPCAddressFlag,
-		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
-		helper.GRPCAddressFlag,
-	)
+	helper.RegisterGRPCAddressFlag(statusCmd)
 
 	return statusCmd
 }
