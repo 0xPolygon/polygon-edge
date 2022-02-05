@@ -1,26 +1,32 @@
 package secrets
 
-import "github.com/mitchellh/cli"
+import (
+	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/secrets/init"
+	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/spf13/cobra"
+)
 
-// SecretsCommand is the top level secret manager command
-type SecretsCommand struct {
+func GetCommand() *cobra.Command {
+	secretsCmd := &cobra.Command{
+		Use:   "secrets",
+		Short: "Top level SecretsManager command for interacting with secrets functionality. Only accepts subcommands.",
+	}
+
+	// Register the base GRPC address flag
+	secretsCmd.PersistentFlags().String(
+		helper.GRPCAddressFlag,
+		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
+		helper.GRPCAddressFlag,
+	)
+
+	registerSubcommands(secretsCmd)
+
+	return secretsCmd
 }
 
-// Help implements the cli.Command interface
-func (c *SecretsCommand) Help() string {
-	return c.Synopsis()
-}
-
-func (c *SecretsCommand) GetBaseCommand() string {
-	return "secrets"
-}
-
-// Synopsis implements the cli.Command interface
-func (c *SecretsCommand) Synopsis() string {
-	return "Top level SecretsManager command for interacting with secrets functionality. Only accepts subcommands"
-}
-
-// Run implements the cli.Command interface
-func (c *SecretsCommand) Run(args []string) int {
-	return cli.RunResultHelp
+func registerSubcommands(baseCmd *cobra.Command) {
+	// secrets init
+	baseCmd.AddCommand(init.GetCommand())
 }
