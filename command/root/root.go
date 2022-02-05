@@ -3,6 +3,7 @@ package root
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/peers"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
@@ -35,6 +36,7 @@ func (rc *RootCommand) registerSubCommands() {
 	rc.baseCmd.AddCommand(txpool.GetCommand())
 	rc.baseCmd.AddCommand(status.GetCommand())
 	rc.baseCmd.AddCommand(secrets.GetCommand())
+	rc.baseCmd.AddCommand(peers.GetCommand())
 }
 
 func (rc *RootCommand) Execute() {
