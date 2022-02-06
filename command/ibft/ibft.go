@@ -2,6 +2,8 @@ package ibft
 
 import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/ibft/propose"
+	"github.com/0xPolygon/polygon-edge/command/ibft/snapshot"
 	"github.com/0xPolygon/polygon-edge/command/ibft/status"
 	"github.com/spf13/cobra"
 )
@@ -22,4 +24,10 @@ func GetCommand() *cobra.Command {
 func registerSubcommands(baseCmd *cobra.Command) {
 	// ibft status
 	baseCmd.AddCommand(status.GetCommand())
+
+	// ibft snapshot
+	baseCmd.AddCommand(snapshot.GetCommand())
+
+	// ibft propose
+	baseCmd.AddCommand(propose.GetCommand())
 }
