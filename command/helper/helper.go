@@ -1,11 +1,12 @@
 package helper
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -33,11 +34,11 @@ import (
 )
 
 const (
-	GenesisFileName       = "./genesis.json"
+	GenesisFileName       = "genesis.json"
 	DefaultChainName      = "polygon-edge"
 	DefaultChainID        = 100
 	DefaultPremineBalance = "0x3635C9ADC5DEA00000" // 1000 ETH
-	DefaultConsensus      = "pow"
+	DefaultConsensus      = server.IBFTConsensus
 	DefaultMaxSlots       = 4096
 	GenesisGasUsed        = 458752  // 0x70000
 	GenesisGasLimit       = 5242880 // 0x500000
@@ -312,19 +313,42 @@ func MergeMaps(maps ...map[string]interface{}) map[string]interface{} {
 	return mergedMap
 }
 
-// WriteGenesisToDisk writes the passed in configuration to a genesis.json file at the specified path
-func WriteGenesisToDisk(chain *chain.Chain, genesisPath string) error {
-	data, err := json.MarshalIndent(chain, "", "    ")
+func GetValidatorsFromPrefixPath(prefix string) ([]types.Address, error) {
+	validators := []types.Address{}
+
+	files, err := ioutil.ReadDir(".")
 	if err != nil {
-		return fmt.Errorf("failed to generate genesis: %w", err)
+		return nil, err
 	}
 
-	//nolint: gosec
-	if err := ioutil.WriteFile(genesisPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write genesis: %w", err)
+	for _, file := range files {
+		path := file.Name()
+
+		if !file.IsDir() {
+			continue
+		}
+
+		if !strings.HasPrefix(path, prefix) {
+			continue
+		}
+
+		// try to read key from the filepath/consensus/<key> path
+		possibleConsensusPath := filepath.Join(path, "consensus", ibft.IbftKeyName)
+
+		// check if path exists
+		if _, err := os.Stat(possibleConsensusPath); os.IsNotExist(err) {
+			continue
+		}
+
+		priv, err := crypto.GenerateOrReadPrivateKey(possibleConsensusPath)
+		if err != nil {
+			return nil, err
+		}
+
+		validators = append(validators, crypto.PubKeyToAddress(&priv.PublicKey))
 	}
 
-	return nil
+	return validators, nil
 }
 
 type devGenesisParams struct {
@@ -336,7 +360,7 @@ type devGenesisParams struct {
 
 // generateDevGenesis generates a base dev genesis file with premined balances
 func generateDevGenesis(params devGenesisParams) error {
-	genesisPath := filepath.Join(".", GenesisFileName)
+	genesisPath := filepath.Join("./", GenesisFileName)
 
 	generateError := VerifyGenesisExistence(genesisPath)
 
@@ -383,7 +407,10 @@ func generateDevGenesis(params devGenesisParams) error {
 		return err
 	}
 
-	return WriteGenesisToDisk(cc, genesisPath)
+	//return WriteGenesisToDisk(cc, genesisPath)
+	// TODO refactor
+
+	return nil
 }
 
 // BootstrapDevCommand creates a config and generates the dev genesis file

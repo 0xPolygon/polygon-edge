@@ -332,7 +332,7 @@ func (s *Server) setupSecretsManager() error {
 // setupConsensus sets up the consensus mechanism
 func (s *Server) setupConsensus() error {
 	engineName := s.config.Chain.Params.GetEngine()
-	engine, ok := consensusBackends[engineName]
+	engine, ok := consensusBackends[ConsensusType(engineName)]
 
 	if !ok {
 		return fmt.Errorf("consensus engine '%s' not found", engineName)

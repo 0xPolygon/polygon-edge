@@ -3,6 +3,7 @@ package root
 import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/backup"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
 	"github.com/0xPolygon/polygon-edge/command/loadbot"
@@ -36,15 +37,45 @@ func NewRootCommand() *RootCommand {
 }
 
 func (rc *RootCommand) registerSubCommands() {
-	rc.baseCmd.AddCommand(version.GetCommand())
-	rc.baseCmd.AddCommand(txpool.GetCommand())
-	rc.baseCmd.AddCommand(status.GetCommand())
-	rc.baseCmd.AddCommand(secrets.GetCommand())
-	rc.baseCmd.AddCommand(peers.GetCommand())
-	rc.baseCmd.AddCommand(monitor.GetCommand())
-	rc.baseCmd.AddCommand(loadbot.GetCommand())
-	rc.baseCmd.AddCommand(ibft.GetCommand())
-	rc.baseCmd.AddCommand(backup.GetCommand())
+	rc.baseCmd.AddCommand(
+		version.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		txpool.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		status.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		secrets.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		peers.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		monitor.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		loadbot.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		ibft.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		backup.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		genesis.GetCommand(),
+	)
 }
 
 func (rc *RootCommand) Execute() {
