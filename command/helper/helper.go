@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"io/ioutil"
+	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -43,6 +45,7 @@ const (
 const (
 	JSONOutputFlag  = "json"
 	GRPCAddressFlag = "grpc-address"
+	JSONRPCFlag     = "jsonrpc"
 )
 
 // FlagDescriptor contains the description elements for a command flag
@@ -590,12 +593,17 @@ func GetGRPCAddress(cmd *cobra.Command) string {
 	return cmd.Flag(GRPCAddressFlag).Value.String()
 }
 
+// GetJSONRPCAddress extracts the set JSON-RPC address
+func GetJSONRPCAddress(cmd *cobra.Command) string {
+	return cmd.Flag(JSONRPCFlag).Value.String()
+}
+
 // RegisterJSONOutputFlag registers the --json output setting for all child commands
 func RegisterJSONOutputFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool(
 		JSONOutputFlag,
 		false,
-		"Specifies if the output should be in JSON",
+		"the JSON-RPC interface",
 	)
 }
 
@@ -604,8 +612,25 @@ func RegisterGRPCAddressFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		GRPCAddressFlag,
 		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
-		GRPCAddressFlag,
+		"the GRPC interface",
 	)
+}
+
+func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
+	return net.ResolveTCPAddr("tcp", grpcAddress)
+}
+
+// RegisterJSONRPCFlag registers the base JSON-RPC address flag for all child commands
+func RegisterJSONRPCFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().String(
+		JSONRPCFlag,
+		fmt.Sprintf("http://%s:%d", "127.0.0.1", server.DefaultJSONRPCPort),
+		"the JSON-RPC interface",
+	)
+}
+
+func ParseJSONRPCAddress(jsonrpcAddress string) (*url.URL, error) {
+	return url.ParseRequestURI(jsonrpcAddress)
 }
 
 func GetInterruptCh() chan os.Signal {
