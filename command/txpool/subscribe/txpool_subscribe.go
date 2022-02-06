@@ -9,9 +9,6 @@ import (
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/spf13/cobra"
 	"io"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func GetCommand() *cobra.Command {
@@ -153,20 +150,7 @@ func runSubscribeLoop(
 	}()
 
 	select {
-	case <-getInterruptCh():
+	case <-helper.GetInterruptCh():
 	case <-doneCh:
 	}
-}
-
-func getInterruptCh() chan os.Signal {
-	// wait for the user to quit with ctrl-c
-	signalCh := make(chan os.Signal, 4)
-	signal.Notify(
-		signalCh,
-		os.Interrupt,
-		syscall.SIGTERM,
-		syscall.SIGHUP,
-	)
-
-	return signalCh
 }

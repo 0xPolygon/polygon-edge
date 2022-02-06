@@ -13,9 +13,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -604,4 +606,17 @@ func RegisterGRPCAddressFlag(cmd *cobra.Command) {
 		fmt.Sprintf("%s:%d", "127.0.0.1", server.DefaultGRPCPort),
 		GRPCAddressFlag,
 	)
+}
+
+func GetInterruptCh() chan os.Signal {
+	// wait for the user to quit with ctrl-c
+	signalCh := make(chan os.Signal, 4)
+	signal.Notify(
+		signalCh,
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGHUP,
+	)
+
+	return signalCh
 }
