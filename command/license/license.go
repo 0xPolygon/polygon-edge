@@ -54,12 +54,16 @@ func (c *LicenseCommand) Run(args []string) int {
 			buffer.WriteString("\n")
 		}
 
+		name := l.Name
+		if l.Version != nil {
+			name += " " + *l.Version
+		}
+
 		buffer.WriteString(fmt.Sprintf(
-			"   This product bundles %s %s,\n"+
+			"   This product bundles %s,\n"+
 				"   which is available under a \"%s\" license.\n"+
 				"   For details, see %s.\n",
-			l.Name,
-			l.Version,
+			name,
 			l.Type,
 			l.Path,
 		))

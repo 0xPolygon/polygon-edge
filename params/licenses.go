@@ -9,10 +9,10 @@ import (
 )
 
 type DepLicense struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Type    string `json:"type"`
-	Path    string `json:"path"`
+	Name    string  `json:"name"`
+	Version *string `json:"version"`
+	Type    string  `json:"type"`
+	Path    string  `json:"path"`
 }
 
 var (
