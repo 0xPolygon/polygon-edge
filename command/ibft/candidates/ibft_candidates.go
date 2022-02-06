@@ -1,9 +1,11 @@
-package ibft
+package candidates
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/ibft"
+	"github.com/0xPolygon/polygon-edge/command/ibft/snapshot"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -76,8 +78,8 @@ func (c *IbftCandidates) Run(args []string) int {
 }
 
 type IBFTCandidate struct {
-	Address string `json:"address"`
-	Vote    Vote   `json:"vote"`
+	Address string        `json:"address"`
+	Vote    snapshot.Vote `json:"vote"`
 }
 
 type IBFTCandidatesResult struct {
@@ -90,7 +92,7 @@ func NewIBFTCandidatesResult(resp *ibftOp.CandidatesResp) *IBFTCandidatesResult 
 	}
 	for i, c := range resp.Candidates {
 		res.Candidates[i].Address = c.Address
-		res.Candidates[i].Vote = voteToString(c.Auth)
+		res.Candidates[i].Vote = ibft.voteToString(c.Auth)
 	}
 
 	return res

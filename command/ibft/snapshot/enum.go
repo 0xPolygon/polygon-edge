@@ -1,4 +1,4 @@
-package ibft
+package snapshot
 
 type Vote string
 

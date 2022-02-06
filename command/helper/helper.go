@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -576,6 +577,19 @@ func GetSystemClientConnection(address string) (
 	}
 
 	return proto.NewSystemClient(conn), nil
+}
+
+// GetIBFTOperatorClientConnection returns the IBFT operator client connection
+func GetIBFTOperatorClientConnection(address string) (
+	ibftOp.IbftOperatorClient,
+	error,
+) {
+	conn, err := getGRPCConnection(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return ibftOp.NewIbftOperatorClient(conn), nil
 }
 
 // getGRPCConnection returns a grpc client connection

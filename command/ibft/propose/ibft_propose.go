@@ -1,4 +1,4 @@
-package ibft
+package propose
 
 import (
 	"bytes"
