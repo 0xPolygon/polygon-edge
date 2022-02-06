@@ -2,6 +2,7 @@ package root
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command/backup"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
 	"github.com/0xPolygon/polygon-edge/command/loadbot"
@@ -43,6 +44,7 @@ func (rc *RootCommand) registerSubCommands() {
 	rc.baseCmd.AddCommand(monitor.GetCommand())
 	rc.baseCmd.AddCommand(loadbot.GetCommand())
 	rc.baseCmd.AddCommand(ibft.GetCommand())
+	rc.baseCmd.AddCommand(backup.GetCommand())
 }
 
 func (rc *RootCommand) Execute() {

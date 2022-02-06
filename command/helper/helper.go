@@ -558,7 +558,7 @@ func GetTxPoolClientConnection(address string) (
 	txpoolOp.TxnPoolOperatorClient,
 	error,
 ) {
-	conn, err := getGRPCConnection(address)
+	conn, err := GetGRPCConnection(address)
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +571,7 @@ func GetSystemClientConnection(address string) (
 	proto.SystemClient,
 	error,
 ) {
-	conn, err := getGRPCConnection(address)
+	conn, err := GetGRPCConnection(address)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +584,7 @@ func GetIBFTOperatorClientConnection(address string) (
 	ibftOp.IbftOperatorClient,
 	error,
 ) {
-	conn, err := getGRPCConnection(address)
+	conn, err := GetGRPCConnection(address)
 	if err != nil {
 		return nil, err
 	}
@@ -592,8 +592,8 @@ func GetIBFTOperatorClientConnection(address string) (
 	return ibftOp.NewIbftOperatorClient(conn), nil
 }
 
-// getGRPCConnection returns a grpc client connection
-func getGRPCConnection(address string) (*grpc.ClientConn, error) {
+// GetGRPCConnection returns a grpc client connection
+func GetGRPCConnection(address string) (*grpc.ClientConn, error) {
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to server: %w", err)
