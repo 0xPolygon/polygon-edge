@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	ibftHelper "github.com/0xPolygon/polygon-edge/command/ibft/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 )
 
 type IBFTSnapshotVote struct {
-	Proposer string `json:"proposer"`
-	Address  string `json:"address"`
-	Vote     Vote   `json:"vote"`
+	Proposer string          `json:"proposer"`
+	Address  string          `json:"address"`
+	Vote     ibftHelper.Vote `json:"vote"`
 }
 
 type IBFTSnapshotResult struct {
@@ -31,7 +32,7 @@ func newIBFTSnapshotResult(resp *ibftOp.Snapshot) *IBFTSnapshotResult {
 	for i, v := range resp.Votes {
 		res.Votes[i].Proposer = v.Validator
 		res.Votes[i].Address = v.Proposed
-		res.Votes[i].Vote = voteToString(v.Auth)
+		res.Votes[i].Vote = ibftHelper.BoolToVote(v.Auth)
 	}
 
 	for i, v := range resp.Validators {
@@ -70,7 +71,12 @@ func (r *IBFTSnapshotResult) writeVoteData(buffer bytes.Buffer) {
 		votes[0] = "PROPOSER|ADDRESS|VOTE TO ADD"
 
 		for i, d := range r.Votes {
-			votes[i+1] = fmt.Sprintf("%s|%s|%v", d.Proposer, d.Address, d.Vote == voteAdd)
+			votes[i+1] = fmt.Sprintf(
+				"%s|%s|%s",
+				d.Proposer,
+				d.Address,
+				ibftHelper.VoteToString(d.Vote),
+			)
 		}
 	}
 

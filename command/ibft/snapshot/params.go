@@ -7,13 +7,6 @@ import (
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 )
 
-type Vote string
-
-const (
-	voteAdd    = "ADD"
-	voteRemove = "REMOVE"
-)
-
 const (
 	numberFlag = "number"
 )
@@ -62,12 +55,4 @@ func (p *snapshotParams) getSnapshotRequest() *ibftOp.SnapshotReq {
 
 func (p *snapshotParams) getResult() output.CommandResult {
 	return newIBFTSnapshotResult(p.snapshot)
-}
-
-func voteToString(vote bool) Vote {
-	if vote {
-		return voteAdd
-	}
-
-	return voteRemove
 }
