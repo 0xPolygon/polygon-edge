@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	eventAdded   = "added"
-	eventRemoved = "removed"
+	eventAdded   = "ADD BLOCK"
+	eventRemoved = "REMOVE BLOCK"
 )
 
 type BlockchainEvent struct {
@@ -23,6 +23,10 @@ type BlockChainEvents struct {
 	Removed []BlockchainEvent `json:"removed"`
 }
 
+type BlockEventResult struct {
+	Events BlockChainEvents `json:"events"`
+}
+
 func NewBlockEventResult(e *proto.BlockchainEvent) *BlockEventResult {
 	res := &BlockEventResult{
 		Events: BlockChainEvents{
@@ -30,6 +34,7 @@ func NewBlockEventResult(e *proto.BlockchainEvent) *BlockEventResult {
 			Removed: make([]BlockchainEvent, len(e.Removed)),
 		},
 	}
+
 	for i, add := range e.Added {
 		res.Events.Added[i].Type = eventAdded
 		res.Events.Added[i].Number = add.Number
@@ -45,30 +50,24 @@ func NewBlockEventResult(e *proto.BlockchainEvent) *BlockEventResult {
 	return res
 }
 
-type BlockEventResult struct {
-	Events BlockChainEvents `json:"events"`
-}
-
 func (r *BlockEventResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	buffer.WriteString("\n[BLOCK EVENT]\n")
 
-	for _, add := range r.Events.Added {
+	for _, event := range r.getCombinedEvents() {
 		buffer.WriteString(helper.FormatKV([]string{
-			fmt.Sprintf("Event Type|%s", "ADD BLOCK"),
-			fmt.Sprintf("Block Number|%d", add.Number),
-			fmt.Sprintf("Block Hash|%s", add.Hash),
-		}))
-	}
-
-	for _, rem := range r.Events.Removed {
-		buffer.WriteString(helper.FormatKV([]string{
-			fmt.Sprintf("Event Type|%s", "REMOVE BLOCK"),
-			fmt.Sprintf("Block Number|%d", rem.Number),
-			fmt.Sprintf("Block Hash|%s", rem.Hash),
+			fmt.Sprintf("Event Type|%s", event.Type),
+			fmt.Sprintf("Block Number|%d", event.Number),
+			fmt.Sprintf("Block Hash|%s", event.Hash),
 		}))
 	}
 
 	return buffer.String()
+}
+
+func (r *BlockEventResult) getCombinedEvents() []BlockchainEvent {
+	events := append([]BlockchainEvent{}, r.Events.Added...)
+
+	return append(events, r.Events.Removed...)
 }
