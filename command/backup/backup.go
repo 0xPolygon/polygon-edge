@@ -15,6 +15,8 @@ func GetCommand() *cobra.Command {
 		Run:     runCommand,
 	}
 
+	helper.RegisterGRPCAddressFlag(backupCmd)
+
 	setFlags(backupCmd)
 	setRequiredFlags(backupCmd)
 
