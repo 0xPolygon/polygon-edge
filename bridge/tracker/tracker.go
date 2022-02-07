@@ -3,41 +3,22 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"os"
-	"strconv"
 
-	"github.com/0xPolygon/polygon-edge/jsonrpc"
-	"github.com/0xPolygon/polygon-edge/types"
-
-	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/go-web3"
-	rpc "github.com/umbracle/go-web3/jsonrpc"
 )
 
 const (
-
-	//	ropsten
-	//rootchainWS          = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
-	//rootchainHTTP        = "https://ropsten.infura.io/v3/58f8f6612b494cac85e2c8ab2ce11ed1"
-
-	//	edge
-	rootchainWS   = "ws://127.0.0.1:10002/ws"
-	rootchainHTTP = "http://127.0.0.1:10002"
-
-	lastProcessedBlock = "last-processed-block"
-	//stateSenderAddress = "74FbD47E7390E345982A3b7e413D35332945C10C"
-	//stateSenderAddress = "1A2dB8920ed2d8E4D14b3091DA0c4febEbdd7BCc"
-	PoCSC          = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
-	AnotherEventSC = "69ceed5Ff0FA5106F4Df7299C8812377394A9388"
+	lastProcessedBlock = "last-processed-block" //	db key
 )
 
 //	Tracker represents an event listener that notifies
-//	for each event emitted to the rootchain (ethereum - hardcoded).
-//	Events of interest are defined in abi.go
+//	for each event emitted on the rootchain (ethereum).
+//	Events of interest are defined in rootchain.go
 type Tracker struct {
 	logger hclog.Logger
 
@@ -53,78 +34,70 @@ type Tracker struct {
 	// cancel funcs
 	cancelSubscription, cancelHeaderProcess context.CancelFunc
 
-	// websocket connection (newHeads)
-	wsConn *websocket.Conn
-
-	// rpc client (eth_getLogs)
-	rpcClient *rpc.Client
+	//	rootchain client
+	client *rootchainClient
 
 	//	db for last processed block number
 	db *leveldb.DB
 }
 
 //	NewEventTracker returns a new tracker with the desired
-//	confirmations depth. Events are defined in abi.go
+//	confirmations depth. Events are defined in rootchain.go
 func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
 		confirmations: confirmations,
-		headerCh:      make(chan *ethHeader),
+		headerCh:      make(chan *ethHeader, 1),
 		eventCh:       make(chan []byte),
 	}
 
-	//	load database for last processed block
-	if err := tracker.loadDB(); err != nil {
+	//	create rootchain rootchainClient
+	client, err := newRootchainClient(rootchainWS)
+	if err != nil {
+		logger.Error("cannot connect to rootchain", "err", err)
 		return nil, err
 	}
+
+	tracker.client = client
+
+	//	load db (last processed block number)
+	db, err := tracker.loadDB()
+	if err != nil {
+		logger.Error("cannot load db", "err", err)
+		return nil, err
+	}
+
+	tracker.db = db
 
 	return tracker, nil
 }
 
 //	loadDB creates a new database (or loads existing)
-//	for storing the last block processed by the tracker.
-func (t *Tracker) loadDB() error {
+//	for storing the last processed block's number by the tracker.
+func (t *Tracker) loadDB() (*leveldb.DB, error) {
 	//	get path
 	cwd, err := os.Getwd()
 	if err != nil {
-		t.logger.Error(
-			"failed to create tracker",
-			"err", err)
-
-		return err
+		t.logger.Error("failed to create tracker", "err", err)
+		return nil, err
 	}
 
 	//	create or load db
-	db, err := leveldb.OpenFile(
-		cwd+"/event_tracker/last_block_number",
-		nil,
-	)
+	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
 	if err != nil {
-		t.logger.Error(
-			"failed to load db",
-			"err", err)
-
-		return err
+		return nil, err
 	}
 
-	//	store db
-	t.db = db
-
-	return nil
+	return db, nil
 }
 
-//	Start connects the tracker to the rootchain
-//	and listens for new events.
+//	Start runs the tracker's listening mechanism:
+//	1. startHeaderProcess - goroutine processing each header
+//		received by the subscription
+//
+//	2. startSubscription - goroutine that subscribes to the rootchain
+//		for new headers, sending them to the header process
 func (t *Tracker) Start() error {
-	//	connect to the rootchain
-	if err := t.connect(); err != nil {
-		t.logger.Error(
-			"could not connect",
-			"err", err)
-
-		return err
-	}
-
 	//	create cancellable contexts
 	ctxSubscription, cancelSub := context.WithCancel(context.Background())
 	t.cancelSubscription = cancelSub
@@ -132,11 +105,18 @@ func (t *Tracker) Start() error {
 	ctxHeaderProcess, cancelHeader := context.WithCancel(context.Background())
 	t.cancelHeaderProcess = cancelHeader
 
-	//	start the header processing early
+	//	start header processing early
 	go t.startHeaderProcess(ctxSubscription)
 
-	//	start receiving new heads
-	go t.startSubscription(ctxHeaderProcess)
+	//	create newHeads subscription
+	subscription, err := t.client.subscribeNewHeads(t.headerCh)
+	if err != nil {
+		t.logger.Error("cannot subscribe to rootchain", "err", err)
+		return err
+	}
+
+	//	start receiving new header events
+	go t.startSubscription(ctxHeaderProcess, subscription)
 
 	return nil
 }
@@ -146,6 +126,7 @@ func (t *Tracker) Start() error {
 //	return t.eventCh
 //}
 
+//	Stop stops the tracker's listening mechanism.
 func (t *Tracker) Stop() error {
 	//	stop subscription
 	t.cancelSubscription()
@@ -153,96 +134,36 @@ func (t *Tracker) Stop() error {
 	// 	stop processing headers
 	t.cancelHeaderProcess()
 
-	//	disconnect rpc
-	if err := t.rpcClient.Close(); err != nil {
+	//	close rootchain client
+	if err := t.client.close(); err != nil {
+		t.logger.Error("cannot close rootchainClient", "err", err)
 		return err
 	}
 
 	return nil
 }
 
-//	connect connects the tracker to rootchain's http and ws endpoints.
-func (t *Tracker) connect() error {
-	// create ws connection
-	conn, _, err := websocket.DefaultDialer.Dial(
-		rootchainWS,
-		nil)
-	if err != nil {
-		t.logger.Error(
-			"ws: cannot connect",
-			"err", err)
-
-		return err
-	}
-
-	t.wsConn = conn
-	t.logger.Debug("connected to ws endpoint")
-
-	//	create http connection
-	rpcClient, err := rpc.NewClient(rootchainHTTP)
-	if err != nil {
-		t.logger.Error("http: cannot connect")
-
-		return err
-	}
-
-	t.rpcClient = rpcClient
-	t.logger.Debug("connected to http endpoint")
-
-	return nil
-}
-
-//	startSubscription subscribes to the rootchain for new headers.
-//	Each header received is processed in startHeaderProcess().
-func (t *Tracker) startSubscription(ctx context.Context) {
-	//	subscribe for new headers
-	if err := t.subscribeNewHeads(); err != nil {
-		t.logger.Error(
-			"could not subscribe",
-			"err", err)
-
-		return
-	}
-
-	defer func() {
-		t.wsConn.Close()
-		t.logger.Debug("closed websocket connection")
-	}()
-
-	//	listen for ws messages
+//	startSubscription handles subscription errors or context cancel.
+func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
 	for {
 		select {
+		case err := <-sub.err():
+			t.logger.Error("subscription error", err)
+
+			t.cancelSubscription()
+			t.logger.Debug("cancelling subscription")
+
+			return
 		case <-ctx.Done():
-			t.logger.Debug("stopping subscription")
+			sub.unsubscribe()
+			t.logger.Debug("subscription stopped")
 
-		default:
-			res := ethSubscribeResponse{}
-			//	read the subscription message
-			if err := t.wsConn.ReadJSON(&res); err != nil {
-				t.logger.Error(
-					"cannot read message from ws",
-					"err", err)
-
-				continue
-			}
-
-			//	parse the result
-			header := &ethHeader{}
-			if err := json.Unmarshal(res.Params.Result, header); err != nil {
-				t.logger.Error(
-					"cannot parse message",
-					"err", err)
-
-				continue
-			}
-
-			//	send header for processing
-			t.headerCh <- header
+			return
 		}
 	}
 }
 
-//	startHeaderProcess processes each header received by startSubscription().
+//	startHeaderProcess processes new header events received by the subscription.
 func (t *Tracker) startHeaderProcess(ctx context.Context) {
 	for {
 		select {
@@ -257,7 +178,7 @@ func (t *Tracker) startHeaderProcess(ctx context.Context) {
 }
 
 //	processHeader determines the range of block to query
-//	based on the blockNumber of the header and issues
+//	based on the blockNumber of the header and issues a
 //	eth_getLogs call. If an event of interest was emitted,
 //	it is sent to eventCh.
 func (t *Tracker) processHeader(header *ethHeader) {
@@ -269,118 +190,46 @@ func (t *Tracker) processHeader(header *ethHeader) {
 	//	fetch logs
 	logs := t.queryEvents(fromBlock, toBlock)
 
+	t.logger.Info("matched events", "num", len(logs))
+
 	//	notify each matched log event
-	t.matchAndDispatch(logs)
-}
-
-func (t *Tracker) matchAndDispatch(logs []*web3.Log) {
-	if len(logs) == 0 {
-		t.logger.Debug("no events")
-		return
-	}
-
-	//	TODO: refactor once PoC is reached
-	//	Events will be matched by server,
-	//	when they are included as topics
-	//	in queryFilter()
-
-	//	match each log with defined abi events
-	for _, log := range logs {
-		if NewRegistrationEvent.Match(log) {
-			t.logger.Info("NewRegistrationEvent")
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
-
-		if RegistrationUpdatedEvent.Match(log) {
-			t.logger.Info("RegistrationUpdatedEvent")
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
-
-		if StateSyncedEvent.Match(log) {
-			t.logger.Info("StateSyncedEvent")
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
-
-		if PoCEvent.Match(log) {
-			t.logger.Info("PoC event", "contract address", log.Address.String())
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
-
-		if AnotherEvent.Match(log) {
-			t.logger.Info("AnotherEvent", "contract address", log.Address.String())
-
-			if err := t.notify(log); err != nil {
-				t.logger.Error(
-					"cannot marshal log",
-					"err", err)
-			}
-
-			continue
-		}
-	}
+	t.notify(logs...)
 }
 
 func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
-	latestHeight := big.NewInt(0).SetUint64(header.Number)
-	//latestHeight, err := types.ParseUint256orHex(&header.Number)	TODO (ethHeader)
 
-	confirmationBlocks := big.NewInt(0).SetUint64(t.confirmations)
-	if latestHeight.Cmp(confirmationBlocks) < 0 {
+	//	TODO: polygon-edge header
+	latestHeight := big.NewInt(0).SetUint64(header.Number)
+
+	//	or: TODO ethereum header
+	//latestHeight, _ := types.ParseUint256orHex(&header.Number)
+
+	//	check  if block number is at required depth
+	confirmations := big.NewInt(0).SetUint64(t.confirmations)
+	if latestHeight.Cmp(confirmations) < 0 {
 		//	block height less than required
 		t.logger.Debug(
 			"not enough confirmations",
 			"current", latestHeight.Uint64(),
-			"required", confirmationBlocks.Uint64())
+			"required", confirmations.Uint64())
 
 		return
 	}
 
-	//	right bound (latest - confirmations)
-	toBlock := big.NewInt(0).Sub(latestHeight, confirmationBlocks)
+	/*	right bound */
+	toBlock := big.NewInt(0).Sub(latestHeight, confirmations)
 
-	//	left bound
-	var fromBlock *big.Int
-
-	lastBlock, ok := t.loadLastBlock()
-	if !ok {
-		// 	lastBlock not available
+	/*	left bound */
+	fromBlock := t.loadLastBlock()
+	if fromBlock == nil {
 		fromBlock = toBlock
 	} else {
-		//	increment last block number
-		fromBlock = lastBlock.Add(
-			lastBlock,
-			big.NewInt(1))
+		//	increment - fetched block number was already queried
+		fromBlock = fromBlock.Add(fromBlock, big.NewInt(1))
 	}
 
+	//	TODO: not sure how this will ever happen, but Heimdall checks this
 	if toBlock.Cmp(fromBlock) < 0 {
 		fromBlock = toBlock
 	}
@@ -390,150 +239,99 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 
 //	loadLastBlock returns the block number of the last
 // 	block processed by the tracker (if available).
-func (t *Tracker) loadLastBlock() (*big.Int, bool) {
-	//	check if db has last block
-	if exists, _ := t.db.Has(
-		[]byte(lastProcessedBlock),
-		nil,
-	); !exists {
-		return nil, false
-	}
-
+func (t *Tracker) loadLastBlock() *big.Int {
 	//	read from db
-	bytesLastBlock, err := t.db.Get(
-		[]byte(lastProcessedBlock),
-		nil)
+	bytesLastBlock, err := t.db.Get([]byte(lastProcessedBlock), nil)
 	if err != nil {
-		t.logger.Error(
-			"cannot read db",
-			"err", err)
+		t.logger.Error("cannot read db", "err", err)
 
-		return nil, false
+		return nil
 	}
 
 	//	parse
-	lastBlock, ok := big.NewInt(0).SetString(
-		string(bytesLastBlock),
-		10)
+	lastBlock, ok := big.NewInt(0).SetString(string(bytesLastBlock), 10)
 	if !ok {
-		return nil, false
+		return nil
 	}
 
-	return lastBlock, true
+	return lastBlock
 }
 
-func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
-	queryFilter := &web3.LogFilter{
-		Address: []web3.Address{
-			web3.HexToAddress(PoCSC),
-			web3.HexToAddress(AnotherEventSC),
-		},
+//	saveLastBlock stores the number of the last block processed.
+func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
+	//	store last processed block number
+	if err := t.db.Put(
+		[]byte(lastProcessedBlock),
+		[]byte(blockNumber.String()),
+		nil,
+	); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+//	queryEvents collects all events on the rootchain that occurred
+//	between blocks fromBlock and toBlock (inclusive).
+func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
+	queryFilter := &web3.LogFilter{}
+
+	//	set range of blocks to query
 	queryFilter.SetFromUint64(fromBlock)
 	queryFilter.SetToUint64(toBlock)
 
-	t.logger.Debug("eth_getLogs",
-		"from", fromBlock,
-		"to", toBlock,
-	)
+	//	set smart contract addresses
+	queryFilter.Address = []web3.Address{
+		web3.HexToAddress(PoCSC),
+		web3.HexToAddress(AnotherEventSC),
+		web3.HexToAddress(ThirdEventSC),
+	}
 
-	logs, err := t.rpcClient.Eth().GetLogs(queryFilter)
+	//	set relevant topics (defined in contracts)
+	queryFilter.Topics = [][]*web3.Hash{
+		{
+			&topicPoCEvent,
+			&topicAnotherEvent,
+		},
+	}
+
+	//	fetch logs
+	logs, err := t.client.getLogs(queryFilter)
 	if err != nil {
-		println("eth_getLogs failed", err.Error())
 		t.logger.Error("eth_getLogs failed", "err", err)
 
 		return nil
 	}
 
-	//	store last processed block number
-	if err := t.db.Put(
-		[]byte(lastProcessedBlock),
-		[]byte(strconv.FormatUint(toBlock, 10)),
-		nil,
-	); err != nil {
-		t.logger.Error(
-			"cannot write last block to db",
-			"err", err)
-	}
+	t.logger.Debug("eth_getLogs", "from", fromBlock, "to", toBlock)
+
+	//	overwrite checkpoint
+	t.saveLastBlock(big.NewInt(0).SetUint64(toBlock))
 
 	return logs
 }
 
-//	notify sends the given log to the event channel.
-func (t *Tracker) notify(log *web3.Log) error {
-	bLog, err := json.Marshal(log)
-	if err != nil {
-		t.logger.Error(
-			"cannot marshal log",
-			"err", err)
+//	notify sends the given logs to the event channel.
+func (t *Tracker) notify(logs ...*web3.Log) error {
+	for _, log := range logs {
+		bytesLog, err := json.Marshal(log)
+		if err != nil {
+			t.logger.Error("cannot marshal log", "err", err)
 
-		return err
-	}
+			return err
+		}
 
-	// notify
-	select {
-	case t.eventCh <- bLog:
-	default:
-	}
-
-	return nil
-}
-
-func (t *Tracker) subscribeNewHeads() error {
-	// 	prepare subscribe request
-	request := ethSubscribeRequest{
-		JSONRPC: "2.0",
-		Method:  "eth_subscribe",
-		Params:  []string{"newHeads"},
-		ID:      1,
-	}
-
-	bytes, err := json.Marshal(request)
-	if err != nil {
-		return errors.New("failed to marshal subscribe request")
-	}
-
-	// subscribe
-	if err := t.wsConn.WriteMessage(
-		websocket.TextMessage,
-		bytes,
-	); err != nil {
-		return errors.New("failed to write ws message")
-	}
-
-	// receive subscription response
-	var res jsonrpc.SuccessResponse
-
-	_, msg, err := t.wsConn.ReadMessage()
-	if err != nil {
-		return errors.New("failed to read ws message")
-	}
-
-	if err := json.Unmarshal(msg, &res); err != nil {
-		return errors.New("failed to unmarshal response")
+		// notify
+		select {
+		case t.eventCh <- bytesLog:
+		default:
+		}
 	}
 
 	return nil
 }
 
-/* Structures used for message parsing (json) */
-
-type ethSubscribeRequest struct {
-	JSONRPC string   `json:"jsonrpc"`
-	Method  string   `json:"method"`
-	Params  []string `json:"params"`
-	ID      int      `json:"id"`
-}
-
-type ethSubscribeResponse struct {
-	JSONRPC string `json:"jsonrpc"`
-	Method  string `json:"method"`
-	Params  struct {
-		Result       json.RawMessage `json:"result"`
-		Subscription string          `json:"subscription"`
-	} `json:"params"`
-}
+/* Header structs parsed by the client */
 
 //	Ethereum header
 //type ethHeader struct {
