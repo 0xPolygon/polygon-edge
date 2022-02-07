@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command"
-	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets/init"
+	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"math/big"
@@ -161,11 +161,11 @@ type InitIBFTResult struct {
 }
 
 func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
-	secretsInitCmd := secretsCommand.SecretsInit{}
+	secretsInitCmd := initCmd.GetCommand()
 
 	var args []string
 
-	commandSlice := strings.Split(secretsInitCmd.GetBaseCommand(), " ")
+	commandSlice := strings.Split(secretsInitCmd.Use, " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 
@@ -225,9 +225,9 @@ func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
 }
 
 func (t *TestServer) GenerateGenesis() error {
-	genesisCmd := genesis.GenesisCommand{}
+	genesisCmd := genesis.GetCommand()
 	args := []string{
-		genesisCmd.GetBaseCommand(),
+		genesisCmd.Use,
 	}
 
 	// add pre-mined accounts
@@ -284,13 +284,13 @@ func (t *TestServer) GenerateGenesis() error {
 }
 
 func (t *TestServer) Start(ctx context.Context) error {
-	serverCmd := server.ServerCommand{}
+	serverCmd := server.GetCommand()
 	args := []string{
-		serverCmd.GetBaseCommand(),
+		serverCmd.Use,
 		// add custom chain
 		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
 		// enable grpc
-		"--grpc", fmt.Sprintf(":%d", t.Config.GRPCPort),
+		"--grpc-address", fmt.Sprintf(":%d", t.Config.GRPCPort),
 		// enable libp2p
 		"--libp2p", fmt.Sprintf(":%d", t.Config.LibP2PPort),
 		// enable jsonrpc
