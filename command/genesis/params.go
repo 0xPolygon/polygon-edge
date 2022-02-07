@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/staking"
@@ -19,8 +19,6 @@ const (
 	nameFlag                = "name"
 	premineFlag             = "premine"
 	chainIDFlag             = "chain-id"
-	bootnodeFlag            = "bootnode"
-	consensusFlag           = "consensusRaw"
 	ibftValidatorFlag       = "ibft-validator"
 	ibftValidatorPrefixFlag = "ibft-validators-prefix-path"
 	epochSizeFlag           = "epoch-size"
@@ -86,7 +84,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	// Check if the genesis file already exists
-	if generateError := helper.VerifyGenesisExistence(p.genesisPath); generateError != nil {
+	if generateError := verifyGenesisExistence(p.genesisPath); generateError != nil {
 		return errors.New(generateError.GetMessage())
 	}
 
@@ -103,7 +101,7 @@ func (p *genesisParams) validateFlags() error {
 
 func (p *genesisParams) getRequiredFlags() []string {
 	return []string{
-		bootnodeFlag,
+		command.BootnodeFlag,
 	}
 }
 
@@ -133,7 +131,7 @@ func (p *genesisParams) initValidatorSet() error {
 	}
 
 	var readErr error
-	if p.ibftValidators, readErr = helper.GetValidatorsFromPrefixPath(
+	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
 	); readErr != nil {
 		return fmt.Errorf("failed to read from prefix: %v", readErr)
@@ -200,7 +198,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			Difficulty: 1,
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  p.extraData,
-			GasUsed:    helper.GenesisGasUsed,
+			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
 			ChainID: int(p.chainID),
@@ -221,7 +219,7 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// Premine accounts
-	if err := helper.FillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
+	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
 		return err
 	}
 

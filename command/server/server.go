@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/spf13/cobra"
 	"strconv"
@@ -32,7 +33,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.rawConfig.LogLevel,
-		logLevelFlag,
+		command.LogLevelFlag,
 		defaultConfig.LogLevel,
 		fmt.Sprintf(
 			"the log level for console output. Default: %s",
@@ -129,7 +130,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Network.NoDiscover,
-		noDiscoverFlag,
+		command.NoDiscoverFlag,
 		false,
 		"prevent the client from discovering other peers. Default: false",
 	)
@@ -177,10 +178,10 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.TxPool.MaxSlots,
 		maxSlotsFlag,
-		helper.DefaultMaxSlots,
+		command.DefaultMaxSlots,
 		fmt.Sprintf(
 			"Sets maximum slots in the pool. Default: %d",
-			helper.DefaultMaxSlots,
+			command.DefaultMaxSlots,
 		),
 	)
 
@@ -195,13 +196,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 }
 
-func configFileSpecified(cmd *cobra.Command) bool {
-	return cmd.Flags().Changed(configFlag)
-}
-
 func runPreRun(cmd *cobra.Command, _ []string) error {
 	// Check if the config file has been specified
-	if configFileSpecified(cmd) {
+	if isConfigFileSpecified(cmd) {
 		if err := params.initConfigFromFile(); err != nil {
 			return err
 		}
@@ -219,6 +216,10 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func isConfigFileSpecified(cmd *cobra.Command) bool {
+	return cmd.Flags().Changed(configFlag)
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {

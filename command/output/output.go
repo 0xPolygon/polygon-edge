@@ -1,7 +1,7 @@
 package output
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ type CommandResult interface {
 }
 
 func shouldOutputJSON(baseCmd *cobra.Command) bool {
-	return baseCmd.Flag(helper.JSONOutputFlag).Changed
+	return baseCmd.Flag(command.JSONOutputFlag).Changed
 }
 
 func InitializeOutputter(cmd *cobra.Command) OutputFormatter {

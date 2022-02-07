@@ -27,8 +27,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.addressRaw,
 		addressFlag,
 		"",
-		"the address of the account to be voted for"+
-			"",
+		"the address of the account to be voted for",
 	)
 
 	cmd.Flags().StringVar(
@@ -50,7 +49,11 @@ func setRequiredFlags(cmd *cobra.Command) {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	return params.validateFlags()
+	if err := params.validateFlags(); err != nil {
+		return err
+	}
+
+	return params.initRawParams()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {

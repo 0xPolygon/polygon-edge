@@ -27,7 +27,7 @@ func setFlags(cmd *cobra.Command) {
 		dirFlag,
 		defaultConfigFileName,
 		fmt.Sprintf(
-			"Sets the directory for the secrets manager configuration file Default: %s",
+			"the directory for the secrets manager configuration file Default: %s",
 			defaultConfigFileName,
 		),
 	)
@@ -36,14 +36,14 @@ func setFlags(cmd *cobra.Command) {
 		&params.token,
 		tokenFlag,
 		"",
-		"Specifies the access token for the service",
+		"the access token for the service",
 	)
 
 	cmd.Flags().StringVar(
 		&params.serverURL,
 		serverURLFlag,
 		"",
-		"Specifies the server URL for the service",
+		"the server URL for the service",
 	)
 
 	cmd.Flags().StringVar(
@@ -51,7 +51,7 @@ func setFlags(cmd *cobra.Command) {
 		typeFlag,
 		string(secrets.HashicorpVault),
 		fmt.Sprintf(
-			"Specifies the type of the secrets manager. Default: %s",
+			"the type of the secrets manager. Default: %s",
 			secrets.HashicorpVault,
 		),
 	)
@@ -61,7 +61,7 @@ func setFlags(cmd *cobra.Command) {
 		nameFlag,
 		defaultNodeName,
 		fmt.Sprintf(
-			"Specifies the name of the node for on-service record keeping. Default: %s",
+			"the name of the node for on-service record keeping. Default: %s",
 			defaultNodeName,
 		),
 	)
@@ -71,7 +71,7 @@ func setFlags(cmd *cobra.Command) {
 		namespaceFlag,
 		defaultNamespace,
 		fmt.Sprintf(
-			"Specifics the namespace for the service. Default %s",
+			"the namespace for the service. Default %s",
 			defaultNamespace,
 		),
 	)

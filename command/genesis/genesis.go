@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
@@ -28,30 +29,30 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.genesisPath,
 		dirFlag,
-		fmt.Sprintf("./%s", helper.GenesisFileName),
+		fmt.Sprintf("./%s", command.DefaultGenesisFileName),
 		fmt.Sprintf(
-			"sets the directory for the Polygon Edge genesis data. Default: %s",
-			fmt.Sprintf("./%s", helper.GenesisFileName),
+			"the directory for the Polygon Edge genesis data. Default: %s",
+			fmt.Sprintf("./%s", command.DefaultGenesisFileName),
 		),
 	)
 
 	cmd.Flags().StringVar(
 		&params.name,
 		nameFlag,
-		helper.DefaultChainName,
+		command.DefaultChainName,
 		fmt.Sprintf(
-			"sets the name for the chain. Default: %s",
-			helper.DefaultChainName,
+			"the name for the chain. Default: %s",
+			command.DefaultChainName,
 		),
 	)
 
 	cmd.Flags().StringVar(
 		&params.consensusRaw,
-		consensusFlag,
-		string(helper.DefaultConsensus),
+		command.ConsensusFlag,
+		string(command.DefaultConsensus),
 		fmt.Sprintf(
-			"sets consensusRaw protocol. Default: %s",
-			helper.DefaultConsensus,
+			"the consensus protocol to be used. Default: %s",
+			command.DefaultConsensus,
 		),
 	)
 
@@ -68,14 +69,14 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"sets the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
-			helper.DefaultPremineBalance,
+			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			command.DefaultPremineBalance,
 		),
 	)
 
 	cmd.Flags().StringArrayVar(
 		&params.bootnodes,
-		bootnodeFlag,
+		command.BootnodeFlag,
 		[]string{},
 		"multiAddr URL for p2p discovery bootstrap. This flag can be used multiple times",
 	)
@@ -84,7 +85,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.ibftValidatorsRaw,
 		ibftValidatorFlag,
 		[]string{},
-		"sets passed in addresses as IBFT validators. "+
+		"addresses to be used as IBFT validators. "+
 			"Needs to be present if ibft-validators-prefix-path is omitted",
 	)
 
@@ -92,17 +93,17 @@ func setFlags(cmd *cobra.Command) {
 		&params.isPos,
 		posFlag,
 		false,
-		"sets the flag indicating that the client should use Proof of Stake IBFT. Defaults to "+
+		"the flag indicating that the client should use Proof of Stake IBFT. Defaults to "+
 			"Proof of Authority if flag is not provided or false",
 	)
 
 	cmd.Flags().Uint64Var(
 		&params.chainID,
 		chainIDFlag,
-		helper.DefaultChainID,
+		command.DefaultChainID,
 		fmt.Sprintf(
-			"sets the ID of the chain. Default: %d",
-			helper.DefaultChainID,
+			"the ID of the chain. Default: %d",
+			command.DefaultChainID,
 		),
 	)
 
@@ -111,7 +112,7 @@ func setFlags(cmd *cobra.Command) {
 		epochSizeFlag,
 		ibft.DefaultEpochSize,
 		fmt.Sprintf(
-			"sets the epoch size for the chain. Default %d",
+			"the epoch size for the chain. Default %d",
 			ibft.DefaultEpochSize,
 		),
 	)
@@ -119,10 +120,10 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.blockGasLimit,
 		blockGasLimitFlag,
-		helper.GenesisGasLimit,
+		command.DefaultGenesisGasLimit,
 		fmt.Sprintf(
 			"the maximum amount of gas used by all transactions in a block. Default: %d",
-			helper.GenesisGasLimit,
+			command.DefaultGenesisGasLimit,
 		),
 	)
 }

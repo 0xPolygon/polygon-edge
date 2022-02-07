@@ -24,37 +24,67 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&from, "from", "", "the sender address")
-	cmd.Flags().StringVar(&to, "to", "", "the receiver address")
-	cmd.Flags().StringVar(&value, "value", "", "the value of the transaction")
-	cmd.Flags().StringVar(&gasPrice, "gas-price", "0x100000", "the gas price")
-	cmd.Flags().Uint64Var(&gasLimit, "gas-limit", 1000000, "the specified gas limit")
-	cmd.Flags().Uint64Var(&nonce, "nonce", 0, "the nonce of the transaction")
+	cmd.Flags().StringVar(
+		&params.fromRaw,
+		fromFlag,
+		"",
+		"the sender address",
+	)
+
+	cmd.Flags().StringVar(
+		&params.toRaw,
+		toFlag,
+		"",
+		"the receiver address",
+	)
+
+	cmd.Flags().StringVar(
+		&params.valueRaw,
+		valueFlag,
+		"",
+		"the value of the transaction",
+	)
+
+	cmd.Flags().StringVar(
+		&params.gasPriceRaw,
+		gasPriceFlag,
+		"0x100000",
+		"the gas price",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.gas,
+		gasLimitFlag,
+		1000000,
+		"the specified gas limit",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.nonce,
+		nonceFlag,
+		0,
+		"the nonce of the transaction",
+	)
 }
 
 func setRequiredFlags(cmd *cobra.Command) {
-	_ = cmd.MarkFlagRequired("from")
-	_ = cmd.MarkFlagRequired("to")
-	_ = cmd.MarkFlagRequired("value")
+	for _, requiredFlag := range params.getRequiredFlags() {
+		_ = cmd.MarkFlagRequired(requiredFlag)
+	}
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := output.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	addParams := &addParams{
-		gas:   gasLimit,
-		nonce: nonce,
-	}
-
-	if err := addParams.init(); err != nil {
+	if err := params.init(); err != nil {
 		outputter.SetError(err)
 
 		return
 	}
 
 	resp, err := addTransaction(
-		addParams.constructAddRequest(),
+		params.constructAddRequest(),
 		helper.GetGRPCAddress(cmd),
 	)
 	if err != nil {
@@ -65,11 +95,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	outputter.SetCommandResult(&TxPoolAddResult{
 		Hash:     resp.TxHash,
-		From:     addParams.from.String(),
-		To:       addParams.to.String(),
-		Value:    *types.EncodeBigInt(addParams.value),
-		GasPrice: *types.EncodeBigInt(addParams.gasPrice),
-		GasLimit: addParams.gas,
+		From:     params.from.String(),
+		To:       params.to.String(),
+		Value:    *types.EncodeBigInt(params.value),
+		GasPrice: *types.EncodeBigInt(params.gasPrice),
+		GasLimit: params.gas,
 	})
 }
 

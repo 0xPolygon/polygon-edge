@@ -8,23 +8,41 @@ import (
 	"math/big"
 )
 
-// Define local flag values
+const (
+	fromFlag     = "from"
+	toFlag       = "to"
+	valueFlag    = "value"
+	gasPriceFlag = "gas-price"
+	gasLimitFlag = "gas-limit"
+	nonceFlag    = "nonce"
+)
+
 var (
-	from     string
-	to       string
-	value    string
-	gasPrice string
-	gasLimit uint64
-	nonce    uint64
+	params = &addParams{}
 )
 
 type addParams struct {
-	from     types.Address
-	to       types.Address
-	gas      uint64
-	nonce    uint64
+	fromRaw     string
+	toRaw       string
+	valueRaw    string
+	gasPriceRaw string
+
+	from types.Address
+	to   types.Address
+
+	gas   uint64
+	nonce uint64
+
 	value    *big.Int
 	gasPrice *big.Int
+}
+
+func (ap *addParams) getRequiredFlags() []string {
+	return []string{
+		fromFlag,
+		toFlag,
+		valueFlag,
+	}
 }
 
 func (ap *addParams) init() error {
@@ -40,12 +58,12 @@ func (ap *addParams) init() error {
 }
 
 func (ap *addParams) initAddressValues() (err error) {
-	ap.from, err = getAddressFromString(from)
+	ap.from, err = getAddressFromString(ap.fromRaw)
 	if err != nil {
 		return
 	}
 
-	ap.to, err = getAddressFromString(from)
+	ap.to, err = getAddressFromString(ap.toRaw)
 	if err != nil {
 		return
 	}
@@ -54,12 +72,12 @@ func (ap *addParams) initAddressValues() (err error) {
 }
 
 func (ap *addParams) initUintOrHexValues() (err error) {
-	ap.value, err = types.ParseUint256orHex(&value)
+	ap.value, err = types.ParseUint256orHex(&ap.valueRaw)
 	if err != nil {
 		return
 	}
 
-	ap.gasPrice, err = types.ParseUint256orHex(&gasPrice)
+	ap.gasPrice, err = types.ParseUint256orHex(&ap.gasPriceRaw)
 	if err != nil {
 		return
 	}

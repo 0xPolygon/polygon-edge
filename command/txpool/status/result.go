@@ -7,7 +7,7 @@ import (
 )
 
 type TxPoolStatusResult struct {
-	Txs uint64 `json:"txs"`
+	Transactions uint64 `json:"transactions"`
 }
 
 func (r *TxPoolStatusResult) GetOutput() string {
@@ -15,7 +15,7 @@ func (r *TxPoolStatusResult) GetOutput() string {
 
 	buffer.WriteString("\n[TXPOOL STATUS]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Number of transactions in pool:|%d", r.Txs),
+		fmt.Sprintf("Number of transactions in pool:|%d", r.Transactions),
 	}))
 	buffer.WriteString("\n")
 

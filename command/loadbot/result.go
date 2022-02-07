@@ -21,32 +21,32 @@ type TxnCountData struct {
 }
 
 type TxnTurnAroundData struct {
-	FastestTurnAround float64 `json:"fastestTurnAround"`
-	SlowestTurnAround float64 `json:"slowestTurnAround"`
-	AverageTurnAround float64 `json:"averageTurnAround"`
-	TotalExecTime     float64 `json:"totalExecTime"`
+	FastestTurnAround float64 `json:"fastest_turn_around"`
+	SlowestTurnAround float64 `json:"slowest_turn_around"`
+	AverageTurnAround float64 `json:"average_turn_around"`
+	TotalExecTime     float64 `json:"total_exec_time"`
 }
 
 type TxnBlockData struct {
 	// BlocksRequired is the required number of blocks to seal the data
-	BlocksRequired uint64 `json:"blocksRequired"`
+	BlocksRequired uint64 `json:"blocks_required"`
 
 	// BlockTransactionsMap maps the block number to the number of loadbot transactions in it
-	BlockTransactionsMap map[uint64]uint64 `json:"blockTransactionsMap"`
+	BlockTransactionsMap map[uint64]uint64 `json:"block_transactions_map"`
 }
 
 type TxnDetailedErrorData struct {
 	// DetailedErrorMap groups transaction errors by error type, with each transaction hash
 	// mapping to its specific error
-	DetailedErrorMap map[generator.TxnErrorType][]*generator.FailedTxnInfo `json:"detailedErrorMap"`
+	DetailedErrorMap map[generator.TxnErrorType][]*generator.FailedTxnInfo `json:"detailed_error_map"`
 }
 
 type LoadbotResult struct {
-	CountData         TxnCountData         `json:"countData"`
-	TurnAroundData    TxnTurnAroundData    `json:"turnAroundData"`
-	BlockData         TxnBlockData         `json:"blockData"`
-	DetailedErrorData TxnDetailedErrorData `json:"detailedErrorData,omitempty"`
-	ApproxTPS         uint64               `json:"approxTps"`
+	CountData         TxnCountData         `json:"count_data"`
+	TurnAroundData    TxnTurnAroundData    `json:"turn_around_data"`
+	BlockData         TxnBlockData         `json:"block_data"`
+	DetailedErrorData TxnDetailedErrorData `json:"detailed_error_data,omitempty"`
+	ApproxTPS         uint64               `json:"approx_tps"`
 }
 
 func (lr *LoadbotResult) initExecutionData(metrics *Metrics) {

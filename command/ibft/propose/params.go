@@ -43,10 +43,14 @@ func (p *proposeParams) getRequiredFlags() []string {
 }
 
 func (p *proposeParams) validateFlags() error {
-	if !isValidVote(p.vote) {
+	if !isValidVoteType(p.vote) {
 		return errInvalidVoteType
 	}
 
+	return nil
+}
+
+func (p *proposeParams) initRawParams() error {
 	p.address = types.Address{}
 	if err := p.address.UnmarshalText([]byte(p.addressRaw)); err != nil {
 		return errInvalidAddressFormat
@@ -55,8 +59,8 @@ func (p *proposeParams) validateFlags() error {
 	return nil
 }
 
-func isValidVote(vote string) bool {
-	return vote != authVote && vote != dropVote
+func isValidVoteType(vote string) bool {
+	return vote == authVote || vote == dropVote
 }
 
 func (p *proposeParams) proposeCandidate(grpcAddress string) error {

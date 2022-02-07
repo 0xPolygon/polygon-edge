@@ -4,10 +4,22 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 )
 
 type PeersListResult struct {
 	Peers []string `json:"peers"`
+}
+
+func newPeersListResult(peers []*proto.Peer) *PeersListResult {
+	resultPeers := make([]string, len(peers))
+	for i, p := range peers {
+		resultPeers[i] = p.Id
+	}
+
+	return &PeersListResult{
+		Peers: resultPeers,
+	}
 }
 
 func (r *PeersListResult) GetOutput() string {

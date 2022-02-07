@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	logLevelFlag          = "log-level"
 	configFlag            = "config"
 	genesisPathFlag       = "chain"
 	dataDirFlag           = "data-dir"
@@ -24,7 +23,6 @@ const (
 	natFlag               = "nat"
 	dnsFlag               = "dns"
 	sealFlag              = "seal"
-	noDiscoverFlag        = "no-discover"
 	maxPeersFlag          = "max-peers"
 	maxInboundPeersFlag   = "max-inbound-peers"
 	maxOutboundPeersFlag  = "max-outbound-peers"

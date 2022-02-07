@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/command"
 	secretsCommand "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"google.golang.org/grpc/credentials/insecure"
 	"io"
@@ -21,7 +22,6 @@ import (
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -271,7 +271,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add block gas limit
 	if t.Config.BlockGasLimit == 0 {
-		t.Config.BlockGasLimit = helper.GenesisGasLimit
+		t.Config.BlockGasLimit = command.DefaultGenesisGasLimit
 	}
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)

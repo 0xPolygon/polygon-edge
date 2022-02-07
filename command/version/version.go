@@ -17,12 +17,11 @@ func GetCommand() *cobra.Command {
 
 func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := output.InitializeOutputter(cmd)
+	defer outputter.WriteOutput()
 
 	outputter.SetCommandResult(
 		&VersionResult{
 			Version: version.GetVersion(),
 		},
 	)
-
-	outputter.WriteOutput()
 }

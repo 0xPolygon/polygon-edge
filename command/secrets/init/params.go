@@ -2,6 +2,7 @@ package init
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"github.com/0xPolygon/polygon-edge/command/output"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -10,8 +11,19 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
+const (
+	dataDirFlag = "data-dir"
+	configFlag  = "config"
+)
+
 var (
 	params = &initParams{}
+)
+
+var (
+	errInvalidConfig   = errors.New("invalid secrets configuration")
+	errInvalidParams   = errors.New("no config file or data directory passed in")
+	errUnsupportedType = errors.New("unsupported secrets manager")
 )
 
 type initParams struct {
@@ -27,8 +39,12 @@ type initParams struct {
 	nodeID peer.ID
 }
 
-func (ip *initParams) areValidParams() bool {
-	return ip.dataDir != "" || ip.configPath != ""
+func (ip *initParams) validateFlags() error {
+	if ip.dataDir != "" || ip.configPath != "" {
+		return errInvalidParams
+	}
+
+	return nil
 }
 
 func (ip *initParams) initSecrets() error {

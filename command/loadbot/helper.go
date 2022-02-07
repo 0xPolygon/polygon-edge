@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// getInitialSenderNonce queries the sender account nonce before starting the loadbot run.
+// The nonce used for transactions is incremented by the loadbot during runtime
 func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint64, error) {
 	nonce, err := client.Eth().GetNonce(web3.Address(address), web3.Latest)
 	if err != nil {
@@ -17,6 +19,8 @@ func getInitialSenderNonce(client *jsonrpc.Client, address types.Address) (uint6
 	return nonce, nil
 }
 
+// getAverageGasPrice queries the network node for the average gas price
+// before starting the loadbot run
 func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 	gasPrice, err := client.Eth().GasPrice()
 	if err != nil {
@@ -26,6 +30,8 @@ func getAverageGasPrice(client *jsonrpc.Client) (uint64, error) {
 	return gasPrice, nil
 }
 
+// estimateGas queries the network node for a gas estimation before starting
+// the loadbot run
 func estimateGas(client *jsonrpc.Client, txn *types.Transaction) (uint64, error) {
 	gasEstimate, err := client.Eth().EstimateGas(&web3.CallMsg{
 		From:     web3.Address(txn.From),

@@ -30,7 +30,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&TxPoolStatusResult{
-		Txs: statusResponse.Length,
+		Transactions: statusResponse.Length,
 	})
 }
 

@@ -43,14 +43,3 @@ func getPeersList(grpcAddress string) (*proto.PeersListResponse, error) {
 
 	return client.PeersList(context.Background(), &empty.Empty{})
 }
-
-func newPeersListResult(peers []*proto.Peer) *PeersListResult {
-	resultPeers := make([]string, len(peers))
-	for i, p := range peers {
-		resultPeers[i] = p.Id
-	}
-
-	return &PeersListResult{
-		Peers: resultPeers,
-	}
-}

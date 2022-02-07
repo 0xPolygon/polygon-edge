@@ -8,8 +8,8 @@ import (
 )
 
 type TxPoolEventResult struct {
-	EventType txpoolProto.EventType `json:"eventType"`
-	TxHash    string                `json:"txHash"`
+	EventType txpoolProto.EventType `json:"event_type"`
+	TxHash    string                `json:"tx_hash"`
 }
 
 func (r *TxPoolEventResult) GetOutput() string {
