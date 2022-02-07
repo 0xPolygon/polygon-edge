@@ -7,4 +7,4 @@ require (
 	github.com/libp2p/go-netroute v0.1.2
 )
 
-go 1.12
+go 1.16

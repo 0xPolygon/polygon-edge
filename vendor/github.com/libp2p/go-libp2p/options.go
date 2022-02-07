@@ -6,10 +6,8 @@ package libp2p
 import (
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
-	circuit "github.com/libp2p/go-libp2p-circuit"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/metrics"
@@ -19,8 +17,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/pnet"
 
 	"github.com/libp2p/go-libp2p/config"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	autorelay "github.com/libp2p/go-libp2p/p2p/host/relay"
+	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -125,8 +125,8 @@ func Muxer(name string, tpt interface{}) Option {
 // * Public Key
 // * Address filter (filter.Filter)
 // * Peerstore
-func Transport(tpt interface{}) Option {
-	tptc, err := config.TransportConstructor(tpt)
+func Transport(tpt interface{}, opts ...interface{}) Option {
+	tptc, err := config.TransportConstructor(tpt, opts...)
 	err = traceError(err, 1)
 	return func(cfg *Config) error {
 		if err != nil {
@@ -186,6 +186,9 @@ func Identity(sk crypto.PrivKey) Option {
 }
 
 // ConnectionManager configures libp2p to use the given connection manager.
+//
+// The current "standard" connection manager lives in github.com/libp2p/go-libp2p-connmgr. See
+// https://pkg.go.dev/github.com/libp2p/go-libp2p-connmgr?utm_source=godoc#NewConnManager.
 func ConnectionManager(connman connmgr.ConnManager) Option {
 	return func(cfg *Config) error {
 		if cfg.ConnManager != nil {
@@ -207,17 +210,15 @@ func AddrsFactory(factory config.AddrsFactory) Option {
 	}
 }
 
-// EnableRelay configures libp2p to enable the relay transport with
-// configuration options. By default, this option only configures libp2p to
-// accept inbound connections from relays and make outbound connections
-// _through_ relays when requested by the remote peer. (default: enabled)
-//
-// To _act_ as a relay, pass the circuit.OptHop option.
-func EnableRelay(options ...circuit.RelayOpt) Option {
+// EnableRelay configures libp2p to enable the relay transport.
+// This option only configures libp2p to accept inbound connections from relays
+// and make outbound connections_through_ relays when requested by the remote peer.
+// This option supports both circuit v1 and v2 connections.
+// (default: enabled)
+func EnableRelay() Option {
 	return func(cfg *Config) error {
 		cfg.RelayCustom = true
 		cfg.Relay = true
-		cfg.RelayOpts = options
 		return nil
 	}
 }
@@ -231,22 +232,32 @@ func DisableRelay() Option {
 	}
 }
 
+// EnableRelayService configures libp2p to run a circuit v2 relay,
+// if we detect that we're publicly reachable.
+func EnableRelayService(opts ...relayv2.Option) Option {
+	return func(cfg *Config) error {
+		cfg.EnableRelayService = true
+		cfg.RelayServiceOpts = opts
+		return nil
+	}
+}
+
 // EnableAutoRelay configures libp2p to enable the AutoRelay subsystem.
 //
 // Dependencies:
 //  * Relay (enabled by default)
 //  * Routing (to find relays), or StaticRelays/DefaultStaticRelays.
 //
-// This subsystem performs two functions:
-//
-// 1. When this libp2p node is configured to act as a relay "hop"
-//    (circuit.OptHop is passed to EnableRelay), this node will advertise itself
-//    as a public relay using the provided routing system.
-// 2. When this libp2p node is _not_ configured as a relay "hop", it will
-//    automatically detect if it is unreachable (e.g., behind a NAT). If so, it will
-//    find, configure, and announce a set of public relays.
-func EnableAutoRelay() Option {
+// This subsystem performs automatic address rewriting to advertise relay addresses when it
+// detects that the node is publicly unreachable (e.g. behind a NAT).
+func EnableAutoRelay(opts ...autorelay.StaticRelayOption) Option {
 	return func(cfg *Config) error {
+		if len(opts) > 0 {
+			if len(opts) > 1 {
+				return errors.New("only expected a single static relay configuration option")
+			}
+			cfg.StaticRelayOpt = opts[0]
+		}
 		cfg.EnableAutoRelay = true
 		return nil
 	}
@@ -255,30 +266,26 @@ func EnableAutoRelay() Option {
 // StaticRelays configures known relays for autorelay; when this option is enabled
 // then the system will use the configured relays instead of querying the DHT to
 // discover relays.
+// Deprecated: pass an autorelay.WithStaticRelays option to EnableAutoRelay.
 func StaticRelays(relays []peer.AddrInfo) Option {
 	return func(cfg *Config) error {
-		cfg.StaticRelays = append(cfg.StaticRelays, relays...)
+		cfg.StaticRelayOpt = autorelay.WithStaticRelays(relays)
 		return nil
 	}
 }
 
 // DefaultStaticRelays configures the static relays to use the known PL-operated relays.
+// Deprecated: pass autorelay.WithDefaultStaticRelays to EnableAutoRelay.
 func DefaultStaticRelays() Option {
-	return func(cfg *Config) error {
-		for _, addr := range autorelay.DefaultRelays {
-			a, err := ma.NewMultiaddr(addr)
-			if err != nil {
-				return err
-			}
-			pi, err := peer.AddrInfoFromP2pAddr(a)
-			if err != nil {
-				return err
-			}
-			cfg.StaticRelays = append(cfg.StaticRelays, *pi)
+	relays := make([]peer.AddrInfo, 0, len(autorelay.DefaultRelays))
+	for _, addr := range autorelay.DefaultRelays {
+		pi, err := peer.AddrInfoFromString(addr)
+		if err != nil {
+			panic(fmt.Sprintf("failed to initialize default static relays: %s", err))
 		}
-
-		return nil
+		relays = append(relays, *pi)
 	}
+	return StaticRelays(relays)
 }
 
 // ForceReachabilityPublic overrides automatic reachability detection in the AutoNAT subsystem,
@@ -324,60 +331,6 @@ func AutoNATServiceRateLimit(global, perPeer int, interval time.Duration) Option
 	}
 }
 
-// FilterAddresses configures libp2p to never dial nor accept connections from
-// the given addresses. FilterAddresses should be used for cases where the
-// addresses you want to deny are known ahead of time.
-//
-// Note: Using Filter + FilterAddresses at the same time is fine, but you cannot
-// configure a both ConnectionGater and filtered addresses.
-//
-// Deprecated: Please use ConnectionGater() instead.
-func FilterAddresses(addrs ...*net.IPNet) Option {
-	return func(cfg *Config) error {
-		var f *filtersConnectionGater
-
-		// preserve backwards compatibility.
-		// if we have a connection gater, try to cast it to a *filtersConnectionGater.
-		if cfg.ConnectionGater != nil {
-			var ok bool
-			if f, ok = cfg.ConnectionGater.(*filtersConnectionGater); !ok {
-				return errors.New("cannot configure both Filters and Connection Gater; please consider configuring just a ConnectionGater instead")
-			}
-		}
-
-		if f == nil {
-			f = (*filtersConnectionGater)(ma.NewFilters())
-			cfg.ConnectionGater = f
-		}
-
-		for _, addr := range addrs {
-			(*ma.Filters)(f).AddFilter(*addr, ma.ActionDeny)
-		}
-
-		return nil
-	}
-}
-
-// Filters configures libp2p to use the given filters for accepting/denying
-// certain addresses. Filters offers more control and should be used when the
-// addresses you want to accept/deny are not known ahead of time and can
-// dynamically change.
-//
-// Note: You cannot configure both a ConnectionGater and a Filter at the same
-// time. Under the hood, the Filters object is converted to a ConnectionGater.
-//
-// Deprecated: use ConnectionGater() instead.
-func Filters(filters *ma.Filters) Option {
-	return func(cfg *Config) error {
-		if cfg.ConnectionGater != nil {
-			return errors.New("cannot configure both Filters and Connection Gater; please consider configuring just a ConnectionGater instead")
-
-		}
-		cfg.ConnectionGater = (*filtersConnectionGater)(filters)
-		return nil
-	}
-}
-
 // ConnectionGater configures libp2p to use the given ConnectionGater
 // to actively reject inbound/outbound connections based on the lifecycle stage
 // of the connection.
@@ -389,6 +342,17 @@ func ConnectionGater(cg connmgr.ConnectionGater) Option {
 			return errors.New("cannot configure multiple connection gaters, or cannot configure both Filters and ConnectionGater")
 		}
 		cfg.ConnectionGater = cg
+		return nil
+	}
+}
+
+// ResourceManager configures libp2p to use the given ResourceManager.
+func ResourceManager(rcmgr network.ResourceManager) Option {
+	return func(cfg *Config) error {
+		if cfg.ResourceManager != nil {
+			return errors.New("cannot configure multiple resource managers")
+		}
+		cfg.ResourceManager = rcmgr
 		return nil
 	}
 }
@@ -466,6 +430,55 @@ func UserAgent(userAgent string) Option {
 func MultiaddrResolver(rslv *madns.Resolver) Option {
 	return func(cfg *Config) error {
 		cfg.MultiaddrResolver = rslv
+		return nil
+	}
+}
+
+// Experimental
+// EnableHolePunching enables NAT traversal by enabling NATT'd peers to both initiate and respond to hole punching attempts
+// to create direct/NAT-traversed connections with other peers. (default: disabled)
+//
+// Dependencies:
+//  * Relay (enabled by default)
+//
+// This subsystem performs two functions:
+//
+// 1. On receiving an inbound Relay connection, it attempts to create a direct connection with the remote peer
+//    by initiating and co-ordinating a hole punch over the Relayed connection.
+// 2. If a peer sees a request to co-ordinate a hole punch on an outbound Relay connection,
+//    it will participate in the hole-punch to create a direct connection with the remote peer.
+//
+// If the hole punch is successful, all new streams will thereafter be created on the hole-punched connection.
+// The Relayed connection will eventually be closed after a grace period.
+//
+// All existing indefinite long-lived streams on the Relayed connection will have to re-opened on the hole-punched connection by the user.
+// Users can make use of the `Connected`/`Disconnected` notifications emitted by the Network for this purpose.
+//
+// It is not mandatory but nice to also enable the `AutoRelay` option (See `EnableAutoRelay`)
+// so the peer can discover and connect to Relay servers  if it discovers that it is NATT'd and has private reachability via AutoNAT.
+// This will then enable it to advertise Relay addresses which can be used to accept inbound Relay connections to then co-ordinate
+// a hole punch.
+//
+// If `EnableAutoRelay` is configured and the user is confident that the peer has private reachability/is NATT'd,
+// the `ForceReachabilityPrivate` option can be configured to short-circuit reachability discovery via AutoNAT
+// so the peer can immediately start connecting to Relay servers.
+//
+// If `EnableAutoRelay` is configured, the `StaticRelays` option can be used to configure a static set of Relay servers
+// for `AutoRelay` to connect to so that it does not need to discover Relay servers via Routing.
+func EnableHolePunching(opts ...holepunch.Option) Option {
+	return func(cfg *Config) error {
+		cfg.EnableHolePunching = true
+		cfg.HolePunchingOptions = opts
+		return nil
+	}
+}
+
+func WithDialTimeout(t time.Duration) Option {
+	return func(cfg *Config) error {
+		if t <= 0 {
+			return errors.New("dial timeout needs to be non-negative")
+		}
+		cfg.DialTimeout = t
 		return nil
 	}
 }

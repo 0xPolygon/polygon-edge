@@ -362,6 +362,7 @@ func (s *Server) setupConsensus() error {
 			Logger:         s.logger.Named("consensus"),
 			Metrics:        s.serverMetrics.consensus,
 			SecretsManager: s.secretsManager,
+			BlockTime:      s.config.BlockTime,
 		},
 	)
 

@@ -10,6 +10,7 @@ package internetgateway2
 // ***********************************************************
 
 import (
+	"context"
 	"net/url"
 	"time"
 
@@ -105,7 +106,11 @@ func newDeviceProtection1ClientsFromGenericClients(genericClients []goupnp.Servi
 	return clients
 }
 
-func (client *DeviceProtection1) SendSetupMessage(ProtocolType string, InMessage []byte) (OutMessage []byte, err error) {
+func (client *DeviceProtection1) SendSetupMessageCtx(
+	ctx context.Context,
+	ProtocolType string,
+	InMessage []byte,
+) (OutMessage []byte, err error) {
 	// Request structure.
 	request := &struct {
 		ProtocolType string
@@ -127,7 +132,7 @@ func (client *DeviceProtection1) SendSetupMessage(ProtocolType string, InMessage
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "SendSetupMessage", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "SendSetupMessage", request, response); err != nil {
 		return
 	}
 
@@ -140,7 +145,18 @@ func (client *DeviceProtection1) SendSetupMessage(ProtocolType string, InMessage
 	return
 }
 
-func (client *DeviceProtection1) GetSupportedProtocols() (ProtocolList string, err error) {
+// SendSetupMessage is the legacy version of SendSetupMessageCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) SendSetupMessage(ProtocolType string, InMessage []byte) (OutMessage []byte, err error) {
+	return client.SendSetupMessageCtx(context.Background(),
+		ProtocolType,
+		InMessage,
+	)
+}
+
+func (client *DeviceProtection1) GetSupportedProtocolsCtx(
+	ctx context.Context,
+) (ProtocolList string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -153,7 +169,7 @@ func (client *DeviceProtection1) GetSupportedProtocols() (ProtocolList string, e
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "GetSupportedProtocols", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "GetSupportedProtocols", request, response); err != nil {
 		return
 	}
 
@@ -166,7 +182,15 @@ func (client *DeviceProtection1) GetSupportedProtocols() (ProtocolList string, e
 	return
 }
 
-func (client *DeviceProtection1) GetAssignedRoles() (RoleList string, err error) {
+// GetSupportedProtocols is the legacy version of GetSupportedProtocolsCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) GetSupportedProtocols() (ProtocolList string, err error) {
+	return client.GetSupportedProtocolsCtx(context.Background())
+}
+
+func (client *DeviceProtection1) GetAssignedRolesCtx(
+	ctx context.Context,
+) (RoleList string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -179,7 +203,7 @@ func (client *DeviceProtection1) GetAssignedRoles() (RoleList string, err error)
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "GetAssignedRoles", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "GetAssignedRoles", request, response); err != nil {
 		return
 	}
 
@@ -192,7 +216,18 @@ func (client *DeviceProtection1) GetAssignedRoles() (RoleList string, err error)
 	return
 }
 
-func (client *DeviceProtection1) GetRolesForAction(DeviceUDN string, ServiceId string, ActionName string) (RoleList string, RestrictedRoleList string, err error) {
+// GetAssignedRoles is the legacy version of GetAssignedRolesCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) GetAssignedRoles() (RoleList string, err error) {
+	return client.GetAssignedRolesCtx(context.Background())
+}
+
+func (client *DeviceProtection1) GetRolesForActionCtx(
+	ctx context.Context,
+	DeviceUDN string,
+	ServiceId string,
+	ActionName string,
+) (RoleList string, RestrictedRoleList string, err error) {
 	// Request structure.
 	request := &struct {
 		DeviceUDN  string
@@ -219,7 +254,7 @@ func (client *DeviceProtection1) GetRolesForAction(DeviceUDN string, ServiceId s
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "GetRolesForAction", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "GetRolesForAction", request, response); err != nil {
 		return
 	}
 
@@ -235,7 +270,21 @@ func (client *DeviceProtection1) GetRolesForAction(DeviceUDN string, ServiceId s
 	return
 }
 
-func (client *DeviceProtection1) GetUserLoginChallenge(ProtocolType string, Name string) (Salt []byte, Challenge []byte, err error) {
+// GetRolesForAction is the legacy version of GetRolesForActionCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) GetRolesForAction(DeviceUDN string, ServiceId string, ActionName string) (RoleList string, RestrictedRoleList string, err error) {
+	return client.GetRolesForActionCtx(context.Background(),
+		DeviceUDN,
+		ServiceId,
+		ActionName,
+	)
+}
+
+func (client *DeviceProtection1) GetUserLoginChallengeCtx(
+	ctx context.Context,
+	ProtocolType string,
+	Name string,
+) (Salt []byte, Challenge []byte, err error) {
 	// Request structure.
 	request := &struct {
 		ProtocolType string
@@ -258,7 +307,7 @@ func (client *DeviceProtection1) GetUserLoginChallenge(ProtocolType string, Name
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "GetUserLoginChallenge", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "GetUserLoginChallenge", request, response); err != nil {
 		return
 	}
 
@@ -274,7 +323,21 @@ func (client *DeviceProtection1) GetUserLoginChallenge(ProtocolType string, Name
 	return
 }
 
-func (client *DeviceProtection1) UserLogin(ProtocolType string, Challenge []byte, Authenticator []byte) (err error) {
+// GetUserLoginChallenge is the legacy version of GetUserLoginChallengeCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) GetUserLoginChallenge(ProtocolType string, Name string) (Salt []byte, Challenge []byte, err error) {
+	return client.GetUserLoginChallengeCtx(context.Background(),
+		ProtocolType,
+		Name,
+	)
+}
+
+func (client *DeviceProtection1) UserLoginCtx(
+	ctx context.Context,
+	ProtocolType string,
+	Challenge []byte,
+	Authenticator []byte,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		ProtocolType  string
@@ -298,7 +361,7 @@ func (client *DeviceProtection1) UserLogin(ProtocolType string, Challenge []byte
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "UserLogin", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "UserLogin", request, response); err != nil {
 		return
 	}
 
@@ -308,7 +371,19 @@ func (client *DeviceProtection1) UserLogin(ProtocolType string, Challenge []byte
 	return
 }
 
-func (client *DeviceProtection1) UserLogout() (err error) {
+// UserLogin is the legacy version of UserLoginCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) UserLogin(ProtocolType string, Challenge []byte, Authenticator []byte) (err error) {
+	return client.UserLoginCtx(context.Background(),
+		ProtocolType,
+		Challenge,
+		Authenticator,
+	)
+}
+
+func (client *DeviceProtection1) UserLogoutCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -319,7 +394,7 @@ func (client *DeviceProtection1) UserLogout() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "UserLogout", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "UserLogout", request, response); err != nil {
 		return
 	}
 
@@ -329,7 +404,15 @@ func (client *DeviceProtection1) UserLogout() (err error) {
 	return
 }
 
-func (client *DeviceProtection1) GetACLData() (ACL string, err error) {
+// UserLogout is the legacy version of UserLogoutCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) UserLogout() (err error) {
+	return client.UserLogoutCtx(context.Background())
+}
+
+func (client *DeviceProtection1) GetACLDataCtx(
+	ctx context.Context,
+) (ACL string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -342,7 +425,7 @@ func (client *DeviceProtection1) GetACLData() (ACL string, err error) {
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "GetACLData", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "GetACLData", request, response); err != nil {
 		return
 	}
 
@@ -355,7 +438,16 @@ func (client *DeviceProtection1) GetACLData() (ACL string, err error) {
 	return
 }
 
-func (client *DeviceProtection1) AddIdentityList(IdentityList string) (IdentityListResult string, err error) {
+// GetACLData is the legacy version of GetACLDataCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) GetACLData() (ACL string, err error) {
+	return client.GetACLDataCtx(context.Background())
+}
+
+func (client *DeviceProtection1) AddIdentityListCtx(
+	ctx context.Context,
+	IdentityList string,
+) (IdentityListResult string, err error) {
 	// Request structure.
 	request := &struct {
 		IdentityList string
@@ -373,7 +465,7 @@ func (client *DeviceProtection1) AddIdentityList(IdentityList string) (IdentityL
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "AddIdentityList", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "AddIdentityList", request, response); err != nil {
 		return
 	}
 
@@ -386,7 +478,18 @@ func (client *DeviceProtection1) AddIdentityList(IdentityList string) (IdentityL
 	return
 }
 
-func (client *DeviceProtection1) RemoveIdentity(Identity string) (err error) {
+// AddIdentityList is the legacy version of AddIdentityListCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) AddIdentityList(IdentityList string) (IdentityListResult string, err error) {
+	return client.AddIdentityListCtx(context.Background(),
+		IdentityList,
+	)
+}
+
+func (client *DeviceProtection1) RemoveIdentityCtx(
+	ctx context.Context,
+	Identity string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		Identity string
@@ -402,7 +505,7 @@ func (client *DeviceProtection1) RemoveIdentity(Identity string) (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "RemoveIdentity", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "RemoveIdentity", request, response); err != nil {
 		return
 	}
 
@@ -412,7 +515,21 @@ func (client *DeviceProtection1) RemoveIdentity(Identity string) (err error) {
 	return
 }
 
-func (client *DeviceProtection1) SetUserLoginPassword(ProtocolType string, Name string, Stored []byte, Salt []byte) (err error) {
+// RemoveIdentity is the legacy version of RemoveIdentityCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) RemoveIdentity(Identity string) (err error) {
+	return client.RemoveIdentityCtx(context.Background(),
+		Identity,
+	)
+}
+
+func (client *DeviceProtection1) SetUserLoginPasswordCtx(
+	ctx context.Context,
+	ProtocolType string,
+	Name string,
+	Stored []byte,
+	Salt []byte,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		ProtocolType string
@@ -440,7 +557,7 @@ func (client *DeviceProtection1) SetUserLoginPassword(ProtocolType string, Name 
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "SetUserLoginPassword", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "SetUserLoginPassword", request, response); err != nil {
 		return
 	}
 
@@ -450,7 +567,65 @@ func (client *DeviceProtection1) SetUserLoginPassword(ProtocolType string, Name 
 	return
 }
 
+// SetUserLoginPassword is the legacy version of SetUserLoginPasswordCtx, but uses
+// context.Background() as the context.
+func (client *DeviceProtection1) SetUserLoginPassword(ProtocolType string, Name string, Stored []byte, Salt []byte) (err error) {
+	return client.SetUserLoginPasswordCtx(context.Background(),
+		ProtocolType,
+		Name,
+		Stored,
+		Salt,
+	)
+}
+
+func (client *DeviceProtection1) AddRolesForIdentityCtx(
+	ctx context.Context,
+	Identity string,
+	RoleList string,
+) (err error) {
+	// Request structure.
+	request := &struct {
+		Identity string
+		RoleList string
+	}{}
+	// BEGIN Marshal arguments into request.
+
+	if request.Identity, err = soap.MarshalString(Identity); err != nil {
+		return
+	}
+	if request.RoleList, err = soap.MarshalString(RoleList); err != nil {
+		return
+	}
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "AddRolesForIdentity", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// AddRolesForIdentity is the legacy version of AddRolesForIdentityCtx, but uses
+// context.Background() as the context.
 func (client *DeviceProtection1) AddRolesForIdentity(Identity string, RoleList string) (err error) {
+	return client.AddRolesForIdentityCtx(context.Background(),
+		Identity,
+		RoleList,
+	)
+}
+
+func (client *DeviceProtection1) RemoveRolesForIdentityCtx(
+	ctx context.Context,
+	Identity string,
+	RoleList string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		Identity string
@@ -470,7 +645,7 @@ func (client *DeviceProtection1) AddRolesForIdentity(Identity string, RoleList s
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "AddRolesForIdentity", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_DeviceProtection_1, "RemoveRolesForIdentity", request, response); err != nil {
 		return
 	}
 
@@ -480,34 +655,13 @@ func (client *DeviceProtection1) AddRolesForIdentity(Identity string, RoleList s
 	return
 }
 
+// RemoveRolesForIdentity is the legacy version of RemoveRolesForIdentityCtx, but uses
+// context.Background() as the context.
 func (client *DeviceProtection1) RemoveRolesForIdentity(Identity string, RoleList string) (err error) {
-	// Request structure.
-	request := &struct {
-		Identity string
-		RoleList string
-	}{}
-	// BEGIN Marshal arguments into request.
-
-	if request.Identity, err = soap.MarshalString(Identity); err != nil {
-		return
-	}
-	if request.RoleList, err = soap.MarshalString(RoleList); err != nil {
-		return
-	}
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_DeviceProtection_1, "RemoveRolesForIdentity", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.RemoveRolesForIdentityCtx(context.Background(),
+		Identity,
+		RoleList,
+	)
 }
 
 // LANHostConfigManagement1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:LANHostConfigManagement:1". See
@@ -570,7 +724,10 @@ func newLANHostConfigManagement1ClientsFromGenericClients(genericClients []goupn
 	return clients
 }
 
-func (client *LANHostConfigManagement1) SetDHCPServerConfigurable(NewDHCPServerConfigurable bool) (err error) {
+func (client *LANHostConfigManagement1) SetDHCPServerConfigurableCtx(
+	ctx context.Context,
+	NewDHCPServerConfigurable bool,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDHCPServerConfigurable string
@@ -586,7 +743,7 @@ func (client *LANHostConfigManagement1) SetDHCPServerConfigurable(NewDHCPServerC
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetDHCPServerConfigurable", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetDHCPServerConfigurable", request, response); err != nil {
 		return
 	}
 
@@ -596,7 +753,17 @@ func (client *LANHostConfigManagement1) SetDHCPServerConfigurable(NewDHCPServerC
 	return
 }
 
-func (client *LANHostConfigManagement1) GetDHCPServerConfigurable() (NewDHCPServerConfigurable bool, err error) {
+// SetDHCPServerConfigurable is the legacy version of SetDHCPServerConfigurableCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) SetDHCPServerConfigurable(NewDHCPServerConfigurable bool) (err error) {
+	return client.SetDHCPServerConfigurableCtx(context.Background(),
+		NewDHCPServerConfigurable,
+	)
+}
+
+func (client *LANHostConfigManagement1) GetDHCPServerConfigurableCtx(
+	ctx context.Context,
+) (NewDHCPServerConfigurable bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -609,7 +776,7 @@ func (client *LANHostConfigManagement1) GetDHCPServerConfigurable() (NewDHCPServ
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetDHCPServerConfigurable", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetDHCPServerConfigurable", request, response); err != nil {
 		return
 	}
 
@@ -622,7 +789,16 @@ func (client *LANHostConfigManagement1) GetDHCPServerConfigurable() (NewDHCPServ
 	return
 }
 
-func (client *LANHostConfigManagement1) SetDHCPRelay(NewDHCPRelay bool) (err error) {
+// GetDHCPServerConfigurable is the legacy version of GetDHCPServerConfigurableCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetDHCPServerConfigurable() (NewDHCPServerConfigurable bool, err error) {
+	return client.GetDHCPServerConfigurableCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetDHCPRelayCtx(
+	ctx context.Context,
+	NewDHCPRelay bool,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDHCPRelay string
@@ -638,7 +814,7 @@ func (client *LANHostConfigManagement1) SetDHCPRelay(NewDHCPRelay bool) (err err
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetDHCPRelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetDHCPRelay", request, response); err != nil {
 		return
 	}
 
@@ -648,7 +824,17 @@ func (client *LANHostConfigManagement1) SetDHCPRelay(NewDHCPRelay bool) (err err
 	return
 }
 
-func (client *LANHostConfigManagement1) GetDHCPRelay() (NewDHCPRelay bool, err error) {
+// SetDHCPRelay is the legacy version of SetDHCPRelayCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) SetDHCPRelay(NewDHCPRelay bool) (err error) {
+	return client.SetDHCPRelayCtx(context.Background(),
+		NewDHCPRelay,
+	)
+}
+
+func (client *LANHostConfigManagement1) GetDHCPRelayCtx(
+	ctx context.Context,
+) (NewDHCPRelay bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -661,7 +847,7 @@ func (client *LANHostConfigManagement1) GetDHCPRelay() (NewDHCPRelay bool, err e
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetDHCPRelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetDHCPRelay", request, response); err != nil {
 		return
 	}
 
@@ -674,7 +860,16 @@ func (client *LANHostConfigManagement1) GetDHCPRelay() (NewDHCPRelay bool, err e
 	return
 }
 
-func (client *LANHostConfigManagement1) SetSubnetMask(NewSubnetMask string) (err error) {
+// GetDHCPRelay is the legacy version of GetDHCPRelayCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetDHCPRelay() (NewDHCPRelay bool, err error) {
+	return client.GetDHCPRelayCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetSubnetMaskCtx(
+	ctx context.Context,
+	NewSubnetMask string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewSubnetMask string
@@ -690,7 +885,7 @@ func (client *LANHostConfigManagement1) SetSubnetMask(NewSubnetMask string) (err
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetSubnetMask", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetSubnetMask", request, response); err != nil {
 		return
 	}
 
@@ -700,7 +895,17 @@ func (client *LANHostConfigManagement1) SetSubnetMask(NewSubnetMask string) (err
 	return
 }
 
-func (client *LANHostConfigManagement1) GetSubnetMask() (NewSubnetMask string, err error) {
+// SetSubnetMask is the legacy version of SetSubnetMaskCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) SetSubnetMask(NewSubnetMask string) (err error) {
+	return client.SetSubnetMaskCtx(context.Background(),
+		NewSubnetMask,
+	)
+}
+
+func (client *LANHostConfigManagement1) GetSubnetMaskCtx(
+	ctx context.Context,
+) (NewSubnetMask string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -713,7 +918,7 @@ func (client *LANHostConfigManagement1) GetSubnetMask() (NewSubnetMask string, e
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetSubnetMask", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetSubnetMask", request, response); err != nil {
 		return
 	}
 
@@ -726,7 +931,53 @@ func (client *LANHostConfigManagement1) GetSubnetMask() (NewSubnetMask string, e
 	return
 }
 
+// GetSubnetMask is the legacy version of GetSubnetMaskCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetSubnetMask() (NewSubnetMask string, err error) {
+	return client.GetSubnetMaskCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetIPRouterCtx(
+	ctx context.Context,
+	NewIPRouters string,
+) (err error) {
+	// Request structure.
+	request := &struct {
+		NewIPRouters string
+	}{}
+	// BEGIN Marshal arguments into request.
+
+	if request.NewIPRouters, err = soap.MarshalString(NewIPRouters); err != nil {
+		return
+	}
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetIPRouter", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// SetIPRouter is the legacy version of SetIPRouterCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) SetIPRouter(NewIPRouters string) (err error) {
+	return client.SetIPRouterCtx(context.Background(),
+		NewIPRouters,
+	)
+}
+
+func (client *LANHostConfigManagement1) DeleteIPRouterCtx(
+	ctx context.Context,
+	NewIPRouters string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewIPRouters string
@@ -742,7 +993,7 @@ func (client *LANHostConfigManagement1) SetIPRouter(NewIPRouters string) (err er
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetIPRouter", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "DeleteIPRouter", request, response); err != nil {
 		return
 	}
 
@@ -752,33 +1003,17 @@ func (client *LANHostConfigManagement1) SetIPRouter(NewIPRouters string) (err er
 	return
 }
 
+// DeleteIPRouter is the legacy version of DeleteIPRouterCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) DeleteIPRouter(NewIPRouters string) (err error) {
-	// Request structure.
-	request := &struct {
-		NewIPRouters string
-	}{}
-	// BEGIN Marshal arguments into request.
-
-	if request.NewIPRouters, err = soap.MarshalString(NewIPRouters); err != nil {
-		return
-	}
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "DeleteIPRouter", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.DeleteIPRouterCtx(context.Background(),
+		NewIPRouters,
+	)
 }
 
-func (client *LANHostConfigManagement1) GetIPRoutersList() (NewIPRouters string, err error) {
+func (client *LANHostConfigManagement1) GetIPRoutersListCtx(
+	ctx context.Context,
+) (NewIPRouters string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -791,7 +1026,7 @@ func (client *LANHostConfigManagement1) GetIPRoutersList() (NewIPRouters string,
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetIPRoutersList", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetIPRoutersList", request, response); err != nil {
 		return
 	}
 
@@ -804,7 +1039,16 @@ func (client *LANHostConfigManagement1) GetIPRoutersList() (NewIPRouters string,
 	return
 }
 
-func (client *LANHostConfigManagement1) SetDomainName(NewDomainName string) (err error) {
+// GetIPRoutersList is the legacy version of GetIPRoutersListCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetIPRoutersList() (NewIPRouters string, err error) {
+	return client.GetIPRoutersListCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetDomainNameCtx(
+	ctx context.Context,
+	NewDomainName string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDomainName string
@@ -820,7 +1064,7 @@ func (client *LANHostConfigManagement1) SetDomainName(NewDomainName string) (err
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetDomainName", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetDomainName", request, response); err != nil {
 		return
 	}
 
@@ -830,7 +1074,17 @@ func (client *LANHostConfigManagement1) SetDomainName(NewDomainName string) (err
 	return
 }
 
-func (client *LANHostConfigManagement1) GetDomainName() (NewDomainName string, err error) {
+// SetDomainName is the legacy version of SetDomainNameCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) SetDomainName(NewDomainName string) (err error) {
+	return client.SetDomainNameCtx(context.Background(),
+		NewDomainName,
+	)
+}
+
+func (client *LANHostConfigManagement1) GetDomainNameCtx(
+	ctx context.Context,
+) (NewDomainName string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -843,7 +1097,7 @@ func (client *LANHostConfigManagement1) GetDomainName() (NewDomainName string, e
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetDomainName", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetDomainName", request, response); err != nil {
 		return
 	}
 
@@ -856,7 +1110,17 @@ func (client *LANHostConfigManagement1) GetDomainName() (NewDomainName string, e
 	return
 }
 
-func (client *LANHostConfigManagement1) SetAddressRange(NewMinAddress string, NewMaxAddress string) (err error) {
+// GetDomainName is the legacy version of GetDomainNameCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetDomainName() (NewDomainName string, err error) {
+	return client.GetDomainNameCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetAddressRangeCtx(
+	ctx context.Context,
+	NewMinAddress string,
+	NewMaxAddress string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewMinAddress string
@@ -876,7 +1140,7 @@ func (client *LANHostConfigManagement1) SetAddressRange(NewMinAddress string, Ne
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetAddressRange", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetAddressRange", request, response); err != nil {
 		return
 	}
 
@@ -886,7 +1150,18 @@ func (client *LANHostConfigManagement1) SetAddressRange(NewMinAddress string, Ne
 	return
 }
 
-func (client *LANHostConfigManagement1) GetAddressRange() (NewMinAddress string, NewMaxAddress string, err error) {
+// SetAddressRange is the legacy version of SetAddressRangeCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) SetAddressRange(NewMinAddress string, NewMaxAddress string) (err error) {
+	return client.SetAddressRangeCtx(context.Background(),
+		NewMinAddress,
+		NewMaxAddress,
+	)
+}
+
+func (client *LANHostConfigManagement1) GetAddressRangeCtx(
+	ctx context.Context,
+) (NewMinAddress string, NewMaxAddress string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -900,7 +1175,7 @@ func (client *LANHostConfigManagement1) GetAddressRange() (NewMinAddress string,
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetAddressRange", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetAddressRange", request, response); err != nil {
 		return
 	}
 
@@ -916,7 +1191,53 @@ func (client *LANHostConfigManagement1) GetAddressRange() (NewMinAddress string,
 	return
 }
 
+// GetAddressRange is the legacy version of GetAddressRangeCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetAddressRange() (NewMinAddress string, NewMaxAddress string, err error) {
+	return client.GetAddressRangeCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetReservedAddressCtx(
+	ctx context.Context,
+	NewReservedAddresses string,
+) (err error) {
+	// Request structure.
+	request := &struct {
+		NewReservedAddresses string
+	}{}
+	// BEGIN Marshal arguments into request.
+
+	if request.NewReservedAddresses, err = soap.MarshalString(NewReservedAddresses); err != nil {
+		return
+	}
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetReservedAddress", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// SetReservedAddress is the legacy version of SetReservedAddressCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) SetReservedAddress(NewReservedAddresses string) (err error) {
+	return client.SetReservedAddressCtx(context.Background(),
+		NewReservedAddresses,
+	)
+}
+
+func (client *LANHostConfigManagement1) DeleteReservedAddressCtx(
+	ctx context.Context,
+	NewReservedAddresses string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewReservedAddresses string
@@ -932,7 +1253,7 @@ func (client *LANHostConfigManagement1) SetReservedAddress(NewReservedAddresses 
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetReservedAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "DeleteReservedAddress", request, response); err != nil {
 		return
 	}
 
@@ -942,33 +1263,17 @@ func (client *LANHostConfigManagement1) SetReservedAddress(NewReservedAddresses 
 	return
 }
 
+// DeleteReservedAddress is the legacy version of DeleteReservedAddressCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) DeleteReservedAddress(NewReservedAddresses string) (err error) {
-	// Request structure.
-	request := &struct {
-		NewReservedAddresses string
-	}{}
-	// BEGIN Marshal arguments into request.
-
-	if request.NewReservedAddresses, err = soap.MarshalString(NewReservedAddresses); err != nil {
-		return
-	}
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "DeleteReservedAddress", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.DeleteReservedAddressCtx(context.Background(),
+		NewReservedAddresses,
+	)
 }
 
-func (client *LANHostConfigManagement1) GetReservedAddresses() (NewReservedAddresses string, err error) {
+func (client *LANHostConfigManagement1) GetReservedAddressesCtx(
+	ctx context.Context,
+) (NewReservedAddresses string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -981,7 +1286,7 @@ func (client *LANHostConfigManagement1) GetReservedAddresses() (NewReservedAddre
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetReservedAddresses", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetReservedAddresses", request, response); err != nil {
 		return
 	}
 
@@ -994,7 +1299,53 @@ func (client *LANHostConfigManagement1) GetReservedAddresses() (NewReservedAddre
 	return
 }
 
+// GetReservedAddresses is the legacy version of GetReservedAddressesCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetReservedAddresses() (NewReservedAddresses string, err error) {
+	return client.GetReservedAddressesCtx(context.Background())
+}
+
+func (client *LANHostConfigManagement1) SetDNSServerCtx(
+	ctx context.Context,
+	NewDNSServers string,
+) (err error) {
+	// Request structure.
+	request := &struct {
+		NewDNSServers string
+	}{}
+	// BEGIN Marshal arguments into request.
+
+	if request.NewDNSServers, err = soap.MarshalString(NewDNSServers); err != nil {
+		return
+	}
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "SetDNSServer", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// SetDNSServer is the legacy version of SetDNSServerCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) SetDNSServer(NewDNSServers string) (err error) {
+	return client.SetDNSServerCtx(context.Background(),
+		NewDNSServers,
+	)
+}
+
+func (client *LANHostConfigManagement1) DeleteDNSServerCtx(
+	ctx context.Context,
+	NewDNSServers string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDNSServers string
@@ -1010,7 +1361,7 @@ func (client *LANHostConfigManagement1) SetDNSServer(NewDNSServers string) (err 
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "SetDNSServer", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "DeleteDNSServer", request, response); err != nil {
 		return
 	}
 
@@ -1020,33 +1371,17 @@ func (client *LANHostConfigManagement1) SetDNSServer(NewDNSServers string) (err 
 	return
 }
 
+// DeleteDNSServer is the legacy version of DeleteDNSServerCtx, but uses
+// context.Background() as the context.
 func (client *LANHostConfigManagement1) DeleteDNSServer(NewDNSServers string) (err error) {
-	// Request structure.
-	request := &struct {
-		NewDNSServers string
-	}{}
-	// BEGIN Marshal arguments into request.
-
-	if request.NewDNSServers, err = soap.MarshalString(NewDNSServers); err != nil {
-		return
-	}
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "DeleteDNSServer", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.DeleteDNSServerCtx(context.Background(),
+		NewDNSServers,
+	)
 }
 
-func (client *LANHostConfigManagement1) GetDNSServers() (NewDNSServers string, err error) {
+func (client *LANHostConfigManagement1) GetDNSServersCtx(
+	ctx context.Context,
+) (NewDNSServers string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1059,7 +1394,7 @@ func (client *LANHostConfigManagement1) GetDNSServers() (NewDNSServers string, e
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_LANHostConfigManagement_1, "GetDNSServers", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_LANHostConfigManagement_1, "GetDNSServers", request, response); err != nil {
 		return
 	}
 
@@ -1070,6 +1405,12 @@ func (client *LANHostConfigManagement1) GetDNSServers() (NewDNSServers string, e
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetDNSServers is the legacy version of GetDNSServersCtx, but uses
+// context.Background() as the context.
+func (client *LANHostConfigManagement1) GetDNSServers() (NewDNSServers string, err error) {
+	return client.GetDNSServersCtx(context.Background())
 }
 
 // Layer3Forwarding1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:Layer3Forwarding:1". See
@@ -1132,7 +1473,10 @@ func newLayer3Forwarding1ClientsFromGenericClients(genericClients []goupnp.Servi
 	return clients
 }
 
-func (client *Layer3Forwarding1) SetDefaultConnectionService(NewDefaultConnectionService string) (err error) {
+func (client *Layer3Forwarding1) SetDefaultConnectionServiceCtx(
+	ctx context.Context,
+	NewDefaultConnectionService string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDefaultConnectionService string
@@ -1148,7 +1492,7 @@ func (client *Layer3Forwarding1) SetDefaultConnectionService(NewDefaultConnectio
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_Layer3Forwarding_1, "SetDefaultConnectionService", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_Layer3Forwarding_1, "SetDefaultConnectionService", request, response); err != nil {
 		return
 	}
 
@@ -1158,7 +1502,17 @@ func (client *Layer3Forwarding1) SetDefaultConnectionService(NewDefaultConnectio
 	return
 }
 
-func (client *Layer3Forwarding1) GetDefaultConnectionService() (NewDefaultConnectionService string, err error) {
+// SetDefaultConnectionService is the legacy version of SetDefaultConnectionServiceCtx, but uses
+// context.Background() as the context.
+func (client *Layer3Forwarding1) SetDefaultConnectionService(NewDefaultConnectionService string) (err error) {
+	return client.SetDefaultConnectionServiceCtx(context.Background(),
+		NewDefaultConnectionService,
+	)
+}
+
+func (client *Layer3Forwarding1) GetDefaultConnectionServiceCtx(
+	ctx context.Context,
+) (NewDefaultConnectionService string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1171,7 +1525,7 @@ func (client *Layer3Forwarding1) GetDefaultConnectionService() (NewDefaultConnec
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_Layer3Forwarding_1, "GetDefaultConnectionService", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_Layer3Forwarding_1, "GetDefaultConnectionService", request, response); err != nil {
 		return
 	}
 
@@ -1182,6 +1536,12 @@ func (client *Layer3Forwarding1) GetDefaultConnectionService() (NewDefaultConnec
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetDefaultConnectionService is the legacy version of GetDefaultConnectionServiceCtx, but uses
+// context.Background() as the context.
+func (client *Layer3Forwarding1) GetDefaultConnectionService() (NewDefaultConnectionService string, err error) {
+	return client.GetDefaultConnectionServiceCtx(context.Background())
 }
 
 // WANCableLinkConfig1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANCableLinkConfig:1". See
@@ -1250,7 +1610,9 @@ func newWANCableLinkConfig1ClientsFromGenericClients(genericClients []goupnp.Ser
 // * NewCableLinkConfigState: allowed values: notReady, dsSyncComplete, usParamAcquired, rangingComplete, ipComplete, todEstablished, paramTransferComplete, registrationComplete, operational, accessDenied
 //
 // * NewLinkType: allowed values: Ethernet
-func (client *WANCableLinkConfig1) GetCableLinkConfigInfo() (NewCableLinkConfigState string, NewLinkType string, err error) {
+func (client *WANCableLinkConfig1) GetCableLinkConfigInfoCtx(
+	ctx context.Context,
+) (NewCableLinkConfigState string, NewLinkType string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1264,7 +1626,7 @@ func (client *WANCableLinkConfig1) GetCableLinkConfigInfo() (NewCableLinkConfigS
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetCableLinkConfigInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetCableLinkConfigInfo", request, response); err != nil {
 		return
 	}
 
@@ -1280,7 +1642,15 @@ func (client *WANCableLinkConfig1) GetCableLinkConfigInfo() (NewCableLinkConfigS
 	return
 }
 
-func (client *WANCableLinkConfig1) GetDownstreamFrequency() (NewDownstreamFrequency uint32, err error) {
+// GetCableLinkConfigInfo is the legacy version of GetCableLinkConfigInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetCableLinkConfigInfo() (NewCableLinkConfigState string, NewLinkType string, err error) {
+	return client.GetCableLinkConfigInfoCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetDownstreamFrequencyCtx(
+	ctx context.Context,
+) (NewDownstreamFrequency uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1293,7 +1663,7 @@ func (client *WANCableLinkConfig1) GetDownstreamFrequency() (NewDownstreamFreque
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetDownstreamFrequency", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetDownstreamFrequency", request, response); err != nil {
 		return
 	}
 
@@ -1306,11 +1676,19 @@ func (client *WANCableLinkConfig1) GetDownstreamFrequency() (NewDownstreamFreque
 	return
 }
 
+// GetDownstreamFrequency is the legacy version of GetDownstreamFrequencyCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetDownstreamFrequency() (NewDownstreamFrequency uint32, err error) {
+	return client.GetDownstreamFrequencyCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewDownstreamModulation: allowed values: 64QAM, 256QAM
-func (client *WANCableLinkConfig1) GetDownstreamModulation() (NewDownstreamModulation string, err error) {
+func (client *WANCableLinkConfig1) GetDownstreamModulationCtx(
+	ctx context.Context,
+) (NewDownstreamModulation string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1323,7 +1701,7 @@ func (client *WANCableLinkConfig1) GetDownstreamModulation() (NewDownstreamModul
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetDownstreamModulation", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetDownstreamModulation", request, response); err != nil {
 		return
 	}
 
@@ -1336,7 +1714,15 @@ func (client *WANCableLinkConfig1) GetDownstreamModulation() (NewDownstreamModul
 	return
 }
 
-func (client *WANCableLinkConfig1) GetUpstreamFrequency() (NewUpstreamFrequency uint32, err error) {
+// GetDownstreamModulation is the legacy version of GetDownstreamModulationCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetDownstreamModulation() (NewDownstreamModulation string, err error) {
+	return client.GetDownstreamModulationCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetUpstreamFrequencyCtx(
+	ctx context.Context,
+) (NewUpstreamFrequency uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1349,7 +1735,7 @@ func (client *WANCableLinkConfig1) GetUpstreamFrequency() (NewUpstreamFrequency 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetUpstreamFrequency", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetUpstreamFrequency", request, response); err != nil {
 		return
 	}
 
@@ -1362,11 +1748,19 @@ func (client *WANCableLinkConfig1) GetUpstreamFrequency() (NewUpstreamFrequency 
 	return
 }
 
+// GetUpstreamFrequency is the legacy version of GetUpstreamFrequencyCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetUpstreamFrequency() (NewUpstreamFrequency uint32, err error) {
+	return client.GetUpstreamFrequencyCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewUpstreamModulation: allowed values: QPSK, 16QAM
-func (client *WANCableLinkConfig1) GetUpstreamModulation() (NewUpstreamModulation string, err error) {
+func (client *WANCableLinkConfig1) GetUpstreamModulationCtx(
+	ctx context.Context,
+) (NewUpstreamModulation string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1379,7 +1773,7 @@ func (client *WANCableLinkConfig1) GetUpstreamModulation() (NewUpstreamModulatio
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetUpstreamModulation", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetUpstreamModulation", request, response); err != nil {
 		return
 	}
 
@@ -1392,7 +1786,15 @@ func (client *WANCableLinkConfig1) GetUpstreamModulation() (NewUpstreamModulatio
 	return
 }
 
-func (client *WANCableLinkConfig1) GetUpstreamChannelID() (NewUpstreamChannelID uint32, err error) {
+// GetUpstreamModulation is the legacy version of GetUpstreamModulationCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetUpstreamModulation() (NewUpstreamModulation string, err error) {
+	return client.GetUpstreamModulationCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetUpstreamChannelIDCtx(
+	ctx context.Context,
+) (NewUpstreamChannelID uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1405,7 +1807,7 @@ func (client *WANCableLinkConfig1) GetUpstreamChannelID() (NewUpstreamChannelID 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetUpstreamChannelID", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetUpstreamChannelID", request, response); err != nil {
 		return
 	}
 
@@ -1418,7 +1820,15 @@ func (client *WANCableLinkConfig1) GetUpstreamChannelID() (NewUpstreamChannelID 
 	return
 }
 
-func (client *WANCableLinkConfig1) GetUpstreamPowerLevel() (NewUpstreamPowerLevel uint32, err error) {
+// GetUpstreamChannelID is the legacy version of GetUpstreamChannelIDCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetUpstreamChannelID() (NewUpstreamChannelID uint32, err error) {
+	return client.GetUpstreamChannelIDCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetUpstreamPowerLevelCtx(
+	ctx context.Context,
+) (NewUpstreamPowerLevel uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1431,7 +1841,7 @@ func (client *WANCableLinkConfig1) GetUpstreamPowerLevel() (NewUpstreamPowerLeve
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetUpstreamPowerLevel", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetUpstreamPowerLevel", request, response); err != nil {
 		return
 	}
 
@@ -1444,7 +1854,15 @@ func (client *WANCableLinkConfig1) GetUpstreamPowerLevel() (NewUpstreamPowerLeve
 	return
 }
 
-func (client *WANCableLinkConfig1) GetBPIEncryptionEnabled() (NewBPIEncryptionEnabled bool, err error) {
+// GetUpstreamPowerLevel is the legacy version of GetUpstreamPowerLevelCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetUpstreamPowerLevel() (NewUpstreamPowerLevel uint32, err error) {
+	return client.GetUpstreamPowerLevelCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetBPIEncryptionEnabledCtx(
+	ctx context.Context,
+) (NewBPIEncryptionEnabled bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1457,7 +1875,7 @@ func (client *WANCableLinkConfig1) GetBPIEncryptionEnabled() (NewBPIEncryptionEn
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetBPIEncryptionEnabled", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetBPIEncryptionEnabled", request, response); err != nil {
 		return
 	}
 
@@ -1470,7 +1888,15 @@ func (client *WANCableLinkConfig1) GetBPIEncryptionEnabled() (NewBPIEncryptionEn
 	return
 }
 
-func (client *WANCableLinkConfig1) GetConfigFile() (NewConfigFile string, err error) {
+// GetBPIEncryptionEnabled is the legacy version of GetBPIEncryptionEnabledCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetBPIEncryptionEnabled() (NewBPIEncryptionEnabled bool, err error) {
+	return client.GetBPIEncryptionEnabledCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetConfigFileCtx(
+	ctx context.Context,
+) (NewConfigFile string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1483,7 +1909,7 @@ func (client *WANCableLinkConfig1) GetConfigFile() (NewConfigFile string, err er
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetConfigFile", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetConfigFile", request, response); err != nil {
 		return
 	}
 
@@ -1496,7 +1922,15 @@ func (client *WANCableLinkConfig1) GetConfigFile() (NewConfigFile string, err er
 	return
 }
 
-func (client *WANCableLinkConfig1) GetTFTPServer() (NewTFTPServer string, err error) {
+// GetConfigFile is the legacy version of GetConfigFileCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetConfigFile() (NewConfigFile string, err error) {
+	return client.GetConfigFileCtx(context.Background())
+}
+
+func (client *WANCableLinkConfig1) GetTFTPServerCtx(
+	ctx context.Context,
+) (NewTFTPServer string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1509,7 +1943,7 @@ func (client *WANCableLinkConfig1) GetTFTPServer() (NewTFTPServer string, err er
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCableLinkConfig_1, "GetTFTPServer", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCableLinkConfig_1, "GetTFTPServer", request, response); err != nil {
 		return
 	}
 
@@ -1520,6 +1954,12 @@ func (client *WANCableLinkConfig1) GetTFTPServer() (NewTFTPServer string, err er
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetTFTPServer is the legacy version of GetTFTPServerCtx, but uses
+// context.Background() as the context.
+func (client *WANCableLinkConfig1) GetTFTPServer() (NewTFTPServer string, err error) {
+	return client.GetTFTPServerCtx(context.Background())
 }
 
 // WANCommonInterfaceConfig1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1". See
@@ -1582,7 +2022,10 @@ func newWANCommonInterfaceConfig1ClientsFromGenericClients(genericClients []goup
 	return clients
 }
 
-func (client *WANCommonInterfaceConfig1) SetEnabledForInternet(NewEnabledForInternet bool) (err error) {
+func (client *WANCommonInterfaceConfig1) SetEnabledForInternetCtx(
+	ctx context.Context,
+	NewEnabledForInternet bool,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewEnabledForInternet string
@@ -1598,7 +2041,7 @@ func (client *WANCommonInterfaceConfig1) SetEnabledForInternet(NewEnabledForInte
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "SetEnabledForInternet", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "SetEnabledForInternet", request, response); err != nil {
 		return
 	}
 
@@ -1608,7 +2051,17 @@ func (client *WANCommonInterfaceConfig1) SetEnabledForInternet(NewEnabledForInte
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetEnabledForInternet() (NewEnabledForInternet bool, err error) {
+// SetEnabledForInternet is the legacy version of SetEnabledForInternetCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) SetEnabledForInternet(NewEnabledForInternet bool) (err error) {
+	return client.SetEnabledForInternetCtx(context.Background(),
+		NewEnabledForInternet,
+	)
+}
+
+func (client *WANCommonInterfaceConfig1) GetEnabledForInternetCtx(
+	ctx context.Context,
+) (NewEnabledForInternet bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1621,7 +2074,7 @@ func (client *WANCommonInterfaceConfig1) GetEnabledForInternet() (NewEnabledForI
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetEnabledForInternet", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetEnabledForInternet", request, response); err != nil {
 		return
 	}
 
@@ -1634,13 +2087,21 @@ func (client *WANCommonInterfaceConfig1) GetEnabledForInternet() (NewEnabledForI
 	return
 }
 
+// GetEnabledForInternet is the legacy version of GetEnabledForInternetCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetEnabledForInternet() (NewEnabledForInternet bool, err error) {
+	return client.GetEnabledForInternetCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewWANAccessType: allowed values: DSL, POTS, Cable, Ethernet
 //
 // * NewPhysicalLinkStatus: allowed values: Up, Down
-func (client *WANCommonInterfaceConfig1) GetCommonLinkProperties() (NewWANAccessType string, NewLayer1UpstreamMaxBitRate uint32, NewLayer1DownstreamMaxBitRate uint32, NewPhysicalLinkStatus string, err error) {
+func (client *WANCommonInterfaceConfig1) GetCommonLinkPropertiesCtx(
+	ctx context.Context,
+) (NewWANAccessType string, NewLayer1UpstreamMaxBitRate uint32, NewLayer1DownstreamMaxBitRate uint32, NewPhysicalLinkStatus string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1656,7 +2117,7 @@ func (client *WANCommonInterfaceConfig1) GetCommonLinkProperties() (NewWANAccess
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetCommonLinkProperties", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetCommonLinkProperties", request, response); err != nil {
 		return
 	}
 
@@ -1678,7 +2139,15 @@ func (client *WANCommonInterfaceConfig1) GetCommonLinkProperties() (NewWANAccess
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetWANAccessProvider() (NewWANAccessProvider string, err error) {
+// GetCommonLinkProperties is the legacy version of GetCommonLinkPropertiesCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetCommonLinkProperties() (NewWANAccessType string, NewLayer1UpstreamMaxBitRate uint32, NewLayer1DownstreamMaxBitRate uint32, NewPhysicalLinkStatus string, err error) {
+	return client.GetCommonLinkPropertiesCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetWANAccessProviderCtx(
+	ctx context.Context,
+) (NewWANAccessProvider string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1691,7 +2160,7 @@ func (client *WANCommonInterfaceConfig1) GetWANAccessProvider() (NewWANAccessPro
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetWANAccessProvider", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetWANAccessProvider", request, response); err != nil {
 		return
 	}
 
@@ -1704,11 +2173,19 @@ func (client *WANCommonInterfaceConfig1) GetWANAccessProvider() (NewWANAccessPro
 	return
 }
 
+// GetWANAccessProvider is the legacy version of GetWANAccessProviderCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetWANAccessProvider() (NewWANAccessProvider string, err error) {
+	return client.GetWANAccessProviderCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewMaximumActiveConnections: allowed value range: minimum=1, step=1
-func (client *WANCommonInterfaceConfig1) GetMaximumActiveConnections() (NewMaximumActiveConnections uint16, err error) {
+func (client *WANCommonInterfaceConfig1) GetMaximumActiveConnectionsCtx(
+	ctx context.Context,
+) (NewMaximumActiveConnections uint16, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1721,7 +2198,7 @@ func (client *WANCommonInterfaceConfig1) GetMaximumActiveConnections() (NewMaxim
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetMaximumActiveConnections", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetMaximumActiveConnections", request, response); err != nil {
 		return
 	}
 
@@ -1734,7 +2211,15 @@ func (client *WANCommonInterfaceConfig1) GetMaximumActiveConnections() (NewMaxim
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetTotalBytesSent() (NewTotalBytesSent uint64, err error) {
+// GetMaximumActiveConnections is the legacy version of GetMaximumActiveConnectionsCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetMaximumActiveConnections() (NewMaximumActiveConnections uint16, err error) {
+	return client.GetMaximumActiveConnectionsCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetTotalBytesSentCtx(
+	ctx context.Context,
+) (NewTotalBytesSent uint64, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1747,7 +2232,7 @@ func (client *WANCommonInterfaceConfig1) GetTotalBytesSent() (NewTotalBytesSent 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetTotalBytesSent", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetTotalBytesSent", request, response); err != nil {
 		return
 	}
 
@@ -1760,7 +2245,15 @@ func (client *WANCommonInterfaceConfig1) GetTotalBytesSent() (NewTotalBytesSent 
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetTotalBytesReceived() (NewTotalBytesReceived uint64, err error) {
+// GetTotalBytesSent is the legacy version of GetTotalBytesSentCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetTotalBytesSent() (NewTotalBytesSent uint64, err error) {
+	return client.GetTotalBytesSentCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetTotalBytesReceivedCtx(
+	ctx context.Context,
+) (NewTotalBytesReceived uint64, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1773,7 +2266,7 @@ func (client *WANCommonInterfaceConfig1) GetTotalBytesReceived() (NewTotalBytesR
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetTotalBytesReceived", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetTotalBytesReceived", request, response); err != nil {
 		return
 	}
 
@@ -1786,7 +2279,15 @@ func (client *WANCommonInterfaceConfig1) GetTotalBytesReceived() (NewTotalBytesR
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetTotalPacketsSent() (NewTotalPacketsSent uint32, err error) {
+// GetTotalBytesReceived is the legacy version of GetTotalBytesReceivedCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetTotalBytesReceived() (NewTotalBytesReceived uint64, err error) {
+	return client.GetTotalBytesReceivedCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetTotalPacketsSentCtx(
+	ctx context.Context,
+) (NewTotalPacketsSent uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1799,7 +2300,7 @@ func (client *WANCommonInterfaceConfig1) GetTotalPacketsSent() (NewTotalPacketsS
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetTotalPacketsSent", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetTotalPacketsSent", request, response); err != nil {
 		return
 	}
 
@@ -1812,7 +2313,15 @@ func (client *WANCommonInterfaceConfig1) GetTotalPacketsSent() (NewTotalPacketsS
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetTotalPacketsReceived() (NewTotalPacketsReceived uint32, err error) {
+// GetTotalPacketsSent is the legacy version of GetTotalPacketsSentCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetTotalPacketsSent() (NewTotalPacketsSent uint32, err error) {
+	return client.GetTotalPacketsSentCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetTotalPacketsReceivedCtx(
+	ctx context.Context,
+) (NewTotalPacketsReceived uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1825,7 +2334,7 @@ func (client *WANCommonInterfaceConfig1) GetTotalPacketsReceived() (NewTotalPack
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetTotalPacketsReceived", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetTotalPacketsReceived", request, response); err != nil {
 		return
 	}
 
@@ -1838,7 +2347,16 @@ func (client *WANCommonInterfaceConfig1) GetTotalPacketsReceived() (NewTotalPack
 	return
 }
 
-func (client *WANCommonInterfaceConfig1) GetActiveConnection(NewActiveConnectionIndex uint16) (NewActiveConnDeviceContainer string, NewActiveConnectionServiceID string, err error) {
+// GetTotalPacketsReceived is the legacy version of GetTotalPacketsReceivedCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetTotalPacketsReceived() (NewTotalPacketsReceived uint32, err error) {
+	return client.GetTotalPacketsReceivedCtx(context.Background())
+}
+
+func (client *WANCommonInterfaceConfig1) GetActiveConnectionCtx(
+	ctx context.Context,
+	NewActiveConnectionIndex uint16,
+) (NewActiveConnDeviceContainer string, NewActiveConnectionServiceID string, err error) {
 	// Request structure.
 	request := &struct {
 		NewActiveConnectionIndex string
@@ -1857,7 +2375,7 @@ func (client *WANCommonInterfaceConfig1) GetActiveConnection(NewActiveConnection
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANCommonInterfaceConfig_1, "GetActiveConnection", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANCommonInterfaceConfig_1, "GetActiveConnection", request, response); err != nil {
 		return
 	}
 
@@ -1871,6 +2389,14 @@ func (client *WANCommonInterfaceConfig1) GetActiveConnection(NewActiveConnection
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetActiveConnection is the legacy version of GetActiveConnectionCtx, but uses
+// context.Background() as the context.
+func (client *WANCommonInterfaceConfig1) GetActiveConnection(NewActiveConnectionIndex uint16) (NewActiveConnDeviceContainer string, NewActiveConnectionServiceID string, err error) {
+	return client.GetActiveConnectionCtx(context.Background(),
+		NewActiveConnectionIndex,
+	)
 }
 
 // WANDSLLinkConfig1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANDSLLinkConfig:1". See
@@ -1933,7 +2459,10 @@ func newWANDSLLinkConfig1ClientsFromGenericClients(genericClients []goupnp.Servi
 	return clients
 }
 
-func (client *WANDSLLinkConfig1) SetDSLLinkType(NewLinkType string) (err error) {
+func (client *WANDSLLinkConfig1) SetDSLLinkTypeCtx(
+	ctx context.Context,
+	NewLinkType string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewLinkType string
@@ -1949,7 +2478,7 @@ func (client *WANDSLLinkConfig1) SetDSLLinkType(NewLinkType string) (err error) 
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "SetDSLLinkType", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "SetDSLLinkType", request, response); err != nil {
 		return
 	}
 
@@ -1959,11 +2488,21 @@ func (client *WANDSLLinkConfig1) SetDSLLinkType(NewLinkType string) (err error) 
 	return
 }
 
+// SetDSLLinkType is the legacy version of SetDSLLinkTypeCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) SetDSLLinkType(NewLinkType string) (err error) {
+	return client.SetDSLLinkTypeCtx(context.Background(),
+		NewLinkType,
+	)
+}
+
 //
 // Return values:
 //
 // * NewLinkStatus: allowed values: Up, Down
-func (client *WANDSLLinkConfig1) GetDSLLinkInfo() (NewLinkType string, NewLinkStatus string, err error) {
+func (client *WANDSLLinkConfig1) GetDSLLinkInfoCtx(
+	ctx context.Context,
+) (NewLinkType string, NewLinkStatus string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -1977,7 +2516,7 @@ func (client *WANDSLLinkConfig1) GetDSLLinkInfo() (NewLinkType string, NewLinkSt
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetDSLLinkInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetDSLLinkInfo", request, response); err != nil {
 		return
 	}
 
@@ -1993,7 +2532,15 @@ func (client *WANDSLLinkConfig1) GetDSLLinkInfo() (NewLinkType string, NewLinkSt
 	return
 }
 
-func (client *WANDSLLinkConfig1) GetAutoConfig() (NewAutoConfig bool, err error) {
+// GetDSLLinkInfo is the legacy version of GetDSLLinkInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetDSLLinkInfo() (NewLinkType string, NewLinkStatus string, err error) {
+	return client.GetDSLLinkInfoCtx(context.Background())
+}
+
+func (client *WANDSLLinkConfig1) GetAutoConfigCtx(
+	ctx context.Context,
+) (NewAutoConfig bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2006,7 +2553,7 @@ func (client *WANDSLLinkConfig1) GetAutoConfig() (NewAutoConfig bool, err error)
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetAutoConfig", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetAutoConfig", request, response); err != nil {
 		return
 	}
 
@@ -2019,7 +2566,15 @@ func (client *WANDSLLinkConfig1) GetAutoConfig() (NewAutoConfig bool, err error)
 	return
 }
 
-func (client *WANDSLLinkConfig1) GetModulationType() (NewModulationType string, err error) {
+// GetAutoConfig is the legacy version of GetAutoConfigCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetAutoConfig() (NewAutoConfig bool, err error) {
+	return client.GetAutoConfigCtx(context.Background())
+}
+
+func (client *WANDSLLinkConfig1) GetModulationTypeCtx(
+	ctx context.Context,
+) (NewModulationType string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2032,7 +2587,7 @@ func (client *WANDSLLinkConfig1) GetModulationType() (NewModulationType string, 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetModulationType", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetModulationType", request, response); err != nil {
 		return
 	}
 
@@ -2045,7 +2600,16 @@ func (client *WANDSLLinkConfig1) GetModulationType() (NewModulationType string, 
 	return
 }
 
-func (client *WANDSLLinkConfig1) SetDestinationAddress(NewDestinationAddress string) (err error) {
+// GetModulationType is the legacy version of GetModulationTypeCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetModulationType() (NewModulationType string, err error) {
+	return client.GetModulationTypeCtx(context.Background())
+}
+
+func (client *WANDSLLinkConfig1) SetDestinationAddressCtx(
+	ctx context.Context,
+	NewDestinationAddress string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewDestinationAddress string
@@ -2061,7 +2625,7 @@ func (client *WANDSLLinkConfig1) SetDestinationAddress(NewDestinationAddress str
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "SetDestinationAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "SetDestinationAddress", request, response); err != nil {
 		return
 	}
 
@@ -2071,7 +2635,17 @@ func (client *WANDSLLinkConfig1) SetDestinationAddress(NewDestinationAddress str
 	return
 }
 
-func (client *WANDSLLinkConfig1) GetDestinationAddress() (NewDestinationAddress string, err error) {
+// SetDestinationAddress is the legacy version of SetDestinationAddressCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) SetDestinationAddress(NewDestinationAddress string) (err error) {
+	return client.SetDestinationAddressCtx(context.Background(),
+		NewDestinationAddress,
+	)
+}
+
+func (client *WANDSLLinkConfig1) GetDestinationAddressCtx(
+	ctx context.Context,
+) (NewDestinationAddress string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2084,7 +2658,7 @@ func (client *WANDSLLinkConfig1) GetDestinationAddress() (NewDestinationAddress 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetDestinationAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetDestinationAddress", request, response); err != nil {
 		return
 	}
 
@@ -2097,7 +2671,16 @@ func (client *WANDSLLinkConfig1) GetDestinationAddress() (NewDestinationAddress 
 	return
 }
 
-func (client *WANDSLLinkConfig1) SetATMEncapsulation(NewATMEncapsulation string) (err error) {
+// GetDestinationAddress is the legacy version of GetDestinationAddressCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetDestinationAddress() (NewDestinationAddress string, err error) {
+	return client.GetDestinationAddressCtx(context.Background())
+}
+
+func (client *WANDSLLinkConfig1) SetATMEncapsulationCtx(
+	ctx context.Context,
+	NewATMEncapsulation string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewATMEncapsulation string
@@ -2113,7 +2696,7 @@ func (client *WANDSLLinkConfig1) SetATMEncapsulation(NewATMEncapsulation string)
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "SetATMEncapsulation", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "SetATMEncapsulation", request, response); err != nil {
 		return
 	}
 
@@ -2123,7 +2706,17 @@ func (client *WANDSLLinkConfig1) SetATMEncapsulation(NewATMEncapsulation string)
 	return
 }
 
-func (client *WANDSLLinkConfig1) GetATMEncapsulation() (NewATMEncapsulation string, err error) {
+// SetATMEncapsulation is the legacy version of SetATMEncapsulationCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) SetATMEncapsulation(NewATMEncapsulation string) (err error) {
+	return client.SetATMEncapsulationCtx(context.Background(),
+		NewATMEncapsulation,
+	)
+}
+
+func (client *WANDSLLinkConfig1) GetATMEncapsulationCtx(
+	ctx context.Context,
+) (NewATMEncapsulation string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2136,7 +2729,7 @@ func (client *WANDSLLinkConfig1) GetATMEncapsulation() (NewATMEncapsulation stri
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetATMEncapsulation", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetATMEncapsulation", request, response); err != nil {
 		return
 	}
 
@@ -2149,7 +2742,16 @@ func (client *WANDSLLinkConfig1) GetATMEncapsulation() (NewATMEncapsulation stri
 	return
 }
 
-func (client *WANDSLLinkConfig1) SetFCSPreserved(NewFCSPreserved bool) (err error) {
+// GetATMEncapsulation is the legacy version of GetATMEncapsulationCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetATMEncapsulation() (NewATMEncapsulation string, err error) {
+	return client.GetATMEncapsulationCtx(context.Background())
+}
+
+func (client *WANDSLLinkConfig1) SetFCSPreservedCtx(
+	ctx context.Context,
+	NewFCSPreserved bool,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewFCSPreserved string
@@ -2165,7 +2767,7 @@ func (client *WANDSLLinkConfig1) SetFCSPreserved(NewFCSPreserved bool) (err erro
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "SetFCSPreserved", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "SetFCSPreserved", request, response); err != nil {
 		return
 	}
 
@@ -2175,7 +2777,17 @@ func (client *WANDSLLinkConfig1) SetFCSPreserved(NewFCSPreserved bool) (err erro
 	return
 }
 
-func (client *WANDSLLinkConfig1) GetFCSPreserved() (NewFCSPreserved bool, err error) {
+// SetFCSPreserved is the legacy version of SetFCSPreservedCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) SetFCSPreserved(NewFCSPreserved bool) (err error) {
+	return client.SetFCSPreservedCtx(context.Background(),
+		NewFCSPreserved,
+	)
+}
+
+func (client *WANDSLLinkConfig1) GetFCSPreservedCtx(
+	ctx context.Context,
+) (NewFCSPreserved bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2188,7 +2800,7 @@ func (client *WANDSLLinkConfig1) GetFCSPreserved() (NewFCSPreserved bool, err er
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANDSLLinkConfig_1, "GetFCSPreserved", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANDSLLinkConfig_1, "GetFCSPreserved", request, response); err != nil {
 		return
 	}
 
@@ -2199,6 +2811,12 @@ func (client *WANDSLLinkConfig1) GetFCSPreserved() (NewFCSPreserved bool, err er
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetFCSPreserved is the legacy version of GetFCSPreservedCtx, but uses
+// context.Background() as the context.
+func (client *WANDSLLinkConfig1) GetFCSPreserved() (NewFCSPreserved bool, err error) {
+	return client.GetFCSPreservedCtx(context.Background())
 }
 
 // WANEthernetLinkConfig1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANEthernetLinkConfig:1". See
@@ -2265,7 +2883,9 @@ func newWANEthernetLinkConfig1ClientsFromGenericClients(genericClients []goupnp.
 // Return values:
 //
 // * NewEthernetLinkStatus: allowed values: Up, Down
-func (client *WANEthernetLinkConfig1) GetEthernetLinkStatus() (NewEthernetLinkStatus string, err error) {
+func (client *WANEthernetLinkConfig1) GetEthernetLinkStatusCtx(
+	ctx context.Context,
+) (NewEthernetLinkStatus string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2278,7 +2898,7 @@ func (client *WANEthernetLinkConfig1) GetEthernetLinkStatus() (NewEthernetLinkSt
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANEthernetLinkConfig_1, "GetEthernetLinkStatus", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANEthernetLinkConfig_1, "GetEthernetLinkStatus", request, response); err != nil {
 		return
 	}
 
@@ -2289,6 +2909,12 @@ func (client *WANEthernetLinkConfig1) GetEthernetLinkStatus() (NewEthernetLinkSt
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetEthernetLinkStatus is the legacy version of GetEthernetLinkStatusCtx, but uses
+// context.Background() as the context.
+func (client *WANEthernetLinkConfig1) GetEthernetLinkStatus() (NewEthernetLinkStatus string, err error) {
+	return client.GetEthernetLinkStatusCtx(context.Background())
 }
 
 // WANIPConnection1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANIPConnection:1". See
@@ -2351,7 +2977,10 @@ func newWANIPConnection1ClientsFromGenericClients(genericClients []goupnp.Servic
 	return clients
 }
 
-func (client *WANIPConnection1) SetConnectionType(NewConnectionType string) (err error) {
+func (client *WANIPConnection1) SetConnectionTypeCtx(
+	ctx context.Context,
+	NewConnectionType string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewConnectionType string
@@ -2367,7 +2996,7 @@ func (client *WANIPConnection1) SetConnectionType(NewConnectionType string) (err
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "SetConnectionType", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "SetConnectionType", request, response); err != nil {
 		return
 	}
 
@@ -2377,11 +3006,21 @@ func (client *WANIPConnection1) SetConnectionType(NewConnectionType string) (err
 	return
 }
 
+// SetConnectionType is the legacy version of SetConnectionTypeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) SetConnectionType(NewConnectionType string) (err error) {
+	return client.SetConnectionTypeCtx(context.Background(),
+		NewConnectionType,
+	)
+}
+
 //
 // Return values:
 //
 // * NewPossibleConnectionTypes: allowed values: Unconfigured, IP_Routed, IP_Bridged
-func (client *WANIPConnection1) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+func (client *WANIPConnection1) GetConnectionTypeInfoCtx(
+	ctx context.Context,
+) (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2395,7 +3034,7 @@ func (client *WANIPConnection1) GetConnectionTypeInfo() (NewConnectionType strin
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetConnectionTypeInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetConnectionTypeInfo", request, response); err != nil {
 		return
 	}
 
@@ -2411,7 +3050,44 @@ func (client *WANIPConnection1) GetConnectionTypeInfo() (NewConnectionType strin
 	return
 }
 
+// GetConnectionTypeInfo is the legacy version of GetConnectionTypeInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+	return client.GetConnectionTypeInfoCtx(context.Background())
+}
+
+func (client *WANIPConnection1) RequestConnectionCtx(
+	ctx context.Context,
+) (err error) {
+	// Request structure.
+	request := interface{}(nil)
+	// BEGIN Marshal arguments into request.
+
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "RequestConnection", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// RequestConnection is the legacy version of RequestConnectionCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection1) RequestConnection() (err error) {
+	return client.RequestConnectionCtx(context.Background())
+}
+
+func (client *WANIPConnection1) RequestTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2422,7 +3098,7 @@ func (client *WANIPConnection1) RequestConnection() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "RequestConnection", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "RequestTermination", request, response); err != nil {
 		return
 	}
 
@@ -2432,7 +3108,15 @@ func (client *WANIPConnection1) RequestConnection() (err error) {
 	return
 }
 
+// RequestTermination is the legacy version of RequestTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection1) RequestTermination() (err error) {
+	return client.RequestTerminationCtx(context.Background())
+}
+
+func (client *WANIPConnection1) ForceTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2443,7 +3127,7 @@ func (client *WANIPConnection1) RequestTermination() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "RequestTermination", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "ForceTermination", request, response); err != nil {
 		return
 	}
 
@@ -2453,28 +3137,16 @@ func (client *WANIPConnection1) RequestTermination() (err error) {
 	return
 }
 
+// ForceTermination is the legacy version of ForceTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection1) ForceTermination() (err error) {
-	// Request structure.
-	request := interface{}(nil)
-	// BEGIN Marshal arguments into request.
-
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "ForceTermination", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.ForceTerminationCtx(context.Background())
 }
 
-func (client *WANIPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+func (client *WANIPConnection1) SetAutoDisconnectTimeCtx(
+	ctx context.Context,
+	NewAutoDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewAutoDisconnectTime string
@@ -2490,7 +3162,7 @@ func (client *WANIPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "SetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "SetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -2500,7 +3172,18 @@ func (client *WANIPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint
 	return
 }
 
-func (client *WANIPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+// SetAutoDisconnectTime is the legacy version of SetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+	return client.SetAutoDisconnectTimeCtx(context.Background(),
+		NewAutoDisconnectTime,
+	)
+}
+
+func (client *WANIPConnection1) SetIdleDisconnectTimeCtx(
+	ctx context.Context,
+	NewIdleDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewIdleDisconnectTime string
@@ -2516,7 +3199,7 @@ func (client *WANIPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "SetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "SetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -2526,7 +3209,18 @@ func (client *WANIPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint
 	return
 }
 
-func (client *WANIPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+// SetIdleDisconnectTime is the legacy version of SetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+	return client.SetIdleDisconnectTimeCtx(context.Background(),
+		NewIdleDisconnectTime,
+	)
+}
+
+func (client *WANIPConnection1) SetWarnDisconnectDelayCtx(
+	ctx context.Context,
+	NewWarnDisconnectDelay uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewWarnDisconnectDelay string
@@ -2542,7 +3236,7 @@ func (client *WANIPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay ui
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "SetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "SetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -2552,13 +3246,23 @@ func (client *WANIPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay ui
 	return
 }
 
+// SetWarnDisconnectDelay is the legacy version of SetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+	return client.SetWarnDisconnectDelayCtx(context.Background(),
+		NewWarnDisconnectDelay,
+	)
+}
+
 //
 // Return values:
 //
 // * NewConnectionStatus: allowed values: Unconfigured, Connected, Disconnected
 //
 // * NewLastConnectionError: allowed values: ERROR_NONE
-func (client *WANIPConnection1) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+func (client *WANIPConnection1) GetStatusInfoCtx(
+	ctx context.Context,
+) (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2573,7 +3277,7 @@ func (client *WANIPConnection1) GetStatusInfo() (NewConnectionStatus string, New
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetStatusInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetStatusInfo", request, response); err != nil {
 		return
 	}
 
@@ -2592,7 +3296,15 @@ func (client *WANIPConnection1) GetStatusInfo() (NewConnectionStatus string, New
 	return
 }
 
-func (client *WANIPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+// GetStatusInfo is the legacy version of GetStatusInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+	return client.GetStatusInfoCtx(context.Background())
+}
+
+func (client *WANIPConnection1) GetAutoDisconnectTimeCtx(
+	ctx context.Context,
+) (NewAutoDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2605,7 +3317,7 @@ func (client *WANIPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -2618,7 +3330,15 @@ func (client *WANIPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime u
 	return
 }
 
-func (client *WANIPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+// GetAutoDisconnectTime is the legacy version of GetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+	return client.GetAutoDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANIPConnection1) GetIdleDisconnectTimeCtx(
+	ctx context.Context,
+) (NewIdleDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2631,7 +3351,7 @@ func (client *WANIPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -2644,7 +3364,15 @@ func (client *WANIPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime u
 	return
 }
 
-func (client *WANIPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+// GetIdleDisconnectTime is the legacy version of GetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+	return client.GetIdleDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANIPConnection1) GetWarnDisconnectDelayCtx(
+	ctx context.Context,
+) (NewWarnDisconnectDelay uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2657,7 +3385,7 @@ func (client *WANIPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -2670,7 +3398,15 @@ func (client *WANIPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay
 	return
 }
 
-func (client *WANIPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+// GetWarnDisconnectDelay is the legacy version of GetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+	return client.GetWarnDisconnectDelayCtx(context.Background())
+}
+
+func (client *WANIPConnection1) GetNATRSIPStatusCtx(
+	ctx context.Context,
+) (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2684,7 +3420,7 @@ func (client *WANIPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNA
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetNATRSIPStatus", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetNATRSIPStatus", request, response); err != nil {
 		return
 	}
 
@@ -2700,11 +3436,20 @@ func (client *WANIPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNA
 	return
 }
 
+// GetNATRSIPStatus is the legacy version of GetNATRSIPStatusCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+	return client.GetNATRSIPStatusCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewProtocol: allowed values: TCP, UDP
-func (client *WANIPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANIPConnection1) GetGenericPortMappingEntryCtx(
+	ctx context.Context,
+	NewPortMappingIndex uint16,
+) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewPortMappingIndex string
@@ -2729,7 +3474,7 @@ func (client *WANIPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetGenericPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetGenericPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -2763,12 +3508,25 @@ func (client *WANIPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex u
 	return
 }
 
+// GetGenericPortMappingEntry is the legacy version of GetGenericPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetGenericPortMappingEntryCtx(context.Background(),
+		NewPortMappingIndex,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANIPConnection1) GetSpecificPortMappingEntryCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -2798,7 +3556,7 @@ func (client *WANIPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetSpecificPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetSpecificPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -2823,12 +3581,32 @@ func (client *WANIPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string
 	return
 }
 
+// GetSpecificPortMappingEntry is the legacy version of GetSpecificPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetSpecificPortMappingEntryCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection1) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+func (client *WANIPConnection1) AddPortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+	NewInternalPort uint16,
+	NewInternalClient string,
+	NewEnabled bool,
+	NewPortMappingDescription string,
+	NewLeaseDuration uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost             string
@@ -2872,7 +3650,7 @@ func (client *WANIPConnection1) AddPortMapping(NewRemoteHost string, NewExternal
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "AddPortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "AddPortMapping", request, response); err != nil {
 		return
 	}
 
@@ -2882,12 +3660,32 @@ func (client *WANIPConnection1) AddPortMapping(NewRemoteHost string, NewExternal
 	return
 }
 
+// AddPortMapping is the legacy version of AddPortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+	return client.AddPortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+		NewInternalPort,
+		NewInternalClient,
+		NewEnabled,
+		NewPortMappingDescription,
+		NewLeaseDuration,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection1) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+func (client *WANIPConnection1) DeletePortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -2911,7 +3709,7 @@ func (client *WANIPConnection1) DeletePortMapping(NewRemoteHost string, NewExter
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "DeletePortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "DeletePortMapping", request, response); err != nil {
 		return
 	}
 
@@ -2921,7 +3719,19 @@ func (client *WANIPConnection1) DeletePortMapping(NewRemoteHost string, NewExter
 	return
 }
 
-func (client *WANIPConnection1) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+// DeletePortMapping is the legacy version of DeletePortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+	return client.DeletePortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
+func (client *WANIPConnection1) GetExternalIPAddressCtx(
+	ctx context.Context,
+) (NewExternalIPAddress string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -2934,7 +3744,7 @@ func (client *WANIPConnection1) GetExternalIPAddress() (NewExternalIPAddress str
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_1, "GetExternalIPAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_1, "GetExternalIPAddress", request, response); err != nil {
 		return
 	}
 
@@ -2945,6 +3755,12 @@ func (client *WANIPConnection1) GetExternalIPAddress() (NewExternalIPAddress str
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetExternalIPAddress is the legacy version of GetExternalIPAddressCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection1) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+	return client.GetExternalIPAddressCtx(context.Background())
 }
 
 // WANIPConnection2 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANIPConnection:2". See
@@ -3007,7 +3823,10 @@ func newWANIPConnection2ClientsFromGenericClients(genericClients []goupnp.Servic
 	return clients
 }
 
-func (client *WANIPConnection2) SetConnectionType(NewConnectionType string) (err error) {
+func (client *WANIPConnection2) SetConnectionTypeCtx(
+	ctx context.Context,
+	NewConnectionType string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewConnectionType string
@@ -3023,7 +3842,7 @@ func (client *WANIPConnection2) SetConnectionType(NewConnectionType string) (err
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "SetConnectionType", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "SetConnectionType", request, response); err != nil {
 		return
 	}
 
@@ -3033,7 +3852,17 @@ func (client *WANIPConnection2) SetConnectionType(NewConnectionType string) (err
 	return
 }
 
-func (client *WANIPConnection2) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+// SetConnectionType is the legacy version of SetConnectionTypeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) SetConnectionType(NewConnectionType string) (err error) {
+	return client.SetConnectionTypeCtx(context.Background(),
+		NewConnectionType,
+	)
+}
+
+func (client *WANIPConnection2) GetConnectionTypeInfoCtx(
+	ctx context.Context,
+) (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3047,7 +3876,7 @@ func (client *WANIPConnection2) GetConnectionTypeInfo() (NewConnectionType strin
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetConnectionTypeInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetConnectionTypeInfo", request, response); err != nil {
 		return
 	}
 
@@ -3063,7 +3892,44 @@ func (client *WANIPConnection2) GetConnectionTypeInfo() (NewConnectionType strin
 	return
 }
 
+// GetConnectionTypeInfo is the legacy version of GetConnectionTypeInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+	return client.GetConnectionTypeInfoCtx(context.Background())
+}
+
+func (client *WANIPConnection2) RequestConnectionCtx(
+	ctx context.Context,
+) (err error) {
+	// Request structure.
+	request := interface{}(nil)
+	// BEGIN Marshal arguments into request.
+
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "RequestConnection", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// RequestConnection is the legacy version of RequestConnectionCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection2) RequestConnection() (err error) {
+	return client.RequestConnectionCtx(context.Background())
+}
+
+func (client *WANIPConnection2) RequestTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3074,7 +3940,7 @@ func (client *WANIPConnection2) RequestConnection() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "RequestConnection", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "RequestTermination", request, response); err != nil {
 		return
 	}
 
@@ -3084,7 +3950,15 @@ func (client *WANIPConnection2) RequestConnection() (err error) {
 	return
 }
 
+// RequestTermination is the legacy version of RequestTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection2) RequestTermination() (err error) {
+	return client.RequestTerminationCtx(context.Background())
+}
+
+func (client *WANIPConnection2) ForceTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3095,7 +3969,7 @@ func (client *WANIPConnection2) RequestTermination() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "RequestTermination", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "ForceTermination", request, response); err != nil {
 		return
 	}
 
@@ -3105,28 +3979,16 @@ func (client *WANIPConnection2) RequestTermination() (err error) {
 	return
 }
 
+// ForceTermination is the legacy version of ForceTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANIPConnection2) ForceTermination() (err error) {
-	// Request structure.
-	request := interface{}(nil)
-	// BEGIN Marshal arguments into request.
-
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "ForceTermination", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.ForceTerminationCtx(context.Background())
 }
 
-func (client *WANIPConnection2) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+func (client *WANIPConnection2) SetAutoDisconnectTimeCtx(
+	ctx context.Context,
+	NewAutoDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewAutoDisconnectTime string
@@ -3142,7 +4004,7 @@ func (client *WANIPConnection2) SetAutoDisconnectTime(NewAutoDisconnectTime uint
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "SetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "SetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -3152,7 +4014,18 @@ func (client *WANIPConnection2) SetAutoDisconnectTime(NewAutoDisconnectTime uint
 	return
 }
 
-func (client *WANIPConnection2) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+// SetAutoDisconnectTime is the legacy version of SetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+	return client.SetAutoDisconnectTimeCtx(context.Background(),
+		NewAutoDisconnectTime,
+	)
+}
+
+func (client *WANIPConnection2) SetIdleDisconnectTimeCtx(
+	ctx context.Context,
+	NewIdleDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewIdleDisconnectTime string
@@ -3168,7 +4041,7 @@ func (client *WANIPConnection2) SetIdleDisconnectTime(NewIdleDisconnectTime uint
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "SetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "SetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -3178,7 +4051,18 @@ func (client *WANIPConnection2) SetIdleDisconnectTime(NewIdleDisconnectTime uint
 	return
 }
 
-func (client *WANIPConnection2) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+// SetIdleDisconnectTime is the legacy version of SetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+	return client.SetIdleDisconnectTimeCtx(context.Background(),
+		NewIdleDisconnectTime,
+	)
+}
+
+func (client *WANIPConnection2) SetWarnDisconnectDelayCtx(
+	ctx context.Context,
+	NewWarnDisconnectDelay uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewWarnDisconnectDelay string
@@ -3194,7 +4078,7 @@ func (client *WANIPConnection2) SetWarnDisconnectDelay(NewWarnDisconnectDelay ui
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "SetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "SetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -3204,13 +4088,23 @@ func (client *WANIPConnection2) SetWarnDisconnectDelay(NewWarnDisconnectDelay ui
 	return
 }
 
+// SetWarnDisconnectDelay is the legacy version of SetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+	return client.SetWarnDisconnectDelayCtx(context.Background(),
+		NewWarnDisconnectDelay,
+	)
+}
+
 //
 // Return values:
 //
 // * NewConnectionStatus: allowed values: Unconfigured, Connecting, Connected, PendingDisconnect, Disconnecting, Disconnected
 //
 // * NewLastConnectionError: allowed values: ERROR_NONE, ERROR_COMMAND_ABORTED, ERROR_NOT_ENABLED_FOR_INTERNET, ERROR_USER_DISCONNECT, ERROR_ISP_DISCONNECT, ERROR_IDLE_DISCONNECT, ERROR_FORCED_DISCONNECT, ERROR_NO_CARRIER, ERROR_IP_CONFIGURATION, ERROR_UNKNOWN
-func (client *WANIPConnection2) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+func (client *WANIPConnection2) GetStatusInfoCtx(
+	ctx context.Context,
+) (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3225,7 +4119,7 @@ func (client *WANIPConnection2) GetStatusInfo() (NewConnectionStatus string, New
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetStatusInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetStatusInfo", request, response); err != nil {
 		return
 	}
 
@@ -3244,7 +4138,15 @@ func (client *WANIPConnection2) GetStatusInfo() (NewConnectionStatus string, New
 	return
 }
 
-func (client *WANIPConnection2) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+// GetStatusInfo is the legacy version of GetStatusInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+	return client.GetStatusInfoCtx(context.Background())
+}
+
+func (client *WANIPConnection2) GetAutoDisconnectTimeCtx(
+	ctx context.Context,
+) (NewAutoDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3257,7 +4159,7 @@ func (client *WANIPConnection2) GetAutoDisconnectTime() (NewAutoDisconnectTime u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -3270,7 +4172,15 @@ func (client *WANIPConnection2) GetAutoDisconnectTime() (NewAutoDisconnectTime u
 	return
 }
 
-func (client *WANIPConnection2) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+// GetAutoDisconnectTime is the legacy version of GetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+	return client.GetAutoDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANIPConnection2) GetIdleDisconnectTimeCtx(
+	ctx context.Context,
+) (NewIdleDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3283,7 +4193,7 @@ func (client *WANIPConnection2) GetIdleDisconnectTime() (NewIdleDisconnectTime u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -3296,7 +4206,15 @@ func (client *WANIPConnection2) GetIdleDisconnectTime() (NewIdleDisconnectTime u
 	return
 }
 
-func (client *WANIPConnection2) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+// GetIdleDisconnectTime is the legacy version of GetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+	return client.GetIdleDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANIPConnection2) GetWarnDisconnectDelayCtx(
+	ctx context.Context,
+) (NewWarnDisconnectDelay uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3309,7 +4227,7 @@ func (client *WANIPConnection2) GetWarnDisconnectDelay() (NewWarnDisconnectDelay
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -3322,7 +4240,15 @@ func (client *WANIPConnection2) GetWarnDisconnectDelay() (NewWarnDisconnectDelay
 	return
 }
 
-func (client *WANIPConnection2) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+// GetWarnDisconnectDelay is the legacy version of GetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+	return client.GetWarnDisconnectDelayCtx(context.Background())
+}
+
+func (client *WANIPConnection2) GetNATRSIPStatusCtx(
+	ctx context.Context,
+) (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3336,7 +4262,7 @@ func (client *WANIPConnection2) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNA
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetNATRSIPStatus", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetNATRSIPStatus", request, response); err != nil {
 		return
 	}
 
@@ -3352,11 +4278,20 @@ func (client *WANIPConnection2) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNA
 	return
 }
 
+// GetNATRSIPStatus is the legacy version of GetNATRSIPStatusCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+	return client.GetNATRSIPStatusCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewProtocol: allowed values: TCP, UDP
-func (client *WANIPConnection2) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANIPConnection2) GetGenericPortMappingEntryCtx(
+	ctx context.Context,
+	NewPortMappingIndex uint16,
+) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewPortMappingIndex string
@@ -3381,7 +4316,7 @@ func (client *WANIPConnection2) GetGenericPortMappingEntry(NewPortMappingIndex u
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetGenericPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetGenericPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -3415,12 +4350,25 @@ func (client *WANIPConnection2) GetGenericPortMappingEntry(NewPortMappingIndex u
 	return
 }
 
+// GetGenericPortMappingEntry is the legacy version of GetGenericPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetGenericPortMappingEntryCtx(context.Background(),
+		NewPortMappingIndex,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANIPConnection2) GetSpecificPortMappingEntryCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -3450,7 +4398,7 @@ func (client *WANIPConnection2) GetSpecificPortMappingEntry(NewRemoteHost string
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetSpecificPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetSpecificPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -3475,12 +4423,32 @@ func (client *WANIPConnection2) GetSpecificPortMappingEntry(NewRemoteHost string
 	return
 }
 
+// GetSpecificPortMappingEntry is the legacy version of GetSpecificPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetSpecificPortMappingEntryCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+func (client *WANIPConnection2) AddPortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+	NewInternalPort uint16,
+	NewInternalClient string,
+	NewEnabled bool,
+	NewPortMappingDescription string,
+	NewLeaseDuration uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost             string
@@ -3524,7 +4492,7 @@ func (client *WANIPConnection2) AddPortMapping(NewRemoteHost string, NewExternal
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "AddPortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "AddPortMapping", request, response); err != nil {
 		return
 	}
 
@@ -3534,12 +4502,32 @@ func (client *WANIPConnection2) AddPortMapping(NewRemoteHost string, NewExternal
 	return
 }
 
+// AddPortMapping is the legacy version of AddPortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+	return client.AddPortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+		NewInternalPort,
+		NewInternalClient,
+		NewEnabled,
+		NewPortMappingDescription,
+		NewLeaseDuration,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+func (client *WANIPConnection2) DeletePortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -3563,7 +4551,7 @@ func (client *WANIPConnection2) DeletePortMapping(NewRemoteHost string, NewExter
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "DeletePortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "DeletePortMapping", request, response); err != nil {
 		return
 	}
 
@@ -3573,12 +4561,28 @@ func (client *WANIPConnection2) DeletePortMapping(NewRemoteHost string, NewExter
 	return
 }
 
+// DeletePortMapping is the legacy version of DeletePortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+	return client.DeletePortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) DeletePortMappingRange(NewStartPort uint16, NewEndPort uint16, NewProtocol string, NewManage bool) (err error) {
+func (client *WANIPConnection2) DeletePortMappingRangeCtx(
+	ctx context.Context,
+	NewStartPort uint16,
+	NewEndPort uint16,
+	NewProtocol string,
+	NewManage bool,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewStartPort string
@@ -3606,7 +4610,7 @@ func (client *WANIPConnection2) DeletePortMappingRange(NewStartPort uint16, NewE
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "DeletePortMappingRange", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "DeletePortMappingRange", request, response); err != nil {
 		return
 	}
 
@@ -3616,7 +4620,20 @@ func (client *WANIPConnection2) DeletePortMappingRange(NewStartPort uint16, NewE
 	return
 }
 
-func (client *WANIPConnection2) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+// DeletePortMappingRange is the legacy version of DeletePortMappingRangeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) DeletePortMappingRange(NewStartPort uint16, NewEndPort uint16, NewProtocol string, NewManage bool) (err error) {
+	return client.DeletePortMappingRangeCtx(context.Background(),
+		NewStartPort,
+		NewEndPort,
+		NewProtocol,
+		NewManage,
+	)
+}
+
+func (client *WANIPConnection2) GetExternalIPAddressCtx(
+	ctx context.Context,
+) (NewExternalIPAddress string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3629,7 +4646,7 @@ func (client *WANIPConnection2) GetExternalIPAddress() (NewExternalIPAddress str
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetExternalIPAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetExternalIPAddress", request, response); err != nil {
 		return
 	}
 
@@ -3642,12 +4659,25 @@ func (client *WANIPConnection2) GetExternalIPAddress() (NewExternalIPAddress str
 	return
 }
 
+// GetExternalIPAddress is the legacy version of GetExternalIPAddressCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+	return client.GetExternalIPAddressCtx(context.Background())
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) GetListOfPortMappings(NewStartPort uint16, NewEndPort uint16, NewProtocol string, NewManage bool, NewNumberOfPorts uint16) (NewPortListing string, err error) {
+func (client *WANIPConnection2) GetListOfPortMappingsCtx(
+	ctx context.Context,
+	NewStartPort uint16,
+	NewEndPort uint16,
+	NewProtocol string,
+	NewManage bool,
+	NewNumberOfPorts uint16,
+) (NewPortListing string, err error) {
 	// Request structure.
 	request := &struct {
 		NewStartPort     string
@@ -3681,7 +4711,7 @@ func (client *WANIPConnection2) GetListOfPortMappings(NewStartPort uint16, NewEn
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "GetListOfPortMappings", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "GetListOfPortMappings", request, response); err != nil {
 		return
 	}
 
@@ -3694,12 +4724,34 @@ func (client *WANIPConnection2) GetListOfPortMappings(NewStartPort uint16, NewEn
 	return
 }
 
+// GetListOfPortMappings is the legacy version of GetListOfPortMappingsCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) GetListOfPortMappings(NewStartPort uint16, NewEndPort uint16, NewProtocol string, NewManage bool, NewNumberOfPorts uint16) (NewPortListing string, err error) {
+	return client.GetListOfPortMappingsCtx(context.Background(),
+		NewStartPort,
+		NewEndPort,
+		NewProtocol,
+		NewManage,
+		NewNumberOfPorts,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANIPConnection2) AddAnyPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (NewReservedPort uint16, err error) {
+func (client *WANIPConnection2) AddAnyPortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+	NewInternalPort uint16,
+	NewInternalClient string,
+	NewEnabled bool,
+	NewPortMappingDescription string,
+	NewLeaseDuration uint32,
+) (NewReservedPort uint16, err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost             string
@@ -3745,7 +4797,7 @@ func (client *WANIPConnection2) AddAnyPortMapping(NewRemoteHost string, NewExter
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPConnection_2, "AddAnyPortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPConnection_2, "AddAnyPortMapping", request, response); err != nil {
 		return
 	}
 
@@ -3756,6 +4808,21 @@ func (client *WANIPConnection2) AddAnyPortMapping(NewRemoteHost string, NewExter
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// AddAnyPortMapping is the legacy version of AddAnyPortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPConnection2) AddAnyPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (NewReservedPort uint16, err error) {
+	return client.AddAnyPortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+		NewInternalPort,
+		NewInternalClient,
+		NewEnabled,
+		NewPortMappingDescription,
+		NewLeaseDuration,
+	)
 }
 
 // WANIPv6FirewallControl1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANIPv6FirewallControl:1". See
@@ -3818,7 +4885,9 @@ func newWANIPv6FirewallControl1ClientsFromGenericClients(genericClients []goupnp
 	return clients
 }
 
-func (client *WANIPv6FirewallControl1) GetFirewallStatus() (FirewallEnabled bool, InboundPinholeAllowed bool, err error) {
+func (client *WANIPv6FirewallControl1) GetFirewallStatusCtx(
+	ctx context.Context,
+) (FirewallEnabled bool, InboundPinholeAllowed bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -3832,7 +4901,7 @@ func (client *WANIPv6FirewallControl1) GetFirewallStatus() (FirewallEnabled bool
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "GetFirewallStatus", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "GetFirewallStatus", request, response); err != nil {
 		return
 	}
 
@@ -3848,7 +4917,20 @@ func (client *WANIPv6FirewallControl1) GetFirewallStatus() (FirewallEnabled bool
 	return
 }
 
-func (client *WANIPv6FirewallControl1) GetOutboundPinholeTimeout(RemoteHost string, RemotePort uint16, InternalClient string, InternalPort uint16, Protocol uint16) (OutboundPinholeTimeout uint32, err error) {
+// GetFirewallStatus is the legacy version of GetFirewallStatusCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) GetFirewallStatus() (FirewallEnabled bool, InboundPinholeAllowed bool, err error) {
+	return client.GetFirewallStatusCtx(context.Background())
+}
+
+func (client *WANIPv6FirewallControl1) GetOutboundPinholeTimeoutCtx(
+	ctx context.Context,
+	RemoteHost string,
+	RemotePort uint16,
+	InternalClient string,
+	InternalPort uint16,
+	Protocol uint16,
+) (OutboundPinholeTimeout uint32, err error) {
 	// Request structure.
 	request := &struct {
 		RemoteHost     string
@@ -3882,7 +4964,7 @@ func (client *WANIPv6FirewallControl1) GetOutboundPinholeTimeout(RemoteHost stri
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "GetOutboundPinholeTimeout", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "GetOutboundPinholeTimeout", request, response); err != nil {
 		return
 	}
 
@@ -3895,12 +4977,32 @@ func (client *WANIPv6FirewallControl1) GetOutboundPinholeTimeout(RemoteHost stri
 	return
 }
 
+// GetOutboundPinholeTimeout is the legacy version of GetOutboundPinholeTimeoutCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) GetOutboundPinholeTimeout(RemoteHost string, RemotePort uint16, InternalClient string, InternalPort uint16, Protocol uint16) (OutboundPinholeTimeout uint32, err error) {
+	return client.GetOutboundPinholeTimeoutCtx(context.Background(),
+		RemoteHost,
+		RemotePort,
+		InternalClient,
+		InternalPort,
+		Protocol,
+	)
+}
+
 //
 // Arguments:
 //
 // * LeaseTime: allowed value range: minimum=1, maximum=86400
 
-func (client *WANIPv6FirewallControl1) AddPinhole(RemoteHost string, RemotePort uint16, InternalClient string, InternalPort uint16, Protocol uint16, LeaseTime uint32) (UniqueID uint16, err error) {
+func (client *WANIPv6FirewallControl1) AddPinholeCtx(
+	ctx context.Context,
+	RemoteHost string,
+	RemotePort uint16,
+	InternalClient string,
+	InternalPort uint16,
+	Protocol uint16,
+	LeaseTime uint32,
+) (UniqueID uint16, err error) {
 	// Request structure.
 	request := &struct {
 		RemoteHost     string
@@ -3938,7 +5040,7 @@ func (client *WANIPv6FirewallControl1) AddPinhole(RemoteHost string, RemotePort 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "AddPinhole", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "AddPinhole", request, response); err != nil {
 		return
 	}
 
@@ -3951,12 +5053,29 @@ func (client *WANIPv6FirewallControl1) AddPinhole(RemoteHost string, RemotePort 
 	return
 }
 
+// AddPinhole is the legacy version of AddPinholeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) AddPinhole(RemoteHost string, RemotePort uint16, InternalClient string, InternalPort uint16, Protocol uint16, LeaseTime uint32) (UniqueID uint16, err error) {
+	return client.AddPinholeCtx(context.Background(),
+		RemoteHost,
+		RemotePort,
+		InternalClient,
+		InternalPort,
+		Protocol,
+		LeaseTime,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewLeaseTime: allowed value range: minimum=1, maximum=86400
 
-func (client *WANIPv6FirewallControl1) UpdatePinhole(UniqueID uint16, NewLeaseTime uint32) (err error) {
+func (client *WANIPv6FirewallControl1) UpdatePinholeCtx(
+	ctx context.Context,
+	UniqueID uint16,
+	NewLeaseTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		UniqueID     string
@@ -3976,7 +5095,7 @@ func (client *WANIPv6FirewallControl1) UpdatePinhole(UniqueID uint16, NewLeaseTi
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "UpdatePinhole", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "UpdatePinhole", request, response); err != nil {
 		return
 	}
 
@@ -3986,7 +5105,19 @@ func (client *WANIPv6FirewallControl1) UpdatePinhole(UniqueID uint16, NewLeaseTi
 	return
 }
 
-func (client *WANIPv6FirewallControl1) DeletePinhole(UniqueID uint16) (err error) {
+// UpdatePinhole is the legacy version of UpdatePinholeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) UpdatePinhole(UniqueID uint16, NewLeaseTime uint32) (err error) {
+	return client.UpdatePinholeCtx(context.Background(),
+		UniqueID,
+		NewLeaseTime,
+	)
+}
+
+func (client *WANIPv6FirewallControl1) DeletePinholeCtx(
+	ctx context.Context,
+	UniqueID uint16,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		UniqueID string
@@ -4002,7 +5133,7 @@ func (client *WANIPv6FirewallControl1) DeletePinhole(UniqueID uint16) (err error
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "DeletePinhole", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "DeletePinhole", request, response); err != nil {
 		return
 	}
 
@@ -4012,7 +5143,18 @@ func (client *WANIPv6FirewallControl1) DeletePinhole(UniqueID uint16) (err error
 	return
 }
 
-func (client *WANIPv6FirewallControl1) GetPinholePackets(UniqueID uint16) (PinholePackets uint32, err error) {
+// DeletePinhole is the legacy version of DeletePinholeCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) DeletePinhole(UniqueID uint16) (err error) {
+	return client.DeletePinholeCtx(context.Background(),
+		UniqueID,
+	)
+}
+
+func (client *WANIPv6FirewallControl1) GetPinholePacketsCtx(
+	ctx context.Context,
+	UniqueID uint16,
+) (PinholePackets uint32, err error) {
 	// Request structure.
 	request := &struct {
 		UniqueID string
@@ -4030,7 +5172,7 @@ func (client *WANIPv6FirewallControl1) GetPinholePackets(UniqueID uint16) (Pinho
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "GetPinholePackets", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "GetPinholePackets", request, response); err != nil {
 		return
 	}
 
@@ -4043,7 +5185,18 @@ func (client *WANIPv6FirewallControl1) GetPinholePackets(UniqueID uint16) (Pinho
 	return
 }
 
-func (client *WANIPv6FirewallControl1) CheckPinholeWorking(UniqueID uint16) (IsWorking bool, err error) {
+// GetPinholePackets is the legacy version of GetPinholePacketsCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) GetPinholePackets(UniqueID uint16) (PinholePackets uint32, err error) {
+	return client.GetPinholePacketsCtx(context.Background(),
+		UniqueID,
+	)
+}
+
+func (client *WANIPv6FirewallControl1) CheckPinholeWorkingCtx(
+	ctx context.Context,
+	UniqueID uint16,
+) (IsWorking bool, err error) {
 	// Request structure.
 	request := &struct {
 		UniqueID string
@@ -4061,7 +5214,7 @@ func (client *WANIPv6FirewallControl1) CheckPinholeWorking(UniqueID uint16) (IsW
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANIPv6FirewallControl_1, "CheckPinholeWorking", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANIPv6FirewallControl_1, "CheckPinholeWorking", request, response); err != nil {
 		return
 	}
 
@@ -4072,6 +5225,14 @@ func (client *WANIPv6FirewallControl1) CheckPinholeWorking(UniqueID uint16) (IsW
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// CheckPinholeWorking is the legacy version of CheckPinholeWorkingCtx, but uses
+// context.Background() as the context.
+func (client *WANIPv6FirewallControl1) CheckPinholeWorking(UniqueID uint16) (IsWorking bool, err error) {
+	return client.CheckPinholeWorkingCtx(context.Background(),
+		UniqueID,
+	)
 }
 
 // WANPOTSLinkConfig1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANPOTSLinkConfig:1". See
@@ -4139,7 +5300,12 @@ func newWANPOTSLinkConfig1ClientsFromGenericClients(genericClients []goupnp.Serv
 //
 // * NewLinkType: allowed values: PPP_Dialup
 
-func (client *WANPOTSLinkConfig1) SetISPInfo(NewISPPhoneNumber string, NewISPInfo string, NewLinkType string) (err error) {
+func (client *WANPOTSLinkConfig1) SetISPInfoCtx(
+	ctx context.Context,
+	NewISPPhoneNumber string,
+	NewISPInfo string,
+	NewLinkType string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewISPPhoneNumber string
@@ -4163,7 +5329,7 @@ func (client *WANPOTSLinkConfig1) SetISPInfo(NewISPPhoneNumber string, NewISPInf
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "SetISPInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "SetISPInfo", request, response); err != nil {
 		return
 	}
 
@@ -4173,7 +5339,21 @@ func (client *WANPOTSLinkConfig1) SetISPInfo(NewISPPhoneNumber string, NewISPInf
 	return
 }
 
-func (client *WANPOTSLinkConfig1) SetCallRetryInfo(NewNumberOfRetries uint32, NewDelayBetweenRetries uint32) (err error) {
+// SetISPInfo is the legacy version of SetISPInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) SetISPInfo(NewISPPhoneNumber string, NewISPInfo string, NewLinkType string) (err error) {
+	return client.SetISPInfoCtx(context.Background(),
+		NewISPPhoneNumber,
+		NewISPInfo,
+		NewLinkType,
+	)
+}
+
+func (client *WANPOTSLinkConfig1) SetCallRetryInfoCtx(
+	ctx context.Context,
+	NewNumberOfRetries uint32,
+	NewDelayBetweenRetries uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewNumberOfRetries     string
@@ -4193,7 +5373,7 @@ func (client *WANPOTSLinkConfig1) SetCallRetryInfo(NewNumberOfRetries uint32, Ne
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "SetCallRetryInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "SetCallRetryInfo", request, response); err != nil {
 		return
 	}
 
@@ -4203,11 +5383,22 @@ func (client *WANPOTSLinkConfig1) SetCallRetryInfo(NewNumberOfRetries uint32, Ne
 	return
 }
 
+// SetCallRetryInfo is the legacy version of SetCallRetryInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) SetCallRetryInfo(NewNumberOfRetries uint32, NewDelayBetweenRetries uint32) (err error) {
+	return client.SetCallRetryInfoCtx(context.Background(),
+		NewNumberOfRetries,
+		NewDelayBetweenRetries,
+	)
+}
+
 //
 // Return values:
 //
 // * NewLinkType: allowed values: PPP_Dialup
-func (client *WANPOTSLinkConfig1) GetISPInfo() (NewISPPhoneNumber string, NewISPInfo string, NewLinkType string, err error) {
+func (client *WANPOTSLinkConfig1) GetISPInfoCtx(
+	ctx context.Context,
+) (NewISPPhoneNumber string, NewISPInfo string, NewLinkType string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4222,7 +5413,7 @@ func (client *WANPOTSLinkConfig1) GetISPInfo() (NewISPPhoneNumber string, NewISP
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetISPInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetISPInfo", request, response); err != nil {
 		return
 	}
 
@@ -4241,7 +5432,15 @@ func (client *WANPOTSLinkConfig1) GetISPInfo() (NewISPPhoneNumber string, NewISP
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetCallRetryInfo() (NewNumberOfRetries uint32, NewDelayBetweenRetries uint32, err error) {
+// GetISPInfo is the legacy version of GetISPInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetISPInfo() (NewISPPhoneNumber string, NewISPInfo string, NewLinkType string, err error) {
+	return client.GetISPInfoCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetCallRetryInfoCtx(
+	ctx context.Context,
+) (NewNumberOfRetries uint32, NewDelayBetweenRetries uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4255,7 +5454,7 @@ func (client *WANPOTSLinkConfig1) GetCallRetryInfo() (NewNumberOfRetries uint32,
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetCallRetryInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetCallRetryInfo", request, response); err != nil {
 		return
 	}
 
@@ -4271,7 +5470,15 @@ func (client *WANPOTSLinkConfig1) GetCallRetryInfo() (NewNumberOfRetries uint32,
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetFclass() (NewFclass string, err error) {
+// GetCallRetryInfo is the legacy version of GetCallRetryInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetCallRetryInfo() (NewNumberOfRetries uint32, NewDelayBetweenRetries uint32, err error) {
+	return client.GetCallRetryInfoCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetFclassCtx(
+	ctx context.Context,
+) (NewFclass string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4284,7 +5491,7 @@ func (client *WANPOTSLinkConfig1) GetFclass() (NewFclass string, err error) {
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetFclass", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetFclass", request, response); err != nil {
 		return
 	}
 
@@ -4297,7 +5504,15 @@ func (client *WANPOTSLinkConfig1) GetFclass() (NewFclass string, err error) {
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetDataModulationSupported() (NewDataModulationSupported string, err error) {
+// GetFclass is the legacy version of GetFclassCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetFclass() (NewFclass string, err error) {
+	return client.GetFclassCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetDataModulationSupportedCtx(
+	ctx context.Context,
+) (NewDataModulationSupported string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4310,7 +5525,7 @@ func (client *WANPOTSLinkConfig1) GetDataModulationSupported() (NewDataModulatio
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetDataModulationSupported", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetDataModulationSupported", request, response); err != nil {
 		return
 	}
 
@@ -4323,7 +5538,15 @@ func (client *WANPOTSLinkConfig1) GetDataModulationSupported() (NewDataModulatio
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetDataProtocol() (NewDataProtocol string, err error) {
+// GetDataModulationSupported is the legacy version of GetDataModulationSupportedCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetDataModulationSupported() (NewDataModulationSupported string, err error) {
+	return client.GetDataModulationSupportedCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetDataProtocolCtx(
+	ctx context.Context,
+) (NewDataProtocol string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4336,7 +5559,7 @@ func (client *WANPOTSLinkConfig1) GetDataProtocol() (NewDataProtocol string, err
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetDataProtocol", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetDataProtocol", request, response); err != nil {
 		return
 	}
 
@@ -4349,7 +5572,15 @@ func (client *WANPOTSLinkConfig1) GetDataProtocol() (NewDataProtocol string, err
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetDataCompression() (NewDataCompression string, err error) {
+// GetDataProtocol is the legacy version of GetDataProtocolCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetDataProtocol() (NewDataProtocol string, err error) {
+	return client.GetDataProtocolCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetDataCompressionCtx(
+	ctx context.Context,
+) (NewDataCompression string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4362,7 +5593,7 @@ func (client *WANPOTSLinkConfig1) GetDataCompression() (NewDataCompression strin
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetDataCompression", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetDataCompression", request, response); err != nil {
 		return
 	}
 
@@ -4375,7 +5606,15 @@ func (client *WANPOTSLinkConfig1) GetDataCompression() (NewDataCompression strin
 	return
 }
 
-func (client *WANPOTSLinkConfig1) GetPlusVTRCommandSupported() (NewPlusVTRCommandSupported bool, err error) {
+// GetDataCompression is the legacy version of GetDataCompressionCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetDataCompression() (NewDataCompression string, err error) {
+	return client.GetDataCompressionCtx(context.Background())
+}
+
+func (client *WANPOTSLinkConfig1) GetPlusVTRCommandSupportedCtx(
+	ctx context.Context,
+) (NewPlusVTRCommandSupported bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4388,7 +5627,7 @@ func (client *WANPOTSLinkConfig1) GetPlusVTRCommandSupported() (NewPlusVTRComman
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPOTSLinkConfig_1, "GetPlusVTRCommandSupported", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPOTSLinkConfig_1, "GetPlusVTRCommandSupported", request, response); err != nil {
 		return
 	}
 
@@ -4399,6 +5638,12 @@ func (client *WANPOTSLinkConfig1) GetPlusVTRCommandSupported() (NewPlusVTRComman
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetPlusVTRCommandSupported is the legacy version of GetPlusVTRCommandSupportedCtx, but uses
+// context.Background() as the context.
+func (client *WANPOTSLinkConfig1) GetPlusVTRCommandSupported() (NewPlusVTRCommandSupported bool, err error) {
+	return client.GetPlusVTRCommandSupportedCtx(context.Background())
 }
 
 // WANPPPConnection1 is a client for UPnP SOAP service with URN "urn:schemas-upnp-org:service:WANPPPConnection:1". See
@@ -4461,7 +5706,10 @@ func newWANPPPConnection1ClientsFromGenericClients(genericClients []goupnp.Servi
 	return clients
 }
 
-func (client *WANPPPConnection1) SetConnectionType(NewConnectionType string) (err error) {
+func (client *WANPPPConnection1) SetConnectionTypeCtx(
+	ctx context.Context,
+	NewConnectionType string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewConnectionType string
@@ -4477,7 +5725,7 @@ func (client *WANPPPConnection1) SetConnectionType(NewConnectionType string) (er
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "SetConnectionType", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "SetConnectionType", request, response); err != nil {
 		return
 	}
 
@@ -4487,11 +5735,21 @@ func (client *WANPPPConnection1) SetConnectionType(NewConnectionType string) (er
 	return
 }
 
+// SetConnectionType is the legacy version of SetConnectionTypeCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) SetConnectionType(NewConnectionType string) (err error) {
+	return client.SetConnectionTypeCtx(context.Background(),
+		NewConnectionType,
+	)
+}
+
 //
 // Return values:
 //
 // * NewPossibleConnectionTypes: allowed values: Unconfigured, IP_Routed, DHCP_Spoofed, PPPoE_Bridged, PPTP_Relay, L2TP_Relay, PPPoE_Relay
-func (client *WANPPPConnection1) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+func (client *WANPPPConnection1) GetConnectionTypeInfoCtx(
+	ctx context.Context,
+) (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4505,7 +5763,7 @@ func (client *WANPPPConnection1) GetConnectionTypeInfo() (NewConnectionType stri
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetConnectionTypeInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetConnectionTypeInfo", request, response); err != nil {
 		return
 	}
 
@@ -4521,7 +5779,17 @@ func (client *WANPPPConnection1) GetConnectionTypeInfo() (NewConnectionType stri
 	return
 }
 
-func (client *WANPPPConnection1) ConfigureConnection(NewUserName string, NewPassword string) (err error) {
+// GetConnectionTypeInfo is the legacy version of GetConnectionTypeInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetConnectionTypeInfo() (NewConnectionType string, NewPossibleConnectionTypes string, err error) {
+	return client.GetConnectionTypeInfoCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) ConfigureConnectionCtx(
+	ctx context.Context,
+	NewUserName string,
+	NewPassword string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewUserName string
@@ -4541,7 +5809,7 @@ func (client *WANPPPConnection1) ConfigureConnection(NewUserName string, NewPass
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "ConfigureConnection", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "ConfigureConnection", request, response); err != nil {
 		return
 	}
 
@@ -4551,7 +5819,47 @@ func (client *WANPPPConnection1) ConfigureConnection(NewUserName string, NewPass
 	return
 }
 
+// ConfigureConnection is the legacy version of ConfigureConnectionCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) ConfigureConnection(NewUserName string, NewPassword string) (err error) {
+	return client.ConfigureConnectionCtx(context.Background(),
+		NewUserName,
+		NewPassword,
+	)
+}
+
+func (client *WANPPPConnection1) RequestConnectionCtx(
+	ctx context.Context,
+) (err error) {
+	// Request structure.
+	request := interface{}(nil)
+	// BEGIN Marshal arguments into request.
+
+	// END Marshal arguments into request.
+
+	// Response structure.
+	response := interface{}(nil)
+
+	// Perform the SOAP call.
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "RequestConnection", request, response); err != nil {
+		return
+	}
+
+	// BEGIN Unmarshal arguments from response.
+
+	// END Unmarshal arguments from response.
+	return
+}
+
+// RequestConnection is the legacy version of RequestConnectionCtx, but uses
+// context.Background() as the context.
 func (client *WANPPPConnection1) RequestConnection() (err error) {
+	return client.RequestConnectionCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) RequestTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4562,7 +5870,7 @@ func (client *WANPPPConnection1) RequestConnection() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "RequestConnection", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "RequestTermination", request, response); err != nil {
 		return
 	}
 
@@ -4572,7 +5880,15 @@ func (client *WANPPPConnection1) RequestConnection() (err error) {
 	return
 }
 
+// RequestTermination is the legacy version of RequestTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANPPPConnection1) RequestTermination() (err error) {
+	return client.RequestTerminationCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) ForceTerminationCtx(
+	ctx context.Context,
+) (err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4583,7 +5899,7 @@ func (client *WANPPPConnection1) RequestTermination() (err error) {
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "RequestTermination", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "ForceTermination", request, response); err != nil {
 		return
 	}
 
@@ -4593,28 +5909,16 @@ func (client *WANPPPConnection1) RequestTermination() (err error) {
 	return
 }
 
+// ForceTermination is the legacy version of ForceTerminationCtx, but uses
+// context.Background() as the context.
 func (client *WANPPPConnection1) ForceTermination() (err error) {
-	// Request structure.
-	request := interface{}(nil)
-	// BEGIN Marshal arguments into request.
-
-	// END Marshal arguments into request.
-
-	// Response structure.
-	response := interface{}(nil)
-
-	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "ForceTermination", request, response); err != nil {
-		return
-	}
-
-	// BEGIN Unmarshal arguments from response.
-
-	// END Unmarshal arguments from response.
-	return
+	return client.ForceTerminationCtx(context.Background())
 }
 
-func (client *WANPPPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+func (client *WANPPPConnection1) SetAutoDisconnectTimeCtx(
+	ctx context.Context,
+	NewAutoDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewAutoDisconnectTime string
@@ -4630,7 +5934,7 @@ func (client *WANPPPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uin
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "SetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "SetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -4640,7 +5944,18 @@ func (client *WANPPPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uin
 	return
 }
 
-func (client *WANPPPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+// SetAutoDisconnectTime is the legacy version of SetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) SetAutoDisconnectTime(NewAutoDisconnectTime uint32) (err error) {
+	return client.SetAutoDisconnectTimeCtx(context.Background(),
+		NewAutoDisconnectTime,
+	)
+}
+
+func (client *WANPPPConnection1) SetIdleDisconnectTimeCtx(
+	ctx context.Context,
+	NewIdleDisconnectTime uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewIdleDisconnectTime string
@@ -4656,7 +5971,7 @@ func (client *WANPPPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uin
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "SetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "SetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -4666,7 +5981,18 @@ func (client *WANPPPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uin
 	return
 }
 
-func (client *WANPPPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+// SetIdleDisconnectTime is the legacy version of SetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) SetIdleDisconnectTime(NewIdleDisconnectTime uint32) (err error) {
+	return client.SetIdleDisconnectTimeCtx(context.Background(),
+		NewIdleDisconnectTime,
+	)
+}
+
+func (client *WANPPPConnection1) SetWarnDisconnectDelayCtx(
+	ctx context.Context,
+	NewWarnDisconnectDelay uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewWarnDisconnectDelay string
@@ -4682,7 +6008,7 @@ func (client *WANPPPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay u
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "SetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "SetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -4692,13 +6018,23 @@ func (client *WANPPPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay u
 	return
 }
 
+// SetWarnDisconnectDelay is the legacy version of SetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) SetWarnDisconnectDelay(NewWarnDisconnectDelay uint32) (err error) {
+	return client.SetWarnDisconnectDelayCtx(context.Background(),
+		NewWarnDisconnectDelay,
+	)
+}
+
 //
 // Return values:
 //
 // * NewConnectionStatus: allowed values: Unconfigured, Connected, Disconnected
 //
 // * NewLastConnectionError: allowed values: ERROR_NONE
-func (client *WANPPPConnection1) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+func (client *WANPPPConnection1) GetStatusInfoCtx(
+	ctx context.Context,
+) (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4713,7 +6049,7 @@ func (client *WANPPPConnection1) GetStatusInfo() (NewConnectionStatus string, Ne
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetStatusInfo", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetStatusInfo", request, response); err != nil {
 		return
 	}
 
@@ -4732,7 +6068,15 @@ func (client *WANPPPConnection1) GetStatusInfo() (NewConnectionStatus string, Ne
 	return
 }
 
-func (client *WANPPPConnection1) GetLinkLayerMaxBitRates() (NewUpstreamMaxBitRate uint32, NewDownstreamMaxBitRate uint32, err error) {
+// GetStatusInfo is the legacy version of GetStatusInfoCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetStatusInfo() (NewConnectionStatus string, NewLastConnectionError string, NewUptime uint32, err error) {
+	return client.GetStatusInfoCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetLinkLayerMaxBitRatesCtx(
+	ctx context.Context,
+) (NewUpstreamMaxBitRate uint32, NewDownstreamMaxBitRate uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4746,7 +6090,7 @@ func (client *WANPPPConnection1) GetLinkLayerMaxBitRates() (NewUpstreamMaxBitRat
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetLinkLayerMaxBitRates", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetLinkLayerMaxBitRates", request, response); err != nil {
 		return
 	}
 
@@ -4762,7 +6106,15 @@ func (client *WANPPPConnection1) GetLinkLayerMaxBitRates() (NewUpstreamMaxBitRat
 	return
 }
 
-func (client *WANPPPConnection1) GetPPPEncryptionProtocol() (NewPPPEncryptionProtocol string, err error) {
+// GetLinkLayerMaxBitRates is the legacy version of GetLinkLayerMaxBitRatesCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetLinkLayerMaxBitRates() (NewUpstreamMaxBitRate uint32, NewDownstreamMaxBitRate uint32, err error) {
+	return client.GetLinkLayerMaxBitRatesCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetPPPEncryptionProtocolCtx(
+	ctx context.Context,
+) (NewPPPEncryptionProtocol string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4775,7 +6127,7 @@ func (client *WANPPPConnection1) GetPPPEncryptionProtocol() (NewPPPEncryptionPro
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetPPPEncryptionProtocol", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetPPPEncryptionProtocol", request, response); err != nil {
 		return
 	}
 
@@ -4788,7 +6140,15 @@ func (client *WANPPPConnection1) GetPPPEncryptionProtocol() (NewPPPEncryptionPro
 	return
 }
 
-func (client *WANPPPConnection1) GetPPPCompressionProtocol() (NewPPPCompressionProtocol string, err error) {
+// GetPPPEncryptionProtocol is the legacy version of GetPPPEncryptionProtocolCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetPPPEncryptionProtocol() (NewPPPEncryptionProtocol string, err error) {
+	return client.GetPPPEncryptionProtocolCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetPPPCompressionProtocolCtx(
+	ctx context.Context,
+) (NewPPPCompressionProtocol string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4801,7 +6161,7 @@ func (client *WANPPPConnection1) GetPPPCompressionProtocol() (NewPPPCompressionP
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetPPPCompressionProtocol", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetPPPCompressionProtocol", request, response); err != nil {
 		return
 	}
 
@@ -4814,7 +6174,15 @@ func (client *WANPPPConnection1) GetPPPCompressionProtocol() (NewPPPCompressionP
 	return
 }
 
-func (client *WANPPPConnection1) GetPPPAuthenticationProtocol() (NewPPPAuthenticationProtocol string, err error) {
+// GetPPPCompressionProtocol is the legacy version of GetPPPCompressionProtocolCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetPPPCompressionProtocol() (NewPPPCompressionProtocol string, err error) {
+	return client.GetPPPCompressionProtocolCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetPPPAuthenticationProtocolCtx(
+	ctx context.Context,
+) (NewPPPAuthenticationProtocol string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4827,7 +6195,7 @@ func (client *WANPPPConnection1) GetPPPAuthenticationProtocol() (NewPPPAuthentic
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetPPPAuthenticationProtocol", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetPPPAuthenticationProtocol", request, response); err != nil {
 		return
 	}
 
@@ -4840,7 +6208,15 @@ func (client *WANPPPConnection1) GetPPPAuthenticationProtocol() (NewPPPAuthentic
 	return
 }
 
-func (client *WANPPPConnection1) GetUserName() (NewUserName string, err error) {
+// GetPPPAuthenticationProtocol is the legacy version of GetPPPAuthenticationProtocolCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetPPPAuthenticationProtocol() (NewPPPAuthenticationProtocol string, err error) {
+	return client.GetPPPAuthenticationProtocolCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetUserNameCtx(
+	ctx context.Context,
+) (NewUserName string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4853,7 +6229,7 @@ func (client *WANPPPConnection1) GetUserName() (NewUserName string, err error) {
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetUserName", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetUserName", request, response); err != nil {
 		return
 	}
 
@@ -4866,7 +6242,15 @@ func (client *WANPPPConnection1) GetUserName() (NewUserName string, err error) {
 	return
 }
 
-func (client *WANPPPConnection1) GetPassword() (NewPassword string, err error) {
+// GetUserName is the legacy version of GetUserNameCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetUserName() (NewUserName string, err error) {
+	return client.GetUserNameCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetPasswordCtx(
+	ctx context.Context,
+) (NewPassword string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4879,7 +6263,7 @@ func (client *WANPPPConnection1) GetPassword() (NewPassword string, err error) {
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetPassword", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetPassword", request, response); err != nil {
 		return
 	}
 
@@ -4892,7 +6276,15 @@ func (client *WANPPPConnection1) GetPassword() (NewPassword string, err error) {
 	return
 }
 
-func (client *WANPPPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+// GetPassword is the legacy version of GetPasswordCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetPassword() (NewPassword string, err error) {
+	return client.GetPasswordCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetAutoDisconnectTimeCtx(
+	ctx context.Context,
+) (NewAutoDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4905,7 +6297,7 @@ func (client *WANPPPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetAutoDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetAutoDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -4918,7 +6310,15 @@ func (client *WANPPPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime 
 	return
 }
 
-func (client *WANPPPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+// GetAutoDisconnectTime is the legacy version of GetAutoDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetAutoDisconnectTime() (NewAutoDisconnectTime uint32, err error) {
+	return client.GetAutoDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetIdleDisconnectTimeCtx(
+	ctx context.Context,
+) (NewIdleDisconnectTime uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4931,7 +6331,7 @@ func (client *WANPPPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetIdleDisconnectTime", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetIdleDisconnectTime", request, response); err != nil {
 		return
 	}
 
@@ -4944,7 +6344,15 @@ func (client *WANPPPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime 
 	return
 }
 
-func (client *WANPPPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+// GetIdleDisconnectTime is the legacy version of GetIdleDisconnectTimeCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetIdleDisconnectTime() (NewIdleDisconnectTime uint32, err error) {
+	return client.GetIdleDisconnectTimeCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetWarnDisconnectDelayCtx(
+	ctx context.Context,
+) (NewWarnDisconnectDelay uint32, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4957,7 +6365,7 @@ func (client *WANPPPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDela
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetWarnDisconnectDelay", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetWarnDisconnectDelay", request, response); err != nil {
 		return
 	}
 
@@ -4970,7 +6378,15 @@ func (client *WANPPPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDela
 	return
 }
 
-func (client *WANPPPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+// GetWarnDisconnectDelay is the legacy version of GetWarnDisconnectDelayCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetWarnDisconnectDelay() (NewWarnDisconnectDelay uint32, err error) {
+	return client.GetWarnDisconnectDelayCtx(context.Background())
+}
+
+func (client *WANPPPConnection1) GetNATRSIPStatusCtx(
+	ctx context.Context,
+) (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -4984,7 +6400,7 @@ func (client *WANPPPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewN
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetNATRSIPStatus", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetNATRSIPStatus", request, response); err != nil {
 		return
 	}
 
@@ -5000,11 +6416,20 @@ func (client *WANPPPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewN
 	return
 }
 
+// GetNATRSIPStatus is the legacy version of GetNATRSIPStatusCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetNATRSIPStatus() (NewRSIPAvailable bool, NewNATEnabled bool, err error) {
+	return client.GetNATRSIPStatusCtx(context.Background())
+}
+
 //
 // Return values:
 //
 // * NewProtocol: allowed values: TCP, UDP
-func (client *WANPPPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANPPPConnection1) GetGenericPortMappingEntryCtx(
+	ctx context.Context,
+	NewPortMappingIndex uint16,
+) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewPortMappingIndex string
@@ -5029,7 +6454,7 @@ func (client *WANPPPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex 
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetGenericPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetGenericPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -5063,12 +6488,25 @@ func (client *WANPPPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex 
 	return
 }
 
+// GetGenericPortMappingEntry is the legacy version of GetGenericPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetGenericPortMappingEntry(NewPortMappingIndex uint16) (NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetGenericPortMappingEntryCtx(context.Background(),
+		NewPortMappingIndex,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANPPPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+func (client *WANPPPConnection1) GetSpecificPortMappingEntryCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -5098,7 +6536,7 @@ func (client *WANPPPConnection1) GetSpecificPortMappingEntry(NewRemoteHost strin
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetSpecificPortMappingEntry", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetSpecificPortMappingEntry", request, response); err != nil {
 		return
 	}
 
@@ -5123,12 +6561,32 @@ func (client *WANPPPConnection1) GetSpecificPortMappingEntry(NewRemoteHost strin
 	return
 }
 
+// GetSpecificPortMappingEntry is the legacy version of GetSpecificPortMappingEntryCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetSpecificPortMappingEntry(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32, err error) {
+	return client.GetSpecificPortMappingEntryCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANPPPConnection1) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+func (client *WANPPPConnection1) AddPortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+	NewInternalPort uint16,
+	NewInternalClient string,
+	NewEnabled bool,
+	NewPortMappingDescription string,
+	NewLeaseDuration uint32,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost             string
@@ -5172,7 +6630,7 @@ func (client *WANPPPConnection1) AddPortMapping(NewRemoteHost string, NewExterna
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "AddPortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "AddPortMapping", request, response); err != nil {
 		return
 	}
 
@@ -5182,12 +6640,32 @@ func (client *WANPPPConnection1) AddPortMapping(NewRemoteHost string, NewExterna
 	return
 }
 
+// AddPortMapping is the legacy version of AddPortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) AddPortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string, NewInternalPort uint16, NewInternalClient string, NewEnabled bool, NewPortMappingDescription string, NewLeaseDuration uint32) (err error) {
+	return client.AddPortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+		NewInternalPort,
+		NewInternalClient,
+		NewEnabled,
+		NewPortMappingDescription,
+		NewLeaseDuration,
+	)
+}
+
 //
 // Arguments:
 //
 // * NewProtocol: allowed values: TCP, UDP
 
-func (client *WANPPPConnection1) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+func (client *WANPPPConnection1) DeletePortMappingCtx(
+	ctx context.Context,
+	NewRemoteHost string,
+	NewExternalPort uint16,
+	NewProtocol string,
+) (err error) {
 	// Request structure.
 	request := &struct {
 		NewRemoteHost   string
@@ -5211,7 +6689,7 @@ func (client *WANPPPConnection1) DeletePortMapping(NewRemoteHost string, NewExte
 	response := interface{}(nil)
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "DeletePortMapping", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "DeletePortMapping", request, response); err != nil {
 		return
 	}
 
@@ -5221,7 +6699,19 @@ func (client *WANPPPConnection1) DeletePortMapping(NewRemoteHost string, NewExte
 	return
 }
 
-func (client *WANPPPConnection1) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+// DeletePortMapping is the legacy version of DeletePortMappingCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) DeletePortMapping(NewRemoteHost string, NewExternalPort uint16, NewProtocol string) (err error) {
+	return client.DeletePortMappingCtx(context.Background(),
+		NewRemoteHost,
+		NewExternalPort,
+		NewProtocol,
+	)
+}
+
+func (client *WANPPPConnection1) GetExternalIPAddressCtx(
+	ctx context.Context,
+) (NewExternalIPAddress string, err error) {
 	// Request structure.
 	request := interface{}(nil)
 	// BEGIN Marshal arguments into request.
@@ -5234,7 +6724,7 @@ func (client *WANPPPConnection1) GetExternalIPAddress() (NewExternalIPAddress st
 	}{}
 
 	// Perform the SOAP call.
-	if err = client.SOAPClient.PerformAction(URN_WANPPPConnection_1, "GetExternalIPAddress", request, response); err != nil {
+	if err = client.SOAPClient.PerformActionCtx(ctx, URN_WANPPPConnection_1, "GetExternalIPAddress", request, response); err != nil {
 		return
 	}
 
@@ -5245,4 +6735,10 @@ func (client *WANPPPConnection1) GetExternalIPAddress() (NewExternalIPAddress st
 	}
 	// END Unmarshal arguments from response.
 	return
+}
+
+// GetExternalIPAddress is the legacy version of GetExternalIPAddressCtx, but uses
+// context.Background() as the context.
+func (client *WANPPPConnection1) GetExternalIPAddress() (NewExternalIPAddress string, err error) {
+	return client.GetExternalIPAddressCtx(context.Background())
 }
