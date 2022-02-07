@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
@@ -116,7 +115,7 @@ func (c *rootchainClient) subscribeNewHeads(headerCh chan<- *ethHeader) (subscri
 		header, err := sub.handleWSResponse(b)
 		if err != nil {
 			//	send error to subscription object
-			err := errors.New(fmt.Sprintf("unable to parse header - err: %v", err))
+			err := fmt.Errorf("unable to parse header - err: %w", err)
 			sub.errorCh <- err
 
 			return

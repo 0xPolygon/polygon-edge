@@ -55,6 +55,7 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 	client, err := newRootchainClient(rootchainWS)
 	if err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
+
 		return nil, err
 	}
 
@@ -64,6 +65,7 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 	db, err := tracker.loadDB()
 	if err != nil {
 		logger.Error("cannot load db", "err", err)
+
 		return nil, err
 	}
 
@@ -78,7 +80,6 @@ func (t *Tracker) loadDB() (*leveldb.DB, error) {
 	//	get path
 	cwd, err := os.Getwd()
 	if err != nil {
-		t.logger.Error("failed to create tracker", "err", err)
 		return nil, err
 	}
 
@@ -112,6 +113,7 @@ func (t *Tracker) Start() error {
 	subscription, err := t.client.subscribeNewHeads(t.headerCh)
 	if err != nil {
 		t.logger.Error("cannot subscribe to rootchain", "err", err)
+
 		return err
 	}
 
@@ -137,6 +139,7 @@ func (t *Tracker) Stop() error {
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
 		t.logger.Error("cannot close rootchainClient", "err", err)
+
 		return err
 	}
 
@@ -155,7 +158,12 @@ func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
 
 			return
 		case <-ctx.Done():
-			sub.unsubscribe()
+			if err := sub.unsubscribe(); err != nil {
+				t.logger.Error("cannot unsubscribe", "err", err)
+
+				return
+			}
+
 			t.logger.Debug("subscription stopped")
 
 			return
@@ -193,12 +201,13 @@ func (t *Tracker) processHeader(header *ethHeader) {
 	t.logger.Info("matched events", "num", len(logs))
 
 	//	notify each matched log event
-	t.notify(logs...)
+	if err := t.notify(logs...); err != nil {
+		t.logger.Error("failed to notify events", "err", err)
+	}
 }
 
 func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
-
 	//	TODO: polygon-edge header
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
 
@@ -306,7 +315,9 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 	t.logger.Debug("eth_getLogs", "from", fromBlock, "to", toBlock)
 
 	//	overwrite checkpoint
-	t.saveLastBlock(big.NewInt(0).SetUint64(toBlock))
+	if err := t.saveLastBlock(big.NewInt(0).SetUint64(toBlock)); err != nil {
+		t.logger.Error("cannot save last block number proccesed", "err", err)
+	}
 
 	return logs
 }
