@@ -18,7 +18,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.3.0
-	github.com/imdario/mergo v0.3.12
 	github.com/ipfs/go-cid v0.1.0 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/libp2p/go-libp2p v0.18.0-rc2
@@ -27,7 +26,6 @@ require (
 	github.com/libp2p/go-libp2p-noise v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.6.1
 	github.com/miekg/dns v1.1.45 // indirect
-	github.com/mitchellh/cli v1.1.2
 	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multihash v0.1.0 // indirect
