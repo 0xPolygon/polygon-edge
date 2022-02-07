@@ -134,7 +134,7 @@ func (p *genesisParams) initValidatorSet() error {
 	if p.ibftValidators, readErr = getValidatorsFromPrefixPath(
 		p.validatorPrefixPath,
 	); readErr != nil {
-		return fmt.Errorf("failed to read from prefix: %v", readErr)
+		return fmt.Errorf("failed to read from prefix: %w", readErr)
 	}
 
 	return nil

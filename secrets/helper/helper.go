@@ -2,7 +2,6 @@ package helper
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -22,12 +21,11 @@ func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
 	// Check if the sub-directories exist / are already populated
 	for _, subDirectory := range subDirectories {
 		if common.DirectoryExists(filepath.Join(dataDir, subDirectory)) {
-			return nil, errors.New(
-				fmt.Sprintf(
-					"Directory %s has previously initialized secrets data",
+			return nil,
+				fmt.Errorf(
+					"directory %s has previously initialized secrets data",
 					dataDir,
-				),
-			)
+				)
 		}
 	}
 

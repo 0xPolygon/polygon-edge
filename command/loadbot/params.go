@@ -122,7 +122,6 @@ func (p *loadbotParams) initGasValues() error {
 func (p *loadbotParams) initAddressValues() error {
 	if err := p.sender.UnmarshalText([]byte(p.senderRaw)); err != nil {
 		return fmt.Errorf("failed to decode sender address: %w", err)
-
 	}
 
 	if err := p.receiver.UnmarshalText([]byte(p.receiverRaw)); err != nil {
