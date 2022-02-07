@@ -161,6 +161,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		m.txpool, err = txpool.NewTxPool(
 			logger,
 			m.chain.Params.Forks.At(0),
+			m.chain.Params.Features,
 			hub,
 			m.grpcServer,
 			m.network,

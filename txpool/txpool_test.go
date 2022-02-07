@@ -74,6 +74,7 @@ func newTestPool(header *types.Header) (*TxPool, error) {
 	return NewTxPool(
 		hclog.NewNullLogger(),
 		forks.At(0),
+		nil,
 		NewDefaultMockStore(header),
 		nil,
 		nil,

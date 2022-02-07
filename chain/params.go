@@ -7,6 +7,7 @@ import (
 // Params are all the set of params for the chain
 type Params struct {
 	Forks          *Forks                 `json:"forks"`
+	Features       *Features              `json:"features"`
 	ChainID        int                    `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
@@ -19,6 +20,15 @@ func (p *Params) GetEngine() string {
 	}
 
 	return ""
+}
+
+// Forks specifies when each fork is activated
+type Features struct {
+	ContractDeployment *ContractDeployment `json:"contractDeployment"`
+}
+
+type ContractDeployment struct {
+	WhiteList []string `json:"contractDeploymentWhiteList"`
 }
 
 // Forks specifies when each fork is activated
@@ -118,4 +128,10 @@ var AllForksEnabled = &Forks{
 	Constantinople: NewFork(0),
 	Petersburg:     NewFork(0),
 	Istanbul:       NewFork(0),
+}
+
+var AllDefaultFeatures = &Features{
+	ContractDeployment: &ContractDeployment{
+		WhiteList: make([]string, 0),
+	},
 }

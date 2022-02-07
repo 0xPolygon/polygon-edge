@@ -296,8 +296,9 @@ func (c *GenesisCommand) Run(args []string) int {
 			GasUsed:    helper.GenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: int(chainID),
-			Forks:   chain.AllForksEnabled,
+			ChainID:  int(chainID),
+			Forks:    chain.AllForksEnabled,
+			Features: chain.AllDefaultFeatures,
 			Engine: map[string]interface{}{
 				consensus: constructEngineConfig(),
 			},

@@ -344,8 +344,9 @@ func generateDevGenesis(params devGenesisParams) error {
 			GasUsed:    GenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: int(params.chainID),
-			Forks:   chain.AllForksEnabled,
+			ChainID:  int(params.chainID),
+			Forks:    chain.AllForksEnabled,
+			Features: chain.AllDefaultFeatures,
 			Engine: map[string]interface{}{
 				"dev": map[string]interface{}{},
 			},

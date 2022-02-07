@@ -46,6 +46,7 @@ func Commands() map[string]cli.CommandFactory {
 	ibftProposeCmd := ibft.IbftPropose{Base: base, Formatter: formatter, GRPC: grpc}
 	ibftSnapshotCmd := ibft.IbftSnapshot{Base: base, Formatter: formatter, GRPC: grpc}
 	ibftStatusCmd := ibft.IbftStatus{Base: base, Formatter: formatter, GRPC: grpc}
+	ibftContractCmd := ibft.IbftContractRestriction{Base: base, Formatter: formatter, GRPC: grpc}
 
 	peersCmd := peers.PeersCommand{}
 	peersAddCmd := peers.PeersAdd{Base: base, Formatter: formatter, GRPC: grpc}
@@ -108,6 +109,9 @@ func Commands() map[string]cli.CommandFactory {
 		},
 		ibftStatusCmd.GetBaseCommand(): func() (cli.Command, error) {
 			return &ibftStatusCmd, nil
+		},
+		ibftContractCmd.GetBaseCommand(): func() (cli.Command, error) {
+			return &ibftContractCmd, nil
 		},
 
 		// TXPOOL COMMANDS //

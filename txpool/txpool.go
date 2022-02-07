@@ -25,18 +25,19 @@ const (
 
 // errors
 var (
-	ErrIntrinsicGas        = errors.New("intrinsic gas too low")
-	ErrBlockLimitExceeded  = errors.New("exceeds block gas limit")
-	ErrNegativeValue       = errors.New("negative value")
-	ErrNonEncryptedTx      = errors.New("non-encrypted transaction")
-	ErrInvalidSender       = errors.New("invalid sender")
-	ErrTxPoolOverflow      = errors.New("txpool is full")
-	ErrUnderpriced         = errors.New("transaction underpriced")
-	ErrNonceTooLow         = errors.New("nonce too low")
-	ErrInsufficientFunds   = errors.New("insufficient funds for gas * price + value")
-	ErrInvalidAccountState = errors.New("invalid account state")
-	ErrAlreadyKnown        = errors.New("already known")
-	ErrOversizedData       = errors.New("oversized data")
+	ErrIntrinsicGas            = errors.New("intrinsic gas too low")
+	ErrBlockLimitExceeded      = errors.New("exceeds block gas limit")
+	ErrNegativeValue           = errors.New("negative value")
+	ErrNonEncryptedTx          = errors.New("non-encrypted transaction")
+	ErrInvalidSender           = errors.New("invalid sender")
+	ErrTxPoolOverflow          = errors.New("txpool is full")
+	ErrUnderpriced             = errors.New("transaction underpriced")
+	ErrNonceTooLow             = errors.New("nonce too low")
+	ErrInsufficientFunds       = errors.New("insufficient funds for gas * price + value")
+	ErrInvalidAccountState     = errors.New("invalid account state")
+	ErrAlreadyKnown            = errors.New("already known")
+	ErrOversizedData           = errors.New("oversized data")
+	ErrSmartContractRestricted = errors.New("Deploying smart contract from this address is disabled")
 )
 
 // indicates origin of a transaction
@@ -117,10 +118,11 @@ type promoteRequest struct {
 // transactions are the first-in-line of some promoted queue,
 // ready to be written to the state (primaries).
 type TxPool struct {
-	logger hclog.Logger
-	signer signer
-	forks  chain.ForksInTime
-	store  store
+	logger   hclog.Logger
+	signer   signer
+	forks    chain.ForksInTime
+	features chain.Features
+	store    store
 
 	// map of all accounts registered by the pool
 	accounts accountsMap
@@ -170,6 +172,7 @@ type TxPool struct {
 func NewTxPool(
 	logger hclog.Logger,
 	forks chain.ForksInTime,
+	features *chain.Features,
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
@@ -179,6 +182,7 @@ func NewTxPool(
 	pool := &TxPool{
 		logger:      logger.Named("txpool"),
 		forks:       forks,
+		features:    *features,
 		store:       store,
 		metrics:     metrics,
 		accounts:    accountsMap{},
@@ -541,7 +545,25 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if tx.Gas > latestBlockGasLimit {
 		return ErrBlockLimitExceeded
 	}
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("USAOOO")
+	fmt.Println("TX to", tx.To)
 
+	if !tx.CanApplyNewContract(p.features.ContractDeployment.WhiteList) {
+		fmt.Println("PUKAO")
+		fmt.Println("PUKAO")
+		fmt.Println("PUKAO")
+		fmt.Println("PUKAO")
+		fmt.Println("PUKAO")
+		fmt.Println("PUKAO")
+
+		return ErrSmartContractRestricted
+	}
 	return nil
 }
 

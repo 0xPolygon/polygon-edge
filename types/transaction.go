@@ -96,6 +96,19 @@ func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Gas > blockGasLimit
 }
 
+func (t *Transaction) CanApplyNewContract(whiteList []string) bool {
+	//Contra t creation not restricted or is not create contract transaction
+	if len(whiteList) == 0 || t.To != nil {
+		return true
+	}
+	for _, address := range whiteList {
+		if t.From == StringToAddress(address) {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
 	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
 }
