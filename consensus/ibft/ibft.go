@@ -538,8 +538,6 @@ func (i *Ibft) runSyncState() {
 	}
 }
 
-var defaultBlockPeriod = 2 * time.Second
-
 // shouldWriteTransactions checks if each consensus mechanism accepts a block with transactions at given height
 // returns true if all mechanisms accept
 // otherwise return false
