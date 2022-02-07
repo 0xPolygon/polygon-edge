@@ -102,7 +102,7 @@ func (p *serverParams) initBlockGasTarget() error {
 }
 
 func (p *serverParams) isSecretsConfigPathSet() bool {
-	return p.rawConfig.SecretsConfigPath == ""
+	return p.rawConfig.SecretsConfigPath != ""
 }
 
 func (p *serverParams) initSecretsConfig() error {
@@ -115,7 +115,7 @@ func (p *serverParams) initSecretsConfig() error {
 	if p.secretsConfig, parseErr = secrets.ReadConfig(
 		p.rawConfig.SecretsConfigPath,
 	); parseErr != nil {
-		return fmt.Errorf("unable to read config file, %w", parseErr)
+		return fmt.Errorf("unable to read secrets config file, %w", parseErr)
 	}
 
 	return nil

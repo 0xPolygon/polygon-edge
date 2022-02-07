@@ -68,19 +68,23 @@ func (p *genesisParams) validateFlags() error {
 		return errMissingBootnode
 	}
 
+	// Check if the consensusRaw is supported
+	if !server.ConsensusSupported(p.consensusRaw) {
+		return errUnsupportedConsensus
+	}
+
 	// Check if validator information is set at all
-	if len(p.ibftValidatorsRaw) == 0 && p.validatorPrefixPath == "" {
+	if p.isIBFTConsensus() &&
+		!p.areValidatorsSetManually() &&
+		!p.areValidatorsSetByPrefix() {
 		return errValidatorsNotSpecified
 	}
 
 	// Check if mutually exclusive flags are set correctly
-	if len(p.ibftValidatorsRaw) != 0 && p.validatorPrefixPath != "" {
+	if p.isIBFTConsensus() &&
+		p.areValidatorsSetManually() &&
+		p.areValidatorsSetByPrefix() {
 		return errValidatorsSpecifiedIncorrectly
-	}
-
-	// Check if the consensusRaw is supported
-	if !server.ConsensusSupported(p.consensusRaw) {
-		return errUnsupportedConsensus
 	}
 
 	// Check if the genesis file already exists
@@ -97,6 +101,18 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	return nil
+}
+
+func (p *genesisParams) isIBFTConsensus() bool {
+	return server.ConsensusType(p.consensusRaw) == server.IBFTConsensus
+}
+
+func (p *genesisParams) areValidatorsSetManually() bool {
+	return len(p.ibftValidatorsRaw) != 0
+}
+
+func (p *genesisParams) areValidatorsSetByPrefix() bool {
+	return p.validatorPrefixPath != ""
 }
 
 func (p *genesisParams) getRequiredFlags() []string {
@@ -157,7 +173,9 @@ func (p *genesisParams) initIBFTExtraData() {
 
 func (p *genesisParams) initConsensusEngineConfig() {
 	if p.consensus != server.IBFTConsensus {
-		p.consensusEngineConfig = map[string]interface{}{}
+		p.consensusEngineConfig = map[string]interface{}{
+			p.consensusRaw: "",
+		}
 
 		return
 	}

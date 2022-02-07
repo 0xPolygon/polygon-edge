@@ -429,6 +429,10 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 		srv := NewTestServer(t, dataDir, conf)
 		srv.Config.SetBootnodes(bootnodes)
 
+		if _, initErr := srv.SecretsInit(); initErr != nil {
+			t.Fatal(initErr)
+		}
+
 		if genesisErr := srv.GenerateGenesis(); genesisErr != nil {
 			t.Fatal(genesisErr)
 		}

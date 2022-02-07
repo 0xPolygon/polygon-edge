@@ -38,7 +38,7 @@ func TestBroadcast(t *testing.T) {
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	conf := func(config *framework.TestServerConfig) {
-		config.SetConsensus(framework.ConsensusDummy)
+		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(senderAddr, framework.EthToWei(10))
 		config.SetSeal(true)
 	}

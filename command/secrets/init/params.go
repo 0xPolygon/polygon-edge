@@ -40,7 +40,7 @@ type initParams struct {
 }
 
 func (ip *initParams) validateFlags() error {
-	if ip.dataDir != "" || ip.configPath != "" {
+	if ip.dataDir == "" && ip.configPath == "" {
 		return errInvalidParams
 	}
 

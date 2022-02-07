@@ -160,7 +160,7 @@ type InitIBFTResult struct {
 	NodeID  string
 }
 
-func (t *TestServer) InitIBFT() (*InitIBFTResult, error) {
+func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	secretsInitCmd := initCmd.GetCommand()
 
 	var args []string
