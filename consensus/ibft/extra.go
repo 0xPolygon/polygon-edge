@@ -98,7 +98,7 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(vals)
 
-	// Seal
+	// ShouldSeal
 	if len(i.Seal) == 0 {
 		vv.Set(ar.NewNull())
 	} else {
@@ -153,7 +153,7 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 	}
 
-	// Seal
+	// ShouldSeal
 	{
 		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
 			return err

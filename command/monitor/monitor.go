@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 	"io"
 
@@ -103,7 +104,7 @@ func runSubscribeLoop(
 	}()
 
 	select {
-	case <-helper.GetInterruptCh():
+	case <-common.GetTerminationSignalCh():
 	case <-doneCh:
 	}
 }

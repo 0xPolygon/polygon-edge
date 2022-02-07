@@ -98,8 +98,8 @@ type EventType int
 
 const (
 	EventHead  EventType = iota // New head event
-	EventReorg                  // Chain reorganization event
-	EventFork                   // Chain fork event
+	EventReorg                  // GenesisPath reorganization event
+	EventFork                   // GenesisPath fork event
 )
 
 // Event is the blockchain event that gets passed to the listeners

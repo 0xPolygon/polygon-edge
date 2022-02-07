@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/output"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/spf13/cobra"
 	"io"
@@ -150,7 +151,7 @@ func runSubscribeLoop(
 	}()
 
 	select {
-	case <-helper.GetInterruptCh():
+	case <-common.GetTerminationSignalCh():
 	case <-doneCh:
 	}
 }

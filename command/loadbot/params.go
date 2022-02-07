@@ -72,14 +72,14 @@ func (p *loadbotParams) validateFlags() error {
 		return errContractPath
 	}
 
-	if err := p.initRawValues(); err != nil {
+	if err := p.initRawParams(); err != nil {
 		return errInvalidValues
 	}
 
 	return nil
 }
 
-func (p *loadbotParams) initRawValues() error {
+func (p *loadbotParams) initRawParams() error {
 	if err := p.initGasValues(); err != nil {
 		return err
 	}

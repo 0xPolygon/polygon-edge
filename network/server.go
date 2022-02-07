@@ -94,7 +94,7 @@ type Server struct {
 	protocols     map[string]Protocol
 	protocolsLock sync.Mutex
 
-	// Secrets manager
+	// SecretsConfigPath manager
 	secretsManager secrets.SecretsManager
 
 	// pubsub
@@ -124,7 +124,7 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is present in the secrets manager, read it
 		networkingKey, readErr := ReadLibp2pKey(secretsManager)
 		if readErr != nil {
-			return nil, fmt.Errorf("unable to read networking private key from Secrets Manager, %w", readErr)
+			return nil, fmt.Errorf("unable to read networking private key from SecretsConfigPath Manager, %w", readErr)
 		}
 
 		key = networkingKey
@@ -132,12 +132,12 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 		// The key is not present in the secrets manager, generate it
 		libp2pKey, libp2pKeyEncoded, keyErr := GenerateAndEncodeLibp2pKey()
 		if keyErr != nil {
-			return nil, fmt.Errorf("unable to generate networking private key for Secrets Manager, %w", keyErr)
+			return nil, fmt.Errorf("unable to generate networking private key for SecretsConfigPath Manager, %w", keyErr)
 		}
 
 		// Write the networking private key to disk
 		if setErr := secretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-			return nil, fmt.Errorf("unable to store networking private key to Secrets Manager, %w", setErr)
+			return nil, fmt.Errorf("unable to store networking private key to SecretsConfigPath Manager, %w", setErr)
 		}
 
 		key = libp2pKey

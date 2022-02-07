@@ -18,7 +18,7 @@ func (r *StatusResult) GetOutput() string {
 
 	buffer.WriteString("\n[CLIENT STATUS]\n")
 	buffer.WriteString(helper.FormatKV([]string{
-		fmt.Sprintf("Network (Chain ID)|%d", r.ChainID),
+		fmt.Sprintf("Network (GenesisPath ID)|%d", r.ChainID),
 		fmt.Sprintf("Current Block Number (base 10)|%d", r.CurrentBlockNumber),
 		fmt.Sprintf("Current Block Hash|%s", r.CurrentBlockHash),
 		fmt.Sprintf("Libp2p Address|%s", r.LibP2PAddress),

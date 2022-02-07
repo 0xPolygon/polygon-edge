@@ -154,7 +154,7 @@ func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 }
 
 // SetSecret saves a secret to the Hashicorp Vault server
-// Secrets saved in Vault need to have a string value (Base64)
+// SecretsConfigPath saved in Vault need to have a string value (Base64)
 func (v *VaultSecretsManager) SetSecret(name string, value []byte) error {
 	// Check if overwrite is possible
 	_, err := v.GetSecret(name)

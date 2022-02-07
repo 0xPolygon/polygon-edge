@@ -82,7 +82,12 @@ var dirPaths = []string{
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
-func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
+func NewServer(config *Config) (*Server, error) {
+	logger := hclog.New(&hclog.LoggerOptions{
+		Name:  "polygon",
+		Level: config.LogLevel,
+	})
+
 	m := &Server{
 		logger:             logger,
 		config:             config,

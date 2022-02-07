@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
+	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
@@ -75,6 +76,10 @@ func (rc *RootCommand) registerSubCommands() {
 
 	rc.baseCmd.AddCommand(
 		genesis.GetCommand(),
+	)
+
+	rc.baseCmd.AddCommand(
+		server.GetCommand(),
 	)
 }
 

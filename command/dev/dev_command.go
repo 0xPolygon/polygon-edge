@@ -2,6 +2,7 @@ package dev
 
 import (
 	"fmt"
+	server2 "github.com/0xPolygon/polygon-edge/command/server"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -18,7 +19,7 @@ func (d *DevCommand) DefineFlags() {
 	d.Base.DefineFlags()
 
 	d.FlagMap["log-level"] = helper.FlagDescriptor{
-		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", helper.DefaultConfig().LogLevel),
+		Description: fmt.Sprintf("Sets the log level for console output. Default: %s", server2.DefaultConfig().LogLevel),
 		Arguments: []string{
 			"LOG_LEVEL",
 		},
@@ -48,7 +49,7 @@ func (d *DevCommand) DefineFlags() {
 	d.FlagMap["price-limit"] = helper.FlagDescriptor{
 		Description: fmt.Sprintf(
 			"Sets minimum gas price limit to enforce for acceptance into the pool. Default: %d",
-			helper.DefaultConfig().TxPool.PriceLimit,
+			server2.DefaultConfig().TxPool.PriceLimit,
 		),
 		Arguments: []string{
 			"PRICE_LIMIT",

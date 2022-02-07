@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/hashicorp/go-hclog"
 	"net"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -16,18 +17,25 @@ const DefaultBlockTime = 2 // in seconds
 type Config struct {
 	Chain *chain.Chain
 
-	JSONRPCAddr    *net.TCPAddr
-	GRPCAddr       *net.TCPAddr
-	LibP2PAddr     *net.TCPAddr
-	Telemetry      *Telemetry
-	Network        *network.Config
-	DataDir        string
-	Seal           bool
-	PriceLimit     uint64
-	MaxSlots       uint64
+	JSONRPCAddr *net.TCPAddr
+	GRPCAddr    *net.TCPAddr
+	LibP2PAddr  *net.TCPAddr
+
+	PriceLimit uint64
+	MaxSlots   uint64
+	BlockTime  uint64
+
+	Telemetry *Telemetry
+	Network   *network.Config
+
+	DataDir     string
+	RestoreFile *string
+
+	Seal bool
+
 	SecretsManager *secrets.SecretsManagerConfig
-	RestoreFile    *string
-	BlockTime      uint64
+
+	LogLevel hclog.Level
 }
 
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
