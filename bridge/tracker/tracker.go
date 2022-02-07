@@ -3,9 +3,10 @@ package tracker
 import (
 	"context"
 	"encoding/json"
-	"github.com/0xPolygon/polygon-edge/types"
 	"math/big"
 	"os"
+
+	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -74,24 +75,6 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 	return tracker, nil
 }
 
-//	loadDB creates a new database (or loads existing)
-//	for storing the last processed block's number by the tracker.
-func (t *Tracker) loadDB() (*leveldb.DB, error) {
-	//	get path
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	//	create or load db
-	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
 //	Start runs the tracker's listening mechanism:
 //	1. startHeaderProcess - goroutine processing each header
 //		received by the subscription
@@ -123,11 +106,6 @@ func (t *Tracker) Start() error {
 	return nil
 }
 
-//	getEventChannel returns the tracker's event channel.
-//func (t *Tracker) getEventChannel() <-chan []byte {
-//	return t.eventCh
-//}
-
 //	Stop stops the tracker's listening mechanism.
 func (t *Tracker) Stop() error {
 	//	stop subscription
@@ -145,6 +123,11 @@ func (t *Tracker) Stop() error {
 
 	return nil
 }
+
+//	getEventChannel returns the tracker's event channel.
+//func (t *Tracker) getEventChannel() <-chan []byte {
+//	return t.eventCh
+//}
 
 //	startSubscription handles subscription errors or context cancel.
 func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
@@ -183,6 +166,24 @@ func (t *Tracker) startHeaderProcess(ctx context.Context) {
 			return
 		}
 	}
+}
+
+//	loadDB creates a new database (or loads existing)
+//	for storing the last processed block's number by the tracker.
+func (t *Tracker) loadDB() (*leveldb.DB, error) {
+	//	get path
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	//	create or load db
+	db, err := leveldb.OpenFile(cwd+"/event_tracker/last_block_number", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 //	processHeader determines the range of block to query

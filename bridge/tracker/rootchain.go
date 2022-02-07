@@ -3,6 +3,7 @@ package tracker
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/umbracle/go-web3"
 	"github.com/umbracle/go-web3/abi"
 	client "github.com/umbracle/go-web3/jsonrpc"
