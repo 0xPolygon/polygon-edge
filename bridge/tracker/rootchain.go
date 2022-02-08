@@ -9,7 +9,6 @@ import (
 	client "github.com/umbracle/go-web3/jsonrpc"
 )
 
-//	Rootchain URLs
 const (
 	//	Ropsten testnet
 	//rootchainWS   = "wss://ropsten.infura.io/ws/v3/17eac086ff36442ebd43737400eb71ca"
@@ -18,17 +17,17 @@ const (
 	rootchainWS = "ws://127.0.0.1:10002/ws"
 )
 
-//	Smart contract addresses
 const (
+	//	Smart contract addresses
 	PoCSC          = "19DC3Af00E7f7502a2A40B7e0FeA194A86CeAA0c"
 	AnotherEventSC = "69ceed5Ff0FA5106F4Df7299C8812377394A9388"
 	ThirdEventSC   = "b22a1Cd34d39D46bB2f077bd6295c850702D8e81"
 )
 
-//	ABI events (defined in the above smart contracts)
 var (
-	/*	StateSender.sol	*/
+	//	ABI events (defined in the above smart contracts)
 
+	/*	StateSender.sol	*/
 	NewRegistrationEvent = abi.MustNewEvent(`event NewRegistration(
 	address indexed user,
 	address indexed sender,
@@ -48,7 +47,6 @@ var (
 	)
 
 	/*	PoC contract events	*/
-
 	PoCEvent      = abi.MustNewEvent(`event MyEvent(address indexed sender)`)
 	topicPoCEvent = PoCEvent.ID()
 
@@ -57,6 +55,8 @@ var (
 
 	ThirdEvent = abi.MustNewEvent(`event ThirdEvent(address indexed sender)`)
 )
+
+/*	Rootchain subscription object	*/
 
 type cancelSubCallback func() error
 
@@ -86,6 +86,8 @@ func (s *subscription) handleWSResponse(response []byte) (*ethHeader, error) {
 
 	return header, nil
 }
+
+/*	Rootchain client */
 
 //	rootchainClient is a wrapper object for the web3 client.
 type rootchainClient struct {
