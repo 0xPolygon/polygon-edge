@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	lastProcessedBlock = "last-processed-block" //	db key
+	lastQueriedBlockNumber = "last-block-num" //	db key
 )
 
 //	Tracker represents an event listener that notifies
@@ -33,7 +33,7 @@ type Tracker struct {
 	eventCh chan []byte
 
 	// cancel funcs
-	cancelSubscription, cancelHeaderProcess context.CancelFunc
+	cancelSubscription, cancelEventTracking context.CancelFunc
 
 	//	rootchain client
 	client *rootchainClient
@@ -42,8 +42,9 @@ type Tracker struct {
 	db *leveldb.DB
 }
 
-//	NewEventTracker returns a new tracker with the desired
-//	confirmations depth. Events are defined in rootchain.go
+//	NewEventTracker returns a new tracker able to listen for events
+//	at the desired block depth. Events of interest are defined
+//	in rootchain.go
 func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error) {
 	tracker := &Tracker{
 		logger:        logger.Named("event_tracker"),
@@ -52,7 +53,7 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 		eventCh:       make(chan []byte),
 	}
 
-	//	create rootchain rootchainClient
+	//	create rootchain client
 	client, err := newRootchainClient(rootchainWS)
 	if err != nil {
 		logger.Error("cannot connect to rootchain", "err", err)
@@ -76,21 +77,24 @@ func NewEventTracker(logger hclog.Logger, confirmations uint64) (*Tracker, error
 }
 
 //	Start runs the tracker's listening mechanism:
-//	1. startHeaderProcess - goroutine processing each header
-//		received by the subscription
+//	1. startEventTracking - goroutine keeping track of
+//	the last block queried, as well as collecting events
+//	of interest.
 //
-//	2. startSubscription - goroutine that subscribes to the rootchain
-//		for new headers, sending them to the header process
+//	2. startSubscription - goroutine responsible for handling
+//	the subscription object. This object is provided by the
+//	client's subscribeNewHeads method that initiates the subscription.
 func (t *Tracker) Start() error {
 	//	create cancellable contexts
-	ctxSubscription, cancelSub := context.WithCancel(context.Background())
-	t.cancelSubscription = cancelSub
+	ctxSubscription, cancelSubscription := context.WithCancel(context.Background())
+	t.cancelSubscription = cancelSubscription
 
-	ctxHeaderProcess, cancelHeader := context.WithCancel(context.Background())
-	t.cancelHeaderProcess = cancelHeader
+	ctxEventTracking, cancelEventTracking := context.WithCancel(context.Background())
+	t.cancelEventTracking = cancelEventTracking
 
-	//	start header processing early
-	go t.startHeaderProcess(ctxSubscription)
+	//	start event tracking process early
+	//	TODO wrong ctx used
+	go t.startEventTracking(ctxSubscription)
 
 	//	create newHeads subscription
 	subscription, err := t.client.subscribeNewHeads(t.headerCh)
@@ -101,7 +105,7 @@ func (t *Tracker) Start() error {
 	}
 
 	//	start receiving new header events
-	go t.startSubscription(ctxHeaderProcess, subscription)
+	go t.startSubscription(ctxEventTracking, subscription)
 
 	return nil
 }
@@ -112,11 +116,11 @@ func (t *Tracker) Stop() error {
 	t.cancelSubscription()
 
 	// 	stop processing headers
-	t.cancelHeaderProcess()
+	t.cancelEventTracking()
 
 	//	close rootchain client
 	if err := t.client.close(); err != nil {
-		t.logger.Error("cannot close rootchainClient", "err", err)
+		t.logger.Error("cannot close rootchain client", "err", err)
 
 		return err
 	}
@@ -154,12 +158,12 @@ func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
 	}
 }
 
-//	startHeaderProcess processes new header events received by the subscription.
-func (t *Tracker) startHeaderProcess(ctx context.Context) {
+//	startEventTracking tracks each header (received by the subscription) for events.
+func (t *Tracker) startEventTracking(ctx context.Context) {
 	for {
 		select {
 		case header := <-t.headerCh:
-			t.processHeader(header)
+			t.trackHeader(header)
 		case <-ctx.Done():
 			t.logger.Debug("stopping header process")
 
@@ -186,27 +190,25 @@ func (t *Tracker) loadDB() (*leveldb.DB, error) {
 	return db, nil
 }
 
-//	processHeader determines the range of block to query
-//	based on the blockNumber of the header and issues a
+//	trackHeader determines the range of block to query
+//	based on the blockNumber of the header and issues an appropriate
 //	eth_getLogs call. If an event of interest was emitted,
 //	it is sent to eventCh.
-func (t *Tracker) processHeader(header *ethHeader) {
-	t.logger.Info("processing header", "num", header.Number)
-
+func (t *Tracker) trackHeader(header *ethHeader) {
 	//	determine range of blocks to query
 	fromBlock, toBlock := t.calculateRange(header)
+	t.logger.Info("querying events", "from", fromBlock, "to", toBlock)
 
 	//	fetch logs
 	logs := t.queryEvents(fromBlock, toBlock)
-
 	t.logger.Info("matched events", "num", len(logs))
 
 	//	notify each matched log event
-	if err := t.notify(logs...); err != nil {
-		t.logger.Error("failed to notify events", "err", err)
-	}
+	t.notify(logs...)
 }
 
+//	calculateRange determines the next next range of blocks
+//	to query for events.
 func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	extract block number from header field
 	//	TODO: polygon-edge header
@@ -215,7 +217,7 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	//	or: TODO ethereum header
 	//latestHeight, _ := types.ParseUint256orHex(&header.Number)
 
-	//	check  if block number is at required depth
+	//	check if block number is at required depth
 	confirmations := big.NewInt(0).SetUint64(t.confirmations)
 	if latestHeight.Cmp(confirmations) < 0 {
 		//	block height less than required
@@ -235,13 +237,14 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 	if fromBlock == nil {
 		fromBlock = toBlock
 	} else {
-		//	increment - fetched block number was already queried
+		//	increment - last block number was already queried
 		fromBlock = fromBlock.Add(fromBlock, big.NewInt(1))
 	}
 
 	//	TODO: not sure how this will ever happen, but Heimdall checks this
 	if toBlock.Cmp(fromBlock) < 0 {
 		fromBlock = toBlock
+		//	return here
 	}
 
 	return fromBlock.Uint64(), toBlock.Uint64()
@@ -251,7 +254,7 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 // 	block processed by the tracker (if available).
 func (t *Tracker) loadLastBlock() *big.Int {
 	//	read from db
-	bytesLastBlock, err := t.db.Get([]byte(lastProcessedBlock), nil)
+	bytesLastBlock, err := t.db.Get([]byte(lastQueriedBlockNumber), nil)
 	if err != nil {
 		t.logger.Error("cannot read db", "err", err)
 
@@ -267,11 +270,12 @@ func (t *Tracker) loadLastBlock() *big.Int {
 	return lastBlock
 }
 
-//	saveLastBlock stores the number of the last block processed.
+//	saveLastBlock stores the number of the last block processed
+//	into the tracker's database.	.
 func (t *Tracker) saveLastBlock(blockNumber *big.Int) error {
 	//	store last processed block number
 	if err := t.db.Put(
-		[]byte(lastProcessedBlock),
+		[]byte(lastQueriedBlockNumber),
 		[]byte(blockNumber.String()),
 		nil,
 	); err != nil {
@@ -305,15 +309,13 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 		},
 	}
 
-	//	fetch logs
+	//	call eth_getLogs
 	logs, err := t.client.getLogs(queryFilter)
 	if err != nil {
 		t.logger.Error("eth_getLogs failed", "err", err)
 
 		return nil
 	}
-
-	t.logger.Debug("eth_getLogs", "from", fromBlock, "to", toBlock)
 
 	//	overwrite checkpoint
 	if err := t.saveLastBlock(big.NewInt(0).SetUint64(toBlock)); err != nil {
@@ -324,13 +326,11 @@ func (t *Tracker) queryEvents(fromBlock, toBlock uint64) []*web3.Log {
 }
 
 //	notify sends the given logs to the event channel.
-func (t *Tracker) notify(logs ...*web3.Log) error {
+func (t *Tracker) notify(logs ...*web3.Log) {
 	for _, log := range logs {
 		bytesLog, err := json.Marshal(log)
 		if err != nil {
 			t.logger.Error("cannot marshal log", "err", err)
-
-			return err
 		}
 
 		// notify
@@ -339,8 +339,6 @@ func (t *Tracker) notify(logs ...*web3.Log) error {
 		default:
 		}
 	}
-
-	return nil
 }
 
 /* Header structs parsed by the client */
