@@ -132,7 +132,7 @@ func (t *Tracker) Stop() error {
 //	return t.eventCh
 //}
 
-//	startSubscription handles subscription errors or context cancel.
+//	startSubscription handles the subscription object (provided by the rootchain client).
 func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
 	for {
 		select {
@@ -195,8 +195,15 @@ func (t *Tracker) loadDB() (*leveldb.DB, error) {
 //	it is sent to eventCh.
 func (t *Tracker) trackHeader(header *ethHeader) {
 	//	determine range of blocks to query
-	fromBlock, toBlock := t.calculateRange(header)
-	t.logger.Info("querying events", "from", fromBlock, "to", toBlock)
+	fromBlock, toBlock, ok := t.calculateRange(header)
+	if !ok {
+		//	we are returning here because the calculated
+		//	range was already queried or the chain is not
+		//	at the desired depth.
+		return
+	}
+
+	t.logger.Info("querying events within block range", "from", fromBlock, "to", toBlock)
 
 	//	fetch logs
 	logs := t.queryEvents(fromBlock, toBlock)
@@ -206,9 +213,9 @@ func (t *Tracker) trackHeader(header *ethHeader) {
 	t.notify(logs...)
 }
 
-//	calculateRange determines the next next range of blocks
+//	calculateRange determines the next range of blocks
 //	to query for events.
-func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
+func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64, ok bool) {
 	//	extract block number from header field
 	//	TODO: polygon-edge header
 	latestHeight := big.NewInt(0).SetUint64(header.Number)
@@ -240,13 +247,13 @@ func (t *Tracker) calculateRange(header *ethHeader) (from, to uint64) {
 		fromBlock = fromBlock.Add(fromBlock, big.NewInt(1))
 	}
 
-	//	TODO: not sure how this will ever happen, but Heimdall checks this
 	if toBlock.Cmp(fromBlock) < 0 {
-		fromBlock = toBlock
-		//	return here
+		//	no need to perform any query
+		//	as left bound is higher than the right
+		return
 	}
 
-	return fromBlock.Uint64(), toBlock.Uint64()
+	return fromBlock.Uint64(), toBlock.Uint64(), true
 }
 
 //	loadLastBlock returns the block number of the last
