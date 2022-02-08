@@ -63,7 +63,7 @@ func DefaultConfig() *Config {
 	defaultNetworkConfig := network.DefaultConfig()
 
 	return &Config{
-		GenesisPath:    "test",
+		GenesisPath:    "./genesis.json",
 		DataDir:        "./test-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
