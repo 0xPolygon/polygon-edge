@@ -165,7 +165,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 
 	var args []string
 
-	commandSlice := strings.Split(secretsInitCmd.Use, " ")
+	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", t.Config.IBFTDir)
 

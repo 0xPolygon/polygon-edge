@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/0xPolygon/polygon-edge/network"
 	"io/ioutil"
 	"strings"
 
@@ -53,15 +54,17 @@ const defaultBlockTime uint64 = 2
 
 // DefaultConfig returns the default server configuration
 func DefaultConfig() *Config {
+	defaultNetworkConfig := network.DefaultConfig()
+
 	return &Config{
 		GenesisPath:    "test",
 		DataDir:        "./test-chain",
 		BlockGasTarget: "0x0", // Special value signaling the parent gas limit should be applied
 		Network: &Network{
-			NoDiscover:       false,
-			MaxPeers:         40,
-			MaxOutboundPeers: 8,
-			MaxInboundPeers:  32,
+			NoDiscover:       defaultNetworkConfig.NoDiscover,
+			MaxPeers:         defaultNetworkConfig.MaxPeers,
+			MaxOutboundPeers: defaultNetworkConfig.MaxOutboundPeers,
+			MaxInboundPeers:  defaultNetworkConfig.MaxInboundPeers,
 		},
 		Telemetry:  &Telemetry{},
 		ShouldSeal: false,

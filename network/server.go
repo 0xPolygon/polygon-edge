@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"net"
 	"regexp"
@@ -148,11 +147,6 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 	logger = logger.Named("network")
-
-	if config.MaxPeers != DefaultConfig().MaxPeers {
-		config.MaxOutboundPeers = int64(math.Floor(float64(config.MaxPeers) * DefaultDialRatio))
-		config.MaxInboundPeers = config.MaxPeers - config.MaxOutboundPeers
-	}
 
 	key, err := setupLibp2pKey(config.SecretsManager)
 	if err != nil {

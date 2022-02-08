@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/multiformats/go-multiaddr"
+	"math"
 	"net"
 )
 
@@ -32,10 +33,12 @@ const (
 	secretsConfigFlag     = "secrets-config"
 	restoreFlag           = "restore"
 	blockTimeFlag         = "block-time"
+	devIntervalFlag       = "dev-interval"
+	devFlag               = "dev"
 )
 
 const (
-	defaultPeersValue = -1
+	unsetPeersValue = -1
 )
 
 var (
@@ -65,28 +68,83 @@ type serverParams struct {
 	jsonRPCAddress    *net.TCPAddr
 
 	blockGasTarget uint64
+	devInterval    uint64
+	isDevMode      bool
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
 }
 
 func (p *serverParams) isMaxPeersSet() bool {
-	return p.rawConfig.Network.MaxPeers != defaultPeersValue
+	return p.rawConfig.Network.MaxPeers != unsetPeersValue
 }
 
 func (p *serverParams) isPeerRangeSet() bool {
-	return p.rawConfig.Network.MaxInboundPeers != defaultPeersValue ||
-		p.rawConfig.Network.MaxOutboundPeers != defaultPeersValue
+	return p.rawConfig.Network.MaxInboundPeers != unsetPeersValue ||
+		p.rawConfig.Network.MaxOutboundPeers != unsetPeersValue
 }
 
 func (p *serverParams) validateFlags() error {
 	// Validate the max peers configuration
-	// TODO refactor
 	if p.isMaxPeersSet() && p.isPeerRangeSet() {
 		return errInvalidPeerParams
 	}
 
 	return nil
+}
+
+func (p *serverParams) initDefaultPeerLimits() {
+	defaultNetworkConfig := network.DefaultConfig()
+
+	p.rawConfig.Network.MaxPeers = defaultNetworkConfig.MaxPeers
+	p.rawConfig.Network.MaxInboundPeers = defaultNetworkConfig.MaxInboundPeers
+	p.rawConfig.Network.MaxOutboundPeers = defaultNetworkConfig.MaxOutboundPeers
+}
+
+func (p *serverParams) initUsingPeerRange() {
+	defaultConfig := network.DefaultConfig()
+
+	if p.rawConfig.Network.MaxInboundPeers == unsetPeersValue {
+		p.rawConfig.Network.MaxInboundPeers = defaultConfig.MaxInboundPeers
+	}
+
+	if p.rawConfig.Network.MaxOutboundPeers == unsetPeersValue {
+		p.rawConfig.Network.MaxOutboundPeers = defaultConfig.MaxOutboundPeers
+	}
+
+	p.rawConfig.Network.MaxPeers = p.rawConfig.Network.MaxInboundPeers + p.rawConfig.Network.MaxOutboundPeers
+}
+
+func (p *serverParams) initUsingMaxPeers() {
+	p.rawConfig.Network.MaxOutboundPeers = int64(
+		math.Floor(
+			float64(p.rawConfig.Network.MaxPeers) * network.DefaultDialRatio,
+		),
+	)
+	p.rawConfig.Network.MaxInboundPeers = p.rawConfig.Network.MaxPeers - p.rawConfig.Network.MaxOutboundPeers
+}
+
+func (p *serverParams) initPeerLimits() {
+	if !p.isMaxPeersSet() && !p.isPeerRangeSet() {
+		// No peer limits specified, use the default limits
+		p.initDefaultPeerLimits()
+
+		return
+	}
+
+	if p.isPeerRangeSet() {
+		// Some part of the peer range is specified
+		p.initUsingPeerRange()
+
+		return
+	}
+
+	if p.isMaxPeersSet() {
+		// The max peer value is specified, derive precise limits
+		p.initUsingMaxPeers()
+
+		return
+	}
 }
 
 func (p *serverParams) initBlockGasTarget() error {
@@ -259,6 +317,33 @@ func (p *serverParams) initAddresses() error {
 	return p.initGRPCAddress()
 }
 
+func (p *serverParams) isDevConsensus() bool {
+	return server.ConsensusType(p.genesisConfig.Params.GetEngine()) == server.DevConsensus
+}
+
+func (p *serverParams) initDevConsensusConfig() {
+	if !p.isDevConsensus() {
+		return
+	}
+
+	p.genesisConfig.Params.Engine = map[string]interface{}{
+		string(server.DevConsensus): map[string]interface{}{
+			"interval": p.devInterval,
+		},
+	}
+}
+
+func (p *serverParams) initDevMode() {
+	// Dev mode:
+	// - disables peer discovery
+	// - enables all forks
+	p.rawConfig.ShouldSeal = true
+	//p.rawConfig.Network.NoDiscover = true
+	p.genesisConfig.Params.Forks = chain.AllForksEnabled
+
+	p.initDevConsensusConfig()
+}
+
 func (p *serverParams) initRawParams() error {
 	if err := p.initBlockGasTarget(); err != nil {
 		return err
@@ -272,6 +357,12 @@ func (p *serverParams) initRawParams() error {
 		return err
 	}
 
+	if p.isDevMode {
+		p.initDevMode()
+	}
+
+	p.initPeerLimits()
+
 	return p.initAddresses()
 }
 
@@ -280,6 +371,14 @@ func (p *serverParams) initConfigFromFile() error {
 
 	if p.rawConfig, parseErr = readConfigFile(p.configPath); parseErr != nil {
 		return parseErr
+	}
+
+	return nil
+}
+
+func (p *serverParams) getRestoreFilePath() *string {
+	if p.rawConfig.RestoreFile != "" {
+		return &p.rawConfig.RestoreFile
 	}
 
 	return nil
@@ -310,7 +409,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		PriceLimit:     p.rawConfig.TxPool.PriceLimit,
 		MaxSlots:       p.rawConfig.TxPool.MaxSlots,
 		SecretsManager: p.secretsConfig,
-		RestoreFile:    &p.rawConfig.RestoreFile,
+		RestoreFile:    p.getRestoreFilePath(),
 		BlockTime:      p.rawConfig.BlockTime,
 		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
 	}

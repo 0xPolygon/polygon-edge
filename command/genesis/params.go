@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	dirFlag                 = "genesisPath"
+	dirFlag                 = "dir"
 	nameFlag                = "name"
 	premineFlag             = "premine"
 	chainIDFlag             = "chain-id"
@@ -174,7 +174,7 @@ func (p *genesisParams) initIBFTExtraData() {
 func (p *genesisParams) initConsensusEngineConfig() {
 	if p.consensus != server.IBFTConsensus {
 		p.consensusEngineConfig = map[string]interface{}{
-			p.consensusRaw: "",
+			p.consensusRaw: map[string]interface{}{},
 		}
 
 		return
@@ -191,8 +191,10 @@ func (p *genesisParams) initConsensusEngineConfig() {
 
 func (p *genesisParams) initIBFTEngineMap(mechanism ibft.MechanismType) {
 	p.consensusEngineConfig = map[string]interface{}{
-		"type":      mechanism,
-		"epochSize": p.epochSize,
+		string(server.IBFTConsensus): map[string]interface{}{
+			"type":      mechanism,
+			"epochSize": p.epochSize,
+		},
 	}
 }
 

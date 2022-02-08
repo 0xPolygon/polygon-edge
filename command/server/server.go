@@ -131,8 +131,11 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
-		false,
-		"prevent the client from discovering other peers. Default: false",
+		defaultConfig.Network.NoDiscover,
+		fmt.Sprintf(
+			"prevent the client from discovering other peers. Default: %t",
+			defaultConfig.Network.NoDiscover,
+		),
 	)
 
 	cmd.Flags().Int64Var(
@@ -194,6 +197,28 @@ func setFlags(cmd *cobra.Command) {
 			defaultConfig.BlockTime,
 		),
 	)
+
+	setDevFlags(cmd)
+}
+
+func setDevFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(
+		&params.isDevMode,
+		devFlag,
+		false,
+		"should the client start in dev mode. Default: false",
+	)
+
+	_ = cmd.Flags().MarkHidden(devFlag)
+
+	cmd.Flags().Uint64Var(
+		&params.devInterval,
+		devIntervalFlag,
+		0,
+		"the client's dev notification interval. Default: 1s",
+	)
+
+	_ = cmd.Flags().MarkHidden(devIntervalFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
