@@ -128,9 +128,9 @@ func (t *Tracker) Stop() error {
 }
 
 //	getEventChannel returns the tracker's event channel.
-//func (t *Tracker) getEventChannel() <-chan []byte {
-//	return t.eventCh
-//}
+func (t *Tracker) getEventChannel() <-chan []byte {
+	return t.eventCh
+}
 
 //	startSubscription handles the subscription object (provided by the rootchain client).
 func (t *Tracker) startSubscription(ctx context.Context, sub subscription) {
