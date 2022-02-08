@@ -14,28 +14,28 @@ func TestMultiAddrFromDns(t *testing.T) {
 		outcome    string
 	}{
 		{
-			name:       "Invalid DNSAddr Version",
+			name:       "Invalid DNS Version",
 			dnsAddress: "/dns8/example.io/",
 			port:       12345,
 			err:        true,
 			outcome:    "",
 		},
 		{
-			name:       "Invalid DNSAddr String",
+			name:       "Invalid DNS String",
 			dnsAddress: "dns4rahul.io",
 			port:       12345,
 			err:        true,
 			outcome:    "",
 		},
 		{
-			name:       "Valid DNSAddr Address with `/` ",
+			name:       "Valid DNS Address with `/` ",
 			dnsAddress: "/dns4/rahul.io/",
 			port:       12345,
 			err:        false,
 			outcome:    "/dns4/rahul.io/tcp/12345",
 		},
 		{
-			name:       "Valid DNSAddr Address without `/`",
+			name:       "Valid DNS Address without `/`",
 			dnsAddress: "dns6/example.io",
 			port:       12345,
 			err:        false,
@@ -77,14 +77,14 @@ func TestMultiAddrFromDns(t *testing.T) {
 			outcome:    "",
 		},
 		{
-			name:       "Missing DNSAddr version",
+			name:       "Missing DNS version",
 			dnsAddress: "example.io",
 			port:       12345,
 			err:        true,
 			outcome:    "",
 		},
 		{
-			name:       "Invalid DNSAddr version",
+			name:       "Invalid DNS version",
 			dnsAddress: "/dns8/example.io",
 			port:       12345,
 			err:        true,

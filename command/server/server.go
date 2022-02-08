@@ -96,7 +96,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.Network.DNSAddr,
 		dnsFlag,
 		"",
-		"the host DNSAddr address which can be used by a remote peer for connection",
+		"the host DNS address which can be used by a remote peer for connection",
 	)
 
 	cmd.Flags().StringVar(

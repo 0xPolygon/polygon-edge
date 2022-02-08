@@ -215,14 +215,14 @@ func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
 		addr,
 	)
 	if err != nil || !match {
-		return nil, errors.New("invalid DNSAddr address")
+		return nil, errors.New("invalid DNS address")
 	}
 
 	s := strings.Trim(addr, "/")
 	split := strings.Split(s, "/")
 
 	if len(split) != 2 {
-		return nil, errors.New("invalid DNSAddr address")
+		return nil, errors.New("invalid DNS address")
 	}
 
 	switch split[0] {
@@ -233,7 +233,7 @@ func MultiAddrFromDNS(addr string, port int) (multiaddr.Multiaddr, error) {
 	case "dns6":
 		version = "dns6"
 	default:
-		return nil, errors.New("invalid DNSAddr version")
+		return nil, errors.New("invalid DNS version")
 	}
 
 	domain = split[1]
