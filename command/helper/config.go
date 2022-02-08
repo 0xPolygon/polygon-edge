@@ -34,6 +34,7 @@ type Config struct {
 	DevInterval    uint64                 `json:"dev_interval"`
 	Join           string                 `json:"join_addr"`
 	Consensus      map[string]interface{} `json:"consensus"`
+	Headers        *Headers               `json:"headers"`
 	RestoreFile    string                 `json:"restore_file"`
 	BlockTime      uint64                 `json:"block_time_s"`
 }
@@ -58,6 +59,11 @@ type Network struct {
 type TxPool struct {
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
+}
+
+// Headers defines the HTTP response headers required to enable CORS.
+type Headers struct {
+	AccessControlAllowOrigins []string `json:"access_control_allow_origins"`
 }
 
 // minimum block generation time in seconds
@@ -120,10 +126,13 @@ func (c *Config) BuildConfig() (*server.Config, error) {
 	}
 
 	if c.JSONRPCAddr != "" {
-		// If an address was passed in, parse it
-		if conf.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
+		if conf.JSONRPC.JSONRPCAddr, err = resolveAddr(c.JSONRPCAddr); err != nil {
 			return nil, err
 		}
+	}
+
+	if c.Headers != nil {
+		conf.JSONRPC.AccessControlAllowOrigin = c.Headers.AccessControlAllowOrigins
 	}
 
 	if c.Telemetry.PrometheusAddr != "" {
@@ -265,6 +274,10 @@ func (c *Config) mergeConfigWith(otherConfig *Config) error {
 
 	if otherConfig.JSONRPCAddr != "" {
 		c.JSONRPCAddr = otherConfig.JSONRPCAddr
+	}
+
+	if otherConfig.Headers != nil {
+		c.Headers = otherConfig.Headers
 	}
 
 	if otherConfig.Join != "" {
