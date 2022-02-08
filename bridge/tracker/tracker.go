@@ -93,8 +93,7 @@ func (t *Tracker) Start() error {
 	t.cancelEventTracking = cancelEventTracking
 
 	//	start event tracking process early
-	//	TODO wrong ctx used
-	go t.startEventTracking(ctxSubscription)
+	go t.startEventTracking(ctxEventTracking)
 
 	//	create newHeads subscription
 	subscription, err := t.client.subscribeNewHeads(t.headerCh)
@@ -105,7 +104,7 @@ func (t *Tracker) Start() error {
 	}
 
 	//	start receiving new header events
-	go t.startSubscription(ctxEventTracking, subscription)
+	go t.startSubscription(ctxSubscription, subscription)
 
 	return nil
 }
