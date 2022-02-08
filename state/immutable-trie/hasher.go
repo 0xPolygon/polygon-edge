@@ -152,7 +152,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		child := t.hash(n.child, h, a, d+1)
 
 		val = a.NewArray()
-		val.Set(a.NewBytes(hexToCompact(n.key)))
+		val.Set(a.NewBytes(encodeCompact(n.key)))
 		val.Set(child)
 
 	case *FullNode:
