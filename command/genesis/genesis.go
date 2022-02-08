@@ -155,8 +155,18 @@ func (c *GenesisCommand) DefineFlags() {
 		FlagOptional: true,
 	}
 
+	c.FlagMap["min-validator-count"] = helper.FlagDescriptor{
+		Description: "Sets the flag indicating the minimum number of validators in the validator set for PoS. " +
+			"Defaults to 1 and can not be greater than max-validator-count",
+		Arguments: []string{
+			"MIN_VALIDATOR_COUNT",
+		},
+		FlagOptional: true,
+	}
+
 	c.FlagMap["max-validator-count"] = helper.FlagDescriptor{
-		Description: "Sets the flag indicating the maximum number of validators in the validator set for PoS",
+		Description: "Sets the flag indicating the maximum number of validators in the validator set for PoS. " +
+			"Defaults to and can not be greater than MAX_UINT_32",
 		Arguments: []string{
 			"MAX_VALIDATOR_COUNT",
 		},
@@ -202,6 +212,7 @@ func (c *GenesisCommand) Run(args []string) int {
 		ibftValidators           helperFlags.ArrayFlags
 		ibftValidatorsPrefixPath string
 		blockGasLimit            uint64
+		minNumValidator          uint
 		maxNumValidator          uint
 	)
 
@@ -216,6 +227,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	flags.Uint64Var(&epochSize, "epoch-size", ibft.DefaultEpochSize, "")
 	flags.Uint64Var(&blockGasLimit, "block-gas-limit", helper.GenesisGasLimit, "")
 	flags.BoolVar(&isPos, "pos", false, "")
+	flags.UintVar(&minNumValidator, "min-validator-count", 1, "")
 	flags.UintVar(&maxNumValidator, "max-validator-count", math.MaxUint32, "")
 
 	if err := flags.Parse(args); err != nil {
@@ -319,7 +331,7 @@ func (c *GenesisCommand) Run(args []string) int {
 	// If the consensus selected is IBFT and the mechanism is Proof of Stake,
 	// deploy the Staking SC
 	if isPos && (consensus == ibftConsensus || consensus == devConsensus) {
-		stakingAccount, predeployErr := staking.PredeployStakingSC(validators, maxNumValidator)
+		stakingAccount, predeployErr := staking.PredeployStakingSC(validators, minNumValidator, maxNumValidator)
 		if predeployErr != nil {
 			c.UI.Error(predeployErr.Error())
 
