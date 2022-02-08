@@ -16,7 +16,6 @@ const DefaultBlockTime = 2 // in seconds
 type Config struct {
 	Chain *chain.Chain
 
-	JSONRPCAddr    *net.TCPAddr
 	GRPCAddr       *net.TCPAddr
 	LibP2PAddr     *net.TCPAddr
 	Telemetry      *Telemetry
@@ -27,6 +26,7 @@ type Config struct {
 	PriceLimit     uint64
 	MaxSlots       uint64
 	SecretsManager *secrets.SecretsManagerConfig
+	JSONRPC        *JSONRPC
 	RestoreFile    *string
 	BlockTime      uint64
 }
@@ -34,16 +34,25 @@ type Config struct {
 // DefaultConfig returns the default config for JSON-RPC, GRPC (ports) and Networking
 func DefaultConfig() *Config {
 	return &Config{
-		JSONRPCAddr:    &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
 		GRPCAddr:       &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultGRPCPort},
 		Network:        network.DefaultConfig(),
 		Telemetry:      &Telemetry{PrometheusAddr: nil},
 		SecretsManager: nil,
-		BlockTime:      DefaultBlockTime,
+		JSONRPC: &JSONRPC{
+			JSONRPCAddr:              &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: DefaultJSONRPCPort},
+			AccessControlAllowOrigin: nil,
+		},
+		BlockTime: DefaultBlockTime,
 	}
 }
 
 // Telemetry holds the config details for metric services
 type Telemetry struct {
 	PrometheusAddr *net.TCPAddr
+}
+
+// JSONRPC holds the config details for the JSON-RPC server
+type JSONRPC struct {
+	JSONRPCAddr              *net.TCPAddr
+	AccessControlAllowOrigin []string
 }
