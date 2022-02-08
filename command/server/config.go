@@ -25,6 +25,7 @@ type Config struct {
 	LogLevel          string     `json:"log_level"`
 	RestoreFile       string     `json:"restore_file"`
 	BlockTime         uint64     `json:"block_time_s"`
+	Headers           *Headers   `json:"headers"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -47,6 +48,11 @@ type Network struct {
 type TxPool struct {
 	PriceLimit uint64 `json:"price_limit"`
 	MaxSlots   uint64 `json:"max_slots"`
+}
+
+// Headers defines the HTTP response headers required to enable CORS.
+type Headers struct {
+	AccessControlAllowOrigins []string `json:"access_control_allow_origins"`
 }
 
 // minimum block generation time in seconds
@@ -75,6 +81,9 @@ func DefaultConfig() *Config {
 		LogLevel:    "INFO",
 		RestoreFile: "",
 		BlockTime:   defaultBlockTime,
+		Headers: &Headers{
+			AccessControlAllowOrigins: nil,
+		},
 	}
 }
 

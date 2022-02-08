@@ -183,7 +183,7 @@ func setFlags(cmd *cobra.Command) {
 		maxSlotsFlag,
 		command.DefaultMaxSlots,
 		fmt.Sprintf(
-			"Sets maximum slots in the pool. Default: %d",
+			"maximum slots in the pool. Default: %d",
 			command.DefaultMaxSlots,
 		),
 	)
@@ -193,9 +193,16 @@ func setFlags(cmd *cobra.Command) {
 		blockTimeFlag,
 		defaultConfig.BlockTime,
 		fmt.Sprintf(
-			"Sets block time in seconds. Default: %ds",
+			"minimum block time in seconds. Default: %ds",
 			defaultConfig.BlockTime,
 		),
+	)
+
+	cmd.Flags().StringArrayVar(
+		&params.corsAllowedOrigins,
+		corsOriginFlag,
+		defaultConfig.Headers.AccessControlAllowOrigins,
+		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",
 	)
 
 	setDevFlags(cmd)

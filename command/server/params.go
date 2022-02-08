@@ -31,6 +31,7 @@ const (
 	blockTimeFlag         = "block-time"
 	devIntervalFlag       = "dev-interval"
 	devFlag               = "dev"
+	corsOriginFlag        = "access-control-allow-origins"
 )
 
 const (
@@ -66,6 +67,8 @@ type serverParams struct {
 	blockGasTarget uint64
 	devInterval    uint64
 	isDevMode      bool
+
+	corsAllowedOrigins []string
 
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
@@ -127,10 +130,13 @@ func (p *serverParams) setRawJSONRPCAddress(jsonRPCAddress string) {
 
 func (p *serverParams) generateConfig() *server.Config {
 	return &server.Config{
-		Chain:       p.genesisConfig,
-		JSONRPCAddr: p.jsonRPCAddress,
-		GRPCAddr:    p.grpcAddress,
-		LibP2PAddr:  p.libp2pAddress,
+		Chain: p.genesisConfig,
+		JSONRPC: &server.JSONRPC{
+			JSONRPCAddr:              p.jsonRPCAddress,
+			AccessControlAllowOrigin: p.corsAllowedOrigins,
+		},
+		GRPCAddr:   p.grpcAddress,
+		LibP2PAddr: p.libp2pAddress,
 		Telemetry: &server.Telemetry{
 			PrometheusAddr: p.prometheusAddress,
 		},

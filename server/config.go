@@ -16,9 +16,9 @@ const DefaultJSONRPCPort int = 8545
 type Config struct {
 	Chain *chain.Chain
 
-	JSONRPCAddr *net.TCPAddr
-	GRPCAddr    *net.TCPAddr
-	LibP2PAddr  *net.TCPAddr
+	JSONRPC    *JSONRPC
+	GRPCAddr   *net.TCPAddr
+	LibP2PAddr *net.TCPAddr
 
 	PriceLimit uint64
 	MaxSlots   uint64
@@ -40,4 +40,10 @@ type Config struct {
 // Telemetry holds the config details for metric services
 type Telemetry struct {
 	PrometheusAddr *net.TCPAddr
+}
+
+// JSONRPC holds the config details for the JSON-RPC server
+type JSONRPC struct {
+	JSONRPCAddr              *net.TCPAddr
+	AccessControlAllowOrigin []string
 }
