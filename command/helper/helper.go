@@ -356,6 +356,7 @@ func generateDevGenesis(params devGenesisParams) error {
 
 	stakingAccount, err := staking.PredeployStakingSC(
 		[]types.Address{},
+		1,
 		math.MaxUint32,
 	)
 	if err != nil {
