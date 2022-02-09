@@ -1730,10 +1730,6 @@ func TestRecovery(t *testing.T) {
 				}
 			}()
 
-			// pool was handling requests
-			ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
-			defer cancelFn()
-
 			assert.Equal(t, testCase.expected.slots, pool.gauge.read())
 			commonAssert(testCase.expected.accounts, pool)
 		})
