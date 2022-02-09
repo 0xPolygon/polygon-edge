@@ -1685,10 +1685,6 @@ func TestRecovery(t *testing.T) {
 				[]proto.EventType{proto.EventType_PROMOTED},
 			)
 
-			enqueuedSubscription := pool.eventManager.subscribe(
-				[]proto.EventType{proto.EventType_ENQUEUED},
-			)
-
 			// setup prestate
 			totalTx := 0
 			expectedEnqueued := uint64(0)
@@ -1737,9 +1733,6 @@ func TestRecovery(t *testing.T) {
 			// pool was handling requests
 			ctx, cancelFn = context.WithTimeout(context.Background(), time.Second*10)
 			defer cancelFn()
-
-			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, enqueuedSubscription, int(expectedEnqueued)), int(expectedEnqueued))
 
 			assert.Equal(t, testCase.expected.slots, pool.gauge.read())
 			commonAssert(testCase.expected.accounts, pool)
