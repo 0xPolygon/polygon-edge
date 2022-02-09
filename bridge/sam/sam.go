@@ -222,6 +222,7 @@ func newMessageMap() *messageMap {
 
 func (m *messageMap) Has(id uint64) bool {
 	_, loaded := m.Load(id)
+
 	return loaded
 }
 
@@ -307,6 +308,7 @@ func (m *messageMap) RemoveNotEnoughSignedMessages(threshold uint64, num *uint64
 
 func (m *messageMap) removeBy(isValid func(*messageRecord) bool, num *uint64) []*MessageAndSignatures {
 	msgs := []*MessageAndSignatures{}
+
 	m.Range(func(key, value interface{}) bool {
 		record, _ := value.(*messageRecord)
 
