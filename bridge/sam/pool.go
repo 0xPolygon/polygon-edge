@@ -180,7 +180,7 @@ func (p *pool) promote(id uint64) {
 }
 
 func (p *pool) demote(id uint64) {
-	p.readyMap.Store(id, false)
+	p.readyMap.Delete(id)
 }
 
 // warning: SignatureCount optimistic concurrency
